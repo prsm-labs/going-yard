@@ -565,14 +565,14 @@ async function fetchPlayers(setL, setP, setE) {
   setL(true); setE(null);
   try {
     const today = new Date().toISOString().slice(0, 10);
-    const sched = await fetch(`https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${today}&hydrate=lineups`);
+    const sched = await fetch(`/api/schedule?date=${today}`);
     const sd = await sched.json(); const pt = {};
     for (const g of (sd.dates?.[0]?.games || [])) {
       const aL = g.lineups?.awayPlayers || [], hL = g.lineups?.homePlayers || [];
       const aT = g.teams?.away?.team?.abbreviation || "???", hT = g.teams?.home?.team?.abbreviation || "???";
       [...aL, ...hL].forEach((p, i) => { if (p?.id) pt[p.id] = i < aL.length ? aT : hT; });
     }
-    const sc = await fetch("https://baseballsavant.mlb.com/leaderboard/statcast?abs=25&type=batter&year=2025&position=&team=&min=q&csv=true");
+    const sc = await fetch("/api/statcast?year=2025&minAB=25");
     const csv = await sc.text();
     const rows = csv.trim().split("\n"), hdrs = rows[0].split(",").map(h => h.trim().replace(/"/g, ""));
     const data = rows.slice(1).map(row => {
@@ -605,7 +605,7 @@ async function fetchGames(setL, setG, setE) {
   setL(true); setE(null);
   try {
     const today = new Date().toISOString().slice(0, 10);
-    const res = await fetch(`https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${today}&hydrate=linescore,boxscore,decisions,person,stats,probablePitcher`);
+    const res = await fetch(`/api/schedule?date=${today}`);
     const data = await res.json();
     const games = (data.dates?.[0]?.games || []).map(g => {
       const aw = g.teams?.away, hm = g.teams?.home, ls = g.linescore || {};
@@ -624,7 +624,7 @@ async function fetchGames(setL, setG, setE) {
 
 async function fetchLiveBatters(gamePk) {
   try {
-    const res = await fetch(`https://statsapi.mlb.com/api/v1/game/${gamePk}/boxscore`);
+    const res = await fetch(`/api/boxscore?gamePk=${gamePk}`);
     const data = await res.json(); const batters = [];
     for (const side of ["away", "home"]) {
       const team = data.teams?.[side], ta = team?.team?.abbreviation || side.toUpperCase();
@@ -648,7 +648,7 @@ async function fetchLiveBatters(gamePk) {
 
 async function fetchLiftoffBatters(game) {
   try {
-    const res = await fetch(`https://statsapi.mlb.com/api/v1/game/${game.gamePk}/boxscore`);
+    const res = await fetch(`/api/boxscore?gamePk=${game.gamePk}`);
     const data = await res.json(); const batters = [];
     for (const side of ["away", "home"]) {
       const team = data.teams?.[side], ta = team?.team?.abbreviation || side.toUpperCase(), isHome = side === "home";
@@ -1188,7 +1188,7 @@ function genPitchProfile(p) {
 }
 
 // ── TEAM ROSTERS ──────────────────────────────────────────
-const MLB_TEAMS = ["NYY","LAD","HOU","PHI","NYM","BAL","CHC","TEX","CLE","SEA","BOS","ATL","SD","MIL","MIN","TB","TOR","CIN","SF","ARI"];
+const MLB_TEAMS = ["NYY","BOS","LAD","HOU","PHI","NYM","BAL","CHC","TEX","CLE","SEA","ATL","SD","MIL","MIN","TB","TOR","CIN","SF","ARI","DET","KC","OAK","LAA","WSH","COL","MIA","PIT","STL","CHW"];
 const ROSTERS = {
   NYY:["Aaron Judge","Juan Soto","Giancarlo Stanton","Anthony Rizzo","Gleyber Torres","Anthony Volpe","DJ LeMahieu","Jose Trevino","Alex Verdugo"],
   LAD:["Shohei Ohtani","Freddie Freeman","Mookie Betts","Will Smith","Max Muncy","Teoscar Hernandez","Gavin Lux","Miguel Rojas","Andy Pages"],
@@ -1210,6 +1210,16 @@ const ROSTERS = {
   CIN:["Elly De La Cruz","Jonathan India","TJ Friedl","Tyler Stephenson","Spencer Steer","Will Benson","Jake Fraley","Jeimer Candelario","Nick Martini"],
   SF:["Matt Chapman","LaMonte Wade Jr","Patrick Bailey","Wilmer Flores","Michael Conforto","Joc Pederson","Luis Matos","Thairo Estrada","Casey Schmitt"],
   ARI:["Corbin Carroll","Ketel Marte","Lourdes Gurriel Jr","Christian Walker","Gabriel Moreno","Pavin Smith","Jake McCarthy","Alek Thomas","Eugenio Suarez"],
+  DET:["Riley Greene","Spencer Torkelson","Kerry Carpenter","Parker Meadows","Matt Vierling","Jake Rogers","Zach McKinstry","Trey Sweeney","Andy Ibanez"],
+  KC:["Bobby Witt Jr","Vinnie Pasquantino","Salvador Perez","MJ Melendez","Hunter Dozier","Michael Massey","Drew Waters","Maikel Garcia","Kyle Isbel"],
+  OAK:["Brent Rooker","Lawrence Butler","Shea Langeliers","Tyler Soderstrom","JJ Bleday","Zack Gelof","Max Schuemann","Esteury Ruiz","Abraham Toro"],
+  LAA:["Mike Trout","Anthony Rendon","Taylor Ward","Brandon Drury","Luis Rengifo","Logan O'Hoppe","Mickey Moniak","Zach Neto","Kevin Pillar"],
+  WSH:["CJ Abrams","Joey Meneses","Keibert Ruiz","Lane Thomas","Dominic Smith","Alex Call","Stone Garrett","Ildemaro Vargas","Jacob Young"],
+  COL:["Charlie Blackmon","Ryan McMahon","C.J. Cron","Elias Diaz","Brenton Doyle","Nolan Jones","Sean Bouchard","Alan Trejo","Ezequiel Tovar"],
+  MIA:["Luis Arraez","Jazz Chisholm Jr","Jorge Soler","Jake Burger","Bryan De La Cruz","Jesus Sanchez","Nick Fortes","Garrett Hampson","Peyton Burdick"],
+  PIT:["Oneil Cruz","Bryan Reynolds","Andrew McCutchen","Ke'Bryan Hayes","Connor Joe","Rowdy Tellez","Henry Davis","Ji Hwan Bae","Michael Chavis"],
+  STL:["Paul Goldschmidt","Nolan Arenado","Willson Contreras","Dylan Carlson","Lars Nootbaar","Brendan Donovan","Tommy Edman","Jordan Walker","Alec Burleson"],
+  CHW:["Luis Robert Jr","Andrew Vaughn","Eloy Jimenez","Yoan Moncada","Gavin Sheets","Jake Burger","Seby Zavala","Tim Anderson","Romy Gonzalez"],
 };
 
 function genTeamRoster(team) {
