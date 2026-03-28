@@ -1309,7 +1309,7 @@ function PregameTab() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [sortKey, setSortKey] = useState("os");
-  const [sortDir, setSortDir] = useState(-1);
+  const [sortDir, setSortDir] = useState(1);
   const [filter, setFilter] = useState("all");
   const [refreshing, setRefreshing] = useState(false);
   const [window, setWindow] = useState(3);
@@ -1470,7 +1470,7 @@ function ScoutingTab() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [sortKey, setSortKey] = useState("os");
-  const [sortDir, setSortDir] = useState(-1);
+  const [sortDir, setSortDir] = useState(1);
   const [filter, setFilter] = useState("all");
   const [refreshing, setRefreshing] = useState(false);
   const [window, setWindow] = useState(3);
