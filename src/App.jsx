@@ -713,8 +713,9 @@ const STAT_COL_HEADERS = [
 
 
 // DATA FETCHING
-async function fetchPlayers(setL, setP, setE) {
-  setL(true); setE(null);
+async function fetchPlayers(setL, setP, setE, silent=false) {
+  if (!silent) setL(true);
+  setE(null);
   try {
     const today = new Date().toISOString().slice(0, 10);
 
@@ -870,8 +871,9 @@ async function fetchPlayers(setL, setP, setE) {
   finally { setL(false); }
 }
 
-async function fetchGames(setL, setG, setE) {
-  setL(true); setE(null);
+async function fetchGames(setL, setG, setE, silent=false) {
+  if (!silent) setL(true);
+  setE(null);
   try {
     const today = new Date().toISOString().slice(0, 10);
     const res = await fetch(`/api/schedule?date=${today}`);
@@ -1147,11 +1149,22 @@ function GPanel({game, isLive}) {
   const [loading, setLoading] = useState(true);
   const [expId, setExpId] = useState(null);
   useEffect(() => {
-    setLoading(true); setData(null); setExpId(null);
+    // Initial load only — don't reset expId or clear data on background updates
+    setLoading(true);
     (async () => {
       const d = isLive ? await fetchLiveBatters(game.gamePk) : await fetchLiftoffBatters(game);
       setData(d); setLoading(false);
     })();
+  }, [game.gamePk, isLive]);
+
+  // Background refresh for live games — silent, preserves expanded rows
+  useEffect(() => {
+    if (!isLive) return;
+    const id = setInterval(async () => {
+      const d = await fetchLiveBatters(game.gamePk);
+      setData(d); // update data without resetting expId or scroll
+    }, 30000);
+    return () => clearInterval(id);
   }, [game.gamePk, isLive]);
   return <div className="gp">
     <div className="gph">
@@ -1291,8 +1304,15 @@ function PregameTab() {
   const [window, setWindow] = useState(15);
   const [selMatchup, setSelMatchup] = useState(null); // null = all batters
   const [games, setGames] = useState([]);
-  const load = useCallback(() => { fetchPlayers(setLoading, setPlayers, setError); }, []);
-  useEffect(() => { load(); }, [load]);
+  const load = useCallback((silent=false) => {
+    fetchPlayers(setLoading, setPlayers, setError, silent);
+  }, []);
+  useEffect(() => { load(false); }, []); // initial load — show spinner
+  // Background refresh every 5 min — silent, no spinner, no scroll reset
+  useEffect(() => {
+    const id = setInterval(() => load(true), 300000);
+    return () => clearInterval(id);
+  }, [load]);
   useEffect(() => { fetchGames(()=>{}, setGames, ()=>{}); }, []);
   const hs = (k) => { if (sortKey===k) setSortDir(d=>-d); else { setSortKey(k); setSortDir(-1); } };
 
@@ -1329,7 +1349,7 @@ function PregameTab() {
   return <div>
     <div className="hrow">
       <div className="section-header"><div className="section-title">💥 Who's Going Yard Today?</div><div className="section-sub">EV · Barrel% · Fly Ball% · Launch° · Pull Air% · Chase% · AVG · H · XBH · HR · BB% · HH% · TB · AB/HR · AB Since HR · Almost% · K%</div></div>
-      <RefBtn refreshing={refreshing} onClick={async()=>{setRefreshing(true);await fetchPlayers(setLoading,setPlayers,setError);setRefreshing(false);}}/>
+      <RefBtn refreshing={refreshing} onClick={async()=>{setRefreshing(true);await fetchPlayers(setLoading,setPlayers,setError,true);setRefreshing(false);}}/>
     </div>
     <div className="cards">
       <div className="card"><div className="cl">Players Tracked</div><div className="cv">{players.length}</div><div className="cs">min 25 AB</div></div>
@@ -1400,14 +1420,21 @@ function LiveTab() {
   const [error, setError] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
-  const load = useCallback(() => { fetchGames(setLoading, setGames, setError); setLastUpdate(new Date().toLocaleTimeString()); }, []);
-  useEffect(() => { load(); }, [load]);
-  useEffect(() => { const id = setInterval(load, 30000); return () => clearInterval(id); }, [load]);
+  const load = useCallback((silent=false) => {
+    fetchGames(setLoading, setGames, setError, silent);
+    setLastUpdate(new Date().toLocaleTimeString());
+  }, []);
+  useEffect(() => { load(false); }, []); // initial — show spinner
+  // Background refresh every 30s — silent so open game panels stay open
+  useEffect(() => {
+    const id = setInterval(() => load(true), 30000);
+    return () => clearInterval(id);
+  }, [load]);
   const live = games.filter(g=>g.status==="Live"), pre = games.filter(g=>g.status==="Preview"), fin = games.filter(g=>g.status==="Final");
   return <div>
     <div className="hrow">
       <div className="section-header"><div className="section-title">📡 Live Yard Watch</div><div className="section-sub">Tap any game · Live=heat · Upcoming=🚀Liftoff · 30s refresh{lastUpdate&&<span style={{marginLeft:8}}>Last: {lastUpdate}</span>}</div></div>
-      <RefBtn refreshing={refreshing} onClick={async()=>{setRefreshing(true);await fetchGames(setLoading,setGames,setError);setLastUpdate(new Date().toLocaleTimeString());setRefreshing(false);}}/>
+      <RefBtn refreshing={refreshing} onClick={async()=>{setRefreshing(true);await fetchGames(setLoading,setGames,setError,true);setLastUpdate(new Date().toLocaleTimeString());setRefreshing(false);}}/>
     </div>
     <div className="note">ℹ️ <strong>Live</strong>: tap → hard contact in HR zones now vs L7. <strong>Upcoming</strong>: tap → 🚀 Liftoff list ranked by HR probability.</div>
     <div className="cards" style={{marginBottom:14}}>
@@ -1436,8 +1463,15 @@ function ScoutingTab() {
   const [window, setWindow] = useState(15);
   const [selMatchup, setSelMatchup] = useState(null);
   const [games, setGames] = useState([]);
-  const load = useCallback(() => { fetchPlayers(setLoading, setPlayers, setError); }, []);
-  useEffect(() => { load(); }, [load]);
+  const load = useCallback((silent=false) => {
+    fetchPlayers(setLoading, setPlayers, setError, silent);
+  }, []);
+  useEffect(() => { load(false); }, []); // initial load — show spinner
+  // Background refresh every 5 min — silent, no spinner, no scroll reset
+  useEffect(() => {
+    const id = setInterval(() => load(true), 300000);
+    return () => clearInterval(id);
+  }, [load]);
   useEffect(() => { fetchGames(()=>{}, setGames, ()=>{}); }, []);
   const hs = (k) => { if (sortKey===k) setSortDir(d=>-d); else { setSortKey(k); setSortDir(-1); } };
   const matchupTeamsS = selMatchup
@@ -1459,7 +1493,7 @@ function ScoutingTab() {
       <div className="section-header"><div className="section-title">🎯 Scouting Board</div><div className="section-sub">Contact Quality (50%) + HR Intent (30%) + Readiness (20%) · grades recalculate per window</div></div>
       <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
         <WindowButtons window={window} setWindow={setWindow}/>
-        <RefBtn refreshing={refreshing} onClick={async()=>{setRefreshing(true);await fetchPlayers(setLoading,setPlayers,setError);setRefreshing(false);}}/>
+        <RefBtn refreshing={refreshing} onClick={async()=>{setRefreshing(true);await fetchPlayers(setLoading,setPlayers,setError,true);setRefreshing(false);}}/>
       </div>
     </div>
     {/* Matchup selector */}
@@ -2332,6 +2366,7 @@ function HRTicker({ onHRClick }) {
               <span style={{color:"var(--text)"}}>{hr.hrType}</span>
               {hr.distance && <span style={{color:"var(--green)"}}>{hr.distance}ft</span>}
               {hr.exitVelo && <span style={{color:hr.exitVelo>=103?"var(--accent)":hr.exitVelo>=95?"var(--fire3)":"var(--muted)"}}>{hr.exitVelo}mph</span>}
+              {hr.pitchType && <span style={{color:"var(--muted)",fontSize:10}}>{hr.pitchType}</span>}
               <span style={{color:"var(--muted)",fontSize:10}}>vs {hr.pitcherName}</span>
               <span style={{color:"var(--muted)",fontSize:10}}>Inn.{hr.inning}</span>
               <span className="ticker-sep">·</span>
@@ -2441,6 +2476,7 @@ function HRTrackerTab() {
               <th className={sortKey==="launchAngle"?"sk":""} onClick={()=>hs("launchAngle")}><Tip text="Launch angle in degrees">Angle{sortKey==="launchAngle"&&(sortDir<0?"↓":"↑")}</Tip></th>
               <th className={sortKey==="exitVelo"?"sk":""} onClick={()=>hs("exitVelo")}><Tip text="Exit velocity mph">Exit Velo{sortKey==="exitVelo"&&(sortDir<0?"↓":"↑")}</Tip></th>
               <th className={sortKey==="distance"?"sk":""} onClick={()=>hs("distance")}><Tip text="Estimated distance in feet">Distance{sortKey==="distance"&&(sortDir<0?"↓":"↑")}</Tip></th>
+              <th>Pitch</th>
               <th>vs Pitcher</th>
               <th>Game</th>
             </tr></thead>
@@ -2465,6 +2501,11 @@ function HRTrackerTab() {
                   <td><span className={`sv ${hr.launchAngle>=25&&hr.launchAngle<=35?"good":"avg"}`}>{hr.launchAngle!=null?`${hr.launchAngle}°`:"—"}</span></td>
                   <td><span className={`sv ${evC}`}>{hr.exitVelo!=null?`${hr.exitVelo}`:"—"}</span></td>
                   <td><span className={`sv ${distC}`}>{hr.distance!=null?`${hr.distance}ft`:"—"}</span></td>
+                  <td>
+                    {hr.pitchType
+                      ? <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",padding:"2px 7px",borderRadius:4,background:"var(--surface2)",border:"1px solid var(--border)",color:"var(--text)"}}>{hr.pitchType}</span>
+                      : <span style={{color:"var(--muted)"}}>—</span>}
+                  </td>
                   <td>
                     <div style={{fontSize:11,fontWeight:500}}>{hr.pitcherName}</div>
                     <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{hr.pitcherTeam}</div>
