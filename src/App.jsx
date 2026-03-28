@@ -429,9 +429,9 @@ const enrichP = (r) => {
 // In production these would come from the MLB Stats API game logs
 function genWindows(p) {
   const windows = {};
-  [5,10,15,30].forEach(w => {
+  [3,7,15,30].forEach(w => {
     // Shorter windows = more variance (hot/cold streaks are real)
-    const variance = w <= 5 ? 0.35 : w <= 10 ? 0.25 : w <= 15 ? 0.18 : 0.10;
+    const variance = w <= 3 ? 0.38 : w <= 7 ? 0.26 : w <= 15 ? 0.18 : 0.10;
     const rv = (base, rng) => Math.max(0, Math.round((base + (Math.random()*rng*2-rng)) * 100) / 100);
     const ri = (base, rng) => Math.max(0, Math.round(base + (Math.random()*rng*2-rng)));
 
@@ -445,11 +445,13 @@ function genWindows(p) {
     const bbPct   = rv(p.bbPct ?? 9, variance * 5);
     const kPct    = rv(p.kPct ?? 22, variance * 8);
     const avgBA   = rv(p.avg ?? 0.255, variance * 0.06);
-    const hits    = ri(w * 1.1, w * 0.5);
+    // Scale to days: ~3.5 AB per day, ~0.9 games per day
+    const gamesInWindow = Math.round(w * 0.9);
+    const hits    = ri(gamesInWindow * 1.1, gamesInWindow * 0.5);
     const xbh     = ri(hits * 0.28, hits * 0.15);
-    const hr      = ri(w * 0.18, w * 0.12);
+    const hr      = ri(gamesInWindow * 0.18, gamesInWindow * 0.12);
     const totalBases = hits + xbh + hr * 2;
-    const atBats  = ri(w * 3.8, w * 0.6);
+    const atBats  = ri(gamesInWindow * 3.8, gamesInWindow * 0.6);
     const abPerHR = hr > 0 ? Math.round(atBats / hr * 10) / 10 : 99;
     const abSinceHR = ri(3, 8);
     // "Almost%" — fly balls hit 350ft+ but not HR (estimated from flyBall% and EV)
@@ -611,17 +613,26 @@ function WeatherBanner({ team }) {
   </div>;
 }
 
+const WINDOWS = [
+  {key:3,  label:"L3D",  tip:"Last 3 days"},
+  {key:7,  label:"L7D",  tip:"Last 7 days"},
+  {key:15, label:"L15D", tip:"Last 15 days"},
+  {key:30, label:"L30D", tip:"Last 30 days"},
+];
+
 function WindowButtons({ window, setWindow }) {
   return (
     <div style={{display:"flex",gap:5,alignItems:"center",flexWrap:"wrap"}}>
-      <span style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1,marginRight:4}}>Last:</span>
-      {[5,10,15,30].map(w => (
-        <button key={w}
-          className={`chip ${window===w?"active":""}`}
-          onClick={()=>setWindow(w)}
-          style={{padding:"4px 10px",fontSize:11,fontFamily:"'Oswald',sans-serif",fontWeight:600}}>
-          {w}G
-        </button>
+      <span style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1,marginRight:4}}>Window:</span>
+      {WINDOWS.map(w => (
+        <Tip key={w.key} text={w.tip}>
+          <button
+            className={`chip ${window===w.key?"active":""}`}
+            onClick={()=>setWindow(w.key)}
+            style={{padding:"4px 10px",fontSize:11,fontFamily:"'Oswald',sans-serif",fontWeight:600}}>
+            {w.label}
+          </button>
+        </Tip>
       ))}
     </div>
   );
@@ -1301,7 +1312,7 @@ function PregameTab() {
   const [sortDir, setSortDir] = useState(-1);
   const [filter, setFilter] = useState("all");
   const [refreshing, setRefreshing] = useState(false);
-  const [window, setWindow] = useState(15);
+  const [window, setWindow] = useState(7);
   const [selMatchup, setSelMatchup] = useState(null); // null = all batters
   const [games, setGames] = useState([]);
   const load = useCallback((silent=false) => {
@@ -1353,9 +1364,9 @@ function PregameTab() {
     </div>
     <div className="cards">
       <div className="card"><div className="cl">Players Tracked</div><div className="cv">{players.length}</div><div className="cs">min 25 AB</div></div>
-      <div className="card"><div className="cl">🔴 A+ Threats</div><div className="cv" style={{color:"#ff4020"}}>{elC}</div><div className="cs">L{window}G grade</div></div>
+      <div className="card"><div className="cl">🔴 A+ Threats</div><div className="cv" style={{color:"#ff4020"}}>{elC}</div><div className="cs">L{window}D grade</div></div>
       <div className="card"><div className="cl">Grade A Bats</div><div className="cv" style={{color:"#ff8020"}}>{hotC}</div><div className="cs">Impact bats</div></div>
-      <div className="card"><div className="cl">Avg EV</div><div className="cv">{avgEV}</div><div className="cs">L{window}G avg</div></div>
+      <div className="card"><div className="cl">Avg EV</div><div className="cv">{avgEV}</div><div className="cs">L{window}D avg</div></div>
     </div>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:10}}>
       <WindowButtons window={window} setWindow={setWindow}/>
@@ -1460,7 +1471,7 @@ function ScoutingTab() {
   const [sortDir, setSortDir] = useState(-1);
   const [filter, setFilter] = useState("all");
   const [refreshing, setRefreshing] = useState(false);
-  const [window, setWindow] = useState(15);
+  const [window, setWindow] = useState(7);
   const [selMatchup, setSelMatchup] = useState(null);
   const [games, setGames] = useState([]);
   const load = useCallback((silent=false) => {
@@ -2540,6 +2551,48 @@ function HRTrackerTab() {
   </div>;
 }
 
+function PowerBITab() {
+  return <div>
+    <div className="section-header" style={{marginBottom:16}}>
+      <div className="section-title">📊 Analytics Dashboard</div>
+      <div className="section-sub">Power BI · interactive analytics · full screen mode available</div>
+    </div>
+    <div style={{
+      borderRadius:10,
+      overflow:"hidden",
+      border:"1px solid var(--border)",
+      background:"var(--surface)",
+      position:"relative",
+      paddingBottom:"56.25%", // 16:9 aspect ratio
+      height:0,
+    }}>
+      <iframe
+        title="Going Yard Analytics"
+        src="https://app.powerbi.com/view?r=eyJrIjoiYTQzOGZmMWMtOWZmMy00Y2NhLWE1NWUtZDljZmFkYWFhODg0IiwidCI6IjgzOGY2MGI3LTc4NzYtNGEwZC1iM2MxLTg1Y2VlZWE1YmJhYiIsImMiOjF9"
+        frameBorder="0"
+        allowFullScreen
+        style={{
+          position:"absolute",
+          top:0, left:0,
+          width:"100%",
+          height:"100%",
+          border:"none",
+        }}
+      />
+    </div>
+    <div style={{marginTop:10,display:"flex",gap:8,justifyContent:"flex-end"}}>
+      <a
+        href="https://app.powerbi.com/view?r=eyJrIjoiYTQzOGZmMWMtOWZmMy00Y2NhLWE1NWUtZDljZmFkYWFhODg0IiwidCI6IjgzOGY2MGI3LTc4NzYtNGEwZC1iM2MxLTg1Y2VlZWE1YmJhYiIsImMiOjF9"
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{display:"flex",alignItems:"center",gap:5,padding:"6px 12px",borderRadius:6,background:"var(--surface2)",border:"1px solid var(--border)",color:"var(--muted)",fontFamily:"'DM Mono',monospace",fontSize:11,textDecoration:"none",transition:"all .15s"}}
+      >
+        ↗ Open in Power BI
+      </a>
+    </div>
+  </div>;
+}
+
 export default function App() {
   const [tab, setTab] = useState("pregame");
   // Load player→team map immediately at startup
@@ -2559,6 +2612,7 @@ export default function App() {
         <button className={`tab ${tab==="bvp"?"active":""}`} onClick={()=>setTab("bvp")}>⚔️ Batter vs P</button>
         <button className={`tab ${tab==="builder"?"active":""}`} onClick={()=>setTab("builder")}>🔬 Pitch Builder</button>
         <button className={`tab ${tab==="homeruns"?"active":""}`} onClick={()=>setTab("homeruns")} style={{color:tab==="homeruns"?"var(--accent)":undefined}}>💥 HR Tracker</button>
+        <button className={`tab ${tab==="powerbi"?"active":""}`} onClick={()=>setTab("powerbi")}>📊 Analytics</button>
       </nav>
       <main className="content">
         {tab==="pregame" && <PregameTab/>}
@@ -2567,6 +2621,7 @@ export default function App() {
         {tab==="bvp" && <BvPTab/>}
         {tab==="builder" && <PitchBuilderTab/>}
         {tab==="homeruns" && <HRTrackerTab/>}
+        {tab==="powerbi" && <PowerBITab/>}
       </main>
     </div>
   </>;
