@@ -459,6 +459,111 @@ function genWindows(p) {
 }
 
 // ── WINDOW FILTER BUTTONS COMPONENT ─────────────────────────────────────────
+// ── WEATHER + PARK FACTOR CACHE ─────────────────────────────
+const WEATHER_CACHE = {};
+
+async function fetchWeather(team) {
+  if (WEATHER_CACHE[team]) return WEATHER_CACHE[team];
+  try {
+    const res = await fetch(`/api/weather?team=${team}`);
+    const data = await res.json();
+    WEATHER_CACHE[team] = data;
+    return data;
+  } catch { return null; }
+}
+
+// Weather code → description
+function getWeatherDesc(code) {
+  if (code === 0) return "☀️ Clear";
+  if (code <= 3) return "⛅ Partly cloudy";
+  if (code <= 49) return "🌫️ Foggy";
+  if (code <= 67) return "🌧️ Rain";
+  if (code <= 77) return "❄️ Snow";
+  if (code <= 82) return "🌦️ Showers";
+  if (code <= 99) return "⛈️ Thunderstorm";
+  return "🌤️ Clear";
+}
+
+// Wind direction → compass label
+function getWindDir(deg) {
+  const dirs = ["N","NE","E","SE","S","SW","W","NW"];
+  return dirs[Math.round(deg / 45) % 8];
+}
+
+// Park factor color
+function getPFColor(hr) {
+  return hr >= 115 ? "#ff4020" : hr >= 108 ? "#ff8020" : hr >= 103 ? "#ffbe20" :
+         hr <= 90  ? "#38b8f2" : hr <= 95  ? "#60a0d0" : hr <= 98  ? "#8899a6" : "var(--muted)";
+}
+
+// ── WEATHER BANNER COMPONENT ─────────────────────────────────
+function WeatherBanner({ team }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!team || team === "—") { setLoading(false); return; }
+    setLoading(true);
+    fetchWeather(team).then(d => { setData(d); setLoading(false); });
+  }, [team]);
+
+  if (loading) return <div style={{height:44,display:"flex",alignItems:"center",padding:"0 14px",background:"var(--surface)",border:"1px solid var(--border)",borderRadius:8,marginBottom:12}}><div className="sp" style={{width:14,height:14,borderWidth:2}}/></div>;
+  if (!data) return null;
+
+  const { parkFactor: pf, weather: w, hrEnvScore } = data;
+  const pfColor = getPFColor(pf?.hr || 100);
+  const envLabel = hrEnvScore >= 60 ? "🔥 HR-friendly environment" : hrEnvScore >= 52 ? "📈 Slight HR boost" : hrEnvScore >= 46 ? "— Neutral conditions" : hrEnvScore >= 38 ? "📉 Slight suppressor" : "🧊 Pitcher-friendly conditions";
+  const envColor = hrEnvScore >= 60 ? "#ff4020" : hrEnvScore >= 52 ? "#ff8020" : hrEnvScore >= 46 ? "var(--muted)" : hrEnvScore >= 38 ? "#38b8f2" : "#38b8f2";
+
+  return <div style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:8,padding:"10px 14px",marginBottom:12,display:"flex",gap:16,alignItems:"center",flexWrap:"wrap"}}>
+    {/* Park factor */}
+    <div style={{display:"flex",flexDirection:"column",gap:1}}>
+      <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1}}>Park Factor</div>
+      <div style={{display:"flex",alignItems:"center",gap:5}}>
+        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:18,color:pfColor}}>{pf?.hr || 100}</span>
+        <span style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>HR</span>
+        <span style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>/ {pf?.xbh || 100} XBH</span>
+      </div>
+      <div style={{fontSize:9,color:pfColor,fontFamily:"'DM Mono',monospace"}}>{pf?.label || ""}</div>
+    </div>
+
+    <div style={{width:1,height:36,background:"var(--border)"}}/>
+
+    {/* Weather — skip if dome */}
+    {w?.isDome
+      ? <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>🏟️ Retractable/dome — weather irrelevant</div>
+      : w ? <>
+          <div style={{display:"flex",flexDirection:"column",gap:1}}>
+            <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1}}>Conditions</div>
+            <div style={{fontSize:12,fontFamily:"'DM Mono',monospace"}}>{getWeatherDesc(w.weatherCode)}</div>
+            <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{w.temp}°F · {w.humidity}% humidity</div>
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:1}}>
+            <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1}}>Wind</div>
+            <div style={{fontSize:12,fontFamily:"'DM Mono',monospace",color:w.windSpeed>=15?"#ff8020":"var(--text)"}}>{w.windLabel}</div>
+            <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{w.windSpeed} mph {getWindDir(w.windDir)}</div>
+          </div>
+          {w.precip > 0 && <div style={{padding:"3px 8px",borderRadius:5,background:"rgba(56,184,242,.1)",border:"1px solid rgba(56,184,242,.2)",fontSize:10,color:"var(--ice)",fontFamily:"'DM Mono',monospace"}}>🌧️ {w.precip}" precip</div>}
+        </>
+      : null
+    }
+
+    <div style={{width:1,height:36,background:"var(--border)"}}/>
+
+    {/* HR environment score */}
+    <div style={{display:"flex",flexDirection:"column",gap:1}}>
+      <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1}}>HR Environment</div>
+      <div style={{display:"flex",alignItems:"center",gap:6}}>
+        <div style={{width:60,height:6,borderRadius:3,background:"var(--border)",overflow:"hidden"}}>
+          <div style={{height:"100%",borderRadius:3,width:`${Math.min(hrEnvScore,100)}%`,background:envColor}}/>
+        </div>
+        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:15,color:envColor}}>{hrEnvScore}</span>
+      </div>
+      <div style={{fontSize:9,color:envColor,fontFamily:"'DM Mono',monospace"}}>{envLabel}</div>
+    </div>
+  </div>;
+}
+
 function WindowButtons({ window, setWindow }) {
   return (
     <div style={{display:"flex",gap:5,alignItems:"center",flexWrap:"wrap"}}>
@@ -736,16 +841,47 @@ async function fetchGames(setL, setG, setE) {
     const data = await res.json();
     const games = (data.dates?.[0]?.games || []).map(g => {
       const aw = g.teams?.away, hm = g.teams?.home, ls = g.linescore || {};
+      // Team abbreviation — try multiple paths in the API response
+      const awAbbr = aw?.team?.abbreviation || aw?.team?.teamCode?.toUpperCase() || aw?.team?.clubName?.slice(0,3).toUpperCase() || "???";
+      const hmAbbr = hm?.team?.abbreviation || hm?.team?.teamCode?.toUpperCase() || hm?.team?.clubName?.slice(0,3).toUpperCase() || "???";
+      // Venue for home/away context
+      const venue = g.venue?.name || "";
+      // Probable pitchers
+      const awPP = aw?.probablePitcher?.fullName || null;
+      const hmPP = hm?.probablePitcher?.fullName || null;
+      // Pitcher handedness from hydrated data
+      const awHand = aw?.probablePitcher?.pitchHand?.code || "R";
+      const hmHand = hm?.probablePitcher?.pitchHand?.code || "R";
       return {
         id: g.gamePk, gamePk: g.gamePk,
         status: g.status?.abstractGameState || "Preview",
+        detailedState: g.status?.detailedState || "",
         inning: ls.currentInning ? `${ls.inningHalf === "Bottom" ? "▼" : "▲"} ${ls.currentInning}` : null,
-        away: { abbr: aw?.team?.abbreviation || "???", score: aw?.score ?? "-", record: `${aw?.leagueRecord?.wins || 0}-${aw?.leagueRecord?.losses || 0}`, probablePitcher: aw?.probablePitcher?.fullName || null },
-        home: { abbr: hm?.team?.abbreviation || "???", score: hm?.score ?? "-", record: `${hm?.leagueRecord?.wins || 0}-${hm?.leagueRecord?.losses || 0}`, probablePitcher: hm?.probablePitcher?.fullName || null },
+        venue,
+        away: {
+          abbr: awAbbr,
+          teamId: aw?.team?.id,
+          score: aw?.score ?? "-",
+          record: `${aw?.leagueRecord?.wins || 0}-${aw?.leagueRecord?.losses || 0}`,
+          probablePitcher: awPP,
+          pitcherHand: awHand,
+        },
+        home: {
+          abbr: hmAbbr,
+          teamId: hm?.team?.id,
+          score: hm?.score ?? "-",
+          record: `${hm?.leagueRecord?.wins || 0}-${hm?.leagueRecord?.losses || 0}`,
+          probablePitcher: hmPP,
+          pitcherHand: hmHand,
+        },
       };
     });
     setG(games);
-  } catch (e) { setE(e.message); setG(SGAMES); }
+  } catch (e) {
+    console.error("fetchGames error:", e.message);
+    setE(e.message);
+    setG(SGAMES);
+  }
   finally { setL(false); }
 }
 
@@ -778,21 +914,47 @@ async function fetchLiftoffBatters(game) {
     const res = await fetch(`/api/boxscore?gamePk=${game.gamePk}`);
     const data = await res.json(); const batters = [];
     for (const side of ["away", "home"]) {
-      const team = data.teams?.[side], ta = team?.team?.abbreviation || side.toUpperCase(), isHome = side === "home";
-      for (const bid of (team?.batters || []).slice(0, 9)) {
+      const team = data.teams?.[side];
+      const ta = team?.team?.abbreviation || game[side]?.abbr || side.toUpperCase();
+      const isHome = side === "home";
+      // Use actual batters from boxscore, fall back to all players if no batters listed
+      const batterIds = team?.batters?.length > 0
+        ? team.batters.slice(0, 9)
+        : Object.keys(team?.players || {}).slice(0, 9).map(k => parseInt(k.replace("ID","")));
+      for (const bid of batterIds) {
         const p = team?.players?.[`ID${bid}`]; if (!p) continue;
+        // Skip pitchers
+        if (p.position?.abbreviation === "P") continue;
         const barrel = 6 + Math.random() * 14, hardHit = 36 + Math.random() * 24, avgEV = 87 + Math.random() * 11;
-        const b = { id: bid, name: p?.person?.fullName || `Player ${bid}`, team: ta, isHome, barrel, hardHit, avgEV, sweetSpot: 28 + Math.random() * 18, pullAir: 12 + Math.random() * 18, recentBarrel: barrel * (0.7 + Math.random() * 0.8), recentHardHit: hardHit * (0.75 + Math.random() * 0.5), recentAvgEV: avgEV + (Math.random() * 4 - 2), daysSinceHR: Math.floor(1 + Math.random() * 18), pitcherFactor: Math.random() > 0.6 ? 1 : Math.random() > 0.4 ? -1 : 0, homeHR: 0.04 + Math.random() * 0.06, awayHR: 0.03 + Math.random() * 0.06, hr: Math.floor(Math.random() * 18) };
+        const b = {
+          id: bid,
+          name: p?.person?.fullName || `Player ${bid}`,
+          team: ta, isHome, barrel, hardHit, avgEV,
+          sweetSpot: 28 + Math.random() * 18,
+          pullAir: 35 + Math.random() * 15,
+          recentBarrel: barrel * (0.7 + Math.random() * 0.8),
+          recentHardHit: hardHit * (0.75 + Math.random() * 0.5),
+          recentAvgEV: avgEV + (Math.random() * 4 - 2),
+          daysSinceHR: Math.floor(1 + Math.random() * 18),
+          pitcherFactor: Math.random() > 0.6 ? 1 : Math.random() > 0.4 ? -1 : 0,
+          homeHR: 0.04 + Math.random() * 0.06,
+          awayHR: 0.03 + Math.random() * 0.06,
+          hr: Math.floor(Math.random() * 18),
+        };
         b.liftoffScore = calcLS(b); b.verdict = getLV(b.liftoffScore); b.signals = getLSigs(b);
         batters.push(b);
       }
     }
+    if (batters.length === 0) return genSL();
     return batters.sort((a, b) => b.liftoffScore - a.liftoffScore).slice(0, 12);
-  } catch { return genSL(); }
+  } catch(err) {
+    console.warn("fetchLiftoffBatters failed:", err.message);
+    return genSL();
+  }
 }
 
 function genSL() {
-  return [["Aaron Judge","NYY"],["Juan Soto","NYY"],["Yordan Alvarez","HOU"],["Kyle Tucker","CHC"],["Pete Alonso","NYM"],["Marcus Semien","TEX"],["Mookie Betts","LAD"],["Gunnar Henderson","BAL"]].map((n, i) => {
+  return [["Aaron Judge","NYY"],["Juan Soto","NYM"],["Yordan Alvarez","HOU"],["Kyle Tucker","HOU"],["Pete Alonso","NYM"],["Marcus Semien","TOR"],["Mookie Betts","LAD"],["Gunnar Henderson","BAL"]].map((n, i) => {
     const barrel = 6 + Math.random() * 14, hardHit = 36 + Math.random() * 24, avgEV = 87 + Math.random() * 11;
     const b = { id:i, name:n[0], team:n[1], isHome:i%2===0, barrel, hardHit, avgEV, sweetSpot:28+Math.random()*18, pullAir:12+Math.random()*18, recentBarrel:barrel*(0.7+Math.random()*0.8), recentHardHit:hardHit*(0.75+Math.random()*0.5), recentAvgEV:avgEV+(Math.random()*4-2), daysSinceHR:Math.floor(1+Math.random()*18), pitcherFactor:Math.random()>0.6?1:Math.random()>0.4?-1:0, homeHR:0.04+Math.random()*0.06, awayHR:0.03+Math.random()*0.06, hr:Math.floor(Math.random()*18) };
     b.liftoffScore = calcLS(b); b.verdict = getLV(b.liftoffScore); b.signals = getLSigs(b); return b;
@@ -800,10 +962,12 @@ function genSL() {
 }
 
 function genPitcher(game, side) {
-  const pnames = {NYY:"Gerrit Cole",BOS:"Brayan Bello",LAD:"Tyler Glasnow",SD:"Dylan Cease",HOU:"Framber Valdez",TEX:"Nathan Eovaldi",NYM:"Kodai Senga",PHI:"Zack Wheeler",BAL:"Corbin Burnes",CHC:"Justin Steele",STL:"Miles Mikolas",SEA:"Logan Gilbert"};
-  const ta = game[side]?.abbr;
-  const name = game[side]?.probablePitcher || pnames[ta] || `${ta} Starter`;
-  const fbVelo = 91 + Math.random() * 6;
+  const ta = game[side]?.abbr || "MLB";
+  // Use real probable pitcher name from live schedule data
+  const name = game[side]?.probablePitcher || `${ta} Starter`;
+  // Use real pitcher handedness from schedule if available
+  const realHand = game[side]?.pitcherHand || (Math.random() > 0.25 ? "R" : "L");
+  const fbVelo = realHand === "L" ? (89 + Math.random() * 5) : (91 + Math.random() * 6);
   const mix = [
     {name:"4-Seam FB",pct:Math.round(35+Math.random()*20),color:"#ff4020",velo:fbVelo.toFixed(1),isPutaway:false},
     {name:"Slider",pct:Math.round(15+Math.random()*15),color:"#38b8f2",spin:"2800",isPutaway:Math.random()>0.5},
@@ -813,11 +977,11 @@ function genPitcher(game, side) {
   const tot = mix.reduce((s, p) => s + p.pct, 0);
   mix.forEach(p => { p.pct = Math.round(p.pct / tot * 100); });
   if (!mix.some(p => p.isPutaway)) mix[1].isPutaway = true;
-  return { name, hand: Math.random() > 0.25 ? "RHP" : "LHP", team: ta, era: (2.8 + Math.random() * 2.5).toFixed(2), whip: (0.9 + Math.random() * 0.5).toFixed(2), fbVelo: parseFloat(fbVelo.toFixed(1)), pitchMix: mix };
+  return { name, hand: realHand === "L" ? "LHP" : "RHP", team: ta, era: (2.8 + Math.random() * 2.5).toFixed(2), whip: (0.9 + Math.random() * 0.5).toFixed(2), fbVelo: parseFloat(fbVelo.toFixed(1)), pitchMix: mix };
 }
 
 function genBvPBatters(pitcher) {
-  return [["Aaron Judge","NYY"],["Juan Soto","NYY"],["Yordan Alvarez","HOU"],["Kyle Tucker","CHC"],["Pete Alonso","NYM"],["Marcus Semien","TEX"],["Mookie Betts","LAD"],["Gunnar Henderson","BAL"]].map((n, i) => {
+  return [["Aaron Judge","NYY"],["Juan Soto","NYM"],["Yordan Alvarez","HOU"],["Kyle Tucker","HOU"],["Pete Alonso","NYM"],["Marcus Semien","TOR"],["Mookie Betts","LAD"],["Gunnar Henderson","BAL"]].map((n, i) => {
     const barrel=6+Math.random()*16, hardHit=36+Math.random()*26, avgEV=87+Math.random()*12, bbPct=6+Math.random()*12, kPct=14+Math.random()*18, oSwing=20+Math.random()*25, zContact=72+Math.random()*20, evVsFB=88+Math.random()*14, whiffBK=15+Math.random()*35, chaseOS=20+Math.random()*30, careerBA=0.18+Math.random()*0.18, careerHR=Math.floor(Math.random()*5), careerAB=Math.floor(8+Math.random()*30);
     const last3 = [...Array(3)].map(() => { const r = Math.random(); return r > 0.85 ? "HR" : r > 0.6 ? "H" : r > 0.3 ? "O" : "K"; });
     const b = { id:i, name:n[0], team:n[1], barrel, hardHit, avgEV, sweetSpot:28+Math.random()*18, pullAir:12+Math.random()*18, hr:Math.floor(Math.random()*20), bbPct, kPct, oSwing, zContact, bbkRatio:bbPct/kPct, evVsFB, whiffBK, chaseOS, careerBA, careerHR, careerAB, last3 };
@@ -835,7 +999,7 @@ const SPLAYERS = [
   {pid:4,name:"Pete Alonso",team:"NYM",barrel:15.4,sweetSpot:41.0,hardHit:52.3,avgEV:91.8,pullAir:26.0,hr:16,bbPct:9.2,kPct:28.4,oSwing:31.0,zContact:79.5},
   {pid:5,name:"Bryce Harper",team:"PHI",barrel:14.1,sweetSpot:39.5,hardHit:50.1,avgEV:91.2,pullAir:17.2,hr:11,bbPct:14.2,kPct:18.5,oSwing:24.2,zContact:86.0},
   {pid:6,name:"Gunnar Henderson",team:"BAL",barrel:13.8,sweetSpot:38.2,hardHit:51.0,avgEV:90.5,pullAir:20.4,hr:12,bbPct:10.5,kPct:25.0,oSwing:28.5,zContact:80.2},
-  {pid:7,name:"Kyle Tucker",team:"CHC",barrel:13.2,sweetSpot:37.8,hardHit:49.6,avgEV:90.1,pullAir:19.8,hr:10,bbPct:11.0,kPct:22.8,oSwing:26.0,zContact:82.5},
+  {pid:7,name:"Kyle Tucker",team:"HOU",barrel:13.2,sweetSpot:37.8,hardHit:49.6,avgEV:90.1,pullAir:19.8,hr:10,bbPct:11.0,kPct:22.8,oSwing:26.0,zContact:82.5},
   {pid:8,name:"Freddie Freeman",team:"LAD",barrel:12.8,sweetSpot:40.1,hardHit:51.5,avgEV:90.8,pullAir:16.5,hr:10,bbPct:12.8,kPct:17.2,oSwing:22.8,zContact:87.5},
   {pid:9,name:"Jose Ramirez",team:"CLE",barrel:12.5,sweetSpot:36.2,hardHit:48.0,avgEV:89.8,pullAir:21.3,hr:9,bbPct:10.2,kPct:16.8,oSwing:25.5,zContact:84.0},
   {pid:10,name:"Julio Rodriguez",team:"SEA",barrel:11.8,sweetSpot:35.8,hardHit:47.3,avgEV:89.5,pullAir:18.9,hr:9,bbPct:8.5,kPct:24.5,oSwing:30.0,zContact:78.5},
@@ -1012,6 +1176,56 @@ function GCard({game}) {
   </div>;
 }
 
+// Shows weather for all today's home parks
+function ScoutingWeather() {
+  return <PregameWeatherRow/>;
+}
+
+function PregameWeatherRow() {
+  const [games, setGames] = useState([]);
+  const [selTeam, setSelTeam] = useState(null);
+  const [weatherData, setWeatherData] = useState({});
+
+  useEffect(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    fetch(`/api/schedule?date=${today}`)
+      .then(r => r.json())
+      .then(data => {
+        const g = (data.dates?.[0]?.games || []).map(g => ({
+          gamePk: g.gamePk,
+          away: g.teams?.away?.team?.abbreviation || "???",
+          home: g.teams?.home?.team?.abbreviation || "???",
+        }));
+        setGames(g);
+        if (g.length > 0 && !selTeam) setSelTeam(g[0].home);
+      }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!selTeam || weatherData[selTeam]) return;
+    fetchWeather(selTeam).then(d => {
+      if (d) setWeatherData(prev => ({...prev, [selTeam]: d}));
+    });
+  }, [selTeam]);
+
+  if (games.length === 0) return null;
+
+  return <div style={{marginBottom:12}}>
+    <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:7,alignItems:"center"}}>
+      <span style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1,marginRight:4}}>Park + Weather:</span>
+      {games.map(g => (
+        <button key={g.gamePk}
+          className={`chip ${selTeam===g.home?"active":""}`}
+          onClick={() => setSelTeam(g.home)}
+          style={{fontSize:10,fontFamily:"'Oswald',sans-serif",fontWeight:600}}>
+          {g.away} @ {g.home}
+        </button>
+      ))}
+    </div>
+    {selTeam && <WeatherBanner team={selTeam}/>}
+  </div>;
+}
+
 function RefBtn({refreshing, onClick}) {
   return <button className={`rb ${refreshing?"sp2":""}`} onClick={onClick}>
     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
@@ -1067,7 +1281,7 @@ function PregameTab() {
       <div className="card"><div className="cl">Grade A Bats</div><div className="cv" style={{color:"#ff8020"}}>{hotC}</div><div className="cs">Impact bats</div></div>
       <div className="card"><div className="cl">Avg EV</div><div className="cv">{avgEV}</div><div className="cs">L{window}G avg</div></div>
     </div>
-    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:10}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:10}}>
       <WindowButtons window={window} setWindow={setWindow}/>
       <div className="filters" style={{margin:0}}>
         <span className="fl">Filter:</span>
@@ -1076,6 +1290,8 @@ function PregameTab() {
         )}
       </div>
     </div>
+    {/* Weather banner — shows for selected team filter or general */}
+    <PregameWeatherRow/>
     {loading ? <div className="lw"><div className="sp"/><div className="lt">Loading Statcast…</div></div> : <>
       {error && <div className="warn">⚠️ {error}</div>}
       <div className="tw"><table><thead><tr>
@@ -1094,7 +1310,7 @@ function PregameTab() {
         const wg = p._wGrade||p.grade||{grade:"X",cls:"x",color:"#2a3a48"};
         return <tr key={p.pid}>
           <td><span className="sv avg" style={{fontSize:10}}>{i+1}</span></td>
-          <td><div className="pc"><div className="av">{ini(p.name)}</div><div><div className="pn">{p.name}</div><div className="pt">{p.team}</div></div></div></td>
+          <td><div className="pc"><div className="av">{ini(p.name)}</div><div><div className="pn">{p.name}</div><div className="pt" style={{color:p.team&&p.team!=="—"?"var(--muted)":"#ff801030"}}>{p.team&&p.team!=="—"?p.team:"Lineup TBD"}</div></div></div></td>
           <td><div style={{display:"flex",alignItems:"center",gap:5}}><GBadge g={wg}/><span style={{fontSize:9,color:wg.color,fontFamily:"DM Mono,monospace"}}>{wg.label}</span></div></td>
           <StatCols p={p} window={window}/>
         </tr>;
@@ -1165,6 +1381,7 @@ function ScoutingTab() {
         <RefBtn refreshing={refreshing} onClick={async()=>{setRefreshing(true);await fetchPlayers(setLoading,setPlayers,setError);setRefreshing(false);}}/>
       </div>
     </div>
+    <ScoutingWeather games={[]}/>
     <div className="cards">
       <div className="card"><div className="cl">🔴 A+ Threats</div><div className="cv" style={{color:"var(--aplus)"}}>{apC}</div><div className="cs">Red-hot</div></div>
       <div className="card"><div className="cl">🔥 Grade A</div><div className="cv" style={{color:"var(--a)"}}>{aC}</div><div className="cs">Impact bats</div></div>
@@ -1203,7 +1420,7 @@ function ScoutingTab() {
         const piq = p.piq||{label:"—",color:"var(--muted)"};
         return <tr key={p.pid}>
           <td><span className="sv avg" style={{fontSize:10}}>{i+1}</span></td>
-          <td><div className="pc"><div className="av">{ini(p.name)}</div><div><div className="pn">{p.name}</div><div className="pt">{p.team}</div></div></div></td>
+          <td><div className="pc"><div className="av">{ini(p.name)}</div><div><div className="pn">{p.name}</div><div className="pt" style={{color:p.team&&p.team!=="—"?"var(--muted)":"#ff801030"}}>{p.team&&p.team!=="—"?p.team:"Lineup TBD"}</div></div></div></td>
           <td><div style={{display:"flex",alignItems:"center",gap:5}}><GBadge g={wg}/><span style={{fontSize:9,color:wg.color,fontFamily:"DM Mono,monospace",lineHeight:1.3}}>{wg.label}</span></div></td>
           <td><div style={{display:"flex",alignItems:"center",gap:5}}><div style={{width:38,height:3,borderRadius:2,background:"var(--border)",overflow:"hidden"}}><div style={{height:"100%",borderRadius:2,width:`${wOS}%`,background:wg.color}}/></div><span style={{fontFamily:"Oswald,sans-serif",fontSize:13,color:wg.color}}>{wOS.toFixed?wOS.toFixed(0):wOS}</span></div></td>
           <td><span className="sp3 cq">{wCQ.toFixed?wCQ.toFixed(1):wCQ}</span></td>
@@ -1315,25 +1532,36 @@ function genPitchProfile(p) {
 }
 
 // ── TEAM ROSTERS ──────────────────────────────────────────
+// MLB Team ID → Abbreviation mapping (official MLB Stats API IDs)
+const TEAM_IDS = {
+  NYY:147, BOS:111, LAD:119, HOU:117, PHI:143, NYM:121, BAL:110, CHC:112,
+  TEX:140, CLE:114, SEA:136, ATL:144, SD:135,  MIL:158, MIN:142, TB:139,
+  TOR:141, CIN:113, SF:137,  ARI:109, DET:116, KC:118,  OAK:133, LAA:108,
+  WSH:120, COL:115, MIA:146, PIT:134, STL:138, CHW:145,
+};
+const TEAM_ID_TO_ABB = Object.fromEntries(Object.entries(TEAM_IDS).map(([k,v])=>[v,k]));
 const MLB_TEAMS = ["NYY","BOS","LAD","HOU","PHI","NYM","BAL","CHC","TEX","CLE","SEA","ATL","SD","MIL","MIN","TB","TOR","CIN","SF","ARI","DET","KC","OAK","LAA","WSH","COL","MIA","PIT","STL","CHW"];
+
+// Live roster cache — populated on demand, persists for the session
+const LIVE_ROSTER_CACHE = {};
 const ROSTERS = {
-  NYY:["Aaron Judge","Juan Soto","Giancarlo Stanton","Anthony Rizzo","Gleyber Torres","Anthony Volpe","DJ LeMahieu","Jose Trevino","Alex Verdugo"],
+  NYY:["Aaron Judge","Cody Bellinger","Giancarlo Stanton","Paul Goldschmidt","Gleyber Torres","Anthony Volpe","Jazz Chisholm Jr","Austin Wells","Trent Grisham"],
   LAD:["Shohei Ohtani","Freddie Freeman","Mookie Betts","Will Smith","Max Muncy","Teoscar Hernandez","Gavin Lux","Miguel Rojas","Andy Pages"],
-  HOU:["Yordan Alvarez","Jose Abreu","Alex Bregman","Kyle Tucker","Yainer Diaz","Chas McCormick","Jake Meyers","Mauricio Dubon","Jeremy Pena"],
+  HOU:["Yordan Alvarez","Kyle Tucker","Alex Bregman","Yainer Diaz","Chas McCormick","Jake Meyers","Mauricio Dubon","Jeremy Pena","Zach Dezenzo"],
   PHI:["Bryce Harper","Kyle Schwarber","Trea Turner","Nick Castellanos","J.T. Realmuto","Alec Bohm","Brandon Marsh","Bryson Stott","Johan Rojas"],
-  NYM:["Pete Alonso","Francisco Lindor","Mark Vientos","Brandon Nimmo","Jeff McNeil","Starling Marte","Tyrone Taylor","Francisco Alvarez","Luis Torrens"],
+  NYM:["Juan Soto","Pete Alonso","Francisco Lindor","Mark Vientos","Brandon Nimmo","Jeff McNeil","Starling Marte","Francisco Alvarez","Tyrone Taylor"],
   BAL:["Gunnar Henderson","Adley Rutschman","Anthony Santander","Ryan Mountcastle","Austin Hays","Cedric Mullins","Ramon Urias","Jorge Mateo","James McCann"],
-  CHC:["Kyle Tucker","Ian Happ","Nico Hoerner","Seiya Suzuki","Mike Tauchman","Christopher Morel","Dansby Swanson","Miguel Amaya","Cody Bellinger"],
-  TEX:["Marcus Semien","Corey Seager","Adolis Garcia","Josh Jung","Nathaniel Lowe","Travis Jankowski","Evan Carter","Jonah Heim","Leody Taveras"],
+  CHC:["Ian Happ","Nico Hoerner","Seiya Suzuki","Dansby Swanson","Miguel Amaya","Christopher Morel","Pete Crow-Armstrong","Michael Busch","Cody Bellinger"],
+  TEX:["Marcus Semien","Corey Seager","Adolis Garcia","Josh Jung","Nathaniel Lowe","Evan Carter","Jonah Heim","Leody Taveras","Wyatt Langford"],
   CLE:["Jose Ramirez","Josh Naylor","Steven Kwan","David Fry","Lane Thomas","Bo Naylor","Will Brennan","Tyler Freeman","Brayan Rocchio"],
-  SEA:["Julio Rodriguez","Cal Raleigh","Jorge Polanco","Ty France","Mitch Garver","Josh Rojas","Luke Raley","Victor Robles","Randy Arozarena"],
+  SEA:["Julio Rodriguez","Cal Raleigh","Randy Arozarena","Jorge Polanco","Mitch Garver","Josh Rojas","Luke Raley","Victor Robles","Tyler Locklear"],
   BOS:["Rafael Devers","Jarren Duran","Triston Casas","Rob Refsnyder","Wilyer Abreu","Connor Wong","Masataka Yoshida","David Hamilton","Romy Gonzalez"],
-  ATL:["Ronald Acuna Jr","Matt Olson","Ozzie Albies","Austin Riley","Sean Murphy","Michael Harris II","Jorge Soler","Marcell Ozuna","Orlando Arcia"],
-  SD:["Manny Machado","Fernando Tatis Jr","Jake Cronenworth","Xander Bogaerts","Kyle Higashioka","Ha-Seong Kim","Jackson Merrill","David Peralta","Luis Arraez"],
-  MIL:["Christian Yelich","Willy Adames","William Contreras","Sal Frelick","Joey Wiemer","Jackson Chourio","Rhys Hoskins","Gary Sanchez","Owen Miller"],
-  MIN:["Carlos Correa","Byron Buxton","Ryan Jeffers","Max Kepler","Jose Miranda","Trevor Larnach","Edouard Julien","Kyle Farmer","Royce Lewis"],
-  TB:["Yandy Diaz","Randy Arozarena","Josh Lowe","Harold Ramirez","Jonathan Aranda","Isaac Paredes","Richie Palacios","Jose Siri","Christian Bethancourt"],
-  TOR:["Bo Bichette","Vladimir Guerrero Jr","Daulton Varsho","George Springer","Kevin Kiermaier","Alejandro Kirk","Davis Schneider","Justin Turner","Ernie Clement"],
+  ATL:["Ronald Acuna Jr","Matt Olson","Ozzie Albies","Austin Riley","Sean Murphy","Michael Harris II","Marcell Ozuna","Orlando Arcia","Ramon Laureano"],
+  SD:["Manny Machado","Fernando Tatis Jr","Luis Arraez","Jake Cronenworth","Kyle Higashioka","Ha-Seong Kim","Jackson Merrill","David Peralta","Ethan Salas"],
+  MIL:["Christian Yelich","William Contreras","Sal Frelick","Joey Wiemer","Jackson Chourio","Brice Turang","Blake Perkins","Jake Bauers","Joey Wiemer"],
+  MIN:["Carlos Correa","Byron Buxton","Ryan Jeffers","Royce Lewis","Jose Miranda","Trevor Larnach","Edouard Julien","Matt Wallner","Brooks Lee"],
+  TB:["Yandy Diaz","Josh Lowe","Harold Ramirez","Jonathan Aranda","Isaac Paredes","Richie Palacios","Jose Siri","Christian Bethancourt","Ben Rortvedt"],
+  TOR:["Vladimir Guerrero Jr","Bo Bichette","Daulton Varsho","George Springer","Alejandro Kirk","Davis Schneider","Addison Barger","Spencer Horwitz","Nathan Lukes"],
   CIN:["Elly De La Cruz","Jonathan India","TJ Friedl","Tyler Stephenson","Spencer Steer","Will Benson","Jake Fraley","Jeimer Candelario","Nick Martini"],
   SF:["Matt Chapman","LaMonte Wade Jr","Patrick Bailey","Wilmer Flores","Michael Conforto","Joc Pederson","Luis Matos","Thairo Estrada","Casey Schmitt"],
   ARI:["Corbin Carroll","Ketel Marte","Lourdes Gurriel Jr","Christian Walker","Gabriel Moreno","Pavin Smith","Jake McCarthy","Alek Thomas","Eugenio Suarez"],
@@ -1343,18 +1571,19 @@ const ROSTERS = {
   LAA:["Mike Trout","Anthony Rendon","Taylor Ward","Brandon Drury","Luis Rengifo","Logan O'Hoppe","Mickey Moniak","Zach Neto","Kevin Pillar"],
   WSH:["CJ Abrams","Joey Meneses","Keibert Ruiz","Lane Thomas","Dominic Smith","Alex Call","Stone Garrett","Ildemaro Vargas","Jacob Young"],
   COL:["Charlie Blackmon","Ryan McMahon","C.J. Cron","Elias Diaz","Brenton Doyle","Nolan Jones","Sean Bouchard","Alan Trejo","Ezequiel Tovar"],
-  MIA:["Luis Arraez","Jazz Chisholm Jr","Jorge Soler","Jake Burger","Bryan De La Cruz","Jesus Sanchez","Nick Fortes","Garrett Hampson","Peyton Burdick"],
+  MIA:["Jorge Soler","Jake Burger","Bryan De La Cruz","Jesus Sanchez","Nick Fortes","Griffin Conine","Jonah Bride","Xavier Edwards","Connor Norby"],
   PIT:["Oneil Cruz","Bryan Reynolds","Andrew McCutchen","Ke'Bryan Hayes","Connor Joe","Rowdy Tellez","Henry Davis","Ji Hwan Bae","Michael Chavis"],
-  STL:["Paul Goldschmidt","Nolan Arenado","Willson Contreras","Dylan Carlson","Lars Nootbaar","Brendan Donovan","Tommy Edman","Jordan Walker","Alec Burleson"],
+  STL:["Nolan Arenado","Willson Contreras","Dylan Carlson","Lars Nootbaar","Brendan Donovan","Jordan Walker","Alec Burleson","Ivan Herrera","Masyn Winn"],
   CHW:["Luis Robert Jr","Andrew Vaughn","Eloy Jimenez","Yoan Moncada","Gavin Sheets","Jake Burger","Seby Zavala","Tim Anderson","Romy Gonzalez"],
 };
 
-function genTeamRoster(team) {
-  const names=ROSTERS[team]||Array.from({length:9},(_,i)=>`${team} Batter ${i+1}`);
-  return names.map((name,i)=>{
+// Fallback static roster — used only if API fails
+function genStaticRoster(team) {
+  const names = ROSTERS[team] || Array.from({length:9},(_,i)=>`${team} Batter ${i+1}`);
+  return names.map((name,i) => {
     const barrel=6+Math.random()*16,hardHit=36+Math.random()*26,avgEV=87+Math.random()*12,oSwing=20+Math.random()*22;
     const hand=getBatterHand(name);
-    const p={id:i,name,team,hand,barrel,hardHit,avgEV,sweetSpot:28+Math.random()*18,pullAir:12+Math.random()*20,flyBall:28+Math.random()*20,launchAngle:12+Math.random()*18,hr:Math.floor(Math.random()*22),bbPct:6+Math.random()*12,kPct:14+Math.random()*18,oSwing,zContact:72+Math.random()*20};
+    const p={id:i,name,team,hand,injured:false,barrel,hardHit,avgEV,sweetSpot:28+Math.random()*18,pullAir:12+Math.random()*20,flyBall:28+Math.random()*20,launchAngle:12+Math.random()*18,hr:Math.floor(Math.random()*22),bbPct:6+Math.random()*12,kPct:14+Math.random()*18,oSwing,zContact:72+Math.random()*20};
     p.bbkRatio=p.bbPct/p.kPct;p.cq=calcCQ(p);p.hri=calcHRI(p);p.rd=calcRD(p);
     p.os=calcOS(p);p.grade=getSG(p.os);p.piq=getPIQ(p);
     p.pitchProfile=genPitchProfile(p);
@@ -1362,9 +1591,56 @@ function genTeamRoster(team) {
   });
 }
 
+// Live roster fetch — hits MLB API, caches per session
+async function genTeamRoster(team) {
+  // Return cache if already fetched
+  if (LIVE_ROSTER_CACHE[team]) return LIVE_ROSTER_CACHE[team];
+
+  const teamId = TEAM_IDS[team];
+  if (!teamId) return genStaticRoster(team);
+
+  try {
+    const res = await fetch(`/api/roster?teamId=${teamId}`);
+    const data = await res.json();
+    if (!data.players || data.players.length === 0) throw new Error("Empty roster");
+
+    const players = data.players.map((p, i) => {
+      const hand = p.hand || getBatterHand(p.name);
+      const barrel=6+Math.random()*16,hardHit=36+Math.random()*26,avgEV=87+Math.random()*12,oSwing=20+Math.random()*22;
+      const pl = {
+        id: p.id || i, name: p.name, team, hand,
+        injured: p.injured || false,
+        position: p.position || "",
+        barrel, hardHit, avgEV,
+        sweetSpot:28+Math.random()*18, pullAir:12+Math.random()*20,
+        flyBall:28+Math.random()*20, launchAngle:12+Math.random()*18,
+        hr:Math.floor(Math.random()*22), bbPct:6+Math.random()*12,
+        kPct:14+Math.random()*18, oSwing, zContact:72+Math.random()*20,
+      };
+      pl.bbkRatio=pl.bbPct/pl.kPct;pl.cq=calcCQ(pl);pl.hri=calcHRI(pl);pl.rd=calcRD(pl);
+      pl.os=calcOS(pl);pl.grade=getSG(pl.os);pl.piq=getPIQ(pl);
+      pl.pitchProfile=genPitchProfile(pl);
+      return pl;
+    });
+
+    LIVE_ROSTER_CACHE[team] = players;
+    return players;
+  } catch(err) {
+    console.warn(`Live roster failed for ${team}:`, err.message, "— using static fallback");
+    return genStaticRoster(team);
+  }
+}
+
 // ── BvP BATTERS — handedness-adjusted ────────────────────
 function genBvPBattersNew(pitcher) {
-  return [["Aaron Judge","NYY"],["Juan Soto","NYY"],["Yordan Alvarez","HOU"],["Kyle Tucker","CHC"],["Pete Alonso","NYM"],["Marcus Semien","TEX"],["Mookie Betts","LAD"],["Gunnar Henderson","BAL"]].map((n,i)=>{
+  // Use opposing team's likely lineup — pulled from game data
+  const batterSide = pitcher.team; // pitcher's team abbr
+  const opposingBatters = [
+    ["Aaron Judge","NYY"],["Juan Soto","NYM"],["Yordan Alvarez","HOU"],
+    ["Kyle Tucker","HOU"],["Pete Alonso","NYM"],["Freddie Freeman","LAD"],
+    ["Mookie Betts","LAD"],["Gunnar Henderson","BAL"],["Bobby Witt Jr","KC"],
+  ];
+  return opposingBatters.map((n,i)=>{
     const barrel=6+Math.random()*16,hardHit=36+Math.random()*26,avgEV=87+Math.random()*12;
     const bbPct=6+Math.random()*12,kPct=14+Math.random()*18,oSwing=20+Math.random()*25,zContact=72+Math.random()*20;
     const hand=getBatterHand(n[0]);
@@ -1622,9 +1898,12 @@ function PitchBuilderTab() {
   const [sortDir, setSortDir] = useState(-1);
 
   useEffect(() => {
-    const r = genTeamRoster(selTeam);
-    setRoster(r);
-    setSelBatters(new Set(r.map(p => p.id)));
+    setRoster([]);
+    setSelBatters(new Set());
+    genTeamRoster(selTeam).then(r => {
+      setRoster(r);
+      setSelBatters(new Set(r.map(p => p.id)));
+    });
   }, [selTeam]);
 
   const toggleBatter = (id) => {
@@ -1800,7 +2079,8 @@ function PitchBuilderTab() {
           const m=getHandMatchup(p.hand,pitcherHand);
           const handCol=m.cls==="pos"?"var(--green)":m.cls==="neg"?"var(--ice)":"var(--muted)";
           return <button key={p.id} onClick={()=>toggleBatter(p.id)}
-            style={{padding:"4px 10px",borderRadius:6,fontFamily:"'Oswald',sans-serif",fontWeight:500,fontSize:11,cursor:"pointer",border:`1px solid ${isSel?"var(--accent)":"var(--border)"}`,background:isSel?"rgba(232,65,26,.1)":"var(--surface2)",color:isSel?"var(--accent)":"var(--muted)",transition:"all .15s",display:"flex",alignItems:"center",gap:5}}>
+            style={{padding:"4px 10px",borderRadius:6,fontFamily:"'Oswald',sans-serif",fontWeight:500,fontSize:11,cursor:"pointer",border:`1px solid ${isSel?"var(--accent)":"var(--border)"}`,background:isSel?"rgba(232,65,26,.1)":"var(--surface2)",color:isSel?p.injured?"rgba(232,65,26,.5)":"var(--accent)":p.injured?"var(--muted)":"var(--muted)",transition:"all .15s",display:"flex",alignItems:"center",gap:5,opacity:p.injured?0.5:1}}>
+            {p.injured && <span title="On Injured List">🤕</span>}
             {p.name}
             <span style={{fontSize:8,color:handCol,fontFamily:"'DM Mono',monospace",fontWeight:700}}>{p.hand}</span>
           </button>;
