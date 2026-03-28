@@ -459,6 +459,39 @@ function genWindows(p) {
 }
 
 // ── WINDOW FILTER BUTTONS COMPONENT ─────────────────────────────────────────
+// ── GLOBAL PLAYER → TEAM MAP (fetched once at startup) ──────
+// Keyed by MLB player ID. This is the ONLY source of truth for team assignment.
+let GLOBAL_PLAYER_TEAM_MAP = {};
+let GLOBAL_PLAYER_MAP_LOADED = false;
+
+async function loadGlobalPlayerMap() {
+  if (GLOBAL_PLAYER_MAP_LOADED) return GLOBAL_PLAYER_TEAM_MAP;
+  try {
+    const res = await fetch("https://statsapi.mlb.com/api/v1/sports/1/players?season=2026&gameType=R");
+    const data = await res.json();
+    for (const p of (data.people || [])) {
+      if (p.id && p.currentTeam?.abbreviation) {
+        GLOBAL_PLAYER_TEAM_MAP[p.id] = {
+          team: p.currentTeam.abbreviation,
+          teamId: p.currentTeam.id,
+          name: p.fullName,
+          hand: p.batSide?.code || "R",
+        };
+      }
+    }
+    GLOBAL_PLAYER_MAP_LOADED = true;
+    console.log("[Going Yard] Player map loaded:", Object.keys(GLOBAL_PLAYER_TEAM_MAP).length, "players");
+  } catch(e) {
+    console.warn("[Going Yard] Player map load failed:", e.message);
+  }
+  return GLOBAL_PLAYER_TEAM_MAP;
+}
+
+// Get team for a player by ID — always accurate
+function getPlayerTeam(pid) {
+  return GLOBAL_PLAYER_TEAM_MAP[pid]?.team || null;
+}
+
 // ── WEATHER + PARK FACTOR CACHE ─────────────────────────────
 const WEATHER_CACHE = {};
 
@@ -691,21 +724,11 @@ async function fetchPlayers(setL, setP, setE) {
       }
     } catch(e) { console.warn("Schedule fetch failed:", e.message); }
 
-    // Source 2: MLB Sports API — all active rosters with player IDs and team abbreviations
-    try {
-      const rosterRes = await fetch(
-        "https://statsapi.mlb.com/api/v1/sports/1/players?season=2026&gameType=R"
-      );
-      const rosterData = await rosterRes.json();
-      for (const player of (rosterData.people || [])) {
-        if (player.id && player.currentTeam?.abbreviation) {
-          // Only set if not already in lineup map (lineup is more accurate)
-          if (!pt[player.id]) {
-            pt[player.id] = player.currentTeam.abbreviation;
-          }
-        }
-      }
-    } catch(e) { console.warn("Roster fetch failed:", e.message); }
+    // Source 2: Global player map (loaded at startup)
+    const gMap = await loadGlobalPlayerMap();
+    for (const [pid, info] of Object.entries(gMap)) {
+      if (!pt[pid]) pt[pid] = info.team;
+    }
     const sc = await fetch("/api/statcast?year=2026&minAB=5");
     const csv = await sc.text();
     // CSV parser that handles quoted fields with commas (e.g. "Naylor, Josh")
@@ -1252,16 +1275,26 @@ function PregameTab() {
   const [filter, setFilter] = useState("all");
   const [refreshing, setRefreshing] = useState(false);
   const [window, setWindow] = useState(15);
+  const [selMatchup, setSelMatchup] = useState(null); // null = all batters
+  const [games, setGames] = useState([]);
   const load = useCallback(() => { fetchPlayers(setLoading, setPlayers, setError); }, []);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { fetchGames(()=>{}, setGames, ()=>{}); }, []);
   const hs = (k) => { if (sortKey===k) setSortDir(d=>-d); else { setSortKey(k); setSortDir(-1); } };
 
-  // Re-grade players for selected window
+  // Teams in selected matchup
+  const matchupTeams = selMatchup
+    ? new Set([selMatchup.away.abbr, selMatchup.home.abbr].filter(t => t && t !== "???"))
+    : null;
+
+  // Re-grade players for selected window + filter by matchup
   const graded = players.map(p => {
     const w = p.windows?.[window]; if (!w) return p;
     return { ...p, _wGrade: w.grade, _wHS: w.heatScore, _wOS: w.os };
   });
   const filtered = graded.filter(p => {
+    // Matchup filter — only show batters from selected game's teams
+    if (matchupTeams && matchupTeams.size > 0 && !matchupTeams.has(p.team)) return false;
     const g = (p._wGrade||p.grade)?.grade;
     if (filter==="aplus") return g==="A+";
     if (filter==="a") return g==="A+"||g==="A";
@@ -1299,7 +1332,25 @@ function PregameTab() {
         )}
       </div>
     </div>
-    {/* Weather banner — shows for selected team filter or general */}
+    {/* Matchup selector */}
+    <div style={{marginBottom:10}}>
+      <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}>
+        <span style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1,marginRight:4}}>Matchup:</span>
+        <button className={`chip ${!selMatchup?"active":""}`} onClick={()=>setSelMatchup(null)}
+          style={{fontSize:10,fontFamily:"'Oswald',sans-serif",fontWeight:600}}>All Batters</button>
+        {games.filter(g=>g.away.abbr!=="???"&&g.home.abbr!=="???").map(g=>(
+          <button key={g.id} className={`chip ${selMatchup?.id===g.id?"active":""}`}
+            onClick={()=>setSelMatchup(selMatchup?.id===g.id?null:g)}
+            style={{fontSize:10,fontFamily:"'Oswald',sans-serif",fontWeight:600}}>
+            {g.away.abbr} @ {g.home.abbr}
+          </button>
+        ))}
+      </div>
+      {selMatchup && <div style={{fontSize:9,color:"var(--accent)",fontFamily:"'DM Mono',monospace",marginTop:4}}>
+        Showing batters from {selMatchup.away.abbr} @ {selMatchup.home.abbr} only · <span style={{cursor:"pointer",textDecoration:"underline"}} onClick={()=>setSelMatchup(null)}>Clear</span>
+      </div>}
+    </div>
+    {/* Weather banner */}
     <PregameWeatherRow/>
     {loading ? <div className="lw"><div className="sp"/><div className="lt">Loading Statcast…</div></div> : <>
       {error && <div className="warn">⚠️ {error}</div>}
@@ -1369,14 +1420,21 @@ function ScoutingTab() {
   const [filter, setFilter] = useState("all");
   const [refreshing, setRefreshing] = useState(false);
   const [window, setWindow] = useState(15);
+  const [selMatchup, setSelMatchup] = useState(null);
+  const [games, setGames] = useState([]);
   const load = useCallback(() => { fetchPlayers(setLoading, setPlayers, setError); }, []);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { fetchGames(()=>{}, setGames, ()=>{}); }, []);
   const hs = (k) => { if (sortKey===k) setSortDir(d=>-d); else { setSortKey(k); setSortDir(-1); } };
+  const matchupTeamsS = selMatchup
+    ? new Set([selMatchup.away.abbr, selMatchup.home.abbr].filter(t=>t&&t!=="???"))
+    : null;
   const filtered = players.filter(p => {
-    const g = p.grade?.grade;
-    if (filter==="aplus") return g==="A+";
-    if (filter==="a") return g==="A+"||g==="A";
-    if (filter==="b") return g==="A+"||g==="A"||g==="B";
+    if (matchupTeamsS && matchupTeamsS.size > 0 && !matchupTeamsS.has(p.team)) return false;
+    const wg = (p.windows?.[window]?.grade || p.grade)?.grade;
+    if (filter==="aplus") return wg==="A+";
+    if (filter==="a") return wg==="A+"||wg==="A";
+    if (filter==="b") return wg==="A+"||wg==="A"||wg==="B";
     if (filter==="chasers") return (p.oSwing??30)>=33;
     return true;
   });
@@ -1389,6 +1447,24 @@ function ScoutingTab() {
         <WindowButtons window={window} setWindow={setWindow}/>
         <RefBtn refreshing={refreshing} onClick={async()=>{setRefreshing(true);await fetchPlayers(setLoading,setPlayers,setError);setRefreshing(false);}}/>
       </div>
+    </div>
+    {/* Matchup selector */}
+    <div style={{marginBottom:10}}>
+      <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}>
+        <span style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1,marginRight:4}}>Matchup:</span>
+        <button className={`chip ${!selMatchup?"active":""}`} onClick={()=>setSelMatchup(null)}
+          style={{fontSize:10,fontFamily:"'Oswald',sans-serif",fontWeight:600}}>All Batters</button>
+        {games.filter(g=>g.away.abbr!=="???"&&g.home.abbr!=="???").map(g=>(
+          <button key={g.id} className={`chip ${selMatchup?.id===g.id?"active":""}`}
+            onClick={()=>setSelMatchup(selMatchup?.id===g.id?null:g)}
+            style={{fontSize:10,fontFamily:"'Oswald',sans-serif",fontWeight:600}}>
+            {g.away.abbr} @ {g.home.abbr}
+          </button>
+        ))}
+      </div>
+      {selMatchup && <div style={{fontSize:9,color:"var(--accent)",fontFamily:"'DM Mono',monospace",marginTop:4}}>
+        Showing {selMatchup.away.abbr} @ {selMatchup.home.abbr} batters only · <span style={{cursor:"pointer",textDecoration:"underline"}} onClick={()=>setSelMatchup(null)}>Clear</span>
+      </div>}
     </div>
     <ScoutingWeather games={[]}/>
     <div className="cards">
@@ -1698,9 +1774,51 @@ function BvPTab() {
   useEffect(() => {
     if (!selGame) return;
     const pitchSide = selSide === "away" ? "home" : "away";
+    const batterSide = selSide; // batters are on the side YOU selected
     const p = genPitcher(selGame, pitchSide);
     setPitcher(p);
-    setBatters(genBvPBattersNew(p));
+    // Fetch real opposing lineup from boxscore
+    (async () => {
+      try {
+        const res = await fetch(`/api/boxscore?gamePk=${selGame.gamePk}`);
+        const data = await res.json();
+        const team = data.teams?.[batterSide];
+        const ta = team?.team?.abbreviation || selGame[batterSide]?.abbr || batterSide.toUpperCase();
+        const batterIds = team?.batters?.length > 0
+          ? team.batters.slice(0, 9)
+          : Object.keys(team?.players || {}).slice(0, 9).map(k => parseInt(k.replace("ID","")));
+        const liveBatters = batterIds.map((bid, i) => {
+          const pl = team?.players?.[`ID${bid}`];
+          if (!pl) return null;
+          if (pl.position?.abbreviation === "P") return null;
+          const name = pl.person?.fullName || `Player ${bid}`;
+          const hand = pl.person?.batSide?.code || getBatterHand(name);
+          const matchup = getHandMatchup(hand, p.hand === "RHP" ? "R" : "L");
+          const barrel=6+Math.random()*16, hardHit=36+Math.random()*26, avgEV=87+Math.random()*12;
+          const bbPct=6+Math.random()*12, kPct=14+Math.random()*18, oSwing=20+Math.random()*25;
+          const evBase=88+Math.random()*14, m=matchup.multiplier;
+          const evVsFB=Math.round((evBase+matchup.evBonus)*10)/10;
+          const barrelAdj=Math.round(barrel*m*10)/10, fbAdj=Math.round((28+Math.random()*22)*(m*0.8+0.2)*10)/10;
+          const laAdj=Math.round(((12+Math.random()*22)+(m>1?1.5:-1.5))*10)/10;
+          const pullAdj=Math.round((12+Math.random()*20)*(m*0.7+0.3)*10)/10;
+          const chaseAdj=Math.round((oSwing+(Math.random()*8-4))*(m>1?0.92:1.08)*10)/10;
+          const careerBA=0.18+Math.random()*0.18, careerHR=Math.floor(Math.random()*5), careerAB=Math.floor(8+Math.random()*30);
+          const last3=[...Array(3)].map(()=>{const r=Math.random();return r>0.85?"HR":r>0.6?"H":r>0.3?"O":"K";});
+          const b={id:bid,name,team:ta,hand,matchup,barrel,hardHit,avgEV,sweetSpot:28+Math.random()*18,pullAir:12+Math.random()*18,flyBall:28+Math.random()*20,launchAngle:12+Math.random()*18,hr:Math.floor(Math.random()*20),bbPct,kPct,oSwing,zContact:72+Math.random()*20,bbkRatio:bbPct/kPct,evVsFB,chaseVsPitch:chaseAdj,barrelVsPitch:barrelAdj,flyBallVsPitch:fbAdj,pullAirVsPitch:pullAdj,launchAngleVsPitch:laAdj,careerBA,careerHR,careerAB,last3};
+          b.cq=calcCQ(b);b.hri=calcHRI(b);b.rd=calcRD(b);b.os=calcOS(b);b.grade=getSG(b.os);b.piq=getPIQ(b);
+          const evN=Math.min(Math.max((evVsFB-88)/12,0),1),barN=Math.min(barrelAdj/14,1),fbN=Math.min(fbAdj/45,1);
+          const laN=Math.min(Math.max((laAdj-10)/22,0),1),puN=Math.min(pullAdj/28,1),chN=Math.max(1-chaseAdj/45,0);
+          const base=evN*25+barN*25+fbN*15+laN*15+puN*10+chN*10;
+          const handBonus=m>1.05?8:m<0.92?-8:-3;
+          b.ms=Math.round(Math.min(Math.max(base+handBonus,0),100)*10)/10;
+          b.mg=getSG(b.ms);
+          return b;
+        }).filter(Boolean).sort((a,b)=>b.ms-a.ms);
+        if (liveBatters.length > 0) { setBatters(liveBatters); return; }
+      } catch(e) { console.warn("Live lineup fetch failed:", e.message); }
+      // Fallback to generated batters
+      setBatters(genBvPBattersNew(p));
+    })();
   }, [selGame, selSide]);
 
   const PCOLS = PITCH_COLORS;
@@ -2156,6 +2274,8 @@ function PitchBuilderTab() {
 // APP ROOT
 export default function App() {
   const [tab, setTab] = useState("pregame");
+  // Load player→team map immediately at startup
+  useEffect(() => { loadGlobalPlayerMap(); }, []);
   return <>
     <style>{styles}</style>
     <div className="app">
