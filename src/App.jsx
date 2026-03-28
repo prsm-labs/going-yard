@@ -36,7 +36,7 @@ const styles = `
   .tw{overflow-x:auto;border-radius:10px;border:1px solid var(--border);}
   table{width:100%;border-collapse:collapse;}
   thead tr{background:var(--surface2);}
-  th{padding:9px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-family:'DM Mono',monospace;white-space:nowrap;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;}
+  th{padding:9px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-family:'DM Mono',monospace;white-space:nowrap;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;transition:color .15s;}  th:hover{color:var(--text);}
   th:hover{color:var(--text);}
   th.sk{color:var(--accent);}
   td{padding:10px 12px;font-size:12px;border-bottom:1px solid rgba(30,45,58,.5);vertical-align:middle;}
@@ -1163,7 +1163,7 @@ function GPanel({game, isLive}) {
     const id = setInterval(async () => {
       const d = await fetchLiveBatters(game.gamePk);
       setData(d); // update data without resetting expId or scroll
-    }, 30000);
+    }, 60000);
     return () => clearInterval(id);
   }, [game.gamePk, isLive]);
   return <div className="gp">
@@ -1390,7 +1390,7 @@ function PregameTab() {
       {error && <div className="warn">⚠️ {error}</div>}
       <div className="tw"><table><thead><tr>
         <th>#</th><th>Player</th>
-        <th className={sortKey==="os"?"sk":""} onClick={()=>hs("os")}>Grade{sortKey==="os"&&(sortDir<0?"↓":"↑")}</th>
+        <th className={sortKey==="os"?"sk":""} onClick={()=>hs("os")} style={{cursor:"pointer"}}>Grade{sortKey==="os"&&<span style={{color:"var(--accent)",marginLeft:3}}>{sortDir<0?"↓":"↑"}</span>}</th>
         {STAT_COL_HEADERS.map(c=>
           <th key={c.key} className={sortKey===c.key?"sk":""} onClick={()=>hs(c.key)}>
             <div style={{display:"flex",alignItems:"center",gap:2}}>
@@ -1427,7 +1427,7 @@ function LiveTab() {
   useEffect(() => { load(false); }, []); // initial — show spinner
   // Background refresh every 30s — silent so open game panels stay open
   useEffect(() => {
-    const id = setInterval(() => load(true), 30000);
+    const id = setInterval(() => load(true), 60000);
     return () => clearInterval(id);
   }, [load]);
   const live = games.filter(g=>g.status==="Live"), pre = games.filter(g=>g.status==="Preview"), fin = games.filter(g=>g.status==="Final");
@@ -1528,7 +1528,7 @@ function ScoutingTab() {
       {error && <div className="warn">⚠️ {error}</div>}
       <div className="tw"><table><thead><tr>
         <th>#</th><th>Player</th>
-        <th className={sortKey==="os"?"sk":""} onClick={()=>hs("os")}>Grade{sortKey==="os"&&(sortDir<0?"↓":"↑")}</th>
+        <th className={sortKey==="os"?"sk":""} onClick={()=>hs("os")} style={{cursor:"pointer"}}>Grade{sortKey==="os"&&<span style={{color:"var(--accent)",marginLeft:3}}>{sortDir<0?"↓":"↑"}</span>}</th>
         <th><Tip text="Composite score: CQ 50% + HRI 30% + RDY 20%"><span>Score</span></Tip></th>
         <th><Tip text="Contact Quality"><span>CQ</span></Tip></th>
         <th><Tip text="HR Intent"><span>HRI</span></Tip></th>
@@ -2324,16 +2324,20 @@ function PitchBuilderTab() {
 // Global HR data — shared between ticker and tracker tab
 let HR_DATA = [];
 let HR_LAST_FETCH = 0;
-const HR_CACHE_MS = 60000; // refresh every 60s
+const HR_CACHE_MS = 60000;
 
-async function fetchHRs() {
+async function fetchHRs(force=false) {
   const now = Date.now();
-  if (now - HR_LAST_FETCH < HR_CACHE_MS && HR_DATA.length > 0) return HR_DATA;
+  if (!force && now - HR_LAST_FETCH < HR_CACHE_MS && HR_DATA.length >= 0 && HR_LAST_FETCH > 0) {
+    return HR_DATA;
+  }
   try {
     const res = await fetch("/api/homeruns");
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     HR_DATA = data.homeruns || [];
     HR_LAST_FETCH = now;
+    console.log("[HRs] Fetched:", HR_DATA.length, "home runs");
     return HR_DATA;
   } catch(e) {
     console.warn("[HRs] Fetch failed:", e.message);
@@ -2343,36 +2347,50 @@ async function fetchHRs() {
 
 function HRTicker({ onHRClick }) {
   const [hrs, setHrs] = useState([]);
+  const [tickerReady, setTickerReady] = useState(false);
   useEffect(() => {
-    fetchHRs().then(setHrs);
-    const id = setInterval(() => fetchHRs().then(setHrs), 60000);
+    fetchHRs(true).then(d => { setHrs(d); setTickerReady(true); });
+    const id = setInterval(() => fetchHRs(false).then(setHrs), 60000);
     return () => clearInterval(id);
   }, []);
 
-  if (hrs.length === 0) return null;
-
-  const items = [...hrs, ...hrs]; // duplicate for seamless loop
+  // Always render — show placeholder until data arrives
+  const items = hrs.length > 0 ? [...hrs, ...hrs] : [];
+  const speed = Math.max(hrs.length * 8, 40);
 
   return (
-    <div className="ticker-wrap">
-      <div className="ticker-label">🚨 YARD</div>
-      <div style={{overflow:"hidden",flex:1}}>
-        <div className="ticker-track" style={{animationDuration:`${Math.max(hrs.length * 8, 40)}s`}}>
-          {items.map((hr, i) => (
-            <div key={i} className="ticker-item" onClick={() => onHRClick()}>
-              <span style={{color:"var(--accent)",fontWeight:700}}>💥</span>
-              <span style={{color:"var(--accent2)",fontWeight:600}}>{hr.batterName}</span>
-              <span style={{color:"var(--muted)"}}>({hr.batterTeam})</span>
-              <span style={{color:"var(--text)"}}>{hr.hrType}</span>
-              {hr.distance && <span style={{color:"var(--green)"}}>{hr.distance}ft</span>}
-              {hr.exitVelo && <span style={{color:hr.exitVelo>=103?"var(--accent)":hr.exitVelo>=95?"var(--fire3)":"var(--muted)"}}>{hr.exitVelo}mph</span>}
-              {hr.pitchType && <span style={{color:"var(--muted)",fontSize:10}}>{hr.pitchType}</span>}
-              <span style={{color:"var(--muted)",fontSize:10}}>vs {hr.pitcherName}</span>
-              <span style={{color:"var(--muted)",fontSize:10}}>Inn.{hr.inning}</span>
-              <span className="ticker-sep">·</span>
-            </div>
-          ))}
-        </div>
+    <div className="ticker-wrap" style={{cursor:"pointer"}} onClick={onHRClick}>
+      <div className="ticker-label">💥 HR</div>
+      <div style={{overflow:"hidden",flex:1,display:"flex",alignItems:"center"}}>
+        {!tickerReady && (
+          <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:"var(--muted)",padding:"0 14px"}}>
+            Loading today's home runs…
+          </span>
+        )}
+        {tickerReady && hrs.length === 0 && (
+          <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:"var(--muted)",padding:"0 14px"}}>
+            No home runs yet today · updates every 60s · click for HR Tracker ⚾
+          </span>
+        )}
+        {tickerReady && hrs.length > 0 && (
+          <div className="ticker-track" style={{animationDuration:`${speed}s`}}>
+            {items.map((hr, i) => (
+              <div key={i} className="ticker-item">
+                <span style={{color:"var(--accent)",fontWeight:700}}>💥</span>
+                <span style={{color:"var(--accent2)",fontWeight:700}}>{hr.batterName}</span>
+                <span style={{color:"var(--muted)"}}>({hr.batterTeam})</span>
+                <span style={{color:"var(--text)"}}>{hr.hrType}</span>
+                {hr.distance && <span style={{color:"var(--green)",fontWeight:600}}>{hr.distance}ft</span>}
+                {hr.exitVelo && <span style={{color:hr.exitVelo>=103?"var(--accent)":hr.exitVelo>=95?"var(--fire3)":"var(--muted)"}}>{hr.exitVelo}mph</span>}
+                {hr.launchAngle && <span style={{color:"var(--muted)",fontSize:10}}>{hr.launchAngle}°</span>}
+                {hr.pitchType && <span style={{color:"var(--muted)",fontSize:10}}>{hr.pitchType}</span>}
+                <span style={{color:"var(--muted)",fontSize:10}}>vs {hr.pitcherName}</span>
+                <span style={{color:"var(--muted)",fontSize:10}}>Inn.{hr.inning}</span>
+                <span className="ticker-sep">·</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -2381,15 +2399,14 @@ function HRTicker({ onHRClick }) {
 function HRTrackerTab() {
   const [hrs, setHrs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [sortKey, setSortKey] = useState("atBatIndex");
+  const [sortKey, setSortKey] = useState("distance");
   const [sortDir, setSortDir] = useState(-1);
   const [filterTeam, setFilterTeam] = useState("all");
   const [refreshing, setRefreshing] = useState(false);
 
   const load = async () => {
     setLoading(true);
-    HR_LAST_FETCH = 0; // force refresh
-    const data = await fetchHRs();
+    const data = await fetchHRs(true); // always force fresh
     setHrs(data);
     setLoading(false);
   };
@@ -2402,7 +2419,11 @@ function HRTrackerTab() {
 
   const filtered = hrs.filter(h => filterTeam === "all" || h.batterTeam === filterTeam);
   const sorted = [...filtered].sort((a,b) => {
-    const av = a[sortKey] ?? 0, bv = b[sortKey] ?? 0;
+    // Put nulls at bottom always
+    const av = a[sortKey], bv = b[sortKey];
+    if (av == null && bv == null) return 0;
+    if (av == null) return 1;
+    if (bv == null) return -1;
     if (typeof av === "string") return sortDir * av.localeCompare(bv);
     return sortDir * (bv - av);
   });
@@ -2466,19 +2487,27 @@ function HRTrackerTab() {
           </div>
         : <div className="tw"><table style={{width:"100%"}}>
             <thead><tr>
-              <th style={{width:24}}>#</th>
-              <th className={sortKey==="batterTeam"?"sk":""} onClick={()=>hs("batterTeam")}><div style={{display:"flex",alignItems:"center",gap:2}}>Team{sortKey==="batterTeam"&&(sortDir<0?"↓":"↑")}</div></th>
-              <th className={sortKey==="batterName"?"sk":""} onClick={()=>hs("batterName")}>Batter{sortKey==="batterName"&&(sortDir<0?"↓":"↑")}</th>
-              <th>Type</th>
-              <th className={sortKey==="rbi"?"sk":""} onClick={()=>hs("rbi")}><Tip text="Runners batted in">RBI{sortKey==="rbi"&&(sortDir<0?"↓":"↑")}</Tip></th>
-              <th className={sortKey==="inning"?"sk":""} onClick={()=>hs("inning")}>Inning{sortKey==="inning"&&(sortDir<0?"↓":"↑")}</th>
-              <th>Outs</th>
-              <th className={sortKey==="launchAngle"?"sk":""} onClick={()=>hs("launchAngle")}><Tip text="Launch angle in degrees">Angle{sortKey==="launchAngle"&&(sortDir<0?"↓":"↑")}</Tip></th>
-              <th className={sortKey==="exitVelo"?"sk":""} onClick={()=>hs("exitVelo")}><Tip text="Exit velocity mph">Exit Velo{sortKey==="exitVelo"&&(sortDir<0?"↓":"↑")}</Tip></th>
-              <th className={sortKey==="distance"?"sk":""} onClick={()=>hs("distance")}><Tip text="Estimated distance in feet">Distance{sortKey==="distance"&&(sortDir<0?"↓":"↑")}</Tip></th>
-              <th>Pitch</th>
-              <th>vs Pitcher</th>
-              <th>Game</th>
+              <th style={{width:24,cursor:"default"}}>#</th>
+              {[
+                {key:"batterTeam", label:"Team",     tip:"Batter's team"},
+                {key:"batterName", label:"Batter",   tip:"Batter name"},
+                {key:"rbi",        label:"Type / RBI",tip:"HR type and RBIs"},
+                {key:"inning",     label:"Inning",   tip:"Inning hit"},
+                {key:"outs",       label:"Outs",     tip:"Outs when hit"},
+                {key:"launchAngle",label:"Angle",    tip:"Launch angle °. 25–35° = HR sweet spot"},
+                {key:"exitVelo",   label:"Exit Velo",tip:"Exit velocity mph. 95+ = hard hit, 103+ = elite"},
+                {key:"distance",   label:"Distance", tip:"Estimated distance in feet"},
+                {key:"pitchType",  label:"Pitch",    tip:"Pitch type thrown"},
+                {key:"pitcherName",label:"vs Pitcher",tip:"Pitcher who gave it up"},
+                {key:"gameId",     label:"Game",     tip:"Matchup"},
+              ].map(c => (
+                <th key={c.key} className={sortKey===c.key?"sk":""} onClick={()=>hs(c.key)} style={{cursor:"pointer"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:2}}>
+                    <Tip text={c.tip}><span>{c.label}</span></Tip>
+                    {sortKey===c.key && <span style={{color:"var(--accent)"}}>{sortDir<0?"↓":"↑"}</span>}
+                  </div>
+                </th>
+              ))}
             </tr></thead>
             <tbody>
               {sorted.map((hr, i) => {
@@ -2488,28 +2517,20 @@ function HRTrackerTab() {
                 return <tr key={i}>
                   <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:i<3?"var(--accent)":"var(--muted)"}}>{i+1}</span></td>
                   <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color:"var(--text)"}}>{hr.batterTeam}</span></td>
+                  <td><div className="pn">{hr.batterName}</div></td>
                   <td>
-                    <div className="pn">{hr.batterName}</div>
-                    <div className="pt" style={{fontSize:9}}>{hr.gameId}</div>
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      <span className={`hr-badge ${badgeCls}`}>{hr.hrType}</span>
+                      <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:16,color:hr.rbi>=2?"var(--accent)":"var(--text)"}}>{hr.rbi} RBI</span>
+                    </div>
                   </td>
-                  <td><span className={`hr-badge ${badgeCls}`}>{hr.hrType}</span></td>
-                  <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:16,color:hr.rbi>=2?"var(--accent)":"var(--text)"}}>{hr.rbi}</span></td>
-                  <td>
-                    <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{hr.halfInning==="top"?"▲":"▼"} {hr.inning}</span>
-                  </td>
+                  <td><span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{hr.halfInning==="top"?"▲":"▼"} {hr.inning}</span></td>
                   <td><span className="sv avg">{hr.outs}</span></td>
                   <td><span className={`sv ${hr.launchAngle>=25&&hr.launchAngle<=35?"good":"avg"}`}>{hr.launchAngle!=null?`${hr.launchAngle}°`:"—"}</span></td>
                   <td><span className={`sv ${evC}`}>{hr.exitVelo!=null?`${hr.exitVelo}`:"—"}</span></td>
                   <td><span className={`sv ${distC}`}>{hr.distance!=null?`${hr.distance}ft`:"—"}</span></td>
-                  <td>
-                    {hr.pitchType
-                      ? <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",padding:"2px 7px",borderRadius:4,background:"var(--surface2)",border:"1px solid var(--border)",color:"var(--text)"}}>{hr.pitchType}</span>
-                      : <span style={{color:"var(--muted)"}}>—</span>}
-                  </td>
-                  <td>
-                    <div style={{fontSize:11,fontWeight:500}}>{hr.pitcherName}</div>
-                    <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{hr.pitcherTeam}</div>
-                  </td>
+                  <td>{hr.pitchType?<span style={{fontSize:10,fontFamily:"'DM Mono',monospace",padding:"2px 7px",borderRadius:4,background:"var(--surface2)",border:"1px solid var(--border)"}}>{hr.pitchType}</span>:<span style={{color:"var(--muted)"}}>—</span>}</td>
+                  <td><div style={{fontSize:11,fontWeight:500}}>{hr.pitcherName}</div><div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{hr.pitcherTeam}</div></td>
                   <td><span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:"var(--muted)"}}>{hr.gameId}</span></td>
                 </tr>;
               })}
