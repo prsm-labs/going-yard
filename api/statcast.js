@@ -5,7 +5,7 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET');
 
   try {
-    const { year = '2025', minAB = '25', type = 'batter' } = req.query;
+    const { year = '2026', minAB = '25', type = 'batter' } = req.query;
 
     // Primary: exit velo / barrel / contact quality leaderboard
     const url = `https://baseballsavant.mlb.com/leaderboard/statcast?abs=${minAB}&type=${type}&year=${year}&position=&team=&min=q&csv=true`;

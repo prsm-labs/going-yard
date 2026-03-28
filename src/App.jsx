@@ -565,14 +565,43 @@ async function fetchPlayers(setL, setP, setE) {
   setL(true); setE(null);
   try {
     const today = new Date().toISOString().slice(0, 10);
-    const sched = await fetch(`/api/schedule?date=${today}`);
-    const sd = await sched.json(); const pt = {};
-    for (const g of (sd.dates?.[0]?.games || [])) {
-      const aL = g.lineups?.awayPlayers || [], hL = g.lineups?.homePlayers || [];
-      const aT = g.teams?.away?.team?.abbreviation || "???", hT = g.teams?.home?.team?.abbreviation || "???";
-      [...aL, ...hL].forEach((p, i) => { if (p?.id) pt[p.id] = i < aL.length ? aT : hT; });
-    }
-    const sc = await fetch("/api/statcast?year=2025&minAB=5");
+
+    // Build player → team map from TWO sources:
+    // 1. Today's schedule lineups (most accurate for today's starters)
+    // 2. Full MLB roster endpoint (covers everyone else)
+    const pt = {};
+
+    // Source 1: Today's schedule lineups
+    try {
+      const sched = await fetch(`/api/schedule?date=${today}`);
+      const sd = await sched.json();
+      for (const g of (sd.dates?.[0]?.games || [])) {
+        const aL = g.lineups?.awayPlayers || [], hL = g.lineups?.homePlayers || [];
+        const aT = g.teams?.away?.team?.abbreviation || "", hT = g.teams?.home?.team?.abbreviation || "";
+        [...aL].forEach(p => { if (p?.id && aT) pt[p.id] = aT; });
+        [...hL].forEach(p => { if (p?.id && hT) pt[p.id] = hT; });
+        // Also map all players from teams even without lineups posted
+        if (aT) { const awayId = g.teams?.away?.team?.id; if (awayId) pt[`team_${awayId}`] = aT; }
+        if (hT) { const homeId = g.teams?.home?.team?.id; if (homeId) pt[`team_${homeId}`] = hT; }
+      }
+    } catch(e) { console.warn("Schedule fetch failed:", e.message); }
+
+    // Source 2: MLB Sports API — all active rosters with player IDs and team abbreviations
+    try {
+      const rosterRes = await fetch(
+        "https://statsapi.mlb.com/api/v1/sports/1/players?season=2026&gameType=R"
+      );
+      const rosterData = await rosterRes.json();
+      for (const player of (rosterData.people || [])) {
+        if (player.id && player.currentTeam?.abbreviation) {
+          // Only set if not already in lineup map (lineup is more accurate)
+          if (!pt[player.id]) {
+            pt[player.id] = player.currentTeam.abbreviation;
+          }
+        }
+      }
+    } catch(e) { console.warn("Roster fetch failed:", e.message); }
+    const sc = await fetch("/api/statcast?year=2026&minAB=5");
     const csv = await sc.text();
     // CSV parser that handles quoted fields with commas (e.g. "Naylor, Josh")
     const parseCSVRow = (row) => {
@@ -642,7 +671,7 @@ async function fetchPlayers(setL, setP, setE) {
     // These fill in what Savant doesn't provide
     try {
       const mlbStats = await fetch(
-        `https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns,strikeouts,walks&season=2025&sportId=1&limit=300&statType=season`
+        `https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns,strikeouts,walks&season=2026&sportId=1&limit=300&statType=season`
       );
       // Build a lookup from player name → stats for enrichment
       // We match by player_id where possible
@@ -1843,7 +1872,7 @@ export default function App() {
     <div className="app">
       <header className="header">
         <div className="logo"><div className="logo-dot"/>⚾ <span>GOING</span> YARD</div>
-        <div className="live-badge"><div className="live-dot"/>MLB 2025</div>
+        <div className="live-badge"><div className="live-dot"/>MLB 2026</div>
       </header>
       <nav className="tabs">
         <button className={`tab ${tab==="pregame"?"active":""}`} onClick={()=>setTab("pregame")}>📊 Pregame</button>
