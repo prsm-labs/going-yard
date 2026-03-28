@@ -209,6 +209,20 @@ const styles = `
   .abr.hit{background:rgba(39,201,122,.15);color:var(--green);border:1px solid rgba(39,201,122,.2);}
   .abr.out{background:rgba(30,45,58,.5);color:var(--muted);border:1px solid var(--border);}
   .abr.k{background:rgba(56,184,242,.1);color:var(--ice);border:1px solid rgba(56,184,242,.15);}
+  /* HR Ticker */
+  .ticker-wrap{background:#0a0e14;border-bottom:1px solid rgba(232,65,26,.25);overflow:hidden;height:32px;display:flex;align-items:center;position:relative;}
+  .ticker-label{background:var(--accent);color:white;padding:0 12px;height:100%;display:flex;align-items:center;font-family:'Oswald',sans-serif;font-weight:700;font-size:11px;letter-spacing:2px;white-space:nowrap;flex-shrink:0;z-index:2;gap:5px;}
+  .ticker-track{display:flex;gap:0;animation:ticker-scroll 60s linear infinite;white-space:nowrap;}
+  .ticker-track:hover{animation-play-state:paused;}
+  @keyframes ticker-scroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+  .ticker-item{padding:0 24px;font-family:'DM Mono',monospace;font-size:11px;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:7px;height:32px;border-right:1px solid rgba(255,255,255,.05);transition:background .15s;}
+  .ticker-item:hover{background:rgba(232,65,26,.1);}
+  .ticker-sep{color:var(--accent);font-size:14px;padding:0 8px;}
+  /* HR Tracker table */
+  .hr-badge{display:inline-flex;align-items:center;justify-content:center;padding:2px 8px;border-radius:4px;font-family:'Oswald',sans-serif;font-weight:700;font-size:11px;letter-spacing:1px;}
+  .hr-badge.solo{background:rgba(56,184,242,.15);color:var(--ice);border:1px solid rgba(56,184,242,.25);}
+  .hr-badge.multi{background:rgba(232,65,26,.18);color:var(--accent);border:1px solid rgba(232,65,26,.3);}
+  .hr-badge.slam{background:rgba(255,183,0,.18);color:var(--accent2);border:1px solid rgba(255,183,0,.3);}
   ::-webkit-scrollbar{width:5px;height:5px;}
   ::-webkit-scrollbar-track{background:var(--bg);}
   ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
@@ -2272,6 +2286,198 @@ function PitchBuilderTab() {
 }
 
 // APP ROOT
+// ── HR TICKER + TRACKER ──────────────────────────────────────
+// Global HR data — shared between ticker and tracker tab
+let HR_DATA = [];
+let HR_LAST_FETCH = 0;
+const HR_CACHE_MS = 60000; // refresh every 60s
+
+async function fetchHRs() {
+  const now = Date.now();
+  if (now - HR_LAST_FETCH < HR_CACHE_MS && HR_DATA.length > 0) return HR_DATA;
+  try {
+    const res = await fetch("/api/homeruns");
+    const data = await res.json();
+    HR_DATA = data.homeruns || [];
+    HR_LAST_FETCH = now;
+    return HR_DATA;
+  } catch(e) {
+    console.warn("[HRs] Fetch failed:", e.message);
+    return HR_DATA;
+  }
+}
+
+function HRTicker({ onHRClick }) {
+  const [hrs, setHrs] = useState([]);
+  useEffect(() => {
+    fetchHRs().then(setHrs);
+    const id = setInterval(() => fetchHRs().then(setHrs), 60000);
+    return () => clearInterval(id);
+  }, []);
+
+  if (hrs.length === 0) return null;
+
+  const items = [...hrs, ...hrs]; // duplicate for seamless loop
+
+  return (
+    <div className="ticker-wrap">
+      <div className="ticker-label">🚨 YARD</div>
+      <div style={{overflow:"hidden",flex:1}}>
+        <div className="ticker-track" style={{animationDuration:`${Math.max(hrs.length * 8, 40)}s`}}>
+          {items.map((hr, i) => (
+            <div key={i} className="ticker-item" onClick={() => onHRClick()}>
+              <span style={{color:"var(--accent)",fontWeight:700}}>💥</span>
+              <span style={{color:"var(--accent2)",fontWeight:600}}>{hr.batterName}</span>
+              <span style={{color:"var(--muted)"}}>({hr.batterTeam})</span>
+              <span style={{color:"var(--text)"}}>{hr.hrType}</span>
+              {hr.distance && <span style={{color:"var(--green)"}}>{hr.distance}ft</span>}
+              {hr.exitVelo && <span style={{color:hr.exitVelo>=103?"var(--accent)":hr.exitVelo>=95?"var(--fire3)":"var(--muted)"}}>{hr.exitVelo}mph</span>}
+              <span style={{color:"var(--muted)",fontSize:10}}>vs {hr.pitcherName}</span>
+              <span style={{color:"var(--muted)",fontSize:10}}>Inn.{hr.inning}</span>
+              <span className="ticker-sep">·</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HRTrackerTab() {
+  const [hrs, setHrs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [sortKey, setSortKey] = useState("atBatIndex");
+  const [sortDir, setSortDir] = useState(-1);
+  const [filterTeam, setFilterTeam] = useState("all");
+  const [refreshing, setRefreshing] = useState(false);
+
+  const load = async () => {
+    setLoading(true);
+    HR_LAST_FETCH = 0; // force refresh
+    const data = await fetchHRs();
+    setHrs(data);
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const hs = (k) => { if (sortKey===k) setSortDir(d=>-d); else { setSortKey(k); setSortDir(-1); } };
+
+  const teams = [...new Set(hrs.map(h => h.batterTeam))].filter(Boolean).sort();
+
+  const filtered = hrs.filter(h => filterTeam === "all" || h.batterTeam === filterTeam);
+  const sorted = [...filtered].sort((a,b) => {
+    const av = a[sortKey] ?? 0, bv = b[sortKey] ?? 0;
+    if (typeof av === "string") return sortDir * av.localeCompare(bv);
+    return sortDir * (bv - av);
+  });
+
+  const totalHRs = hrs.length;
+  const slamCount = hrs.filter(h => h.rbi === 4).length;
+  const avgDist = hrs.filter(h=>h.distance).length
+    ? Math.round(hrs.filter(h=>h.distance).reduce((s,h)=>s+h.distance,0)/hrs.filter(h=>h.distance).length)
+    : null;
+  const avgEV = hrs.filter(h=>h.exitVelo).length
+    ? (hrs.filter(h=>h.exitVelo).reduce((s,h)=>s+h.exitVelo,0)/hrs.filter(h=>h.exitVelo).length).toFixed(1)
+    : null;
+  const topShot = hrs.filter(h=>h.distance).sort((a,b)=>b.distance-a.distance)[0];
+  const hardest = hrs.filter(h=>h.exitVelo).sort((a,b)=>b.exitVelo-a.exitVelo)[0];
+
+  return <div>
+    <div className="hrow">
+      <div className="section-header">
+        <div className="section-title">💥 Home Run Tracker</div>
+        <div className="section-sub">Every homer hit today · live play-by-play · exit velo · distance · pitch type</div>
+      </div>
+      <RefBtn refreshing={refreshing} onClick={async()=>{setRefreshing(true);await load();setRefreshing(false);}}/>
+    </div>
+
+    {/* Stats summary cards */}
+    <div className="cards" style={{marginBottom:14}}>
+      <div className="card"><div className="cl">💥 Total HRs</div><div className="cv" style={{color:"var(--accent)"}}>{totalHRs}</div><div className="cs">today</div></div>
+      <div className="card"><div className="cl">🎉 Grand Slams</div><div className="cv" style={{color:"var(--accent2)"}}>{slamCount}</div><div className="cs">today</div></div>
+      {avgDist && <div className="card"><div className="cl">📏 Avg Distance</div><div className="cv">{avgDist}</div><div className="cs">feet</div></div>}
+      {avgEV && <div className="card"><div className="cl">⚡ Avg Exit Velo</div><div className="cv">{avgEV}</div><div className="cs">mph</div></div>}
+    </div>
+
+    {/* Top shots */}
+    {(topShot || hardest) && <div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap"}}>
+      {topShot && <div style={{flex:1,minWidth:200,background:"var(--surface)",border:"1px solid rgba(232,65,26,.3)",borderRadius:8,padding:"10px 14px"}}>
+        <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>🚀 Longest Today</div>
+        <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:16,color:"var(--accent)"}}>{topShot.batterName}</div>
+        <div style={{fontFamily:"'Oswald',sans-serif",fontSize:28,color:"var(--text)",fontWeight:700,lineHeight:1}}>{topShot.distance}<span style={{fontSize:14,color:"var(--muted)",marginLeft:3}}>ft</span></div>
+        <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",marginTop:2}}>{topShot.batterTeam} · {topShot.exitVelo}mph · {topShot.launchAngle}°</div>
+      </div>}
+      {hardest && <div style={{flex:1,minWidth:200,background:"var(--surface)",border:"1px solid rgba(245,166,35,.3)",borderRadius:8,padding:"10px 14px"}}>
+        <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>⚡ Hardest Hit Today</div>
+        <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:16,color:"var(--accent2)"}}>{hardest.batterName}</div>
+        <div style={{fontFamily:"'Oswald',sans-serif",fontSize:28,color:"var(--text)",fontWeight:700,lineHeight:1}}>{hardest.exitVelo}<span style={{fontSize:14,color:"var(--muted)",marginLeft:3}}>mph</span></div>
+        <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",marginTop:2}}>{hardest.batterTeam} · {hardest.distance}ft · {hardest.launchAngle}°</div>
+      </div>}
+    </div>}
+
+    {/* Team filter */}
+    {teams.length > 0 && <div className="filters" style={{marginBottom:12}}>
+      <span className="fl">Team:</span>
+      <button className={`chip ${filterTeam==="all"?"active":""}`} onClick={()=>setFilterTeam("all")}>All</button>
+      {teams.map(t => <button key={t} className={`chip ${filterTeam===t?"active":""}`} onClick={()=>setFilterTeam(t)}>{t}</button>)}
+    </div>}
+
+    {loading
+      ? <div className="lw"><div className="sp"/><div className="lt">Loading today's home runs…</div></div>
+      : sorted.length === 0
+        ? <div style={{padding:"40px",textAlign:"center",color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>
+            {totalHRs === 0 ? "No home runs yet today. Check back once games start! ⚾" : "No HRs match the current filter."}
+          </div>
+        : <div className="tw"><table style={{width:"100%"}}>
+            <thead><tr>
+              <th style={{width:24}}>#</th>
+              <th className={sortKey==="batterTeam"?"sk":""} onClick={()=>hs("batterTeam")}><div style={{display:"flex",alignItems:"center",gap:2}}>Team{sortKey==="batterTeam"&&(sortDir<0?"↓":"↑")}</div></th>
+              <th className={sortKey==="batterName"?"sk":""} onClick={()=>hs("batterName")}>Batter{sortKey==="batterName"&&(sortDir<0?"↓":"↑")}</th>
+              <th>Type</th>
+              <th className={sortKey==="rbi"?"sk":""} onClick={()=>hs("rbi")}><Tip text="Runners batted in">RBI{sortKey==="rbi"&&(sortDir<0?"↓":"↑")}</Tip></th>
+              <th className={sortKey==="inning"?"sk":""} onClick={()=>hs("inning")}>Inning{sortKey==="inning"&&(sortDir<0?"↓":"↑")}</th>
+              <th>Outs</th>
+              <th className={sortKey==="launchAngle"?"sk":""} onClick={()=>hs("launchAngle")}><Tip text="Launch angle in degrees">Angle{sortKey==="launchAngle"&&(sortDir<0?"↓":"↑")}</Tip></th>
+              <th className={sortKey==="exitVelo"?"sk":""} onClick={()=>hs("exitVelo")}><Tip text="Exit velocity mph">Exit Velo{sortKey==="exitVelo"&&(sortDir<0?"↓":"↑")}</Tip></th>
+              <th className={sortKey==="distance"?"sk":""} onClick={()=>hs("distance")}><Tip text="Estimated distance in feet">Distance{sortKey==="distance"&&(sortDir<0?"↓":"↑")}</Tip></th>
+              <th>vs Pitcher</th>
+              <th>Game</th>
+            </tr></thead>
+            <tbody>
+              {sorted.map((hr, i) => {
+                const badgeCls = hr.rbi===4?"slam":hr.rbi>=2?"multi":"solo";
+                const evC = (hr.exitVelo||0)>=103?"dng":(hr.exitVelo||0)>=95?"hot":(hr.exitVelo||0)>=90?"warm":"avg";
+                const distC = (hr.distance||0)>=440?"dng":(hr.distance||0)>=420?"hot":(hr.distance||0)>=400?"warm":"avg";
+                return <tr key={i}>
+                  <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:i<3?"var(--accent)":"var(--muted)"}}>{i+1}</span></td>
+                  <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color:"var(--text)"}}>{hr.batterTeam}</span></td>
+                  <td>
+                    <div className="pn">{hr.batterName}</div>
+                    <div className="pt" style={{fontSize:9}}>{hr.gameId}</div>
+                  </td>
+                  <td><span className={`hr-badge ${badgeCls}`}>{hr.hrType}</span></td>
+                  <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:16,color:hr.rbi>=2?"var(--accent)":"var(--text)"}}>{hr.rbi}</span></td>
+                  <td>
+                    <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{hr.halfInning==="top"?"▲":"▼"} {hr.inning}</span>
+                  </td>
+                  <td><span className="sv avg">{hr.outs}</span></td>
+                  <td><span className={`sv ${hr.launchAngle>=25&&hr.launchAngle<=35?"good":"avg"}`}>{hr.launchAngle!=null?`${hr.launchAngle}°`:"—"}</span></td>
+                  <td><span className={`sv ${evC}`}>{hr.exitVelo!=null?`${hr.exitVelo}`:"—"}</span></td>
+                  <td><span className={`sv ${distC}`}>{hr.distance!=null?`${hr.distance}ft`:"—"}</span></td>
+                  <td>
+                    <div style={{fontSize:11,fontWeight:500}}>{hr.pitcherName}</div>
+                    <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{hr.pitcherTeam}</div>
+                  </td>
+                  <td><span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:"var(--muted)"}}>{hr.gameId}</span></td>
+                </tr>;
+              })}
+            </tbody>
+          </table></div>
+    }
+  </div>;
+}
+
 export default function App() {
   const [tab, setTab] = useState("pregame");
   // Load player→team map immediately at startup
@@ -2283,12 +2489,14 @@ export default function App() {
         <div className="logo"><div className="logo-dot"/>⚾ <span>GOING</span> YARD</div>
         <div className="live-badge"><div className="live-dot"/>MLB 2026</div>
       </header>
+      <HRTicker onHRClick={()=>setTab("homeruns")}/>
       <nav className="tabs">
         <button className={`tab ${tab==="pregame"?"active":""}`} onClick={()=>setTab("pregame")}>📊 Pregame</button>
         <button className={`tab ${tab==="live"?"active":""}`} onClick={()=>setTab("live")}>📡 Live</button>
         <button className={`tab ${tab==="scouting"?"active":""}`} onClick={()=>setTab("scouting")}>🎯 Scouting</button>
         <button className={`tab ${tab==="bvp"?"active":""}`} onClick={()=>setTab("bvp")}>⚔️ Batter vs P</button>
         <button className={`tab ${tab==="builder"?"active":""}`} onClick={()=>setTab("builder")}>🔬 Pitch Builder</button>
+        <button className={`tab ${tab==="homeruns"?"active":""}`} onClick={()=>setTab("homeruns")} style={{color:tab==="homeruns"?"var(--accent)":undefined}}>💥 HR Tracker</button>
       </nav>
       <main className="content">
         {tab==="pregame" && <PregameTab/>}
@@ -2296,6 +2504,7 @@ export default function App() {
         {tab==="scouting" && <ScoutingTab/>}
         {tab==="bvp" && <BvPTab/>}
         {tab==="builder" && <PitchBuilderTab/>}
+        {tab==="homeruns" && <HRTrackerTab/>}
       </main>
     </div>
   </>;
