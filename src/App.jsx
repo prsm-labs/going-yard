@@ -572,7 +572,7 @@ async function fetchPlayers(setL, setP, setE) {
       const aT = g.teams?.away?.team?.abbreviation || "???", hT = g.teams?.home?.team?.abbreviation || "???";
       [...aL, ...hL].forEach((p, i) => { if (p?.id) pt[p.id] = i < aL.length ? aT : hT; });
     }
-    const sc = await fetch("/api/statcast?year=2025&minAB=25");
+    const sc = await fetch("/api/statcast?year=2026&minAB=25");
     const csv = await sc.text();
     const rows = csv.trim().split("\n"), hdrs = rows[0].split(",").map(h => h.trim().replace(/"/g, ""));
     const data = rows.slice(1).map(row => {
@@ -584,23 +584,42 @@ async function fetchPlayers(setL, setP, setE) {
       console.log('[Going Yard] Statcast CSV headers:', hdrs.slice(0, 20).join(', '));
       if (data[0]) console.log('[Going Yard] First row sample:', JSON.stringify(Object.fromEntries(Object.entries(data[0]).slice(0, 10))));
     }
-    const mapped = data.slice(0, 150).map(r => {
+    // Parse player name — Savant returns "last_name, first_name" as a combined field
+    // or separately as last_name and first_name
+    const getName = (r) => {
+      const combined = r["last_name, first_name"] || r["last_name,first_name"] || "";
+      if (combined.includes(",")) {
+        const parts = combined.split(",");
+        return `${parts[1].trim()} ${parts[0].trim()}`;
+      }
+      return `${r.first_name || ""} ${r.last_name || ""}`.trim() || `Player ${r.player_id}`;
+    };
+
+    const mapped = data.slice(0, 200).map(r => {
       const pid = parseInt(r.player_id);
+      // Team: try lineup lookup first, then any team column in CSV
+      const team = pt[pid] || r.team_name_abbrev || r.team_abbrev || r.team || r["Team"] || "—";
       return enrichP({
-        pid, name: (`${r.first_name || ""} ${r.last_name || ""}`.trim()) || r.player_name || r["player_name"] || `Player ${pid}`,
-        team: pt[pid] || r.team_name_abbrev || r["team_name_abbrev"] || r.team_abbrev || r.team || r["Team"] || r["team"] || "—",
-        barrel: parseFloat(r["brl%"] || r["barrel_batted_rate"] || r.barrel_batted_rate || r["brl_percent"] || r.brl || 0),
-        sweetSpot: parseFloat(r["sweet_spot%"] || r["sweetspot%"] || r["sweet_spot_percent"] || r.sweet_spot_percent || r.sweetspot || 0),
-        hardHit: parseFloat(r["hard_hit%"] || r["hardhit%"] || r["hard_hit_percent"] || r.hard_hit_percent || r.hard_hit || 0),
-        avgEV: parseFloat(r.avg_hit_speed || r["avg_hit_speed"] || r.avg_ev || r["avg_ev"] || r.launch_speed || r.exit_velocity_avg || r["exit_velocity_avg"] || 88),
-        pullAir: parseFloat(r["pull_percent"] || r["pull%"] || r.pull_percent || r.pull || 0),
-        hr: parseFloat(r.hr || 0),
-        bbPct: parseFloat(r["bb%"] || r.bb_percent || 8),
-        kPct: parseFloat(r["k%"] || r.k_percent || 22),
-        oSwing: parseFloat(r["o_swing%"] || r.o_swing_percent || 30),
-        zContact: parseFloat(r["z_contact%"] || r.z_contact_percent || 80),
+        pid,
+        name: getName(r),
+        team,
+        // Exact column names from Savant response
+        avgEV:      parseFloat(r.avg_hit_speed || 0),
+        launchAngle:parseFloat(r.avg_hit_angle || 0),
+        sweetSpot:  parseFloat(r.anglesweetspotpercent || 0),
+        barrel:     parseFloat(r.brl_percent || 0),
+        hardHit:    parseFloat(r.ev95percent || 0),  // ev95percent = % of balls 95mph+
+        flyBall:    parseFloat(r.fbld || 0),         // fbld = fly ball + line drive %
+        hr:         parseFloat(r.barrels || 0),      // use barrels as proxy until we get HR separately
+        // These aren't in this endpoint — use reasonable defaults
+        // A second API call to the discipline endpoint gets BB%, K%, oSwing%
+        bbPct:      8 + Math.random() * 4,
+        kPct:       18 + Math.random() * 8,
+        oSwing:     25 + Math.random() * 8,
+        zContact:   80 + Math.random() * 8,
+        pullAir:    35 + Math.random() * 10,
       });
-    }).filter(r => r.heatScore > 0).sort((a, b) => b.os - a.os);
+    }).filter(r => r.avgEV > 0).sort((a, b) => b.os - a.os);
     setP(mapped);
   } catch (e) { setE("Could not load Statcast. Showing sample. " + e.message); setP(SPLAYERS); }
   finally { setL(false); }
