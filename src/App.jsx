@@ -579,16 +579,21 @@ async function fetchPlayers(setL, setP, setE) {
       const v = row.split(",").map(x => x.replace(/"/g, "").trim()), o = {};
       hdrs.forEach((h, i) => { o[h] = v[i]; }); return o;
     }).filter(r => r.player_id && r.last_name);
+    // Log headers for debugging — remove after confirming
+    if (process?.env?.NODE_ENV !== 'production') {
+      console.log('[Going Yard] Statcast CSV headers:', hdrs.slice(0, 20).join(', '));
+      if (data[0]) console.log('[Going Yard] First row sample:', JSON.stringify(Object.fromEntries(Object.entries(data[0]).slice(0, 10))));
+    }
     const mapped = data.slice(0, 150).map(r => {
       const pid = parseInt(r.player_id);
       return enrichP({
-        pid, name: `${r.first_name || ""} ${r.last_name || ""}`.trim() || `P${pid}`,
-        team: pt[pid] || r.team_name_abbrev || r.team || "MLB",
-        barrel: parseFloat(r["brl%"] || r.barrel_batted_rate || 0),
-        sweetSpot: parseFloat(r["sweet_spot%"] || r["sweetspot%"] || r.sweet_spot_percent || 0),
-        hardHit: parseFloat(r["hard_hit%"] || r["hardhit%"] || r.hard_hit_percent || 0),
-        avgEV: parseFloat(r.avg_hit_speed || r.launch_speed || r.avg_ev || 88),
-        pullAir: parseFloat(r["pull_percent"] || r.pull || 0),
+        pid, name: (`${r.first_name || ""} ${r.last_name || ""}`.trim()) || r.player_name || r["player_name"] || `Player ${pid}`,
+        team: pt[pid] || r.team_name_abbrev || r["team_name_abbrev"] || r.team_abbrev || r.team || r["Team"] || r["team"] || "—",
+        barrel: parseFloat(r["brl%"] || r["barrel_batted_rate"] || r.barrel_batted_rate || r["brl_percent"] || r.brl || 0),
+        sweetSpot: parseFloat(r["sweet_spot%"] || r["sweetspot%"] || r["sweet_spot_percent"] || r.sweet_spot_percent || r.sweetspot || 0),
+        hardHit: parseFloat(r["hard_hit%"] || r["hardhit%"] || r["hard_hit_percent"] || r.hard_hit_percent || r.hard_hit || 0),
+        avgEV: parseFloat(r.avg_hit_speed || r["avg_hit_speed"] || r.avg_ev || r["avg_ev"] || r.launch_speed || r.exit_velocity_avg || r["exit_velocity_avg"] || 88),
+        pullAir: parseFloat(r["pull_percent"] || r["pull%"] || r.pull_percent || r.pull || 0),
         hr: parseFloat(r.hr || 0),
         bbPct: parseFloat(r["bb%"] || r.bb_percent || 8),
         kPct: parseFloat(r["k%"] || r.k_percent || 22),
