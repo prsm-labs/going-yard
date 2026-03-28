@@ -2519,6 +2519,7 @@ function HRTrackerTab() {
                 {key:"pitchType",  label:"Pitch",    tip:"Pitch type thrown"},
                 {key:"pitcherName",label:"vs Pitcher",tip:"Pitcher who gave it up"},
                 {key:"gameId",     label:"Game",     tip:"Matchup"},
+              {key:"chronoIndex",label:"Time",     tip:"Chronological order — most recent first"},
               ].map(c => (
                 <th key={c.key} className={sortKey===c.key?"sk":""} onClick={()=>hs(c.key)} style={{cursor:"pointer"}}>
                   <div style={{display:"flex",alignItems:"center",gap:2}}>
