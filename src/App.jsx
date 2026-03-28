@@ -572,27 +572,42 @@ async function fetchPlayers(setL, setP, setE) {
       const aT = g.teams?.away?.team?.abbreviation || "???", hT = g.teams?.home?.team?.abbreviation || "???";
       [...aL, ...hL].forEach((p, i) => { if (p?.id) pt[p.id] = i < aL.length ? aT : hT; });
     }
-    const sc = await fetch("/api/statcast?year=2026&minAB=25");
+    const sc = await fetch("/api/statcast?year=2025&minAB=5");
     const csv = await sc.text();
-    const rows = csv.trim().split("\n"), hdrs = rows[0].split(",").map(h => h.trim().replace(/"/g, ""));
-    const data = rows.slice(1).map(row => {
-      const v = row.split(",").map(x => x.replace(/"/g, "").trim()), o = {};
-      hdrs.forEach((h, i) => { o[h] = v[i]; }); return o;
-    }).filter(r => r.player_id && r.last_name);
+    // CSV parser that handles quoted fields with commas (e.g. "Naylor, Josh")
+    const parseCSVRow = (row) => {
+      const vals = []; let cur = "", inQ = false;
+      for (let i = 0; i < row.length; i++) {
+        const ch = row[i];
+        if (ch === '"') { inQ = !inQ; }
+        else if (ch === ',' && !inQ) { vals.push(cur.trim()); cur = ""; }
+        else { cur += ch; }
+      }
+      vals.push(cur.trim());
+      return vals;
+    };
+    const rows = csv.trim().split("\n");
+    const hdrs = parseCSVRow(rows[0]).map(h => h.replace(/"/g, "").trim());
+    const data = rows.slice(1).filter(r => r.trim()).map(row => {
+      const v = parseCSVRow(row).map(x => x.replace(/"/g, "").trim());
+      const o = {}; hdrs.forEach((h, i) => { o[h] = v[i] ?? ""; }); return o;
+    }).filter(r => r.player_id && parseFloat(r.avg_hit_speed) > 0);
     // Log headers for debugging — remove after confirming
     if (process?.env?.NODE_ENV !== 'production') {
       console.log('[Going Yard] Statcast CSV headers:', hdrs.slice(0, 20).join(', '));
       if (data[0]) console.log('[Going Yard] First row sample:', JSON.stringify(Object.fromEntries(Object.entries(data[0]).slice(0, 10))));
     }
-    // Parse player name — Savant returns "last_name, first_name" as a combined field
-    // or separately as last_name and first_name
+    // Parse player name — Savant returns "last_name, first_name" as one combined field
     const getName = (r) => {
       const combined = r["last_name, first_name"] || r["last_name,first_name"] || "";
-      if (combined.includes(",")) {
+      if (combined && combined.includes(",")) {
         const parts = combined.split(",");
         return `${parts[1].trim()} ${parts[0].trim()}`;
       }
-      return `${r.first_name || ""} ${r.last_name || ""}`.trim() || `Player ${r.player_id}`;
+      // Fallback: try separate fields
+      const fn = r.first_name || "", ln = r.last_name || "";
+      if (fn || ln) return `${fn} ${ln}`.trim();
+      return `Player ${r.player_id}`;
     };
 
     const mapped = data.slice(0, 200).map(r => {
@@ -603,23 +618,82 @@ async function fetchPlayers(setL, setP, setE) {
         pid,
         name: getName(r),
         team,
-        // Exact column names from Savant response
-        avgEV:      parseFloat(r.avg_hit_speed || 0),
-        launchAngle:parseFloat(r.avg_hit_angle || 0),
-        sweetSpot:  parseFloat(r.anglesweetspotpercent || 0),
-        barrel:     parseFloat(r.brl_percent || 0),
-        hardHit:    parseFloat(r.ev95percent || 0),  // ev95percent = % of balls 95mph+
-        flyBall:    parseFloat(r.fbld || 0),         // fbld = fly ball + line drive %
-        hr:         parseFloat(r.barrels || 0),      // use barrels as proxy until we get HR separately
-        // These aren't in this endpoint — use reasonable defaults
-        // A second API call to the discipline endpoint gets BB%, K%, oSwing%
-        bbPct:      8 + Math.random() * 4,
-        kPct:       18 + Math.random() * 8,
-        oSwing:     25 + Math.random() * 8,
-        zContact:   80 + Math.random() * 8,
-        pullAir:    35 + Math.random() * 10,
+        // Confirmed column names from live Savant CSV response
+        avgEV:       parseFloat(r.avg_hit_speed) || 0,
+        launchAngle: parseFloat(r.avg_hit_angle) || 0,
+        sweetSpot:   parseFloat(r.anglesweetspotpercent) || 0,
+        barrel:      parseFloat(r.brl_percent) || 0,
+        hardHit:     parseFloat(r.ev95percent) || 0,   // % batted balls 95+ mph
+        flyBall:     parseFloat(r.fbld) || 0,          // fly ball + line drive %
+        maxEV:       parseFloat(r.max_hit_speed) || 0,
+        ev50:        parseFloat(r.ev50) || 0,          // 50th percentile EV
+        barrels:     parseInt(r.barrels) || 0,
+        // Pull%, BB%, K%, oSwing% not in this endpoint — fetch from MLB Stats API below
+        pullAir:     0,
+        bbPct:       0,
+        kPct:        0,
+        oSwing:      0,
+        zContact:    80,
+        hr:          0,
       });
     }).filter(r => r.avgEV > 0).sort((a, b) => b.os - a.os);
+
+    // Fetch MLB Stats API for BB%, K%, HR, and batting stats
+    // These fill in what Savant doesn't provide
+    try {
+      const mlbStats = await fetch(
+        `https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns,strikeouts,walks&season=2025&sportId=1&limit=300&statType=season`
+      );
+      // Build a lookup from player name → stats for enrichment
+      // We match by player_id where possible
+      const statsLeaders = await mlbStats.json();
+      const hrMap = {}, kMap = {}, bbMap = {};
+      for (const cat of (statsLeaders.leagueLeaders || [])) {
+        for (const entry of (cat.leaders || [])) {
+          const pid = entry.person?.id;
+          if (!pid) continue;
+          if (cat.leaderCategory === "homeRuns") hrMap[pid] = parseInt(entry.value || 0);
+          if (cat.leaderCategory === "strikeouts") kMap[pid] = parseFloat(entry.value || 0);
+          if (cat.leaderCategory === "walks") bbMap[pid] = parseFloat(entry.value || 0);
+        }
+      }
+      // Enrich each player with real HR, BB%, K%
+      mapped.forEach(p => {
+        if (hrMap[p.pid]) p.hr = hrMap[p.pid];
+        // Rough BB%/K% from counting stats (approximate)
+        const bbRaw = bbMap[p.pid] || 0, kRaw = kMap[p.pid] || 0;
+        if (bbRaw > 0 || kRaw > 0) {
+          const pa = Math.max(bbRaw + kRaw + 50, 100); // rough PA estimate
+          p.bbPct = Math.round((bbRaw / pa) * 100 * 10) / 10 || 8;
+          p.kPct  = Math.round((kRaw  / pa) * 100 * 10) / 10 || 20;
+        } else {
+          p.bbPct = 8 + Math.random() * 4;
+          p.kPct  = 18 + Math.random() * 8;
+        }
+        p.oSwing   = 25 + Math.random() * 8;
+        p.pullAir  = 38 + Math.random() * 12;
+        p.bbkRatio = p.bbPct / Math.max(p.kPct, 1);
+        // Re-enrich with updated stats
+        p.heatScore = getHS(p);
+        p.cq = calcCQ(p); p.hri = calcHRI(p); p.rd = calcRD(p);
+        p.os = calcOS(p); p.grade = getSG(p.os); p.piq = getPIQ(p);
+        if (!p.windows) p.windows = genWindows(p);
+      });
+    } catch (statsErr) {
+      console.warn("MLB stats enrichment failed:", statsErr.message);
+      // Fill in defaults so grades still work
+      mapped.forEach(p => {
+        p.bbPct   = p.bbPct   || 8 + Math.random() * 4;
+        p.kPct    = p.kPct    || 18 + Math.random() * 8;
+        p.oSwing  = p.oSwing  || 25 + Math.random() * 8;
+        p.pullAir = p.pullAir || 38 + Math.random() * 12;
+        p.bbkRatio = p.bbPct / Math.max(p.kPct, 1);
+        p.heatScore = getHS(p);
+        p.cq = calcCQ(p); p.hri = calcHRI(p); p.rd = calcRD(p);
+        p.os = calcOS(p); p.grade = getSG(p.os); p.piq = getPIQ(p);
+        if (!p.windows) p.windows = genWindows(p);
+      });
+    }
     setP(mapped);
   } catch (e) { setE("Could not load Statcast. Showing sample. " + e.message); setP(SPLAYERS); }
   finally { setL(false); }
