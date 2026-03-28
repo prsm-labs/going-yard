@@ -1312,7 +1312,7 @@ function PregameTab() {
   const [sortDir, setSortDir] = useState(-1);
   const [filter, setFilter] = useState("all");
   const [refreshing, setRefreshing] = useState(false);
-  const [window, setWindow] = useState(7);
+  const [window, setWindow] = useState(3);
   const [selMatchup, setSelMatchup] = useState(null); // null = all batters
   const [games, setGames] = useState([]);
   const load = useCallback((silent=false) => {
@@ -1349,6 +1349,8 @@ function PregameTab() {
   });
   const sortVal = (p, k) => {
     const w = p.windows?.[window];
+    // For grade sort, use the window-recalculated os score
+    if (k === "os") return w?.os ?? p.os ?? 0;
     if (w && k in w) return w[k];
     return p[k] ?? 0;
   };
@@ -1471,7 +1473,7 @@ function ScoutingTab() {
   const [sortDir, setSortDir] = useState(-1);
   const [filter, setFilter] = useState("all");
   const [refreshing, setRefreshing] = useState(false);
-  const [window, setWindow] = useState(7);
+  const [window, setWindow] = useState(3);
   const [selMatchup, setSelMatchup] = useState(null);
   const [games, setGames] = useState([]);
   const load = useCallback((silent=false) => {
@@ -1497,7 +1499,13 @@ function ScoutingTab() {
     if (filter==="chasers") return (p.oSwing??30)>=33;
     return true;
   });
-  const sorted = [...filtered].sort((a,b) => sortDir*((b[sortKey]||0)-(a[sortKey]||0)));
+  const sortValS = (p, k) => {
+    const w = p.windows?.[window];
+    if (k === "os") return w?.os ?? p.os ?? 0;
+    if (w && k in w) return w[k];
+    return p[k] ?? 0;
+  };
+  const sorted = [...filtered].sort((a,b) => sortDir*(sortValS(b,sortKey)-sortValS(a,sortKey)));
   const apC=players.filter(p=>p.grade?.grade==="A+").length, aC=players.filter(p=>p.grade?.grade==="A").length, bC=players.filter(p=>p.grade?.grade==="B").length, chC=players.filter(p=>(p.oSwing??30)>=33).length;
   return <div>
     <div className="hrow">
