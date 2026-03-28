@@ -89,7 +89,7 @@ const styles = `
   .rb:hover{border-color:var(--accent);color:var(--accent);}
   .rb.sp2 svg{animation:spin .8s linear infinite;}
   .div{font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;}
-  .gg{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:11px;margin-bottom:6px;}
+  .gg{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:11px;margin-bottom:6px;}
   .gc{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;}
   .gc:hover{border-color:rgba(232,65,26,.5);}
   .gc.exp{border-color:var(--accent);border-bottom-left-radius:0;border-bottom-right-radius:0;border-bottom:none;}
@@ -108,8 +108,8 @@ const styles = `
   .gi{font-family:'DM Mono',monospace;font-size:10px;text-align:center;margin-top:5px;}
   .cv2{font-size:10px;color:var(--muted);transition:transform .2s;display:inline-block;}
   .cv2.op{transform:rotate(180deg);}
-  .gpw{margin-bottom:14px;}
-  .gp{border:1px solid var(--accent);border-top:none;border-bottom-left-radius:10px;border-bottom-right-radius:10px;background:#0a1218;overflow:hidden;animation:sd .2s ease;}
+  .gpw{margin-bottom:14px;grid-column:1/-1;}
+  .gp{border:1px solid var(--accent);border-top:none;border-bottom-left-radius:10px;border-bottom-right-radius:10px;background:#0a1218;overflow:hidden;animation:sd .2s ease;width:100%;}
   @keyframes sd{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
   .gph{padding:9px 15px;border-bottom:1px solid var(--border);}
   .gpt{font-family:'Oswald',sans-serif;font-size:13px;letter-spacing:1.5px;color:var(--text);}
@@ -841,9 +841,15 @@ async function fetchGames(setL, setG, setE) {
     const data = await res.json();
     const games = (data.dates?.[0]?.games || []).map(g => {
       const aw = g.teams?.away, hm = g.teams?.home, ls = g.linescore || {};
-      // Team abbreviation — try multiple paths in the API response
-      const awAbbr = aw?.team?.abbreviation || aw?.team?.teamCode?.toUpperCase() || aw?.team?.clubName?.slice(0,3).toUpperCase() || "???";
-      const hmAbbr = hm?.team?.abbreviation || hm?.team?.teamCode?.toUpperCase() || hm?.team?.clubName?.slice(0,3).toUpperCase() || "???";
+      // Team abbreviation — try every possible path
+      const awTeam = aw?.team || {};
+      const hmTeam = hm?.team || {};
+      const awAbbr = awTeam.abbreviation || awTeam.teamCode?.toUpperCase() ||
+                     (awTeam.teamName ? awTeam.teamName.slice(0,3).toUpperCase() : null) ||
+                     TEAM_ID_TO_ABB[awTeam.id] || "???";
+      const hmAbbr = hmTeam.abbreviation || hmTeam.teamCode?.toUpperCase() ||
+                     (hmTeam.teamName ? hmTeam.teamName.slice(0,3).toUpperCase() : null) ||
+                     TEAM_ID_TO_ABB[hmTeam.id] || "???";
       // Venue for home/away context
       const venue = g.venue?.name || "";
       // Probable pitchers
@@ -1213,7 +1219,7 @@ function PregameWeatherRow() {
   return <div style={{marginBottom:12}}>
     <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:7,alignItems:"center"}}>
       <span style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1,marginRight:4}}>Park + Weather:</span>
-      {games.map(g => (
+      {games.filter(g => g.home && g.home !== "???").map(g => (
         <button key={g.gamePk}
           className={`chip ${selTeam===g.home?"active":""}`}
           onClick={() => setSelTeam(g.home)}
@@ -1221,6 +1227,9 @@ function PregameWeatherRow() {
           {g.away} @ {g.home}
         </button>
       ))}
+      {games.every(g => !g.home || g.home === "???") && (
+        <span style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>Loading game schedule…</span>
+      )}
     </div>
     {selTeam && <WeatherBanner team={selTeam}/>}
   </div>;
@@ -1723,7 +1732,7 @@ function BvPTab() {
     {loadingG ? <div style={{padding:"14px 0",fontFamily:"'DM Mono',monospace",fontSize:11,color:"var(--muted)"}}>Loading games…</div>
     : <div className="bgs">{games.filter(g=>g.status!=="Final").map(g=>
         <div key={g.id} className={`bgb ${selGame?.id===g.id?"active":""}`} onClick={()=>{setSelGame(g);setSelSide("away");}}>
-          <div className="bgbt">{g.away.abbr} @ {g.home.abbr}</div>
+          <div className="bgbt">{g.away.abbr!=="???"?g.away.abbr:"TBD"} @ {g.home.abbr!=="???"?g.home.abbr:"TBD"}</div>
           <div className="bgbs">{g.status==="Live"?`● Live ${g.inning||""}`:"Scheduled"}</div>
         </div>
       )}</div>
@@ -1734,7 +1743,7 @@ function BvPTab() {
         <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--muted)",textTransform:"uppercase",letterSpacing:1}}>Facing pitcher from:</span>
         {["away","home"].map(s=>
           <button key={s} className={`chip ${selSide===s?"active":""}`} onClick={()=>setSelSide(s)}>
-            {selGame[s].abbr} ({s==="away"?"Away":"Home"})
+            {selGame[s].abbr!=="???"?selGame[s].abbr:s==="away"?"Away Team":"Home Team"} ({s==="away"?"Away":"Home"})
           </button>
         )}
       </div>
@@ -1744,7 +1753,7 @@ function BvPTab() {
           <div className="pa">{ini(pitcher.name)}</div>
           <div>
             <div className="pnam">{pitcher.name}<span className="hnd">{pitcher.hand}</span></div>
-            <div className="psub">{pitcher.team} · ERA {pitcher.era} · WHIP {pitcher.whip} · FB {pitcher.fbVelo} mph</div>
+            <div className="psub">{pitcher.team && pitcher.team!=="???"?pitcher.team:selGame?.away?.abbr||selGame?.home?.abbr||"—"} · ERA {pitcher.era} · WHIP {pitcher.whip} · FB {pitcher.fbVelo} mph</div>
           </div>
         </div>
         <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",marginBottom:7,textTransform:"uppercase",letterSpacing:1}}>Pitch Arsenal</div>
