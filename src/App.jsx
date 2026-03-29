@@ -226,10 +226,10 @@ const styles = `
   /* Pick buttons */
   input[type=text]{outline:none;}
   input[type=text]::placeholder{color:var(--muted);}
-  .tw-scroll{overflow-x:auto;overflow-y:auto;max-height:72vh;border-radius:10px;border:1px solid var(--border);}
-  .tw-scroll table{width:100%;border-collapse:collapse;}
-  .tw-scroll thead tr{position:sticky;top:0;z-index:10;}
-  .tw-scroll th{padding:9px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-family:'DM Mono',monospace;white-space:nowrap;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;background:var(--surface2);}
+  .tw-scroll{overflow-x:auto;overflow-y:auto;max-height:68vh;border-radius:10px;border:1px solid var(--border);position:relative;}
+  .tw-scroll table{width:100%;border-collapse:separate;border-spacing:0;}
+  .tw-scroll th{padding:9px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-family:'DM Mono',monospace;white-space:nowrap;border-bottom:2px solid var(--border);cursor:pointer;user-select:none;background:var(--surface2);position:sticky;top:0;z-index:20;}
+  .tw-scroll td{padding:10px 12px;font-size:12px;border-bottom:1px solid rgba(30,45,58,.5);vertical-align:middle;}
   ::-webkit-scrollbar{width:5px;height:5px;}
   ::-webkit-scrollbar-track{background:var(--bg);}
   ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
