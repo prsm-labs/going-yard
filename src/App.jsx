@@ -1917,47 +1917,6 @@ function LiveTab() {
   </div>;
 }
 
-// TAB 3: SCOUTING BOARD
-function LiveTab() {
-  const [games, setGames] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [lastUpdate, setLastUpdate] = useState(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const load = useCallback((silent=false) => {
-    fetchGames(setLoading, setGames, setError, silent);
-    setLastUpdate(new Date().toLocaleTimeString());
-  }, []);
-  useEffect(() => { load(false); }, []); // initial — show spinner
-  // Background refresh every 30s — silent so open game panels stay open
-  useEffect(() => {
-    const id = setInterval(() => load(true), 60000);
-    return () => clearInterval(id);
-  }, [load]);
-  const live = games.filter(g=>g.status==="Live");
-  const pre  = games.filter(g=>g.status==="Preview");
-  const fin  = games.filter(g=>g.status==="Final");
-  // Debug: log what statuses we got
-  if (games.length > 0) console.log("[Live] Game statuses:", games.map(g=>`${g.away?.abbr}@${g.home?.abbr}:${g.status}`).join(", "));
-  return <div>
-    <div className="hrow">
-      <div className="section-header"><div className="section-title">📡 Live Yard Watch</div><div className="section-sub">Tap any game · Live=heat · Upcoming=🚀Liftoff · auto-refreshes every 60s{lastUpdate&&<span style={{marginLeft:8}}>Last: {lastUpdate}</span>}</div></div>
-      <RefBtn refreshing={refreshing} onClick={async()=>{setRefreshing(true);await fetchGames(setLoading,setGames,setError,true);setLastUpdate(new Date().toLocaleTimeString());setRefreshing(false);}}/>
-    </div>
-    <div className="note">ℹ️ <strong>Live</strong>: tap → hard contact in HR zones now vs L7. <strong>Upcoming</strong>: tap → 🚀 Liftoff list ranked by HR probability.</div>
-    <div className="cards" style={{marginBottom:14}}>
-      <div className="card"><div className="cl">Live Games</div><div className="cv" style={{color:"#e8411a"}}>{live.length}</div><div className="cs">in progress</div></div>
-      <div className="card"><div className="cl">Scheduled</div><div className="cv" style={{color:"#27c97a"}}>{pre.length}</div><div className="cs">today</div></div>
-      <div className="card"><div className="cl">Total</div><div className="cv">{games.length}</div><div className="cs">on slate</div></div>
-    </div>
-    {loading ? <div className="lw"><div className="sp"/><div className="lt">Fetching schedule…</div></div> : <>
-      {error && <div className="warn">⚠️ {error} — Showing sample.</div>}
-      {live.length>0&&<><div className="div" style={{marginTop:8}}>🔴 Live Now</div><div className="gg">{live.map(g=><GCard key={g.id} game={g}/>)}</div></>}
-      {pre.length>0&&<><div className="div" style={{marginTop:12}}>🟢 Upcoming — Tap for 🚀 Liftoff List</div><div className="gg">{pre.map(g=><GCard key={g.id} game={g}/>)}</div></>}
-      {fin.length>0&&<><div className="div" style={{marginTop:12}}>✓ Final</div><div className="gg">{fin.map(g=><GCard key={g.id} game={g}/>)}</div></>}
-    </>}
-  </div>;
-}
 
 // TAB 3: SCOUTING BOARD
 function ScoutingTab() {
