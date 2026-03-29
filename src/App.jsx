@@ -2253,7 +2253,7 @@ function genBvPBattersNew(pitcher) {
     const pullAdj=Math.round(pullBase*(m*0.7+0.3)*10)/10;
     const chaseAdj=Math.round(chaseBase*(m>1?0.92:1.08)*10)/10;
     const careerBA=0.18+seededRand(sbv,12)*0.18,careerHR=Math.floor(seededRand(sbv,13)*5),careerAB=Math.floor(8+seededRand(sbv,14)*30);
-    const last3=[...Array(3)].map((_,li)=>{const rv=seededRand(2964,25+li);return rv>0.85?"HR":rv>0.6?"H":rv>0.3?"O":"K";});
+    const last3=[...Array(3)].map((_,li)=>{const rv=seededRand(sbv,25+li);return rv>0.85?"HR":rv>0.6?"H":rv>0.3?"O":"K";});
     const b={id:i,name:n[0],team:n[1],hand,matchup,barrel,hardHit,avgEV,sweetSpot:28+seededRand(sbv,4)*18,pullAir:12+seededRand(sbv,5)*18,flyBall:28+seededRand(sbv,4)*20,launchAngle:12+seededRand(sbv,5)*18,hr:Math.floor(seededRand(sbv,15)*20),bbPct,kPct,oSwing,zContact,bbkRatio:bbPct/kPct,evVsFB,chaseVsPitch:chaseAdj,barrelVsPitch:barrelAdj,flyBallVsPitch:fbAdj,pullAirVsPitch:pullAdj,launchAngleVsPitch:laAdj,careerBA,careerHR,careerAB,last3};
     b.cq=calcCQ(b);b.hri=calcHRI(b);b.rd=calcRD(b);b.os=calcOS(b);b.grade=getSG(b.os);b.piq=getPIQ(b);
     const evN=Math.min(Math.max((evVsFB-88)/12,0),1),barN=Math.min(barrelAdj/14,1),fbN=Math.min(fbAdj/45,1);
@@ -2309,15 +2309,16 @@ function BvPTab() {
           const s2=bid||i+1;
           const barrel=Math.round(sr(s2,1,6,22)*10)/10, hardHit=Math.round(sr(s2,2,36,62)*10)/10, avgEV=Math.round(sr(s2,3,87,99)*10)/10;
           const bbPct=Math.round(sr(s2,7,6,14)*10)/10, kPct=Math.round(sr(s2,8,14,28)*10)/10, oSwing=Math.round(sr(s2,10,20,38)*10)/10;
-          const evBase=88+seededRand(3020,3)*14, m=matchup.multiplier;
+          // All seeds use s2 = bid (player ID) for consistency
+          const evBase=88+seededRand(s2,3)*14, m=matchup.multiplier;
           const evVsFB=Math.round((evBase+matchup.evBonus)*10)/10;
-          const barrelAdj=Math.round(barrel*m*10)/10, fbAdj=Math.round((28+seededRand(3022,4)*22)*(m*0.8+0.2)*10)/10;
-          const laAdj=Math.round(((12+seededRand(3023,5)*22)+(m>1?1.5:-1.5))*10)/10;
-          const pullAdj=Math.round((12+seededRand(3024,5)*20)*(m*0.7+0.3)*10)/10;
-          const chaseAdj=Math.round((oSwing+(seededRand(3025,22)*8-4))*(m>1?0.92:1.08)*10)/10;
-          const careerBA=0.18+seededRand(3026,12)*0.18, careerHR=Math.floor(seededRand(3026,13)*5), careerAB=Math.floor(8+seededRand(3026,14)*30);
-          const last3=[...Array(3)].map((_,li)=>{const rv=seededRand(3027,25+li);return rv>0.85?"HR":rv>0.6?"H":rv>0.3?"O":"K";});
-          const b={id:bid,name,team:ta,hand,matchup,barrel,hardHit,avgEV,sweetSpot:28+seededRand(3028,4)*18,pullAir:12+seededRand(3028,5)*18,flyBall:28+seededRand(3028,4)*20,launchAngle:12+seededRand(3028,5)*18,hr:Math.floor(seededRand(3028,15)*20),bbPct,kPct,oSwing,zContact:72+seededRand(3028,9)*20,bbkRatio:bbPct/kPct,evVsFB,chaseVsPitch:chaseAdj,barrelVsPitch:barrelAdj,flyBallVsPitch:fbAdj,pullAirVsPitch:pullAdj,launchAngleVsPitch:laAdj,careerBA,careerHR,careerAB,last3};
+          const barrelAdj=Math.round(barrel*m*10)/10, fbAdj=Math.round((28+seededRand(s2,4)*22)*(m*0.8+0.2)*10)/10;
+          const laAdj=Math.round(((12+seededRand(s2,5)*22)+(m>1?1.5:-1.5))*10)/10;
+          const pullAdj=Math.round((12+seededRand(s2,6)*20)*(m*0.7+0.3)*10)/10;
+          const chaseAdj=Math.round((oSwing+(seededRand(s2,22)*8-4))*(m>1?0.92:1.08)*10)/10;
+          const careerBA=0.18+seededRand(s2,12)*0.18, careerHR=Math.floor(seededRand(s2,13)*5), careerAB=Math.floor(8+seededRand(s2,14)*30);
+          const last3=[...Array(3)].map((_,li)=>{const rv=seededRand(s2,25+li);return rv>0.85?"HR":rv>0.6?"H":rv>0.3?"O":"K";});
+          const b={id:bid,name,team:ta,hand,matchup,barrel,hardHit,avgEV,sweetSpot:28+seededRand(s2,4)*18,pullAir:12+seededRand(s2,5)*18,flyBall:28+seededRand(s2,4)*20,launchAngle:12+seededRand(s2,5)*18,hr:Math.floor(seededRand(s2,15)*20),bbPct,kPct,oSwing,zContact:72+seededRand(s2,9)*20,bbkRatio:bbPct/kPct,evVsFB,chaseVsPitch:chaseAdj,barrelVsPitch:barrelAdj,flyBallVsPitch:fbAdj,pullAirVsPitch:pullAdj,launchAngleVsPitch:laAdj,careerBA,careerHR,careerAB,last3};
           b.cq=calcCQ(b);b.hri=calcHRI(b);b.rd=calcRD(b);b.os=calcOS(b);b.grade=getSG(b.os);b.piq=getPIQ(b);
           const evN=Math.min(Math.max((evVsFB-88)/12,0),1),barN=Math.min(barrelAdj/14,1),fbN=Math.min(fbAdj/45,1);
           const laN=Math.min(Math.max((laAdj-10)/22,0),1),puN=Math.min(pullAdj/28,1),chN=Math.max(1-chaseAdj/45,0);
