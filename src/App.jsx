@@ -728,7 +728,13 @@ async function fetchPlayers(setL, setP, setE, silent=false) {
   if (!silent) setL(true);
   setE(null);
   try {
-    const today = new Date().toISOString().slice(0, 10);
+    // Use Eastern Time for date — MLB schedule is ET-based
+    const etDateP = new Date().toLocaleDateString("en-US", {
+      timeZone: "America/New_York",
+      year: "numeric", month: "2-digit", day: "2-digit"
+    });
+    const [mp,dp,yp] = etDateP.split("/");
+    const today = `${yp}-${mp}-${dp}`;
 
     // Build player → team map from TWO sources:
     // 1. Today's schedule lineups (most accurate for today's starters)
@@ -886,7 +892,13 @@ async function fetchGames(setL, setG, setE, silent=false) {
   if (!silent) setL(true);
   setE(null);
   try {
-    const today = new Date().toISOString().slice(0, 10);
+    // Use Eastern Time for date — MLB schedule is ET-based
+    const etDate = new Date().toLocaleDateString("en-US", {
+      timeZone: "America/New_York",
+      year: "numeric", month: "2-digit", day: "2-digit"
+    });
+    const [m,d,y] = etDate.split("/");
+    const today = `${y}-${m}-${d}`;
     const res = await fetch(`/api/schedule?date=${today}`);
     const data = await res.json();
     const games = (data.dates?.[0]?.games || []).map(g => {
@@ -910,7 +922,18 @@ async function fetchGames(setL, setG, setE, silent=false) {
       const hmHand = hm?.probablePitcher?.pitchHand?.code || "R";
       return {
         id: g.gamePk, gamePk: g.gamePk,
-        status: g.status?.abstractGameState || "Preview",
+        status: (() => {
+          const abs = g.status?.abstractGameState || "";
+          const detailed = g.status?.detailedState || "";
+          const coded = g.status?.codedGameState || "";
+          // Live: In Progress, Manager Challenge, Delayed, etc.
+          if (abs === "Live") return "Live";
+          if (abs === "Final" || abs === "Game Over") return "Final";
+          // Some games show as "I" (in progress) in codedGameState
+          if (coded === "I" || coded === "M" || coded === "N") return "Live";
+          if (coded === "F" || coded === "O") return "Final";
+          return "Preview";
+        })(),
         detailedState: g.status?.detailedState || "",
         inning: ls.currentInning ? `${ls.inningHalf === "Bottom" ? "▼" : "▲"} ${ls.currentInning}` : null,
         venue,
@@ -1443,10 +1466,14 @@ function LiveTab() {
     const id = setInterval(() => load(true), 60000);
     return () => clearInterval(id);
   }, [load]);
-  const live = games.filter(g=>g.status==="Live"), pre = games.filter(g=>g.status==="Preview"), fin = games.filter(g=>g.status==="Final");
+  const live = games.filter(g=>g.status==="Live");
+  const pre  = games.filter(g=>g.status==="Preview");
+  const fin  = games.filter(g=>g.status==="Final");
+  // Debug: log what statuses we got
+  if (games.length > 0) console.log("[Live] Game statuses:", games.map(g=>`${g.away?.abbr}@${g.home?.abbr}:${g.status}`).join(", "));
   return <div>
     <div className="hrow">
-      <div className="section-header"><div className="section-title">📡 Live Yard Watch</div><div className="section-sub">Tap any game · Live=heat · Upcoming=🚀Liftoff · 30s refresh{lastUpdate&&<span style={{marginLeft:8}}>Last: {lastUpdate}</span>}</div></div>
+      <div className="section-header"><div className="section-title">📡 Live Yard Watch</div><div className="section-sub">Tap any game · Live=heat · Upcoming=🚀Liftoff · auto-refreshes every 60s{lastUpdate&&<span style={{marginLeft:8}}>Last: {lastUpdate}</span>}</div></div>
       <RefBtn refreshing={refreshing} onClick={async()=>{setRefreshing(true);await fetchGames(setLoading,setGames,setError,true);setLastUpdate(new Date().toLocaleTimeString());setRefreshing(false);}}/>
     </div>
     <div className="note">ℹ️ <strong>Live</strong>: tap → hard contact in HR zones now vs L7. <strong>Upcoming</strong>: tap → 🚀 Liftoff list ranked by HR probability.</div>

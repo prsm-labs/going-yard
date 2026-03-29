@@ -4,8 +4,18 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET');
   try {
     const { date } = req.query;
-    const today = date || new Date().toISOString().slice(0, 10);
-    // Use simpler hydration — team,linescore,probablePitcher is most reliable
+
+    // Use Eastern Time if no date provided — MLB schedule is ET-based
+    let today = date;
+    if (!today) {
+      const etDate = new Date().toLocaleDateString("en-US", {
+        timeZone: "America/New_York",
+        year: "numeric", month: "2-digit", day: "2-digit"
+      });
+      const [m,d,y] = etDate.split("/");
+      today = `${y}-${m}-${d}`;
+    }
+
     const url = `https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${today}&hydrate=team,linescore,probablePitcher,lineups`;
     const response = await fetch(url, {
       headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' }
@@ -13,14 +23,11 @@ export default async function handler(req, res) {
     if (!response.ok) throw new Error(`MLB API ${response.status}`);
     const data = await response.json();
 
-    // Log what we're getting for debugging
-    const firstGame = data.dates?.[0]?.games?.[0];
-    console.log('[Schedule] First game teams:',
-      firstGame?.teams?.away?.team?.abbreviation,
-      'vs',
-      firstGame?.teams?.home?.team?.abbreviation
-    );
-    console.log('[Schedule] Total games:', data.dates?.[0]?.games?.length ?? 0);
+    const games = data.dates?.[0]?.games || [];
+    console.log(`[Schedule] date=${today} games=${games.length}`);
+    games.slice(0,3).forEach(g => {
+      console.log(`  ${g.teams?.away?.team?.abbreviation}@${g.teams?.home?.team?.abbreviation} status=${g.status?.abstractGameState} coded=${g.status?.codedGameState}`);
+    });
 
     res.status(200).json(data);
   } catch (err) {
