@@ -1362,7 +1362,7 @@ async function fetchLiftoffBatters(game) {
             // Check if this batter hit a HR today from our cached HR data
             const todayHR = HR_DATA.find(h => h.batterId === bid || h.batterName === p?.person?.fullName);
             if (todayHR) return 0; // hit one today!
-            return Math.floor(3+seededRand(999,17)*12); // use tighter range, seeded by bid
+            return Math.floor(3+seededRand(bid||1,17)*12); // seeded by player ID
           })(),
           pitcherFactor: ((bid % 3) === 0) ? 1 : ((bid % 3) === 1) ? -1 : 0,
           homeHR: 0.04 + ((bid % 7) * 0.008),
@@ -1385,8 +1385,9 @@ async function fetchLiftoffBatters(game) {
 
 function genSL() {
   return [["Aaron Judge","NYY"],["Juan Soto","NYM"],["Yordan Alvarez","HOU"],["Kyle Tucker","HOU"],["Pete Alonso","NYM"],["Marcus Semien","TOR"],["Mookie Betts","LAD"],["Gunnar Henderson","BAL"]].map((n, i) => {
-    const barrel = 6+seededRand(999,1)*14, hardHit = 36+seededRand(999,2)*24, avgEV = 87+seededRand(999,3)*11;
-    const b = { id:i, name:n[0], team:n[1], isHome:i%2===0, barrel, hardHit, avgEV, sweetSpot:28+seededRand(999,4)*18, pullAir:12+seededRand(999,5)*18, recentBarrel:barrel*(0.7+seededRand(999,30)*0.8), recentHardHit:hardHit*(0.75+seededRand(999,31)*0.5), recentAvgEV:avgEV+(seededRand(999,23)*4-2), daysSinceHR:Math.floor(1+seededRand(999,16)*18), pitcherFactor:seededRand(999,6)>0.6?1:seededRand(999,21)>0.4?-1:0, homeHR:0.04+seededRand(999,18)*0.06, awayHR:0.03+seededRand(999,19)*0.06, hr:Math.floor(seededRand(999,15)*18) };
+    const si=i+1;
+    const barrel = 6+seededRand(si,1)*14, hardHit = 36+seededRand(si,2)*24, avgEV = 87+seededRand(si,3)*11;
+    const b = { id:i, name:n[0], team:n[1], isHome:i%2===0, barrel, hardHit, avgEV, sweetSpot:28+seededRand(si,4)*18, pullAir:12+seededRand(si,5)*18, recentBarrel:barrel*0.85, recentHardHit:hardHit*0.9, recentAvgEV:avgEV-1, daysSinceHR:Math.floor(2+seededRand(si,6)*12), pitcherFactor:si%3===0?1:si%3===1?-1:0, homeHR:0.04+seededRand(si,8)*0.04, awayHR:0.03+seededRand(si,9)*0.04, hr:Math.floor(seededRand(si,10)*15) };
     b.liftoffScore = calcLS(b); b.verdict = getLV(b.liftoffScore); b.signals = getLSigs(b); return b;
   }).sort((a, b) => b.liftoffScore - a.liftoffScore);
 }
@@ -1396,25 +1397,27 @@ function genPitcher(game, side) {
   // Use real probable pitcher name from live schedule data
   const name = game[side]?.probablePitcher || `${ta} Starter`;
   // Use real pitcher handedness from schedule if available
-  const realHand = game[side]?.pitcherHand || (seededRand(999,30) > 0.25 ? "R" : "L");
-  const fbVelo = realHand === "L" ? (89+seededRand(999,10)*5) : (91+seededRand(999,11)*6);
+  const sp = (ta.charCodeAt(0)||80) + (ta.charCodeAt(1)||0) + (side==="away"?0:7);
+  const realHand = game[side]?.pitcherHand || (seededRand(sp,30) > 0.25 ? "R" : "L");
+  const fbVelo = realHand === "L" ? (89+seededRand(sp,10)*5) : (91+seededRand(sp,11)*6);
   const mix = [
-    {name:"4-Seam FB",pct:Math.round(35+seededRand(999,1)*20),color:"#ff4020",velo:fbVelo.toFixed(1),isPutaway:false},
-    {name:"Slider",pct:Math.round(15+seededRand(999,2)*15),color:"#38b8f2",spin:"2800",isPutaway:seededRand(999,5)>0.5},
-    {name:"Changeup",pct:Math.round(10+seededRand(999,3)*15),color:"#27c97a",velo:(fbVelo-8).toFixed(1),isPutaway:false},
-    {name:"Curveball",pct:Math.round(8+seededRand(999,4)*12),color:"#f5a623",spin:"2600",isPutaway:seededRand(999,6)>0.6},
+    {name:"4-Seam FB",pct:Math.round(35+seededRand(sp,1)*20),color:"#ff4020",velo:fbVelo.toFixed(1),isPutaway:false},
+    {name:"Slider",pct:Math.round(15+seededRand(sp,2)*15),color:"#38b8f2",spin:"2800",isPutaway:seededRand(sp,5)>0.5},
+    {name:"Changeup",pct:Math.round(10+seededRand(sp,3)*15),color:"#27c97a",velo:(fbVelo-8).toFixed(1),isPutaway:false},
+    {name:"Curveball",pct:Math.round(8+seededRand(sp,4)*12),color:"#f5a623",spin:"2600",isPutaway:seededRand(sp,6)>0.6},
   ];
   const tot = mix.reduce((s, p) => s + p.pct, 0);
   mix.forEach(p => { p.pct = Math.round(p.pct / tot * 100); });
   if (!mix.some(p => p.isPutaway)) mix[1].isPutaway = true;
-  return { name, hand: realHand === "L" ? "LHP" : "RHP", team: ta, era: (2.8+seededRand(999,8)*2.5).toFixed(2), whip: (0.9+seededRand(999,9)*0.5).toFixed(2), fbVelo: parseFloat(fbVelo.toFixed(1)), pitchMix: mix };
+  return { name, hand: realHand === "L" ? "LHP" : "RHP", team: ta, era: (2.8+seededRand(sp,8)*2.5).toFixed(2), whip: (0.9+seededRand(sp,9)*0.5).toFixed(2), fbVelo: parseFloat(fbVelo.toFixed(1)), pitchMix: mix };
 }
 
 function genBvPBatters(pitcher) {
   return [["Aaron Judge","NYY"],["Juan Soto","NYM"],["Yordan Alvarez","HOU"],["Kyle Tucker","HOU"],["Pete Alonso","NYM"],["Marcus Semien","TOR"],["Mookie Betts","LAD"],["Gunnar Henderson","BAL"]].map((n, i) => {
-    const barrel=6+seededRand(999,1)*16, hardHit=36+seededRand(999,2)*26, avgEV=87+seededRand(999,3)*12, bbPct=6+seededRand(999,6)*12, kPct=14+seededRand(999,7)*18, oSwing=20+seededRand(999,8)*25, zContact=72+seededRand(999,9)*20, evVsFB=88+seededRand(999,3)*14, whiffBK=15+seededRand(999,10)*35, chaseOS=20+seededRand(999,11)*30, careerBA=0.18+seededRand(999,12)*0.18, careerHR=Math.floor(seededRand(999,13)*5), careerAB=Math.floor(8+seededRand(999,14)*30);
-    const last3 = [...Array(3)].map(() => { const r = seededRand(999,30); return r > 0.85 ? "HR" : r > 0.6 ? "H" : r > 0.3 ? "O" : "K"; });
-    const b = { id:i, name:n[0], team:n[1], barrel, hardHit, avgEV, sweetSpot:28+seededRand(999,4)*18, pullAir:12+seededRand(999,5)*18, hr:Math.floor(seededRand(999,15)*20), bbPct, kPct, oSwing, zContact, bbkRatio:bbPct/kPct, evVsFB, whiffBK, chaseOS, careerBA, careerHR, careerAB, last3 };
+    const sb=i+1;
+    const barrel=6+seededRand(sb,1)*16, hardHit=36+seededRand(sb,2)*26, avgEV=87+seededRand(sb,3)*12, bbPct=6+seededRand(sb,6)*12, kPct=14+seededRand(sb,7)*18, oSwing=20+seededRand(sb,8)*25, zContact=72+seededRand(sb,9)*20, evVsFB=88+seededRand(sb,3)*14, whiffBK=15+seededRand(sb,10)*35, chaseOS=20+seededRand(sb,11)*30, careerBA=0.18+seededRand(sb,12)*0.18, careerHR=Math.floor(seededRand(sb,13)*5), careerAB=Math.floor(8+seededRand(sb,14)*30);
+    const last3 = [...Array(3)].map((_,li) => { const r = seededRand(sb,30+li); return r > 0.85 ? "HR" : r > 0.6 ? "H" : r > 0.3 ? "O" : "K"; });
+    const b = { id:i, name:n[0], team:n[1], barrel, hardHit, avgEV, sweetSpot:28+seededRand(sb,4)*18, pullAir:12+seededRand(sb,5)*18, hr:Math.floor(seededRand(sb,15)*20), bbPct, kPct, oSwing, zContact, bbkRatio:bbPct/kPct, evVsFB, whiffBK, chaseOS, careerBA, careerHR, careerAB, last3 };
     b.cq = calcCQ(b); b.hri = calcHRI(b); b.rd = calcRD(b); b.os = calcOS(b); b.grade = getSG(b.os); b.piq = getPIQ(b);
     b.ms = calcMS(b, pitcher); b.mg = getSG(b.ms);
     return b;
@@ -2238,9 +2241,10 @@ function genBvPBattersNew(pitcher) {
     const bbPct=Math.round(sr(s3,7,6,14)*10)/10,kPct=Math.round(sr(s3,8,14,28)*10)/10,oSwing=Math.round(sr(s3,10,20,38)*10)/10,zContact=Math.round(sr(s3,12,72,92)*10)/10;
     const hand=getBatterHand(n[0]);
     const matchup=getHandMatchup(hand,pitcher.hand);
-    const evBase=88+seededRand(999,3)*14,chaseBase=oSwing+(seededRand(999,22)*8-4);
-    const barrelBase=barrel+(seededRand(999,23)*4-2),fbBase=28+seededRand(999,4)*22;
-    const pullBase=12+seededRand(999,5)*20,laBase=12+seededRand(999,5)*22;
+    const sbv=bid||i+1;
+    const evBase=88+seededRand(sbv,3)*14,chaseBase=oSwing+(seededRand(sbv,22)*8-4);
+    const barrelBase=barrel+(seededRand(sbv,23)*4-2),fbBase=28+seededRand(sbv,4)*22;
+    const pullBase=12+seededRand(sbv,5)*20,laBase=12+seededRand(sbv,5)*22;
     const m=matchup.multiplier;
     const evVsFB=Math.round((evBase+matchup.evBonus)*10)/10;
     const barrelAdj=Math.round(barrelBase*m*10)/10;
@@ -2248,9 +2252,9 @@ function genBvPBattersNew(pitcher) {
     const laAdj=Math.round((laBase+(m>1?1.5:-1.5))*10)/10;
     const pullAdj=Math.round(pullBase*(m*0.7+0.3)*10)/10;
     const chaseAdj=Math.round(chaseBase*(m>1?0.92:1.08)*10)/10;
-    const careerBA=0.18+seededRand(999,12)*0.18,careerHR=Math.floor(seededRand(999,13)*5),careerAB=Math.floor(8+seededRand(999,14)*30);
+    const careerBA=0.18+seededRand(sbv,12)*0.18,careerHR=Math.floor(seededRand(sbv,13)*5),careerAB=Math.floor(8+seededRand(sbv,14)*30);
     const last3=[...Array(3)].map((_,li)=>{const rv=seededRand(2964,25+li);return rv>0.85?"HR":rv>0.6?"H":rv>0.3?"O":"K";});
-    const b={id:i,name:n[0],team:n[1],hand,matchup,barrel,hardHit,avgEV,sweetSpot:28+seededRand(999,4)*18,pullAir:12+seededRand(999,5)*18,flyBall:28+seededRand(999,4)*20,launchAngle:12+seededRand(999,5)*18,hr:Math.floor(seededRand(999,15)*20),bbPct,kPct,oSwing,zContact,bbkRatio:bbPct/kPct,evVsFB,chaseVsPitch:chaseAdj,barrelVsPitch:barrelAdj,flyBallVsPitch:fbAdj,pullAirVsPitch:pullAdj,launchAngleVsPitch:laAdj,careerBA,careerHR,careerAB,last3};
+    const b={id:i,name:n[0],team:n[1],hand,matchup,barrel,hardHit,avgEV,sweetSpot:28+seededRand(sbv,4)*18,pullAir:12+seededRand(sbv,5)*18,flyBall:28+seededRand(sbv,4)*20,launchAngle:12+seededRand(sbv,5)*18,hr:Math.floor(seededRand(sbv,15)*20),bbPct,kPct,oSwing,zContact,bbkRatio:bbPct/kPct,evVsFB,chaseVsPitch:chaseAdj,barrelVsPitch:barrelAdj,flyBallVsPitch:fbAdj,pullAirVsPitch:pullAdj,launchAngleVsPitch:laAdj,careerBA,careerHR,careerAB,last3};
     b.cq=calcCQ(b);b.hri=calcHRI(b);b.rd=calcRD(b);b.os=calcOS(b);b.grade=getSG(b.os);b.piq=getPIQ(b);
     const evN=Math.min(Math.max((evVsFB-88)/12,0),1),barN=Math.min(barrelAdj/14,1),fbN=Math.min(fbAdj/45,1);
     const laN=Math.min(Math.max((laAdj-10)/22,0),1),puN=Math.min(pullAdj/28,1),chN=Math.max(1-chaseAdj/45,0);
