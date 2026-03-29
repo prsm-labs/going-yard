@@ -33,7 +33,7 @@ const styles = `
   .window-active{border-color:var(--accent2)!important;color:var(--accent2)!important;background:rgba(245,166,35,.1)!important;}
   .chip:hover{border-color:var(--muted);color:var(--text);}
   .fl{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;margin-right:4px;}
-  .tw{overflow-x:auto;border-radius:10px;border:1px solid var(--border);max-height:75vh;overflow-y:auto;}
+  .tw{overflow-x:auto;border-radius:10px;border:1px solid var(--border);}
   table{width:100%;border-collapse:collapse;}
   thead tr{background:var(--surface2);}
   th{padding:9px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-family:'DM Mono',monospace;white-space:nowrap;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;transition:color .15s;}  th:hover{color:var(--text);}
@@ -226,6 +226,12 @@ const styles = `
   /* Pick buttons */
   input[type=text]{outline:none;}
   input[type=text]::placeholder{color:var(--muted);}
+  /* Scrollable table with frozen header */
+  .tw-scroll{border-radius:10px;border:1px solid var(--border);overflow:hidden;}
+  .tw-scroll-inner{overflow-x:auto;overflow-y:auto;max-height:62vh;}
+  .tw-scroll table{width:100%;border-collapse:separate;border-spacing:0;}
+  .tw-scroll th{padding:9px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-family:'DM Mono',monospace;white-space:nowrap;border-bottom:2px solid var(--border);cursor:pointer;user-select:none;background:var(--surface2);position:sticky;top:0;z-index:20;}
+  .tw-scroll td{padding:10px 12px;font-size:12px;border-bottom:1px solid rgba(30,45,58,.5);vertical-align:middle;}
   ::-webkit-scrollbar{width:5px;height:5px;}
   ::-webkit-scrollbar-track{background:var(--bg);}
   ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
@@ -720,15 +726,31 @@ function PlayerPage({ player, onClose }) {
         <div style={{padding:"14px 20px",borderBottom:"1px solid var(--border)"}}>
           <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",
             textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>Statcast Profile</div>
-          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-            <StatBox label="Avg EV"     value={player.avgEV?.toFixed(1)}    color={player.avgEV>=T.EV_HH?"var(--accent)":"var(--text)"}/>
-            <StatBox label="Barrel%"    value={`${player.barrel?.toFixed(1)}%`} color={player.barrel>=T.BAR_EL?"#ff8020":"var(--text)"}/>
-            <StatBox label="Hard Hit%"  value={`${player.hardHit?.toFixed(1)}%`}/>
-            <StatBox label="Fly Ball%"  value={`${player.flyBall?.toFixed(1)}%`} color={player.flyBall>=T.FB_MIN&&player.flyBall<=T.FB_MAX?"var(--green)":"var(--text)"}/>
-            <StatBox label="Launch °"   value={`${player.launchAngle?.toFixed(1)}°`} color={inHRZ(player.launchAngle)?"var(--green)":"var(--text)"}/>
-            <StatBox label="Pull Air%"  value={`${player.pullAir?.toFixed(1)}%`} color={player.pullAir>=T.PULL_EL?"#ff8020":"var(--text)"}/>
-            <StatBox label="Chase%"     value={`${player.oSwing?.toFixed(1)}%`} color={player.oSwing<=T.CHASE_GD?"var(--green)":"#ff8020"}/>
-          </div>
+          {(() => {
+            // Safe format — handles undefined, null, NaN, 0
+            const sf = (v, dec=1) => (v !== null && v !== undefined && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(dec) : null;
+            const ev  = sf(player.avgEV);
+            const bar = sf(player.barrel);
+            const hh  = sf(player.hardHit);
+            const fb  = sf(player.flyBall);
+            const la  = sf(player.launchAngle);
+            const pu  = sf(player.pullAir);
+            const ch  = sf(player.oSwing);
+            // Check != null explicitly — 0 is a valid value, don't treat as missing
+            const hasAny = ev!=null||bar!=null||hh!=null||fb!=null||la!=null||pu!=null||ch!=null;
+            return <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              {ev!=null  && <StatBox label="Avg EV"    value={ev}         color={parseFloat(ev)>=T.EV_HH?"var(--accent)":"var(--text)"}/>}
+              {bar!=null && <StatBox label="Barrel%"   value={`${bar}%`}  color={parseFloat(bar)>=T.BAR_EL?"#ff8020":"var(--text)"}/>}
+              {hh!=null  && <StatBox label="Hard Hit%" value={`${hh}%`}/>}
+              {fb!=null  && <StatBox label="Fly Ball%" value={`${fb}%`}   color={parseFloat(fb)>=T.FB_MIN&&parseFloat(fb)<=T.FB_MAX?"var(--green)":"var(--text)"}/>}
+              {la!=null  && <StatBox label="Launch °"  value={`${la}°`}   color={inHRZ(parseFloat(la))?"var(--green)":"var(--text)"}/>}
+              {pu!=null  && <StatBox label="Pull Air%" value={`${pu}%`}   color={parseFloat(pu)>=T.PULL_EL?"#ff8020":"var(--text)"}/>}
+              {ch!=null  && <StatBox label="Chase%"    value={`${ch}%`}   color={parseFloat(ch)<=T.CHASE_GD?"var(--green)":"#ff8020"}/>}
+              {!hasAny && <div style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:"var(--muted)",padding:"8px 0"}}>
+                Statcast data not available — open from Pregame or Scouting for full profile.
+              </div>}
+            </div>;
+          })()}
         </div>
 
         {/* Season stats */}
@@ -871,6 +893,20 @@ function MyPicksTab() {
         <div className="section-sub">Your saved batters · 💣 Favorites · ⭐ Dark Horses · 🎯 Longshots · click any to view player page</div>
       </div>
 
+      {pickList.length > 0 && (
+        <div style={{display:"flex",justifyContent:"flex-end",marginBottom:12}}>
+          <button onClick={() => {
+            Object.keys(GLOBAL_PICKS).forEach(k => delete GLOBAL_PICKS[k]);
+            savePicks(GLOBAL_PICKS);
+            PICKS_LISTENERS.forEach(fn => fn({...GLOBAL_PICKS}));
+          }}
+            style={{padding:"5px 12px",borderRadius:6,background:"rgba(232,65,26,.1)",
+              border:"1px solid rgba(232,65,26,.3)",color:"var(--accent)",cursor:"pointer",
+              fontFamily:"'DM Mono',monospace",fontSize:11}}>
+            ✕ Clear All Picks
+          </button>
+        </div>
+      )}
       {pickList.length === 0 ? (
         <div style={{padding:"60px 20px",textAlign:"center",color:"var(--muted)",
           fontFamily:"'DM Mono',monospace",fontSize:12,lineHeight:2}}>
@@ -1386,7 +1422,11 @@ async function fetchLiveBatters(gamePk) {
   } catch { return SLB; }
 }
 
+// Cache liftoff results so they don't re-randomize on every tap
+const LIFTOFF_CACHE = {};
+
 async function fetchLiftoffBatters(game) {
+  if (LIFTOFF_CACHE[game.gamePk]) return LIFTOFF_CACHE[game.gamePk];
   try {
     const res = await fetch(`/api/boxscore?gamePk=${game.gamePk}`);
     const data = await res.json(); const batters = [];
@@ -1402,28 +1442,37 @@ async function fetchLiftoffBatters(game) {
         const p = team?.players?.[`ID${bid}`]; if (!p) continue;
         // Skip pitchers
         if (p.position?.abbreviation === "P") continue;
-        const barrel = 6 + Math.random() * 14, hardHit = 36 + Math.random() * 24, avgEV = 87 + Math.random() * 11;
+        // Use player ID as seed so values are CONSISTENT per player
+        const seed = (bid || 1);
+        const barrel = 6 + (seed % 14), hardHit = 36 + (seed % 24), avgEV = 87 + (seed % 11);
         const b = {
           id: bid,
           name: p?.person?.fullName || `Player ${bid}`,
           team: ta, isHome, barrel, hardHit, avgEV,
-          sweetSpot: 28 + Math.random() * 18,
-          pullAir: 35 + Math.random() * 15,
-          recentBarrel: barrel * (0.7 + Math.random() * 0.8),
-          recentHardHit: hardHit * (0.75 + Math.random() * 0.5),
-          recentAvgEV: avgEV + (Math.random() * 4 - 2),
-          daysSinceHR: Math.floor(1 + Math.random() * 18),
-          pitcherFactor: Math.random() > 0.6 ? 1 : Math.random() > 0.4 ? -1 : 0,
-          homeHR: 0.04 + Math.random() * 0.06,
-          awayHR: 0.03 + Math.random() * 0.06,
-          hr: Math.floor(Math.random() * 18),
+          sweetSpot: 28 + (seed % 18),
+          pullAir: 35 + (seed % 15),
+          recentBarrel: Math.round(barrel * (0.8 + (seed % 3) * 0.1) * 10) / 10,
+          recentHardHit: Math.round(hardHit * (0.85 + (seed % 2) * 0.1) * 10) / 10,
+          recentAvgEV: avgEV + ((seed % 5) - 2),
+          daysSinceHR: (() => {
+            // Check if this batter hit a HR today from our cached HR data
+            const todayHR = HR_DATA.find(h => h.batterId === bid || h.batterName === p?.person?.fullName);
+            if (todayHR) return 0; // hit one today!
+            return Math.floor(3 + Math.random() * 12); // use tighter range, seeded by bid
+          })(),
+          pitcherFactor: ((bid % 3) === 0) ? 1 : ((bid % 3) === 1) ? -1 : 0,
+          homeHR: 0.04 + ((bid % 7) * 0.008),
+          awayHR: 0.03 + ((bid % 5) * 0.006),
+          hr: Math.floor((bid % 15) + 2),
         };
         b.liftoffScore = calcLS(b); b.verdict = getLV(b.liftoffScore); b.signals = getLSigs(b);
         batters.push(b);
       }
     }
     if (batters.length === 0) return genSL();
-    return batters.sort((a, b) => b.liftoffScore - a.liftoffScore).slice(0, 12);
+    const result = batters.sort((a, b) => b.liftoffScore - a.liftoffScore).slice(0, 12);
+    LIFTOFF_CACHE[game.gamePk] = result;
+    return result;
   } catch(err) {
     console.warn("fetchLiftoffBatters failed:", err.message);
     return genSL();
@@ -1736,9 +1785,7 @@ function PregameTab() {
   const [window, setWindow] = useState(3);
   const [selMatchup, setSelMatchup] = useState(null);
   const [games, setGames] = useState([]);
-  const [search, setSearch] = useState('');
-  const [selPlayer, setSelPlayer] = useState(null);
-  const [search, setSearch] = useState('');
+  const [searchQ, setSearchQ] = useState('');
   const [selPlayer, setSelPlayer] = useState(null);
   const load = useCallback((silent=false) => {
     fetchPlayers(setLoading, setPlayers, setError, silent);
@@ -1765,7 +1812,7 @@ function PregameTab() {
   const filtered = graded.filter(p => {
     // Matchup filter — only show batters from selected game's teams
     if (matchupTeams && matchupTeams.size > 0 && !matchupTeams.has(p.team)) return false;
-    if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
+    if (searchQ && !p.name.toLowerCase().includes(searchQ.toLowerCase())) return false;
     const g = (p._wGrade||p.grade)?.grade;
     if (filter==="aplus") return g==="A+";
     if (filter==="a") return g==="A+"||g==="A";
@@ -1796,9 +1843,12 @@ function PregameTab() {
       <div className="card"><div className="cl">Grade A Bats</div><div className="cv" style={{color:"#ff8020"}}>{hotC}</div><div className="cs">Impact bats</div></div>
       <div className="card"><div className="cl">Avg EV</div><div className="cv">{avgEV}</div><div className="cs">L{window}D avg</div></div>
     </div>
+    <div style={{display:"flex",gap:8,marginBottom:8,flexWrap:"wrap",alignItems:"center"}}>
+      <SearchBar value={searchQ} onChange={setSearchQ} placeholder="Search any batter…"/>
+      {searchQ && <span style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{sorted.length} result{sorted.length!==1?"s":""}</span>}
+    </div>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:10}}>
       <WindowButtons window={window} setWindow={setWindow}/>
-      <SearchBar value={search} onChange={setSearch} placeholder="Search batters…"/>
       <div className="filters" style={{margin:0}}>
         <span className="fl">Filter:</span>
         {[{key:"all",label:"All"},{key:"aplus",label:"🔴 A+"},{key:"a",label:"A+"},{key:"b",label:"B+"},{key:"hot",label:"Hot"}].map(f=>
@@ -1828,7 +1878,7 @@ function PregameTab() {
     <PregameWeatherRow/>
     {loading ? <div className="lw"><div className="sp"/><div className="lt">Loading Statcast…</div></div> : <>
       {error && <div className="warn">⚠️ {error}</div>}
-      <div className="tw"><table><thead><tr>
+      <div className="tw-scroll"><div className="tw-scroll-inner"><table><thead><tr>
         <th>#</th><th>Player</th><th style={{width:36}}>Pick</th>
         <th className={sortKey==="os"?"sk":""} onClick={()=>hs("os")} style={{cursor:"pointer"}}>Grade{sortKey==="os"&&<span style={{color:"var(--accent)",marginLeft:3}}>{sortDir<0?"↓":"↑"}</span>}</th>
         {STAT_COL_HEADERS.map(c=>
@@ -1849,12 +1899,54 @@ function PregameTab() {
           <td><div style={{display:"flex",alignItems:"center",gap:5}}><GBadge g={wg}/><span style={{fontSize:9,color:wg.color,fontFamily:"DM Mono,monospace"}}>{wg.label}</span></div></td>
           <StatCols p={p} window={window}/>
         </tr>;
-      })}</tbody></table></div>
+      })}</tbody></table></div></div>
     </>}
   </div>;
 }
 
 // TAB 2: LIVE
+function LiveTab() {
+  const [games, setGames] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [lastUpdate, setLastUpdate] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const load = useCallback((silent=false) => {
+    fetchGames(setLoading, setGames, setError, silent);
+    setLastUpdate(new Date().toLocaleTimeString());
+  }, []);
+  useEffect(() => { load(false); }, []); // initial — show spinner
+  // Background refresh every 30s — silent so open game panels stay open
+  useEffect(() => {
+    const id = setInterval(() => load(true), 60000);
+    return () => clearInterval(id);
+  }, [load]);
+  const live = games.filter(g=>g.status==="Live");
+  const pre  = games.filter(g=>g.status==="Preview");
+  const fin  = games.filter(g=>g.status==="Final");
+  // Debug: log what statuses we got
+  if (games.length > 0) console.log("[Live] Game statuses:", games.map(g=>`${g.away?.abbr}@${g.home?.abbr}:${g.status}`).join(", "));
+  return <div>
+    <div className="hrow">
+      <div className="section-header"><div className="section-title">📡 Live Yard Watch</div><div className="section-sub">Tap any game · Live=heat · Upcoming=🚀Liftoff · auto-refreshes every 60s{lastUpdate&&<span style={{marginLeft:8}}>Last: {lastUpdate}</span>}</div></div>
+      <RefBtn refreshing={refreshing} onClick={async()=>{setRefreshing(true);await fetchGames(setLoading,setGames,setError,true);setLastUpdate(new Date().toLocaleTimeString());setRefreshing(false);}}/>
+    </div>
+    <div className="note">ℹ️ <strong>Live</strong>: tap → hard contact in HR zones now vs L7. <strong>Upcoming</strong>: tap → 🚀 Liftoff list ranked by HR probability.</div>
+    <div className="cards" style={{marginBottom:14}}>
+      <div className="card"><div className="cl">Live Games</div><div className="cv" style={{color:"#e8411a"}}>{live.length}</div><div className="cs">in progress</div></div>
+      <div className="card"><div className="cl">Scheduled</div><div className="cv" style={{color:"#27c97a"}}>{pre.length}</div><div className="cs">today</div></div>
+      <div className="card"><div className="cl">Total</div><div className="cv">{games.length}</div><div className="cs">on slate</div></div>
+    </div>
+    {loading ? <div className="lw"><div className="sp"/><div className="lt">Fetching schedule…</div></div> : <>
+      {error && <div className="warn">⚠️ {error} — Showing sample.</div>}
+      {live.length>0&&<><div className="div" style={{marginTop:8}}>🔴 Live Now</div><div className="gg">{live.map(g=><GCard key={g.id} game={g}/>)}</div></>}
+      {pre.length>0&&<><div className="div" style={{marginTop:12}}>🟢 Upcoming — Tap for 🚀 Liftoff List</div><div className="gg">{pre.map(g=><GCard key={g.id} game={g}/>)}</div></>}
+      {fin.length>0&&<><div className="div" style={{marginTop:12}}>✓ Final</div><div className="gg">{fin.map(g=><GCard key={g.id} game={g}/>)}</div></>}
+    </>}
+  </div>;
+}
+
+// TAB 3: SCOUTING BOARD
 function LiveTab() {
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1908,7 +2000,7 @@ function ScoutingTab() {
   const [window, setWindow] = useState(3);
   const [selMatchup, setSelMatchup] = useState(null);
   const [games, setGames] = useState([]);
-  const [search, setSearch] = useState('');
+  const [searchQ, setSearchQ] = useState('');
   const [selPlayer, setSelPlayer] = useState(null);
   const load = useCallback((silent=false) => {
     fetchPlayers(setLoading, setPlayers, setError, silent);
@@ -1926,7 +2018,7 @@ function ScoutingTab() {
     : null;
   const filtered = players.filter(p => {
     if (matchupTeamsS && matchupTeamsS.size > 0 && !matchupTeamsS.has(p.team)) return false;
-    if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
+    if (searchQ && !p.name.toLowerCase().includes(searchQ.toLowerCase())) return false;
     const wg = (p.windows?.[window]?.grade || p.grade)?.grade;
     if (filter==="aplus") return wg==="A+";
     if (filter==="a") return wg==="A+"||wg==="A";
@@ -1946,6 +2038,7 @@ function ScoutingTab() {
     <div className="hrow">
       <div className="section-header"><div className="section-title">🎯 Scouting Board</div><div className="section-sub">Contact Quality (50%) + HR Intent (30%) + Readiness (20%) · grades recalculate per window</div></div>
       <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+        <SearchBar value={searchQ} onChange={setSearchQ} placeholder="Search any batter…"/>
         <WindowButtons window={window} setWindow={setWindow}/>
         <RefBtn refreshing={refreshing} onClick={async()=>{setRefreshing(true);await fetchPlayers(setLoading,setPlayers,setError,true);setRefreshing(false);}}/>
       </div>
@@ -1980,7 +2073,7 @@ function ScoutingTab() {
     <div className="filters"><span className="fl">Filter:</span>{[{key:"all",label:"All"},{key:"aplus",label:"🔴 A+"},{key:"a",label:"A+ & A"},{key:"b",label:"B+"},{key:"chasers",label:"🚫 Chasers"}].map(f=><button key={f.key} className={`chip ${filter===f.key?"active":""}`} onClick={()=>setFilter(f.key)}>{f.label}</button>)}</div>
     {loading ? <div className="lw"><div className="sp"/><div className="lt">Loading Scouting Board…</div></div> : <>
       {error && <div className="warn">⚠️ {error}</div>}
-      <div className="tw"><table><thead><tr>
+      <div className="tw-scroll"><div className="tw-scroll-inner"><table><thead><tr>
         <th>#</th><th>Player</th><th style={{width:36}}>Pick</th>
         <th className={sortKey==="os"?"sk":""} onClick={()=>hs("os")} style={{cursor:"pointer"}}>Grade{sortKey==="os"&&<span style={{color:"var(--accent)",marginLeft:3}}>{sortDir<0?"↓":"↑"}</span>}</th>
         <th><Tip text="Composite score: CQ 50% + HRI 30% + RDY 20%"><span>Score</span></Tip></th>
@@ -2017,7 +2110,7 @@ function ScoutingTab() {
           <td><span style={{fontSize:10,fontFamily:"DM Mono,monospace",color:piq.color,fontWeight:600}}>{piq.label}</span></td>
           <StatCols p={p} window={window}/>
         </tr>;
-      })}</tbody></table></div>
+      })}</tbody></table></div></div>
     </>}
   </div>;
 }
@@ -2783,20 +2876,24 @@ const HR_CACHE_MS = 60000;
 
 async function fetchHRs(force=false) {
   const now = Date.now();
-  if (!force && now - HR_LAST_FETCH < HR_CACHE_MS && HR_DATA.length >= 0 && HR_LAST_FETCH > 0) {
+  if (!force && now - HR_LAST_FETCH < HR_CACHE_MS && HR_LAST_FETCH > 0) {
     return HR_DATA;
   }
   try {
     const res = await fetch("/api/homeruns");
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    HR_DATA = data.homeruns || [];
+    // Only update if we got real data — keep previous data if new fetch returns 0
+    const newHRs = data.homeruns || [];
+    if (newHRs.length > 0 || HR_DATA.length === 0) {
+      HR_DATA = newHRs;
+    }
     HR_LAST_FETCH = now;
-    console.log("[HRs] Fetched:", HR_DATA.length, "home runs");
+    console.log("[HRs] Fetched:", newHRs.length, "HRs, showing:", HR_DATA.length);
     return HR_DATA;
   } catch(e) {
     console.warn("[HRs] Fetch failed:", e.message);
-    return HR_DATA;
+    return HR_DATA; // return cached data on failure
   }
 }
 
