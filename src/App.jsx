@@ -338,27 +338,36 @@ const calcRD = (p) => {
   return Math.round((bb + k + os + zc) * 10) / 10;
 };
 const calcOS = (p) => {
+  // ── PRIMARY: EV gate (40pts) ─────────────────────────────
   const ev = p.avgEV ?? p.windows?.[15]?.avgEV ?? 85;
-
-  // ── EV GATE — primary grade anchor (60pts) ──────────────
-  // Based on provided EV grade table. Slow bats cannot reach A/A+.
   const evPts =
-    ev >= 92.5 ? 60 :
-    ev >= 90.0 ? 52 :
-    ev >= 87.0 ? 42 :
-    ev >= 84.0 ? 30 :
-    ev >= 81.0 ? 18 :
-                  8;
+    ev >= 92.5 ? 40 :
+    ev >= 90.0 ? 34 :
+    ev >= 87.0 ? 28 :
+    ev >= 84.0 ? 20 :
+    ev >= 81.0 ? 12 : 5;
 
-  // ── MODIFIER METRICS (40pts total) ──────────────────────
-  // These can only push a batter UP within their EV tier, never past it
-  const cq  = calcCQ(p),  rd = calcRD(p), hri = calcHRI(p);
-  const cqN = Math.min(Math.max((cq  - 0.5) / (3.5 - 0.5), 0), 1);
-  const rdN = Math.min(Math.max((rd  - 2)   / (10  - 2),   0), 1);
-  const hrN = Math.min(Math.max((hri - 1.5) / (9   - 1.5), 0), 1);
-  const modPts = (0.5 * cqN + 0.3 * hrN + 0.2 * rdN) * 40;
+  // ── POWER QUALITY (25pts) — xwOBA + Barrel% + HardHit% ──
+  // This mirrors Power BI "Power Score" + "HR Grade"
+  const xw = p.xwoba ?? 0;
+  const xwPts = xw >= 0.400 ? 25 : xw >= 0.350 ? 20 : xw >= 0.320 ? 15 :
+                xw >= 0.300 ? 10 : xw > 0 ? 6 : 0;
+  const barrelPts = Math.min((p.barrel ?? 0) / 15 * 15, 15);
+  const hhPts     = Math.min((p.hardHit ?? 0) / 50 * 10, 10);
+  const powerPts  = xw > 0 ? (xwPts * 0.6 + barrelPts * 0.3 + hhPts * 0.1)
+                            : (barrelPts * 0.7 + hhPts * 0.3);
 
-  return Math.round((evPts + modPts) * 10) / 10;
+  // ── CONTACT QUALITY (20pts) — launch angle + sweet spot ──
+  const la = p.launchAngle ?? 0;
+  const laPts = inHRZ(la) ? 20 : (la >= 10 && la < 25) ? 14 :
+                (la >= 0 && la < 10) ? 8 : la < 0 ? 4 : 6;
+
+  // ── PLATE DISCIPLINE (15pts) — BB%, K%, Chase% ───────────
+  const cq = calcCQ(p), rd = calcRD(p);
+  const rdN = Math.min(Math.max((rd - 2) / (10-2), 0), 1);
+  const discPts = rdN * 15;
+
+  return Math.round((evPts + powerPts + laPts + discPts) * 10) / 10;
 };
 const getSG = (s) => {
   // Score bands aligned to EV gate:
@@ -877,27 +886,36 @@ const calcRD = (p) => {
   return Math.round((bb + k + os + zc) * 10) / 10;
 };
 const calcOS = (p) => {
+  // ── PRIMARY: EV gate (40pts) ─────────────────────────────
   const ev = p.avgEV ?? p.windows?.[15]?.avgEV ?? 85;
-
-  // ── EV GATE — primary grade anchor (60pts) ──────────────
-  // Based on provided EV grade table. Slow bats cannot reach A/A+.
   const evPts =
-    ev >= 92.5 ? 60 :
-    ev >= 90.0 ? 52 :
-    ev >= 87.0 ? 42 :
-    ev >= 84.0 ? 30 :
-    ev >= 81.0 ? 18 :
-                  8;
+    ev >= 92.5 ? 40 :
+    ev >= 90.0 ? 34 :
+    ev >= 87.0 ? 28 :
+    ev >= 84.0 ? 20 :
+    ev >= 81.0 ? 12 : 5;
 
-  // ── MODIFIER METRICS (40pts total) ──────────────────────
-  // These can only push a batter UP within their EV tier, never past it
-  const cq  = calcCQ(p),  rd = calcRD(p), hri = calcHRI(p);
-  const cqN = Math.min(Math.max((cq  - 0.5) / (3.5 - 0.5), 0), 1);
-  const rdN = Math.min(Math.max((rd  - 2)   / (10  - 2),   0), 1);
-  const hrN = Math.min(Math.max((hri - 1.5) / (9   - 1.5), 0), 1);
-  const modPts = (0.5 * cqN + 0.3 * hrN + 0.2 * rdN) * 40;
+  // ── POWER QUALITY (25pts) — xwOBA + Barrel% + HardHit% ──
+  // This mirrors Power BI "Power Score" + "HR Grade"
+  const xw = p.xwoba ?? 0;
+  const xwPts = xw >= 0.400 ? 25 : xw >= 0.350 ? 20 : xw >= 0.320 ? 15 :
+                xw >= 0.300 ? 10 : xw > 0 ? 6 : 0;
+  const barrelPts = Math.min((p.barrel ?? 0) / 15 * 15, 15);
+  const hhPts     = Math.min((p.hardHit ?? 0) / 50 * 10, 10);
+  const powerPts  = xw > 0 ? (xwPts * 0.6 + barrelPts * 0.3 + hhPts * 0.1)
+                            : (barrelPts * 0.7 + hhPts * 0.3);
 
-  return Math.round((evPts + modPts) * 10) / 10;
+  // ── CONTACT QUALITY (20pts) — launch angle + sweet spot ──
+  const la = p.launchAngle ?? 0;
+  const laPts = inHRZ(la) ? 20 : (la >= 10 && la < 25) ? 14 :
+                (la >= 0 && la < 10) ? 8 : la < 0 ? 4 : 6;
+
+  // ── PLATE DISCIPLINE (15pts) — BB%, K%, Chase% ───────────
+  const cq = calcCQ(p), rd = calcRD(p);
+  const rdN = Math.min(Math.max((rd - 2) / (10-2), 0), 1);
+  const discPts = rdN * 15;
+
+  return Math.round((evPts + powerPts + laPts + discPts) * 10) / 10;
 };
 const getSG = (s) => {
   // Score bands aligned to EV gate:
@@ -1810,71 +1828,69 @@ async function fetchPlayers(setL, setP, setE, silent=false) {
       if (!pt[pid]) pt[pid] = info.team;
     }
     const sc = await fetch("/api/statcast?year=2026&minAB=5");
-    const csv = await sc.text();
-    // CSV parser that handles quoted fields with commas (e.g. "Naylor, Josh")
-    const parseCSVRow = (row) => {
-      const vals = []; let cur = "", inQ = false;
-      for (let i = 0; i < row.length; i++) {
-        const ch = row[i];
-        if (ch === '"') { inQ = !inQ; }
-        else if (ch === ',' && !inQ) { vals.push(cur.trim()); cur = ""; }
-        else { cur += ch; }
-      }
-      vals.push(cur.trim());
-      return vals;
-    };
-    const rows = csv.trim().split("\n");
-    const hdrs = parseCSVRow(rows[0]).map(h => h.replace(/"/g, "").trim());
-    const data = rows.slice(1).filter(r => r.trim()).map(row => {
-      const v = parseCSVRow(row).map(x => x.replace(/"/g, "").trim());
-      const o = {}; hdrs.forEach((h, i) => { o[h] = v[i] ?? ""; }); return o;
-    }).filter(r => r.player_id && parseFloat(r.avg_hit_speed) > 0);
-    // Log headers for debugging — remove after confirming
-    if (process?.env?.NODE_ENV !== 'production') {
-      console.log('[Going Yard] Statcast CSV headers:', hdrs.slice(0, 20).join(', '));
-      if (data[0]) console.log('[Going Yard] First row sample:', JSON.stringify(Object.fromEntries(Object.entries(data[0]).slice(0, 10))));
-    }
-    // Parse player name — Savant returns "last_name, first_name" as one combined field
+    const scJson = await sc.json();
+    const data = (scJson.players || []).filter(r => r.player_id);
+
+    console.log("[Going Yard] Statcast players:", data.length);
+    if (data[0]) console.log("[Going Yard] Sample keys:", Object.keys(data[0]).slice(0,15).join(", "));
+
+    // Parse player name — Savant returns "last_name, first_name"
     const getName = (r) => {
       const combined = r["last_name, first_name"] || r["last_name,first_name"] || "";
       if (combined && combined.includes(",")) {
         const parts = combined.split(",");
         return `${parts[1].trim()} ${parts[0].trim()}`;
       }
-      // Fallback: try separate fields
-      const fn = r.first_name || "", ln = r.last_name || "";
+      const fn = r.first_name || r.player_first_name || "";
+      const ln = r.last_name  || r.player_last_name  || "";
       if (fn || ln) return `${fn} ${ln}`.trim();
       return `Player ${r.player_id}`;
     };
 
-    const mapped = data.slice(0, 200).map(r => {
+    // Safe float parser with cap
+    const pf = (v, cap=999) => Math.min(parseFloat(v)||0, cap);
+
+    const mapped = data.map(r => {
       const pid = parseInt(r.player_id);
-      // Team: try lineup lookup first, then any team column in CSV
-      const team = pt[pid] || r.team_name_abbrev || r.team_abbrev || r.team || r["Team"] || "—";
+      const team = pt[pid] || r.team_name_abbrev || r.team_abbrev || r.team || "—";
+
+      // ── Map ALL Statcast columns — try multiple possible names ──
+      // Expected stats endpoint uses: xba, xslg, xwoba, xobp, exit_velocity_avg
+      // Batted ball endpoint uses: avg_hit_speed, brl_percent, ev95percent, fbld
+      const avgEV      = pf(r.exit_velocity_avg || r.avg_hit_speed, 115);
+      const barrel     = pf(r.barrel_batted_rate || r.brl_percent, 25);
+      const hardHit    = pf(r.hard_hit_percent || r.ev95percent, 80);
+      const launchAngle= Math.min(Math.max(pf(r.launch_angle_avg || r.avg_hit_angle), -20), 50);
+      const sweetSpot  = pf(r.sweet_spot_percent || r.anglesweetspotpercent, 60);
+      // Fly ball%: fb_percent is pure FB%, fbld is FB+LD combined
+      const flyBall    = Math.min(pf(r.fb_percent) || Math.round(pf(r.fbld)/2.2*10)/10, 52);
+      // Expected stats
+      const xwoba      = pf(r.xwoba || r.est_woba, 0.600);
+      const xslg       = pf(r.xslg  || r.est_slg,  1.200);
+      const xba        = pf(r.xba   || r.est_ba,    0.400);
+      // Pull/GB/Sprint
+      const pullPct    = pf(r.pull_percent, 60);
+      const groundBall = pf(r.gb_percent,   70);
+      // Counts
+      const paCount    = parseInt(r.pa || r.abs || 0);
+      const abCount    = parseInt(r.abs || r.ab || paCount);
+
       return enrichP({
-        pid,
-        name: getName(r),
-        team,
-        // Confirmed column names from live Savant CSV response
-        avgEV:       Math.min(parseFloat(r.avg_hit_speed) || 0, 115),   // cap at 115
-        launchAngle: Math.min(Math.max(parseFloat(r.avg_hit_angle) || 0, -20), 50),
-        sweetSpot:   Math.min(parseFloat(r.anglesweetspotpercent) || 0, 60),
-        barrel:      Math.min(parseFloat(r.brl_percent) || 0, 25),       // cap at 25%
-        hardHit:     Math.min(parseFloat(r.ev95percent) || 0, 80),       // cap at 80%
-        // fbld = fly ball + line drive % combined — divide by ~2.2 to get flyball% only
-        flyBall:     Math.min(Math.round((parseFloat(r.fbld) || 0) / 2.2 * 10) / 10, 55),
-        maxEV:       parseFloat(r.max_hit_speed) || 0,
-        ev50:        parseFloat(r.ev50) || 0,
-        barrels:     parseInt(r.barrels) || 0,
-        // These come from MLB Stats API enrichment below
-        pullAir:     0,
-        bbPct:       0,
-        kPct:        0,
-        oSwing:      0,
-        zContact:    80,
-        hr:          0,
+        pid, name: getName(r), team,
+        avgEV, barrel, hardHit, launchAngle, sweetSpot, flyBall,
+        xwoba, xslg, xba,
+        pullAir: pullPct,  // pull% from Savant is accurate
+        maxEV: pf(r.max_hit_speed || r.max_exit_velocity, 130),
+        ev50:  pf(r.ev50, 120),
+        // BB/K/oSwing from MLB Stats enrichment below
+        bbPct: 0, kPct: 0, oSwing: 0, zContact: 80, hr: 0,
+        pa: paCount, ab: abCount,
+        avg: pf(r.ba || r.avg, 0.500),
+        slg: pf(r.slg, 1.200),
+        obp: pf(r.obp, 0.600),
+        ops: pf(r.ops, 2.000),
       });
-    }).filter(r => r.avgEV > 0).sort((a, b) => b.os - a.os);
+    }).filter(r => r.avgEV > 0 || r.xwoba > 0).sort((a,b) => b.os - a.os);
 
     // Fetch MLB Stats API for BB%, K%, HR, and batting stats
     // These fill in what Savant doesn't provide
