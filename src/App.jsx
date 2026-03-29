@@ -244,6 +244,12 @@ const styles = `
 `;
 
 // THRESHOLDS
+// ── PLAYER DATA CACHE (module-level, persists across renders) ────
+const PLAYER_DATA_CACHE = {};
+let PLAYER_CACHE_DATE = null;
+function cachePlayer(p) { if (p.pid) PLAYER_DATA_CACHE[p.pid] = p; }
+function getCachedPlayer(pid) { return PLAYER_DATA_CACHE[pid] || null; }
+
 const T={
   EV_HH:95,       // Hard hit entry point
   EV_HR:103,       // HR probability spike
@@ -458,25 +464,25 @@ function genWindows(p) {
       return Math.max(0, Math.round(base_val + offset));
     };
 
-    const avgEV   = rv(p.avgEV ?? 92, variance * 8);
-    const barrel  = rv(p.barrel ?? 10, variance * 10);
-    const flyBall = rv(p.flyBall ?? 38, variance * 10);
-    const launchAngle = rv(p.launchAngle ?? 26, variance * 8);
-    const pullAir = rv(p.pullAir ?? 38, variance * 12);
-    const oSwing  = rv(p.oSwing ?? 28, variance * 8);
-    const hardHit = rv(p.hardHit ?? 42, variance * 12);
-    const bbPct   = rv(p.bbPct ?? 9, variance * 5);
-    const kPct    = rv(p.kPct ?? 22, variance * 8);
-    const avgBA   = rv(p.avg ?? 0.255, variance * 0.06);
+    const avgEV   = rv(p.avgEV ?? 92, variance * 8, 1);
+    const barrel  = rv(p.barrel ?? 10, variance * 10, 2);
+    const flyBall = Math.min(rv(p.flyBall > 0 ? p.flyBall : 32, variance * 8, 3), 52);
+    const launchAngle = rv(p.launchAngle ?? 26, variance * 8, 4);
+    const pullAir = rv(p.pullAir ?? 18, variance * 8, 5);
+    const oSwing  = rv(p.oSwing ?? 28, variance * 8, 6);
+    const hardHit = rv(p.hardHit ?? 42, variance * 12, 7);
+    const bbPct   = rv(p.bbPct ?? 9, variance * 5, 8);
+    const kPct    = rv(p.kPct ?? 22, variance * 8, 9);
+    const avgBA   = rv(p.avg ?? 0.255, variance * 0.06, 10);
     // Scale to days: ~3.5 AB per day, ~0.9 games per day
     const gamesInWindow = Math.round(w * 0.9);
-    const hits    = ri(gamesInWindow * 1.1, gamesInWindow * 0.5);
-    const xbh     = ri(hits * 0.28, hits * 0.15);
-    const hr      = ri(gamesInWindow * 0.18, gamesInWindow * 0.12);
+    const hits    = ri(gamesInWindow * 1.1, gamesInWindow * 0.5, 11);
+    const xbh     = ri(hits * 0.28, hits * 0.15, 12);
+    const hr      = ri(gamesInWindow * 0.18, gamesInWindow * 0.12, 13);
     const totalBases = hits + xbh + hr * 2;
-    const atBats  = ri(gamesInWindow * 3.8, gamesInWindow * 0.6);
+    const atBats  = ri(gamesInWindow * 3.8, gamesInWindow * 0.6, 14);
     const abPerHR = hr > 0 ? Math.round(atBats / hr * 10) / 10 : 99;
-    const abSinceHR = ri(3, 8);
+    const abSinceHR = ri(3, 8, 15);
     // "Almost%" — fly balls hit 350ft+ but not HR (estimated from flyBall% and EV)
     const almostPct = Math.round(Math.min(flyBall * (avgEV >= T.EV_HH ? 0.45 : 0.3), 35) * 10) / 10;
 
@@ -742,15 +748,16 @@ function PlayerPage({ player, onClose }) {
             textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>Statcast Profile</div>
           {(() => {
             // Safe format — handles undefined, null, NaN, 0
-            // sf: safe format — returns formatted string or null if missing/invalid
-            // Returns null for 0 values too since 0 EV/barrel means no real data
+            // sf: safe format — show value if it exists, null only if truly missing
             const sf = (v, dec=1) => {
               if (v === null || v === undefined) return null;
               const n = parseFloat(v);
-              if (isNaN(n)) return null;
-              if (n === 0 && dec === 1) return null; // 0.0 means "no data" for these metrics
+              if (isNaN(n) || !isFinite(n)) return null;
               return n.toFixed(dec);
             };
+            // Only show stat if it's a real non-zero value from Statcast
+            // avgEV of 0 means no data; barrel of 0 could be real but rare
+            const hasReal = (v) => v != null && parseFloat(v) > 0;
             const ev  = sf(player.avgEV);
             const bar = sf(player.barrel);
             const hh  = sf(player.hardHit);
@@ -759,15 +766,15 @@ function PlayerPage({ player, onClose }) {
             const pu  = sf(player.pullAir);
             const ch  = sf(player.oSwing);
             // Check != null explicitly — 0 is a valid value, don't treat as missing
-            const hasAny = ev!=null||bar!=null||hh!=null||fb!=null||la!=null||pu!=null||ch!=null;
+            const hasAny = hasReal(player.avgEV)||hasReal(player.barrel)||hasReal(player.hardHit);
             return <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-              {ev!=null  && <StatBox label="Avg EV"    value={ev}         color={parseFloat(ev)>=T.EV_HH?"var(--accent)":"var(--text)"}/>}
-              {bar!=null && <StatBox label="Barrel%"   value={`${bar}%`}  color={parseFloat(bar)>=T.BAR_EL?"#ff8020":"var(--text)"}/>}
-              {hh!=null  && <StatBox label="Hard Hit%" value={`${hh}%`}/>}
-              {fb!=null  && <StatBox label="Fly Ball%" value={`${fb}%`}   color={parseFloat(fb)>=T.FB_MIN&&parseFloat(fb)<=T.FB_MAX?"var(--green)":"var(--text)"}/>}
-              {la!=null  && <StatBox label="Launch °"  value={`${la}°`}   color={inHRZ(parseFloat(la))?"var(--green)":"var(--text)"}/>}
-              {pu!=null  && <StatBox label="Pull Air%" value={`${pu}%`}   color={parseFloat(pu)>=T.PULL_EL?"#ff8020":"var(--text)"}/>}
-              {ch!=null  && <StatBox label="Chase%"    value={`${ch}%`}   color={parseFloat(ch)<=T.CHASE_GD?"var(--green)":"#ff8020"}/>}
+              {hasReal(player.avgEV) && ev!=null  && <StatBox label="Avg EV"    value={ev}         color={parseFloat(ev)>=T.EV_HH?"var(--accent)":"var(--text)"}/>}
+              {hasReal(player.barrel) && bar!=null && <StatBox label="Barrel%"   value={`${bar}%`}  color={parseFloat(bar)>=T.BAR_EL?"#ff8020":"var(--text)"}/>}
+              {hasReal(player.hardHit) && hh!=null  && <StatBox label="Hard Hit%" value={`${hh}%`}/>}
+              {hasReal(player.flyBall) && fb!=null  && <StatBox label="Fly Ball%" value={`${fb}%`}   color={parseFloat(fb)>=T.FB_MIN&&parseFloat(fb)<=T.FB_MAX?"var(--green)":"var(--text)"}/>}
+              {hasReal(player.launchAngle) && la!=null  && <StatBox label="Launch °"  value={`${la}°`}   color={inHRZ(parseFloat(la))?"var(--green)":"var(--text)"}/>}
+              {hasReal(player.pullAir) && pu!=null  && <StatBox label="Pull Air%" value={`${pu}%`}   color={parseFloat(pu)>=T.PULL_EL?"#ff8020":"var(--text)"}/>}
+              {hasReal(player.oSwing) && ch!=null  && <StatBox label="Chase%"    value={`${ch}%`}   color={parseFloat(ch)<=T.CHASE_GD?"var(--green)":"#ff8020"}/>}
               {!hasAny && <div style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:"var(--muted)",padding:"8px 0"}}>
                 Statcast data not available — open from Pregame or Scouting for full profile.
               </div>}
@@ -1194,10 +1201,12 @@ const STAT_COL_HEADERS = [
 async function fetchPlayers(setL, setP, setE, silent=false) {
   if (!silent) setL(true);
   setE(null);
-  // On silent refresh, return cached data if we have it (prevents stat flickering)
+  // On silent refresh, use cached players if same day — prevents stat flickering
   const etNow = new Date().toLocaleDateString("en-US",{timeZone:"America/New_York"});
   if (silent && PLAYER_CACHE_DATE === etNow && Object.keys(PLAYER_DATA_CACHE).length > 50) {
-    console.log("[Players] Using cache:", Object.keys(PLAYER_DATA_CACHE).length, "players");
+    const cachedList = Object.values(PLAYER_DATA_CACHE);
+    console.log("[Players] Returning cache:", cachedList.length, "players");
+    setP(cachedList);
     setL(false);
     return;
   }
@@ -1466,19 +1475,6 @@ async function fetchLiveBatters(gamePk) {
     }
     return batters.sort((a, b) => { const o = {elite:4,hot:3,warm:2,avg:1,cold:0}; return (o[b.heatLabel.cls] || 0) - (o[a.heatLabel.cls] || 0); });
   } catch { return SLB; }
-}
-
-// ── PLAYER DATA CACHE ───────────────────────────────────────
-// Prevents stats from changing on every silent refresh
-// Maps pid → enriched player object, set once on first load
-const PLAYER_DATA_CACHE = {};
-let PLAYER_CACHE_DATE = null;
-
-function cachePlayer(p) {
-  if (p.pid) PLAYER_DATA_CACHE[p.pid] = p;
-}
-function getCachedPlayer(pid) {
-  return PLAYER_DATA_CACHE[pid] || null;
 }
 
 // Cache liftoff results so they don't re-randomize on every tap
