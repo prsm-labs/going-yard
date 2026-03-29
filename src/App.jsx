@@ -435,12 +435,576 @@ const enrichP = (r) => {
   r.cq = calcCQ(r); r.hri = calcHRI(r); r.rd = calcRD(r);
   r.os = calcOS(r); r.grade = getSG(r.os); r.piq = getPIQ(r);
   // Generate windowed stats if not already present
-  // Use cached windows if available — prevents stats from changing on refresh
-  const cached = getCachedPlayer(r.pid);
-  if (cached?.windows) {
-    r.windows = cached.windows;
-  } else if (!r.windows) {
-    r.windows = genWindows(r);
+  if (!r.windows) r.windows = genWindows(r);
+  // Async window fetch — updates in background without blocking
+  if (r.pid && !WINDOW_CACHE[r.pid]) {
+    fetchRealWindows(r.pid).then(realWin => {
+      if (realWin) {
+        // Merge real counting stats with Statcast metrics
+        const cached = getCachedPlayer(r.pid);
+        if (cached) {
+          [3,7,15,30].forEach(w => {
+            if (realWin[w] && cached.windows?.[w]) {
+              // Real data: AB, H, HR, BB, K, AVG, BB%, K%, abSinceHR
+              // Keep Statcast metrics: EV, Barrel%, HardHit%, FlyBall%, Launch°
+              Object.assign(cached.windows[w], {
+                hits: realWin[w].hits,
+                hr: realWin[w].hr,
+                atBats: realWin[w].ab,
+                xbh: realWin[w].xbh,
+                tb: realWin[w].tb,
+                avg: parseFloat(realWin[w].avg),
+                bbPct: realWin[w].bbPct,
+                kPct: realWin[w].kPct,
+                abPerHR: realWin[w].abPerHR,
+                abSinceHR: realWin[w].abSinceHR,
+                games: realWin[w].games,
+              });
+            }
+          });
+        }
+        WINDOW_CACHE[r.pid] = { data: realWin, ts: Date.now() };
+      }
+    }).catch(() => {});
+  }
+  return r;
+};
+
+// ── WINDOW STAT GENERATOR ─────────────────────────────────────
+// Uses real MLB Stats API game log data via /api/playerstats
+// Falls back to Statcast season baseline only if API unavailable
+const WINDOW_CACHE = {}; // pid → {windows, ts}
+
+async function fetchRealWindows(pid) {
+  if (!pid) return null;
+  const cached = WINDOW_CACHE[pid];
+  if (cached && Date.now() - cached.ts < 3600000) return cached.data; // 1hr cache
+  try {
+    const res = await fetch(`/api/playerstats?pid=${pid}`);
+    const data = await res.json();
+    if (data.windows) {
+      WINDOW_CACHE[pid] = { data: data.windows, ts: Date.now() };
+      return data.windows;
+    }
+  } catch(e) { console.warn('[Windows] fetch failed:', e.message); }
+  return null;
+}
+
+// Fallback: build windows from season Statcast baseline (no random, seeded by pid)
+function genWindows(p) {
+  const windows = {};
+  const pid = p.pid || p.id || 1;
+  [3,7,15,30].forEach((w, wi) => {
+    const base = wi * 20;
+    const variance = w <= 3 ? 0.25 : w <= 7 ? 0.18 : w <= 15 ? 0.12 : 0.08;
+    const rv = (base_val, rng, idx) => {
+      if (!base_val || base_val === 0) return 0;
+      const offset = (seededRand(pid, base + idx) * 2 - 1) * rng * variance;
+      return Math.max(0, Math.round((base_val + offset) * 100) / 100);
+    };
+    const ri = (base_val, rng, idx) => {
+      const offset = (seededRand(pid, base + idx) * 2 - 1) * rng;
+      return Math.max(0, Math.round(base_val + offset));
+    };
+    const avgEV       = rv(p.avgEV || 0,       8,  1);
+    const barrel      = rv(p.barrel || 0,       6,  2);
+    const flyBall     = Math.min(rv(p.flyBall > 0 ? p.flyBall : 0, 5, 3), 52);
+    const launchAngle = rv(p.launchAngle || 0,  5,  4);
+    const pullAir     = rv(p.pullAir || 0,      4,  5);
+    const oSwing      = rv(p.oSwing || 0,       4,  6);
+    const hardHit     = rv(p.hardHit || 0,      6,  7);
+    const bbPct       = rv(p.bbPct || 0,        3,  8);
+    const kPct        = rv(p.kPct || 0,         4,  9);
+    // Count stats: scale from season rate using days
+    const gamesInWindow = Math.round(w * 0.9);
+    const abPerGame = 3.8;
+    const atBats    = Math.round(gamesInWindow * abPerGame);
+    const hits      = ri(atBats * (p.avg || 0.245), atBats * 0.05, 11);
+    const hr        = ri(gamesInWindow * (p.hr > 0 ? p.hr / 162 : 0.08), 1, 13);
+    const xbh       = ri(hits * 0.28, hits * 0.1, 12);
+    const tb        = hits + xbh + hr * 2;
+    const abPerHR   = hr > 0 ? Math.round(atBats / hr * 10) / 10 : 99;
+    const abSinceHR = ri(3, 3, 15);
+    const almostPct = flyBall > 0 ? Math.round(Math.min(flyBall * (avgEV >= T.EV_HH ? 0.45 : 0.3), 35) * 10) / 10 : 0;
+    const avg = atBats > 0 ? parseFloat((hits / atBats).toFixed(3)) : 0;
+    const wp = { ...p, avgEV, barrel, flyBall, launchAngle, pullAir, oSwing, hardHit, bbPct, kPct, bbkRatio: bbPct / Math.max(kPct, 1) };
+    const wos = calcOS(wp); const wgrade = getSG(wos);
+    windows[w] = {
+      avgEV, barrel, flyBall, launchAngle, pullAir, oSwing, hardHit,
+      bbPct, kPct, hits, hr, xbh, tb, atBats, abPerHR, abSinceHR,
+      almostPct, avg, games: gamesInWindow, os: wos, grade: wgrade,
+      heatScore: getHS(wp),
+    };
+  });
+  return windows;
+}port { useState, useEffect, useCallback } from "react";
+
+const styles = `
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  :root{
+    --bg:#080c10;--surface:#0d1318;--surface2:#131b22;--border:#1e2d3a;
+    --accent:#e8411a;--accent2:#f5a623;--ice:#38b8f2;--green:#27c97a;
+    --text:#e8edf2;--muted:#5a7080;--fire2:#ff7a00;--fire3:#ffb700;
+    --aplus:#ff3010;--a:#ff7000;--b:#f5a623;--c:#8bc4e8;--d:#5a7080;--f:#38b8f2;
+  }
+  body{background:var(--bg);color:var(--text);font-family:'Oswald',sans-serif;min-height:100vh;}
+  .app{min-height:100vh;display:flex;flex-direction:column;}
+  .header{padding:16px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:linear-gradient(180deg,#0a1520 0%,var(--bg) 100%);position:sticky;top:0;z-index:100;backdrop-filter:blur(12px);}
+  .logo{font-family:'Oswald',sans-serif;font-weight:700;font-size:26px;text-transform:uppercase;letter-spacing:3px;color:var(--text);display:flex;align-items:center;gap:10px;}
+  .logo span{color:var(--accent);}
+  .logo-dot{width:9px;height:9px;background:var(--accent);border-radius:50%;animation:pulse 1.8s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.4)}}
+  .live-badge{display:flex;align-items:center;gap:6px;background:rgba(232,65,26,.15);border:1px solid rgba(232,65,26,.3);padding:4px 11px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:1.5px;color:var(--accent);text-transform:uppercase;}
+  .live-dot{width:6px;height:6px;background:var(--accent);border-radius:50%;animation:pulse 1s infinite;}
+  .tabs{display:flex;padding:0 16px;background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto;}
+  .tab{padding:12px 14px;font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;border:none;background:none;color:var(--muted);border-bottom:2px solid transparent;transition:all .2s;font-family:'Oswald',sans-serif;font-weight:500;white-space:nowrap;}
+  .tab:hover{color:var(--text);}
+  .tab.active{color:var(--text);border-bottom-color:var(--accent);}
+  .content{flex:1;padding:22px;max-width:1440px;margin:0 auto;width:100%;}
+  .section-title{font-family:'Oswald',sans-serif;font-weight:700;font-size:26px;text-transform:uppercase;letter-spacing:2px;color:var(--text);}
+  .section-sub{font-size:12px;color:var(--muted);margin-top:3px;font-family:'Oswald',sans-serif;font-weight:300;letter-spacing:.5px;}
+  .section-header{margin-bottom:18px;}
+  .hrow{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:16px;flex-wrap:wrap;gap:10px;}
+  .filters{display:flex;gap:7px;margin-bottom:14px;flex-wrap:wrap;align-items:center;}
+  .chip{padding:4px 11px;border-radius:6px;font-size:11px;font-weight:500;border:1px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer;transition:all .15s;font-family:'DM Mono',monospace;}
+  .chip.active{border-color:var(--accent);color:var(--accent);background:rgba(232,65,26,.08);}
+  .window-active{border-color:var(--accent2)!important;color:var(--accent2)!important;background:rgba(245,166,35,.1)!important;}
+  .chip:hover{border-color:var(--muted);color:var(--text);}
+  .fl{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;margin-right:4px;}
+  .tw{overflow-x:auto;border-radius:10px;border:1px solid var(--border);}
+  table{width:100%;border-collapse:collapse;}
+  thead tr{background:var(--surface2);}
+  th{padding:9px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-family:'DM Mono',monospace;white-space:nowrap;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;transition:color .15s;}  th:hover{color:var(--text);}
+  th:hover{color:var(--text);}
+  th.sk{color:var(--accent);}
+  td{padding:10px 12px;font-size:12px;border-bottom:1px solid rgba(30,45,58,.5);vertical-align:middle;}
+  tr:last-child td{border-bottom:none;}
+  tr.dr:hover td{background:rgba(255,255,255,.02);cursor:pointer;}
+  tr.dr.ex td{background:rgba(232,65,26,.03);border-bottom:none;}
+  tr.xr td{padding:0;border-bottom:1px solid var(--border);}
+  .pc{display:flex;align-items:center;gap:9px;}
+  .av{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--surface2),var(--border));display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--text);flex-shrink:0;border:1px solid var(--border);}
+  .pn{font-weight:700;font-size:13px;letter-spacing:.3px;}
+  .pt{font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;}
+  .sv{font-family:'DM Mono',monospace;font-size:11px;font-weight:500;}
+  .sv.hot{color:var(--fire2);}
+  .sv.warm{color:var(--fire3);}
+  .sv.good{color:var(--green);}
+  .sv.avg{color:var(--text);}
+  .sv.cold{color:var(--ice);}
+  .sv.dng{color:#ff3010;}
+  .hbc{display:flex;align-items:center;gap:6px;}
+  .hbb{flex:1;height:4px;border-radius:2px;background:var(--border);overflow:hidden;min-width:50px;}
+  .hbf{height:100%;border-radius:2px;transition:width .6s ease;}
+  .hbn{font-family:'Oswald',sans-serif;font-weight:700;font-size:16px;min-width:28px;}
+  .hl{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:9px;font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;font-family:'DM Mono',monospace;white-space:nowrap;}
+  .hl.elite{background:rgba(255,45,0,.18);color:#ff6040;border:1px solid rgba(255,45,0,.3);}
+  .hl.hot{background:rgba(255,122,0,.15);color:#ff9a30;border:1px solid rgba(255,122,0,.25);}
+  .hl.warm{background:rgba(255,183,0,.12);color:#ffc840;border:1px solid rgba(255,183,0,.2);}
+  .hl.avg{background:rgba(90,112,128,.12);color:var(--muted);border:1px solid var(--border);}
+  .hl.cold{background:rgba(56,184,242,.1);color:var(--ice);border:1px solid rgba(56,184,242,.2);}
+  .lw{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:16px;}
+  .sp{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .lt{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:9px;margin-bottom:18px;}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:12px 15px;}
+  .cl{font-size:9px;color:var(--muted);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:1px;}
+  .cv{font-family:'Oswald',sans-serif;font-weight:700;font-size:28px;letter-spacing:2px;color:var(--text);margin:2px 0 1px;}
+  .cs{font-size:9px;color:var(--muted);font-family:'DM Mono',monospace;}
+  .leg{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;}
+  .legt{font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;}
+  .legi{display:flex;gap:9px;flex-wrap:wrap;}
+  .leit{display:flex;align-items:center;gap:4px;font-size:10px;font-family:'DM Mono',monospace;}
+  .ld{width:6px;height:6px;border-radius:50%;}
+  .tw2{position:relative;display:inline-flex;}
+  .ti{width:11px;height:11px;border-radius:50%;background:var(--border);color:var(--muted);font-size:8px;display:flex;align-items:center;justify-content:center;cursor:help;}
+  .tb{position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);background:#1a2630;border:1px solid var(--border);border-radius:5px;padding:5px 9px;font-size:10px;color:var(--text);font-family:'DM Mono',monospace;white-space:nowrap;z-index:200;pointer-events:none;opacity:0;transition:opacity .15s;}
+  .tw2:hover .tb{opacity:1;}
+  .note{background:rgba(56,184,242,.06);border:1px solid rgba(56,184,242,.15);border-radius:7px;padding:9px 13px;font-size:11px;color:rgba(56,184,242,.8);font-family:'DM Mono',monospace;margin-bottom:14px;line-height:1.6;}
+  .warn{background:rgba(232,65,26,.06);border:1px solid rgba(232,65,26,.25);border-radius:7px;padding:9px 13px;font-size:11px;color:rgba(232,65,26,.85);font-family:'DM Mono',monospace;margin-bottom:12px;}
+  .rb{display:flex;align-items:center;gap:5px;padding:5px 11px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-size:11px;font-family:'DM Mono',monospace;cursor:pointer;transition:all .15s;}
+  .rb:hover{border-color:var(--accent);color:var(--accent);}
+  .rb.sp2 svg{animation:spin .8s linear infinite;}
+  .div{font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;}
+  .gg{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:11px;margin-bottom:6px;}
+  .gc{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;}
+  .gc:hover{border-color:rgba(232,65,26,.5);}
+  .gc.exp{border-color:var(--accent);border-bottom-left-radius:0;border-bottom-right-radius:0;border-bottom:none;}
+  .gc::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),var(--accent2));opacity:0;transition:opacity .2s;}
+  .gc.exp::before,.gc:hover::before{opacity:1;}
+  .gh{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+  .gs{font-family:'DM Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:1px;text-transform:uppercase;}
+  .gs.fin{color:var(--muted);}
+  .gs.pre{color:var(--green);}
+  .gm{display:flex;align-items:center;justify-content:space-between;}
+  .gt{text-align:center;}
+  .ta{font-family:'Oswald',sans-serif;font-weight:700;font-size:22px;letter-spacing:2px;text-transform:uppercase;}
+  .tsc{font-family:'Oswald',sans-serif;font-weight:600;font-size:18px;letter-spacing:1px;color:var(--muted);}
+  .tsc.win{color:var(--text);}
+  .gd{color:var(--muted);font-size:11px;font-family:'DM Mono',monospace;}
+  .gi{font-family:'DM Mono',monospace;font-size:10px;text-align:center;margin-top:5px;}
+  .cv2{font-size:10px;color:var(--muted);transition:transform .2s;display:inline-block;}
+  .cv2.op{transform:rotate(180deg);}
+  .gpw{margin-bottom:14px;grid-column:1/-1;}
+  .gp{border:1px solid var(--accent);border-top:none;border-bottom-left-radius:10px;border-bottom-right-radius:10px;background:#0a1218;overflow:hidden;animation:sd .2s ease;width:100%;}
+  @keyframes sd{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+  .gph{padding:9px 15px;border-bottom:1px solid var(--border);}
+  .gpt{font-family:'Oswald',sans-serif;font-size:13px;letter-spacing:1.5px;color:var(--text);}
+  .gps{font-size:9px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:1px;}
+  .xd{background:rgba(10,18,28,.95);border-top:1px solid var(--border);padding:12px 15px;animation:sd .15s ease;}
+  .xg{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:7px;margin-bottom:10px;}
+  .xb{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;}
+  .xbl{font-size:9px;color:var(--muted);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px;}
+  .xbv{font-family:'Oswald',sans-serif;font-size:18px;letter-spacing:1px;}
+  .xbs{font-size:9px;font-family:'DM Mono',monospace;margin-top:1px;}
+  .cbr{display:flex;gap:6px;align-items:center;margin-bottom:5px;}
+  .cbl{font-size:9px;color:var(--muted);font-family:'DM Mono',monospace;width:58px;flex-shrink:0;}
+  .cbg{flex:1;display:flex;gap:6px;align-items:center;}
+  .cbw{flex:1;}
+  .cbwl{font-size:8px;color:var(--muted);font-family:'DM Mono',monospace;margin-bottom:1px;}
+  .cbb{height:5px;border-radius:3px;background:var(--border);overflow:hidden;}
+  .cbbf{height:100%;border-radius:3px;transition:width .5s ease;}
+  .cbv{font-size:9px;font-family:'DM Mono',monospace;min-width:28px;text-align:right;}
+  .stags{display:flex;flex-wrap:wrap;gap:4px;margin-top:7px;}
+  .stag{padding:2px 7px;border-radius:8px;font-size:9px;font-family:'DM Mono',monospace;font-weight:600;}
+  .stag.pos{background:rgba(39,201,122,.12);color:var(--green);border:1px solid rgba(39,201,122,.2);}
+  .stag.neg{background:rgba(56,184,242,.08);color:var(--ice);border:1px solid rgba(56,184,242,.15);}
+  .stag.neu{background:rgba(90,112,128,.1);color:var(--muted);border:1px solid var(--border);}
+  .stag.fire{background:rgba(255,90,0,.14);color:#ff7020;border:1px solid rgba(255,90,0,.25);}
+  .lr{padding:10px 15px;border-bottom:1px solid rgba(30,45,58,.4);display:flex;align-items:center;gap:10px;transition:background .15s;}
+  .lr:last-child{border-bottom:none;}
+  .lr:hover{background:rgba(255,255,255,.02);}
+  .lrk{font-family:'Oswald',sans-serif;font-size:17px;color:var(--muted);min-width:17px;}
+  .li{flex:1;min-width:0;}
+  .ln{font-weight:600;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .lm{font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:1px;}
+  .ls{display:flex;flex-wrap:wrap;gap:3px;margin-top:4px;}
+  .lv{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:9px;font-size:9px;font-weight:700;letter-spacing:.8px;font-family:'DM Mono',monospace;white-space:nowrap;}
+  .lv.primed{background:rgba(255,45,0,.2);color:#ff5030;border:1px solid rgba(255,45,0,.35);}
+  .lv.hot{background:rgba(255,122,0,.15);color:#ff9a30;border:1px solid rgba(255,122,0,.3);}
+  .lv.watch{background:rgba(255,183,0,.12);color:#ffc840;border:1px solid rgba(255,183,0,.22);}
+  .lv.cold{background:rgba(56,184,242,.1);color:var(--ice);border:1px solid rgba(56,184,242,.2);}
+  .lmini{display:flex;gap:8px;align-items:center;flex-shrink:0;}
+  .lms{text-align:center;}
+  .lmsv{font-family:'DM Mono',monospace;font-size:11px;font-weight:600;}
+  .lmsl{font-size:8px;color:var(--muted);font-family:'DM Mono',monospace;text-transform:uppercase;}
+  .sr{position:relative;width:42px;height:42px;flex-shrink:0;}
+  .sr svg{transform:rotate(-90deg);}
+  .srv{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Oswald',sans-serif;font-size:13px;}
+  .gb{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:6px;font-family:'Oswald',sans-serif;font-weight:700;font-size:18px;flex-shrink:0;}
+  .gb.aplus{background:rgba(255,48,16,.2);color:var(--aplus);border:2px solid rgba(255,48,16,.4);}
+  .gb.a{background:rgba(255,112,0,.18);color:var(--a);border:2px solid rgba(255,112,0,.35);}
+  .gb.b{background:rgba(245,166,35,.14);color:var(--b);border:2px solid rgba(245,166,35,.28);}
+  .gb.c{background:rgba(139,196,232,.1);color:var(--c);border:2px solid rgba(139,196,232,.2);}
+  .gb.d{background:rgba(90,112,128,.1);color:var(--d);border:1px solid var(--border);}
+  .gb.f{background:rgba(56,184,242,.08);color:var(--f);border:1px solid rgba(56,184,242,.15);}
+  .gb.x{background:rgba(42,58,72,.3);color:#3a5060;border:1px solid var(--border);}
+  .sp3{padding:2px 6px;border-radius:5px;font-size:9px;font-family:'DM Mono',monospace;font-weight:600;background:var(--surface2);border:1px solid var(--border);}
+  .sp3.cq{border-color:rgba(255,112,0,.3);color:#ff7000;}
+  .sp3.hi{border-color:rgba(255,48,16,.3);color:#ff3010;}
+  .sp3.rd{border-color:rgba(39,201,122,.3);color:var(--green);}
+  .bgs{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:16px;}
+  .bgb{padding:6px 12px;border-radius:7px;font-size:10px;font-family:'DM Mono',monospace;font-weight:600;border:1px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer;transition:all .15s;text-align:center;}
+  .bgb:hover{border-color:var(--accent);color:var(--text);}
+  .bgb.active{border-color:var(--accent);background:rgba(232,65,26,.08);color:var(--accent);}
+  .bgbt{font-size:12px;font-family:'Oswald',sans-serif;letter-spacing:1px;color:var(--text);}
+  .bgbs{font-size:9px;color:var(--muted);margin-top:1px;}
+  .pc2{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:14px 16px;margin-bottom:16px;}
+  .ph{display:flex;align-items:center;gap:11px;margin-bottom:11px;}
+  .pa{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#1a2a38,#0d1a28);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;border:2px solid var(--border);}
+  .pnam{font-family:'Oswald',sans-serif;font-size:18px;letter-spacing:1.5px;}
+  .psub{font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;}
+  .hnd{display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;font-family:'DM Mono',monospace;font-weight:700;background:rgba(232,65,26,.1);color:var(--accent);border:1px solid rgba(232,65,26,.2);margin-left:6px;}
+  .pmg{display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:7px;}
+  .pmc{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:9px 11px;}
+  .pmh{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;}
+  .pmn{font-size:10px;font-weight:600;font-family:'DM Mono',monospace;}
+  .pmp{font-family:'Oswald',sans-serif;font-size:17px;letter-spacing:1px;}
+  .pub{height:3px;border-radius:1px;background:var(--border);overflow:hidden;margin-bottom:6px;}
+  .puf{height:100%;border-radius:1px;}
+  .psr{display:flex;justify-content:space-between;font-size:9px;font-family:'DM Mono',monospace;color:var(--muted);}
+  .psv2{font-weight:600;}
+  .psv2.gd{color:var(--green);}
+  .psv2.bd{color:#ff3010;}
+  .psv2.nu{color:var(--fire3);}
+  .pta{display:inline-flex;align-items:center;gap:3px;padding:2px 6px;border-radius:4px;font-size:9px;font-family:'DM Mono',monospace;font-weight:700;background:rgba(255,48,16,.15);color:#ff5030;border:1px solid rgba(255,48,16,.25);margin-top:3px;}
+  .bvr{padding:11px 15px;border-bottom:1px solid rgba(30,45,58,.4);display:grid;grid-template-columns:auto 1fr auto auto;gap:11px;align-items:center;}
+  .bvr:last-child{border-bottom:none;}
+  .bvr:hover{background:rgba(255,255,255,.02);}
+  .h2h{display:flex;gap:9px;}
+  .h2hs{text-align:center;}
+  .h2hv{font-family:'Oswald',sans-serif;font-size:16px;letter-spacing:1px;}
+  .h2hl{font-size:8px;color:var(--muted);font-family:'DM Mono',monospace;text-transform:uppercase;}
+  .vr{display:flex;align-items:center;gap:4px;font-size:9px;font-family:'DM Mono',monospace;margin-bottom:3px;}
+  .vrl{color:var(--muted);width:44px;font-size:8px;}
+  .vrb{flex:1;height:3px;border-radius:2px;background:var(--border);overflow:hidden;}
+  .vrbf{height:100%;border-radius:2px;}
+  .vrv{font-size:8px;min-width:24px;text-align:right;}
+  .rab{display:flex;gap:3px;flex-wrap:wrap;}
+  .abr{width:19px;height:19px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-family:'DM Mono',monospace;font-weight:700;}
+  .abr.hr{background:rgba(255,48,16,.25);color:#ff5030;border:1px solid rgba(255,48,16,.3);}
+  .abr.hit{background:rgba(39,201,122,.15);color:var(--green);border:1px solid rgba(39,201,122,.2);}
+  .abr.out{background:rgba(30,45,58,.5);color:var(--muted);border:1px solid var(--border);}
+  .abr.k{background:rgba(56,184,242,.1);color:var(--ice);border:1px solid rgba(56,184,242,.15);}
+  /* HR Ticker */
+  .ticker-wrap{background:#0a0e14;border-bottom:1px solid rgba(232,65,26,.25);overflow:hidden;height:32px;display:flex;align-items:center;position:relative;}
+  .ticker-label{background:var(--accent);color:white;padding:0 12px;height:100%;display:flex;align-items:center;font-family:'Oswald',sans-serif;font-weight:700;font-size:11px;letter-spacing:2px;white-space:nowrap;flex-shrink:0;z-index:2;gap:5px;}
+  .ticker-track{display:flex;gap:0;animation:ticker-scroll 60s linear infinite;white-space:nowrap;}
+  .ticker-track:hover{animation-play-state:paused;}
+  @keyframes ticker-scroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+  .ticker-item{padding:0 24px;font-family:'DM Mono',monospace;font-size:11px;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:7px;height:32px;border-right:1px solid rgba(255,255,255,.05);transition:background .15s;}
+  .ticker-item:hover{background:rgba(232,65,26,.1);}
+  .ticker-sep{color:var(--accent);font-size:14px;padding:0 8px;}
+  /* HR Tracker table */
+  .hr-badge{display:inline-flex;align-items:center;justify-content:center;padding:2px 8px;border-radius:4px;font-family:'Oswald',sans-serif;font-weight:700;font-size:11px;letter-spacing:1px;}
+  .hr-badge.solo{background:rgba(56,184,242,.15);color:var(--ice);border:1px solid rgba(56,184,242,.25);}
+  .hr-badge.multi{background:rgba(232,65,26,.18);color:var(--accent);border:1px solid rgba(232,65,26,.3);}
+  .hr-badge.slam{background:rgba(255,183,0,.18);color:var(--accent2);border:1px solid rgba(255,183,0,.3);}
+  /* Pick buttons */
+  input[type=text]{outline:none;}
+  input[type=text]::placeholder{color:var(--muted);}
+  /* Scrollable table with frozen header */
+  .tw-scroll{border-radius:10px;border:1px solid var(--border);overflow:hidden;}
+  .tw-scroll-inner{overflow-x:auto;overflow-y:auto;max-height:62vh;}
+  .tw-scroll table{width:100%;border-collapse:separate;border-spacing:0;}
+  .tw-scroll th{padding:9px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-family:'DM Mono',monospace;white-space:nowrap;border-bottom:2px solid var(--border);cursor:pointer;user-select:none;background:var(--surface2);position:sticky;top:0;z-index:20;}
+  .tw-scroll td{padding:10px 12px;font-size:12px;border-bottom:1px solid rgba(30,45,58,.5);vertical-align:middle;}
+  ::-webkit-scrollbar{width:5px;height:5px;}
+  ::-webkit-scrollbar-track{background:var(--bg);}
+  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+  @media(max-width:768px){
+    .content{padding:13px;}.header{padding:12px 15px;}
+    .gg{grid-template-columns:1fr;}.cards{grid-template-columns:repeat(2,1fr);}
+    .xg{grid-template-columns:repeat(2,1fr);}.lmini{display:none;}
+    .bvr{grid-template-columns:auto 1fr;}.h2h{display:none;}.pmg{grid-template-columns:repeat(2,1fr);}
+  }
+`;
+
+// THRESHOLDS
+// ── PLAYER DATA CACHE (module-level, persists across renders) ────
+const PLAYER_DATA_CACHE = {};
+let PLAYER_CACHE_DATE = null;
+function cachePlayer(p) { if (p.pid) PLAYER_DATA_CACHE[p.pid] = p; }
+function getCachedPlayer(pid) { return PLAYER_DATA_CACHE[pid] || null; }
+
+const T={
+  EV_HH:95,       // Hard hit entry point
+  EV_HR:103,       // HR probability spike
+  EV_EL:108,       // Elite power contact
+  LA_MIN:25,       // HR sweet spot floor
+  LA_MAX:35,       // HR sweet spot ceiling
+  BAR_EL:15,       // Elite barrel% (12-18% range, 15 = center)
+  BAR_GD:10,       // Good barrel%
+  BAR_MAX:18,      // Above this = over-swinging
+  FB_MIN:35,       // Fly ball% floor (sweet spot)
+  FB_MAX:45,       // Fly ball% ceiling (above 50% = too many outs)
+  PULL_EL:45,      // Elite pull air% (40-50% range)
+  PULL_GD:35,      // Good pull air%
+  CHASE_EL:20,     // Elite chase rate (below this)
+  CHASE_GD:25,     // Good chase rate threshold
+  HH_EL:50,HH_GD:42,
+};
+const inHRZ = (la) => la >= T.LA_MIN && la <= T.LA_MAX;
+const getLAZ = (la) => {
+  if (la >= T.LA_MIN && la <= T.LA_MAX) return "💥 HR Sweet Spot (25–35°)";
+  if (la > T.LA_MAX) return "📈 Too high";
+  if (la > 0) return "📉 Too low";
+  return null;
+};
+const getHS = (r) => {
+  // EV: 30pts — scales from 95 (entry) to 108 (elite)
+  const ev = Math.min(Math.max((r.avgEV - T.EV_HH) / (T.EV_EL - T.EV_HH), 0), 1) * 30;
+  // LA in sweet spot 25-35°: 25pts — penalize outside zone
+  const la = r.launchAngle ?? r.sweetSpotLA ?? 22;
+  const laScore = (la >= T.LA_MIN && la <= T.LA_MAX) ? 25 : (la >= 19 && la < T.LA_MIN) ? 12 : (la > T.LA_MAX && la <= 40) ? 10 : 0;
+  // Barrel% 12-18% sweet zone: 20pts — peaks at 15%, penalize >18%
+  const barPct = r.barrel ?? 0;
+  const barScore = barPct >= T.BAR_MAX ? Math.min(18, 20) : Math.min((barPct / T.BAR_EL) * 20, 20);
+  // FlyBall% 35-45% sweet zone: 10pts
+  const fb = r.flyBall ?? r.sweetSpot ?? 35;
+  const fbScore = (fb >= T.FB_MIN && fb <= T.FB_MAX) ? 10 : (fb >= 30 && fb < T.FB_MIN) ? 5 : (fb > T.FB_MAX && fb <= 55) ? 6 : 2;
+  // Pull Air% 40-50% elite zone: 10pts
+  const pull = r.pullAir ?? 20;
+  const pullScore = pull >= T.PULL_EL ? 10 : pull >= T.PULL_GD ? 6 : Math.min((pull / T.PULL_GD) * 6, 6);
+  // Chase rate <25% bonus: 5pts
+  const chase = r.oSwing ?? r.chaseRate ?? 30;
+  const chaseScore = chase <= T.CHASE_EL ? 5 : chase <= T.CHASE_GD ? 3 : 0;
+  return Math.round(ev + laScore + barScore + fbScore + pullScore + chaseScore);
+};
+const getHC = (s) => s >= 75 ? "#ff4020" : s >= 58 ? "#ff8020" : s >= 42 ? "#ffbe20" : s >= 25 ? "#8899a6" : "#38b8f2";
+const getLHL = (ev, la, hh) => {
+  const ep = ev >= T.EV_EL ? 3 : ev >= T.EV_HH ? 2 : ev >= 90 ? 1 : 0;
+  
+  
+  const lp = (la>=T.LA_MIN&&la<=T.LA_MAX)?3:(la>=19&&la<T.LA_MIN)?2:la>0?1:0;
+  const hp = hh >= 3 ? 4 : hh >= 2 ? 3 : hh === 1 ? 1 : 0;
+  const sc = ep + lp + hp;
+  return sc >= 8 ? {label:"🔥 On Fire",cls:"elite"} : sc >= 5 ? {label:"🔥 Heating Up",cls:"hot"} : sc >= 3 ? {label:"🌡 Warm",cls:"warm"} : sc >= 1 ? {label:"— Neutral",cls:"avg"} : {label:"🧊 Ice Cold",cls:"cold"};
+};
+const ini = (n) => n.split(" ").map(p => p[0]).join("").toUpperCase().slice(0, 2);
+
+// SCOUTING ENGINE
+const calcCQ = (p) => {
+  // EV: 0-1.5 scaled from 95 to 108
+  const evN = Math.min(Math.max((p.avgEV - T.EV_HH) / (T.EV_EL - T.EV_HH), 0), 1) * 1.5;
+  // Barrel: peaks at T.BAR_EL (15%), penalized if above T.BAR_MAX (18%) — indicates over-swinging
+  const bar = p.barrel ?? 0;
+  const barN = bar >= T.BAR_MAX ? 0.8 : Math.min(bar / T.BAR_EL, 1);
+  // HardHit: 0-1 scaled to 50%
+  const hhN = Math.min((p.hardHit ?? 0) / T.HH_EL, 1);
+  return Math.round((evN + barN + hhN) * 10) / 10;
+};
+const calcHRI = (p) => {
+  // Pull Air: peaks at 40-50%, below 35% = low power intent
+  const pull = p.pullAir ?? 20;
+  const pullN = pull >= T.PULL_EL ? 1 : pull >= T.PULL_GD ? 0.7 : pull / T.PULL_EL;
+  // Fly Ball: sweet zone 35-45%, above 50% = too many outs (penalize)
+  const fb = p.flyBall ?? p.sweetSpot ?? 35;
+  const fbN = (fb >= T.FB_MIN && fb <= T.FB_MAX) ? 1 : (fb > T.FB_MAX && fb <= 55) ? 0.7 : fb >= 30 ? 0.5 : 0.2;
+  // HR rate contribution
+  const hrN = Math.min((p.hr ?? 0) / 25, 1);
+  return Math.round((pullN * 3.5 + fbN * 3.5 + hrN * 3) * 10) / 10;
+};
+const calcRD = (p) => {
+  const bb = Math.min((p.bbPct ?? 8) / 15, 1) * 3;
+  const k = Math.max(1 - (p.kPct ?? 22) / 35, 0) * 3;
+  // Chase rate: <20% elite (3pts), <25% good (2pts), >=25% penalized
+  const chase = p.oSwing ?? 30;
+  const os = chase <= T.CHASE_EL ? 3 : chase <= T.CHASE_GD ? 2 : Math.max(1 - (chase - T.CHASE_GD) / 20, 0) * 1.5;
+  const zc = Math.min((p.zContact ?? 80) / 90, 1) * 3;
+  return Math.round((bb + k + os + zc) * 10) / 10;
+};
+const calcOS = (p) => {
+  const ev = p.avgEV ?? p.windows?.[15]?.avgEV ?? 85;
+
+  // ── EV GATE — primary grade anchor (60pts) ──────────────
+  // Based on provided EV grade table. Slow bats cannot reach A/A+.
+  const evPts =
+    ev >= 92.5 ? 60 :
+    ev >= 90.0 ? 52 :
+    ev >= 87.0 ? 42 :
+    ev >= 84.0 ? 30 :
+    ev >= 81.0 ? 18 :
+                  8;
+
+  // ── MODIFIER METRICS (40pts total) ──────────────────────
+  // These can only push a batter UP within their EV tier, never past it
+  const cq  = calcCQ(p),  rd = calcRD(p), hri = calcHRI(p);
+  const cqN = Math.min(Math.max((cq  - 0.5) / (3.5 - 0.5), 0), 1);
+  const rdN = Math.min(Math.max((rd  - 2)   / (10  - 2),   0), 1);
+  const hrN = Math.min(Math.max((hri - 1.5) / (9   - 1.5), 0), 1);
+  const modPts = (0.5 * cqN + 0.3 * hrN + 0.2 * rdN) * 40;
+
+  return Math.round((evPts + modPts) * 10) / 10;
+};
+const getSG = (s) => {
+  // Score bands aligned to EV gate:
+  // A+ = 92.5+ EV + strong modifiers (85+)
+  // A  = 90+ EV + decent modifiers (70+)
+  // B  = 87+ EV gate (52+ base, 58+ with mods)
+  // C  = 84+ EV gate (40+)
+  // D  = 81+ EV gate (26+)
+  // F  = below 81 EV (15+)
+  // X  = no data / too soft
+  if (s >= 85) return {grade:"A+",cls:"aplus",label:"🔴 Elite damage threat",color:"var(--aplus)"};
+  if (s >= 70) return {grade:"A", cls:"a",    label:"🔥 Above-avg power",  color:"var(--a)"};
+  if (s >= 55) return {grade:"B", cls:"b",    label:"⚡ Solid EV / heating",color:"var(--b)"};
+  if (s >= 40) return {grade:"C", cls:"c",    label:"👀 Contact-first bat", color:"var(--c)"};
+  if (s >= 26) return {grade:"D", cls:"d",    label:"🌡 Below-avg EV",      color:"var(--d)"};
+  if (s >= 15) return {grade:"F", cls:"f",    label:"🧊 Soft contact",      color:"var(--f)"};
+  return              {grade:"X", cls:"x",    label:"❌ Insufficient data", color:"#2a3a48"};
+};
+const getPIQ = (p) => {
+  const chase = p.oSwing ?? 30, zc = p.zContact ?? 80, bbk = p.bbkRatio ?? 0.35;
+  // Chase rate <20% = elite (40pts), <25% = good — tighter now
+  const chaseScore = chase <= T.CHASE_EL ? 40 : chase <= T.CHASE_GD ? 28 : Math.max(0, (35 - chase) / 10) * 20;
+  const zcScore = Math.min(zc / 90, 1) * 30;
+  const bbkScore = Math.min(bbk / 0.7, 1) * 30;
+  const sc = chaseScore + zcScore + bbkScore;
+  if (sc >= 75) return {label:"🎯 Elite IQ",color:"var(--green)"};
+  if (sc >= 55) return {label:"✅ Patient",color:"var(--green)"};
+  if (sc >= 38) return {label:"— Average",color:"var(--muted)"};
+  if (sc >= 22) return {label:"⚠️ Chaser",color:"var(--fire3)"};
+  return {label:"🚫 Free Swinger",color:"#ff3010"};
+};
+
+// BvP ENGINE
+const calcMS = (b, p) => {
+  const fb = Math.min(Math.max(((b.evVsFB ?? 88) - (p.fbVelo ?? 93)) / 8, 0), 1) * 30;
+  const bk = Math.max(1 - (b.whiffBK ?? 30) / 50, 0) * 25;
+  const os = Math.max(1 - (b.chaseOS ?? 35) / 50, 0) * 20;
+  const h2h = Math.min(((b.careerBA ?? 0.25) - 0.2) / 0.1, 1) * 15 + Math.min((b.careerHR ?? 0) / 3, 1) * 10;
+  return Math.round(Math.min(fb + bk + os + h2h, 100) * 10) / 10;
+};
+
+// LIFTOFF ENGINE
+const calcLS = (b) => {
+  const rb = b.recentBarrel ?? b.barrel ?? 0;
+  const rh = b.recentHardHit ?? b.hardHit ?? 0;
+  const re = b.recentAvgEV ?? b.avgEV ?? 88;
+  const streak = Math.min(((rb / 14) * 18) + ((rh / 55) * 12) + (Math.max(0, (re - 88) / 10) * 10), 40);
+  const ds = b.daysSinceHR ?? 5;
+  const due = ds <= 1 ? 5 : ds <= 3 ? 12 : ds <= 7 ? 25 : ds <= 14 ? 18 : 8;
+  const pf = b.pitcherFactor ?? 0;
+  const pit = pf > 0 ? 12 : pf < 0 ? 3 : 7;
+  const home = b.isHome ? (b.homeHR ?? 0) > (b.awayHR ?? 0) ? 10 : 5 : (b.awayHR ?? 0) > (b.homeHR ?? 0) ? 10 : 5;
+  const sea = Math.min(((b.barrel ?? 0) / T.BAR_EL) * 10, 10);
+  return Math.round(streak + due + pit + home + sea);
+};
+const getLV = (s) => s >= 75 ? {label:"🚀 Primed",cls:"primed"} : s >= 55 ? {label:"🔥 Hot",cls:"hot"} : s >= 38 ? {label:"⚡ Watch",cls:"watch"} : {label:"❄️ Cold",cls:"cold"};
+const getLSigs = (b) => {
+  const sigs = [], ds = b.daysSinceHR ?? 5, rb = b.recentBarrel ?? b.barrel ?? 0, re = b.recentAvgEV ?? b.avgEV ?? 88, rh = b.recentHardHit ?? b.hardHit ?? 0;
+  if (ds >= 4 && ds <= 10) sigs.push({t:`${ds}d since last HR`, c:"fire"});
+  else if (ds > 14) sigs.push({t:`${ds}d HR drought`, c:"neg"});
+  if (rb >= 14) sigs.push({t:`${rb.toFixed(0)}% barrel L7`, c:"pos"});
+  else if (rb >= 8) sigs.push({t:`${rb.toFixed(0)}% barrel L7`, c:"neu"});
+  if (re >= T.EV_HH) sigs.push({t:`${re.toFixed(0)} mph EV (95+)`, c:"pos"});
+  if ((b.pitcherFactor ?? 0) > 0) sigs.push({t:"Favorable matchup", c:"pos"});
+  if ((b.pitcherFactor ?? 0) < 0) sigs.push({t:"Tough pitcher", c:"neg"});
+  if (b.isHome && (b.homeHR ?? 0) > (b.awayHR ?? 0)) sigs.push({t:"Home HR boost", c:"pos"});
+  if (rh >= 50) sigs.push({t:"Hard contact streak", c:"fire"});
+  return sigs.slice(0, 4);
+};
+
+const enrichP = (r) => {
+  r.bbkRatio = r.kPct > 0 ? r.bbPct / r.kPct : 0.35;
+  r.heatScore = getHS(r);
+  r.cq = calcCQ(r); r.hri = calcHRI(r); r.rd = calcRD(r);
+  r.os = calcOS(r); r.grade = getSG(r.os); r.piq = getPIQ(r);
+  // Generate windowed stats if not already present
+  if (!r.windows) r.windows = genWindows(r);
+  // Async window fetch — updates in background without blocking
+  if (r.pid && !WINDOW_CACHE[r.pid]) {
+    fetchRealWindows(r.pid).then(realWin => {
+      if (realWin) {
+        // Merge real counting stats with Statcast metrics
+        const cached = getCachedPlayer(r.pid);
+        if (cached) {
+          [3,7,15,30].forEach(w => {
+            if (realWin[w] && cached.windows?.[w]) {
+              // Real data: AB, H, HR, BB, K, AVG, BB%, K%, abSinceHR
+              // Keep Statcast metrics: EV, Barrel%, HardHit%, FlyBall%, Launch°
+              Object.assign(cached.windows[w], {
+                hits: realWin[w].hits,
+                hr: realWin[w].hr,
+                atBats: realWin[w].ab,
+                xbh: realWin[w].xbh,
+                tb: realWin[w].tb,
+                avg: parseFloat(realWin[w].avg),
+                bbPct: realWin[w].bbPct,
+                kPct: realWin[w].kPct,
+                abPerHR: realWin[w].abPerHR,
+                abSinceHR: realWin[w].abSinceHR,
+                games: realWin[w].games,
+              });
+            }
+          });
+        }
+        WINDOW_CACHE[r.pid] = { data: realWin, ts: Date.now() };
+      }
+    }).catch(() => {});
   }
   return r;
 };
@@ -669,16 +1233,19 @@ function PlayerPage({ player, onClose }) {
 
   useEffect(() => {
     if (!player?.pid) { setLoading(false); return; }
-    // Fetch real player stats from MLB Stats API
     (async () => {
       try {
-        const [seasonRes, gameLogRes] = await Promise.all([
+        const [seasonRes, playerStatsRes] = await Promise.all([
           fetch(`https://statsapi.mlb.com/api/v1/people/${player.pid}/stats?stats=season,career&group=hitting&season=2026&sportId=1`),
-          fetch(`https://statsapi.mlb.com/api/v1/people/${player.pid}/stats?stats=gameLog&group=hitting&season=2026&sportId=1&limit=10`),
+          fetch(`/api/playerstats?pid=${player.pid}`),
         ]);
-        const seasonData  = await seasonRes.json();
-        const gameLogData = await gameLogRes.json();
-        setStats({ season: seasonData.stats, gameLog: gameLogData.stats });
+        const seasonData = await seasonRes.json();
+        const playerStatsData = await playerStatsRes.json();
+        setStats({
+          season: seasonData.stats,
+          gameLog: playerStatsData.games || [],
+          windows: playerStatsData.windows,
+        });
       } catch(e) {
         console.warn("Player stats fetch failed:", e.message);
       }
@@ -690,7 +1257,7 @@ function PlayerPage({ player, onClose }) {
 
   const seasonStats = stats?.season?.find(s => s.type?.displayName === "season")?.splits?.[0]?.stat;
   const careerStats = stats?.season?.find(s => s.type?.displayName === "career")?.splits?.[0]?.stat;
-  const gameLogs    = stats?.gameLog?.[0]?.splits?.slice(0, 10) || [];
+  const gameLogs    = stats?.gameLog || [];
 
   const StatBox = ({label, value, color}) => (
     <div style={{background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:7,
@@ -824,21 +1391,19 @@ function PlayerPage({ player, onClose }) {
                     </thead>
                     <tbody>
                       {gameLogs.map((g, i) => {
-                        const s = g.stat;
-                        const isHR = parseInt(s.homeRuns) > 0;
                         return (
                           <tr key={i} style={{borderBottom:"1px solid rgba(30,45,58,.4)",
                             background:isHR?"rgba(232,65,26,.05)":""}}>
                             <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--muted)"}}>{g.date?.slice(5)}</td>
-                            <td style={{padding:"5px 8px",fontFamily:"'Oswald',sans-serif",fontWeight:600,fontSize:11}}>{g.opponent?.abbreviation||"—"}</td>
-                            <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",fontSize:11}}>{s.atBats}</td>
-                            <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",fontSize:11,color:parseInt(s.hits)>0?"var(--green)":"var(--muted)"}}>{s.hits}</td>
-                            <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",fontSize:11,color:isHR?"var(--accent)":"var(--muted)",fontWeight:isHR?"700":"400"}}>{s.homeRuns}</td>
-                            <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",fontSize:11}}>{s.runs}</td>
-                            <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",fontSize:11}}>{s.rbi}</td>
-                            <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",fontSize:11}}>{s.baseOnBalls}</td>
-                            <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",fontSize:11,color:parseInt(s.strikeOuts)>=3?"var(--ice)":"var(--muted)"}}>{s.strikeOuts}</td>
-                            <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",fontSize:11,color:parseFloat(s.avg)>=0.300?"var(--accent)":"var(--text)"}}>{s.avg}</td>
+                            <td style={{padding:"5px 8px",fontFamily:"'Oswald',sans-serif",fontWeight:600,fontSize:11}}>{g.opponent||"—"}</td>
+                            <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",fontSize:11}}>{g.ab}</td>
+                            <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",fontSize:11,color:parseInt(g.hits)>0?"var(--green)":"var(--muted)"}}>{g.hits}</td>
+                            <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",fontSize:11,color:parseInt(g.hr)>0?"var(--accent)":"var(--muted)",fontWeight:parseInt(g.hr)>0?"700":"400"}}>{g.hr}</td>
+                            <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",fontSize:11}}>{g.runs}</td>
+                            <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",fontSize:11}}>{g.rbi}</td>
+                            <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",fontSize:11}}>{g.bb}</td>
+                            <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",fontSize:11,color:parseInt(g.k)>=3?"var(--ice)":"var(--muted)"}}>{g.k}</td>
+                            <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",fontSize:11,color:parseFloat(g.avg)>=0.300?"var(--accent)":"var(--text)"}}>{g.avg}</td>
                           </tr>
                         );
                       })}
