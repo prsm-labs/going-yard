@@ -2445,7 +2445,7 @@ function HRTicker({ onHRClick }) {
 function HRTrackerTab() {
   const [hrs, setHrs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [sortKey, setSortKey] = useState("distance");
+  const [sortKey, setSortKey] = useState("chronoIndex");
   const [sortDir, setSortDir] = useState(-1);
   const [filterTeam, setFilterTeam] = useState("all");
   const [refreshing, setRefreshing] = useState(false);
@@ -2660,6 +2660,82 @@ function PowerBITab() {
   </div>;
 }
 
+function DataStatusBadge() {
+  const [status, setStatus] = useState("checking"); // checking | live | delayed | offline
+  const [lastOk, setLastOk] = useState(null);
+
+  useEffect(() => {
+    const check = async () => {
+      try {
+        const etDate = new Date().toLocaleDateString("en-US",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"});
+        const [m,d,y] = etDate.split("/");
+        const today = `${y}-${m}-${d}`;
+        const res = await fetch(`/api/schedule?date=${today}`);
+        if (!res.ok) throw new Error("API error");
+        const data = await res.json();
+        const games = data.dates?.[0]?.games || [];
+        const liveGames = games.filter(g =>
+          g.status?.abstractGameState === "Live" ||
+          g.status?.codedGameState === "I"
+        ).length;
+        if (liveGames > 0) setStatus("live");
+        else if (games.length > 0) setStatus("ok");
+        else setStatus("idle");
+        setLastOk(new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}));
+      } catch {
+        setStatus("offline");
+      }
+    };
+    check();
+    const id = setInterval(check, 120000);
+    return () => clearInterval(id);
+  }, []);
+
+  const cfg = {
+    live:     {dot:"#27c97a", text:"Live",     tip:"Games in progress · data updating"},
+    ok:       {dot:"#38b8f2", text:"Scheduled", tip:"Data connected · games scheduled"},
+    idle:     {dot:"#5a7080", text:"Off Day",   tip:"No games today"},
+    checking: {dot:"#5a7080", text:"...",        tip:"Checking data connection"},
+    offline:  {dot:"#ff4020", text:"Offline",   tip:"Data connection issue · retrying"},
+  }[status] || {dot:"#5a7080",text:"—",tip:""};
+
+  return (
+    <div title={cfg.tip + (lastOk ? ` · ${lastOk}` : "")} style={{display:"flex",alignItems:"center",gap:5,padding:"3px 9px",borderRadius:20,background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.08)",cursor:"default"}}>
+      <div style={{width:6,height:6,borderRadius:"50%",background:cfg.dot,boxShadow:status==="live"?`0 0 6px ${cfg.dot}`:"none",animation:status==="live"?"pulse 1.5s ease-in-out infinite":"none"}}/>
+      <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:cfg.dot,letterSpacing:.5,textTransform:"uppercase"}}>{cfg.text}</span>
+    </div>
+  );
+}
+
+function StatcastTab() {
+  return <div>
+    <div className="section-header" style={{marginBottom:16}}>
+      <div className="section-title">📊 Baseball Savant</div>
+      <div className="section-sub">Affiliate partner · Statcast data, spray charts, leaderboards</div>
+    </div>
+    <div style={{background:"rgba(56,184,242,.06)",border:"1px solid rgba(56,184,242,.2)",borderRadius:8,padding:"8px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
+      <span style={{fontSize:10,color:"var(--ice)",fontFamily:"'DM Mono',monospace"}}>🤝 Affiliate Partner</span>
+      <span style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>— Going Yard uses Baseball Savant data to power its Statcast metrics.</span>
+      <a href="https://baseballsavant.mlb.com/" target="_blank" rel="noopener noreferrer"
+        style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:6,background:"var(--ice)",color:"#0a1218",fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,letterSpacing:1,textDecoration:"none",flexShrink:0}}>
+        ↗ Open in New Tab
+      </a>
+    </div>
+    <div style={{borderRadius:10,overflow:"hidden",border:"1px solid var(--border)",background:"var(--surface)",position:"relative",paddingBottom:"75%",height:0}}>
+      <iframe
+        title="Baseball Savant"
+        src="https://baseballsavant.mlb.com/"
+        frameBorder="0"
+        allowFullScreen
+        style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",border:"none"}}
+      />
+    </div>
+    <div style={{marginTop:8,fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textAlign:"center"}}>
+      If the embed is blocked, use the ↗ Open in New Tab button above.
+    </div>
+  </div>;
+}
+
 export default function App() {
   const [tab, setTab] = useState("pregame");
   // Load player→team map immediately at startup
@@ -2669,7 +2745,10 @@ export default function App() {
     <div className="app">
       <header className="header">
         <div className="logo"><div className="logo-dot"/>⚾ <span>GOING</span> YARD</div>
-        <div className="live-badge"><div className="live-dot"/>MLB 2026</div>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <DataStatusBadge/>
+          <div className="live-badge"><div className="live-dot"/>MLB 2026</div>
+        </div>
       </header>
       <HRTicker onHRClick={()=>setTab("homeruns")}/>
       <nav className="tabs">
@@ -2681,6 +2760,7 @@ export default function App() {
         <button className={`tab ${tab==="homeruns"?"active":""}`} onClick={()=>setTab("homeruns")} style={{color:tab==="homeruns"?"var(--accent)":undefined}}>💥 HR Tracker</button>
         <button className={`tab ${tab==="powerbi"?"active":""}`} onClick={()=>setTab("powerbi")}>📊 Analytics</button>
         <button className={`tab ${tab==="onlyhomers"?"active":""}`} onClick={()=>setTab("onlyhomers")} style={{color:tab==="onlyhomers"?"var(--accent2)":undefined}}>⚾ Only Homers</button>
+        <button className={`tab ${tab==="statcast"?"active":""}`} onClick={()=>setTab("statcast")} style={{color:tab==="statcast"?"var(--ice)":undefined}}>📡 Statcast</button>
       </nav>
       <main className="content">
         {tab==="pregame" && <PregameTab/>}
@@ -2691,6 +2771,7 @@ export default function App() {
         {tab==="homeruns" && <HRTrackerTab/>}
         {tab==="powerbi" && <PowerBITab/>}
         {tab==="onlyhomers" && <OnlyHomersTab/>}
+        {tab==="statcast" && <StatcastTab/>}
       </main>
     </div>
   </>;

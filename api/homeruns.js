@@ -1,95 +1,88 @@
 // api/homeruns.js
+// Uses MLB Stats API game content + live feed for reliable HR detection
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET');
   try {
-    const { date } = req.query;
-    const today = date || new Date().toISOString().slice(0, 10);
+    // ET date
+    const etDate = new Date().toLocaleDateString("en-US", {
+      timeZone: "America/New_York",
+      year: "numeric", month: "2-digit", day: "2-digit"
+    });
+    const [m,d,y] = etDate.split("/");
+    const today = req.query.date || `${y}-${m}-${d}`;
 
+    // Get schedule
     const schedRes = await fetch(
       `https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${today}&hydrate=team,linescore`
     );
     const schedData = await schedRes.json();
     const games = schedData.dates?.[0]?.games || [];
-    console.log(`[HRs] date=${today} games=${games.length}`);
+    console.log(`[HRs] date=${today} total games=${games.length}`);
 
     const allHRs = [];
-    const debugInfo = [];
 
     await Promise.allSettled(games.map(async (game) => {
       const awayAbbr = game.teams?.away?.team?.abbreviation || "???";
       const homeAbbr = game.teams?.home?.team?.abbreviation || "???";
-      const status   = game.status?.abstractGameState || "Preview";
-      const detailed = game.status?.detailedState || "";
-
-      debugInfo.push(`${awayAbbr}@${homeAbbr} status=${status} detail=${detailed}`);
-      if (status === "Preview") return;
+      const abs = game.status?.abstractGameState || "";
+      const coded = game.status?.codedGameState || "";
+      const isActive = abs === "Live" || abs === "Final" ||
+                       coded === "I" || coded === "F" || coded === "O" || coded === "M";
+      if (!isActive) {
+        console.log(`[HRs] Skipping ${awayAbbr}@${homeAbbr} status=${abs}/${coded}`);
+        return;
+      }
 
       try {
-        const pbpRes  = await fetch(
-          `https://statsapi.mlb.com/api/v1/game/${game.gamePk}/playByPlay`
+        // Use the live game feed v1.1 — most complete data
+        const feedRes = await fetch(
+          `https://statsapi.mlb.com/api/v1.1/game/${game.gamePk}/feed/live`
         );
-        const pbpData = await pbpRes.json();
-        const plays   = pbpData.allPlays || [];
+        const feedData = await feedRes.json();
+        const allPlays = feedData?.liveData?.plays?.allPlays || [];
+        console.log(`[HRs] ${awayAbbr}@${homeAbbr} gamePk=${game.gamePk} plays=${allPlays.length}`);
 
-        // Log ALL event types to find what home runs are called
-        const eventTypes = [...new Set(plays.map(p =>
-          p.result?.eventType || p.result?.event || "unknown"
-        ))];
-        console.log(`[HRs] ${awayAbbr}@${homeAbbr} plays=${plays.length} events=${eventTypes.slice(0,10).join(',')}`);
-        debugInfo.push(`  plays=${plays.length} eventTypes=${eventTypes.join(',')}`);
+        // Log first few event types for debugging
+        const events = allPlays.slice(0,5).map(p=>p.result?.event||p.result?.eventType||"?");
+        console.log(`[HRs] Sample events: ${events.join(", ")}`);
 
-        for (const play of plays) {
+        for (const play of allPlays) {
+          const event = (play.result?.event || "").toLowerCase();
           const eventType = (play.result?.eventType || "").toLowerCase();
-          const event     = (play.result?.event     || "").toLowerCase();
-
-          // Cast wide net — catch any variation
-          const isHR = eventType === "home_run"
-            || event === "home run"
-            || event.includes("home run")
-            || event.includes("homer")
-            || eventType.includes("home");
-
-          if (!isHR) continue;
+          if (event !== "home run" && eventType !== "home_run") continue;
 
           const batter  = play.matchup?.batter;
           const pitcher = play.matchup?.pitcher;
           const about   = play.about || {};
           const desc    = play.result?.description || "";
 
-          // RBI: try result.rbi first (most reliable), then parse description
-          let rbi = parseInt(play.result?.rbi) || 0;
-          if (!rbi) {
-            const runMatch = desc.match(/(\d+)-run/i);
-            rbi = runMatch ? parseInt(runMatch[1]) : 1;
+          // RBI — use result.rbi (most reliable in live feed)
+          let rbi = parseInt(play.result?.rbi);
+          if (!rbi || isNaN(rbi)) {
+            const m = desc.match(/(\d+)-run/i);
+            rbi = m ? parseInt(m[1]) : 1;
           }
-          if (!rbi) rbi = 1;
-          rbi = Math.min(Math.max(rbi, 1), 4);
-
+          rbi = Math.min(Math.max(rbi || 1, 1), 4);
           const hrType = rbi >= 4 ? "Grand Slam 🎉" : rbi === 3 ? "3-Run" : rbi === 2 ? "2-Run" : "Solo";
 
+          // hitData from playEvents
           let ev = null, dist = null, la = null, pitch = null;
-          // Check hitData on play directly
-          if (play.hitData?.launchSpeed)   ev   = Math.round(play.hitData.launchSpeed   * 10) / 10;
-          if (play.hitData?.totalDistance) dist = Math.round(play.hitData.totalDistance);
-          if (play.hitData?.launchAngle)   la   = Math.round(play.hitData.launchAngle   * 10) / 10;
-          // Check each playEvent in reverse (last event has hit data)
           for (const pe of [...(play.playEvents || [])].reverse()) {
-            if (!ev   && pe.hitData?.launchSpeed)           ev    = Math.round(pe.hitData.launchSpeed   * 10) / 10;
-            if (!dist && pe.hitData?.totalDistance)         dist  = Math.round(pe.hitData.totalDistance);
-            if (!la   && pe.hitData?.launchAngle)           la    = Math.round(pe.hitData.launchAngle   * 10) / 10;
+            if (!ev   && pe.hitData?.launchSpeed)          ev    = Math.round(pe.hitData.launchSpeed   * 10) / 10;
+            if (!dist && pe.hitData?.totalDistance)        dist  = Math.round(pe.hitData.totalDistance);
+            if (!la   && pe.hitData?.launchAngle)          la    = Math.round(pe.hitData.launchAngle   * 10) / 10;
             if (!pitch && pe.details?.type?.description)   pitch = pe.details.type.description;
           }
 
           const isTop = about.halfInning === "top";
           const chronoIndex = (about.inning || 0) * 1000 + (about.atBatIndex || 0);
-
-          console.log(`[HRs] ✅ HR: ${batter?.fullName} (${isTop?awayAbbr:homeAbbr}) inn=${about.inning} rbi=${rbi} ev=${ev} dist=${dist}`);
+          console.log(`[HRs] ✅ ${batter?.fullName} (${isTop?awayAbbr:homeAbbr}) inn=${about.inning} rbi=${rbi} ev=${ev} dist=${dist} pitch=${pitch}`);
 
           allHRs.push({
-            gamePk:      game.gamePk,
-            gameId:      `${awayAbbr} @ ${homeAbbr}`,
-            awayAbbr,    homeAbbr,
+            gamePk: game.gamePk,
+            gameId: `${awayAbbr} @ ${homeAbbr}`,
+            awayAbbr, homeAbbr,
             batterName:  batter?.fullName  || "Unknown",
             batterId:    batter?.id,
             batterTeam:  isTop ? awayAbbr : homeAbbr,
@@ -108,23 +101,16 @@ export default async function handler(req, res) {
             chronoIndex,
           });
         }
-      } catch(gameErr) {
-        console.error(`[HRs] Game ${game.gamePk} error:`, gameErr.message);
-        debugInfo.push(`  ERROR: ${gameErr.message}`);
+      } catch(e) {
+        console.error(`[HRs] Game ${game.gamePk} failed:`, e.message);
       }
     }));
 
     allHRs.sort((a, b) => b.chronoIndex - a.chronoIndex);
-    console.log(`[HRs] TOTAL HRs found: ${allHRs.length}`);
-
-    res.status(200).json({
-      date: today,
-      homeruns: allHRs,
-      total: allHRs.length,
-      debug: debugInfo, // include debug in response so we can see it in Network tab
-    });
+    console.log(`[HRs] Returning ${allHRs.length} home runs`);
+    res.status(200).json({ date: today, homeruns: allHRs, total: allHRs.length });
   } catch (err) {
-    console.error('[HRs] fatal:', err.message);
-    res.status(500).json({ error: err.message, homeruns: [], debug: [] });
+    console.error('[HRs] Fatal:', err.message);
+    res.status(500).json({ error: err.message, homeruns: [] });
   }
 }
