@@ -246,7 +246,7 @@ const styles = `
 // THRESHOLDS
 // ── PLAYER DATA CACHE (module-level, persists across renders) ────
 const PLAYER_DATA_CACHE = {};
-let PLAYER_CACHE_DATE = null;
+let PLAYER_CACHE_DATE = null; // timestamp (ms) — refreshes every 3 hours
 function cachePlayer(p) { if (p.pid) PLAYER_DATA_CACHE[p.pid] = p; }
 function getCachedPlayer(pid) { return PLAYER_DATA_CACHE[pid] || null; }
 
@@ -308,83 +308,128 @@ const ini = (n) => n.split(" ").map(p => p[0]).join("").toUpperCase().slice(0, 2
 
 // SCOUTING ENGINE
 const calcCQ = (p) => {
-  // EV: 0-1.5 scaled from 95 to 108
-  const evN = Math.min(Math.max((p.avgEV - T.EV_HH) / (T.EV_EL - T.EV_HH), 0), 1) * 1.5;
-  // Barrel: peaks at T.BAR_EL (15%), penalized if above T.BAR_MAX (18%) — indicates over-swinging
-  const bar = p.barrel ?? 0;
-  const barN = bar >= T.BAR_MAX ? 0.8 : Math.min(bar / T.BAR_EL, 1);
-  // HardHit: 0-1 scaled to 50%
-  const hhN = Math.min((p.hardHit ?? 0) / T.HH_EL, 1);
-  return Math.round((evN + barN + hhN) * 10) / 10;
+  // Contact Quality — EV backbone + barrel + hard hit + sweet spot
+  // Returns 0-10 score used for display in Scouting tab
+  const ev = p.avgEV ?? 0;
+  const evN = ev >= 94.5 ? 4.0 : ev >= 90 ? 3.2 : ev >= 87 ? 2.5 :
+              ev >= 84   ? 1.8 : ev >= 81 ? 1.0 : ev > 0 ? 0.5 : 0;
+  const barN = Math.min((p.barrel  ?? 0) / 15, 1) * 3.0;
+  const hhN  = Math.min((p.hardHit ?? 0) / 50, 1) * 2.0;
+  const ssN  = Math.min((p.sweetSpot ?? 0) / 35, 1) * 1.0;
+  return Math.round((evN + barN + hhN + ssN) * 10) / 10;
 };
 const calcHRI = (p) => {
-  // Pull Air: peaks at 40-50%, below 35% = low power intent
-  const pull = p.pullAir ?? 20;
-  const pullN = pull >= T.PULL_EL ? 1 : pull >= T.PULL_GD ? 0.7 : pull / T.PULL_EL;
-  // Fly Ball: sweet zone 35-45%, above 50% = too many outs (penalize)
-  const fb = p.flyBall ?? p.sweetSpot ?? 35;
-  const fbN = (fb >= T.FB_MIN && fb <= T.FB_MAX) ? 1 : (fb > T.FB_MAX && fb <= 55) ? 0.7 : fb >= 30 ? 0.5 : 0.2;
-  // HR rate contribution
+  // HR Intent — pull%, flyball%, xSLG, HR rate
+  // Returns 0-10 score used for display in Scouting tab
+  const pull = p.pullAir ?? 0;
+  const pullN = pull >= 45 ? 1 : pull >= 35 ? 0.8 : pull >= 25 ? 0.55 :
+                pull >= 15 ? 0.3 : pull > 0 ? 0.15 : 0;
+  const fb = p.flyBall ?? 0;
+  const fbN = (fb >= 35 && fb <= 45) ? 1 : (fb >= 28 && fb < 35) ? 0.75 :
+              (fb > 45 && fb <= 52)   ? 0.65 : fb >= 20 ? 0.4 : fb > 0 ? 0.2 : 0;
+  const xslg = p.xslg ?? p.slg ?? 0;
+  const xslgN = xslg >= 0.600 ? 1 : xslg >= 0.500 ? 0.82 : xslg >= 0.420 ? 0.62 :
+                xslg >= 0.360 ? 0.42 : xslg > 0 ? 0.22 : 0;
   const hrN = Math.min((p.hr ?? 0) / 25, 1);
-  return Math.round((pullN * 3.5 + fbN * 3.5 + hrN * 3) * 10) / 10;
+  return Math.round((pullN*3 + fbN*2.5 + xslgN*2.5 + hrN*2) * 10) / 10;
 };
 const calcRD = (p) => {
-  const bb = Math.min((p.bbPct ?? 8) / 15, 1) * 3;
-  const k = Math.max(1 - (p.kPct ?? 22) / 35, 0) * 3;
-  // Chase rate: <20% elite (3pts), <25% good (2pts), >=25% penalized
-  const chase = p.oSwing ?? 30;
-  const os = chase <= T.CHASE_EL ? 3 : chase <= T.CHASE_GD ? 2 : Math.max(1 - (chase - T.CHASE_GD) / 20, 0) * 1.5;
-  const zc = Math.min((p.zContact ?? 80) / 90, 1) * 3;
-  return Math.round((bb + k + os + zc) * 10) / 10;
+  // Readiness — chase%, K%, BB%, zone contact%
+  // Returns 0-10 score used for display in Scouting tab
+  const chase = p.oSwing ?? p.chasePct ?? 30;
+  const chaseN = chase <= 20 ? 1 : chase <= 25 ? 0.8 : chase <= 30 ? 0.58 :
+                 chase <= 35 ? 0.38 : chase <= 40 ? 0.2 : 0.05;
+  const bb = p.bbPct ?? 0;
+  const bbN = bb >= 12 ? 1 : bb >= 9 ? 0.8 : bb >= 7 ? 0.6 :
+              bb >= 5  ? 0.4 : bb > 0 ? 0.2 : 0;
+  const k = p.kPct ?? 22;
+  const kN = k <= 15 ? 1 : k <= 20 ? 0.78 : k <= 25 ? 0.55 :
+             k <= 30 ? 0.33 : k <= 35 ? 0.15 : 0.05;
+  const zc = p.zContact ?? p.zContactPct ?? 80;
+  const zcN = zc >= 88 ? 1 : zc >= 83 ? 0.78 : zc >= 78 ? 0.55 :
+              zc >= 72 ? 0.33 : zc > 0 ? 0.15 : 0.5;
+  return Math.round((chaseN*3.5 + kN*2.5 + bbN*2 + zcN*2) * 10) / 10;
 };
 const calcOS = (p) => {
-  // ── PRIMARY: EV gate (40pts) ─────────────────────────────
-  const ev = p.avgEV ?? p.windows?.[15]?.avgEV ?? 85;
-  const evPts =
-    ev >= 92.5 ? 40 :
-    ev >= 90.0 ? 34 :
-    ev >= 87.0 ? 28 :
-    ev >= 84.0 ? 20 :
-    ev >= 81.0 ? 12 : 5;
+  // ── Matches Power BI spec exactly: CQ 50% + HRI 30% + RD 20% ──
+  // Each sub-score normalised 0-100, then weighted
 
-  // ── POWER QUALITY (25pts) — xwOBA + Barrel% + HardHit% ──
-  // This mirrors Power BI "Power Score" + "HR Grade"
+  // ── CONTACT QUALITY (50%) ─────────────────────────────────
+  // EV is the backbone — gates everything else
+  const ev = p.avgEV ?? 0;
+  // EV grade per spec: A+ ≥94.5, A ≥90, B ≥87, C ≥84, D ≥81, F <81
+  const evScore =
+    ev >= 94.5 ? 100 :
+    ev >= 90.0 ?  82 :
+    ev >= 87.0 ?  65 :
+    ev >= 84.0 ?  48 :
+    ev >= 81.0 ?  30 : ev > 0 ? 15 : 0;
+  // Barrel%, HardHit%, SweetSpot% boost within EV tier
+  const barrelScore  = Math.min((p.barrel   ?? 0) / 20 * 100, 100);
+  const hardHitScore = Math.min((p.hardHit  ?? 0) / 55 * 100, 100);
+  const ssScore      = Math.min((p.sweetSpot?? 0) / 40 * 100, 100);
+  // xwOBA: strongest predictor of true contact quality
   const xw = p.xwoba ?? 0;
-  const xwPts = xw >= 0.400 ? 25 : xw >= 0.350 ? 20 : xw >= 0.320 ? 15 :
-                xw >= 0.300 ? 10 : xw > 0 ? 6 : 0;
-  const barrelPts = Math.min((p.barrel ?? 0) / 15 * 15, 15);
-  const hhPts     = Math.min((p.hardHit ?? 0) / 50 * 10, 10);
-  const powerPts  = xw > 0 ? (xwPts * 0.6 + barrelPts * 0.3 + hhPts * 0.1)
-                            : (barrelPts * 0.7 + hhPts * 0.3);
+  const xwobaScore = xw >= 0.420 ? 100 : xw >= 0.380 ? 85 : xw >= 0.340 ? 68 :
+                     xw >= 0.310 ? 50  : xw >= 0.280 ? 32 : xw > 0 ? 15 : 0;
+  // Blend: EV 35% + xwOBA 30% + Barrel 20% + HardHit 10% + SweetSpot 5%
+  const cqScore = xw > 0
+    ? (evScore*0.35 + xwobaScore*0.30 + barrelScore*0.20 + hardHitScore*0.10 + ssScore*0.05)
+    : (evScore*0.50 + barrelScore*0.30 + hardHitScore*0.15 + ssScore*0.05);
 
-  // ── CONTACT QUALITY (20pts) — launch angle + sweet spot ──
-  const la = p.launchAngle ?? 0;
-  const laPts = inHRZ(la) ? 20 : (la >= 10 && la < 25) ? 14 :
-                (la >= 0 && la < 10) ? 8 : la < 0 ? 4 : 6;
+  // ── HR INTENT (30%) ───────────────────────────────────────
+  // Pull Air% + Fly Ball% + HR rate + xSLG
+  const pull = p.pullAir ?? 0;
+  const pullScore = pull >= 45 ? 100 : pull >= 35 ? 80 : pull >= 25 ? 55 :
+                    pull >= 15 ? 30  : pull > 0 ? 15 : 0;
+  const fb = p.flyBall ?? 0;
+  const fbScore = (fb >= 35 && fb <= 45) ? 100 : (fb >= 28 && fb < 35) ? 75 :
+                  (fb > 45 && fb <= 52)   ? 65  : fb >= 20 ? 40 : fb > 0 ? 20 : 0;
+  const hrRate = (p.hr ?? 0) / Math.max(p.pa ?? p.ab ?? 1, 1);
+  const hrRateScore = Math.min(hrRate / 0.060 * 100, 100); // 6% HR rate = elite
+  const xslg = p.xslg ?? p.slg ?? 0;
+  const xslgScore = xslg >= 0.600 ? 100 : xslg >= 0.500 ? 82 : xslg >= 0.420 ? 62 :
+                    xslg >= 0.360 ? 42  : xslg > 0 ? 22 : 0;
+  // Blend: Pull% 30% + FB% 25% + xSLG 25% + HR rate 20%
+  const hriScore = (pullScore*0.30 + fbScore*0.25 + xslgScore*0.25 + hrRateScore*0.20);
 
-  // ── PLATE DISCIPLINE (15pts) — BB%, K%, Chase% ───────────
-  const cq = calcCQ(p), rd = calcRD(p);
-  const rdN = Math.min(Math.max((rd - 2) / (10-2), 0), 1);
-  const discPts = rdN * 15;
+  // ── READINESS (20%) ───────────────────────────────────────
+  // Chase%, Whiff%, BB%, K%, Zone contact%
+  const chase = p.oSwing ?? p.chasePct ?? 30;
+  const chaseScore = chase <= 20 ? 100 : chase <= 25 ? 80 : chase <= 30 ? 58 :
+                     chase <= 35 ? 38  : chase <= 40 ? 20 : 5;
+  const bb = p.bbPct ?? 0;
+  const bbScore = bb >= 12 ? 100 : bb >= 9 ? 80 : bb >= 7 ? 60 :
+                  bb >= 5  ? 40  : bb > 0  ? 20 : 0;
+  const k = p.kPct ?? 22;
+  const kScore = k <= 15 ? 100 : k <= 20 ? 78 : k <= 25 ? 55 :
+                 k <= 30  ? 33  : k <= 35 ? 15 : 5;
+  const zc = p.zContact ?? p.zContactPct ?? 80;
+  const zcScore = zc >= 88 ? 100 : zc >= 83 ? 78 : zc >= 78 ? 55 :
+                  zc >= 72 ? 33  : zc > 0   ? 15 : 50; // 50 default if unknown
+  // Blend: Chase% 35% + K% 25% + BB% 20% + ZContact% 20%
+  const rdScore = (chaseScore*0.35 + kScore*0.25 + bbScore*0.20 + zcScore*0.20);
 
-  return Math.round((evPts + powerPts + laPts + discPts) * 10) / 10;
+  // ── UNIFIED SCORE: CQ 50% + HRI 30% + RD 20% ─────────────
+  const unified = (cqScore * 0.50) + (hriScore * 0.30) + (rdScore * 0.20);
+  return Math.round(unified * 10) / 10;
 };
 const getSG = (s) => {
-  // Score bands aligned to EV gate:
-  // A+ = 92.5+ EV + strong modifiers (85+)
-  // A  = 90+ EV + decent modifiers (70+)
-  // B  = 87+ EV gate (52+ base, 58+ with mods)
-  // C  = 84+ EV gate (40+)
-  // D  = 81+ EV gate (26+)
-  // F  = below 81 EV (15+)
-  // X  = no data / too soft
-  if (s >= 85) return {grade:"A+",cls:"aplus",label:"🔴 Elite damage threat",color:"var(--aplus)"};
-  if (s >= 70) return {grade:"A", cls:"a",    label:"🔥 Above-avg power",  color:"var(--a)"};
-  if (s >= 55) return {grade:"B", cls:"b",    label:"⚡ Solid EV / heating",color:"var(--b)"};
-  if (s >= 40) return {grade:"C", cls:"c",    label:"👀 Contact-first bat", color:"var(--c)"};
-  if (s >= 26) return {grade:"D", cls:"d",    label:"🌡 Below-avg EV",      color:"var(--d)"};
-  if (s >= 15) return {grade:"F", cls:"f",    label:"🧊 Soft contact",      color:"var(--f)"};
-  return              {grade:"X", cls:"x",    label:"❌ Insufficient data", color:"#2a3a48"};
+  // Score bands — unified 0-100 scale matching spec
+  // A+ ≥78 — red-hot elite, immediate HR threat
+  // A  ≥62 — impact bat, above-avg damage probability
+  // B  ≥48 — heating up, trending positive
+  // C  ≥34 — watchlist, neutral
+  // D  ≥20 — cooling off
+  // F  ≥10 — cold
+  // X  <10  — no meaningful data
+  if (s >= 78) return {grade:"A+",cls:"aplus",label:"🔴 Elite damage threat",  color:"var(--aplus)"};
+  if (s >= 62) return {grade:"A", cls:"a",    label:"🔥 Above-avg power",      color:"var(--a)"};
+  if (s >= 48) return {grade:"B", cls:"b",    label:"⚡ Heating up",           color:"var(--b)"};
+  if (s >= 34) return {grade:"C", cls:"c",    label:"👀 Watch list",           color:"var(--c)"};
+  if (s >= 20) return {grade:"D", cls:"d",    label:"🌡 Cooling off",          color:"var(--d)"};
+  if (s >= 10) return {grade:"F", cls:"f",    label:"🧊 Cold",                 color:"var(--f)"};
+  return              {grade:"X", cls:"x",    label:"❌ Insufficient data",    color:"#2a3a48"};
 };
 const getPIQ = (p) => {
   const chase = p.oSwing ?? 30, zc = p.zContact ?? 80, bbk = p.bbkRatio ?? 0.35;
@@ -1030,182 +1075,199 @@ const STAT_COL_HEADERS = [
 async function fetchPlayers(setL, setP, setE, silent=false) {
   if (!silent) setL(true);
   setE(null);
-  // On silent refresh, use cached players if same day — prevents stat flickering
-  const etNow = new Date().toLocaleDateString("en-US",{timeZone:"America/New_York"});
-  if (silent && PLAYER_CACHE_DATE === etNow && Object.keys(PLAYER_DATA_CACHE).length > 50) {
-    // Return exact same player objects — no re-processing, no variance
-    const cachedList = Object.values(PLAYER_DATA_CACHE).sort((a,b) => (b.os||0)-(a.os||0));
-    console.log("[Players] Returning", cachedList.length, "cached players — no recompute");
-    setP([...cachedList]); // spread to trigger React re-render check
-    if (!silent) setL(false);
+
+  // Return cached data if less than 3 hours old — covers late West Coast games
+  const THREE_HOURS = 3 * 60 * 60 * 1000;
+  const now = Date.now();
+  if (silent && PLAYER_CACHE_DATE && (now - PLAYER_CACHE_DATE) < THREE_HOURS && Object.keys(PLAYER_DATA_CACHE).length > 50) {
+    const cached = Object.values(PLAYER_DATA_CACHE).sort((a,b) => (b.os||0)-(a.os||0));
+    console.log("[Players] Cache hit —", Math.round((now - PLAYER_CACHE_DATE)/60000), "min old");
+    setP([...cached]);
     setL(false);
     return;
   }
+
   try {
-    // Use Eastern Time for date — MLB schedule is ET-based
-    const etDateP = new Date().toLocaleDateString("en-US", {
-      timeZone: "America/New_York",
-      year: "numeric", month: "2-digit", day: "2-digit"
-    });
-    const [mp,dp,yp] = etDateP.split("/");
-    const today = `${yp}-${mp}-${dp}`;
-
-    // Build player → team map from TWO sources:
-    // 1. Today's schedule lineups (most accurate for today's starters)
-    // 2. Full MLB roster endpoint (covers everyone else)
+    // ── STEP 1: Build player→team map from MLB API ──────────
     const pt = {};
-
-    // Source 1: Today's schedule lineups
     try {
+      const gMap = await loadGlobalPlayerMap();
+      for (const [pid, info] of Object.entries(gMap)) {
+        pt[pid] = info.team;
+      }
+    } catch(e) { console.warn('[Players] Team map failed:', e.message); }
+
+    // Also get today's lineup teams
+    try {
+      const etDate = new Date().toLocaleDateString("en-US",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"});
+      const [m,d,y] = etDate.split("/");
+      const today = `${y}-${m}-${d}`;
       const sched = await fetch(`/api/schedule?date=${today}`);
       const sd = await sched.json();
       for (const g of (sd.dates?.[0]?.games || [])) {
-        const aL = g.lineups?.awayPlayers || [], hL = g.lineups?.homePlayers || [];
-        const aT = g.teams?.away?.team?.abbreviation || "", hT = g.teams?.home?.team?.abbreviation || "";
+        const aT = g.teams?.away?.team?.abbreviation || '';
+        const hT = g.teams?.home?.team?.abbreviation || '';
+        const aL = g.lineups?.awayPlayers || [];
+        const hL = g.lineups?.homePlayers || [];
         [...aL].forEach(p => { if (p?.id && aT) pt[p.id] = aT; });
         [...hL].forEach(p => { if (p?.id && hT) pt[p.id] = hT; });
-        // Also map all players from teams even without lineups posted
-        if (aT) { const awayId = g.teams?.away?.team?.id; if (awayId) pt[`team_${awayId}`] = aT; }
-        if (hT) { const homeId = g.teams?.home?.team?.id; if (homeId) pt[`team_${homeId}`] = hT; }
       }
-    } catch(e) { console.warn("Schedule fetch failed:", e.message); }
+    } catch(e) { console.warn('[Players] Lineup fetch failed:', e.message); }
 
-    // Source 2: Global player map (loaded at startup)
-    const gMap = await loadGlobalPlayerMap();
-    for (const [pid, info] of Object.entries(gMap)) {
-      if (!pt[pid]) pt[pid] = info.team;
+    // ── STEP 2: Fetch real Statcast season data ─────────────
+    // Uses Baseball Savant leaderboard — real EV, Barrel%, HardHit%, xwOBA
+    // This is the ONLY source for Statcast metrics — no generated numbers
+    const scRes = await fetch('/api/atbats');
+    const scData = await scRes.json();
+    const statcastPlayers = scData.players || [];
+    console.log('[Players] Statcast players received:', statcastPlayers.length);
+
+    if (statcastPlayers.length === 0) {
+      throw new Error('No Statcast data returned from API');
     }
-    const sc = await fetch("/api/statcast?year=2026&minAB=5");
-    const scJson = await sc.json();
-    const data = (scJson.players || []).filter(r => r.player_id);
 
-    console.log("[Going Yard] Statcast players:", data.length);
-    if (data[0]) console.log("[Going Yard] Sample keys:", Object.keys(data[0]).slice(0,15).join(", "));
+    // ── STEP 3: Build player objects with REAL metrics only ─
+    const mapped = statcastPlayers.map(sc => {
+      const pid = sc.pid;
+      const team = pt[pid] || sc.team || '—';
 
-    // Parse player name — Savant returns "last_name, first_name"
-    const getName = (r) => {
-      const combined = r["last_name, first_name"] || r["last_name,first_name"] || "";
-      if (combined && combined.includes(",")) {
-        const parts = combined.split(",");
-        return `${parts[1].trim()} ${parts[0].trim()}`;
-      }
-      const fn = r.first_name || r.player_first_name || "";
-      const ln = r.last_name  || r.player_last_name  || "";
-      if (fn || ln) return `${fn} ${ln}`.trim();
-      return `Player ${r.player_id}`;
-    };
+      // ── Fly Ball %: use fb_percent if available, else estimate from fbld ──
+      // fbld = FB + LD combined (~55-65% of batted balls)
+      // Pure FB% is roughly fbld * 0.55 for most hitters
+      const flyBall = sc.fbPct > 0
+        ? Math.min(sc.fbPct, 52)
+        : sc.fbldPct > 0
+          ? Math.min(Math.round(sc.fbldPct * 0.55 * 10) / 10, 52)
+          : 0;
 
-    // Safe float parser with cap
-    const pf = (v, cap=999) => Math.min(parseFloat(v)||0, cap);
+      // ── Build the player object with ONLY real Statcast values ──
+      const p = {
+        pid,
+        name:        sc.name,
+        team,
+        // Statcast contact quality — READ FROM API, NEVER GENERATED
+        avgEV:       sc.avgEV,
+        maxEV:       sc.maxEV,
+        barrel:      sc.barrelPct,
+        hardHit:     sc.hardHitPct,
+        sweetSpot:   sc.sweetSpotPct,
+        launchAngle: sc.launchAngle,
+        flyBall,
+        gbPct:       sc.gbPct,
+        ldPct:       sc.ldPct,
+        pullAir:     sc.pullPct,
+        // Expected stats
+        xwoba:       sc.xwoba,
+        xba:         sc.xba,
+        xslg:        sc.xslg,
+        // Traditional season stats
+        avg:         sc.avg,
+        slg:         sc.slg,
+        obp:         sc.obp,
+        ops:         sc.ops,
+        pa:          sc.pa,
+        ab:          sc.ab,
+        // Discipline — from API where available
+        oSwing:      sc.chasePct  || 0,
+        kPct:        sc.kPct      || 0,
+        bbPct:       sc.bbPct     || 0,
+        zContact:    sc.zContactPct || 80,
+        bbkRatio:    sc.bbPct > 0 && sc.kPct > 0 ? sc.bbPct / sc.kPct : 0.4,
+        // HR count enriched below
+        hr: 0,
+      };
 
-    const mapped = data.map(r => {
-      const pid = parseInt(r.player_id);
-      const team = pt[pid] || r.team_name_abbrev || r.team_abbrev || r.team || "—";
+      // ── STEP 4: Calculate grades from REAL metrics ─────────
+      p.heatScore = getHS(p);
+      p.cq  = calcCQ(p);
+      p.hri = calcHRI(p);
+      p.rd  = calcRD(p);
+      p.os  = calcOS(p);
+      p.grade = getSG(p.os);
+      p.piq = getPIQ(p);
 
-      // ── Map ALL Statcast columns — try multiple possible names ──
-      // Expected stats endpoint uses: xba, xslg, xwoba, xobp, exit_velocity_avg
-      // Batted ball endpoint uses: avg_hit_speed, brl_percent, ev95percent, fbld
-      const avgEV      = pf(r.exit_velocity_avg || r.avg_hit_speed, 115);
-      const barrel     = pf(r.barrel_batted_rate || r.brl_percent, 25);
-      const hardHit    = pf(r.hard_hit_percent || r.ev95percent, 80);
-      const launchAngle= Math.min(Math.max(pf(r.launch_angle_avg || r.avg_hit_angle), -20), 50);
-      const sweetSpot  = pf(r.sweet_spot_percent || r.anglesweetspotpercent, 60);
-      // Fly ball%: fb_percent is pure FB%, fbld is FB+LD combined
-      const flyBall    = Math.min(pf(r.fb_percent) || Math.round(pf(r.fbld)/2.2*10)/10, 52);
-      // Expected stats
-      const xwoba      = pf(r.xwoba || r.est_woba, 0.600);
-      const xslg       = pf(r.xslg  || r.est_slg,  1.200);
-      const xba        = pf(r.xba   || r.est_ba,    0.400);
-      // Pull/GB/Sprint
-      const pullPct    = pf(r.pull_percent, 60);
-      const groundBall = pf(r.gb_percent,   70);
-      // Counts
-      const paCount    = parseInt(r.pa || r.abs || 0);
-      const abCount    = parseInt(r.abs || r.ab || paCount);
+      // ── STEP 5: Generate windows using REAL season baseline ─
+      // genWindows uses the real Statcast metrics as baseline
+      // Window variations come from /api/playerstats real game logs
+      p.windows = genWindows(p);
 
-      return enrichP({
-        pid, name: getName(r), team,
-        avgEV, barrel, hardHit, launchAngle, sweetSpot, flyBall,
-        xwoba, xslg, xba,
-        pullAir: pullPct,  // pull% from Savant is accurate
-        maxEV: pf(r.max_hit_speed || r.max_exit_velocity, 130),
-        ev50:  pf(r.ev50, 120),
-        // BB/K/oSwing from MLB Stats enrichment below
-        bbPct: 0, kPct: 0, oSwing: 0, zContact: 80, hr: 0,
-        pa: paCount, ab: abCount,
-        avg: pf(r.ba || r.avg, 0.500),
-        slg: pf(r.slg, 1.200),
-        obp: pf(r.obp, 0.600),
-        ops: pf(r.ops, 2.000),
-      });
-    }).filter(r => r.avgEV > 0 || r.xwoba > 0).sort((a,b) => b.os - a.os);
+      return p;
+    }).filter(p => p.avgEV > 0 || p.xwoba > 0);
 
-    // Fetch MLB Stats API for BB%, K%, HR, and batting stats
-    // These fill in what Savant doesn't provide
+    // ── STEP 6: Enrich with real HR counts from MLB Stats API ─
     try {
-      const mlbStats = await fetch(
-        `https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns,strikeouts,walks&season=2026&sportId=1&limit=300&statType=season`
+      const hrRes = await fetch(
+        'https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&season=2026&sportId=1&limit=500&statType=season'
       );
-      // Build a lookup from player name → stats for enrichment
-      // We match by player_id where possible
-      const statsLeaders = await mlbStats.json();
-      const hrMap = {}, kMap = {}, bbMap = {};
-      for (const cat of (statsLeaders.leagueLeaders || [])) {
+      const hrData = await hrRes.json();
+      const hrMap = {};
+      for (const cat of (hrData.leagueLeaders || [])) {
         for (const entry of (cat.leaders || [])) {
-          const pid = entry.person?.id;
-          if (!pid) continue;
-          if (cat.leaderCategory === "homeRuns") hrMap[pid] = parseInt(entry.value || 0);
-          if (cat.leaderCategory === "strikeouts") kMap[pid] = parseFloat(entry.value || 0);
-          if (cat.leaderCategory === "walks") bbMap[pid] = parseFloat(entry.value || 0);
+          if (entry.person?.id) hrMap[entry.person.id] = parseInt(entry.value || 0);
         }
       }
-      // Enrich each player with real HR, BB%, K%
       mapped.forEach(p => {
-        if (hrMap[p.pid]) p.hr = hrMap[p.pid];
-        // Rough BB%/K% from counting stats (approximate)
-        const bbRaw = bbMap[p.pid] || 0, kRaw = kMap[p.pid] || 0;
-        if (bbRaw > 0 || kRaw > 0) {
-          const pa = Math.max(bbRaw + kRaw + 50, 100); // rough PA estimate
-          p.bbPct = Math.round((bbRaw / pa) * 100 * 10) / 10 || 8;
-          p.kPct  = Math.round((kRaw  / pa) * 100 * 10) / 10 || 20;
-        } else {
-          p.bbPct = Math.round(sr(p.pid, 7, 6, 14) * 10) / 10;
-          p.kPct  = Math.round(sr(p.pid, 8, 14, 28) * 10) / 10;
+        if (hrMap[p.pid]) {
+          p.hr = hrMap[p.pid];
+          // Recalculate HRI with real HR count
+          p.hri = calcHRI(p);
+          p.os  = calcOS(p);
+          p.grade = getSG(p.os);
         }
-        p.oSwing   = Math.round(sr(p.pid, 10, 18, 38) * 10) / 10;
-        p.pullAir  = Math.round(sr(p.pid, 11, 10, 28) * 10) / 10;
-        p.bbkRatio = p.bbPct / Math.max(p.kPct, 1);
-        // Re-enrich with updated stats
-        p.heatScore = getHS(p);
-        p.cq = calcCQ(p); p.hri = calcHRI(p); p.rd = calcRD(p);
-        p.os = calcOS(p); p.grade = getSG(p.os); p.piq = getPIQ(p);
-        if (!p.windows) p.windows = genWindows(p);
       });
-    } catch (statsErr) {
-      console.warn("MLB stats enrichment failed:", statsErr.message);
-      // Fill in defaults so grades still work
-      mapped.forEach(p => {
-        p.bbPct   = p.bbPct   || Math.round(sr(p.pid||1, 7,  6, 14) * 10) / 10;
-        p.kPct    = p.kPct    || Math.round(sr(p.pid||1, 8, 14, 28) * 10) / 10;
-        p.oSwing  = p.oSwing  || Math.round(sr(p.pid||1, 10, 18, 38) * 10) / 10;
-        p.pullAir = p.pullAir || Math.round(sr(p.pid||1, 11, 10, 28) * 10) / 10;
-        p.bbkRatio = p.bbPct / Math.max(p.kPct, 1);
-        p.heatScore = getHS(p);
-        p.cq = calcCQ(p); p.hri = calcHRI(p); p.rd = calcRD(p);
-        p.os = calcOS(p); p.grade = getSG(p.os); p.piq = getPIQ(p);
-        if (!p.windows) p.windows = genWindows(p);
-      });
+      console.log('[Players] HR enrichment done. HR leaders mapped:', Object.keys(hrMap).length);
+    } catch(e) { console.warn('[Players] HR enrichment failed:', e.message); }
+
+    // ── Kick off async real window fetches in background ──────
+    // These update the counting stats (H, AB, HR per window) from game logs
+    // without blocking the initial render
+    mapped.slice(0, 50).forEach(p => {
+      if (p.pid) {
+        fetchRealWindows(p.pid).then(realWin => {
+          if (!realWin) return;
+          const cached = getCachedPlayer(p.pid);
+          if (!cached) return;
+          [3,7,15,30].forEach(w => {
+            if (realWin[w] && cached.windows?.[w]) {
+              Object.assign(cached.windows[w], {
+                hits:       realWin[w].hits,
+                hr:         realWin[w].hr,
+                atBats:     realWin[w].ab,
+                xbh:        realWin[w].xbh,
+                tb:         realWin[w].tb,
+                avg:        parseFloat(realWin[w].avg),
+                bbPct:      realWin[w].bbPct,
+                kPct:       realWin[w].kPct,
+                abPerHR:    realWin[w].abPerHR,
+                abSinceHR:  realWin[w].abSinceHR,
+                games:      realWin[w].games,
+              });
+            }
+          });
+        }).catch(() => {});
+      }
+    });
+
+    // ── Cache and deliver ─────────────────────────────────────
+    const sorted = mapped.sort((a,b) => (b.os||0)-(a.os||0));
+    if (sorted.length > 0) {
+      PLAYER_CACHE_DATE = Date.now(); // timestamp for 3-hour TTL
+      sorted.forEach(p => cachePlayer(p));
+      setP(sorted);
+      console.log('[Players] Done. Top player:', sorted[0]?.name, 'OS:', sorted[0]?.os, 'EV:', sorted[0]?.avgEV);
+    } else {
+      throw new Error('No players after mapping');
     }
-    // Cache and set — once cached, these values never change until next day
-    if (mapped.length > 0) {
-      PLAYER_CACHE_DATE = new Date().toLocaleDateString("en-US",{timeZone:"America/New_York"});
-      mapped.forEach(p => cachePlayer(p));
-      setP(mapped.sort((a,b) => (b.os||0)-(a.os||0)));
-      console.log("[Players] Cached", mapped.length, "players. Top:", mapped[0]?.name, mapped[0]?.os);
-    }
-  } catch (e) { setE("Could not load Statcast. Showing sample. " + e.message); setP(SPLAYERS); }
-  finally { setL(false); }
+
+  } catch(e) {
+    console.error('[Players] Fatal:', e.message);
+    setE('Could not load player data: ' + e.message);
+    setP(SPLAYERS);
+  } finally {
+    setL(false);
+  }
 }
+
 
 async function fetchGames(setL, setG, setE, silent=false) {
   if (!silent) setL(true);
@@ -2309,12 +2371,11 @@ function BvPTab() {
           const s2=bid||i+1;
           const barrel=Math.round(sr(s2,1,6,22)*10)/10, hardHit=Math.round(sr(s2,2,36,62)*10)/10, avgEV=Math.round(sr(s2,3,87,99)*10)/10;
           const bbPct=Math.round(sr(s2,7,6,14)*10)/10, kPct=Math.round(sr(s2,8,14,28)*10)/10, oSwing=Math.round(sr(s2,10,20,38)*10)/10;
-          // All seeds use s2 = bid (player ID) for consistency
           const evBase=88+seededRand(s2,3)*14, m=matchup.multiplier;
           const evVsFB=Math.round((evBase+matchup.evBonus)*10)/10;
           const barrelAdj=Math.round(barrel*m*10)/10, fbAdj=Math.round((28+seededRand(s2,4)*22)*(m*0.8+0.2)*10)/10;
           const laAdj=Math.round(((12+seededRand(s2,5)*22)+(m>1?1.5:-1.5))*10)/10;
-          const pullAdj=Math.round((12+seededRand(s2,6)*20)*(m*0.7+0.3)*10)/10;
+          const pullAdj=Math.round((12+seededRand(s2,5)*20)*(m*0.7+0.3)*10)/10;
           const chaseAdj=Math.round((oSwing+(seededRand(s2,22)*8-4))*(m>1?0.92:1.08)*10)/10;
           const careerBA=0.18+seededRand(s2,12)*0.18, careerHR=Math.floor(seededRand(s2,13)*5), careerAB=Math.floor(8+seededRand(s2,14)*30);
           const last3=[...Array(3)].map((_,li)=>{const rv=seededRand(s2,25+li);return rv>0.85?"HR":rv>0.6?"H":rv>0.3?"O":"K";});
