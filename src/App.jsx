@@ -444,7 +444,13 @@ const enrichP = (r) => {
   r.cq = calcCQ(r); r.hri = calcHRI(r); r.rd = calcRD(r);
   r.os = calcOS(r); r.grade = getSG(r.os); r.piq = getPIQ(r);
   // Generate windowed stats if not already present
-  if (!r.windows) r.windows = genWindows(r);
+  // Use existing windows from cache if available — NEVER regenerate Statcast metrics
+  const existingCached = getCachedPlayer(r.pid);
+  if (existingCached?.windows) {
+    r.windows = existingCached.windows;
+  } else if (!r.windows) {
+    r.windows = genWindows(r);
+  }
   // Async window fetch — updates in background without blocking
   if (r.pid && !WINDOW_CACHE[r.pid]) {
     fetchRealWindows(r.pid).then(realWin => {
@@ -515,15 +521,18 @@ function genWindows(p) {
       const offset = (seededRand(pid, base + idx) * 2 - 1) * rng;
       return Math.max(0, Math.round(base_val + offset));
     };
-    const avgEV       = rv(p.avgEV || 0,       8,  1);
-    const barrel      = rv(p.barrel || 0,       6,  2);
-    const flyBall     = Math.min(rv(p.flyBall > 0 ? p.flyBall : 0, 5, 3), 52);
-    const launchAngle = rv(p.launchAngle || 0,  5,  4);
-    const pullAir     = rv(p.pullAir || 0,      4,  5);
-    const oSwing      = rv(p.oSwing || 0,       4,  6);
-    const hardHit     = rv(p.hardHit || 0,      6,  7);
-    const bbPct       = rv(p.bbPct || 0,        3,  8);
-    const kPct        = rv(p.kPct || 0,         4,  9);
+    // !! CRITICAL: Statcast metrics are READ-ONLY from the API — never modify !!
+    // EV, Barrel%, HardHit%, LaunchAngle, FlyBall% come from Baseball Savant only
+    const avgEV       = p.avgEV       || 0;  // real Statcast — no variance
+    const barrel      = p.barrel      || 0;  // real Statcast — no variance
+    const flyBall     = p.flyBall     || 0;  // real Statcast — no variance
+    const launchAngle = p.launchAngle || 0;  // real Statcast — no variance
+    const pullAir     = p.pullAir     || 0;  // real Statcast — no variance
+    const hardHit     = p.hardHit     || 0;  // real Statcast — no variance
+    // Discipline metrics — minor seeded variance is ok, not shown as primary stats
+    const oSwing      = rv(p.oSwing || 28, 3, 6);
+    const bbPct       = rv(p.bbPct  || 8,  2, 8);
+    const kPct        = rv(p.kPct   || 22, 3, 9);
     // Count stats: scale from season rate using days
     const gamesInWindow = Math.round(w * 0.9);
     const abPerGame = 3.8;
@@ -992,7 +1001,13 @@ const enrichP = (r) => {
   r.cq = calcCQ(r); r.hri = calcHRI(r); r.rd = calcRD(r);
   r.os = calcOS(r); r.grade = getSG(r.os); r.piq = getPIQ(r);
   // Generate windowed stats if not already present
-  if (!r.windows) r.windows = genWindows(r);
+  // Use existing windows from cache if available — NEVER regenerate Statcast metrics
+  const existingCached = getCachedPlayer(r.pid);
+  if (existingCached?.windows) {
+    r.windows = existingCached.windows;
+  } else if (!r.windows) {
+    r.windows = genWindows(r);
+  }
   // Async window fetch — updates in background without blocking
   if (r.pid && !WINDOW_CACHE[r.pid]) {
     fetchRealWindows(r.pid).then(realWin => {
@@ -1787,9 +1802,11 @@ async function fetchPlayers(setL, setP, setE, silent=false) {
   // On silent refresh, use cached players if same day — prevents stat flickering
   const etNow = new Date().toLocaleDateString("en-US",{timeZone:"America/New_York"});
   if (silent && PLAYER_CACHE_DATE === etNow && Object.keys(PLAYER_DATA_CACHE).length > 50) {
-    const cachedList = Object.values(PLAYER_DATA_CACHE);
-    console.log("[Players] Returning cache:", cachedList.length, "players");
-    setP(cachedList);
+    // Return exact same player objects — no re-processing, no variance
+    const cachedList = Object.values(PLAYER_DATA_CACHE).sort((a,b) => (b.os||0)-(a.os||0));
+    console.log("[Players] Returning", cachedList.length, "cached players — no recompute");
+    setP([...cachedList]); // spread to trigger React re-render check
+    if (!silent) setL(false);
     setL(false);
     return;
   }
@@ -1948,11 +1965,12 @@ async function fetchPlayers(setL, setP, setE, silent=false) {
         if (!p.windows) p.windows = genWindows(p);
       });
     }
-    // Cache and set players
+    // Cache and set — once cached, these values never change until next day
     if (mapped.length > 0) {
       PLAYER_CACHE_DATE = new Date().toLocaleDateString("en-US",{timeZone:"America/New_York"});
       mapped.forEach(p => cachePlayer(p));
-      setP(mapped);
+      setP(mapped.sort((a,b) => (b.os||0)-(a.os||0)));
+      console.log("[Players] Cached", mapped.length, "players. Top:", mapped[0]?.name, mapped[0]?.os);
     }
   } catch (e) { setE("Could not load Statcast. Showing sample. " + e.message); setP(SPLAYERS); }
   finally { setL(false); }
@@ -2048,10 +2066,29 @@ async function fetchLiveBatters(gamePk) {
         const runs = parseInt(s.runs || 0);
         const doubles = parseInt(s.doubles || 0), triples = parseInt(s.triples || 0);
         const totalBases = hits + doubles + (triples * 2) + (hr * 3); // 1B=1, 2B=2, 3B=3, HR=4
-        const ev = hr > 0 ? (103+seededRand(2035,12)*7) : hits > 0 ? (90+seededRand(2035,13)*10) : (76+seededRand(2035,14)*12);
-        const la = hr > 0 ? (25+seededRand(2036,15)*9) : hits > 0 ? (12+seededRand(2036,16)*15) : (-3+seededRand(2036,17)*16);
-        const hh = hr > 0 ? Math.floor(2+seededRand(2037,18)*2) : hits > 1 ? 1 : 0;
-        const slb=bid||1; batters.push({ id: bid, name: p?.person?.fullName || `Player ${bid}`, team: ta, ab, hits, hr, bb, so, runs, totalBases, avgEV: Math.round(ev * 10) / 10, launchAngle: Math.round(la * 10) / 10, hardHits: hh, heatLabel: getLHL(ev, la, hh), barrel: Math.round(sr(slb,1,6,20)*10)/10, hardHit: Math.round(sr(slb,2,36,58)*10)/10, seasonAvgEV: Math.round(sr(slb,3,87,97)*10)/10, recentBarrel: Math.round(sr(slb,4,6,22)*10)/10, recentHardHit: Math.round(sr(slb,5,36,62)*10)/10, recentAvgEV: Math.round(sr(slb,6,87,99)*10)/10, pullAirPct: Math.round(sr(slb,7,12,32)*10)/10, flyBallPct: Math.round(sr(slb,8,28,50)*10)/10 });
+        // Seed EV/LA by player ID (bid) so each batter gets consistent values
+        const ev = hr > 0 ? (103+seededRand(bid,12)*7) : hits > 0 ? (90+seededRand(bid,13)*10) : (76+seededRand(bid,14)*12);
+        const la = hr > 0 ? (25+seededRand(bid,15)*9) : hits > 0 ? (12+seededRand(bid,16)*15) : (-3+seededRand(bid,17)*16);
+        const hh = hr > 0 ? Math.floor(2+seededRand(bid,18)*2) : hits > 1 ? 1 : 0;
+        // For live batters: look up their real Statcast data from the player cache
+        const cachedP = getCachedPlayer(bid);
+        const realBarrel = cachedP?.barrel || 0;
+        const realHardHit = cachedP?.hardHit || 0;
+        const realSeasonEV = cachedP?.avgEV || Math.round(ev * 10) / 10;
+        batters.push({ id: bid, name: p?.person?.fullName || `Player ${bid}`, team: ta, ab, hits, hr, bb, so, runs, totalBases,
+          avgEV: Math.round(ev * 10) / 10,
+          launchAngle: Math.round(la * 10) / 10,
+          hardHits: hh,
+          heatLabel: getLHL(ev, la, hh),
+          barrel: realBarrel,
+          hardHit: realHardHit,
+          seasonAvgEV: realSeasonEV,
+          recentBarrel: realBarrel,
+          recentHardHit: realHardHit,
+          recentAvgEV: realSeasonEV,
+          pullAirPct: cachedP?.pullAir || seededRand(bid,7)*20+12,
+          flyBallPct: cachedP?.flyBall || seededRand(bid,8)*20+28,
+        });
       }
     }
     return batters.sort((a, b) => { const o = {elite:4,hot:3,warm:2,avg:1,cold:0}; return (o[b.heatLabel.cls] || 0) - (o[a.heatLabel.cls] || 0); });
