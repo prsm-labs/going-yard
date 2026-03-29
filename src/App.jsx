@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 
+const BUILD_TIMESTAMP = "2026-03-29 19:31 ET";
+
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
@@ -3260,6 +3262,11 @@ export default function App() {
         {tab==="statcast" && <StatcastTab/>}
         {tab==="picks" && <MyPicksTab/>}
       </main>
+      <div style={{textAlign:"center",padding:"12px 0 8px",borderTop:"1px solid var(--border)",marginTop:24}}>
+        <span style={{fontSize:10,color:"#2a3a48",fontFamily:"'DM Mono',monospace",letterSpacing:1}}>
+          Going Yard · Build {BUILD_TIMESTAMP} · prsm-labs
+        </span>
+      </div>
     </div>
   </>;
 }
