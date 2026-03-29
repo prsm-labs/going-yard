@@ -33,7 +33,7 @@ const styles = `
   .window-active{border-color:var(--accent2)!important;color:var(--accent2)!important;background:rgba(245,166,35,.1)!important;}
   .chip:hover{border-color:var(--muted);color:var(--text);}
   .fl{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;margin-right:4px;}
-  .tw{overflow-x:auto;border-radius:10px;border:1px solid var(--border);}
+  .tw{overflow-x:auto;border-radius:10px;border:1px solid var(--border);max-height:75vh;overflow-y:auto;}
   table{width:100%;border-collapse:collapse;}
   thead tr{background:var(--surface2);}
   th{padding:9px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-family:'DM Mono',monospace;white-space:nowrap;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;transition:color .15s;}  th:hover{color:var(--text);}
@@ -1736,9 +1736,7 @@ function PregameTab() {
   const [window, setWindow] = useState(3);
   const [selMatchup, setSelMatchup] = useState(null);
   const [games, setGames] = useState([]);
-  const [search, setSearch] = useState('');
-  const [selPlayer, setSelPlayer] = useState(null);
-  const [search, setSearch] = useState('');
+  const [searchQ, setSearchQ] = useState('');
   const [selPlayer, setSelPlayer] = useState(null);
   const load = useCallback((silent=false) => {
     fetchPlayers(setLoading, setPlayers, setError, silent);
@@ -1765,7 +1763,7 @@ function PregameTab() {
   const filtered = graded.filter(p => {
     // Matchup filter — only show batters from selected game's teams
     if (matchupTeams && matchupTeams.size > 0 && !matchupTeams.has(p.team)) return false;
-    if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
+    if (searchQ && !p.name.toLowerCase().includes(searchQ.toLowerCase())) return false;
     const g = (p._wGrade||p.grade)?.grade;
     if (filter==="aplus") return g==="A+";
     if (filter==="a") return g==="A+"||g==="A";
@@ -1798,7 +1796,7 @@ function PregameTab() {
     </div>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:10}}>
       <WindowButtons window={window} setWindow={setWindow}/>
-      <SearchBar value={search} onChange={setSearch} placeholder="Search batters…"/>
+      <SearchBar value={searchQ} onChange={setSearchQ} placeholder="Search batters…"/>
       <div className="filters" style={{margin:0}}>
         <span className="fl">Filter:</span>
         {[{key:"all",label:"All"},{key:"aplus",label:"🔴 A+"},{key:"a",label:"A+"},{key:"b",label:"B+"},{key:"hot",label:"Hot"}].map(f=>
@@ -1908,7 +1906,7 @@ function ScoutingTab() {
   const [window, setWindow] = useState(3);
   const [selMatchup, setSelMatchup] = useState(null);
   const [games, setGames] = useState([]);
-  const [search, setSearch] = useState('');
+  const [searchQ, setSearchQ] = useState('');
   const [selPlayer, setSelPlayer] = useState(null);
   const load = useCallback((silent=false) => {
     fetchPlayers(setLoading, setPlayers, setError, silent);
@@ -1926,7 +1924,7 @@ function ScoutingTab() {
     : null;
   const filtered = players.filter(p => {
     if (matchupTeamsS && matchupTeamsS.size > 0 && !matchupTeamsS.has(p.team)) return false;
-    if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
+    if (searchQ && !p.name.toLowerCase().includes(searchQ.toLowerCase())) return false;
     const wg = (p.windows?.[window]?.grade || p.grade)?.grade;
     if (filter==="aplus") return wg==="A+";
     if (filter==="a") return wg==="A+"||wg==="A";
