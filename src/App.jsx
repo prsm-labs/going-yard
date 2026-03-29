@@ -2560,6 +2560,37 @@ function HRTrackerTab() {
   </div>;
 }
 
+function OnlyHomersTab() {
+  return <div>
+    <div className="section-header" style={{marginBottom:16}}>
+      <div className="section-title">⚾ Only Homers</div>
+      <div className="section-sub">Affiliate partner · the #1 home run community</div>
+    </div>
+    {/* Affiliate disclosure */}
+    <div style={{background:"rgba(245,166,35,.06)",border:"1px solid rgba(245,166,35,.2)",borderRadius:8,padding:"8px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
+      <span style={{fontSize:10,color:"var(--accent2)",fontFamily:"'DM Mono',monospace"}}>🤝 Affiliate Partner</span>
+      <span style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>— Going Yard may earn a commission when you sign up via this link.</span>
+      <a href="https://www.onlyhomers.com/" target="_blank" rel="noopener noreferrer"
+        style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:6,background:"var(--accent)",color:"white",fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,letterSpacing:1,textDecoration:"none",flexShrink:0}}>
+        ↗ Open in New Tab
+      </a>
+    </div>
+    {/* Embedded iframe */}
+    <div style={{borderRadius:10,overflow:"hidden",border:"1px solid var(--border)",background:"var(--surface)",position:"relative",paddingBottom:"75%",height:0}}>
+      <iframe
+        title="Only Homers"
+        src="https://www.onlyhomers.com/"
+        frameBorder="0"
+        allowFullScreen
+        style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",border:"none"}}
+      />
+    </div>
+    <div style={{marginTop:8,fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textAlign:"center"}}>
+      If the embed is blocked by the site, use the ↗ Open in New Tab button above.
+    </div>
+  </div>;
+}
+
 function PowerBITab() {
   return <div>
     <div className="section-header" style={{marginBottom:16}}>
@@ -2622,6 +2653,7 @@ export default function App() {
         <button className={`tab ${tab==="builder"?"active":""}`} onClick={()=>setTab("builder")}>🔬 Pitch Builder</button>
         <button className={`tab ${tab==="homeruns"?"active":""}`} onClick={()=>setTab("homeruns")} style={{color:tab==="homeruns"?"var(--accent)":undefined}}>💥 HR Tracker</button>
         <button className={`tab ${tab==="powerbi"?"active":""}`} onClick={()=>setTab("powerbi")}>📊 Analytics</button>
+        <button className={`tab ${tab==="onlyhomers"?"active":""}`} onClick={()=>setTab("onlyhomers")} style={{color:tab==="onlyhomers"?"var(--accent2)":undefined}}>⚾ Only Homers</button>
       </nav>
       <main className="content">
         {tab==="pregame" && <PregameTab/>}
@@ -2631,6 +2663,7 @@ export default function App() {
         {tab==="builder" && <PitchBuilderTab/>}
         {tab==="homeruns" && <HRTrackerTab/>}
         {tab==="powerbi" && <PowerBITab/>}
+        {tab==="onlyhomers" && <OnlyHomersTab/>}
       </main>
     </div>
   </>;
