@@ -223,6 +223,9 @@ const styles = `
   .hr-badge.solo{background:rgba(56,184,242,.15);color:var(--ice);border:1px solid rgba(56,184,242,.25);}
   .hr-badge.multi{background:rgba(232,65,26,.18);color:var(--accent);border:1px solid rgba(232,65,26,.3);}
   .hr-badge.slam{background:rgba(255,183,0,.18);color:var(--accent2);border:1px solid rgba(255,183,0,.3);}
+  /* Pick buttons */
+  input[type=text]{outline:none;}
+  input[type=text]::placeholder{color:var(--muted);}
   ::-webkit-scrollbar{width:5px;height:5px;}
   ::-webkit-scrollbar-track{background:var(--bg);}
   ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
@@ -507,6 +510,401 @@ async function loadGlobalPlayerMap() {
 function getPlayerTeam(pid) {
   return GLOBAL_PLAYER_TEAM_MAP[pid]?.team || null;
 }
+
+
+// ── PICKS STORE (persistent via localStorage) ─────────────────
+// Stores favorite/dark horse/longshot selections
+const PICK_TYPES = {
+  favorite:   { label: "💣 Favorite",    cls: "favorite",   color: "#ff4020" },
+  darkhorse:  { label: "⭐ Dark Horse",   cls: "darkhorse",  color: "#f5a623" },
+  longshot:   { label: "🎯 Longshot",     cls: "longshot",   color: "#38b8f2" },
+};
+
+function loadPicks() {
+  try { return JSON.parse(localStorage.getItem("gy_picks") || "{}"); }
+  catch { return {}; }
+}
+function savePicks(picks) {
+  try { localStorage.setItem("gy_picks", JSON.stringify(picks)); } catch {}
+}
+
+// Global picks state — shared across all tabs
+let GLOBAL_PICKS = loadPicks();
+const PICKS_LISTENERS = new Set();
+function subscribePicks(fn) { PICKS_LISTENERS.add(fn); return () => PICKS_LISTENERS.delete(fn); }
+function setPick(pid, name, team, type) {
+  pid = String(pid);
+  if (GLOBAL_PICKS[pid]?.type === type) {
+    delete GLOBAL_PICKS[pid]; // toggle off
+  } else {
+    GLOBAL_PICKS[pid] = { pid, name, team, type, ts: Date.now() };
+  }
+  savePicks(GLOBAL_PICKS);
+  PICKS_LISTENERS.forEach(fn => fn({...GLOBAL_PICKS}));
+}
+function usePicks() {
+  const [picks, setPicksState] = useState({...GLOBAL_PICKS});
+  useEffect(() => subscribePicks(setPicksState), []);
+  return picks;
+}
+
+// ── PICK BUTTON COMPONENT ──────────────────────────────────────
+function PickButton({ pid, name, team }) {
+  const picks = usePicks();
+  const key = String(pid);
+  const current = picks[key]?.type;
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div style={{position:"relative",display:"inline-block"}}>
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen(o => !o); }}
+        style={{
+          padding:"2px 7px", borderRadius:5, fontSize:10,
+          fontFamily:"'DM Mono',monospace", cursor:"pointer",
+          border:`1px solid ${current ? PICK_TYPES[current].color : "var(--border)"}`,
+          background: current ? `${PICK_TYPES[current].color}20` : "var(--surface2)",
+          color: current ? PICK_TYPES[current].color : "var(--muted)",
+        }}
+      >
+        {current ? PICK_TYPES[current].label.split(" ")[0] : "＋"}
+      </button>
+      {open && (
+        <div
+          style={{position:"absolute",top:"calc(100% + 4px)",left:0,zIndex:500,
+            background:"#0d1318",border:"1px solid var(--border)",borderRadius:8,
+            padding:5,display:"flex",flexDirection:"column",gap:3,minWidth:130,
+            boxShadow:"0 8px 24px rgba(0,0,0,.5)"}}
+          onClick={e => e.stopPropagation()}
+        >
+          {Object.entries(PICK_TYPES).map(([type, cfg]) => (
+            <button key={type}
+              onClick={() => { setPick(pid, name, team, type); setOpen(false); }}
+              style={{
+                padding:"5px 9px", borderRadius:5, cursor:"pointer", textAlign:"left",
+                fontFamily:"'DM Mono',monospace", fontSize:11,
+                border:`1px solid ${current===type ? cfg.color : "transparent"}`,
+                background: current===type ? `${cfg.color}20` : "transparent",
+                color: current===type ? cfg.color : "var(--text)",
+              }}
+            >
+              {cfg.label}
+            </button>
+          ))}
+          {current && (
+            <button
+              onClick={() => { setPick(pid, name, team, current); setOpen(false); }}
+              style={{padding:"5px 9px",borderRadius:5,cursor:"pointer",textAlign:"left",
+                fontFamily:"'DM Mono',monospace",fontSize:11,border:"1px solid transparent",
+                background:"transparent",color:"var(--muted)"}}
+            >
+              ✕ Remove
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── SEARCH BAR COMPONENT ────────────────────────────────────────
+function SearchBar({ value, onChange, placeholder = "Search players…" }) {
+  return (
+    <div style={{position:"relative",flex:1,minWidth:160,maxWidth:280}}>
+      <input
+        type="text"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        style={{
+          width:"100%", padding:"6px 10px 6px 30px",
+          background:"var(--surface2)", border:"1px solid var(--border)",
+          borderRadius:7, color:"var(--text)",
+          fontFamily:"'DM Mono',monospace", fontSize:11,
+          outline:"none", boxSizing:"border-box",
+        }}
+      />
+      <span style={{position:"absolute",left:9,top:"50%",transform:"translateY(-50%)",
+        fontSize:12,color:"var(--muted)",pointerEvents:"none"}}>🔍</span>
+      {value && (
+        <button onClick={() => onChange("")}
+          style={{position:"absolute",right:6,top:"50%",transform:"translateY(-50%)",
+            background:"none",border:"none",color:"var(--muted)",cursor:"pointer",
+            fontSize:12,padding:0}}>✕</button>
+      )}
+    </div>
+  );
+}
+
+// ── PLAYER PAGE (modal overlay) ────────────────────────────────
+function PlayerPage({ player, onClose }) {
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!player?.pid) { setLoading(false); return; }
+    // Fetch real player stats from MLB Stats API
+    (async () => {
+      try {
+        const [seasonRes, gameLogRes] = await Promise.all([
+          fetch(`https://statsapi.mlb.com/api/v1/people/${player.pid}/stats?stats=season,career&group=hitting&season=2026&sportId=1`),
+          fetch(`https://statsapi.mlb.com/api/v1/people/${player.pid}/stats?stats=gameLog&group=hitting&season=2026&sportId=1&limit=10`),
+        ]);
+        const seasonData  = await seasonRes.json();
+        const gameLogData = await gameLogRes.json();
+        setStats({ season: seasonData.stats, gameLog: gameLogData.stats });
+      } catch(e) {
+        console.warn("Player stats fetch failed:", e.message);
+      }
+      setLoading(false);
+    })();
+  }, [player?.pid]);
+
+  if (!player) return null;
+
+  const seasonStats = stats?.season?.find(s => s.type?.displayName === "season")?.splits?.[0]?.stat;
+  const careerStats = stats?.season?.find(s => s.type?.displayName === "career")?.splits?.[0]?.stat;
+  const gameLogs    = stats?.gameLog?.[0]?.splits?.slice(0, 10) || [];
+
+  const StatBox = ({label, value, color}) => (
+    <div style={{background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:7,
+      padding:"9px 12px",textAlign:"center",minWidth:70}}>
+      <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",
+        textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>{label}</div>
+      <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:22,
+        color:color||"var(--text)"}}>{value ?? "—"}</div>
+    </div>
+  );
+
+  const g = player.grade || player._wGrade || { grade:"X", cls:"x", color:"#2a3a48" };
+
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:1000,background:"rgba(0,0,0,.85)",
+      backdropFilter:"blur(8px)",display:"flex",alignItems:"flex-start",justifyContent:"center",
+      padding:"20px 16px",overflowY:"auto"}}
+      onClick={onClose}
+    >
+      <div style={{background:"#0d1318",border:"1px solid var(--border)",borderRadius:14,
+        width:"100%",maxWidth:700,animation:"sd .2s ease"}}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div style={{padding:"16px 20px",borderBottom:"1px solid var(--border)",
+          display:"flex",alignItems:"center",gap:14}}>
+          <div style={{width:52,height:52,borderRadius:"50%",background:"linear-gradient(135deg,var(--surface2),var(--border))",
+            display:"flex",alignItems:"center",justifyContent:"center",
+            fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:18,
+            border:`2px solid ${g.color}`,color:g.color}}>
+            {ini(player.name)}
+          </div>
+          <div style={{flex:1}}>
+            <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:22,
+              letterSpacing:1}}>{player.name}</div>
+            <div style={{fontSize:11,color:"var(--muted)",fontFamily:"'DM Mono',monospace",
+              marginTop:2,display:"flex",gap:10,alignItems:"center"}}>
+              <span>{player.team}</span>
+              <span>·</span>
+              <span style={{color:g.color}}>{g.grade} — {g.label}</span>
+              {player.hand && <span>· Bats: {player.hand}</span>}
+            </div>
+          </div>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            <PickButton pid={player.pid||player.id} name={player.name} team={player.team}/>
+            <button onClick={onClose}
+              style={{background:"none",border:"1px solid var(--border)",borderRadius:6,
+                color:"var(--muted)",cursor:"pointer",padding:"4px 10px",fontSize:12}}>✕ Close</button>
+          </div>
+        </div>
+
+        {/* Statcast metrics */}
+        <div style={{padding:"14px 20px",borderBottom:"1px solid var(--border)"}}>
+          <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",
+            textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>Statcast Profile</div>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            <StatBox label="Avg EV"     value={player.avgEV?.toFixed(1)}    color={player.avgEV>=T.EV_HH?"var(--accent)":"var(--text)"}/>
+            <StatBox label="Barrel%"    value={`${player.barrel?.toFixed(1)}%`} color={player.barrel>=T.BAR_EL?"#ff8020":"var(--text)"}/>
+            <StatBox label="Hard Hit%"  value={`${player.hardHit?.toFixed(1)}%`}/>
+            <StatBox label="Fly Ball%"  value={`${player.flyBall?.toFixed(1)}%`} color={player.flyBall>=T.FB_MIN&&player.flyBall<=T.FB_MAX?"var(--green)":"var(--text)"}/>
+            <StatBox label="Launch °"   value={`${player.launchAngle?.toFixed(1)}°`} color={inHRZ(player.launchAngle)?"var(--green)":"var(--text)"}/>
+            <StatBox label="Pull Air%"  value={`${player.pullAir?.toFixed(1)}%`} color={player.pullAir>=T.PULL_EL?"#ff8020":"var(--text)"}/>
+            <StatBox label="Chase%"     value={`${player.oSwing?.toFixed(1)}%`} color={player.oSwing<=T.CHASE_GD?"var(--green)":"#ff8020"}/>
+          </div>
+        </div>
+
+        {/* Season stats */}
+        {loading ? (
+          <div style={{padding:"20px",display:"flex",alignItems:"center",gap:8}}>
+            <div className="sp" style={{width:16,height:16,borderWidth:2}}/>
+            <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:"var(--muted)"}}>Loading MLB stats…</span>
+          </div>
+        ) : seasonStats ? (
+          <>
+            <div style={{padding:"14px 20px",borderBottom:"1px solid var(--border)"}}>
+              <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",
+                textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>2026 Season</div>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                <StatBox label="AVG"  value={seasonStats.avg}/>
+                <StatBox label="HR"   value={seasonStats.homeRuns}  color="var(--accent)"/>
+                <StatBox label="RBI"  value={seasonStats.rbi}/>
+                <StatBox label="OBP"  value={seasonStats.obp}       color="var(--green)"/>
+                <StatBox label="SLG"  value={seasonStats.slg}/>
+                <StatBox label="OPS"  value={seasonStats.ops}       color={parseFloat(seasonStats.ops)>=0.900?"var(--accent)":parseFloat(seasonStats.ops)>=0.800?"#ff8020":"var(--text)"}/>
+                <StatBox label="AB"   value={seasonStats.atBats}/>
+                <StatBox label="BB%"  value={seasonStats.baseOnBalls}/>
+                <StatBox label="SO"   value={seasonStats.strikeOuts}/>
+              </div>
+            </div>
+
+            {/* Game log */}
+            {gameLogs.length > 0 && (
+              <div style={{padding:"14px 20px",borderBottom:"1px solid var(--border)"}}>
+                <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",
+                  textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>Last 10 Games</div>
+                <div style={{overflowX:"auto"}}>
+                  <table style={{width:"100%",borderCollapse:"collapse"}}>
+                    <thead>
+                      <tr style={{background:"var(--surface2)"}}>
+                        {["Date","Opp","AB","H","HR","R","RBI","BB","K","AVG"].map(h => (
+                          <th key={h} style={{padding:"5px 8px",textAlign:"left",fontSize:9,
+                            color:"var(--muted)",fontFamily:"'DM Mono',monospace",
+                            textTransform:"uppercase",letterSpacing:1,borderBottom:"1px solid var(--border)"}}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {gameLogs.map((g, i) => {
+                        const s = g.stat;
+                        const isHR = parseInt(s.homeRuns) > 0;
+                        return (
+                          <tr key={i} style={{borderBottom:"1px solid rgba(30,45,58,.4)",
+                            background:isHR?"rgba(232,65,26,.05)":""}}>
+                            <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--muted)"}}>{g.date?.slice(5)}</td>
+                            <td style={{padding:"5px 8px",fontFamily:"'Oswald',sans-serif",fontWeight:600,fontSize:11}}>{g.opponent?.abbreviation||"—"}</td>
+                            <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",fontSize:11}}>{s.atBats}</td>
+                            <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",fontSize:11,color:parseInt(s.hits)>0?"var(--green)":"var(--muted)"}}>{s.hits}</td>
+                            <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",fontSize:11,color:isHR?"var(--accent)":"var(--muted)",fontWeight:isHR?"700":"400"}}>{s.homeRuns}</td>
+                            <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",fontSize:11}}>{s.runs}</td>
+                            <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",fontSize:11}}>{s.rbi}</td>
+                            <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",fontSize:11}}>{s.baseOnBalls}</td>
+                            <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",fontSize:11,color:parseInt(s.strikeOuts)>=3?"var(--ice)":"var(--muted)"}}>{s.strikeOuts}</td>
+                            <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",fontSize:11,color:parseFloat(s.avg)>=0.300?"var(--accent)":"var(--text)"}}>{s.avg}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <div style={{padding:"16px 20px",fontFamily:"'DM Mono',monospace",fontSize:11,color:"var(--muted)"}}>
+            Season stats unavailable — may be too early in the season or player ID not found.
+          </div>
+        )}
+
+        {/* Links */}
+        <div style={{padding:"12px 20px",display:"flex",gap:8,flexWrap:"wrap"}}>
+          <a href={`https://baseballsavant.mlb.com/savant-player/${player.name?.toLowerCase().replace(/\s+/g,"-")}-${player.pid}`}
+            target="_blank" rel="noopener noreferrer"
+            style={{padding:"5px 11px",borderRadius:6,background:"var(--surface2)",
+              border:"1px solid var(--border)",color:"var(--ice)",fontFamily:"'DM Mono',monospace",
+              fontSize:11,textDecoration:"none"}}>
+            📊 Baseball Savant
+          </a>
+          <a href={`https://www.baseball-reference.com/search/search.fcgi?q=${encodeURIComponent(player.name)}`}
+            target="_blank" rel="noopener noreferrer"
+            style={{padding:"5px 11px",borderRadius:6,background:"var(--surface2)",
+              border:"1px solid var(--border)",color:"var(--muted)",fontFamily:"'DM Mono',monospace",
+              fontSize:11,textDecoration:"none"}}>
+            📚 B-Ref
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── MY PICKS TAB ───────────────────────────────────────────────
+function MyPicksTab() {
+  const picks = usePicks();
+  const [selPlayer, setSelPlayer] = useState(null);
+  const pickList = Object.values(picks).sort((a,b) => a.type.localeCompare(b.type));
+
+  const grouped = {
+    favorite:  pickList.filter(p => p.type === "favorite"),
+    darkhorse: pickList.filter(p => p.type === "darkhorse"),
+    longshot:  pickList.filter(p => p.type === "longshot"),
+  };
+
+  const PickRow = ({p}) => {
+    const cfg = PICK_TYPES[p.type];
+    return (
+      <div style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",
+        borderBottom:"1px solid rgba(30,45,58,.4)",transition:"background .15s",cursor:"pointer"}}
+        onClick={() => setSelPlayer(p)}
+        onMouseEnter={e => e.currentTarget.style.background="rgba(255,255,255,.02)"}
+        onMouseLeave={e => e.currentTarget.style.background=""}
+      >
+        <div style={{width:34,height:34,borderRadius:"50%",
+          background:"var(--surface2)",border:`2px solid ${cfg.color}`,
+          display:"flex",alignItems:"center",justifyContent:"center",
+          fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,color:cfg.color}}>
+          {ini(p.name)}
+        </div>
+        <div style={{flex:1}}>
+          <div style={{fontWeight:600,fontSize:13}}>{p.name}</div>
+          <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{p.team}</div>
+        </div>
+        <span style={{fontSize:14}}>{cfg.label.split(" ")[0]}</span>
+        <button onClick={e => { e.stopPropagation(); setPick(p.pid,p.name,p.team,p.type); }}
+          style={{background:"none",border:"1px solid var(--border)",borderRadius:5,
+            color:"var(--muted)",cursor:"pointer",padding:"2px 7px",fontSize:10}}>✕</button>
+      </div>
+    );
+  };
+
+  return (
+    <div>
+      <div className="section-header" style={{marginBottom:16}}>
+        <div className="section-title">🎯 My Picks</div>
+        <div className="section-sub">Your saved batters · 💣 Favorites · ⭐ Dark Horses · 🎯 Longshots · click any to view player page</div>
+      </div>
+
+      {pickList.length === 0 ? (
+        <div style={{padding:"60px 20px",textAlign:"center",color:"var(--muted)",
+          fontFamily:"'DM Mono',monospace",fontSize:12,lineHeight:2}}>
+          No picks yet.<br/>
+          Click the <strong style={{color:"var(--text)"}}>＋</strong> button next to any batter on the Pregame or Scouting tabs to add them here.
+        </div>
+      ) : (
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:14}}>
+          {Object.entries(grouped).map(([type, players]) => {
+            if (players.length === 0) return null;
+            const cfg = PICK_TYPES[type];
+            return (
+              <div key={type} style={{background:"var(--surface)",border:`1px solid ${cfg.color}30`,
+                borderRadius:10,overflow:"hidden"}}>
+                <div style={{padding:"10px 14px",background:`${cfg.color}10`,
+                  borderBottom:`1px solid ${cfg.color}20`,display:"flex",alignItems:"center",gap:8}}>
+                  <span style={{fontSize:16}}>{cfg.label.split(" ")[0]}</span>
+                  <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,
+                    color:cfg.color,letterSpacing:1}}>{cfg.label.split(" ").slice(1).join(" ").toUpperCase()}</span>
+                  <span style={{marginLeft:"auto",fontFamily:"'DM Mono',monospace",fontSize:11,
+                    color:"var(--muted)"}}>{players.length} batter{players.length!==1?"s":""}</span>
+                </div>
+                {players.map(p => <PickRow key={p.pid} p={p}/>)}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {selPlayer && <PlayerPage player={selPlayer} onClose={() => setSelPlayer(null)}/>}
+    </div>
+  );
+}
+
+
 
 // ── WEATHER + PARK FACTOR CACHE ─────────────────────────────
 const WEATHER_CACHE = {};
@@ -1336,8 +1734,12 @@ function PregameTab() {
   const [filter, setFilter] = useState("all");
   const [refreshing, setRefreshing] = useState(false);
   const [window, setWindow] = useState(3);
-  const [selMatchup, setSelMatchup] = useState(null); // null = all batters
+  const [selMatchup, setSelMatchup] = useState(null);
   const [games, setGames] = useState([]);
+  const [search, setSearch] = useState('');
+  const [selPlayer, setSelPlayer] = useState(null);
+  const [search, setSearch] = useState('');
+  const [selPlayer, setSelPlayer] = useState(null);
   const load = useCallback((silent=false) => {
     fetchPlayers(setLoading, setPlayers, setError, silent);
   }, []);
@@ -1363,6 +1765,7 @@ function PregameTab() {
   const filtered = graded.filter(p => {
     // Matchup filter — only show batters from selected game's teams
     if (matchupTeams && matchupTeams.size > 0 && !matchupTeams.has(p.team)) return false;
+    if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
     const g = (p._wGrade||p.grade)?.grade;
     if (filter==="aplus") return g==="A+";
     if (filter==="a") return g==="A+"||g==="A";
@@ -1395,6 +1798,7 @@ function PregameTab() {
     </div>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:10}}>
       <WindowButtons window={window} setWindow={setWindow}/>
+      <SearchBar value={search} onChange={setSearch} placeholder="Search batters…"/>
       <div className="filters" style={{margin:0}}>
         <span className="fl">Filter:</span>
         {[{key:"all",label:"All"},{key:"aplus",label:"🔴 A+"},{key:"a",label:"A+"},{key:"b",label:"B+"},{key:"hot",label:"Hot"}].map(f=>
@@ -1425,7 +1829,7 @@ function PregameTab() {
     {loading ? <div className="lw"><div className="sp"/><div className="lt">Loading Statcast…</div></div> : <>
       {error && <div className="warn">⚠️ {error}</div>}
       <div className="tw"><table><thead><tr>
-        <th>#</th><th>Player</th>
+        <th>#</th><th>Player</th><th style={{width:36}}>Pick</th>
         <th className={sortKey==="os"?"sk":""} onClick={()=>hs("os")} style={{cursor:"pointer"}}>Grade{sortKey==="os"&&<span style={{color:"var(--accent)",marginLeft:3}}>{sortDir<0?"↓":"↑"}</span>}</th>
         {STAT_COL_HEADERS.map(c=>
           <th key={c.key} className={sortKey===c.key?"sk":""} onClick={()=>hs(c.key)}>
@@ -1440,7 +1844,8 @@ function PregameTab() {
         const wg = p._wGrade||p.grade||{grade:"X",cls:"x",color:"#2a3a48"};
         return <tr key={p.pid}>
           <td><span className="sv avg" style={{fontSize:10}}>{i+1}</span></td>
-          <td><div className="pc"><div className="av">{ini(p.name)}</div><div><div className="pn">{p.name}</div><div className="pt" style={{color:p.team&&p.team!=="—"?"var(--muted)":"#ff801030"}}>{p.team&&p.team!=="—"?p.team:"Lineup TBD"}</div></div></div></td>
+          <td><div className="pc" style={{cursor:"pointer"}} onClick={()=>setSelPlayer(p)}><div className="av">{ini(p.name)}</div><div><div className="pn">{p.name}</div><div className="pt" style={{color:p.team&&p.team!=="—"?"var(--muted)":"#ff801030"}}>{p.team&&p.team!=="—"?p.team:"Lineup TBD"}</div></div></div></td>
+          <td onClick={e=>e.stopPropagation()}><PickButton pid={p.pid} name={p.name} team={p.team}/></td>
           <td><div style={{display:"flex",alignItems:"center",gap:5}}><GBadge g={wg}/><span style={{fontSize:9,color:wg.color,fontFamily:"DM Mono,monospace"}}>{wg.label}</span></div></td>
           <StatCols p={p} window={window}/>
         </tr>;
@@ -1503,6 +1908,8 @@ function ScoutingTab() {
   const [window, setWindow] = useState(3);
   const [selMatchup, setSelMatchup] = useState(null);
   const [games, setGames] = useState([]);
+  const [search, setSearch] = useState('');
+  const [selPlayer, setSelPlayer] = useState(null);
   const load = useCallback((silent=false) => {
     fetchPlayers(setLoading, setPlayers, setError, silent);
   }, []);
@@ -1519,6 +1926,7 @@ function ScoutingTab() {
     : null;
   const filtered = players.filter(p => {
     if (matchupTeamsS && matchupTeamsS.size > 0 && !matchupTeamsS.has(p.team)) return false;
+    if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
     const wg = (p.windows?.[window]?.grade || p.grade)?.grade;
     if (filter==="aplus") return wg==="A+";
     if (filter==="a") return wg==="A+"||wg==="A";
@@ -1573,7 +1981,7 @@ function ScoutingTab() {
     {loading ? <div className="lw"><div className="sp"/><div className="lt">Loading Scouting Board…</div></div> : <>
       {error && <div className="warn">⚠️ {error}</div>}
       <div className="tw"><table><thead><tr>
-        <th>#</th><th>Player</th>
+        <th>#</th><th>Player</th><th style={{width:36}}>Pick</th>
         <th className={sortKey==="os"?"sk":""} onClick={()=>hs("os")} style={{cursor:"pointer"}}>Grade{sortKey==="os"&&<span style={{color:"var(--accent)",marginLeft:3}}>{sortDir<0?"↓":"↑"}</span>}</th>
         <th><Tip text="Composite score: CQ 50% + HRI 30% + RDY 20%"><span>Score</span></Tip></th>
         <th><Tip text="Contact Quality"><span>CQ</span></Tip></th>
@@ -1599,7 +2007,8 @@ function ScoutingTab() {
         const piq = p.piq||{label:"—",color:"var(--muted)"};
         return <tr key={p.pid}>
           <td><span className="sv avg" style={{fontSize:10}}>{i+1}</span></td>
-          <td><div className="pc"><div className="av">{ini(p.name)}</div><div><div className="pn">{p.name}</div><div className="pt" style={{color:p.team&&p.team!=="—"?"var(--muted)":"#ff801030"}}>{p.team&&p.team!=="—"?p.team:"Lineup TBD"}</div></div></div></td>
+          <td><div className="pc" style={{cursor:"pointer"}} onClick={()=>setSelPlayer(p)}><div className="av">{ini(p.name)}</div><div><div className="pn">{p.name}</div><div className="pt" style={{color:p.team&&p.team!=="—"?"var(--muted)":"#ff801030"}}>{p.team&&p.team!=="—"?p.team:"Lineup TBD"}</div></div></div></td>
+          <td onClick={e=>e.stopPropagation()}><PickButton pid={p.pid} name={p.name} team={p.team}/></td>
           <td><div style={{display:"flex",alignItems:"center",gap:5}}><GBadge g={wg}/><span style={{fontSize:9,color:wg.color,fontFamily:"DM Mono,monospace",lineHeight:1.3}}>{wg.label}</span></div></td>
           <td><div style={{display:"flex",alignItems:"center",gap:5}}><div style={{width:38,height:3,borderRadius:2,background:"var(--border)",overflow:"hidden"}}><div style={{height:"100%",borderRadius:2,width:`${wOS}%`,background:wg.color}}/></div><span style={{fontFamily:"Oswald,sans-serif",fontSize:13,color:wg.color}}>{wOS.toFixed?wOS.toFixed(0):wOS}</span></div></td>
           <td><span className="sp3 cq">{wCQ.toFixed?wCQ.toFixed(1):wCQ}</span></td>
@@ -2761,6 +3170,7 @@ export default function App() {
         <button className={`tab ${tab==="powerbi"?"active":""}`} onClick={()=>setTab("powerbi")}>📊 Analytics</button>
         <button className={`tab ${tab==="onlyhomers"?"active":""}`} onClick={()=>setTab("onlyhomers")} style={{color:tab==="onlyhomers"?"var(--accent2)":undefined}}>⚾ Only Homers</button>
         <button className={`tab ${tab==="statcast"?"active":""}`} onClick={()=>setTab("statcast")} style={{color:tab==="statcast"?"var(--ice)":undefined}}>📡 Statcast</button>
+        <button className={`tab ${tab==="picks"?"active":""}`} onClick={()=>setTab("picks")} style={{color:tab==="picks"?"var(--accent2)":undefined}}>🎯 My Picks</button>
       </nav>
       <main className="content">
         {tab==="pregame" && <PregameTab/>}
@@ -2772,6 +3182,7 @@ export default function App() {
         {tab==="powerbi" && <PowerBITab/>}
         {tab==="onlyhomers" && <OnlyHomersTab/>}
         {tab==="statcast" && <StatcastTab/>}
+        {tab==="picks" && <MyPicksTab/>}
       </main>
     </div>
   </>;
