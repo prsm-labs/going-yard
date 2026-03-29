@@ -555,9 +555,9 @@ function genWindows(p) {
     };
   });
   return windows;
-}port { useState, useEffect, useCallback } from "react";
+}
 
-const styles = `
+
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
   :root{
@@ -799,775 +799,6 @@ const styles = `
     .bvr{grid-template-columns:auto 1fr;}.h2h{display:none;}.pmg{grid-template-columns:repeat(2,1fr);}
   }
 `;
-
-// THRESHOLDS
-// ── PLAYER DATA CACHE (module-level, persists across renders) ────
-const PLAYER_DATA_CACHE = {};
-let PLAYER_CACHE_DATE = null;
-function cachePlayer(p) { if (p.pid) PLAYER_DATA_CACHE[p.pid] = p; }
-function getCachedPlayer(pid) { return PLAYER_DATA_CACHE[pid] || null; }
-
-const T={
-  EV_HH:95,       // Hard hit entry point
-  EV_HR:103,       // HR probability spike
-  EV_EL:108,       // Elite power contact
-  LA_MIN:25,       // HR sweet spot floor
-  LA_MAX:35,       // HR sweet spot ceiling
-  BAR_EL:15,       // Elite barrel% (12-18% range, 15 = center)
-  BAR_GD:10,       // Good barrel%
-  BAR_MAX:18,      // Above this = over-swinging
-  FB_MIN:35,       // Fly ball% floor (sweet spot)
-  FB_MAX:45,       // Fly ball% ceiling (above 50% = too many outs)
-  PULL_EL:45,      // Elite pull air% (40-50% range)
-  PULL_GD:35,      // Good pull air%
-  CHASE_EL:20,     // Elite chase rate (below this)
-  CHASE_GD:25,     // Good chase rate threshold
-  HH_EL:50,HH_GD:42,
-};
-const inHRZ = (la) => la >= T.LA_MIN && la <= T.LA_MAX;
-const getLAZ = (la) => {
-  if (la >= T.LA_MIN && la <= T.LA_MAX) return "💥 HR Sweet Spot (25–35°)";
-  if (la > T.LA_MAX) return "📈 Too high";
-  if (la > 0) return "📉 Too low";
-  return null;
-};
-const getHS = (r) => {
-  // EV: 30pts — scales from 95 (entry) to 108 (elite)
-  const ev = Math.min(Math.max((r.avgEV - T.EV_HH) / (T.EV_EL - T.EV_HH), 0), 1) * 30;
-  // LA in sweet spot 25-35°: 25pts — penalize outside zone
-  const la = r.launchAngle ?? r.sweetSpotLA ?? 22;
-  const laScore = (la >= T.LA_MIN && la <= T.LA_MAX) ? 25 : (la >= 19 && la < T.LA_MIN) ? 12 : (la > T.LA_MAX && la <= 40) ? 10 : 0;
-  // Barrel% 12-18% sweet zone: 20pts — peaks at 15%, penalize >18%
-  const barPct = r.barrel ?? 0;
-  const barScore = barPct >= T.BAR_MAX ? Math.min(18, 20) : Math.min((barPct / T.BAR_EL) * 20, 20);
-  // FlyBall% 35-45% sweet zone: 10pts
-  const fb = r.flyBall ?? r.sweetSpot ?? 35;
-  const fbScore = (fb >= T.FB_MIN && fb <= T.FB_MAX) ? 10 : (fb >= 30 && fb < T.FB_MIN) ? 5 : (fb > T.FB_MAX && fb <= 55) ? 6 : 2;
-  // Pull Air% 40-50% elite zone: 10pts
-  const pull = r.pullAir ?? 20;
-  const pullScore = pull >= T.PULL_EL ? 10 : pull >= T.PULL_GD ? 6 : Math.min((pull / T.PULL_GD) * 6, 6);
-  // Chase rate <25% bonus: 5pts
-  const chase = r.oSwing ?? r.chaseRate ?? 30;
-  const chaseScore = chase <= T.CHASE_EL ? 5 : chase <= T.CHASE_GD ? 3 : 0;
-  return Math.round(ev + laScore + barScore + fbScore + pullScore + chaseScore);
-};
-const getHC = (s) => s >= 75 ? "#ff4020" : s >= 58 ? "#ff8020" : s >= 42 ? "#ffbe20" : s >= 25 ? "#8899a6" : "#38b8f2";
-const getLHL = (ev, la, hh) => {
-  const ep = ev >= T.EV_EL ? 3 : ev >= T.EV_HH ? 2 : ev >= 90 ? 1 : 0;
-  
-  
-  const lp = (la>=T.LA_MIN&&la<=T.LA_MAX)?3:(la>=19&&la<T.LA_MIN)?2:la>0?1:0;
-  const hp = hh >= 3 ? 4 : hh >= 2 ? 3 : hh === 1 ? 1 : 0;
-  const sc = ep + lp + hp;
-  return sc >= 8 ? {label:"🔥 On Fire",cls:"elite"} : sc >= 5 ? {label:"🔥 Heating Up",cls:"hot"} : sc >= 3 ? {label:"🌡 Warm",cls:"warm"} : sc >= 1 ? {label:"— Neutral",cls:"avg"} : {label:"🧊 Ice Cold",cls:"cold"};
-};
-const ini = (n) => n.split(" ").map(p => p[0]).join("").toUpperCase().slice(0, 2);
-
-// SCOUTING ENGINE
-const calcCQ = (p) => {
-  // EV: 0-1.5 scaled from 95 to 108
-  const evN = Math.min(Math.max((p.avgEV - T.EV_HH) / (T.EV_EL - T.EV_HH), 0), 1) * 1.5;
-  // Barrel: peaks at T.BAR_EL (15%), penalized if above T.BAR_MAX (18%) — indicates over-swinging
-  const bar = p.barrel ?? 0;
-  const barN = bar >= T.BAR_MAX ? 0.8 : Math.min(bar / T.BAR_EL, 1);
-  // HardHit: 0-1 scaled to 50%
-  const hhN = Math.min((p.hardHit ?? 0) / T.HH_EL, 1);
-  return Math.round((evN + barN + hhN) * 10) / 10;
-};
-const calcHRI = (p) => {
-  // Pull Air: peaks at 40-50%, below 35% = low power intent
-  const pull = p.pullAir ?? 20;
-  const pullN = pull >= T.PULL_EL ? 1 : pull >= T.PULL_GD ? 0.7 : pull / T.PULL_EL;
-  // Fly Ball: sweet zone 35-45%, above 50% = too many outs (penalize)
-  const fb = p.flyBall ?? p.sweetSpot ?? 35;
-  const fbN = (fb >= T.FB_MIN && fb <= T.FB_MAX) ? 1 : (fb > T.FB_MAX && fb <= 55) ? 0.7 : fb >= 30 ? 0.5 : 0.2;
-  // HR rate contribution
-  const hrN = Math.min((p.hr ?? 0) / 25, 1);
-  return Math.round((pullN * 3.5 + fbN * 3.5 + hrN * 3) * 10) / 10;
-};
-const calcRD = (p) => {
-  const bb = Math.min((p.bbPct ?? 8) / 15, 1) * 3;
-  const k = Math.max(1 - (p.kPct ?? 22) / 35, 0) * 3;
-  // Chase rate: <20% elite (3pts), <25% good (2pts), >=25% penalized
-  const chase = p.oSwing ?? 30;
-  const os = chase <= T.CHASE_EL ? 3 : chase <= T.CHASE_GD ? 2 : Math.max(1 - (chase - T.CHASE_GD) / 20, 0) * 1.5;
-  const zc = Math.min((p.zContact ?? 80) / 90, 1) * 3;
-  return Math.round((bb + k + os + zc) * 10) / 10;
-};
-const calcOS = (p) => {
-  // ── PRIMARY: EV gate (40pts) ─────────────────────────────
-  const ev = p.avgEV ?? p.windows?.[15]?.avgEV ?? 85;
-  const evPts =
-    ev >= 92.5 ? 40 :
-    ev >= 90.0 ? 34 :
-    ev >= 87.0 ? 28 :
-    ev >= 84.0 ? 20 :
-    ev >= 81.0 ? 12 : 5;
-
-  // ── POWER QUALITY (25pts) — xwOBA + Barrel% + HardHit% ──
-  // This mirrors Power BI "Power Score" + "HR Grade"
-  const xw = p.xwoba ?? 0;
-  const xwPts = xw >= 0.400 ? 25 : xw >= 0.350 ? 20 : xw >= 0.320 ? 15 :
-                xw >= 0.300 ? 10 : xw > 0 ? 6 : 0;
-  const barrelPts = Math.min((p.barrel ?? 0) / 15 * 15, 15);
-  const hhPts     = Math.min((p.hardHit ?? 0) / 50 * 10, 10);
-  const powerPts  = xw > 0 ? (xwPts * 0.6 + barrelPts * 0.3 + hhPts * 0.1)
-                            : (barrelPts * 0.7 + hhPts * 0.3);
-
-  // ── CONTACT QUALITY (20pts) — launch angle + sweet spot ──
-  const la = p.launchAngle ?? 0;
-  const laPts = inHRZ(la) ? 20 : (la >= 10 && la < 25) ? 14 :
-                (la >= 0 && la < 10) ? 8 : la < 0 ? 4 : 6;
-
-  // ── PLATE DISCIPLINE (15pts) — BB%, K%, Chase% ───────────
-  const cq = calcCQ(p), rd = calcRD(p);
-  const rdN = Math.min(Math.max((rd - 2) / (10-2), 0), 1);
-  const discPts = rdN * 15;
-
-  return Math.round((evPts + powerPts + laPts + discPts) * 10) / 10;
-};
-const getSG = (s) => {
-  // Score bands aligned to EV gate:
-  // A+ = 92.5+ EV + strong modifiers (85+)
-  // A  = 90+ EV + decent modifiers (70+)
-  // B  = 87+ EV gate (52+ base, 58+ with mods)
-  // C  = 84+ EV gate (40+)
-  // D  = 81+ EV gate (26+)
-  // F  = below 81 EV (15+)
-  // X  = no data / too soft
-  if (s >= 85) return {grade:"A+",cls:"aplus",label:"🔴 Elite damage threat",color:"var(--aplus)"};
-  if (s >= 70) return {grade:"A", cls:"a",    label:"🔥 Above-avg power",  color:"var(--a)"};
-  if (s >= 55) return {grade:"B", cls:"b",    label:"⚡ Solid EV / heating",color:"var(--b)"};
-  if (s >= 40) return {grade:"C", cls:"c",    label:"👀 Contact-first bat", color:"var(--c)"};
-  if (s >= 26) return {grade:"D", cls:"d",    label:"🌡 Below-avg EV",      color:"var(--d)"};
-  if (s >= 15) return {grade:"F", cls:"f",    label:"🧊 Soft contact",      color:"var(--f)"};
-  return              {grade:"X", cls:"x",    label:"❌ Insufficient data", color:"#2a3a48"};
-};
-const getPIQ = (p) => {
-  const chase = p.oSwing ?? 30, zc = p.zContact ?? 80, bbk = p.bbkRatio ?? 0.35;
-  // Chase rate <20% = elite (40pts), <25% = good — tighter now
-  const chaseScore = chase <= T.CHASE_EL ? 40 : chase <= T.CHASE_GD ? 28 : Math.max(0, (35 - chase) / 10) * 20;
-  const zcScore = Math.min(zc / 90, 1) * 30;
-  const bbkScore = Math.min(bbk / 0.7, 1) * 30;
-  const sc = chaseScore + zcScore + bbkScore;
-  if (sc >= 75) return {label:"🎯 Elite IQ",color:"var(--green)"};
-  if (sc >= 55) return {label:"✅ Patient",color:"var(--green)"};
-  if (sc >= 38) return {label:"— Average",color:"var(--muted)"};
-  if (sc >= 22) return {label:"⚠️ Chaser",color:"var(--fire3)"};
-  return {label:"🚫 Free Swinger",color:"#ff3010"};
-};
-
-// BvP ENGINE
-const calcMS = (b, p) => {
-  const fb = Math.min(Math.max(((b.evVsFB ?? 88) - (p.fbVelo ?? 93)) / 8, 0), 1) * 30;
-  const bk = Math.max(1 - (b.whiffBK ?? 30) / 50, 0) * 25;
-  const os = Math.max(1 - (b.chaseOS ?? 35) / 50, 0) * 20;
-  const h2h = Math.min(((b.careerBA ?? 0.25) - 0.2) / 0.1, 1) * 15 + Math.min((b.careerHR ?? 0) / 3, 1) * 10;
-  return Math.round(Math.min(fb + bk + os + h2h, 100) * 10) / 10;
-};
-
-// LIFTOFF ENGINE
-const calcLS = (b) => {
-  const rb = b.recentBarrel ?? b.barrel ?? 0;
-  const rh = b.recentHardHit ?? b.hardHit ?? 0;
-  const re = b.recentAvgEV ?? b.avgEV ?? 88;
-  const streak = Math.min(((rb / 14) * 18) + ((rh / 55) * 12) + (Math.max(0, (re - 88) / 10) * 10), 40);
-  const ds = b.daysSinceHR ?? 5;
-  const due = ds <= 1 ? 5 : ds <= 3 ? 12 : ds <= 7 ? 25 : ds <= 14 ? 18 : 8;
-  const pf = b.pitcherFactor ?? 0;
-  const pit = pf > 0 ? 12 : pf < 0 ? 3 : 7;
-  const home = b.isHome ? (b.homeHR ?? 0) > (b.awayHR ?? 0) ? 10 : 5 : (b.awayHR ?? 0) > (b.homeHR ?? 0) ? 10 : 5;
-  const sea = Math.min(((b.barrel ?? 0) / T.BAR_EL) * 10, 10);
-  return Math.round(streak + due + pit + home + sea);
-};
-const getLV = (s) => s >= 75 ? {label:"🚀 Primed",cls:"primed"} : s >= 55 ? {label:"🔥 Hot",cls:"hot"} : s >= 38 ? {label:"⚡ Watch",cls:"watch"} : {label:"❄️ Cold",cls:"cold"};
-const getLSigs = (b) => {
-  const sigs = [], ds = b.daysSinceHR ?? 5, rb = b.recentBarrel ?? b.barrel ?? 0, re = b.recentAvgEV ?? b.avgEV ?? 88, rh = b.recentHardHit ?? b.hardHit ?? 0;
-  if (ds >= 4 && ds <= 10) sigs.push({t:`${ds}d since last HR`, c:"fire"});
-  else if (ds > 14) sigs.push({t:`${ds}d HR drought`, c:"neg"});
-  if (rb >= 14) sigs.push({t:`${rb.toFixed(0)}% barrel L7`, c:"pos"});
-  else if (rb >= 8) sigs.push({t:`${rb.toFixed(0)}% barrel L7`, c:"neu"});
-  if (re >= T.EV_HH) sigs.push({t:`${re.toFixed(0)} mph EV (95+)`, c:"pos"});
-  if ((b.pitcherFactor ?? 0) > 0) sigs.push({t:"Favorable matchup", c:"pos"});
-  if ((b.pitcherFactor ?? 0) < 0) sigs.push({t:"Tough pitcher", c:"neg"});
-  if (b.isHome && (b.homeHR ?? 0) > (b.awayHR ?? 0)) sigs.push({t:"Home HR boost", c:"pos"});
-  if (rh >= 50) sigs.push({t:"Hard contact streak", c:"fire"});
-  return sigs.slice(0, 4);
-};
-
-const enrichP = (r) => {
-  r.bbkRatio = r.kPct > 0 ? r.bbPct / r.kPct : 0.35;
-  r.heatScore = getHS(r);
-  r.cq = calcCQ(r); r.hri = calcHRI(r); r.rd = calcRD(r);
-  r.os = calcOS(r); r.grade = getSG(r.os); r.piq = getPIQ(r);
-  // Generate windowed stats if not already present
-  // Use existing windows from cache if available — NEVER regenerate Statcast metrics
-  const existingCached = getCachedPlayer(r.pid);
-  if (existingCached?.windows) {
-    r.windows = existingCached.windows;
-  } else if (!r.windows) {
-    r.windows = genWindows(r);
-  }
-  // Async window fetch — updates in background without blocking
-  if (r.pid && !WINDOW_CACHE[r.pid]) {
-    fetchRealWindows(r.pid).then(realWin => {
-      if (realWin) {
-        // Merge real counting stats with Statcast metrics
-        const cached = getCachedPlayer(r.pid);
-        if (cached) {
-          [3,7,15,30].forEach(w => {
-            if (realWin[w] && cached.windows?.[w]) {
-              // Real data: AB, H, HR, BB, K, AVG, BB%, K%, abSinceHR
-              // Keep Statcast metrics: EV, Barrel%, HardHit%, FlyBall%, Launch°
-              Object.assign(cached.windows[w], {
-                hits: realWin[w].hits,
-                hr: realWin[w].hr,
-                atBats: realWin[w].ab,
-                xbh: realWin[w].xbh,
-                tb: realWin[w].tb,
-                avg: parseFloat(realWin[w].avg),
-                bbPct: realWin[w].bbPct,
-                kPct: realWin[w].kPct,
-                abPerHR: realWin[w].abPerHR,
-                abSinceHR: realWin[w].abSinceHR,
-                games: realWin[w].games,
-              });
-            }
-          });
-        }
-        WINDOW_CACHE[r.pid] = { data: realWin, ts: Date.now() };
-      }
-    }).catch(() => {});
-  }
-  return r;
-};
-
-// ── WINDOW STAT GENERATOR ────────────────────────────────────────────────────
-// Simulates last 5/10/15/30 game stats based on season baseline
-// In production these would come from the MLB Stats API game logs
-function genWindows(p) {
-  const windows = {};
-  const pid = p.pid || p.id || 1; // player ID — used as seed for deterministic values
-  [3,7,15,30].forEach((w, wi) => {
-    // Shorter windows = more variance (hot/cold streaks are real)
-    const variance = w <= 3 ? 0.38 : w <= 7 ? 0.26 : w <= 15 ? 0.18 : 0.10;
-    const base = wi * 20; // each window gets a different seed offset
-    const rv = (base_val, rng, idx) => {
-      const offset = (seededRand(pid, base + idx) * 2 - 1) * rng * variance;
-      return Math.max(0, Math.round((base_val + offset) * 100) / 100);
-    };
-    const ri = (base_val, rng, idx) => {
-      const offset = (seededRand(pid, base + idx) * 2 - 1) * rng;
-      return Math.max(0, Math.round(base_val + offset));
-    };
-
-    const avgEV   = rv(p.avgEV ?? 92, variance * 8, 1);
-    const barrel  = rv(p.barrel ?? 10, variance * 10, 2);
-    const flyBall = Math.min(rv(p.flyBall > 0 ? p.flyBall : 32, variance * 8, 3), 52);
-    const launchAngle = rv(p.launchAngle ?? 26, variance * 8, 4);
-    const pullAir = rv(p.pullAir ?? 18, variance * 8, 5);
-    const oSwing  = rv(p.oSwing ?? 28, variance * 8, 6);
-    const hardHit = rv(p.hardHit ?? 42, variance * 12, 7);
-    const bbPct   = rv(p.bbPct ?? 9, variance * 5, 8);
-    const kPct    = rv(p.kPct ?? 22, variance * 8, 9);
-    const avgBA   = rv(p.avg ?? 0.255, variance * 0.06, 10);
-    // Scale to days: ~3.5 AB per day, ~0.9 games per day
-    const gamesInWindow = Math.round(w * 0.9);
-    const hits    = ri(gamesInWindow * 1.1, gamesInWindow * 0.5, 11);
-    const xbh     = ri(hits * 0.28, hits * 0.15, 12);
-    const hr      = ri(gamesInWindow * 0.18, gamesInWindow * 0.12, 13);
-    const totalBases = hits + xbh + hr * 2;
-    const atBats  = ri(gamesInWindow * 3.8, gamesInWindow * 0.6, 14);
-    const abPerHR = hr > 0 ? Math.round(atBats / hr * 10) / 10 : 99;
-    const abSinceHR = ri(3, 8, 15);
-    // "Almost%" — fly balls hit 350ft+ but not HR (estimated from flyBall% and EV)
-    const almostPct = Math.round(Math.min(flyBall * (avgEV >= T.EV_HH ? 0.45 : 0.3), 35) * 10) / 10;
-
-    // Recalculate grade for this window
-    const wp = { ...p, avgEV, barrel, flyBall, launchAngle, pullAir,
-                  oSwing, hardHit, bbPct, kPct, bbkRatio: bbPct/Math.max(kPct,1) };
-    const wGrade = getSG(calcOS(wp));
-    const wHS    = getHS(wp);
-
-    windows[w] = {
-      avgEV, barrel, flyBall, launchAngle, pullAir, oSwing, hardHit,
-      bbPct, kPct, avg: avgBA, hits, xbh, hr, totalBases,
-      atBats, abPerHR, abSinceHR, almostPct,
-      grade: wGrade, heatScore: wHS,
-      cq: calcCQ(wp), hri: calcHRI(wp), rd: calcRD(wp), os: calcOS(wp),
-    };
-  });
-  return windows;
-}
-
-// ── WINDOW FILTER BUTTONS COMPONENT ─────────────────────────────────────────
-// ── GLOBAL PLAYER → TEAM MAP (fetched once at startup) ──────
-// Keyed by MLB player ID. This is the ONLY source of truth for team assignment.
-let GLOBAL_PLAYER_TEAM_MAP = {};
-let GLOBAL_PLAYER_MAP_LOADED = false;
-
-async function loadGlobalPlayerMap() {
-  if (GLOBAL_PLAYER_MAP_LOADED) return GLOBAL_PLAYER_TEAM_MAP;
-  try {
-    const res = await fetch("https://statsapi.mlb.com/api/v1/sports/1/players?season=2026&gameType=R");
-    const data = await res.json();
-    for (const p of (data.people || [])) {
-      if (p.id && p.currentTeam?.abbreviation) {
-        GLOBAL_PLAYER_TEAM_MAP[p.id] = {
-          team: p.currentTeam.abbreviation,
-          teamId: p.currentTeam.id,
-          name: p.fullName,
-          hand: p.batSide?.code || "R",
-        };
-      }
-    }
-    GLOBAL_PLAYER_MAP_LOADED = true;
-    console.log("[Going Yard] Player map loaded:", Object.keys(GLOBAL_PLAYER_TEAM_MAP).length, "players");
-  } catch(e) {
-    console.warn("[Going Yard] Player map load failed:", e.message);
-  }
-  return GLOBAL_PLAYER_TEAM_MAP;
-}
-
-// Get team for a player by ID — always accurate
-function getPlayerTeam(pid) {
-  return GLOBAL_PLAYER_TEAM_MAP[pid]?.team || null;
-}
-
-
-// ── PICKS STORE (persistent via localStorage) ─────────────────
-// Stores favorite/dark horse/longshot selections
-const PICK_TYPES = {
-  favorite:   { label: "💣 Favorite",    cls: "favorite",   color: "#ff4020" },
-  darkhorse:  { label: "⭐ Dark Horse",   cls: "darkhorse",  color: "#f5a623" },
-  longshot:   { label: "🎯 Longshot",     cls: "longshot",   color: "#38b8f2" },
-};
-
-function loadPicks() {
-  try { return JSON.parse(localStorage.getItem("gy_picks") || "{}"); }
-  catch { return {}; }
-}
-function savePicks(picks) {
-  try { localStorage.setItem("gy_picks", JSON.stringify(picks)); } catch {}
-}
-
-// Global picks state — shared across all tabs
-let GLOBAL_PICKS = loadPicks();
-const PICKS_LISTENERS = new Set();
-function subscribePicks(fn) { PICKS_LISTENERS.add(fn); return () => PICKS_LISTENERS.delete(fn); }
-function setPick(pid, name, team, type) {
-  pid = String(pid);
-  if (GLOBAL_PICKS[pid]?.type === type) {
-    delete GLOBAL_PICKS[pid]; // toggle off
-  } else {
-    GLOBAL_PICKS[pid] = { pid, name, team, type, ts: Date.now() };
-  }
-  savePicks(GLOBAL_PICKS);
-  PICKS_LISTENERS.forEach(fn => fn({...GLOBAL_PICKS}));
-}
-function usePicks() {
-  const [picks, setPicksState] = useState({...GLOBAL_PICKS});
-  useEffect(() => subscribePicks(setPicksState), []);
-  return picks;
-}
-
-// ── PICK BUTTON COMPONENT ──────────────────────────────────────
-function PickButton({ pid, name, team }) {
-  const picks = usePicks();
-  const key = String(pid);
-  const current = picks[key]?.type;
-  const [open, setOpen] = useState(false);
-
-  return (
-    <div style={{position:"relative",display:"inline-block"}}>
-      <button
-        onClick={(e) => { e.stopPropagation(); setOpen(o => !o); }}
-        style={{
-          padding:"2px 7px", borderRadius:5, fontSize:10,
-          fontFamily:"'DM Mono',monospace", cursor:"pointer",
-          border:`1px solid ${current ? PICK_TYPES[current].color : "var(--border)"}`,
-          background: current ? `${PICK_TYPES[current].color}20` : "var(--surface2)",
-          color: current ? PICK_TYPES[current].color : "var(--muted)",
-        }}
-      >
-        {current ? PICK_TYPES[current].label.split(" ")[0] : "＋"}
-      </button>
-      {open && (
-        <div
-          style={{position:"absolute",top:"calc(100% + 4px)",left:0,zIndex:500,
-            background:"#0d1318",border:"1px solid var(--border)",borderRadius:8,
-            padding:5,display:"flex",flexDirection:"column",gap:3,minWidth:130,
-            boxShadow:"0 8px 24px rgba(0,0,0,.5)"}}
-          onClick={e => e.stopPropagation()}
-        >
-          {Object.entries(PICK_TYPES).map(([type, cfg]) => (
-            <button key={type}
-              onClick={() => { setPick(pid, name, team, type); setOpen(false); }}
-              style={{
-                padding:"5px 9px", borderRadius:5, cursor:"pointer", textAlign:"left",
-                fontFamily:"'DM Mono',monospace", fontSize:11,
-                border:`1px solid ${current===type ? cfg.color : "transparent"}`,
-                background: current===type ? `${cfg.color}20` : "transparent",
-                color: current===type ? cfg.color : "var(--text)",
-              }}
-            >
-              {cfg.label}
-            </button>
-          ))}
-          {current && (
-            <button
-              onClick={() => { setPick(pid, name, team, current); setOpen(false); }}
-              style={{padding:"5px 9px",borderRadius:5,cursor:"pointer",textAlign:"left",
-                fontFamily:"'DM Mono',monospace",fontSize:11,border:"1px solid transparent",
-                background:"transparent",color:"var(--muted)"}}
-            >
-              ✕ Remove
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── SEARCH BAR COMPONENT ────────────────────────────────────────
-function SearchBar({ value, onChange, placeholder = "Search players…" }) {
-  return (
-    <div style={{position:"relative",flex:1,minWidth:160,maxWidth:280}}>
-      <input
-        type="text"
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        placeholder={placeholder}
-        style={{
-          width:"100%", padding:"6px 10px 6px 30px",
-          background:"var(--surface2)", border:"1px solid var(--border)",
-          borderRadius:7, color:"var(--text)",
-          fontFamily:"'DM Mono',monospace", fontSize:11,
-          outline:"none", boxSizing:"border-box",
-        }}
-      />
-      <span style={{position:"absolute",left:9,top:"50%",transform:"translateY(-50%)",
-        fontSize:12,color:"var(--muted)",pointerEvents:"none"}}>🔍</span>
-      {value && (
-        <button onClick={() => onChange("")}
-          style={{position:"absolute",right:6,top:"50%",transform:"translateY(-50%)",
-            background:"none",border:"none",color:"var(--muted)",cursor:"pointer",
-            fontSize:12,padding:0}}>✕</button>
-      )}
-    </div>
-  );
-}
-
-// ── PLAYER PAGE (modal overlay) ────────────────────────────────
-function PlayerPage({ player, onClose }) {
-  const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!player?.pid) { setLoading(false); return; }
-    (async () => {
-      try {
-        const [seasonRes, playerStatsRes] = await Promise.all([
-          fetch(`https://statsapi.mlb.com/api/v1/people/${player.pid}/stats?stats=season,career&group=hitting&season=2026&sportId=1`),
-          fetch(`/api/playerstats?pid=${player.pid}`),
-        ]);
-        const seasonData = await seasonRes.json();
-        const playerStatsData = await playerStatsRes.json();
-        setStats({
-          season: seasonData.stats,
-          gameLog: playerStatsData.games || [],
-          windows: playerStatsData.windows,
-        });
-      } catch(e) {
-        console.warn("Player stats fetch failed:", e.message);
-      }
-      setLoading(false);
-    })();
-  }, [player?.pid]);
-
-  if (!player) return null;
-
-  const seasonStats = stats?.season?.find(s => s.type?.displayName === "season")?.splits?.[0]?.stat;
-  const careerStats = stats?.season?.find(s => s.type?.displayName === "career")?.splits?.[0]?.stat;
-  const gameLogs    = stats?.gameLog || [];
-
-  const StatBox = ({label, value, color}) => (
-    <div style={{background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:7,
-      padding:"9px 12px",textAlign:"center",minWidth:70}}>
-      <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",
-        textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>{label}</div>
-      <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:22,
-        color:color||"var(--text)"}}>{value ?? "—"}</div>
-    </div>
-  );
-
-  const g = player.grade || player._wGrade || { grade:"X", cls:"x", color:"#2a3a48" };
-
-  return (
-    <div style={{position:"fixed",inset:0,zIndex:1000,background:"rgba(0,0,0,.85)",
-      backdropFilter:"blur(8px)",display:"flex",alignItems:"flex-start",justifyContent:"center",
-      padding:"20px 16px",overflowY:"auto"}}
-      onClick={onClose}
-    >
-      <div style={{background:"#0d1318",border:"1px solid var(--border)",borderRadius:14,
-        width:"100%",maxWidth:700,animation:"sd .2s ease"}}
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div style={{padding:"16px 20px",borderBottom:"1px solid var(--border)",
-          display:"flex",alignItems:"center",gap:14}}>
-          <div style={{width:52,height:52,borderRadius:"50%",background:"linear-gradient(135deg,var(--surface2),var(--border))",
-            display:"flex",alignItems:"center",justifyContent:"center",
-            fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:18,
-            border:`2px solid ${g.color}`,color:g.color}}>
-            {ini(player.name)}
-          </div>
-          <div style={{flex:1}}>
-            <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:22,
-              letterSpacing:1}}>{player.name}</div>
-            <div style={{fontSize:11,color:"var(--muted)",fontFamily:"'DM Mono',monospace",
-              marginTop:2,display:"flex",gap:10,alignItems:"center"}}>
-              <span>{player.team}</span>
-              <span>·</span>
-              <span style={{color:g.color}}>{g.grade} — {g.label}</span>
-              {player.hand && <span>· Bats: {player.hand}</span>}
-            </div>
-          </div>
-          <div style={{display:"flex",gap:8,alignItems:"center"}}>
-            <PickButton pid={player.pid||player.id} name={player.name} team={player.team}/>
-            <button onClick={onClose}
-              style={{background:"none",border:"1px solid var(--border)",borderRadius:6,
-                color:"var(--muted)",cursor:"pointer",padding:"4px 10px",fontSize:12}}>✕ Close</button>
-          </div>
-        </div>
-
-        {/* Statcast metrics */}
-        <div style={{padding:"14px 20px",borderBottom:"1px solid var(--border)"}}>
-          <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",
-            textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>Statcast Profile</div>
-          {(() => {
-            // Safe format — handles undefined, null, NaN, 0
-            // sf: safe format — show value if it exists, null only if truly missing
-            const sf = (v, dec=1) => {
-              if (v === null || v === undefined) return null;
-              const n = parseFloat(v);
-              if (isNaN(n) || !isFinite(n)) return null;
-              return n.toFixed(dec);
-            };
-            // Only show stat if it's a real non-zero value from Statcast
-            // avgEV of 0 means no data; barrel of 0 could be real but rare
-            const hasReal = (v) => v != null && parseFloat(v) > 0;
-            const ev  = sf(player.avgEV);
-            const bar = sf(player.barrel);
-            const hh  = sf(player.hardHit);
-            const fb  = sf(player.flyBall);
-            const la  = sf(player.launchAngle);
-            const pu  = sf(player.pullAir);
-            const ch  = sf(player.oSwing);
-            // Check != null explicitly — 0 is a valid value, don't treat as missing
-            const hasAny = hasReal(player.avgEV)||hasReal(player.barrel)||hasReal(player.hardHit);
-            return <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-              {hasReal(player.avgEV) && ev!=null  && <StatBox label="Avg EV"    value={ev}         color={parseFloat(ev)>=T.EV_HH?"var(--accent)":"var(--text)"}/>}
-              {hasReal(player.barrel) && bar!=null && <StatBox label="Barrel%"   value={`${bar}%`}  color={parseFloat(bar)>=T.BAR_EL?"#ff8020":"var(--text)"}/>}
-              {hasReal(player.hardHit) && hh!=null  && <StatBox label="Hard Hit%" value={`${hh}%`}/>}
-              {hasReal(player.flyBall) && fb!=null  && <StatBox label="Fly Ball%" value={`${fb}%`}   color={parseFloat(fb)>=T.FB_MIN&&parseFloat(fb)<=T.FB_MAX?"var(--green)":"var(--text)"}/>}
-              {hasReal(player.launchAngle) && la!=null  && <StatBox label="Launch °"  value={`${la}°`}   color={inHRZ(parseFloat(la))?"var(--green)":"var(--text)"}/>}
-              {hasReal(player.pullAir) && pu!=null  && <StatBox label="Pull Air%" value={`${pu}%`}   color={parseFloat(pu)>=T.PULL_EL?"#ff8020":"var(--text)"}/>}
-              {hasReal(player.oSwing) && ch!=null  && <StatBox label="Chase%"    value={`${ch}%`}   color={parseFloat(ch)<=T.CHASE_GD?"var(--green)":"#ff8020"}/>}
-              {!hasAny && <div style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:"var(--muted)",padding:"8px 0"}}>
-                Statcast data not available — open from Pregame or Scouting for full profile.
-              </div>}
-            </div>;
-          })()}
-        </div>
-
-        {/* Season stats */}
-        {loading ? (
-          <div style={{padding:"20px",display:"flex",alignItems:"center",gap:8}}>
-            <div className="sp" style={{width:16,height:16,borderWidth:2}}/>
-            <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:"var(--muted)"}}>Loading MLB stats…</span>
-          </div>
-        ) : seasonStats ? (
-          <>
-            <div style={{padding:"14px 20px",borderBottom:"1px solid var(--border)"}}>
-              <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",
-                textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>2026 Season</div>
-              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                <StatBox label="AVG"  value={seasonStats.avg}/>
-                <StatBox label="HR"   value={seasonStats.homeRuns}  color="var(--accent)"/>
-                <StatBox label="RBI"  value={seasonStats.rbi}/>
-                <StatBox label="OBP"  value={seasonStats.obp}       color="var(--green)"/>
-                <StatBox label="SLG"  value={seasonStats.slg}/>
-                <StatBox label="OPS"  value={seasonStats.ops}       color={parseFloat(seasonStats.ops)>=0.900?"var(--accent)":parseFloat(seasonStats.ops)>=0.800?"#ff8020":"var(--text)"}/>
-                <StatBox label="AB"   value={seasonStats.atBats}/>
-                <StatBox label="BB%"  value={seasonStats.baseOnBalls}/>
-                <StatBox label="SO"   value={seasonStats.strikeOuts}/>
-              </div>
-            </div>
-
-            {/* Game log */}
-            {gameLogs.length > 0 && (
-              <div style={{padding:"14px 20px",borderBottom:"1px solid var(--border)"}}>
-                <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",
-                  textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>Last 10 Games</div>
-                <div style={{overflowX:"auto"}}>
-                  <table style={{width:"100%",borderCollapse:"collapse"}}>
-                    <thead>
-                      <tr style={{background:"var(--surface2)"}}>
-                        {["Date","Opp","AB","H","HR","R","RBI","BB","K","AVG"].map(h => (
-                          <th key={h} style={{padding:"5px 8px",textAlign:"left",fontSize:9,
-                            color:"var(--muted)",fontFamily:"'DM Mono',monospace",
-                            textTransform:"uppercase",letterSpacing:1,borderBottom:"1px solid var(--border)"}}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {gameLogs.map((g, i) => {
-                        return (
-                          <tr key={i} style={{borderBottom:"1px solid rgba(30,45,58,.4)",
-                            background:isHR?"rgba(232,65,26,.05)":""}}>
-                            <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--muted)"}}>{g.date?.slice(5)}</td>
-                            <td style={{padding:"5px 8px",fontFamily:"'Oswald',sans-serif",fontWeight:600,fontSize:11}}>{g.opponent||"—"}</td>
-                            <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",fontSize:11}}>{g.ab}</td>
-                            <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",fontSize:11,color:parseInt(g.hits)>0?"var(--green)":"var(--muted)"}}>{g.hits}</td>
-                            <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",fontSize:11,color:parseInt(g.hr)>0?"var(--accent)":"var(--muted)",fontWeight:parseInt(g.hr)>0?"700":"400"}}>{g.hr}</td>
-                            <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",fontSize:11}}>{g.runs}</td>
-                            <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",fontSize:11}}>{g.rbi}</td>
-                            <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",fontSize:11}}>{g.bb}</td>
-                            <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",fontSize:11,color:parseInt(g.k)>=3?"var(--ice)":"var(--muted)"}}>{g.k}</td>
-                            <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",fontSize:11,color:parseFloat(g.avg)>=0.300?"var(--accent)":"var(--text)"}}>{g.avg}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </>
-        ) : (
-          <div style={{padding:"16px 20px",fontFamily:"'DM Mono',monospace",fontSize:11,color:"var(--muted)"}}>
-            Season stats unavailable — may be too early in the season or player ID not found.
-          </div>
-        )}
-
-        {/* Links */}
-        <div style={{padding:"12px 20px",display:"flex",gap:8,flexWrap:"wrap"}}>
-          <a href={`https://baseballsavant.mlb.com/savant-player/${player.name?.toLowerCase().replace(/\s+/g,"-")}-${player.pid}`}
-            target="_blank" rel="noopener noreferrer"
-            style={{padding:"5px 11px",borderRadius:6,background:"var(--surface2)",
-              border:"1px solid var(--border)",color:"var(--ice)",fontFamily:"'DM Mono',monospace",
-              fontSize:11,textDecoration:"none"}}>
-            📊 Baseball Savant
-          </a>
-          <a href={`https://www.baseball-reference.com/search/search.fcgi?q=${encodeURIComponent(player.name)}`}
-            target="_blank" rel="noopener noreferrer"
-            style={{padding:"5px 11px",borderRadius:6,background:"var(--surface2)",
-              border:"1px solid var(--border)",color:"var(--muted)",fontFamily:"'DM Mono',monospace",
-              fontSize:11,textDecoration:"none"}}>
-            📚 B-Ref
-          </a>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── MY PICKS TAB ───────────────────────────────────────────────
-function MyPicksTab() {
-  const picks = usePicks();
-  const [selPlayer, setSelPlayer] = useState(null);
-  const pickList = Object.values(picks).sort((a,b) => a.type.localeCompare(b.type));
-
-  const grouped = {
-    favorite:  pickList.filter(p => p.type === "favorite"),
-    darkhorse: pickList.filter(p => p.type === "darkhorse"),
-    longshot:  pickList.filter(p => p.type === "longshot"),
-  };
-
-  const PickRow = ({p}) => {
-    const cfg = PICK_TYPES[p.type];
-    return (
-      <div style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",
-        borderBottom:"1px solid rgba(30,45,58,.4)",transition:"background .15s",cursor:"pointer"}}
-        onClick={() => setSelPlayer(p)}
-        onMouseEnter={e => e.currentTarget.style.background="rgba(255,255,255,.02)"}
-        onMouseLeave={e => e.currentTarget.style.background=""}
-      >
-        <div style={{width:34,height:34,borderRadius:"50%",
-          background:"var(--surface2)",border:`2px solid ${cfg.color}`,
-          display:"flex",alignItems:"center",justifyContent:"center",
-          fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,color:cfg.color}}>
-          {ini(p.name)}
-        </div>
-        <div style={{flex:1}}>
-          <div style={{fontWeight:600,fontSize:13}}>{p.name}</div>
-          <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{p.team}</div>
-        </div>
-        <span style={{fontSize:14}}>{cfg.label.split(" ")[0]}</span>
-        <button onClick={e => { e.stopPropagation(); setPick(p.pid,p.name,p.team,p.type); }}
-          style={{background:"none",border:"1px solid var(--border)",borderRadius:5,
-            color:"var(--muted)",cursor:"pointer",padding:"2px 7px",fontSize:10}}>✕</button>
-      </div>
-    );
-  };
-
-  return (
-    <div>
-      <div className="section-header" style={{marginBottom:16}}>
-        <div className="section-title">🎯 My Picks</div>
-        <div className="section-sub">Your saved batters · 💣 Favorites · ⭐ Dark Horses · 🎯 Longshots · click any to view player page</div>
-      </div>
-
-      {pickList.length > 0 && (
-        <div style={{display:"flex",justifyContent:"flex-end",marginBottom:12}}>
-          <button onClick={() => {
-            Object.keys(GLOBAL_PICKS).forEach(k => delete GLOBAL_PICKS[k]);
-            savePicks(GLOBAL_PICKS);
-            PICKS_LISTENERS.forEach(fn => fn({...GLOBAL_PICKS}));
-          }}
-            style={{padding:"5px 12px",borderRadius:6,background:"rgba(232,65,26,.1)",
-              border:"1px solid rgba(232,65,26,.3)",color:"var(--accent)",cursor:"pointer",
-              fontFamily:"'DM Mono',monospace",fontSize:11}}>
-            ✕ Clear All Picks
-          </button>
-        </div>
-      )}
-      {pickList.length === 0 ? (
-        <div style={{padding:"60px 20px",textAlign:"center",color:"var(--muted)",
-          fontFamily:"'DM Mono',monospace",fontSize:12,lineHeight:2}}>
-          No picks yet.<br/>
-          Click the <strong style={{color:"var(--text)"}}>＋</strong> button next to any batter on the Pregame or Scouting tabs to add them here.
-        </div>
-      ) : (
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:14}}>
-          {Object.entries(grouped).map(([type, players]) => {
-            if (players.length === 0) return null;
-            const cfg = PICK_TYPES[type];
-            return (
-              <div key={type} style={{background:"var(--surface)",border:`1px solid ${cfg.color}30`,
-                borderRadius:10,overflow:"hidden"}}>
-                <div style={{padding:"10px 14px",background:`${cfg.color}10`,
-                  borderBottom:`1px solid ${cfg.color}20`,display:"flex",alignItems:"center",gap:8}}>
-                  <span style={{fontSize:16}}>{cfg.label.split(" ")[0]}</span>
-                  <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,
-                    color:cfg.color,letterSpacing:1}}>{cfg.label.split(" ").slice(1).join(" ").toUpperCase()}</span>
-                  <span style={{marginLeft:"auto",fontFamily:"'DM Mono',monospace",fontSize:11,
-                    color:"var(--muted)"}}>{players.length} batter{players.length!==1?"s":""}</span>
-                </div>
-                {players.map(p => <PickRow key={p.pid} p={p}/>)}
-              </div>
-            );
-          })}
-        </div>
-      )}
-      {selPlayer && <PlayerPage player={selPlayer} onClose={() => setSelPlayer(null)}/>}
-    </div>
-  );
-}
-
-
 
 // ── SEEDED DETERMINISTIC RANDOM ─────────────────────────────
 // Replaces seededRand(1540,30) for all player stat generation
@@ -2131,7 +1362,7 @@ async function fetchLiftoffBatters(game) {
             // Check if this batter hit a HR today from our cached HR data
             const todayHR = HR_DATA.find(h => h.batterId === bid || h.batterName === p?.person?.fullName);
             if (todayHR) return 0; // hit one today!
-            return Math.floor(3+seededRand(2081,17)*12); // use tighter range, seeded by bid
+            return Math.floor(3+seededRand(999,17)*12); // use tighter range, seeded by bid
           })(),
           pitcherFactor: ((bid % 3) === 0) ? 1 : ((bid % 3) === 1) ? -1 : 0,
           homeHR: 0.04 + ((bid % 7) * 0.008),
@@ -2154,8 +1385,8 @@ async function fetchLiftoffBatters(game) {
 
 function genSL() {
   return [["Aaron Judge","NYY"],["Juan Soto","NYM"],["Yordan Alvarez","HOU"],["Kyle Tucker","HOU"],["Pete Alonso","NYM"],["Marcus Semien","TOR"],["Mookie Betts","LAD"],["Gunnar Henderson","BAL"]].map((n, i) => {
-    const barrel = 6+seededRand(2104,1)*14, hardHit = 36+seededRand(2104,2)*24, avgEV = 87+seededRand(2104,3)*11;
-    const b = { id:i, name:n[0], team:n[1], isHome:i%2===0, barrel, hardHit, avgEV, sweetSpot:28+seededRand(2105,4)*18, pullAir:12+seededRand(2105,5)*18, recentBarrel:barrel*(0.7+seededRand(2105,30)*0.8), recentHardHit:hardHit*(0.75+seededRand(2105,31)*0.5), recentAvgEV:avgEV+(seededRand(2105,23)*4-2), daysSinceHR:Math.floor(1+seededRand(2105,16)*18), pitcherFactor:seededRand(2105,6)>0.6?1:seededRand(2105,21)>0.4?-1:0, homeHR:0.04+seededRand(2105,18)*0.06, awayHR:0.03+seededRand(2105,19)*0.06, hr:Math.floor(seededRand(2105,15)*18) };
+    const barrel = 6+seededRand(999,1)*14, hardHit = 36+seededRand(999,2)*24, avgEV = 87+seededRand(999,3)*11;
+    const b = { id:i, name:n[0], team:n[1], isHome:i%2===0, barrel, hardHit, avgEV, sweetSpot:28+seededRand(999,4)*18, pullAir:12+seededRand(999,5)*18, recentBarrel:barrel*(0.7+seededRand(999,30)*0.8), recentHardHit:hardHit*(0.75+seededRand(999,31)*0.5), recentAvgEV:avgEV+(seededRand(999,23)*4-2), daysSinceHR:Math.floor(1+seededRand(999,16)*18), pitcherFactor:seededRand(999,6)>0.6?1:seededRand(999,21)>0.4?-1:0, homeHR:0.04+seededRand(999,18)*0.06, awayHR:0.03+seededRand(999,19)*0.06, hr:Math.floor(seededRand(999,15)*18) };
     b.liftoffScore = calcLS(b); b.verdict = getLV(b.liftoffScore); b.signals = getLSigs(b); return b;
   }).sort((a, b) => b.liftoffScore - a.liftoffScore);
 }
@@ -2165,25 +1396,25 @@ function genPitcher(game, side) {
   // Use real probable pitcher name from live schedule data
   const name = game[side]?.probablePitcher || `${ta} Starter`;
   // Use real pitcher handedness from schedule if available
-  const realHand = game[side]?.pitcherHand || (seededRand(2115,30) > 0.25 ? "R" : "L");
-  const fbVelo = realHand === "L" ? (89+seededRand(2116,10)*5) : (91+seededRand(2116,11)*6);
+  const realHand = game[side]?.pitcherHand || (seededRand(999,30) > 0.25 ? "R" : "L");
+  const fbVelo = realHand === "L" ? (89+seededRand(999,10)*5) : (91+seededRand(999,11)*6);
   const mix = [
-    {name:"4-Seam FB",pct:Math.round(35+seededRand(2118,1)*20),color:"#ff4020",velo:fbVelo.toFixed(1),isPutaway:false},
-    {name:"Slider",pct:Math.round(15+seededRand(2119,2)*15),color:"#38b8f2",spin:"2800",isPutaway:seededRand(2119,5)>0.5},
-    {name:"Changeup",pct:Math.round(10+seededRand(2120,3)*15),color:"#27c97a",velo:(fbVelo-8).toFixed(1),isPutaway:false},
-    {name:"Curveball",pct:Math.round(8+seededRand(2121,4)*12),color:"#f5a623",spin:"2600",isPutaway:seededRand(2121,6)>0.6},
+    {name:"4-Seam FB",pct:Math.round(35+seededRand(999,1)*20),color:"#ff4020",velo:fbVelo.toFixed(1),isPutaway:false},
+    {name:"Slider",pct:Math.round(15+seededRand(999,2)*15),color:"#38b8f2",spin:"2800",isPutaway:seededRand(999,5)>0.5},
+    {name:"Changeup",pct:Math.round(10+seededRand(999,3)*15),color:"#27c97a",velo:(fbVelo-8).toFixed(1),isPutaway:false},
+    {name:"Curveball",pct:Math.round(8+seededRand(999,4)*12),color:"#f5a623",spin:"2600",isPutaway:seededRand(999,6)>0.6},
   ];
   const tot = mix.reduce((s, p) => s + p.pct, 0);
   mix.forEach(p => { p.pct = Math.round(p.pct / tot * 100); });
   if (!mix.some(p => p.isPutaway)) mix[1].isPutaway = true;
-  return { name, hand: realHand === "L" ? "LHP" : "RHP", team: ta, era: (2.8+seededRand(2126,8)*2.5).toFixed(2), whip: (0.9+seededRand(2126,9)*0.5).toFixed(2), fbVelo: parseFloat(fbVelo.toFixed(1)), pitchMix: mix };
+  return { name, hand: realHand === "L" ? "LHP" : "RHP", team: ta, era: (2.8+seededRand(999,8)*2.5).toFixed(2), whip: (0.9+seededRand(999,9)*0.5).toFixed(2), fbVelo: parseFloat(fbVelo.toFixed(1)), pitchMix: mix };
 }
 
 function genBvPBatters(pitcher) {
   return [["Aaron Judge","NYY"],["Juan Soto","NYM"],["Yordan Alvarez","HOU"],["Kyle Tucker","HOU"],["Pete Alonso","NYM"],["Marcus Semien","TOR"],["Mookie Betts","LAD"],["Gunnar Henderson","BAL"]].map((n, i) => {
-    const barrel=6+seededRand(2131,1)*16, hardHit=36+seededRand(2131,2)*26, avgEV=87+seededRand(2131,3)*12, bbPct=6+seededRand(2131,6)*12, kPct=14+seededRand(2131,7)*18, oSwing=20+seededRand(2131,8)*25, zContact=72+seededRand(2131,9)*20, evVsFB=88+seededRand(2131,3)*14, whiffBK=15+seededRand(2131,10)*35, chaseOS=20+seededRand(2131,11)*30, careerBA=0.18+seededRand(2131,12)*0.18, careerHR=Math.floor(seededRand(2131,13)*5), careerAB=Math.floor(8+seededRand(2131,14)*30);
-    const last3 = [...Array(3)].map(() => { const r = seededRand(2132,30); return r > 0.85 ? "HR" : r > 0.6 ? "H" : r > 0.3 ? "O" : "K"; });
-    const b = { id:i, name:n[0], team:n[1], barrel, hardHit, avgEV, sweetSpot:28+seededRand(2133,4)*18, pullAir:12+seededRand(2133,5)*18, hr:Math.floor(seededRand(2133,15)*20), bbPct, kPct, oSwing, zContact, bbkRatio:bbPct/kPct, evVsFB, whiffBK, chaseOS, careerBA, careerHR, careerAB, last3 };
+    const barrel=6+seededRand(999,1)*16, hardHit=36+seededRand(999,2)*26, avgEV=87+seededRand(999,3)*12, bbPct=6+seededRand(999,6)*12, kPct=14+seededRand(999,7)*18, oSwing=20+seededRand(999,8)*25, zContact=72+seededRand(999,9)*20, evVsFB=88+seededRand(999,3)*14, whiffBK=15+seededRand(999,10)*35, chaseOS=20+seededRand(999,11)*30, careerBA=0.18+seededRand(999,12)*0.18, careerHR=Math.floor(seededRand(999,13)*5), careerAB=Math.floor(8+seededRand(999,14)*30);
+    const last3 = [...Array(3)].map(() => { const r = seededRand(999,30); return r > 0.85 ? "HR" : r > 0.6 ? "H" : r > 0.3 ? "O" : "K"; });
+    const b = { id:i, name:n[0], team:n[1], barrel, hardHit, avgEV, sweetSpot:28+seededRand(999,4)*18, pullAir:12+seededRand(999,5)*18, hr:Math.floor(seededRand(999,15)*20), bbPct, kPct, oSwing, zContact, bbkRatio:bbPct/kPct, evVsFB, whiffBK, chaseOS, careerBA, careerHR, careerAB, last3 };
     b.cq = calcCQ(b); b.hri = calcHRI(b); b.rd = calcRD(b); b.os = calcOS(b); b.grade = getSG(b.os); b.piq = getPIQ(b);
     b.ms = calcMS(b, pitcher); b.mg = getSG(b.ms);
     return b;
@@ -2969,10 +2200,14 @@ async function genTeamRoster(team) {
         injured: p.injured || false,
         position: p.position || "",
         barrel, hardHit, avgEV,
-        sweetSpot:28+seededRand(2919,4)*18, pullAir:12+seededRand(2919,5)*20,
-        flyBall:28+seededRand(2920,4)*20, launchAngle:12+seededRand(2920,5)*18,
-        hr:Math.floor(seededRand(2921,15)*22), bbPct:6+seededRand(2921,6)*12,
-        kPct:14+seededRand(2922,7)*18, oSwing, zContact:72+seededRand(2922,9)*20,
+        sweetSpot:Math.round(sr(s6,5,28,46)*10)/10,
+        pullAir:Math.round(sr(s6,6,10,28)*10)/10,
+        flyBall:Math.round(sr(s6,7,25,45)*10)/10,
+        launchAngle:Math.round(sr(s6,8,12,30)*10)/10,
+        hr:Math.floor(sr(s6,9,0,22)),
+        bbPct:Math.round(sr(s6,10,6,15)*10)/10,
+        kPct:Math.round(sr(s6,11,14,28)*10)/10,
+        oSwing, zContact:Math.round(sr(s6,12,72,92)*10)/10,
       };
       pl.bbkRatio=pl.bbPct/pl.kPct;pl.cq=calcCQ(pl);pl.hri=calcHRI(pl);pl.rd=calcRD(pl);
       pl.os=calcOS(pl);pl.grade=getSG(pl.os);pl.piq=getPIQ(pl);
@@ -3003,9 +2238,9 @@ function genBvPBattersNew(pitcher) {
     const bbPct=Math.round(sr(s3,7,6,14)*10)/10,kPct=Math.round(sr(s3,8,14,28)*10)/10,oSwing=Math.round(sr(s3,10,20,38)*10)/10,zContact=Math.round(sr(s3,12,72,92)*10)/10;
     const hand=getBatterHand(n[0]);
     const matchup=getHandMatchup(hand,pitcher.hand);
-    const evBase=88+seededRand(2953,3)*14,chaseBase=oSwing+(seededRand(2953,22)*8-4);
-    const barrelBase=barrel+(seededRand(2954,23)*4-2),fbBase=28+seededRand(2954,4)*22;
-    const pullBase=12+seededRand(2955,5)*20,laBase=12+seededRand(2955,5)*22;
+    const evBase=88+seededRand(999,3)*14,chaseBase=oSwing+(seededRand(999,22)*8-4);
+    const barrelBase=barrel+(seededRand(999,23)*4-2),fbBase=28+seededRand(999,4)*22;
+    const pullBase=12+seededRand(999,5)*20,laBase=12+seededRand(999,5)*22;
     const m=matchup.multiplier;
     const evVsFB=Math.round((evBase+matchup.evBonus)*10)/10;
     const barrelAdj=Math.round(barrelBase*m*10)/10;
@@ -3013,9 +2248,9 @@ function genBvPBattersNew(pitcher) {
     const laAdj=Math.round((laBase+(m>1?1.5:-1.5))*10)/10;
     const pullAdj=Math.round(pullBase*(m*0.7+0.3)*10)/10;
     const chaseAdj=Math.round(chaseBase*(m>1?0.92:1.08)*10)/10;
-    const careerBA=0.18+seededRand(2963,12)*0.18,careerHR=Math.floor(seededRand(2963,13)*5),careerAB=Math.floor(8+seededRand(2963,14)*30);
+    const careerBA=0.18+seededRand(999,12)*0.18,careerHR=Math.floor(seededRand(999,13)*5),careerAB=Math.floor(8+seededRand(999,14)*30);
     const last3=[...Array(3)].map((_,li)=>{const rv=seededRand(2964,25+li);return rv>0.85?"HR":rv>0.6?"H":rv>0.3?"O":"K";});
-    const b={id:i,name:n[0],team:n[1],hand,matchup,barrel,hardHit,avgEV,sweetSpot:28+seededRand(2965,4)*18,pullAir:12+seededRand(2965,5)*18,flyBall:28+seededRand(2965,4)*20,launchAngle:12+seededRand(2965,5)*18,hr:Math.floor(seededRand(2965,15)*20),bbPct,kPct,oSwing,zContact,bbkRatio:bbPct/kPct,evVsFB,chaseVsPitch:chaseAdj,barrelVsPitch:barrelAdj,flyBallVsPitch:fbAdj,pullAirVsPitch:pullAdj,launchAngleVsPitch:laAdj,careerBA,careerHR,careerAB,last3};
+    const b={id:i,name:n[0],team:n[1],hand,matchup,barrel,hardHit,avgEV,sweetSpot:28+seededRand(999,4)*18,pullAir:12+seededRand(999,5)*18,flyBall:28+seededRand(999,4)*20,launchAngle:12+seededRand(999,5)*18,hr:Math.floor(seededRand(999,15)*20),bbPct,kPct,oSwing,zContact,bbkRatio:bbPct/kPct,evVsFB,chaseVsPitch:chaseAdj,barrelVsPitch:barrelAdj,flyBallVsPitch:fbAdj,pullAirVsPitch:pullAdj,launchAngleVsPitch:laAdj,careerBA,careerHR,careerAB,last3};
     b.cq=calcCQ(b);b.hri=calcHRI(b);b.rd=calcRD(b);b.os=calcOS(b);b.grade=getSG(b.os);b.piq=getPIQ(b);
     const evN=Math.min(Math.max((evVsFB-88)/12,0),1),barN=Math.min(barrelAdj/14,1),fbN=Math.min(fbAdj/45,1);
     const laN=Math.min(Math.max((laAdj-10)/22,0),1),puN=Math.min(pullAdj/28,1),chN=Math.max(1-chaseAdj/45,0);
