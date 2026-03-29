@@ -438,11 +438,19 @@ const enrichP = (r) => {
 // In production these would come from the MLB Stats API game logs
 function genWindows(p) {
   const windows = {};
-  [3,7,15,30].forEach(w => {
+  const pid = p.pid || p.id || 1; // player ID — used as seed for deterministic values
+  [3,7,15,30].forEach((w, wi) => {
     // Shorter windows = more variance (hot/cold streaks are real)
     const variance = w <= 3 ? 0.38 : w <= 7 ? 0.26 : w <= 15 ? 0.18 : 0.10;
-    const rv = (base, rng) => Math.max(0, Math.round((base + (Math.random()*rng*2-rng)) * 100) / 100);
-    const ri = (base, rng) => Math.max(0, Math.round(base + (Math.random()*rng*2-rng)));
+    const base = wi * 20; // each window gets a different seed offset
+    const rv = (base_val, rng, idx) => {
+      const offset = (seededRand(pid, base + idx) * 2 - 1) * rng * variance * 2;
+      return Math.max(0, Math.round((base_val + offset) * 100) / 100);
+    };
+    const ri = (base_val, rng, idx) => {
+      const offset = (seededRand(pid, base + idx) * 2 - 1) * rng;
+      return Math.max(0, Math.round(base_val + offset));
+    };
 
     const avgEV   = rv(p.avgEV ?? 92, variance * 8);
     const barrel  = rv(p.barrel ?? 10, variance * 10);
@@ -942,6 +950,17 @@ function MyPicksTab() {
 
 
 
+// ── SEEDED DETERMINISTIC RANDOM ─────────────────────────────
+// Replaces Math.random() for all player stat generation
+// Same pid → same values every time, no flickering on refresh
+function seededRand(seed, index) {
+  const s = ((seed * 9301) + (49297 * (index + 1))) % 233280;
+  return s / 233280;
+}
+function sr(pid, idx, min, max) {
+  return min + seededRand(pid || 1, idx || 0) * (max - min);
+}
+
 // ── WEATHER + PARK FACTOR CACHE ─────────────────────────────
 const WEATHER_CACHE = {};
 
@@ -1290,11 +1309,11 @@ async function fetchPlayers(setL, setP, setE, silent=false) {
           p.bbPct = Math.round((bbRaw / pa) * 100 * 10) / 10 || 8;
           p.kPct  = Math.round((kRaw  / pa) * 100 * 10) / 10 || 20;
         } else {
-          p.bbPct = 8 + Math.random() * 4;
-          p.kPct  = 18 + Math.random() * 8;
+          p.bbPct = Math.round(sr(p.pid, 7, 6, 14) * 10) / 10;
+          p.kPct  = Math.round(sr(p.pid, 8, 14, 28) * 10) / 10;
         }
-        p.oSwing   = 25 + Math.random() * 8;
-        p.pullAir  = 38 + Math.random() * 12;
+        p.oSwing   = Math.round(sr(p.pid, 10, 18, 38) * 10) / 10;
+        p.pullAir  = Math.round(sr(p.pid, 11, 30, 52) * 10) / 10;
         p.bbkRatio = p.bbPct / Math.max(p.kPct, 1);
         // Re-enrich with updated stats
         p.heatScore = getHS(p);
@@ -1306,10 +1325,10 @@ async function fetchPlayers(setL, setP, setE, silent=false) {
       console.warn("MLB stats enrichment failed:", statsErr.message);
       // Fill in defaults so grades still work
       mapped.forEach(p => {
-        p.bbPct   = p.bbPct   || 8 + Math.random() * 4;
-        p.kPct    = p.kPct    || 18 + Math.random() * 8;
-        p.oSwing  = p.oSwing  || 25 + Math.random() * 8;
-        p.pullAir = p.pullAir || 38 + Math.random() * 12;
+        p.bbPct   = p.bbPct   || Math.round(sr(p.pid||1, 7,  6, 14) * 10) / 10;
+        p.kPct    = p.kPct    || Math.round(sr(p.pid||1, 8, 14, 28) * 10) / 10;
+        p.oSwing  = p.oSwing  || Math.round(sr(p.pid||1, 10, 18, 38) * 10) / 10;
+        p.pullAir = p.pullAir || Math.round(sr(p.pid||1, 11, 30, 52) * 10) / 10;
         p.bbkRatio = p.bbPct / Math.max(p.kPct, 1);
         p.heatScore = getHS(p);
         p.cq = calcCQ(p); p.hri = calcHRI(p); p.rd = calcRD(p);
@@ -1415,7 +1434,7 @@ async function fetchLiveBatters(gamePk) {
         const ev = hr > 0 ? (103 + Math.random() * 7) : hits > 0 ? (90 + Math.random() * 10) : (76 + Math.random() * 12);
         const la = hr > 0 ? (25 + Math.random() * 9) : hits > 0 ? (12 + Math.random() * 15) : (-3 + Math.random() * 16);
         const hh = hr > 0 ? Math.floor(2 + Math.random() * 2) : hits > 1 ? 1 : 0;
-        batters.push({ id: bid, name: p?.person?.fullName || `Player ${bid}`, team: ta, ab, hits, hr, bb, so, runs, totalBases, avgEV: Math.round(ev * 10) / 10, launchAngle: Math.round(la * 10) / 10, hardHits: hh, heatLabel: getLHL(ev, la, hh), barrel: 8 + Math.random() * 10, hardHit: 38 + Math.random() * 20, seasonAvgEV: 88 + Math.random() * 8, recentBarrel: 8 + Math.random() * 14, recentHardHit: 38 + Math.random() * 24, recentAvgEV: 88 + Math.random() * 10, pullAirPct: 12 + Math.random() * 18, flyBallPct: 28 + Math.random() * 22 });
+        const slb=bid||1; batters.push({ id: bid, name: p?.person?.fullName || `Player ${bid}`, team: ta, ab, hits, hr, bb, so, runs, totalBases, avgEV: Math.round(ev * 10) / 10, launchAngle: Math.round(la * 10) / 10, hardHits: hh, heatLabel: getLHL(ev, la, hh), barrel: Math.round(sr(slb,1,6,20)*10)/10, hardHit: Math.round(sr(slb,2,36,58)*10)/10, seasonAvgEV: Math.round(sr(slb,3,87,97)*10)/10, recentBarrel: Math.round(sr(slb,4,6,22)*10)/10, recentHardHit: Math.round(sr(slb,5,36,62)*10)/10, recentAvgEV: Math.round(sr(slb,6,87,99)*10)/10, pullAirPct: Math.round(sr(slb,7,12,32)*10)/10, flyBallPct: Math.round(sr(slb,8,28,50)*10)/10 });
       }
     }
     return batters.sort((a, b) => { const o = {elite:4,hot:3,warm:2,avg:1,cold:0}; return (o[b.heatLabel.cls] || 0) - (o[a.heatLabel.cls] || 0); });
@@ -2163,7 +2182,9 @@ const BATTER_HAND = {
 };
 
 function getBatterHand(name) {
-  return BATTER_HAND[name] || (Math.random()>0.65?"R":Math.random()>0.4?"L":"S");
+  // Seed by name so same player always gets same hand
+  const nc = (name.charCodeAt(0)||82) + (name.charCodeAt(1)||0);
+  return BATTER_HAND[name] || (nc % 3 === 0 ? "L" : nc % 7 === 0 ? "S" : "R");
 }
 
 // ── HANDEDNESS MATCHUP ENGINE ──────────────────────────────
@@ -2262,9 +2283,10 @@ const ROSTERS = {
 function genStaticRoster(team) {
   const names = ROSTERS[team] || Array.from({length:9},(_,i)=>`${team} Batter ${i+1}`);
   return names.map((name,i) => {
-    const barrel=6+Math.random()*16,hardHit=36+Math.random()*26,avgEV=87+Math.random()*12,oSwing=20+Math.random()*22;
+    const seed = i + (name.charCodeAt(0) || 1) + (name.charCodeAt(1) || 1);
+    const barrel=Math.round(sr(seed,1,6,22)*10)/10, hardHit=Math.round(sr(seed,2,36,62)*10)/10, avgEV=Math.round(sr(seed,3,87,99)*10)/10, oSwing=Math.round(sr(seed,4,20,42)*10)/10;
     const hand=getBatterHand(name);
-    const p={id:i,name,team,hand,injured:false,barrel,hardHit,avgEV,sweetSpot:28+Math.random()*18,pullAir:12+Math.random()*20,flyBall:28+Math.random()*20,launchAngle:12+Math.random()*18,hr:Math.floor(Math.random()*22),bbPct:6+Math.random()*12,kPct:14+Math.random()*18,oSwing,zContact:72+Math.random()*20};
+    const p={id:i,name,team,hand,injured:false,barrel,hardHit,avgEV,sweetSpot:Math.round(sr(seed,5,28,46)*10)/10,pullAir:Math.round(sr(seed,6,12,32)*10)/10,flyBall:Math.round(sr(seed,7,28,48)*10)/10,launchAngle:Math.round(sr(seed,8,12,30)*10)/10,hr:Math.floor(sr(seed,9,0,22)),bbPct:Math.round(sr(seed,10,6,18)*10)/10,kPct:Math.round(sr(seed,11,14,32)*10)/10,oSwing,zContact:Math.round(sr(seed,12,72,92)*10)/10};
     p.bbkRatio=p.bbPct/p.kPct;p.cq=calcCQ(p);p.hri=calcHRI(p);p.rd=calcRD(p);
     p.os=calcOS(p);p.grade=getSG(p.os);p.piq=getPIQ(p);
     p.pitchProfile=genPitchProfile(p);
@@ -2287,7 +2309,7 @@ async function genTeamRoster(team) {
 
     const players = data.players.map((p, i) => {
       const hand = p.hand || getBatterHand(p.name);
-      const barrel=6+Math.random()*16,hardHit=36+Math.random()*26,avgEV=87+Math.random()*12,oSwing=20+Math.random()*22;
+      const s6=(p.id||i)+1; const barrel=Math.round(sr(s6,1,6,22)*10)/10,hardHit=Math.round(sr(s6,2,36,62)*10)/10,avgEV=Math.round(sr(s6,3,87,99)*10)/10,oSwing=Math.round(sr(s6,10,20,38)*10)/10;
       const pl = {
         id: p.id || i, name: p.name, team, hand,
         injured: p.injured || false,
@@ -2322,8 +2344,9 @@ function genBvPBattersNew(pitcher) {
     ["Mookie Betts","LAD"],["Gunnar Henderson","BAL"],["Bobby Witt Jr","KC"],
   ];
   return opposingBatters.map((n,i)=>{
-    const barrel=6+Math.random()*16,hardHit=36+Math.random()*26,avgEV=87+Math.random()*12;
-    const bbPct=6+Math.random()*12,kPct=14+Math.random()*18,oSwing=20+Math.random()*25,zContact=72+Math.random()*20;
+    const s3=i+1;
+    const barrel=Math.round(sr(s3,1,6,22)*10)/10,hardHit=Math.round(sr(s3,2,36,62)*10)/10,avgEV=Math.round(sr(s3,3,87,99)*10)/10;
+    const bbPct=Math.round(sr(s3,7,6,14)*10)/10,kPct=Math.round(sr(s3,8,14,28)*10)/10,oSwing=Math.round(sr(s3,10,20,38)*10)/10,zContact=Math.round(sr(s3,12,72,92)*10)/10;
     const hand=getBatterHand(n[0]);
     const matchup=getHandMatchup(hand,pitcher.hand);
     const evBase=88+Math.random()*14,chaseBase=oSwing+(Math.random()*8-4);
@@ -2390,8 +2413,9 @@ function BvPTab() {
           const name = pl.person?.fullName || `Player ${bid}`;
           const hand = pl.person?.batSide?.code || getBatterHand(name);
           const matchup = getHandMatchup(hand, p.hand === "RHP" ? "R" : "L");
-          const barrel=6+Math.random()*16, hardHit=36+Math.random()*26, avgEV=87+Math.random()*12;
-          const bbPct=6+Math.random()*12, kPct=14+Math.random()*18, oSwing=20+Math.random()*25;
+          const s2=bid||i+1;
+          const barrel=Math.round(sr(s2,1,6,22)*10)/10, hardHit=Math.round(sr(s2,2,36,62)*10)/10, avgEV=Math.round(sr(s2,3,87,99)*10)/10;
+          const bbPct=Math.round(sr(s2,7,6,14)*10)/10, kPct=Math.round(sr(s2,8,14,28)*10)/10, oSwing=Math.round(sr(s2,10,20,38)*10)/10;
           const evBase=88+Math.random()*14, m=matchup.multiplier;
           const evVsFB=Math.round((evBase+matchup.evBonus)*10)/10;
           const barrelAdj=Math.round(barrel*m*10)/10, fbAdj=Math.round((28+Math.random()*22)*(m*0.8+0.2)*10)/10;
