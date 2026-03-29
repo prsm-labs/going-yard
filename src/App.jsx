@@ -429,7 +429,13 @@ const enrichP = (r) => {
   r.cq = calcCQ(r); r.hri = calcHRI(r); r.rd = calcRD(r);
   r.os = calcOS(r); r.grade = getSG(r.os); r.piq = getPIQ(r);
   // Generate windowed stats if not already present
-  if (!r.windows) r.windows = genWindows(r);
+  // Use cached windows if available — prevents stats from changing on refresh
+  const cached = getCachedPlayer(r.pid);
+  if (cached?.windows) {
+    r.windows = cached.windows;
+  } else if (!r.windows) {
+    r.windows = genWindows(r);
+  }
   return r;
 };
 
@@ -444,7 +450,7 @@ function genWindows(p) {
     const variance = w <= 3 ? 0.38 : w <= 7 ? 0.26 : w <= 15 ? 0.18 : 0.10;
     const base = wi * 20; // each window gets a different seed offset
     const rv = (base_val, rng, idx) => {
-      const offset = (seededRand(pid, base + idx) * 2 - 1) * rng * variance * 2;
+      const offset = (seededRand(pid, base + idx) * 2 - 1) * rng * variance;
       return Math.max(0, Math.round((base_val + offset) * 100) / 100);
     };
     const ri = (base_val, rng, idx) => {
@@ -736,7 +742,15 @@ function PlayerPage({ player, onClose }) {
             textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>Statcast Profile</div>
           {(() => {
             // Safe format — handles undefined, null, NaN, 0
-            const sf = (v, dec=1) => (v !== null && v !== undefined && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(dec) : null;
+            // sf: safe format — returns formatted string or null if missing/invalid
+            // Returns null for 0 values too since 0 EV/barrel means no real data
+            const sf = (v, dec=1) => {
+              if (v === null || v === undefined) return null;
+              const n = parseFloat(v);
+              if (isNaN(n)) return null;
+              if (n === 0 && dec === 1) return null; // 0.0 means "no data" for these metrics
+              return n.toFixed(dec);
+            };
             const ev  = sf(player.avgEV);
             const bar = sf(player.barrel);
             const hh  = sf(player.hardHit);
@@ -1180,6 +1194,13 @@ const STAT_COL_HEADERS = [
 async function fetchPlayers(setL, setP, setE, silent=false) {
   if (!silent) setL(true);
   setE(null);
+  // On silent refresh, return cached data if we have it (prevents stat flickering)
+  const etNow = new Date().toLocaleDateString("en-US",{timeZone:"America/New_York"});
+  if (silent && PLAYER_CACHE_DATE === etNow && Object.keys(PLAYER_DATA_CACHE).length > 50) {
+    console.log("[Players] Using cache:", Object.keys(PLAYER_DATA_CACHE).length, "players");
+    setL(false);
+    return;
+  }
   try {
     // Use Eastern Time for date — MLB schedule is ET-based
     const etDateP = new Date().toLocaleDateString("en-US", {
@@ -1261,16 +1282,17 @@ async function fetchPlayers(setL, setP, setE, silent=false) {
         name: getName(r),
         team,
         // Confirmed column names from live Savant CSV response
-        avgEV:       parseFloat(r.avg_hit_speed) || 0,
-        launchAngle: parseFloat(r.avg_hit_angle) || 0,
-        sweetSpot:   parseFloat(r.anglesweetspotpercent) || 0,
-        barrel:      parseFloat(r.brl_percent) || 0,
-        hardHit:     parseFloat(r.ev95percent) || 0,   // % batted balls 95+ mph
-        flyBall:     parseFloat(r.fbld) || 0,          // fly ball + line drive %
+        avgEV:       Math.min(parseFloat(r.avg_hit_speed) || 0, 115),   // cap at 115
+        launchAngle: Math.min(Math.max(parseFloat(r.avg_hit_angle) || 0, -20), 50),
+        sweetSpot:   Math.min(parseFloat(r.anglesweetspotpercent) || 0, 60),
+        barrel:      Math.min(parseFloat(r.brl_percent) || 0, 25),       // cap at 25%
+        hardHit:     Math.min(parseFloat(r.ev95percent) || 0, 80),       // cap at 80%
+        // fbld = fly ball + line drive % combined — divide by ~2.2 to get flyball% only
+        flyBall:     Math.min(Math.round((parseFloat(r.fbld) || 0) / 2.2 * 10) / 10, 55),
         maxEV:       parseFloat(r.max_hit_speed) || 0,
-        ev50:        parseFloat(r.ev50) || 0,          // 50th percentile EV
+        ev50:        parseFloat(r.ev50) || 0,
         barrels:     parseInt(r.barrels) || 0,
-        // Pull%, BB%, K%, oSwing% not in this endpoint — fetch from MLB Stats API below
+        // These come from MLB Stats API enrichment below
         pullAir:     0,
         bbPct:       0,
         kPct:        0,
@@ -1313,7 +1335,7 @@ async function fetchPlayers(setL, setP, setE, silent=false) {
           p.kPct  = Math.round(sr(p.pid, 8, 14, 28) * 10) / 10;
         }
         p.oSwing   = Math.round(sr(p.pid, 10, 18, 38) * 10) / 10;
-        p.pullAir  = Math.round(sr(p.pid, 11, 30, 52) * 10) / 10;
+        p.pullAir  = Math.round(sr(p.pid, 11, 10, 28) * 10) / 10;
         p.bbkRatio = p.bbPct / Math.max(p.kPct, 1);
         // Re-enrich with updated stats
         p.heatScore = getHS(p);
@@ -1328,7 +1350,7 @@ async function fetchPlayers(setL, setP, setE, silent=false) {
         p.bbPct   = p.bbPct   || Math.round(sr(p.pid||1, 7,  6, 14) * 10) / 10;
         p.kPct    = p.kPct    || Math.round(sr(p.pid||1, 8, 14, 28) * 10) / 10;
         p.oSwing  = p.oSwing  || Math.round(sr(p.pid||1, 10, 18, 38) * 10) / 10;
-        p.pullAir = p.pullAir || Math.round(sr(p.pid||1, 11, 30, 52) * 10) / 10;
+        p.pullAir = p.pullAir || Math.round(sr(p.pid||1, 11, 10, 28) * 10) / 10;
         p.bbkRatio = p.bbPct / Math.max(p.kPct, 1);
         p.heatScore = getHS(p);
         p.cq = calcCQ(p); p.hri = calcHRI(p); p.rd = calcRD(p);
@@ -1336,7 +1358,12 @@ async function fetchPlayers(setL, setP, setE, silent=false) {
         if (!p.windows) p.windows = genWindows(p);
       });
     }
-    setP(mapped);
+    // Cache and set players
+    if (mapped.length > 0) {
+      PLAYER_CACHE_DATE = new Date().toLocaleDateString("en-US",{timeZone:"America/New_York"});
+      mapped.forEach(p => cachePlayer(p));
+      setP(mapped);
+    }
   } catch (e) { setE("Could not load Statcast. Showing sample. " + e.message); setP(SPLAYERS); }
   finally { setL(false); }
 }
@@ -1439,6 +1466,19 @@ async function fetchLiveBatters(gamePk) {
     }
     return batters.sort((a, b) => { const o = {elite:4,hot:3,warm:2,avg:1,cold:0}; return (o[b.heatLabel.cls] || 0) - (o[a.heatLabel.cls] || 0); });
   } catch { return SLB; }
+}
+
+// ── PLAYER DATA CACHE ───────────────────────────────────────
+// Prevents stats from changing on every silent refresh
+// Maps pid → enriched player object, set once on first load
+const PLAYER_DATA_CACHE = {};
+let PLAYER_CACHE_DATE = null;
+
+function cachePlayer(p) {
+  if (p.pid) PLAYER_DATA_CACHE[p.pid] = p;
+}
+function getCachedPlayer(pid) {
+  return PLAYER_DATA_CACHE[pid] || null;
 }
 
 // Cache liftoff results so they don't re-randomize on every tap
