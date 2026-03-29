@@ -33,7 +33,7 @@ const styles = `
   .window-active{border-color:var(--accent2)!important;color:var(--accent2)!important;background:rgba(245,166,35,.1)!important;}
   .chip:hover{border-color:var(--muted);color:var(--text);}
   .fl{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;margin-right:4px;}
-  .tw{overflow-x:auto;border-radius:10px;border:1px solid var(--border);}
+  .tw{overflow-x:auto;border-radius:10px;border:1px solid var(--border);max-height:75vh;overflow-y:auto;}
   table{width:100%;border-collapse:collapse;}
   thead tr{background:var(--surface2);}
   th{padding:9px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-family:'DM Mono',monospace;white-space:nowrap;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;transition:color .15s;}  th:hover{color:var(--text);}
@@ -226,10 +226,6 @@ const styles = `
   /* Pick buttons */
   input[type=text]{outline:none;}
   input[type=text]::placeholder{color:var(--muted);}
-  .tw-scroll{overflow-x:auto;overflow-y:auto;max-height:68vh;border-radius:10px;border:1px solid var(--border);position:relative;}
-  .tw-scroll table{width:100%;border-collapse:separate;border-spacing:0;}
-  .tw-scroll th{padding:9px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-family:'DM Mono',monospace;white-space:nowrap;border-bottom:2px solid var(--border);cursor:pointer;user-select:none;background:var(--surface2);position:sticky;top:0;z-index:20;}
-  .tw-scroll td{padding:10px 12px;font-size:12px;border-bottom:1px solid rgba(30,45,58,.5);vertical-align:middle;}
   ::-webkit-scrollbar{width:5px;height:5px;}
   ::-webkit-scrollbar-track{background:var(--bg);}
   ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
@@ -725,18 +721,13 @@ function PlayerPage({ player, onClose }) {
           <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",
             textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>Statcast Profile</div>
           <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-            {player.avgEV     != null && <StatBox label="Avg EV"    value={player.avgEV.toFixed(1)}       color={player.avgEV>=T.EV_HH?"var(--accent)":"var(--text)"}/>}
-            {player.barrel    != null && <StatBox label="Barrel%"   value={`${player.barrel.toFixed(1)}%`}    color={player.barrel>=T.BAR_EL?"#ff8020":"var(--text)"}/>}
-            {player.hardHit   != null && <StatBox label="Hard Hit%" value={`${player.hardHit.toFixed(1)}%`}/>}
-            {player.flyBall   != null && <StatBox label="Fly Ball%" value={`${player.flyBall.toFixed(1)}%`}   color={player.flyBall>=T.FB_MIN&&player.flyBall<=T.FB_MAX?"var(--green)":"var(--text)"}/>}
-            {player.launchAngle != null && <StatBox label="Launch °" value={`${player.launchAngle.toFixed(1)}°`} color={inHRZ(player.launchAngle)?"var(--green)":"var(--text)"}/>}
-            {player.pullAir   != null && <StatBox label="Pull Air%" value={`${player.pullAir.toFixed(1)}%`}   color={player.pullAir>=T.PULL_EL?"#ff8020":"var(--text)"}/>}
-            {player.oSwing    != null && <StatBox label="Chase%"    value={`${player.oSwing.toFixed(1)}%`}    color={player.oSwing<=T.CHASE_GD?"var(--green)":"#ff8020"}/>}
-            {player.avgEV == null && player.barrel == null && (
-              <div style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:"var(--muted)",padding:"8px 0"}}>
-                Statcast metrics available on Pregame/Scouting tabs — season stats shown below.
-              </div>
-            )}
+            <StatBox label="Avg EV"     value={player.avgEV?.toFixed(1)}    color={player.avgEV>=T.EV_HH?"var(--accent)":"var(--text)"}/>
+            <StatBox label="Barrel%"    value={`${player.barrel?.toFixed(1)}%`} color={player.barrel>=T.BAR_EL?"#ff8020":"var(--text)"}/>
+            <StatBox label="Hard Hit%"  value={`${player.hardHit?.toFixed(1)}%`}/>
+            <StatBox label="Fly Ball%"  value={`${player.flyBall?.toFixed(1)}%`} color={player.flyBall>=T.FB_MIN&&player.flyBall<=T.FB_MAX?"var(--green)":"var(--text)"}/>
+            <StatBox label="Launch °"   value={`${player.launchAngle?.toFixed(1)}°`} color={inHRZ(player.launchAngle)?"var(--green)":"var(--text)"}/>
+            <StatBox label="Pull Air%"  value={`${player.pullAir?.toFixed(1)}%`} color={player.pullAir>=T.PULL_EL?"#ff8020":"var(--text)"}/>
+            <StatBox label="Chase%"     value={`${player.oSwing?.toFixed(1)}%`} color={player.oSwing<=T.CHASE_GD?"var(--green)":"#ff8020"}/>
           </div>
         </div>
 
@@ -880,20 +871,6 @@ function MyPicksTab() {
         <div className="section-sub">Your saved batters · 💣 Favorites · ⭐ Dark Horses · 🎯 Longshots · click any to view player page</div>
       </div>
 
-      {pickList.length > 0 && (
-        <div style={{display:"flex",justifyContent:"flex-end",marginBottom:12}}>
-          <button onClick={() => {
-            Object.keys(GLOBAL_PICKS).forEach(k => delete GLOBAL_PICKS[k]);
-            savePicks(GLOBAL_PICKS);
-            PICKS_LISTENERS.forEach(fn => fn({...GLOBAL_PICKS}));
-          }}
-            style={{padding:"5px 12px",borderRadius:6,background:"rgba(232,65,26,.1)",
-              border:"1px solid rgba(232,65,26,.3)",color:"var(--accent)",cursor:"pointer",
-              fontFamily:"'DM Mono',monospace",fontSize:11}}>
-            ✕ Clear All Picks
-          </button>
-        </div>
-      )}
       {pickList.length === 0 ? (
         <div style={{padding:"60px 20px",textAlign:"center",color:"var(--muted)",
           fontFamily:"'DM Mono',monospace",fontSize:12,lineHeight:2}}>
@@ -1759,7 +1736,9 @@ function PregameTab() {
   const [window, setWindow] = useState(3);
   const [selMatchup, setSelMatchup] = useState(null);
   const [games, setGames] = useState([]);
-  const [searchQ, setSearchQ] = useState('');
+  const [search, setSearch] = useState('');
+  const [selPlayer, setSelPlayer] = useState(null);
+  const [search, setSearch] = useState('');
   const [selPlayer, setSelPlayer] = useState(null);
   const load = useCallback((silent=false) => {
     fetchPlayers(setLoading, setPlayers, setError, silent);
@@ -1786,7 +1765,7 @@ function PregameTab() {
   const filtered = graded.filter(p => {
     // Matchup filter — only show batters from selected game's teams
     if (matchupTeams && matchupTeams.size > 0 && !matchupTeams.has(p.team)) return false;
-    if (searchQ && !p.name.toLowerCase().includes(searchQ.toLowerCase())) return false;
+    if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
     const g = (p._wGrade||p.grade)?.grade;
     if (filter==="aplus") return g==="A+";
     if (filter==="a") return g==="A+"||g==="A";
@@ -1817,12 +1796,9 @@ function PregameTab() {
       <div className="card"><div className="cl">Grade A Bats</div><div className="cv" style={{color:"#ff8020"}}>{hotC}</div><div className="cs">Impact bats</div></div>
       <div className="card"><div className="cl">Avg EV</div><div className="cv">{avgEV}</div><div className="cs">L{window}D avg</div></div>
     </div>
-    <div style={{display:"flex",gap:8,marginBottom:8,flexWrap:"wrap",alignItems:"center"}}>
-      <SearchBar value={searchQ} onChange={setSearchQ} placeholder="Search any batter…"/>
-      {searchQ && <span style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{sorted.length} result{sorted.length!==1?"s":""}</span>}
-    </div>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:10}}>
       <WindowButtons window={window} setWindow={setWindow}/>
+      <SearchBar value={search} onChange={setSearch} placeholder="Search batters…"/>
       <div className="filters" style={{margin:0}}>
         <span className="fl">Filter:</span>
         {[{key:"all",label:"All"},{key:"aplus",label:"🔴 A+"},{key:"a",label:"A+"},{key:"b",label:"B+"},{key:"hot",label:"Hot"}].map(f=>
@@ -1852,7 +1828,7 @@ function PregameTab() {
     <PregameWeatherRow/>
     {loading ? <div className="lw"><div className="sp"/><div className="lt">Loading Statcast…</div></div> : <>
       {error && <div className="warn">⚠️ {error}</div>}
-      <div className="tw-scroll"><table><thead><tr>
+      <div className="tw"><table><thead><tr>
         <th>#</th><th>Player</th><th style={{width:36}}>Pick</th>
         <th className={sortKey==="os"?"sk":""} onClick={()=>hs("os")} style={{cursor:"pointer"}}>Grade{sortKey==="os"&&<span style={{color:"var(--accent)",marginLeft:3}}>{sortDir<0?"↓":"↑"}</span>}</th>
         {STAT_COL_HEADERS.map(c=>
@@ -1921,48 +1897,6 @@ function LiveTab() {
 }
 
 // TAB 3: SCOUTING BOARD
-function LiveTab() {
-  const [games, setGames] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [lastUpdate, setLastUpdate] = useState(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const load = useCallback((silent=false) => {
-    fetchGames(setLoading, setGames, setError, silent);
-    setLastUpdate(new Date().toLocaleTimeString());
-  }, []);
-  useEffect(() => { load(false); }, []); // initial — show spinner
-  // Background refresh every 30s — silent so open game panels stay open
-  useEffect(() => {
-    const id = setInterval(() => load(true), 60000);
-    return () => clearInterval(id);
-  }, [load]);
-  const live = games.filter(g=>g.status==="Live");
-  const pre  = games.filter(g=>g.status==="Preview");
-  const fin  = games.filter(g=>g.status==="Final");
-  // Debug: log what statuses we got
-  if (games.length > 0) console.log("[Live] Game statuses:", games.map(g=>`${g.away?.abbr}@${g.home?.abbr}:${g.status}`).join(", "));
-  return <div>
-    <div className="hrow">
-      <div className="section-header"><div className="section-title">📡 Live Yard Watch</div><div className="section-sub">Tap any game · Live=heat · Upcoming=🚀Liftoff · auto-refreshes every 60s{lastUpdate&&<span style={{marginLeft:8}}>Last: {lastUpdate}</span>}</div></div>
-      <RefBtn refreshing={refreshing} onClick={async()=>{setRefreshing(true);await fetchGames(setLoading,setGames,setError,true);setLastUpdate(new Date().toLocaleTimeString());setRefreshing(false);}}/>
-    </div>
-    <div className="note">ℹ️ <strong>Live</strong>: tap → hard contact in HR zones now vs L7. <strong>Upcoming</strong>: tap → 🚀 Liftoff list ranked by HR probability.</div>
-    <div className="cards" style={{marginBottom:14}}>
-      <div className="card"><div className="cl">Live Games</div><div className="cv" style={{color:"#e8411a"}}>{live.length}</div><div className="cs">in progress</div></div>
-      <div className="card"><div className="cl">Scheduled</div><div className="cv" style={{color:"#27c97a"}}>{pre.length}</div><div className="cs">today</div></div>
-      <div className="card"><div className="cl">Total</div><div className="cv">{games.length}</div><div className="cs">on slate</div></div>
-    </div>
-    {loading ? <div className="lw"><div className="sp"/><div className="lt">Fetching schedule…</div></div> : <>
-      {error && <div className="warn">⚠️ {error} — Showing sample.</div>}
-      {live.length>0&&<><div className="div" style={{marginTop:8}}>🔴 Live Now</div><div className="gg">{live.map(g=><GCard key={g.id} game={g}/>)}</div></>}
-      {pre.length>0&&<><div className="div" style={{marginTop:12}}>🟢 Upcoming — Tap for 🚀 Liftoff List</div><div className="gg">{pre.map(g=><GCard key={g.id} game={g}/>)}</div></>}
-      {fin.length>0&&<><div className="div" style={{marginTop:12}}>✓ Final</div><div className="gg">{fin.map(g=><GCard key={g.id} game={g}/>)}</div></>}
-    </>}
-  </div>;
-}
-
-// TAB 3: SCOUTING BOARD
 function ScoutingTab() {
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1974,7 +1908,7 @@ function ScoutingTab() {
   const [window, setWindow] = useState(3);
   const [selMatchup, setSelMatchup] = useState(null);
   const [games, setGames] = useState([]);
-  const [searchQ, setSearchQ] = useState('');
+  const [search, setSearch] = useState('');
   const [selPlayer, setSelPlayer] = useState(null);
   const load = useCallback((silent=false) => {
     fetchPlayers(setLoading, setPlayers, setError, silent);
@@ -1992,7 +1926,7 @@ function ScoutingTab() {
     : null;
   const filtered = players.filter(p => {
     if (matchupTeamsS && matchupTeamsS.size > 0 && !matchupTeamsS.has(p.team)) return false;
-    if (searchQ && !p.name.toLowerCase().includes(searchQ.toLowerCase())) return false;
+    if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
     const wg = (p.windows?.[window]?.grade || p.grade)?.grade;
     if (filter==="aplus") return wg==="A+";
     if (filter==="a") return wg==="A+"||wg==="A";
@@ -2012,7 +1946,6 @@ function ScoutingTab() {
     <div className="hrow">
       <div className="section-header"><div className="section-title">🎯 Scouting Board</div><div className="section-sub">Contact Quality (50%) + HR Intent (30%) + Readiness (20%) · grades recalculate per window</div></div>
       <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-        <SearchBar value={searchQ} onChange={setSearchQ} placeholder="Search any batter…"/>
         <WindowButtons window={window} setWindow={setWindow}/>
         <RefBtn refreshing={refreshing} onClick={async()=>{setRefreshing(true);await fetchPlayers(setLoading,setPlayers,setError,true);setRefreshing(false);}}/>
       </div>
@@ -2047,7 +1980,7 @@ function ScoutingTab() {
     <div className="filters"><span className="fl">Filter:</span>{[{key:"all",label:"All"},{key:"aplus",label:"🔴 A+"},{key:"a",label:"A+ & A"},{key:"b",label:"B+"},{key:"chasers",label:"🚫 Chasers"}].map(f=><button key={f.key} className={`chip ${filter===f.key?"active":""}`} onClick={()=>setFilter(f.key)}>{f.label}</button>)}</div>
     {loading ? <div className="lw"><div className="sp"/><div className="lt">Loading Scouting Board…</div></div> : <>
       {error && <div className="warn">⚠️ {error}</div>}
-      <div className="tw-scroll"><table><thead><tr>
+      <div className="tw"><table><thead><tr>
         <th>#</th><th>Player</th><th style={{width:36}}>Pick</th>
         <th className={sortKey==="os"?"sk":""} onClick={()=>hs("os")} style={{cursor:"pointer"}}>Grade{sortKey==="os"&&<span style={{color:"var(--accent)",marginLeft:3}}>{sortDir<0?"↓":"↑"}</span>}</th>
         <th><Tip text="Composite score: CQ 50% + HRI 30% + RDY 20%"><span>Score</span></Tip></th>
