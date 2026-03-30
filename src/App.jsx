@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const BUILD_TIMESTAMP = "2026-03-29 22:43 ET";
+const BUILD_TIMESTAMP = "2026-03-29 23:08 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -1610,7 +1610,7 @@ function LRow({b, rank}) {
   </div>;
 }
 
-function GPanel({game, isLive}) {
+function GPanel({game, isLive, isFinal=false}) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [expId, setExpId] = useState(null);
@@ -1618,7 +1618,8 @@ function GPanel({game, isLive}) {
     // Initial load only — don't reset expId or clear data on background updates
     setLoading(true);
     (async () => {
-      const d = isLive ? await fetchLiveBatters(game.gamePk) : await fetchLiftoffBatters(game);
+      // Final games show the full box score (same as live batters — it has final stats)
+      const d = (isLive || isFinal) ? await fetchLiveBatters(game.gamePk) : await fetchLiftoffBatters(game);
       setData(d); setLoading(false);
     })();
   }, [game.gamePk, isLive]);
@@ -1634,11 +1635,11 @@ function GPanel({game, isLive}) {
   }, [game.gamePk, isLive]);
   return <div className="gp">
     <div className="gph">
-      <div className="gpt">{isLive ? "🔥 Live Heat — Who's Going Yard?" : "🚀 Ready for Liftoff"}</div>
-      <div className="gps">{isLive ? "Click any batter → today vs L7 comparison" : "Ranked: streak 40% · due factor 25% · vs pitcher 15% · home/away 10%"}</div>
+      <div className="gpt">{isLive ? "🔥 Live Heat — Who's Going Yard?" : isFinal ? "📋 Final Box Score" : "🚀 Ready for Liftoff"}</div>
+      <div className="gps">{isLive ? "Click any batter → today vs L7 comparison" : isFinal ? "Final game stats · click any batter for detail" : "Ranked: streak 40% · due factor 25% · vs pitcher 15% · home/away 10%"}</div>
     </div>
     {loading ? <div style={{padding:"20px 15px",display:"flex",alignItems:"center",gap:8}}><div className="sp" style={{width:18,height:18,borderWidth:2}}/><span style={{fontFamily:"DM Mono,monospace",fontSize:10,color:"var(--muted)"}}>Loading…</span></div>
-    : isLive ? <div style={{overflowX:"auto"}}>
+    : (isLive || isFinal) ? <div style={{overflowX:"auto"}}>
       <table style={{width:"100%"}}>
         <thead><tr><th style={{width:20}}></th><th>Batter</th><th>Heat</th><th>AB</th><th>H</th><th>HR</th><th><Tip text="Runs scored this game">R</Tip></th><th><Tip text="Total bases this game">TB</Tip></th><th><Tip text="Walks this game">BB</Tip></th><th><Tip text="Strikeouts this game">K</Tip></th><th>Avg EV</th><th>Launch °</th><th>Hard Hits</th></tr></thead>
         <tbody>
@@ -1682,19 +1683,19 @@ function GCard({game}) {
   const isLive = game.status === "Live", isFin = game.status === "Final";
   const aw = game.away.score > game.home.score, hw = game.home.score > game.away.score;
   return <div className="gpw">
-    <div className={`gc ${exp?"exp":""}`} onClick={() => !isFin && setExp(e => !e)}>
+    <div className={`gc ${exp?"exp":""}`} onClick={() => setExp(e => !e)}>
       <div className="gh">
         <div className={`gs ${isFin?"fin":!isLive?"pre":""}`}>{isLive&&<span style={{marginRight:3}}>●</span>}{isLive?"Live":isFin?"Final":"Upcoming"}</div>
-        <div style={{display:"flex",alignItems:"center",gap:6}}>{game.inning&&<div style={{fontSize:9,color:"var(--muted)",fontFamily:"DM Mono,monospace"}}>{game.inning}</div>}{!isFin&&<span className={`cv2 ${exp?"op":""}`} style={{fontSize:11}}>▾</span>}</div>
+        <div style={{display:"flex",alignItems:"center",gap:6}}>{game.inning&&<div style={{fontSize:9,color:"var(--muted)",fontFamily:"DM Mono,monospace"}}>{game.inning}</div>}<span className={`cv2 ${exp?"op":""}`} style={{fontSize:11}}>▾</span></div>
       </div>
       <div className="gm">
         <div className="gt"><div className="ta">{game.away.abbr}</div><div style={{fontSize:9,color:"var(--muted)",fontFamily:"DM Mono,monospace"}}>{game.away.record}</div><div className={`tsc ${aw?"win":""}`}>{game.away.score}</div></div>
         <div className="gd">VS</div>
         <div className="gt"><div className="ta">{game.home.abbr}</div><div style={{fontSize:9,color:"var(--muted)",fontFamily:"DM Mono,monospace"}}>{game.home.record}</div><div className={`tsc ${hw?"win":""}`}>{game.home.score}</div></div>
       </div>
-      {!isFin && !exp && <div className="gi" style={{color:isLive?"var(--fire2)":"var(--green)"}}>{isLive?"▾ Tap for live heat":"▾ Tap for 🚀 Liftoff list"}</div>}
+      {!exp && <div className="gi" style={{color:isLive?"var(--fire2)":isFin?"var(--muted)":"var(--green)"}}>{isLive?"▾ Tap for live heat":isFin?"▾ Tap for final box score":"▾ Tap for 🚀 Liftoff list"}</div>}
     </div>
-    {exp && <GPanel game={game} isLive={isLive}/>}
+    {exp && <GPanel game={game} isLive={isLive} isFinal={isFin}/>}
   </div>;
 }
 
@@ -2023,8 +2024,7 @@ function ScoutingTab() {
         <th><Tip text="Composite score: CQ 50% + HRI 30% + RDY 20%"><span>Score</span></Tip></th>
         <th><Tip text="Contact Quality"><span>CQ</span></Tip></th>
         <th><Tip text="HR Intent"><span>HRI</span></Tip></th>
-        <th><Tip text="Readiness / Plate IQ"><span>RDY</span></Tip></th>
-        <th>Plate IQ</th>
+        <th><Tip text="Readiness — Chase%, K%, BB%, Zone Contact%"><span>RDY</span></Tip></th>
         {STAT_COL_HEADERS.map(c=>
           <th key={c.key} className={sortKey===c.key?"sk":""} onClick={()=>hs(c.key)}>
             <div style={{display:"flex",alignItems:"center",gap:2}}>
@@ -2051,7 +2051,7 @@ function ScoutingTab() {
           <td><span className="sp3 cq">{wCQ.toFixed?wCQ.toFixed(1):wCQ}</span></td>
           <td><span className="sp3 hi">{wHRI.toFixed?wHRI.toFixed(1):wHRI}</span></td>
           <td><span className="sp3 rd">{wRD.toFixed?wRD.toFixed(1):wRD}</span></td>
-          <td><span style={{fontSize:10,fontFamily:"DM Mono,monospace",color:piq.color,fontWeight:600}}>{piq.label}</span></td>
+
           <StatCols p={p} window={window}/>
         </tr>;
       })}</tbody></table></div></div>
@@ -2167,7 +2167,7 @@ const TEAM_IDS = {
   WSH:120, COL:115, MIA:146, PIT:134, STL:138, CHW:145,
 };
 const TEAM_ID_TO_ABB = Object.fromEntries(Object.entries(TEAM_IDS).map(([k,v])=>[v,k]));
-const MLB_TEAMS = ["NYY","BOS","LAD","HOU","PHI","NYM","BAL","CHC","TEX","CLE","SEA","ATL","SD","MIL","MIN","TB","TOR","CIN","SF","ARI","DET","KC","OAK","LAA","WSH","COL","MIA","PIT","STL","CHW"];
+const MLB_TEAMS = ["ARI","ATH","ATL","BAL","BOS","CHC","CHW","CIN","CLE","COL","DET","HOU","KC","LAA","LAD","MIA","MIL","MIN","NYM","NYY","OAK","PHI","PIT","SD","SEA","SF","STL","TB","TEX","TOR","WSH"];
 
 // Live roster cache — populated on demand, persists for the session
 const LIVE_ROSTER_CACHE = {};
@@ -2837,17 +2837,38 @@ async function fetchHRs(force=false) {
     const res = await fetch("/api/homeruns");
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    // Only update if we got real data — keep previous data if new fetch returns 0
     const newHRs = data.homeruns || [];
-    if (newHRs.length > 0 || HR_DATA.length === 0) {
-      HR_DATA = newHRs;
+    // Keep yesterday's HRs in ticker until today's games produce at least 3 HRs
+    // This way the ticker stays alive past midnight until next day's games start
+    if (newHRs.length >= 3) {
+      HR_DATA = newHRs; // today has real data — use it
+    } else if (newHRs.length > 0) {
+      HR_DATA = newHRs; // small amount — still show it
+    } else if (HR_DATA.length === 0) {
+      // Truly no data yet — try fetching yesterday
+      try {
+        const etDate = new Date().toLocaleDateString("en-US",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"});
+        const [m,d,y] = etDate.split("/");
+        const yesterday = new Date(Date.UTC(parseInt(y),parseInt(m)-1,parseInt(d)-1));
+        const yd = yesterday.toISOString().slice(0,10);
+        const yRes = await fetch(`/api/homeruns?date=${yd}`);
+        if (yRes.ok) {
+          const yData = await yRes.json();
+          const yHRs = yData.homeruns || [];
+          if (yHRs.length > 0) {
+            HR_DATA = yHRs;
+            console.log("[HRs] Using yesterday's", yHRs.length, "HRs until today's games start");
+          }
+        }
+      } catch(e) { console.warn("[HRs] Yesterday fetch failed:", e.message); }
     }
+    // else: HR_DATA already has yesterday's data — keep showing it
     HR_LAST_FETCH = now;
-    console.log("[HRs] Fetched:", newHRs.length, "HRs, showing:", HR_DATA.length);
+    console.log("[HRs] Fetched:", newHRs.length, "HRs today, showing:", HR_DATA.length);
     return HR_DATA;
   } catch(e) {
     console.warn("[HRs] Fetch failed:", e.message);
-    return HR_DATA; // return cached data on failure
+    return HR_DATA;
   }
 }
 
@@ -2906,9 +2927,10 @@ function HRTrackerTab() {
   const [hrs, setHrs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sortKey, setSortKey] = useState("chronoIndex");
-  const [sortDir, setSortDir] = useState(-1);
+  const [sortDir, setSortDir] = useState(1); // 1 = ascending = first HR first
   const [filterTeam, setFilterTeam] = useState("all");
   const [refreshing, setRefreshing] = useState(false);
+  const [hrSearch, setHrSearch] = useState("");
 
   // Date picker — defaults to today, min = season start
   const todayET = new Date().toLocaleDateString("en-US",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"});
@@ -2945,7 +2967,16 @@ function HRTrackerTab() {
 
   const teams = [...new Set(hrs.map(h => h.batterTeam))].filter(Boolean).sort();
 
-  const filtered = hrs.filter(h => filterTeam === "all" || h.batterTeam === filterTeam);
+  const filtered = hrs.filter(h => {
+    if (filterTeam !== "all" && h.batterTeam !== filterTeam) return false;
+    if (hrSearch.trim()) {
+      const q = hrSearch.toLowerCase();
+      return (h.batterName||"").toLowerCase().includes(q) ||
+             (h.pitcherName||"").toLowerCase().includes(q) ||
+             (h.batterTeam||"").toLowerCase().includes(q);
+    }
+    return true;
+  });
   const sorted = [...filtered].sort((a,b) => {
     // Put nulls at bottom always
     const av = a[sortKey], bv = b[sortKey];
@@ -3018,12 +3049,15 @@ function HRTrackerTab() {
       </div>}
     </div>}
 
-    {/* Team filter */}
-    {teams.length > 0 && <div className="filters" style={{marginBottom:12}}>
-      <span className="fl">Team:</span>
-      <button className={`chip ${filterTeam==="all"?"active":""}`} onClick={()=>setFilterTeam("all")}>All</button>
-      {teams.map(t => <button key={t} className={`chip ${filterTeam===t?"active":""}`} onClick={()=>setFilterTeam(t)}>{t}</button>)}
-    </div>}
+    {/* Search + Team filter */}
+    <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:10,flexWrap:"wrap"}}>
+      <SearchBar value={hrSearch} onChange={setHrSearch} placeholder="Search batter or pitcher…"/>
+      {teams.length > 0 && <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}>
+        <span style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1}}>Team:</span>
+        <button className={`chip ${filterTeam==="all"?"active":""}`} onClick={()=>setFilterTeam("all")}>All</button>
+        {teams.map(t => <button key={t} className={`chip ${filterTeam===t?"active":""}`} onClick={()=>setFilterTeam(t)}>{t}</button>)}
+      </div>}
+    </div>
 
     {loading
       ? <div className="lw"><div className="sp"/><div className="lt">Loading today's home runs…</div></div>
@@ -3277,11 +3311,56 @@ function DataStatusBadge() {
 }
 
 function StatcastTab() {
+  const picks = usePicks();
+  const players = Object.values(PLAYER_DATA_CACHE);
+  const [searchQ, setSearchQ] = useState("");
+  const [showPicker, setShowPicker] = useState(false);
+  const filtered = searchQ.trim()
+    ? players.filter(p => p.name?.toLowerCase().includes(searchQ.toLowerCase()) || p.team?.toLowerCase().includes(searchQ.toLowerCase())).slice(0,12)
+    : [];
   return <div>
     <div className="section-header" style={{marginBottom:16}}>
       <div className="section-title">📊 Baseball Savant</div>
       <div className="section-sub">Affiliate partner · Statcast data, spray charts, leaderboards</div>
     </div>
+
+    {/* Player Picker */}
+    <div style={{marginBottom:14,background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,padding:"12px 14px"}}>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:showPicker?10:0}}>
+        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,letterSpacing:1}}>🎯 Add to My Picks</span>
+        <span style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>Add players while browsing Statcast</span>
+        <button onClick={()=>setShowPicker(s=>!s)}
+          style={{marginLeft:"auto",padding:"4px 12px",borderRadius:6,border:"1px solid var(--border)",
+            background:showPicker?"var(--accent)":"var(--surface2)",color:showPicker?"white":"var(--muted)",
+            cursor:"pointer",fontFamily:"'DM Mono',monospace",fontSize:11}}>
+          {showPicker?"✕ Close":"＋ Open Picker"}
+        </button>
+      </div>
+      {showPicker && <>
+        <div style={{position:"relative",marginBottom:8}}>
+          <input autoFocus type="text" value={searchQ} onChange={e=>setSearchQ(e.target.value)}
+            placeholder="Search player or team…"
+            style={{width:"100%",padding:"8px 12px 8px 32px",background:"var(--surface2)",
+              border:"1px solid var(--border)",borderRadius:8,color:"var(--text)",
+              fontFamily:"'DM Mono',monospace",fontSize:12,outline:"none",boxSizing:"border-box"}}/>
+          <span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:"var(--muted)",fontSize:13}}>🔍</span>
+          {searchQ&&<button onClick={()=>setSearchQ("")} style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"var(--muted)",cursor:"pointer",fontSize:13}}>✕</button>}
+        </div>
+        {searchQ&&filtered.length===0&&<div style={{fontSize:11,color:"var(--muted)",fontFamily:"'DM Mono',monospace",padding:"8px 0"}}>No players found.</div>}
+        {filtered.length>0&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:8}}>
+          {filtered.map(p=>{
+            const key=String(p.pid),current=picks[key]?.type;
+            return <div key={p.pid} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,background:"var(--surface2)",border:`1px solid ${current?PICK_TYPES[current].color:"var(--border)"}`}}>
+              <div style={{width:30,height:30,borderRadius:"50%",background:"var(--surface)",border:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:"var(--text)",flexShrink:0}}>{ini(p.name)}</div>
+              <div style={{flex:1,minWidth:0}}><div style={{fontWeight:600,fontSize:12,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{p.name}</div><div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{p.team} · {p.grade?.grade||"—"}</div></div>
+              <PickButton pid={p.pid} name={p.name} team={p.team}/>
+            </div>;
+          })}
+        </div>}
+        {!searchQ&&<div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",padding:"4px 0"}}>Start typing to search {players.length} batters</div>}
+      </>}
+    </div>
+
     <div style={{background:"rgba(56,184,242,.06)",border:"1px solid rgba(56,184,242,.2)",borderRadius:8,padding:"8px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
       <span style={{fontSize:10,color:"var(--ice)",fontFamily:"'DM Mono',monospace"}}>🤝 Affiliate Partner</span>
       <span style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>— Going Yard uses Baseball Savant data to power its Statcast metrics.</span>
@@ -3306,7 +3385,7 @@ function StatcastTab() {
 }
 
 export default function App() {
-  const [tab, setTab] = useState("pregame");
+  const [tab, setTab] = useState("homeruns");
   // Load player→team map immediately at startup
   useEffect(() => { loadGlobalPlayerMap(); }, []);
   return <>
@@ -3321,12 +3400,11 @@ export default function App() {
       </header>
       <HRTicker onHRClick={()=>setTab("homeruns")}/>
       <nav className="tabs">
-        <button className={`tab ${tab==="pregame"?"active":""}`} onClick={()=>setTab("pregame")}>📊 Pregame</button>
-        <button className={`tab ${tab==="live"?"active":""}`} onClick={()=>setTab("live")}>📡 Live</button>
-        <button className={`tab ${tab==="scouting"?"active":""}`} onClick={()=>setTab("scouting")}>🎯 Scouting</button>
-        <button className={`tab ${tab==="bvp"?"active":""}`} onClick={()=>setTab("bvp")}>⚔️ Batter vs P</button>
-        <button className={`tab ${tab==="builder"?"active":""}`} onClick={()=>setTab("builder")}>🔬 Pitch Builder</button>
         <button className={`tab ${tab==="homeruns"?"active":""}`} onClick={()=>setTab("homeruns")} style={{color:tab==="homeruns"?"var(--accent)":undefined}}>💥 HR Tracker</button>
+        <button className={`tab ${tab==="bvp"?"active":""}`} onClick={()=>setTab("bvp")}>⚔️ Batter vs P</button>
+        <button className={`tab ${tab==="scouting"?"active":""}`} onClick={()=>setTab("scouting")}>🎯 Scouting</button>
+        <button className={`tab ${tab==="live"?"active":""}`} onClick={()=>setTab("live")}>📡 Live</button>
+        <button className={`tab ${tab==="pregame"?"active":""}`} onClick={()=>setTab("pregame")}>📊 Pregame</button>
         <button className={`tab ${tab==="powerbi"?"active":""}`} onClick={()=>setTab("powerbi")}>📊 Analytics</button>
         <button className={`tab ${tab==="onlyhomers"?"active":""}`} onClick={()=>setTab("onlyhomers")} style={{color:tab==="onlyhomers"?"var(--accent2)":undefined}}>⚾ Only Homers</button>
         <button className={`tab ${tab==="statcast"?"active":""}`} onClick={()=>setTab("statcast")} style={{color:tab==="statcast"?"var(--ice)":undefined}}>📡 Statcast</button>
