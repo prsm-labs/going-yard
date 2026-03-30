@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const BUILD_TIMESTAMP = "2026-03-29 20:55 ET";
+const BUILD_TIMESTAMP = "2026-03-29 21:10 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -934,7 +934,9 @@ function StatCols({ p, window }) {
 
   const mini = (val, label, cls, suffix="") => (
     <td key={label}>
-      <span className={`sv ${cls}`}>{typeof val==="number"?(suffix?val.toFixed(1)+suffix:val):val}</span>
+      <span className={`sv ${val===null||val===undefined?"avg":cls}`}>
+        {val===null||val===undefined ? "—" : typeof val==="number" ? (suffix ? val.toFixed(1)+suffix : val) : val}
+      </span>
     </td>
   );
 
@@ -944,9 +946,9 @@ function StatCols({ p, window }) {
     {mini(fb,  "fb",   fbC,  "%")}
     {mini(la,  "la",   laC,  "°")}
     {mini(pull,   "pull", puC, "%")}
-    {pulbrl > 0 && mini(pulbrl, "pulbrl", pbC, "%")}
     {mini(chase,"chase",chC, "%")}
     {mini(hh,  "hh",   hhC,  "%")}
+    {mini(pulbrl > 0 ? pulbrl : null, "pulbrl", pbC, "%")}
     {mini(avg, "avg",  avgC, "")}
     {mini(hits,"hits", "avg", "")}
     {mini(xbh, "xbh",  hr>=2?"hot":"avg", "")}
@@ -967,9 +969,9 @@ const STAT_COL_HEADERS = [
   {key:"flyBall",  label:"Fly Ball%",  tip:"35–45% = sweet zone. Above 50% = too many outs."},
   {key:"launchAngle",label:"Launch°",  tip:"25–35° = HR sweet spot"},
   {key:"pullAir",  label:"Pull Air%",  tip:"40–50% = elite HR power zone"},
-  {key:"pulledBarrel", label:"Pull Brl%", tip:"Barrels hit to the pull side — the most dangerous contact"},
   {key:"oSwing",   label:"Chase%",     tip:"O-Swing. Below 20% = elite. Below 25% = good."},
   {key:"hardHit",  label:"Hard Hit%",  tip:"EV ≥ 95 mph contact rate"},
+  {key:"pulledBarrel", label:"Pull Brl%", tip:"Barrels hit to the pull side — the most dangerous contact"},
   {key:"avg",      label:"AVG",        tip:"Batting average this window"},
   {key:"hits",     label:"H",          tip:"Hits this window"},
   {key:"xbh",      label:"XBH",        tip:"Extra base hits (2B+3B+HR) this window"},
