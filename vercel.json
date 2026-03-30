@@ -1,0 +1,14 @@
+{
+  "rewrites": [
+    { "source": "/going-yard", "destination": "/" },
+    { "source": "/going-yard/(.*)", "destination": "/$1" }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" }
+      ]
+    }
+  ]
+}
