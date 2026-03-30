@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const BUILD_TIMESTAMP = "2026-03-29 20:34 ET";
+const BUILD_TIMESTAMP = "2026-03-29 20:44 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -986,15 +986,16 @@ let GLOBAL_PLAYER_MAP_LOADED = false;
 async function loadGlobalPlayerMap() {
   if (GLOBAL_PLAYER_MAP_LOADED) return GLOBAL_PLAYER_TEAM_MAP;
   try {
-    const res = await fetch("https://statsapi.mlb.com/api/v1/sports/1/players?season=2026&gameType=R");
+    // Fetch all active players — no gameType filter so we get everyone
+    const res = await fetch("https://statsapi.mlb.com/api/v1/sports/1/players?season=2026&sportId=1");
     const data = await res.json();
     for (const p of (data.people || [])) {
-      if (p.id && p.currentTeam?.abbreviation) {
+      if (p.id && p.fullName) { // include all players for name lookup even without team
         GLOBAL_PLAYER_TEAM_MAP[p.id] = {
-          team: p.currentTeam.abbreviation,
-          teamId: p.currentTeam.id,
+          team: p.currentTeam?.abbreviation || '—',
+          teamId: p.currentTeam?.id || 0,
           name: p.fullName,
-          hand: p.batSide?.code || "R",
+          hand: p.batSide?.code || 'R',
         };
       }
     }

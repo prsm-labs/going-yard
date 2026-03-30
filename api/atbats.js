@@ -1,171 +1,181 @@
-// api/atbats.js
-// Fetches full 2026 season Statcast at-bat data from Baseball Savant
-// Cached daily — one fetch serves the entire app session
-// Returns aggregated per-player stats for L3D/L7D/L15D/L30D windows
-
+// api/atbats.js — Full 2026 season Statcast data, refreshes every 3 hours
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET');
-
   try {
-    const { window = '7' } = req.query; // days back
+    const year = '2026';
+    const minAB = '5';
 
-    // Get ET date
-    const etNow = new Date().toLocaleDateString('en-US', {
-      timeZone: 'America/New_York',
-      year: 'numeric', month: '2-digit', day: '2-digit'
-    });
-    const [m, d, y] = etNow.split('/');
-    const today = `${y}-${m}-${d}`;
+    const headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      'Accept': 'text/csv,text/plain,*/*',
+      'Referer': 'https://baseballsavant.mlb.com/',
+    };
 
-    // Season start 2026
-    const seasonStart = '2026-03-20';
+    // Fetch both leaderboards in parallel
+    const [expRes, statRes] = await Promise.all([
+      fetch(`https://baseballsavant.mlb.com/leaderboard/expected_statistics?type=batter&year=${year}&position=&team=&min=${minAB}&csv=true`, { headers }),
+      fetch(`https://baseballsavant.mlb.com/leaderboard/statcast?abs=${minAB}&type=batter&year=${year}&position=&team=&min=${minAB}&csv=true`, { headers }),
+    ]);
 
-    // Baseball Savant statcast_search — full season batted ball data
-    // Returns every batted ball event with EV, LA, barrel, pitch type etc.
-    const url = [
-      'https://baseballsavant.mlb.com/statcast_search/csv',
-      '?all=true',
-      '&hfPT=',           // all pitch types
-      '&hfAB=',           // all at-bat results
-      '&hfBBT=',          // all batted ball types
-      '&hfPR=',
-      '&hfZ=',
-      '&stadium=',
-      '&hfBBL=',
-      '&hfNewZones=',
-      '&hfGT=R%7C',       // regular season only
-      '&hfC=',
-      `&hfSea=${y}%7C`,   // 2026 season
-      '&hfSit=',
-      '&player_type=batter',
-      `&hfOuts=`,
-      '&opponent=',
-      '&pitcher_throws=',
-      '&batter_stands=',
-      '&hfSA=',
-      `&game_date_gt=${seasonStart}`,
-      `&game_date_lt=${today}`,
-      '&team=',
-      '&position=',
-      '&hfRO=',
-      '&home_road=',
-      '&hfFlag=is%5C.%5C.remove%5C.%5C.bunts%7C', // remove bunts
-      '&metric_1=',
-      '&hfInn=',
-      '&min_pitches=0',
-      '&min_results=0',
-      '&group_by=name',   // aggregate by player
-      '&sort_col=xwoba',
-      '&player_event_sort=api_p_release_speed',
-      '&sort_order=desc',
-      '&min_abs=0',
-      '&type=details',    // detail level for per-AB data
-    ].join('');
+    const expCsv  = expRes.ok  ? await expRes.text()  : '';
+    const statCsv = statRes.ok ? await statRes.text() : '';
 
-    // Use the leaderboard endpoint instead - more reliable aggregated data
-    // This gives us per-player season aggregates we can filter by date
-    const savantUrl = `https://baseballsavant.mlb.com/leaderboard/statcast?abs=1&type=batter&year=${y}&position=&team=&min=1&csv=true`;
+    // ── CSV parser that handles the "last_name, first_name" column correctly ──
+    // The trick: Savant wraps that field in quotes so it stays as one column
+    const parseCSV = (csv) => {
+      if (!csv || csv.length < 50 || csv.startsWith('<')) return { headers: [], rows: [] };
+      const lines = csv.trim().split('\n');
+      if (lines.length < 2) return { headers: [], rows: [] };
 
-    const response = await fetch(savantUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'text/csv,text/plain,*/*',
-        'Referer': 'https://baseballsavant.mlb.com/',
+      // Parse header row — handle quoted fields with commas inside
+      const parseRow = (line) => {
+        const vals = []; let cur = '', inQ = false;
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (ch === '"') { inQ = !inQ; }
+          else if (ch === ',' && !inQ) { vals.push(cur.trim()); cur = ''; }
+          else { cur += ch; }
+        }
+        vals.push(cur.trim());
+        return vals;
+      };
+
+      const hdrs = parseRow(lines[0]).map(h => h.replace(/"/g, '').trim());
+
+      // Log ALL headers so we can see exact column names
+      console.log('[AtBats] All headers:', hdrs.join(' | '));
+
+      const rows = lines.slice(1).filter(l => l.trim()).map(line => {
+        const vals = parseRow(line).map(v => v.replace(/^"|"$/g, '').trim());
+        const o = {};
+        hdrs.forEach((h, i) => { o[h] = vals[i] || ''; });
+        return o;
+      });
+
+      return { headers: hdrs, rows };
+    };
+
+    const { headers: expHdrs, rows: expRows } = parseCSV(expCsv);
+    const { headers: statHdrs, rows: statRows } = parseCSV(statCsv);
+
+    console.log('[AtBats] Expected rows:', expRows.length, 'Stat rows:', statRows.length);
+    if (expRows[0]) console.log('[AtBats] Expected sample:', JSON.stringify(Object.fromEntries(Object.entries(expRows[0]).slice(0, 8))));
+    if (statRows[0]) console.log('[AtBats] Stat sample:', JSON.stringify(Object.fromEntries(Object.entries(statRows[0]).slice(0, 8))));
+
+    // Build name from whatever fields exist
+    const getName = (r) => {
+      // Try every possible name field combination
+      // After CSV parse, "last_name, first_name" may become:
+      // - key exactly: r['last_name, first_name']  (if quoted in CSV)
+      // - split: r['last_name'] + next column value bled in
+      // - or separate first_name / last_name columns
+
+      const allKeys = Object.keys(r);
+
+      // Check for a key that contains both 'last' and 'first' (the combined field)
+      const combinedKey = allKeys.find(k => k.includes('last_name') && k.includes('first_name'));
+      if (combinedKey) {
+        const val = r[combinedKey];
+        if (val && val.includes(',')) {
+          const [last, ...rest] = val.split(',');
+          return `${rest.join(',').trim()} ${last.trim()}`;
+        }
       }
-    });
 
-    if (!response.ok) throw new Error(`Savant ${response.status}`);
-    const csv = await response.text();
-
-    // Parse CSV
-    const rows = csv.trim().split('\n');
-    const rawHdrs = rows[0].split(',').map(h => h.replace(/"/g,'').trim());
-    console.log('[AtBats] Headers sample:', rawHdrs.slice(0,20).join(', '));
-
-    const players = rows.slice(1).filter(r => r.trim()).map(row => {
-      const vals = [];
-      let cur = '', inQ = false;
-      for (const ch of row) {
-        if (ch === '"') { inQ = !inQ; }
-        else if (ch === ',' && !inQ) { vals.push(cur.trim()); cur = ''; }
-        else cur += ch;
+      // Try separate fields
+      const lastKey  = allKeys.find(k => k === 'last_name');
+      const firstKey = allKeys.find(k => k === 'first_name');
+      if (lastKey && firstKey && r[lastKey] && r[firstKey]) {
+        return `${r[firstKey].trim()} ${r[lastKey].trim()}`;
       }
-      vals.push(cur.trim());
-      const o = {};
-      rawHdrs.forEach((h, i) => { o[h] = (vals[i] || '').replace(/"/g,'').trim(); });
-      return o;
-    }).filter(r => r.player_id && r.player_id !== 'player_id');
 
-    console.log('[AtBats] Players parsed:', players.length);
-    if (players[0]) {
-      console.log('[AtBats] Sample row keys:', Object.keys(players[0]).slice(0,15).join(', '));
-      console.log('[AtBats] Sample values:', JSON.stringify(Object.fromEntries(Object.entries(players[0]).slice(0,10))));
+      // Try player_name or name field
+      const nameKey = allKeys.find(k => k === 'player_name' || k === 'name');
+      if (nameKey && r[nameKey]) return r[nameKey];
+
+      // If last_name exists alone, it might contain "Last, First" 
+      if (lastKey && r[lastKey] && r[lastKey].includes(',')) {
+        const [last, first] = r[lastKey].split(',');
+        return `${first?.trim()} ${last?.trim()}`;
+      }
+
+      return '';
+    };
+
+    // Merge by player_id
+    const statMap = {};
+    statRows.forEach(r => { if (r.player_id) statMap[r.player_id] = r; });
+
+    const source = expRows.length > 0 ? expRows : statRows;
+    const pf = (v, cap = 999) => { const n = parseFloat(v); return isNaN(n) ? 0 : Math.min(n, cap); };
+
+    const players = source
+      .filter(r => r.player_id)
+      .map(r => {
+        const s = statMap[r.player_id] || {};
+        const name = getName({ ...s, ...r });
+        const team = r.team_name_abbrev || s.team_name_abbrev || r.team_abbreviation || s.team_abbreviation || '—';
+
+        return {
+          pid:          parseInt(r.player_id),
+          name:         name || `P${r.player_id}`, // temporary ID if name fails
+          team,
+          avgEV:        pf(s.exit_velocity_avg || s.avg_hit_speed, 115),
+          maxEV:        pf(s.max_hit_speed, 130),
+          barrelPct:    pf(s.barrel_batted_rate || s.brl_percent, 25),
+          hardHitPct:   pf(s.hard_hit_percent   || s.ev95percent, 80),
+          sweetSpotPct: pf(s.sweet_spot_percent || s.anglesweetspotpercent, 60),
+          launchAngle:  pf(s.launch_angle_avg   || s.avg_hit_angle),
+          fbPct:        pf(s.fb_percent, 60),
+          fbldPct:      pf(s.fbld, 80),
+          gbPct:        pf(s.gb_percent, 70),
+          pullPct:      pf(s.pull_percent, 60),
+          xwoba:        pf(r.xwoba || r.est_woba, 0.700),
+          xba:          pf(r.xba   || r.est_ba,   0.500),
+          xslg:         pf(r.xslg  || r.est_slg,  1.500),
+          avg:          pf(r.ba    || r.avg, 0.500),
+          slg:          pf(r.slg, 1.500),
+          obp:          pf(r.obp, 0.600),
+          pa:           parseInt(r.pa || 0),
+          ab:           parseInt(r.abs || r.ab || 0),
+          chasePct:     pf(s.oz_swing_percent || s.o_swing_percent, 60),
+          kPct:         pf(r.strikeout_percent || s.k_percent, 50),
+          bbPct:        pf(r.walk_percent || s.bb_percent, 30),
+          zContactPct:  pf(s.z_contact_percent, 100),
+        };
+      })
+      .filter(r => r.avgEV > 0 || r.xwoba > 0);
+
+    // Log name results
+    const withNames = players.filter(p => p.name && !p.name.startsWith('P'));
+    const withoutNames = players.filter(p => !p.name || p.name.startsWith('P'));
+    console.log('[AtBats] Players with names:', withNames.length, 'without:', withoutNames.length);
+    if (players[0]) console.log('[AtBats] Sample player:', JSON.stringify({ name: players[0].name, team: players[0].team, avgEV: players[0].avgEV, xwoba: players[0].xwoba }));
+
+    // If no names resolved, fetch them from MLB Stats API as fallback
+    if (withNames.length === 0 && players.length > 0) {
+      console.log('[AtBats] Name parse failed — fetching names from MLB Stats API');
+      try {
+        const mlbRes = await fetch('https://statsapi.mlb.com/api/v1/sports/1/players?season=2026&gameType=R');
+        const mlbData = await mlbRes.json();
+        const mlbMap = {};
+        for (const p of (mlbData.people || [])) {
+          mlbMap[p.id] = { name: p.fullName, team: p.currentTeam?.abbreviation };
+        }
+        players.forEach(p => {
+          if (mlbMap[p.pid]) {
+            p.name = mlbMap[p.pid].name;
+            if (!p.team || p.team === '—') p.team = mlbMap[p.pid].team || '—';
+          }
+        });
+        console.log('[AtBats] MLB name enrichment done. Sample:', players[0]?.name);
+      } catch(e) {
+        console.warn('[AtBats] MLB name fallback failed:', e.message);
+      }
     }
 
-    // Parse name: Savant returns "last_name, first_name"
-    const parseName = (r) => {
-      const combined = r['last_name, first_name'] || r['last_name,first_name'] || '';
-      if (combined.includes(',')) {
-        const [last, first] = combined.split(',');
-        return `${first.trim()} ${last.trim()}`;
-      }
-      return combined || `Player ${r.player_id}`;
-    };
-
-    const pf = (v, cap = 9999) => {
-      const n = parseFloat(v);
-      return isNaN(n) ? 0 : Math.min(n, cap);
-    };
-
-    const mapped = players.map(r => ({
-      pid:          parseInt(r.player_id),
-      name:         parseName(r),
-      team:         r.team_name_abbrev || r.team_abbrev || r.team || '—',
-      // Exit velocity metrics
-      avgEV:        pf(r.exit_velocity_avg || r.avg_hit_speed, 115),
-      maxEV:        pf(r.max_hit_speed || r.max_exit_velocity, 130),
-      ev50:         pf(r.ev50, 120),
-      // Quality metrics
-      barrelPct:    pf(r.barrel_batted_rate || r.brl_percent, 25),
-      hardHitPct:   pf(r.hard_hit_percent || r.ev95percent, 80),
-      sweetSpotPct: pf(r.sweet_spot_percent || r.anglesweetspotpercent, 60),
-      launchAngle:  pf(r.launch_angle_avg || r.avg_hit_angle),
-      // Batted ball distribution
-      fbPct:        pf(r.fb_percent, 60),        // pure fly ball %
-      gbPct:        pf(r.gb_percent, 80),        // ground ball %
-      ldPct:        pf(r.ld_percent, 40),        // line drive %
-      fbldPct:      pf(r.fbld, 80),              // FB+LD combined
-      pullPct:      pf(r.pull_percent, 60),
-      // Expected stats
-      xwoba:        pf(r.xwoba || r.est_woba, 0.700),
-      xba:          pf(r.xba   || r.est_ba,   0.500),
-      xslg:         pf(r.xslg  || r.est_slg,  1.500),
-      xobp:         pf(r.xobp  || r.est_obp,  0.600),
-      // Traditional
-      avg:          pf(r.ba || r.avg,   0.500),
-      slg:          pf(r.slg,           1.500),
-      obp:          pf(r.obp,           0.600),
-      ops:          pf(r.ops,           2.000),
-      // Counts
-      pa:           parseInt(r.pa  || r.abs || 0),
-      ab:           parseInt(r.abs || r.ab  || 0),
-      // Discipline (may not be in this endpoint)
-      chasePct:     pf(r.oz_swing_percent || r.o_swing_percent || r.chase_rate, 60),
-      whiffPct:     pf(r.whiff_percent, 60),
-      kPct:         pf(r.strikeout_percent || r.k_percent, 50),
-      bbPct:        pf(r.walk_percent || r.bb_percent, 30),
-      zContactPct:  pf(r.z_contact_percent, 100),
-    })).filter(r => r.avgEV > 0 || r.xwoba > 0);
-
-    console.log('[AtBats] Mapped players:', mapped.length);
-    res.status(200).json({ 
-      date: today, 
-      season: y,
-      players: mapped,
-      total: mapped.length,
-      headers: rawHdrs.slice(0, 30), // for debugging
-    });
+    res.status(200).json({ players, total: players.length });
 
   } catch (err) {
     console.error('[AtBats] Error:', err.message);
