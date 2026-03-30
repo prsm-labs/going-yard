@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const BUILD_TIMESTAMP = "2026-03-30 10:41 ET";
+const BUILD_TIMESTAMP = "2026-03-30 13:53 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -837,15 +837,19 @@ function AtBatSlideIn() {
         const games = data.stats?.[0]?.splits || [];
         // Flatten to at-bat level from game log
         const rows = games.slice(0,15).map(g => ({
-          date:    g.date?.slice(5) || "—",
-          opp:     g.opponent?.abbreviation || "—",
-          ab:      parseInt(g.stat?.atBats||0),
-          hits:    parseInt(g.stat?.hits||0),
-          hr:      parseInt(g.stat?.homeRuns||0),
-          rbi:     parseInt(g.stat?.rbi||0),
-          bb:      parseInt(g.stat?.baseOnBalls||0),
-          k:       parseInt(g.stat?.strikeOuts||0),
-          avg:     g.stat?.avg || ".000",
+          date: g.date?.slice(5) || "—",
+          // Opponent: try multiple paths from MLB Stats API game log
+          opp:  g.opponent?.abbreviation ||
+                g.opponent?.teamCode?.toUpperCase() ||
+                g.team?.abbreviation ||
+                (g.isHome ? "HOME" : "AWAY") || "—",
+          ab:   parseInt(g.stat?.atBats||0),
+          hits: parseInt(g.stat?.hits||0),
+          hr:   parseInt(g.stat?.homeRuns||0),
+          rbi:  parseInt(g.stat?.rbi||0),
+          bb:   parseInt(g.stat?.baseOnBalls||0),
+          k:    parseInt(g.stat?.strikeOuts||0),
+          avg:  g.stat?.avg || ".000",
         }));
         setAtBats(rows);
       })
@@ -1215,6 +1219,43 @@ const STAT_COL_HEADERS = [
 let GLOBAL_PLAYER_TEAM_MAP = {};
 let GLOBAL_PLAYER_MAP_LOADED = false;
 
+// ── LINEUP STATUS MAP — pid → "confirmed" | "playing_today" ──
+// Populated when MLB lineup API returns confirmed starters
+const LINEUP_STATUS = {}; // pid → {status:"confirmed"|"today", team}
+const TODAY_TEAMS = new Set(); // teams playing today
+
+async function loadTodayLineups() {
+  try {
+    const etDate = new Date().toLocaleDateString("en-US",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"});
+    const [m,d,y] = etDate.split("/");
+    const today = `${y}-${m}-${d}`;
+    const res = await fetch(`https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${today}&hydrate=lineups,team,probablePitcher`);
+    const data = await res.json();
+    for (const dateObj of (data.dates || [])) {
+      for (const game of (dateObj.games || [])) {
+        const awAbbr = game.teams?.away?.team?.abbreviation;
+        const hmAbbr = game.teams?.home?.team?.abbreviation;
+        if (awAbbr) TODAY_TEAMS.add(awAbbr);
+        if (hmAbbr) TODAY_TEAMS.add(hmAbbr);
+        // Confirmed starters from lineups
+        for (const side of ['away','home']) {
+          const players = game.lineups?.[side==='away'?'awayPlayers':'homePlayers'] || [];
+          const teamAbbr = game.teams?.[side]?.team?.abbreviation || '';
+          players.forEach(p => {
+            if (p.id) {
+              LINEUP_STATUS[p.id] = { status: 'confirmed', team: teamAbbr };
+            }
+          });
+        }
+      }
+    }
+    console.log('[Lineups] Today teams:', [...TODAY_TEAMS].join(', '));
+    console.log('[Lineups] Confirmed starters:', Object.keys(LINEUP_STATUS).length);
+  } catch(e) {
+    console.warn('[Lineups] Load failed:', e.message);
+  }
+}
+
 async function loadGlobalPlayerMap() {
   if (GLOBAL_PLAYER_MAP_LOADED) return GLOBAL_PLAYER_TEAM_MAP;
   try {
@@ -1269,6 +1310,8 @@ async function fetchPlayers(setL, setP, setE, silent=false) {
       }
     } catch(e) { console.warn('[Players] Team map failed:', e.message); }
 
+    // Load today's lineups for confirmed starter status
+    loadTodayLineups().catch(() => {});
     // Also get today's lineup teams
     try {
       const etDate = new Date().toLocaleDateString("en-US",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"});
@@ -1997,9 +2040,12 @@ function PregameTab() {
   const [refreshing, setRefreshing] = useState(false);
   const [window, setWindow] = useState(3);
   const [selMatchup, setSelMatchup] = useState(null);
+  const [selTeam, setSelTeam] = useState(null);
   const [games, setGames] = useState([]);
   const [searchQ, setSearchQ] = useState('');
   const [selPlayer, setSelPlayer] = useState(null);
+  const [handFilter, setHandFilter] = useState('all'); // all / L / R
+  const [pitchFilter, setPitchFilter] = useState('all');
   const load = useCallback((silent=false) => {
     fetchPlayers(setLoading, setPlayers, setError, silent);
   }, []);
@@ -2181,9 +2227,12 @@ function ScoutingTab() {
   const [refreshing, setRefreshing] = useState(false);
   const [window, setWindow] = useState(3);
   const [selMatchup, setSelMatchup] = useState(null);
+  const [selTeam, setSelTeam] = useState(null);
   const [games, setGames] = useState([]);
   const [searchQ, setSearchQ] = useState('');
   const [selPlayer, setSelPlayer] = useState(null);
+  const [handFilter, setHandFilter] = useState('all'); // all / L / R
+  const [pitchFilter, setPitchFilter] = useState('all');
   const load = useCallback((silent=false) => {
     fetchPlayers(setLoading, setPlayers, setError, silent);
   }, []);
@@ -2198,8 +2247,13 @@ function ScoutingTab() {
   const matchupTeamsS = selMatchup
     ? new Set([selMatchup.away.abbr, selMatchup.home.abbr].filter(t=>t&&t!=="???"))
     : null;
+  // Get all teams playing today from games
+  const todayTeamsS = new Set(games.flatMap(g=>[g.away.abbr,g.home.abbr]).filter(t=>t&&t!=="???"));
   const filtered = players.filter(p => {
+    // Only show players on teams playing today (when we have game data)
+    if (todayTeamsS.size > 0 && p.team && p.team !== "—" && !todayTeamsS.has(p.team)) return false;
     if (matchupTeamsS && matchupTeamsS.size > 0 && !matchupTeamsS.has(p.team)) return false;
+    if (selTeam && p.team !== selTeam) return false;
     if (searchQ && !p.name.toLowerCase().includes(searchQ.toLowerCase())) return false;
     const wg = (p.windows?.[window]?.grade || p.grade)?.grade;
     if (filter==="aplus") return wg==="A+";
@@ -2225,25 +2279,40 @@ function ScoutingTab() {
         <RefBtn refreshing={refreshing} onClick={async()=>{setRefreshing(true);await fetchPlayers(setLoading,setPlayers,setError,true);setRefreshing(false);}}/>
       </div>
     </div>
-    {/* Matchup selector */}
-    <div style={{marginBottom:10}}>
-      <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}>
-        <span style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1,marginRight:4}}>Matchup:</span>
-        <button className={`chip ${!selMatchup?"active":""}`} onClick={()=>setSelMatchup(null)}
+    {/* Combined Matchup + Team Filter */}
+    <div style={{marginBottom:12,background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,padding:"10px 14px"}}>
+      <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center",marginBottom:8}}>
+        <span style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1,marginRight:4}}>📅 Matchup:</span>
+        <button className={`chip ${!selMatchup&&!selTeam?"active":""}`}
+          onClick={()=>{setSelMatchup(null);setSelTeam(null);}}
           style={{fontSize:10,fontFamily:"'Oswald',sans-serif",fontWeight:600}}>All Batters</button>
         {games.filter(g=>g.away.abbr!=="???"&&g.home.abbr!=="???").map(g=>(
-          <button key={g.id} className={`chip ${selMatchup?.id===g.id?"active":""}`}
-            onClick={()=>setSelMatchup(selMatchup?.id===g.id?null:g)}
+          <button key={g.id}
+            className={`chip ${selMatchup?.id===g.id?"active":""}`}
+            onClick={()=>{setSelMatchup(selMatchup?.id===g.id?null:g);setSelTeam(null);}}
             style={{fontSize:10,fontFamily:"'Oswald',sans-serif",fontWeight:600}}>
             {g.away.abbr} @ {g.home.abbr}
           </button>
         ))}
       </div>
-      {selMatchup && <div style={{fontSize:9,color:"var(--accent)",fontFamily:"'DM Mono',monospace",marginTop:4}}>
-        Showing {selMatchup.away.abbr} @ {selMatchup.home.abbr} batters only · <span style={{cursor:"pointer",textDecoration:"underline"}} onClick={()=>setSelMatchup(null)}>Clear</span>
+      {/* Single team picker */}
+      <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}>
+        <span style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1,marginRight:4}}>🔍 Team:</span>
+        {[...new Set(games.flatMap(g=>[g.away.abbr,g.home.abbr]).filter(t=>t&&t!=="???"))].sort().map(t=>(
+          <button key={t}
+            className={`chip ${selTeam===t?"active":""}`}
+            onClick={()=>{setSelTeam(selTeam===t?null:t);setSelMatchup(null);}}
+            style={{fontSize:10,fontFamily:"'Oswald',sans-serif",fontWeight:600}}>{t}</button>
+        ))}
+      </div>
+      {(selMatchup||selTeam) && <div style={{fontSize:9,color:"var(--accent)",fontFamily:"'DM Mono',monospace",marginTop:6}}>
+        {selMatchup?`Showing ${selMatchup.away.abbr} @ ${selMatchup.home.abbr} batters`:
+         selTeam?`Showing ${selTeam} batters`:""}
+        {" · "}<span style={{cursor:"pointer",textDecoration:"underline"}} onClick={()=>{setSelMatchup(null);setSelTeam(null);}}>Clear</span>
       </div>}
     </div>
-    <ScoutingWeather games={[]}/>
+    {/* Park + Weather for selected matchup */}
+    {selMatchup && <ScoutingWeather matchup={selMatchup} games={games}/>}
     <div className="cards">
       <div className="card"><div className="cl">🔴 A+ Threats</div><div className="cv" style={{color:"var(--aplus)"}}>{apC}</div><div className="cs">Red-hot</div></div>
       <div className="card"><div className="cl">🔥 Grade A</div><div className="cv" style={{color:"var(--a)"}}>{aC}</div><div className="cs">Impact bats</div></div>
@@ -2252,16 +2321,22 @@ function ScoutingTab() {
     </div>
     <div className="note">ℹ️ <strong>EV is the grade anchor (60%)</strong>: A+ = 92.5+ mph · A = 90–92.4 · B = 87–89.9 · C = 84–86.9 · D = 81–83.9 · F = &lt;81. Barrel%, Pull Air%, Chase Rate, HR Intent modify the score within each tier — a slow bat cannot reach A regardless of approach.</div>
     <div className="leg"><span className="legt">Grades:</span><div className="legi">{[{g:"A+",c:"var(--aplus)",l:"Red-hot"},{g:"A",c:"var(--a)",l:"Impact"},{g:"B",c:"var(--b)",l:"Heating"},{g:"C",c:"var(--c)",l:"Watch"},{g:"D",c:"var(--d)",l:"Cooling"},{g:"F",c:"var(--f)",l:"Cold"},{g:"X",c:"#3a5060",l:"Ignore"}].map(x=><div key={x.g} className="leit"><div className="ld" style={{background:x.c}}/><strong style={{color:x.c}}>{x.g}</strong> — {x.l}</div>)}</div></div>
-    <div className="filters"><span className="fl">Filter:</span>{[{key:"all",label:"All"},{key:"aplus",label:"🔴 A+"},{key:"a",label:"A+ & A"},{key:"b",label:"B+"},{key:"chasers",label:"🚫 Chasers"}].map(f=><button key={f.key} className={`chip ${filter===f.key?"active":""}`} onClick={()=>setFilter(f.key)}>{f.label}</button>)}</div>
+    <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:8,alignItems:"center"}}>
+      <div className="filters" style={{marginBottom:0}}><span className="fl">Grade:</span>{[{key:"all",label:"All"},{key:"aplus",label:"🔴 A+"},{key:"a",label:"A+ & A"},{key:"b",label:"B+"},{key:"chasers",label:"🚫 Chasers"}].map(f=><button key={f.key} className={`chip ${filter===f.key?"active":""}`} onClick={()=>setFilter(f.key)}>{f.label}</button>)}</div>
+      <div className="filters" style={{marginBottom:0}}><span className="fl">vs:</span>{[{k:"all",l:"All"},{k:"R",l:"RHP"},{k:"L",l:"LHP"}].map(f=><button key={f.k} className={`chip ${handFilter===f.k?"active":""}`} onClick={()=>setHandFilter(f.k)}>{f.l}</button>)}</div>
+      <div className="filters" style={{marginBottom:0}}><span className="fl">Pitch:</span>{["All","4-Seam FB","Slider","Changeup","Curveball","Sinker","Cutter"].map(pt=><button key={pt} className={`chip ${pitchFilter===(pt==="All"?"all":pt)?"active":""}`} onClick={()=>setPitchFilter(pt==="All"?"all":pt)}>{pt}</button>)}</div>
+    </div>
     {loading ? <div className="lw"><div className="sp"/><div className="lt">Loading Scouting Board…</div></div> : <>
       {error && <div className="warn">⚠️ {error}</div>}
       <div className="tw-scroll"><div className="tw-scroll-inner"><table><thead><tr>
         <th>#</th><th>Player</th><th style={{width:36}}>Pick</th>
         <th className={sortKey==="os"?"sk":""} onClick={()=>hs("os")} style={{cursor:"pointer"}}>Grade{sortKey==="os"&&<span style={{color:"var(--accent)",marginLeft:3}}>{sortDir<0?"↓":"↑"}</span>}</th>
-        <th><Tip text="Composite score: CQ 50% + HRI 30% + RDY 20%"><span>Score</span></Tip></th>
-        <th><Tip text="Contact Quality"><span>CQ</span></Tip></th>
-        <th><Tip text="HR Intent"><span>HRI</span></Tip></th>
-        <th><Tip text="Readiness — Chase%, K%, BB%, Zone Contact%"><span>RDY</span></Tip></th>
+        <th className={sortKey==="os"?"sk":""} onClick={()=>hs("os")} style={{cursor:"pointer"}}>
+          <div style={{display:"flex",alignItems:"center",gap:2}}>
+            <Tip text="Unified score: Contact Quality 50% + HR Intent 30% + Readiness 20%"><span>Score</span></Tip>
+            {sortKey==="os"&&<span style={{color:"var(--accent)"}}>{sortDir<0?"↓":"↑"}</span>}
+          </div>
+        </th>
         {STAT_COL_HEADERS.map(c=>
           <th key={c.key} className={sortKey===c.key?"sk":""} onClick={()=>hs(c.key)}>
             <div style={{display:"flex",alignItems:"center",gap:2}}>
@@ -2294,10 +2369,32 @@ function ScoutingTab() {
           </div></td>
           <td onClick={e=>e.stopPropagation()}><PickButton pid={p.pid} name={p.name} team={p.team}/></td>
           <td><div style={{display:"flex",alignItems:"center",gap:5}}><GBadge g={wg}/><span style={{fontSize:9,color:wg.color,fontFamily:"DM Mono,monospace",lineHeight:1.3}}>{wg.label}</span></div></td>
-          <td><div style={{display:"flex",alignItems:"center",gap:5}}><div style={{width:38,height:3,borderRadius:2,background:"var(--border)",overflow:"hidden"}}><div style={{height:"100%",borderRadius:2,width:`${wOS}%`,background:wg.color}}/></div><span style={{fontFamily:"Oswald,sans-serif",fontSize:13,color:wg.color}}>{wOS.toFixed?wOS.toFixed(0):wOS}</span></div></td>
-          <td><span className="sp3 cq">{wCQ.toFixed?wCQ.toFixed(1):wCQ}</span></td>
-          <td><span className="sp3 hi">{wHRI.toFixed?wHRI.toFixed(1):wHRI}</span></td>
-          <td><span className="sp3 rd">{wRD.toFixed?wRD.toFixed(1):wRD}</span></td>
+          <td>
+            <div style={{display:"flex",alignItems:"center",gap:6}}>
+              <div style={{width:42,height:4,borderRadius:2,background:"var(--border)",overflow:"hidden"}}>
+                <div style={{height:"100%",borderRadius:2,width:`${Math.min(wOS,100)}%`,background:wg.color}}/>
+              </div>
+              <span style={{fontFamily:"'Oswald',sans-serif",fontSize:14,fontWeight:700,color:wg.color,minWidth:28}}>
+                {wOS.toFixed?wOS.toFixed(0):wOS}
+              </span>
+            </div>
+            {/* Plate IQ — derived from BB%, K%, Chase% */}
+            {(() => {
+              const bb = p.bbPct||0, k = p.kPct||0, chase = p.oSwing||0, zc = p.zContact||80;
+              // Plate IQ = walk rate + zone discipline + contact rate
+              const iqScore = Math.min(
+                (bb>=10?30:bb>=7?22:bb>=5?14:bb>=3?8:3) +
+                (k<=14?25:k<=18?20:k<=22?14:k<=27?8:k<=32?4:1) +
+                (chase<=20?30:chase<=25?24:chase<=30?16:chase<=35?9:chase<=40?4:1) +
+                (zc>=88?15:zc>=83?12:zc>=78?8:zc>=72?4:2),
+                100
+              );
+              const iqLabel = iqScore>=80?"🎯 Elite IQ":iqScore>=65?"✅ Patient":iqScore>=48?"— Avg":iqScore>=32?"⚠️ Chaser":"🚫 Free Swing";
+              const iqColor = iqScore>=80?"var(--green)":iqScore>=65?"var(--green)":iqScore>=48?"var(--muted)":iqScore>=32?"var(--fire3)":"#ff3010";
+              return <div style={{fontSize:9,color:iqColor,fontFamily:"'DM Mono',monospace",marginTop:2,whiteSpace:"nowrap"}}>{iqLabel}</div>;
+            })()}
+          </td>
+
 
           <StatCols p={p} window={window}/>
         </tr>;
@@ -3173,8 +3270,8 @@ function HRTicker({ onHRClick }) {
 function HRTrackerTab() {
   const [hrs, setHrs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [sortKey, setSortKey] = useState("chronoIndex");
-  const [sortDir, setSortDir] = useState(-1); // -1 = most recent first
+  const [sortKey, setSortKey] = useState("timeET");
+  const [sortDir, setSortDir] = useState(-1); // -1 = newest first
   const [filterTeam, setFilterTeam] = useState("all");
   const [refreshing, setRefreshing] = useState(false);
   const [hrSearch, setHrSearch] = useState("");
@@ -3225,7 +3322,11 @@ function HRTrackerTab() {
     return true;
   });
   const sorted = [...filtered].sort((a,b) => {
-    // Put nulls at bottom always
+    // Always sort by chronoIndex as primary sort for "Time" key  
+    if (sortKey === "timeET" || sortKey === "chronoIndex") {
+      const av = a.chronoIndex ?? 0, bv = b.chronoIndex ?? 0;
+      return sortDir === -1 ? bv - av : av - bv; // -1=newest(highest chrono) first
+    }
     const av = a[sortKey], bv = b[sortKey];
     if (av == null && bv == null) return 0;
     if (av == null) return 1;
@@ -3676,7 +3777,7 @@ export default function App() {
         {tab==="scouting" && <ScoutingTab/>}
         {tab==="bvp" && <BvPTab/>}
         {tab==="builder" && <PitchBuilderTab/>}
-        {tab==="homeruns" && <HRTrackerTab/>}
+        <div style={{display:tab==="homeruns"?"block":"none"}}><HRTrackerTab/></div>
         {tab==="picks" && <MyPicksTab/>}
         {/* Affiliate tabs — always mounted, hidden when not active to preserve iframe state */}
         <div style={{display:tab==="powerbi"?"block":"none"}}><PowerBITab/></div>
