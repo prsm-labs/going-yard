@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const BUILD_TIMESTAMP = "2026-03-29 19:31 ET";
+const BUILD_TIMESTAMP = "2026-03-29 20:34 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -1079,7 +1079,10 @@ async function fetchPlayers(setL, setP, setE, silent=false) {
             const fn = r.first_name || r.player_first_name || '';
             const ln = r.last_name  || r.player_last_name  || '';
             if (fn || ln) return `${fn} ${ln}`.trim();
-            return combined || `Player ${r.player_id || r.pid}`;
+            const id = r.player_id || r.pid || '?';
+            // Last resort: look up name from MLB Stats API global map
+            const fromMap = GLOBAL_PLAYER_TEAM_MAP[id]?.name;
+            return fromMap || combined || `Unknown ${id}`;
           })(),
           team:         r.team || r.team_name_abbrev || '—',
           avgEV:        parseFloat(r.exit_velocity_avg || r.avg_hit_speed || 0),
@@ -1143,6 +1146,10 @@ async function fetchPlayers(setL, setP, setE, silent=false) {
               return `${first.trim()} ${last.trim()}`;
             }
           }
+          // Try global player map as final fallback
+          if (!n || n.startsWith('Player') || n.startsWith('Unknown')) {
+            return GLOBAL_PLAYER_TEAM_MAP[sc.pid]?.name || n || `Unknown ${sc.pid}`;
+          }
           return n;
         })(),
         team,
@@ -1193,7 +1200,20 @@ async function fetchPlayers(setL, setP, setE, silent=false) {
       p.windows = genWindows(p);
 
       return p;
-    }).filter(p => p.avgEV > 0 || p.xwoba > 0);
+    }).filter(p => p.pid && p.pid > 0 && (p.avgEV > 0 || p.xwoba > 0));
+
+    // ── STEP 5b: Fix any missing names from global player map ─
+    mapped.forEach(p => {
+      if (!p.name || p.name.startsWith('Player') || p.name.startsWith('Unknown') || p.name === '') {
+        const fromMap = GLOBAL_PLAYER_TEAM_MAP[p.pid]?.name;
+        if (fromMap) p.name = fromMap;
+      }
+      // Fix team from global map if missing
+      if (!p.team || p.team === '—') {
+        const teamFromMap = GLOBAL_PLAYER_TEAM_MAP[p.pid]?.team;
+        if (teamFromMap) p.team = teamFromMap;
+      }
+    });
 
     // ── STEP 6: Enrich with real HR counts from MLB Stats API ─
     try {
