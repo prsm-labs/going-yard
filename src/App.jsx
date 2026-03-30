@@ -1069,7 +1069,18 @@ async function fetchPlayers(setL, setP, setE, silent=false) {
         // Map from old statcast format to new format
         statcastPlayers = (scJson.players || []).map(r => ({
           pid:          parseInt(r.player_id || r.pid || 0),
-          name:         r.name || '',
+          name:         (() => {
+            // Savant returns "last_name, first_name" — parse to "First Last"
+            const combined = r['last_name, first_name'] || r['last_name,first_name'] || r.name || '';
+            if (combined.includes(',')) {
+              const [last, first] = combined.split(',');
+              return `${first.trim()} ${last.trim()}`;
+            }
+            const fn = r.first_name || r.player_first_name || '';
+            const ln = r.last_name  || r.player_last_name  || '';
+            if (fn || ln) return `${fn} ${ln}`.trim();
+            return combined || `Player ${r.player_id || r.pid}`;
+          })(),
           team:         r.team || r.team_name_abbrev || '—',
           avgEV:        parseFloat(r.exit_velocity_avg || r.avg_hit_speed || 0),
           maxEV:        parseFloat(r.max_hit_speed || 0),
@@ -1122,7 +1133,18 @@ async function fetchPlayers(setL, setP, setE, silent=false) {
       // ── Build the player object with ONLY real Statcast values ──
       const p = {
         pid,
-        name:        sc.name,
+        name:        (() => {
+          const n = sc.name || '';
+          if (!n || n.startsWith('Player')) {
+            // Try to parse from raw fields if name is missing
+            const combined = sc['last_name, first_name'] || '';
+            if (combined.includes(',')) {
+              const [last, first] = combined.split(',');
+              return `${first.trim()} ${last.trim()}`;
+            }
+          }
+          return n;
+        })(),
         team,
         // Statcast contact quality — READ FROM API, NEVER GENERATED
         avgEV:       sc.avgEV,
@@ -1745,7 +1767,7 @@ function PregameTab() {
     return () => clearInterval(id);
   }, [load]);
   useEffect(() => { fetchGames(()=>{}, setGames, ()=>{}); }, []);
-  const hs = (k) => { if (sortKey===k) setSortDir(d=>-d); else { setSortKey(k); setSortDir(-1); } };
+  const hs = (k) => { if (sortKey===k) setSortDir(d=>-d); else { setSortKey(k); setSortDir(1); } };
 
   // Teams in selected matchup
   const matchupTeams = selMatchup
@@ -1919,7 +1941,7 @@ function ScoutingTab() {
     return () => clearInterval(id);
   }, [load]);
   useEffect(() => { fetchGames(()=>{}, setGames, ()=>{}); }, []);
-  const hs = (k) => { if (sortKey===k) setSortDir(d=>-d); else { setSortKey(k); setSortDir(-1); } };
+  const hs = (k) => { if (sortKey===k) setSortDir(d=>-d); else { setSortKey(k); setSortDir(1); } };
   const matchupTeamsS = selMatchup
     ? new Set([selMatchup.away.abbr, selMatchup.home.abbr].filter(t=>t&&t!=="???"))
     : null;
@@ -2587,7 +2609,7 @@ function PitchBuilderTab() {
   const isMulti = selPitches.size > 1;
   const pitchCol = isMulti ? "var(--accent2)" : (PITCH_COLORS[selPitchArr[0]] || "#8899a6");
 
-  const hs = (k) => { if (sortKey===k) setSortDir(d=>-d); else { setSortKey(k); setSortDir(-1); } };
+  const hs = (k) => { if (sortKey===k) setSortDir(d=>-d); else { setSortKey(k); setSortDir(1); } };
 
   const metricClass = (key, val) => {
     if (key==="ev") return val>=T.EV_EL?"dng":val>=T.EV_HH?"hot":val>=90?"warm":"avg";
@@ -2882,7 +2904,7 @@ function HRTrackerTab() {
 
   useEffect(() => { load(); }, []);
 
-  const hs = (k) => { if (sortKey===k) setSortDir(d=>-d); else { setSortKey(k); setSortDir(-1); } };
+  const hs = (k) => { if (sortKey===k) setSortDir(d=>-d); else { setSortKey(k); setSortDir(1); } };
 
   const teams = [...new Set(hrs.map(h => h.batterTeam))].filter(Boolean).sort();
 
