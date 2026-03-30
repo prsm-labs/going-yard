@@ -1365,6 +1365,9 @@ async function fetchLiveBatters(gamePk) {
       const team = data.teams?.[side], ta = team?.team?.abbreviation || side.toUpperCase();
       for (const bid of (team?.batters || [])) {
         const p = team?.players?.[`ID${bid}`]; if (!p) continue;
+        // Skip pitchers — position code 1 = SP/RP
+        const posCode = p?.position?.code || p?.person?.primaryPosition?.code || '';
+        if (posCode === '1' || posCode === 'P') continue;
         const s = p?.stats?.batting || {};
         const ab = parseInt(s.atBats || 0), hits = parseInt(s.hits || 0), hr = parseInt(s.homeRuns || 0);
         const bb = parseInt(s.baseOnBalls || 0), so = parseInt(s.strikeOuts || 0);
@@ -1418,8 +1421,9 @@ async function fetchLiftoffBatters(game) {
         : Object.keys(team?.players || {}).slice(0, 9).map(k => parseInt(k.replace("ID","")));
       for (const bid of batterIds) {
         const p = team?.players?.[`ID${bid}`]; if (!p) continue;
-        // Skip pitchers
-        if (p.position?.abbreviation === "P") continue;
+        // Skip pitchers — check all possible position fields
+        const liftPos = p?.position?.code || p?.position?.abbreviation || p?.person?.primaryPosition?.code || '';
+        if (liftPos === '1' || liftPos === 'P') continue;
         // Use player ID as seed so values are CONSISTENT per player
         const seed = (bid || 1);
         const barrel = 6 + (seed % 14), hardHit = 36 + (seed % 24), avgEV = 87 + (seed % 11);
