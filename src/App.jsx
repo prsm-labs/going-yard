@@ -616,6 +616,153 @@ function sr(pid, idx, min, max) {
   return min + seededRand(pid || 1, idx || 0) * (max - min);
 }
 
+// ── SEARCH BAR ───────────────────────────────────────────────
+function SearchBar({ value, onChange, placeholder = "Search players…" }) {
+  return (
+    <div style={{position:"relative",flex:1,minWidth:160,maxWidth:300}}>
+      <input
+        type="text"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        style={{width:"100%",padding:"6px 10px 6px 30px",background:"var(--surface2)",
+          border:"1px solid var(--border)",borderRadius:7,color:"var(--text)",
+          fontFamily:"'DM Mono',monospace",fontSize:11,outline:"none",boxSizing:"border-box"}}
+      />
+      <span style={{position:"absolute",left:9,top:"50%",transform:"translateY(-50%)",
+        fontSize:12,color:"var(--muted)",pointerEvents:"none"}}>🔍</span>
+      {value && <button onClick={()=>onChange("")}
+        style={{position:"absolute",right:6,top:"50%",transform:"translateY(-50%)",
+          background:"none",border:"none",color:"var(--muted)",cursor:"pointer",fontSize:12,padding:0}}>✕</button>}
+    </div>
+  );
+}
+
+// ── PICK TYPES + STORE ────────────────────────────────────────
+const PICK_TYPES = {
+  favorite:  {label:"💣 Favorite",   cls:"favorite",  color:"#ff4020"},
+  darkhorse: {label:"⭐ Dark Horse",  cls:"darkhorse", color:"#f5a623"},
+  longshot:  {label:"🎯 Longshot",    cls:"longshot",  color:"#38b8f2"},
+};
+function loadPicks() { try { return JSON.parse(localStorage.getItem("gy_picks")||"{}"); } catch { return {}; } }
+function savePicks(p) { try { localStorage.setItem("gy_picks",JSON.stringify(p)); } catch {} }
+let GLOBAL_PICKS = loadPicks();
+const PICKS_LISTENERS = new Set();
+function subscribePicks(fn) { PICKS_LISTENERS.add(fn); return ()=>PICKS_LISTENERS.delete(fn); }
+function setPick(pid, name, team, type) {
+  pid = String(pid);
+  if (GLOBAL_PICKS[pid]?.type===type) { delete GLOBAL_PICKS[pid]; }
+  else { GLOBAL_PICKS[pid]={pid,name,team,type,ts:Date.now()}; }
+  savePicks(GLOBAL_PICKS);
+  PICKS_LISTENERS.forEach(fn=>fn({...GLOBAL_PICKS}));
+}
+function usePicks() {
+  const [picks,setPicksState] = useState({...GLOBAL_PICKS});
+  useEffect(()=>subscribePicks(setPicksState),[]);
+  return picks;
+}
+
+// ── PICK BUTTON ───────────────────────────────────────────────
+function PickButton({pid,name,team}) {
+  const picks = usePicks();
+  const key = String(pid);
+  const current = picks[key]?.type;
+  const [open,setOpen] = useState(false);
+  return (
+    <div style={{position:"relative",display:"inline-block"}}>
+      <button onClick={e=>{e.stopPropagation();setOpen(o=>!o);}}
+        style={{padding:"2px 7px",borderRadius:5,fontSize:10,fontFamily:"'DM Mono',monospace",
+          cursor:"pointer",border:`1px solid ${current?PICK_TYPES[current].color:"var(--border)"}`,
+          background:current?`${PICK_TYPES[current].color}20`:"var(--surface2)",
+          color:current?PICK_TYPES[current].color:"var(--muted)"}}>
+        {current?PICK_TYPES[current].label.split(" ")[0]:"＋"}
+      </button>
+      {open&&<div style={{position:"absolute",top:"calc(100% + 4px)",left:0,zIndex:500,
+        background:"#0d1318",border:"1px solid var(--border)",borderRadius:8,padding:5,
+        display:"flex",flexDirection:"column",gap:3,minWidth:130,boxShadow:"0 8px 24px rgba(0,0,0,.5)"}}
+        onClick={e=>e.stopPropagation()}>
+        {Object.entries(PICK_TYPES).map(([type,cfg])=>(
+          <button key={type} onClick={()=>{setPick(pid,name,team,type);setOpen(false);}}
+            style={{padding:"5px 9px",borderRadius:5,cursor:"pointer",textAlign:"left",
+              fontFamily:"'DM Mono',monospace",fontSize:11,
+              border:`1px solid ${current===type?cfg.color:"transparent"}`,
+              background:current===type?`${cfg.color}20`:"transparent",
+              color:current===type?cfg.color:"var(--text)"}}>
+            {cfg.label}
+          </button>
+        ))}
+        {current&&<button onClick={()=>{setPick(pid,name,team,current);setOpen(false);}}
+          style={{padding:"5px 9px",borderRadius:5,cursor:"pointer",textAlign:"left",
+            fontFamily:"'DM Mono',monospace",fontSize:11,border:"1px solid transparent",
+            background:"transparent",color:"var(--muted)"}}>✕ Remove</button>}
+      </div>}
+    </div>
+  );
+}
+
+// ── MY PICKS TAB ──────────────────────────────────────────────
+function MyPicksTab() {
+  const picks = usePicks();
+  const [selPlayer,setSelPlayer] = useState(null);
+  const pickList = Object.values(picks).sort((a,b)=>a.type.localeCompare(b.type));
+  const grouped = {
+    favorite:  pickList.filter(p=>p.type==="favorite"),
+    darkhorse: pickList.filter(p=>p.type==="darkhorse"),
+    longshot:  pickList.filter(p=>p.type==="longshot"),
+  };
+  const PickRow = ({p})=>{
+    const cfg = PICK_TYPES[p.type];
+    return <div style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",
+      borderBottom:"1px solid rgba(30,45,58,.4)",cursor:"pointer"}}
+      onClick={()=>setSelPlayer(p)}>
+      <div style={{width:34,height:34,borderRadius:"50%",background:"var(--surface2)",
+        border:`2px solid ${cfg.color}`,display:"flex",alignItems:"center",justifyContent:"center",
+        fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,color:cfg.color}}>
+        {ini(p.name)}
+      </div>
+      <div style={{flex:1}}>
+        <div style={{fontWeight:600,fontSize:13}}>{p.name}</div>
+        <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{p.team}</div>
+      </div>
+      <span style={{fontSize:14}}>{cfg.label.split(" ")[0]}</span>
+      <button onClick={e=>{e.stopPropagation();setPick(p.pid,p.name,p.team,p.type);}}
+        style={{background:"none",border:"1px solid var(--border)",borderRadius:5,
+          color:"var(--muted)",cursor:"pointer",padding:"2px 7px",fontSize:10}}>✕</button>
+    </div>;
+  };
+  return <div>
+    <div className="section-header" style={{marginBottom:16}}>
+      <div className="section-title">🎯 My Picks</div>
+      <div className="section-sub">Your saved batters · 💣 Favorites · ⭐ Dark Horses · 🎯 Longshots</div>
+    </div>
+    {pickList.length>0&&<div style={{display:"flex",justifyContent:"flex-end",marginBottom:12}}>
+      <button onClick={()=>{Object.keys(GLOBAL_PICKS).forEach(k=>delete GLOBAL_PICKS[k]);savePicks(GLOBAL_PICKS);PICKS_LISTENERS.forEach(fn=>fn({...GLOBAL_PICKS}));}}
+        style={{padding:"5px 12px",borderRadius:6,background:"rgba(232,65,26,.1)",
+          border:"1px solid rgba(232,65,26,.3)",color:"var(--accent)",cursor:"pointer",
+          fontFamily:"'DM Mono',monospace",fontSize:11}}>✕ Clear All Picks</button>
+    </div>}
+    {pickList.length===0
+      ? <div style={{padding:"60px 20px",textAlign:"center",color:"var(--muted)",fontFamily:"'DM Mono',monospace",fontSize:12,lineHeight:2}}>
+          No picks yet.<br/>Click the <strong style={{color:"var(--text)"}}>＋</strong> button next to any batter on Pregame or Scouting tabs.
+        </div>
+      : <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:14}}>
+          {Object.entries(grouped).map(([type,players])=>{
+            if(players.length===0) return null;
+            const cfg=PICK_TYPES[type];
+            return <div key={type} style={{background:"var(--surface)",border:`1px solid ${cfg.color}30`,borderRadius:10,overflow:"hidden"}}>
+              <div style={{padding:"10px 14px",background:`${cfg.color}10`,borderBottom:`1px solid ${cfg.color}20`,display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontSize:16}}>{cfg.label.split(" ")[0]}</span>
+                <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:cfg.color,letterSpacing:1}}>{cfg.label.split(" ").slice(1).join(" ").toUpperCase()}</span>
+                <span style={{marginLeft:"auto",fontFamily:"'DM Mono',monospace",fontSize:11,color:"var(--muted)"}}>{players.length} batter{players.length!==1?"s":""}</span>
+              </div>
+              {players.map(p=><PickRow key={p.pid} p={p}/>)}
+            </div>;
+          })}
+        </div>
+    }
+  </div>;
+}
+
 // ── WEATHER + PARK FACTOR CACHE ─────────────────────────────
 const WEATHER_CACHE = {};
 
