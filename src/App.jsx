@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const BUILD_TIMESTAMP = "2026-03-29 23:08 ET";
+const BUILD_TIMESTAMP = "2026-03-30 10:41 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -13,7 +13,7 @@ const styles = `
   }
   body{background:var(--bg);color:var(--text);font-family:'Oswald',sans-serif;min-height:100vh;}
   .app{min-height:100vh;display:flex;flex-direction:column;}
-  .header{padding:16px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:linear-gradient(180deg,#0a1520 0%,var(--bg) 100%);position:sticky;top:0;z-index:100;backdrop-filter:blur(12px);}
+  .header{padding:16px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:linear-gradient(180deg,#0a1520 0%,var(--bg) 100%);}
   .logo{font-family:'Oswald',sans-serif;font-weight:700;font-size:26px;text-transform:uppercase;letter-spacing:3px;color:var(--text);display:flex;align-items:center;gap:10px;}
   .logo span{color:var(--accent);}
   .logo-dot{width:9px;height:9px;background:var(--accent);border-radius:50%;animation:pulse 1.8s ease-in-out infinite;}
@@ -306,7 +306,43 @@ const getLHL = (ev, la, hh) => {
   const sc = ep + lp + hp;
   return sc >= 8 ? {label:"🔥 On Fire",cls:"elite"} : sc >= 5 ? {label:"🔥 Heating Up",cls:"hot"} : sc >= 3 ? {label:"🌡 Warm",cls:"warm"} : sc >= 1 ? {label:"— Neutral",cls:"avg"} : {label:"🧊 Ice Cold",cls:"cold"};
 };
-const ini = (n) => n.split(" ").map(p => p[0]).join("").toUpperCase().slice(0, 2);
+const ini = (n) => n?.split(" ").map(p => p[0]).join("").toUpperCase().slice(0, 2) || "?";
+
+// Position abbreviation → color mapping
+const POS_COLORS = {
+  "C":   "#38b8f2", // catcher — blue
+  "1B":  "#f5a623", // first base — orange
+  "2B":  "#f5a623",
+  "3B":  "#f5a623",
+  "SS":  "#f5a623",
+  "LF":  "#27c97a", // outfield — green
+  "CF":  "#27c97a",
+  "RF":  "#27c97a",
+  "OF":  "#27c97a",
+  "DH":  "#e8411a", // DH — red
+  "P":   "#5a7080", // pitcher — muted (shouldn't appear)
+};
+
+// PosAvatar — shows position abbreviation with color coding
+// Falls back to initials if no position available
+const PosAvatar = ({ player, size=30, style={} }) => {
+  const pos = player?.pos || GLOBAL_PLAYER_TEAM_MAP[player?.pid]?.pos || '';
+  const color = POS_COLORS[pos] || "var(--muted)";
+  const display = pos || ini(player?.name || '');
+  const fontSize = pos ? (pos.length > 2 ? 8 : pos.length === 2 ? 10 : 12) : 10;
+  return (
+    <div style={{
+      width:size, height:size, borderRadius:"50%",
+      background:`${color}18`,
+      border:`1.5px solid ${color}60`,
+      display:"flex", alignItems:"center", justifyContent:"center",
+      fontFamily:"'DM Mono',monospace", fontWeight:700,
+      fontSize, color, flexShrink:0, ...style
+    }}>
+      {display}
+    </div>
+  );
+};
 
 // SCOUTING ENGINE
 const calcCQ = (p) => {
@@ -713,22 +749,29 @@ function MyPicksTab() {
   };
   const PickRow = ({p})=>{
     const cfg = PICK_TYPES[p.type];
-    return <div style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",
-      borderBottom:"1px solid rgba(30,45,58,.4)",cursor:"pointer"}}
-      onClick={()=>setSelPlayer(p)}>
+    return <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderBottom:"1px solid rgba(30,45,58,.4)"}}>
       <div style={{width:34,height:34,borderRadius:"50%",background:"var(--surface2)",
         border:`2px solid ${cfg.color}`,display:"flex",alignItems:"center",justifyContent:"center",
-        fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,color:cfg.color}}>
-        {ini(p.name)}
-      </div>
-      <div style={{flex:1}}>
-        <div style={{fontWeight:600,fontSize:13}}>{p.name}</div>
+        fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,color:cfg.color,cursor:"pointer",flexShrink:0}}
+        onClick={()=>openAtBatSlide(p)}>{ini(p.name)}</div>
+      <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>openAtBatSlide(p)}>
+        <div style={{fontWeight:600,fontSize:13,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{p.name}</div>
         <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{p.team}</div>
       </div>
-      <span style={{fontSize:14}}>{cfg.label.split(" ")[0]}</span>
-      <button onClick={e=>{e.stopPropagation();setPick(p.pid,p.name,p.team,p.type);}}
+      {/* Category switcher — change pick type inline */}
+      <div style={{display:"flex",gap:3,flexShrink:0}}>
+        {Object.entries(PICK_TYPES).map(([type,c])=>(
+          <button key={type} onClick={()=>setPick(p.pid,p.name,p.team,type)} title={c.label}
+            style={{width:28,height:28,borderRadius:5,cursor:"pointer",fontSize:13,
+              border:`1px solid ${p.type===type?c.color:"var(--border)"}`,
+              background:p.type===type?`${c.color}20`:"var(--surface2)"}}>
+            {c.label.split(" ")[0]}
+          </button>
+        ))}
+      </div>
+      <button onClick={()=>setPick(p.pid,p.name,p.team,p.type)}
         style={{background:"none",border:"1px solid var(--border)",borderRadius:5,
-          color:"var(--muted)",cursor:"pointer",padding:"2px 7px",fontSize:10}}>✕</button>
+          color:"var(--muted)",cursor:"pointer",padding:"2px 7px",fontSize:10,flexShrink:0}}>✕</button>
     </div>;
   };
   return <div>
@@ -762,6 +805,188 @@ function MyPicksTab() {
         </div>
     }
   </div>;
+}
+
+// ── GLOBAL AT-BAT SLIDE-IN ────────────────────────────────────
+// Single global state — any page can trigger it
+let AB_SLIDE_LISTENER = null;
+function openAtBatSlide(player) {
+  if (AB_SLIDE_LISTENER) AB_SLIDE_LISTENER(player);
+}
+
+function AtBatSlideIn() {
+  const [player, setPlayer] = useState(null);
+  const [atBats, setAtBats] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    AB_SLIDE_LISTENER = setPlayer;
+    return () => { AB_SLIDE_LISTENER = null; };
+  }, []);
+
+  useEffect(() => {
+    if (!player?.pid) return;
+    setLoading(true);
+    setAtBats([]);
+    // Fetch real at-bat log from Baseball Savant statcast search
+    const today = new Date().toLocaleDateString("en-US",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"}).split("/");
+    const dateStr = `${today[2]}-${today[0]}-${today[1]}`;
+    fetch(`https://statsapi.mlb.com/api/v1/people/${player.pid}/stats?stats=gameLog&group=hitting&season=2026&sportId=1&limit=20`)
+      .then(r=>r.json())
+      .then(data => {
+        const games = data.stats?.[0]?.splits || [];
+        // Flatten to at-bat level from game log
+        const rows = games.slice(0,15).map(g => ({
+          date:    g.date?.slice(5) || "—",
+          opp:     g.opponent?.abbreviation || "—",
+          ab:      parseInt(g.stat?.atBats||0),
+          hits:    parseInt(g.stat?.hits||0),
+          hr:      parseInt(g.stat?.homeRuns||0),
+          rbi:     parseInt(g.stat?.rbi||0),
+          bb:      parseInt(g.stat?.baseOnBalls||0),
+          k:       parseInt(g.stat?.strikeOuts||0),
+          avg:     g.stat?.avg || ".000",
+        }));
+        setAtBats(rows);
+      })
+      .catch(()=>setAtBats([]))
+      .finally(()=>setLoading(false));
+  }, [player?.pid]);
+
+  if (!player) return null;
+  const isOpen = !!player;
+
+  return <>
+    {/* Backdrop */}
+    <div onClick={()=>setPlayer(null)} style={{
+      position:"fixed",inset:0,background:"rgba(0,0,0,.55)",zIndex:900,
+      opacity:isOpen?1:0,transition:"opacity .25s",pointerEvents:isOpen?"all":"none"
+    }}/>
+    {/* Panel */}
+    <div style={{
+      position:"fixed",right:0,top:0,bottom:0,width:"min(540px,100vw)",
+      background:"var(--surface)",borderLeft:"1px solid var(--border)",
+      zIndex:901,transform:isOpen?"translateX(0)":"translateX(100%)",
+      transition:"transform .3s cubic-bezier(.4,0,.2,1)",
+      display:"flex",flexDirection:"column",overflowY:"auto"
+    }}>
+      {/* Header */}
+      <div style={{padding:"16px 20px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",gap:12,position:"sticky",top:0,background:"var(--surface)",zIndex:10}}>
+        <PosAvatar player={player} size={40} style={{border:"2px solid var(--accent)"}}/>
+        <div style={{flex:1}}>
+          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:18,letterSpacing:1}}>{player.name}</div>
+          <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{player.team} · EV {player.avgEV||"—"} · {player.grade?.grade||"—"} Grade</div>
+        </div>
+        <PickButton pid={player.pid} name={player.name} team={player.team}/>
+        <button onClick={()=>setPlayer(null)} style={{background:"none",border:"1px solid var(--border)",borderRadius:6,color:"var(--muted)",cursor:"pointer",padding:"5px 10px",fontFamily:"'DM Mono',monospace",fontSize:11}}>✕ Close</button>
+      </div>
+
+      {/* Statcast Profile */}
+      <div style={{padding:"14px 20px",borderBottom:"1px solid var(--border)"}}>
+        <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>Statcast Profile — 2026 Season</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+          {[
+            {label:"Avg EV",  val:player.avgEV,   suffix:"",  color: player.avgEV>=103?"var(--accent)":player.avgEV>=95?"#ff8020":"var(--text)"},
+            {label:"Barrel%", val:player.barrel,  suffix:"%", color: player.barrel>=12?"#ff8020":"var(--text)"},
+            {label:"HardHit%",val:player.hardHit, suffix:"%", color: player.hardHit>=50?"#ff8020":"var(--text)"},
+            {label:"FlyBall%",val:player.flyBall, suffix:"%", color:"var(--text)"},
+            {label:"Launch°", val:player.launchAngle, suffix:"°", color: player.launchAngle>=25&&player.launchAngle<=35?"var(--green)":"var(--text)"},
+            {label:"Pull%",   val:player.pullAir, suffix:"%", color: player.pullAir>=40?"#ff8020":"var(--text)"},
+            {label:"xwOBA",   val:player.xwoba,   suffix:"",  color: player.xwoba>=0.380?"var(--accent)":player.xwoba>=0.320?"#ff8020":"var(--text)"},
+            {label:"Chase%",  val:player.oSwing,  suffix:"%", color: player.oSwing<=20?"var(--green)":player.oSwing>=30?"#ff8020":"var(--text)"},
+          ].filter(s=>s.val>0).map(s=>(
+            <div key={s.label} style={{background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8,padding:"8px 12px",minWidth:70,textAlign:"center"}}>
+              <div style={{fontSize:8,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>{s.label}</div>
+              <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:18,color:s.color}}>{typeof s.val==="number"?s.val.toFixed(1):s.val}{s.suffix}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Recent Game Log */}
+      <div style={{padding:"14px 20px",flex:1}}>
+        <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>Recent Game Log — 2026</div>
+        {loading
+          ? <div style={{display:"flex",alignItems:"center",gap:8,color:"var(--muted)",fontFamily:"'DM Mono',monospace",fontSize:11}}><div className="sp" style={{width:14,height:14,borderWidth:2}}/> Loading…</div>
+          : atBats.length === 0
+            ? <div style={{color:"var(--muted)",fontFamily:"'DM Mono',monospace",fontSize:11}}>No game log available yet this season.</div>
+            : <div style={{overflowX:"auto"}}>
+                <table style={{width:"100%",borderCollapse:"collapse"}}>
+                  <thead>
+                    <tr style={{borderBottom:"2px solid var(--border)"}}>
+                      {["Date","Opp","AB","H","HR","RBI","BB","K","AVG"].map(h=>(
+                        <th key={h} style={{padding:"6px 8px",fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1,textAlign:h==="Date"||h==="Opp"?"left":"center",whiteSpace:"nowrap"}}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {atBats.map((g,i)=>(
+                      <tr key={i} style={{borderBottom:"1px solid rgba(30,45,58,.4)"}}>
+                        <td style={{padding:"7px 8px",fontFamily:"'DM Mono',monospace",fontSize:11,color:"var(--muted)"}}>{g.date}</td>
+                        <td style={{padding:"7px 8px",fontFamily:"'Oswald',sans-serif",fontWeight:600,fontSize:12}}>{g.opp}</td>
+                        <td style={{padding:"7px 8px",fontFamily:"'DM Mono',monospace",fontSize:11,textAlign:"center"}}>{g.ab}</td>
+                        <td style={{padding:"7px 8px",fontFamily:"'DM Mono',monospace",fontSize:11,textAlign:"center",color:g.hits>0?"var(--green)":"var(--muted)"}}>{g.hits}</td>
+                        <td style={{padding:"7px 8px",fontFamily:"'DM Mono',monospace",fontSize:11,textAlign:"center",color:g.hr>0?"var(--accent)":"var(--muted)",fontWeight:g.hr>0?700:400}}>{g.hr}</td>
+                        <td style={{padding:"7px 8px",fontFamily:"'DM Mono',monospace",fontSize:11,textAlign:"center"}}>{g.rbi}</td>
+                        <td style={{padding:"7px 8px",fontFamily:"'DM Mono',monospace",fontSize:11,textAlign:"center",color:g.bb>0?"var(--green)":"var(--muted)"}}>{g.bb}</td>
+                        <td style={{padding:"7px 8px",fontFamily:"'DM Mono',monospace",fontSize:11,textAlign:"center",color:g.k>=3?"var(--ice)":"var(--muted)"}}>{g.k}</td>
+                        <td style={{padding:"7px 8px",fontFamily:"'DM Mono',monospace",fontSize:11,textAlign:"center",color:parseFloat(g.avg)>=0.300?"var(--accent)":parseFloat(g.avg)>=0.250?"#ff8020":"var(--text)"}}>{g.avg}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+        }
+      </div>
+    </div>
+  </>;
+}
+
+// ── GLOBAL PICKS SLIDEOUT ─────────────────────────────────────
+function PicksSlideout({onClose}) {
+  const picks = usePicks();
+  const pickList = Object.values(picks).sort((a,b)=>a.type.localeCompare(b.type));
+  return <>
+    <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",zIndex:900}}/>
+    <div style={{position:"fixed",right:0,top:0,bottom:0,width:"min(380px,100vw)",
+      background:"var(--surface)",borderLeft:"1px solid var(--border)",zIndex:901,
+      display:"flex",flexDirection:"column",overflowY:"auto"}}>
+      <div style={{padding:"16px 20px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",gap:10,position:"sticky",top:0,background:"var(--surface)",zIndex:10}}>
+        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:16,letterSpacing:1}}>🎯 My Picks</span>
+        <span style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",marginLeft:4}}>{pickList.length} batter{pickList.length!==1?"s":""}</span>
+        <button onClick={onClose} style={{marginLeft:"auto",background:"none",border:"1px solid var(--border)",borderRadius:6,color:"var(--muted)",cursor:"pointer",padding:"4px 10px",fontFamily:"'DM Mono',monospace",fontSize:11}}>✕ Close</button>
+      </div>
+      {pickList.length===0
+        ? <div style={{padding:"40px 20px",textAlign:"center",color:"var(--muted)",fontFamily:"'DM Mono',monospace",fontSize:11,lineHeight:2}}>No picks yet.<br/>Use the ＋ button next to any batter.</div>
+        : <div style={{flex:1}}>
+            {pickList.map(p=>{
+              const cfg=PICK_TYPES[p.type];
+              return <div key={p.pid} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 16px",borderBottom:"1px solid rgba(30,45,58,.4)"}}>
+                <div style={{width:34,height:34,borderRadius:"50%",background:"var(--surface2)",border:`2px solid ${cfg.color}`,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,color:cfg.color,flexShrink:0}}>{ini(p.name)}</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontWeight:600,fontSize:13,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{p.name}</div>
+                  <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{p.team}</div>
+                </div>
+                {/* Category switcher */}
+                <div style={{display:"flex",gap:4}}>
+                  {Object.entries(PICK_TYPES).map(([type,c])=>(
+                    <button key={type} onClick={()=>setPick(p.pid,p.name,p.team,type)}
+                      title={c.label}
+                      style={{width:26,height:26,borderRadius:5,cursor:"pointer",fontSize:13,
+                        border:`1px solid ${p.type===type?c.color:"var(--border)"}`,
+                        background:p.type===type?`${c.color}20`:"var(--surface2)"}}>
+                      {c.label.split(" ")[0]}
+                    </button>
+                  ))}
+                </div>
+                <button onClick={()=>setPick(p.pid,p.name,p.team,p.type)}
+                  style={{background:"none",border:"1px solid var(--border)",borderRadius:5,color:"var(--muted)",cursor:"pointer",padding:"2px 7px",fontSize:10,flexShrink:0}}>✕</button>
+              </div>;
+            })}
+          </div>
+      }
+    </div>
+  </>;
 }
 
 // ── WEATHER + PARK FACTOR CACHE ─────────────────────────────
@@ -1003,6 +1228,7 @@ async function loadGlobalPlayerMap() {
           teamId: p.currentTeam?.id || 0,
           name: p.fullName,
           hand: p.batSide?.code || 'R',
+          pos:  p.primaryPosition?.abbreviation || p.primaryPosition?.code || '',
         };
       }
     }
@@ -1168,6 +1394,7 @@ async function fetchPlayers(setL, setP, setE, silent=false) {
         pa:     sc.pa  || 0,
         ab:     sc.ab  || 0,
         // ── Plate discipline ──
+        pos:      GLOBAL_PLAYER_TEAM_MAP[sc.pid]?.pos || '',
         oSwing:   sc.chasePct    || 0,
         kPct:     sc.kPct        || 0,
         bbPct:    sc.bbPct       || 0,
@@ -1650,7 +1877,7 @@ function GPanel({game, isLive, isFinal=false}) {
             return [
               <tr key={b.id} className={`dr ${isE?"ex":""}`} onClick={() => setExpId(p => p===b.id ? null : b.id)}>
                 <td style={{textAlign:"center"}}><span className={`cv2 ${isE?"op":""}`}>▾</span></td>
-                <td><div className="pc"><div className="av">{ini(b.name)}</div><div><div className="pn">{b.name}</div><div className="pt">{b.team}</div></div></div></td>
+                <td><div className="pc"><PosAvatar player={b} size={30}/><div><div className="pn">{b.name}</div><div className="pt">{b.team}</div></div></div></td>
                 <td><span className={`hl ${b.heatLabel.cls}`}>{b.heatLabel.label}</span></td>
                 <td><span className="sv avg">{b.ab}</span></td>
                 <td><span className={`sv ${b.hits>0?"good":"avg"}`}>{b.hits}</span></td>
@@ -1880,7 +2107,17 @@ function PregameTab() {
         const wg = p._wGrade||p.grade||{grade:"X",cls:"x",color:"#2a3a48"};
         return <tr key={p.pid}>
           <td><span className="sv avg" style={{fontSize:10}}>{i+1}</span></td>
-          <td><div className="pc" style={{cursor:"pointer"}} onClick={()=>setSelPlayer(p)}><div className="av">{ini(p.name)}</div><div><div className="pn">{p.name}</div><div className="pt" style={{color:p.team&&p.team!=="—"?"var(--muted)":"#ff801030"}}>{p.team&&p.team!=="—"?p.team:"Lineup TBD"}</div></div></div></td>
+          <td><div className="pc" style={{cursor:"pointer"}} onClick={()=>openAtBatSlide(p)}>
+            <PosAvatar player={p} size={30}/>
+            <div>
+              <div className="pn">{p.name}</div>
+              <div className="pt" style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>
+                {p.team&&p.team!=="—" ? p.team : "—"}
+                {p.lineupStatus==="confirmed" && <span style={{color:"var(--green)",marginLeft:4}}>✅</span>}
+                {p.lineupStatus==="unconfirmed" && <span style={{color:"var(--muted)",marginLeft:4}}>❓</span>}
+              </div>
+            </div>
+          </div></td>
           <td onClick={e=>e.stopPropagation()}><PickButton pid={p.pid} name={p.name} team={p.team}/></td>
           <td><div style={{display:"flex",alignItems:"center",gap:5}}><GBadge g={wg}/><span style={{fontSize:9,color:wg.color,fontFamily:"DM Mono,monospace"}}>{wg.label}</span></div></td>
           <StatCols p={p} window={window}/>
@@ -2044,7 +2281,17 @@ function ScoutingTab() {
         const piq = p.piq||{label:"—",color:"var(--muted)"};
         return <tr key={p.pid}>
           <td><span className="sv avg" style={{fontSize:10}}>{i+1}</span></td>
-          <td><div className="pc" style={{cursor:"pointer"}} onClick={()=>setSelPlayer(p)}><div className="av">{ini(p.name)}</div><div><div className="pn">{p.name}</div><div className="pt" style={{color:p.team&&p.team!=="—"?"var(--muted)":"#ff801030"}}>{p.team&&p.team!=="—"?p.team:"Lineup TBD"}</div></div></div></td>
+          <td><div className="pc" style={{cursor:"pointer"}} onClick={()=>openAtBatSlide(p)}>
+            <PosAvatar player={p} size={30}/>
+            <div>
+              <div className="pn">{p.name}</div>
+              <div className="pt" style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>
+                {p.team&&p.team!=="—" ? p.team : "—"}
+                {p.lineupStatus==="confirmed" && <span style={{color:"var(--green)",marginLeft:4}}>✅</span>}
+                {p.lineupStatus==="unconfirmed" && <span style={{color:"var(--muted)",marginLeft:4}}>❓</span>}
+              </div>
+            </div>
+          </div></td>
           <td onClick={e=>e.stopPropagation()}><PickButton pid={p.pid} name={p.name} team={p.team}/></td>
           <td><div style={{display:"flex",alignItems:"center",gap:5}}><GBadge g={wg}/><span style={{fontSize:9,color:wg.color,fontFamily:"DM Mono,monospace",lineHeight:1.3}}>{wg.label}</span></div></td>
           <td><div style={{display:"flex",alignItems:"center",gap:5}}><div style={{width:38,height:3,borderRadius:2,background:"var(--border)",overflow:"hidden"}}><div style={{height:"100%",borderRadius:2,width:`${wOS}%`,background:wg.color}}/></div><span style={{fontFamily:"Oswald,sans-serif",fontSize:13,color:wg.color}}>{wOS.toFixed?wOS.toFixed(0):wOS}</span></div></td>
@@ -2462,7 +2709,7 @@ function BvPTab() {
           const matchupHighlight = b.matchup?.cls==="pos"?"rgba(39,201,122,.05)":b.matchup?.cls==="neg"?"rgba(56,184,242,.04)":"";
           return <tr key={b.id} style={{background:matchupHighlight}}>
             <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:15,color:i<3?"var(--accent2)":"var(--muted)"}}>{i+1}</span></td>
-            <td><div className="pc"><div className="av">{ini(b.name)}</div><div><div className="pn">{b.name}</div><div className="pt">{b.team} · {b.hr} HR</div></div></div></td>
+            <td><div className="pc"><PosAvatar player={b} size={30}/><div><div className="pn">{b.name}</div><div className="pt">{b.team} · {b.hr} HR</div></div></div></td>
             <td>
               <div style={{display:"flex",flexDirection:"column",gap:3}}>
                 <div style={{display:"inline-flex",alignItems:"center",gap:4,padding:"2px 8px",borderRadius:5,background:"var(--surface2)",border:"1px solid var(--border)",width:"fit-content"}}>
@@ -2794,7 +3041,7 @@ function PitchBuilderTab() {
               const rowBg=matchup?.cls==="pos"?"rgba(39,201,122,.04)":matchup?.cls==="neg"?"rgba(56,184,242,.03)":"";
               return <tr key={p.id} style={{background:rowBg}}>
                 <td><div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:15,color:top3?pitchCol:"var(--muted)"}}>{i+1}</div></td>
-                <td><div className="pc"><div className="av" style={{border:`1px solid ${top3?pitchCol+"50":"var(--border)"}`}}>{ini(p.name)}</div><div><div className="pn">{p.name}</div><div className="pt">{p.team} · {p.hr} HR</div></div></div></td>
+                <td><div className="pc"><PosAvatar player={p} size={30} style={{border:`1px solid ${top3?pitchCol+"50":"var(--border)"}`}}/><div><div className="pn">{p.name}</div><div className="pt">{p.team} · {p.hr} HR</div></div></div></td>
                 <td>
                   <div style={{display:"flex",flexDirection:"column",gap:2}}>
                     <div style={{display:"inline-flex",alignItems:"center",gap:4,padding:"2px 7px",borderRadius:5,background:"var(--surface2)",border:"1px solid var(--border)",width:"fit-content"}}>
@@ -2927,7 +3174,7 @@ function HRTrackerTab() {
   const [hrs, setHrs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sortKey, setSortKey] = useState("chronoIndex");
-  const [sortDir, setSortDir] = useState(1); // 1 = ascending = first HR first
+  const [sortDir, setSortDir] = useState(-1); // -1 = most recent first
   const [filterTeam, setFilterTeam] = useState("all");
   const [refreshing, setRefreshing] = useState(false);
   const [hrSearch, setHrSearch] = useState("");
@@ -3066,8 +3313,8 @@ function HRTrackerTab() {
             {totalHRs === 0 ? `No home runs ${isToday?"yet today — check back once games start":"for "+displayDate}. ⚾` : "No HRs match the current filter."}
           </div>
         : <div className="tw"><table style={{width:"100%"}}>
-            <thead><tr>
-              <th style={{width:24,cursor:"default"}}>#</th>
+            <thead><tr style={{position:"sticky",top:0,zIndex:20,background:"var(--surface2)"}}>
+              <th style={{width:24,cursor:"default",background:"var(--surface2)"}}>#</th>
               {[
                 {key:"batterTeam", label:"Team",     tip:"Batter's team"},
                 {key:"batterName", label:"Batter",   tip:"Batter name"},
@@ -3080,7 +3327,7 @@ function HRTrackerTab() {
                 {key:"pitchType",  label:"Pitch",    tip:"Pitch type thrown"},
                 {key:"pitcherName",label:"vs Pitcher",tip:"Pitcher who gave it up"},
                 {key:"gameId",     label:"Game",     tip:"Matchup"},
-              {key:"chronoIndex",label:"Time",     tip:"Chronological order — most recent first"},
+              {key:"timeET",label:"Time (ET)", tip:"Time the HR was hit — Eastern Time"},
               ].map(c => (
                 <th key={c.key} className={sortKey===c.key?"sk":""} onClick={()=>hs(c.key)} style={{cursor:"pointer"}}>
                   <div style={{display:"flex",alignItems:"center",gap:2}}>
@@ -3112,7 +3359,12 @@ function HRTrackerTab() {
                   <td><span className={`sv ${distC}`}>{hr.distance!=null?`${hr.distance}ft`:"—"}</span></td>
                   <td>{hr.pitchType?<span style={{fontSize:10,fontFamily:"'DM Mono',monospace",padding:"2px 7px",borderRadius:4,background:"var(--surface2)",border:"1px solid var(--border)"}}>{hr.pitchType}</span>:<span style={{color:"var(--muted)"}}>—</span>}</td>
                   <td><div style={{fontSize:11,fontWeight:500}}>{hr.pitcherName}</div><div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{hr.pitcherTeam}</div></td>
-                  <td><span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:"var(--muted)"}}>{hr.gameId}</span></td>
+                  <td>
+                    <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:"var(--text)",fontWeight:500}}>
+                      {hr.timeET || hr.time || "—"}
+                    </span>
+                    <div style={{fontSize:8,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{hr.gameId}</div>
+                  </td>
                 </tr>;
               })}
             </tbody>
@@ -3351,7 +3603,7 @@ function StatcastTab() {
           {filtered.map(p=>{
             const key=String(p.pid),current=picks[key]?.type;
             return <div key={p.pid} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,background:"var(--surface2)",border:`1px solid ${current?PICK_TYPES[current].color:"var(--border)"}`}}>
-              <div style={{width:30,height:30,borderRadius:"50%",background:"var(--surface)",border:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:"var(--text)",flexShrink:0}}>{ini(p.name)}</div>
+              <PosAvatar player={p} size={30}/>
               <div style={{flex:1,minWidth:0}}><div style={{fontWeight:600,fontSize:12,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{p.name}</div><div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{p.team} · {p.grade?.grade||"—"}</div></div>
               <PickButton pid={p.pid} name={p.name} team={p.team}/>
             </div>;
@@ -3386,6 +3638,7 @@ function StatcastTab() {
 
 export default function App() {
   const [tab, setTab] = useState("homeruns");
+  const [showPicksSlideout, setShowPicksSlideout] = useState(false);
   // Load player→team map immediately at startup
   useEffect(() => { loadGlobalPlayerMap(); }, []);
   return <>
@@ -3395,6 +3648,13 @@ export default function App() {
         <div className="logo"><div className="logo-dot"/>⚾ <span>GOING</span> YARD</div>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           <DataStatusBadge/>
+        <button onClick={()=>setShowPicksSlideout(s=>!s)}
+          style={{padding:"5px 12px",borderRadius:6,border:"1px solid var(--border)",
+            background:"var(--surface2)",color:"var(--accent2)",cursor:"pointer",
+            fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,letterSpacing:1,
+            display:"flex",alignItems:"center",gap:5}}>
+          🎯 Picks
+        </button>
           <div className="live-badge"><div className="live-dot"/>MLB 2026</div>
         </div>
       </header>
@@ -3404,7 +3664,7 @@ export default function App() {
         <button className={`tab ${tab==="bvp"?"active":""}`} onClick={()=>setTab("bvp")}>⚔️ Batter vs P</button>
         <button className={`tab ${tab==="scouting"?"active":""}`} onClick={()=>setTab("scouting")}>🎯 Scouting</button>
         <button className={`tab ${tab==="live"?"active":""}`} onClick={()=>setTab("live")}>📡 Live</button>
-        <button className={`tab ${tab==="pregame"?"active":""}`} onClick={()=>setTab("pregame")}>📊 Pregame</button>
+
         <button className={`tab ${tab==="powerbi"?"active":""}`} onClick={()=>setTab("powerbi")}>📊 Analytics</button>
         <button className={`tab ${tab==="onlyhomers"?"active":""}`} onClick={()=>setTab("onlyhomers")} style={{color:tab==="onlyhomers"?"var(--accent2)":undefined}}>⚾ Only Homers</button>
         <button className={`tab ${tab==="statcast"?"active":""}`} onClick={()=>setTab("statcast")} style={{color:tab==="statcast"?"var(--ice)":undefined}}>📡 Statcast</button>
@@ -3417,10 +3677,11 @@ export default function App() {
         {tab==="bvp" && <BvPTab/>}
         {tab==="builder" && <PitchBuilderTab/>}
         {tab==="homeruns" && <HRTrackerTab/>}
-        {tab==="powerbi" && <PowerBITab/>}
-        {tab==="onlyhomers" && <OnlyHomersTab/>}
-        {tab==="statcast" && <StatcastTab/>}
         {tab==="picks" && <MyPicksTab/>}
+        {/* Affiliate tabs — always mounted, hidden when not active to preserve iframe state */}
+        <div style={{display:tab==="powerbi"?"block":"none"}}><PowerBITab/></div>
+        <div style={{display:tab==="onlyhomers"?"block":"none"}}><OnlyHomersTab/></div>
+        <div style={{display:tab==="statcast"?"block":"none"}}><StatcastTab/></div>
       </main>
       <div style={{textAlign:"center",padding:"12px 0 8px",borderTop:"1px solid var(--border)",marginTop:24}}>
         <span style={{fontSize:10,color:"#2a3a48",fontFamily:"'DM Mono',monospace",letterSpacing:1}}>
@@ -3428,5 +3689,8 @@ export default function App() {
         </span>
       </div>
     </div>
+    {/* Global slide-in panels — rendered once at app level */}
+    <AtBatSlideIn/>
+    {showPicksSlideout && <PicksSlideout onClose={()=>setShowPicksSlideout(false)}/>}
   </>;
 }

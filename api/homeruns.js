@@ -77,6 +77,18 @@ export default async function handler(req, res) {
 
           const isTop = about.halfInning === "top";
           const chronoIndex = (about.inning || 0) * 1000 + (about.atBatIndex || 0);
+          // Get HR time in ET
+          const playTime = about.endTime || about.startTime || "";
+          let timeET = "";
+          if (playTime) {
+            try {
+              const d = new Date(playTime);
+              timeET = d.toLocaleTimeString("en-US", {
+                timeZone: "America/New_York",
+                hour: "numeric", minute: "2-digit", hour12: true
+              });
+            } catch(e) {}
+          }
           console.log(`[HRs] ✅ ${batter?.fullName} (${isTop?awayAbbr:homeAbbr}) inn=${about.inning} rbi=${rbi} ev=${ev} dist=${dist} pitch=${pitch}`);
 
           allHRs.push({
@@ -99,6 +111,7 @@ export default async function handler(req, res) {
             description: desc,
             atBatIndex:  about.atBatIndex  || 0,
             chronoIndex,
+            timeET,
           });
         }
       } catch(e) {
