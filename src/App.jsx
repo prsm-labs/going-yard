@@ -979,6 +979,37 @@ const STAT_COL_HEADERS = [
 
 
 // DATA FETCHING
+// ── GLOBAL PLAYER→TEAM MAP ───────────────────────────────────
+let GLOBAL_PLAYER_TEAM_MAP = {};
+let GLOBAL_PLAYER_MAP_LOADED = false;
+
+async function loadGlobalPlayerMap() {
+  if (GLOBAL_PLAYER_MAP_LOADED) return GLOBAL_PLAYER_TEAM_MAP;
+  try {
+    const res = await fetch("https://statsapi.mlb.com/api/v1/sports/1/players?season=2026&gameType=R");
+    const data = await res.json();
+    for (const p of (data.people || [])) {
+      if (p.id && p.currentTeam?.abbreviation) {
+        GLOBAL_PLAYER_TEAM_MAP[p.id] = {
+          team: p.currentTeam.abbreviation,
+          teamId: p.currentTeam.id,
+          name: p.fullName,
+          hand: p.batSide?.code || "R",
+        };
+      }
+    }
+    GLOBAL_PLAYER_MAP_LOADED = true;
+    console.log("[Going Yard] Player map loaded:", Object.keys(GLOBAL_PLAYER_TEAM_MAP).length, "players");
+  } catch(e) {
+    console.warn("[Going Yard] Player map load failed:", e.message);
+  }
+  return GLOBAL_PLAYER_TEAM_MAP;
+}
+
+function getPlayerTeam(pid) {
+  return GLOBAL_PLAYER_TEAM_MAP[pid]?.team || null;
+}
+
 async function fetchPlayers(setL, setP, setE, silent=false) {
   if (!silent) setL(true);
   setE(null);
@@ -1022,15 +1053,56 @@ async function fetchPlayers(setL, setP, setE, silent=false) {
     } catch(e) { console.warn('[Players] Lineup fetch failed:', e.message); }
 
     // ── STEP 2: Fetch real Statcast season data ─────────────
-    // Uses Baseball Savant leaderboard — real EV, Barrel%, HardHit%, xwOBA
-    // This is the ONLY source for Statcast metrics — no generated numbers
-    const scRes = await fetch('/api/atbats');
-    const scData = await scRes.json();
-    const statcastPlayers = scData.players || [];
-    console.log('[Players] Statcast players received:', statcastPlayers.length);
+    let statcastPlayers = [];
+    try {
+      const scRes = await fetch('/api/atbats');
+      if (!scRes.ok) throw new Error(`atbats API ${scRes.status}`);
+      const scData = await scRes.json();
+      statcastPlayers = scData.players || [];
+      console.log('[Players] atbats players received:', statcastPlayers.length);
+    } catch(atbatsErr) {
+      console.warn('[Players] /api/atbats failed:', atbatsErr.message, '— trying /api/statcast fallback');
+      try {
+        const scRes2 = await fetch('/api/statcast?year=2026&minAB=5');
+        if (!scRes2.ok) throw new Error(`statcast API ${scRes2.status}`);
+        const scJson = await scRes2.json();
+        // Map from old statcast format to new format
+        statcastPlayers = (scJson.players || []).map(r => ({
+          pid:          parseInt(r.player_id || r.pid || 0),
+          name:         r.name || '',
+          team:         r.team || r.team_name_abbrev || '—',
+          avgEV:        parseFloat(r.exit_velocity_avg || r.avg_hit_speed || 0),
+          maxEV:        parseFloat(r.max_hit_speed || 0),
+          barrelPct:    parseFloat(r.barrel_batted_rate || r.brl_percent || 0),
+          hardHitPct:   parseFloat(r.hard_hit_percent || r.ev95percent || 0),
+          sweetSpotPct: parseFloat(r.sweet_spot_percent || r.anglesweetspotpercent || 0),
+          launchAngle:  parseFloat(r.launch_angle_avg || r.avg_hit_angle || 0),
+          fbPct:        parseFloat(r.fb_percent || 0),
+          fbldPct:      parseFloat(r.fbld || 0),
+          gbPct:        parseFloat(r.gb_percent || 0),
+          pullPct:      parseFloat(r.pull_percent || 0),
+          xwoba:        parseFloat(r.xwoba || r.est_woba || 0),
+          xba:          parseFloat(r.xba   || r.est_ba   || 0),
+          xslg:         parseFloat(r.xslg  || r.est_slg  || 0),
+          avg:          parseFloat(r.ba || r.avg || 0),
+          slg:          parseFloat(r.slg || 0),
+          obp:          parseFloat(r.obp || 0),
+          pa:           parseInt(r.pa || 0),
+          ab:           parseInt(r.abs || r.ab || 0),
+          chasePct:     parseFloat(r.oz_swing_percent || 0),
+          kPct:         parseFloat(r.strikeout_percent || r.k_percent || 0),
+          bbPct:        parseFloat(r.walk_percent || r.bb_percent || 0),
+          zContactPct:  parseFloat(r.z_contact_percent || 0),
+        })).filter(r => r.pid && (r.avgEV > 0 || r.xwoba > 0));
+        console.log('[Players] Statcast fallback players:', statcastPlayers.length);
+      } catch(fallbackErr) {
+        console.error('[Players] Both APIs failed:', fallbackErr.message);
+        throw new Error('Could not load Statcast data from any source');
+      }
+    }
 
     if (statcastPlayers.length === 0) {
-      throw new Error('No Statcast data returned from API');
+      throw new Error('No Statcast players returned');
     }
 
     // ── STEP 3: Build player objects with REAL metrics only ─
