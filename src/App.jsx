@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const BUILD_TIMESTAMP = "2026-03-29 20:44 ET";
+const BUILD_TIMESTAMP = "2026-03-29 20:55 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -575,6 +575,7 @@ function genWindows(p) {
     const flyBall     = p.flyBall     || 0;  // real Statcast — no variance
     const launchAngle = p.launchAngle || 0;  // real Statcast — no variance
     const pullAir     = p.pullAir     || 0;  // real Statcast — no variance
+    const pulledBarrel = p.pulledBarrel || 0; // real Statcast — no variance
     const hardHit     = p.hardHit     || 0;  // real Statcast — no variance
     // Discipline metrics — minor seeded variance is ok, not shown as primary stats
     const oSwing      = rv(p.oSwing || 28, 3, 6);
@@ -595,7 +596,7 @@ function genWindows(p) {
     const wp = { ...p, avgEV, barrel, flyBall, launchAngle, pullAir, oSwing, hardHit, bbPct, kPct, bbkRatio: bbPct / Math.max(kPct, 1) };
     const wos = calcOS(wp); const wgrade = getSG(wos);
     windows[w] = {
-      avgEV, barrel, flyBall, launchAngle, pullAir, oSwing, hardHit,
+      avgEV, barrel, flyBall, launchAngle, pullAir, pulledBarrel, oSwing, hardHit,
       bbPct, kPct, hits, hr, xbh, tb, atBats, abPerHR, abSinceHR,
       almostPct, avg, games: gamesInWindow, os: wos, grade: wgrade,
       heatScore: getHS(wp),
@@ -901,7 +902,8 @@ function StatCols({ p, window }) {
   const bar  = w.barrel ?? p.barrel ?? 0;
   const fb   = w.flyBall ?? p.flyBall ?? 0;
   const la   = w.launchAngle ?? p.launchAngle ?? 0;
-  const pull = w.pullAir ?? p.pullAir ?? 0;
+  const pull   = w.pullAir ?? p.pullAir ?? 0;
+  const pulbrl = w.pulledBarrel ?? p.pulledBarrel ?? 0;
   const chase= w.oSwing ?? p.oSwing ?? 30;
   const hh   = w.hardHit ?? p.hardHit ?? 0;
   const avg  = w.avg ?? p.avg ?? 0;
@@ -920,6 +922,7 @@ function StatCols({ p, window }) {
   const fbC  = fb>=T.FB_MIN&&fb<=T.FB_MAX?"hot":fb>=30?"warm":"avg";
   const laC  = la>=T.LA_MIN&&la<=T.LA_MAX?"good":la>=19?"warm":"avg";
   const puC  = pull>=T.PULL_EL?"hot":pull>=T.PULL_GD?"warm":"avg";
+  const pbC  = pulbrl>=8?"danger":pulbrl>=5?"hot":pulbrl>=3?"warm":"avg";
   const chC  = chase<=T.CHASE_EL?"good":chase<=T.CHASE_GD?"avg":"cold";
   const hhC  = hh>=T.HH_EL?"hot":hh>=T.HH_GD?"warm":"avg";
   const avgC = avg>=0.300?"danger":avg>=0.270?"hot":avg>=0.240?"warm":"avg";
@@ -940,7 +943,8 @@ function StatCols({ p, window }) {
     {mini(bar, "bar",  barC, "%")}
     {mini(fb,  "fb",   fbC,  "%")}
     {mini(la,  "la",   laC,  "°")}
-    {mini(pull,"pull", puC,  "%")}
+    {mini(pull,   "pull", puC, "%")}
+    {pulbrl > 0 && mini(pulbrl, "pulbrl", pbC, "%")}
     {mini(chase,"chase",chC, "%")}
     {mini(hh,  "hh",   hhC,  "%")}
     {mini(avg, "avg",  avgC, "")}
@@ -963,6 +967,7 @@ const STAT_COL_HEADERS = [
   {key:"flyBall",  label:"Fly Ball%",  tip:"35–45% = sweet zone. Above 50% = too many outs."},
   {key:"launchAngle",label:"Launch°",  tip:"25–35° = HR sweet spot"},
   {key:"pullAir",  label:"Pull Air%",  tip:"40–50% = elite HR power zone"},
+  {key:"pulledBarrel", label:"Pull Brl%", tip:"Barrels hit to the pull side — the most dangerous contact"},
   {key:"oSwing",   label:"Chase%",     tip:"O-Swing. Below 20% = elite. Below 25% = good."},
   {key:"hardHit",  label:"Hard Hit%",  tip:"EV ≥ 95 mph contact rate"},
   {key:"avg",      label:"AVG",        tip:"Batting average this window"},
@@ -1165,6 +1170,7 @@ async function fetchPlayers(setL, setP, setE, silent=false) {
         gbPct:       sc.gbPct,
         ldPct:       sc.ldPct,
         pullAir:     sc.pullPct,
+        pulledBarrel: sc.pulledBarrelPct || 0,
         // Expected stats
         xwoba:       sc.xwoba,
         xba:         sc.xba,
