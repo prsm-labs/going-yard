@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const BUILD_TIMESTAMP = "2026-03-29 21:25 ET";
+const BUILD_TIMESTAMP = "2026-03-29 22:43 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -2910,16 +2910,38 @@ function HRTrackerTab() {
   const [filterTeam, setFilterTeam] = useState("all");
   const [refreshing, setRefreshing] = useState(false);
 
-  const load = async () => {
+  // Date picker — defaults to today, min = season start
+  const todayET = new Date().toLocaleDateString("en-US",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"});
+  const [mp,dp,yp] = todayET.split("/");
+  const todayStr = `${yp}-${mp}-${dp}`;
+  const [selDate, setSelDate] = useState(todayStr);
+  const SEASON_START = "2026-03-20";
+
+  const load = async (date) => {
     setLoading(true);
-    const data = await fetchHRs(true); // always force fresh
-    setHrs(data);
+    try {
+      const url = date && date !== todayStr
+        ? `/api/homeruns?date=${date}`
+        : "/api/homeruns";
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setHrs(data.homeruns || []);
+    } catch(e) {
+      console.warn("[HRTracker] Load failed:", e.message);
+      if (date === todayStr) {
+        const cached = await fetchHRs(true);
+        setHrs(cached);
+      }
+    }
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(selDate); }, [selDate]);
 
   const hs = (k) => { if (sortKey===k) setSortDir(d=>-d); else { setSortKey(k); setSortDir(1); } };
+  const isToday = selDate === todayStr;
+  const displayDate = new Date(selDate + "T12:00:00").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric",year:"numeric"});
 
   const teams = [...new Set(hrs.map(h => h.batterTeam))].filter(Boolean).sort();
 
@@ -2949,15 +2971,33 @@ function HRTrackerTab() {
     <div className="hrow">
       <div className="section-header">
         <div className="section-title">💥 Home Run Tracker</div>
-        <div className="section-sub">Every homer hit today · live play-by-play · exit velo · distance · pitch type</div>
+        <div className="section-sub">{isToday ? "Today's homers · live · auto-refreshes" : `HRs from ${displayDate}`} · exit velo · distance · pitch type</div>
       </div>
-      <RefBtn refreshing={refreshing} onClick={async()=>{setRefreshing(true);await load();setRefreshing(false);}}/>
+      <RefBtn refreshing={refreshing} onClick={async()=>{setRefreshing(true);await load(selDate);setRefreshing(false);}}/>
+    </div>
+
+    {/* Date Picker */}
+    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,flexWrap:"wrap"}}>
+      <span style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1}}>Date:</span>
+      <button onClick={()=>{const d=new Date(selDate+"T12:00:00");d.setDate(d.getDate()-1);const s=d.toISOString().slice(0,10);if(s>=SEASON_START)setSelDate(s);}}
+        disabled={selDate<=SEASON_START}
+        style={{padding:"4px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--surface2)",color:"var(--text)",cursor:selDate<=SEASON_START?"not-allowed":"pointer",fontFamily:"'DM Mono',monospace",fontSize:12,opacity:selDate<=SEASON_START?0.4:1}}>◀</button>
+      <input type="date" value={selDate} min={SEASON_START} max={todayStr}
+        onChange={e=>setSelDate(e.target.value)}
+        style={{padding:"4px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--surface2)",color:"var(--text)",fontFamily:"'DM Mono',monospace",fontSize:12,cursor:"pointer"}}
+      />
+      <button onClick={()=>{const d=new Date(selDate+"T12:00:00");d.setDate(d.getDate()+1);const s=d.toISOString().slice(0,10);if(s<=todayStr)setSelDate(s);}}
+        disabled={selDate>=todayStr}
+        style={{padding:"4px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--surface2)",color:"var(--text)",cursor:selDate>=todayStr?"not-allowed":"pointer",fontFamily:"'DM Mono',monospace",fontSize:12,opacity:selDate>=todayStr?0.4:1}}>▶</button>
+      {!isToday && <button onClick={()=>setSelDate(todayStr)}
+        style={{padding:"4px 10px",borderRadius:6,border:"1px solid var(--accent)",background:"rgba(232,65,26,.1)",color:"var(--accent)",cursor:"pointer",fontFamily:"'DM Mono',monospace",fontSize:11}}>↩ Today</button>}
+      <span style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{isToday?"🔴 Live":"📅 " + displayDate}</span>
     </div>
 
     {/* Stats summary cards */}
     <div className="cards" style={{marginBottom:14}}>
-      <div className="card"><div className="cl">💥 Total HRs</div><div className="cv" style={{color:"var(--accent)"}}>{totalHRs}</div><div className="cs">today</div></div>
-      <div className="card"><div className="cl">🎉 Grand Slams</div><div className="cv" style={{color:"var(--accent2)"}}>{slamCount}</div><div className="cs">today</div></div>
+      <div className="card"><div className="cl">💥 Total HRs</div><div className="cv" style={{color:"var(--accent)"}}>{totalHRs}</div><div className="cs">{isToday?"today":displayDate}</div></div>
+      <div className="card"><div className="cl">🎉 Grand Slams</div><div className="cv" style={{color:"var(--accent2)"}}>{slamCount}</div><div className="cs">{isToday?"today":displayDate}</div></div>
       {avgDist && <div className="card"><div className="cl">📏 Avg Distance</div><div className="cv">{avgDist}</div><div className="cs">feet</div></div>}
       {avgEV && <div className="card"><div className="cl">⚡ Avg Exit Velo</div><div className="cv">{avgEV}</div><div className="cs">mph</div></div>}
     </div>
@@ -2989,7 +3029,7 @@ function HRTrackerTab() {
       ? <div className="lw"><div className="sp"/><div className="lt">Loading today's home runs…</div></div>
       : sorted.length === 0
         ? <div style={{padding:"40px",textAlign:"center",color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>
-            {totalHRs === 0 ? "No home runs yet today. Check back once games start! ⚾" : "No HRs match the current filter."}
+            {totalHRs === 0 ? `No home runs ${isToday?"yet today — check back once games start":"for "+displayDate}. ⚾` : "No HRs match the current filter."}
           </div>
         : <div className="tw"><table style={{width:"100%"}}>
             <thead><tr>
@@ -3079,10 +3119,79 @@ function OnlyHomersTab() {
 }
 
 function PowerBITab() {
+  const picks = usePicks();
+  const players = Object.values(PLAYER_DATA_CACHE);
+  const [searchQ, setSearchQ] = useState("");
+  const [showPicker, setShowPicker] = useState(false);
+
+  const filtered = searchQ.trim()
+    ? players.filter(p => p.name?.toLowerCase().includes(searchQ.toLowerCase()) ||
+                          p.team?.toLowerCase().includes(searchQ.toLowerCase()))
+        .slice(0, 12)
+    : [];
+
   return <div>
     <div className="section-header" style={{marginBottom:16}}>
       <div className="section-title">📊 Analytics Dashboard</div>
       <div className="section-sub">Power BI · interactive analytics · full screen mode available</div>
+    </div>
+
+    {/* Player Picker for Picks — browse Power BI and add players */}
+    <div style={{marginBottom:14,background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,padding:"12px 14px"}}>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:showPicker?10:0}}>
+        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,letterSpacing:1}}>🎯 Add to My Picks</span>
+        <span style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>Search any batter while browsing the dashboard</span>
+        <button onClick={()=>setShowPicker(s=>!s)}
+          style={{marginLeft:"auto",padding:"4px 12px",borderRadius:6,border:"1px solid var(--border)",
+            background:showPicker?"var(--accent)":"var(--surface2)",
+            color:showPicker?"white":"var(--muted)",cursor:"pointer",
+            fontFamily:"'DM Mono',monospace",fontSize:11}}>
+          {showPicker?"✕ Close":"＋ Open Picker"}
+        </button>
+      </div>
+      {showPicker && <>
+        <div style={{position:"relative",marginBottom:8}}>
+          <input
+            autoFocus
+            type="text"
+            value={searchQ}
+            onChange={e=>setSearchQ(e.target.value)}
+            placeholder="Search player or team… (e.g. DeLauter, CLE)"
+            style={{width:"100%",padding:"8px 12px 8px 32px",background:"var(--surface2)",
+              border:"1px solid var(--border)",borderRadius:8,color:"var(--text)",
+              fontFamily:"'DM Mono',monospace",fontSize:12,outline:"none",boxSizing:"border-box"}}
+          />
+          <span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:"var(--muted)",fontSize:13}}>🔍</span>
+          {searchQ && <button onClick={()=>setSearchQ("")}
+            style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",
+              background:"none",border:"none",color:"var(--muted)",cursor:"pointer",fontSize:13}}>✕</button>}
+        </div>
+        {searchQ && filtered.length === 0 && <div style={{fontSize:11,color:"var(--muted)",fontFamily:"'DM Mono',monospace",padding:"8px 0"}}>No players found. Try a different name or team.</div>}
+        {filtered.length > 0 && <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:8}}>
+          {filtered.map(p => {
+            const key = String(p.pid);
+            const current = picks[key]?.type;
+            return <div key={p.pid} style={{display:"flex",alignItems:"center",gap:8,
+              padding:"8px 10px",borderRadius:8,background:"var(--surface2)",
+              border:`1px solid ${current?PICK_TYPES[current].color:"var(--border)"}`,
+              transition:"all .15s"}}>
+              <div style={{width:30,height:30,borderRadius:"50%",background:"var(--surface)",
+                border:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"center",
+                fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:"var(--text)",flexShrink:0}}>
+                {ini(p.name)}
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontWeight:600,fontSize:12,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{p.name}</div>
+                <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{p.team} · {p.grade?.grade||"—"}</div>
+              </div>
+              <PickButton pid={p.pid} name={p.name} team={p.team}/>
+            </div>;
+          })}
+        </div>}
+        {!searchQ && <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",padding:"4px 0"}}>
+          Start typing a player name or team abbreviation to search {players.length} batters
+        </div>}
+      </>}
     </div>
     <div style={{
       borderRadius:10,
