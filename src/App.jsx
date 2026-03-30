@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const BUILD_TIMESTAMP = "2026-03-29 21:10 ET";
+const BUILD_TIMESTAMP = "2026-03-29 21:25 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -1132,65 +1132,47 @@ async function fetchPlayers(setL, setP, setE, silent=false) {
       const pid = sc.pid;
       const team = pt[pid] || sc.team || '—';
 
-      // ── Fly Ball %: use fb_percent if available, else estimate from fbld ──
-      // fbld = FB + LD combined (~55-65% of batted balls)
-      // Pure FB% is roughly fbld * 0.55 for most hitters
-      const flyBall = sc.fbPct > 0
-        ? Math.min(sc.fbPct, 52)
-        : sc.fbldPct > 0
-          ? Math.min(Math.round(sc.fbldPct * 0.55 * 10) / 10, 52)
-          : 0;
+      // ── Build player object — all fields map directly from /api/atbats ──
+      // atbats.js now calculates FB%/Pull% from raw bb_type counts (Power BI method)
+      // sc.flyBall, sc.pullPct etc are already correctly calculated
+      const name = sc.name && sc.name.trim() && !sc.name.startsWith('P')
+        ? sc.name
+        : GLOBAL_PLAYER_TEAM_MAP[sc.pid]?.name || sc.name || `Unknown ${sc.pid}`;
 
-      // ── Build the player object with ONLY real Statcast values ──
       const p = {
         pid,
-        name:        (() => {
-          const n = sc.name || '';
-          if (!n || n.startsWith('Player')) {
-            // Try to parse from raw fields if name is missing
-            const combined = sc['last_name, first_name'] || '';
-            if (combined.includes(',')) {
-              const [last, first] = combined.split(',');
-              return `${first.trim()} ${last.trim()}`;
-            }
-          }
-          // Try global player map as final fallback
-          if (!n || n.startsWith('Player') || n.startsWith('Unknown')) {
-            return GLOBAL_PLAYER_TEAM_MAP[sc.pid]?.name || n || `Unknown ${sc.pid}`;
-          }
-          return n;
-        })(),
+        name,
         team,
-        // Statcast contact quality — READ FROM API, NEVER GENERATED
-        avgEV:       sc.avgEV,
-        maxEV:       sc.maxEV,
-        barrel:      sc.barrelPct,
-        hardHit:     sc.hardHitPct,
-        sweetSpot:   sc.sweetSpotPct,
-        launchAngle: sc.launchAngle,
-        flyBall,
-        gbPct:       sc.gbPct,
-        ldPct:       sc.ldPct,
-        pullAir:     sc.pullPct,
+        // ── Statcast metrics — read directly from API, no modification ──
+        avgEV:        sc.avgEV        || 0,
+        maxEV:        sc.maxEV        || 0,
+        barrel:       sc.barrelPct    || 0,
+        hardHit:      sc.hardHitPct   || 0,
+        sweetSpot:    sc.sweetSpotPct || 0,
+        launchAngle:  sc.launchAngle  || 0,
+        // ── Batted ball rates — calculated from raw bb_type counts by atbats.js ──
+        flyBall:      sc.flyBall      || 0,   // fb count / BIP count
+        gbPct:        sc.gbPct        || 0,   // gb count / BIP count
+        ldPct:        sc.ldPct        || 0,   // ld count / BIP count
+        pullAir:      sc.pullPct      || 0,   // pull direction / total directional BIP
         pulledBarrel: sc.pulledBarrelPct || 0,
-        // Expected stats
-        xwoba:       sc.xwoba,
-        xba:         sc.xba,
-        xslg:        sc.xslg,
-        // Traditional season stats
-        avg:         sc.avg,
-        slg:         sc.slg,
-        obp:         sc.obp,
-        ops:         sc.ops,
-        pa:          sc.pa,
-        ab:          sc.ab,
-        // Discipline — from API where available
-        oSwing:      sc.chasePct  || 0,
-        kPct:        sc.kPct      || 0,
-        bbPct:       sc.bbPct     || 0,
-        zContact:    sc.zContactPct || 80,
-        bbkRatio:    sc.bbPct > 0 && sc.kPct > 0 ? sc.bbPct / sc.kPct : 0.4,
-        // HR count enriched below
+        // ── Expected stats ──
+        xwoba:  sc.xwoba || 0,
+        xba:    sc.xba   || 0,
+        xslg:   sc.xslg  || 0,
+        // ── Traditional ──
+        avg:    sc.avg || 0,
+        slg:    sc.slg || 0,
+        obp:    sc.obp || 0,
+        ops:    (sc.slg || 0) + (sc.obp || 0),
+        pa:     sc.pa  || 0,
+        ab:     sc.ab  || 0,
+        // ── Plate discipline ──
+        oSwing:   sc.chasePct    || 0,
+        kPct:     sc.kPct        || 0,
+        bbPct:    sc.bbPct       || 0,
+        zContact: sc.zContactPct || 80,
+        bbkRatio: sc.bbPct > 0 && sc.kPct > 0 ? sc.bbPct / sc.kPct : 0.4,
         hr: 0,
       };
 
