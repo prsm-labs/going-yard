@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const BUILD_TIMESTAMP = "2026-03-30 13:53 ET";
+const BUILD_TIMESTAMP = "2026-03-30 18:03 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -838,11 +838,25 @@ function AtBatSlideIn() {
         // Flatten to at-bat level from game log
         const rows = games.slice(0,15).map(g => ({
           date: g.date?.slice(5) || "—",
-          // Opponent: try multiple paths from MLB Stats API game log
-          opp:  g.opponent?.abbreviation ||
-                g.opponent?.teamCode?.toUpperCase() ||
-                g.team?.abbreviation ||
-                (g.isHome ? "HOME" : "AWAY") || "—",
+          // MLB gameLog: opponent has {id, name} but no abbreviation
+          // Use GLOBAL_PLAYER_TEAM_MAP or derive from team name
+          opp: (() => {
+            const opp = g.opponent;
+            if (!opp) return "—";
+            // Try abbreviation first (sometimes present)
+            if (opp.abbreviation) return opp.abbreviation;
+            // Try to find by team ID in TEAM_ID_TO_ABB
+            if (opp.id && TEAM_ID_TO_ABB[opp.id]) return TEAM_ID_TO_ABB[opp.id];
+            // Use short team name (e.g. "Yankees" → "NYY" via TEAM_IDS reverse)
+            const name = opp.name || opp.teamName || "";
+            const abbr = Object.entries(TEAM_IDS).find(([k,v]) =>
+              name.toLowerCase().includes(k.toLowerCase()) ||
+              name.split(" ").pop()?.toLowerCase() === k.toLowerCase()
+            )?.[0];
+            if (abbr) return abbr;
+            // Last resort: first 3 letters of last word
+            return name.split(" ").pop()?.slice(0,3).toUpperCase() || "—";
+          })(),
           ab:   parseInt(g.stat?.atBats||0),
           hits: parseInt(g.stat?.hits||0),
           hr:   parseInt(g.stat?.homeRuns||0),
@@ -1629,48 +1643,145 @@ async function fetchGames(setL, setG, setE, silent=false) {
 
 async function fetchLiveBatters(gamePk) {
   try {
-    const res = await fetch(`/api/boxscore?gamePk=${gamePk}`);
-    const data = await res.json(); const batters = [];
+    // Fetch boxscore AND live feed play-by-play simultaneously
+    // Live feed gives us real per-AB Statcast: EV, LA, distance per play
+    const [boxRes, liveRes] = await Promise.all([
+      fetch(`/api/boxscore?gamePk=${gamePk}`),
+      fetch(`https://statsapi.mlb.com/api/v1.1/game/${gamePk}/feed/live?fields=liveData,plays,allPlays,result,about,hitData,playEvents,details,type`)
+        .catch(() => null),
+    ]);
+
+    const data = await boxRes.json();
+
+    // ── Parse live feed for real Statcast per-AB data ──────────
+    // Build map: batterId → { evs[], las[], distances[], barrels, hardHits }
+    const liveStatcast = {}; // pid → accumulated in-game Statcast
+
+    if (liveRes?.ok) {
+      const liveData = await liveRes.json();
+      const plays = liveData?.liveData?.plays?.allPlays || [];
+      for (const play of plays) {
+        const batterId = play.matchup?.batter?.id;
+        if (!batterId) continue;
+        if (!liveStatcast[batterId]) {
+          liveStatcast[batterId] = { evs:[], las:[], distances:[], hardHits:0, barrels:0 };
+        }
+        // Extract Statcast from playEvents (each pitch/event in the AB)
+        for (const evt of (play.playEvents || [])) {
+          const hd = evt.hitData;
+          if (!hd?.launchSpeed) continue; // only batted balls have hitData
+          const ev = parseFloat(hd.launchSpeed || 0);
+          const la = parseFloat(hd.launchAngle || 0);
+          const dist = parseFloat(hd.totalDistance || 0);
+          if (ev > 0) {
+            liveStatcast[batterId].evs.push(ev);
+            liveStatcast[batterId].las.push(la);
+            if (dist > 0) liveStatcast[batterId].distances.push(dist);
+            // Hard hit: ≥ 95 mph per Statcast legend
+            if (ev >= 95) liveStatcast[batterId].hardHits++;
+            // Barrel: EV ≥ 98 + LA in 26-30° range (or EV ≥ 116 any LA)
+            const isBarrel = (ev >= 98 && la >= 26 && la <= 30) ||
+                             (ev >= 99 && la >= 24 && la <= 33) ||
+                             (ev >= 100 && la >= 22 && la <= 35) ||
+                             (ev >= 103 && la >= 19 && la <= 39) ||
+                             (ev >= 116);
+            if (isBarrel) liveStatcast[batterId].barrels++;
+          }
+        }
+      }
+    }
+
+    const avg = (arr) => arr.length > 0 ? Math.round(arr.reduce((a,b)=>a+b,0)/arr.length*10)/10 : null;
+
+    const batters = [];
     for (const side of ["away", "home"]) {
       const team = data.teams?.[side], ta = team?.team?.abbreviation || side.toUpperCase();
       for (const bid of (team?.batters || [])) {
         const p = team?.players?.[`ID${bid}`]; if (!p) continue;
-        // Skip pitchers — position code 1 = SP/RP
         const posCode = p?.position?.code || p?.person?.primaryPosition?.code || '';
         if (posCode === '1' || posCode === 'P') continue;
+
         const s = p?.stats?.batting || {};
-        const ab = parseInt(s.atBats || 0), hits = parseInt(s.hits || 0), hr = parseInt(s.homeRuns || 0);
-        const bb = parseInt(s.baseOnBalls || 0), so = parseInt(s.strikeOuts || 0);
-        const runs = parseInt(s.runs || 0);
-        const doubles = parseInt(s.doubles || 0), triples = parseInt(s.triples || 0);
-        const totalBases = hits + doubles + (triples * 2) + (hr * 3); // 1B=1, 2B=2, 3B=3, HR=4
-        // Seed EV/LA by player ID (bid) so each batter gets consistent values
-        const ev = hr > 0 ? (103+seededRand(bid,12)*7) : hits > 0 ? (90+seededRand(bid,13)*10) : (76+seededRand(bid,14)*12);
-        const la = hr > 0 ? (25+seededRand(bid,15)*9) : hits > 0 ? (12+seededRand(bid,16)*15) : (-3+seededRand(bid,17)*16);
-        const hh = hr > 0 ? Math.floor(2+seededRand(bid,18)*2) : hits > 1 ? 1 : 0;
-        // For live batters: look up their real Statcast data from the player cache
+        const ab     = parseInt(s.atBats || 0);
+        const hits   = parseInt(s.hits || 0);
+        const hr     = parseInt(s.homeRuns || 0);
+        const bb     = parseInt(s.baseOnBalls || 0);
+        const so     = parseInt(s.strikeOuts || 0);
+        const runs   = parseInt(s.runs || 0);
+        const doubles= parseInt(s.doubles || 0);
+        const triples= parseInt(s.triples || 0);
+        const totalBases = hits + doubles + (triples*2) + (hr*3);
+
+        // ── Real in-game Statcast ──────────────────────────────
+        const live = liveStatcast[bid];
         const cachedP = getCachedPlayer(bid);
-        const realBarrel = cachedP?.barrel || 0;
-        const realHardHit = cachedP?.hardHit || 0;
-        const realSeasonEV = cachedP?.avgEV || Math.round(ev * 10) / 10;
-        batters.push({ id: bid, name: p?.person?.fullName || `Player ${bid}`, team: ta, ab, hits, hr, bb, so, runs, totalBases,
-          avgEV: Math.round(ev * 10) / 10,
-          launchAngle: Math.round(la * 10) / 10,
-          hardHits: hh,
-          heatLabel: getLHL(ev, la, hh),
-          barrel: realBarrel,
-          hardHit: realHardHit,
-          seasonAvgEV: realSeasonEV,
-          recentBarrel: realBarrel,
-          recentHardHit: realHardHit,
-          recentAvgEV: realSeasonEV,
-          pullAirPct: cachedP?.pullAir || seededRand(bid,7)*20+12,
-          flyBallPct: cachedP?.flyBall || seededRand(bid,8)*20+28,
+
+        // In-game averages from real play-by-play hitData
+        const gameAvgEV   = live?.evs.length   > 0 ? avg(live.evs)   : null;
+        const gameAvgLA   = live?.las.length   > 0 ? avg(live.las)   : null;
+        const gameAvgDist = live?.distances.length > 0 ? avg(live.distances) : null;
+        const gameHardHits= live?.hardHits ?? 0;
+        const gameBarrels = live?.barrels  ?? 0;
+
+        // Season Statcast from cache (Baseball Savant)
+        const seasonEV    = cachedP?.avgEV    || 0;
+        const seasonBarrel= cachedP?.barrel   || 0;
+        const seasonHH    = cachedP?.hardHit  || 0;
+
+        // Display: use real in-game EV if we have it, season avg as fallback label
+        const displayEV  = gameAvgEV  ?? seasonEV;
+        const displayLA  = gameAvgLA  ?? cachedP?.launchAngle ?? 0;
+        const displayDist= gameAvgDist ?? 0;
+
+        // Heat label uses in-game EV, hard hits, LA
+        const heatLabel = getLHL(displayEV, displayLA, gameHardHits);
+
+        batters.push({
+          id: bid,
+          name: p?.person?.fullName || `Player ${bid}`,
+          team: ta,
+          pos: p?.position?.abbreviation || cachedP?.pos || '',
+          ab, hits, hr, bb, so, runs, totalBases,
+
+          // In-game Statcast (from live feed play-by-play)
+          avgEV:       gameAvgEV   !== null ? gameAvgEV   : seasonEV,
+          launchAngle: gameAvgLA   !== null ? gameAvgLA   : (cachedP?.launchAngle ?? 0),
+          avgDist:     gameAvgDist !== null ? gameAvgDist : 0,
+          hardHits:    gameHardHits, // count of ≥95mph balls in play TODAY
+
+          // Labels for UI
+          gameEVLabel: gameAvgEV !== null
+            ? `${gameAvgEV} mph avg (${live.evs.length} BIP)`
+            : seasonEV > 0 ? `${seasonEV} season avg` : "—",
+          gameHHLabel: gameHardHits > 0
+            ? `${gameHardHits} hard hit${gameHardHits>1?"s":""} today`
+            : seasonHH > 0 ? `${seasonHH}% season` : "—",
+
+          heatLabel,
+
+          // Season baselines (from Savant cache)
+          barrel:          seasonBarrel,
+          hardHit:         seasonHH,
+          seasonAvgEV:     seasonEV,
+          recentBarrel:    seasonBarrel,
+          recentHardHit:   seasonHH,
+          recentAvgEV:     seasonEV,
+          pullAirPct:      cachedP?.pullAir  || 0,
+          flyBallPct:      cachedP?.flyBall  || 0,
+          xwoba:           cachedP?.xwoba    || 0,
         });
       }
     }
-    return batters.sort((a, b) => { const o = {elite:4,hot:3,warm:2,avg:1,cold:0}; return (o[b.heatLabel.cls] || 0) - (o[a.heatLabel.cls] || 0); });
-  } catch { return SLB; }
+
+    return batters.sort((a,b) => {
+      const o = {elite:4,hot:3,warm:2,avg:1,cold:0};
+      return (o[b.heatLabel.cls]||0) - (o[a.heatLabel.cls]||0);
+    });
+
+  } catch(e) {
+    console.warn('[LiveBatters]', e.message);
+    return SLB;
+  }
 }
 
 // Cache liftoff results so they don't re-randomize on every tap
@@ -1911,7 +2022,20 @@ function GPanel({game, isLive, isFinal=false}) {
     {loading ? <div style={{padding:"20px 15px",display:"flex",alignItems:"center",gap:8}}><div className="sp" style={{width:18,height:18,borderWidth:2}}/><span style={{fontFamily:"DM Mono,monospace",fontSize:10,color:"var(--muted)"}}>Loading…</span></div>
     : (isLive || isFinal) ? <div style={{overflowX:"auto"}}>
       <table style={{width:"100%"}}>
-        <thead><tr><th style={{width:20}}></th><th>Batter</th><th>Heat</th><th>AB</th><th>H</th><th>HR</th><th><Tip text="Runs scored this game">R</Tip></th><th><Tip text="Total bases this game">TB</Tip></th><th><Tip text="Walks this game">BB</Tip></th><th><Tip text="Strikeouts this game">K</Tip></th><th>Avg EV</th><th>Launch °</th><th>Hard Hits</th></tr></thead>
+        <thead><tr>
+          <th style={{width:20}}></th>
+          <th>Batter</th><th>Heat</th>
+          <th>AB</th><th>H</th><th>HR</th>
+          <th><Tip text="Runs scored this game">R</Tip></th>
+          <th><Tip text="Total bases this game">TB</Tip></th>
+          <th><Tip text="Walks this game">BB</Tip></th>
+          <th><Tip text="Strikeouts this game">K</Tip></th>
+          <th><Tip text="Avg exit velocity this game (real Statcast). Season avg shown if no BIP yet">EV</Tip></th>
+          <th><Tip text="Avg launch angle this game">LA°</Tip></th>
+          <th><Tip text="Hard hits this game: batted balls ≥ 95 mph (Statcast definition)">🔥 HH</Tip></th>
+          <th><Tip text="Season barrel% from Baseball Savant">Brl%</Tip></th>
+          <th><Tip text="Season hard-hit% from Baseball Savant">HH%</Tip></th>
+        </tr></thead>
         <tbody>
           {(data||[]).map(b => {
             const isE = expId === b.id;
@@ -1929,9 +2053,24 @@ function GPanel({game, isLive, isFinal=false}) {
                 <td><span className={`sv ${(b.totalBases??0)>=4?"hot":(b.totalBases??0)>=2?"warm":"avg"}`}>{b.totalBases??0}</span></td>
                 <td><span className={`sv ${(b.bb??0)>0?"good":"avg"}`}>{b.bb??0}</span></td>
                 <td><span className={`sv ${(b.so??0)>=2?"cold":"avg"}`}>{b.so??0}</span></td>
-                <td><span className={`sv ${ec}`}>{b.avgEV.toFixed(1)}</span></td>
-                <td><div style={{display:"flex",flexDirection:"column",gap:1}}><span className={`sv ${inHRZ(b.launchAngle)?"good":"avg"}`}>{b.launchAngle.toFixed(1)}°</span>{zl&&<span style={{fontSize:8,color:"var(--green)",fontFamily:"DM Mono,monospace"}}>{zl}</span>}</div></td>
-                <td><span className={`sv ${b.hardHits>=2?"hot":b.hardHits===1?"warm":"avg"}`}>{b.hardHits}{b.hardHits>=2?" 🔥":""}</span></td>
+                <td>
+                  <span className={`sv ${ec}`}>{b.avgEV > 0 ? b.avgEV.toFixed(1) : "—"}</span>
+                  {b.gameEVLabel && <div style={{fontSize:8,color:"var(--muted)",fontFamily:"DM Mono,monospace",marginTop:1}}>{b.gameEVLabel}</div>}
+                </td>
+                <td>
+                  <div style={{display:"flex",flexDirection:"column",gap:1}}>
+                    <span className={`sv ${inHRZ(b.launchAngle)?"good":"avg"}`}>{b.launchAngle ? b.launchAngle.toFixed(1)+"°" : "—"}</span>
+                    {zl&&<span style={{fontSize:8,color:"var(--green)",fontFamily:"DM Mono,monospace"}}>{zl}</span>}
+                  </div>
+                </td>
+                <td>
+                  <span className={`sv ${b.hardHits>=2?"hot":b.hardHits===1?"warm":"avg"}`}>
+                    {b.hardHits}{b.hardHits>=2?" 🔥":""}
+                  </span>
+                  <div style={{fontSize:8,color:"var(--muted)",fontFamily:"DM Mono,monospace",marginTop:1}}>≥95 mph</div>
+                </td>
+                <td><span className={`sv ${(b.barrel||0)>=12?"hot":(b.barrel||0)>=8?"warm":"avg"}`}>{b.barrel>0?b.barrel.toFixed(1)+"%":"—"}</span></td>
+                <td><span className={`sv ${(b.hardHit||0)>=50?"hot":(b.hardHit||0)>=40?"warm":"avg"}`}>{b.hardHit>0?b.hardHit.toFixed(1)+"%":"—"}</span></td>
               </tr>,
               isE && <tr key={`${b.id}-x`} className="xr"><td colSpan={13}><XRow b={b}/></td></tr>
             ];
@@ -2260,15 +2399,47 @@ function ScoutingTab() {
     if (filter==="a") return wg==="A+"||wg==="A";
     if (filter==="b") return wg==="A+"||wg==="A"||wg==="B";
     if (filter==="chasers") return (p.oSwing??30)>=33;
+    // Handedness filter — vs RHP or LHP
+    // We adjust scores based on handedness when filter is active
+    if (handFilter !== "all") {
+      // Batters with platoon advantage: LHB vs RHP better, RHB vs LHP better
+      const hand = p.hand || GLOBAL_PLAYER_TEAM_MAP[p.pid]?.hand || "R";
+      const hasAdvantage = (handFilter === "R" && hand === "L") || (handFilter === "L" && hand === "R");
+      // Don't filter out — just show all but we sort by platoon-adjusted score
+    }
     return true;
   });
+
+  // Apply platoon and pitch adjustments to scores for display
+  const applyFilters = (p) => {
+    if (handFilter === "all" && pitchFilter === "all") return p;
+    const hand = p.hand || GLOBAL_PLAYER_TEAM_MAP[p.pid]?.hand || "R";
+    let adjOS = p.os || 0;
+    // Platoon boost: opposite-hand batters get +8, same-hand -5
+    if (handFilter !== "all") {
+      const hasAdv = (handFilter === "R" && hand === "L") || (handFilter === "L" && hand === "R");
+      adjOS = Math.min(100, adjOS + (hasAdv ? 8 : -5));
+    }
+    // Pitch type adjustment: use xwOBA as proxy
+    if (pitchFilter !== "all") {
+      // Simplified: contact-first batters (high AVG, low K%) handle off-speed better
+      // Power bats (high barrel%, EV) handle fastballs better
+      const isPower = (p.barrel||0) >= 10 && (p.avgEV||0) >= 92;
+      const isFB = pitchFilter.includes("FB") || pitchFilter === "Sinker" || pitchFilter === "Cutter";
+      const isOS = pitchFilter === "Slider" || pitchFilter === "Changeup" || pitchFilter === "Curveball";
+      if (isPower && isFB) adjOS = Math.min(100, adjOS + 5);
+      if (isPower && isOS) adjOS = Math.max(0, adjOS - 3);
+      if (!isPower && isOS) adjOS = Math.min(100, adjOS + 4);
+    }
+    return {...p, os: adjOS, grade: getSG(adjOS)};
+  };
   const sortValS = (p, k) => {
     const w = p.windows?.[window];
     if (k === "os") return w?.os ?? p.os ?? 0;
     if (w && k in w) return w[k];
     return p[k] ?? 0;
   };
-  const sorted = [...filtered].sort((a,b) => sortDir*(sortValS(b,sortKey)-sortValS(a,sortKey)));
+  const sorted = [...filtered].map(applyFilters).sort((a,b) => sortDir*(sortValS(b,sortKey)-sortValS(a,sortKey)));
   const apC=players.filter(p=>p.grade?.grade==="A+").length, aC=players.filter(p=>p.grade?.grade==="A").length, bC=players.filter(p=>p.grade?.grade==="B").length, chC=players.filter(p=>(p.oSwing??30)>=33).length;
   return <div>
     <div className="hrow">
