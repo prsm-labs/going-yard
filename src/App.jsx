@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const BUILD_TIMESTAMP = "2026-03-30 18:03 ET";
+const BUILD_TIMESTAMP = "2026-03-30 20:56 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -1643,53 +1643,15 @@ async function fetchGames(setL, setG, setE, silent=false) {
 
 async function fetchLiveBatters(gamePk) {
   try {
-    // Fetch boxscore AND live feed play-by-play simultaneously
-    // Live feed gives us real per-AB Statcast: EV, LA, distance per play
-    const [boxRes, liveRes] = await Promise.all([
-      fetch(`/api/boxscore?gamePk=${gamePk}`),
-      fetch(`https://statsapi.mlb.com/api/v1.1/game/${gamePk}/feed/live?fields=liveData,plays,allPlays,result,about,hitData,playEvents,details,type`)
-        .catch(() => null),
-    ]);
-
+    // Single call to our proxy — boxscore.js now fetches live feed server-side
+    // This avoids CORS errors from direct browser → statsapi.mlb.com calls
+    const boxRes = await fetch(`/api/boxscore?gamePk=${gamePk}`);
     const data = await boxRes.json();
 
-    // ── Parse live feed for real Statcast per-AB data ──────────
-    // Build map: batterId → { evs[], las[], distances[], barrels, hardHits }
-    const liveStatcast = {}; // pid → accumulated in-game Statcast
-
-    if (liveRes?.ok) {
-      const liveData = await liveRes.json();
-      const plays = liveData?.liveData?.plays?.allPlays || [];
-      for (const play of plays) {
-        const batterId = play.matchup?.batter?.id;
-        if (!batterId) continue;
-        if (!liveStatcast[batterId]) {
-          liveStatcast[batterId] = { evs:[], las:[], distances:[], hardHits:0, barrels:0 };
-        }
-        // Extract Statcast from playEvents (each pitch/event in the AB)
-        for (const evt of (play.playEvents || [])) {
-          const hd = evt.hitData;
-          if (!hd?.launchSpeed) continue; // only batted balls have hitData
-          const ev = parseFloat(hd.launchSpeed || 0);
-          const la = parseFloat(hd.launchAngle || 0);
-          const dist = parseFloat(hd.totalDistance || 0);
-          if (ev > 0) {
-            liveStatcast[batterId].evs.push(ev);
-            liveStatcast[batterId].las.push(la);
-            if (dist > 0) liveStatcast[batterId].distances.push(dist);
-            // Hard hit: ≥ 95 mph per Statcast legend
-            if (ev >= 95) liveStatcast[batterId].hardHits++;
-            // Barrel: EV ≥ 98 + LA in 26-30° range (or EV ≥ 116 any LA)
-            const isBarrel = (ev >= 98 && la >= 26 && la <= 30) ||
-                             (ev >= 99 && la >= 24 && la <= 33) ||
-                             (ev >= 100 && la >= 22 && la <= 35) ||
-                             (ev >= 103 && la >= 19 && la <= 39) ||
-                             (ev >= 116);
-            if (isBarrel) liveStatcast[batterId].barrels++;
-          }
-        }
-      }
-    }
+    // Statcast data comes pre-parsed from the server
+    // Map: batterId → { evs[], las[], distances[], hardHits, barrels }
+    const liveStatcast = data.statcastByBatter || {};
+    console.log(`[LiveBatters] gamePk=${gamePk} | Statcast entries: ${Object.keys(liveStatcast).length}`);
 
     const avg = (arr) => arr.length > 0 ? Math.round(arr.reduce((a,b)=>a+b,0)/arr.length*10)/10 : null;
 
