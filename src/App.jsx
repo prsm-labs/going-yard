@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const BUILD_TIMESTAMP = "2026-03-31 21:28 ET";
+const BUILD_TIMESTAMP = "2026-03-31 21:51 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -772,43 +772,49 @@ function PitcherTab() {
       }
     }
 
-    // Fetch stats for each pitcher from MLB Stats API
+    // Fetch pitcher stats via /api/schedule which is already proxied
+    // Use pitcher IDs from the games data (already hydrated with probablePitcher)
     const enriched = await Promise.all(pitcherList.map(async (p) => {
       try {
-        // Search for pitcher ID
-        const searchRes = await fetch(
-          `https://statsapi.mlb.com/api/v1/teams/${TEAM_IDS[p.team] || ""}/roster?rosterType=active&season=2026`
-        );
-        const searchData = await searchRes.json();
-        const rosterPlayer = (searchData.roster || []).find(r =>
-          r.person?.fullName?.toLowerCase().includes(p.name.split(" ").pop().toLowerCase()) &&
-          r.position?.code === "1"
-        );
+        // Find pitcher ID from the games data directly
+        const game = games.find(g => g.gamePk === p.gamePk);
+        const pitcherSide = p.side === "away" ? "home" : "away"; // pitcher faces batters from other side
+        // p.side is the pitcher's own team side (away or home)
+        const pitcherId = game?.[p.side]?.probablePitcherId;
 
-        if (rosterPlayer?.person?.id) {
-          const pid = rosterPlayer.person.id;
+        // Use GLOBAL_PLAYER_TEAM_MAP which has all player IDs loaded at startup
+        // Search by name match
+        const pid = pitcherId || Object.entries(GLOBAL_PLAYER_TEAM_MAP).find(([id, data]) =>
+          data.name?.toLowerCase().includes(p.name.split(" ").pop().toLowerCase())
+        )?.[0];
+
+        if (pid) {
           const statsRes = await fetch(
             `https://statsapi.mlb.com/api/v1/people/${pid}/stats?stats=season&group=pitching&season=2026&sportId=1`
           );
-          const statsData = await statsRes.json();
-          const s = statsData.stats?.[0]?.splits?.[0]?.stat || {};
-          return {
-            ...p, pid,
-            era:   s.era || "—",
-            whip:  s.whip || "—",
-            ip:    s.inningsPitched || "0",
-            k9:    s.strikeoutsPer9Inn || "—",
-            bb9:   s.walksPer9Inn || "—",
-            hr9:   parseFloat(s.homeRunsPer9 || 0),
-            hr:    parseInt(s.homeRuns || 0),
-            hits:  parseInt(s.hits || 0),
-            obp:   s.obp || "—",
-            avg:   s.avg || "—",
-            kPct:  s.strikeoutPercentage || "—",
-            bbPct: s.walkPercentage || "—",
-          };
+          if (statsRes.ok) {
+            const statsData = await statsRes.json();
+            const s = statsData.stats?.[0]?.splits?.[0]?.stat || {};
+            if (s.era || s.inningsPitched) {
+              return {
+                ...p, pid: parseInt(pid),
+                era:  s.era              || "—",
+                whip: s.whip             || "—",
+                ip:   s.inningsPitched   || "0",
+                k9:   s.strikeoutsPer9Inn|| "—",
+                bb9:  s.walksPer9Inn     || "—",
+                hr9:  parseFloat(s.homeRunsPer9 || 0),
+                hr:   parseInt(s.homeRuns || 0),
+                hits: parseInt(s.hits    || 0),
+                obp:  s.obp              || "—",
+                avg:  s.avg              || "—",
+                kPct: s.strikeoutPercentage || "—",
+                bbPct:s.walkPercentage   || "—",
+              };
+            }
+          }
         }
-      } catch(e) {}
+      } catch(e) { console.warn("[Pitcher stats]", p.name, e.message); }
       return p;
     }));
 
@@ -1365,14 +1371,14 @@ const WINDOWS = [
   {key:30, label:"L30D", tip:"Last 30 days"},
 ];
 
-function WindowButtons({ window: win, setWindow }) {
+function WindowButtons({ window: winVal, setWindow }) {
   return (
     <div style={{display:"flex",gap:5,alignItems:"center",flexWrap:"wrap"}}>
       <span style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1,marginRight:4}}>Window:</span>
       {WINDOWS.map(w => (
         <Tip key={w.key} text={w.tip}>
           <button
-            className={`chip ${win===w.key?"active":""}`}
+            className={`chip ${winVal===w.key?"active":""}`}
             onClick={()=>setWindow(w.key)}
             style={{padding:"4px 10px",fontSize:11,fontFamily:"'Oswald',sans-serif",fontWeight:600}}>
             {w.label}
@@ -1688,7 +1694,7 @@ async function fetchPlayers(setL, setP, setE, silent=false) {
           zContactPct:  r.zContact     || parseFloat(r.z_contact_percent || 0),
           hand:         r.hand         || '',
           pos:          r.pos          || '',
-        })).filter(r => r.pid && (r.avgEV > 0 || r.xwoba > 0));
+        })).filter(r => r.pid && r.name && r.name.trim() && (r.avgEV > 0 || r.xwoba > 0));
         console.log('[Players] Statcast fallback players:', statcastPlayers.length);
       } catch(fallbackErr) {
         console.error('[Players] Both APIs failed:', fallbackErr.message);
@@ -1710,7 +1716,7 @@ async function fetchPlayers(setL, setP, setE, silent=false) {
       // sc.flyBall, sc.pullPct etc are already correctly calculated
       const name = sc.name && sc.name.trim() && !sc.name.startsWith('P')
         ? sc.name
-        : GLOBAL_PLAYER_TEAM_MAP[sc.pid]?.name || sc.name || `Unknown ${sc.pid}`;
+        : GLOBAL_PLAYER_TEAM_MAP[sc.pid]?.name || sc.name || "";
 
       const p = {
         pid,
@@ -1926,6 +1932,7 @@ async function fetchGames(setL, setG, setE, silent=false) {
           score: aw?.score ?? "-",
           record: `${aw?.leagueRecord?.wins || 0}-${aw?.leagueRecord?.losses || 0}`,
           probablePitcher: awPP,
+          probablePitcherId: aw?.probablePitcher?.id || null,
           pitcherHand: awHand,
         },
         home: {
@@ -1934,6 +1941,7 @@ async function fetchGames(setL, setG, setE, silent=false) {
           score: hm?.score ?? "-",
           record: `${hm?.leagueRecord?.wins || 0}-${hm?.leagueRecord?.losses || 0}`,
           probablePitcher: hmPP,
+          probablePitcherId: hm?.probablePitcher?.id || null,
           pitcherHand: hmHand,
         },
       };
@@ -2214,6 +2222,40 @@ async function fetchPitcherData(pid, name) {
   return null;
 }
 
+const PITCHER_CACHE = {};
+
+async function fetchRealPitcher(game, side) {
+  const cacheKey = `${game.gamePk}-${side}`;
+  if (PITCHER_CACHE[cacheKey]) return PITCHER_CACHE[cacheKey];
+  const ta   = game[side]?.abbr || "MLB";
+  const name = game[side]?.probablePitcher || null;
+  const hand = game[side]?.pitcherHand || "R";
+  const base = { name: name || `${ta} Starter`, hand: hand==="L"?"LHP":"RHP", team:ta, era:"—", whip:"—", fbVelo:0, pitchMix:[], loading:false };
+  if (!name) return base;
+  try {
+    const teamId = TEAM_IDS[ta];
+    if (!teamId) return base;
+    const rRes = await fetch(`https://statsapi.mlb.com/api/v1/teams/${teamId}/roster?rosterType=active&season=2026`);
+    const rData = await rRes.json();
+    const ln = name.split(" ").pop().toLowerCase();
+    const rp = (rData.roster||[]).find(r => r.person?.fullName?.toLowerCase().includes(ln) && r.position?.code==="1");
+    if (!rp?.person?.id) return base;
+    const pid = rp.person.id;
+    const [sRes, pRes] = await Promise.all([
+      fetch(`https://statsapi.mlb.com/api/v1/people/${pid}/stats?stats=season&group=pitching&season=2026&sportId=1`),
+      fetch(`/api/pitcher?pid=${pid}&year=2026`),
+    ]);
+    const sData = await sRes.json();
+    const s = sData.stats?.[0]?.splits?.[0]?.stat || {};
+    const pData = pRes.ok ? await pRes.json() : null;
+    const result = { ...base, pid, era:s.era||"—", whip:s.whip||"—", k9:s.strikeoutsPer9Inn||"—", bb9:s.walksPer9Inn||"—", hr9:s.homeRunsPer9||"—", pitchMix:pData?.pitchMix||[] };
+    const fb = result.pitchMix.find(px => px.code==="FF" || px.name?.includes("Fastball") || px.name?.includes("FB"));
+    if (fb?.velo) result.fbVelo = parseFloat(fb.velo);
+    PITCHER_CACHE[cacheKey] = result;
+    return result;
+  } catch(e) { console.warn('[fetchRealPitcher]', e.message); return base; }
+}
+
 function genPitcher(game, side) {
   const ta = game[side]?.abbr || "MLB";
   const name = game[side]?.probablePitcher || `${ta} Starter`;
@@ -2454,8 +2496,6 @@ function GPanel({game, isLive, isFinal=false}) {
           <th><Tip text="Avg exit velocity this game (real Statcast). Season avg shown if no BIP yet">EV</Tip></th>
           <th><Tip text="Avg launch angle this game">LA°</Tip></th>
           <th><Tip text="Hard hits this game: batted balls ≥ 95 mph (Statcast definition)">🔥 HH</Tip></th>
-          <th><Tip text="Season barrel% from Baseball Savant">Brl%</Tip></th>
-          <th><Tip text="Season hard-hit% from Baseball Savant">HH%</Tip></th>
         </tr></thead>
         <tbody>
           {(data||[]).map(b => {
@@ -2490,8 +2530,7 @@ function GPanel({game, isLive, isFinal=false}) {
                   </span>
                   <div style={{fontSize:8,color:"var(--muted)",fontFamily:"DM Mono,monospace",marginTop:1}}>≥95 mph</div>
                 </td>
-                <td><span className={`sv ${(b.barrel||0)>=12?"hot":(b.barrel||0)>=8?"warm":"avg"}`}>{b.barrel>0?b.barrel.toFixed(1)+"%":"—"}</span></td>
-                <td><span className={`sv ${(b.hardHit||0)>=50?"hot":(b.hardHit||0)>=40?"warm":"avg"}`}>{b.hardHit>0?b.hardHit.toFixed(1)+"%":"—"}</span></td>
+
               </tr>,
               isE && <tr key={`${b.id}-x`} className="xr"><td colSpan={13}><XRow b={b}/></td></tr>
             ];
@@ -2616,7 +2655,12 @@ async function buildTop20(games, weatherCache) {
   const todayTeams = new Set(
     games.flatMap(g => [g.away.abbr, g.home.abbr]).filter(t => t && t !== '???')
   );
-  const active = todayTeams.size > 0 ? players.filter(p => todayTeams.has(p.team)) : players;
+  // Filter to today's teams, but always show something
+  const active = todayTeams.size > 0
+    ? players.filter(p => todayTeams.has(p.team))
+    : players;
+  // If no active players found (team abbr mismatch), use all players
+  const pool = active.length >= 10 ? active : players;
 
   // Build game context map: team → { pitcherHand, pitcherName, isHome, gameTime, vs, gamePk, parkHRScore, windBoost }
   const gameCtx = {};
@@ -2642,7 +2686,7 @@ async function buildTop20(games, weatherCache) {
   }
 
   // Score each player
-  const scored = active.map(p => {
+  const scored = pool.map(p => {
     const ctx  = gameCtx[p.team];
     const w    = weatherCache?.[p.team];
     const pf   = w?.parkFactor?.hr || 100;
@@ -2846,8 +2890,7 @@ function Top20Tab() {
       ? <div className="lw"><div className="sp"/><div className="lt">Building today's HR projections…</div></div>
       : players.length === 0
         ? <div style={{padding:'60px 20px',textAlign:'center',color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:12,lineHeight:2}}>
-            No games today or player data still loading.<br/>
-            Check back once lineups are confirmed (12–9:30 PM ET).
+            {Object.keys(PLAYER_DATA_CACHE).length === 0 ? "Loading player data… click Refresh in a moment." : "No games today or lineups not yet confirmed (12–9:30 PM ET)."}
           </div>
         : <div style={{display:'flex',flexDirection:'column',gap:8}}>
             {players.map((p, i) => {
@@ -3133,7 +3176,7 @@ function PregameTab() {
       {searchQ && <span style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{sorted.length} result{sorted.length!==1?"s":""}</span>}
     </div>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:10}}>
-      <WindowButtons win={win} setWindow={setWin}/>
+      <WindowButtons window={win} setWindow={setWin}/>
       <div className="filters" style={{margin:0}}>
         <span className="fl">Filter:</span>
         {[{key:"all",label:"All"},{key:"aplus",label:"🔴 A+"},{key:"a",label:"A+"},{key:"b",label:"B+"},{key:"hot",label:"Hot"}].map(f=>
@@ -3350,11 +3393,16 @@ function ScoutingTab() {
     : null;
 
   const filtered = players.filter(p => {
-    if (todayTeamsS.size > 0 && p.team && p.team !== "—" && p.team !== "???" && !todayTeamsS.has(p.team)) return false;
+    // Matchup/team filter takes priority over broad today filter
     if (matchupTeamsS && matchupTeamsS.size > 0) {
+      // Show only batters in this matchup
       if (p.team && p.team !== "—" && !matchupTeamsS.has(p.team)) return false;
+    } else if (selTeam) {
+      if (p.team !== selTeam) return false;
+    } else if (todayTeamsS.size > 0) {
+      // No specific selection — show today's teams only
+      if (p.team && p.team !== "—" && p.team !== "???" && !todayTeamsS.has(p.team)) return false;
     }
-    if (selTeam && p.team !== selTeam) return false;
     if (searchQ && !p.name.toLowerCase().includes(searchQ.toLowerCase())) return false;
     const wg = (p.windows?.[win]?.grade || p.grade)?.grade;
     if (filter==="aplus") return wg==="A+";
@@ -3390,7 +3438,7 @@ function ScoutingTab() {
       </div>
       <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
         <SearchBar value={searchQ} onChange={setSearchQ} placeholder="Search any batter…"/>
-        <WindowButtons win={win} setWindow={setWin}/>
+        <WindowButtons window={win} setWindow={setWin}/>
         <RefBtn refreshing={refreshing} onClick={async()=>{setRefreshing(true);await fetchPlayers(setLoading,setPlayers,setError,true);setRefreshing(false);}}/>
       </div>
     </div>
@@ -3666,7 +3714,8 @@ function BvPTab() {
           </div>
         </div>
         <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",marginBottom:7,textTransform:"uppercase",letterSpacing:1}}>Pitch Arsenal</div>
-        <div className="pmg">{pitcher.pitchMix.map(pitch=>{
+        {pitcher?.loading && <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",padding:"8px 0"}}>⟳ Loading pitch data…</div>}
+        <div className="pmg">{(pitcher.pitchMix||[]).map(pitch=>{
           const col=PCOLS[pitch.name]||"#8899a6";
           return <div key={pitch.name} className="pmc">
             <div className="pmh"><div className="pmn" style={{color:col}}>{pitch.name}</div><div className="pmp" style={{color:col}}>{pitch.pct}%</div></div>
