@@ -1015,8 +1015,7 @@ function MyPicksTab() {
           const typeName = cfg?.label?.split(" ").slice(1).join(" ") || p.type;
           rows.push([emoji, typeName, p.team||"—", p.name||"—"]);
         });
-        const csv = rows.map(r=>r.map(c=>`"${c}"`).join(",")).join("
-");
+        const csv = rows.map(r=>r.map(c=>`"${c}"`).join(",")).join("\n");
         const blob = new Blob([csv],{type:"text/csv"});
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
