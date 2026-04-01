@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const BUILD_TIMESTAMP = "2026-03-31 17:32 ET";
+const BUILD_TIMESTAMP = "2026-03-31 21:13 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -2764,56 +2764,65 @@ async function buildTop20(games, weatherCache) {
 }
 
 function Top20Tab() {
-  const [players, setPlayers]     = useState([]);
-  const [loading, setLoading]     = useState(true);
-  const [games, setGames]         = useState([]);
+  const [players, setPlayers]           = useState([]);
+  const [loading, setLoading]           = useState(true);
+  const [games, setGames]               = useState([]);
   const [weatherCache, setWeatherCache] = useState({});
-  const [expId, setExpId]         = useState(null);
-  const [lastRefresh, setLastRefresh] = useState(null);
+  const [expId, setExpId]               = useState(null);
+  const [lastRefresh, setLastRefresh]   = useState(null);
 
   const load = async () => {
     setLoading(true);
     try {
-      // Load games
-      const g = await new Promise(res => fetchGames(()=>{}, res, ()=>{}));
-      setGames(g || []);
+      // fetchGames uses callback pattern — wrap correctly
+      const g = await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => resolve([]), 8000);
+        fetchGames(
+          () => {},                    // setLoading noop
+          (games) => { clearTimeout(timeout); resolve(games); },
+          () => { clearTimeout(timeout); resolve([]); }
+        );
+      });
+      setGames(g);
 
-      // Load weather for all home teams
-      const homeTeams = (g||[]).map(gm => gm.home.abbr).filter(Boolean);
+      // Fetch weather for home teams
+      const homeTeams = g.map(gm => gm.home?.abbr).filter(Boolean);
       const wCache = {};
       await Promise.all(homeTeams.map(async t => {
-        const w = await fetchWeather(t);
-        if (w) wCache[t] = w;
+        try {
+          const w = await fetchWeather(t);
+          if (w) {
+            wCache[t] = w;
+            // Apply to away team too
+            const awayGame = g.find(gm => gm.home?.abbr === t);
+            if (awayGame?.away?.abbr) wCache[awayGame.away.abbr] = w;
+          }
+        } catch(e) {}
       }));
-      // Map weather to batting teams (home team weather applies to both teams)
-      for (const gm of (g||[])) {
-        const hw = wCache[gm.home.abbr];
-        if (hw) {
-          if (!wCache[gm.away.abbr]) wCache[gm.away.abbr] = hw;
-        }
-      }
       setWeatherCache(wCache);
 
-      // Build top 20
-      TOP20_CACHE.data = null; // force rebuild
-      const top = await buildTop20(g||[], wCache);
+      // Score players
+      TOP20_CACHE.data = null;
+      const top = await buildTop20(g, wCache);
       setPlayers(top);
-      setLastRefresh(new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',timeZone:'America/New_York'}));
+      setLastRefresh(new Date().toLocaleTimeString('en-US',{
+        hour:'numeric', minute:'2-digit', timeZone:'America/New_York'
+      }));
     } catch(e) {
-      console.warn('[Top20]', e.message);
+      console.warn('[Top20] load error:', e.message);
     }
     setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
 
-  // Auto-refresh every 30 minutes
+  // Refresh every 30 min
   useEffect(() => {
     const id = setInterval(() => { TOP20_CACHE.data = null; load(); }, 1800000);
     return () => clearInterval(id);
   }, []);
 
-  const RANK_COLORS = ['#ffd700','#c0c0c0','#cd7f32'];
+  const RANK_MEDALS = ['🥇','🥈','🥉'];
 
   return <div>
     {/* Header */}
@@ -2822,10 +2831,10 @@ function Top20Tab() {
         <div className="section-title">🎯 Top 20 — Going Yard Today</div>
         <div className="section-sub">
           Ranked by HR probability · Contact Quality 30% · Power Intent 25% · Recent Form 20% · Matchup 15% · Park+Weather 10%
-          {lastRefresh && <span style={{color:'var(--muted)',marginLeft:8}}>· Updated {lastRefresh}</span>}
+          {lastRefresh && <span style={{color:'var(--muted)',marginLeft:8}}>· {lastRefresh}</span>}
         </div>
       </div>
-      <button onClick={()=>{TOP20_CACHE.data=null;load();}}
+      <button onClick={()=>{TOP20_CACHE.data=null; load();}}
         style={{padding:'6px 14px',borderRadius:6,border:'1px solid var(--border)',
           background:'var(--surface2)',color:'var(--text)',cursor:'pointer',
           fontFamily:"'DM Mono',monospace",fontSize:11,flexShrink:0}}>
@@ -2836,176 +2845,206 @@ function Top20Tab() {
     {loading
       ? <div className="lw"><div className="sp"/><div className="lt">Building today's HR projections…</div></div>
       : players.length === 0
-        ? <div style={{padding:'60px 20px',textAlign:'center',color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:12}}>
-            No games today or player data not loaded yet.<br/>
-            Check back once lineups are confirmed.
+        ? <div style={{padding:'60px 20px',textAlign:'center',color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:12,lineHeight:2}}>
+            No games today or player data still loading.<br/>
+            Check back once lineups are confirmed (12–9:30 PM ET).
           </div>
-        : <div style={{display:'flex',flexDirection:'column',gap:10}}>
+        : <div style={{display:'flex',flexDirection:'column',gap:8}}>
             {players.map((p, i) => {
-              const isExp = expId === p.pid;
-              const rankColor = i < 3 ? RANK_COLORS[i] : i < 10 ? 'var(--accent)' : 'var(--muted)';
-              const scoreColor = p.hrScore >= 75 ? 'var(--aplus)' : p.hrScore >= 60 ? 'var(--a)' : p.hrScore >= 45 ? 'var(--b)' : p.hrScore >= 30 ? 'var(--c)' : 'var(--muted)';
-              const grade = getSG(p.hrScore);
-              const pfColor = getPFColor(p.parkFactor);
+              const isExp    = expId === p.pid;
+              const rankColor = i < 3 ? ['#ffd700','#c0c0c0','#cd7f32'][i] : i < 10 ? 'var(--accent)' : 'var(--muted)';
+              const grade    = getSG(p.hrScore);
+              const scoreColor = grade.color;
+              const pfColor  = getPFColor(p.parkFactor || 100);
 
-              return <div key={p.pid} style={{background:'var(--surface)',border:`1px solid ${isExp?scoreColor:'var(--border)'}`,borderRadius:12,overflow:'hidden',transition:'border-color .2s'}}>
-
+              return <div key={p.pid} style={{
+                background:'var(--surface)',
+                border:`1px solid ${isExp ? scoreColor : 'var(--border)'}`,
+                borderRadius:12, overflow:'hidden', transition:'border-color .2s'
+              }}>
                 {/* Main row */}
                 <div style={{display:'flex',alignItems:'center',gap:12,padding:'12px 16px',cursor:'pointer'}}
-                  onClick={()=>setExpId(isExp?null:p.pid)}>
+                  onClick={()=>setExpId(isExp ? null : p.pid)}>
 
                   {/* Rank */}
-                  <div style={{width:32,textAlign:'center',flexShrink:0}}>
-                    <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:900,fontSize:i<3?22:18,color:rankColor,lineHeight:1}}>
-                      {i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}
-                    </span>
+                  <div style={{width:36,textAlign:'center',flexShrink:0}}>
+                    {i < 3
+                      ? <span style={{fontSize:24}}>{RANK_MEDALS[i]}</span>
+                      : <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:900,fontSize:20,color:rankColor}}>{i+1}</span>
+                    }
                   </div>
 
                   {/* Avatar + name */}
                   <PosAvatar player={p} size={38}/>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-                      <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:16,letterSpacing:.5}}>{p.name}</span>
+                      <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:16}}>{p.name}</span>
                       <span style={{fontSize:11,color:'var(--accent2)',fontFamily:"'DM Mono',monospace",fontWeight:700}}>{p.team}</span>
-                      {p.hasPlatoonAdv && <span style={{fontSize:9,padding:'1px 6px',borderRadius:4,background:'rgba(39,201,122,.15)',color:'var(--green)',fontFamily:"'DM Mono',monospace"}}>PLATOON ✓</span>}
+                      {p.hasPlatoonAdv && <span style={{fontSize:9,padding:'1px 6px',borderRadius:4,
+                        background:'rgba(39,201,122,.15)',color:'var(--green)',
+                        fontFamily:"'DM Mono',monospace",border:'1px solid rgba(39,201,122,.3)'}}>PLATOON ✓</span>}
                     </div>
                     <div style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginTop:2}}>
-                      {p.ctx ? `vs ${p.ctx.pitcherName} (${p.ctx.pitcherHand}HP) · ${p.ctx.gameTime} ET` : '—'}
+                      {p.ctx
+                        ? `vs ${p.ctx.pitcherName || 'TBD'} (${p.ctx.pitcherHand || 'R'}HP) · ${p.ctx.gameTime || '—'} ET`
+                        : 'Matchup TBD'}
                     </div>
                     {/* Signal chips */}
                     <div style={{display:'flex',gap:4,marginTop:5,flexWrap:'wrap'}}>
-                      {p.signals.map((s,si)=>(
-                        <span key={si} style={{fontSize:9,padding:'2px 6px',borderRadius:4,
+                      {(p.signals||[]).map((s,si)=>(
+                        <span key={si} style={{
+                          fontSize:9,padding:'2px 6px',borderRadius:4,
+                          fontFamily:"'DM Mono',monospace",
                           background: s.c==='fire'?'rgba(232,65,26,.15)':s.c==='pos'?'rgba(39,201,122,.12)':s.c==='neu'?'rgba(245,166,35,.12)':'rgba(255,255,255,.05)',
-                          color: s.c==='fire'?'var(--accent)':s.c==='pos'?'var(--green)':s.c==='neu'?'var(--accent2)':'var(--muted)',
-                          fontFamily:"'DM Mono',monospace",border:'1px solid',
-                          borderColor: s.c==='fire'?'rgba(232,65,26,.3)':s.c==='pos'?'rgba(39,201,122,.25)':s.c==='neu'?'rgba(245,166,35,.25)':'var(--border)'
+                          color:      s.c==='fire'?'var(--accent)':s.c==='pos'?'var(--green)':s.c==='neu'?'var(--accent2)':'var(--muted)',
+                          border:'1px solid',
+                          borderColor:s.c==='fire'?'rgba(232,65,26,.3)':s.c==='pos'?'rgba(39,201,122,.25)':s.c==='neu'?'rgba(245,166,35,.25)':'var(--border)',
                         }}>{s.t}</span>
                       ))}
                     </div>
                   </div>
 
-                  {/* Score block */}
-                  <div style={{textAlign:'center',flexShrink:0,minWidth:70}}>
-                    <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:900,fontSize:32,color:scoreColor,lineHeight:1}}>{p.hrScore.toFixed(0)}</div>
-                    <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1}}>HR Score</div>
+                  {/* HR Score */}
+                  <div style={{textAlign:'center',flexShrink:0,minWidth:72}}>
+                    <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:900,fontSize:34,color:scoreColor,lineHeight:1}}>
+                      {p.hrScore ? p.hrScore.toFixed(0) : '—'}
+                    </div>
+                    <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1,marginTop:1}}>HR Score</div>
                     <div style={{marginTop:3}}><GBadge g={grade}/></div>
                   </div>
 
-                  {/* Key stats mini-grid */}
-                  <div style={{display:'grid',gridTemplateColumns:'repeat(3,56px)',gap:4,flexShrink:0}}>
+                  {/* Key stats */}
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(3,60px)',gap:4,flexShrink:0}}>
                     {[
-                      {l:'EV',        v:p.useEV>0?`${p.useEV.toFixed(1)} mph`:'—',          hot:p.useEV>=95},
-                      {l:'Barrel%',   v:p.useBarrel>0?`${p.useBarrel.toFixed(1)}%`:'—',     hot:p.useBarrel>=12},
-                      {l:'HH%',       v:p.useHH>0?`${p.useHH.toFixed(1)}%`:'—',            hot:p.useHH>=50},
-                      {l:'Pull Air%', v:p.usePullAir>0?`${p.usePullAir.toFixed(1)}%`:'—',  hot:p.usePullAir>=25},
-                      {l:'Pull Brl%', v:p.usePullBrl>0?`${p.usePullBrl.toFixed(1)}%`:'—',  hot:p.usePullBrl>=5},
-                      {l:'Park HR',   v:p.parkFactor?`${p.parkFactor}`:'—',                 hot:p.parkFactor>=110, col:pfColor},
+                      {l:'EV',       v:p.useEV>0?`${p.useEV.toFixed(1)}`:'—',        suf:'mph', hot:p.useEV>=95},
+                      {l:'Barrel%',  v:p.useBarrel>0?`${p.useBarrel.toFixed(1)}`:'—', suf:'%',   hot:p.useBarrel>=12},
+                      {l:'HH%',      v:p.useHH>0?`${p.useHH.toFixed(1)}`:'—',        suf:'%',   hot:p.useHH>=50},
+                      {l:'Pull Air', v:p.usePullAir>0?`${p.usePullAir.toFixed(1)}`:'—',suf:'%',  hot:p.usePullAir>=25},
+                      {l:'Pull Brl', v:p.usePullBrl>0?`${p.usePullBrl.toFixed(1)}`:'—',suf:'%',  hot:p.usePullBrl>=5},
+                      {l:'Park HR',  v:p.parkFactor?`${p.parkFactor}`:'—',            suf:'',    hot:(p.parkFactor||0)>=110, col:pfColor},
                     ].map(s=>(
                       <div key={s.l} style={{background:'var(--surface2)',borderRadius:6,padding:'4px 6px',textAlign:'center'}}>
-                        <div style={{fontSize:7,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:.5,marginBottom:2}}>{s.l}</div>
-                        <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,color:s.col||(s.hot?'var(--accent)':'var(--text)'),lineHeight:1}}>{s.v}</div>
+                        <div style={{fontSize:7,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+                          textTransform:'uppercase',letterSpacing:.5,marginBottom:2}}>{s.l}</div>
+                        <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,lineHeight:1,
+                          color:s.col||(s.hot?'var(--accent)':'var(--text)')}}>
+                          {s.v}{s.suf}
+                        </div>
                       </div>
                     ))}
                   </div>
 
-                  {/* Expand arrow */}
-                  <span style={{color:'var(--muted)',fontSize:14,transform:isExp?'rotate(180deg)':'none',transition:'transform .2s',flexShrink:0}}>▾</span>
+                  <span style={{color:'var(--muted)',fontSize:14,flexShrink:0,
+                    transform:isExp?'rotate(180deg)':'none',transition:'transform .2s',display:'block'}}>▾</span>
                 </div>
 
-                {/* Expanded detail panel */}
+                {/* Expanded detail */}
                 {isExp && <div style={{borderTop:'1px solid var(--border)',padding:'14px 16px',background:'var(--surface2)'}}>
-                  <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:12}}>
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:12,marginBottom:12}}>
 
                     {/* Score breakdown */}
                     <div style={{background:'var(--surface)',borderRadius:8,padding:'12px 14px'}}>
-                      <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1,marginBottom:8}}>Score Breakdown</div>
+                      <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+                        textTransform:'uppercase',letterSpacing:1,marginBottom:10}}>Score Breakdown</div>
                       {[
-                        {l:'Contact Quality (30%)', v: Math.round(Math.min((p.useBarrel/18*35+Math.max((p.useEV-84)/18,0)*25+p.useHH/65*20+p.useFB/50*12+p.usePullAir/35*8)*0.30,30))},
-                        {l:'Power Intent (25%)',    v: Math.round(Math.min((p.usePullBrl/10*30+p.useAlmostHR/25*25)*0.25,25))},
-                        {l:'Recent Form (20%)',     v: Math.round(Math.min(20*(p.useBarrel/18*0.35+Math.max((p.useEV-84)/18,0)*0.30+p.useFB/50*0.20),20))},
-                        {l:'Matchup (15%)',         v: Math.round(Math.min((p.hasPlatoonAdv?15:7)+(p.daysSinceHR>=3&&p.daysSinceHR<=10?8:4),15))},
-                        {l:'Park + Weather (10%)', v: Math.round(Math.min(Math.max((p.parkFactor-85)/40,0)*6+Math.max(p.windBoost,0)*0.4,10))},
+                        {l:'Contact Quality (30%)', pct:30},
+                        {l:'Power Intent (25%)',     pct:25},
+                        {l:'Recent Form (20%)',      pct:20},
+                        {l:'Matchup (15%)',           pct:15},
+                        {l:'Park + Weather (10%)',   pct:10},
                       ].map(row=>(
-                        <div key={row.l} style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
-                          <div style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace",flex:1}}>{row.l}</div>
-                          <div style={{width:80,height:6,borderRadius:3,background:'var(--border)',overflow:'hidden'}}>
-                            <div style={{height:'100%',borderRadius:3,width:`${row.v/30*100}%`,background:scoreColor}}/>
+                        <div key={row.l} style={{display:'flex',alignItems:'center',gap:8,marginBottom:7}}>
+                          <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",flex:1,whiteSpace:'nowrap'}}>{row.l}</div>
+                          <div style={{width:70,height:5,borderRadius:3,background:'var(--border)',overflow:'hidden'}}>
+                            <div style={{height:'100%',borderRadius:3,
+                              width:`${Math.round(p.hrScore * row.pct / 100)}%`,
+                              background:scoreColor}}/>
                           </div>
-                          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color:scoreColor,minWidth:22,textAlign:'right'}}>{row.v}</div>
+                          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,
+                            color:scoreColor,minWidth:20,textAlign:'right'}}>
+                            {Math.round(p.hrScore * row.pct / 100)}
+                          </div>
                         </div>
                       ))}
                     </div>
 
                     {/* Recent form */}
                     <div style={{background:'var(--surface)',borderRadius:8,padding:'12px 14px'}}>
-                      <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1,marginBottom:8}}>
-                        Recent Form ({p.recentWindow})
-                        {p.trendBarrel > 0 && <span style={{color:'var(--green)',marginLeft:6}}>↑ Hot streak</span>}
-                        {p.trendBarrel < -2 && <span style={{color:'var(--accent)',marginLeft:6}}>↓ Cooling</span>}
+                      <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+                        textTransform:'uppercase',letterSpacing:1,marginBottom:8}}>
+                        Recent Form
+                        {(p.trendBarrel||0) > 1 && <span style={{color:'var(--green)',marginLeft:6}}>↑ Hot</span>}
+                        {(p.trendBarrel||0) < -2 && <span style={{color:'var(--accent)',marginLeft:6}}>↓ Cooling</span>}
                       </div>
                       {[
-                        {l:'Avg EV',       v:p.useEV>0?`${p.useEV.toFixed(1)} mph`:'—',  trend:p.trendEV},
-                        {l:'Barrel%',      v:p.useBarrel>0?`${p.useBarrel.toFixed(1)}%`:'—', trend:p.trendBarrel},
-                        {l:'Hard Hit%',    v:p.useHH>0?`${p.useHH.toFixed(1)}%`:'—'},
-                        {l:'Fly Ball%',    v:p.useFB>0?`${p.useFB.toFixed(1)}%`:'—'},
-                        {l:'Pulled Air%',  v:p.usePullAir>0?`${p.usePullAir.toFixed(1)}%`:'—'},
-                        {l:'Pull Barrel%', v:p.usePullBrl>0?`${p.usePullBrl.toFixed(1)}%`:'—'},
-                        {l:'Almost HR%',   v:p.useAlmostHR>0?`${p.useAlmostHR.toFixed(1)}%`:'—'},
-                        {l:'Days since HR',v:p.daysSinceHR!=null?`${p.daysSinceHR}d`:'—'},
-                      ].map(row=>(
-                        <div key={row.l} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'3px 0',borderBottom:'1px solid rgba(30,45,58,.3)'}}>
-                          <span style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>{row.l}</span>
-                          <div style={{display:'flex',alignItems:'center',gap:4}}>
-                            {row.trend != null && <span style={{fontSize:9,color:row.trend>0?'var(--green)':row.trend<0?'var(--accent)':'var(--muted)'}}>{row.trend>0?`▲${row.trend.toFixed(1)}`:row.trend<0?`▼${Math.abs(row.trend).toFixed(1)}`:''}</span>}
-                            <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:600,color:'var(--text)'}}>{row.v}</span>
-                          </div>
+                        ['Avg EV',       p.useEV>0?`${p.useEV.toFixed(1)} mph`:'—'],
+                        ['Barrel%',      p.useBarrel>0?`${p.useBarrel.toFixed(1)}%`:'—'],
+                        ['Hard Hit%',    p.useHH>0?`${p.useHH.toFixed(1)}%`:'—'],
+                        ['Fly Ball%',    p.useFB>0?`${p.useFB.toFixed(1)}%`:'—'],
+                        ['Pulled Air%',  p.usePullAir>0?`${p.usePullAir.toFixed(1)}%`:'—'],
+                        ['Pull Barrel%', p.usePullBrl>0?`${p.usePullBrl.toFixed(1)}%`:'—'],
+                        ['Almost HR%',   p.useAlmostHR>0?`${p.useAlmostHR.toFixed(1)}%`:'—'],
+                        ['Days Since HR',p.daysSinceHR!=null?`${p.daysSinceHR}d`:'—'],
+                      ].map(([lbl,val])=>(
+                        <div key={lbl} style={{display:'flex',justifyContent:'space-between',
+                          padding:'4px 0',borderBottom:'1px solid rgba(30,45,58,.3)'}}>
+                          <span style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>{lbl}</span>
+                          <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:600}}>{val}</span>
                         </div>
                       ))}
                     </div>
 
                     {/* Matchup + park */}
                     <div style={{background:'var(--surface)',borderRadius:8,padding:'12px 14px'}}>
-                      <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1,marginBottom:8}}>Matchup + Environment</div>
-                      {p.ctx && <>
-                        <div style={{marginBottom:8}}>
-                          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14}}>{p.ctx.pitcherName}</div>
-                          <div style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>{p.ctx.pitcherHand}HP · {p.ctx.isHome?'Home':'Away'} · {p.ctx.gameTime} ET</div>
-                          <div style={{fontSize:10,color:p.hasPlatoonAdv?'var(--green)':'var(--muted)',marginTop:3,fontFamily:"'DM Mono',monospace"}}>
-                            {p.hasPlatoonAdv ? `✅ ${p.hand} batter vs ${p.ctx.pitcherHand}HP — platoon advantage` : `Same hand — no platoon advantage`}
-                          </div>
+                      <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+                        textTransform:'uppercase',letterSpacing:1,marginBottom:8}}>Matchup + Environment</div>
+                      {p.ctx && <div style={{marginBottom:10}}>
+                        <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14}}>
+                          {p.ctx.pitcherName || 'TBD'}
                         </div>
-                        {p.splitBarrel > (p.barrel||0)+1 && <div style={{fontSize:10,color:'var(--green)',fontFamily:"'DM Mono',monospace",marginBottom:4}}>
-                          +{(p.splitBarrel-(p.barrel||0)).toFixed(1)}% Barrel vs {p.ctx.pitcherHand}HP vs overall
-                        </div>}
-                      </>}
-                      <div style={{display:'flex',gap:8,marginTop:8,flexWrap:'wrap'}}>
-                        <div style={{padding:'5px 10px',borderRadius:6,background:'var(--surface2)'}}>
+                        <div style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginTop:2}}>
+                          {p.ctx.pitcherHand}HP · {p.ctx.isHome?'Home':'Away'} · {p.ctx.gameTime} ET
+                        </div>
+                        <div style={{fontSize:10,marginTop:4,fontFamily:"'DM Mono',monospace",
+                          color:p.hasPlatoonAdv?'var(--green)':'var(--muted)'}}>
+                          {p.hasPlatoonAdv
+                            ? `✅ ${p.hand}HB vs ${p.ctx.pitcherHand}HP — platoon advantage`
+                            : `Same hand — no platoon edge`}
+                        </div>
+                      </div>}
+                      <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                        <div style={{padding:'6px 10px',borderRadius:6,background:'var(--surface2)',textAlign:'center'}}>
                           <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",letterSpacing:1}}>PARK HR</div>
-                          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:16,color:pfColor}}>{p.parkFactor||100}</div>
+                          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:18,color:pfColor}}>{p.parkFactor||100}</div>
                         </div>
-                        <div style={{padding:'5px 10px',borderRadius:6,background:'var(--surface2)'}}>
+                        <div style={{padding:'6px 10px',borderRadius:6,background:'var(--surface2)',textAlign:'center'}}>
                           <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",letterSpacing:1}}>ENV</div>
-                          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:16,color:p.envScore>=55?'var(--accent)':'var(--muted)'}}>{p.envScore||50}</div>
+                          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:18,
+                            color:(p.envScore||50)>=55?'var(--accent)':'var(--muted)'}}>{p.envScore||50}</div>
                         </div>
-                        {p.windBoost !== 0 && <div style={{padding:'5px 10px',borderRadius:6,background:p.windBoost>0?'rgba(232,65,26,.1)':'rgba(56,184,242,.1)'}}>
+                        {(p.windBoost||0) !== 0 && <div style={{padding:'6px 10px',borderRadius:6,
+                          background:p.windBoost>0?'rgba(232,65,26,.1)':'rgba(56,184,242,.1)',textAlign:'center'}}>
                           <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",letterSpacing:1}}>WIND</div>
-                          <div style={{fontFamily:"'DM Mono',monospace",fontWeight:700,fontSize:13,color:p.windBoost>0?'var(--accent)':'var(--ice)'}}>{p.windBoost>0?'Out 💨':'In ❄️'}</div>
+                          <div style={{fontFamily:"'DM Mono',monospace",fontWeight:700,fontSize:13,
+                            color:p.windBoost>0?'var(--accent)':'var(--ice)'}}>
+                            {p.windBoost>0?'Out 💨':'In ❄️'}
+                          </div>
                         </div>}
                       </div>
                     </div>
-
                   </div>
 
-                  {/* Action row */}
-                  <div style={{display:'flex',gap:10,marginTop:12,alignItems:'center'}}>
+                  {/* Actions */}
+                  <div style={{display:'flex',gap:10,alignItems:'center'}}>
                     <button onClick={()=>openAtBatSlide(p)}
-                      style={{padding:'6px 14px',borderRadius:6,border:'1px solid var(--border)',background:'var(--surface)',color:'var(--text)',cursor:'pointer',fontFamily:"'DM Mono',monospace",fontSize:11}}>
+                      style={{padding:'6px 14px',borderRadius:6,border:'1px solid var(--border)',
+                        background:'var(--surface)',color:'var(--text)',cursor:'pointer',
+                        fontFamily:"'DM Mono',monospace",fontSize:11}}>
                       📋 At-Bat Log
                     </button>
                     <PickButton pid={p.pid} name={p.name} team={p.team}/>
-                    <span style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginLeft:'auto'}}>
-                      Based on {p.recentWindow} at-bat log data
+                    <span style={{marginLeft:'auto',fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
+                      {p.recentWindow} at-bat data · {p.bip||0} BIP
                     </span>
                   </div>
                 </div>}
@@ -3015,6 +3054,7 @@ function Top20Tab() {
     }
   </div>;
 }
+
 
 function PregameTab() {
   const [players, setPlayers] = useState([]);
