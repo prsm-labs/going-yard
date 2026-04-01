@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-01 10:35 ET";
+const BUILD_TIMESTAMP = "2026-04-01 12:19 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -4103,891 +4103,309 @@ function StatcastTab() {
   </div>;
 }
 
-// ══════════════════════════════════════════════════════════════
-// DATA TAB — Interactive versions of Power BI dashboard pages
-// Pages: Main · Daily EV · Daily Barrel · Pitcher v Order ·
-//        Pitcher Table · Today Projections · All Batters · All Pitchers
-// Data source: players.json (from mlbdata_aggregate.py)
-// ══════════════════════════════════════════════════════════════
 
-const DATA_PAGES = [
-  { key:'allBatters',   label:'⚾ All Batters',     sub:'EV · Barrel · HH% · grades per batter' },
-  { key:'dailyEV',      label:'⚡ Daily EV',         sub:'Exit velocity leaders today' },
-  { key:'dailyBarrel',  label:'🛢 Daily Barrel',     sub:'Barrel % leaders with contact grades' },
-  { key:'pitcherOrder', label:'⚔️ Pitcher vs Order',  sub:'Pitcher stats vs batting order' },
-  { key:'pitcherTable', label:'⚾ Pitcher Table',    sub:'Pitcher stats leaderboard' },
-  { key:'projections',  label:'🎯 Projections',      sub:'Today HR projections + weather' },
-  { key:'allPitchers',  label:'📋 All Pitchers',     sub:'Full pitcher allowed-metrics view' },
-];
+// ── WEATHER TAB ───────────────────────────────────────────────
+function WeatherTab() {
+  const [games,    setGames]    = useState([]);
+  const [weather,  setWeather]  = useState({});  // team → weather data
+  const [loading,  setLoading]  = useState(true);
+  const [lastRefresh, setLastRefresh] = useState(null);
 
-// ── Shared filter state ────────────────────────────────────────
-const PITCH_LIST = ['All','4-Seam FB','Sinker','Cutter','Slider','Changeup','Curveball','Sweeper','Splitter'];
-const HAND_LIST  = ['All','R','L'];
-const GRADE_LIST = ['All','A+','A','B','C','D','F'];
-
-// ── Data helpers ────────────────────────────────────────────────
-function applyBatterFilters(players, f) {
-  return players.filter(p => {
-    if (f.team  && f.team  !== 'All' && p.team  !== f.team)  return false;
-    if (f.hand  && f.hand  !== 'All' && p.hand  !== f.hand)  return false;
-    if (f.grade && f.grade !== 'All') {
-      const g = p.grade?.grade;
-      if (f.grade === 'A+' && g !== 'A+') return false;
-      if (f.grade === 'A'  && !['A+','A'].includes(g)) return false;
-      if (f.grade === 'B'  && !['A+','A','B'].includes(g)) return false;
-      if (f.grade === 'C'  && g !== 'C') return false;
-      if (f.grade === 'D'  && g !== 'D') return false;
-      if (f.grade === 'F'  && g !== 'F') return false;
-    }
-    if (f.minEV  && (p.avgEV  || 0) < f.minEV)  return false;
-    if (f.minBrl && (p.barrel || 0) < f.minBrl)  return false;
-    if (f.search) {
-      const q = f.search.toLowerCase();
-      if (!p.name?.toLowerCase().includes(q) && !p.team?.toLowerCase().includes(q)) return false;
-    }
-    return true;
-  });
-}
-
-// ── Shared filter bar ──────────────────────────────────────────
-function DataFilters({ filters, setFilters, showPitch=false, showGrade=false, showMinEV=false, showMinBrl=false, teams=[] }) {
-  const teamList = ['All', ...teams];
-  const Chip = ({val, cur, set, label}) => (
-    <button
-      className={`chip ${cur===val?'active':''}`}
-      onClick={() => set(val)}
-      style={{fontFamily:"'DM Mono',monospace",fontSize:10,padding:'3px 8px'}}
-    >{label||val}</button>
-  );
-
-  return <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:10,padding:'10px 14px',marginBottom:14,display:'flex',flexWrap:'wrap',gap:10,alignItems:'center'}}>
-    {/* Search */}
-    <div style={{position:'relative',flexShrink:0}}>
-      <span style={{position:'absolute',left:8,top:'50%',transform:'translateY(-50%)',color:'var(--muted)',fontSize:11}}>🔍</span>
-      <input
-        value={filters.search||''}
-        onChange={e=>setFilters(f=>({...f,search:e.target.value}))}
-        placeholder="Search batter…"
-        style={{paddingLeft:26,paddingRight:8,height:28,background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text)',fontFamily:"'DM Mono',monospace",fontSize:11,outline:'none',width:150}}
-      />
-    </div>
-
-    {/* Team */}
-    {teams.length > 0 && <div style={{display:'flex',gap:3,flexWrap:'wrap'}}>
-      {teamList.slice(0,1).map(t=><Chip key={t} val={t} cur={filters.team||'All'} set={v=>setFilters(f=>({...f,team:v}))}/>)}
-      <select value={filters.team||'All'} onChange={e=>setFilters(f=>({...f,team:e.target.value}))}
-        style={{height:26,background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,
-          color:'var(--text)',fontFamily:"'DM Mono',monospace",fontSize:10,padding:'0 6px',cursor:'pointer'}}>
-        {teamList.map(t=><option key={t} value={t}>{t}</option>)}
-      </select>
-    </div>}
-
-    {/* Batter hand */}
-    <div style={{display:'flex',gap:3,alignItems:'center'}}>
-      <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1}}>Hand</span>
-      {HAND_LIST.map(h=><Chip key={h} val={h} cur={filters.hand||'All'} set={v=>setFilters(f=>({...f,hand:v}))} label={h==='All'?'All':h+'HB'}/>)}
-    </div>
-
-    {/* Pitcher hand */}
-    <div style={{display:'flex',gap:3,alignItems:'center'}}>
-      <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1}}>vs</span>
-      {HAND_LIST.map(h=><Chip key={h} val={h} cur={filters.phand||'All'} set={v=>setFilters(f=>({...f,phand:v}))} label={h==='All'?'All':h+'HP'}/>)}
-    </div>
-
-    {/* Pitch type */}
-    {showPitch && <div style={{display:'flex',gap:3,flexWrap:'wrap',alignItems:'center'}}>
-      <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1}}>Pitch</span>
-      {PITCH_LIST.map(p=><Chip key={p} val={p} cur={filters.pitch||'All'} set={v=>setFilters(f=>({...f,pitch:v}))}
-        label={p==='All'?'All':p.split(' ').map(w=>w[0]).join('').replace('FB','FB')}/>)}
-    </div>}
-
-    {/* Grade */}
-    {showGrade && <div style={{display:'flex',gap:3,alignItems:'center'}}>
-      <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1}}>Grade</span>
-      {GRADE_LIST.map(g=><Chip key={g} val={g} cur={filters.grade||'All'} set={v=>setFilters(f=>({...f,grade:v}))}/>)}
-    </div>}
-
-    {/* Min EV */}
-    {showMinEV && <div style={{display:'flex',gap:4,alignItems:'center'}}>
-      <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1}}>Min EV</span>
-      <input type="number" value={filters.minEV||''} onChange={e=>setFilters(f=>({...f,minEV:parseFloat(e.target.value)||0}))}
-        placeholder="88" style={{width:50,height:26,background:'var(--surface2)',border:'1px solid var(--border)',
-          borderRadius:6,color:'var(--text)',fontFamily:"'DM Mono',monospace",fontSize:11,padding:'0 6px',outline:'none'}}/>
-    </div>}
-
-    {/* Min Barrel */}
-    {showMinBrl && <div style={{display:'flex',gap:4,alignItems:'center'}}>
-      <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1}}>Min Brl%</span>
-      <input type="number" value={filters.minBrl||''} onChange={e=>setFilters(f=>({...f,minBrl:parseFloat(e.target.value)||0}))}
-        placeholder="0" style={{width:44,height:26,background:'var(--surface2)',border:'1px solid var(--border)',
-          borderRadius:6,color:'var(--text)',fontFamily:"'DM Mono',monospace",fontSize:11,padding:'0 6px',outline:'none'}}/>
-    </div>}
-
-    {/* Reset */}
-    {Object.values(filters).some(v=>v&&v!=='All'&&v!=='') &&
-      <button onClick={()=>setFilters({})} style={{padding:'3px 10px',borderRadius:6,border:'1px solid var(--border)',
-        background:'none',color:'var(--muted)',cursor:'pointer',fontFamily:"'DM Mono',monospace",fontSize:10}}>✕ Reset</button>}
-  </div>;
-}
-
-// ── Sortable table head ─────────────────────────────────────────
-function SortTH({ label, col, sortKey, sortDir, onSort, tip='' }) {
-  const active = sortKey === col;
-  return <th onClick={()=>onSort(col)} style={{cursor:'pointer',whiteSpace:'nowrap',userSelect:'none',
-    color:active?'var(--accent)':'var(--muted)',position:'relative'}}>
-    <Tip text={tip}>
-      <span style={{display:'inline-flex',alignItems:'center',gap:3}}>
-        {label}
-        {active && <span style={{fontSize:9}}>{sortDir<0?'↓':'↑'}</span>}
-      </span>
-    </Tip>
-  </th>;
-}
-
-function useSort(defaultKey, defaultDir=-1) {
-  const [sortKey, setSortKey] = useState(defaultKey);
-  const [sortDir, setSortDir] = useState(defaultDir);
-  const onSort = (k) => { if(sortKey===k) setSortDir(d=>-d); else { setSortKey(k); setSortDir(-1); } };
-  const sortFn = (a,b) => {
-    const av=a[sortKey], bv=b[sortKey];
-    if(av==null&&bv==null) return 0; if(av==null) return 1; if(bv==null) return -1;
-    if(typeof av==='string') return sortDir*av.localeCompare(bv);
-    return sortDir*(bv-av);
-  };
-  return { sortKey, sortDir, onSort, sortFn };
-}
-
-// ── Stat cell helper ────────────────────────────────────────────
-function SC({ v, cls='avg', suf='' }) {
-  if(v==null||v===''||v===0&&suf==='%') return <span className="sv avg">—</span>;
-  return <span className={`sv ${cls}`}>{typeof v==='number'?(Number.isInteger(v)?v:v.toFixed(1)):v}{suf}</span>;
-}
-
-// ── PAGE 1: All Batters ────────────────────────────────────────
-function AllBattersPage() {
-  const [filters, setFilters] = useState({});
-  const { sortKey, sortDir, onSort, sortFn } = useSort('os');
-  const picks = usePicks();
-  const allPlayers = Object.values(PLAYER_DATA_CACHE).filter(p=>p.avgEV>0&&p.name&&p.team);
-  const teams = [...new Set(allPlayers.map(p=>p.team).filter(Boolean))].sort();
-
-  const filtered = applyBatterFilters(allPlayers, filters).sort(sortFn);
-
-  const TH = ({label,col,tip}) => <SortTH label={label} col={col} sortKey={sortKey} sortDir={sortDir} onSort={onSort} tip={tip}/>;
-  const evCls = v => v>=103?'dng':v>=95?'hot':v>=90?'warm':'avg';
-  const brlCls= v => v>=14?'hot':v>=8?'warm':'avg';
-  const hhCls = v => v>=50?'hot':v>=40?'warm':'avg';
-  const oCls  = v => getSG(v).cls;
-
-  return <div>
-    <DataFilters filters={filters} setFilters={setFilters} showPitch showGrade showMinEV showMinBrl teams={teams}/>
-    <div style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginBottom:8}}>
-      {filtered.length} of {allPlayers.length} batters
-    </div>
-    <div className="tw"><table style={{width:'100%'}}>
-      <thead><tr>
-        <th>#</th><th>Player</th><th>Team</th><th>Hand</th>
-        <TH label="Grade"    col="os"          tip="Overall PRISM score 0-100"/>
-        <TH label="Score"    col="os"          tip="PRISM unified score"/>
-        <TH label="EV"       col="avgEV"       tip="Avg exit velocity mph"/>
-        <TH label="Barrel%"  col="barrel"      tip="Barrel rate %"/>
-        <TH label="HH%"      col="hardHit"     tip="Hard hit % (≥95mph)"/>
-        <TH label="FB%"      col="flyBall"     tip="Fly ball %"/>
-        <TH label="Pull Air" col="pullAir"     tip="Pulled air ball %"/>
-        <TH label="Pull Brl" col="pulledBarrel"tip="Pulled barrel %"/>
-        <TH label="Chase%"   col="oSwing"      tip="Chase rate — lower is better"/>
-        <TH label="BB%"      col="bbPct"       tip="Walk rate %"/>
-        <TH label="K%"       col="kPct"        tip="Strikeout rate %"/>
-        <TH label="AVG"      col="avg"         tip="Batting average"/>
-        <TH label="HR"       col="hr"          tip="Home runs"/>
-        <TH label="AB/HR"    col="abPerHR"     tip="At bats per home run"/>
-        <TH label="Days HR"  col="daysSinceHR" tip="Days since last home run"/>
-        <th>Pick</th>
-      </tr></thead>
-      <tbody>
-        {filtered.slice(0,200).map((p,i)=>{
-          const g = p.grade || getSG(p.os||0);
-          return <tr key={p.pid}>
-            <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color:i<3?'var(--accent)':'var(--muted)'}}>{i+1}</span></td>
-            <td><div className="pn" style={{cursor:'pointer',minWidth:120}} onClick={()=>openAtBatSlide(p)}>{p.name}</div></td>
-            <td><span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--accent2)',fontWeight:700}}>{p.team}</span></td>
-            <td><span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--muted)'}}>{p.hand||'—'}</span></td>
-            <td><GBadge g={g}/></td>
-            <td><SC v={p.os} cls={oCls(p.os||0)} /></td>
-            <td><SC v={p.avgEV}        cls={evCls(p.avgEV||0)}  suf=" mph"/></td>
-            <td><SC v={p.barrel}       cls={brlCls(p.barrel||0)} suf="%"/></td>
-            <td><SC v={p.hardHit}      cls={hhCls(p.hardHit||0)} suf="%"/></td>
-            <td><SC v={p.flyBall}      cls={(p.flyBall||0)>=40?'hot':(p.flyBall||0)>=30?'warm':'avg'} suf="%"/></td>
-            <td><SC v={p.pullAir}      cls={(p.pullAir||0)>=25?'hot':'avg'} suf="%"/></td>
-            <td><SC v={p.pulledBarrel} cls={(p.pulledBarrel||0)>=8?'hot':(p.pulledBarrel||0)>=4?'warm':'avg'} suf="%"/></td>
-            <td><SC v={p.oSwing}       cls={(p.oSwing||30)<=20?'good':(p.oSwing||30)<=28?'avg':'cold'} suf="%"/></td>
-            <td><SC v={p.bbPct}        cls={(p.bbPct||0)>=10?'good':'avg'} suf="%"/></td>
-            <td><SC v={p.kPct}         cls={(p.kPct||30)>=27?'cold':'avg'} suf="%"/></td>
-            <td><SC v={p.avg!=null?parseFloat(p.avg.toFixed?p.avg.toFixed(3):p.avg):null} cls={(p.avg||0)>=0.280?'hot':(p.avg||0)>=0.240?'warm':'avg'}/></td>
-            <td><SC v={p.hr}           cls={(p.hr||0)>=8?'hot':(p.hr||0)>=3?'warm':'avg'}/></td>
-            <td><SC v={p.abPerHR||p.ab_per_hr} cls={(p.abPerHR||99)<=15?'hot':(p.abPerHR||99)<=25?'warm':'avg'}/></td>
-            <td><SC v={p.daysSinceHR} cls={(p.daysSinceHR||0)>=4&&(p.daysSinceHR||0)<=10?'hot':'avg'} suf="d"/></td>
-            <td onClick={e=>e.stopPropagation()}><PickButton pid={p.pid} name={p.name} team={p.team}/></td>
-          </tr>;
-        })}
-      </tbody>
-    </table></div>
-  </div>;
-}
-
-// ── PAGE 2: Daily EV ──────────────────────────────────────────
-function DailyEVPage() {
-  const [filters, setFilters] = useState({});
-  const { sortKey, sortDir, onSort, sortFn } = useSort('avgEV');
-  const allPlayers = Object.values(PLAYER_DATA_CACHE).filter(p=>p.avgEV>0&&p.name&&p.team);
-  const teams = [...new Set(allPlayers.map(p=>p.team).filter(Boolean))].sort();
-
-  const filtered = applyBatterFilters(allPlayers, {...filters, minEV: filters.minEV||88}).sort(sortFn);
-  const evCls = v => v>=103?'dng':v>=95?'hot':v>=90?'warm':'avg';
-
-  return <div>
-    <DataFilters filters={filters} setFilters={setFilters} showPitch showMinEV teams={teams}/>
-    <div className="cards" style={{marginBottom:14}}>
-      <div className="card"><div className="cl">🔴 EV 103+</div><div className="cv" style={{color:'var(--aplus)'}}>{filtered.filter(p=>(p.avgEV||0)>=103).length}</div><div className="cs">Elite damage</div></div>
-      <div className="card"><div className="cl">🔥 EV 95+</div><div className="cv" style={{color:'var(--a)'}}>{filtered.filter(p=>(p.avgEV||0)>=95).length}</div><div className="cs">Hard hit avg</div></div>
-      <div className="card"><div className="cl">⚡ EV 90+</div><div className="cv" style={{color:'var(--b)'}}>{filtered.filter(p=>(p.avgEV||0)>=90).length}</div><div className="cs">Above avg</div></div>
-      <div className="card"><div className="cl">📊 Total</div><div className="cv">{filtered.length}</div><div className="cs">Qualified batters</div></div>
-    </div>
-    <div className="tw"><table style={{width:'100%'}}>
-      <thead><tr>
-        <th>#</th><th>Player</th><th>Team</th>
-        <SortTH label="Avg EV"     col="avgEV"       sortKey={sortKey} sortDir={sortDir} onSort={onSort} tip="Average exit velocity"/>
-        <SortTH label="Max EV"     col="maxEV"       sortKey={sortKey} sortDir={sortDir} onSort={onSort} tip="Max exit velocity"/>
-        <SortTH label="HH%"        col="hardHit"     sortKey={sortKey} sortDir={sortDir} onSort={onSort} tip="Hard hit rate ≥95 mph"/>
-        <SortTH label="Launch°"    col="launchAngle" sortKey={sortKey} sortDir={sortDir} onSort={onSort} tip="Avg launch angle"/>
-        <SortTH label="Avg Dist"   col="avgDist"     sortKey={sortKey} sortDir={sortDir} onSort={onSort} tip="Avg distance on BIP"/>
-        <SortTH label="Barrel%"    col="barrel"      sortKey={sortKey} sortDir={sortDir} onSort={onSort} tip="Barrel rate"/>
-        <SortTH label="FB%"        col="flyBall"     sortKey={sortKey} sortDir={sortDir} onSort={onSort} tip="Fly ball rate"/>
-        <SortTH label="Almost HR%" col="almostHR"    sortKey={sortKey} sortDir={sortDir} onSort={onSort} tip="Fly balls ≥350ft, not HR"/>
-        <SortTH label="Grade"      col="os"          sortKey={sortKey} sortDir={sortDir} onSort={onSort} tip="Overall grade"/>
-        <th>Pick</th>
-      </tr></thead>
-      <tbody>
-        {filtered.slice(0,200).map((p,i)=>(
-          <tr key={p.pid}>
-            <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color:i<3?'var(--accent)':'var(--muted)'}}>{i+1}</span></td>
-            <td><div className="pn" style={{cursor:'pointer'}} onClick={()=>openAtBatSlide(p)}>{p.name}</div></td>
-            <td><span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--accent2)',fontWeight:700}}>{p.team}</span></td>
-            <td><SC v={p.avgEV}       cls={evCls(p.avgEV||0)}    suf=" mph"/></td>
-            <td><SC v={p.maxEV}       cls={evCls(p.maxEV||0)}    suf=" mph"/></td>
-            <td><SC v={p.hardHit}     cls={(p.hardHit||0)>=50?'hot':(p.hardHit||0)>=40?'warm':'avg'} suf="%"/></td>
-            <td><SC v={p.launchAngle} cls={(p.launchAngle||0)>=18&&(p.launchAngle||0)<=30?'good':'avg'} suf="°"/></td>
-            <td><SC v={p.avgDist}     cls={(p.avgDist||0)>=400?'hot':(p.avgDist||0)>=380?'warm':'avg'} suf="ft"/></td>
-            <td><SC v={p.barrel}      cls={(p.barrel||0)>=12?'hot':(p.barrel||0)>=7?'warm':'avg'}  suf="%"/></td>
-            <td><SC v={p.flyBall}     cls={(p.flyBall||0)>=40?'hot':'avg'} suf="%"/></td>
-            <td><SC v={p.almostHR||p.almostHRPct} cls={(p.almostHR||p.almostHRPct||0)>=20?'hot':'avg'} suf="%"/></td>
-            <td><GBadge g={p.grade||getSG(p.os||0)}/></td>
-            <td onClick={e=>e.stopPropagation()}><PickButton pid={p.pid} name={p.name} team={p.team}/></td>
-          </tr>
-        ))}
-      </tbody>
-    </table></div>
-  </div>;
-}
-
-// ── PAGE 3: Daily Barrel ──────────────────────────────────────
-function DailyBarrelPage() {
-  const [filters, setFilters] = useState({});
-  const { sortKey, sortDir, onSort, sortFn } = useSort('barrel');
-  const allPlayers = Object.values(PLAYER_DATA_CACHE).filter(p=>p.avgEV>0&&p.name&&p.team);
-  const teams = [...new Set(allPlayers.map(p=>p.team).filter(Boolean))].sort();
-
-  const filtered = applyBatterFilters(allPlayers, filters).sort(sortFn);
-  const brlCls = v => v>=14?'hot':v>=8?'warm':'avg';
-  const gradeCls = g => g==='A+'?'aplus':g==='A'?'a':g==='B'?'b':g==='C'?'c':g==='D'?'d':'f';
-
-  return <div>
-    <DataFilters filters={filters} setFilters={setFilters} showPitch showGrade showMinBrl teams={teams}/>
-    <div className="cards" style={{marginBottom:14}}>
-      <div className="card"><div className="cl">🛢 Brl% ≥14</div><div className="cv" style={{color:'var(--accent)'}}>{filtered.filter(p=>(p.barrel||0)>=14).length}</div><div className="cs">Elite barrel</div></div>
-      <div className="card"><div className="cl">🔥 Brl% ≥8</div><div className="cv"  style={{color:'var(--a)'}}>{filtered.filter(p=>(p.barrel||0)>=8&&(p.barrel||0)<14).length}</div><div className="cs">Strong barrel</div></div>
-      <div className="card"><div className="cl">🎯 Pull Brl ≥8</div><div className="cv" style={{color:'var(--b)'}}>{filtered.filter(p=>(p.pulledBarrel||0)>=8).length}</div><div className="cs">Pulled barrels</div></div>
-    </div>
-    <div className="tw"><table style={{width:'100%'}}>
-      <thead><tr>
-        <th>#</th><th>Player</th><th>Team</th><th>Hand</th>
-        <SortTH label="Grade"      col="os"          sortKey={sortKey} sortDir={sortDir} onSort={onSort}/>
-        <SortTH label="Barrel%"    col="barrel"      sortKey={sortKey} sortDir={sortDir} onSort={onSort} tip="Barrel rate"/>
-        <SortTH label="Pull Brl%"  col="pulledBarrel"sortKey={sortKey} sortDir={sortDir} onSort={onSort} tip="Pulled barrel rate"/>
-        <SortTH label="Pull Air%"  col="pullAir"     sortKey={sortKey} sortDir={sortDir} onSort={onSort} tip="Pulled air ball rate"/>
-        <SortTH label="Avg EV"     col="avgEV"       sortKey={sortKey} sortDir={sortDir} onSort={onSort}/>
-        <SortTH label="HH%"        col="hardHit"     sortKey={sortKey} sortDir={sortDir} onSort={onSort}/>
-        <SortTH label="FB%"        col="flyBall"     sortKey={sortKey} sortDir={sortDir} onSort={onSort}/>
-        <SortTH label="AVG"        col="avg"         sortKey={sortKey} sortDir={sortDir} onSort={onSort}/>
-        <SortTH label="xwOBA"      col="xwoba"       sortKey={sortKey} sortDir={sortDir} onSort={onSort} tip="Expected wOBA"/>
-        <SortTH label="HR Int"     col="hri"         sortKey={sortKey} sortDir={sortDir} onSort={onSort} tip="HR Intent score"/>
-        <SortTH label="Contact"    col="cq"          sortKey={sortKey} sortDir={sortDir} onSort={onSort} tip="Contact Quality score"/>
-        <th>Pick</th>
-      </tr></thead>
-      <tbody>
-        {filtered.slice(0,200).map((p,i)=>{
-          const g = p.grade||getSG(p.os||0);
-          return <tr key={p.pid}>
-            <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color:i<3?'var(--accent)':'var(--muted)'}}>{i+1}</span></td>
-            <td><div className="pn" style={{cursor:'pointer'}} onClick={()=>openAtBatSlide(p)}>{p.name}</div></td>
-            <td><span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--accent2)',fontWeight:700}}>{p.team}</span></td>
-            <td><span style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>{p.hand||'—'}</span></td>
-            <td><GBadge g={g}/></td>
-            <td><SC v={p.barrel}       cls={brlCls(p.barrel||0)} suf="%"/></td>
-            <td><SC v={p.pulledBarrel} cls={(p.pulledBarrel||0)>=8?'hot':(p.pulledBarrel||0)>=4?'warm':'avg'} suf="%"/></td>
-            <td><SC v={p.pullAir}      cls={(p.pullAir||0)>=25?'hot':'avg'} suf="%"/></td>
-            <td><SC v={p.avgEV}        cls={(p.avgEV||0)>=95?'hot':(p.avgEV||0)>=90?'warm':'avg'} suf=" mph"/></td>
-            <td><SC v={p.hardHit}      cls={(p.hardHit||0)>=50?'hot':(p.hardHit||0)>=40?'warm':'avg'} suf="%"/></td>
-            <td><SC v={p.flyBall}      cls={(p.flyBall||0)>=40?'hot':'avg'} suf="%"/></td>
-            <td><SC v={p.avg!=null?parseFloat((+p.avg).toFixed(3)):null} cls={(p.avg||0)>=0.280?'hot':'avg'}/></td>
-            <td><SC v={p.xwoba}        cls={(p.xwoba||0)>=0.380?'hot':(p.xwoba||0)>=0.330?'warm':'avg'}/></td>
-            <td><SC v={p.hri!=null?Math.round(p.hri):null} cls={(p.hri||0)>=70?'hot':(p.hri||0)>=50?'warm':'avg'}/></td>
-            <td><SC v={p.cq!=null?Math.round(p.cq):null}  cls={(p.cq||0)>=70?'hot':(p.cq||0)>=50?'warm':'avg'}/></td>
-            <td onClick={e=>e.stopPropagation()}><PickButton pid={p.pid} name={p.name} team={p.team}/></td>
-          </tr>;
-        })}
-      </tbody>
-    </table></div>
-  </div>;
-}
-
-// ── PAGE 4: Pitcher v Batting Order ──────────────────────────
-function PitcherOrderPage() {
-  const [filters, setFilters] = useState({});
-  const [games, setGames] = useState([]);
-  const [selGame, setSelGame] = useState(null);
-  const [selSide, setSelSide] = useState('away');
-  const { sortKey, sortDir, onSort, sortFn } = useSort('os');
-
-  useEffect(() => {
-    fetchGames(()=>{}, setGames, ()=>{});
-  }, []);
-
-  const allPlayers = Object.values(PLAYER_DATA_CACHE).filter(p=>p.avgEV>0&&p.name&&p.team);
-
-  // Filter batters to selected game/side
-  const gamePlayers = selGame
-    ? allPlayers.filter(p => p.team === selGame[selSide]?.abbr)
-    : allPlayers;
-
-  const filtered = applyBatterFilters(gamePlayers, filters).sort(sortFn);
-
-  const pitcherSide = selSide === 'away' ? 'home' : 'away';
-  const pitcher = selGame ? (selGame[pitcherSide]?.probablePitcher || 'TBD') : null;
-  const pitcherHand = selGame ? (selGame[pitcherSide]?.pitcherHand || 'R') : null;
-
-  return <div>
-    {/* Game selector */}
-    {games.length > 0 && <div style={{marginBottom:12}}>
-      <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1,marginBottom:6}}>Select Game</div>
-      <div className="bgs">
-        {games.map(g => (
-          <div key={g.id} className={`bgb ${selGame?.id===g.id?'active':''}`} onClick={()=>{setSelGame(g);setSelSide('away');}}>
-            <div className="bgbt">{g.away.abbr} @ {g.home.abbr}</div>
-            <div className="bgbs">{g.status==='Live'?`● Live ${g.inning||''}`:`${g.gameTime||'Pre'}`}</div>
-          </div>
-        ))}
-      </div>
-      {selGame && <div style={{display:'flex',gap:6,marginTop:8,alignItems:'center'}}>
-        <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1}}>Batting side</span>
-        {['away','home'].map(s => (
-          <button key={s} className={`chip ${selSide===s?'active':''}`} onClick={()=>setSelSide(s)}
-            style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>
-            {selGame[s].abbr} ({s})
-          </button>
-        ))}
-        {pitcher && <span style={{fontSize:11,fontFamily:"'DM Mono',monospace",color:'var(--muted)',marginLeft:8}}>
-          Facing: <strong style={{color:'var(--text)'}}>{pitcher}</strong> ({pitcherHand}HP)
-        </span>}
-      </div>}
-    </div>}
-
-    <DataFilters filters={filters} setFilters={setFilters} showPitch/>
-    <div className="tw"><table style={{width:'100%'}}>
-      <thead><tr>
-        <th>#</th><th>Batter</th><th>Hand</th>
-        <SortTH label="vs Pitcher" col="matchup" sortKey={sortKey} sortDir={sortDir} onSort={onSort} tip="Platoon matchup"/>
-        <SortTH label="Grade"      col="os"       sortKey={sortKey} sortDir={sortDir} onSort={onSort}/>
-        <SortTH label="EV"         col="avgEV"    sortKey={sortKey} sortDir={sortDir} onSort={onSort}/>
-        <SortTH label="Barrel%"    col="barrel"   sortKey={sortKey} sortDir={sortDir} onSort={onSort}/>
-        <SortTH label="FB%"        col="flyBall"  sortKey={sortKey} sortDir={sortDir} onSort={onSort}/>
-        <SortTH label="Chase%"     col="oSwing"   sortKey={sortKey} sortDir={sortDir} onSort={onSort}/>
-        <SortTH label="Pull Air%"  col="pullAir"  sortKey={sortKey} sortDir={sortDir} onSort={onSort}/>
-        <SortTH label="HR Intent"  col="hri"      sortKey={sortKey} sortDir={sortDir} onSort={onSort}/>
-        <SortTH label="HR"         col="hr"       sortKey={sortKey} sortDir={sortDir} onSort={onSort}/>
-        <SortTH label="AB/HR"      col="abPerHR"  sortKey={sortKey} sortDir={sortDir} onSort={onSort}/>
-        <th>Pick</th>
-      </tr></thead>
-      <tbody>
-        {filtered.slice(0,50).map((p,i)=>{
-          const g = p.grade||getSG(p.os||0);
-          const platoon = pitcherHand
-            ? ((p.hand==='L'&&pitcherHand==='R')||(p.hand==='R'&&pitcherHand==='L'))
-            : null;
-          const split = pitcherHand==='R' ? p.vsRHP : pitcherHand==='L' ? p.vsLHP : null;
-          return <tr key={p.pid}>
-            <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color:i<3?'var(--accent)':'var(--muted)'}}>{i+1}</span></td>
-            <td><div className="pn" style={{cursor:'pointer'}} onClick={()=>openAtBatSlide(p)}>{p.name}</div></td>
-            <td><span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--muted)'}}>{p.hand||'—'}</span></td>
-            <td>{pitcherHand
-              ? <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",fontWeight:600,
-                  color:platoon?'var(--green)':'var(--muted)',padding:'2px 6px',borderRadius:4,
-                  background:platoon?'rgba(39,201,122,.1)':'rgba(255,255,255,.04)'}}>
-                  {platoon?'✅ Platoon Adv':'Same Side'}
-                </span>
-              : <span style={{color:'var(--muted)',fontSize:10}}>—</span>}
-            </td>
-            <td><GBadge g={g}/></td>
-            <td><SC v={p.avgEV}  cls={(p.avgEV||0)>=95?'hot':(p.avgEV||0)>=90?'warm':'avg'} suf=" mph"/></td>
-            <td><SC v={split?.barrel||p.barrel}  cls={(split?.barrel||p.barrel||0)>=12?'hot':(split?.barrel||p.barrel||0)>=7?'warm':'avg'} suf="%"/></td>
-            <td><SC v={split?.flyBall||p.flyBall} cls={(split?.flyBall||p.flyBall||0)>=40?'hot':'avg'} suf="%"/></td>
-            <td><SC v={p.oSwing} cls={(p.oSwing||30)<=20?'good':(p.oSwing||30)>=35?'cold':'avg'} suf="%"/></td>
-            <td><SC v={p.pullAir} cls={(p.pullAir||0)>=25?'hot':'avg'} suf="%"/></td>
-            <td><SC v={p.hri!=null?Math.round(p.hri):null} cls={(p.hri||0)>=70?'hot':(p.hri||0)>=50?'warm':'avg'}/></td>
-            <td><SC v={p.hr} cls={(p.hr||0)>=8?'hot':(p.hr||0)>=3?'warm':'avg'}/></td>
-            <td><SC v={p.abPerHR} cls={(p.abPerHR||99)<=15?'hot':(p.abPerHR||99)<=25?'warm':'avg'}/></td>
-            <td onClick={e=>e.stopPropagation()}><PickButton pid={p.pid} name={p.name} team={p.team}/></td>
-          </tr>;
-        })}
-      </tbody>
-    </table></div>
-  </div>;
-}
-
-// ── PAGE 5: Pitcher Table ─────────────────────────────────────
-function PitcherTablePage() {
-  const [year, setYear] = useState('2026');
-  const [pitchers, setPitchers] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [search, setSearch] = useState('');
-  const [handFilter, setHandFilter] = useState('All');
-  const { sortKey, sortDir, onSort, sortFn } = useSort('hr9');
-
-  const fetchPitchers = async (yr) => {
-    setLoading(true); setPitchers([]);
+  const load = async () => {
+    setLoading(true);
     try {
-      const years = yr === 'all' ? ['2024','2025','2026'] : [yr];
-      const allResults = {};
-      for (const y of years) {
-        const res = await fetch(`https://statsapi.mlb.com/api/v1/stats?stats=season&group=pitching&gameType=R&season=${y}&sportId=1&limit=500&hydrate=person,currentTeam`);
-        if (!res.ok) continue;
-        const data = await res.json();
-        for (const l of (data.stats?.[0]?.splits || [])) {
-          const s = l.stat || {};
-          if (parseInt(s.gamesStarted||0) < 1) continue;
-          const pid = l.person?.id;
-          if (!allResults[pid] || parseFloat(s.homeRunsPer9||0) > (allResults[pid].hr9||0)) {
-            allResults[pid] = {
-              pid, year: y,
-              name: l.person?.fullName||'—',
-              team: l.team?.abbreviation||'—',
-              hand: l.person?.pitchHand?.code==='L'?'LHP':'RHP',
-              era:  parseFloat(s.era)||null,
-              whip: parseFloat(s.whip)||null,
-              ip:   s.inningsPitched||'0',
-              k9:   parseFloat(s.strikeoutsPer9Inn)||null,
-              bb9:  parseFloat(s.walksPer9Inn)||null,
-              hr9:  parseFloat(s.homeRunsPer9||0),
-              hr:   parseInt(s.homeRuns||0),
-              hits: parseInt(s.hits||0),
-              gs:   parseInt(s.gamesStarted||0),
-              obp:  parseFloat(s.obp)||null,
-              avg:  parseFloat(s.avg)||null,
-            };
-          }
-        }
-      }
-      setPitchers(Object.values(allResults));
-    } catch(e) { console.warn('[PitcherTable]', e.message); }
-    setLoading(false);
-  };
-
-  useEffect(() => { fetchPitchers(year); }, [year]);
-
-  const displayed = pitchers
-    .filter(p => {
-      if (handFilter!=='All' && p.hand!==handFilter+'HP') return false;
-      if (search && !p.name.toLowerCase().includes(search.toLowerCase()) && !p.team.toLowerCase().includes(search.toLowerCase())) return false;
-      return true;
-    })
-    .sort(sortFn);
-
-  const TH = ({label,col,tip}) => <SortTH label={label} col={col} sortKey={sortKey} sortDir={sortDir} onSort={onSort} tip={tip}/>;
-  const hr9Cls = v => v>=1.5?'hot':v>=1.0?'warm':'avg';
-
-  return <div>
-    <div className="hrow" style={{marginBottom:12,flexWrap:'wrap',gap:8}}>
-      <div style={{display:'flex',gap:5}}>
-        {['2024','2025','2026','all'].map(y=>(
-          <button key={y} className={`chip ${year===y?'active':''}`} onClick={()=>setYear(y)}
-            style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13}}>{y==='all'?'All':y}</button>
-        ))}
-      </div>
-      <div style={{display:'flex',gap:5,alignItems:'center'}}>
-        <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1}}>Hand</span>
-        {['All','R','L'].map(h=>(
-          <button key={h} className={`chip ${handFilter===h?'active':''}`} onClick={()=>setHandFilter(h)}
-            style={{fontFamily:"'DM Mono',monospace",fontSize:10}}>{h==='All'?'All':h+'HP'}</button>
-        ))}
-      </div>
-      <div style={{position:'relative'}}>
-        <span style={{position:'absolute',left:8,top:'50%',transform:'translateY(-50%)',color:'var(--muted)',fontSize:11}}>🔍</span>
-        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search pitcher…"
-          style={{paddingLeft:26,height:28,background:'var(--surface2)',border:'1px solid var(--border)',
-            borderRadius:6,color:'var(--text)',fontFamily:"'DM Mono',monospace",fontSize:11,outline:'none',width:160}}/>
-      </div>
-    </div>
-
-    {loading
-      ? <div className="lw"><div className="sp"/><div className="lt">Loading {year} pitcher stats…</div></div>
-      : <div className="tw"><table style={{width:'100%'}}>
-          <thead><tr>
-            <th>#</th><th>Pitcher</th><th>Team</th><th>Hand</th>
-            <TH label="GS"    col="gs"   tip="Games started"/>
-            <TH label="IP"    col="ip"   tip="Innings pitched"/>
-            <TH label="ERA"   col="era"  tip="Earned run average — lower is better"/>
-            <TH label="WHIP"  col="whip" tip="Walks+hits per inning"/>
-            <TH label="HR/9"  col="hr9"  tip="HR per 9 innings — higher = more hittable"/>
-            <TH label="HR"    col="hr"   tip="Home runs allowed"/>
-            <TH label="OBP"   col="obp"  tip="Opponent on-base %"/>
-            <TH label="BAA"   col="avg"  tip="Batting average against"/>
-            <TH label="K/9"   col="k9"   tip="Strikeouts per 9"/>
-            <TH label="BB/9"  col="bb9"  tip="Walks per 9"/>
-            <TH label="Hits"  col="hits" tip="Hits allowed"/>
-          </tr></thead>
-          <tbody>
-            {displayed.slice(0,200).map((p,i)=>(
-              <tr key={p.pid}>
-                <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color:i<3?'var(--accent)':'var(--muted)'}}>{i+1}</span></td>
-                <td><div className="pn">{p.name}</div></td>
-                <td><span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--accent2)',fontWeight:700}}>{p.team}</span></td>
-                <td><span style={{fontSize:10,fontFamily:"'DM Mono',monospace",padding:'2px 6px',borderRadius:4,
-                  background:p.hand==='LHP'?'rgba(56,184,242,.1)':'rgba(232,65,26,.08)',
-                  color:p.hand==='LHP'?'var(--ice)':'var(--accent)'}}>{p.hand}</span></td>
-                <td><SC v={p.gs}/></td>
-                <td><SC v={p.ip}/></td>
-                <td><SC v={p.era}  cls={(p.era||0)>=5?'hot':(p.era||0)>=4?'warm':(p.era||0)>0?'good':'avg'}/></td>
-                <td><SC v={p.whip} cls={(p.whip||0)>=1.4?'hot':(p.whip||0)>=1.2?'warm':'avg'}/></td>
-                <td><SC v={p.hr9}  cls={hr9Cls(p.hr9||0)}/></td>
-                <td><SC v={p.hr}   cls={(p.hr||0)>=10?'hot':(p.hr||0)>=5?'warm':'avg'}/></td>
-                <td><SC v={p.obp}  cls={(p.obp||0)>=0.360?'hot':(p.obp||0)>=0.320?'warm':'avg'}/></td>
-                <td><SC v={p.avg}  cls={(p.avg||0)>=0.280?'hot':(p.avg||0)>=0.250?'warm':'avg'}/></td>
-                <td><SC v={p.k9}   cls={(p.k9||0)>=9?'good':(p.k9||0)>=7?'avg':'cold'}/></td>
-                <td><SC v={p.bb9}  cls={(p.bb9||0)>=3.5?'hot':'avg'}/></td>
-                <td><SC v={p.hits}/></td>
-              </tr>
-            ))}
-          </tbody>
-        </table></div>
-    }
-  </div>;
-}
-
-// ── PAGE 6: Today Projections ─────────────────────────────────
-function TodayProjectionsPage() {
-  const [games, setGames] = useState([]);
-  const [weatherMap, setWeatherMap] = useState({});
-  const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({});
-  const { sortKey, sortDir, onSort, sortFn } = useSort('os');
-
-  useEffect(() => {
-    (async () => {
-      const g = await new Promise(res => {
-        const t = setTimeout(()=>res([]),8000);
-        fetchGames(()=>{}, games=>{clearTimeout(t);res(games);}, ()=>{clearTimeout(t);res([]);});
+      // Fetch today's schedule
+      const g = await new Promise((resolve) => {
+        const t = setTimeout(() => resolve([]), 8000);
+        fetchGames(
+          () => {},
+          (games) => { clearTimeout(t); resolve(games); },
+          () => { clearTimeout(t); resolve([]); }
+        );
       });
       setGames(g);
-      // Weather
-      const wm = {};
-      await Promise.all(g.map(async gm => {
-        const w = await fetchWeather(gm.home?.abbr).catch(()=>null);
-        if (w) { wm[gm.away?.abbr] = w; wm[gm.home?.abbr] = w; }
+
+      // Fetch weather for every home team (weather applies to both teams)
+      const wMap = {};
+      await Promise.all(g.map(async (game) => {
+        const homeTeam = game.home?.abbr;
+        if (!homeTeam) return;
+        try {
+          const w = await fetchWeather(homeTeam);
+          if (w) {
+            wMap[homeTeam]          = w;
+            wMap[game.away?.abbr]   = w; // same ballpark
+          }
+        } catch(e) {}
       }));
-      setWeatherMap(wm);
-      setLoading(false);
-    })();
-  }, []);
-
-  const todayTeams = new Set(games.flatMap(g=>[g.away?.abbr,g.home?.abbr]).filter(Boolean));
-  const allPlayers = Object.values(PLAYER_DATA_CACHE).filter(p=>p.avgEV>0&&p.name&&p.team);
-  const todayPlayers = todayTeams.size > 0 ? allPlayers.filter(p=>todayTeams.has(p.team)) : allPlayers;
-
-  // Build game context map
-  const gameCtx = {};
-  for (const g of games) {
-    if (g.away?.abbr) gameCtx[g.away.abbr] = { pitcherHand: g.home?.pitcherHand||'R', pitcherName: g.home?.probablePitcher||'TBD', isHome:false, gameTime:g.gameTime||'—', vs:g.home?.abbr };
-    if (g.home?.abbr) gameCtx[g.home.abbr] = { pitcherHand: g.away?.pitcherHand||'R', pitcherName: g.away?.probablePitcher||'TBD', isHome:true, gameTime:g.gameTime||'—', vs:g.away?.abbr };
-  }
-
-  const teams = [...new Set(todayPlayers.map(p=>p.team).filter(Boolean))].sort();
-  const filtered = applyBatterFilters(todayPlayers, filters).sort(sortFn);
-
-  const TH = ({label,col,tip}) => <SortTH label={label} col={col} sortKey={sortKey} sortDir={sortDir} onSort={onSort} tip={tip}/>;
-
-  return <div>
-    {loading && <div className="lw"><div className="sp"/><div className="lt">Loading today's games…</div></div>}
-
-    {/* Game weather cards */}
-    {games.length > 0 && <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))',gap:8,marginBottom:14}}>
-      {games.map(g => {
-        const w = weatherMap[g.home?.abbr];
-        const pf = w?.parkFactor?.hr || 100;
-        const pfC = getPFColor(pf);
-        return <div key={g.gamePk} style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:8,padding:'10px 12px'}}>
-          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13}}>{g.away?.abbr} @ {g.home?.abbr}</div>
-          <div style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginTop:2}}>{g.gameTime||'TBD'} ET</div>
-          <div style={{display:'flex',gap:10,marginTop:6}}>
-            <div><div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",letterSpacing:1}}>PARK HR</div>
-              <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:16,color:pfC}}>{pf}</div></div>
-            {w?.weather && !w.weather.isDome && <div>
-              <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",letterSpacing:1}}>WIND</div>
-              <div style={{fontSize:11,fontFamily:"'DM Mono',monospace",color:(w.weather.windSpeed||0)>=12&&w.weather.windLabel?.includes('Out')?'var(--accent)':'var(--text)'}}>
-                {w.weather.windLabel||`${w.weather.windSpeed||0}mph`}
-              </div>
-            </div>}
-            {w?.weather && <div>
-              <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",letterSpacing:1}}>TEMP</div>
-              <div style={{fontSize:11,fontFamily:"'DM Mono',monospace"}}>{w.weather.temp||'—'}°F</div>
-            </div>}
-          </div>
-        </div>;
-      })}
-    </div>}
-
-    <DataFilters filters={filters} setFilters={setFilters} showGrade teams={teams}/>
-    <div className="tw"><table style={{width:'100%'}}>
-      <thead><tr>
-        <th>#</th><th>Player</th><th>Team</th>
-        <th>Matchup</th>
-        <TH label="Grade"   col="os"    />
-        <TH label="Platoon" col="hasPlatAdv" tip="Platoon advantage vs today's pitcher"/>
-        <TH label="EV"      col="avgEV" />
-        <TH label="Barrel%" col="barrel"/>
-        <TH label="HH%"     col="hardHit"/>
-        <TH label="Pull Brl%" col="pulledBarrel"/>
-        <TH label="Park HR"   col="parkFactor" tip="Park HR factor — above 100 = HR friendly"/>
-        <TH label="Days HR"   col="daysSinceHR"/>
-        <th>Pick</th>
-      </tr></thead>
-      <tbody>
-        {filtered.slice(0,100).map((p,i)=>{
-          const ctx = gameCtx[p.team];
-          const platAdv = ctx ? ((p.hand==='L'&&ctx.pitcherHand==='R')||(p.hand==='R'&&ctx.pitcherHand==='L')) : false;
-          const parkHR = weatherMap[p.team]?.parkFactor?.hr || 100;
-          const g = p.grade||getSG(p.os||0);
-          return <tr key={p.pid}>
-            <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color:i<3?'var(--accent)':'var(--muted)'}}>{i+1}</span></td>
-            <td><div className="pn" style={{cursor:'pointer'}} onClick={()=>openAtBatSlide(p)}>{p.name}</div></td>
-            <td><span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--accent2)',fontWeight:700}}>{p.team}</span></td>
-            <td><div style={{fontSize:10,fontFamily:"'DM Mono',monospace"}}>
-              {ctx ? <><span style={{color:'var(--text)'}}>{ctx.pitcherName}</span> <span style={{color:'var(--muted)'}}>({ctx.pitcherHand}HP)</span></> : '—'}
-            </div></td>
-            <td><GBadge g={g}/></td>
-            <td>{ctx ? <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",fontWeight:600,
-              color:platAdv?'var(--green)':'var(--muted)',padding:'2px 6px',borderRadius:4,
-              background:platAdv?'rgba(39,201,122,.1)':'rgba(255,255,255,.03)'}}>
-              {platAdv?'✅':'—'}</span> : '—'}</td>
-            <td><SC v={p.avgEV}        cls={(p.avgEV||0)>=95?'hot':(p.avgEV||0)>=90?'warm':'avg'} suf=" mph"/></td>
-            <td><SC v={p.barrel}       cls={(p.barrel||0)>=12?'hot':(p.barrel||0)>=7?'warm':'avg'} suf="%"/></td>
-            <td><SC v={p.hardHit}      cls={(p.hardHit||0)>=50?'hot':(p.hardHit||0)>=40?'warm':'avg'} suf="%"/></td>
-            <td><SC v={p.pulledBarrel} cls={(p.pulledBarrel||0)>=8?'hot':(p.pulledBarrel||0)>=4?'warm':'avg'} suf="%"/></td>
-            <td><SC v={parkHR} cls={getPFColor(parkHR)!=='var(--muted)'?'hot':'avg'}/></td>
-            <td><SC v={p.daysSinceHR} cls={(p.daysSinceHR||0)>=3&&(p.daysSinceHR||0)<=10?'hot':'avg'} suf="d"/></td>
-            <td onClick={e=>e.stopPropagation()}><PickButton pid={p.pid} name={p.name} team={p.team}/></td>
-          </tr>;
-        })}
-      </tbody>
-    </table></div>
-  </div>;
-}
-
-// ── PAGE 7: All Pitchers ───────────────────────────────────────
-function AllPitchersPage() {
-  const [year, setYear] = useState('2026');
-  const [pitchers, setPitchers] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [filters, setFilters] = useState({});
-  const { sortKey, sortDir, onSort, sortFn } = useSort('hr9');
-
-  const fetchPitchers = async (yr) => {
-    setLoading(true); setPitchers([]);
-    try {
-      const yrs = yr==='all'?['2024','2025','2026']:[yr];
-      const all = {};
-      for (const y of yrs) {
-        const res = await fetch(`https://statsapi.mlb.com/api/v1/stats?stats=season&group=pitching&gameType=R&season=${y}&sportId=1&limit=500&hydrate=person,currentTeam`);
-        if (!res.ok) continue;
-        const d = await res.json();
-        for (const l of (d.stats?.[0]?.splits||[])) {
-          const s=l.stat||{}, pid=l.person?.id;
-          if (!pid) continue;
-          all[`${pid}-${y}`] = {
-            pid, year:y, name:l.person?.fullName||'—', team:l.team?.abbreviation||'—',
-            hand:l.person?.pitchHand?.code==='L'?'LHP':'RHP',
-            era:parseFloat(s.era)||null, whip:parseFloat(s.whip)||null, ip:s.inningsPitched||'0',
-            k9:parseFloat(s.strikeoutsPer9Inn)||null, bb9:parseFloat(s.walksPer9Inn)||null,
-            hr9:parseFloat(s.homeRunsPer9||0), hr:parseInt(s.homeRuns||0),
-            hpct:parseFloat(s.homeRunsPer9||0), fbPct:null, hhPct:null,
-            gs:parseInt(s.gamesStarted||0), g:parseInt(s.gamesPlayed||0),
-            hits:parseInt(s.hits||0), obp:parseFloat(s.obp)||null, avg:parseFloat(s.avg)||null,
-          };
-        }
-      }
-      setPitchers(Object.values(all));
-    } catch(e) {}
+      setWeather(wMap);
+      setLastRefresh(new Date().toLocaleTimeString('en-US',{
+        hour:'numeric', minute:'2-digit', timeZone:'America/New_York'
+      }));
+    } catch(e) {
+      console.warn('[WeatherTab]', e.message);
+    }
     setLoading(false);
   };
 
-  useEffect(()=>{ fetchPitchers(year); },[year]);
+  useEffect(() => { load(); }, []);
 
-  const hand = filters.phand||'All';
-  const search = filters.search||'';
-  const displayed = pitchers
-    .filter(p=>{
-      if (hand!=='All'&&p.hand!==hand+'HP') return false;
-      if (search&&!p.name.toLowerCase().includes(search.toLowerCase())&&!p.team.toLowerCase().includes(search.toLowerCase())) return false;
-      return true;
-    })
-    .sort(sortFn);
-
-  const TH = ({label,col,tip}) => <SortTH label={label} col={col} sortKey={sortKey} sortDir={sortDir} onSort={onSort} tip={tip}/>;
-
-  return <div>
-    <div className="hrow" style={{marginBottom:12,flexWrap:'wrap',gap:8}}>
-      <div style={{display:'flex',gap:5}}>
-        {['2024','2025','2026','all'].map(y=>(
-          <button key={y} className={`chip ${year===y?'active':''}`} onClick={()=>setYear(y)}
-            style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13}}>{y==='all'?'All':y}</button>
-        ))}
-      </div>
-      <div style={{display:'flex',gap:4,alignItems:'center'}}>
-        <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1}}>Hand</span>
-        {['All','R','L'].map(h=><button key={h} className={`chip ${hand===h?'active':''}`}
-          onClick={()=>setFilters(f=>({...f,phand:h}))}
-          style={{fontFamily:"'DM Mono',monospace",fontSize:10}}>{h==='All'?'All':h+'HP'}</button>)}
-      </div>
-      <div style={{position:'relative'}}>
-        <span style={{position:'absolute',left:8,top:'50%',transform:'translateY(-50%)',color:'var(--muted)',fontSize:11}}>🔍</span>
-        <input value={search} onChange={e=>setFilters(f=>({...f,search:e.target.value}))} placeholder="Search…"
-          style={{paddingLeft:26,height:28,background:'var(--surface2)',border:'1px solid var(--border)',
-            borderRadius:6,color:'var(--text)',fontFamily:"'DM Mono',monospace",fontSize:11,outline:'none',width:160}}/>
-      </div>
-    </div>
-
-    {loading
-      ? <div className="lw"><div className="sp"/><div className="lt">Loading pitcher stats…</div></div>
-      : <div className="tw"><table style={{width:'100%'}}>
-          <thead><tr>
-            <th>#</th><th>Pitcher</th><th>Team</th><th>Hand</th><th>Year</th>
-            <TH label="G"     col="g"    tip="Games appeared"/>
-            <TH label="GS"    col="gs"   tip="Games started"/>
-            <TH label="ERA"   col="era"  tip="ERA — lower is better"/>
-            <TH label="WHIP"  col="whip" tip="Walks+hits per inning"/>
-            <TH label="HR/9"  col="hr9"  tip="HR per 9 — higher = more hittable for us"/>
-            <TH label="HR"    col="hr"   tip="HR allowed"/>
-            <TH label="OBP"   col="obp"  tip="Opp. OBP"/>
-            <TH label="BAA"   col="avg"  tip="Batting avg against"/>
-            <TH label="K/9"   col="k9"   tip="K's per 9"/>
-            <TH label="BB/9"  col="bb9"  tip="Walks per 9"/>
-            <TH label="H"     col="hits" tip="Hits allowed"/>
-          </tr></thead>
-          <tbody>
-            {displayed.slice(0,300).map((p,i)=>(
-              <tr key={`${p.pid}-${p.year}`}>
-                <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color:i<3?'var(--accent)':'var(--muted)'}}>{i+1}</span></td>
-                <td><div className="pn">{p.name}</div></td>
-                <td><span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--accent2)',fontWeight:700}}>{p.team}</span></td>
-                <td><span style={{fontSize:10,fontFamily:"'DM Mono',monospace",padding:'2px 6px',borderRadius:4,
-                  background:p.hand==='LHP'?'rgba(56,184,242,.1)':'rgba(232,65,26,.08)',
-                  color:p.hand==='LHP'?'var(--ice)':'var(--accent)'}}>{p.hand}</span></td>
-                <td><span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--muted)'}}>{p.year}</span></td>
-                <td><SC v={p.g}/></td>
-                <td><SC v={p.gs}/></td>
-                <td><SC v={p.era}  cls={(p.era||0)>=5?'hot':(p.era||0)>=4?'warm':(p.era||0)>0?'good':'avg'}/></td>
-                <td><SC v={p.whip} cls={(p.whip||0)>=1.4?'hot':(p.whip||0)>=1.2?'warm':'avg'}/></td>
-                <td><SC v={p.hr9}  cls={(p.hr9||0)>=1.5?'hot':(p.hr9||0)>=1.0?'warm':'avg'}/></td>
-                <td><SC v={p.hr}   cls={(p.hr||0)>=10?'hot':(p.hr||0)>=5?'warm':'avg'}/></td>
-                <td><SC v={p.obp}  cls={(p.obp||0)>=0.360?'hot':(p.obp||0)>=0.320?'warm':'avg'}/></td>
-                <td><SC v={p.avg}  cls={(p.avg||0)>=0.280?'hot':'avg'}/></td>
-                <td><SC v={p.k9}   cls={(p.k9||0)>=9?'good':(p.k9||0)>=7?'avg':'cold'}/></td>
-                <td><SC v={p.bb9}  cls={(p.bb9||0)>=3.5?'hot':'avg'}/></td>
-                <td><SC v={p.hits}/></td>
-              </tr>
-            ))}
-          </tbody>
-        </table></div>
-    }
-  </div>;
-}
-
-// ── MAIN DATA TAB SHELL ────────────────────────────────────────
-function DataTab() {
-  const [page, setPage] = useState('allBatters');
-  const [loading, setLoading] = useState(true);
-
-  // Make sure player cache is populated
-  useEffect(() => {
-    const noop = ()=>{};
-    if (Object.keys(PLAYER_DATA_CACHE).length < 5) {
-      fetchPlayers(noop, noop, noop, false).then(()=>setLoading(false));
-    } else {
-      setLoading(false);
-    }
-  }, []);
-
-  const current = DATA_PAGES.find(p=>p.key===page);
-
-  const pageComponents = {
-    allBatters:   <AllBattersPage/>,
-    dailyEV:      <DailyEVPage/>,
-    dailyBarrel:  <DailyBarrelPage/>,
-    pitcherOrder: <PitcherOrderPage/>,
-    pitcherTable: <PitcherTablePage/>,
-    projections:  <TodayProjectionsPage/>,
-    allPitchers:  <AllPitchersPage/>,
+  // Wind impact label
+  const windImpact = (w) => {
+    if (!w || w.isDome) return { label:'🏟️ Dome', color:'var(--muted)', cls:'neutral' };
+    const label = w.windLabel || '';
+    const spd   = w.windSpeed || 0;
+    if (label.toLowerCase().includes('out') && spd >= 15) return { label:`💨 Blowing Out ${spd}mph`, color:'#ff4020', cls:'out-strong' };
+    if (label.toLowerCase().includes('out') && spd >= 8)  return { label:`💨 Out ${spd}mph`,         color:'#ff8020', cls:'out-mild' };
+    if (label.toLowerCase().includes('in')  && spd >= 12) return { label:`❄️ Blowing In ${spd}mph`,  color:'#38b8f2', cls:'in-strong' };
+    if (label.toLowerCase().includes('in')  && spd >= 6)  return { label:`🌬️ In ${spd}mph`,          color:'#60a0d0', cls:'in-mild' };
+    if (label.toLowerCase().includes('cross'))             return { label:`↔️ Crosswind ${spd}mph`,   color:'var(--muted)', cls:'cross' };
+    if (spd >= 10) return { label:`🌬️ ${spd}mph`, color:'var(--muted)', cls:'windy' };
+    return { label:`${spd < 3 ? '🌤️ Calm' : `🌤️ ${spd}mph`}`, color:'var(--muted)', cls:'calm' };
   };
 
-  return <div>
-    {/* Page selector header */}
-    <div style={{display:'flex',alignItems:'flex-start',gap:12,marginBottom:16,flexWrap:'wrap'}}>
-      <div>
-        <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:900,fontSize:22,letterSpacing:1,textTransform:'uppercase'}}>
-          📊 Data
-        </div>
-        <div style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginTop:2}}>
-          {current?.sub}
-        </div>
-      </div>
-      {/* Page pills */}
-      <div style={{display:'flex',gap:5,flexWrap:'wrap',marginLeft:'auto',alignItems:'center'}}>
-        {DATA_PAGES.map(p=>(
-          <button key={p.key}
-            onClick={()=>setPage(p.key)}
-            style={{
-              padding:'5px 12px',borderRadius:8,cursor:'pointer',
-              fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:600,
-              transition:'all .15s',
-              background:page===p.key?'var(--accent)':'var(--surface2)',
-              color:page===p.key?'white':'var(--muted)',
-              border:page===p.key?'1px solid var(--accent)':'1px solid var(--border)',
-            }}>{p.label}</button>
-        ))}
-      </div>
-    </div>
+  // HR impact label combining park + wind + temp
+  const hrImpact = (w, pf) => {
+    if (!w || w.isDome) return { label:'Dome', color:'var(--muted)' };
+    const env = w.hrEnvScore || 50;
+    const pfv = pf?.hr || 100;
+    const combined = (env * 0.6) + (Math.min(Math.max((pfv - 85) / 30 * 100, 0), 100) * 0.4);
+    if (combined >= 72) return { label:'🔥 HR Friendly',   color:'#ff4020' };
+    if (combined >= 58) return { label:'📈 Slight Boost',  color:'#ff8020' };
+    if (combined >= 42) return { label:'— Neutral',        color:'var(--muted)' };
+    if (combined >= 28) return { label:'📉 Suppressor',    color:'#60a0d0' };
+    return                     { label:'🧊 Pitcher Park',  color:'#38b8f2' };
+  };
 
-    {loading
-      ? <div className="lw"><div className="sp"/><div className="lt">Loading player data…</div></div>
-      : Object.keys(PLAYER_DATA_CACHE).length === 0
-        ? <div style={{padding:'40px',textAlign:'center',color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:12,lineHeight:2}}>
-            Player data not yet available.<br/>
-            Run <code style={{color:'var(--accent2)'}}>mlbdata_aggregate.py</code> and commit <code style={{color:'var(--accent2)'}}>players.json</code>.
+  return (
+    <div>
+      {/* Header */}
+      <div className="hrow" style={{marginBottom:16}}>
+        <div className="section-header">
+          <div className="section-title">🌤️ Game Day Weather</div>
+          <div className="section-sub">
+            Park factors · conditions · wind direction · HR environment
+            {lastRefresh && <span style={{color:'var(--muted)',marginLeft:8}}>· {lastRefresh}</span>}
           </div>
-        : pageComponents[page]
-    }
-  </div>;
-}
+        </div>
+        <button onClick={load}
+          style={{padding:'6px 14px',borderRadius:6,border:'1px solid var(--border)',
+            background:'var(--surface2)',color:'var(--text)',cursor:'pointer',
+            fontFamily:"'DM Mono',monospace",fontSize:11,flexShrink:0}}>
+          ↻ Refresh
+        </button>
+      </div>
 
+      {loading
+        ? <div className="lw"><div className="sp"/><div className="lt">Loading weather data…</div></div>
+        : games.length === 0
+          ? <div style={{padding:'60px 20px',textAlign:'center',color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:12}}>
+              No games scheduled today.
+            </div>
+          : <>
+              {/* Summary chips */}
+              <div style={{display:'flex',gap:8,marginBottom:16,flexWrap:'wrap'}}>
+                {[
+                  { label:'💨 Blowing Out', count: games.filter(g => {const w=weather[g.home?.abbr]?.weather; return w&&!w.isDome&&(w.windLabel||'').toLowerCase().includes('out')&&(w.windSpeed||0)>=8;}).length, color:'#ff4020' },
+                  { label:'❄️ Blowing In',  count: games.filter(g => {const w=weather[g.home?.abbr]?.weather; return w&&!w.isDome&&(w.windLabel||'').toLowerCase().includes('in')&&(w.windSpeed||0)>=8;}).length, color:'#38b8f2' },
+                  { label:'🏟️ Domes',       count: games.filter(g => weather[g.home?.abbr]?.weather?.isDome).length, color:'var(--muted)' },
+                  { label:'🌧️ Rain Risk',   count: games.filter(g => (weather[g.home?.abbr]?.weather?.precip||0)>0).length, color:'#60a0d0' },
+                ].filter(s=>s.count>0).map(s=>(
+                  <div key={s.label} style={{
+                    padding:'6px 14px',borderRadius:8,
+                    background:'var(--surface)',border:`1px solid ${s.color}30`,
+                    fontFamily:"'DM Mono',monospace",fontSize:11,
+                    display:'flex',alignItems:'center',gap:6
+                  }}>
+                    <span style={{color:s.color,fontWeight:700,fontFamily:"'Oswald',sans-serif",fontSize:15}}>{s.count}</span>
+                    <span style={{color:'var(--muted)'}}>{s.label}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Main table */}
+              <div className="tw"><table style={{width:'100%'}}>
+                <thead>
+                  <tr>
+                    <th style={{minWidth:130}}>Matchup</th>
+                    <th>Time (ET)</th>
+                    <th>Venue</th>
+                    <th>Conditions</th>
+                    <th>Temp</th>
+                    <th>Wind</th>
+                    <th>Direction</th>
+                    <th>Humidity</th>
+                    <th>Rain</th>
+                    <th>Park HR</th>
+                    <th>HR Impact</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {games.map((g) => {
+                    const homeW = weather[g.home?.abbr];
+                    const w     = homeW?.weather;
+                    const pf    = homeW?.parkFactor;
+                    const env   = homeW?.hrEnvScore || 50;
+                    const isDome= w?.isDome;
+                    const wind  = windImpact(w);
+                    const impact= hrImpact(w, pf);
+                    const pfColor = getPFColor(pf?.hr || 100);
+
+                    return (
+                      <tr key={g.gamePk || g.id}>
+                        {/* Matchup */}
+                        <td>
+                          <div style={{display:'flex',alignItems:'center',gap:6}}>
+                            <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14}}>
+                              {g.away?.abbr}
+                            </span>
+                            <span style={{color:'var(--muted)',fontSize:10,fontFamily:"'DM Mono',monospace"}}>@</span>
+                            <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14}}>
+                              {g.home?.abbr}
+                            </span>
+                          </div>
+                          {g.status === 'Live' &&
+                            <div style={{fontSize:9,color:'var(--accent)',fontFamily:"'DM Mono',monospace",marginTop:2}}>
+                              ● Live {g.inning||''}
+                            </div>}
+                        </td>
+
+                        {/* Time */}
+                        <td>
+                          <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--text)'}}>
+                            {g.gameTime || '—'}
+                          </span>
+                        </td>
+
+                        {/* Venue */}
+                        <td>
+                          <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--muted)'}}>
+                            {w?.venueName || pf?.venue || '—'}
+                          </span>
+                          {isDome && <span style={{marginLeft:5,fontSize:9,color:'var(--muted)'}}>🏟️</span>}
+                        </td>
+
+                        {/* Conditions */}
+                        <td>
+                          {!homeW
+                            ? <span style={{color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:10}}>—</span>
+                            : isDome
+                              ? <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--muted)'}}>🏟️ Dome/Retractable</span>
+                              : <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>
+                                  {getWeatherDesc(w?.weatherCode)}
+                                </span>
+                          }
+                        </td>
+
+                        {/* Temp */}
+                        <td>
+                          {isDome || !w
+                            ? <span style={{color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>—</span>
+                            : <span style={{
+                                fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,
+                                color:(w.temp||70)>=90?'#ff4020':(w.temp||70)>=80?'#ff8020':(w.temp||70)<=45?'#38b8f2':'var(--text)'
+                              }}>
+                                {w.temp}°F
+                              </span>
+                          }
+                        </td>
+
+                        {/* Wind speed */}
+                        <td>
+                          {isDome || !w
+                            ? <span style={{color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>—</span>
+                            : <span style={{
+                                fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,
+                                color:(w.windSpeed||0)>=18?'#ff4020':(w.windSpeed||0)>=12?'#ff8020':(w.windSpeed||0)>=8?'var(--accent2)':'var(--text)'
+                              }}>
+                                {w.windSpeed||0} <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:400,color:'var(--muted)'}}>mph</span>
+                              </span>
+                          }
+                        </td>
+
+                        {/* Wind direction label */}
+                        <td>
+                          {isDome || !w
+                            ? <span style={{color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>—</span>
+                            : <div>
+                                <span style={{
+                                  fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:600,
+                                  color:wind.color
+                                }}>{wind.label}</span>
+                                <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginTop:1}}>
+                                  {getWindDir(w.windDir||0)} · {w.windLabel||'—'}
+                                </div>
+                              </div>
+                          }
+                        </td>
+
+                        {/* Humidity */}
+                        <td>
+                          {isDome || !w
+                            ? <span style={{color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>—</span>
+                            : <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--text)'}}>
+                                {w.humidity||'—'}%
+                              </span>
+                          }
+                        </td>
+
+                        {/* Precip */}
+                        <td>
+                          {isDome || !w
+                            ? <span style={{color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>—</span>
+                            : (w.precip||0) > 0
+                              ? <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:'#38b8f2'}}>🌧️ {w.precip}"</span>
+                              : <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--green)'}}>✓ None</span>
+                          }
+                        </td>
+
+                        {/* Park HR factor */}
+                        <td>
+                          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:16,color:pfColor}}>
+                            {pf?.hr || '—'}
+                          </span>
+                          {pf?.label && <div style={{fontSize:8,color:pfColor,fontFamily:"'DM Mono',monospace",marginTop:1}}>{pf.label}</div>}
+                        </td>
+
+                        {/* HR Environment */}
+                        <td>
+                          <div>
+                            <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:600,color:impact.color}}>
+                              {impact.label}
+                            </span>
+                            {!isDome && w && <div style={{marginTop:3}}>
+                              <div style={{width:80,height:4,borderRadius:2,background:'var(--border)',overflow:'hidden'}}>
+                                <div style={{height:'100%',borderRadius:2,
+                                  width:`${Math.min(env,100)}%`,
+                                  background:impact.color}}/>
+                              </div>
+                            </div>}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table></div>
+
+              {/* Legend */}
+              <div style={{marginTop:16,padding:'10px 14px',background:'var(--surface)',
+                border:'1px solid var(--border)',borderRadius:8,
+                fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--muted)',
+                display:'flex',gap:20,flexWrap:'wrap'}}>
+                <span style={{fontWeight:600,color:'var(--text)'}}>Park HR Factor:</span>
+                <span><span style={{color:'#ff4020'}}>■</span> ≥115 extreme hitter</span>
+                <span><span style={{color:'#ff8020'}}>■</span> ≥108 hitter friendly</span>
+                <span><span style={{color:'#ffbe20'}}>■</span> ≥103 slight boost</span>
+                <span><span style={{color:'var(--muted)'}}>■</span> 98–102 neutral</span>
+                <span><span style={{color:'#60a0d0'}}>■</span> ≤95 pitcher friendly</span>
+                <span><span style={{color:'#38b8f2'}}>■</span> ≤90 extreme pitcher</span>
+              </div>
+            </>
+      }
+    </div>
+  );
+}
 
 
 export default function App() {
@@ -5003,7 +4421,7 @@ export default function App() {
 
   const NAV = [
     {key:"homeruns", label:"💥 HR Tracker"},
-    {key:"data",     label:"📊 Data"},
+    {key:"weather",  label:"🌤️ Weather"},
     {key:"live",     label:"📡 Live"},
     {key:"powerbi",  label:"📊 Analytics"},
     {key:"onlyhomers",label:"⚾ Only Homers"},
@@ -5039,7 +4457,7 @@ export default function App() {
         ))}
       </nav>
       <main className="content">
-        {tab==="data"     && <DataTab/>}
+        {tab==="weather"  && <WeatherTab/>}
         {tab==="live"     && <LiveTab/>}
         {tab==="picks"    && <MyPicksTab/>}
         {tab==="powerbi"  && <PowerBITab/>}
@@ -5049,7 +4467,7 @@ export default function App() {
       </main>
       <div style={{textAlign:"center",padding:"12px 0 8px",borderTop:"1px solid var(--border)",marginTop:24}}>
         <span style={{fontSize:10,color:"#2a3a48",fontFamily:"'DM Mono',monospace",letterSpacing:1}}>
-          Going Yard v2 · Build {BUILD_TIMESTAMP} · prsm-labs
+          Going Yard v3 · Build {BUILD_TIMESTAMP} · prsm-labs
         </span>
       </div>
     </div>
