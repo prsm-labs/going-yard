@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-01 19:15 ET";
+const BUILD_TIMESTAMP = "2026-04-01 19:27 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -244,6 +244,7 @@ const styles = `
     .xg{grid-template-columns:repeat(2,1fr);}.lmini{display:none;}
     .bvr{grid-template-columns:auto 1fr;}.h2h{display:none;}.pmg{grid-template-columns:repeat(2,1fr);}
     .tabs{overflow-x:auto;-webkit-overflow-scrolling:touch;flex-wrap:nowrap;padding:0 8px;}
+    @media(orientation:landscape){.landscape-hint{display:none!important;}}
     .tab{white-space:nowrap;flex-shrink:0;padding:10px 9px;font-size:10px;}
     .gp{overflow:hidden;}  /* table panel only — never clip .gc card header */
     .tw{overflow-x:auto;-webkit-overflow-scrolling:touch;}
@@ -2903,7 +2904,14 @@ function LiveTab() {
       <div className="section-header"><div className="section-title">📡 Live Yard Watch</div><div className="section-sub">Tap any game · Live=heat · Upcoming=🚀Liftoff · auto-refreshes every 60s{lastUpdate&&<span style={{marginLeft:8}}>Last: {lastUpdate}</span>}</div></div>
       <RefBtn refreshing={refreshing} onClick={async()=>{setRefreshing(true);await fetchGames(setLoading,setGames,setError,true);setLastUpdate(new Date().toLocaleTimeString());setRefreshing(false);}}/>
     </div>
-    <div className="note">ℹ️ <strong>Live</strong>: tap → hard contact in HR zones now vs L7. <strong>Upcoming</strong>: tap → 🚀 Liftoff list ranked by HR probability.</div>
+    <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 12px",
+        borderRadius:8,background:"rgba(245,166,35,.06)",border:"1px solid rgba(245,166,35,.15)",
+        marginBottom:10,fontSize:10,color:"var(--accent2)",fontFamily:"'DM Mono',monospace"}}
+        className="landscape-hint">
+        <span style={{fontSize:16}}>📱↔️</span>
+        <span>Rotate phone to landscape for best experience</span>
+      </div>
+      <div className="note">ℹ️ <strong>Live</strong>: tap → hard contact in HR zones now vs L7. <strong>Upcoming</strong>: tap → 🚀 Liftoff list ranked by HR probability.</div>
     <div className="cards" style={{marginBottom:14}}>
       <div className="card"><div className="cl">Live Games</div><div className="cv" style={{color:"#e8411a"}}>{live.length}</div><div className="cs">in progress</div></div>
       <div className="card"><div className="cl">Scheduled</div><div className="cv" style={{color:"#27c97a"}}>{pre.length}</div><div className="cs">today</div></div>
@@ -4114,33 +4122,58 @@ function OnlyHomersTab() {
 }
 
 function LiveSportsTab() {
+  const [tried, setTried] = React.useState(false);
   return <div>
     <div className="section-header" style={{marginBottom:16}}>
       <div className="section-title">📺 Live Sports</div>
-      <div className="section-sub">Live streams · sports broadcasts</div>
+      <div className="section-sub">Live streams · sports broadcasts via thetvapp.to</div>
     </div>
-    <div style={{marginBottom:12,display:"flex",alignItems:"center",gap:8,justifyContent:"flex-end"}}>
-      <a href="https://thetvapp.to" target="_blank" rel="noopener noreferrer"
-        style={{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:6,
-          background:"var(--surface2)",color:"var(--muted)",fontFamily:"'Oswald',sans-serif",
-          fontWeight:700,fontSize:12,letterSpacing:1,textDecoration:"none",
-          border:"1px solid var(--border)"}}>
-        ↗ Open in New Tab
-      </a>
-    </div>
+
+    {/* Primary: try embedding with all bypass attributes */}
     <div style={{borderRadius:10,overflow:"hidden",border:"1px solid var(--border)",
-      background:"var(--surface)",position:"relative",paddingBottom:"75%",height:0}}>
+      background:"var(--surface)",position:"relative",paddingBottom:"78%",height:0,marginBottom:12}}>
       <iframe
         title="Live Sports"
         src="https://thetvapp.to"
         frameBorder="0"
         allowFullScreen
-        allow="autoplay; fullscreen"
+        scrolling="yes"
+        allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation"
+        referrerPolicy="no-referrer"
         style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",border:"none"}}
+        onLoad={()=>setTried(true)}
+        onError={()=>setTried(true)}
       />
+      {/* Overlay that shows if iframe is blocked */}
+      {tried && <div style={{
+        position:"absolute",inset:0,display:"flex",flexDirection:"column",
+        alignItems:"center",justifyContent:"center",
+        background:"var(--surface)",pointerEvents:"none",
+        opacity:0 // hidden by default — only shows if iframe renders blank
+      }}>
+        <span style={{fontSize:40,marginBottom:12}}>📺</span>
+        <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:18,marginBottom:8}}>Site blocked embed</div>
+        <div style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:"var(--muted)",textAlign:"center",maxWidth:280}}>
+          Use the button below to open in a new tab
+        </div>
+      </div>}
     </div>
-    <div style={{marginTop:8,fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textAlign:"center"}}>
-      If the embed is blocked, use the ↗ Open in New Tab button above.
+
+    {/* Always-visible launch button */}
+    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10}}>
+      <a href="https://thetvapp.to" target="_blank" rel="noopener noreferrer"
+        style={{display:"inline-flex",alignItems:"center",gap:8,
+          padding:"12px 28px",borderRadius:10,
+          background:"var(--accent)",color:"white",
+          fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:16,
+          letterSpacing:1,textDecoration:"none",
+          boxShadow:"0 4px 20px rgba(232,65,26,.3)"}}>
+        📺 Open Live Sports
+      </a>
+      <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textAlign:"center"}}>
+        Opens thetvapp.to · If the frame above is blank, the site blocks embeds — use this button instead
+      </div>
     </div>
   </div>;
 }
@@ -4165,7 +4198,40 @@ function PowerBITab() {
     </div>
 
     {/* Player Picker for Picks — browse Power BI and add players */}
-    <div style={{marginBottom:14,background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,padding:"12px 14px"}}>
+      borderRadius:10,
+      overflow:"hidden",
+      border:"1px solid var(--border)",
+      background:"var(--surface)",
+      position:"relative",
+      paddingBottom:"56.25%", // 16:9 aspect ratio
+      height:0,
+    }}>
+      <iframe
+        title="Going Yard Analytics"
+        src="https://app.powerbi.com/view?r=eyJrIjoiYTQzOGZmMWMtOWZmMy00Y2NhLWE1NWUtZDljZmFkYWFhODg0IiwidCI6IjgzOGY2MGI3LTc4NzYtNGEwZC1iM2MxLTg1Y2VlZWE1YmJhYiIsImMiOjF9"
+        frameBorder="0"
+        allowFullScreen
+        style={{
+          position:"absolute",
+          top:0, left:0,
+          width:"100%",
+          height:"100%",
+          border:"none",
+        }}
+      />
+    </div>
+    <div style={{marginTop:10,display:"flex",gap:8,justifyContent:"flex-end"}}>
+      <a
+        href="https://app.powerbi.com/view?r=eyJrIjoiYTQzOGZmMWMtOWZmMy00Y2NhLWE1NWUtZDljZmFkYWFhODg0IiwidCI6IjgzOGY2MGI3LTc4NzYtNGEwZC1iM2MxLTg1Y2VlZWE1YmJhYiIsImMiOjF9"
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{display:"flex",alignItems:"center",gap:5,padding:"6px 12px",borderRadius:6,background:"var(--surface2)",border:"1px solid var(--border)",color:"var(--muted)",fontFamily:"'DM Mono',monospace",fontSize:11,textDecoration:"none",transition:"all .15s"}}
+      >
+        ↗ Open in Power BI
+      </a>
+    </div>
+  </div>;
+    <div style={{marginTop:14,background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,padding:"12px 14px"}}>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:showPicker?10:0}}>
         <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,letterSpacing:1}}>🎯 Add to My Picks</span>
         <span style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>Search any batter while browsing the dashboard</span>
@@ -4222,39 +4288,6 @@ function PowerBITab() {
       </>}
     </div>
     <div style={{
-      borderRadius:10,
-      overflow:"hidden",
-      border:"1px solid var(--border)",
-      background:"var(--surface)",
-      position:"relative",
-      paddingBottom:"56.25%", // 16:9 aspect ratio
-      height:0,
-    }}>
-      <iframe
-        title="Going Yard Analytics"
-        src="https://app.powerbi.com/view?r=eyJrIjoiYTQzOGZmMWMtOWZmMy00Y2NhLWE1NWUtZDljZmFkYWFhODg0IiwidCI6IjgzOGY2MGI3LTc4NzYtNGEwZC1iM2MxLTg1Y2VlZWE1YmJhYiIsImMiOjF9"
-        frameBorder="0"
-        allowFullScreen
-        style={{
-          position:"absolute",
-          top:0, left:0,
-          width:"100%",
-          height:"100%",
-          border:"none",
-        }}
-      />
-    </div>
-    <div style={{marginTop:10,display:"flex",gap:8,justifyContent:"flex-end"}}>
-      <a
-        href="https://app.powerbi.com/view?r=eyJrIjoiYTQzOGZmMWMtOWZmMy00Y2NhLWE1NWUtZDljZmFkYWFhODg0IiwidCI6IjgzOGY2MGI3LTc4NzYtNGEwZC1iM2MxLTg1Y2VlZWE1YmJhYiIsImMiOjF9"
-        target="_blank"
-        rel="noopener noreferrer"
-        style={{display:"flex",alignItems:"center",gap:5,padding:"6px 12px",borderRadius:6,background:"var(--surface2)",border:"1px solid var(--border)",color:"var(--muted)",fontFamily:"'DM Mono',monospace",fontSize:11,textDecoration:"none",transition:"all .15s"}}
-      >
-        ↗ Open in Power BI
-      </a>
-    </div>
-  </div>;
 }
 
 
