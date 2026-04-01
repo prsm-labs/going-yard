@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-01 14:56 ET";
+const BUILD_TIMESTAMP = "2026-04-01 16:54 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -11,8 +11,8 @@ const styles = `
     --text:#e8edf2;--muted:#5a7080;--fire2:#ff7a00;--fire3:#ffb700;
     --aplus:#ff3010;--a:#ff7000;--b:#f5a623;--c:#8bc4e8;--d:#5a7080;--f:#38b8f2;
   }
-  body{background:var(--bg);color:var(--text);font-family:'Oswald',sans-serif;min-height:100vh;}
-  .app{min-height:100vh;display:flex;flex-direction:column;}
+  html,body{background:var(--bg);color:var(--text);font-family:'Oswald',sans-serif;min-height:100vh;overflow-x:hidden;max-width:100vw;}
+  .app{min-height:100vh;display:flex;flex-direction:column;overflow-x:hidden;max-width:100%;}
   .header{padding:16px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:linear-gradient(180deg,#0a1520 0%,var(--bg) 100%);}
   .logo{font-family:'Oswald',sans-serif;font-weight:700;font-size:26px;text-transform:uppercase;letter-spacing:3px;color:var(--text);display:flex;align-items:center;gap:10px;}
   .logo span{color:var(--accent);}
@@ -111,7 +111,7 @@ const styles = `
   .cv2{font-size:10px;color:var(--muted);transition:transform .2s;display:inline-block;}
   .cv2.op{transform:rotate(180deg);}
   .gpw{margin-bottom:14px;grid-column:1/-1;}
-  .gp{border:1px solid var(--accent);border-top:none;border-bottom-left-radius:10px;border-bottom-right-radius:10px;background:#0a1218;overflow:hidden;animation:sd .2s ease;width:100%;}
+  .gp{overflow:hidden;max-width:100%;border:1px solid var(--accent);border-top:none;border-bottom-left-radius:10px;border-bottom-right-radius:10px;background:#0a1218;overflow:hidden;animation:sd .2s ease;width:100%;}
   @keyframes sd{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
   .gph{padding:9px 15px;border-bottom:1px solid var(--border);}
   .gpt{font-family:'Oswald',sans-serif;font-size:13px;letter-spacing:1.5px;color:var(--text);}
@@ -237,12 +237,17 @@ const styles = `
   ::-webkit-scrollbar{width:5px;height:5px;}
   ::-webkit-scrollbar-track{background:var(--bg);}
   ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
-  @media(max-width:768px){
-    .content{padding:13px;}.header{padding:12px 15px;}
+@media(max-width:768px){
+    html,body,#root,.app{overflow-x:hidden;max-width:100vw;}
+    .content{padding:10px;}.header{padding:10px 12px;}
     .gg{grid-template-columns:1fr;}.cards{grid-template-columns:repeat(2,1fr);}
     .xg{grid-template-columns:repeat(2,1fr);}.lmini{display:none;}
     .bvr{grid-template-columns:auto 1fr;}.h2h{display:none;}.pmg{grid-template-columns:repeat(2,1fr);}
-  }
+    .tabs{overflow-x:auto;-webkit-overflow-scrolling:touch;flex-wrap:nowrap;padding:0 8px;}
+    .tab{white-space:nowrap;flex-shrink:0;padding:10px 9px;font-size:10px;}
+    .gp,.gc{max-width:100%;overflow:hidden;}
+    .tw{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+    }
 `;
 
 // THRESHOLDS
@@ -1206,6 +1211,7 @@ function PicksSlideout({onClose}) {
       {pickList.length===0
         ? <div style={{padding:"40px 20px",textAlign:"center",color:"var(--muted)",fontFamily:"'DM Mono',monospace",fontSize:11,lineHeight:2}}>No picks yet.<br/>Use the ＋ button next to any batter.</div>
         : <div style={{flex:1}}>
+  {/* Soft signup nudge */}<div style={{margin:"10px 16px 4px",padding:"8px 12px",borderRadius:8,background:"rgba(56,184,242,.06)",border:"1px solid rgba(56,184,242,.12)",display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:12}}>☁️</span><div style={{flex:1}}><div style={{fontSize:10,color:"var(--ice)",fontFamily:"'DM Mono',monospace",fontWeight:600}}>Picks sync across devices — coming soon</div><div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",marginTop:1}}>Sign up to save picks to the cloud. Currently stored on this device only.</div></div></div>
             {pickList.map(p=>{
               const cfg=PICK_TYPES[p.type];
               return <div key={p.pid} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 16px",borderBottom:"1px solid rgba(30,45,58,.4)"}}>
@@ -2108,7 +2114,7 @@ async function fetchLiftoffBatters(game) {
         // ── Use REAL Statcast data from player cache ───────────
         const cachedP = getCachedPlayer(bid);
 
-        // Real season metrics from Baseball Savant (via /api/atbats)
+        // Season metrics from Baseball Savant (via /api/atbats or players.json)
         const barrel    = cachedP?.barrel      || 0;
         const hardHit   = cachedP?.hardHit     || 0;
         const avgEV     = cachedP?.avgEV       || 0;
@@ -2121,6 +2127,13 @@ async function fetchLiftoffBatters(game) {
         const bbPct     = cachedP?.bbPct       || 0;
         const kPct      = cachedP?.kPct        || 0;
         const oSwing    = cachedP?.oSwing      || 0;
+        // L7 window — use real rolling data from at-bat log if available
+        const w7        = cachedP?.windows?.last7;
+        const recentBrl = w7?.barrel   ?? barrel;
+        const recentHH  = w7?.hardHit  ?? hardHit;
+        const recentEV  = w7?.avgEV    ?? avgEV;
+        const recentPull= w7?.pullAir  ?? pullAir;
+        const recentFB  = w7?.flyBall  ?? flyBall;
 
         // ── Real days since last HR from game log ──────────────
         // Check today's HR ticker first (fastest)
@@ -2156,9 +2169,11 @@ async function fetchLiftoffBatters(game) {
           barrel, hardHit, avgEV, sweetSpot, pullAir, flyBall,
           xwoba, xslg, hr, bbPct, kPct, oSwing,
           // For calcLS compatibility
-          recentBarrel:   barrel,
-          recentHardHit:  hardHit,
-          recentAvgEV:    avgEV,
+          recentBarrel:   recentBrl,
+          recentHardHit:  recentHH,
+          recentAvgEV:    recentEV,
+          recentPullAir:  recentPull,
+          recentFlyBall:  recentFB,
           daysSinceHR,
           pitcherFactor,
           homeHR: hr > 0 ? (hr / 162) * 1.05 : 0.04,
@@ -2200,9 +2215,11 @@ function genSL() {
           sweetSpot:     p.sweetSpot   || 0,
           pullAir:       p.pullAir     || 0,
           flyBall:       p.flyBall     || 0,
-          recentBarrel:  p.barrel      || 0,
-          recentHardHit: p.hardHit     || 0,
-          recentAvgEV:   p.avgEV       || 0,
+          recentBarrel:  p.windows?.last7?.barrel  ?? p.barrel   ?? 0,
+          recentHardHit: p.windows?.last7?.hardHit ?? p.hardHit  ?? 0,
+          recentAvgEV:   p.windows?.last7?.avgEV   ?? p.avgEV    ?? 0,
+          recentPullAir: p.windows?.last7?.pullAir ?? p.pullAir  ?? 0,
+          recentFlyBall: p.windows?.last7?.flyBall ?? p.flyBall  ?? 0,
           daysSinceHR:   DAYS_SINCE_HR_CACHE[p.pid]?.days ?? 7,
           pitcherFactor: 0,
           homeHR:        p.hr > 0 ? (p.hr / 162) * 1.05 : 0.04,
@@ -2499,8 +2516,8 @@ function GPanel({game, isLive, isFinal=false}) {
       <div className="gps">{isLive ? "Click any batter → today vs L7 comparison" : isFinal ? "Final game stats · click any batter for detail" : "Ranked: streak 40% · due factor 25% · vs pitcher 15% · home/away 10%"}</div>
     </div>
     {loading ? <div style={{padding:"20px 15px",display:"flex",alignItems:"center",gap:8}}><div className="sp" style={{width:18,height:18,borderWidth:2}}/><span style={{fontFamily:"DM Mono,monospace",fontSize:10,color:"var(--muted)"}}>Loading…</span></div>
-    : (isLive || isFinal) ? <div style={{overflowX:"auto"}}>
-      <table style={{width:"100%"}}>
+    : (isLive || isFinal) ? <div style={{overflowX:"auto",maxWidth:"100%",WebkitOverflowScrolling:"touch"}}>
+      <table style={{width:"100%",tableLayout:"auto",minWidth:580}}>
         <thead><tr>
           <th style={{width:20}}></th>
           <th>Batter</th><th>Heat</th>
@@ -4096,6 +4113,38 @@ function OnlyHomersTab() {
   </div>;
 }
 
+function LiveSportsTab() {
+  return <div>
+    <div className="section-header" style={{marginBottom:16}}>
+      <div className="section-title">📺 Live Sports</div>
+      <div className="section-sub">Live streams · sports broadcasts</div>
+    </div>
+    <div style={{marginBottom:12,display:"flex",alignItems:"center",gap:8,justifyContent:"flex-end"}}>
+      <a href="https://thetvapp.to" target="_blank" rel="noopener noreferrer"
+        style={{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:6,
+          background:"var(--surface2)",color:"var(--muted)",fontFamily:"'Oswald',sans-serif",
+          fontWeight:700,fontSize:12,letterSpacing:1,textDecoration:"none",
+          border:"1px solid var(--border)"}}>
+        ↗ Open in New Tab
+      </a>
+    </div>
+    <div style={{borderRadius:10,overflow:"hidden",border:"1px solid var(--border)",
+      background:"var(--surface)",position:"relative",paddingBottom:"75%",height:0}}>
+      <iframe
+        title="Live Sports"
+        src="https://thetvapp.to"
+        frameBorder="0"
+        allowFullScreen
+        allow="autoplay; fullscreen"
+        style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",border:"none"}}
+      />
+    </div>
+    <div style={{marginTop:8,fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textAlign:"center"}}>
+      If the embed is blocked, use the ↗ Open in New Tab button above.
+    </div>
+  </div>;
+}
+
 
 function PowerBITab() {
   const picks = usePicks();
@@ -4657,6 +4706,7 @@ export default function App() {
     {key:"powerbi",  label:"📊 Analytics"},
     {key:"onlyhomers",label:"⚾ Only Homers"},
     {key:"statcast", label:"📡 Statcast"},
+    {key:"livesports",label:"📺 Live Sports"},
     {key:"picks",    label:"🎯 My Picks"},
   ];
 
@@ -4693,6 +4743,7 @@ export default function App() {
         {tab==="picks"    && <MyPicksTab/>}
         <div style={{display:tab==="powerbi"?"block":"none"}}><PowerBITab/></div>
         <div style={{display:tab==="statcast"?"block":"none"}}><StatcastTab/></div>
+        <div style={{display:tab==="livesports"?"block":"none"}}><LiveSportsTab/></div>
         <div style={{display:tab==="homeruns"?"block":"none"}}><HRTrackerTab/></div>
         <div style={{display:tab==="onlyhomers"?"block":"none"}}><OnlyHomersTab/></div>
       </main>
