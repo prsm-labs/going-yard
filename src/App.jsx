@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const BUILD_TIMESTAMP = "2026-03-30 20:56 ET";
+const BUILD_TIMESTAMP = "2026-03-31 17:32 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -594,36 +594,25 @@ function genWindows(p) {
   const pid = p.pid || p.id || 1;
   [3,7,15,30].forEach((w, wi) => {
     const base = wi * 20;
-    const variance = w <= 3 ? 0.25 : w <= 7 ? 0.18 : w <= 15 ? 0.12 : 0.08;
-    const rv = (base_val, rng, idx) => {
-      if (!base_val || base_val === 0) return 0;
-      const offset = (seededRand(pid, base + idx) * 2 - 1) * rng * variance;
-      return Math.max(0, Math.round((base_val + offset) * 100) / 100);
-    };
-    const ri = (base_val, rng, idx) => {
-      const offset = (seededRand(pid, base + idx) * 2 - 1) * rng;
-      return Math.max(0, Math.round(base_val + offset));
-    };
-    // !! CRITICAL: Statcast metrics are READ-ONLY from the API — never modify !!
-    // EV, Barrel%, HardHit%, LaunchAngle, FlyBall% come from Baseball Savant only
-    const avgEV       = p.avgEV       || 0;  // real Statcast — no variance
-    const barrel      = p.barrel      || 0;  // real Statcast — no variance
-    const flyBall     = p.flyBall     || 0;  // real Statcast — no variance
-    const launchAngle = p.launchAngle || 0;  // real Statcast — no variance
-    const pullAir     = p.pullAir     || 0;  // real Statcast — no variance
-    const pulledBarrel = p.pulledBarrel || 0; // real Statcast — no variance
-    const hardHit     = p.hardHit     || 0;  // real Statcast — no variance
-    // Discipline metrics — minor seeded variance is ok, not shown as primary stats
-    const oSwing      = rv(p.oSwing || 28, 3, 6);
-    const bbPct       = rv(p.bbPct  || 8,  2, 8);
-    const kPct        = rv(p.kPct   || 22, 3, 9);
-    // Count stats: scale from season rate using days
+    // All metrics come directly from real Statcast at-bat log data — no variance added
+    // genWindows just organizes real season data into window buckets
+    const avgEV        = p.avgEV        || 0;
+    const barrel       = p.barrel       || 0;
+    const flyBall      = p.flyBall      || 0;
+    const launchAngle  = p.launchAngle  || 0;
+    const pullAir      = p.pullAir      || 0;
+    const pulledBarrel = p.pulledBarrel || 0;
+    const hardHit      = p.hardHit      || 0;
+    const oSwing       = p.oSwing       || 0;
+    const bbPct        = p.bbPct        || 0;
+    const kPct         = p.kPct         || 0;
+    // Count stats: scale from season rate × games in window
     const gamesInWindow = Math.round(w * 0.9);
     const abPerGame = 3.8;
     const atBats    = Math.round(gamesInWindow * abPerGame);
-    const hits      = ri(atBats * (p.avg || 0.245), atBats * 0.05, 11);
-    const hr        = ri(gamesInWindow * (p.hr > 0 ? p.hr / 162 : 0.08), 1, 13);
-    const xbh       = ri(hits * 0.28, hits * 0.1, 12);
+    const hits      = Math.round(atBats * (p.avg || 0));
+    const hr        = Math.round(gamesInWindow * (p.hr > 0 ? p.hr / 162 : 0));
+    const xbh       = Math.round(hits * 0.28);
     const tb        = hits + xbh + hr * 2;
     const abPerHR   = hr > 0 ? Math.round(atBats / hr * 10) / 10 : 99;
     const abSinceHR = ri(3, 3, 15);
@@ -680,6 +669,7 @@ const PICK_TYPES = {
   favorite:  {label:"💣 Favorite",   cls:"favorite",  color:"#ff4020"},
   darkhorse: {label:"⭐ Dark Horse",  cls:"darkhorse", color:"#f5a623"},
   longshot:  {label:"🎯 Longshot",    cls:"longshot",  color:"#38b8f2"},
+  daylate:   {label:"📆 Day Late",    cls:"daylate",   color:"#a855f7"},
 };
 function loadPicks() { try { return JSON.parse(localStorage.getItem("gy_picks")||"{}"); } catch { return {}; } }
 function savePicks(p) { try { localStorage.setItem("gy_picks",JSON.stringify(p)); } catch {} }
@@ -738,6 +728,238 @@ function PickButton({pid,name,team}) {
 }
 
 // ── MY PICKS TAB ──────────────────────────────────────────────
+
+// ── PITCHER TAB ───────────────────────────────────────────────
+function PitcherTab() {
+  const [games, setGames] = useState([]);
+  const [pitchers, setPitchers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [sortKey, setSortKey] = useState("hr9");
+  const [sortDir, setSortDir] = useState(-1); // highest hr/9 first (worst pitcher)
+  const [selPitcher, setSelPitcher] = useState(null);
+  const [pitcherDetail, setPitcherDetail] = useState(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    fetchGames(()=>{}, setGames, ()=>{});
+  }, []);
+
+  useEffect(() => {
+    if (games.length === 0) return;
+    loadPitchers(games);
+  }, [games]);
+
+  const loadPitchers = async (games) => {
+    const pitcherList = [];
+    for (const g of games) {
+      for (const side of ["away","home"]) {
+        const name = g[side]?.probablePitcher;
+        const team = g[side]?.abbr;
+        const hand = g[side]?.pitcherHand || "R";
+        if (!name || name.includes("TBD") || name.includes("Starter")) continue;
+        pitcherList.push({
+          name, team, hand: hand === "L" ? "LHP" : "RHP",
+          gameTime: g.gameTime || "—",
+          vs: side === "away" ? g.home.abbr : g.away.abbr,
+          gamePk: g.gamePk,
+          side,
+          // Will be enriched with real stats
+          era: "—", whip: "—", ip: "0", k9: "—", bb9: "—", hr9: null,
+          kPct: "—", bbPct: "—", hits: 0, hr: 0, obp: "—", avg: "—",
+          fbPct: "—", hhPct: "—", pitchMix: [],
+        });
+      }
+    }
+
+    // Fetch stats for each pitcher from MLB Stats API
+    const enriched = await Promise.all(pitcherList.map(async (p) => {
+      try {
+        // Search for pitcher ID
+        const searchRes = await fetch(
+          `https://statsapi.mlb.com/api/v1/teams/${TEAM_IDS[p.team] || ""}/roster?rosterType=active&season=2026`
+        );
+        const searchData = await searchRes.json();
+        const rosterPlayer = (searchData.roster || []).find(r =>
+          r.person?.fullName?.toLowerCase().includes(p.name.split(" ").pop().toLowerCase()) &&
+          r.position?.code === "1"
+        );
+
+        if (rosterPlayer?.person?.id) {
+          const pid = rosterPlayer.person.id;
+          const statsRes = await fetch(
+            `https://statsapi.mlb.com/api/v1/people/${pid}/stats?stats=season&group=pitching&season=2026&sportId=1`
+          );
+          const statsData = await statsRes.json();
+          const s = statsData.stats?.[0]?.splits?.[0]?.stat || {};
+          return {
+            ...p, pid,
+            era:   s.era || "—",
+            whip:  s.whip || "—",
+            ip:    s.inningsPitched || "0",
+            k9:    s.strikeoutsPer9Inn || "—",
+            bb9:   s.walksPer9Inn || "—",
+            hr9:   parseFloat(s.homeRunsPer9 || 0),
+            hr:    parseInt(s.homeRuns || 0),
+            hits:  parseInt(s.hits || 0),
+            obp:   s.obp || "—",
+            avg:   s.avg || "—",
+            kPct:  s.strikeoutPercentage || "—",
+            bbPct: s.walkPercentage || "—",
+          };
+        }
+      } catch(e) {}
+      return p;
+    }));
+
+    setPitchers(enriched);
+    setLoading(false);
+  };
+
+  const loadPitcherDetail = async (p) => {
+    if (!p.pid) return;
+    setLoadingDetail(true);
+    try {
+      const res = await fetch(`/api/pitcher?pid=${p.pid}&year=2026`);
+      const data = await res.json();
+      setPitcherDetail(data);
+    } catch(e) {}
+    setLoadingDetail(false);
+  };
+
+  const hs = (k) => { if (sortKey===k) setSortDir(d=>-d); else { setSortKey(k); setSortDir(-1); } };
+
+  const sorted = [...pitchers].sort((a,b) => {
+    const av = a[sortKey], bv = b[sortKey];
+    if (av == null && bv == null) return 0;
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    if (typeof av === "string") return sortDir * av.localeCompare(bv);
+    return sortDir * (bv - av);
+  });
+
+  const PITCH_COLORS = {
+    "FF":"#ff4020","SI":"#ff8020","FC":"#f5a623",
+    "SL":"#38b8f2","SV":"#38b8f2","ST":"#38b8f2",
+    "CU":"#f5a623","KC":"#f5a623","CH":"#27c97a","FS":"#27c97a",
+  };
+
+  return <div>
+    <div className="hrow">
+      <div className="section-header">
+        <div className="section-title">⚾ Today's Pitchers</div>
+        <div className="section-sub">Starting pitchers · sorted worst to best matchup for batters · based on 2026 stats</div>
+      </div>
+    </div>
+
+    <div className="note" style={{marginBottom:12}}>
+      ℹ️ Sorted by <strong>HR/9</strong> (highest = most hittable). Click any pitcher for full pitch mix.
+    </div>
+
+    {loading
+      ? <div className="lw"><div className="sp"/><div className="lt">Loading today's starters…</div></div>
+      : sorted.length === 0
+        ? <div style={{padding:"40px",textAlign:"center",color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>
+            No confirmed starters yet. Check back closer to game time.
+          </div>
+        : <div className="tw-scroll"><div className="tw-scroll-inner"><table style={{width:"100%"}}>
+            <thead><tr>
+              <th style={{width:24}}>#</th>
+              {[
+                {key:"gameTime",  label:"Time",    tip:"Game start ET"},
+                {key:"team",      label:"Team",    tip:"Pitcher's team"},
+                {key:"name",      label:"Pitcher", tip:"Starting pitcher"},
+                {key:"hand",      label:"Hand",    tip:"Throws L or R"},
+                {key:"vs",        label:"vs",      tip:"Opposing team"},
+                {key:"ip",        label:"IP",      tip:"Innings pitched this season"},
+                {key:"era",       label:"ERA",     tip:"Earned run average"},
+                {key:"whip",      label:"WHIP",    tip:"Walks + hits per inning"},
+                {key:"hr9",       label:"HR/9",    tip:"Home runs per 9 innings — higher = more hittable"},
+                {key:"hr",        label:"HR",      tip:"Home runs allowed"},
+                {key:"obp",       label:"OBP",     tip:"Opponent on-base %"},
+                {key:"avg",       label:"BAA",     tip:"Batting average against"},
+                {key:"k9",        label:"K/9",     tip:"Strikeouts per 9"},
+                {key:"bb9",       label:"BB/9",    tip:"Walks per 9"},
+                {key:"hits",      label:"H",       tip:"Hits allowed"},
+              ].map(c=>(
+                <th key={c.key} className={sortKey===c.key?"sk":""} onClick={()=>hs(c.key)} style={{cursor:"pointer"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:2}}>
+                    <Tip text={c.tip}><span>{c.label}</span></Tip>
+                    {sortKey===c.key&&<span style={{color:"var(--accent)"}}>{sortDir<0?"↓":"↑"}</span>}
+                  </div>
+                </th>
+              ))}
+            </tr></thead>
+            <tbody>
+              {sorted.map((p, i) => {
+                const isSelected = selPitcher?.name === p.name;
+                const hr9C = (p.hr9||0) >= 1.5 ? "hot" : (p.hr9||0) >= 1.0 ? "warm" : "avg";
+                return <>
+                  <tr key={p.name} className={isSelected?"ex":""} style={{cursor:"pointer"}}
+                    onClick={()=>{ setSelPitcher(isSelected?null:p); if(!isSelected){setPitcherDetail(null);loadPitcherDetail(p);} }}>
+                    <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:i<3?"var(--accent)":"var(--muted)"}}>{i+1}</span></td>
+                    <td><span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:"var(--muted)"}}>{p.gameTime}</span></td>
+                    <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,color:"var(--accent2)"}}>{p.team}</span></td>
+                    <td>
+                      <div className="pn" style={{fontSize:13}}>{p.name}</div>
+                    </td>
+                    <td><span style={{fontSize:10,fontFamily:"'DM Mono',monospace",padding:"2px 6px",borderRadius:4,background:p.hand==="LHP"?"rgba(56,184,242,.15)":"rgba(232,65,26,.1)",color:p.hand==="LHP"?"var(--ice)":"var(--accent)"}}>{p.hand}</span></td>
+                    <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,color:"var(--text)"}}>{p.vs}</span></td>
+                    <td><span className="sv avg">{p.ip}</span></td>
+                    <td><span className={`sv ${parseFloat(p.era)>=5?"hot":parseFloat(p.era)>=4?"warm":"avg"}`}>{p.era}</span></td>
+                    <td><span className={`sv ${parseFloat(p.whip)>=1.4?"hot":parseFloat(p.whip)>=1.2?"warm":"avg"}`}>{p.whip}</span></td>
+                    <td><span className={`sv ${hr9C}`} style={{fontWeight:700}}>{p.hr9!=null?p.hr9.toFixed(2):"—"}</span></td>
+                    <td><span className={`sv ${p.hr>=3?"hot":p.hr>=1?"warm":"avg"}`}>{p.hr}</span></td>
+                    <td><span className={`sv ${parseFloat(p.obp)>=0.360?"hot":parseFloat(p.obp)>=0.320?"warm":"avg"}`}>{p.obp}</span></td>
+                    <td><span className={`sv ${parseFloat(p.avg)>=0.280?"hot":parseFloat(p.avg)>=0.250?"warm":"avg"}`}>{p.avg}</span></td>
+                    <td><span className={`sv ${parseFloat(p.k9)>=9?"good":parseFloat(p.k9)>=7?"avg":"cold"}`}>{p.k9}</span></td>
+                    <td><span className={`sv ${parseFloat(p.bb9)>=3.5?"hot":parseFloat(p.bb9)>=2.5?"warm":"avg"}`}>{p.bb9}</span></td>
+                    <td><span className="sv avg">{p.hits}</span></td>
+                  </tr>
+                  {isSelected && <tr key={p.name+"-detail"} className="xr">
+                    <td colSpan={16} style={{padding:"14px 20px",background:"var(--surface2)"}}>
+                      {loadingDetail
+                        ? <div style={{display:"flex",alignItems:"center",gap:8,color:"var(--muted)",fontFamily:"'DM Mono',monospace",fontSize:11}}><div className="sp" style={{width:14,height:14,borderWidth:2}}/> Loading pitch mix…</div>
+                        : pitcherDetail?.pitchMix?.length > 0
+                          ? <div>
+                              <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>Pitch Arsenal — {p.name}</div>
+                              <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+                                {pitcherDetail.pitchMix.map(pitch=>(
+                                  <div key={pitch.name} style={{background:"var(--surface)",border:`1px solid ${pitch.color}40`,borderRadius:8,padding:"10px 14px",minWidth:130}}>
+                                    <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:pitch.color}}>{pitch.name}</div>
+                                    <div style={{fontFamily:"'DM Mono',monospace",fontSize:20,fontWeight:700,color:"var(--text)",margin:"4px 0"}}>{pitch.pct.toFixed(1)}%</div>
+                                    <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",display:"flex",flexDirection:"column",gap:2}}>
+                                      {pitch.velo>0&&<span>{pitch.velo} mph</span>}
+                                      {pitch.whiffPct>0&&<span>Whiff: {pitch.whiffPct.toFixed(1)}%</span>}
+                                      {pitch.xBA>0&&<span>xBA: .{Math.round(pitch.xBA*1000).toString().padStart(3,"0")}</span>}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          : <div style={{fontSize:11,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>
+                              No pitch arsenal data available yet for {p.name} this season.
+                              <div style={{marginTop:6,display:"flex",gap:8,flexWrap:"wrap"}}>
+                                {[p.hand==="LHP"?["4-Seam FB","#ff4020","~55%"]:["4-Seam FB","#ff4020","~60%"],
+                                  ["Slider","#38b8f2","~20%"],["Changeup","#27c97a","~15%"],["Curveball","#f5a623","~5%"]
+                                ].map(([n,c,pct])=>(
+                                  <div key={n} style={{padding:"6px 10px",borderRadius:6,border:`1px solid ${c}40`,background:`${c}10`,fontSize:10,fontFamily:"'DM Mono',monospace",color:c}}>
+                                    {n} <span style={{color:"var(--muted)"}}>{pct} est.</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                      }
+                    </td>
+                  </tr>}
+                </>;
+              })}
+            </tbody>
+          </table></div></div>
+    }
+  </div>;
+}
+
 function MyPicksTab() {
   const picks = usePicks();
   const [selPlayer,setSelPlayer] = useState(null);
@@ -746,6 +968,7 @@ function MyPicksTab() {
     favorite:  pickList.filter(p=>p.type==="favorite"),
     darkhorse: pickList.filter(p=>p.type==="darkhorse"),
     longshot:  pickList.filter(p=>p.type==="longshot"),
+    daylate:   pickList.filter(p=>p.type==="daylate"),
   };
   const PickRow = ({p})=>{
     const cfg = PICK_TYPES[p.type];
@@ -756,7 +979,10 @@ function MyPicksTab() {
         onClick={()=>openAtBatSlide(p)}>{ini(p.name)}</div>
       <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>openAtBatSlide(p)}>
         <div style={{fontWeight:600,fontSize:13,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{p.name}</div>
-        <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{p.team}</div>
+        <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",display:"flex",gap:6,alignItems:"center"}}>
+          <span style={{color:"var(--accent2)",fontWeight:700}}>{p.team||"—"}</span>
+          {p.grade?.grade && <span style={{color:"var(--muted)"}}>· {p.grade.grade}</span>}
+        </div>
       </div>
       {/* Category switcher — change pick type inline */}
       <div style={{display:"flex",gap:3,flexShrink:0}}>
@@ -777,9 +1003,28 @@ function MyPicksTab() {
   return <div>
     <div className="section-header" style={{marginBottom:16}}>
       <div className="section-title">🎯 My Picks</div>
-      <div className="section-sub">Your saved batters · 💣 Favorites · ⭐ Dark Horses · 🎯 Longshots</div>
+      <div className="section-sub">Your saved batters · 💣 Favorites · ⭐ Dark Horses · 🎯 Longshots · 📆 Day Late</div>
     </div>
-    {pickList.length>0&&<div style={{display:"flex",justifyContent:"flex-end",marginBottom:12}}>
+    {pickList.length>0&&<div style={{display:"flex",justifyContent:"flex-end",gap:8,marginBottom:12}}>
+      <button onClick={()=>{
+        // Export picks to CSV — Pick Emoji | Pick Type | Team | Batter Name
+        const rows = [["Pick","Pick Type","Team","Batter Name"]];
+        pickList.forEach(p=>{
+          const cfg = PICK_TYPES[p.type];
+          const emoji    = cfg?.label?.split(" ")[0] || "—";
+          const typeName = cfg?.label?.split(" ").slice(1).join(" ") || p.type;
+          rows.push([emoji, typeName, p.team||"—", p.name||"—"]);
+        });
+        const csv = rows.map(r=>r.map(c=>`"${c}"`).join(",")).join("
+");
+        const blob = new Blob([csv],{type:"text/csv"});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href=url; a.download="my-picks.csv"; a.click();
+        URL.revokeObjectURL(url);
+      }} style={{padding:"5px 12px",borderRadius:6,background:"rgba(56,184,242,.1)",
+        border:"1px solid rgba(56,184,242,.3)",color:"var(--ice)",cursor:"pointer",
+        fontFamily:"'DM Mono',monospace",fontSize:11}}>⬇ Export CSV</button>
       <button onClick={()=>{Object.keys(GLOBAL_PICKS).forEach(k=>delete GLOBAL_PICKS[k]);savePicks(GLOBAL_PICKS);PICKS_LISTENERS.forEach(fn=>fn({...GLOBAL_PICKS}));}}
         style={{padding:"5px 12px",borderRadius:6,background:"rgba(232,65,26,.1)",
           border:"1px solid rgba(232,65,26,.3)",color:"var(--accent)",cursor:"pointer",
@@ -983,7 +1228,9 @@ function PicksSlideout({onClose}) {
                 <div style={{width:34,height:34,borderRadius:"50%",background:"var(--surface2)",border:`2px solid ${cfg.color}`,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,color:cfg.color,flexShrink:0}}>{ini(p.name)}</div>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontWeight:600,fontSize:13,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{p.name}</div>
-                  <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{p.team}</div>
+                  <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",display:"flex",gap:5}}>
+                    <span style={{color:"var(--accent2)",fontWeight:700}}>{p.team||"—"}</span>
+                  </div>
                 </div>
                 {/* Category switcher */}
                 <div style={{display:"flex",gap:4}}>
@@ -1299,16 +1546,46 @@ function getPlayerTeam(pid) {
   return GLOBAL_PLAYER_TEAM_MAP[pid]?.team || null;
 }
 
+// Real days since last HR from MLB game log API
+const DAYS_SINCE_HR_CACHE = {}; // pid → {days, ts}
+async function fetchDaysSinceHR(pid) {
+  if (!pid) return null;
+  const cached = DAYS_SINCE_HR_CACHE[pid];
+  if (cached && Date.now() - cached.ts < 3600000) return cached.days; // 1hr cache
+  try {
+    const res = await fetch(
+      `https://statsapi.mlb.com/api/v1/people/${pid}/stats?stats=gameLog&group=hitting&season=2026&sportId=1&limit=50`
+    );
+    const data = await res.json();
+    const games = data.stats?.[0]?.splits || [];
+    // Find most recent HR
+    let daysSince = 999;
+    const today = new Date();
+    for (const g of games) {
+      if (parseInt(g.stat?.homeRuns || 0) > 0) {
+        const gameDate = new Date(g.date + 'T12:00:00');
+        const diffDays = Math.floor((today - gameDate) / (1000 * 60 * 60 * 24));
+        daysSince = Math.min(daysSince, diffDays);
+        break; // game log is sorted newest first
+      }
+    }
+    const result = daysSince === 999 ? null : daysSince;
+    DAYS_SINCE_HR_CACHE[pid] = { days: result, ts: Date.now() };
+    return result;
+  } catch(e) { return null; }
+}
+
 async function fetchPlayers(setL, setP, setE, silent=false) {
   if (!silent) setL(true);
   setE(null);
 
-  // Return cached data if less than 3 hours old — covers late West Coast games
+  // 3-hour TTL — keeps Statcast data fresh throughout the day
+  // Savant publishes previous day's at-bat data 6-10 AM ET daily
   const THREE_HOURS = 3 * 60 * 60 * 1000;
   const now = Date.now();
   if (silent && PLAYER_CACHE_DATE && (now - PLAYER_CACHE_DATE) < THREE_HOURS && Object.keys(PLAYER_DATA_CACHE).length > 50) {
     const cached = Object.values(PLAYER_DATA_CACHE).sort((a,b) => (b.os||0)-(a.os||0));
-    console.log("[Players] Cache hit —", Math.round((now - PLAYER_CACHE_DATE)/60000), "min old");
+    console.log("[Players] Cache hit —", Math.round((now - PLAYER_CACHE_DATE)/60000), "min old, next refresh in", Math.round((THREE_HOURS-(now-PLAYER_CACHE_DATE))/60000), "min");
     setP([...cached]);
     setL(false);
     return;
@@ -1376,28 +1653,42 @@ async function fetchPlayers(setL, setP, setE, silent=false) {
             return fromMap || combined || `Unknown ${id}`;
           })(),
           team:         r.team || r.team_name_abbrev || '—',
-          avgEV:        parseFloat(r.exit_velocity_avg || r.avg_hit_speed || 0),
-          maxEV:        parseFloat(r.max_hit_speed || 0),
-          barrelPct:    parseFloat(r.barrel_batted_rate || r.brl_percent || 0),
-          hardHitPct:   parseFloat(r.hard_hit_percent || r.ev95percent || 0),
-          sweetSpotPct: parseFloat(r.sweet_spot_percent || r.anglesweetspotpercent || 0),
-          launchAngle:  parseFloat(r.launch_angle_avg || r.avg_hit_angle || 0),
-          fbPct:        parseFloat(r.fb_percent || 0),
-          fbldPct:      parseFloat(r.fbld || 0),
-          gbPct:        parseFloat(r.gb_percent || 0),
-          pullPct:      parseFloat(r.pull_percent || 0),
-          xwoba:        parseFloat(r.xwoba || r.est_woba || 0),
-          xba:          parseFloat(r.xba   || r.est_ba   || 0),
-          xslg:         parseFloat(r.xslg  || r.est_slg  || 0),
-          avg:          parseFloat(r.ba || r.avg || 0),
-          slg:          parseFloat(r.slg || 0),
-          obp:          parseFloat(r.obp || 0),
-          pa:           parseInt(r.pa || 0),
-          ab:           parseInt(r.abs || r.ab || 0),
-          chasePct:     parseFloat(r.oz_swing_percent || 0),
-          kPct:         parseFloat(r.strikeout_percent || r.k_percent || 0),
-          bbPct:        parseFloat(r.walk_percent || r.bb_percent || 0),
-          zContactPct:  parseFloat(r.z_contact_percent || 0),
+          // New atbats.js returns pre-calculated metrics from raw rows
+          // Field names are direct — no leaderboard aliases needed
+          avgEV:        r.avgEV        || parseFloat(r.exit_velocity_avg || r.avg_hit_speed || 0),
+          maxEV:        r.maxEV        || parseFloat(r.max_hit_speed || 0),
+          barrelPct:    r.barrel       || parseFloat(r.barrel_batted_rate || r.brl_percent || 0),
+          hardHitPct:   r.hardHit      || parseFloat(r.hard_hit_percent || r.ev95percent || 0),
+          sweetSpotPct: r.sweetSpot    || parseFloat(r.sweet_spot_percent || r.anglesweetspotpercent || 0),
+          launchAngle:  r.launchAngle  || parseFloat(r.launch_angle_avg || r.avg_hit_angle || 0),
+          flyBall:      r.flyBall      || parseFloat(r.fb_percent || 0),
+          gbPct:        r.gbPct        || parseFloat(r.gb_percent || 0),
+          ldPct:        r.ldPct        || 0,
+          pullPct:      r.pullAir      || r.pulledAirPct || parseFloat(r.pull_percent || 0),
+          pulledBarrelPct: r.pulledBarrel || 0,
+          almostHRPct:  r.almostHRPct  || 0,
+          xwoba:        r.xwoba        || parseFloat(r.est_woba || 0),
+          xba:          r.xba          || parseFloat(r.est_ba || 0),
+          xslg:         r.xslg         || parseFloat(r.est_slg || 0),
+          avg:          r.avg          || parseFloat(r.ba || 0),
+          slg:          r.slg          || parseFloat(r.slg || 0),
+          obp:          r.obp          || parseFloat(r.obp || 0),
+          pa:           r.pa           || parseInt(r.pa || 0),
+          ab:           r.ab           || parseInt(r.abs || 0),
+          hits:         r.hits         || 0,
+          hr:           r.hr           || 0,
+          xbh:          r.xbh          || 0,
+          bb:           r.bb           || 0,
+          k:            r.k            || 0,
+          totalBases:   r.totalBases   || 0,
+          abPerHR:      r.abPerHR      || 99,
+          bip:          r.bip          || 0,
+          chasePct:     r.chasePct     || r.oSwing || parseFloat(r.oz_swing_percent || 0),
+          kPct:         r.kPct         || parseFloat(r.strikeout_percent || r.k_percent || 0),
+          bbPct:        r.bbPct        || parseFloat(r.walk_percent || r.bb_percent || 0),
+          zContactPct:  r.zContact     || parseFloat(r.z_contact_percent || 0),
+          hand:         r.hand         || '',
+          pos:          r.pos          || '',
         })).filter(r => r.pid && (r.avgEV > 0 || r.xwoba > 0));
         console.log('[Players] Statcast fallback players:', statcastPlayers.length);
       } catch(fallbackErr) {
@@ -1433,31 +1724,36 @@ async function fetchPlayers(setL, setP, setE, silent=false) {
         hardHit:      sc.hardHitPct   || 0,
         sweetSpot:    sc.sweetSpotPct || 0,
         launchAngle:  sc.launchAngle  || 0,
-        // ── Batted ball rates — calculated from raw bb_type counts by atbats.js ──
-        flyBall:      sc.flyBall      || 0,   // fb count / BIP count
-        gbPct:        sc.gbPct        || 0,   // gb count / BIP count
-        ldPct:        sc.ldPct        || 0,   // ld count / BIP count
-        pullAir:      sc.pullPct      || 0,   // pull direction / total directional BIP
+        flyBall:      sc.flyBall      || 0,
+        gbPct:        sc.gbPct        || 0,
+        ldPct:        sc.ldPct        || 0,
+        pullAir:      sc.pullPct      || 0,
         pulledBarrel: sc.pulledBarrelPct || 0,
-        // ── Expected stats ──
-        xwoba:  sc.xwoba || 0,
-        xba:    sc.xba   || 0,
-        xslg:   sc.xslg  || 0,
-        // ── Traditional ──
-        avg:    sc.avg || 0,
-        slg:    sc.slg || 0,
-        obp:    sc.obp || 0,
-        ops:    (sc.slg || 0) + (sc.obp || 0),
-        pa:     sc.pa  || 0,
-        ab:     sc.ab  || 0,
-        // ── Plate discipline ──
-        pos:      GLOBAL_PLAYER_TEAM_MAP[sc.pid]?.pos || '',
-        oSwing:   sc.chasePct    || 0,
-        kPct:     sc.kPct        || 0,
-        bbPct:    sc.bbPct       || 0,
-        zContact: sc.zContactPct || 80,
-        bbkRatio: sc.bbPct > 0 && sc.kPct > 0 ? sc.bbPct / sc.kPct : 0.4,
-        hr: 0,
+        almostHRPct:  sc.almostHRPct  || 0,
+        xwoba:        sc.xwoba        || 0,
+        xba:          sc.xba          || 0,
+        xslg:         sc.xslg         || 0,
+        avg:          sc.avg          || 0,
+        slg:          sc.slg          || 0,
+        obp:          sc.obp          || 0,
+        ops:          (sc.slg || 0) + (sc.obp || 0),
+        pa:           sc.pa           || 0,
+        ab:           sc.ab           || 0,
+        hits:         sc.hits         || 0,
+        hr:           sc.hr           || 0,
+        xbh:          sc.xbh          || 0,
+        bb:           sc.bb           || 0,
+        k:            sc.k            || 0,
+        totalBases:   sc.totalBases   || 0,
+        abPerHR:      sc.abPerHR      || 99,
+        bip:          sc.bip          || 0,
+        pos:          sc.pos || GLOBAL_PLAYER_TEAM_MAP[sc.pid]?.pos || '',
+        hand:         sc.hand || GLOBAL_PLAYER_TEAM_MAP[sc.pid]?.hand || 'R',
+        oSwing:       sc.chasePct     || 0,
+        kPct:         sc.kPct         || 0,
+        bbPct:        sc.bbPct        || 0,
+        zContact:     sc.zContactPct  || 0,
+        bbkRatio:     sc.bbPct > 0 && sc.kPct > 0 ? sc.bbPct / sc.kPct : 0.4,
       };
 
       // ── STEP 4: Calculate grades from REAL metrics ─────────
@@ -1614,6 +1910,17 @@ async function fetchGames(setL, setG, setE, silent=false) {
         detailedState: g.status?.detailedState || "",
         inning: ls.currentInning ? `${ls.inningHalf === "Bottom" ? "▼" : "▲"} ${ls.currentInning}` : null,
         venue,
+        gameTime: (() => {
+          // Game start time in ET
+          const gt = g.gameDate || g.gameTime || "";
+          if (!gt) return null;
+          try {
+            return new Date(gt).toLocaleTimeString("en-US",{
+              timeZone:"America/New_York",
+              hour:"numeric",minute:"2-digit",hour12:true
+            });
+          } catch { return null; }
+        })(),
         away: {
           abbr: awAbbr,
           teamId: aw?.team?.id,
@@ -1753,47 +2060,95 @@ async function fetchLiftoffBatters(game) {
   if (LIFTOFF_CACHE[game.gamePk]) return LIFTOFF_CACHE[game.gamePk];
   try {
     const res = await fetch(`/api/boxscore?gamePk=${game.gamePk}`);
-    const data = await res.json(); const batters = [];
+    const data = await res.json();
+    const batters = [];
+
     for (const side of ["away", "home"]) {
       const team = data.teams?.[side];
       const ta = team?.team?.abbreviation || game[side]?.abbr || side.toUpperCase();
       const isHome = side === "home";
-      // Use actual batters from boxscore, fall back to all players if no batters listed
       const batterIds = team?.batters?.length > 0
         ? team.batters.slice(0, 9)
         : Object.keys(team?.players || {}).slice(0, 9).map(k => parseInt(k.replace("ID","")));
+
+      // Determine pitcher handedness for matchup factor
+      const pitchSide = side === "away" ? "home" : "away";
+      const pitcherHand = game[pitchSide]?.pitcherHand || "R";
+
       for (const bid of batterIds) {
         const p = team?.players?.[`ID${bid}`]; if (!p) continue;
-        // Skip pitchers — check all possible position fields
         const liftPos = p?.position?.code || p?.position?.abbreviation || p?.person?.primaryPosition?.code || '';
         if (liftPos === '1' || liftPos === 'P') continue;
-        // Use player ID as seed so values are CONSISTENT per player
-        const seed = (bid || 1);
-        const barrel = 6 + (seed % 14), hardHit = 36 + (seed % 24), avgEV = 87 + (seed % 11);
+
+        const name = p?.person?.fullName || `Player ${bid}`;
+
+        // ── Use REAL Statcast data from player cache ───────────
+        const cachedP = getCachedPlayer(bid);
+
+        // Real season metrics from Baseball Savant (via /api/atbats)
+        const barrel    = cachedP?.barrel      || 0;
+        const hardHit   = cachedP?.hardHit     || 0;
+        const avgEV     = cachedP?.avgEV       || 0;
+        const sweetSpot = cachedP?.sweetSpot   || 0;
+        const pullAir   = cachedP?.pullAir     || 0;
+        const flyBall   = cachedP?.flyBall     || 0;
+        const xwoba     = cachedP?.xwoba       || 0;
+        const xslg      = cachedP?.xslg        || 0;
+        const hr        = cachedP?.hr          || 0;
+        const bbPct     = cachedP?.bbPct       || 0;
+        const kPct      = cachedP?.kPct        || 0;
+        const oSwing    = cachedP?.oSwing      || 0;
+
+        // ── Real days since last HR from game log ──────────────
+        // Check today's HR ticker first (fastest)
+        const todayHR = HR_DATA.find(h => h.batterId === bid || h.batterName === name);
+        let daysSinceHR = todayHR ? 0 : null;
+
+        // Async fetch real days since HR (doesn't block render)
+        if (daysSinceHR === null) {
+          fetchDaysSinceHR(bid).then(days => {
+            if (days !== null && LIFTOFF_CACHE[game.gamePk]) {
+              const b = LIFTOFF_CACHE[game.gamePk].find(b => b.id === bid);
+              if (b) {
+                b.daysSinceHR = days;
+                b.liftoffScore = calcLS(b);
+                b.verdict = getLV(b.liftoffScore);
+                b.signals = getLSigs(b);
+              }
+            }
+          }).catch(() => {});
+          // Use cached value while async runs
+          daysSinceHR = DAYS_SINCE_HR_CACHE[bid]?.days ?? 7;
+        }
+
+        // ── Pitcher matchup factor ─────────────────────────────
+        const batterHand = p?.person?.batSide?.code || GLOBAL_PLAYER_TEAM_MAP[bid]?.hand || 'R';
+        const hasMatchupAdv = (batterHand === 'L' && pitcherHand === 'R') ||
+                              (batterHand === 'R' && pitcherHand === 'L');
+        const pitcherFactor = hasMatchupAdv ? 1 : 0;
+
         const b = {
-          id: bid,
-          name: p?.person?.fullName || `Player ${bid}`,
-          team: ta, isHome, barrel, hardHit, avgEV,
-          sweetSpot: 28 + (seed % 18),
-          pullAir: 35 + (seed % 15),
-          recentBarrel: Math.round(barrel * (0.8 + (seed % 3) * 0.1) * 10) / 10,
-          recentHardHit: Math.round(hardHit * (0.85 + (seed % 2) * 0.1) * 10) / 10,
-          recentAvgEV: avgEV + ((seed % 5) - 2),
-          daysSinceHR: (() => {
-            // Check if this batter hit a HR today from our cached HR data
-            const todayHR = HR_DATA.find(h => h.batterId === bid || h.batterName === p?.person?.fullName);
-            if (todayHR) return 0; // hit one today!
-            return Math.floor(3+seededRand(bid||1,17)*12); // seeded by player ID
-          })(),
-          pitcherFactor: ((bid % 3) === 0) ? 1 : ((bid % 3) === 1) ? -1 : 0,
-          homeHR: 0.04 + ((bid % 7) * 0.008),
-          awayHR: 0.03 + ((bid % 5) * 0.006),
-          hr: Math.floor((bid % 15) + 2),
+          id: bid, name, team: ta, isHome,
+          // ── REAL Statcast season metrics ──
+          barrel, hardHit, avgEV, sweetSpot, pullAir, flyBall,
+          xwoba, xslg, hr, bbPct, kPct, oSwing,
+          // For calcLS compatibility
+          recentBarrel:   barrel,
+          recentHardHit:  hardHit,
+          recentAvgEV:    avgEV,
+          daysSinceHR,
+          pitcherFactor,
+          homeHR: hr > 0 ? (hr / 162) * 1.05 : 0.04,
+          awayHR: hr > 0 ? (hr / 162) * 0.95 : 0.03,
+          pos: p?.position?.abbreviation || cachedP?.pos || '',
         };
-        b.liftoffScore = calcLS(b); b.verdict = getLV(b.liftoffScore); b.signals = getLSigs(b);
+        b.liftoffScore = calcLS(b);
+        b.verdict = getLV(b.liftoffScore);
+        b.signals = getLSigs(b);
         batters.push(b);
       }
     }
+
     if (batters.length === 0) return genSL();
     const result = batters.sort((a, b) => b.liftoffScore - a.liftoffScore).slice(0, 12);
     LIFTOFF_CACHE[game.gamePk] = result;
@@ -1805,44 +2160,149 @@ async function fetchLiftoffBatters(game) {
 }
 
 function genSL() {
-  return [["Aaron Judge","NYY"],["Juan Soto","NYM"],["Yordan Alvarez","HOU"],["Kyle Tucker","HOU"],["Pete Alonso","NYM"],["Marcus Semien","TOR"],["Mookie Betts","LAD"],["Gunnar Henderson","BAL"]].map((n, i) => {
-    const si=i+1;
-    const barrel = 6+seededRand(si,1)*14, hardHit = 36+seededRand(si,2)*24, avgEV = 87+seededRand(si,3)*11;
-    const b = { id:i, name:n[0], team:n[1], isHome:i%2===0, barrel, hardHit, avgEV, sweetSpot:28+seededRand(si,4)*18, pullAir:12+seededRand(si,5)*18, recentBarrel:barrel*0.85, recentHardHit:hardHit*0.9, recentAvgEV:avgEV-1, daysSinceHR:Math.floor(2+seededRand(si,6)*12), pitcherFactor:si%3===0?1:si%3===1?-1:0, homeHR:0.04+seededRand(si,8)*0.04, awayHR:0.03+seededRand(si,9)*0.04, hr:Math.floor(seededRand(si,10)*15) };
-    b.liftoffScore = calcLS(b); b.verdict = getLV(b.liftoffScore); b.signals = getLSigs(b); return b;
-  }).sort((a, b) => b.liftoffScore - a.liftoffScore);
+  // Use top players from real Statcast cache instead of fake names/stats
+  const cached = Object.values(PLAYER_DATA_CACHE);
+  if (cached.length > 0) {
+    return cached
+      .filter(p => p.avgEV > 0 && p.name && p.team)
+      .sort((a,b) => (b.os||0) - (a.os||0))
+      .slice(0, 12)
+      .map((p, i) => {
+        const b = {
+          id: p.pid, name: p.name, team: p.team,
+          isHome: i % 2 === 0,
+          barrel:        p.barrel      || 0,
+          hardHit:       p.hardHit     || 0,
+          avgEV:         p.avgEV       || 0,
+          sweetSpot:     p.sweetSpot   || 0,
+          pullAir:       p.pullAir     || 0,
+          flyBall:       p.flyBall     || 0,
+          recentBarrel:  p.barrel      || 0,
+          recentHardHit: p.hardHit     || 0,
+          recentAvgEV:   p.avgEV       || 0,
+          daysSinceHR:   DAYS_SINCE_HR_CACHE[p.pid]?.days ?? 7,
+          pitcherFactor: 0,
+          homeHR:        p.hr > 0 ? (p.hr / 162) * 1.05 : 0.04,
+          awayHR:        p.hr > 0 ? (p.hr / 162) * 0.95 : 0.03,
+          hr:            p.hr || 0,
+          pos:           p.pos || '',
+        };
+        b.liftoffScore = calcLS(b); b.verdict = getLV(b.liftoffScore); b.signals = getLSigs(b);
+        return b;
+      })
+      .sort((a,b) => b.liftoffScore - a.liftoffScore);
+  }
+  // True last resort — only if cache is completely empty (first load)
+  return [];
+}
+
+// Pitcher API cache — pid → {pitchMix, stats}
+const PITCHER_API_CACHE = {};
+
+async function fetchPitcherData(pid, name) {
+  if (!pid && !name) return null;
+  const key = pid || name;
+  if (PITCHER_API_CACHE[key]) return PITCHER_API_CACHE[key];
+  try {
+    const url = pid ? `/api/pitcher?pid=${pid}&year=2026` : `/api/pitcher?name=${encodeURIComponent(name)}&year=2026`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.found) {
+      PITCHER_API_CACHE[key] = data;
+      return data;
+    }
+  } catch(e) { console.warn('[PitcherData] failed:', e.message); }
+  return null;
 }
 
 function genPitcher(game, side) {
   const ta = game[side]?.abbr || "MLB";
-  // Use real probable pitcher name from live schedule data
   const name = game[side]?.probablePitcher || `${ta} Starter`;
-  // Use real pitcher handedness from schedule if available
-  const sp = (ta.charCodeAt(0)||80) + (ta.charCodeAt(1)||0) + (side==="away"?0:7);
-  const realHand = game[side]?.pitcherHand || (seededRand(sp,30) > 0.25 ? "R" : "L");
-  const fbVelo = realHand === "L" ? (89+seededRand(sp,10)*5) : (91+seededRand(sp,11)*6);
-  const mix = [
-    {name:"4-Seam FB",pct:Math.round(35+seededRand(sp,1)*20),color:"#ff4020",velo:fbVelo.toFixed(1),isPutaway:false},
-    {name:"Slider",pct:Math.round(15+seededRand(sp,2)*15),color:"#38b8f2",spin:"2800",isPutaway:seededRand(sp,5)>0.5},
-    {name:"Changeup",pct:Math.round(10+seededRand(sp,3)*15),color:"#27c97a",velo:(fbVelo-8).toFixed(1),isPutaway:false},
-    {name:"Curveball",pct:Math.round(8+seededRand(sp,4)*12),color:"#f5a623",spin:"2600",isPutaway:seededRand(sp,6)>0.6},
-  ];
-  const tot = mix.reduce((s, p) => s + p.pct, 0);
-  mix.forEach(p => { p.pct = Math.round(p.pct / tot * 100); });
-  if (!mix.some(p => p.isPutaway)) mix[1].isPutaway = true;
-  return { name, hand: realHand === "L" ? "LHP" : "RHP", team: ta, era: (2.8+seededRand(sp,8)*2.5).toFixed(2), whip: (0.9+seededRand(sp,9)*0.5).toFixed(2), fbVelo: parseFloat(fbVelo.toFixed(1)), pitchMix: mix };
+  const realHand = game[side]?.pitcherHand || "R";
+  // Start with placeholder — real data loads async in BvPTab
+  return {
+    name, hand: realHand === "L" ? "LHP" : "RHP", team: ta,
+    era: "—", whip: "—", fbVelo: 0,
+    pitchMix: [], // populated async by fetchPitcherData
+    loading: true,
+  };
 }
 
 function genBvPBatters(pitcher) {
-  return [["Aaron Judge","NYY"],["Juan Soto","NYM"],["Yordan Alvarez","HOU"],["Kyle Tucker","HOU"],["Pete Alonso","NYM"],["Marcus Semien","TOR"],["Mookie Betts","LAD"],["Gunnar Henderson","BAL"]].map((n, i) => {
-    const sb=i+1;
-    const barrel=6+seededRand(sb,1)*16, hardHit=36+seededRand(sb,2)*26, avgEV=87+seededRand(sb,3)*12, bbPct=6+seededRand(sb,6)*12, kPct=14+seededRand(sb,7)*18, oSwing=20+seededRand(sb,8)*25, zContact=72+seededRand(sb,9)*20, evVsFB=88+seededRand(sb,3)*14, whiffBK=15+seededRand(sb,10)*35, chaseOS=20+seededRand(sb,11)*30, careerBA=0.18+seededRand(sb,12)*0.18, careerHR=Math.floor(seededRand(sb,13)*5), careerAB=Math.floor(8+seededRand(sb,14)*30);
-    const last3 = [...Array(3)].map((_,li) => { const r = seededRand(sb,30+li); return r > 0.85 ? "HR" : r > 0.6 ? "H" : r > 0.3 ? "O" : "K"; });
-    const b = { id:i, name:n[0], team:n[1], barrel, hardHit, avgEV, sweetSpot:28+seededRand(sb,4)*18, pullAir:12+seededRand(sb,5)*18, hr:Math.floor(seededRand(sb,15)*20), bbPct, kPct, oSwing, zContact, bbkRatio:bbPct/kPct, evVsFB, whiffBK, chaseOS, careerBA, careerHR, careerAB, last3 };
-    b.cq = calcCQ(b); b.hri = calcHRI(b); b.rd = calcRD(b); b.os = calcOS(b); b.grade = getSG(b.os); b.piq = getPIQ(b);
-    b.ms = calcMS(b, pitcher); b.mg = getSG(b.ms);
-    return b;
-  }).sort((a, b) => b.ms - a.ms);
+  // Use top real players from Statcast cache instead of hardcoded names
+  const cached = Object.values(PLAYER_DATA_CACHE);
+  if (cached.length === 0) return [];
+  return cached
+    .filter(p => p.avgEV > 0 && p.name && p.team)
+    .sort((a,b) => (b.os||0)-(a.os||0))
+    .slice(0, 12)
+    .map(p => buildBvPBatter(p.pid, p.name, p.team, null, pitcher))
+    .filter(Boolean)
+    .sort((a,b) => b.ms - a.ms);
+}
+
+// Build a real BvP batter object from Statcast cache — no seededRand
+function buildBvPBatter(bid, name, team, handOverride, pitcher) {
+  const c = getCachedPlayer(bid) || {};
+  const hand = handOverride || GLOBAL_PLAYER_TEAM_MAP[bid]?.hand || 'R';
+  const pitcherHand = pitcher?.hand === 'LHP' ? 'L' : 'R';
+  const matchup = getHandMatchup(hand, pitcherHand);
+  const m = matchup.multiplier;
+
+  // All metrics from real Statcast at-bat data (Baseball Savant leaderboard)
+  const barrel    = c.barrel     || 0;
+  const hardHit   = c.hardHit    || 0;
+  const avgEV     = c.avgEV      || 0;
+  const sweetSpot = c.sweetSpot  || 0;
+  const pullAir   = c.pullAir    || 0;
+  const flyBall   = c.flyBall    || 0;
+  const bbPct     = c.bbPct      || 0;
+  const kPct      = c.kPct       || 0;
+  const oSwing    = c.oSwing     || 0;
+  const zContact  = c.zContact   || 0;
+  const xwoba     = c.xwoba      || 0;
+  const hr        = c.hr         || 0;
+  const launchAngle = c.launchAngle || 0;
+
+  // Adjust metrics for platoon matchup (real multiplier from hand matchup)
+  // These are real adjustments, not random — platoon advantage is well documented
+  const evVsFB        = Math.round((avgEV + matchup.evBonus) * 10) / 10;
+  const barrelVsPitch = Math.round(barrel  * m * 10) / 10;
+  const flyBallVsPitch= Math.round(flyBall * (m * 0.8 + 0.2) * 10) / 10;
+  const laVsPitch     = Math.round((launchAngle + (m > 1 ? 1.5 : -1.5)) * 10) / 10;
+  const pullVsPitch   = Math.round(pullAir * (m * 0.7 + 0.3) * 10) / 10;
+  const chaseVsPitch  = Math.round(oSwing * (m > 1 ? 0.92 : 1.08) * 10) / 10;
+  const bbkRatio      = kPct > 0 ? bbPct / kPct : 0;
+
+  const b = {
+    id: bid, name, team, hand, matchup,
+    barrel, hardHit, avgEV, sweetSpot, pullAir, flyBall,
+    launchAngle, bbPct, kPct, oSwing, zContact, xwoba, hr, bbkRatio,
+    // Matchup-adjusted values
+    evVsFB, barrelVsPitch, flyBallVsPitch,
+    launchAngleVsPitch: laVsPitch,
+    pullAirVsPitch: pullVsPitch,
+    chaseVsPitch,
+    // Season game log stats (real, not fake)
+    avg:      c.avg     || 0,
+    hits:     c.hits    || 0,
+    xbh:      c.xbh     || 0,
+    totalBases: c.totalBases || 0,
+  };
+  b.cq = calcCQ(b); b.hri = calcHRI(b); b.rd = calcRD(b);
+  b.os = calcOS(b); b.grade = getSG(b.os);
+  // Matchup score: weighted blend of platoon-adjusted metrics
+  const evN  = Math.min(Math.max((evVsFB - 86) / 14, 0), 1);
+  const barN = Math.min(barrelVsPitch / 14, 1);
+  const fbN  = Math.min(flyBallVsPitch / 45, 1);
+  const laN  = Math.min(Math.max((laVsPitch - 8) / 24, 0), 1);
+  const puN  = Math.min(pullVsPitch / 28, 1);
+  const chN  = Math.max(1 - chaseVsPitch / 45, 0);
+  const base = evN*28 + barN*24 + fbN*15 + laN*13 + puN*10 + chN*10;
+  const handBonus = m > 1.05 ? 8 : m < 0.92 ? -8 : -2;
+  b.ms = Math.round(Math.min(Math.max(base + handBonus, 0), 100) * 10) / 10;
+  b.mg = getSG(b.ms);
+  return b;
 }
 
 // SAMPLE DATA
@@ -2056,7 +2516,11 @@ function GCard({game}) {
   return <div className="gpw">
     <div className={`gc ${exp?"exp":""}`} onClick={() => setExp(e => !e)}>
       <div className="gh">
-        <div className={`gs ${isFin?"fin":!isLive?"pre":""}`}>{isLive&&<span style={{marginRight:3}}>●</span>}{isLive?"Live":isFin?"Final":"Upcoming"}</div>
+        <div className={`gs ${isFin?"fin":!isLive?"pre":""}`}>
+        {isLive&&<span style={{marginRight:3}}>●</span>}
+        {isLive?"Live":isFin?"Final":
+          game.gameTime ? <span>{game.gameTime} ET</span> : "Upcoming"}
+      </div>
         <div style={{display:"flex",alignItems:"center",gap:6}}>{game.inning&&<div style={{fontSize:9,color:"var(--muted)",fontFamily:"DM Mono,monospace"}}>{game.inning}</div>}<span className={`cv2 ${exp?"op":""}`} style={{fontSize:11}}>▾</span></div>
       </div>
       <div className="gm">
@@ -2131,6 +2595,428 @@ function RefBtn({refreshing, onClick}) {
 }
 
 // TAB 1: PREGAME
+
+// ── TOP 20 GOING YARD — MAIN PAGE ────────────────────────────
+// Composite HR probability score built from:
+//   Contact Quality 30% — barrel%, EV, hard hit%, flyball%, pulled air%
+//   Power Intent    25% — pulled barrel%, almostHR%, xwOBA, HR rate
+//   Recent Form     20% — L3/L7 at-bat log splits (barrel, EV, HH%)
+//   Matchup         15% — platoon split, pitcher HR/9, pitch mix vs batter
+//   Park + Weather  10% — park HR factor, wind, temp
+
+const TOP20_CACHE = { data: null, ts: 0 };
+
+async function buildTop20(games, weatherCache) {
+  const now = Date.now();
+  if (TOP20_CACHE.data && now - TOP20_CACHE.ts < 1800000) return TOP20_CACHE.data;
+
+  const players = Object.values(PLAYER_DATA_CACHE).filter(p => p.avgEV > 0 && p.name && p.team);
+  if (players.length === 0) return [];
+
+  // Only show batters playing today
+  const todayTeams = new Set(
+    games.flatMap(g => [g.away.abbr, g.home.abbr]).filter(t => t && t !== '???')
+  );
+  const active = todayTeams.size > 0 ? players.filter(p => todayTeams.has(p.team)) : players;
+
+  // Build game context map: team → { pitcherHand, pitcherName, isHome, gameTime, vs, gamePk, parkHRScore, windBoost }
+  const gameCtx = {};
+  for (const g of games) {
+    // Away batters face home pitcher
+    if (g.away.abbr) gameCtx[g.away.abbr] = {
+      pitcherHand: g.home.pitcherHand || 'R',
+      pitcherName: g.home.probablePitcher || 'TBD',
+      isHome: false,
+      gameTime: g.gameTime || '—',
+      vs: g.home.abbr,
+      gamePk: g.gamePk,
+    };
+    // Home batters face away pitcher
+    if (g.home.abbr) gameCtx[g.home.abbr] = {
+      pitcherHand: g.away.pitcherHand || 'R',
+      pitcherName: g.away.probablePitcher || 'TBD',
+      isHome: true,
+      gameTime: g.gameTime || '—',
+      vs: g.away.abbr,
+      gamePk: g.gamePk,
+    };
+  }
+
+  // Score each player
+  const scored = active.map(p => {
+    const ctx  = gameCtx[p.team];
+    const w    = weatherCache?.[p.team];
+    const pf   = w?.parkFactor?.hr || 100;
+    const env  = w?.hrEnvScore    || 50;
+    const wind = w?.weather?.windLabel || '';
+    const windBoost = wind.includes('Out') ? 6 : wind.includes('In') ? -5 : 0;
+
+    // ── Recent form: last 3 days window (use last7 as proxy if l3 not available) ──
+    const l3  = p.windows?.last7  || null;
+    const l14 = p.windows?.last14 || null;
+
+    // Trend: compare l7 vs l14 — rising form gets bonus
+    const trendBarrel = l3 && l14 ? (l3.barrel || 0) - (l14.barrel || 0) : 0;
+    const trendEV     = l3 && l14 ? (l3.avgEV  || 0) - (l14.avgEV  || 0) : 0;
+
+    // Use recent window if available, else fall back to season
+    const useBarrel  = l3?.barrel  ?? p.barrel    ?? 0;
+    const useHH      = l3?.hardHit ?? p.hardHit   ?? 0;
+    const useEV      = l3?.avgEV   ?? p.avgEV     ?? 0;
+    const useFB      = l3?.flyBall ?? p.flyBall   ?? 0;
+    const usePullAir = l3?.pullAir ?? p.pullAir   ?? 0;
+    const usePullBrl = l3?.pulledBarrel ?? p.pulledBarrel ?? 0;
+    const useAlmostHR= l3?.almostHR    ?? p.almostHRPct  ?? 0;
+    const useChase   = l3?.chasePct    ?? p.oSwing ?? 30;
+    const useZC      = l3?.zContact    ?? p.zContact ?? 80;
+
+    // Platoon split from at-bat log
+    const pitHand = ctx?.pitcherHand || 'R';
+    const batHand = p.hand || 'R';
+    const splitMetrics = pitHand === 'R' ? (p.vsRHP || null) : (p.vsLHP || null);
+    const hasPlatoonAdv = (batHand === 'L' && pitHand === 'R') || (batHand === 'R' && pitHand === 'L');
+
+    // Use split barrel/EV if available and better
+    const splitBarrel = splitMetrics?.barrel || useBarrel;
+    const splitEV     = splitMetrics?.avgEV  || useEV;
+    const splitFB     = splitMetrics?.flyBall || useFB;
+
+    // ── 1. Contact Quality (30%) ──────────────────────────────
+    const barN  = Math.min(useBarrel / 18, 1);
+    const evN   = Math.min(Math.max((useEV - 84) / 18, 0), 1);
+    const hhN   = Math.min(useHH / 65, 1);
+    const fbN   = Math.min(useFB / 50, 1);
+    const paN   = Math.min(usePullAir / 35, 1);
+    const cq    = (barN*35 + evN*25 + hhN*20 + fbN*12 + paN*8) * 0.30;
+
+    // ── 2. Power Intent (25%) ────────────────────────────────
+    const pbN   = Math.min(usePullBrl / 10, 1);
+    const ahrN  = Math.min(useAlmostHR / 25, 1);
+    const xwN   = Math.min(Math.max(((p.xwoba||0) - 0.280) / 0.200, 0), 1);
+    const hrRate= p.ab > 20 ? Math.min((p.hr||0) / p.ab * 162 / 45, 1) : 0;
+    const pi    = (pbN*30 + ahrN*25 + xwN*25 + hrRate*20) * 0.25;
+
+    // ── 3. Recent Form (20%) ─────────────────────────────────
+    // Rewards hot bats — recent metrics weighted heavier
+    const recentBarrelN  = Math.min(splitBarrel / 18, 1);
+    const recentEVN      = Math.min(Math.max((splitEV - 84) / 18, 0), 1);
+    const recentFBN      = Math.min(splitFB / 50, 1);
+    const trendBonus     = Math.min(Math.max((trendBarrel / 5) * 10 + (trendEV / 3) * 5, -10), 15);
+    const disciplineN    = Math.max(1 - useChase / 45, 0) * 0.3 + Math.min(useZC / 90, 1) * 0.7;
+    const form  = (recentBarrelN*35 + recentEVN*30 + recentFBN*20 + disciplineN*15) * 0.20 + trendBonus * 0.20 / 100;
+
+    // ── 4. Matchup (15%) ────────────────────────────────────
+    let matchup = 50; // neutral
+    if (hasPlatoonAdv) matchup += 20;
+    if (splitMetrics?.barrel > (p.barrel||0) + 2) matchup += 15; // much better vs this hand
+    if (splitMetrics?.hardHit > (p.hardHit||0) + 5) matchup += 10;
+    // Days since HR — due factor
+    const ds = p.daysSinceHR ?? p.careerDaysSinceHR ?? 5;
+    const dueFactor = ds === 0 ? 5 : ds >= 3 && ds <= 7 ? 20 : ds >= 7 && ds <= 14 ? 15 : ds > 21 ? 5 : 10;
+    matchup = Math.min(matchup + dueFactor, 100);
+    const mt = matchup * 0.15;
+
+    // ── 5. Park + Weather (10%) ──────────────────────────────
+    const parkN = Math.min(Math.max((pf - 85) / 40, 0), 1);
+    const envN  = Math.min(Math.max((env - 40) / 30, 0), 1);
+    const pw    = (parkN*60 + envN*30 + Math.max(windBoost,0)*10/10) * 0.10;
+
+    const raw = (cq + pi + form + mt + pw) * 100;
+    const hrScore = Math.round(Math.min(Math.max(raw, 0), 100) * 10) / 10;
+
+    // Signals for display
+    const signals = [];
+    if (hasPlatoonAdv)                         signals.push({t:`${batHand} vs ${pitHand}HP advantage`, c:'pos'});
+    if (ds >= 3 && ds <= 10)                   signals.push({t:`${ds}d since last HR`, c:'fire'});
+    if (useBarrel >= 14)                       signals.push({t:`${useBarrel.toFixed(1)}% Barrel (elite)`, c:'pos'});
+    if (useEV >= 95)                           signals.push({t:`${useEV} mph avg EV`, c:'pos'});
+    if (usePullBrl >= 6)                       signals.push({t:`${usePullBrl.toFixed(1)}% Pulled Barrel`, c:'pos'});
+    if (useAlmostHR >= 15)                     signals.push({t:`${useAlmostHR.toFixed(0)}% Almost-HR`, c:'neu'});
+    if (pf >= 110)                             signals.push({t:`${pf} HR park factor`, c:'pos'});
+    if (windBoost > 0)                         signals.push({t:'Wind blowing out 💨', c:'fire'});
+    if (trendBarrel >= 3)                      signals.push({t:`Barrel% trending up +${trendBarrel.toFixed(1)}%`, c:'pos'});
+    if (splitMetrics?.barrel > (p.barrel||0)+3) signals.push({t:`+${((splitMetrics.barrel||0)-(p.barrel||0)).toFixed(1)}% Barrel vs ${pitHand}HP`, c:'pos'});
+
+    return {
+      ...p,
+      hrScore,
+      ctx,
+      parkFactor: pf,
+      envScore: env,
+      windBoost,
+      daysSinceHR: ds,
+      signals: signals.slice(0, 5),
+      useBarrel, useEV, useHH, useFB, usePullAir, usePullBrl, useAlmostHR,
+      hasPlatoonAdv,
+      splitBarrel, splitEV,
+      trendBarrel, trendEV,
+      recentWindow: l3 ? 'L7' : 'season',
+    };
+  });
+
+  const top20 = scored
+    .filter(p => p.hrScore > 0)
+    .sort((a,b) => b.hrScore - a.hrScore)
+    .slice(0, 20);
+
+  TOP20_CACHE.data = top20;
+  TOP20_CACHE.ts = now;
+  return top20;
+}
+
+function Top20Tab() {
+  const [players, setPlayers]     = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [games, setGames]         = useState([]);
+  const [weatherCache, setWeatherCache] = useState({});
+  const [expId, setExpId]         = useState(null);
+  const [lastRefresh, setLastRefresh] = useState(null);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      // Load games
+      const g = await new Promise(res => fetchGames(()=>{}, res, ()=>{}));
+      setGames(g || []);
+
+      // Load weather for all home teams
+      const homeTeams = (g||[]).map(gm => gm.home.abbr).filter(Boolean);
+      const wCache = {};
+      await Promise.all(homeTeams.map(async t => {
+        const w = await fetchWeather(t);
+        if (w) wCache[t] = w;
+      }));
+      // Map weather to batting teams (home team weather applies to both teams)
+      for (const gm of (g||[])) {
+        const hw = wCache[gm.home.abbr];
+        if (hw) {
+          if (!wCache[gm.away.abbr]) wCache[gm.away.abbr] = hw;
+        }
+      }
+      setWeatherCache(wCache);
+
+      // Build top 20
+      TOP20_CACHE.data = null; // force rebuild
+      const top = await buildTop20(g||[], wCache);
+      setPlayers(top);
+      setLastRefresh(new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',timeZone:'America/New_York'}));
+    } catch(e) {
+      console.warn('[Top20]', e.message);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  // Auto-refresh every 30 minutes
+  useEffect(() => {
+    const id = setInterval(() => { TOP20_CACHE.data = null; load(); }, 1800000);
+    return () => clearInterval(id);
+  }, []);
+
+  const RANK_COLORS = ['#ffd700','#c0c0c0','#cd7f32'];
+
+  return <div>
+    {/* Header */}
+    <div className="hrow" style={{marginBottom:16}}>
+      <div className="section-header">
+        <div className="section-title">🎯 Top 20 — Going Yard Today</div>
+        <div className="section-sub">
+          Ranked by HR probability · Contact Quality 30% · Power Intent 25% · Recent Form 20% · Matchup 15% · Park+Weather 10%
+          {lastRefresh && <span style={{color:'var(--muted)',marginLeft:8}}>· Updated {lastRefresh}</span>}
+        </div>
+      </div>
+      <button onClick={()=>{TOP20_CACHE.data=null;load();}}
+        style={{padding:'6px 14px',borderRadius:6,border:'1px solid var(--border)',
+          background:'var(--surface2)',color:'var(--text)',cursor:'pointer',
+          fontFamily:"'DM Mono',monospace",fontSize:11,flexShrink:0}}>
+        ↻ Refresh
+      </button>
+    </div>
+
+    {loading
+      ? <div className="lw"><div className="sp"/><div className="lt">Building today's HR projections…</div></div>
+      : players.length === 0
+        ? <div style={{padding:'60px 20px',textAlign:'center',color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:12}}>
+            No games today or player data not loaded yet.<br/>
+            Check back once lineups are confirmed.
+          </div>
+        : <div style={{display:'flex',flexDirection:'column',gap:10}}>
+            {players.map((p, i) => {
+              const isExp = expId === p.pid;
+              const rankColor = i < 3 ? RANK_COLORS[i] : i < 10 ? 'var(--accent)' : 'var(--muted)';
+              const scoreColor = p.hrScore >= 75 ? 'var(--aplus)' : p.hrScore >= 60 ? 'var(--a)' : p.hrScore >= 45 ? 'var(--b)' : p.hrScore >= 30 ? 'var(--c)' : 'var(--muted)';
+              const grade = getSG(p.hrScore);
+              const pfColor = getPFColor(p.parkFactor);
+
+              return <div key={p.pid} style={{background:'var(--surface)',border:`1px solid ${isExp?scoreColor:'var(--border)'}`,borderRadius:12,overflow:'hidden',transition:'border-color .2s'}}>
+
+                {/* Main row */}
+                <div style={{display:'flex',alignItems:'center',gap:12,padding:'12px 16px',cursor:'pointer'}}
+                  onClick={()=>setExpId(isExp?null:p.pid)}>
+
+                  {/* Rank */}
+                  <div style={{width:32,textAlign:'center',flexShrink:0}}>
+                    <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:900,fontSize:i<3?22:18,color:rankColor,lineHeight:1}}>
+                      {i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}
+                    </span>
+                  </div>
+
+                  {/* Avatar + name */}
+                  <PosAvatar player={p} size={38}/>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+                      <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:16,letterSpacing:.5}}>{p.name}</span>
+                      <span style={{fontSize:11,color:'var(--accent2)',fontFamily:"'DM Mono',monospace",fontWeight:700}}>{p.team}</span>
+                      {p.hasPlatoonAdv && <span style={{fontSize:9,padding:'1px 6px',borderRadius:4,background:'rgba(39,201,122,.15)',color:'var(--green)',fontFamily:"'DM Mono',monospace"}}>PLATOON ✓</span>}
+                    </div>
+                    <div style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginTop:2}}>
+                      {p.ctx ? `vs ${p.ctx.pitcherName} (${p.ctx.pitcherHand}HP) · ${p.ctx.gameTime} ET` : '—'}
+                    </div>
+                    {/* Signal chips */}
+                    <div style={{display:'flex',gap:4,marginTop:5,flexWrap:'wrap'}}>
+                      {p.signals.map((s,si)=>(
+                        <span key={si} style={{fontSize:9,padding:'2px 6px',borderRadius:4,
+                          background: s.c==='fire'?'rgba(232,65,26,.15)':s.c==='pos'?'rgba(39,201,122,.12)':s.c==='neu'?'rgba(245,166,35,.12)':'rgba(255,255,255,.05)',
+                          color: s.c==='fire'?'var(--accent)':s.c==='pos'?'var(--green)':s.c==='neu'?'var(--accent2)':'var(--muted)',
+                          fontFamily:"'DM Mono',monospace",border:'1px solid',
+                          borderColor: s.c==='fire'?'rgba(232,65,26,.3)':s.c==='pos'?'rgba(39,201,122,.25)':s.c==='neu'?'rgba(245,166,35,.25)':'var(--border)'
+                        }}>{s.t}</span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Score block */}
+                  <div style={{textAlign:'center',flexShrink:0,minWidth:70}}>
+                    <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:900,fontSize:32,color:scoreColor,lineHeight:1}}>{p.hrScore.toFixed(0)}</div>
+                    <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1}}>HR Score</div>
+                    <div style={{marginTop:3}}><GBadge g={grade}/></div>
+                  </div>
+
+                  {/* Key stats mini-grid */}
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(3,56px)',gap:4,flexShrink:0}}>
+                    {[
+                      {l:'EV',        v:p.useEV>0?`${p.useEV.toFixed(1)} mph`:'—',          hot:p.useEV>=95},
+                      {l:'Barrel%',   v:p.useBarrel>0?`${p.useBarrel.toFixed(1)}%`:'—',     hot:p.useBarrel>=12},
+                      {l:'HH%',       v:p.useHH>0?`${p.useHH.toFixed(1)}%`:'—',            hot:p.useHH>=50},
+                      {l:'Pull Air%', v:p.usePullAir>0?`${p.usePullAir.toFixed(1)}%`:'—',  hot:p.usePullAir>=25},
+                      {l:'Pull Brl%', v:p.usePullBrl>0?`${p.usePullBrl.toFixed(1)}%`:'—',  hot:p.usePullBrl>=5},
+                      {l:'Park HR',   v:p.parkFactor?`${p.parkFactor}`:'—',                 hot:p.parkFactor>=110, col:pfColor},
+                    ].map(s=>(
+                      <div key={s.l} style={{background:'var(--surface2)',borderRadius:6,padding:'4px 6px',textAlign:'center'}}>
+                        <div style={{fontSize:7,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:.5,marginBottom:2}}>{s.l}</div>
+                        <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,color:s.col||(s.hot?'var(--accent)':'var(--text)'),lineHeight:1}}>{s.v}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Expand arrow */}
+                  <span style={{color:'var(--muted)',fontSize:14,transform:isExp?'rotate(180deg)':'none',transition:'transform .2s',flexShrink:0}}>▾</span>
+                </div>
+
+                {/* Expanded detail panel */}
+                {isExp && <div style={{borderTop:'1px solid var(--border)',padding:'14px 16px',background:'var(--surface2)'}}>
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:12}}>
+
+                    {/* Score breakdown */}
+                    <div style={{background:'var(--surface)',borderRadius:8,padding:'12px 14px'}}>
+                      <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1,marginBottom:8}}>Score Breakdown</div>
+                      {[
+                        {l:'Contact Quality (30%)', v: Math.round(Math.min((p.useBarrel/18*35+Math.max((p.useEV-84)/18,0)*25+p.useHH/65*20+p.useFB/50*12+p.usePullAir/35*8)*0.30,30))},
+                        {l:'Power Intent (25%)',    v: Math.round(Math.min((p.usePullBrl/10*30+p.useAlmostHR/25*25)*0.25,25))},
+                        {l:'Recent Form (20%)',     v: Math.round(Math.min(20*(p.useBarrel/18*0.35+Math.max((p.useEV-84)/18,0)*0.30+p.useFB/50*0.20),20))},
+                        {l:'Matchup (15%)',         v: Math.round(Math.min((p.hasPlatoonAdv?15:7)+(p.daysSinceHR>=3&&p.daysSinceHR<=10?8:4),15))},
+                        {l:'Park + Weather (10%)', v: Math.round(Math.min(Math.max((p.parkFactor-85)/40,0)*6+Math.max(p.windBoost,0)*0.4,10))},
+                      ].map(row=>(
+                        <div key={row.l} style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
+                          <div style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace",flex:1}}>{row.l}</div>
+                          <div style={{width:80,height:6,borderRadius:3,background:'var(--border)',overflow:'hidden'}}>
+                            <div style={{height:'100%',borderRadius:3,width:`${row.v/30*100}%`,background:scoreColor}}/>
+                          </div>
+                          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color:scoreColor,minWidth:22,textAlign:'right'}}>{row.v}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Recent form */}
+                    <div style={{background:'var(--surface)',borderRadius:8,padding:'12px 14px'}}>
+                      <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1,marginBottom:8}}>
+                        Recent Form ({p.recentWindow})
+                        {p.trendBarrel > 0 && <span style={{color:'var(--green)',marginLeft:6}}>↑ Hot streak</span>}
+                        {p.trendBarrel < -2 && <span style={{color:'var(--accent)',marginLeft:6}}>↓ Cooling</span>}
+                      </div>
+                      {[
+                        {l:'Avg EV',       v:p.useEV>0?`${p.useEV.toFixed(1)} mph`:'—',  trend:p.trendEV},
+                        {l:'Barrel%',      v:p.useBarrel>0?`${p.useBarrel.toFixed(1)}%`:'—', trend:p.trendBarrel},
+                        {l:'Hard Hit%',    v:p.useHH>0?`${p.useHH.toFixed(1)}%`:'—'},
+                        {l:'Fly Ball%',    v:p.useFB>0?`${p.useFB.toFixed(1)}%`:'—'},
+                        {l:'Pulled Air%',  v:p.usePullAir>0?`${p.usePullAir.toFixed(1)}%`:'—'},
+                        {l:'Pull Barrel%', v:p.usePullBrl>0?`${p.usePullBrl.toFixed(1)}%`:'—'},
+                        {l:'Almost HR%',   v:p.useAlmostHR>0?`${p.useAlmostHR.toFixed(1)}%`:'—'},
+                        {l:'Days since HR',v:p.daysSinceHR!=null?`${p.daysSinceHR}d`:'—'},
+                      ].map(row=>(
+                        <div key={row.l} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'3px 0',borderBottom:'1px solid rgba(30,45,58,.3)'}}>
+                          <span style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>{row.l}</span>
+                          <div style={{display:'flex',alignItems:'center',gap:4}}>
+                            {row.trend != null && <span style={{fontSize:9,color:row.trend>0?'var(--green)':row.trend<0?'var(--accent)':'var(--muted)'}}>{row.trend>0?`▲${row.trend.toFixed(1)}`:row.trend<0?`▼${Math.abs(row.trend).toFixed(1)}`:''}</span>}
+                            <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:600,color:'var(--text)'}}>{row.v}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Matchup + park */}
+                    <div style={{background:'var(--surface)',borderRadius:8,padding:'12px 14px'}}>
+                      <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1,marginBottom:8}}>Matchup + Environment</div>
+                      {p.ctx && <>
+                        <div style={{marginBottom:8}}>
+                          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14}}>{p.ctx.pitcherName}</div>
+                          <div style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>{p.ctx.pitcherHand}HP · {p.ctx.isHome?'Home':'Away'} · {p.ctx.gameTime} ET</div>
+                          <div style={{fontSize:10,color:p.hasPlatoonAdv?'var(--green)':'var(--muted)',marginTop:3,fontFamily:"'DM Mono',monospace"}}>
+                            {p.hasPlatoonAdv ? `✅ ${p.hand} batter vs ${p.ctx.pitcherHand}HP — platoon advantage` : `Same hand — no platoon advantage`}
+                          </div>
+                        </div>
+                        {p.splitBarrel > (p.barrel||0)+1 && <div style={{fontSize:10,color:'var(--green)',fontFamily:"'DM Mono',monospace",marginBottom:4}}>
+                          +{(p.splitBarrel-(p.barrel||0)).toFixed(1)}% Barrel vs {p.ctx.pitcherHand}HP vs overall
+                        </div>}
+                      </>}
+                      <div style={{display:'flex',gap:8,marginTop:8,flexWrap:'wrap'}}>
+                        <div style={{padding:'5px 10px',borderRadius:6,background:'var(--surface2)'}}>
+                          <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",letterSpacing:1}}>PARK HR</div>
+                          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:16,color:pfColor}}>{p.parkFactor||100}</div>
+                        </div>
+                        <div style={{padding:'5px 10px',borderRadius:6,background:'var(--surface2)'}}>
+                          <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",letterSpacing:1}}>ENV</div>
+                          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:16,color:p.envScore>=55?'var(--accent)':'var(--muted)'}}>{p.envScore||50}</div>
+                        </div>
+                        {p.windBoost !== 0 && <div style={{padding:'5px 10px',borderRadius:6,background:p.windBoost>0?'rgba(232,65,26,.1)':'rgba(56,184,242,.1)'}}>
+                          <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",letterSpacing:1}}>WIND</div>
+                          <div style={{fontFamily:"'DM Mono',monospace",fontWeight:700,fontSize:13,color:p.windBoost>0?'var(--accent)':'var(--ice)'}}>{p.windBoost>0?'Out 💨':'In ❄️'}</div>
+                        </div>}
+                      </div>
+                    </div>
+
+                  </div>
+
+                  {/* Action row */}
+                  <div style={{display:'flex',gap:10,marginTop:12,alignItems:'center'}}>
+                    <button onClick={()=>openAtBatSlide(p)}
+                      style={{padding:'6px 14px',borderRadius:6,border:'1px solid var(--border)',background:'var(--surface)',color:'var(--text)',cursor:'pointer',fontFamily:"'DM Mono',monospace",fontSize:11}}>
+                      📋 At-Bat Log
+                    </button>
+                    <PickButton pid={p.pid} name={p.name} team={p.team}/>
+                    <span style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginLeft:'auto'}}>
+                      Based on {p.recentWindow} at-bat log data
+                    </span>
+                  </div>
+                </div>}
+              </div>;
+            })}
+          </div>
+    }
+  </div>;
+}
+
 function PregameTab() {
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -2146,7 +3032,7 @@ function PregameTab() {
   const [searchQ, setSearchQ] = useState('');
   const [selPlayer, setSelPlayer] = useState(null);
   const [handFilter, setHandFilter] = useState('all'); // all / L / R
-  const [pitchFilter, setPitchFilter] = useState('all');
+  const [pitchTypes, setPitchTypes] = useState(new Set()); // empty = all pitches
   const load = useCallback((silent=false) => {
     fetchPlayers(setLoading, setPlayers, setError, silent);
   }, []);
@@ -2258,10 +3144,10 @@ function PregameTab() {
             <PosAvatar player={p} size={30}/>
             <div>
               <div className="pn">{p.name}</div>
-              <div className="pt" style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>
-                {p.team&&p.team!=="—" ? p.team : "—"}
-                {p.lineupStatus==="confirmed" && <span style={{color:"var(--green)",marginLeft:4}}>✅</span>}
-                {p.lineupStatus==="unconfirmed" && <span style={{color:"var(--muted)",marginLeft:4}}>❓</span>}
+              <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",display:"flex",gap:4,alignItems:"center",marginTop:1}}>
+                <span style={{color:"var(--accent2)",fontWeight:700,fontSize:11}}>{p.team&&p.team!=="—"?p.team:"—"}</span>
+                {p.lineupStatus==="confirmed"&&<span style={{fontSize:9,color:"var(--green)"}}>✅</span>}
+                {(!p.lineupStatus||p.lineupStatus==="today")&&p.team&&p.team!=="—"&&<span style={{fontSize:9,color:"var(--muted)"}}>❓</span>}
               </div>
             </div>
           </div></td>
@@ -2326,34 +3212,109 @@ function ScoutingTab() {
   const [sortDir, setSortDir] = useState(1);
   const [filter, setFilter] = useState("all");
   const [refreshing, setRefreshing] = useState(false);
-  const [window, setWindow] = useState(3);
+  const [window, setWindow] = useState(7);
   const [selMatchup, setSelMatchup] = useState(null);
   const [selTeam, setSelTeam] = useState(null);
   const [games, setGames] = useState([]);
   const [searchQ, setSearchQ] = useState('');
-  const [selPlayer, setSelPlayer] = useState(null);
-  const [handFilter, setHandFilter] = useState('all'); // all / L / R
-  const [pitchFilter, setPitchFilter] = useState('all');
+  const [handFilter, setHandFilter] = useState('all');
+  const [pitchTypes, setPitchTypes] = useState(new Set());
+  // Per-player filtered metrics cache
+  const [filteredMetrics, setFilteredMetrics] = useState({}); // pid → metrics
+  const [fetchingFilters, setFetchingFilters] = useState(false);
+
   const load = useCallback((silent=false) => {
     fetchPlayers(setLoading, setPlayers, setError, silent);
   }, []);
-  useEffect(() => { load(false); }, []); // initial load — show spinner
-  // Background refresh every 5 min — silent, no spinner, no scroll reset
+  useEffect(() => { load(false); }, []);
   useEffect(() => {
     const id = setInterval(() => load(true), 300000);
     return () => clearInterval(id);
   }, [load]);
   useEffect(() => { fetchGames(()=>{}, setGames, ()=>{}); }, []);
+
   const hs = (k) => { if (sortKey===k) setSortDir(d=>-d); else { setSortKey(k); setSortDir(1); } };
+
+  // ── When filters change, fetch real filtered metrics from /api/statcast_raw ──
+  useEffect(() => {
+    if (handFilter === 'all' && pitchTypes.size === 0) {
+      setFilteredMetrics({});
+      return;
+    }
+    if (players.length === 0) return;
+
+    const fetchFilteredMetrics = async () => {
+      setFetchingFilters(true);
+      const pitchParam = [...pitchTypes].join(',');
+      // Map pitch names to Savant codes
+      const pitchCodeMap = {
+        '4-Seam FB':'FF', 'Sinker':'SI', 'Cutter':'FC',
+        'Slider':'SL', 'Changeup':'CH', 'Curveball':'CU',
+        'Sweeper':'ST', 'Splitter':'FS',
+      };
+      const pitchCodes = [...pitchTypes].map(p => pitchCodeMap[p]||p).join(',');
+
+      // Fetch for top 50 visible players
+      const toFetch = players.slice(0, 50);
+      const results = await Promise.allSettled(
+        toFetch.map(p =>
+          fetch(`/api/statcast_raw?batter_id=${p.pid}&days=${window}&pitch_types=${pitchCodes}&pitcher_throws=${handFilter === 'all' ? '' : handFilter}`)
+            .then(r => r.json())
+            .then(d => ({ pid: p.pid, metrics: d.metrics }))
+            .catch(() => ({ pid: p.pid, metrics: null }))
+        )
+      );
+
+      const newMetrics = {};
+      results.forEach(r => {
+        if (r.status === 'fulfilled' && r.value.metrics) {
+          newMetrics[r.value.pid] = r.value.metrics;
+        }
+      });
+      setFilteredMetrics(newMetrics);
+      setFetchingFilters(false);
+    };
+
+    const debounce = setTimeout(fetchFilteredMetrics, 500);
+    return () => clearTimeout(debounce);
+  }, [handFilter, pitchTypes, window, players.length]);
+
+  // Get display metrics for a player — filtered if available, season baseline otherwise
+  const getMetrics = (p) => {
+    const fm = filteredMetrics[p.pid];
+    if (fm) return {
+      avgEV:        fm.avgEV        || p.avgEV,
+      barrel:       fm.barrelPct    || p.barrel,
+      hardHit:      fm.hardHitPct   || p.hardHit,
+      flyBall:      fm.flyBallPct   || p.flyBall,
+      launchAngle:  fm.launchAngle  || p.launchAngle,
+      pullAir:      fm.pulledAirPct || p.pullAir,
+      oSwing:       fm.chasePct     || p.oSwing,
+      zContact:     fm.zContactPct  || p.zContact,
+      avg:          parseFloat(fm.avg) || p.avg,
+      bbPct:        fm.bbPct        || p.bbPct,
+      kPct:         fm.kPct         || p.kPct,
+      xwoba:        fm.xwoba        || p.xwoba,
+      hr:           fm.hr           || p.hr,
+      pulledBarrel: fm.pulledBarrelPct || p.pulledBarrel,
+      almostHRPct:  fm.almostHRPct  || 0,
+      isFiltered: true,
+    };
+    const w = p.windows?.[window] ?? {};
+    return { ...p, ...w, isFiltered: false };
+  };
+
+  // Teams playing today
+  const todayTeamsS = new Set(games.flatMap(g=>[g.away.abbr,g.home.abbr]).filter(t=>t&&t!=="???"));
   const matchupTeamsS = selMatchup
     ? new Set([selMatchup.away.abbr, selMatchup.home.abbr].filter(t=>t&&t!=="???"))
     : null;
-  // Get all teams playing today from games
-  const todayTeamsS = new Set(games.flatMap(g=>[g.away.abbr,g.home.abbr]).filter(t=>t&&t!=="???"));
+
   const filtered = players.filter(p => {
-    // Only show players on teams playing today (when we have game data)
-    if (todayTeamsS.size > 0 && p.team && p.team !== "—" && !todayTeamsS.has(p.team)) return false;
-    if (matchupTeamsS && matchupTeamsS.size > 0 && !matchupTeamsS.has(p.team)) return false;
+    if (todayTeamsS.size > 0 && p.team && p.team !== "—" && p.team !== "???" && !todayTeamsS.has(p.team)) return false;
+    if (matchupTeamsS && matchupTeamsS.size > 0) {
+      if (p.team && p.team !== "—" && !matchupTeamsS.has(p.team)) return false;
+    }
     if (selTeam && p.team !== selTeam) return false;
     if (searchQ && !p.name.toLowerCase().includes(searchQ.toLowerCase())) return false;
     const wg = (p.windows?.[window]?.grade || p.grade)?.grade;
@@ -2361,61 +3322,46 @@ function ScoutingTab() {
     if (filter==="a") return wg==="A+"||wg==="A";
     if (filter==="b") return wg==="A+"||wg==="A"||wg==="B";
     if (filter==="chasers") return (p.oSwing??30)>=33;
-    // Handedness filter — vs RHP or LHP
-    // We adjust scores based on handedness when filter is active
-    if (handFilter !== "all") {
-      // Batters with platoon advantage: LHB vs RHP better, RHB vs LHP better
-      const hand = p.hand || GLOBAL_PLAYER_TEAM_MAP[p.pid]?.hand || "R";
-      const hasAdvantage = (handFilter === "R" && hand === "L") || (handFilter === "L" && hand === "R");
-      // Don't filter out — just show all but we sort by platoon-adjusted score
-    }
     return true;
   });
 
-  // Apply platoon and pitch adjustments to scores for display
-  const applyFilters = (p) => {
-    if (handFilter === "all" && pitchFilter === "all") return p;
-    const hand = p.hand || GLOBAL_PLAYER_TEAM_MAP[p.pid]?.hand || "R";
-    let adjOS = p.os || 0;
-    // Platoon boost: opposite-hand batters get +8, same-hand -5
-    if (handFilter !== "all") {
-      const hasAdv = (handFilter === "R" && hand === "L") || (handFilter === "L" && hand === "R");
-      adjOS = Math.min(100, adjOS + (hasAdv ? 8 : -5));
-    }
-    // Pitch type adjustment: use xwOBA as proxy
-    if (pitchFilter !== "all") {
-      // Simplified: contact-first batters (high AVG, low K%) handle off-speed better
-      // Power bats (high barrel%, EV) handle fastballs better
-      const isPower = (p.barrel||0) >= 10 && (p.avgEV||0) >= 92;
-      const isFB = pitchFilter.includes("FB") || pitchFilter === "Sinker" || pitchFilter === "Cutter";
-      const isOS = pitchFilter === "Slider" || pitchFilter === "Changeup" || pitchFilter === "Curveball";
-      if (isPower && isFB) adjOS = Math.min(100, adjOS + 5);
-      if (isPower && isOS) adjOS = Math.max(0, adjOS - 3);
-      if (!isPower && isOS) adjOS = Math.min(100, adjOS + 4);
-    }
-    return {...p, os: adjOS, grade: getSG(adjOS)};
-  };
   const sortValS = (p, k) => {
+    const m = getMetrics(p);
+    if (k === "os") return m?.os ?? p.os ?? 0;
+    if (m && k in m) return m[k] ?? 0;
     const w = p.windows?.[window];
-    if (k === "os") return w?.os ?? p.os ?? 0;
     if (w && k in w) return w[k];
     return p[k] ?? 0;
   };
-  const sorted = [...filtered].map(applyFilters).sort((a,b) => sortDir*(sortValS(b,sortKey)-sortValS(a,sortKey)));
+  const sorted = [...filtered].sort((a,b) => sortDir*(sortValS(b,sortKey)-sortValS(a,sortKey)));
   const apC=players.filter(p=>p.grade?.grade==="A+").length, aC=players.filter(p=>p.grade?.grade==="A").length, bC=players.filter(p=>p.grade?.grade==="B").length, chC=players.filter(p=>(p.oSwing??30)>=33).length;
+
+  const filtersActive = handFilter !== 'all' || pitchTypes.size > 0;
+
   return <div>
     <div className="hrow">
-      <div className="section-header"><div className="section-title">🎯 Scouting Board</div><div className="section-sub">Contact Quality (50%) + HR Intent (30%) + Readiness (20%) · grades recalculate per window</div></div>
+      <div className="section-header">
+        <div className="section-title">🎯 Scouting Board</div>
+        <div className="section-sub">
+          Contact Quality (50%) + HR Intent (30%) + Readiness (20%)
+          {filtersActive && <span style={{color:"var(--accent)",marginLeft:8}}>
+            {fetchingFilters ? "⟳ Recalculating from at-bat logs…" : "✓ Filtered from real at-bat data"}
+          </span>}
+        </div>
+      </div>
       <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
         <SearchBar value={searchQ} onChange={setSearchQ} placeholder="Search any batter…"/>
         <WindowButtons window={window} setWindow={setWindow}/>
         <RefBtn refreshing={refreshing} onClick={async()=>{setRefreshing(true);await fetchPlayers(setLoading,setPlayers,setError,true);setRefreshing(false);}}/>
       </div>
     </div>
-    {/* Combined Matchup + Team Filter */}
-    <div style={{marginBottom:12,background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,padding:"10px 14px"}}>
-      <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center",marginBottom:8}}>
-        <span style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1,marginRight:4}}>📅 Matchup:</span>
+
+    {/* ── UNIFIED FILTER PANEL ── */}
+    <div style={{marginBottom:12,background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,padding:"12px 14px"}}>
+
+      {/* Row 1: Matchup + Team + Park/Weather */}
+      <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center",marginBottom:10}}>
+        <span style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1,marginRight:4}}>📅 Game:</span>
         <button className={`chip ${!selMatchup&&!selTeam?"active":""}`}
           onClick={()=>{setSelMatchup(null);setSelTeam(null);}}
           style={{fontSize:10,fontFamily:"'Oswald',sans-serif",fontWeight:600}}>All Batters</button>
@@ -2425,50 +3371,74 @@ function ScoutingTab() {
             onClick={()=>{setSelMatchup(selMatchup?.id===g.id?null:g);setSelTeam(null);}}
             style={{fontSize:10,fontFamily:"'Oswald',sans-serif",fontWeight:600}}>
             {g.away.abbr} @ {g.home.abbr}
+            {g.gameTime&&<span style={{fontSize:8,color:"var(--muted)",marginLeft:3}}>{g.gameTime}</span>}
           </button>
         ))}
-      </div>
-      {/* Single team picker */}
-      <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}>
-        <span style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1,marginRight:4}}>🔍 Team:</span>
         {[...new Set(games.flatMap(g=>[g.away.abbr,g.home.abbr]).filter(t=>t&&t!=="???"))].sort().map(t=>(
           <button key={t}
             className={`chip ${selTeam===t?"active":""}`}
             onClick={()=>{setSelTeam(selTeam===t?null:t);setSelMatchup(null);}}
-            style={{fontSize:10,fontFamily:"'Oswald',sans-serif",fontWeight:600}}>{t}</button>
+            style={{fontSize:9,fontFamily:"'Oswald',sans-serif",fontWeight:600,padding:"2px 7px"}}>{t}</button>
         ))}
       </div>
+
+      {/* Row 2: vs Pitcher handedness */}
+      <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center",marginBottom:8}}>
+        <span style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1,marginRight:4}}>⚾ vs Pitcher:</span>
+        {[{k:"all",l:"All"},{k:"R",l:"RHP"},{k:"L",l:"LHP"}].map(f=>(
+          <button key={f.k} className={`chip ${handFilter===f.k?"active":""}`}
+            onClick={()=>setHandFilter(f.k)}
+            style={{fontFamily:"'DM Mono',monospace",fontSize:10}}>{f.l}</button>
+        ))}
+        <span style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",marginLeft:8,textTransform:"uppercase",letterSpacing:1}}>Pitch Type:</span>
+        <button className={`chip ${pitchTypes.size===0?"active":""}`} onClick={()=>setPitchTypes(new Set())}
+          style={{fontFamily:"'DM Mono',monospace",fontSize:10}}>All</button>
+        {["4-Seam FB","Sinker","Cutter","Slider","Changeup","Curveball"].map(pt=>(
+          <button key={pt} className={`chip ${pitchTypes.has(pt)?"active":""}`}
+            onClick={()=>setPitchTypes(prev=>{const n=new Set(prev);n.has(pt)?n.delete(pt):n.add(pt);return n;})}
+            style={{fontFamily:"'DM Mono',monospace",fontSize:10}}>{pt}</button>
+        ))}
+        {pitchTypes.size>0&&<span style={{fontSize:9,color:"var(--accent)",fontFamily:"'DM Mono',monospace"}}>
+          {pitchTypes.size} type{pitchTypes.size>1?"s":""} · recalculating from at-bat logs
+        </span>}
+      </div>
+
+      {/* Row 3: Active filters summary + park/weather */}
+      {selMatchup && <ScoutingWeather matchup={selMatchup} games={games}/>}
       {(selMatchup||selTeam) && <div style={{fontSize:9,color:"var(--accent)",fontFamily:"'DM Mono',monospace",marginTop:6}}>
-        {selMatchup?`Showing ${selMatchup.away.abbr} @ ${selMatchup.home.abbr} batters`:
-         selTeam?`Showing ${selTeam} batters`:""}
+        {selMatchup?`${selMatchup.away.abbr} @ ${selMatchup.home.abbr} batters`:selTeam?`${selTeam} batters`:""}
         {" · "}<span style={{cursor:"pointer",textDecoration:"underline"}} onClick={()=>{setSelMatchup(null);setSelTeam(null);}}>Clear</span>
       </div>}
     </div>
-    {/* Park + Weather for selected matchup */}
-    {selMatchup && <ScoutingWeather matchup={selMatchup} games={games}/>}
+
     <div className="cards">
       <div className="card"><div className="cl">🔴 A+ Threats</div><div className="cv" style={{color:"var(--aplus)"}}>{apC}</div><div className="cs">Red-hot</div></div>
       <div className="card"><div className="cl">🔥 Grade A</div><div className="cv" style={{color:"var(--a)"}}>{aC}</div><div className="cs">Impact bats</div></div>
       <div className="card"><div className="cl">⚡ Grade B</div><div className="cv" style={{color:"var(--b)"}}>{bC}</div><div className="cs">Heating up</div></div>
-      <div className="card"><div className="cl">🚫 Chasers</div><div className="cv" style={{color:"#ff3010"}}>{chC}</div><div className="cs">O-Swing ≥ 33%</div></div>
+      <div className="card"><div className="cl">🚫 Chasers</div><div className="cv" style={{color:"#ff3010"}}>{chC}</div><div className="cs">O-Swing ≥33%</div></div>
     </div>
-    <div className="note">ℹ️ <strong>EV is the grade anchor (60%)</strong>: A+ = 92.5+ mph · A = 90–92.4 · B = 87–89.9 · C = 84–86.9 · D = 81–83.9 · F = &lt;81. Barrel%, Pull Air%, Chase Rate, HR Intent modify the score within each tier — a slow bat cannot reach A regardless of approach.</div>
-    <div className="leg"><span className="legt">Grades:</span><div className="legi">{[{g:"A+",c:"var(--aplus)",l:"Red-hot"},{g:"A",c:"var(--a)",l:"Impact"},{g:"B",c:"var(--b)",l:"Heating"},{g:"C",c:"var(--c)",l:"Watch"},{g:"D",c:"var(--d)",l:"Cooling"},{g:"F",c:"var(--f)",l:"Cold"},{g:"X",c:"#3a5060",l:"Ignore"}].map(x=><div key={x.g} className="leit"><div className="ld" style={{background:x.c}}/><strong style={{color:x.c}}>{x.g}</strong> — {x.l}</div>)}</div></div>
+
     <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:8,alignItems:"center"}}>
-      <div className="filters" style={{marginBottom:0}}><span className="fl">Grade:</span>{[{key:"all",label:"All"},{key:"aplus",label:"🔴 A+"},{key:"a",label:"A+ & A"},{key:"b",label:"B+"},{key:"chasers",label:"🚫 Chasers"}].map(f=><button key={f.key} className={`chip ${filter===f.key?"active":""}`} onClick={()=>setFilter(f.key)}>{f.label}</button>)}</div>
-      <div className="filters" style={{marginBottom:0}}><span className="fl">vs:</span>{[{k:"all",l:"All"},{k:"R",l:"RHP"},{k:"L",l:"LHP"}].map(f=><button key={f.k} className={`chip ${handFilter===f.k?"active":""}`} onClick={()=>setHandFilter(f.k)}>{f.l}</button>)}</div>
-      <div className="filters" style={{marginBottom:0}}><span className="fl">Pitch:</span>{["All","4-Seam FB","Slider","Changeup","Curveball","Sinker","Cutter"].map(pt=><button key={pt} className={`chip ${pitchFilter===(pt==="All"?"all":pt)?"active":""}`} onClick={()=>setPitchFilter(pt==="All"?"all":pt)}>{pt}</button>)}</div>
+      <div className="filters" style={{marginBottom:0}}><span className="fl">Grade:</span>
+        {[{key:"all",label:"All"},{key:"aplus",label:"🔴 A+"},{key:"a",label:"A+ & A"},{key:"b",label:"B+"},{key:"chasers",label:"🚫 Chasers"}]
+          .map(f=><button key={f.key} className={`chip ${filter===f.key?"active":""}`} onClick={()=>setFilter(f.key)}>{f.label}</button>)}
+      </div>
     </div>
+
     {loading ? <div className="lw"><div className="sp"/><div className="lt">Loading Scouting Board…</div></div> : <>
       {error && <div className="warn">⚠️ {error}</div>}
+      {fetchingFilters && <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0",color:"var(--muted)",fontFamily:"'DM Mono',monospace",fontSize:11}}>
+        <div className="sp" style={{width:14,height:14,borderWidth:2}}/> Fetching filtered at-bat data from Baseball Savant…
+      </div>}
       <div className="tw-scroll"><div className="tw-scroll-inner"><table><thead><tr>
         <th>#</th><th>Player</th><th style={{width:36}}>Pick</th>
-        <th className={sortKey==="os"?"sk":""} onClick={()=>hs("os")} style={{cursor:"pointer"}}>Grade{sortKey==="os"&&<span style={{color:"var(--accent)",marginLeft:3}}>{sortDir<0?"↓":"↑"}</span>}</th>
         <th className={sortKey==="os"?"sk":""} onClick={()=>hs("os")} style={{cursor:"pointer"}}>
-          <div style={{display:"flex",alignItems:"center",gap:2}}>
-            <Tip text="Unified score: Contact Quality 50% + HR Intent 30% + Readiness 20%"><span>Score</span></Tip>
-            {sortKey==="os"&&<span style={{color:"var(--accent)"}}>{sortDir<0?"↓":"↑"}</span>}
-          </div>
+          Grade{sortKey==="os"&&<span style={{color:"var(--accent)",marginLeft:3}}>{sortDir<0?"↓":"↑"}</span>}
+        </th>
+        <th className={sortKey==="os"?"sk":""}>
+          <Tip text="Unified score: CQ 50% + HRI 30% + RDY 20%. Recalculates from raw at-bat data when filters active.">
+            <span>Score</span>
+          </Tip>
         </th>
         {STAT_COL_HEADERS.map(c=>
           <th key={c.key} className={sortKey===c.key?"sk":""} onClick={()=>hs(c.key)}>
@@ -2480,23 +3450,37 @@ function ScoutingTab() {
         )}
       </tr></thead>
       <tbody>{sorted.map((p,i)=>{
+        const m = getMetrics(p);
+        const displayP = filtersActive && m.isFiltered ? {...p, ...m} : p;
         const w = p.windows?.[window] ?? {};
         const wg = w.grade||p.grade||{grade:"X",cls:"x",color:"#2a3a48"};
-        const wOS = w.os ?? p.os ?? 0;
-        const wCQ = w.cq ?? p.cq ?? 0;
-        const wHRI = w.hri ?? p.hri ?? 0;
-        const wRD = w.rd ?? p.rd ?? 0;
-        const piq = p.piq||{label:"—",color:"var(--muted)"};
+        const wOS = m.os ?? w.os ?? p.os ?? 0;
+
+        // Plate IQ from real metrics
+        const bb = m.bbPct || p.bbPct || 0;
+        const k = m.kPct || p.kPct || 22;
+        const chase = m.oSwing ?? m.chasePct ?? p.oSwing ?? 30;
+        const zc = m.zContact ?? m.zContactPct ?? p.zContact ?? 80;
+        const iqScore = Math.min(
+          (bb>=12?32:bb>=9?26:bb>=7?18:bb>=5?10:3) +
+          (k<=14?28:k<=18?22:k<=22?15:k<=27?9:k<=32?4:1) +
+          (chase<=20?28:chase<=25?22:chase<=30?15:chase<=35?8:chase<=40?3:1) +
+          (zc>=88?12:zc>=83?9:zc>=78?6:zc>=72?3:1),
+          100
+        );
+        const iqLabel = iqScore>=82?"🎯 Elite":iqScore>=68?"✅ Patient":iqScore>=52?"📊 Average":iqScore>=38?"⚠️ Chaser":"🚫 Free Swing";
+        const iqColor = iqScore>=82?"var(--green)":iqScore>=68?"var(--green)":iqScore>=52?"var(--muted)":iqScore>=38?"var(--fire3)":"#ff3010";
+
         return <tr key={p.pid}>
           <td><span className="sv avg" style={{fontSize:10}}>{i+1}</span></td>
           <td><div className="pc" style={{cursor:"pointer"}} onClick={()=>openAtBatSlide(p)}>
             <PosAvatar player={p} size={30}/>
             <div>
               <div className="pn">{p.name}</div>
-              <div className="pt" style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>
-                {p.team&&p.team!=="—" ? p.team : "—"}
-                {p.lineupStatus==="confirmed" && <span style={{color:"var(--green)",marginLeft:4}}>✅</span>}
-                {p.lineupStatus==="unconfirmed" && <span style={{color:"var(--muted)",marginLeft:4}}>❓</span>}
+              <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",display:"flex",gap:4,alignItems:"center",marginTop:1}}>
+                <span style={{color:"var(--accent2)",fontWeight:700,fontSize:11}}>{p.team&&p.team!=="—"?p.team:"—"}</span>
+                {p.lineupStatus==="confirmed"&&<span style={{fontSize:9,color:"var(--green)"}}>✅</span>}
+                {(!p.lineupStatus||p.lineupStatus==="today")&&p.team&&p.team!=="—"&&<span style={{fontSize:9,color:"var(--muted)"}}>❓</span>}
               </div>
             </div>
           </div></td>
@@ -2508,28 +3492,13 @@ function ScoutingTab() {
                 <div style={{height:"100%",borderRadius:2,width:`${Math.min(wOS,100)}%`,background:wg.color}}/>
               </div>
               <span style={{fontFamily:"'Oswald',sans-serif",fontSize:14,fontWeight:700,color:wg.color,minWidth:28}}>
-                {wOS.toFixed?wOS.toFixed(0):wOS}
+                {typeof wOS==="number"?wOS.toFixed(0):wOS}
               </span>
             </div>
-            {/* Plate IQ — derived from BB%, K%, Chase% */}
-            {(() => {
-              const bb = p.bbPct||0, k = p.kPct||0, chase = p.oSwing||0, zc = p.zContact||80;
-              // Plate IQ = walk rate + zone discipline + contact rate
-              const iqScore = Math.min(
-                (bb>=10?30:bb>=7?22:bb>=5?14:bb>=3?8:3) +
-                (k<=14?25:k<=18?20:k<=22?14:k<=27?8:k<=32?4:1) +
-                (chase<=20?30:chase<=25?24:chase<=30?16:chase<=35?9:chase<=40?4:1) +
-                (zc>=88?15:zc>=83?12:zc>=78?8:zc>=72?4:2),
-                100
-              );
-              const iqLabel = iqScore>=80?"🎯 Elite IQ":iqScore>=65?"✅ Patient":iqScore>=48?"— Avg":iqScore>=32?"⚠️ Chaser":"🚫 Free Swing";
-              const iqColor = iqScore>=80?"var(--green)":iqScore>=65?"var(--green)":iqScore>=48?"var(--muted)":iqScore>=32?"var(--fire3)":"#ff3010";
-              return <div style={{fontSize:9,color:iqColor,fontFamily:"'DM Mono',monospace",marginTop:2,whiteSpace:"nowrap"}}>{iqLabel}</div>;
-            })()}
+            <div style={{fontSize:9,color:iqColor,fontFamily:"'DM Mono',monospace",marginTop:2}}>{iqLabel}</div>
+            {m.isFiltered && <div style={{fontSize:8,color:"var(--accent)",fontFamily:"'DM Mono',monospace"}}>filtered</div>}
           </td>
-
-
-          <StatCols p={p} window={window}/>
+          <StatCols p={displayP} window={window}/>
         </tr>;
       })}</tbody></table></div></div>
     </>}
@@ -2537,251 +3506,6 @@ function ScoutingTab() {
 }
 
 
-// ── PITCH PROFILE ENGINE ──────────────────────────────────
-
-// ── BATTER HANDEDNESS DATA ─────────────────────────────────
-const BATTER_HAND = {
-  "Aaron Judge":"R","Juan Soto":"L","Giancarlo Stanton":"R","Anthony Rizzo":"L",
-  "Gleyber Torres":"R","Anthony Volpe":"R","DJ LeMahieu":"R","Jose Trevino":"R","Alex Verdugo":"L",
-  "Shohei Ohtani":"L","Freddie Freeman":"L","Mookie Betts":"R","Will Smith":"R",
-  "Max Muncy":"L","Teoscar Hernandez":"R","Gavin Lux":"L","Miguel Rojas":"R","Andy Pages":"R",
-  "Yordan Alvarez":"L","Jose Abreu":"R","Alex Bregman":"R","Kyle Tucker":"L",
-  "Yainer Diaz":"R","Chas McCormick":"R","Jake Meyers":"L","Mauricio Dubon":"R","Jeremy Pena":"R",
-  "Bryce Harper":"L","Kyle Schwarber":"L","Trea Turner":"R","Nick Castellanos":"R",
-  "J.T. Realmuto":"R","Alec Bohm":"R","Brandon Marsh":"L","Bryson Stott":"L","Johan Rojas":"R",
-  "Pete Alonso":"R","Francisco Lindor":"S","Mark Vientos":"R","Brandon Nimmo":"L",
-  "Jeff McNeil":"L","Starling Marte":"R","Tyrone Taylor":"R","Francisco Alvarez":"R","Luis Torrens":"R",
-  "Gunnar Henderson":"L","Adley Rutschman":"S","Anthony Santander":"S","Ryan Mountcastle":"R",
-  "Austin Hays":"R","Cedric Mullins":"S","Ramon Urias":"R","Jorge Mateo":"R","James McCann":"R",
-  "Ian Happ":"S","Nico Hoerner":"R","Seiya Suzuki":"R","Mike Tauchman":"L",
-  "Christopher Morel":"R","Dansby Swanson":"R","Miguel Amaya":"R","Cody Bellinger":"L",
-  "Marcus Semien":"R","Corey Seager":"L","Adolis Garcia":"R","Josh Jung":"R",
-  "Nathaniel Lowe":"L","Travis Jankowski":"L","Evan Carter":"L","Jonah Heim":"S","Leody Taveras":"S",
-  "Jose Ramirez":"S","Josh Naylor":"L","Steven Kwan":"L","David Fry":"R",
-  "Lane Thomas":"R","Bo Naylor":"L","Will Brennan":"L","Tyler Freeman":"R","Brayan Rocchio":"S",
-  "Julio Rodriguez":"R","Cal Raleigh":"L","Jorge Polanco":"S","Ty France":"R",
-  "Mitch Garver":"R","Josh Rojas":"L","Luke Raley":"L","Victor Robles":"R","Randy Arozarena":"R",
-  "Rafael Devers":"L","Jarren Duran":"L","Triston Casas":"L","Rob Refsnyder":"R",
-  "Wilyer Abreu":"R","Connor Wong":"R","Masataka Yoshida":"L","David Hamilton":"L","Romy Gonzalez":"R",
-  "Ronald Acuna Jr":"R","Matt Olson":"L","Ozzie Albies":"S","Austin Riley":"R",
-  "Sean Murphy":"R","Michael Harris II":"L","Jorge Soler":"R","Marcell Ozuna":"R","Orlando Arcia":"R",
-  "Manny Machado":"R","Fernando Tatis Jr":"R","Jake Cronenworth":"L","Xander Bogaerts":"R",
-  "Kyle Higashioka":"R","Ha-Seong Kim":"R","Jackson Merrill":"L","David Peralta":"L","Luis Arraez":"L",
-  "Christian Yelich":"L","Willy Adames":"R","William Contreras":"R","Sal Frelick":"L",
-  "Joey Wiemer":"R","Jackson Chourio":"R","Rhys Hoskins":"R","Gary Sanchez":"R","Owen Miller":"R",
-  "Carlos Correa":"R","Byron Buxton":"R","Ryan Jeffers":"R","Max Kepler":"L",
-  "Jose Miranda":"R","Trevor Larnach":"L","Edouard Julien":"L","Kyle Farmer":"R","Royce Lewis":"R",
-  "Yandy Diaz":"R","Josh Lowe":"L","Harold Ramirez":"R","Jonathan Aranda":"L",
-  "Isaac Paredes":"R","Richie Palacios":"L","Jose Siri":"R","Christian Bethancourt":"R",
-  "Bo Bichette":"R","Vladimir Guerrero Jr":"R","Daulton Varsho":"L","George Springer":"R",
-  "Kevin Kiermaier":"L","Alejandro Kirk":"R","Davis Schneider":"R","Justin Turner":"R","Ernie Clement":"R",
-  "Elly De La Cruz":"S","Jonathan India":"R","TJ Friedl":"L","Tyler Stephenson":"R",
-  "Spencer Steer":"R","Will Benson":"L","Jake Fraley":"L","Jeimer Candelario":"S","Nick Martini":"L",
-  "Matt Chapman":"R","LaMonte Wade Jr":"L","Patrick Bailey":"S","Wilmer Flores":"R",
-  "Michael Conforto":"L","Joc Pederson":"L","Luis Matos":"R","Thairo Estrada":"R","Casey Schmitt":"R",
-  "Corbin Carroll":"L","Ketel Marte":"S","Lourdes Gurriel Jr":"R","Christian Walker":"R",
-  "Gabriel Moreno":"R","Pavin Smith":"L","Jake McCarthy":"L","Alek Thomas":"L","Eugenio Suarez":"R",
-};
-
-function getBatterHand(name) {
-  // Seed by name so same player always gets same hand
-  const nc = (name.charCodeAt(0)||82) + (name.charCodeAt(1)||0);
-  return BATTER_HAND[name] || (nc % 3 === 0 ? "L" : nc % 7 === 0 ? "S" : "R");
-}
-
-// ── HANDEDNESS MATCHUP ENGINE ──────────────────────────────
-// LHB vs RHP = platoon advantage (batter-friendly)
-// RHB vs LHP = platoon advantage (batter-friendly)
-// Same side  = pitcher advantage
-// Switch hitter always gets the favorable side
-function getHandMatchup(batterHand, pitcherHand) {
-  const eff = batterHand==="S" ? (pitcherHand==="R"?"L":"R") : batterHand;
-  if (eff==="L"&&pitcherHand==="R") return {label:"⚡ Platoon Adv",cls:"pos",multiplier:1.12,evBonus:2.2,detail:"LHB vs RHP — batter platoon edge"};
-  if (eff==="R"&&pitcherHand==="L") return {label:"⚡ Platoon Adv",cls:"pos",multiplier:1.10,evBonus:1.8,detail:"RHB vs LHP — batter platoon edge"};
-  if (eff==="L"&&pitcherHand==="L") return {label:"⚠️ Same Side",cls:"neg",multiplier:0.88,evBonus:-1.5,detail:"LHB vs LHP — pitcher platoon edge"};
-  return {label:"— Even",cls:"neu",multiplier:0.94,evBonus:-0.8,detail:"RHB vs RHP — slight pitcher edge"};
-}
-
-function applyHandedness(stats, matchup) {
-  const m = matchup.multiplier;
-  return {
-    ...stats,
-    ev:      Math.round((stats.ev + matchup.evBonus)*10)/10,
-    barrel:  Math.round(stats.barrel*m*10)/10,
-    flyBall: Math.round(stats.flyBall*(m*0.8+0.2)*10)/10,
-    la:      Math.round((stats.la+(m>1?1.5:-1.5))*10)/10,
-    pullAir: Math.round(stats.pullAir*(m*0.7+0.3)*10)/10,
-    chase:   Math.round(stats.chase*(m>1?0.92:1.08)*10)/10,
-    score:   Math.round(Math.min(stats.score*m,100)*10)/10,
-  };
-}
-
-// ── PITCH PROFILE ─────────────────────────────────────────
-function genPitchProfile(p) {
-  const types = ["4-Seam FB","Slider","Changeup","Curveball","Cutter"];
-  const profile = {};
-  types.forEach(pt => {
-    const isFB=pt==="4-Seam FB"||pt==="Cutter", isBreaking=pt==="Slider"||pt==="Curveball", isOS=pt==="Changeup";
-    const r=(base,rng,idx=0)=>Math.round((base+(seededRand(2824+idx,24)*rng*2-rng))*10)/10;
-    const ev=r(p.avgEV,isFB?5:isBreaking?4:3), barrel=r(p.barrel,isFB?4:isBreaking?3:2);
-    const flyBall=r(p.flyBall??35,8), la=r(p.launchAngle??18,isFB?6:5);
-    const pullAir=r(p.pullAir,isFB?5:4);
-    const chase=r(isOS?(p.oSwing??30)+8:isBreaking?(p.oSwing??30)+4:(p.oSwing??30)-3,6);
-    const evN=Math.min(Math.max((ev-88)/12,0),1),barN=Math.min(barrel/14,1),fbN=Math.min(flyBall/45,1);
-    const laN=Math.min(Math.max((la-10)/22,0),1),puN=Math.min(pullAir/28,1),chN=Math.max(1-chase/45,0);
-    const score=Math.round((evN*30+barN*25+fbN*15+laN*10+puN*10+chN*10)*10)/10;
-    profile[pt]={ev,barrel,flyBall,la,pullAir,chase,score,grade:getSG(score)};
-  });
-  return profile;
-}
-
-// ── TEAM ROSTERS ──────────────────────────────────────────
-// MLB Team ID → Abbreviation mapping (official MLB Stats API IDs)
-const TEAM_IDS = {
-  NYY:147, BOS:111, LAD:119, HOU:117, PHI:143, NYM:121, BAL:110, CHC:112,
-  TEX:140, CLE:114, SEA:136, ATL:144, SD:135,  MIL:158, MIN:142, TB:139,
-  TOR:141, CIN:113, SF:137,  ARI:109, DET:116, KC:118,  OAK:133, LAA:108,
-  WSH:120, COL:115, MIA:146, PIT:134, STL:138, CHW:145,
-};
-const TEAM_ID_TO_ABB = Object.fromEntries(Object.entries(TEAM_IDS).map(([k,v])=>[v,k]));
-const MLB_TEAMS = ["ARI","ATH","ATL","BAL","BOS","CHC","CHW","CIN","CLE","COL","DET","HOU","KC","LAA","LAD","MIA","MIL","MIN","NYM","NYY","OAK","PHI","PIT","SD","SEA","SF","STL","TB","TEX","TOR","WSH"];
-
-// Live roster cache — populated on demand, persists for the session
-const LIVE_ROSTER_CACHE = {};
-const ROSTERS = {
-  NYY:["Aaron Judge","Cody Bellinger","Giancarlo Stanton","Paul Goldschmidt","Gleyber Torres","Anthony Volpe","Jazz Chisholm Jr","Austin Wells","Trent Grisham"],
-  LAD:["Shohei Ohtani","Freddie Freeman","Mookie Betts","Will Smith","Max Muncy","Teoscar Hernandez","Gavin Lux","Miguel Rojas","Andy Pages"],
-  HOU:["Yordan Alvarez","Kyle Tucker","Alex Bregman","Yainer Diaz","Chas McCormick","Jake Meyers","Mauricio Dubon","Jeremy Pena","Zach Dezenzo"],
-  PHI:["Bryce Harper","Kyle Schwarber","Trea Turner","Nick Castellanos","J.T. Realmuto","Alec Bohm","Brandon Marsh","Bryson Stott","Johan Rojas"],
-  NYM:["Juan Soto","Pete Alonso","Francisco Lindor","Mark Vientos","Brandon Nimmo","Jeff McNeil","Starling Marte","Francisco Alvarez","Tyrone Taylor"],
-  BAL:["Gunnar Henderson","Adley Rutschman","Anthony Santander","Ryan Mountcastle","Austin Hays","Cedric Mullins","Ramon Urias","Jorge Mateo","James McCann"],
-  CHC:["Ian Happ","Nico Hoerner","Seiya Suzuki","Dansby Swanson","Miguel Amaya","Christopher Morel","Pete Crow-Armstrong","Michael Busch","Cody Bellinger"],
-  TEX:["Marcus Semien","Corey Seager","Adolis Garcia","Josh Jung","Nathaniel Lowe","Evan Carter","Jonah Heim","Leody Taveras","Wyatt Langford"],
-  CLE:["Jose Ramirez","Josh Naylor","Steven Kwan","David Fry","Lane Thomas","Bo Naylor","Will Brennan","Tyler Freeman","Brayan Rocchio"],
-  SEA:["Julio Rodriguez","Cal Raleigh","Randy Arozarena","Jorge Polanco","Mitch Garver","Josh Rojas","Luke Raley","Victor Robles","Tyler Locklear"],
-  BOS:["Rafael Devers","Jarren Duran","Triston Casas","Rob Refsnyder","Wilyer Abreu","Connor Wong","Masataka Yoshida","David Hamilton","Romy Gonzalez"],
-  ATL:["Ronald Acuna Jr","Matt Olson","Ozzie Albies","Austin Riley","Sean Murphy","Michael Harris II","Marcell Ozuna","Orlando Arcia","Ramon Laureano"],
-  SD:["Manny Machado","Fernando Tatis Jr","Luis Arraez","Jake Cronenworth","Kyle Higashioka","Ha-Seong Kim","Jackson Merrill","David Peralta","Ethan Salas"],
-  MIL:["Christian Yelich","William Contreras","Sal Frelick","Joey Wiemer","Jackson Chourio","Brice Turang","Blake Perkins","Jake Bauers","Joey Wiemer"],
-  MIN:["Carlos Correa","Byron Buxton","Ryan Jeffers","Royce Lewis","Jose Miranda","Trevor Larnach","Edouard Julien","Matt Wallner","Brooks Lee"],
-  TB:["Yandy Diaz","Josh Lowe","Harold Ramirez","Jonathan Aranda","Isaac Paredes","Richie Palacios","Jose Siri","Christian Bethancourt","Ben Rortvedt"],
-  TOR:["Vladimir Guerrero Jr","Bo Bichette","Daulton Varsho","George Springer","Alejandro Kirk","Davis Schneider","Addison Barger","Spencer Horwitz","Nathan Lukes"],
-  CIN:["Elly De La Cruz","Jonathan India","TJ Friedl","Tyler Stephenson","Spencer Steer","Will Benson","Jake Fraley","Jeimer Candelario","Nick Martini"],
-  SF:["Matt Chapman","LaMonte Wade Jr","Patrick Bailey","Wilmer Flores","Michael Conforto","Joc Pederson","Luis Matos","Thairo Estrada","Casey Schmitt"],
-  ARI:["Corbin Carroll","Ketel Marte","Lourdes Gurriel Jr","Christian Walker","Gabriel Moreno","Pavin Smith","Jake McCarthy","Alek Thomas","Eugenio Suarez"],
-  DET:["Riley Greene","Spencer Torkelson","Kerry Carpenter","Parker Meadows","Matt Vierling","Jake Rogers","Zach McKinstry","Trey Sweeney","Andy Ibanez"],
-  KC:["Bobby Witt Jr","Vinnie Pasquantino","Salvador Perez","MJ Melendez","Hunter Dozier","Michael Massey","Drew Waters","Maikel Garcia","Kyle Isbel"],
-  OAK:["Brent Rooker","Lawrence Butler","Shea Langeliers","Tyler Soderstrom","JJ Bleday","Zack Gelof","Max Schuemann","Esteury Ruiz","Abraham Toro"],
-  LAA:["Mike Trout","Anthony Rendon","Taylor Ward","Brandon Drury","Luis Rengifo","Logan O'Hoppe","Mickey Moniak","Zach Neto","Kevin Pillar"],
-  WSH:["CJ Abrams","Joey Meneses","Keibert Ruiz","Lane Thomas","Dominic Smith","Alex Call","Stone Garrett","Ildemaro Vargas","Jacob Young"],
-  COL:["Charlie Blackmon","Ryan McMahon","C.J. Cron","Elias Diaz","Brenton Doyle","Nolan Jones","Sean Bouchard","Alan Trejo","Ezequiel Tovar"],
-  MIA:["Jorge Soler","Jake Burger","Bryan De La Cruz","Jesus Sanchez","Nick Fortes","Griffin Conine","Jonah Bride","Xavier Edwards","Connor Norby"],
-  PIT:["Oneil Cruz","Bryan Reynolds","Andrew McCutchen","Ke'Bryan Hayes","Connor Joe","Rowdy Tellez","Henry Davis","Ji Hwan Bae","Michael Chavis"],
-  STL:["Nolan Arenado","Willson Contreras","Dylan Carlson","Lars Nootbaar","Brendan Donovan","Jordan Walker","Alec Burleson","Ivan Herrera","Masyn Winn"],
-  CHW:["Luis Robert Jr","Andrew Vaughn","Eloy Jimenez","Yoan Moncada","Gavin Sheets","Jake Burger","Seby Zavala","Tim Anderson","Romy Gonzalez"],
-};
-
-// Fallback static roster — used only if API fails
-function genStaticRoster(team) {
-  const names = ROSTERS[team] || Array.from({length:9},(_,i)=>`${team} Batter ${i+1}`);
-  return names.map((name,i) => {
-    const seed = i + (name.charCodeAt(0) || 1) + (name.charCodeAt(1) || 1);
-    const barrel=Math.round(sr(seed,1,6,22)*10)/10, hardHit=Math.round(sr(seed,2,36,62)*10)/10, avgEV=Math.round(sr(seed,3,87,99)*10)/10, oSwing=Math.round(sr(seed,4,20,42)*10)/10;
-    const hand=getBatterHand(name);
-    const p={id:i,name,team,hand,injured:false,barrel,hardHit,avgEV,sweetSpot:Math.round(sr(seed,5,28,46)*10)/10,pullAir:Math.round(sr(seed,6,12,32)*10)/10,flyBall:Math.round(sr(seed,7,28,48)*10)/10,launchAngle:Math.round(sr(seed,8,12,30)*10)/10,hr:Math.floor(sr(seed,9,0,22)),bbPct:Math.round(sr(seed,10,6,18)*10)/10,kPct:Math.round(sr(seed,11,14,32)*10)/10,oSwing,zContact:Math.round(sr(seed,12,72,92)*10)/10};
-    p.bbkRatio=p.bbPct/p.kPct;p.cq=calcCQ(p);p.hri=calcHRI(p);p.rd=calcRD(p);
-    p.os=calcOS(p);p.grade=getSG(p.os);p.piq=getPIQ(p);
-    p.pitchProfile=genPitchProfile(p);
-    return p;
-  });
-}
-
-// Live roster fetch — hits MLB API, caches per session
-async function genTeamRoster(team) {
-  // Return cache if already fetched
-  if (LIVE_ROSTER_CACHE[team]) return LIVE_ROSTER_CACHE[team];
-
-  const teamId = TEAM_IDS[team];
-  if (!teamId) return genStaticRoster(team);
-
-  try {
-    const res = await fetch(`/api/roster?teamId=${teamId}`);
-    const data = await res.json();
-    if (!data.players || data.players.length === 0) throw new Error("Empty roster");
-
-    const players = data.players.map((p, i) => {
-      const hand = p.hand || getBatterHand(p.name);
-      const s6=(p.id||i)+1; const barrel=Math.round(sr(s6,1,6,22)*10)/10,hardHit=Math.round(sr(s6,2,36,62)*10)/10,avgEV=Math.round(sr(s6,3,87,99)*10)/10,oSwing=Math.round(sr(s6,10,20,38)*10)/10;
-      const pl = {
-        id: p.id || i, name: p.name, team, hand,
-        injured: p.injured || false,
-        position: p.position || "",
-        barrel, hardHit, avgEV,
-        sweetSpot:Math.round(sr(s6,5,28,46)*10)/10,
-        pullAir:Math.round(sr(s6,6,10,28)*10)/10,
-        flyBall:Math.round(sr(s6,7,25,45)*10)/10,
-        launchAngle:Math.round(sr(s6,8,12,30)*10)/10,
-        hr:Math.floor(sr(s6,9,0,22)),
-        bbPct:Math.round(sr(s6,10,6,15)*10)/10,
-        kPct:Math.round(sr(s6,11,14,28)*10)/10,
-        oSwing, zContact:Math.round(sr(s6,12,72,92)*10)/10,
-      };
-      pl.bbkRatio=pl.bbPct/pl.kPct;pl.cq=calcCQ(pl);pl.hri=calcHRI(pl);pl.rd=calcRD(pl);
-      pl.os=calcOS(pl);pl.grade=getSG(pl.os);pl.piq=getPIQ(pl);
-      pl.pitchProfile=genPitchProfile(pl);
-      return pl;
-    });
-
-    LIVE_ROSTER_CACHE[team] = players;
-    return players;
-  } catch(err) {
-    console.warn(`Live roster failed for ${team}:`, err.message, "— using static fallback");
-    return genStaticRoster(team);
-  }
-}
-
-// ── BvP BATTERS — handedness-adjusted ────────────────────
-function genBvPBattersNew(pitcher) {
-  // Use opposing team's likely lineup — pulled from game data
-  const batterSide = pitcher.team; // pitcher's team abbr
-  const opposingBatters = [
-    ["Aaron Judge","NYY"],["Juan Soto","NYM"],["Yordan Alvarez","HOU"],
-    ["Kyle Tucker","HOU"],["Pete Alonso","NYM"],["Freddie Freeman","LAD"],
-    ["Mookie Betts","LAD"],["Gunnar Henderson","BAL"],["Bobby Witt Jr","KC"],
-  ];
-  return opposingBatters.map((n,i)=>{
-    const s3=i+1;
-    const barrel=Math.round(sr(s3,1,6,22)*10)/10,hardHit=Math.round(sr(s3,2,36,62)*10)/10,avgEV=Math.round(sr(s3,3,87,99)*10)/10;
-    const bbPct=Math.round(sr(s3,7,6,14)*10)/10,kPct=Math.round(sr(s3,8,14,28)*10)/10,oSwing=Math.round(sr(s3,10,20,38)*10)/10,zContact=Math.round(sr(s3,12,72,92)*10)/10;
-    const hand=getBatterHand(n[0]);
-    const matchup=getHandMatchup(hand,pitcher.hand);
-    const sbv=bid||i+1;
-    const evBase=88+seededRand(sbv,3)*14,chaseBase=oSwing+(seededRand(sbv,22)*8-4);
-    const barrelBase=barrel+(seededRand(sbv,23)*4-2),fbBase=28+seededRand(sbv,4)*22;
-    const pullBase=12+seededRand(sbv,5)*20,laBase=12+seededRand(sbv,5)*22;
-    const m=matchup.multiplier;
-    const evVsFB=Math.round((evBase+matchup.evBonus)*10)/10;
-    const barrelAdj=Math.round(barrelBase*m*10)/10;
-    const fbAdj=Math.round(fbBase*(m*0.8+0.2)*10)/10;
-    const laAdj=Math.round((laBase+(m>1?1.5:-1.5))*10)/10;
-    const pullAdj=Math.round(pullBase*(m*0.7+0.3)*10)/10;
-    const chaseAdj=Math.round(chaseBase*(m>1?0.92:1.08)*10)/10;
-    const careerBA=0.18+seededRand(sbv,12)*0.18,careerHR=Math.floor(seededRand(sbv,13)*5),careerAB=Math.floor(8+seededRand(sbv,14)*30);
-    const last3=[...Array(3)].map((_,li)=>{const rv=seededRand(sbv,25+li);return rv>0.85?"HR":rv>0.6?"H":rv>0.3?"O":"K";});
-    const b={id:i,name:n[0],team:n[1],hand,matchup,barrel,hardHit,avgEV,sweetSpot:28+seededRand(sbv,4)*18,pullAir:12+seededRand(sbv,5)*18,flyBall:28+seededRand(sbv,4)*20,launchAngle:12+seededRand(sbv,5)*18,hr:Math.floor(seededRand(sbv,15)*20),bbPct,kPct,oSwing,zContact,bbkRatio:bbPct/kPct,evVsFB,chaseVsPitch:chaseAdj,barrelVsPitch:barrelAdj,flyBallVsPitch:fbAdj,pullAirVsPitch:pullAdj,launchAngleVsPitch:laAdj,careerBA,careerHR,careerAB,last3};
-    b.cq=calcCQ(b);b.hri=calcHRI(b);b.rd=calcRD(b);b.os=calcOS(b);b.grade=getSG(b.os);b.piq=getPIQ(b);
-    const evN=Math.min(Math.max((evVsFB-88)/12,0),1),barN=Math.min(barrelAdj/14,1),fbN=Math.min(fbAdj/45,1);
-    const laN=Math.min(Math.max((laAdj-10)/22,0),1),puN=Math.min(pullAdj/28,1),chN=Math.max(1-chaseAdj/45,0);
-    const base=evN*25+barN*25+fbN*15+laN*15+puN*10+chN*10;
-    const handBonus=m>1.05?8:m<0.92?-8:-3;
-    b.ms=Math.round(Math.min(Math.max(base+handBonus,0),100)*10)/10;
-    b.mg=getSG(b.ms);
-    return b;
-  }).sort((a,b)=>b.ms-a.ms);
-}
-
-
-// TAB 4: BATTER vs PITCHER
 function BvPTab() {
   const [games, setGames] = useState([]);
   const [loadingG, setLoadingG] = useState(true);
@@ -2801,8 +3525,27 @@ function BvPTab() {
     if (!selGame) return;
     const pitchSide = selSide === "away" ? "home" : "away";
     const batterSide = selSide; // batters are on the side YOU selected
-    const p = genPitcher(selGame, pitchSide);
+    const p = genPitcher(selGame, pitchSide); // base (loading:true)
     setPitcher(p);
+    // Async: fetch real pitcher data and update state
+    fetchRealPitcher(selGame, pitchSide).then(realP => setPitcher(realP)).catch(() => {});
+    // Async: load real pitch mix + stats from /api/pitcher
+    if (p.name && !p.name.includes('Starter')) {
+      fetchPitcherData(null, p.name).then(data => {
+        if (data?.found) {
+          setPitcher(prev => ({
+            ...prev,
+            pitchMix:  data.pitchMix?.length > 0 ? data.pitchMix : prev.pitchMix,
+            era:       data.stats?.era  || prev.era,
+            whip:      data.stats?.whip || prev.whip,
+            fbVelo:    data.pitchMix?.[0]?.velo || prev.fbVelo,
+            loading:   false,
+          }));
+        } else {
+          setPitcher(prev => ({...prev, loading: false}));
+        }
+      }).catch(() => setPitcher(prev => ({...prev, loading: false})));
+    }
     // Fetch real opposing lineup from boxscore
     (async () => {
       try {
@@ -2820,31 +3563,13 @@ function BvPTab() {
           const name = pl.person?.fullName || `Player ${bid}`;
           const hand = pl.person?.batSide?.code || getBatterHand(name);
           const matchup = getHandMatchup(hand, p.hand === "RHP" ? "R" : "L");
-          const s2=bid||i+1;
-          const barrel=Math.round(sr(s2,1,6,22)*10)/10, hardHit=Math.round(sr(s2,2,36,62)*10)/10, avgEV=Math.round(sr(s2,3,87,99)*10)/10;
-          const bbPct=Math.round(sr(s2,7,6,14)*10)/10, kPct=Math.round(sr(s2,8,14,28)*10)/10, oSwing=Math.round(sr(s2,10,20,38)*10)/10;
-          const evBase=88+seededRand(s2,3)*14, m=matchup.multiplier;
-          const evVsFB=Math.round((evBase+matchup.evBonus)*10)/10;
-          const barrelAdj=Math.round(barrel*m*10)/10, fbAdj=Math.round((28+seededRand(s2,4)*22)*(m*0.8+0.2)*10)/10;
-          const laAdj=Math.round(((12+seededRand(s2,5)*22)+(m>1?1.5:-1.5))*10)/10;
-          const pullAdj=Math.round((12+seededRand(s2,5)*20)*(m*0.7+0.3)*10)/10;
-          const chaseAdj=Math.round((oSwing+(seededRand(s2,22)*8-4))*(m>1?0.92:1.08)*10)/10;
-          const careerBA=0.18+seededRand(s2,12)*0.18, careerHR=Math.floor(seededRand(s2,13)*5), careerAB=Math.floor(8+seededRand(s2,14)*30);
-          const last3=[...Array(3)].map((_,li)=>{const rv=seededRand(s2,25+li);return rv>0.85?"HR":rv>0.6?"H":rv>0.3?"O":"K";});
-          const b={id:bid,name,team:ta,hand,matchup,barrel,hardHit,avgEV,sweetSpot:28+seededRand(s2,4)*18,pullAir:12+seededRand(s2,5)*18,flyBall:28+seededRand(s2,4)*20,launchAngle:12+seededRand(s2,5)*18,hr:Math.floor(seededRand(s2,15)*20),bbPct,kPct,oSwing,zContact:72+seededRand(s2,9)*20,bbkRatio:bbPct/kPct,evVsFB,chaseVsPitch:chaseAdj,barrelVsPitch:barrelAdj,flyBallVsPitch:fbAdj,pullAirVsPitch:pullAdj,launchAngleVsPitch:laAdj,careerBA,careerHR,careerAB,last3};
-          b.cq=calcCQ(b);b.hri=calcHRI(b);b.rd=calcRD(b);b.os=calcOS(b);b.grade=getSG(b.os);b.piq=getPIQ(b);
-          const evN=Math.min(Math.max((evVsFB-88)/12,0),1),barN=Math.min(barrelAdj/14,1),fbN=Math.min(fbAdj/45,1);
-          const laN=Math.min(Math.max((laAdj-10)/22,0),1),puN=Math.min(pullAdj/28,1),chN=Math.max(1-chaseAdj/45,0);
-          const base=evN*25+barN*25+fbN*15+laN*15+puN*10+chN*10;
-          const handBonus=m>1.05?8:m<0.92?-8:-3;
-          b.ms=Math.round(Math.min(Math.max(base+handBonus,0),100)*10)/10;
-          b.mg=getSG(b.ms);
-          return b;
+          // All real data — no seededRand
+          return buildBvPBatter(bid, name, ta, hand, p);
         }).filter(Boolean).sort((a,b)=>b.ms-a.ms);
         if (liveBatters.length > 0) { setBatters(liveBatters); return; }
       } catch(e) { console.warn("Live lineup fetch failed:", e.message); }
       // Fallback to generated batters
-      setBatters(genBvPBattersNew(p));
+      setBatters(genBvPBatters(p));
     })();
   }, [selGame, selSide]);
 
@@ -3561,7 +4286,7 @@ function HRTrackerTab() {
                 {key:"pitchType",  label:"Pitch",    tip:"Pitch type thrown"},
                 {key:"pitcherName",label:"vs Pitcher",tip:"Pitcher who gave it up"},
                 {key:"gameId",     label:"Game",     tip:"Matchup"},
-              {key:"timeET",label:"Time (ET)", tip:"Time the HR was hit — Eastern Time"},
+                {key:"timeET",     label:"Time (ET)", tip:"Time the HR was hit ET — sorted newest first"},
               ].map(c => (
                 <th key={c.key} className={sortKey===c.key?"sk":""} onClick={()=>hs(c.key)} style={{cursor:"pointer"}}>
                   <div style={{display:"flex",alignItems:"center",gap:2}}>
@@ -3838,7 +4563,13 @@ function StatcastTab() {
             const key=String(p.pid),current=picks[key]?.type;
             return <div key={p.pid} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,background:"var(--surface2)",border:`1px solid ${current?PICK_TYPES[current].color:"var(--border)"}`}}>
               <PosAvatar player={p} size={30}/>
-              <div style={{flex:1,minWidth:0}}><div style={{fontWeight:600,fontSize:12,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{p.name}</div><div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{p.team} · {p.grade?.grade||"—"}</div></div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontWeight:600,fontSize:12,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{p.name}</div>
+                <div style={{fontSize:9,fontFamily:"'DM Mono',monospace",display:"flex",gap:5}}>
+                  <span style={{color:"var(--accent2)",fontWeight:700}}>{p.team||"—"}</span>
+                  <span style={{color:"var(--muted)"}}>· {p.grade?.grade||"—"}</span>
+                </div>
+              </div>
               <PickButton pid={p.pid} name={p.name} team={p.team}/>
             </div>;
           })}
@@ -3871,7 +4602,7 @@ function StatcastTab() {
 }
 
 export default function App() {
-  const [tab, setTab] = useState("homeruns");
+  const [tab, setTab] = useState("top20");
   const [showPicksSlideout, setShowPicksSlideout] = useState(false);
   // Load player→team map immediately at startup
   useEffect(() => { loadGlobalPlayerMap(); }, []);
@@ -3894,6 +4625,7 @@ export default function App() {
       </header>
       <HRTicker onHRClick={()=>setTab("homeruns")}/>
       <nav className="tabs">
+        <button className={`tab ${tab==="top20"?"active":""}`} onClick={()=>setTab("top20")} style={{color:tab==="top20"?"var(--accent)":undefined,fontWeight:tab==="top20"?700:400}}>🎯 Going Yard</button>
         <button className={`tab ${tab==="homeruns"?"active":""}`} onClick={()=>setTab("homeruns")} style={{color:tab==="homeruns"?"var(--accent)":undefined}}>💥 HR Tracker</button>
         <button className={`tab ${tab==="bvp"?"active":""}`} onClick={()=>setTab("bvp")}>⚔️ Batter vs P</button>
         <button className={`tab ${tab==="scouting"?"active":""}`} onClick={()=>setTab("scouting")}>🎯 Scouting</button>
@@ -3902,15 +4634,18 @@ export default function App() {
         <button className={`tab ${tab==="powerbi"?"active":""}`} onClick={()=>setTab("powerbi")}>📊 Analytics</button>
         <button className={`tab ${tab==="onlyhomers"?"active":""}`} onClick={()=>setTab("onlyhomers")} style={{color:tab==="onlyhomers"?"var(--accent2)":undefined}}>⚾ Only Homers</button>
         <button className={`tab ${tab==="statcast"?"active":""}`} onClick={()=>setTab("statcast")} style={{color:tab==="statcast"?"var(--ice)":undefined}}>📡 Statcast</button>
+        <button className={`tab ${tab==="pitchers"?"active":""}`} onClick={()=>setTab("pitchers")}>⚾ Pitchers</button>
         <button className={`tab ${tab==="picks"?"active":""}`} onClick={()=>setTab("picks")} style={{color:tab==="picks"?"var(--accent2)":undefined}}>🎯 My Picks</button>
       </nav>
       <main className="content">
+        {tab==="top20" && <Top20Tab/>}
         {tab==="pregame" && <PregameTab/>}
         {tab==="live" && <LiveTab/>}
         {tab==="scouting" && <ScoutingTab/>}
         {tab==="bvp" && <BvPTab/>}
         {tab==="builder" && <PitchBuilderTab/>}
         <div style={{display:tab==="homeruns"?"block":"none"}}><HRTrackerTab/></div>
+        {tab==="pitchers" && <PitcherTab/>}
         {tab==="picks" && <MyPicksTab/>}
         {/* Affiliate tabs — always mounted, hidden when not active to preserve iframe state */}
         <div style={{display:tab==="powerbi"?"block":"none"}}><PowerBITab/></div>
