@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-01 09:11 ET";
+const BUILD_TIMESTAMP = "2026-04-01 09:34 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -985,10 +985,10 @@ function MyPicksTab() {
         pickList.forEach(p=>{
           const cfg = PICK_TYPES[p.type];
           const typeName = cfg?.label?.split(" ").slice(1).join(" ") || p.type;
-          rows.push([typeName, p.team||"—", p.name||"—"]);
+          rows.push([typeName, p.team||"-", p.name||"-"]);
         });
         const csv = rows.map(r=>r.map(c=>`"${c}"`).join(",")).join("\n");
-        const blob = new Blob([csv],{type:"text/csv"});
+        const blob = new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href=url; a.download="my-picks.csv"; a.click();
@@ -1183,6 +1183,15 @@ function PicksSlideout({onClose}) {
   const picks = usePicks();
   const pickList = Object.values(picks).sort((a,b)=>a.type.localeCompare(b.type));
   return <>
+    <button onClick={()=>{
+              const pl=Object.values(picks).sort((a,b)=>a.type.localeCompare(b.type));
+              if(!pl.length)return;
+              const rows=[["Pick Type","Team","Batter Name"]];
+              pl.forEach(p=>{const cfg=PICK_TYPES[p.type];const tn=cfg?.label?.split(" ").slice(1).join(" ")||p.type;rows.push([tn,p.team||"-",p.name||"-"]);});
+              const csv=rows.map(r=>r.map(c=>`"${c}"`).join(",")).join("\n");
+              const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
+              const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="my-picks.csv";a.click();URL.revokeObjectURL(url);
+            }} style={{padding:"4px 10px",borderRadius:6,border:"1px solid rgba(56,184,242,.3)",background:"rgba(56,184,242,.1)",color:"var(--ice)",cursor:"pointer",fontFamily:"'DM Mono',monospace",fontSize:10}}>⬇ CSV</button>
     <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",zIndex:900}}/>
     <div style={{position:"fixed",right:0,top:0,bottom:0,width:"min(380px,100vw)",
       background:"var(--surface)",borderLeft:"1px solid var(--border)",zIndex:901,
@@ -3756,8 +3765,8 @@ function HRTicker({ onHRClick }) {
 function HRTrackerTab() {
   const [hrs, setHrs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [sortKey, setSortKey] = useState("timeET");
-  const [sortDir, setSortDir] = useState(-1); // -1 = newest first
+  const [sortKey, setSortKey] = useState("chronoIndex");
+  const [sortDir, setSortDir] = useState(-1); // -1 = newest (highest chronoIndex) first
   const [filterTeam, setFilterTeam] = useState("all");
   const [refreshing, setRefreshing] = useState(false);
   const [hrSearch, setHrSearch] = useState("");
@@ -3909,7 +3918,7 @@ function HRTrackerTab() {
             <thead><tr style={{position:"sticky",top:0,zIndex:20,background:"var(--surface2)"}}>
               <th style={{width:24,cursor:"default",background:"var(--surface2)"}}>#</th>
               {[
-                {key:"timeET",     label:"Time (ET)", tip:"Time the HR was hit ET — sorted newest first"},
+                {key:"chronoIndex",label:"Time (ET)", tip:"Sorted newest HR first by inning/at-bat"},
                 {key:"batterTeam", label:"Team",     tip:"Batter's team"},
                 {key:"batterName", label:"Batter",   tip:"Batter name"},
                 {key:"rbi",        label:"Type / RBI",tip:"HR type and RBIs"},
@@ -3936,27 +3945,24 @@ function HRTrackerTab() {
                 const evC = (hr.exitVelo||0)>=103?"dng":(hr.exitVelo||0)>=95?"hot":(hr.exitVelo||0)>=90?"warm":"avg";
                 const distC = (hr.distance||0)>=440?"dng":(hr.distance||0)>=420?"hot":(hr.distance||0)>=400?"warm":"avg";
                 return <tr key={i}>
-                  <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:i<3?"var(--accent)":"var(--muted)"}}>{i+1}</span></td>
-                  <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color:"var(--text)"}}>{hr.batterTeam}</span></td>
-                  <td><div className="pn">{hr.batterName}</div></td>
-                  <td>
-                    <div style={{display:"flex",alignItems:"center",gap:6}}>
-                      <span className={`hr-badge ${badgeCls}`}>{hr.hrType}</span>
-                      <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:16,color:hr.rbi>=2?"var(--accent)":"var(--text)"}}>{hr.rbi} RBI</span>
-                    </div>
-                  </td>
-                  <td><span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{hr.halfInning==="top"?"▲":"▼"} {hr.inning}</span></td>
-                  <td><span className="sv avg">{hr.outs}</span></td>
-                  <td><span className={`sv ${hr.launchAngle>=25&&hr.launchAngle<=35?"good":"avg"}`}>{hr.launchAngle!=null?`${hr.launchAngle}°`:"—"}</span></td>
-                  <td><span className={`sv ${evC}`}>{hr.exitVelo!=null?`${hr.exitVelo}`:"—"}</span></td>
-                  <td><span className={`sv ${distC}`}>{hr.distance!=null?`${hr.distance}ft`:"—"}</span></td>
-                  <td>{hr.pitchType?<span style={{fontSize:10,fontFamily:"'DM Mono',monospace",padding:"2px 7px",borderRadius:4,background:"var(--surface2)",border:"1px solid var(--border)"}}>{hr.pitchType}</span>:<span style={{color:"var(--muted)"}}>—</span>}</td>
-                  <td><div style={{fontSize:11,fontWeight:500}}>{hr.pitcherName}</div><div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{hr.pitcherTeam}</div></td>
-                  <td>
-                    <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:"var(--text)",fontWeight:600}}>
-                      {hr.timeET && hr.timeET !== "" ? hr.timeET : `Inn. ${hr.inning}`}
-                    </span>
-                  </td>
+                <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:i<3?"var(--accent)":"var(--muted)"}}>{i+1}</span></td>
+                <td><span style={{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:600,color:"var(--text)"}}>{hr.timeET&&hr.timeET!==""?hr.timeET:`Inn. ${hr.inning}`}</span></td>
+                <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color:"var(--text)"}}>{hr.batterTeam}</span></td>
+                <td><div className="pn">{hr.batterName}</div></td>
+                <td>
+                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                <span className={`hr-badge ${badgeCls}`}>{hr.hrType}</span>
+                <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:16,color:hr.rbi>=2?"var(--accent)":"var(--text)"}}>{hr.rbi} RBI</span>
+                </div>
+                </td>
+                <td><span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{hr.halfInning==="top"?"▲":"▼"} {hr.inning}</span></td>
+                <td><span className="sv avg">{hr.outs}</span></td>
+                <td><span className={`sv ${hr.launchAngle>=25&&hr.launchAngle<=35?"good":"avg"}`}>{hr.launchAngle!=null?`${hr.launchAngle}°`:"—"}</span></td>
+                <td><span className={`sv ${evC}`}>{hr.exitVelo!=null?`${hr.exitVelo}`:"—"}</span></td>
+                <td><span className={`sv ${distC}`}>{hr.distance!=null?`${hr.distance}ft`:"—"}</span></td>
+                <td>{hr.pitchType?<span style={{fontSize:10,fontFamily:"'DM Mono',monospace",padding:"2px 7px",borderRadius:4,background:"var(--surface2)",border:"1px solid var(--border)"}}>{hr.pitchType}</span>:"—"}</td>
+                <td><div style={{fontSize:11,fontWeight:500}}>{hr.pitcherName}</div><div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{hr.pitcherTeam}</div></td>
+                <td><span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:"var(--muted)"}}>{hr.gameId}</span></td>
                 </tr>;
               })}
             </tbody>
