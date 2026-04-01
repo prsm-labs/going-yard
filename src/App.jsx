@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-01 10:23 ET";
+const BUILD_TIMESTAMP = "2026-04-01 10:35 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -4245,8 +4245,8 @@ function SortTH({ label, col, sortKey, sortDir, onSort, tip='' }) {
 }
 
 function useSort(defaultKey, defaultDir=-1) {
-  const [sortKey, setSortKey] = React.useState(defaultKey);
-  const [sortDir, setSortDir] = React.useState(defaultDir);
+  const [sortKey, setSortKey] = useState(defaultKey);
+  const [sortDir, setSortDir] = useState(defaultDir);
   const onSort = (k) => { if(sortKey===k) setSortDir(d=>-d); else { setSortKey(k); setSortDir(-1); } };
   const sortFn = (a,b) => {
     const av=a[sortKey], bv=b[sortKey];
@@ -4265,7 +4265,7 @@ function SC({ v, cls='avg', suf='' }) {
 
 // ── PAGE 1: All Batters ────────────────────────────────────────
 function AllBattersPage() {
-  const [filters, setFilters] = React.useState({});
+  const [filters, setFilters] = useState({});
   const { sortKey, sortDir, onSort, sortFn } = useSort('os');
   const picks = usePicks();
   const allPlayers = Object.values(PLAYER_DATA_CACHE).filter(p=>p.avgEV>0&&p.name&&p.team);
@@ -4337,7 +4337,7 @@ function AllBattersPage() {
 
 // ── PAGE 2: Daily EV ──────────────────────────────────────────
 function DailyEVPage() {
-  const [filters, setFilters] = React.useState({});
+  const [filters, setFilters] = useState({});
   const { sortKey, sortDir, onSort, sortFn } = useSort('avgEV');
   const allPlayers = Object.values(PLAYER_DATA_CACHE).filter(p=>p.avgEV>0&&p.name&&p.team);
   const teams = [...new Set(allPlayers.map(p=>p.team).filter(Boolean))].sort();
@@ -4392,7 +4392,7 @@ function DailyEVPage() {
 
 // ── PAGE 3: Daily Barrel ──────────────────────────────────────
 function DailyBarrelPage() {
-  const [filters, setFilters] = React.useState({});
+  const [filters, setFilters] = useState({});
   const { sortKey, sortDir, onSort, sortFn } = useSort('barrel');
   const allPlayers = Object.values(PLAYER_DATA_CACHE).filter(p=>p.avgEV>0&&p.name&&p.team);
   const teams = [...new Set(allPlayers.map(p=>p.team).filter(Boolean))].sort();
@@ -4453,13 +4453,13 @@ function DailyBarrelPage() {
 
 // ── PAGE 4: Pitcher v Batting Order ──────────────────────────
 function PitcherOrderPage() {
-  const [filters, setFilters] = React.useState({});
-  const [games, setGames] = React.useState([]);
-  const [selGame, setSelGame] = React.useState(null);
-  const [selSide, setSelSide] = React.useState('away');
+  const [filters, setFilters] = useState({});
+  const [games, setGames] = useState([]);
+  const [selGame, setSelGame] = useState(null);
+  const [selSide, setSelSide] = useState('away');
   const { sortKey, sortDir, onSort, sortFn } = useSort('os');
 
-  React.useEffect(() => {
+  useEffect(() => {
     fetchGames(()=>{}, setGames, ()=>{});
   }, []);
 
@@ -4556,11 +4556,11 @@ function PitcherOrderPage() {
 
 // ── PAGE 5: Pitcher Table ─────────────────────────────────────
 function PitcherTablePage() {
-  const [year, setYear] = React.useState('2026');
-  const [pitchers, setPitchers] = React.useState([]);
-  const [loading, setLoading] = React.useState(false);
-  const [search, setSearch] = React.useState('');
-  const [handFilter, setHandFilter] = React.useState('All');
+  const [year, setYear] = useState('2026');
+  const [pitchers, setPitchers] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState('');
+  const [handFilter, setHandFilter] = useState('All');
   const { sortKey, sortDir, onSort, sortFn } = useSort('hr9');
 
   const fetchPitchers = async (yr) => {
@@ -4602,7 +4602,7 @@ function PitcherTablePage() {
     setLoading(false);
   };
 
-  React.useEffect(() => { fetchPitchers(year); }, [year]);
+  useEffect(() => { fetchPitchers(year); }, [year]);
 
   const displayed = pitchers
     .filter(p => {
@@ -4685,13 +4685,13 @@ function PitcherTablePage() {
 
 // ── PAGE 6: Today Projections ─────────────────────────────────
 function TodayProjectionsPage() {
-  const [games, setGames] = React.useState([]);
-  const [weatherMap, setWeatherMap] = React.useState({});
-  const [loading, setLoading] = React.useState(true);
-  const [filters, setFilters] = React.useState({});
+  const [games, setGames] = useState([]);
+  const [weatherMap, setWeatherMap] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [filters, setFilters] = useState({});
   const { sortKey, sortDir, onSort, sortFn } = useSort('os');
 
-  React.useEffect(() => {
+  useEffect(() => {
     (async () => {
       const g = await new Promise(res => {
         const t = setTimeout(()=>res([]),8000);
@@ -4804,10 +4804,10 @@ function TodayProjectionsPage() {
 
 // ── PAGE 7: All Pitchers ───────────────────────────────────────
 function AllPitchersPage() {
-  const [year, setYear] = React.useState('2026');
-  const [pitchers, setPitchers] = React.useState([]);
-  const [loading, setLoading] = React.useState(false);
-  const [filters, setFilters] = React.useState({});
+  const [year, setYear] = useState('2026');
+  const [pitchers, setPitchers] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [filters, setFilters] = useState({});
   const { sortKey, sortDir, onSort, sortFn } = useSort('hr9');
 
   const fetchPitchers = async (yr) => {
@@ -4839,7 +4839,7 @@ function AllPitchersPage() {
     setLoading(false);
   };
 
-  React.useEffect(()=>{ fetchPitchers(year); },[year]);
+  useEffect(()=>{ fetchPitchers(year); },[year]);
 
   const hand = filters.phand||'All';
   const search = filters.search||'';
@@ -4923,11 +4923,11 @@ function AllPitchersPage() {
 
 // ── MAIN DATA TAB SHELL ────────────────────────────────────────
 function DataTab() {
-  const [page, setPage] = React.useState('allBatters');
-  const [loading, setLoading] = React.useState(true);
+  const [page, setPage] = useState('allBatters');
+  const [loading, setLoading] = useState(true);
 
   // Make sure player cache is populated
-  React.useEffect(() => {
+  useEffect(() => {
     const noop = ()=>{};
     if (Object.keys(PLAYER_DATA_CACHE).length < 5) {
       fetchPlayers(noop, noop, noop, false).then(()=>setLoading(false));
@@ -4991,11 +4991,11 @@ function DataTab() {
 
 
 export default function App() {
-  const [tab, setTab] = React.useState("homeruns");
-  const [showPicksSlideout, setShowPicksSlideout] = React.useState(false);
+  const [tab, setTab] = useState("homeruns");
+  const [showPicksSlideout, setShowPicksSlideout] = useState(false);
 
   // Load player data at startup
-  React.useEffect(() => {
+  useEffect(() => {
     loadGlobalPlayerMap();
     const noop = () => {};
     fetchPlayers(noop, noop, noop, false);
