@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const BUILD_TIMESTAMP = "2026-03-31 21:13 ET";
+const BUILD_TIMESTAMP = "2026-03-31 21:22 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -1365,14 +1365,14 @@ const WINDOWS = [
   {key:30, label:"L30D", tip:"Last 30 days"},
 ];
 
-function WindowButtons({ window, setWindow }) {
+function WindowButtons({ window: win, setWindow }) {
   return (
     <div style={{display:"flex",gap:5,alignItems:"center",flexWrap:"wrap"}}>
       <span style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1,marginRight:4}}>Window:</span>
       {WINDOWS.map(w => (
         <Tip key={w.key} text={w.tip}>
           <button
-            className={`chip ${window===w.key?"active":""}`}
+            className={`chip ${win===w.key?"active":""}`}
             onClick={()=>setWindow(w.key)}
             style={{padding:"4px 10px",fontSize:11,fontFamily:"'Oswald',sans-serif",fontWeight:600}}>
             {w.label}
@@ -3064,7 +3064,7 @@ function PregameTab() {
   const [sortDir, setSortDir] = useState(1);
   const [filter, setFilter] = useState("all");
   const [refreshing, setRefreshing] = useState(false);
-  const [window, setWindow] = useState(3);
+  const [win, setWin] = useState(3);
   const [selMatchup, setSelMatchup] = useState(null);
   const [selTeam, setSelTeam] = useState(null);
   const [games, setGames] = useState([]);
@@ -3089,9 +3089,9 @@ function PregameTab() {
     ? new Set([selMatchup.away.abbr, selMatchup.home.abbr].filter(t => t && t !== "???"))
     : null;
 
-  // Re-grade players for selected window + filter by matchup
+  // Re-grade players for selected win + filter by matchup
   const graded = players.map(p => {
-    const w = p.windows?.[window]; if (!w) return p;
+    const w = p.windows?.[win]; if (!w) return p;
     return { ...p, _wGrade: w.grade, _wHS: w.heatScore, _wOS: w.os };
   });
   const filtered = graded.filter(p => {
@@ -3102,12 +3102,12 @@ function PregameTab() {
     if (filter==="aplus") return g==="A+";
     if (filter==="a") return g==="A+"||g==="A";
     if (filter==="b") return g==="A+"||g==="A"||g==="B";
-    if (filter==="hot") return (p.windows?.[window]?.heatScore??p.heatScore)>=58;
+    if (filter==="hot") return (p.windows?.[win]?.heatScore??p.heatScore)>=58;
     return true;
   });
   const sortVal = (p, k) => {
-    const w = p.windows?.[window];
-    // For grade sort, use the window-recalculated os score
+    const w = p.windows?.[win];
+    // For grade sort, use the win-recalculated os score
     if (k === "os") return w?.os ?? p.os ?? 0;
     if (w && k in w) return w[k];
     return p[k] ?? 0;
@@ -3115,7 +3115,7 @@ function PregameTab() {
   const sorted = [...filtered].sort((a,b) => sortDir*(sortVal(b,sortKey)-sortVal(a,sortKey)));
   const elC = graded.filter(p=>p._wGrade?.grade==="A+").length;
   const hotC = graded.filter(p=>p._wGrade?.grade==="A").length;
-  const avgEV = players.length?(players.reduce((s,p)=>s+(p.windows?.[window]?.avgEV??p.avgEV),0)/players.length).toFixed(1):"--";
+  const avgEV = players.length?(players.reduce((s,p)=>s+(p.windows?.[win]?.avgEV??p.avgEV),0)/players.length).toFixed(1):"--";
 
   return <div>
     <div className="hrow">
@@ -3124,16 +3124,16 @@ function PregameTab() {
     </div>
     <div className="cards">
       <div className="card"><div className="cl">Players Tracked</div><div className="cv">{players.length}</div><div className="cs">min 25 AB</div></div>
-      <div className="card"><div className="cl">🔴 A+ Threats</div><div className="cv" style={{color:"#ff4020"}}>{elC}</div><div className="cs">L{window}D grade</div></div>
+      <div className="card"><div className="cl">🔴 A+ Threats</div><div className="cv" style={{color:"#ff4020"}}>{elC}</div><div className="cs">L{win}D grade</div></div>
       <div className="card"><div className="cl">Grade A Bats</div><div className="cv" style={{color:"#ff8020"}}>{hotC}</div><div className="cs">Impact bats</div></div>
-      <div className="card"><div className="cl">Avg EV</div><div className="cv">{avgEV}</div><div className="cs">L{window}D avg</div></div>
+      <div className="card"><div className="cl">Avg EV</div><div className="cv">{avgEV}</div><div className="cs">L{win}D avg</div></div>
     </div>
     <div style={{display:"flex",gap:8,marginBottom:8,flexWrap:"wrap",alignItems:"center"}}>
       <SearchBar value={searchQ} onChange={setSearchQ} placeholder="Search any batter…"/>
       {searchQ && <span style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{sorted.length} result{sorted.length!==1?"s":""}</span>}
     </div>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:10}}>
-      <WindowButtons window={window} setWindow={setWindow}/>
+      <WindowButtons win={win} setWindow={setWin}/>
       <div className="filters" style={{margin:0}}>
         <span className="fl">Filter:</span>
         {[{key:"all",label:"All"},{key:"aplus",label:"🔴 A+"},{key:"a",label:"A+"},{key:"b",label:"B+"},{key:"hot",label:"Hot"}].map(f=>
@@ -3192,7 +3192,7 @@ function PregameTab() {
           </div></td>
           <td onClick={e=>e.stopPropagation()}><PickButton pid={p.pid} name={p.name} team={p.team}/></td>
           <td><div style={{display:"flex",alignItems:"center",gap:5}}><GBadge g={wg}/><span style={{fontSize:9,color:wg.color,fontFamily:"DM Mono,monospace"}}>{wg.label}</span></div></td>
-          <StatCols p={p} window={window}/>
+          <StatCols p={p} win={win}/>
         </tr>;
       })}</tbody></table></div></div>
     </>}
@@ -3251,7 +3251,7 @@ function ScoutingTab() {
   const [sortDir, setSortDir] = useState(1);
   const [filter, setFilter] = useState("all");
   const [refreshing, setRefreshing] = useState(false);
-  const [window, setWindow] = useState(7);
+  const [win, setWin] = useState(7);
   const [selMatchup, setSelMatchup] = useState(null);
   const [selTeam, setSelTeam] = useState(null);
   const [games, setGames] = useState([]);
@@ -3297,7 +3297,7 @@ function ScoutingTab() {
       const toFetch = players.slice(0, 50);
       const results = await Promise.allSettled(
         toFetch.map(p =>
-          fetch(`/api/statcast_raw?batter_id=${p.pid}&days=${window}&pitch_types=${pitchCodes}&pitcher_throws=${handFilter === 'all' ? '' : handFilter}`)
+          fetch(`/api/statcast_raw?batter_id=${p.pid}&days=${win}&pitch_types=${pitchCodes}&pitcher_throws=${handFilter === 'all' ? '' : handFilter}`)
             .then(r => r.json())
             .then(d => ({ pid: p.pid, metrics: d.metrics }))
             .catch(() => ({ pid: p.pid, metrics: null }))
@@ -3316,7 +3316,7 @@ function ScoutingTab() {
 
     const debounce = setTimeout(fetchFilteredMetrics, 500);
     return () => clearTimeout(debounce);
-  }, [handFilter, pitchTypes, window, players.length]);
+  }, [handFilter, pitchTypes, win, players.length]);
 
   // Get display metrics for a player — filtered if available, season baseline otherwise
   const getMetrics = (p) => {
@@ -3339,7 +3339,7 @@ function ScoutingTab() {
       almostHRPct:  fm.almostHRPct  || 0,
       isFiltered: true,
     };
-    const w = p.windows?.[window] ?? {};
+    const w = p.windows?.[win] ?? {};
     return { ...p, ...w, isFiltered: false };
   };
 
@@ -3356,7 +3356,7 @@ function ScoutingTab() {
     }
     if (selTeam && p.team !== selTeam) return false;
     if (searchQ && !p.name.toLowerCase().includes(searchQ.toLowerCase())) return false;
-    const wg = (p.windows?.[window]?.grade || p.grade)?.grade;
+    const wg = (p.windows?.[win]?.grade || p.grade)?.grade;
     if (filter==="aplus") return wg==="A+";
     if (filter==="a") return wg==="A+"||wg==="A";
     if (filter==="b") return wg==="A+"||wg==="A"||wg==="B";
@@ -3368,7 +3368,7 @@ function ScoutingTab() {
     const m = getMetrics(p);
     if (k === "os") return m?.os ?? p.os ?? 0;
     if (m && k in m) return m[k] ?? 0;
-    const w = p.windows?.[window];
+    const w = p.windows?.[win];
     if (w && k in w) return w[k];
     return p[k] ?? 0;
   };
@@ -3390,7 +3390,7 @@ function ScoutingTab() {
       </div>
       <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
         <SearchBar value={searchQ} onChange={setSearchQ} placeholder="Search any batter…"/>
-        <WindowButtons window={window} setWindow={setWindow}/>
+        <WindowButtons win={win} setWindow={setWin}/>
         <RefBtn refreshing={refreshing} onClick={async()=>{setRefreshing(true);await fetchPlayers(setLoading,setPlayers,setError,true);setRefreshing(false);}}/>
       </div>
     </div>
@@ -3491,7 +3491,7 @@ function ScoutingTab() {
       <tbody>{sorted.map((p,i)=>{
         const m = getMetrics(p);
         const displayP = filtersActive && m.isFiltered ? {...p, ...m} : p;
-        const w = p.windows?.[window] ?? {};
+        const w = p.windows?.[win] ?? {};
         const wg = w.grade||p.grade||{grade:"X",cls:"x",color:"#2a3a48"};
         const wOS = m.os ?? w.os ?? p.os ?? 0;
 
@@ -3537,7 +3537,7 @@ function ScoutingTab() {
             <div style={{fontSize:9,color:iqColor,fontFamily:"'DM Mono',monospace",marginTop:2}}>{iqLabel}</div>
             {m.isFiltered && <div style={{fontSize:8,color:"var(--accent)",fontFamily:"'DM Mono',monospace"}}>filtered</div>}
           </td>
-          <StatCols p={displayP} window={window}/>
+          <StatCols p={displayP} win={win}/>
         </tr>;
       })}</tbody></table></div></div>
     </>}
