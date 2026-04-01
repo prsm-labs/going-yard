@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-01 12:42 ET";
+const BUILD_TIMESTAMP = "2026-04-01 13:00 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -1187,7 +1187,7 @@ function PicksSlideout({onClose}) {
               const pl=Object.values(picks).sort((a,b)=>a.type.localeCompare(b.type));
               if(!pl.length)return;
               const rows=[["Pick Type","Team","Batter Name"]];
-              pl.forEach(p=>{const cfg=PICK_TYPES[p.type];const tn=cfg?.label?.split(" ").slice(1).join(" ")||p.type;rows.push([tn,p.team||"-",p.name||"-"]);});
+              pl.forEach(p=>{const cfg=PICK_TYPES[p.type];const tn=cfg?.label?.split(" ").slice(1).join(" ")||p.type;const tm=(p.team&&p.team!=='-'&&p.team!=='—')?p.team:(PLAYER_DATA_CACHE[p.pid]?.team||GLOBAL_PLAYER_TEAM_MAP[p.pid]?.team||'-');rows.push([tn,tm,p.name||"-"]);});
               const csv=rows.map(r=>r.map(c=>`"${c}"`).join(",")).join("\n");
               const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
               const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="my-picks.csv";a.click();URL.revokeObjectURL(url);
@@ -2627,12 +2627,212 @@ function RefBtn({refreshing, onClick}) {
 
 
 
+// ── HEATING UP SLIDEOUT ────────────────────────────────────────
+// Reads live Statcast data from all live games and surfaces
+// top hard-hit / high exit velocity batters in a slideout panel
+
+function HeatingUpSlideout({ games, onClose }) {
+  const [batters, setBatters] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const live = (games || []).filter(g => g.status === 'Live');
+
+  useEffect(() => {
+    if (live.length === 0) { setLoading(false); return; }
+    (async () => {
+      setLoading(true);
+      const allBatters = {};
+
+      await Promise.all(live.map(async (game) => {
+        try {
+          const res  = await fetch(`/api/boxscore?gamePk=${game.gamePk}`);
+          const data = await res.json();
+
+          for (const side of ['away', 'home']) {
+            const team = data.teams?.[side];
+            if (!team) continue;
+            const teamAbbr = team.team?.abbreviation || game[side]?.abbr || '—';
+
+            for (const [key, player] of Object.entries(team.players || {})) {
+              const pid  = parseInt(key.replace('ID',''));
+              const name = player.person?.fullName;
+              if (!name) continue;
+
+              // Pull this game's live stats
+              const stats = player.stats?.batting || {};
+              const ab    = parseInt(stats.atBats || 0);
+              if (ab === 0) continue;
+
+              // Get Statcast EV from hitData if available
+              // We aggregate from the live at-bat feed if present
+              const cached = PLAYER_DATA_CACHE[pid];
+              const seasonEV = cached?.avgEV || 0;
+              const seasonBrl= cached?.barrel || 0;
+
+              // Build or update batter entry
+              if (!allBatters[pid]) {
+                allBatters[pid] = {
+                  pid, name, team: teamAbbr,
+                  ab, hits: parseInt(stats.hits||0),
+                  hr:  parseInt(stats.homeRuns||0),
+                  rbi: parseInt(stats.rbi||0),
+                  seasonEV, seasonBrl,
+                  gameHits: parseInt(stats.hits||0),
+                  gameTB:   parseInt(stats.totalBases||0),
+                };
+              }
+            }
+          }
+        } catch(e) { console.warn('[HeatingUp]', e.message); }
+      }));
+
+      // Sort: prioritize HR today, then hard contact season metrics
+      const sorted = Object.values(allBatters)
+        .filter(b => b.ab > 0)
+        .sort((a, b) => {
+          // HR today first
+          if (b.hr !== a.hr) return b.hr - a.hr;
+          // Then multi-hit games
+          if (b.gameHits !== a.gameHits) return b.gameHits - a.gameHits;
+          // Then season EV
+          return b.seasonEV - a.seasonEV;
+        })
+        .slice(0, 10);
+
+      setBatters(sorted);
+      setLoading(false);
+    })();
+  }, [live.length]);
+
+  const evCls = v => v>=103?'dng':v>=95?'hot':v>=90?'warm':'avg';
+  const brlCls= v => v>=12?'hot':v>=7?'warm':'avg';
+
+  return <>
+    {/* Backdrop */}
+    <div onClick={onClose} style={{
+      position:'fixed',inset:0,background:'rgba(0,0,0,.55)',zIndex:900
+    }}/>
+    {/* Panel */}
+    <div style={{
+      position:'fixed',right:0,top:0,bottom:0,width:'min(400px,100vw)',
+      background:'var(--surface)',borderLeft:'1px solid var(--border)',
+      zIndex:901,display:'flex',flexDirection:'column',overflowY:'auto'
+    }}>
+      {/* Header */}
+      <div style={{padding:'16px 20px',borderBottom:'1px solid var(--border)',
+        display:'flex',alignItems:'center',gap:10}}>
+        <div>
+          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:18,
+            letterSpacing:1,color:'var(--accent)'}}>🔥 Heating Up</div>
+          <div style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginTop:2}}>
+            Top contact batters across {live.length} live game{live.length!==1?'s':''}
+          </div>
+        </div>
+        <button onClick={onClose} style={{marginLeft:'auto',background:'none',
+          border:'1px solid var(--border)',borderRadius:6,padding:'4px 10px',
+          color:'var(--muted)',cursor:'pointer',fontFamily:"'DM Mono',monospace",fontSize:11}}>
+          ✕ Close
+        </button>
+      </div>
+
+      {/* Content */}
+      <div style={{flex:1,padding:'12px 16px'}}>
+        {live.length === 0
+          ? <div style={{padding:'40px 0',textAlign:'center',color:'var(--muted)',
+              fontFamily:"'DM Mono',monospace",fontSize:12}}>
+              No live games right now.
+            </div>
+          : loading
+            ? <div className="lw"><div className="sp"/><div className="lt">Scanning live lineups…</div></div>
+            : batters.length === 0
+              ? <div style={{padding:'40px 0',textAlign:'center',color:'var(--muted)',
+                  fontFamily:"'DM Mono',monospace",fontSize:12}}>
+                  No batter data available yet.
+                </div>
+              : <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                  {batters.map((b, i) => (
+                    <div key={b.pid} style={{
+                      background:'var(--surface2)',borderRadius:10,padding:'12px 14px',
+                      border:`1px solid ${b.hr>0?'rgba(232,65,26,.3)':b.gameHits>=2?'rgba(245,166,35,.2)':'var(--border)'}`,
+                      cursor:'pointer'
+                    }} onClick={()=>openAtBatSlide(b)}>
+                      {/* Rank + Name row */}
+                      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}>
+                        <span style={{
+                          fontFamily:"'Oswald',sans-serif",fontWeight:900,fontSize:18,
+                          color:i===0?'#ffd700':i===1?'#c0c0c0':i===2?'#cd7f32':'var(--muted)',
+                          minWidth:22,textAlign:'center'
+                        }}>{i+1}</span>
+                        <div style={{flex:1}}>
+                          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:15}}>
+                            {b.name}
+                          </div>
+                          <div style={{fontSize:10,color:'var(--accent2)',fontFamily:"'DM Mono',monospace",
+                            fontWeight:700,marginTop:1}}>{b.team}</div>
+                        </div>
+                        {/* Today's line */}
+                        <div style={{textAlign:'right'}}>
+                          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13}}>
+                            {b.gameHits}/{b.ab}
+                            {b.hr > 0 && <span style={{color:'var(--accent)',marginLeft:5}}>
+                              {b.hr}HR
+                            </span>}
+                            {b.rbi > 0 && <span style={{color:'var(--accent2)',marginLeft:5,fontSize:11}}>
+                              {b.rbi}RBI
+                            </span>}
+                          </div>
+                          <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
+                            today
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Season Statcast */}
+                      <div style={{display:'flex',gap:8}}>
+                        <div style={{flex:1,background:'var(--surface)',borderRadius:6,
+                          padding:'5px 8px',textAlign:'center'}}>
+                          <div style={{fontSize:7,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+                            textTransform:'uppercase',letterSpacing:1,marginBottom:2}}>Avg EV</div>
+                          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,
+                            color:b.seasonEV>=95?'var(--accent)':b.seasonEV>=90?'var(--accent2)':'var(--text)'}}>
+                            {b.seasonEV > 0 ? `${b.seasonEV.toFixed(1)}` : '—'}
+                            <span style={{fontSize:9,color:'var(--muted)',fontWeight:400}}> mph</span>
+                          </div>
+                        </div>
+                        <div style={{flex:1,background:'var(--surface)',borderRadius:6,
+                          padding:'5px 8px',textAlign:'center'}}>
+                          <div style={{fontSize:7,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+                            textTransform:'uppercase',letterSpacing:1,marginBottom:2}}>Barrel%</div>
+                          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,
+                            color:b.seasonBrl>=12?'var(--accent)':b.seasonBrl>=7?'var(--accent2)':'var(--text)'}}>
+                            {b.seasonBrl > 0 ? `${b.seasonBrl.toFixed(1)}%` : '—'}
+                          </div>
+                        </div>
+                        <div style={{flex:1,background:'var(--surface)',borderRadius:6,
+                          padding:'5px 8px',textAlign:'center'}}>
+                          <div style={{fontSize:7,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+                            textTransform:'uppercase',letterSpacing:1,marginBottom:2}}>Today</div>
+                          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,
+                            color:b.gameTB>=4?'var(--accent)':b.gameTB>=2?'var(--accent2)':'var(--text)'}}>
+                            {b.gameTB > 0 ? `${b.gameTB}TB` : `${b.gameHits}H`}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+        }
+      </div>
+    </div>
+  </>;
+}
+
 function LiveTab() {
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [showHeatingUp, setShowHeatingUp] = useState(false);
   const load = useCallback((silent=false) => {
     fetchGames(setLoading, setGames, setError, silent);
     setLastUpdate(new Date().toLocaleTimeString());
@@ -2665,7 +2865,8 @@ function LiveTab() {
       {pre.length>0&&<><div className="div" style={{marginTop:12}}>🟢 Upcoming — Tap for 🚀 Liftoff List</div><div className="gg">{pre.map(g=><GCard key={g.id} game={g}/>)}</div></>}
       {fin.length>0&&<><div className="div" style={{marginTop:12}}>✓ Final</div><div className="gg">{fin.map(g=><GCard key={g.id} game={g}/>)}</div></>}
     </>}
-  </div>;
+    {showHeatingUp && <HeatingUpSlideout games={games} onClose={()=>setShowHeatingUp(false)}/>}
+</div>;
 }
 
 
@@ -4118,7 +4319,7 @@ function WeatherTab() {
       const homeTeam = game.home?.abbr;
       if (!homeTeam || homeTeam === '???') return;
       try {
-        const w = await fetchWeather(homeTeam);
+        const w = await fetchWeather(homeTeam, game.gameTime || null);
         if (w) {
           wMap[homeTeam] = w;
           if (game.away?.abbr && game.away.abbr !== '???') wMap[game.away.abbr] = w;

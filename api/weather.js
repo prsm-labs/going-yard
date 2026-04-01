@@ -77,7 +77,7 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET');
 
   try {
-    const { team } = req.query;
+    const { team, gameTime } = req.query;
     if (!team) return res.status(400).json({ error: 'team required' });
 
     const stadium = STADIUMS[team];
@@ -88,19 +88,47 @@ export default async function handler(req, res) {
     }
 
     // Open-Meteo — free weather API, no key needed
-    const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${stadium.lat}&longitude=${stadium.lon}&current=temperature_2m,wind_speed_10m,wind_direction_10m,precipitation,relative_humidity_2m,weather_code&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto`;
+    const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${stadium.lat}&longitude=${stadium.lon}&current=temperature_2m,wind_speed_10m,wind_direction_10m,precipitation,relative_humidity_2m,weather_code&hourly=temperature_2m,wind_speed_10m,wind_direction_10m,precipitation_probability,weather_code,relative_humidity_2m&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto&forecast_days=1`;
 
     const weatherRes = await fetch(weatherUrl);
     const weatherData = await weatherRes.json();
-    const current = weatherData.current || {};
 
-    // Wind direction relative to typical home plate orientation
-    // We flag "blowing out" if wind has a component toward center/outfield
-    const windDir = current.wind_direction_10m || 0;
-    const windSpeed = current.wind_speed_10m || 0;
-    const temp = current.temperature_2m || 72;
-    const humidity = current.relative_humidity_2m || 50;
-    const precip = current.precipitation || 0;
+    // Try to get forecast at game time if provided, else use current
+    let targetHour = null;
+    if (gameTime) {
+      try {
+        // gameTime is like "7:10 PM" — parse it into a local hour
+        const d = new Date();
+        const [timePart, ampm] = gameTime.split(' ');
+        let [h, m] = timePart.split(':').map(Number);
+        if (ampm === 'PM' && h !== 12) h += 12;
+        if (ampm === 'AM' && h === 12) h = 0;
+        targetHour = h;
+      } catch(e) {}
+    }
+
+    // Get hourly data at game time hour, fallback to current
+    const hourly = weatherData.hourly || {};
+    const hours  = hourly.time || [];
+    let hourIdx  = -1;
+    if (targetHour !== null && hours.length > 0) {
+      hourIdx = hours.findIndex(t => new Date(t).getHours() === targetHour);
+    }
+
+    const getVal = (hourlyKey, currentKey) => {
+      if (hourIdx >= 0 && hourly[hourlyKey]?.[hourIdx] != null) {
+        return hourly[hourlyKey][hourIdx];
+      }
+      return (weatherData.current || {})[currentKey] ?? null;
+    };
+
+    const current = weatherData.current || {};
+    const windDir   = getVal('wind_direction_10m',   'wind_direction_10m')   || 0;
+    const windSpeed = getVal('wind_speed_10m',        'wind_speed_10m')       || 0;
+    const temp      = getVal('temperature_2m',        'temperature_2m')       || 72;
+    const humidity  = getVal('relative_humidity_2m',  'relative_humidity_2m') || 50;
+    const precipProb= hourIdx >= 0 ? (hourly['precipitation_probability']?.[hourIdx] || 0) : 0;
+    const precip    = precipProb > 30 ? precipProb / 100 : (current.precipitation || 0);
     const weatherCode = current.weather_code || 0;
 
     // Weather multiplier for HR probability
