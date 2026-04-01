@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-01 12:34 ET";
+const BUILD_TIMESTAMP = "2026-04-01 12:42 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -4111,9 +4111,6 @@ function WeatherTab() {
   const [loading,  setLoading]  = useState(true);
   const [lastRefresh, setLastRefresh] = useState(null);
 
-  // Keep games in a ref so weather fetch can see them
-  const gamesRef = useRef([]);
-
   const loadWeather = async (gamesList) => {
     if (!gamesList || gamesList.length === 0) return;
     const wMap = {};
@@ -4137,8 +4134,7 @@ function WeatherTab() {
 
   const handleGames = (gamesList) => {
     const valid = (gamesList || []).filter(g => g.home?.abbr && g.home.abbr !== '???');
-    gamesRef.current = valid;
-    setGames(valid);
+setGames(valid);
     loadWeather(valid);
   };
 
@@ -4458,11 +4454,11 @@ export default function App() {
         ))}
       </nav>
       <main className="content">
-        {tab==="weather"  && <WeatherTab/>}
+        <div style={{display:tab==="weather"?"block":"none"}}><WeatherTab/></div>
         {tab==="live"     && <LiveTab/>}
         {tab==="picks"    && <MyPicksTab/>}
         <div style={{display:tab==="powerbi"?"block":"none"}}><PowerBITab/></div>
-        {tab==="statcast" && <StatcastTab/>}
+        <div style={{display:tab==="statcast"?"block":"none"}}><StatcastTab/></div>
         <div style={{display:tab==="homeruns"?"block":"none"}}><HRTrackerTab/></div>
         <div style={{display:tab==="onlyhomers"?"block":"none"}}><OnlyHomersTab/></div>
       </main>
