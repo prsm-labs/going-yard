@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const BUILD_TIMESTAMP = "2026-03-31 23:48 ET";
+const BUILD_TIMESTAMP = "2026-04-01 09:11 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -1333,11 +1333,17 @@ function WeatherBanner({ team }) {
 }
 
 const WINDOWS = [
-  {key:3,  label:"L3D",  tip:"Last 3 days"},
   {key:7,  label:"L7D",  tip:"Last 7 days"},
-  {key:15, label:"L15D", tip:"Last 15 days"},
+  {key:14, label:"L14D", tip:"Last 14 days"},
   {key:30, label:"L30D", tip:"Last 30 days"},
+  {key:60, label:"L60D", tip:"Last 60 days"},
 ];
+
+
+// Convert numeric window (7,14,30,60) to players.json key (last7/last14/last30/last60)
+function winKey(w) {
+  return w <= 7 ? 'last7' : w <= 14 ? 'last14' : w <= 30 ? 'last30' : 'last60';
+}
 
 function WindowButtons({ window: winVal, setWindow }) {
   return (
@@ -1360,7 +1366,7 @@ function WindowButtons({ window: winVal, setWindow }) {
 // ── UNIVERSAL STAT COLUMNS RENDERER ─────────────────────────────────────────
 // Returns the windowed stat columns for any batter row
 function StatCols({ p, window }) {
-  const w = p.windows?.[window] ?? p.windows?.[30] ?? {};
+  const w = p.windows?.[winKey(window)] ?? {};
   const ev   = w.avgEV ?? p.avgEV ?? 0;
   const bar  = w.barrel ?? p.barrel ?? 0;
   const fb   = w.flyBall ?? p.flyBall ?? 0;
@@ -2610,469 +2616,6 @@ function RefBtn({refreshing, onClick}) {
 //   Matchup         15% — platoon split, pitcher HR/9, pitch mix vs batter
 //   Park + Weather  10% — park HR factor, wind, temp
 
-const TOP20_CACHE = { data: null, ts: 0 };
-
-async function buildTop20(games, weatherCache) {
-  const now = Date.now();
-  if (TOP20_CACHE.data && now - TOP20_CACHE.ts < 1800000) return TOP20_CACHE.data;
-
-  const players = Object.values(PLAYER_DATA_CACHE).filter(p => p.avgEV > 0 && p.name && p.team);
-  if (players.length === 0) return [];
-
-  // Only show batters playing today
-  const todayTeams = new Set(
-    games.flatMap(g => [g.away.abbr, g.home.abbr]).filter(t => t && t !== '???')
-  );
-  // Filter to today's teams, but always show something
-  const active = todayTeams.size > 0
-    ? players.filter(p => todayTeams.has(p.team))
-    : players;
-  // If no active players found (team abbr mismatch), use all players
-  const pool = active.length >= 10 ? active : players;
-
-  // Build game context map: team → { pitcherHand, pitcherName, isHome, gameTime, vs, gamePk, parkHRScore, windBoost }
-  const gameCtx = {};
-  for (const g of games) {
-    // Away batters face home pitcher
-    if (g.away.abbr) gameCtx[g.away.abbr] = {
-      pitcherHand: g.home.pitcherHand || 'R',
-      pitcherName: g.home.probablePitcher || 'TBD',
-      isHome: false,
-      gameTime: g.gameTime || '—',
-      vs: g.home.abbr,
-      gamePk: g.gamePk,
-    };
-    // Home batters face away pitcher
-    if (g.home.abbr) gameCtx[g.home.abbr] = {
-      pitcherHand: g.away.pitcherHand || 'R',
-      pitcherName: g.away.probablePitcher || 'TBD',
-      isHome: true,
-      gameTime: g.gameTime || '—',
-      vs: g.away.abbr,
-      gamePk: g.gamePk,
-    };
-  }
-
-  // Score each player
-  const scored = pool.map(p => {
-    const ctx  = gameCtx[p.team];
-    const w    = weatherCache?.[p.team];
-    const pf   = w?.parkFactor?.hr || 100;
-    const env  = w?.hrEnvScore    || 50;
-    const wind = w?.weather?.windLabel || '';
-    const windBoost = wind.includes('Out') ? 6 : wind.includes('In') ? -5 : 0;
-
-    // ── Recent form: last 3 days window (use last7 as proxy if l3 not available) ──
-    const l3  = p.windows?.last7  || null;
-    const l14 = p.windows?.last14 || null;
-
-    // Trend: compare l7 vs l14 — rising form gets bonus
-    const trendBarrel = l3 && l14 ? (l3.barrel || 0) - (l14.barrel || 0) : 0;
-    const trendEV     = l3 && l14 ? (l3.avgEV  || 0) - (l14.avgEV  || 0) : 0;
-
-    // Use recent window if available, else fall back to season
-    const useBarrel  = l3?.barrel  ?? p.barrel    ?? 0;
-    const useHH      = l3?.hardHit ?? p.hardHit   ?? 0;
-    const useEV      = l3?.avgEV   ?? p.avgEV     ?? 0;
-    const useFB      = l3?.flyBall ?? p.flyBall   ?? 0;
-    const usePullAir = l3?.pullAir ?? p.pullAir   ?? 0;
-    const usePullBrl = l3?.pulledBarrel ?? p.pulledBarrel ?? 0;
-    const useAlmostHR= l3?.almostHR    ?? p.almostHRPct  ?? 0;
-    const useChase   = l3?.chasePct    ?? p.oSwing ?? 30;
-    const useZC      = l3?.zContact    ?? p.zContact ?? 80;
-
-    // Platoon split from at-bat log
-    const pitHand = ctx?.pitcherHand || 'R';
-    const batHand = p.hand || 'R';
-    const splitMetrics = pitHand === 'R' ? (p.vsRHP || null) : (p.vsLHP || null);
-    const hasPlatoonAdv = (batHand === 'L' && pitHand === 'R') || (batHand === 'R' && pitHand === 'L');
-
-    // Use split barrel/EV if available and better
-    const splitBarrel = splitMetrics?.barrel || useBarrel;
-    const splitEV     = splitMetrics?.avgEV  || useEV;
-    const splitFB     = splitMetrics?.flyBall || useFB;
-
-    // ── 1. Contact Quality (30%) ──────────────────────────────
-    const barN  = Math.min(useBarrel / 18, 1);
-    const evN   = Math.min(Math.max((useEV - 84) / 18, 0), 1);
-    const hhN   = Math.min(useHH / 65, 1);
-    const fbN   = Math.min(useFB / 50, 1);
-    const paN   = Math.min(usePullAir / 35, 1);
-    const cq    = (barN*35 + evN*25 + hhN*20 + fbN*12 + paN*8) * 0.30;
-
-    // ── 2. Power Intent (25%) ────────────────────────────────
-    const pbN   = Math.min(usePullBrl / 10, 1);
-    const ahrN  = Math.min(useAlmostHR / 25, 1);
-    const xwN   = Math.min(Math.max(((p.xwoba||0) - 0.280) / 0.200, 0), 1);
-    const hrRate= p.ab > 20 ? Math.min((p.hr||0) / p.ab * 162 / 45, 1) : 0;
-    const pi    = (pbN*30 + ahrN*25 + xwN*25 + hrRate*20) * 0.25;
-
-    // ── 3. Recent Form (20%) ─────────────────────────────────
-    // Rewards hot bats — recent metrics weighted heavier
-    const recentBarrelN  = Math.min(splitBarrel / 18, 1);
-    const recentEVN      = Math.min(Math.max((splitEV - 84) / 18, 0), 1);
-    const recentFBN      = Math.min(splitFB / 50, 1);
-    const trendBonus     = Math.min(Math.max((trendBarrel / 5) * 10 + (trendEV / 3) * 5, -10), 15);
-    const disciplineN    = Math.max(1 - useChase / 45, 0) * 0.3 + Math.min(useZC / 90, 1) * 0.7;
-    const form  = (recentBarrelN*35 + recentEVN*30 + recentFBN*20 + disciplineN*15) * 0.20 + trendBonus * 0.20 / 100;
-
-    // ── 4. Matchup (15%) ────────────────────────────────────
-    let matchup = 50; // neutral
-    if (hasPlatoonAdv) matchup += 20;
-    if (splitMetrics?.barrel > (p.barrel||0) + 2) matchup += 15; // much better vs this hand
-    if (splitMetrics?.hardHit > (p.hardHit||0) + 5) matchup += 10;
-    // Days since HR — due factor
-    const ds = p.daysSinceHR ?? p.careerDaysSinceHR ?? 5;
-    const dueFactor = ds === 0 ? 5 : ds >= 3 && ds <= 7 ? 20 : ds >= 7 && ds <= 14 ? 15 : ds > 21 ? 5 : 10;
-    matchup = Math.min(matchup + dueFactor, 100);
-    const mt = matchup * 0.15;
-
-    // ── 5. Park + Weather (10%) ──────────────────────────────
-    const parkN = Math.min(Math.max((pf - 85) / 40, 0), 1);
-    const envN  = Math.min(Math.max((env - 40) / 30, 0), 1);
-    const pw    = (parkN*60 + envN*30 + Math.max(windBoost,0)*10/10) * 0.10;
-
-    const raw = (cq + pi + form + mt + pw) * 100;
-    const hrScore = Math.round(Math.min(Math.max(raw, 0), 100) * 10) / 10;
-
-    // Signals for display
-    const signals = [];
-    if (hasPlatoonAdv)                         signals.push({t:`${batHand} vs ${pitHand}HP advantage`, c:'pos'});
-    if (ds >= 3 && ds <= 10)                   signals.push({t:`${ds}d since last HR`, c:'fire'});
-    if (useBarrel >= 14)                       signals.push({t:`${useBarrel.toFixed(1)}% Barrel (elite)`, c:'pos'});
-    if (useEV >= 95)                           signals.push({t:`${useEV} mph avg EV`, c:'pos'});
-    if (usePullBrl >= 6)                       signals.push({t:`${usePullBrl.toFixed(1)}% Pulled Barrel`, c:'pos'});
-    if (useAlmostHR >= 15)                     signals.push({t:`${useAlmostHR.toFixed(0)}% Almost-HR`, c:'neu'});
-    if (pf >= 110)                             signals.push({t:`${pf} HR park factor`, c:'pos'});
-    if (windBoost > 0)                         signals.push({t:'Wind blowing out 💨', c:'fire'});
-    if (trendBarrel >= 3)                      signals.push({t:`Barrel% trending up +${trendBarrel.toFixed(1)}%`, c:'pos'});
-    if (splitMetrics?.barrel > (p.barrel||0)+3) signals.push({t:`+${((splitMetrics.barrel||0)-(p.barrel||0)).toFixed(1)}% Barrel vs ${pitHand}HP`, c:'pos'});
-
-    return {
-      ...p,
-      hrScore,
-      ctx,
-      parkFactor: pf,
-      envScore: env,
-      windBoost,
-      daysSinceHR: ds,
-      signals: signals.slice(0, 5),
-      useBarrel, useEV, useHH, useFB, usePullAir, usePullBrl, useAlmostHR,
-      hasPlatoonAdv,
-      splitBarrel, splitEV,
-      trendBarrel, trendEV,
-      recentWindow: l3 ? 'L7' : 'season',
-    };
-  });
-
-  const top20 = scored
-    .filter(p => p.hrScore > 0)
-    .sort((a,b) => b.hrScore - a.hrScore)
-    .slice(0, 20);
-
-  TOP20_CACHE.data = top20;
-  TOP20_CACHE.ts = now;
-  return top20;
-}
-
-function Top20Tab() {
-  const [players, setPlayers]           = useState([]);
-  const [loading, setLoading]           = useState(true);
-  const [games, setGames]               = useState([]);
-  const [weatherCache, setWeatherCache] = useState({});
-  const [expId, setExpId]               = useState(null);
-  const [lastRefresh, setLastRefresh]   = useState(null);
-
-  const load = async () => {
-    setLoading(true);
-    try {
-      // fetchGames uses callback pattern — wrap correctly
-      const g = await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => resolve([]), 8000);
-        fetchGames(
-          () => {},                    // setLoading noop
-          (games) => { clearTimeout(timeout); resolve(games); },
-          () => { clearTimeout(timeout); resolve([]); }
-        );
-      });
-      setGames(g);
-
-      // Fetch weather for home teams
-      const homeTeams = g.map(gm => gm.home?.abbr).filter(Boolean);
-      const wCache = {};
-      await Promise.all(homeTeams.map(async t => {
-        try {
-          const w = await fetchWeather(t);
-          if (w) {
-            wCache[t] = w;
-            // Apply to away team too
-            const awayGame = g.find(gm => gm.home?.abbr === t);
-            if (awayGame?.away?.abbr) wCache[awayGame.away.abbr] = w;
-          }
-        } catch(e) {}
-      }));
-      setWeatherCache(wCache);
-
-      // Wait for player cache if needed (fetchPlayers runs at App startup)
-      let waitMs = 0;
-      while (Object.keys(PLAYER_DATA_CACHE).length < 10 && waitMs < 8000) {
-        await new Promise(r => setTimeout(r, 500));
-        waitMs += 500;
-      }
-      console.log('[Top20] Player cache size:', Object.keys(PLAYER_DATA_CACHE).length);
-      // Score players
-      TOP20_CACHE.data = null;
-      const top = await buildTop20(g, wCache);
-      setPlayers(top);
-      setLastRefresh(new Date().toLocaleTimeString('en-US',{
-        hour:'numeric', minute:'2-digit', timeZone:'America/New_York'
-      }));
-    } catch(e) {
-      console.warn('[Top20] load error:', e.message);
-    }
-    setLoading(false);
-  };
-
-  useEffect(() => { load(); }, []);
-
-  // Refresh every 30 min
-  useEffect(() => {
-    const id = setInterval(() => { TOP20_CACHE.data = null; load(); }, 1800000);
-    return () => clearInterval(id);
-  }, []);
-
-  const RANK_MEDALS = ['🥇','🥈','🥉'];
-
-  return <div>
-    {/* Header */}
-    <div className="hrow" style={{marginBottom:16}}>
-      <div className="section-header">
-        <div className="section-title">🎯 Top 20 — Going Yard Today</div>
-        <div className="section-sub">
-          Ranked by HR probability · Contact Quality 30% · Power Intent 25% · Recent Form 20% · Matchup 15% · Park+Weather 10%
-          {lastRefresh && <span style={{color:'var(--muted)',marginLeft:8}}>· {lastRefresh}</span>}
-        </div>
-      </div>
-      <button onClick={()=>{TOP20_CACHE.data=null; load();}}
-        style={{padding:'6px 14px',borderRadius:6,border:'1px solid var(--border)',
-          background:'var(--surface2)',color:'var(--text)',cursor:'pointer',
-          fontFamily:"'DM Mono',monospace",fontSize:11,flexShrink:0}}>
-        ↻ Refresh
-      </button>
-    </div>
-
-    {loading
-      ? <div className="lw"><div className="sp"/><div className="lt">Building today's HR projections…</div></div>
-      : players.length === 0
-        ? <div style={{padding:'60px 20px',textAlign:'center',color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:12,lineHeight:2}}>
-            {Object.keys(PLAYER_DATA_CACHE).length === 0 ? "Loading player data… click Refresh in a moment." : "No games today or lineups not yet confirmed (12–9:30 PM ET)."}
-          </div>
-        : <div style={{display:'flex',flexDirection:'column',gap:8}}>
-            {players.map((p, i) => {
-              const isExp    = expId === p.pid;
-              const rankColor = i < 3 ? ['#ffd700','#c0c0c0','#cd7f32'][i] : i < 10 ? 'var(--accent)' : 'var(--muted)';
-              const grade    = getSG(p.hrScore);
-              const scoreColor = grade.color;
-              const pfColor  = getPFColor(p.parkFactor || 100);
-
-              return <div key={p.pid} style={{
-                background:'var(--surface)',
-                border:`1px solid ${isExp ? scoreColor : 'var(--border)'}`,
-                borderRadius:12, overflow:'hidden', transition:'border-color .2s'
-              }}>
-                {/* Main row */}
-                <div style={{display:'flex',alignItems:'center',gap:12,padding:'12px 16px',cursor:'pointer'}}
-                  onClick={()=>setExpId(isExp ? null : p.pid)}>
-
-                  {/* Rank */}
-                  <div style={{width:36,textAlign:'center',flexShrink:0}}>
-                    {i < 3
-                      ? <span style={{fontSize:24}}>{RANK_MEDALS[i]}</span>
-                      : <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:900,fontSize:20,color:rankColor}}>{i+1}</span>
-                    }
-                  </div>
-
-                  {/* Avatar + name */}
-                  <PosAvatar player={p} size={38}/>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-                      <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:16}}>{p.name}</span>
-                      <span style={{fontSize:11,color:'var(--accent2)',fontFamily:"'DM Mono',monospace",fontWeight:700}}>{p.team}</span>
-                      {p.hasPlatoonAdv && <span style={{fontSize:9,padding:'1px 6px',borderRadius:4,
-                        background:'rgba(39,201,122,.15)',color:'var(--green)',
-                        fontFamily:"'DM Mono',monospace",border:'1px solid rgba(39,201,122,.3)'}}>PLATOON ✓</span>}
-                    </div>
-                    <div style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginTop:2}}>
-                      {p.ctx
-                        ? `vs ${p.ctx.pitcherName || 'TBD'} (${p.ctx.pitcherHand || 'R'}HP) · ${p.ctx.gameTime || '—'} ET`
-                        : 'Matchup TBD'}
-                    </div>
-                    {/* Signal chips */}
-                    <div style={{display:'flex',gap:4,marginTop:5,flexWrap:'wrap'}}>
-                      {(p.signals||[]).map((s,si)=>(
-                        <span key={si} style={{
-                          fontSize:9,padding:'2px 6px',borderRadius:4,
-                          fontFamily:"'DM Mono',monospace",
-                          background: s.c==='fire'?'rgba(232,65,26,.15)':s.c==='pos'?'rgba(39,201,122,.12)':s.c==='neu'?'rgba(245,166,35,.12)':'rgba(255,255,255,.05)',
-                          color:      s.c==='fire'?'var(--accent)':s.c==='pos'?'var(--green)':s.c==='neu'?'var(--accent2)':'var(--muted)',
-                          border:'1px solid',
-                          borderColor:s.c==='fire'?'rgba(232,65,26,.3)':s.c==='pos'?'rgba(39,201,122,.25)':s.c==='neu'?'rgba(245,166,35,.25)':'var(--border)',
-                        }}>{s.t}</span>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* HR Score */}
-                  <div style={{textAlign:'center',flexShrink:0,minWidth:72}}>
-                    <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:900,fontSize:34,color:scoreColor,lineHeight:1}}>
-                      {p.hrScore ? p.hrScore.toFixed(0) : '—'}
-                    </div>
-                    <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1,marginTop:1}}>HR Score</div>
-                    <div style={{marginTop:3}}><GBadge g={grade}/></div>
-                  </div>
-
-                  {/* Key stats */}
-                  <div style={{display:'grid',gridTemplateColumns:'repeat(3,60px)',gap:4,flexShrink:0}}>
-                    {[
-                      {l:'EV',       v:p.useEV>0?`${p.useEV.toFixed(1)}`:'—',        suf:'mph', hot:p.useEV>=95},
-                      {l:'Barrel%',  v:p.useBarrel>0?`${p.useBarrel.toFixed(1)}`:'—', suf:'%',   hot:p.useBarrel>=12},
-                      {l:'HH%',      v:p.useHH>0?`${p.useHH.toFixed(1)}`:'—',        suf:'%',   hot:p.useHH>=50},
-                      {l:'Pull Air', v:p.usePullAir>0?`${p.usePullAir.toFixed(1)}`:'—',suf:'%',  hot:p.usePullAir>=25},
-                      {l:'Pull Brl', v:p.usePullBrl>0?`${p.usePullBrl.toFixed(1)}`:'—',suf:'%',  hot:p.usePullBrl>=5},
-                      {l:'Park HR',  v:p.parkFactor?`${p.parkFactor}`:'—',            suf:'',    hot:(p.parkFactor||0)>=110, col:pfColor},
-                    ].map(s=>(
-                      <div key={s.l} style={{background:'var(--surface2)',borderRadius:6,padding:'4px 6px',textAlign:'center'}}>
-                        <div style={{fontSize:7,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
-                          textTransform:'uppercase',letterSpacing:.5,marginBottom:2}}>{s.l}</div>
-                        <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,lineHeight:1,
-                          color:s.col||(s.hot?'var(--accent)':'var(--text)')}}>
-                          {s.v}{s.suf}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <span style={{color:'var(--muted)',fontSize:14,flexShrink:0,
-                    transform:isExp?'rotate(180deg)':'none',transition:'transform .2s',display:'block'}}>▾</span>
-                </div>
-
-                {/* Expanded detail */}
-                {isExp && <div style={{borderTop:'1px solid var(--border)',padding:'14px 16px',background:'var(--surface2)'}}>
-                  <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:12,marginBottom:12}}>
-
-                    {/* Score breakdown */}
-                    <div style={{background:'var(--surface)',borderRadius:8,padding:'12px 14px'}}>
-                      <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
-                        textTransform:'uppercase',letterSpacing:1,marginBottom:10}}>Score Breakdown</div>
-                      {[
-                        {l:'Contact Quality (30%)', pct:30},
-                        {l:'Power Intent (25%)',     pct:25},
-                        {l:'Recent Form (20%)',      pct:20},
-                        {l:'Matchup (15%)',           pct:15},
-                        {l:'Park + Weather (10%)',   pct:10},
-                      ].map(row=>(
-                        <div key={row.l} style={{display:'flex',alignItems:'center',gap:8,marginBottom:7}}>
-                          <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",flex:1,whiteSpace:'nowrap'}}>{row.l}</div>
-                          <div style={{width:70,height:5,borderRadius:3,background:'var(--border)',overflow:'hidden'}}>
-                            <div style={{height:'100%',borderRadius:3,
-                              width:`${Math.round(p.hrScore * row.pct / 100)}%`,
-                              background:scoreColor}}/>
-                          </div>
-                          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,
-                            color:scoreColor,minWidth:20,textAlign:'right'}}>
-                            {Math.round(p.hrScore * row.pct / 100)}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Recent form */}
-                    <div style={{background:'var(--surface)',borderRadius:8,padding:'12px 14px'}}>
-                      <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
-                        textTransform:'uppercase',letterSpacing:1,marginBottom:8}}>
-                        Recent Form
-                        {(p.trendBarrel||0) > 1 && <span style={{color:'var(--green)',marginLeft:6}}>↑ Hot</span>}
-                        {(p.trendBarrel||0) < -2 && <span style={{color:'var(--accent)',marginLeft:6}}>↓ Cooling</span>}
-                      </div>
-                      {[
-                        ['Avg EV',       p.useEV>0?`${p.useEV.toFixed(1)} mph`:'—'],
-                        ['Barrel%',      p.useBarrel>0?`${p.useBarrel.toFixed(1)}%`:'—'],
-                        ['Hard Hit%',    p.useHH>0?`${p.useHH.toFixed(1)}%`:'—'],
-                        ['Fly Ball%',    p.useFB>0?`${p.useFB.toFixed(1)}%`:'—'],
-                        ['Pulled Air%',  p.usePullAir>0?`${p.usePullAir.toFixed(1)}%`:'—'],
-                        ['Pull Barrel%', p.usePullBrl>0?`${p.usePullBrl.toFixed(1)}%`:'—'],
-                        ['Almost HR%',   p.useAlmostHR>0?`${p.useAlmostHR.toFixed(1)}%`:'—'],
-                        ['Days Since HR',p.daysSinceHR!=null?`${p.daysSinceHR}d`:'—'],
-                      ].map(([lbl,val])=>(
-                        <div key={lbl} style={{display:'flex',justifyContent:'space-between',
-                          padding:'4px 0',borderBottom:'1px solid rgba(30,45,58,.3)'}}>
-                          <span style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>{lbl}</span>
-                          <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:600}}>{val}</span>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Matchup + park */}
-                    <div style={{background:'var(--surface)',borderRadius:8,padding:'12px 14px'}}>
-                      <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
-                        textTransform:'uppercase',letterSpacing:1,marginBottom:8}}>Matchup + Environment</div>
-                      {p.ctx && <div style={{marginBottom:10}}>
-                        <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14}}>
-                          {p.ctx.pitcherName || 'TBD'}
-                        </div>
-                        <div style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginTop:2}}>
-                          {p.ctx.pitcherHand}HP · {p.ctx.isHome?'Home':'Away'} · {p.ctx.gameTime} ET
-                        </div>
-                        <div style={{fontSize:10,marginTop:4,fontFamily:"'DM Mono',monospace",
-                          color:p.hasPlatoonAdv?'var(--green)':'var(--muted)'}}>
-                          {p.hasPlatoonAdv
-                            ? `✅ ${p.hand}HB vs ${p.ctx.pitcherHand}HP — platoon advantage`
-                            : `Same hand — no platoon edge`}
-                        </div>
-                      </div>}
-                      <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                        <div style={{padding:'6px 10px',borderRadius:6,background:'var(--surface2)',textAlign:'center'}}>
-                          <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",letterSpacing:1}}>PARK HR</div>
-                          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:18,color:pfColor}}>{p.parkFactor||100}</div>
-                        </div>
-                        <div style={{padding:'6px 10px',borderRadius:6,background:'var(--surface2)',textAlign:'center'}}>
-                          <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",letterSpacing:1}}>ENV</div>
-                          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:18,
-                            color:(p.envScore||50)>=55?'var(--accent)':'var(--muted)'}}>{p.envScore||50}</div>
-                        </div>
-                        {(p.windBoost||0) !== 0 && <div style={{padding:'6px 10px',borderRadius:6,
-                          background:p.windBoost>0?'rgba(232,65,26,.1)':'rgba(56,184,242,.1)',textAlign:'center'}}>
-                          <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",letterSpacing:1}}>WIND</div>
-                          <div style={{fontFamily:"'DM Mono',monospace",fontWeight:700,fontSize:13,
-                            color:p.windBoost>0?'var(--accent)':'var(--ice)'}}>
-                            {p.windBoost>0?'Out 💨':'In ❄️'}
-                          </div>
-                        </div>}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div style={{display:'flex',gap:10,alignItems:'center'}}>
-                    <button onClick={()=>openAtBatSlide(p)}
-                      style={{padding:'6px 14px',borderRadius:6,border:'1px solid var(--border)',
-                        background:'var(--surface)',color:'var(--text)',cursor:'pointer',
-                        fontFamily:"'DM Mono',monospace",fontSize:11}}>
-                      📋 At-Bat Log
-                    </button>
-                    <PickButton pid={p.pid} name={p.name} team={p.team}/>
-                    <span style={{marginLeft:'auto',fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
-                      {p.recentWindow} at-bat data · {p.bip||0} BIP
-                    </span>
-                  </div>
-                </div>}
-              </div>;
-            })}
-          </div>
-    }
-  </div>;
-}
-
 
 function PregameTab() {
   const [players, setPlayers] = useState([]);
@@ -3082,7 +2625,7 @@ function PregameTab() {
   const [sortDir, setSortDir] = useState(1);
   const [filter, setFilter] = useState("all");
   const [refreshing, setRefreshing] = useState(false);
-  const [win, setWin] = useState(3);
+  const [win, setWin] = useState(7);
   const [selMatchup, setSelMatchup] = useState(null);
   const [selTeam, setSelTeam] = useState(null);
   const [games, setGames] = useState([]);
@@ -3109,7 +2652,7 @@ function PregameTab() {
 
   // Re-grade players for selected win + filter by matchup
   const graded = players.map(p => {
-    const w = p.windows?.[win]; if (!w) return p;
+    const w = p.windows?.[winKey(win)]; if (!w) return p;
     return { ...p, _wGrade: w.grade, _wHS: w.heatScore, _wOS: w.os };
   });
   const filtered = graded.filter(p => {
@@ -3120,11 +2663,11 @@ function PregameTab() {
     if (filter==="aplus") return g==="A+";
     if (filter==="a") return g==="A+"||g==="A";
     if (filter==="b") return g==="A+"||g==="A"||g==="B";
-    if (filter==="hot") return (p.windows?.[win]?.heatScore??p.heatScore)>=58;
+    if (filter==="hot") return (p.windows?.[winKey(win)]?.heatScore??p.heatScore)>=58;
     return true;
   });
   const sortVal = (p, k) => {
-    const w = p.windows?.[win];
+    const w = p.windows?.[winKey(win)];
     // For grade sort, use the win-recalculated os score
     if (k === "os") return w?.os ?? p.os ?? 0;
     if (w && k in w) return w[k];
@@ -3133,7 +2676,7 @@ function PregameTab() {
   const sorted = [...filtered].sort((a,b) => sortDir*(sortVal(b,sortKey)-sortVal(a,sortKey)));
   const elC = graded.filter(p=>p._wGrade?.grade==="A+").length;
   const hotC = graded.filter(p=>p._wGrade?.grade==="A").length;
-  const avgEV = players.length?(players.reduce((s,p)=>s+(p.windows?.[win]?.avgEV??p.avgEV),0)/players.length).toFixed(1):"--";
+  const avgEV = players.length?(players.reduce((s,p)=>s+(p.windows?.[winKey(win)]?.avgEV??p.avgEV),0)/players.length).toFixed(1):"--";
 
   return <div>
     <div className="hrow">
@@ -3293,6 +2836,9 @@ function ScoutingTab() {
   const hs = (k) => { if (sortKey===k) setSortDir(d=>-d); else { setSortKey(k); setSortDir(k==="timeET"||k==="chronoIndex"||k==="distance"||k==="exitVelo"?-1:1); } };
 
   // ── When filters change, fetch real filtered metrics from /api/statcast_raw ──
+  // NOTE: pitch type + handedness filters require players.json (from mlbdata_aggregate.py)
+  // Until that file is committed, these filters return no data from the API
+  // Window buttons (L3/L7/L15/L30) work once players.json has window data
   useEffect(() => {
     if (handFilter === 'all' && pitchTypes.size === 0) {
       setFilteredMetrics({});
@@ -3357,7 +2903,7 @@ function ScoutingTab() {
       almostHRPct:  fm.almostHRPct  || 0,
       isFiltered: true,
     };
-    const w = p.windows?.[win] ?? {};
+    const w = p.windows?.[winKey(win)] ?? {};
     return { ...p, ...w, isFiltered: false };
   };
 
@@ -3379,7 +2925,7 @@ function ScoutingTab() {
       if (p.team && p.team !== "—" && p.team !== "???" && !todayTeamsS.has(p.team)) return false;
     }
     if (searchQ && !p.name.toLowerCase().includes(searchQ.toLowerCase())) return false;
-    const wg = (p.windows?.[win]?.grade || p.grade)?.grade;
+    const wg = (p.windows?.[winKey(win)]?.grade || p.grade)?.grade;
     if (filter==="aplus") return wg==="A+";
     if (filter==="a") return wg==="A+"||wg==="A";
     if (filter==="b") return wg==="A+"||wg==="A"||wg==="B";
@@ -3391,14 +2937,23 @@ function ScoutingTab() {
     const m = getMetrics(p);
     if (k === "os") return m?.os ?? p.os ?? 0;
     if (m && k in m) return m[k] ?? 0;
-    const w = p.windows?.[win];
+    const w = p.windows?.[winKey(win)];
     if (w && k in w) return w[k];
     return p[k] ?? 0;
   };
   const sorted = [...filtered].sort((a,b) => sortDir*(sortValS(b,sortKey)-sortValS(a,sortKey)));
+  // ── Data availability notice ──────────────────────────────
+  const dataNotice = !hasRealFilterData && filtersActive
+    ? "⚠️ Pitch type / handedness filters need at-bat log data. Run mlbdata_aggregate.py and commit players.json to enable."
+    : !hasRealWindowData && win !== 7
+    ? "ℹ️ Date windows will show different data once the at-bat log (players.json) is committed."
+    : null;
+
   const apC=players.filter(p=>p.grade?.grade==="A+").length, aC=players.filter(p=>p.grade?.grade==="A").length, bC=players.filter(p=>p.grade?.grade==="B").length, chC=players.filter(p=>(p.oSwing??30)>=33).length;
 
   const filtersActive = handFilter !== 'all' || pitchTypes.size > 0;
+  const hasRealWindowData = players.some(p => p.windows?.last7 && p.windows.last7.avgEV > 0);
+  const hasRealFilterData = players.some(p => p.pitchSplits && Object.keys(p.pitchSplits).length > 0);
 
   return <div>
     <div className="hrow">
@@ -3514,7 +3069,7 @@ function ScoutingTab() {
       <tbody>{sorted.map((p,i)=>{
         const m = getMetrics(p);
         const displayP = filtersActive && m.isFiltered ? {...p, ...m} : p;
-        const w = p.windows?.[win] ?? {};
+        const w = p.windows?.[winKey(win)] ?? {};
         const wg = w.grade||p.grade||{grade:"X",cls:"x",color:"#2a3a48"};
         const wOS = m.os ?? w.os ?? p.os ?? 0;
 
@@ -3560,7 +3115,7 @@ function ScoutingTab() {
             <div style={{fontSize:9,color:iqColor,fontFamily:"'DM Mono',monospace",marginTop:2}}>{iqLabel}</div>
             {m.isFiltered && <div style={{fontSize:8,color:"var(--accent)",fontFamily:"'DM Mono',monospace"}}>filtered</div>}
           </td>
-          <StatCols p={displayP} win={win}/>
+          <StatCols p={displayP} window={win}/>
         </tr>;
       })}</tbody></table></div></div>
     </>}
@@ -4253,17 +3808,23 @@ function HRTrackerTab() {
     return true;
   });
   const sorted = [...filtered].sort((a,b) => {
-    // Time sort: always use chronoIndex (reliable number), timeET is just for display
+    // chronoIndex is always the PRIMARY sort — newest HR first
+    // Other columns are secondary sort only
     if (sortKey === "timeET" || sortKey === "chronoIndex") {
-      const av = a.chronoIndex ?? 0, bv = b.chronoIndex ?? 0;
-      return sortDir < 0 ? bv - av : av - bv; // default: -1 = newest (highest) first
+      // Primary: chronoIndex descending (newest first)
+      return (b.chronoIndex ?? 0) - (a.chronoIndex ?? 0);
     }
+    // Secondary: sort by chosen column, then break ties with chronoIndex
     const av = a[sortKey], bv = b[sortKey];
-    if (av == null && bv == null) return 0;
+    if (av == null && bv == null) return (b.chronoIndex??0)-(a.chronoIndex??0);
     if (av == null) return 1;
     if (bv == null) return -1;
-    if (typeof av === "string") return sortDir * av.localeCompare(bv);
-    return sortDir * (bv - av);
+    const primary = typeof av === "string"
+      ? sortDir * av.localeCompare(bv)
+      : sortDir * (bv - av);
+    if (primary !== 0) return primary;
+    // Tie-break: newest first
+    return (b.chronoIndex ?? 0) - (a.chronoIndex ?? 0);
   });
 
   const totalHRs = hrs.length;
@@ -4348,6 +3909,7 @@ function HRTrackerTab() {
             <thead><tr style={{position:"sticky",top:0,zIndex:20,background:"var(--surface2)"}}>
               <th style={{width:24,cursor:"default",background:"var(--surface2)"}}>#</th>
               {[
+                {key:"timeET",     label:"Time (ET)", tip:"Time the HR was hit ET — sorted newest first"},
                 {key:"batterTeam", label:"Team",     tip:"Batter's team"},
                 {key:"batterName", label:"Batter",   tip:"Batter name"},
                 {key:"rbi",        label:"Type / RBI",tip:"HR type and RBIs"},
@@ -4359,7 +3921,6 @@ function HRTrackerTab() {
                 {key:"pitchType",  label:"Pitch",    tip:"Pitch type thrown"},
                 {key:"pitcherName",label:"vs Pitcher",tip:"Pitcher who gave it up"},
                 {key:"gameId",     label:"Game",     tip:"Matchup"},
-                {key:"timeET",     label:"Time (ET)", tip:"Time the HR was hit ET — sorted newest first"},
               ].map(c => (
                 <th key={c.key} className={sortKey===c.key?"sk":""} onClick={()=>hs(c.key)} style={{cursor:"pointer"}}>
                   <div style={{display:"flex",alignItems:"center",gap:2}}>
@@ -4392,10 +3953,9 @@ function HRTrackerTab() {
                   <td>{hr.pitchType?<span style={{fontSize:10,fontFamily:"'DM Mono',monospace",padding:"2px 7px",borderRadius:4,background:"var(--surface2)",border:"1px solid var(--border)"}}>{hr.pitchType}</span>:<span style={{color:"var(--muted)"}}>—</span>}</td>
                   <td><div style={{fontSize:11,fontWeight:500}}>{hr.pitcherName}</div><div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{hr.pitcherTeam}</div></td>
                   <td>
-                    <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:"var(--text)",fontWeight:500}}>
-                      {hr.timeET && hr.timeET !== "" ? hr.timeET : `Inn. ${hr.inning}`}
+                    <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:"var(--text)",fontWeight:600}}>
+                      {hr.timeET && hr.timeET !== "" ? hr.timeET : `Inn. ${hr.inning}`}
                     </span>
-                    <div style={{fontSize:8,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{hr.gameId}</div>
                   </td>
                 </tr>;
               })}
@@ -4675,12 +4235,12 @@ function StatcastTab() {
 }
 
 export default function App() {
-  const [tab, setTab] = useState("top20");
+  const [tab, setTab] = useState("homeruns");
   const [showPicksSlideout, setShowPicksSlideout] = useState(false);
   // Load player data at startup — populates PLAYER_DATA_CACHE for all tabs
   useEffect(() => {
     loadGlobalPlayerMap();
-    // Fetch player Statcast data — feeds Top20, BvP, Scouting, Liftoff
+    // Fetch player Statcast data — feeds BvP, Scouting, Liftoff
     const noop = () => {};
     fetchPlayers(noop, noop, noop, false);
   }, []);
@@ -4703,7 +4263,6 @@ export default function App() {
       </header>
       <HRTicker onHRClick={()=>setTab("homeruns")}/>
       <nav className="tabs">
-        <button className={`tab ${tab==="top20"?"active":""}`} onClick={()=>setTab("top20")} style={{color:tab==="top20"?"var(--accent)":undefined,fontWeight:tab==="top20"?700:400}}>🎯 Going Yard</button>
         <button className={`tab ${tab==="homeruns"?"active":""}`} onClick={()=>setTab("homeruns")} style={{color:tab==="homeruns"?"var(--accent)":undefined}}>💥 HR Tracker</button>
         <button className={`tab ${tab==="bvp"?"active":""}`} onClick={()=>setTab("bvp")}>⚔️ Batter vs P</button>
         <button className={`tab ${tab==="scouting"?"active":""}`} onClick={()=>setTab("scouting")}>🎯 Scouting</button>
@@ -4716,7 +4275,6 @@ export default function App() {
         <button className={`tab ${tab==="picks"?"active":""}`} onClick={()=>setTab("picks")} style={{color:tab==="picks"?"var(--accent2)":undefined}}>🎯 My Picks</button>
       </nav>
       <main className="content">
-        {tab==="top20" && <Top20Tab/>}
         {tab==="pregame" && <PregameTab/>}
         {tab==="live" && <LiveTab/>}
         {tab==="scouting" && <ScoutingTab/>}
