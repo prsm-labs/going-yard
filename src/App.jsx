@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const BUILD_TIMESTAMP = "2026-03-31 23:02 ET";
+const BUILD_TIMESTAMP = "2026-03-31 23:20 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -745,39 +745,56 @@ function PitcherTab() {
     setPitchers([]);
     setSelPitcher(null);
     try {
-      // Fetch season pitching leaders from MLB Stats API
-      const res = await fetch(
-        `https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=earnedRunAverage&season=${yr}&sportId=1&limit=200&statGroup=pitching&statType=season&hydrate=person,currentTeam`
-      );
-      const data = await res.json();
-      const leaders = data.leagueLeaders?.[0]?.leaders || [];
+      // Use team rosters + season stats — more reliable than leaders endpoint
+      // Fetch all pitchers' season stats via stats endpoint
+      const [statsRes, teamRes] = await Promise.all([
+        fetch(`https://statsapi.mlb.com/api/v1/stats?stats=season&group=pitching&season=${yr}&sportId=1&limit=500&sortStat=gamesStarted&order=desc&hydrate=person,currentTeam`),
+        fetch(`https://statsapi.mlb.com/api/v1/sports/1/players?season=${yr}&sportId=1`),
+      ]);
 
-      const results = leaders
-        .filter(l => l.person?.id && l.value)
+      const statsData = statsRes.ok ? await statsRes.json() : {};
+      const teamData  = teamRes.ok  ? await teamRes.json()  : {};
+
+      // Build name+hand map from players endpoint
+      const personMap = {};
+      for (const p of (teamData.people || [])) {
+        personMap[p.id] = {
+          hand: p.pitchHand?.code === 'L' ? 'LHP' : 'RHP',
+          name: p.fullName,
+          team: p.currentTeam?.abbreviation || '—',
+        };
+      }
+
+      const splits = statsData.stats?.[0]?.splits || [];
+      console.log('[PitcherTab] splits:', splits.length, 'year:', yr);
+
+      const results = splits
         .map(l => {
-          const s = l.stat || {};
-          const person = l.person || {};
+          const s  = l.stat || {};
+          const pid = l.person?.id;
+          const pm  = personMap[pid] || {};
           return {
-            pid:    person.id,
-            name:   person.fullName || '—',
-            team:   l.team?.abbreviation || '—',
-            hand:   person.pitchHand?.code === 'L' ? 'LHP' : 'RHP',
-            era:    l.value || '—',
-            whip:   s.whip || '—',
-            ip:     s.inningsPitched || '0',
-            k9:     s.strikeoutsPer9Inn || '—',
-            bb9:    s.walksPer9Inn || '—',
-            hr9:    parseFloat(s.homeRunsPer9 || 0),
-            hr:     parseInt(s.homeRuns || 0),
-            hits:   parseInt(s.hits || 0),
-            obp:    s.obp || '—',
-            avg:    s.avg || '—',
-            kPct:   s.strikeoutPercentage || '—',
-            bbPct:  s.walkPercentage || '—',
-            gs:     parseInt(s.gamesStarted || 0),
+            pid,
+            name:  l.person?.fullName || pm.name || '—',
+            team:  l.team?.abbreviation || pm.team || '—',
+            hand:  pm.hand || 'RHP',
+            era:   s.era   || '—',
+            whip:  s.whip  || '—',
+            ip:    s.inningsPitched || '0',
+            k9:    s.strikeoutsPer9Inn || '—',
+            bb9:   s.walksPer9Inn || '—',
+            hr9:   parseFloat(s.homeRunsPer9 || 0),
+            hr:    parseInt(s.homeRuns || 0),
+            hits:  parseInt(s.hits || 0),
+            obp:   s.obp   || '—',
+            avg:   s.avg   || '—',
+            kPct:  s.strikeoutPercentage || '—',
+            bbPct: s.walkPercentage || '—',
+            gs:    parseInt(s.gamesStarted || 0),
           };
         })
-        .filter(p => p.gs >= 1); // starters only
+        .filter(p => p.gs >= 1 && p.pid)
+        .sort((a,b) => (b.hr9||0) - (a.hr9||0)); // highest HR/9 = most hittable
 
       setPitchers(results);
     } catch(e) {
@@ -825,6 +842,8 @@ function PitcherTab() {
             {yr}
           </button>
         ))}
+        <button className={`chip ${year==='all'?'active':''}`} onClick={()=>setYear('all')}
+          style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13}}>All</button>
       </div>
     </div>
 
@@ -1029,12 +1048,22 @@ function AtBatSlideIn() {
     // Fetch real at-bat log from Baseball Savant statcast search
     const today = new Date().toLocaleDateString("en-US",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"}).split("/");
     const dateStr = `${today[2]}-${today[0]}-${today[1]}`;
-    fetch(`https://statsapi.mlb.com/api/v1/people/${player.pid}/stats?stats=gameLog&group=hitting&season=2026&sportId=1&limit=20`)
-      .then(r=>r.json())
-      .then(data => {
-        const games = data.stats?.[0]?.splits || [];
+    // Try 2026 first, fall back to 2025 if empty (early season)
+    const fetchGameLog = async (pid, season) => {
+      const r = await fetch(`https://statsapi.mlb.com/api/v1/people/${pid}/stats?stats=gameLog&group=hitting&season=${season}&sportId=1&limit=25`);
+      const d = await r.json();
+      return d.stats?.[0]?.splits || [];
+    };
+    fetchGameLog(player.pid, 2026)
+      .then(async games => {
+        // If no 2026 games yet, try 2025
+        if (games.length === 0) games = await fetchGameLog(player.pid, 2025);
+        return games;
+      })
+      .then(games => {
+        const games2 = games;
         // Flatten to at-bat level from game log
-        const rows = games.slice(0,15).map(g => ({
+        const rows = games2.slice(0,15).map(g => ({
           date: g.date?.slice(5) || "—",
           // MLB gameLog: opponent.id maps to TEAM_ID_TO_ABB
           opp: TEAM_ID_TO_ABB[g.opponent?.id] ||
@@ -3600,8 +3629,17 @@ function BvPTab() {
         }).filter(Boolean).sort((a,b)=>b.ms-a.ms);
         if (liveBatters.length > 0) { setBatters(liveBatters); return; }
       } catch(e) { console.warn("Live lineup fetch failed:", e.message); }
-      // Fallback to generated batters
-      setBatters(genBvPBatters(p));
+      // Fallback: use cached players ranked by overall score
+      const fallback = genBvPBatters(p);
+      if (fallback.length > 0) {
+        setBatters(fallback);
+      } else {
+        // Cache not ready yet — retry after 2 seconds
+        setTimeout(() => {
+          const retry = genBvPBatters(p);
+          if (retry.length > 0) setBatters(retry);
+        }, 2000);
+      }
     })();
   }, [selGame, selSide]);
 
@@ -4353,7 +4391,7 @@ function HRTrackerTab() {
                   <td><div style={{fontSize:11,fontWeight:500}}>{hr.pitcherName}</div><div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{hr.pitcherTeam}</div></td>
                   <td>
                     <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:"var(--text)",fontWeight:500}}>
-                      {hr.timeET || hr.time || "—"}
+                      {hr.timeET && hr.timeET !== "" ? hr.timeET : `Inn. ${hr.inning}`}
                     </span>
                     <div style={{fontSize:8,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{hr.gameId}</div>
                   </td>
