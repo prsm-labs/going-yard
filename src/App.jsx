@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const BUILD_TIMESTAMP = "2026-03-31 23:20 ET";
+const BUILD_TIMESTAMP = "2026-03-31 23:48 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -740,62 +740,61 @@ function PitcherTab() {
   const [pitcherDetail, setPitcherDetail] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
+  const fetchOneSeason = async (yr) => {
+    // Fetch directly from statsapi - simpler endpoint that actually works
+    const url = `https://statsapi.mlb.com/api/v1/stats?stats=season&group=pitching&gameType=R&season=${yr}&sportId=1&limit=500&hydrate=person,currentTeam`;
+    const res = await fetch(url);
+    if (!res.ok) return [];
+    const data = await res.json();
+    const splits = data.stats?.[0]?.splits || [];
+    return splits
+      .filter(l => parseInt(l.stat?.gamesStarted||0) >= 1)
+      .map(l => {
+        const s = l.stat || {};
+        return {
+          pid:   l.person?.id,
+          name:  l.person?.fullName || '—',
+          team:  l.team?.abbreviation || '—',
+          hand:  l.person?.pitchHand?.code === 'L' ? 'LHP' : 'RHP',
+          era:   s.era   || '—',
+          whip:  s.whip  || '—',
+          ip:    s.inningsPitched || '0',
+          k9:    s.strikeoutsPer9Inn || '—',
+          bb9:   s.walksPer9Inn || '—',
+          hr9:   parseFloat(s.homeRunsPer9 || 0),
+          hr:    parseInt(s.homeRuns || 0),
+          hits:  parseInt(s.hits || 0),
+          obp:   s.obp   || '—',
+          avg:   s.avg   || '—',
+          gs:    parseInt(s.gamesStarted || 0),
+          season: yr,
+        };
+      })
+      .filter(p => p.pid);
+  };
+
   const load = async (yr) => {
     setLoading(true);
     setPitchers([]);
     setSelPitcher(null);
     try {
-      // Use team rosters + season stats — more reliable than leaders endpoint
-      // Fetch all pitchers' season stats via stats endpoint
-      const [statsRes, teamRes] = await Promise.all([
-        fetch(`https://statsapi.mlb.com/api/v1/stats?stats=season&group=pitching&season=${yr}&sportId=1&limit=500&sortStat=gamesStarted&order=desc&hydrate=person,currentTeam`),
-        fetch(`https://statsapi.mlb.com/api/v1/sports/1/players?season=${yr}&sportId=1`),
-      ]);
-
-      const statsData = statsRes.ok ? await statsRes.json() : {};
-      const teamData  = teamRes.ok  ? await teamRes.json()  : {};
-
-      // Build name+hand map from players endpoint
-      const personMap = {};
-      for (const p of (teamData.people || [])) {
-        personMap[p.id] = {
-          hand: p.pitchHand?.code === 'L' ? 'LHP' : 'RHP',
-          name: p.fullName,
-          team: p.currentTeam?.abbreviation || '—',
-        };
+      let results = [];
+      if (yr === 'all') {
+        // Fetch all three seasons and merge, dedup by pid keeping best HR/9
+        const [r2024, r2025, r2026] = await Promise.all([
+          fetchOneSeason(2024), fetchOneSeason(2025), fetchOneSeason(2026),
+        ]);
+        const merged = {};
+        for (const p of [...r2024, ...r2025, ...r2026]) {
+          const key = p.pid;
+          if (!merged[key] || (p.hr9||0) > (merged[key].hr9||0)) merged[key] = p;
+        }
+        results = Object.values(merged);
+      } else {
+        results = await fetchOneSeason(yr);
       }
-
-      const splits = statsData.stats?.[0]?.splits || [];
-      console.log('[PitcherTab] splits:', splits.length, 'year:', yr);
-
-      const results = splits
-        .map(l => {
-          const s  = l.stat || {};
-          const pid = l.person?.id;
-          const pm  = personMap[pid] || {};
-          return {
-            pid,
-            name:  l.person?.fullName || pm.name || '—',
-            team:  l.team?.abbreviation || pm.team || '—',
-            hand:  pm.hand || 'RHP',
-            era:   s.era   || '—',
-            whip:  s.whip  || '—',
-            ip:    s.inningsPitched || '0',
-            k9:    s.strikeoutsPer9Inn || '—',
-            bb9:   s.walksPer9Inn || '—',
-            hr9:   parseFloat(s.homeRunsPer9 || 0),
-            hr:    parseInt(s.homeRuns || 0),
-            hits:  parseInt(s.hits || 0),
-            obp:   s.obp   || '—',
-            avg:   s.avg   || '—',
-            kPct:  s.strikeoutPercentage || '—',
-            bbPct: s.walkPercentage || '—',
-            gs:    parseInt(s.gamesStarted || 0),
-          };
-        })
-        .filter(p => p.gs >= 1 && p.pid)
-        .sort((a,b) => (b.hr9||0) - (a.hr9||0)); // highest HR/9 = most hittable
-
+      console.log('[PitcherTab] loaded:', results.length, 'pitchers for', yr);
+      results.sort((a,b) => (b.hr9||0) - (a.hr9||0));
       setPitchers(results);
     } catch(e) {
       console.warn('[PitcherTab]', e.message);
@@ -1043,6 +1042,8 @@ function AtBatSlideIn() {
 
   useEffect(() => {
     if (!player?.pid) return;
+    setAtBats([]);
+    setLoading(true);
     setLoading(true);
     setAtBats([]);
     // Fetch real at-bat log from Baseball Savant statcast search
@@ -2178,7 +2179,7 @@ async function fetchPitcherData(pid, name) {
   const key = pid || name;
   if (PITCHER_API_CACHE[key]) return PITCHER_API_CACHE[key];
   try {
-    const url = pid ? `/api/pitcher?pid=${pid}&year=2026` : `/api/pitcher?name=${encodeURIComponent(name)}&year=2026`;
+    const url = pid ? `/api/pitcher?pid=${pid}&year=2026` : `/api/pitcher?name=${encodeURIComponent(name)}&year=2026`; // Falls back to 2025 in pitcher.js
     const res = await fetch(url);
     const data = await res.json();
     if (data.found) {
@@ -3099,7 +3100,7 @@ function PregameTab() {
     return () => clearInterval(id);
   }, [load]);
   useEffect(() => { fetchGames(()=>{}, setGames, ()=>{}); }, []);
-  const hs = (k) => { if (sortKey===k) setSortDir(d=>-d); else { setSortKey(k); setSortDir(1); } };
+  const hs = (k) => { if (sortKey===k) setSortDir(d=>-d); else { setSortKey(k); setSortDir(k==="timeET"||k==="chronoIndex"||k==="distance"||k==="exitVelo"?-1:1); } };
 
   // Teams in selected matchup
   const matchupTeams = selMatchup
@@ -3289,7 +3290,7 @@ function ScoutingTab() {
   }, [load]);
   useEffect(() => { fetchGames(()=>{}, setGames, ()=>{}); }, []);
 
-  const hs = (k) => { if (sortKey===k) setSortDir(d=>-d); else { setSortKey(k); setSortDir(1); } };
+  const hs = (k) => { if (sortKey===k) setSortDir(d=>-d); else { setSortKey(k); setSortDir(k==="timeET"||k==="chronoIndex"||k==="distance"||k==="exitVelo"?-1:1); } };
 
   // ── When filters change, fetch real filtered metrics from /api/statcast_raw ──
   useEffect(() => {
@@ -3584,36 +3585,45 @@ function BvPTab() {
   }, [games, selGame]);
   useEffect(() => {
     if (!selGame) return;
-    const pitchSide = selSide === "away" ? "home" : "away";
-    const batterSide = selSide; // batters are on the side YOU selected
-    const p = genPitcher(selGame, pitchSide); // base (loading:true)
+    const pitchSide  = selSide === "away" ? "home" : "away";
+    const batterSide = selSide;
+    const p = genPitcher(selGame, pitchSide);
     setPitcher(p);
-    // Async: fetch real pitcher data and update state
+    setBatters([]);
+
+    // Load pitcher data
     fetchRealPitcher(selGame, pitchSide).then(realP => setPitcher(realP)).catch(() => {});
-    // Async: load real pitch mix + stats from /api/pitcher
     if (p.name && !p.name.includes('Starter')) {
       fetchPitcherData(null, p.name).then(data => {
         if (data?.found) {
           setPitcher(prev => ({
             ...prev,
-            pitchMix:  data.pitchMix?.length > 0 ? data.pitchMix : prev.pitchMix,
-            era:       data.stats?.era  || prev.era,
-            whip:      data.stats?.whip || prev.whip,
-            fbVelo:    data.pitchMix?.[0]?.velo || prev.fbVelo,
-            loading:   false,
+            pitchMix: data.pitchMix?.length > 0 ? data.pitchMix : prev.pitchMix,
+            era:      data.stats?.era  || prev.era,
+            whip:     data.stats?.whip || prev.whip,
+            fbVelo:   data.pitchMix?.[0]?.velo || prev.fbVelo,
+            loading:  false,
           }));
         } else {
           setPitcher(prev => ({...prev, loading: false}));
         }
       }).catch(() => setPitcher(prev => ({...prev, loading: false})));
     }
-    // Fetch real opposing lineup from boxscore
+
+    // Load batters — try live boxscore first, then fall back to cache
     (async () => {
+      // Wait up to 5s for player cache to be ready
+      let waited = 0;
+      while (Object.keys(PLAYER_DATA_CACHE).length < 5 && waited < 5000) {
+        await new Promise(r => setTimeout(r, 500));
+        waited += 500;
+      }
+
       try {
-        const res = await fetch(`/api/boxscore?gamePk=${selGame.gamePk}`);
+        const res  = await fetch(`/api/boxscore?gamePk=${selGame.gamePk}`);
         const data = await res.json();
         const team = data.teams?.[batterSide];
-        const ta = team?.team?.abbreviation || selGame[batterSide]?.abbr || batterSide.toUpperCase();
+        const ta   = team?.team?.abbreviation || selGame[batterSide]?.abbr || batterSide.toUpperCase();
         const batterIds = team?.batters?.length > 0
           ? team.batters.slice(0, 9)
           : Object.keys(team?.players || {}).slice(0, 9).map(k => parseInt(k.replace("ID","")));
@@ -3621,25 +3631,17 @@ function BvPTab() {
           const pl = team?.players?.[`ID${bid}`];
           if (!pl) return null;
           if (pl.position?.abbreviation === "P") return null;
-          const name = pl.person?.fullName || `Player ${bid}`;
-          const hand = pl.person?.batSide?.code || getBatterHand(name);
-          const matchup = getHandMatchup(hand, p.hand === "RHP" ? "R" : "L");
-          // All real data — no seededRand
+          const name  = pl.person?.fullName || `Player ${bid}`;
+          const hand  = pl.person?.batSide?.code || getBatterHand(name);
           return buildBvPBatter(bid, name, ta, hand, p);
-        }).filter(Boolean).sort((a,b)=>b.ms-a.ms);
+        }).filter(Boolean).sort((a,b) => b.ms - a.ms);
+
         if (liveBatters.length > 0) { setBatters(liveBatters); return; }
       } catch(e) { console.warn("Live lineup fetch failed:", e.message); }
-      // Fallback: use cached players ranked by overall score
+
+      // Fallback: top players from cache ranked by score
       const fallback = genBvPBatters(p);
-      if (fallback.length > 0) {
-        setBatters(fallback);
-      } else {
-        // Cache not ready yet — retry after 2 seconds
-        setTimeout(() => {
-          const retry = genBvPBatters(p);
-          if (retry.length > 0) setBatters(retry);
-        }, 2000);
-      }
+      setBatters(fallback.length > 0 ? fallback : []);
     })();
   }, [selGame, selSide]);
 
@@ -3897,7 +3899,7 @@ function PitchBuilderTab() {
   const isMulti = selPitches.size > 1;
   const pitchCol = isMulti ? "var(--accent2)" : (PITCH_COLORS[selPitchArr[0]] || "#8899a6");
 
-  const hs = (k) => { if (sortKey===k) setSortDir(d=>-d); else { setSortKey(k); setSortDir(1); } };
+  const hs = (k) => { if (sortKey===k) setSortDir(d=>-d); else { setSortKey(k); setSortDir(k==="timeET"||k==="chronoIndex"||k==="distance"||k==="exitVelo"?-1:1); } };
 
   const metricClass = (key, val) => {
     if (key==="ev") return val>=T.EV_EL?"dng":val>=T.EV_HH?"hot":val>=90?"warm":"avg";
@@ -4234,7 +4236,7 @@ function HRTrackerTab() {
 
   useEffect(() => { load(selDate); }, [selDate]);
 
-  const hs = (k) => { if (sortKey===k) setSortDir(d=>-d); else { setSortKey(k); setSortDir(1); } };
+  const hs = (k) => { if (sortKey===k) setSortDir(d=>-d); else { setSortKey(k); setSortDir(k==="timeET"||k==="chronoIndex"||k==="distance"||k==="exitVelo"?-1:1); } };
   const isToday = selDate === todayStr;
   const displayDate = new Date(selDate + "T12:00:00").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric",year:"numeric"});
 
