@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const BUILD_TIMESTAMP = "2026-03-31 21:51 ET";
+const BUILD_TIMESTAMP = "2026-03-31 23:02 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -731,102 +731,68 @@ function PickButton({pid,name,team}) {
 
 // ── PITCHER TAB ───────────────────────────────────────────────
 function PitcherTab() {
-  const [games, setGames] = useState([]);
+  const [year, setYear] = useState('2026');
   const [pitchers, setPitchers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [sortKey, setSortKey] = useState("hr9");
-  const [sortDir, setSortDir] = useState(-1); // highest hr/9 first (worst pitcher)
+  const [loading, setLoading] = useState(false);
+  const [sortKey, setSortKey] = useState('hr9');
+  const [sortDir, setSortDir] = useState(-1);
   const [selPitcher, setSelPitcher] = useState(null);
   const [pitcherDetail, setPitcherDetail] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
-  useEffect(() => {
+  const load = async (yr) => {
     setLoading(true);
-    fetchGames(()=>{}, setGames, ()=>{});
-  }, []);
+    setPitchers([]);
+    setSelPitcher(null);
+    try {
+      // Fetch season pitching leaders from MLB Stats API
+      const res = await fetch(
+        `https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=earnedRunAverage&season=${yr}&sportId=1&limit=200&statGroup=pitching&statType=season&hydrate=person,currentTeam`
+      );
+      const data = await res.json();
+      const leaders = data.leagueLeaders?.[0]?.leaders || [];
 
-  useEffect(() => {
-    if (games.length === 0) return;
-    loadPitchers(games);
-  }, [games]);
+      const results = leaders
+        .filter(l => l.person?.id && l.value)
+        .map(l => {
+          const s = l.stat || {};
+          const person = l.person || {};
+          return {
+            pid:    person.id,
+            name:   person.fullName || '—',
+            team:   l.team?.abbreviation || '—',
+            hand:   person.pitchHand?.code === 'L' ? 'LHP' : 'RHP',
+            era:    l.value || '—',
+            whip:   s.whip || '—',
+            ip:     s.inningsPitched || '0',
+            k9:     s.strikeoutsPer9Inn || '—',
+            bb9:    s.walksPer9Inn || '—',
+            hr9:    parseFloat(s.homeRunsPer9 || 0),
+            hr:     parseInt(s.homeRuns || 0),
+            hits:   parseInt(s.hits || 0),
+            obp:    s.obp || '—',
+            avg:    s.avg || '—',
+            kPct:   s.strikeoutPercentage || '—',
+            bbPct:  s.walkPercentage || '—',
+            gs:     parseInt(s.gamesStarted || 0),
+          };
+        })
+        .filter(p => p.gs >= 1); // starters only
 
-  const loadPitchers = async (games) => {
-    const pitcherList = [];
-    for (const g of games) {
-      for (const side of ["away","home"]) {
-        const name = g[side]?.probablePitcher;
-        const team = g[side]?.abbr;
-        const hand = g[side]?.pitcherHand || "R";
-        if (!name || name.includes("TBD") || name.includes("Starter")) continue;
-        pitcherList.push({
-          name, team, hand: hand === "L" ? "LHP" : "RHP",
-          gameTime: g.gameTime || "—",
-          vs: side === "away" ? g.home.abbr : g.away.abbr,
-          gamePk: g.gamePk,
-          side,
-          // Will be enriched with real stats
-          era: "—", whip: "—", ip: "0", k9: "—", bb9: "—", hr9: null,
-          kPct: "—", bbPct: "—", hits: 0, hr: 0, obp: "—", avg: "—",
-          fbPct: "—", hhPct: "—", pitchMix: [],
-        });
-      }
+      setPitchers(results);
+    } catch(e) {
+      console.warn('[PitcherTab]', e.message);
     }
-
-    // Fetch pitcher stats via /api/schedule which is already proxied
-    // Use pitcher IDs from the games data (already hydrated with probablePitcher)
-    const enriched = await Promise.all(pitcherList.map(async (p) => {
-      try {
-        // Find pitcher ID from the games data directly
-        const game = games.find(g => g.gamePk === p.gamePk);
-        const pitcherSide = p.side === "away" ? "home" : "away"; // pitcher faces batters from other side
-        // p.side is the pitcher's own team side (away or home)
-        const pitcherId = game?.[p.side]?.probablePitcherId;
-
-        // Use GLOBAL_PLAYER_TEAM_MAP which has all player IDs loaded at startup
-        // Search by name match
-        const pid = pitcherId || Object.entries(GLOBAL_PLAYER_TEAM_MAP).find(([id, data]) =>
-          data.name?.toLowerCase().includes(p.name.split(" ").pop().toLowerCase())
-        )?.[0];
-
-        if (pid) {
-          const statsRes = await fetch(
-            `https://statsapi.mlb.com/api/v1/people/${pid}/stats?stats=season&group=pitching&season=2026&sportId=1`
-          );
-          if (statsRes.ok) {
-            const statsData = await statsRes.json();
-            const s = statsData.stats?.[0]?.splits?.[0]?.stat || {};
-            if (s.era || s.inningsPitched) {
-              return {
-                ...p, pid: parseInt(pid),
-                era:  s.era              || "—",
-                whip: s.whip             || "—",
-                ip:   s.inningsPitched   || "0",
-                k9:   s.strikeoutsPer9Inn|| "—",
-                bb9:  s.walksPer9Inn     || "—",
-                hr9:  parseFloat(s.homeRunsPer9 || 0),
-                hr:   parseInt(s.homeRuns || 0),
-                hits: parseInt(s.hits    || 0),
-                obp:  s.obp              || "—",
-                avg:  s.avg              || "—",
-                kPct: s.strikeoutPercentage || "—",
-                bbPct:s.walkPercentage   || "—",
-              };
-            }
-          }
-        }
-      } catch(e) { console.warn("[Pitcher stats]", p.name, e.message); }
-      return p;
-    }));
-
-    setPitchers(enriched);
     setLoading(false);
   };
 
-  const loadPitcherDetail = async (p) => {
+  useEffect(() => { load(year); }, [year]);
+
+  const loadDetail = async (p) => {
     if (!p.pid) return;
     setLoadingDetail(true);
     try {
-      const res = await fetch(`/api/pitcher?pid=${p.pid}&year=2026`);
+      const res = await fetch(`/api/pitcher?pid=${p.pid}&year=${year}`);
       const data = await res.json();
       setPitcherDetail(data);
     } catch(e) {}
@@ -838,123 +804,105 @@ function PitcherTab() {
   const sorted = [...pitchers].sort((a,b) => {
     const av = a[sortKey], bv = b[sortKey];
     if (av == null && bv == null) return 0;
-    if (av == null) return 1;
-    if (bv == null) return -1;
-    if (typeof av === "string") return sortDir * av.localeCompare(bv);
+    if (av == null) return 1; if (bv == null) return -1;
+    if (typeof av === 'string') return sortDir * av.localeCompare(bv);
     return sortDir * (bv - av);
   });
-
-  const PITCH_COLORS = {
-    "FF":"#ff4020","SI":"#ff8020","FC":"#f5a623",
-    "SL":"#38b8f2","SV":"#38b8f2","ST":"#38b8f2",
-    "CU":"#f5a623","KC":"#f5a623","CH":"#27c97a","FS":"#27c97a",
-  };
 
   return <div>
     <div className="hrow">
       <div className="section-header">
-        <div className="section-title">⚾ Today's Pitchers</div>
-        <div className="section-sub">Starting pitchers · sorted worst to best matchup for batters · based on 2026 stats</div>
+        <div className="section-title">⚾ Pitcher Stats</div>
+        <div className="section-sub">Starting pitchers · sorted by HR/9 (highest = most hittable) · click to expand pitch mix</div>
+      </div>
+      {/* Year selector */}
+      <div style={{display:'flex',gap:6,alignItems:'center'}}>
+        {['2024','2025','2026'].map(yr=>(
+          <button key={yr}
+            className={`chip ${year===yr?'active':''}`}
+            onClick={()=>setYear(yr)}
+            style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13}}>
+            {yr}
+          </button>
+        ))}
       </div>
     </div>
 
-    <div className="note" style={{marginBottom:12}}>
-      ℹ️ Sorted by <strong>HR/9</strong> (highest = most hittable). Click any pitcher for full pitch mix.
-    </div>
-
     {loading
-      ? <div className="lw"><div className="sp"/><div className="lt">Loading today's starters…</div></div>
+      ? <div className="lw"><div className="sp"/><div className="lt">Loading {year} pitcher stats…</div></div>
       : sorted.length === 0
-        ? <div style={{padding:"40px",textAlign:"center",color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>
-            No confirmed starters yet. Check back closer to game time.
-          </div>
-        : <div className="tw-scroll"><div className="tw-scroll-inner"><table style={{width:"100%"}}>
+        ? <div style={{padding:'40px',textAlign:'center',color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>No pitcher data available for {year}.</div>
+        : <div className="tw-scroll"><div className="tw-scroll-inner"><table style={{width:'100%'}}>
             <thead><tr>
               <th style={{width:24}}>#</th>
               {[
-                {key:"gameTime",  label:"Time",    tip:"Game start ET"},
-                {key:"team",      label:"Team",    tip:"Pitcher's team"},
-                {key:"name",      label:"Pitcher", tip:"Starting pitcher"},
-                {key:"hand",      label:"Hand",    tip:"Throws L or R"},
-                {key:"vs",        label:"vs",      tip:"Opposing team"},
-                {key:"ip",        label:"IP",      tip:"Innings pitched this season"},
-                {key:"era",       label:"ERA",     tip:"Earned run average"},
-                {key:"whip",      label:"WHIP",    tip:"Walks + hits per inning"},
-                {key:"hr9",       label:"HR/9",    tip:"Home runs per 9 innings — higher = more hittable"},
-                {key:"hr",        label:"HR",      tip:"Home runs allowed"},
-                {key:"obp",       label:"OBP",     tip:"Opponent on-base %"},
-                {key:"avg",       label:"BAA",     tip:"Batting average against"},
-                {key:"k9",        label:"K/9",     tip:"Strikeouts per 9"},
-                {key:"bb9",       label:"BB/9",    tip:"Walks per 9"},
-                {key:"hits",      label:"H",       tip:"Hits allowed"},
+                {key:'name',  label:'Pitcher', tip:'Starting pitcher'},
+                {key:'team',  label:'Team',    tip:"Pitcher's team"},
+                {key:'hand',  label:'Hand',    tip:'Throws L or R'},
+                {key:'gs',    label:'GS',      tip:'Games started'},
+                {key:'ip',    label:'IP',      tip:'Innings pitched'},
+                {key:'era',   label:'ERA',     tip:'Earned run average'},
+                {key:'whip',  label:'WHIP',    tip:'Walks + hits per inning'},
+                {key:'hr9',   label:'HR/9',    tip:'Home runs per 9 innings — higher = more hittable'},
+                {key:'hr',    label:'HR',      tip:'Home runs allowed'},
+                {key:'obp',   label:'OBP',     tip:'Opponent on-base %'},
+                {key:'avg',   label:'BAA',     tip:'Batting average against'},
+                {key:'k9',    label:'K/9',     tip:'Strikeouts per 9'},
+                {key:'bb9',   label:'BB/9',    tip:'Walks per 9'},
+                {key:'hits',  label:'H',       tip:'Hits allowed'},
               ].map(c=>(
-                <th key={c.key} className={sortKey===c.key?"sk":""} onClick={()=>hs(c.key)} style={{cursor:"pointer"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:2}}>
+                <th key={c.key} className={sortKey===c.key?'sk':''} onClick={()=>hs(c.key)} style={{cursor:'pointer'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:2}}>
                     <Tip text={c.tip}><span>{c.label}</span></Tip>
-                    {sortKey===c.key&&<span style={{color:"var(--accent)"}}>{sortDir<0?"↓":"↑"}</span>}
+                    {sortKey===c.key&&<span style={{color:'var(--accent)'}}>{sortDir<0?'↓':'↑'}</span>}
                   </div>
                 </th>
               ))}
             </tr></thead>
             <tbody>
-              {sorted.map((p, i) => {
-                const isSelected = selPitcher?.name === p.name;
-                const hr9C = (p.hr9||0) >= 1.5 ? "hot" : (p.hr9||0) >= 1.0 ? "warm" : "avg";
+              {sorted.map((p,i)=>{
+                const isSelected = selPitcher?.pid === p.pid;
+                const hr9C = (p.hr9||0)>=1.5?'hot':(p.hr9||0)>=1.0?'warm':'avg';
                 return <>
-                  <tr key={p.name} className={isSelected?"ex":""} style={{cursor:"pointer"}}
-                    onClick={()=>{ setSelPitcher(isSelected?null:p); if(!isSelected){setPitcherDetail(null);loadPitcherDetail(p);} }}>
-                    <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:i<3?"var(--accent)":"var(--muted)"}}>{i+1}</span></td>
-                    <td><span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:"var(--muted)"}}>{p.gameTime}</span></td>
-                    <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,color:"var(--accent2)"}}>{p.team}</span></td>
-                    <td>
-                      <div className="pn" style={{fontSize:13}}>{p.name}</div>
-                    </td>
-                    <td><span style={{fontSize:10,fontFamily:"'DM Mono',monospace",padding:"2px 6px",borderRadius:4,background:p.hand==="LHP"?"rgba(56,184,242,.15)":"rgba(232,65,26,.1)",color:p.hand==="LHP"?"var(--ice)":"var(--accent)"}}>{p.hand}</span></td>
-                    <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,color:"var(--text)"}}>{p.vs}</span></td>
+                  <tr key={p.pid} className={isSelected?'ex':''} style={{cursor:'pointer'}}
+                    onClick={()=>{ setSelPitcher(isSelected?null:p); if(!isSelected){setPitcherDetail(null);loadDetail(p);} }}>
+                    <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:i<3?'var(--accent)':'var(--muted)'}}>{i+1}</span></td>
+                    <td><div className="pn" style={{fontSize:13}}>{p.name}</div></td>
+                    <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,color:'var(--accent2)'}}>{p.team}</span></td>
+                    <td><span style={{fontSize:10,fontFamily:"'DM Mono',monospace",padding:'2px 6px',borderRadius:4,background:p.hand==='LHP'?'rgba(56,184,242,.15)':'rgba(232,65,26,.1)',color:p.hand==='LHP'?'var(--ice)':'var(--accent)'}}>{p.hand}</span></td>
+                    <td><span className="sv avg">{p.gs}</span></td>
                     <td><span className="sv avg">{p.ip}</span></td>
-                    <td><span className={`sv ${parseFloat(p.era)>=5?"hot":parseFloat(p.era)>=4?"warm":"avg"}`}>{p.era}</span></td>
-                    <td><span className={`sv ${parseFloat(p.whip)>=1.4?"hot":parseFloat(p.whip)>=1.2?"warm":"avg"}`}>{p.whip}</span></td>
-                    <td><span className={`sv ${hr9C}`} style={{fontWeight:700}}>{p.hr9!=null?p.hr9.toFixed(2):"—"}</span></td>
-                    <td><span className={`sv ${p.hr>=3?"hot":p.hr>=1?"warm":"avg"}`}>{p.hr}</span></td>
-                    <td><span className={`sv ${parseFloat(p.obp)>=0.360?"hot":parseFloat(p.obp)>=0.320?"warm":"avg"}`}>{p.obp}</span></td>
-                    <td><span className={`sv ${parseFloat(p.avg)>=0.280?"hot":parseFloat(p.avg)>=0.250?"warm":"avg"}`}>{p.avg}</span></td>
-                    <td><span className={`sv ${parseFloat(p.k9)>=9?"good":parseFloat(p.k9)>=7?"avg":"cold"}`}>{p.k9}</span></td>
-                    <td><span className={`sv ${parseFloat(p.bb9)>=3.5?"hot":parseFloat(p.bb9)>=2.5?"warm":"avg"}`}>{p.bb9}</span></td>
+                    <td><span className={`sv ${parseFloat(p.era)>=5?'hot':parseFloat(p.era)>=4?'warm':'avg'}`}>{p.era}</span></td>
+                    <td><span className={`sv ${parseFloat(p.whip)>=1.4?'hot':parseFloat(p.whip)>=1.2?'warm':'avg'}`}>{p.whip}</span></td>
+                    <td><span className={`sv ${hr9C}`} style={{fontWeight:700}}>{p.hr9>0?p.hr9.toFixed(2):'—'}</span></td>
+                    <td><span className={`sv ${p.hr>=10?'hot':p.hr>=5?'warm':'avg'}`}>{p.hr}</span></td>
+                    <td><span className={`sv ${parseFloat(p.obp)>=0.360?'hot':parseFloat(p.obp)>=0.320?'warm':'avg'}`}>{p.obp}</span></td>
+                    <td><span className={`sv ${parseFloat(p.avg)>=0.280?'hot':parseFloat(p.avg)>=0.250?'warm':'avg'}`}>{p.avg}</span></td>
+                    <td><span className={`sv ${parseFloat(p.k9)>=9?'good':parseFloat(p.k9)>=7?'avg':'cold'}`}>{p.k9}</span></td>
+                    <td><span className={`sv ${parseFloat(p.bb9)>=3.5?'hot':parseFloat(p.bb9)>=2.5?'warm':'avg'}`}>{p.bb9}</span></td>
                     <td><span className="sv avg">{p.hits}</span></td>
                   </tr>
-                  {isSelected && <tr key={p.name+"-detail"} className="xr">
-                    <td colSpan={16} style={{padding:"14px 20px",background:"var(--surface2)"}}>
+                  {isSelected && <tr key={p.pid+'-detail'} className="xr">
+                    <td colSpan={15} style={{padding:'14px 20px',background:'var(--surface2)'}}>
                       {loadingDetail
-                        ? <div style={{display:"flex",alignItems:"center",gap:8,color:"var(--muted)",fontFamily:"'DM Mono',monospace",fontSize:11}}><div className="sp" style={{width:14,height:14,borderWidth:2}}/> Loading pitch mix…</div>
+                        ? <div style={{display:'flex',alignItems:'center',gap:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:11}}><div className="sp" style={{width:14,height:14,borderWidth:2}}/> Loading pitch mix…</div>
                         : pitcherDetail?.pitchMix?.length > 0
                           ? <div>
-                              <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>Pitch Arsenal — {p.name}</div>
-                              <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+                              <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1,marginBottom:10}}>Pitch Arsenal — {p.name} ({year})</div>
+                              <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
                                 {pitcherDetail.pitchMix.map(pitch=>(
-                                  <div key={pitch.name} style={{background:"var(--surface)",border:`1px solid ${pitch.color}40`,borderRadius:8,padding:"10px 14px",minWidth:130}}>
-                                    <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:pitch.color}}>{pitch.name}</div>
-                                    <div style={{fontFamily:"'DM Mono',monospace",fontSize:20,fontWeight:700,color:"var(--text)",margin:"4px 0"}}>{pitch.pct.toFixed(1)}%</div>
-                                    <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",display:"flex",flexDirection:"column",gap:2}}>
-                                      {pitch.velo>0&&<span>{pitch.velo} mph</span>}
-                                      {pitch.whiffPct>0&&<span>Whiff: {pitch.whiffPct.toFixed(1)}%</span>}
-                                      {pitch.xBA>0&&<span>xBA: .{Math.round(pitch.xBA*1000).toString().padStart(3,"0")}</span>}
+                                  <div key={pitch.name} style={{background:'var(--surface)',border:`1px solid ${pitch.color||'var(--border)'}40`,borderRadius:8,padding:'10px 14px',minWidth:120}}>
+                                    <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:pitch.color||'var(--text)'}}>{pitch.name}</div>
+                                    <div style={{fontFamily:"'DM Mono',monospace",fontSize:20,fontWeight:700,color:'var(--text)',margin:'4px 0'}}>{pitch.pct?.toFixed(1)}%</div>
+                                    <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
+                                      {pitch.velo>0&&<div>{pitch.velo} mph</div>}
+                                      {pitch.whiffPct>0&&<div>Whiff: {pitch.whiffPct.toFixed(1)}%</div>}
                                     </div>
                                   </div>
                                 ))}
                               </div>
                             </div>
-                          : <div style={{fontSize:11,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>
-                              No pitch arsenal data available yet for {p.name} this season.
-                              <div style={{marginTop:6,display:"flex",gap:8,flexWrap:"wrap"}}>
-                                {[p.hand==="LHP"?["4-Seam FB","#ff4020","~55%"]:["4-Seam FB","#ff4020","~60%"],
-                                  ["Slider","#38b8f2","~20%"],["Changeup","#27c97a","~15%"],["Curveball","#f5a623","~5%"]
-                                ].map(([n,c,pct])=>(
-                                  <div key={n} style={{padding:"6px 10px",borderRadius:6,border:`1px solid ${c}40`,background:`${c}10`,fontSize:10,fontFamily:"'DM Mono',monospace",color:c}}>
-                                    {n} <span style={{color:"var(--muted)"}}>{pct} est.</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
+                          : <div style={{color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:11}}>No pitch mix data available for {p.name} in {year}.</div>
                       }
                     </td>
                   </tr>}
@@ -965,6 +913,7 @@ function PitcherTab() {
     }
   </div>;
 }
+
 
 function MyPicksTab() {
   const picks = usePicks();
@@ -1013,13 +962,12 @@ function MyPicksTab() {
     </div>
     {pickList.length>0&&<div style={{display:"flex",justifyContent:"flex-end",gap:8,marginBottom:12}}>
       <button onClick={()=>{
-        // Export picks to CSV — Pick Emoji | Pick Type | Team | Batter Name
-        const rows = [["Pick","Pick Type","Team","Batter Name"]];
+        // Export picks to CSV — Pick Type, Team, Batter Name
+        const rows = [["Pick Type","Team","Batter Name"]];
         pickList.forEach(p=>{
           const cfg = PICK_TYPES[p.type];
-          const emoji    = cfg?.label?.split(" ")[0] || "—";
           const typeName = cfg?.label?.split(" ").slice(1).join(" ") || p.type;
-          rows.push([emoji, typeName, p.team||"—", p.name||"—"]);
+          rows.push([typeName, p.team||"—", p.name||"—"]);
         });
         const csv = rows.map(r=>r.map(c=>`"${c}"`).join(",")).join("\n");
         const blob = new Blob([csv],{type:"text/csv"});
@@ -1088,25 +1036,15 @@ function AtBatSlideIn() {
         // Flatten to at-bat level from game log
         const rows = games.slice(0,15).map(g => ({
           date: g.date?.slice(5) || "—",
-          // MLB gameLog: opponent has {id, name} but no abbreviation
-          // Use GLOBAL_PLAYER_TEAM_MAP or derive from team name
-          opp: (() => {
-            const opp = g.opponent;
-            if (!opp) return "—";
-            // Try abbreviation first (sometimes present)
-            if (opp.abbreviation) return opp.abbreviation;
-            // Try to find by team ID in TEAM_ID_TO_ABB
-            if (opp.id && TEAM_ID_TO_ABB[opp.id]) return TEAM_ID_TO_ABB[opp.id];
-            // Use short team name (e.g. "Yankees" → "NYY" via TEAM_IDS reverse)
-            const name = opp.name || opp.teamName || "";
-            const abbr = Object.entries(TEAM_IDS).find(([k,v]) =>
-              name.toLowerCase().includes(k.toLowerCase()) ||
-              name.split(" ").pop()?.toLowerCase() === k.toLowerCase()
-            )?.[0];
-            if (abbr) return abbr;
-            // Last resort: first 3 letters of last word
-            return name.split(" ").pop()?.slice(0,3).toUpperCase() || "—";
-          })(),
+          // MLB gameLog: opponent.id maps to TEAM_ID_TO_ABB
+          opp: TEAM_ID_TO_ABB[g.opponent?.id] ||
+               g.opponent?.abbreviation ||
+               (() => {
+                 const name = g.opponent?.name || "";
+                 const found = Object.entries(TEAM_IDS).find(([,v]) => v === g.opponent?.id);
+                 if (found) return found[0];
+                 return name.split(" ").pop()?.slice(0,3).toUpperCase() || "—";
+               })(),
           ab:   parseInt(g.stat?.atBats||0),
           hits: parseInt(g.stat?.hits||0),
           hr:   parseInt(g.stat?.homeRuns||0),
@@ -1657,7 +1595,7 @@ async function fetchPlayers(setL, setP, setE, silent=false) {
             const fromMap = GLOBAL_PLAYER_TEAM_MAP[id]?.name;
             return fromMap || combined || `Unknown ${id}`;
           })(),
-          team:         r.team || r.team_name_abbrev || '—',
+          team:         r.team || r.team_name_abbrev || GLOBAL_PLAYER_TEAM_MAP[r.pid]?.team || '—',
           // New atbats.js returns pre-calculated metrics from raw rows
           // Field names are direct — no leaderboard aliases needed
           avgEV:        r.avgEV        || parseFloat(r.exit_velocity_avg || r.avg_hit_speed || 0),
@@ -1721,7 +1659,7 @@ async function fetchPlayers(setL, setP, setE, silent=false) {
       const p = {
         pid,
         name,
-        team,
+        team: team && team !== '—' ? team : (GLOBAL_PLAYER_TEAM_MAP[pid]?.team || '—'),
         // ── Statcast metrics — read directly from API, no modification ──
         avgEV:        sc.avgEV        || 0,
         maxEV:        sc.maxEV        || 0,
@@ -2845,6 +2783,13 @@ function Top20Tab() {
       }));
       setWeatherCache(wCache);
 
+      // Wait for player cache if needed (fetchPlayers runs at App startup)
+      let waitMs = 0;
+      while (Object.keys(PLAYER_DATA_CACHE).length < 10 && waitMs < 8000) {
+        await new Promise(r => setTimeout(r, 500));
+        waitMs += 500;
+      }
+      console.log('[Top20] Player cache size:', Object.keys(PLAYER_DATA_CACHE).length);
       // Score players
       TOP20_CACHE.data = null;
       const top = await buildTop20(g, wCache);
@@ -4268,10 +4213,10 @@ function HRTrackerTab() {
     return true;
   });
   const sorted = [...filtered].sort((a,b) => {
-    // Always sort by chronoIndex as primary sort for "Time" key  
+    // Time sort: always use chronoIndex (reliable number), timeET is just for display
     if (sortKey === "timeET" || sortKey === "chronoIndex") {
       const av = a.chronoIndex ?? 0, bv = b.chronoIndex ?? 0;
-      return sortDir === -1 ? bv - av : av - bv; // -1=newest(highest chrono) first
+      return sortDir < 0 ? bv - av : av - bv; // default: -1 = newest (highest) first
     }
     const av = a[sortKey], bv = b[sortKey];
     if (av == null && bv == null) return 0;
@@ -4692,8 +4637,13 @@ function StatcastTab() {
 export default function App() {
   const [tab, setTab] = useState("top20");
   const [showPicksSlideout, setShowPicksSlideout] = useState(false);
-  // Load player→team map immediately at startup
-  useEffect(() => { loadGlobalPlayerMap(); }, []);
+  // Load player data at startup — populates PLAYER_DATA_CACHE for all tabs
+  useEffect(() => {
+    loadGlobalPlayerMap();
+    // Fetch player Statcast data — feeds Top20, BvP, Scouting, Liftoff
+    const noop = () => {};
+    fetchPlayers(noop, noop, noop, false);
+  }, []);
   return <>
     <style>{styles}</style>
     <div className="app">
