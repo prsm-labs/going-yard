@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const BUILD_TIMESTAMP = "2026-03-31 21:22 ET";
+const BUILD_TIMESTAMP = "2026-03-31 21:28 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -615,7 +615,7 @@ function genWindows(p) {
     const xbh       = Math.round(hits * 0.28);
     const tb        = hits + xbh + hr * 2;
     const abPerHR   = hr > 0 ? Math.round(atBats / hr * 10) / 10 : 99;
-    const abSinceHR = ri(3, 3, 15);
+    const abSinceHR = p.daysSinceHR != null ? Math.round(p.daysSinceHR * 3.8) : 99;
     const almostPct = flyBall > 0 ? Math.round(Math.min(flyBall * (avgEV >= T.EV_HH ? 0.45 : 0.3), 35) * 10) / 10 : 0;
     const avg = atBats > 0 ? parseFloat((hits / atBats).toFixed(3)) : 0;
     const wp = { ...p, avgEV, barrel, flyBall, launchAngle, pullAir, oSwing, hardHit, bbPct, kPct, bbkRatio: bbPct / Math.max(kPct, 1) };
