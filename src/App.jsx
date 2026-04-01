@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-01 16:54 ET";
+const BUILD_TIMESTAMP = "2026-04-01 19:15 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -92,7 +92,7 @@ const styles = `
   .rb.sp2 svg{animation:spin .8s linear infinite;}
   .div{font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;}
   .gg{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:11px;margin-bottom:6px;}
-  .gc{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;}
+  .gc{overflow:visible;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;}
   .gc:hover{border-color:rgba(232,65,26,.5);}
   .gc.exp{border-color:var(--accent);border-bottom-left-radius:0;border-bottom-right-radius:0;border-bottom:none;}
   .gc::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),var(--accent2));opacity:0;transition:opacity .2s;}
@@ -245,7 +245,7 @@ const styles = `
     .bvr{grid-template-columns:auto 1fr;}.h2h{display:none;}.pmg{grid-template-columns:repeat(2,1fr);}
     .tabs{overflow-x:auto;-webkit-overflow-scrolling:touch;flex-wrap:nowrap;padding:0 8px;}
     .tab{white-space:nowrap;flex-shrink:0;padding:10px 9px;font-size:10px;}
-    .gp,.gc{max-width:100%;overflow:hidden;}
+    .gp{overflow:hidden;}  /* table panel only — never clip .gc card header */
     .tw{overflow-x:auto;-webkit-overflow-scrolling:touch;}
     }
 `;
