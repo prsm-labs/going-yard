@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-01 19:41 ET";
+const BUILD_TIMESTAMP = "2026-04-01 19:53 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -4122,7 +4122,7 @@ function OnlyHomersTab() {
 }
 
 function LiveSportsTab() {
-  const [tried, setTried] = React.useState(false);
+  const [tried, setTried] = useState(false);
   return <div>
     <div className="section-header" style={{marginBottom:16}}>
       <div className="section-title">📺 Live Sports</div>
