@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-01 19:27 ET";
+const BUILD_TIMESTAMP = "2026-04-01 19:41 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -4192,45 +4192,38 @@ function PowerBITab() {
     : [];
 
   return <div>
+    {/* Header */}
     <div className="section-header" style={{marginBottom:16}}>
       <div className="section-title">📊 Analytics Dashboard</div>
       <div className="section-sub">Power BI · interactive analytics · full screen mode available</div>
     </div>
 
-    {/* Player Picker for Picks — browse Power BI and add players */}
-      borderRadius:10,
-      overflow:"hidden",
-      border:"1px solid var(--border)",
-      background:"var(--surface)",
-      position:"relative",
-      paddingBottom:"56.25%", // 16:9 aspect ratio
-      height:0,
+    {/* iframe — always first */}
+    <div style={{
+      borderRadius:10, overflow:"hidden",
+      border:"1px solid var(--border)", background:"var(--surface)",
+      position:"relative", paddingBottom:"56.25%", height:0,
     }}>
       <iframe
         title="Going Yard Analytics"
         src="https://app.powerbi.com/view?r=eyJrIjoiYTQzOGZmMWMtOWZmMy00Y2NhLWE1NWUtZDljZmFkYWFhODg0IiwidCI6IjgzOGY2MGI3LTc4NzYtNGEwZC1iM2MxLTg1Y2VlZWE1YmJhYiIsImMiOjF9"
         frameBorder="0"
         allowFullScreen
-        style={{
-          position:"absolute",
-          top:0, left:0,
-          width:"100%",
-          height:"100%",
-          border:"none",
-        }}
+        style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",border:"none"}}
       />
     </div>
+
+    {/* Open in Power BI button */}
     <div style={{marginTop:10,display:"flex",gap:8,justifyContent:"flex-end"}}>
-      <a
-        href="https://app.powerbi.com/view?r=eyJrIjoiYTQzOGZmMWMtOWZmMy00Y2NhLWE1NWUtZDljZmFkYWFhODg0IiwidCI6IjgzOGY2MGI3LTc4NzYtNGEwZC1iM2MxLTg1Y2VlZWE1YmJhYiIsImMiOjF9"
-        target="_blank"
-        rel="noopener noreferrer"
-        style={{display:"flex",alignItems:"center",gap:5,padding:"6px 12px",borderRadius:6,background:"var(--surface2)",border:"1px solid var(--border)",color:"var(--muted)",fontFamily:"'DM Mono',monospace",fontSize:11,textDecoration:"none",transition:"all .15s"}}
-      >
+      <a href="https://app.powerbi.com/view?r=eyJrIjoiYTQzOGZmMWMtOWZmMy00Y2NhLWE1NWUtZDljZmFkYWFhODg0IiwidCI6IjgzOGY2MGI3LTc4NzYtNGEwZC1iM2MxLTg1Y2VlZWE1YmJhYiIsImMiOjF9" target="_blank" rel="noopener noreferrer"
+        style={{display:"flex",alignItems:"center",gap:5,padding:"6px 12px",borderRadius:6,
+          background:"var(--surface2)",border:"1px solid var(--border)",
+          color:"var(--muted)",fontFamily:"'DM Mono',monospace",fontSize:11,textDecoration:"none"}}>
         ↗ Open in Power BI
       </a>
     </div>
-  </div>;
+
+    {/* Add to My Picks — at the bottom */}
     <div style={{marginTop:14,background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,padding:"12px 14px"}}>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:showPicker?10:0}}>
         <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,letterSpacing:1}}>🎯 Add to My Picks</span>
@@ -4246,9 +4239,7 @@ function PowerBITab() {
       {showPicker && <>
         <div style={{position:"relative",marginBottom:8}}>
           <input
-            autoFocus
-            type="text"
-            value={searchQ}
+            autoFocus type="text" value={searchQ}
             onChange={e=>setSearchQ(e.target.value)}
             placeholder="Search player or team… (e.g. DeLauter, CLE)"
             style={{width:"100%",padding:"8px 12px 8px 32px",background:"var(--surface2)",
@@ -4260,7 +4251,7 @@ function PowerBITab() {
             style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",
               background:"none",border:"none",color:"var(--muted)",cursor:"pointer",fontSize:13}}>✕</button>}
         </div>
-        {searchQ && filtered.length === 0 && <div style={{fontSize:11,color:"var(--muted)",fontFamily:"'DM Mono',monospace",padding:"8px 0"}}>No players found. Try a different name or team.</div>}
+        {searchQ && filtered.length === 0 && <div style={{fontSize:11,color:"var(--muted)",fontFamily:"'DM Mono',monospace",padding:"8px 0"}}>No players found.</div>}
         {filtered.length > 0 && <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:8}}>
           {filtered.map(p => {
             const key = String(p.pid);
@@ -4271,25 +4262,24 @@ function PowerBITab() {
               transition:"all .15s"}}>
               <div style={{width:30,height:30,borderRadius:"50%",background:"var(--surface)",
                 border:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"center",
-                fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:"var(--text)",flexShrink:0}}>
+                fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,flexShrink:0}}>
                 {ini(p.name)}
               </div>
               <div style={{flex:1,minWidth:0}}>
-                <div style={{fontWeight:600,fontSize:12,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{p.name}</div>
-                <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{(p.team && p.team!=='—' ? p.team : GLOBAL_PLAYER_TEAM_MAP[p.pid]?.team || '—')} · {p.grade?.grade||"—"}</div>
+                <div style={{fontWeight:600,fontSize:12,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}> {p.name}</div>
+                <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}> {getTeam(p.pid,p.team)} · {p.grade?.grade||"—"}</div>
               </div>
               <PickButton pid={p.pid} name={p.name} team={p.team}/>
             </div>;
           })}
         </div>}
         {!searchQ && <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",padding:"4px 0"}}>
-          Start typing a player name or team abbreviation to search {players.length} batters
+          Start typing to search {players.length} batters
         </div>}
       </>}
     </div>
-    <div style={{
+  </div>;
 }
-
 
 function DataStatusBadge() {
   const [status, setStatus] = useState("checking"); // checking | live | delayed | offline
