@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-01 13:43 ET";
+const BUILD_TIMESTAMP = "2026-04-01 14:56 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -710,10 +710,7 @@ function PickButton({pid,name,team}) {
         onClick={e=>e.stopPropagation()}>
         {Object.entries(PICK_TYPES).map(([type,cfg])=>(
           <button key={type} onClick={()=>{
-              const resolvedTeam = (team && team !== '—' && team !== '-')
-                ? team
-                : GLOBAL_PLAYER_TEAM_MAP[pid]?.team || PLAYER_DATA_CACHE[pid]?.team || team;
-              setPick(pid,name,resolvedTeam,type);setOpen(false);}}
+              setPick(pid,name,getTeam(pid,team),type);setOpen(false);}}
             style={{padding:"5px 9px",borderRadius:5,cursor:"pointer",textAlign:"left",
               fontFamily:"'DM Mono',monospace",fontSize:11,
               border:`1px solid ${current===type?cfg.color:"transparent"}`,
@@ -723,10 +720,7 @@ function PickButton({pid,name,team}) {
           </button>
         ))}
         {current&&<button onClick={()=>{
-              const resolvedTeam = (team && team !== '—' && team !== '-')
-                ? team
-                : GLOBAL_PLAYER_TEAM_MAP[pid]?.team || PLAYER_DATA_CACHE[pid]?.team || team;
-              setPick(pid,name,resolvedTeam,current);setOpen(false);}}
+              setPick(pid,name,getTeam(pid,team),current);setOpen(false);}}
           style={{padding:"5px 9px",borderRadius:5,cursor:"pointer",textAlign:"left",
             fontFamily:"'DM Mono',monospace",fontSize:11,border:"1px solid transparent",
             background:"transparent",color:"var(--muted)"}}>✕ Remove</button>}
@@ -961,7 +955,7 @@ function MyPicksTab() {
       <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>openAtBatSlide(p)}>
         <div style={{fontWeight:600,fontSize:13,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{p.name}</div>
         <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",display:"flex",gap:6,alignItems:"center"}}>
-          <span style={{color:"var(--accent2)",fontWeight:700}}>{p.team||"—"}</span>
+          <span style={{color:"var(--accent2)",fontWeight:700}}>{getTeam(p.pid, p.team)}</span>
           {p.grade?.grade && <span style={{color:"var(--muted)"}}>· {p.grade.grade}</span>}
         </div>
       </div>
@@ -1219,7 +1213,7 @@ function PicksSlideout({onClose}) {
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontWeight:600,fontSize:13,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{p.name}</div>
                   <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",display:"flex",gap:5}}>
-                    <span style={{color:"var(--accent2)",fontWeight:700}}>{p.team||"—"}</span>
+                    <span style={{color:"var(--accent2)",fontWeight:700}}>{getTeam(p.pid, p.team)}</span>
                   </div>
                 </div>
                 {/* Category switcher */}
@@ -1516,37 +1510,54 @@ async function loadTodayLineups() {
 async function loadGlobalPlayerMap() {
   if (GLOBAL_PLAYER_MAP_LOADED) return GLOBAL_PLAYER_TEAM_MAP;
   try {
-    // Fetch all active players — no gameType filter so we get everyone
-    const res = await fetch("https://statsapi.mlb.com/api/v1/sports/1/players?season=2026&sportId=1");
-    const data = await res.json();
-    for (const p of (data.people || [])) {
-      if (p.id && p.fullName) { // include all players for name lookup even without team
-        GLOBAL_PLAYER_TEAM_MAP[p.id] = {
-          team: p.currentTeam?.abbreviation || '—',
-          teamId: p.currentTeam?.id || 0,
-          name: p.fullName,
-          hand: p.batSide?.code || 'R',
-          pos:  p.primaryPosition?.abbreviation || p.primaryPosition?.code || '',
-        };
-      }
+    for (const season of ['2025', '2026']) {
+      try {
+        const res2 = await fetch(`https://statsapi.mlb.com/api/v1/sports/1/players?season=${season}&sportId=1`);
+        const d2 = await res2.json();
+        for (const p of (d2.people || [])) {
+          if (!p.id || !p.fullName) continue;
+          const ex = GLOBAL_PLAYER_TEAM_MAP[p.id] || {};
+          GLOBAL_PLAYER_TEAM_MAP[p.id] = {
+            team:   p.currentTeam?.abbreviation || ex.team || '',
+            teamId: p.currentTeam?.id || ex.teamId || 0,
+            name:   p.fullName,
+            hand:   p.batSide?.code || ex.hand || 'R',
+            pos:    p.primaryPosition?.abbreviation || p.primaryPosition?.code || ex.pos || '',
+          };
+        }
+      } catch(se) {}
     }
     GLOBAL_PLAYER_MAP_LOADED = true;
-    console.log("[Going Yard] Player map loaded:", Object.keys(GLOBAL_PLAYER_TEAM_MAP).length, "players");
-// Backfill any cached players missing team
-for (const [pidStr, player] of Object.entries(PLAYER_DATA_CACHE)) {
-  if (!player.team || player.team === '—' || player.team === '-') {
-    const mapped = GLOBAL_PLAYER_TEAM_MAP[parseInt(pidStr)]?.team;
-    if (mapped && mapped !== '—') player.team = mapped;
-  }
-}
+    console.log('[Going Yard] Player map loaded:', Object.keys(GLOBAL_PLAYER_TEAM_MAP).length);
+    // Backfill cached players missing team
+    for (const [pidStr, player] of Object.entries(PLAYER_DATA_CACHE)) {
+      if (!player.team || player.team === '—' || player.team === '-' || player.team === '') {
+        const m = GLOBAL_PLAYER_TEAM_MAP[parseInt(pidStr)]?.team;
+        if (m && m !== '—' && m !== '') player.team = m;
+      }
+    }
   } catch(e) {
-    console.warn("[Going Yard] Player map load failed:", e.message);
+    console.warn('[Going Yard] Player map failed:', e.message);
   }
   return GLOBAL_PLAYER_TEAM_MAP;
 }
 
 function getPlayerTeam(pid) {
   return GLOBAL_PLAYER_TEAM_MAP[pid]?.team || null;
+}
+
+// Resolve team name from all available sources — use everywhere instead of p.team directly
+function getTeam(pid, fallback) {
+  const id = parseInt(pid);
+  // Check cache first (fastest)
+  const cached = PLAYER_DATA_CACHE[id]?.team;
+  if (cached && cached !== '—' && cached !== '-') return cached;
+  // Check global map (loaded from MLB API)
+  const mapped = GLOBAL_PLAYER_TEAM_MAP[id]?.team;
+  if (mapped && mapped !== '—' && mapped !== '-') return mapped;
+  // Use whatever was passed as fallback
+  if (fallback && fallback !== '—' && fallback !== '-') return fallback;
+  return '—';
 }
 
 // Real days since last HR from MLB game log API
@@ -3184,7 +3195,7 @@ function ScoutingTab() {
             <div>
               <div className="pn">{p.name}</div>
               <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",display:"flex",gap:4,alignItems:"center",marginTop:1}}>
-                <span style={{color:"var(--accent2)",fontWeight:700,fontSize:11}}>{p.team&&p.team!=="—"?p.team:"—"}</span>
+                <span style={{color:"var(--accent2)",fontWeight:700,fontSize:11}}>{getTeam(p.pid, p.team)}</span>
                 {p.lineupStatus==="confirmed"&&<span style={{fontSize:9,color:"var(--green)"}}>✅</span>}
                 {(!p.lineupStatus||p.lineupStatus==="today")&&p.team&&p.team!=="—"&&<span style={{fontSize:9,color:"var(--muted)"}}>❓</span>}
               </div>
@@ -4291,7 +4302,7 @@ function StatcastTab() {
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontWeight:600,fontSize:12,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{p.name}</div>
                 <div style={{fontSize:9,fontFamily:"'DM Mono',monospace",display:"flex",gap:5}}>
-                  <span style={{color:"var(--accent2)",fontWeight:700}}>{p.team||"—"}</span>
+                  <span style={{color:"var(--accent2)",fontWeight:700}}>{getTeam(p.pid, p.team)}</span>
                   <span style={{color:"var(--muted)"}}>· {p.grade?.grade||"—"}</span>
                 </div>
               </div>
