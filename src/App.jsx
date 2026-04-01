@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-01 12:19 ET";
+const BUILD_TIMESTAMP = "2026-04-01 12:34 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -4111,41 +4111,42 @@ function WeatherTab() {
   const [loading,  setLoading]  = useState(true);
   const [lastRefresh, setLastRefresh] = useState(null);
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      // Fetch today's schedule
-      const g = await new Promise((resolve) => {
-        const t = setTimeout(() => resolve([]), 8000);
-        fetchGames(
-          () => {},
-          (games) => { clearTimeout(t); resolve(games); },
-          () => { clearTimeout(t); resolve([]); }
-        );
-      });
-      setGames(g);
+  // Keep games in a ref so weather fetch can see them
+  const gamesRef = useRef([]);
 
-      // Fetch weather for every home team (weather applies to both teams)
-      const wMap = {};
-      await Promise.all(g.map(async (game) => {
-        const homeTeam = game.home?.abbr;
-        if (!homeTeam) return;
-        try {
-          const w = await fetchWeather(homeTeam);
-          if (w) {
-            wMap[homeTeam]          = w;
-            wMap[game.away?.abbr]   = w; // same ballpark
-          }
-        } catch(e) {}
-      }));
-      setWeather(wMap);
-      setLastRefresh(new Date().toLocaleTimeString('en-US',{
-        hour:'numeric', minute:'2-digit', timeZone:'America/New_York'
-      }));
-    } catch(e) {
-      console.warn('[WeatherTab]', e.message);
-    }
+  const loadWeather = async (gamesList) => {
+    if (!gamesList || gamesList.length === 0) return;
+    const wMap = {};
+    await Promise.all(gamesList.map(async (game) => {
+      const homeTeam = game.home?.abbr;
+      if (!homeTeam || homeTeam === '???') return;
+      try {
+        const w = await fetchWeather(homeTeam);
+        if (w) {
+          wMap[homeTeam] = w;
+          if (game.away?.abbr && game.away.abbr !== '???') wMap[game.away.abbr] = w;
+        }
+      } catch(e) {}
+    }));
+    setWeather(wMap);
+    setLastRefresh(new Date().toLocaleTimeString('en-US',{
+      hour:'numeric', minute:'2-digit', timeZone:'America/New_York'
+    }));
     setLoading(false);
+  };
+
+  const handleGames = (gamesList) => {
+    const valid = (gamesList || []).filter(g => g.home?.abbr && g.home.abbr !== '???');
+    gamesRef.current = valid;
+    setGames(valid);
+    loadWeather(valid);
+  };
+
+  const load = () => {
+    setLoading(true);
+    setGames([]);
+    setWeather({});
+    fetchGames(() => {}, handleGames, () => { setLoading(false); });
   };
 
   useEffect(() => { load(); }, []);
@@ -4460,7 +4461,7 @@ export default function App() {
         {tab==="weather"  && <WeatherTab/>}
         {tab==="live"     && <LiveTab/>}
         {tab==="picks"    && <MyPicksTab/>}
-        {tab==="powerbi"  && <PowerBITab/>}
+        <div style={{display:tab==="powerbi"?"block":"none"}}><PowerBITab/></div>
         {tab==="statcast" && <StatcastTab/>}
         <div style={{display:tab==="homeruns"?"block":"none"}}><HRTrackerTab/></div>
         <div style={{display:tab==="onlyhomers"?"block":"none"}}><OnlyHomersTab/></div>
