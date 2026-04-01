@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-01 13:00 ET";
+const BUILD_TIMESTAMP = "2026-04-01 13:43 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -709,7 +709,11 @@ function PickButton({pid,name,team}) {
         display:"flex",flexDirection:"column",gap:3,minWidth:130,boxShadow:"0 8px 24px rgba(0,0,0,.5)"}}
         onClick={e=>e.stopPropagation()}>
         {Object.entries(PICK_TYPES).map(([type,cfg])=>(
-          <button key={type} onClick={()=>{setPick(pid,name,team,type);setOpen(false);}}
+          <button key={type} onClick={()=>{
+              const resolvedTeam = (team && team !== '—' && team !== '-')
+                ? team
+                : GLOBAL_PLAYER_TEAM_MAP[pid]?.team || PLAYER_DATA_CACHE[pid]?.team || team;
+              setPick(pid,name,resolvedTeam,type);setOpen(false);}}
             style={{padding:"5px 9px",borderRadius:5,cursor:"pointer",textAlign:"left",
               fontFamily:"'DM Mono',monospace",fontSize:11,
               border:`1px solid ${current===type?cfg.color:"transparent"}`,
@@ -718,7 +722,11 @@ function PickButton({pid,name,team}) {
             {cfg.label}
           </button>
         ))}
-        {current&&<button onClick={()=>{setPick(pid,name,team,current);setOpen(false);}}
+        {current&&<button onClick={()=>{
+              const resolvedTeam = (team && team !== '—' && team !== '-')
+                ? team
+                : GLOBAL_PLAYER_TEAM_MAP[pid]?.team || PLAYER_DATA_CACHE[pid]?.team || team;
+              setPick(pid,name,resolvedTeam,current);setOpen(false);}}
           style={{padding:"5px 9px",borderRadius:5,cursor:"pointer",textAlign:"left",
             fontFamily:"'DM Mono',monospace",fontSize:11,border:"1px solid transparent",
             background:"transparent",color:"var(--muted)"}}>✕ Remove</button>}
@@ -1524,6 +1532,13 @@ async function loadGlobalPlayerMap() {
     }
     GLOBAL_PLAYER_MAP_LOADED = true;
     console.log("[Going Yard] Player map loaded:", Object.keys(GLOBAL_PLAYER_TEAM_MAP).length, "players");
+// Backfill any cached players missing team
+for (const [pidStr, player] of Object.entries(PLAYER_DATA_CACHE)) {
+  if (!player.team || player.team === '—' || player.team === '-') {
+    const mapped = GLOBAL_PLAYER_TEAM_MAP[parseInt(pidStr)]?.team;
+    if (mapped && mapped !== '—') player.team = mapped;
+  }
+}
   } catch(e) {
     console.warn("[Going Yard] Player map load failed:", e.message);
   }
@@ -1640,7 +1655,7 @@ async function fetchPlayers(setL, setP, setE, silent=false) {
             const fromMap = GLOBAL_PLAYER_TEAM_MAP[id]?.name;
             return fromMap || combined || `Unknown ${id}`;
           })(),
-          team:         r.team || r.team_name_abbrev || GLOBAL_PLAYER_TEAM_MAP[r.pid]?.team || '—',
+          team:         (() => { const t = r.team || r.team_name_abbrev || GLOBAL_PLAYER_TEAM_MAP[r.pid]?.team || ''; return (t && t !== '—') ? t : '—'; })(),
           // New atbats.js returns pre-calculated metrics from raw rows
           // Field names are direct — no leaderboard aliases needed
           avgEV:        r.avgEV        || parseFloat(r.exit_velocity_avg || r.avg_hit_speed || 0),
@@ -1832,7 +1847,14 @@ async function fetchPlayers(setL, setP, setE, silent=false) {
     const sorted = mapped.sort((a,b) => (b.os||0)-(a.os||0));
     if (sorted.length > 0) {
       PLAYER_CACHE_DATE = Date.now(); // timestamp for 3-hour TTL
-      sorted.forEach(p => cachePlayer(p));
+      sorted.forEach(p => {
+  // Enrich team from global map if still missing
+  if (!p.team || p.team === '—' || p.team === '-') {
+    const mapped = GLOBAL_PLAYER_TEAM_MAP[p.pid]?.team;
+    if (mapped && mapped !== '—') p.team = mapped;
+  }
+  cachePlayer(p);
+});
       setP(sorted);
       console.log('[Players] Done. Top player:', sorted[0]?.name, 'OS:', sorted[0]?.os, 'EV:', sorted[0]?.avgEV);
     } else {
@@ -4128,7 +4150,7 @@ function PowerBITab() {
               </div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontWeight:600,fontSize:12,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{p.name}</div>
-                <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{p.team} · {p.grade?.grade||"—"}</div>
+                <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{(p.team && p.team!=='—' ? p.team : GLOBAL_PLAYER_TEAM_MAP[p.pid]?.team || '—')} · {p.grade?.grade||"—"}</div>
               </div>
               <PickButton pid={p.pid} name={p.name} team={p.team}/>
             </div>;
