@@ -20,7 +20,7 @@ export default async function handler(req, res) {
     const boxData = await boxRes.json();
 
     // Parse live feed for Statcast hitData per batter
-    // Returns map: batterId → { evs, las, distances, hardHits, barrels }
+    // Returns map: batterId → { evs, las, distances, hardHits, barrels, atBats[] }
     const statcastByBatter = {};
 
     if (liveRes.ok) {
@@ -28,38 +28,50 @@ export default async function handler(req, res) {
       const plays = liveData?.liveData?.plays?.allPlays || [];
 
       for (const play of plays) {
-        const batterId = play.matchup?.batter?.id;
+        const batterId  = play.matchup?.batter?.id;
+        const pitcherId = play.matchup?.pitcher?.id;
+        const pitcherName = play.matchup?.pitcher?.fullName || null;
         if (!batterId) continue;
 
         if (!statcastByBatter[batterId]) {
           statcastByBatter[batterId] = {
             evs: [], las: [], distances: [],
-            hardHits: 0, barrels: 0
+            hardHits: 0, barrels: 0,
+            atBats: [],   // per-AB detail rows
           };
         }
 
         const sc = statcastByBatter[batterId];
 
-        // Each play has playEvents — find the terminal batted ball event
+        // Result from play outcome
+        const result = play.result?.event || play.result?.description || null;
+        const inning = play.about?.inning || null;
+        const halfInning = play.about?.halfInning || null;
+
+        let ev = null, la = null, dist = null, pitchType = null;
+
+        // Each play has playEvents — find the terminal batted ball / last pitch event
         for (const evt of (play.playEvents || [])) {
+          // Capture last pitch type thrown
+          if (evt.details?.type?.code) {
+            pitchType = evt.details.type.description || evt.details.type.code;
+          }
+
           const hd = evt.hitData;
-          if (!hd?.launchSpeed) continue; // only batted balls have hitData
+          if (!hd?.launchSpeed) continue;
 
-          const ev   = parseFloat(hd.launchSpeed   || 0);
-          const la   = parseFloat(hd.launchAngle   || 0);
-          const dist = parseFloat(hd.totalDistance || 0);
+          ev   = parseFloat(hd.launchSpeed   || 0) || null;
+          la   = parseFloat(hd.launchAngle   || 0);
+          dist = parseFloat(hd.totalDistance || 0) || null;
 
-          if (ev <= 0) continue;
+          if (!ev || ev <= 0) { ev = null; continue; }
 
           sc.evs.push(ev);
           sc.las.push(la);
           if (dist > 0) sc.distances.push(dist);
 
-          // Hard Hit: ≥ 95 mph per Statcast/Baseball Savant definition
           if (ev >= 95) sc.hardHits++;
 
-          // Barrel: official MLB Statcast barrel zones
-          // EV ≥ 98 + LA 26-30°, expanding as EV increases
           const barrel =
             (ev >= 116) ||
             (ev >= 110 && la >= 18 && la <= 42) ||
@@ -70,16 +82,25 @@ export default async function handler(req, res) {
             (ev >= 98  && la >= 26 && la <= 30);
           if (barrel) sc.barrels++;
         }
+
+        // Only log at-bats that have a result (not walks-mid-AB etc.)
+        if (result) {
+          sc.atBats.push({
+            result,
+            inning,
+            halfInning,
+            pitcherName,
+            pitchType,
+            ev:   ev   ? Math.round(ev * 10) / 10 : null,
+            la:   ev   ? Math.round(la * 10) / 10 : null,
+            dist: dist ? Math.round(dist)          : null,
+          });
+        }
       }
     }
 
-    console.log(`[Boxscore] gamePk=${gamePk} | Statcast batters with data: ${Object.keys(statcastByBatter).length}`);
-    if (Object.keys(statcastByBatter).length > 0) {
-      const sample = Object.entries(statcastByBatter)[0];
-      console.log(`[Boxscore] Sample batter ${sample[0]}:`, JSON.stringify(sample[1]));
-    }
+    console.log(`[Boxscore] gamePk=${gamePk} | Statcast batters: ${Object.keys(statcastByBatter).length}`);
 
-    // Attach statcast data to the response
     res.status(200).json({
       ...boxData,
       statcastByBatter,

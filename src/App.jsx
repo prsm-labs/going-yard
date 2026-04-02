@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-01 20:30 ET";
+const BUILD_TIMESTAMP = "2026-04-02 16:03 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -2068,6 +2068,7 @@ async function fetchLiveBatters(gamePk) {
           pullAirPct:      cachedP?.pullAir  || 0,
           flyBallPct:      cachedP?.flyBall  || 0,
           xwoba:           cachedP?.xwoba    || 0,
+          atBats:          live?.atBats      || [],
         });
       }
     }
@@ -2180,6 +2181,8 @@ async function fetchLiftoffBatters(game) {
           homeHR: hr > 0 ? (hr / 162) * 1.05 : 0.04,
           awayHR: hr > 0 ? (hr / 162) * 0.95 : 0.03,
           pos: p?.position?.abbreviation || cachedP?.pos || '',
+          avgDist: cachedP?.avgDist || 0,
+          atBats: [],
         };
         b.liftoffScore = calcLS(b);
         b.verdict = getLV(b.liftoffScore);
@@ -2464,6 +2467,71 @@ function XRow({b}) {
       {b.avgEV < T.EV_HH && <span className="stag neg">⬇ Low EV</span>}
       {!inZ && <span className="stag neg">✗ Wrong Angle</span>}
     </div>
+
+    {/* At-bat log table */}
+    {(b.atBats||[]).length > 0 && <div style={{marginTop:10}}>
+      <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",
+        textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>
+        Today's At-Bats
+      </div>
+      <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
+        <table style={{width:"100%",minWidth:420,borderCollapse:"collapse",fontSize:11}}>
+          <thead>
+            <tr style={{borderBottom:"1px solid var(--border)"}}>
+              {["Inn","Result","EV","Angle","Dist","Pitch","Pitcher"].map(h=>(
+                <th key={h} style={{padding:"4px 8px",textAlign:"left",fontSize:9,
+                  color:"var(--muted)",fontFamily:"'DM Mono',monospace",
+                  textTransform:"uppercase",letterSpacing:.5,whiteSpace:"nowrap"}}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {(b.atBats||[]).map((ab,i)=>{
+              const evColor = (ab.ev||0)>=103?"#ff4020":(ab.ev||0)>=95?"#ff8020":(ab.ev||0)>=90?"#ffc840":"var(--text)";
+              const distColor = (ab.dist||0)>=400?"#ff4020":(ab.dist||0)>=350?"#ff8020":(ab.dist||0)>=300?"#ffc840":"var(--text)";
+              const isGoodResult = /home_run|double|triple|single/i.test(ab.result||"");
+              const isOut = /out|grounded|fly|lined|popped|struck/i.test(ab.result||"");
+              return <tr key={i} style={{borderBottom:"1px solid rgba(255,255,255,.04)",
+                background:i%2===0?"rgba(255,255,255,.01)":"transparent"}}>
+                <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",
+                  color:"var(--muted)",whiteSpace:"nowrap",fontSize:10}}>
+                  {ab.halfInning==="top"?"▲":"▼"}{ab.inning||"—"}
+                </td>
+                <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",
+                  color:isGoodResult?"#27c97a":isOut?"var(--muted)":"var(--text)",
+                  fontWeight:isGoodResult?700:400,maxWidth:140,overflow:"hidden",
+                  textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                  {ab.result||"—"}
+                </td>
+                <td style={{padding:"5px 8px",fontFamily:"'Oswald',sans-serif",
+                  fontWeight:700,fontSize:13,color:evColor,whiteSpace:"nowrap"}}>
+                  {ab.ev ? `${ab.ev}` : "—"}
+                  {ab.ev && <span style={{fontSize:9,color:"var(--muted)",fontWeight:400}}> mph</span>}
+                </td>
+                <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",
+                  color:ab.la>=25&&ab.la<=35?"#27c97a":"var(--text)",whiteSpace:"nowrap"}}>
+                  {ab.la!=null && ab.ev ? `${ab.la}°` : "—"}
+                </td>
+                <td style={{padding:"5px 8px",fontFamily:"'Oswald',sans-serif",
+                  fontWeight:700,fontSize:13,color:distColor,whiteSpace:"nowrap"}}>
+                  {ab.dist ? `${ab.dist}ft` : "—"}
+                  {(ab.dist||0)>=300 && <span style={{marginLeft:3}}>🔥</span>}
+                </td>
+                <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",
+                  color:"var(--muted)",whiteSpace:"nowrap",fontSize:10}}>
+                  {ab.pitchType||"—"}
+                </td>
+                <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",
+                  color:"var(--muted)",whiteSpace:"nowrap",fontSize:10,
+                  maxWidth:120,overflow:"hidden",textOverflow:"ellipsis"}}>
+                  {ab.pitcherName||"—"}
+                </td>
+              </tr>;
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>}
   </div>;
 }
 
