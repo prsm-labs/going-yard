@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-01 19:53 ET";
+const BUILD_TIMESTAMP = "2026-04-01 20:30 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -4729,7 +4729,7 @@ export default function App() {
     {key:"powerbi",  label:"📊 Analytics"},
     {key:"onlyhomers",label:"⚾ Only Homers"},
     {key:"statcast", label:"📡 Statcast"},
-    {key:"livesports",label:"📺 Live Sports"},
+    {key:"livesports",label:"📺 Live Sports",external:"https://thetvapp.to"},
     {key:"picks",    label:"🎯 My Picks"},
   ];
 
@@ -4753,11 +4753,17 @@ export default function App() {
       <HRTicker onHRClick={()=>setTab("homeruns")}/>
       <nav className="tabs">
         {NAV.map(n=>(
-          <button key={n.key} className={`tab ${tab===n.key?"active":""}`}
-            onClick={()=>setTab(n.key)}
-            style={{color:tab===n.key?"var(--accent)":undefined,fontWeight:tab===n.key?700:400}}>
-            {n.label}
-          </button>
+          n.external
+            ? <button key={n.key} className="tab"
+                onClick={()=>window.open(n.external,"_blank","noopener,noreferrer")}
+                style={{color:"var(--muted)",fontWeight:400,display:"flex",alignItems:"center",gap:4}}>
+                {n.label} <span style={{fontSize:9,opacity:.6}}>↗</span>
+              </button>
+            : <button key={n.key} className={`tab ${tab===n.key?"active":""}`}
+                onClick={()=>setTab(n.key)}
+                style={{color:tab===n.key?"var(--accent)":undefined,fontWeight:tab===n.key?700:400}}>
+                {n.label}
+              </button>
         ))}
       </nav>
       <main className="content">
@@ -4766,7 +4772,6 @@ export default function App() {
         {tab==="picks"    && <MyPicksTab/>}
         <div style={{display:tab==="powerbi"?"block":"none"}}><PowerBITab/></div>
         <div style={{display:tab==="statcast"?"block":"none"}}><StatcastTab/></div>
-        <div style={{display:tab==="livesports"?"block":"none"}}><LiveSportsTab/></div>
         <div style={{display:tab==="homeruns"?"block":"none"}}><HRTrackerTab/></div>
         <div style={{display:tab==="onlyhomers"?"block":"none"}}><OnlyHomersTab/></div>
       </main>
