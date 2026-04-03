@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-03 19:09 ET";
+const BUILD_TIMESTAMP = "2026-04-03 19:12 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -2933,6 +2933,7 @@ function RefBtn({refreshing, onClick}) {
 function HeatingUpSlideout({ games, onClose }) {
   const [batters, setBatters] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState(null);
   // Only live games — "heating up" means RIGHT NOW, not season potential
   const liveGames = (games||[]).filter(g => g.status==='Live');
 
