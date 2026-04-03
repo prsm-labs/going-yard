@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-02 16:37 ET";
+const BUILD_TIMESTAMP = "2026-04-02 20:39 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -2453,13 +2453,13 @@ function XRow({b}) {
       <div className="xb"><div className="xbl">Avg EV Today</div><div className="xbv" style={{color:ec}}>{b.avgEV.toFixed(1)}</div><div className="xbs" style={{color:evUp?"var(--green)":"var(--ice)"}}>{evUp?"▲":"▼"} vs L7 ({(b.recentAvgEV??88).toFixed(1)})</div></div>
       <div className="xb"><div className="xbl">Launch Angle</div><div className="xbv" style={{color:inZ?"var(--green)":"var(--muted)"}}>{b.launchAngle.toFixed(1)}°</div><div className="xbs" style={{color:inZ?"var(--green)":"var(--muted)"}}>{zl??"Outside HR zone"}</div></div>
       <div className="xb"><div className="xbl">Hard Hits 95+</div><div className="xbv" style={{color:b.hardHits>=2?"#ff8020":b.hardHits===1?"#ffc840":"var(--muted)"}}>{b.hardHits}</div><div className="xbs" style={{color:"var(--muted)"}}>this game</div></div>
-      <div className="xb"><div className="xbl">Barrel% L7</div><div className="xbv" style={{color:(b.recentBarrel??0)>=T.BAR_EL?"#ff4020":"var(--text)"}}>{(b.recentBarrel??0).toFixed(1)}%</div><div className="xbs" style={{color:"var(--muted)"}}>season: {(b.barrel??0).toFixed(1)}%</div></div>
-      <div className="xb"><div className="xbl">Hard Hit% L7</div><div className="xbv" style={{color:(b.recentHardHit??0)>=50?"#ff8020":"var(--text)"}}>{(b.recentHardHit??0).toFixed(1)}%</div><div className="xbs" style={{color:"var(--muted)"}}>season: {(b.hardHit??0).toFixed(1)}%</div></div>
-      <div className="xb"><div className="xbl">Pull Air%</div><div className="xbv" style={{color:(b.pullAirPct??0)>=18?"#ff8020":"var(--text)"}}>{(b.pullAirPct??0).toFixed(0)}%</div><div className="xbs" style={{color:"var(--muted)"}}>HR zone intent</div></div>
+      <div className="xb"><div className="xbl">Barrel%</div><div className="xbv" style={{color:(b.recentBarrel??b.barrel??0)>=T.BAR_EL?"#ff4020":(b.recentBarrel??b.barrel??0)>=8?"#ff8020":"var(--text)"}}>{((b.recentBarrel??0)>0?(b.recentBarrel??0):(b.barrel??0)).toFixed(1)}%</div><div className="xbs" style={{color:"var(--muted)"}}>{(b.recentBarrel??0)>0?"L7":"season"}</div></div>
+      <div className="xb"><div className="xbl">Hard Hit%</div><div className="xbv" style={{color:(b.recentHardHit??b.hardHit??0)>=50?"#ff4020":(b.recentHardHit??b.hardHit??0)>=40?"#ff8020":"var(--text)"}}>{((b.recentHardHit??0)>0?(b.recentHardHit??0):(b.hardHit??0)).toFixed(1)}%</div><div className="xbs" style={{color:"var(--muted)"}}>{(b.recentHardHit??0)>0?"L7":"season"}</div></div>
+      <div className="xb"><div className="xbl">Pull Air%</div><div className="xbv" style={{color:(b.pullAirPct??b.pullAir??0)>=25?"#ff8020":(b.pullAirPct??b.pullAir??0)>=18?"#ffc840":"var(--text)"}}>{(b.pullAirPct??b.pullAir??0).toFixed(1)}%</div><div className="xbs" style={{color:"var(--muted)"}}>HR zone intent</div></div>
     </div>
     <div style={{marginBottom:4,fontSize:9,color:"var(--muted)",fontFamily:"DM Mono,monospace",textTransform:"uppercase",letterSpacing:1}}>Today vs L7</div>
     <CBar label="Exit Velo" tv={b.avgEV} l7={b.recentAvgEV??88} max={112} col={ec}/>
-    <CBar label="Hard Hit%" tv={b.hardHits*20} l7={b.recentHardHit??0} max={80} col="#ff8020"/>
+    <CBar label="Hard Hit%" tv={(b.recentHardHit??0)>0?(b.recentHardHit??0):(b.hardHit??0)} l7={(b.recentHardHit??0)>0?(b.recentHardHit??0):(b.hardHit??0)} max={80} col="#ff8020"/>
     <div className="stags">
       {inZ && <span className="stag pos">✓ HR Zone</span>}
       {b.avgEV >= T.EV_HH && <span className="stag fire">⚡ 95+ MPH</span>}
@@ -2549,9 +2549,9 @@ function LRow({b, rank}) {
       </div>
     </div>
     <div className="lmini">
-      <div className="lms"><div className="lmsv" style={{color:(b.recentBarrel??0)>=12?"#ff8020":"var(--text)"}}>{(b.recentBarrel??0).toFixed(0)}%</div><div className="lmsl">Barrel L7</div></div>
+      <div className="lms"><div className="lmsv" style={{color:((b.recentBarrel??0)>0?(b.recentBarrel??0):(b.barrel??0))>=12?"#ff8020":"var(--text)"}}>{((b.recentBarrel??0)>0?(b.recentBarrel??0):(b.barrel??0)).toFixed(0)}%</div><div className="lmsl">Barrel L7</div></div>
       <div className="lms"><div className="lmsv" style={{color:(b.recentAvgEV??0)>=T.EV_HH?"#ff8020":"var(--text)"}}>{(b.recentAvgEV??0).toFixed(0)}</div><div className="lmsl">EV L7</div></div>
-      <div className="lms"><div className="lmsv" style={{color:b.daysSinceHR>=4&&b.daysSinceHR<=10?"#ffc840":"var(--text)"}}>{b.daysSinceHR}d</div><div className="lmsl">Since HR</div></div>
+      <div className="lms"><div className="lmsv" style={{color:b.daysSinceHR>=4&&b.daysSinceHR<=10?"#ffc840":"var(--text)"}}>{b.daysSinceHR!=null?`${b.daysSinceHR}d`:"—"}</div><div className="lmsl">Since HR</div></div>
     </div>
   </div>;
 }
