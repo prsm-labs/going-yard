@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-03 13:12 ET";
+const BUILD_TIMESTAMP = "2026-04-03 13:21 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -2520,7 +2520,39 @@ function XRow({b}) {
       {!inZ && <span className="stag neg">✗ Wrong Angle</span>}
     </div>
 
-    {/* At-bat log table */}
+    {/* Box score summary */}
+    {(b.ab > 0) && <div style={{
+      display:'flex',gap:0,marginTop:10,marginBottom:8,
+      border:'1px solid var(--border)',borderRadius:8,overflow:'hidden'
+    }}>
+      {[
+        {label:'AB', val:b.ab,         color:'var(--text)'},
+        {label:'H',  val:b.hits,       color:(b.hits||0)>0?'#27c97a':'var(--text)'},
+        {label:'HR', val:b.hr,         color:(b.hr||0)>0?'var(--accent)':'var(--text)'},
+        {label:'R',  val:b.runs??0,    color:(b.runs||0)>0?'#27c97a':'var(--text)'},
+        {label:'TB', val:b.totalBases??0,color:(b.totalBases||0)>=4?'var(--accent)':(b.totalBases||0)>=2?'#ff8020':'var(--text)'},
+        {label:'BB', val:b.bb??0,      color:(b.bb||0)>0?'#38b8f2':'var(--text)'},
+        {label:'K',  val:b.so??0,      color:(b.so||0)>=2?'#38b8f2':'var(--text)'},
+      ].map((s,i,arr) => (
+        <div key={s.label} style={{
+          flex:1,textAlign:'center',padding:'6px 4px',
+          background:'rgba(255,255,255,.02)',
+          borderRight:i<arr.length-1?'1px solid var(--border)':'none',
+        }}>
+          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,
+            fontSize:15,color:s.color,lineHeight:1}}>
+            {s.val}
+          </div>
+          <div style={{fontSize:8,color:'var(--muted)',
+            fontFamily:"'DM Mono',monospace",
+            textTransform:'uppercase',letterSpacing:.5,marginTop:2}}>
+            {s.label}
+          </div>
+        </div>
+      ))}
+    </div>}
+
+        {/* At-bat log table */}
     {(b.atBats||[]).length > 0 && <div style={{marginTop:10}}>
       <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",
         textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>
