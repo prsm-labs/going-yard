@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-02 21:25 ET";
+const BUILD_TIMESTAMP = "2026-04-02 22:03 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -2761,48 +2761,42 @@ function RefBtn({refreshing, onClick}) {
 function HeatingUpSlideout({ games, onClose }) {
   const [batters, setBatters] = useState([]);
   const [loading, setLoading] = useState(true);
+  // Only live games — "heating up" means RIGHT NOW, not season potential
   const liveGames = (games||[]).filter(g => g.status==='Live');
-  const preGames  = (games||[]).filter(g => g.status==='Preview');
 
   useEffect(() => {
     (async () => {
       setLoading(true);
       const all = [];
 
-      // Live games — use real in-game Statcast data
+      if (liveGames.length === 0) {
+        setBatters([]);
+        setLoading(false);
+        return;
+      }
+
+      // Live games only — real in-game Statcast data
       await Promise.all(liveGames.map(async (game) => {
         try {
-          const batters = await fetchLiveBatters(game.gamePk);
-          batters.forEach(b => all.push({...b, gameStatus:'Live', gamePk:game.gamePk}));
+          const liveBatters = await fetchLiveBatters(game.gamePk);
+          liveBatters.forEach(b => {
+            // REQUIRE at least 1 real AB in this game — no pre-AB ghost appearances
+            if ((b.ab || 0) < 1) return;
+            all.push({...b, gameStatus:'Live', gamePk:game.gamePk});
+          });
         } catch(e) {}
       }));
 
-      // Pre-game — use liftoff scores (season metrics)
-      await Promise.all(preGames.map(async (game) => {
-        try {
-          const batters = await fetchLiftoffBatters(game);
-          batters.forEach(b => all.push({...b, gameStatus:'Preview', gamePk:game.gamePk}));
-        } catch(e) {}
-      }));
+      // Filter: only "Heating Up" or hotter — based on in-game heatLabel only
+      // heatLabel.cls: 'elite' | 'hot' | 'avg' | 'cold'
+      const hot = all.filter(b =>
+        b.heatLabel && (b.heatLabel.cls === 'elite' || b.heatLabel.cls === 'hot')
+      );
 
-      // Filter: only heating up or hotter
-      // Live batters use heatLabel.cls: 'elite' | 'hot' | 'avg' | 'cold'
-      // Liftoff batters use verdict.cls:  'primed' | 'hot' | 'watch' | 'cold'
-      const HOT_LIVE    = new Set(['elite','hot']);
-      const HOT_LIFTOFF = new Set(['primed','hot']);
-
-      const hot = all.filter(b => {
-        if (b.heatLabel) return HOT_LIVE.has(b.heatLabel.cls);
-        if (b.verdict)   return HOT_LIFTOFF.has(b.verdict.cls);
-        return false;
-      });
-
-      // Sort: elite/primed first, then by EV descending
-      const order = {elite:4, primed:4, hot:3, watch:2, warm:2};
+      // Sort: elite first, then by in-game EV descending
       hot.sort((a,b) => {
-        const ac = a.heatLabel?.cls || a.verdict?.cls || '';
-        const bc = b.heatLabel?.cls || b.verdict?.cls || '';
-        const diff = (order[bc]||0) - (order[ac]||0);
+        const order = {elite:3, hot:2};
+        const diff = (order[b.heatLabel?.cls]||0) - (order[a.heatLabel?.cls]||0);
         if (diff !== 0) return diff;
         return (b.avgEV||0) - (a.avgEV||0);
       });
@@ -2810,14 +2804,7 @@ function HeatingUpSlideout({ games, onClose }) {
       setBatters(hot);
       setLoading(false);
     })();
-  }, [games.length]);
-
-  const getBadge = (b) => {
-    const cls = b.heatLabel?.cls || b.verdict?.cls || '';
-    const label = b.heatLabel?.label || b.verdict?.label || '';
-    const color = cls==='elite'||cls==='primed' ? '#ff4020' : '#ff8020';
-    return { cls, label, color };
-  };
+  }, [liveGames.length]);
 
   const evColor = (ev) => (ev||0)>=103?'#ff4020':(ev||0)>=95?'#ff8020':(ev||0)>=90?'#ffc840':'var(--muted)';
   const laColor = (la) => (la||0)>=25&&(la||0)<=35?'#27c97a':(la||0)>=18?'var(--accent2)':'var(--muted)';
@@ -2835,17 +2822,17 @@ function HeatingUpSlideout({ games, onClose }) {
           <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:900,fontSize:20,
             letterSpacing:1,color:'var(--accent)'}}>🔥 Heating Up</div>
           <div style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginTop:2}}>
-            {loading ? 'Scanning games…'
-              : batters.length > 0
-                ? `${batters.length} batter${batters.length!==1?'s':''} heating up across ${liveGames.length} live + ${preGames.length} upcoming`
-                : 'No batters heating up right now'}
+            {loading ? 'Scanning live at-bats…'
+              : liveGames.length === 0
+                ? 'No live games right now'
+                : batters.length > 0
+                  ? `${batters.length} batter${batters.length!==1?'s':''} heating up across ${liveGames.length} live game${liveGames.length!==1?'s':''}`
+                  : `Watching ${liveGames.length} live game${liveGames.length!==1?'s':''} — nobody heating up yet`}
           </div>
         </div>
         <button onClick={onClose} style={{marginLeft:'auto',background:'none',
           border:'1px solid var(--border)',borderRadius:6,padding:'4px 10px',
-          color:'var(--muted)',cursor:'pointer',fontFamily:"'DM Mono',monospace",fontSize:11}}>
-          ✕
-        </button>
+          color:'var(--muted)',cursor:'pointer',fontFamily:"'DM Mono',monospace",fontSize:11}}>✕</button>
       </div>
 
       {/* Body */}
@@ -2853,75 +2840,92 @@ function HeatingUpSlideout({ games, onClose }) {
         {loading
           ? <div className="lw" style={{padding:'40px 0'}}>
               <div className="sp"/>
-              <div className="lt">Fetching live batter data…</div>
+              <div className="lt">Scanning live lineups…</div>
             </div>
-          : batters.length === 0
+          : liveGames.length === 0
             ? <div style={{padding:'50px 20px',textAlign:'center',
                 color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:12,lineHeight:2}}>
-                No batters at heating up level or above right now.<br/>
-                Check back once more at-bats roll in.
+                No live games right now.<br/>
+                Check back once tonight's games start.
               </div>
-            : batters.map((b, idx) => {
-                const badge = getBadge(b);
-                return <div key={`${b.id}-${idx}`}
-                  onClick={()=>{ openAtBatSlide(b); onClose(); }}
-                  style={{display:'flex',alignItems:'center',gap:12,
-                    padding:'10px 16px',borderBottom:'1px solid rgba(255,255,255,.04)',
-                    cursor:'pointer',transition:'background .1s'}}
-                  onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.04)'}
-                  onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+            : batters.length === 0
+              ? <div style={{padding:'50px 20px',textAlign:'center',
+                  color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:12,lineHeight:2}}>
+                  Nobody heating up yet.<br/>
+                  <span style={{fontSize:10}}>Batters need at least 1 AB before qualifying.</span>
+                </div>
+              : batters.map((b, idx) => (
+                  <div key={`${b.id}-${idx}`}
+                    onClick={()=>{ openAtBatSlide(b); onClose(); }}
+                    style={{display:'flex',alignItems:'center',gap:12,
+                      padding:'10px 16px',borderBottom:'1px solid rgba(255,255,255,.04)',
+                      cursor:'pointer',transition:'background .1s'}}
+                    onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.04)'}
+                    onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
 
-                  {/* Rank */}
-                  <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:900,fontSize:18,
-                    color:idx===0?'#ffd700':idx===1?'#c0c0c0':idx===2?'#cd7f32':'var(--muted)',
-                    minWidth:22,textAlign:'center',flexShrink:0}}>
-                    {idx+1}
-                  </div>
-
-                  {/* Name + team */}
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:15,
-                      whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                      {b.name}
+                    {/* Rank */}
+                    <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:900,fontSize:18,
+                      color:idx===0?'#ffd700':idx===1?'#c0c0c0':idx===2?'#cd7f32':'var(--muted)',
+                      minWidth:22,textAlign:'center',flexShrink:0}}>
+                      {idx+1}
                     </div>
-                    <div style={{display:'flex',alignItems:'center',gap:6,marginTop:2}}>
-                      <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,
-                        color:'var(--accent2)',fontWeight:700}}>{b.team}</span>
-                      <span style={{fontSize:9,padding:'1px 6px',borderRadius:4,
-                        background:`${badge.color}18`,color:badge.color,
-                        fontFamily:"'DM Mono',monospace",fontWeight:600,
-                        border:`1px solid ${badge.color}30`}}>
-                        {badge.label}
-                      </span>
-                      {b.gameStatus==='Live' &&
-                        <span style={{fontSize:9,color:'var(--accent)',
-                          fontFamily:"'DM Mono',monospace"}}>● Live</span>}
-                    </div>
-                  </div>
 
-                  {/* Stats */}
-                  <div style={{display:'flex',gap:10,flexShrink:0}}>
-                    <div style={{textAlign:'center'}}>
-                      <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,
-                        fontSize:16,color:evColor(b.avgEV),lineHeight:1}}>
-                        {b.avgEV > 0 ? b.avgEV.toFixed(1) : '—'}
+                    {/* Name + team + badge */}
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:15,
+                        whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                        {b.name}
                       </div>
-                      <div style={{fontSize:8,color:'var(--muted)',
-                        fontFamily:"'DM Mono',monospace",marginTop:2,textTransform:'uppercase',
-                        letterSpacing:.5}}>Avg EV</div>
-                    </div>
-                    <div style={{textAlign:'center'}}>
-                      <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,
-                        fontSize:16,color:laColor(b.launchAngle),lineHeight:1}}>
-                        {b.launchAngle > 0 ? `${b.launchAngle.toFixed(0)}°` : '—'}
+                      <div style={{display:'flex',alignItems:'center',gap:6,marginTop:2,flexWrap:'wrap'}}>
+                        <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,
+                          color:'var(--accent2)',fontWeight:700}}>{getTeam(b.id, b.team)}</span>
+                        <span style={{fontSize:9,padding:'1px 6px',borderRadius:4,
+                          background:b.heatLabel?.cls==='elite'?'rgba(232,65,26,.15)':'rgba(255,128,32,.12)',
+                          color:b.heatLabel?.cls==='elite'?'#ff4020':'#ff8020',
+                          fontFamily:"'DM Mono',monospace",fontWeight:600,
+                          border:`1px solid ${b.heatLabel?.cls==='elite'?'rgba(232,65,26,.3)':'rgba(255,128,32,.25)'}`}}>
+                          {b.heatLabel?.label||'—'}
+                        </span>
+                        {/* Today's line */}
+                        <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
+                          {b.hits||0}/{b.ab||0}
+                          {(b.hr||0)>0&&<span style={{color:'var(--accent)',marginLeft:4}}>{b.hr}HR</span>}
+                        </span>
                       </div>
-                      <div style={{fontSize:8,color:'var(--muted)',
-                        fontFamily:"'DM Mono',monospace",marginTop:2,textTransform:'uppercase',
-                        letterSpacing:.5}}>Avg LA</div>
+                    </div>
+
+                    {/* Live stats */}
+                    <div style={{display:'flex',gap:10,flexShrink:0}}>
+                      <div style={{textAlign:'center'}}>
+                        <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,
+                          fontSize:16,color:evColor(b.avgEV),lineHeight:1}}>
+                          {b.avgEV > 0 ? b.avgEV.toFixed(1) : '—'}
+                        </div>
+                        <div style={{fontSize:8,color:'var(--muted)',
+                          fontFamily:"'DM Mono',monospace",marginTop:2,
+                          textTransform:'uppercase',letterSpacing:.5}}>Live EV</div>
+                      </div>
+                      <div style={{textAlign:'center'}}>
+                        <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,
+                          fontSize:16,color:laColor(b.launchAngle),lineHeight:1}}>
+                          {b.launchAngle > 0 ? `${b.launchAngle.toFixed(0)}°` : '—'}
+                        </div>
+                        <div style={{fontSize:8,color:'var(--muted)',
+                          fontFamily:"'DM Mono',monospace",marginTop:2,
+                          textTransform:'uppercase',letterSpacing:.5}}>Avg LA</div>
+                      </div>
+                      {b.hardHits > 0 && <div style={{textAlign:'center'}}>
+                        <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,
+                          fontSize:16,color:'#ff8020',lineHeight:1}}>
+                          {b.hardHits}
+                        </div>
+                        <div style={{fontSize:8,color:'var(--muted)',
+                          fontFamily:"'DM Mono',monospace",marginTop:2,
+                          textTransform:'uppercase',letterSpacing:.5}}>HH 95+</div>
+                      </div>}
                     </div>
                   </div>
-                </div>;
-              })
+                ))
         }
       </div>
     </div>
