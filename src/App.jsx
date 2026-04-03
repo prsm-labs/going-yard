@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-03 13:50 ET";
+const BUILD_TIMESTAMP = "2026-04-03 14:06 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -2054,6 +2054,7 @@ async function fetchLiveBatters(gamePk) {
         const ab     = parseInt(s.atBats || 0);
         const hits   = parseInt(s.hits || 0);
         const hr     = parseInt(s.homeRuns || 0);
+  const rbi   = parseInt(s.rbi || 0);
         const bb     = parseInt(s.baseOnBalls || 0);
         const so     = parseInt(s.strikeOuts || 0);
         const runs   = parseInt(s.runs || 0);
@@ -2094,7 +2095,7 @@ async function fetchLiveBatters(gamePk) {
           name: p?.person?.fullName || `Player ${bid}`,
           team: ta,
           pos: p?.position?.abbreviation || cachedP?.pos || '',
-          ab, hits, hr, bb, so, runs, totalBases,
+          ab, hits, hr, rbi, bb, so, runs, totalBases,
 
           // In-game Statcast (from live feed play-by-play)
           avgEV:       gameAvgEV   !== null ? gameAvgEV   : seasonEV,
@@ -2543,6 +2544,7 @@ function XRow({b}) {
         {label:'HR', val:b.hr,         color:(b.hr||0)>0?'var(--accent)':'var(--text)'},
         {label:'R',  val:b.runs??0,    color:(b.runs||0)>0?'#27c97a':'var(--text)'},
         {label:'TB', val:b.totalBases??0,color:(b.totalBases||0)>=4?'var(--accent)':(b.totalBases||0)>=2?'#ff8020':'var(--text)'},
+        {label:'RBI',val:b.rbi??0,     color:(b.rbi||0)>0?'#ffc840':'var(--text)'},
         {label:'BB', val:b.bb??0,      color:(b.bb||0)>0?'#38b8f2':'var(--text)'},
         {label:'K',  val:b.so??0,      color:(b.so||0)>=2?'#38b8f2':'var(--text)'},
       ].map((s,i,arr) => (
