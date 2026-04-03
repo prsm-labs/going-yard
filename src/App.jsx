@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-03 00:19 ET";
+const BUILD_TIMESTAMP = "2026-04-03 09:09 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -4308,6 +4308,38 @@ function LiveSportsTab() {
 }
 
 
+function LinemateTab() {
+  return <div>
+    <div className="section-header" style={{marginBottom:16}}>
+      <div className="section-title">📊 Linemate</div>
+      <div className="section-sub">Affiliate partner · MLB player props & lineup tool</div>
+    </div>
+    {/* Affiliate disclosure */}
+    <div style={{background:"rgba(245,166,35,.06)",border:"1px solid rgba(245,166,35,.2)",borderRadius:8,padding:"8px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
+      <span style={{fontSize:10,color:"var(--accent2)",fontFamily:"'DM Mono',monospace"}}>🤝 Affiliate Partner</span>
+      <span style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>— Going Yard may earn a commission when you sign up via this link.</span>
+      <a href="http://linemate.io/mlb" target="_blank" rel="noopener noreferrer"
+        style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:6,background:"var(--accent)",color:"white",fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,letterSpacing:1,textDecoration:"none",flexShrink:0}}>
+        ↗ Open in New Tab
+      </a>
+    </div>
+    {/* Embedded iframe */}
+    <div style={{borderRadius:10,overflow:"hidden",border:"1px solid var(--border)",background:"var(--surface)",position:"relative",paddingBottom:"75%",height:0}}>
+      <iframe
+        title="Linemate MLB"
+        src="http://linemate.io/mlb"
+        frameBorder="0"
+        allowFullScreen
+        style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",border:"none"}}
+      />
+    </div>
+    <div style={{marginTop:8,fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textAlign:"center"}}>
+      If the embed is blocked by the site, use the ↗ Open in New Tab button above.
+    </div>
+  </div>;
+}
+
+
 function PowerBITab() {
   const picks = usePicks();
   // Merge Statcast cache with full MLB roster so new/low-AB players are findable
@@ -4891,6 +4923,7 @@ export default function App() {
     {key:"live",     label:"📡 Live"},
     {key:"powerbi",  label:"📊 Analytics"},
     {key:"onlyhomers",label:"⚾ Only Homers"},
+    {key:"linemate", label:"📊 Linemate"},
     {key:"statcast", label:"📡 Statcast"},
     {key:"livesports",label:"📺 Live Sports",external:"https://thetvapp.to"},
     {key:"picks",    label:"🎯 My Picks"},
@@ -4937,6 +4970,7 @@ export default function App() {
         <div style={{display:tab==="statcast"?"block":"none"}}><StatcastTab/></div>
         <div style={{display:tab==="homeruns"?"block":"none"}}><HRTrackerTab/></div>
         <div style={{display:tab==="onlyhomers"?"block":"none"}}><OnlyHomersTab/></div>
+        <div style={{display:tab==="linemate"?"block":"none"}}><LinemateTab/></div>
       </main>
       <div style={{textAlign:"center",padding:"12px 0 8px",borderTop:"1px solid var(--border)",marginTop:24}}>
         <span style={{fontSize:10,color:"#2a3a48",fontFamily:"'DM Mono',monospace",letterSpacing:1}}>
