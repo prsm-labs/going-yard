@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-02 22:03 ET";
+const BUILD_TIMESTAMP = "2026-04-02 22:23 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -2605,6 +2605,7 @@ function GPanel({game, isLive, isFinal=false}) {
           <th><Tip text="Strikeouts this game">K</Tip></th>
           <th><Tip text="Avg exit velocity this game (real Statcast). Season avg shown if no BIP yet">EV</Tip></th>
           <th><Tip text="Avg launch angle this game">LA°</Tip></th>
+          <th><Tip text="Avg hit distance this game">Dist</Tip></th>
           <th><Tip text="Hard hits this game: batted balls ≥ 95 mph (Statcast definition)">🔥 HH</Tip></th>
         </tr></thead>
         <tbody>
@@ -2634,6 +2635,7 @@ function GPanel({game, isLive, isFinal=false}) {
                     {zl&&<span style={{fontSize:8,color:"var(--green)",fontFamily:"DM Mono,monospace"}}>{zl}</span>}
                   </div>
                 </td>
+              <td><span className={`sv ${(b.avgDist||0)>=400?'hot':(b.avgDist||0)>=350?'warm':(b.avgDist||0)>=300?'avg2':'avg'}`}>{b.avgDist>0?`${Math.round(b.avgDist)}ft`:'—'}{(b.avgDist||0)>=350&&' 🔥'}</span></td>
                 <td>
                   <span className={`sv ${b.hardHits>=2?"hot":b.hardHits===1?"warm":"avg"}`}>
                     {b.hardHits}{b.hardHits>=2?" 🔥":""}
@@ -2642,7 +2644,7 @@ function GPanel({game, isLive, isFinal=false}) {
                 </td>
 
               </tr>,
-              isE && <tr key={`${b.id}-x`} className="xr"><td colSpan={13}><XRow b={b}/></td></tr>
+              isE && <tr key={`${b.id}-x`} className="xr"><td colSpan={14}><XRow b={b}/></td></tr>
             ];
           })}
         </tbody>
@@ -2915,6 +2917,7 @@ function HeatingUpSlideout({ games, onClose }) {
                           textTransform:'uppercase',letterSpacing:.5}}>Avg LA</div>
                       </div>
                       {b.hardHits > 0 && <div style={{textAlign:'center'}}>
+              <div style={{textAlign:'center'}}><div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:16,color:(b.avgDist||0)>=350?'#ff8020':(b.avgDist||0)>=300?'#ffc840':'var(--text)',lineHeight:1}}>{b.avgDist>0?`${Math.round(b.avgDist)}ft`:'—'}{(b.avgDist||0)>=350&&<span style={{marginLeft:2}}>🔥</span>}</div><div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginTop:2,textTransform:'uppercase',letterSpacing:.5}}>Avg Dist</div></div>
                         <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,
                           fontSize:16,color:'#ff8020',lineHeight:1}}>
                           {b.hardHits}
