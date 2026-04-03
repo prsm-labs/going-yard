@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-03 19:12 ET";
+const BUILD_TIMESTAMP = "2026-04-03 19:18 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -3145,7 +3145,7 @@ function HeatingUpSlideout({ games, onClose }) {
                         <td style={{padding:'3px 5px',color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:9,whiteSpace:'nowrap'}}>{ab.halfInning==='top'?'▲':'▼'}{ab.inning||'—'}</td>
                         <td style={{padding:'3px 5px',color:good?'#27c97a':'var(--muted)',fontWeight:good?700:400,maxWidth:100,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontFamily:"'DM Mono',monospace",fontSize:9}}>{ab.result||'—'}</td>
                         <td style={{padding:'3px 5px',color:evc,fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,whiteSpace:'nowrap'}}>{ab.ev>0?ab.ev.toFixed(1):'—'}</td>
-                        <td style={{padding:'3px 5px',color:'var(--text)',fontFamily:"'DM Mono',monospace",fontSize:9,whiteSpace:'nowrap'}}>{ab.launchAngle>0?ab.launchAngle.toFixed(0)+'°':'—'}</td>
+                        <td style={{padding:'3px 5px',color:'var(--text)',fontFamily:"'DM Mono',monospace",fontSize:9,whiteSpace:'nowrap'}}>{(ab.la||ab.launchAngle||0)>0?(ab.la||ab.launchAngle).toFixed(0)+'°':'—'}</td>
                         <td style={{padding:'3px 5px',color:dc,fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,whiteSpace:'nowrap'}}>{ab.dist>0?ab.dist+'ft':'—'}</td>
                         <td style={{padding:'3px 5px',color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:9,whiteSpace:'nowrap'}}>{ab.pitchType||'—'}</td>
                         <td style={{padding:'3px 5px',color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:9,maxWidth:80,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{ab.pitcherName||'—'}</td>
