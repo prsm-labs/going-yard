@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-02 22:31 ET";
+const BUILD_TIMESTAMP = "2026-04-02 23:01 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -2905,7 +2905,7 @@ function HeatingUpSlideout({ games, onClose }) {
                     <div style={{display:'flex',gap:10,flexShrink:0}}>
                       <div style={{textAlign:'center'}}>
                         <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,
-                          fontSize:16,color:evColor(b.avgEV),lineHeight:1}}>
+                          fontSize:13,color:evColor(b.avgEV),lineHeight:1}}>
                           {b.avgEV > 0 ? b.avgEV.toFixed(1) : '—'}
                         </div>
                         <div style={{fontSize:8,color:'var(--muted)',
@@ -2914,7 +2914,7 @@ function HeatingUpSlideout({ games, onClose }) {
                       </div>
                       <div style={{textAlign:'center'}}>
                         <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,
-                          fontSize:16,color:laColor(b.launchAngle),lineHeight:1}}>
+                          fontSize:13,color:laColor(b.launchAngle),lineHeight:1}}>
                           {b.launchAngle > 0 ? `${b.launchAngle.toFixed(0)}°` : '—'}
                         </div>
                         <div style={{fontSize:8,color:'var(--muted)',
@@ -2922,9 +2922,9 @@ function HeatingUpSlideout({ games, onClose }) {
                           textTransform:'uppercase',letterSpacing:.5}}>Avg LA</div>
                       </div>
                       {b.hardHits > 0 && <div style={{textAlign:'center'}}>
-              <div style={{textAlign:'center'}}><div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:16,color:(b.avgDist||0)>=350?'#ff8020':(b.avgDist||0)>=300?'#ffc840':'var(--text)',lineHeight:1}}>{b.avgDist>0?`${Math.round(b.avgDist)}ft`:'—'}{(b.avgDist||0)>=350&&<span style={{marginLeft:2}}>🔥</span>}</div><div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginTop:2,textTransform:'uppercase',letterSpacing:.5}}>Avg Dist</div></div>
+              <div style={{textAlign:'center'}}><div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color:(b.avgDist||0)>=350?'#ff8020':(b.avgDist||0)>=300?'#ffc840':'var(--text)',lineHeight:1}}>{b.avgDist>0?`${Math.round(b.avgDist)}ft`:'—'}{(b.avgDist||0)>=350&&<span style={{marginLeft:2}}>🔥</span>}</div><div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginTop:2,textTransform:'uppercase',letterSpacing:.5}}>Avg Dist</div></div>
                         <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,
-                          fontSize:16,color:'#ff8020',lineHeight:1}}>
+                          fontSize:13,color:'#ff8020',lineHeight:1}}>
                           {b.hardHits}
                         </div>
                         <div style={{fontSize:8,color:'var(--muted)',
