@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-03 13:31 ET";
+const BUILD_TIMESTAMP = "2026-04-03 13:44 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -1981,6 +1981,11 @@ async function fetchGames(setL, setG, setE, silent=false) {
         })(),
         detailedState: g.status?.detailedState || "",
         inning: ls.currentInning ? `${ls.inningHalf === "Bottom" ? "▼" : "▲"} ${ls.currentInning}` : null,
+    currentInning: ls.currentInning || null,
+    currentHalf: ls.inningHalf || null,
+    innings: (ls.innings||[]).map(inn=>({num:inn.num,away:inn.away?.runs??'',home:inn.home?.runs??''})),
+    awayRuns: ls.teams?.away?.runs??aw?.score??'-',
+    homeRuns: ls.teams?.home?.runs??hm?.score??'-',
         venue,
         gameTime: (() => {
           // Game start time in ET
@@ -2811,7 +2816,39 @@ function GCard({game}) {
       </div>
       {!exp && <div className="gi" style={{color:isLive?"var(--fire2)":isFin?"var(--muted)":"var(--green)"}}>{isLive?"▾ Tap for live heat":isFin?"▾ Tap for final box score":"▾ Tap for 🚀 Liftoff list"}</div>}
     </div>
-    {exp && <GPanel game={game} isLive={isLive} isFinal={isFin}/>}
+  {exp && <>
+    {(game.innings||[]).length > 0 && <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch",
+      borderTop:"1px solid var(--border)",padding:"6px 10px",background:"rgba(0,0,0,.2)"}}>
+      <table style={{borderCollapse:"collapse",width:"100%",fontSize:10,fontFamily:"'DM Mono',monospace"}}>
+        <thead><tr>
+          <th style={{padding:"2px 5px",color:"var(--muted)",textAlign:"left",width:30}}>INN</th>
+          {(game.innings||[]).map(inn=>(
+            <th key={inn.num} style={{padding:"2px 4px",textAlign:"center",minWidth:18,
+              color:(game.currentInning===inn.num)?(game.currentHalf==="Bottom"?"var(--accent2)":"var(--accent)"):"var(--muted)",
+              fontWeight:(game.currentInning===inn.num)?700:400}}>{inn.num}</th>
+          ))}
+          <th style={{padding:"2px 6px",textAlign:"center",color:"var(--text)",fontWeight:700}}>R</th>
+        </tr></thead>
+        <tbody>
+          {["away","home"].map(side=>(
+            <tr key={side} style={{borderTop:"1px solid rgba(255,255,255,.04)"}}>
+              <td style={{padding:"2px 5px",color:"var(--accent2)",fontWeight:700,fontFamily:"'Oswald',sans-serif",fontSize:11}}>{game[side]?.abbr}</td>
+              {(game.innings||[]).map(inn=>(
+                <td key={inn.num} style={{padding:"2px 4px",textAlign:"center",
+                  color:inn[side]===""?"var(--muted)":parseInt(inn[side])>0?"var(--text)":"var(--muted)",
+                  background:(game.currentInning===inn.num&&((side==="home"&&game.currentHalf==="Bottom")||(side==="away"&&game.currentHalf!=="Bottom")))?"rgba(232,65,26,.08)":"transparent"}}>
+                  {inn[side]===""?"·":inn[side]}
+                </td>
+              ))}
+              <td style={{padding:"2px 6px",textAlign:"center",fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,
+                color:side==="away"?(game.away?.score>game.home?.score?"var(--accent)":"var(--text)"):(game.home?.score>game.away?.score?"var(--accent)":"var(--text)")}}>{side==="away"?game.awayRuns:game.homeRuns}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>}
+    <GPanel game={game} isLive={isLive} isFinal={isFin}/>
+  </>}
   </div>;
 }
 
@@ -3080,14 +3117,57 @@ function LiveTab() {
   const [lastUpdate, setLastUpdate] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [showHeatingUp, setShowHeatingUp] = useState(false);
-  const load = useCallback((silent=false) => {
-    fetchGames(setLoading, setGames, setError, silent);
+  const todayET2 = new Date().toLocaleDateString("en-US",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"});
+  const [lm2,ld2,ly2] = todayET2.split("/");
+  const liveTodayStr = `${ly2}-${lm2}-${ld2}`;
+  const LIVE_SEASON_START = "2026-03-20";
+  const [liveDate, setLiveDate] = useState(liveTodayStr);
+  const [todayHRCount, setTodayHRCount] = useState(null);
+
+  const load = useCallback((silent=false, dateOverride=null) => {
+    const d = dateOverride || liveDate;
+    const isToday2 = d === liveTodayStr;
+    if (isToday2) {
+      fetchGames(setLoading, setGames, setError, silent);
+    } else {
+      if (!silent) setLoading(true);
+      setError(null);
+      fetch(`/api/schedule?date=${d}`)
+        .then(r=>r.json())
+        .then(data=>{
+          const allGames = (data.dates?.[0]?.games||[]).map(g=>{
+            const aw=g.teams?.away,hm=g.teams?.home,ls=g.linescore||{};
+            const awAbbr=aw?.team?.abbreviation||"???";
+            const hmAbbr=hm?.team?.abbreviation||"???";
+            return {
+              id:g.gamePk,gamePk:g.gamePk,
+              status:(()=>{const abs=g.status?.abstractGameState||"";const coded=g.status?.codedGameState||"";if(abs==="Live")return"Live";if(abs==="Final"||abs==="Game Over")return"Final";if(coded==="I")return"Live";if(coded==="F"||coded==="O")return"Final";return"Preview";})(),
+              inning:ls.currentInning?`${ls.inningHalf==="Bottom"?"▼":"▲"} ${ls.currentInning}`:null,
+              venue:g.venue?.name||"",
+              gameTime:(()=>{const gt=g.gameDate||"";if(!gt)return null;try{return new Date(gt).toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit",hour12:true});}catch{return null;}})(),
+              away:{abbr:awAbbr,teamId:aw?.team?.id,score:aw?.score??"-",record:`${aw?.leagueRecord?.wins||0}-${aw?.leagueRecord?.losses||0}`,probablePitcher:aw?.probablePitcher?.fullName||null,pitcherHand:aw?.probablePitcher?.pitchHand?.code||"R"},
+              home:{abbr:hmAbbr,teamId:hm?.team?.id,score:hm?.score??"-",record:`${hm?.leagueRecord?.wins||0}-${hm?.leagueRecord?.losses||0}`,probablePitcher:hm?.probablePitcher?.fullName||null,pitcherHand:hm?.probablePitcher?.pitchHand?.code||"R"},
+            };
+          });
+          setGames(allGames);
+          setLoading(false);
+        })
+        .catch(e=>{setError(e.message);setLoading(false);});
+    }
     setLastUpdate(new Date().toLocaleTimeString());
-  }, []);
+  }, [liveDate]);
+
+  // Fetch today's HR count for the stat card
+  useEffect(()=>{
+    fetch('/api/homeruns').then(r=>r.json())
+      .then(d=>setTodayHRCount(d.homeruns?.length||0))
+      .catch(()=>{});
+  },[]);
+
   useEffect(() => { load(false); }, []); // initial — show spinner
   // Background refresh every 30s — silent so open game panels stay open
   useEffect(() => {
-    const id = setInterval(() => load(true), 60000);
+    const id = setInterval(() => load(true, liveDate), 60000);
     return () => clearInterval(id);
   }, [load]);
   const live = games.filter(g=>g.status==="Live");
@@ -3118,6 +3198,7 @@ function LiveTab() {
       </div>
       <div className="note">ℹ️ <strong>Live</strong>: tap → hard contact in HR zones now vs L7. <strong>Upcoming</strong>: tap → 🚀 Liftoff list ranked by HR probability.</div>
     <div className="cards" style={{marginBottom:14}}>
+<div className="card"><div className="cl">💥 HRs Today</div><div className="cv" style={{color:"var(--accent)"}}>{todayHRCount??"—"}</div><div className="cs">total homers</div></div>
       <div className="card"><div className="cl">Live Games</div><div className="cv" style={{color:"#e8411a"}}>{live.length}</div><div className="cs">in progress</div></div>
       <div className="card"><div className="cl">Scheduled</div><div className="cv" style={{color:"#27c97a"}}>{pre.length}</div><div className="cs">today</div></div>
       <div className="card"><div className="cl">Total</div><div className="cv">{games.length}</div><div className="cs">on slate</div></div>
