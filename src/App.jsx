@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-02 23:01 ET";
+const BUILD_TIMESTAMP = "2026-04-02 23:09 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -2861,80 +2861,86 @@ function HeatingUpSlideout({ games, onClose }) {
                   Nobody heating up yet.<br/>
                   <span style={{fontSize:10}}>Batters need at least 1 AB before qualifying.</span>
                 </div>
-              : batters.map((b, idx) => (
-                  <div key={`${b.id}-${idx}`}
-                    onClick={()=>{ openAtBatSlide(b); onClose(); }}
-                    style={{display:'flex',alignItems:'center',gap:12,
-                      padding:'10px 16px',borderBottom:'1px solid rgba(255,255,255,.04)',
-                      cursor:'pointer',transition:'background .1s'}}
-                    onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.04)'}
-                    onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+: batters.map((b, idx) => (
+          <div key={`${b.id}-${idx}`}
+            onClick={()=>{ openAtBatSlide(b); onClose(); }}
+            style={{display:'flex',alignItems:'center',gap:8,
+              padding:'8px 14px',borderBottom:'1px solid rgba(255,255,255,.04)',
+              cursor:'pointer',transition:'background .1s'}}
+            onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.04)'}
+            onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
 
-                    {/* Rank */}
-                    <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:900,fontSize:18,
-                      color:idx===0?'#ffd700':idx===1?'#c0c0c0':idx===2?'#cd7f32':'var(--muted)',
-                      minWidth:22,textAlign:'center',flexShrink:0}}>
-                      {idx+1}
-                    </div>
+            {/* Rank */}
+            <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:900,fontSize:13,
+              color:idx===0?'#ffd700':idx===1?'#c0c0c0':idx===2?'#cd7f32':'var(--muted)',
+              minWidth:16,textAlign:'center',flexShrink:0}}>
+              {idx+1}
+            </div>
 
-                    {/* Name + team + badge */}
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:15,
-                        whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                        {b.name}
-                      </div>
-                      <div style={{display:'flex',alignItems:'center',gap:6,marginTop:2,flexWrap:'wrap'}}>
-                        <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,
-                          color:'var(--accent2)',fontWeight:700}}>{getTeam(b.id, b.team)}</span>
-                        <span style={{fontSize:9,padding:'1px 6px',borderRadius:4,
-                          background:b.heatLabel?.cls==='gone_yard'?'rgba(255,20,0,.25)':b.heatLabel?.cls==='elite'?'rgba(232,65,26,.15)':'rgba(255,128,32,.12)',
-                          color:b.heatLabel?.cls==='gone_yard'?'#fff':b.heatLabel?.cls==='elite'?'#ff4020':'#ff8020',
-                          fontFamily:"'DM Mono',monospace",fontWeight:b.heatLabel?.cls==='gone_yard'?800:600,
-                          border:`1px solid ${b.heatLabel?.cls==='gone_yard'?'rgba(255,20,0,.5)':b.heatLabel?.cls==='elite'?'rgba(232,65,26,.3)':'rgba(255,128,32,.25)'}`}}>
-                          {b.heatLabel?.label||'—'}
-                        </span>
-                        {/* Today's line */}
-                        <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
-                          {b.hits||0}/{b.ab||0}
-                          {(b.hr||0)>0&&<span style={{color:'var(--accent)',marginLeft:4}}>{b.hr}HR</span>}
-                        </span>
-                      </div>
-                    </div>
+            {/* Name + team + badge — all on one compact block */}
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,
+                whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',lineHeight:1.2}}>
+                {b.name}
+              </div>
+              <div style={{display:'flex',alignItems:'center',gap:4,marginTop:2,flexWrap:'nowrap'}}>
+                <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,
+                  color:'var(--accent2)',fontWeight:700,flexShrink:0}}>{getTeam(b.id, b.team)}</span>
+                <span style={{fontSize:8,padding:'1px 5px',borderRadius:4,flexShrink:0,
+                  background:b.heatLabel?.cls==='gone_yard'?'rgba(255,20,0,.25)':b.heatLabel?.cls==='elite'?'rgba(232,65,26,.15)':'rgba(255,128,32,.12)',
+                  color:b.heatLabel?.cls==='gone_yard'?'#fff':b.heatLabel?.cls==='elite'?'#ff4020':'#ff8020',
+                  fontFamily:"'DM Mono',monospace",fontWeight:b.heatLabel?.cls==='gone_yard'?800:600,
+                  border:`1px solid ${b.heatLabel?.cls==='gone_yard'?'rgba(255,20,0,.5)':b.heatLabel?.cls==='elite'?'rgba(232,65,26,.3)':'rgba(255,128,32,.25)'}`}}>
+                  {b.heatLabel?.label||'—'}
+                </span>
+                <span style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",flexShrink:0}}>
+                  {b.hits||0}/{b.ab||0}{(b.hr||0)>0&&<span style={{color:'var(--accent)',marginLeft:3}}>{b.hr}HR</span>}
+                </span>
+              </div>
+            </div>
 
-                    {/* Live stats */}
-                    <div style={{display:'flex',gap:10,flexShrink:0}}>
-                      <div style={{textAlign:'center'}}>
-                        <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,
-                          fontSize:13,color:evColor(b.avgEV),lineHeight:1}}>
-                          {b.avgEV > 0 ? b.avgEV.toFixed(1) : '—'}
-                        </div>
-                        <div style={{fontSize:8,color:'var(--muted)',
-                          fontFamily:"'DM Mono',monospace",marginTop:2,
-                          textTransform:'uppercase',letterSpacing:.5}}>Live EV</div>
-                      </div>
-                      <div style={{textAlign:'center'}}>
-                        <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,
-                          fontSize:13,color:laColor(b.launchAngle),lineHeight:1}}>
-                          {b.launchAngle > 0 ? `${b.launchAngle.toFixed(0)}°` : '—'}
-                        </div>
-                        <div style={{fontSize:8,color:'var(--muted)',
-                          fontFamily:"'DM Mono',monospace",marginTop:2,
-                          textTransform:'uppercase',letterSpacing:.5}}>Avg LA</div>
-                      </div>
-                      {b.hardHits > 0 && <div style={{textAlign:'center'}}>
-              <div style={{textAlign:'center'}}><div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color:(b.avgDist||0)>=350?'#ff8020':(b.avgDist||0)>=300?'#ffc840':'var(--text)',lineHeight:1}}>{b.avgDist>0?`${Math.round(b.avgDist)}ft`:'—'}{(b.avgDist||0)>=350&&<span style={{marginLeft:2}}>🔥</span>}</div><div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginTop:2,textTransform:'uppercase',letterSpacing:.5}}>Avg Dist</div></div>
-                        <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,
-                          fontSize:13,color:'#ff8020',lineHeight:1}}>
-                          {b.hardHits}
-                        </div>
-                        <div style={{fontSize:8,color:'var(--muted)',
-                          fontFamily:"'DM Mono',monospace",marginTop:2,
-                          textTransform:'uppercase',letterSpacing:.5}}>HH 95+</div>
-                      </div>}
-                    </div>
-                  </div>
-                ))
-        }
+            {/* Stats — compact inline, all on one row */}
+            <div style={{display:'flex',gap:6,flexShrink:0,alignItems:'center'}}>
+              {/* EV */}
+              <div style={{textAlign:'center',minWidth:34}}>
+                <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,
+                  color:evColor(b.avgEV),lineHeight:1}}>
+                  {b.avgEV>0?b.avgEV.toFixed(1):'—'}
+                </div>
+                <div style={{fontSize:7,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+                  textTransform:'uppercase',letterSpacing:.4,marginTop:1}}>EV</div>
+              </div>
+              {/* LA */}
+              <div style={{textAlign:'center',minWidth:26}}>
+                <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,
+                  color:laColor(b.launchAngle),lineHeight:1}}>
+                  {b.launchAngle>0?`${b.launchAngle.toFixed(0)}°`:'—'}
+                </div>
+                <div style={{fontSize:7,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+                  textTransform:'uppercase',letterSpacing:.4,marginTop:1}}>LA</div>
+              </div>
+              {/* Dist */}
+              <div style={{textAlign:'center',minWidth:34}}>
+                <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,
+                  color:(b.avgDist||0)>=350?'#ff8020':(b.avgDist||0)>=300?'#ffc840':'var(--text)',lineHeight:1}}>
+                  {b.avgDist>0?`${Math.round(b.avgDist)}ft`:'—'}
+                </div>
+                <div style={{fontSize:7,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+                  textTransform:'uppercase',letterSpacing:.4,marginTop:1}}>Dist</div>
+              </div>
+              {/* HH */}
+              {b.hardHits>0&&<div style={{textAlign:'center',minWidth:22}}>
+                <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,
+                  color:'#ff8020',lineHeight:1}}>
+                  {b.hardHits}🔥
+                </div>
+                <div style={{fontSize:7,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+                  textTransform:'uppercase',letterSpacing:.4,marginTop:1}}>HH</div>
+              </div>}
+            </div>
+          </div>
+        ))
+      }
       </div>
     </div>
   </>;
