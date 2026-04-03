@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-03 09:54 ET";
+const BUILD_TIMESTAMP = "2026-04-03 13:12 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -2637,63 +2637,100 @@ function GPanel({game, isLive, isFinal=false}) {
       <div className="gps">{isLive ? "Click any batter → today vs L7 comparison" : isFinal ? "Final game stats · click any batter for detail" : "Ranked: streak 40% · due factor 25% · vs pitcher 15% · home/away 10%"}</div>
     </div>
     {loading ? <div style={{padding:"20px 15px",display:"flex",alignItems:"center",gap:8}}><div className="sp" style={{width:18,height:18,borderWidth:2}}/><span style={{fontFamily:"DM Mono,monospace",fontSize:10,color:"var(--muted)"}}>Loading…</span></div>
-    : (isLive || isFinal) ? <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch",width:"100%"}}>
-      <table style={{width:"100%",tableLayout:"auto",minWidth:580}}>
-        <thead><tr>
-          <th style={{width:20}}></th>
-          <th>Batter</th><th>Heat</th>
-          <th>AB</th><th>H</th><th>HR</th>
-          <th><Tip text="Runs scored this game">R</Tip></th>
-          <th><Tip text="Total bases this game">TB</Tip></th>
-          <th><Tip text="Walks this game">BB</Tip></th>
-          <th><Tip text="Strikeouts this game">K</Tip></th>
-          <th><Tip text="Avg exit velocity this game (real Statcast). Season avg shown if no BIP yet">EV</Tip></th>
-          <th><Tip text="Avg launch angle this game">LA°</Tip></th>
-          <th><Tip text="Avg hit distance this game">Dist</Tip></th>
-          <th><Tip text="Hard hits this game: batted balls ≥ 95 mph (Statcast definition)">🔥 HH</Tip></th>
-        </tr></thead>
-        <tbody>
+: (isLive || isFinal) ? <div>
           {(data||[]).map(b => {
             const isE = expId === b.id;
-            const ec = b.avgEV>=T.EV_EL?"hot":b.avgEV>=T.EV_HH?"warm":"avg";
-            const zl = getLAZ(b.launchAngle);
+            const ec  = b.avgEV>=T.EV_EL?"hot":b.avgEV>=T.EV_HH?"warm":"avg";
+            const zl  = getLAZ(b.launchAngle);
+            const distC = (b.avgDist||0)>=400?"hot":(b.avgDist||0)>=350?"warm":(b.avgDist||0)>=300?"avg2":"avg";
             return [
-              <tr key={b.id} className={`dr ${isE?"ex":""}`} onClick={() => setExpId(p => p===b.id ? null : b.id)}>
-                <td style={{textAlign:"center"}}><span className={`cv2 ${isE?"op":""}`}>▾</span></td>
-                <td><div className="pc"><PosAvatar player={b} size={30}/><div><div className="pn">{b.name}</div><div className="pt">{b.team}</div></div></div></td>
-                <td><span className={`hl ${b.heatLabel.cls}`}>{b.heatLabel.label}</span></td>
-                <td><span className="sv avg">{b.ab}</span></td>
-                <td><span className={`sv ${b.hits>0?"good":"avg"}`}>{b.hits}</span></td>
-                <td><span className={`sv ${b.hr>0?"hot":"avg"}`}>{b.hr}</span></td>
-                <td><span className={`sv ${(b.runs??0)>0?"good":"avg"}`}>{b.runs??0}</span></td>
-                <td><span className={`sv ${(b.totalBases??0)>=4?"hot":(b.totalBases??0)>=2?"warm":"avg"}`}>{b.totalBases??0}</span></td>
-                <td><span className={`sv ${(b.bb??0)>0?"good":"avg"}`}>{b.bb??0}</span></td>
-                <td><span className={`sv ${(b.so??0)>=2?"cold":"avg"}`}>{b.so??0}</span></td>
-                <td>
-                  <span className={`sv ${ec}`}>{b.avgEV > 0 ? b.avgEV.toFixed(1) : "—"}</span>
-                  {b.gameEVLabel && <div style={{fontSize:8,color:"var(--muted)",fontFamily:"DM Mono,monospace",marginTop:1}}>{b.gameEVLabel}</div>}
-                </td>
-                <td>
-                  <div style={{display:"flex",flexDirection:"column",gap:1}}>
-                    <span className={`sv ${inHRZ(b.launchAngle)?"good":"avg"}`}>{b.launchAngle ? b.launchAngle.toFixed(1)+"°" : "—"}</span>
-                    {zl&&<span style={{fontSize:8,color:"var(--green)",fontFamily:"DM Mono,monospace"}}>{zl}</span>}
-                  </div>
-                </td>
-              <td><span className={`sv ${(b.avgDist||0)>=400?'hot':(b.avgDist||0)>=350?'warm':(b.avgDist||0)>=300?'avg2':'avg'}`}>{b.avgDist>0?`${Math.round(b.avgDist)}ft`:'—'}{(b.avgDist||0)>=350&&' 🔥'}</span></td>
-                <td>
-                  <span className={`sv ${b.hardHits>=2?"hot":b.hardHits===1?"warm":"avg"}`}>
-                    {b.hardHits}{b.hardHits>=2?" 🔥":""}
-                  </span>
-                  <div style={{fontSize:8,color:"var(--muted)",fontFamily:"DM Mono,monospace",marginTop:1}}>≥95 mph</div>
-                </td>
+              <div key={b.id}
+                className={`dr ${isE?"ex":""}`}
+                onClick={() => setExpId(p => p===b.id ? null : b.id)}
+                style={{padding:"8px 12px",borderBottom:"1px solid rgba(30,45,58,.5)",
+                  cursor:"pointer",background:isE?"rgba(232,65,26,.04)":"transparent"}}>
 
-              </tr>,
-              isE && <tr key={`${b.id}-x`} className="xr"><td colSpan={14}><XRow b={b}/></td></tr>
+                {/* Row 1: expand + avatar/name + heat badge + today line */}
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <span className={`cv2 ${isE?"op":""}`}
+                    style={{fontSize:11,color:"var(--muted)",flexShrink:0}}>▾</span>
+                  <div className="pc" style={{flex:1,minWidth:0}}>
+                    <PosAvatar player={b} size={26}/>
+                    <div style={{minWidth:0}}>
+                      <div className="pn" style={{fontSize:12}}>{b.name}</div>
+                      <div style={{fontSize:9,color:"var(--accent2)",fontFamily:"'DM Mono',monospace",fontWeight:700}}>
+                        {getTeam(b.id,b.team)}
+                      </div>
+                    </div>
+                  </div>
+                  <span className={`hl ${b.heatLabel.cls}`}
+                    style={{flexShrink:0,fontSize:9}}>{b.heatLabel.label}</span>
+                  {/* Today's line: H/AB HR */}
+                  <div style={{textAlign:"right",flexShrink:0}}>
+                    <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,
+                      color:b.hr>0?"var(--accent)":"var(--text)"}}>
+                      {b.hits}/{b.ab}
+                      {b.hr>0&&<span style={{marginLeft:4,color:"var(--accent)"}}>{b.hr}HR</span>}
+                    </div>
+                    <div style={{fontSize:8,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>
+                      {(b.runs??0)>0&&<span style={{color:"var(--green)",marginRight:4}}>{b.runs}R</span>}
+                      {(b.totalBases??0)>0&&<span style={{marginRight:4}}>{b.totalBases}TB</span>}
+                      {(b.bb??0)>0&&<span style={{color:"var(--green)",marginRight:4}}>{b.bb}BB</span>}
+                      {(b.so??0)>0&&<span style={{color:"var(--cold)"}}>{b.so}K</span>}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Row 2: Statcast metrics pill row */}
+                <div style={{display:"flex",gap:6,marginTop:5,marginLeft:20,flexWrap:"wrap"}}>
+                  {b.avgEV > 0 && <div style={{
+                    padding:"2px 7px",borderRadius:5,
+                    background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.08)",
+                    fontFamily:"'DM Mono',monospace",fontSize:10}}>
+                    <span style={{color:"var(--muted)",fontSize:8}}>EV </span>
+                    <span className={`sv ${ec}`} style={{fontSize:11,fontFamily:"'Oswald',sans-serif",fontWeight:700}}>
+                      {b.avgEV.toFixed(1)}
+                    </span>
+                  </div>}
+                  {b.launchAngle > 0 && <div style={{
+                    padding:"2px 7px",borderRadius:5,
+                    background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.08)",
+                    fontFamily:"'DM Mono',monospace",fontSize:10}}>
+                    <span style={{color:"var(--muted)",fontSize:8}}>LA </span>
+                    <span className={`sv ${inHRZ(b.launchAngle)?"good":"avg"}`}
+                      style={{fontSize:11,fontFamily:"'Oswald',sans-serif",fontWeight:700}}>
+                      {b.launchAngle.toFixed(0)}°
+                    </span>
+                    {zl&&<span style={{fontSize:8,color:"var(--green)",marginLeft:3}}>{zl}</span>}
+                  </div>}
+                  {(b.avgDist||0) > 0 && <div style={{
+                    padding:"2px 7px",borderRadius:5,
+                    background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.08)",
+                    fontFamily:"'DM Mono',monospace",fontSize:10}}>
+                    <span style={{color:"var(--muted)",fontSize:8}}>Dist </span>
+                    <span className={`sv ${distC}`}
+                      style={{fontSize:11,fontFamily:"'Oswald',sans-serif",fontWeight:700}}>
+                      {Math.round(b.avgDist)}ft
+                    </span>
+                    {(b.avgDist||0)>=350&&<span style={{marginLeft:2,fontSize:10}}>🔥</span>}
+                  </div>}
+                  {b.hardHits > 0 && <div style={{
+                    padding:"2px 7px",borderRadius:5,
+                    background:"rgba(255,128,32,.08)",border:"1px solid rgba(255,128,32,.2)",
+                    fontFamily:"'DM Mono',monospace",fontSize:10}}>
+                    <span style={{color:"var(--muted)",fontSize:8}}>HH </span>
+                    <span className="sv hot"
+                      style={{fontSize:11,fontFamily:"'Oswald',sans-serif",fontWeight:700}}>
+                      {b.hardHits}🔥
+                    </span>
+                  </div>}
+                </div>
+              </div>,
+              isE && <div key={`${b.id}-x`} style={{background:"rgba(232,65,26,.03)",
+                borderBottom:"1px solid rgba(30,45,58,.5)"}}><XRow b={b}/></div>
             ];
           })}
-        </tbody>
-      </table>
-    </div>
+        </div>
     : <div>
       {(data||[]).length === 0
         ? <div style={{padding:"16px 15px",color:"var(--muted)",fontFamily:"DM Mono,monospace",fontSize:11}}>Lineup not confirmed.</div>
