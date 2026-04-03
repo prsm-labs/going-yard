@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-02 20:39 ET";
+const BUILD_TIMESTAMP = "2026-04-02 20:54 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -504,7 +504,7 @@ const calcLS = (b) => {
   const rh = b.recentHardHit ?? b.hardHit ?? 0;
   const re = b.recentAvgEV ?? b.avgEV ?? 88;
   const streak = Math.min(((rb / 14) * 18) + ((rh / 55) * 12) + (Math.max(0, (re - 88) / 10) * 10), 40);
-  const ds = b.daysSinceHR ?? 5;
+  const ds = b.daysSinceHR;
   const due = ds <= 1 ? 5 : ds <= 3 ? 12 : ds <= 7 ? 25 : ds <= 14 ? 18 : 8;
   const pf = b.pitcherFactor ?? 0;
   const pit = pf > 0 ? 12 : pf < 0 ? 3 : 7;
@@ -514,15 +514,15 @@ const calcLS = (b) => {
 };
 const getLV = (s) => s >= 75 ? {label:"🚀 Primed",cls:"primed"} : s >= 55 ? {label:"🔥 Hot",cls:"hot"} : s >= 38 ? {label:"⚡ Watch",cls:"watch"} : {label:"❄️ Cold",cls:"cold"};
 const getLSigs = (b) => {
-  const sigs = [], ds = b.daysSinceHR ?? 5, rb = b.recentBarrel ?? b.barrel ?? 0, re = b.recentAvgEV ?? b.avgEV ?? 88, rh = b.recentHardHit ?? b.hardHit ?? 0;
-  if (ds >= 4 && ds <= 10) sigs.push({t:`${ds}d since last HR`, c:"fire"});
-  else if (ds > 14) sigs.push({t:`${ds}d HR drought`, c:"neg"});
+  const sigs = [], ds = b.daysSinceHR, rb = b.recentBarrel ?? b.barrel ?? 0, re = b.recentAvgEV ?? b.avgEV ?? 88, rh = b.recentHardHit ?? b.hardHit ?? 0;
+  if (ds != null && ds >= 4 && ds <= 10) sigs.push({t:`${ds}d since last HR`, c:"fire"});
+  else if (ds != null && ds > 14) sigs.push({t:`${ds}d HR drought`, c:"neg"});
   if (rb >= 14) sigs.push({t:`${rb.toFixed(0)}% barrel L7`, c:"pos"});
   else if (rb >= 8) sigs.push({t:`${rb.toFixed(0)}% barrel L7`, c:"neu"});
   if (re >= T.EV_HH) sigs.push({t:`${re.toFixed(0)} mph EV (95+)`, c:"pos"});
   if ((b.pitcherFactor ?? 0) > 0) sigs.push({t:"Favorable matchup", c:"pos"});
   if ((b.pitcherFactor ?? 0) < 0) sigs.push({t:"Tough pitcher", c:"neg"});
-  if (b.isHome && (b.homeHR ?? 0) > (b.awayHR ?? 0)) sigs.push({t:"Home HR boost", c:"pos"});
+  if (b.isHome && (b.hr ?? 0) > 0 && (b.homeHR ?? 0) > (b.awayHR ?? 0)) sigs.push({t:"Home HR boost", c:"pos"});
   if (rh >= 50) sigs.push({t:"Hard contact streak", c:"fire"});
   return sigs.slice(0, 4);
 };
@@ -1535,6 +1535,9 @@ async function loadGlobalPlayerMap() {
       } catch(se) {}
     }
     GLOBAL_PLAYER_MAP_LOADED = true;
+    // Check if any known players still have no team — if so mark for re-fetch later
+    const emptyTeams = Object.values(GLOBAL_PLAYER_TEAM_MAP).filter(p=>!p.team||p.team==="").length;
+    if (emptyTeams > 50) console.warn(`[PlayerMap] ${emptyTeams} players missing team abbreviation`);
     console.log('[Going Yard] Player map loaded:', Object.keys(GLOBAL_PLAYER_TEAM_MAP).length);
     // Backfill cached players missing team
     for (const [pidStr, player] of Object.entries(PLAYER_DATA_CACHE)) {
@@ -2089,6 +2092,11 @@ const LIFTOFF_CACHE = {};
 
 async function fetchLiftoffBatters(game) {
   if (LIFTOFF_CACHE[game.gamePk]) return LIFTOFF_CACHE[game.gamePk];
+  // Ensure player cache is populated before computing stats
+  if (Object.keys(PLAYER_DATA_CACHE).length < 5) {
+    await new Promise(res => fetchPlayers(()=>{}, ()=>{}, ()=>{}, true));
+    await new Promise(r => setTimeout(r, 800));
+  }
   try {
     const res = await fetch(`/api/boxscore?gamePk=${game.gamePk}`);
     const data = await res.json();
@@ -2156,7 +2164,7 @@ async function fetchLiftoffBatters(game) {
             }
           }).catch(() => {});
           // Use cached value while async runs
-          daysSinceHR = DAYS_SINCE_HR_CACHE[bid]?.days ?? 7;
+          daysSinceHR = DAYS_SINCE_HR_CACHE[bid]?.days ?? null;
         }
 
         // ── Pitcher matchup factor ─────────────────────────────
@@ -2224,7 +2232,7 @@ function genSL() {
           recentAvgEV:   p.windows?.last7?.avgEV   ?? p.avgEV    ?? 0,
           recentPullAir: p.windows?.last7?.pullAir ?? p.pullAir  ?? 0,
           recentFlyBall: p.windows?.last7?.flyBall ?? p.flyBall  ?? 0,
-          daysSinceHR:   DAYS_SINCE_HR_CACHE[p.pid]?.days ?? 7,
+          daysSinceHR:   DAYS_SINCE_HR_CACHE[p.pid]?.days ?? null,
           pitcherFactor: 0,
           homeHR:        p.hr > 0 ? (p.hr / 162) * 1.05 : 0.04,
           awayHR:        p.hr > 0 ? (p.hr / 162) * 0.95 : 0.03,
@@ -2455,7 +2463,7 @@ function XRow({b}) {
       <div className="xb"><div className="xbl">Hard Hits 95+</div><div className="xbv" style={{color:b.hardHits>=2?"#ff8020":b.hardHits===1?"#ffc840":"var(--muted)"}}>{b.hardHits}</div><div className="xbs" style={{color:"var(--muted)"}}>this game</div></div>
       <div className="xb"><div className="xbl">Barrel%</div><div className="xbv" style={{color:(b.recentBarrel??b.barrel??0)>=T.BAR_EL?"#ff4020":(b.recentBarrel??b.barrel??0)>=8?"#ff8020":"var(--text)"}}>{((b.recentBarrel??0)>0?(b.recentBarrel??0):(b.barrel??0)).toFixed(1)}%</div><div className="xbs" style={{color:"var(--muted)"}}>{(b.recentBarrel??0)>0?"L7":"season"}</div></div>
       <div className="xb"><div className="xbl">Hard Hit%</div><div className="xbv" style={{color:(b.recentHardHit??b.hardHit??0)>=50?"#ff4020":(b.recentHardHit??b.hardHit??0)>=40?"#ff8020":"var(--text)"}}>{((b.recentHardHit??0)>0?(b.recentHardHit??0):(b.hardHit??0)).toFixed(1)}%</div><div className="xbs" style={{color:"var(--muted)"}}>{(b.recentHardHit??0)>0?"L7":"season"}</div></div>
-      <div className="xb"><div className="xbl">Pull Air%</div><div className="xbv" style={{color:(b.pullAirPct??b.pullAir??0)>=25?"#ff8020":(b.pullAirPct??b.pullAir??0)>=18?"#ffc840":"var(--text)"}}>{(b.pullAirPct??b.pullAir??0).toFixed(1)}%</div><div className="xbs" style={{color:"var(--muted)"}}>HR zone intent</div></div>
+      <div className="xb"><div className="xbl">Pull Air%</div><div className="xbv" style={{color:(b.pullAirPct??b.pullAir??0)>=25?"#ff8020":"var(--text)"}}>{(b.pullAirPct??b.pullAir??0).toFixed(1)}%</div><div className="xbs" style={{color:"var(--muted)"}}>HR zone intent</div></div>
     </div>
     <div style={{marginBottom:4,fontSize:9,color:"var(--muted)",fontFamily:"DM Mono,monospace",textTransform:"uppercase",letterSpacing:1}}>Today vs L7</div>
     <CBar label="Exit Velo" tv={b.avgEV} l7={b.recentAvgEV??88} max={112} col={ec}/>
@@ -2542,7 +2550,7 @@ function LRow({b, rank}) {
     <SRing score={b.liftoffScore} color={vc}/>
     <div className="li">
       <div className="ln">{b.name}</div>
-      <div className="lm">{b.team} · {b.isHome?"Home":"Away"} · {b.hr} HR</div>
+      <div className="lm">{getTeam(b.id, b.team)} · {b.isHome?"Home":"Away"} · {b.hr} HR</div>
       <div className="ls">
         <span className={`lv ${b.verdict.cls}`}>{b.verdict.label}</span>
         {b.signals.map((s, i) => <span key={i} className={`stag ${s.c}`}>{s.t}</span>)}
@@ -2551,7 +2559,7 @@ function LRow({b, rank}) {
     <div className="lmini">
       <div className="lms"><div className="lmsv" style={{color:((b.recentBarrel??0)>0?(b.recentBarrel??0):(b.barrel??0))>=12?"#ff8020":"var(--text)"}}>{((b.recentBarrel??0)>0?(b.recentBarrel??0):(b.barrel??0)).toFixed(0)}%</div><div className="lmsl">Barrel L7</div></div>
       <div className="lms"><div className="lmsv" style={{color:(b.recentAvgEV??0)>=T.EV_HH?"#ff8020":"var(--text)"}}>{(b.recentAvgEV??0).toFixed(0)}</div><div className="lmsl">EV L7</div></div>
-      <div className="lms"><div className="lmsv" style={{color:b.daysSinceHR>=4&&b.daysSinceHR<=10?"#ffc840":"var(--text)"}}>{b.daysSinceHR!=null?`${b.daysSinceHR}d`:"—"}</div><div className="lmsl">Since HR</div></div>
+      <div className="lms"><div className="lmsv" style={{color:b.daysSinceHR>=4&&b.daysSinceHR<=10?"#ffc840":"var(--text)"}}>{b.daysSinceHR!=null?`${b.daysSinceHR != null ? `${b.daysSinceHR}d` : "—"}`:"—"}</div><div className="lmsl">Since HR</div></div>
     </div>
   </div>;
 }
@@ -2946,7 +2954,16 @@ function LiveTab() {
   return <div>
     <div className="hrow">
       <div className="section-header"><div className="section-title">📡 Live Yard Watch</div><div className="section-sub">Tap any game · Live=heat · Upcoming=🚀Liftoff · auto-refreshes every 60s{lastUpdate&&<span style={{marginLeft:8}}>Last: {lastUpdate}</span>}</div></div>
-      <RefBtn refreshing={refreshing} onClick={async()=>{setRefreshing(true);await fetchGames(setLoading,setGames,setError,true);setLastUpdate(new Date().toLocaleTimeString());setRefreshing(false);}}/>
+      <div style={{display:"flex",gap:8,alignItems:"center"}}>
+        <button onClick={()=>setShowHeatingUp(true)}
+          style={{padding:"6px 14px",borderRadius:8,cursor:"pointer",
+            background:"rgba(232,65,26,.12)",border:"1px solid rgba(232,65,26,.35)",
+            color:"var(--accent)",fontFamily:"'Oswald',sans-serif",fontWeight:700,
+            fontSize:12,letterSpacing:.5,display:"flex",alignItems:"center",gap:5}}>
+          🔥 Heating Up
+        </button>
+        <RefBtn refreshing={refreshing} onClick={async()=>{setRefreshing(true);await fetchGames(setLoading,setGames,setError,true);setLastUpdate(new Date().toLocaleTimeString());setRefreshing(false);}}/>
+      </div>
     </div>
     <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 12px",
         borderRadius:8,background:"rgba(245,166,35,.06)",border:"1px solid rgba(245,166,35,.15)",
