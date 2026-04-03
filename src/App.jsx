@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-03 18:50 ET";
+const BUILD_TIMESTAMP = "2026-04-03 18:52 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -3026,7 +3026,7 @@ function HeatingUpSlideout({ games, onClose }) {
                   Nobody heating up yet.<br/>
                   <span style={{fontSize:10}}>Batters need at least 1 AB before qualifying.</span>
                 </div>
-          : batters.map((b, idx) => <React.Fragment key={`hu-${b.id}-${idx}`}>
+          : batters.map((b, idx) => (<React.Fragment key={`hu-${b.id}-${idx}`}>
           <div
             onClick={()=>setExpandedId(id => id===b.id ? null : b.id)}
             style={{display:'flex',alignItems:'center',gap:8,
@@ -3156,7 +3156,7 @@ function HeatingUpSlideout({ games, onClose }) {
             </div>}
             {(b.atBats||[]).length===0&&<div style={{padding:'8px 12px 10px',fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>No at-bats recorded yet.</div>}
           </div>}
-        </React.Fragment>
+        </React.Fragment>))
       }
       </div>
     </div>
