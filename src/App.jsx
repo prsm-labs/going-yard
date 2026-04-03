@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-03 09:09 ET";
+const BUILD_TIMESTAMP = "2026-04-03 09:23 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -4372,8 +4372,8 @@ function PowerBITab() {
   return <div>
     {/* Header */}
     <div className="section-header" style={{marginBottom:16}}>
-      <div className="section-title">📊 Analytics Dashboard</div>
-      <div className="section-sub">Power BI · interactive analytics · full screen mode available</div>
+      <div className="section-title">📊 Data</div>
+      <div className="section-sub">Power BI · interactive analytics · full screen available</div>
     </div>
 
     {/* iframe — always first */}
@@ -4918,15 +4918,15 @@ export default function App() {
   }, []);
 
   const NAV = [
-    {key:"homeruns", label:"💥 HR Tracker"},
-    {key:"weather",  label:"🌤️ Weather"},
-    {key:"live",     label:"📡 Live"},
-    {key:"powerbi",  label:"📊 Analytics"},
+    {key:"homeruns",  label:"💥 HR Tracker"},
+    {key:"weather",   label:"🌤️ Weather"},
+    {key:"live",      label:"📡 Live"},
+    {key:"powerbi",   label:"📊 Data"},
+    {key:"picks",     label:"🎯 My Picks"},
+    {key:"statcast",  label:"📡 Statcast"},
     {key:"onlyhomers",label:"⚾ Only Homers"},
-    {key:"linemate", label:"📊 Linemate"},
-    {key:"statcast", label:"📡 Statcast"},
+    {key:"linemate",  label:"📊 Linemate",  external:"https://linemate.io/mlb"},
     {key:"livesports",label:"📺 Live Sports",external:"https://thetvapp.to"},
-    {key:"picks",    label:"🎯 My Picks"},
   ];
 
   return <>
@@ -4970,7 +4970,6 @@ export default function App() {
         <div style={{display:tab==="statcast"?"block":"none"}}><StatcastTab/></div>
         <div style={{display:tab==="homeruns"?"block":"none"}}><HRTrackerTab/></div>
         <div style={{display:tab==="onlyhomers"?"block":"none"}}><OnlyHomersTab/></div>
-        <div style={{display:tab==="linemate"?"block":"none"}}><LinemateTab/></div>
       </main>
       <div style={{textAlign:"center",padding:"12px 0 8px",borderTop:"1px solid var(--border)",marginTop:24}}>
         <span style={{fontSize:10,color:"#2a3a48",fontFamily:"'DM Mono',monospace",letterSpacing:1}}>
