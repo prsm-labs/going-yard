@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-03 13:21 ET";
+const BUILD_TIMESTAMP = "2026-04-03 13:28 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -236,6 +236,7 @@ const styles = `
   .tw-scroll th{padding:9px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-family:'DM Mono',monospace;white-space:nowrap;border-bottom:2px solid var(--border);cursor:pointer;user-select:none;background:var(--surface2);position:sticky;top:0;z-index:20;}
   .tw-scroll td{padding:10px 12px;font-size:12px;border-bottom:1px solid rgba(30,45,58,.5);vertical-align:middle;}
   ::-webkit-scrollbar{width:5px;height:5px;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.5;}}
   ::-webkit-scrollbar-track{background:var(--bg);}
   ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
 @media(max-width:768px){
@@ -2030,8 +2031,9 @@ async function fetchLiveBatters(gamePk) {
 
     // Statcast data comes pre-parsed from the server
     // Map: batterId → { evs[], las[], distances[], hardHits, barrels }
-    const liveStatcast = data.statcastByBatter || {};
-    console.log(`[LiveBatters] gamePk=${gamePk} | Statcast entries: ${Object.keys(liveStatcast).length}`);
+  const liveStatcast    = data.statcastByBatter || {};
+  const currentBatterId = data.currentBatterId  || null;
+  const onDeckId        = data.onDeckId         || null;
 
     const avg = (arr) => arr.length > 0 ? Math.round(arr.reduce((a,b)=>a+b,0)/arr.length*10)/10 : null;
 
@@ -2116,16 +2118,20 @@ async function fetchLiveBatters(gamePk) {
           flyBallPct:      cachedP?.flyBall  || 0,
           xwoba:           cachedP?.xwoba    || 0,
           atBats:          live?.atBats      || [],
+          isAtBat:         bid === currentBatterId,
+          isOnDeck:        bid === onDeckId,
         });
       }
     }
 
-    return batters.sort((a,b) => {
-      const o = {elite:4,hot:3,warm:2,avg:1,cold:0};
-      return (o[b.heatLabel.cls]||0) - (o[a.heatLabel.cls]||0);
-    });
-
-  } catch(e) {
+  return batters.sort((a,b) => {
+    if (a.isAtBat && !b.isAtBat)  return -1;
+    if (b.isAtBat && !a.isAtBat)  return  1;
+    if (a.isOnDeck && !b.isOnDeck) return -1;
+    if (b.isOnDeck && !a.isOnDeck) return  1;
+    const o = {gone_yard:5,elite:4,hot:3,warm:2,avg:1,cold:0};
+    return (o[b.heatLabel.cls]||0) - (o[a.heatLabel.cls]||0);
+  });
     console.warn('[LiveBatters]', e.message);
     return SLB;
   }
@@ -2695,6 +2701,17 @@ function GPanel({game, isLive, isFinal=false}) {
                       </div>
                     </div>
                   </div>
+                  {b.isAtBat && <span style={{
+                    padding:"1px 6px",borderRadius:4,fontSize:9,fontWeight:800,
+                    background:"rgba(39,201,122,.2)",color:"#27c97a",
+                    border:"1px solid rgba(39,201,122,.4)",flexShrink:0,
+                    fontFamily:"'DM Mono',monospace",letterSpacing:.5,
+                    animation:"pulse 1.2s ease-in-out infinite"}}>⚡ AT BAT</span>}
+                  {b.isOnDeck && !b.isAtBat && <span style={{
+                    padding:"1px 6px",borderRadius:4,fontSize:9,fontWeight:600,
+                    background:"rgba(245,166,35,.12)",color:"var(--accent2)",
+                    border:"1px solid rgba(245,166,35,.25)",flexShrink:0,
+                    fontFamily:"'DM Mono',monospace"}}>👀 ON DECK</span>}
                   <span className={`hl ${b.heatLabel.cls}`}
                     style={{flexShrink:0,fontSize:9}}>{b.heatLabel.label}</span>
                   {/* Today's line: H/AB HR */}

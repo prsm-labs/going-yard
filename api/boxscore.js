@@ -23,9 +23,17 @@ export default async function handler(req, res) {
     // Returns map: batterId → { evs, las, distances, hardHits, barrels, atBats[] }
     const statcastByBatter = {};
 
+    let currentBatterId = null;
+    let onDeckId = null;
+
     if (liveRes.ok) {
       const liveData = await liveRes.json();
       const plays = liveData?.liveData?.plays?.allPlays || [];
+
+      // Extract who is currently at-bat and on-deck from the linescore offense
+      const offense = liveData?.liveData?.linescore?.offense || {};
+      currentBatterId = offense.batter?.id || null;
+      onDeckId        = offense.onDeck?.id  || null;
 
       for (const play of plays) {
         const batterId  = play.matchup?.batter?.id;
@@ -104,6 +112,8 @@ export default async function handler(req, res) {
     res.status(200).json({
       ...boxData,
       statcastByBatter,
+      currentBatterId,
+      onDeckId,
     });
 
   } catch (err) {
