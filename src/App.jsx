@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-02 20:54 ET";
+const BUILD_TIMESTAMP = "2026-04-02 21:25 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -1135,7 +1135,7 @@ function AtBatSlideIn() {
             {label:"HardHit%",val:player.hardHit, suffix:"%", color: player.hardHit>=50?"#ff8020":"var(--text)"},
             {label:"FlyBall%",val:player.flyBall, suffix:"%", color:"var(--text)"},
             {label:"Launch°", val:player.launchAngle, suffix:"°", color: player.launchAngle>=25&&player.launchAngle<=35?"var(--green)":"var(--text)"},
-            {label:"Pull%",   val:player.pullAir, suffix:"%", color: player.pullAir>=40?"#ff8020":"var(--text)"},
+            
             {label:"xwOBA",   val:player.xwoba,   suffix:"",  color: player.xwoba>=0.380?"var(--accent)":player.xwoba>=0.320?"#ff8020":"var(--text)"},
             {label:"Chase%",  val:player.oSwing,  suffix:"%", color: player.oSwing<=20?"var(--green)":player.oSwing>=30?"#ff8020":"var(--text)"},
           ].filter(s=>s.val>0).map(s=>(
@@ -2463,7 +2463,7 @@ function XRow({b}) {
       <div className="xb"><div className="xbl">Hard Hits 95+</div><div className="xbv" style={{color:b.hardHits>=2?"#ff8020":b.hardHits===1?"#ffc840":"var(--muted)"}}>{b.hardHits}</div><div className="xbs" style={{color:"var(--muted)"}}>this game</div></div>
       <div className="xb"><div className="xbl">Barrel%</div><div className="xbv" style={{color:(b.recentBarrel??b.barrel??0)>=T.BAR_EL?"#ff4020":(b.recentBarrel??b.barrel??0)>=8?"#ff8020":"var(--text)"}}>{((b.recentBarrel??0)>0?(b.recentBarrel??0):(b.barrel??0)).toFixed(1)}%</div><div className="xbs" style={{color:"var(--muted)"}}>{(b.recentBarrel??0)>0?"L7":"season"}</div></div>
       <div className="xb"><div className="xbl">Hard Hit%</div><div className="xbv" style={{color:(b.recentHardHit??b.hardHit??0)>=50?"#ff4020":(b.recentHardHit??b.hardHit??0)>=40?"#ff8020":"var(--text)"}}>{((b.recentHardHit??0)>0?(b.recentHardHit??0):(b.hardHit??0)).toFixed(1)}%</div><div className="xbs" style={{color:"var(--muted)"}}>{(b.recentHardHit??0)>0?"L7":"season"}</div></div>
-      <div className="xb"><div className="xbl">Pull Air%</div><div className="xbv" style={{color:(b.pullAirPct??b.pullAir??0)>=25?"#ff8020":"var(--text)"}}>{(b.pullAirPct??b.pullAir??0).toFixed(1)}%</div><div className="xbs" style={{color:"var(--muted)"}}>HR zone intent</div></div>
+      <div className="xb"><div className="xbl">Fly Ball%</div><div className="xbv" style={{color:(b.recentFlyBall??b.flyBall??0)>=35&&(b.recentFlyBall??b.flyBall??0)<=45?"#ff8020":"var(--text)"}}>{((b.recentFlyBall??0)>0?(b.recentFlyBall??0):(b.flyBall??0)).toFixed(1)}%</div><div className="xbs" style={{color:"var(--muted)"}}>{(b.recentFlyBall??0)>0?"L7":"season"}</div></div>
     </div>
     <div style={{marginBottom:4,fontSize:9,color:"var(--muted)",fontFamily:"DM Mono,monospace",textTransform:"uppercase",letterSpacing:1}}>Today vs L7</div>
     <CBar label="Exit Velo" tv={b.avgEV} l7={b.recentAvgEV??88} max={112} col={ec}/>
@@ -2471,7 +2471,7 @@ function XRow({b}) {
     <div className="stags">
       {inZ && <span className="stag pos">✓ HR Zone</span>}
       {b.avgEV >= T.EV_HH && <span className="stag fire">⚡ 95+ MPH</span>}
-      {(b.pullAirPct??0) >= 18 && <span className="stag pos">↗ Pull Power</span>}
+      {(b.recentFlyBall??b.flyBall??0) >= 40 && <span className="stag pos">🚀 High FB%</span>}
       {b.avgEV < T.EV_HH && <span className="stag neg">⬇ Low EV</span>}
       {!inZ && <span className="stag neg">✗ Wrong Angle</span>}
     </div>
