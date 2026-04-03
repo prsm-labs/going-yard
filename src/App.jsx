@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-03 14:06 ET";
+const BUILD_TIMESTAMP = "2026-04-03 18:50 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -3026,9 +3026,9 @@ function HeatingUpSlideout({ games, onClose }) {
                   Nobody heating up yet.<br/>
                   <span style={{fontSize:10}}>Batters need at least 1 AB before qualifying.</span>
                 </div>
-: batters.map((b, idx) => (
-          <div key={`${b.id}-${idx}`}
-            onClick={()=>{ openAtBatSlide(b); onClose(); }}
+          : batters.map((b, idx) => <React.Fragment key={`hu-${b.id}-${idx}`}>
+          <div
+            onClick={()=>setExpandedId(id => id===b.id ? null : b.id)}
             style={{display:'flex',alignItems:'center',gap:8,
               padding:'8px 14px',borderBottom:'1px solid rgba(255,255,255,.04)',
               cursor:'pointer',transition:'background .1s'}}
@@ -3104,7 +3104,59 @@ function HeatingUpSlideout({ games, onClose }) {
               </div>}
             </div>
           </div>
-        ))
+          {expandedId === b.id && <div style={{
+            background:'rgba(20,30,40,1)',borderBottom:'1px solid var(--border)',
+            borderLeft:'3px solid var(--accent)'
+          }}>
+            {(b.ab > 0) && <div style={{display:'flex',gap:0,margin:'8px 12px 4px',border:'1px solid var(--border)',borderRadius:8,overflow:'hidden'}}>
+              {[
+                {label:'AB', val:b.ab,           color:'var(--text)'},
+                {label:'H',  val:b.hits||0,      color:(b.hits||0)>0?'#27c97a':'var(--text)'},
+                {label:'HR', val:b.hr||0,        color:(b.hr||0)>0?'var(--accent)':'var(--text)'},
+                {label:'R',  val:b.runs??0,      color:(b.runs||0)>0?'#27c97a':'var(--text)'},
+                {label:'TB', val:b.totalBases??0,color:(b.totalBases||0)>=4?'var(--accent)':(b.totalBases||0)>=2?'#ff8020':'var(--text)'},
+                {label:'RBI',val:b.rbi??0,       color:(b.rbi||0)>0?'#ffc840':'var(--text)'},
+                {label:'BB', val:b.bb??0,        color:(b.bb||0)>0?'#38b8f2':'var(--text)'},
+                {label:'K',  val:b.so??0,        color:(b.so||0)>=2?'#38b8f2':'var(--text)'},
+              ].map((s,si,arr)=>(
+                <div key={s.label} style={{flex:1,textAlign:'center',padding:'5px 3px',
+                  background:'rgba(255,255,255,.02)',borderRight:si<arr.length-1?'1px solid var(--border)':'none'}}>
+                  <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color:s.color,lineHeight:1}}>{s.val}</div>
+                  <div style={{fontSize:7,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:.5,marginTop:2}}>{s.label}</div>
+                </div>
+              ))}
+            </div>}
+            {(b.atBats||[]).length > 0 && <div style={{padding:'0 12px 10px'}}>
+              <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1,marginBottom:5,marginTop:6}}>Today's At-Bats</div>
+              <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
+                <table style={{width:'100%',borderCollapse:'collapse',fontSize:11}}>
+                  <thead><tr style={{borderBottom:'1px solid var(--border)'}}>
+                    {['Inn','Result','EV','Angle','Dist','Pitch','Pitcher'].map(h=>(
+                      <th key={h} style={{padding:'3px 6px',textAlign:'left',fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:.5,whiteSpace:'nowrap'}}>{h}</th>
+                    ))}
+                  </tr></thead>
+                  <tbody>
+                    {(b.atBats||[]).map((ab,ai)=>{
+                      const evc=(ab.ev||0)>=103?'#ff4020':(ab.ev||0)>=95?'#ff8020':(ab.ev||0)>=90?'#ffc840':'var(--text)';
+                      const dc=(ab.dist||0)>=400?'#ff4020':(ab.dist||0)>=350?'#ff8020':(ab.dist||0)>=300?'#ffc840':'var(--text)';
+                      const good=/home_run|double|triple|single/i.test(ab.result||'');
+                      return <tr key={ai} style={{borderBottom:'1px solid rgba(255,255,255,.04)',background:ai%2===0?'rgba(255,255,255,.01)':'transparent'}}>
+                        <td style={{padding:'3px 5px',color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:9,whiteSpace:'nowrap'}}>{ab.halfInning==='top'?'▲':'▼'}{ab.inning||'—'}</td>
+                        <td style={{padding:'3px 5px',color:good?'#27c97a':'var(--muted)',fontWeight:good?700:400,maxWidth:100,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontFamily:"'DM Mono',monospace",fontSize:9}}>{ab.result||'—'}</td>
+                        <td style={{padding:'3px 5px',color:evc,fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,whiteSpace:'nowrap'}}>{ab.ev>0?ab.ev.toFixed(1):'—'}</td>
+                        <td style={{padding:'3px 5px',color:'var(--text)',fontFamily:"'DM Mono',monospace",fontSize:9,whiteSpace:'nowrap'}}>{ab.launchAngle>0?ab.launchAngle.toFixed(0)+'°':'—'}</td>
+                        <td style={{padding:'3px 5px',color:dc,fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,whiteSpace:'nowrap'}}>{ab.dist>0?ab.dist+'ft':'—'}</td>
+                        <td style={{padding:'3px 5px',color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:9,whiteSpace:'nowrap'}}>{ab.pitchType||'—'}</td>
+                        <td style={{padding:'3px 5px',color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:9,maxWidth:80,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{ab.pitcherName||'—'}</td>
+                      </tr>;
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>}
+            {(b.atBats||[]).length===0&&<div style={{padding:'8px 12px 10px',fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>No at-bats recorded yet.</div>}
+          </div>}
+        </React.Fragment>
       }
       </div>
     </div>
