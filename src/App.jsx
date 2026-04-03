@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-02 23:09 ET";
+const BUILD_TIMESTAMP = "2026-04-03 00:07 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -11,8 +11,8 @@ const styles = `
     --text:#e8edf2;--muted:#5a7080;--fire2:#ff7a00;--fire3:#ffb700;
     --aplus:#ff3010;--a:#ff7000;--b:#f5a623;--c:#8bc4e8;--d:#5a7080;--f:#38b8f2;
   }
-  html,body{background:var(--bg);color:var(--text);font-family:'Oswald',sans-serif;min-height:100vh;overflow-x:hidden;max-width:100vw;}
-  .app{min-height:100vh;display:flex;flex-direction:column;overflow-x:hidden;max-width:100%;}
+  html,body{background:var(--bg);color:var(--text);font-family:'Oswald',sans-serif;min-height:100vh;overflow-x:clip;max-width:100vw;}
+  .app{min-height:100vh;display:flex;flex-direction:column;overflow-x:clip;max-width:100%;}
   .header{padding:16px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:linear-gradient(180deg,#0a1520 0%,var(--bg) 100%);}
   .logo{font-family:'Oswald',sans-serif;font-weight:700;font-size:26px;text-transform:uppercase;letter-spacing:3px;color:var(--text);display:flex;align-items:center;gap:10px;}
   .logo span{color:var(--accent);}
@@ -92,8 +92,8 @@ const styles = `
   .rb:hover{border-color:var(--accent);color:var(--accent);}
   .rb.sp2 svg{animation:spin .8s linear infinite;}
   .div{font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;}
-  .gg{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:11px;margin-bottom:6px;}
-  .gc{overflow:visible;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;}
+  .gg{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:11px;margin-bottom:6px;max-width:100%;min-width:0;}
+  .gc{overflow:hidden;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;cursor:pointer;transition:all .2s;position:relative;min-width:0;max-width:100%;}
   .gc:hover{border-color:rgba(232,65,26,.5);}
   .gc.exp{border-color:var(--accent);border-bottom-left-radius:0;border-bottom-right-radius:0;border-bottom:none;}
   .gc::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),var(--accent2));opacity:0;transition:opacity .2s;}
@@ -111,8 +111,8 @@ const styles = `
   .gi{font-family:'DM Mono',monospace;font-size:10px;text-align:center;margin-top:5px;}
   .cv2{font-size:10px;color:var(--muted);transition:transform .2s;display:inline-block;}
   .cv2.op{transform:rotate(180deg);}
-  .gpw{margin-bottom:14px;grid-column:1/-1;}
-  .gp{overflow:hidden;max-width:100%;border:1px solid var(--accent);border-top:none;border-bottom-left-radius:10px;border-bottom-right-radius:10px;background:#0a1218;overflow:hidden;animation:sd .2s ease;width:100%;}
+  .gpw{margin-bottom:14px;grid-column:1/-1;min-width:0;width:100%;max-width:100%;}
+  .gp{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;min-width:0;width:100%;max-width:100%;border:1px solid var(--accent);border-top:none;border-bottom-left-radius:10px;border-bottom-right-radius:10px;background:#0a1218;overflow:hidden;animation:sd .2s ease;width:100%;}
   @keyframes sd{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
   .gph{padding:9px 15px;border-bottom:1px solid var(--border);}
   .gpt{font-family:'Oswald',sans-serif;font-size:13px;letter-spacing:1.5px;color:var(--text);}
@@ -239,7 +239,7 @@ const styles = `
   ::-webkit-scrollbar-track{background:var(--bg);}
   ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
 @media(max-width:768px){
-    html,body,#root,.app{overflow-x:hidden;max-width:100vw;}
+    html,body,#root,.app{overflow-x:clip;max-width:100vw;}
     .content{padding:10px;}.header{padding:10px 12px;}
     .gg{grid-template-columns:1fr;}.cards{grid-template-columns:repeat(2,1fr);}
     .xg{grid-template-columns:repeat(2,1fr);}.lmini{display:none;}
@@ -247,7 +247,7 @@ const styles = `
     .tabs{overflow-x:auto;-webkit-overflow-scrolling:touch;flex-wrap:nowrap;padding:0 8px;}
     @media(orientation:landscape){.landscape-hint{display:none!important;}}
     .tab{white-space:nowrap;flex-shrink:0;padding:10px 9px;font-size:10px;}
-    .gp{overflow:hidden;}  /* table panel only — never clip .gc card header */
+    '    .gc{overflow:visible;}'
     .tw{overflow-x:auto;-webkit-overflow-scrolling:touch;}
     }
 `;
@@ -2598,7 +2598,7 @@ function GPanel({game, isLive, isFinal=false}) {
       <div className="gps">{isLive ? "Click any batter → today vs L7 comparison" : isFinal ? "Final game stats · click any batter for detail" : "Ranked: streak 40% · due factor 25% · vs pitcher 15% · home/away 10%"}</div>
     </div>
     {loading ? <div style={{padding:"20px 15px",display:"flex",alignItems:"center",gap:8}}><div className="sp" style={{width:18,height:18,borderWidth:2}}/><span style={{fontFamily:"DM Mono,monospace",fontSize:10,color:"var(--muted)"}}>Loading…</span></div>
-    : (isLive || isFinal) ? <div style={{overflowX:"auto",maxWidth:"100%",WebkitOverflowScrolling:"touch"}}>
+    : (isLive || isFinal) ? <div style={{WebkitOverflowScrolling:"touch"}}>
       <table style={{width:"100%",tableLayout:"auto",minWidth:580}}>
         <thead><tr>
           <th style={{width:20}}></th>
