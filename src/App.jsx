@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-02 16:03 ET";
+const BUILD_TIMESTAMP = "2026-04-02 16:37 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -2753,197 +2753,173 @@ function RefBtn({refreshing, onClick}) {
 function HeatingUpSlideout({ games, onClose }) {
   const [batters, setBatters] = useState([]);
   const [loading, setLoading] = useState(true);
-  const live = (games || []).filter(g => g.status === 'Live');
+  const liveGames = (games||[]).filter(g => g.status==='Live');
+  const preGames  = (games||[]).filter(g => g.status==='Preview');
 
   useEffect(() => {
-    if (live.length === 0) { setLoading(false); return; }
     (async () => {
       setLoading(true);
-      const allBatters = {};
+      const all = [];
 
-      await Promise.all(live.map(async (game) => {
+      // Live games — use real in-game Statcast data
+      await Promise.all(liveGames.map(async (game) => {
         try {
-          const res  = await fetch(`/api/boxscore?gamePk=${game.gamePk}`);
-          const data = await res.json();
-
-          for (const side of ['away', 'home']) {
-            const team = data.teams?.[side];
-            if (!team) continue;
-            const teamAbbr = team.team?.abbreviation || game[side]?.abbr || '—';
-
-            for (const [key, player] of Object.entries(team.players || {})) {
-              const pid  = parseInt(key.replace('ID',''));
-              const name = player.person?.fullName;
-              if (!name) continue;
-
-              // Pull this game's live stats
-              const stats = player.stats?.batting || {};
-              const ab    = parseInt(stats.atBats || 0);
-              if (ab === 0) continue;
-
-              // Get Statcast EV from hitData if available
-              // We aggregate from the live at-bat feed if present
-              const cached = PLAYER_DATA_CACHE[pid];
-              const seasonEV = cached?.avgEV || 0;
-              const seasonBrl= cached?.barrel || 0;
-
-              // Build or update batter entry
-              if (!allBatters[pid]) {
-                allBatters[pid] = {
-                  pid, name, team: teamAbbr,
-                  ab, hits: parseInt(stats.hits||0),
-                  hr:  parseInt(stats.homeRuns||0),
-                  rbi: parseInt(stats.rbi||0),
-                  seasonEV, seasonBrl,
-                  gameHits: parseInt(stats.hits||0),
-                  gameTB:   parseInt(stats.totalBases||0),
-                };
-              }
-            }
-          }
-        } catch(e) { console.warn('[HeatingUp]', e.message); }
+          const batters = await fetchLiveBatters(game.gamePk);
+          batters.forEach(b => all.push({...b, gameStatus:'Live', gamePk:game.gamePk}));
+        } catch(e) {}
       }));
 
-      // Sort: prioritize HR today, then hard contact season metrics
-      const sorted = Object.values(allBatters)
-        .filter(b => b.ab > 0)
-        .sort((a, b) => {
-          // HR today first
-          if (b.hr !== a.hr) return b.hr - a.hr;
-          // Then multi-hit games
-          if (b.gameHits !== a.gameHits) return b.gameHits - a.gameHits;
-          // Then season EV
-          return b.seasonEV - a.seasonEV;
-        })
-        .slice(0, 10);
+      // Pre-game — use liftoff scores (season metrics)
+      await Promise.all(preGames.map(async (game) => {
+        try {
+          const batters = await fetchLiftoffBatters(game);
+          batters.forEach(b => all.push({...b, gameStatus:'Preview', gamePk:game.gamePk}));
+        } catch(e) {}
+      }));
 
-      setBatters(sorted);
+      // Filter: only heating up or hotter
+      // Live batters use heatLabel.cls: 'elite' | 'hot' | 'avg' | 'cold'
+      // Liftoff batters use verdict.cls:  'primed' | 'hot' | 'watch' | 'cold'
+      const HOT_LIVE    = new Set(['elite','hot']);
+      const HOT_LIFTOFF = new Set(['primed','hot']);
+
+      const hot = all.filter(b => {
+        if (b.heatLabel) return HOT_LIVE.has(b.heatLabel.cls);
+        if (b.verdict)   return HOT_LIFTOFF.has(b.verdict.cls);
+        return false;
+      });
+
+      // Sort: elite/primed first, then by EV descending
+      const order = {elite:4, primed:4, hot:3, watch:2, warm:2};
+      hot.sort((a,b) => {
+        const ac = a.heatLabel?.cls || a.verdict?.cls || '';
+        const bc = b.heatLabel?.cls || b.verdict?.cls || '';
+        const diff = (order[bc]||0) - (order[ac]||0);
+        if (diff !== 0) return diff;
+        return (b.avgEV||0) - (a.avgEV||0);
+      });
+
+      setBatters(hot);
       setLoading(false);
     })();
-  }, [live.length]);
+  }, [games.length]);
 
-  const evCls = v => v>=103?'dng':v>=95?'hot':v>=90?'warm':'avg';
-  const brlCls= v => v>=12?'hot':v>=7?'warm':'avg';
+  const getBadge = (b) => {
+    const cls = b.heatLabel?.cls || b.verdict?.cls || '';
+    const label = b.heatLabel?.label || b.verdict?.label || '';
+    const color = cls==='elite'||cls==='primed' ? '#ff4020' : '#ff8020';
+    return { cls, label, color };
+  };
+
+  const evColor = (ev) => (ev||0)>=103?'#ff4020':(ev||0)>=95?'#ff8020':(ev||0)>=90?'#ffc840':'var(--muted)';
+  const laColor = (la) => (la||0)>=25&&(la||0)<=35?'#27c97a':(la||0)>=18?'var(--accent2)':'var(--muted)';
 
   return <>
-    {/* Backdrop */}
-    <div onClick={onClose} style={{
-      position:'fixed',inset:0,background:'rgba(0,0,0,.55)',zIndex:900
-    }}/>
-    {/* Panel */}
-    <div style={{
-      position:'fixed',right:0,top:0,bottom:0,width:'min(400px,100vw)',
+    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.6)',zIndex:900}}/>
+    <div style={{position:'fixed',right:0,top:0,bottom:0,width:'min(420px,100vw)',
       background:'var(--surface)',borderLeft:'1px solid var(--border)',
-      zIndex:901,display:'flex',flexDirection:'column',overflowY:'auto'
-    }}>
+      zIndex:901,display:'flex',flexDirection:'column'}}>
+
       {/* Header */}
       <div style={{padding:'16px 20px',borderBottom:'1px solid var(--border)',
-        display:'flex',alignItems:'center',gap:10}}>
+        display:'flex',alignItems:'center',gap:10,flexShrink:0}}>
         <div>
-          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:18,
+          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:900,fontSize:20,
             letterSpacing:1,color:'var(--accent)'}}>🔥 Heating Up</div>
           <div style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginTop:2}}>
-            Top contact batters across {live.length} live game{live.length!==1?'s':''}
+            {loading ? 'Scanning games…'
+              : batters.length > 0
+                ? `${batters.length} batter${batters.length!==1?'s':''} heating up across ${liveGames.length} live + ${preGames.length} upcoming`
+                : 'No batters heating up right now'}
           </div>
         </div>
         <button onClick={onClose} style={{marginLeft:'auto',background:'none',
           border:'1px solid var(--border)',borderRadius:6,padding:'4px 10px',
           color:'var(--muted)',cursor:'pointer',fontFamily:"'DM Mono',monospace",fontSize:11}}>
-          ✕ Close
+          ✕
         </button>
       </div>
 
-      {/* Content */}
-      <div style={{flex:1,padding:'12px 16px'}}>
-        {live.length === 0
-          ? <div style={{padding:'40px 0',textAlign:'center',color:'var(--muted)',
-              fontFamily:"'DM Mono',monospace",fontSize:12}}>
-              No live games right now.
+      {/* Body */}
+      <div style={{flex:1,overflowY:'auto',padding:'10px 0'}}>
+        {loading
+          ? <div className="lw" style={{padding:'40px 0'}}>
+              <div className="sp"/>
+              <div className="lt">Fetching live batter data…</div>
             </div>
-          : loading
-            ? <div className="lw"><div className="sp"/><div className="lt">Scanning live lineups…</div></div>
-            : batters.length === 0
-              ? <div style={{padding:'40px 0',textAlign:'center',color:'var(--muted)',
-                  fontFamily:"'DM Mono',monospace",fontSize:12}}>
-                  No batter data available yet.
-                </div>
-              : <div style={{display:'flex',flexDirection:'column',gap:8}}>
-                  {batters.map((b, i) => (
-                    <div key={b.pid} style={{
-                      background:'var(--surface2)',borderRadius:10,padding:'12px 14px',
-                      border:`1px solid ${b.hr>0?'rgba(232,65,26,.3)':b.gameHits>=2?'rgba(245,166,35,.2)':'var(--border)'}`,
-                      cursor:'pointer'
-                    }} onClick={()=>openAtBatSlide(b)}>
-                      {/* Rank + Name row */}
-                      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}>
-                        <span style={{
-                          fontFamily:"'Oswald',sans-serif",fontWeight:900,fontSize:18,
-                          color:i===0?'#ffd700':i===1?'#c0c0c0':i===2?'#cd7f32':'var(--muted)',
-                          minWidth:22,textAlign:'center'
-                        }}>{i+1}</span>
-                        <div style={{flex:1}}>
-                          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:15}}>
-                            {b.name}
-                          </div>
-                          <div style={{fontSize:10,color:'var(--accent2)',fontFamily:"'DM Mono',monospace",
-                            fontWeight:700,marginTop:1}}>{b.team}</div>
-                        </div>
-                        {/* Today's line */}
-                        <div style={{textAlign:'right'}}>
-                          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13}}>
-                            {b.gameHits}/{b.ab}
-                            {b.hr > 0 && <span style={{color:'var(--accent)',marginLeft:5}}>
-                              {b.hr}HR
-                            </span>}
-                            {b.rbi > 0 && <span style={{color:'var(--accent2)',marginLeft:5,fontSize:11}}>
-                              {b.rbi}RBI
-                            </span>}
-                          </div>
-                          <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
-                            today
-                          </div>
-                        </div>
-                      </div>
+          : batters.length === 0
+            ? <div style={{padding:'50px 20px',textAlign:'center',
+                color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:12,lineHeight:2}}>
+                No batters at heating up level or above right now.<br/>
+                Check back once more at-bats roll in.
+              </div>
+            : batters.map((b, idx) => {
+                const badge = getBadge(b);
+                return <div key={`${b.id}-${idx}`}
+                  onClick={()=>{ openAtBatSlide(b); onClose(); }}
+                  style={{display:'flex',alignItems:'center',gap:12,
+                    padding:'10px 16px',borderBottom:'1px solid rgba(255,255,255,.04)',
+                    cursor:'pointer',transition:'background .1s'}}
+                  onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.04)'}
+                  onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
 
-                      {/* Season Statcast */}
-                      <div style={{display:'flex',gap:8}}>
-                        <div style={{flex:1,background:'var(--surface)',borderRadius:6,
-                          padding:'5px 8px',textAlign:'center'}}>
-                          <div style={{fontSize:7,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
-                            textTransform:'uppercase',letterSpacing:1,marginBottom:2}}>Avg EV</div>
-                          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,
-                            color:b.seasonEV>=95?'var(--accent)':b.seasonEV>=90?'var(--accent2)':'var(--text)'}}>
-                            {b.seasonEV > 0 ? `${b.seasonEV.toFixed(1)}` : '—'}
-                            <span style={{fontSize:9,color:'var(--muted)',fontWeight:400}}> mph</span>
-                          </div>
-                        </div>
-                        <div style={{flex:1,background:'var(--surface)',borderRadius:6,
-                          padding:'5px 8px',textAlign:'center'}}>
-                          <div style={{fontSize:7,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
-                            textTransform:'uppercase',letterSpacing:1,marginBottom:2}}>Barrel%</div>
-                          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,
-                            color:b.seasonBrl>=12?'var(--accent)':b.seasonBrl>=7?'var(--accent2)':'var(--text)'}}>
-                            {b.seasonBrl > 0 ? `${b.seasonBrl.toFixed(1)}%` : '—'}
-                          </div>
-                        </div>
-                        <div style={{flex:1,background:'var(--surface)',borderRadius:6,
-                          padding:'5px 8px',textAlign:'center'}}>
-                          <div style={{fontSize:7,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
-                            textTransform:'uppercase',letterSpacing:1,marginBottom:2}}>Today</div>
-                          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,
-                            color:b.gameTB>=4?'var(--accent)':b.gameTB>=2?'var(--accent2)':'var(--text)'}}>
-                            {b.gameTB > 0 ? `${b.gameTB}TB` : `${b.gameHits}H`}
-                          </div>
-                        </div>
-                      </div>
+                  {/* Rank */}
+                  <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:900,fontSize:18,
+                    color:idx===0?'#ffd700':idx===1?'#c0c0c0':idx===2?'#cd7f32':'var(--muted)',
+                    minWidth:22,textAlign:'center',flexShrink:0}}>
+                    {idx+1}
+                  </div>
+
+                  {/* Name + team */}
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:15,
+                      whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                      {b.name}
                     </div>
-                  ))}
-                </div>
+                    <div style={{display:'flex',alignItems:'center',gap:6,marginTop:2}}>
+                      <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,
+                        color:'var(--accent2)',fontWeight:700}}>{b.team}</span>
+                      <span style={{fontSize:9,padding:'1px 6px',borderRadius:4,
+                        background:`${badge.color}18`,color:badge.color,
+                        fontFamily:"'DM Mono',monospace",fontWeight:600,
+                        border:`1px solid ${badge.color}30`}}>
+                        {badge.label}
+                      </span>
+                      {b.gameStatus==='Live' &&
+                        <span style={{fontSize:9,color:'var(--accent)',
+                          fontFamily:"'DM Mono',monospace"}}>● Live</span>}
+                    </div>
+                  </div>
+
+                  {/* Stats */}
+                  <div style={{display:'flex',gap:10,flexShrink:0}}>
+                    <div style={{textAlign:'center'}}>
+                      <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,
+                        fontSize:16,color:evColor(b.avgEV),lineHeight:1}}>
+                        {b.avgEV > 0 ? b.avgEV.toFixed(1) : '—'}
+                      </div>
+                      <div style={{fontSize:8,color:'var(--muted)',
+                        fontFamily:"'DM Mono',monospace",marginTop:2,textTransform:'uppercase',
+                        letterSpacing:.5}}>Avg EV</div>
+                    </div>
+                    <div style={{textAlign:'center'}}>
+                      <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,
+                        fontSize:16,color:laColor(b.launchAngle),lineHeight:1}}>
+                        {b.launchAngle > 0 ? `${b.launchAngle.toFixed(0)}°` : '—'}
+                      </div>
+                      <div style={{fontSize:8,color:'var(--muted)',
+                        fontFamily:"'DM Mono',monospace",marginTop:2,textTransform:'uppercase',
+                        letterSpacing:.5}}>Avg LA</div>
+                    </div>
+                  </div>
+                </div>;
+              })
         }
       </div>
     </div>
   </>;
 }
+
 
 function LiveTab() {
   const [games, setGames] = useState([]);
@@ -4249,7 +4225,24 @@ function LiveSportsTab() {
 
 function PowerBITab() {
   const picks = usePicks();
-  const players = Object.values(PLAYER_DATA_CACHE);
+  // Merge Statcast cache with full MLB roster so new/low-AB players are findable
+  const players = (() => {
+    const cached = Object.values(PLAYER_DATA_CACHE);
+    const cachedIds = new Set(cached.map(p => p.pid));
+    // Add anyone in the MLB player map who isn't in the Statcast cache
+    const rosterOnly = Object.entries(GLOBAL_PLAYER_TEAM_MAP)
+      .filter(([id]) => !cachedIds.has(parseInt(id)))
+      .map(([id, info]) => ({
+        pid:  parseInt(id),
+        name: info.name,
+        team: info.team || '—',
+        hand: info.hand || 'R',
+        pos:  info.pos  || '',
+        // No Statcast data yet — zeros
+        avgEV: 0, barrel: 0, hardHit: 0, hr: 0, grade: null,
+      }));
+    return [...cached, ...rosterOnly];
+  })();
   const [searchQ, setSearchQ] = useState("");
   const [showPicker, setShowPicker] = useState(false);
 
@@ -4399,7 +4392,24 @@ function DataStatusBadge() {
 
 function StatcastTab() {
   const picks = usePicks();
-  const players = Object.values(PLAYER_DATA_CACHE);
+  // Merge Statcast cache with full MLB roster so new/low-AB players are findable
+  const players = (() => {
+    const cached = Object.values(PLAYER_DATA_CACHE);
+    const cachedIds = new Set(cached.map(p => p.pid));
+    // Add anyone in the MLB player map who isn't in the Statcast cache
+    const rosterOnly = Object.entries(GLOBAL_PLAYER_TEAM_MAP)
+      .filter(([id]) => !cachedIds.has(parseInt(id)))
+      .map(([id, info]) => ({
+        pid:  parseInt(id),
+        name: info.name,
+        team: info.team || '—',
+        hand: info.hand || 'R',
+        pos:  info.pos  || '',
+        // No Statcast data yet — zeros
+        avgEV: 0, barrel: 0, hardHit: 0, hr: 0, grade: null,
+      }));
+    return [...cached, ...rosterOnly];
+  })();
   const [searchQ, setSearchQ] = useState("");
   const [showPicker, setShowPicker] = useState(false);
   const filtered = searchQ.trim()
