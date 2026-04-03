@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-03 00:07 ET";
+const BUILD_TIMESTAMP = "2026-04-03 00:19 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -112,7 +112,7 @@ const styles = `
   .cv2{font-size:10px;color:var(--muted);transition:transform .2s;display:inline-block;}
   .cv2.op{transform:rotate(180deg);}
   .gpw{margin-bottom:14px;grid-column:1/-1;min-width:0;width:100%;max-width:100%;}
-  .gp{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;min-width:0;width:100%;max-width:100%;border:1px solid var(--accent);border-top:none;border-bottom-left-radius:10px;border-bottom-right-radius:10px;background:#0a1218;overflow:hidden;animation:sd .2s ease;width:100%;}
+  .gp{overflow:visible;min-width:0;width:100%;max-width:100%;border:1px solid var(--accent);border-top:none;border-bottom-left-radius:10px;border-bottom-right-radius:10px;background:#0a1218;overflow:hidden;animation:sd .2s ease;width:100%;}
   @keyframes sd{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
   .gph{padding:9px 15px;border-bottom:1px solid var(--border);}
   .gpt{font-family:'Oswald',sans-serif;font-size:13px;letter-spacing:1.5px;color:var(--text);}
@@ -1904,9 +1904,48 @@ async function fetchGames(setL, setG, setE, silent=false) {
     });
     const [m,d,y] = etDate.split("/");
     const today = `${y}-${m}-${d}`;
-    const res = await fetch(`/api/schedule?date=${today}`);
-    const data = await res.json();
-    const games = (data.dates?.[0]?.games || []).map(g => {
+
+    // After midnight check: if it's before 6 AM ET, also fetch yesterday's schedule
+    // to catch games that started the night before and are still live/not final
+    const etHour = new Date().toLocaleString("en-US", {
+      timeZone: "America/New_York", hour: "numeric", hour12: false
+    });
+    const isLateNight = parseInt(etHour) < 6; // midnight → 5:59 AM ET
+
+    let allGameData = [];
+
+    if (isLateNight) {
+      const yest = new Date();
+      yest.setDate(yest.getDate() - 1);
+      const yDate = yest.toLocaleDateString("en-US", {
+        timeZone: "America/New_York",
+        year: "numeric", month: "2-digit", day: "2-digit"
+      });
+      const [ym,yd,yy] = yDate.split("/");
+      const yesterday = `${yy}-${ym}-${yd}`;
+
+      // Fetch yesterday in parallel with today
+      const [yRes, tRes] = await Promise.all([
+        fetch(`/api/schedule?date=${yesterday}`),
+        fetch(`/api/schedule?date=${today}`)
+      ]);
+      const [yData, tData] = await Promise.all([yRes.json(), tRes.json()]);
+
+      // Only keep yesterday's games that are NOT yet final
+      const yGames = (yData.dates?.[0]?.games || []).filter(g => {
+        const abs = g.status?.abstractGameState || "";
+        const coded = g.status?.codedGameState || "";
+        return abs === "Live" || (coded !== "F" && coded !== "O" && abs !== "Final" && abs !== "Game Over");
+      });
+
+      allGameData = [...yGames, ...(tData.dates?.[0]?.games || [])];
+    } else {
+      const res = await fetch(`/api/schedule?date=${today}`);
+      const data = await res.json();
+      allGameData = data.dates?.[0]?.games || [];
+    }
+
+    const games = allGameData.map(g => {
       const aw = g.teams?.away, hm = g.teams?.home, ls = g.linescore || {};
       // Team abbreviation — try every possible path
       const awTeam = aw?.team || {};
@@ -2598,7 +2637,7 @@ function GPanel({game, isLive, isFinal=false}) {
       <div className="gps">{isLive ? "Click any batter → today vs L7 comparison" : isFinal ? "Final game stats · click any batter for detail" : "Ranked: streak 40% · due factor 25% · vs pitcher 15% · home/away 10%"}</div>
     </div>
     {loading ? <div style={{padding:"20px 15px",display:"flex",alignItems:"center",gap:8}}><div className="sp" style={{width:18,height:18,borderWidth:2}}/><span style={{fontFamily:"DM Mono,monospace",fontSize:10,color:"var(--muted)"}}>Loading…</span></div>
-    : (isLive || isFinal) ? <div style={{WebkitOverflowScrolling:"touch"}}>
+    : (isLive || isFinal) ? <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch",width:"100%"}}>
       <table style={{width:"100%",tableLayout:"auto",minWidth:580}}>
         <thead><tr>
           <th style={{width:20}}></th>
@@ -3972,15 +4011,26 @@ function HRTrackerTab() {
   const todayET = new Date().toLocaleDateString("en-US",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"});
   const [mp,dp,yp] = todayET.split("/");
   const todayStr = `${yp}-${mp}-${dp}`;
-  const [selDate, setSelDate] = useState(todayStr);
+  // After midnight: if before 6 AM ET, default to yesterday so late night HRs still show
+  const etHourNow = parseInt(new Date().toLocaleString('en-US',{timeZone:'America/New_York',hour:'numeric',hour12:false}));
+  const defaultDate = (() => {
+    if (etHourNow < 6) {
+      const y = new Date(); y.setDate(y.getDate()-1);
+      const yd = y.toLocaleDateString('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'});
+      const [ym2,yd2,yy2] = yd.split('/');
+      return `${yy2}-${ym2}-${yd2}`;
+    }
+    return todayStr;
+  })();
+  const [selDate, setSelDate] = useState(defaultDate);
   const SEASON_START = "2026-03-20";
 
   const load = async (date) => {
     setLoading(true);
     try {
-      const url = date && date !== todayStr
-        ? `/api/homeruns?date=${date}`
-        : "/api/homeruns";
+    // When after midnight, /api/homeruns uses explicit date to stay on the right day
+    const url = date ? `/api/homeruns?date=${date}` : "/api/homeruns";
+
       const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
