@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-03 09:23 ET";
+const BUILD_TIMESTAMP = "2026-04-03 09:54 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -4721,6 +4721,20 @@ setGames(valid);
                 ))}
               </div>
 
+                            {/* Disclaimer */}
+              <div style={{marginBottom:12,padding:"8px 14px",borderRadius:8,
+                background:"rgba(56,184,242,.05)",border:"1px solid rgba(56,184,242,.15)",
+                display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                <span style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",flex:1}}>
+                  ⚠️ Weather data may not reflect exact game-time conditions or field orientation.
+                </span>
+                <a href="https://rotogrinders.com/weather/mlb" target="_blank" rel="noopener noreferrer"
+                  style={{fontSize:10,color:"var(--ice)",fontFamily:"'DM Mono',monospace",
+                    fontWeight:600,textDecoration:"none",flexShrink:0,
+                    display:"flex",alignItems:"center",gap:4}}>
+                  More accurate forecast ↗
+                </a>
+              </div>
               {/* Main table */}
               <div className="tw"><table style={{width:'100%'}}>
                 <thead>
