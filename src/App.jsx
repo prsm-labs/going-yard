@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-03 13:44 ET";
+const BUILD_TIMESTAMP = "2026-04-03 13:50 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -2692,7 +2692,7 @@ function GPanel({game, isLive, isFinal=false}) {
                 className={`dr ${isE?"ex":""}`}
                 onClick={() => setExpId(p => p===b.id ? null : b.id)}
                 style={{padding:"8px 12px",borderBottom:"1px solid rgba(30,45,58,.5)",
-                  cursor:"pointer",background:isE?"rgba(232,65,26,.04)":"transparent"}}>
+                  cursor:"pointer",background:isE?"rgba(255,255,255,.10)":"transparent",borderLeft:isE?"3px solid var(--accent)":"3px solid transparent"}}>
 
                 {/* Row 1: expand + avatar/name + heat badge + today line */}
                 <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -3189,6 +3189,24 @@ function LiveTab() {
         <RefBtn refreshing={refreshing} onClick={async()=>{setRefreshing(true);await fetchGames(setLoading,setGames,setError,true);setLastUpdate(new Date().toLocaleTimeString());setRefreshing(false);}}/>
       </div>
     </div>
+  {/* Date picker */}
+  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,flexWrap:"wrap"}}>
+    <span style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1}}>Date</span>
+    <button onClick={()=>{const d=new Date(liveDate+"T12:00:00");d.setDate(d.getDate()-1);const s=d.toISOString().slice(0,10);setLiveDate(s);load(false,s);}}
+      disabled={liveDate<=LIVE_SEASON_START}
+      style={{padding:"3px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--surface2)",color:"var(--muted)",cursor:"pointer",fontFamily:"'DM Mono',monospace",fontSize:12}}>←</button>
+    <input type="date" value={liveDate} min={LIVE_SEASON_START}
+      onChange={e=>{setLiveDate(e.target.value);load(false,e.target.value);}}
+      style={{padding:"3px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--surface2)",color:"var(--text)",fontFamily:"'DM Mono',monospace",fontSize:11,cursor:"pointer"}}/>
+    <button onClick={()=>{const d=new Date(liveDate+"T12:00:00");d.setDate(d.getDate()+1);const s=d.toISOString().slice(0,10);setLiveDate(s);load(false,s);}}
+      style={{padding:"3px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--surface2)",color:"var(--muted)",cursor:"pointer",fontFamily:"'DM Mono',monospace",fontSize:12}}>→</button>
+    {liveDate!==liveTodayStr&&<button onClick={()=>{setLiveDate(liveTodayStr);load(false,liveTodayStr);}}
+      style={{padding:"3px 10px",borderRadius:6,border:"1px solid var(--accent)",background:"rgba(232,65,26,.1)",color:"var(--accent)",cursor:"pointer",fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:700}}>Today</button>}
+    <span style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>
+      {liveDate===liveTodayStr?"🔴 Live":"📅 "+new Date(liveDate+"T12:00:00").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"})}
+    </span>
+  </div>
+
     <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 12px",
         borderRadius:8,background:"rgba(245,166,35,.06)",border:"1px solid rgba(245,166,35,.15)",
         marginBottom:10,fontSize:10,color:"var(--accent2)",fontFamily:"'DM Mono',monospace"}}
