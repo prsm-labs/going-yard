@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-03 13:28 ET";
+const BUILD_TIMESTAMP = "2026-04-03 13:31 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -2132,6 +2132,7 @@ async function fetchLiveBatters(gamePk) {
     const o = {gone_yard:5,elite:4,hot:3,warm:2,avg:1,cold:0};
     return (o[b.heatLabel.cls]||0) - (o[a.heatLabel.cls]||0);
   });
+  } catch(e) {
     console.warn('[LiveBatters]', e.message);
     return SLB;
   }
