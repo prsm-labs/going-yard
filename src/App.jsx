@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-02 22:23 ET";
+const BUILD_TIMESTAMP = "2026-04-02 22:31 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -62,6 +62,7 @@ const styles = `
   .hbf{height:100%;border-radius:2px;transition:width .6s ease;}
   .hbn{font-family:'Oswald',sans-serif;font-weight:700;font-size:16px;min-width:28px;}
   .hl{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:9px;font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;font-family:'DM Mono',monospace;white-space:nowrap;}
+  .hl.gone_yard{background:rgba(255,20,0,.25);color:#fff;border:1px solid rgba(255,20,0,.5);font-weight:800;letter-spacing:.5px;}
   .hl.elite{background:rgba(255,45,0,.18);color:#ff6040;border:1px solid rgba(255,45,0,.3);}
   .hl.hot{background:rgba(255,122,0,.15);color:#ff9a30;border:1px solid rgba(255,122,0,.25);}
   .hl.warm{background:rgba(255,183,0,.12);color:#ffc840;border:1px solid rgba(255,183,0,.2);}
@@ -2036,7 +2037,11 @@ async function fetchLiveBatters(gamePk) {
         const displayDist= gameAvgDist ?? 0;
 
         // Heat label uses in-game EV, hard hits, LA
-        const heatLabel = getLHL(displayEV, displayLA, gameHardHits);
+        const heatLabel = (() => {
+        // HR today → top grade regardless of EV/LA
+        if (hr > 0) return {label:'💥 Gone Yard', cls:'gone_yard'};
+        return getLHL(displayEV, displayLA, gameHardHits);
+      })();
 
         batters.push({
           id: bid,
@@ -2792,12 +2797,12 @@ function HeatingUpSlideout({ games, onClose }) {
       // Filter: only "Heating Up" or hotter — based on in-game heatLabel only
       // heatLabel.cls: 'elite' | 'hot' | 'avg' | 'cold'
       const hot = all.filter(b =>
-        b.heatLabel && (b.heatLabel.cls === 'elite' || b.heatLabel.cls === 'hot')
+        b.heatLabel && (b.heatLabel.cls === 'gone_yard' || b.heatLabel.cls === 'elite' || b.heatLabel.cls === 'hot')
       );
 
       // Sort: elite first, then by in-game EV descending
       hot.sort((a,b) => {
-        const order = {elite:3, hot:2};
+        const order = {gone_yard:4, elite:3, hot:2};
         const diff = (order[b.heatLabel?.cls]||0) - (order[a.heatLabel?.cls]||0);
         if (diff !== 0) return diff;
         return (b.avgEV||0) - (a.avgEV||0);
@@ -2882,10 +2887,10 @@ function HeatingUpSlideout({ games, onClose }) {
                         <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,
                           color:'var(--accent2)',fontWeight:700}}>{getTeam(b.id, b.team)}</span>
                         <span style={{fontSize:9,padding:'1px 6px',borderRadius:4,
-                          background:b.heatLabel?.cls==='elite'?'rgba(232,65,26,.15)':'rgba(255,128,32,.12)',
-                          color:b.heatLabel?.cls==='elite'?'#ff4020':'#ff8020',
-                          fontFamily:"'DM Mono',monospace",fontWeight:600,
-                          border:`1px solid ${b.heatLabel?.cls==='elite'?'rgba(232,65,26,.3)':'rgba(255,128,32,.25)'}`}}>
+                          background:b.heatLabel?.cls==='gone_yard'?'rgba(255,20,0,.25)':b.heatLabel?.cls==='elite'?'rgba(232,65,26,.15)':'rgba(255,128,32,.12)',
+                          color:b.heatLabel?.cls==='gone_yard'?'#fff':b.heatLabel?.cls==='elite'?'#ff4020':'#ff8020',
+                          fontFamily:"'DM Mono',monospace",fontWeight:b.heatLabel?.cls==='gone_yard'?800:600,
+                          border:`1px solid ${b.heatLabel?.cls==='gone_yard'?'rgba(255,20,0,.5)':b.heatLabel?.cls==='elite'?'rgba(232,65,26,.3)':'rgba(255,128,32,.25)'}`}}>
                           {b.heatLabel?.label||'—'}
                         </span>
                         {/* Today's line */}
