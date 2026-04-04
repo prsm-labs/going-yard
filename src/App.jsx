@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-03 19:18 ET";
+const BUILD_TIMESTAMP = "2026-04-04 15:33 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -11,8 +11,8 @@ const styles = `
     --text:#e8edf2;--muted:#5a7080;--fire2:#ff7a00;--fire3:#ffb700;
     --aplus:#ff3010;--a:#ff7000;--b:#f5a623;--c:#8bc4e8;--d:#5a7080;--f:#38b8f2;
   }
-  html,body{background:var(--bg);color:var(--text);font-family:'Oswald',sans-serif;min-height:100vh;overflow-x:clip;max-width:100vw;}
-  .app{min-height:100vh;display:flex;flex-direction:column;overflow-x:clip;max-width:100%;}
+  html,body{background:var(--bg);color:var(--text);font-family:'Oswald',sans-serif;min-height:100vh;overflow-x:clip;max-width:100%;width:100%;}
+  .app{min-height:100vh;display:flex;flex-direction:column;overflow-x:clip;max-width:100%;width:100%;}
   .header{padding:16px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:linear-gradient(180deg,#0a1520 0%,var(--bg) 100%);}
   .logo{font-family:'Oswald',sans-serif;font-weight:700;font-size:26px;text-transform:uppercase;letter-spacing:3px;color:var(--text);display:flex;align-items:center;gap:10px;}
   .logo span{color:var(--accent);}
@@ -240,7 +240,7 @@ const styles = `
   ::-webkit-scrollbar-track{background:var(--bg);}
   ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
 @media(max-width:768px){
-    html,body,#root,.app{overflow-x:clip;max-width:100vw;}
+    html,body,#root,.app{overflow-x:clip;max-width:100%;width:100%;}
     .content{padding:10px;}.header{padding:10px 12px;}
     .gg{grid-template-columns:1fr;}.cards{grid-template-columns:repeat(2,1fr);}
     .xg{grid-template-columns:repeat(2,1fr);}.lmini{display:none;}
@@ -4617,32 +4617,8 @@ function PowerBITab() {
       <div className="section-sub">Power BI · interactive analytics · full screen available</div>
     </div>
 
-    {/* iframe — always first */}
-    <div style={{
-      borderRadius:10, overflow:"hidden",
-      border:"1px solid var(--border)", background:"var(--surface)",
-      position:"relative", paddingBottom:"56.25%", height:0,
-    }}>
-      <iframe
-        title="Going Yard Analytics"
-        src="https://app.powerbi.com/view?r=eyJrIjoiYTQzOGZmMWMtOWZmMy00Y2NhLWE1NWUtZDljZmFkYWFhODg0IiwidCI6IjgzOGY2MGI3LTc4NzYtNGEwZC1iM2MxLTg1Y2VlZWE1YmJhYiIsImMiOjF9"
-        frameBorder="0"
-        allowFullScreen
-        style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",border:"none"}}
-      />
-    </div>
-
-    {/* Open in Power BI button */}
-    <div style={{marginTop:10,display:"flex",gap:8,justifyContent:"flex-end"}}>
-      <a href="https://app.powerbi.com/view?r=eyJrIjoiYTQzOGZmMWMtOWZmMy00Y2NhLWE1NWUtZDljZmFkYWFhODg0IiwidCI6IjgzOGY2MGI3LTc4NzYtNGEwZC1iM2MxLTg1Y2VlZWE1YmJhYiIsImMiOjF9" target="_blank" rel="noopener noreferrer"
-        style={{display:"flex",alignItems:"center",gap:5,padding:"6px 12px",borderRadius:6,
-          background:"var(--surface2)",border:"1px solid var(--border)",
-          color:"var(--muted)",fontFamily:"'DM Mono',monospace",fontSize:11,textDecoration:"none"}}>
-        ↗ Open in Power BI
-      </a>
-    </div>
-
-    {/* Add to My Picks — at the bottom */}
+    {/* Add to My Picks — now at top */}
+    {/* Add to My Picks */}
     <div style={{marginTop:14,background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,padding:"12px 14px"}}>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:showPicker?10:0}}>
         <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,letterSpacing:1}}>🎯 Add to My Picks</span>
@@ -4696,6 +4672,31 @@ function PowerBITab() {
           Start typing to search {players.length} batters
         </div>}
       </>}
+    </div>
+
+    {/* Power BI iframe */}
+    <div style={{
+      borderRadius:10, overflow:"hidden",
+      border:"1px solid var(--border)", background:"var(--surface)",
+      position:"relative", paddingBottom:"56.25%", height:0,
+    }}>
+      <iframe
+        title="Going Yard Analytics"
+        src="https://app.powerbi.com/view?r=eyJrIjoiYTQzOGZmMWMtOWZmMy00Y2NhLWE1NWUtZDljZmFkYWFhODg0IiwidCI6IjgzOGY2MGI3LTc4NzYtNGEwZC1iM2MxLTg1Y2VlZWE1YmJhYiIsImMiOjF9"
+        frameBorder="0"
+        allowFullScreen
+        style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",border:"none"}}
+      />
+    </div>
+
+    {/* Open in Power BI button */}
+    <div style={{marginTop:10,display:"flex",gap:8,justifyContent:"flex-end"}}>
+      <a href="https://app.powerbi.com/view?r=eyJrIjoiYTQzOGZmMWMtOWZmMy00Y2NhLWE1NWUtZDljZmFkYWFhODg0IiwidCI6IjgzOGY2MGI3LTc4NzYtNGEwZC1iM2MxLTg1Y2VlZWE1YmJhYiIsImMiOjF9" target="_blank" rel="noopener noreferrer"
+        style={{display:"flex",alignItems:"center",gap:5,padding:"6px 12px",borderRadius:6,
+          background:"var(--surface2)",border:"1px solid var(--border)",
+          color:"var(--muted)",fontFamily:"'DM Mono',monospace",fontSize:11,textDecoration:"none"}}>
+        ↗ Open in Power BI
+      </a>
     </div>
   </div>;
 }
