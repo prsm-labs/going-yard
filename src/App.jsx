@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-05 22:00 ET";
+const BUILD_TIMESTAMP = "2026-04-06 10:44 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -4818,6 +4818,7 @@ function MatchupEngineTab() {
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState(null);
   const [selGame, setSelGame]     = useState('all');
+  const [selGrade, setSelGrade]    = useState('all');
   const [expandedId, setExpanded] = useState(null);
   const [generated, setGenerated] = useState(null);
   const picks = usePicks();
@@ -4847,7 +4848,9 @@ function MatchupEngineTab() {
 
   // Group by game_id, then by batting_team
   const grouped = {};
-  (selGame === 'all' ? data : data.filter(r => r.game_id === selGame)).forEach(r => {
+  (selGame === 'all' ? data : data.filter(r => r.game_id === selGame))
+    .filter(r => selGrade === 'all' || r.grade === selGrade)
+    .forEach(r => {
     const key = r.game_id;
     if (!grouped[key]) grouped[key] = { gameId: key, gameTime: r.game_time, teams: {} };
     const team = r.batting_team;
@@ -4872,6 +4875,34 @@ function MatchupEngineTab() {
           {generated && <span style={{marginLeft:8,fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>anchored {generated}</span>}
         </div>
       </div>
+    <button onClick={()=>{
+        const bom='﻿';
+        const headers=['Grade','Team','Batter','Hand','vs Pitcher','Top Pitches','Game Time',
+          'Flags','Recent EV','Recent Barrel%','Recent FB%','Recent LA',
+          'BvP EV','BvP Barrel%','BvP FB%','BvP LA',
+          'Sim H','Sim 2B','Sim BB','Sim K','Sim TB','Sim RBI',
+          'Wind','Temp','Condition'];
+        const rows=data.map(b=>[
+          b.grade,b.batting_team,b.batter,b.batter_hand,b.pitcher,b.top_pitches,b.game_time,
+          b.total_flags,b.recent_avg_ev,b.recent_barrel_pct,b.recent_fb_pct,b.recent_avg_la,
+          b.bvp_avg_ev,b.bvp_barrel_pct,b.bvp_fb_pct,b.bvp_avg_la,
+          b.sim_h,b.sim_2b,b.sim_bb,b.sim_k,b.sim_tb,b.sim_rbi,
+          b.wind_effect,b.temp_f,b.condition
+        ].map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(','));
+        const csv=bom+headers.join(',')+'
+'+rows.join('
+');
+        const a=document.createElement('a');
+        a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+        a.download=`key-matchups-${new Date().toISOString().slice(0,10)}.csv`;
+        a.click();
+      }}
+      style={{padding:"5px 12px",borderRadius:6,cursor:"pointer",
+        background:"var(--surface2)",border:"1px solid var(--border)",
+        color:"var(--muted)",fontFamily:"'DM Mono',monospace",
+        fontSize:11,display:"flex",alignItems:"center",gap:5}}>
+      ⬇ CSV
+    </button>
     </div>
 
 
@@ -4916,6 +4947,30 @@ function MatchupEngineTab() {
       })}
     </div>}
 
+    {/* Grade filter */}
+    {!loading && !error && data.length > 0 && <div style={{display:'flex',gap:6,marginBottom:14,flexWrap:'wrap',alignItems:'center'}}>
+      <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1}}>Grade</span>
+      <button onClick={()=>setSelGrade('all')}
+        style={{padding:'3px 12px',borderRadius:6,cursor:'pointer',
+          background:selGrade==='all'?'var(--surface2)':'transparent',
+          color:selGrade==='all'?'var(--text)':'var(--muted)',
+          border:`1px solid ${selGrade==='all'?'var(--accent)':'var(--border)'}`,
+          fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:selGrade==='all'?700:400}}>
+        All
+      </button>
+      {Object.keys(GRADE_CFG).map(g => {
+        const c = GRADE_CFG[g];
+        const active = selGrade === g;
+        return <button key={g} onClick={()=>setSelGrade(s=>s===g?'all':g)}
+          style={{padding:'3px 12px',borderRadius:6,cursor:'pointer',
+            background:active?c.bg:'transparent',
+            color:active?c.color:'var(--muted)',
+            border:`1px solid ${active?c.border:'var(--border)'}`,
+            fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:11,letterSpacing:.5}}>
+          {g}
+        </button>;
+      })}
+    </div>}
     {loading && <div className="lw"><div className="sp"/><div className="lt">Loading matchup data…</div></div>}
     {error && <div style={{padding:'30px 20px',textAlign:'center',color:'var(--muted)',
       fontFamily:"'DM Mono',monospace",fontSize:12,lineHeight:1.8}}>
@@ -4982,7 +5037,6 @@ function MatchupEngineTab() {
             const bvpEV    = parseFloat(b.bvp_avg_ev)||0;
             const simHR    = parseFloat(b.sim_hr_adj)||parseFloat(b.sim_hr)||0;
             const projHR   = parseFloat(b.proj_hr_adj)||0;
-            const intent   = parseFloat(b.hr_intent_score)||0;
 
             return <div key={uid}>
               {/* Batter row */}
@@ -5055,14 +5109,11 @@ function MatchupEngineTab() {
 
                   {/* Key stats */}
                   <div style={{display:'flex',gap:8,flexShrink:0,alignItems:'center'}}>
-                    {totalFlags > 0 && <div style={{textAlign:'center'}}>
-                      <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,
-                        fontSize:18,color:cfg.color,lineHeight:1}}>
-                        {totalFlags}
-                      </div>
-                      <div style={{fontSize:7,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
-                        textTransform:'uppercase',letterSpacing:.4,marginTop:1}}>Flags</div>
-                    </div>}
+          {totalFlags > 0 && <div style={{textAlign:'center',flexShrink:0}}>
+            <div style={{letterSpacing:1,lineHeight:1,fontSize:11}}>
+              {Array.from({length:Math.min(totalFlags,8)}).map((_,si)=><span key={si}>⭐</span>)}
+            </div>
+          </div>}
                     {recentEV > 0 && <div style={{textAlign:'center'}}>
                       <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,
                         fontSize:14,color:recentEV>=95?'#ff8020':recentEV>=90?'#ffc840':'var(--text)',lineHeight:1}}>
@@ -5071,15 +5122,6 @@ function MatchupEngineTab() {
                       <div style={{fontSize:7,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
                         textTransform:'uppercase',letterSpacing:.4,marginTop:1}}>EV L7</div>
                     </div>}
-                    {simHR > 0 && <div style={{textAlign:'center'}}>
-                      <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,
-                        fontSize:14,color:simHR>=0.2?'var(--accent)':simHR>=0.1?'#ff8020':'var(--text)',lineHeight:1}}>
-                        {simHR.toFixed(2)}
-                      </div>
-                      <div style={{fontSize:7,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
-                        textTransform:'uppercase',letterSpacing:.4,marginTop:1}}>Sim HR</div>
-                    </div>}
-
                     {/* Add to Picks */}
                     {pid > 0 && <PickButton pid={pid} name={b.batter} team={b.batting_team}/>}
                   </div>
@@ -5175,12 +5217,7 @@ function MatchupEngineTab() {
                     fontFamily:"'DM Mono',monospace",color:'var(--muted)'}}>
                     {b.condition}
                   </div>}
-                  {b.hr_intent_score && parseFloat(b.hr_intent_score)>0 && <div style={{
-                    padding:'3px 10px',borderRadius:6,fontSize:10,
-                    background:`${cfg.bg}`,border:`1px solid ${cfg.border}`,
-                    fontFamily:"'DM Mono',monospace",color:cfg.color}}>
-                    Intent: {parseFloat(b.hr_intent_score).toFixed(3)}
-                  </div>}
+                  
                 </div>
                 {/* Live box score — fetches real game data */}
                 <LiveBatterBox batterId={b.batter_id} gamePk={b.game_id}/>
