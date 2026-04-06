@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-05 20:54 ET";
+const BUILD_TIMESTAMP = "2026-04-05 20:58 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -4433,8 +4433,7 @@ function HRTrackerTab() {
                 {key:"batterName", label:"Batter",   tip:"Batter name"},
                 {key:"rbi",        label:"Type / RBI",tip:"HR type and RBIs"},
                 {key:"inning",     label:"Inning",   tip:"Inning hit"},
-                {key:"outs",       label:"Outs",     tip:"Outs when hit"},
-                {key:"launchAngle",label:"Angle",    tip:"Launch angle °. 25–35° = HR sweet spot"},
+                                {key:"launchAngle",label:"Angle",    tip:"Launch angle °. 25–35° = HR sweet spot"},
                 {key:"exitVelo",   label:"Exit Velo",tip:"Exit velocity mph. 95+ = hard hit, 103+ = elite"},
                 {key:"distance",   label:"Distance", tip:"Estimated distance in feet"},
                 {key:"pitchType",  label:"Pitch",    tip:"Pitch type thrown"},
@@ -4466,8 +4465,7 @@ function HRTrackerTab() {
                 </div>
                 </td>
                 <td><span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{hr.halfInning==="top"?"▲":"▼"} {hr.inning}</span></td>
-                <td><span className="sv avg">{hr.outs}</span></td>
-                <td><span className={`sv ${hr.launchAngle>=25&&hr.launchAngle<=35?"good":"avg"}`}>{hr.launchAngle!=null?`${hr.launchAngle}°`:"—"}</span></td>
+                          <td><span className={`sv ${hr.launchAngle>=25&&hr.launchAngle<=35?"good":"avg"}`}>{hr.launchAngle!=null?`${hr.launchAngle}°`:"—"}</span></td>
                 <td><span className={`sv ${evC}`}>{hr.exitVelo!=null?`${hr.exitVelo}`:"—"}</span></td>
                 <td><span className={`sv ${distC}`}>{hr.distance!=null?`${hr.distance}ft`:"—"}</span></td>
                 <td>{hr.pitchType?<span style={{fontSize:10,fontFamily:"'DM Mono',monospace",padding:"2px 7px",borderRadius:4,background:"var(--surface2)",border:"1px solid var(--border)"}}>{hr.pitchType}</span>:"—"}</td>
