@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-05 20:27 ET";
+const BUILD_TIMESTAMP = "2026-04-05 20:54 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -4746,19 +4746,8 @@ function MatchupEngineTab() {
     {!loading && !error && Object.values(grouped).map(game => {
       const teamPairs = Object.values(game.teams);
       // Format game time
-      const rawTime = game.gameTime;
-      let displayTime = '';
-      const frac = parseFloat(rawTime);
-      if (!isNaN(frac) && frac > 0) {
-        const totalMins = frac * 24 * 60;
-        const h = Math.floor(totalMins / 60) % 24;
-        const m = Math.round(totalMins % 60) % 60;
-        const ampm = h >= 12 ? 'PM' : 'AM';
-        const h12 = h % 12 || 12;
-        displayTime = `${h12}:${String(m).padStart(2,'0')} ${ampm} ET`;
-      } else if (typeof rawTime === 'string' && rawTime.includes(':')) {
-        displayTime = rawTime;
-      }
+      // game_time comes directly from daily_summary.csv — use as-is
+      const displayTime = game.gameTime ? String(game.gameTime).trim() : '';
       return <div key={game.gameId} style={{marginBottom:20}}>
         {/* Game header */}
         <div style={{display:'flex',alignItems:'center',gap:10,
