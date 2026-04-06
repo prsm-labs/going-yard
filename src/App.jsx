@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-06 10:44 ET";
+const BUILD_TIMESTAMP = "2026-04-06 10:48 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -4889,9 +4889,7 @@ function MatchupEngineTab() {
           b.sim_h,b.sim_2b,b.sim_bb,b.sim_k,b.sim_tb,b.sim_rbi,
           b.wind_effect,b.temp_f,b.condition
         ].map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(','));
-        const csv=bom+headers.join(',')+'
-'+rows.join('
-');
+        const csv=bom+headers.join(',')+String.fromCharCode(10)+rows.join(String.fromCharCode(10));
         const a=document.createElement('a');
         a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
         a.download=`key-matchups-${new Date().toISOString().slice(0,10)}.csv`;
