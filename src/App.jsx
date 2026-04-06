@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-05 20:14 ET";
+const BUILD_TIMESTAMP = "2026-04-05 20:27 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -4690,16 +4690,6 @@ function MatchupEngineTab() {
           {generated && <span style={{marginLeft:8,fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>anchored {generated}</span>}
         </div>
       </div>
-      <div style={{display:'flex',gap:8,alignItems:'center'}}>
-        {/* Run Engine button */}
-        <button onClick={()=>setShowRun(s=>!s)}
-          style={{padding:"6px 14px",borderRadius:8,cursor:"pointer",
-            background:"rgba(232,65,26,.12)",border:"1px solid rgba(232,65,26,.35)",
-            color:"var(--accent)",fontFamily:"'Oswald',sans-serif",fontWeight:700,
-            fontSize:12,letterSpacing:.5}}>
-          ▶ Run Engine
-        </button>
-      </div>
     </div>
 
 
@@ -4750,12 +4740,7 @@ function MatchupEngineTab() {
       <div style={{fontSize:20,marginBottom:8}}>📭</div>
       <div>No matchup data found.</div>
       <div style={{fontSize:10,marginTop:6}}>Run the engine and commit <code>daily_summary.csv</code> to <code>public/data/</code></div>
-      <button onClick={()=>setShowRun(true)}
-        style={{marginTop:12,padding:"5px 16px",borderRadius:6,cursor:"pointer",
-          background:"rgba(232,65,26,.12)",border:"1px solid rgba(232,65,26,.35)",
-          color:"var(--accent)",fontFamily:"'DM Mono',monospace",fontSize:11}}>
-        ▶ See Run Instructions
-      </button>
+
     </div>}
 
     {!loading && !error && Object.values(grouped).map(game => {
@@ -4763,13 +4748,16 @@ function MatchupEngineTab() {
       // Format game time
       const rawTime = game.gameTime;
       let displayTime = '';
-      if (rawTime && parseFloat(rawTime) > 0) {
-        const totalMinutes = parseFloat(rawTime) * 24 * 60;
-        const h = Math.floor(totalMinutes / 60) % 24;
-        const m = Math.round(totalMinutes % 60);
+      const frac = parseFloat(rawTime);
+      if (!isNaN(frac) && frac > 0) {
+        const totalMins = frac * 24 * 60;
+        const h = Math.floor(totalMins / 60) % 24;
+        const m = Math.round(totalMins % 60) % 60;
         const ampm = h >= 12 ? 'PM' : 'AM';
         const h12 = h % 12 || 12;
         displayTime = `${h12}:${String(m).padStart(2,'0')} ${ampm} ET`;
+      } else if (typeof rawTime === 'string' && rawTime.includes(':')) {
+        displayTime = rawTime;
       }
       return <div key={game.gameId} style={{marginBottom:20}}>
         {/* Game header */}

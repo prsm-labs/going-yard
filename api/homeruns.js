@@ -79,7 +79,7 @@ export default async function handler(req, res) {
           const chronoIndex = (about.inning || 0) * 1000 + (about.atBatIndex || 0);
           // Get HR time in ET
           const playTime = about.endTime || about.startTime || "";
-          let timeET = "";
+          let timeET = "", time24 = "";
           if (playTime) {
             try {
               const d = new Date(playTime);
@@ -87,7 +87,10 @@ export default async function handler(req, res) {
                 timeZone: "America/New_York",
                 hour: "numeric", minute: "2-digit", hour12: true
               });
-            } catch(e) {}
+              });
+              const hh = d.toLocaleString("en-US",{timeZone:"America/New_York",hour:"2-digit",hour12:false});
+              const mm = d.toLocaleString("en-US",{timeZone:"America/New_York",minute:"2-digit"});
+              time24 = String(parseInt(hh)||0).padStart(2,"0")+":"+String(parseInt(mm)||0).padStart(2,"0");
           }
           console.log(`[HRs] ✅ ${batter?.fullName} (${isTop?awayAbbr:homeAbbr}) inn=${about.inning} rbi=${rbi} ev=${ev} dist=${dist} pitch=${pitch}`);
 
@@ -112,6 +115,7 @@ export default async function handler(req, res) {
             atBatIndex:  about.atBatIndex  || 0,
             chronoIndex,
             timeET,
+            time24,
           });
         }
       } catch(e) {
