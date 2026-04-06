@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-05 21:44 ET";
+const BUILD_TIMESTAMP = "2026-04-05 22:00 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -4629,6 +4629,190 @@ function parseCSVText(text) {
   });
 }
 
+// Fetches live box score for a single batter from an active/final game
+function LiveBatterBox({ batterId, gamePk }) {
+  const [stats, setStats] = useState(null);
+  const [status, setStatus] = useState('loading'); // loading | live | final | preview | error
+
+  useEffect(() => {
+    if (!gamePk || !batterId) { setStatus('error'); return; }
+    (async () => {
+      try {
+        const batters = await fetchLiveBatters(gamePk);
+        const bid = parseInt(batterId);
+        const found = batters.find(b => b.id === bid || String(b.id) === String(batterId));
+        if (found) {
+          setStats(found);
+          setStatus('live');
+        } else {
+          setStatus('preview');
+        }
+      } catch(e) {
+        setStatus('error');
+      }
+    })();
+  }, [gamePk, batterId]);
+
+  if (status === 'loading') return (
+    <div style={{padding:'8px 0',display:'flex',alignItems:'center',gap:8,
+      fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
+      <div className="sp" style={{width:14,height:14,borderWidth:2}}/> Loading live data…
+    </div>
+  );
+
+  if (status === 'preview') return (
+    <div style={{padding:'6px 0',fontSize:10,color:'var(--muted)',
+      fontFamily:"'DM Mono',monospace"}}>
+      🕐 Game hasn't started yet — no live stats available
+    </div>
+  );
+
+  if (status === 'error' || !stats) return null;
+
+  const heatCfg = {
+    gone_yard: {color:'#fff',   bg:'rgba(255,20,0,.25)',  border:'rgba(255,20,0,.5)'},
+    elite:     {color:'#ff4020',bg:'rgba(255,45,0,.15)',  border:'rgba(255,45,0,.3)'},
+    hot:       {color:'#ff8020',bg:'rgba(255,128,32,.12)',border:'rgba(255,128,32,.25)'},
+    warm:      {color:'#ffc840',bg:'rgba(255,183,0,.10)', border:'rgba(255,183,0,.2)'},
+    avg:       {color:'var(--muted)',bg:'transparent',    border:'var(--border)'},
+  };
+  const hc = heatCfg[stats.heatLabel?.cls] || heatCfg.avg;
+
+  return (
+    <div style={{marginTop:10,marginBottom:4}}>
+      {/* Live header */}
+      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+        <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+          textTransform:'uppercase',letterSpacing:1}}>
+          📡 Live Today
+        </div>
+        {stats.heatLabel && <span style={{
+          fontSize:8,padding:'1px 6px',borderRadius:4,
+          background:hc.bg,color:hc.color,
+          fontFamily:"'DM Mono',monospace",fontWeight:700,
+          border:`1px solid ${hc.border}`}}>
+          {stats.heatLabel.label}
+        </span>}
+        {stats.isAtBat && <span style={{
+          fontSize:8,padding:'1px 6px',borderRadius:4,
+          background:'rgba(39,201,122,.2)',color:'#27c97a',
+          fontFamily:"'DM Mono',monospace",fontWeight:700,
+          border:'1px solid rgba(39,201,122,.4)',
+          animation:'pulse 1.2s ease-in-out infinite'}}>⚡ AT BAT</span>}
+        {stats.isOnDeck && !stats.isAtBat && <span style={{
+          fontSize:8,padding:'1px 6px',borderRadius:4,
+          background:'rgba(245,166,35,.12)',color:'var(--accent2)',
+          fontFamily:"'DM Mono',monospace",fontWeight:600,
+          border:'1px solid rgba(245,166,35,.25)'}}>👀 ON DECK</span>}
+      </div>
+
+      {/* Box score strip */}
+      <div style={{display:'flex',gap:0,border:'1px solid var(--border)',
+        borderRadius:8,overflow:'hidden',marginBottom:8}}>
+        {[
+          {label:'AB',  val:stats.ab||0,          color:'var(--text)'},
+          {label:'H',   val:stats.hits||0,         color:(stats.hits||0)>0?'#27c97a':'var(--text)'},
+          {label:'HR',  val:stats.hr||0,           color:(stats.hr||0)>0?'var(--accent)':'var(--text)'},
+          {label:'R',   val:stats.runs??0,         color:(stats.runs||0)>0?'#27c97a':'var(--text)'},
+          {label:'TB',  val:stats.totalBases??0,   color:(stats.totalBases||0)>=4?'var(--accent)':(stats.totalBases||0)>=2?'#ff8020':'var(--text)'},
+          {label:'RBI', val:stats.rbi??0,          color:(stats.rbi||0)>0?'#ffc840':'var(--text)'},
+          {label:'BB',  val:stats.bb??0,           color:(stats.bb||0)>0?'#38b8f2':'var(--text)'},
+          {label:'K',   val:stats.so??0,           color:(stats.so||0)>=2?'#38b8f2':'var(--text)'},
+        ].map((s,i,arr) => (
+          <div key={s.label} style={{flex:1,textAlign:'center',padding:'5px 3px',
+            background:'rgba(255,255,255,.02)',
+            borderRight:i<arr.length-1?'1px solid var(--border)':'none'}}>
+            <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,
+              fontSize:13,color:s.color,lineHeight:1}}>{s.val}</div>
+            <div style={{fontSize:7,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+              textTransform:'uppercase',letterSpacing:.4,marginTop:2}}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Statcast pills */}
+      {(stats.avgEV > 0 || (stats.hardHits||0) > 0) && (
+        <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+          {stats.avgEV > 0 && <div style={{
+            padding:'2px 8px',borderRadius:5,fontSize:10,
+            background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.08)',
+            fontFamily:"'DM Mono',monospace"}}>
+            <span style={{color:'var(--muted)',fontSize:8}}>EV </span>
+            <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,
+              color:stats.avgEV>=103?'#ff4020':stats.avgEV>=95?'#ff8020':'var(--text)'}}>
+              {stats.avgEV.toFixed(1)}
+            </span>
+          </div>}
+          {stats.launchAngle > 0 && <div style={{
+            padding:'2px 8px',borderRadius:5,fontSize:10,
+            background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.08)',
+            fontFamily:"'DM Mono',monospace"}}>
+            <span style={{color:'var(--muted)',fontSize:8}}>LA </span>
+            <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,
+              color:stats.launchAngle>=25&&stats.launchAngle<=35?'#27c97a':'var(--text)'}}>
+              {stats.launchAngle.toFixed(0)}°
+            </span>
+          </div>}
+          {(stats.avgDist||0) > 0 && <div style={{
+            padding:'2px 8px',borderRadius:5,fontSize:10,
+            background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.08)',
+            fontFamily:"'DM Mono',monospace"}}>
+            <span style={{color:'var(--muted)',fontSize:8}}>Dist </span>
+            <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,
+              color:(stats.avgDist||0)>=350?'#ff8020':'var(--text)'}}>
+              {Math.round(stats.avgDist)}ft
+            </span>
+          </div>}
+          {(stats.hardHits||0) > 0 && <div style={{
+            padding:'2px 8px',borderRadius:5,fontSize:10,
+            background:'rgba(255,128,32,.08)',border:'1px solid rgba(255,128,32,.2)',
+            fontFamily:"'DM Mono',monospace"}}>
+            <span style={{color:'var(--muted)',fontSize:8}}>HH </span>
+            <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,color:'#ff8020'}}>
+              {stats.hardHits}🔥
+            </span>
+          </div>}
+        </div>
+      )}
+
+      {/* At-bat log */}
+      {(stats.atBats||[]).length > 0 && <div style={{marginTop:8}}>
+        <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+          textTransform:'uppercase',letterSpacing:1,marginBottom:5}}>Today's At-Bats</div>
+        <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:11}}>
+            <thead><tr style={{borderBottom:'1px solid var(--border)'}}>
+              {['Inn','Result','EV','LA','Dist','Pitch','Pitcher'].map(h=>(
+                <th key={h} style={{padding:'3px 6px',textAlign:'left',fontSize:8,
+                  color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+                  textTransform:'uppercase',letterSpacing:.5,whiteSpace:'nowrap'}}>{h}</th>
+              ))}
+            </tr></thead>
+            <tbody>
+              {stats.atBats.map((ab,ai) => {
+                const evc=(ab.ev||0)>=103?'#ff4020':(ab.ev||0)>=95?'#ff8020':(ab.ev||0)>=90?'#ffc840':'var(--text)';
+                const dc=(ab.dist||0)>=400?'#ff4020':(ab.dist||0)>=350?'#ff8020':(ab.dist||0)>=300?'#ffc840':'var(--text)';
+                const good=/home_run|double|triple|single/i.test(ab.result||'');
+                return <tr key={ai} style={{borderBottom:'1px solid rgba(255,255,255,.04)',
+                  background:ai%2===0?'rgba(255,255,255,.01)':'transparent'}}>
+                  <td style={{padding:'3px 6px',color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:9,whiteSpace:'nowrap'}}>{ab.halfInning==='top'?'▲':'▼'}{ab.inning||'—'}</td>
+                  <td style={{padding:'3px 6px',color:good?'#27c97a':'var(--muted)',fontWeight:good?700:400,maxWidth:110,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontFamily:"'DM Mono',monospace",fontSize:9}}>{ab.result||'—'}</td>
+                  <td style={{padding:'3px 6px',color:evc,fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,whiteSpace:'nowrap'}}>{ab.ev>0?ab.ev.toFixed(1):'—'}</td>
+                  <td style={{padding:'3px 6px',color:'var(--text)',fontFamily:"'DM Mono',monospace",fontSize:9,whiteSpace:'nowrap'}}>{(ab.la||ab.launchAngle||0)>0?(ab.la||ab.launchAngle).toFixed(0)+'°':'—'}</td>
+                  <td style={{padding:'3px 6px',color:dc,fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,whiteSpace:'nowrap'}}>{ab.dist>0?ab.dist+'ft':'—'}</td>
+                  <td style={{padding:'3px 6px',color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:9,whiteSpace:'nowrap'}}>{ab.pitchType||'—'}</td>
+                  <td style={{padding:'3px 6px',color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:9,maxWidth:80,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{ab.pitcherName||'—'}</td>
+                </tr>;
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>}
+    </div>
+  );
+}
+
+
 function MatchupEngineTab() {
   const [data, setData]           = useState([]);
   const [loading, setLoading]     = useState(true);
@@ -4998,6 +5182,8 @@ function MatchupEngineTab() {
                     Intent: {parseFloat(b.hr_intent_score).toFixed(3)}
                   </div>}
                 </div>
+                {/* Live box score — fetches real game data */}
+                <LiveBatterBox batterId={b.batter_id} gamePk={b.game_id}/>
               </div>}
             </div>;
           })}
