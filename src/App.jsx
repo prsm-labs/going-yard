@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-05 20:11 ET";
+const BUILD_TIMESTAMP = "2026-04-05 20:14 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -4702,35 +4702,6 @@ function MatchupEngineTab() {
       </div>
     </div>
 
-    {/* Run Engine modal */}
-    {showRun && <div style={{marginBottom:16,padding:'14px 16px',borderRadius:10,
-      background:'rgba(232,65,26,.06)',border:'1px solid rgba(232,65,26,.2)'}}>
-      <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,marginBottom:8}}>
-        ▶ Run Matchup Engine Locally
-      </div>
-      <div style={{fontSize:11,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginBottom:10,lineHeight:1.6}}>
-        The engine runs on your machine against your CSV files. After running,
-        commit <code style={{color:'var(--accent)'}}>daily_summary.csv</code> to{' '}
-        <code style={{color:'var(--accent)'}}>public/data/</code> and push to reload this tab.
-      </div>
-      <div style={{background:'rgba(0,0,0,.4)',borderRadius:6,padding:'10px 14px',
-        fontFamily:"'DM Mono',monospace",fontSize:11,color:'#27c97a',lineHeight:1.8,
-        overflowX:'auto',whiteSpace:'nowrap'}}>
-        <div style={{color:'var(--muted)',marginBottom:4}}># 1. Run the engine</div>
-        <div>cd "C:\Users\Art Vandelay\OneDrive - Vandelay Industries LLC\Project Portal - Documents\Projects\mlb_project\output"</div>
-        <div>python matchup_engine.py</div>
-        <div style={{color:'var(--muted)',marginTop:8,marginBottom:4}}># 2. Copy output to repo and deploy</div>
-        <div>Copy-Item ".\daily_summary.csv" "C:\Users\Art Vandelay\going-yard\public\data\daily_summary.csv" -Force</div>
-        <div>cd "C:\Users\Art Vandelay\going-yard"</div>
-        <div>git add public/data/daily_summary.csv</div>
-        <div>git commit -m "Update matchup engine output"</div>
-        <div>git push</div>
-      </div>
-      <button onClick={()=>setShowRun(false)}
-        style={{marginTop:10,padding:"4px 12px",borderRadius:6,cursor:"pointer",
-          background:"var(--surface2)",border:"1px solid var(--border)",
-          color:"var(--muted)",fontFamily:"'DM Mono',monospace",fontSize:11}}>Close</button>
-    </div>}
 
     {/* Grade legend */}
     <div style={{display:'flex',gap:6,marginBottom:14,flexWrap:'wrap'}}>
