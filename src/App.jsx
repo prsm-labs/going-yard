@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-05 14:04 ET";
+const BUILD_TIMESTAMP = "2026-04-05 20:11 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -4341,6 +4341,28 @@ function HRTrackerTab() {
         <div className="section-title">💥 Home Run Tracker</div>
         <div className="section-sub">{isToday ? "Today's homers · live · auto-refreshes" : `HRs from ${displayDate}`} · exit velo · distance · pitch type</div>
       </div>
+      <button onClick={()=>{
+          const bom = "﻿";
+          const headers = ["Time","Team","Batter","Type","RBI","Inn","Outs","Angle","EV","Dist","Pitch","Pitcher","Game"];
+          const rows = sorted.map(h=>[
+            h.timeET||"",h.batterTeam||"",h.batterName||"",h.hrType||"",h.rbi||0,
+            `${h.halfInning==="top"?"▲":"▼"}${h.inning}`,h.outs||0,
+            h.launchAngle>0?h.launchAngle.toFixed(1):"",
+            h.exitVelo>0?h.exitVelo.toFixed(1):"",
+            h.distance||"",h.pitchType||"",h.pitcherName||"",
+            `${h.awayAbbr} @ ${h.homeAbbr}`
+          ].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(","));
+          const csv = bom + headers.join(",") + "\n" + rows.join("\n");
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
+          a.download = `hr-tracker-${selDate}.csv`;
+          a.click();
+        }}
+        style={{padding:"4px 12px",borderRadius:6,border:"1px solid var(--border)",
+          background:"var(--surface2)",color:"var(--muted)",cursor:"pointer",
+          fontFamily:"'DM Mono',monospace",fontSize:11,display:"flex",alignItems:"center",gap:5}}>
+        ⬇ CSV
+      </button>
       <RefBtn refreshing={refreshing} onClick={async()=>{setRefreshing(true);await load(selDate);setRefreshing(false);}}/>
     </div>
 
@@ -4615,7 +4637,6 @@ function MatchupEngineTab() {
   const [error, setError]         = useState(null);
   const [selGame, setSelGame]     = useState('all');
   const [expandedId, setExpanded] = useState(null);
-  const [showRun, setShowRun]     = useState(false);
   const [generated, setGenerated] = useState(null);
   const picks = usePicks();
 
@@ -4923,7 +4944,7 @@ function MatchupEngineTab() {
                     {simHR > 0 && <div style={{textAlign:'center'}}>
                       <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,
                         fontSize:14,color:simHR>=0.2?'var(--accent)':simHR>=0.1?'#ff8020':'var(--text)',lineHeight:1}}>
-                        {(simHR*100).toFixed(0)}%
+                        {simHR.toFixed(2)}
                       </div>
                       <div style={{fontSize:7,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
                         textTransform:'uppercase',letterSpacing:.4,marginTop:1}}>Sim HR</div>
@@ -4949,15 +4970,15 @@ function MatchupEngineTab() {
                   <div style={{display:'flex',gap:0,border:'1px solid var(--border)',
                     borderRadius:8,overflow:'hidden'}}>
                     {[
-                      {label:'PA',   val:num(b.sim_pa,1)},
-                      {label:'H',    val:num(b.sim_h,2)},
-                      {label:'HR',   val:num(b.sim_hr_adj,2)||num(b.sim_hr,2), color:simHR>=0.15?'var(--accent)':undefined},
-                      {label:'2B',   val:num(b.sim_2b,2)},
-                      {label:'BB',   val:num(b.sim_bb,2)},
-                      {label:'K',    val:num(b.sim_k,2)},
-                      {label:'TB',   val:num(b.sim_tb,2)},
-                      {label:'RBI',  val:num(b.sim_rbi,2)},
-                    ].map((s,i,arr)=>(
+                      {label:'PA',   val:num(b.sim_pa,1),   raw:parseFloat(b.sim_pa)||0},
+                      {label:'H',    val:num(b.sim_h,2),    raw:parseFloat(b.sim_h)||0},
+                      {label:'HR',   val:num(b.sim_hr_adj||b.sim_hr,2), raw:simHR, color:simHR>=0.15?'var(--accent)':undefined},
+                      {label:'2B',   val:num(b.sim_2b,2),   raw:parseFloat(b.sim_2b)||0},
+                      {label:'BB',   val:num(b.sim_bb,2),   raw:parseFloat(b.sim_bb)||0},
+                      {label:'K',    val:num(b.sim_k,2),    raw:parseFloat(b.sim_k)||0},
+                      {label:'TB',   val:num(b.sim_tb,2),   raw:parseFloat(b.sim_tb)||0},
+                      {label:'RBI',  val:num(b.sim_rbi,2),  raw:parseFloat(b.sim_rbi)||0},
+                    ].filter(s=>s.raw>0).map((s,i,arr)=>(
                       <div key={s.label} style={{flex:1,textAlign:'center',padding:'5px 3px',
                         background:'rgba(255,255,255,.02)',
                         borderRight:i<arr.length-1?'1px solid var(--border)':'none'}}>
@@ -5639,7 +5660,7 @@ export default function App() {
     {key:"live",      label:"📡 Live"},
     {key:"powerbi",   label:"📊 Data"},
     {key:"picks",     label:"🎯 My Picks"},
-    {key:"matchup",   label:"⚡ Matchup Engine"},
+    {key:"matchup",   label:"⚡ Key Matchups"},
     {key:"statcast",  label:"📡 Statcast"},
     {key:"onlyhomers",label:"⚾ Only Homers"},
     {key:"linemate",  label:"📊 Linemate",  external:"https://linemate.io/mlb"},
