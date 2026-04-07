@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-07 12:00 ET";
+const BUILD_TIMESTAMP = "2026-04-07 16:29 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -4141,6 +4141,8 @@ function PitchBuilderTab() {
 let HR_DATA = [];
 let HR_DATA_DATE = '';
 let HR_LAST_FETCH = 0;
+const SEEN_HR_IDS = new Set();
+let _notifyNewHR = null; // callback set by useHRNotifications hook
 const HR_CACHE_MS = 60000;
 
 async function fetchHRs(force=false) {
@@ -4157,6 +4159,13 @@ async function fetchHRs(force=false) {
     // This way the ticker stays alive past midnight until next day's games start
     if (newHRs.length >= 3) {
       HR_DATA = newHRs; HR_DATA_DATE = data.date || ''; // today has real data — use it
+      // Fire notifications for any HRs we haven't seen yet
+      if (_notifyNewHR && HR_DATA_DATE) {
+        newHRs.forEach(h => {
+          const id = `${h.gamePk}-${h.batterId}-${h.atBatIndex}`;
+          if (!SEEN_HR_IDS.has(id)) { SEEN_HR_IDS.add(id); _notifyNewHR(h); }
+        });
+      }
     } else if (newHRs.length > 0) {
       HR_DATA = newHRs; HR_DATA_DATE = data.date || ''; // small amount — still show it
     } else if (HR_DATA.length === 0) {
@@ -5956,6 +5965,162 @@ setGames(valid);
 }
 
 
+// ── HR LIVE NOTIFICATION SYSTEM ─────────────────────────────
+function useHRNotifications() {
+  const [queue, setQueue] = useState([]);
+  useEffect(() => {
+    _notifyNewHR = (hr) => {
+      const isXBH = /double|triple|home_run/i.test(hr.hrType||'');
+      if (!isXBH) return; // only HR and XBH
+      const notif = {
+        id: Date.now() + Math.random(),
+        batterName: hr.batterName || 'Unknown',
+        batterTeam: hr.batterTeam || '',
+        type: hr.hrType || 'home_run',
+        rbi: hr.rbi || 0,
+        exitVelo: hr.exitVelo || 0,
+        distance: hr.distance || 0,
+        gameId: hr.gameId || '',
+        inning: hr.inning || '',
+        halfInning: hr.halfInning || 'top',
+      };
+      setQueue(q => [...q.slice(-2), notif]); // keep max 3
+    };
+    return () => { _notifyNewHR = null; };
+  }, []);
+  const dismiss = (id) => setQueue(q => q.filter(n => n.id !== id));
+  return { queue, dismiss };
+}
+
+function HRNotificationBanner({ notif, onDismiss }) {
+  const [visible, setVisible] = useState(false);
+  const [touching, setTouching] = useState(false);
+  const [dragY, setDragY] = useState(0);
+  const startY = useRef(0);
+
+  const typeMap = {
+    home_run:    { icon:'💥', label:'HOME RUN',  color:'#ff4020', bg:'rgba(232,65,26,.18)' },
+    double:      { icon:'⚡', label:'DOUBLE',    color:'#ffc840', bg:'rgba(255,200,64,.14)' },
+    triple:      { icon:'🚀', label:'TRIPLE',    color:'#27c97a', bg:'rgba(39,201,122,.14)' },
+  };
+  const t = typeMap[notif.type?.toLowerCase()] || typeMap.home_run;
+
+  useEffect(() => {
+    const tin = setTimeout(() => setVisible(true), 50);
+    const tout = setTimeout(() => { setVisible(false); setTimeout(onDismiss, 400); }, 6000);
+    return () => { clearTimeout(tin); clearTimeout(tout); };
+  }, []);
+
+  const handleTouchStart = (e) => { startY.current = e.touches[0].clientY; setTouching(true); };
+  const handleTouchMove = (e) => {
+    const dy = e.touches[0].clientY - startY.current;
+    if (dy < 0) setDragY(dy);
+  };
+  const handleTouchEnd = () => {
+    setTouching(false);
+    if (dragY < -40) { setVisible(false); setTimeout(onDismiss, 300); }
+    else setDragY(0);
+  };
+
+  return (
+    <div
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onClick={() => { setVisible(false); setTimeout(onDismiss, 300); }}
+      style={{
+        position:'fixed', top:0, left:0, right:0, zIndex:9999,
+        display:'flex', justifyContent:'center',
+        pointerEvents:'auto',
+        transform: visible ? `translateY(${dragY}px)` : 'translateY(-110%)',
+        transition: touching ? 'none' : 'transform 0.35s cubic-bezier(.34,1.56,.64,1)',
+      }}>
+      <div style={{
+        margin:'12px 16px 0',
+        maxWidth:480, width:'100%',
+        background:'rgba(10,15,20,.96)',
+        border:`1px solid ${t.color}44`,
+        borderRadius:14,
+        boxShadow:`0 8px 32px rgba(0,0,0,.6), 0 0 0 1px ${t.color}22`,
+        padding:'12px 16px',
+        display:'flex', alignItems:'center', gap:12,
+        backdropFilter:'blur(16px)',
+        WebkitBackdropFilter:'blur(16px)',
+      }}>
+        {/* Icon */}
+        <div style={{
+          width:44, height:44, borderRadius:10, flexShrink:0,
+          background:t.bg, border:`1px solid ${t.color}44`,
+          display:'flex', alignItems:'center', justifyContent:'center',
+          fontSize:22,
+        }}>{t.icon}</div>
+
+        {/* Content */}
+        <div style={{flex:1, minWidth:0}}>
+          <div style={{display:'flex', alignItems:'center', gap:8, marginBottom:2}}>
+            <span style={{
+              fontFamily:"'Oswald',sans-serif", fontWeight:800, fontSize:11,
+              color:t.color, letterSpacing:1, textTransform:'uppercase',
+            }}>{t.label}</span>
+            {notif.rbi > 0 && <span style={{
+              fontSize:9, padding:'1px 5px', borderRadius:4,
+              background:'rgba(255,255,255,.08)',
+              fontFamily:"'DM Mono',monospace", color:'var(--muted)',
+            }}>{notif.rbi} RBI</span>}
+            <span style={{
+              marginLeft:'auto', fontSize:9,
+              fontFamily:"'DM Mono',monospace", color:'var(--muted)',
+            }}>{notif.halfInning==='top'?'▲':'▼'}{notif.inning}</span>
+          </div>
+          <div style={{
+            fontFamily:"'Oswald',sans-serif", fontWeight:700, fontSize:15,
+            color:'var(--text)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis',
+          }}>{notif.batterName}</div>
+          <div style={{display:'flex', gap:8, marginTop:3, flexWrap:'wrap'}}>
+            <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
+              {notif.batterTeam} · {notif.gameId}
+            </span>
+            {notif.exitVelo > 0 && <span style={{
+              fontSize:9, fontFamily:"'DM Mono',monospace",
+              color:notif.exitVelo>=103?'#ff4020':notif.exitVelo>=95?'#ff8020':'var(--muted)',
+            }}>⚡{notif.exitVelo.toFixed(1)} mph</span>}
+            {notif.distance > 0 && <span style={{
+              fontSize:9, fontFamily:"'DM Mono',monospace", color:'var(--muted)',
+            }}>📏{notif.distance}ft</span>}
+          </div>
+        </div>
+
+        {/* Dismiss */}
+        <div style={{
+          fontSize:16, color:'var(--muted)', flexShrink:0,
+          padding:'4px 8px', cursor:'pointer',
+        }}>×</div>
+      </div>
+    </div>
+  );
+}
+
+function HRNotifications() {
+  const { queue, dismiss } = useHRNotifications();
+  if (queue.length === 0) return null;
+  return (
+    <div style={{position:'fixed',top:0,left:0,right:0,zIndex:9999,pointerEvents:'none'}}>
+      {queue.map((n,i) => (
+        <div key={n.id} style={{
+          transform:`translateY(${i*8}px) scale(${1-i*0.03})`,
+          pointerEvents:'auto',
+          zIndex:9999-i,
+          position: i===0?'relative':'absolute',
+          top:0,left:0,right:0,
+        }}>
+          <HRNotificationBanner notif={n} onDismiss={()=>dismiss(n.id)}/>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+
 export default function App() {
   const [tab, setTab] = useState("homeruns");
   const [showPicksSlideout, setShowPicksSlideout] = useState(false);
@@ -5984,6 +6149,7 @@ export default function App() {
   return <>
     <style>{styles}</style>
     <div className="app">
+      <HRNotifications/>
       <header className="header">
         <div className="logo"><div className="logo-dot"/>⚾ <span>GOING</span> YARD</div>
         <div style={{display:"flex",alignItems:"center",gap:8}}> 
