@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-06 10:48 ET";
+const BUILD_TIMESTAMP = "2026-04-07 10:03 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -4860,6 +4860,32 @@ function MatchupEngineTab() {
     grouped[key].teams[team].pitchMix = r.top_pitches;
   });
 
+  const exportCSV = () => {
+    const bom = String.fromCharCode(65279);
+    const headers = ['Grade','Gone Yard','Team','Batter','Hand','vs Pitcher',
+      'Top Pitches','Game Time','Flags','Recent EV','Recent Barrel%',
+      'Recent FB%','Recent LA','BvP EV','BvP Barrel%','BvP FB%','BvP LA',
+      'Sim H','Sim 2B','Sim BB','Sim K','Sim TB','Sim RBI',
+      'Wind','Temp','Condition'];
+    const esc = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+    const rows = data.map(b => {
+      const bid = parseInt(b.batter_id) || 0;
+      const gy = HR_DATA.some(h => h.batterId === bid ||
+        (b.batter && h.batterName && h.batterName.toLowerCase() === b.batter.toLowerCase()));
+      return [b.grade, gy?'YES':'', b.batting_team, b.batter, b.batter_hand,
+        b.pitcher, b.top_pitches, b.game_time, b.total_flags,
+        b.recent_avg_ev, b.recent_barrel_pct, b.recent_fb_pct, b.recent_avg_la,
+        b.bvp_avg_ev, b.bvp_barrel_pct, b.bvp_fb_pct, b.bvp_avg_la,
+        b.sim_h, b.sim_2b, b.sim_bb, b.sim_k, b.sim_tb, b.sim_rbi,
+        b.wind_effect, b.temp_f, b.condition].map(esc).join(',');
+    });
+    const csv = bom + headers.map(esc).join(',') + String.fromCharCode(10) + rows.join(String.fromCharCode(10));
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}));
+    a.download = 'key-matchups-' + new Date().toISOString().slice(0,10) + '.csv';
+    a.click();
+  };
+
   const gc = (g) => GRADE_CFG[g] || GRADE_CFG['D'];
   const pct = (v) => v && parseFloat(v) > 0 ? `${parseFloat(v).toFixed(1)}%` : '—';
   const num = (v, d=1) => v && parseFloat(v) > 0 ? parseFloat(v).toFixed(d) : '—';
@@ -4875,26 +4901,7 @@ function MatchupEngineTab() {
           {generated && <span style={{marginLeft:8,fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>anchored {generated}</span>}
         </div>
       </div>
-    <button onClick={()=>{
-        const bom='﻿';
-        const headers=['Grade','Team','Batter','Hand','vs Pitcher','Top Pitches','Game Time',
-          'Flags','Recent EV','Recent Barrel%','Recent FB%','Recent LA',
-          'BvP EV','BvP Barrel%','BvP FB%','BvP LA',
-          'Sim H','Sim 2B','Sim BB','Sim K','Sim TB','Sim RBI',
-          'Wind','Temp','Condition'];
-        const rows=data.map(b=>[
-          b.grade,b.batting_team,b.batter,b.batter_hand,b.pitcher,b.top_pitches,b.game_time,
-          b.total_flags,b.recent_avg_ev,b.recent_barrel_pct,b.recent_fb_pct,b.recent_avg_la,
-          b.bvp_avg_ev,b.bvp_barrel_pct,b.bvp_fb_pct,b.bvp_avg_la,
-          b.sim_h,b.sim_2b,b.sim_bb,b.sim_k,b.sim_tb,b.sim_rbi,
-          b.wind_effect,b.temp_f,b.condition
-        ].map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(','));
-        const csv=bom+headers.join(',')+String.fromCharCode(10)+rows.join(String.fromCharCode(10));
-        const a=document.createElement('a');
-        a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
-        a.download=`key-matchups-${new Date().toISOString().slice(0,10)}.csv`;
-        a.click();
-      }}
+    <button onClick={exportCSV}
       style={{padding:"5px 12px",borderRadius:6,cursor:"pointer",
         background:"var(--surface2)",border:"1px solid var(--border)",
         color:"var(--muted)",fontFamily:"'DM Mono',monospace",
@@ -5034,6 +5041,7 @@ function MatchupEngineTab() {
             const recentEV = parseFloat(b.recent_avg_ev)||0;
             const bvpEV    = parseFloat(b.bvp_avg_ev)||0;
             const simHR    = parseFloat(b.sim_hr_adj)||parseFloat(b.sim_hr)||0;
+            const goneYard = HR_DATA.some(h => h.batterId === pid || (b.batter && h.batterName && h.batterName.toLowerCase() === b.batter.toLowerCase()));
             const projHR   = parseFloat(b.proj_hr_adj)||0;
 
             return <div key={uid}>
@@ -5054,6 +5062,12 @@ function MatchupEngineTab() {
                     fontWeight:800,fontSize:12,letterSpacing:.5,flexShrink:0}}>
                     {b.grade}
                   </div>
+                  {goneYard && <div style={{padding:'2px 8px',borderRadius:5,flexShrink:0,
+                    background:'rgba(255,20,0,.25)',border:'1px solid rgba(255,20,0,.5)',
+                    color:'#fff',fontFamily:"'DM Mono',monospace",
+                    fontWeight:800,fontSize:10,letterSpacing:.5}}>
+                    💥 Gone Yard
+                  </div>}
 
                   {/* Batter name + hand */}
                   <div style={{flex:1,minWidth:0}}>
@@ -5225,6 +5239,133 @@ function MatchupEngineTab() {
         </div>)}
       </div>;
     })}
+  </div>;
+}
+
+
+function GetAppTab() {
+  const url = "https://goingyard.app";
+  const Step = ({n, text}) => (
+    <div style={{display:"flex",gap:10,marginBottom:8,alignItems:"flex-start"}}>
+      <div style={{width:22,height:22,borderRadius:"50%",background:"var(--accent)",
+        color:"white",fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,
+        display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:1}}>
+        {n}
+      </div>
+      <div style={{fontSize:12,color:"var(--text)",fontFamily:"'DM Mono',monospace",lineHeight:1.6}}>
+        {text}
+      </div>
+    </div>
+  );
+
+  const Card = ({icon, title, subtitle, children}) => (
+    <div style={{background:"var(--surface)",border:"1px solid var(--border)",
+      borderRadius:12,padding:"18px 20px",marginBottom:14}}>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
+        <div style={{fontSize:28,lineHeight:1}}>{icon}</div>
+        <div>
+          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:16,
+            letterSpacing:.5,color:"var(--text)"}}>{title}</div>
+          <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",
+            marginTop:2}}>{subtitle}</div>
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+
+  return <div style={{maxWidth:600,margin:"0 auto"}}>
+    {/* Header */}
+    <div className="section-header" style={{marginBottom:20}}>
+      <div>
+        <div className="section-title">📲 Get the App</div>
+        <div className="section-sub">Add Going Yard to your home screen or desktop — no app store needed</div>
+      </div>
+    </div>
+
+    {/* App icon preview */}
+    <div style={{textAlign:"center",marginBottom:24}}>
+      <div style={{display:"inline-flex",flexDirection:"column",alignItems:"center",gap:8}}>
+        <div style={{width:80,height:80,borderRadius:18,background:"linear-gradient(135deg,#0d1a28,#1a2a38)",
+          border:"2px solid rgba(232,65,26,.4)",display:"flex",alignItems:"center",
+          justifyContent:"center",fontSize:42,boxShadow:"0 8px 32px rgba(232,65,26,.25)"}}>
+          💥
+        </div>
+        <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,
+          color:"var(--text)",letterSpacing:.5}}>Going Yard</div>
+        <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>
+          {url}
+        </div>
+      </div>
+    </div>
+
+    {/* iOS */}
+    <Card icon="🍎" title="iPhone / iPad" subtitle="iOS Safari · 30 seconds">
+      <Step n="1" text={<>Open <strong style={{color:"var(--accent2)"}}>goingyard.app</strong> in Safari (must be Safari, not Chrome)</>}/>
+      <Step n="2" text={<>Tap the <strong>Share</strong> button <span style={{fontSize:16}}>⎙</span> at the bottom of the screen</>}/>
+      <Step n="3" text={<>Scroll down and tap <strong>"Add to Home Screen"</strong></>}/>
+      <Step n="4" text={<>Tap <strong>"Add"</strong> in the top right — the 💥 icon appears on your home screen</>}/>
+      <div style={{marginTop:10,padding:"8px 12px",borderRadius:8,
+        background:"rgba(39,201,122,.06)",border:"1px solid rgba(39,201,122,.15)",
+        fontSize:10,color:"#27c97a",fontFamily:"'DM Mono',monospace"}}>
+        ✓ Launches full screen with no browser bar — just like a native app
+      </div>
+    </Card>
+
+    {/* Android */}
+    <Card icon="🤖" title="Android" subtitle="Chrome · 30 seconds">
+      <Step n="1" text={<>Open <strong style={{color:"var(--accent2)"}}>goingyard.app</strong> in Chrome</>}/>
+      <Step n="2" text={<>Tap the <strong>⋮</strong> menu (three dots) in the top right</>}/>
+      <Step n="3" text={<>Tap <strong>"Add to Home screen"</strong> or <strong>"Install app"</strong></>}/>
+      <Step n="4" text={<>Tap <strong>"Add"</strong> — the icon appears on your home screen and app drawer</>}/>
+      <div style={{marginTop:10,padding:"8px 12px",borderRadius:8,
+        background:"rgba(39,201,122,.06)",border:"1px solid rgba(39,201,122,.15)",
+        fontSize:10,color:"#27c97a",fontFamily:"'DM Mono',monospace"}}>
+        ✓ Chrome may show an automatic "Install" banner at the bottom — tap that too
+      </div>
+    </Card>
+
+    {/* Mac */}
+    <Card icon="🖥️" title="Mac" subtitle="Safari or Chrome · desktop shortcut">
+      <div style={{marginBottom:10,fontSize:11,color:"var(--muted)",fontFamily:"'Oswald',sans-serif",
+        fontWeight:600,letterSpacing:.5,textTransform:"uppercase"}}>Safari</div>
+      <Step n="1" text={<>Open <strong style={{color:"var(--accent2)"}}>goingyard.app</strong> in Safari</>}/>
+      <Step n="2" text={<>Go to <strong>File → Add to Dock</strong> (macOS Sonoma+) or <strong>File → Share → Add to Home Screen</strong></>}/>
+      <Step n="3" text={<>Click <strong>Add</strong> — appears in your Dock and Launchpad</>}/>
+      <div style={{marginBottom:10,marginTop:14,fontSize:11,color:"var(--muted)",fontFamily:"'Oswald',sans-serif",
+        fontWeight:600,letterSpacing:.5,textTransform:"uppercase"}}>Chrome</div>
+      <Step n="1" text={<>Open <strong style={{color:"var(--accent2)"}}>goingyard.app</strong> in Chrome</>}/>
+      <Step n="2" text={<>Click the <strong>⊕</strong> install icon in the address bar (right side)</>}/>
+      <Step n="3" text={<>Click <strong>"Install"</strong> — opens as a standalone window</>}/>
+    </Card>
+
+    {/* Windows */}
+    <Card icon="🪟" title="Windows" subtitle="Chrome or Edge · desktop shortcut">
+      <div style={{marginBottom:10,fontSize:11,color:"var(--muted)",fontFamily:"'Oswald',sans-serif",
+        fontWeight:600,letterSpacing:.5,textTransform:"uppercase"}}>Chrome</div>
+      <Step n="1" text={<>Open <strong style={{color:"var(--accent2)"}}>goingyard.app</strong> in Chrome</>}/>
+      <Step n="2" text={<>Click the <strong>⋮</strong> menu → <strong>Save and share → Create shortcut</strong></>}/>
+      <Step n="3" text={<>Check <strong>"Open as window"</strong> and click <strong>Create</strong></>}/>
+      <div style={{marginBottom:10,marginTop:14,fontSize:11,color:"var(--muted)",fontFamily:"'Oswald',sans-serif",
+        fontWeight:600,letterSpacing:.5,textTransform:"uppercase"}}>Edge</div>
+      <Step n="1" text={<>Open <strong style={{color:"var(--accent2)"}}>goingyard.app</strong> in Edge</>}/>
+      <Step n="2" text={<>Click <strong>⋯</strong> menu → <strong>Apps → Install this site as an app</strong></>}/>
+      <Step n="3" text={<>Click <strong>Install</strong> — pinned to taskbar and Start menu</>}/>
+    </Card>
+
+    {/* Direct link */}
+    <div style={{textAlign:"center",marginBottom:24}}>
+      <a href={url} target="_blank" rel="noopener noreferrer"
+        style={{display:"inline-flex",alignItems:"center",gap:8,padding:"10px 24px",
+          borderRadius:10,background:"var(--accent)",color:"white",
+          fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,
+          letterSpacing:.5,textDecoration:"none",
+          boxShadow:"0 4px 16px rgba(232,65,26,.35)"}}>
+        ↗ Open Going Yard
+      </a>
+      <div style={{marginTop:8,fontSize:10,color:"var(--muted)",
+        fontFamily:"'DM Mono',monospace"}}>{url}</div>
+    </div>
   </div>;
 }
 
@@ -5832,6 +5973,7 @@ export default function App() {
     {key:"onlyhomers",label:"⚾ Only Homers"},
     {key:"linemate",  label:"📊 Linemate",  external:"https://linemate.io/mlb"},
     {key:"livesports",label:"📺 Live Sports",external:"https://thetvapp.to"},
+    {key:"getapp",    label:"📲 Get App"},
   ];
 
   return <>
@@ -5875,6 +6017,7 @@ export default function App() {
         <div style={{display:tab==="statcast"?"block":"none"}}><StatcastTab/></div>
         <div style={{display:tab==="homeruns"?"block":"none"}}><HRTrackerTab/></div>
         <div style={{display:tab==="onlyhomers"?"block":"none"}}><OnlyHomersTab/></div>
+        <div style={{display:tab==="getapp"?"block":"none"}}><GetAppTab/></div>
         <div style={{display:tab==="matchup"?"block":"none"}}><MatchupEngineTab/></div>
       </main>
       <div style={{textAlign:"center",padding:"12px 0 8px",borderTop:"1px solid var(--border)",marginTop:24}}>
