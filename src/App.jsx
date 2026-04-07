@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-07 10:03 ET";
+const BUILD_TIMESTAMP = "2026-04-07 10:24 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -4139,6 +4139,7 @@ function PitchBuilderTab() {
 // ── HR TICKER + TRACKER ──────────────────────────────────────
 // Global HR data — shared between ticker and tracker tab
 let HR_DATA = [];
+let HR_DATA_DATE = '';
 let HR_LAST_FETCH = 0;
 const HR_CACHE_MS = 60000;
 
@@ -4155,9 +4156,9 @@ async function fetchHRs(force=false) {
     // Keep yesterday's HRs in ticker until today's games produce at least 3 HRs
     // This way the ticker stays alive past midnight until next day's games start
     if (newHRs.length >= 3) {
-      HR_DATA = newHRs; // today has real data — use it
+      HR_DATA = newHRs; HR_DATA_DATE = data.date || ''; // today has real data — use it
     } else if (newHRs.length > 0) {
-      HR_DATA = newHRs; // small amount — still show it
+      HR_DATA = newHRs; HR_DATA_DATE = data.date || ''; // small amount — still show it
     } else if (HR_DATA.length === 0) {
       // Truly no data yet — try fetching yesterday
       try {
@@ -5041,7 +5042,11 @@ function MatchupEngineTab() {
             const recentEV = parseFloat(b.recent_avg_ev)||0;
             const bvpEV    = parseFloat(b.bvp_avg_ev)||0;
             const simHR    = parseFloat(b.sim_hr_adj)||parseFloat(b.sim_hr)||0;
-            const goneYard = HR_DATA.some(h => h.batterId === pid || (b.batter && h.batterName && h.batterName.toLowerCase() === b.batter.toLowerCase()));
+            // Only show Gone Yard if the HR happened today (not yesterday's leftover data)
+            const todayETStr = new Date().toLocaleDateString('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).split('/').reverse().join('-').replace(/-(\d{2})-(\d{2})$/,(_,m,d)=>'-'+m+'-'+d).replace(/(\d{4})-(\d{2})-(\d{2})/,(_,y,m,d)=>y+'-'+m+'-'+d);
+            const etToday = (() => { const d=new Date(); const s=d.toLocaleDateString('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}); const [m,dy,y]=s.split('/'); return `${y}-${m.padStart(2,'0')}-${dy.padStart(2,'0')}`; })();
+            const hrIsToday = HR_DATA_DATE === etToday;
+            const goneYard = hrIsToday && HR_DATA.some(h => h.batterId === pid || (b.batter && h.batterName && h.batterName.toLowerCase() === b.batter.toLowerCase()));
             const projHR   = parseFloat(b.proj_hr_adj)||0;
 
             return <div key={uid}>
