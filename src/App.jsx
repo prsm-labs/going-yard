@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-07 16:29 ET";
+const BUILD_TIMESTAMP = "2026-04-07 16:49 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -4847,6 +4847,20 @@ function MatchupEngineTab() {
   }, []);
 
   // Build unique game list
+  // Parse "7:05 PM" → minutes since midnight for sorting
+  const timeToMins = (t) => {
+    if (!t) return 9999;
+    try {
+      const parts = String(t).trim().match(/(\d+):(\d+)\s*(AM|PM)/i);
+      if (!parts) return 9999;
+      let h = parseInt(parts[1]), m = parseInt(parts[2]);
+      const ap = parts[3].toUpperCase();
+      if (ap === 'PM' && h !== 12) h += 12;
+      if (ap === 'AM' && h === 12) h = 0;
+      return h * 60 + m;
+    } catch { return 9999; }
+  };
+
   const games = [];
   const seen = new Set();
   data.forEach(r => {
@@ -4855,6 +4869,8 @@ function MatchupEngineTab() {
       games.push({ id: r.game_id, time: r.game_time || '', label: `${r.batting_team} game` });
     }
   });
+  // Sort games earliest → latest
+  games.sort((a, b) => timeToMins(a.time) - timeToMins(b.time));
 
   // Group by game_id, then by batting_team
   const grouped = {};
@@ -4995,7 +5011,7 @@ function MatchupEngineTab() {
 
     </div>}
 
-    {!loading && !error && Object.values(grouped).map(game => {
+    {!loading && !error && Object.values(grouped).sort((a,b)=>timeToMins(a.gameTime)-timeToMins(b.gameTime)).map(game => {
       const teamPairs = Object.values(game.teams);
       // Format game time
       // game_time comes directly from daily_summary.csv — use as-is
