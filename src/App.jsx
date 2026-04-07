@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-07 10:49 ET";
+const BUILD_TIMESTAMP = "2026-04-07 12:00 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -5041,7 +5041,7 @@ function MatchupEngineTab() {
             const totalFlags = parseInt(b.total_flags)||0;
             const recentEV = parseFloat(b.recent_avg_ev)||0;
             const bvpEV    = parseFloat(b.bvp_avg_ev)||0;
-            const simHR    = parseFloat(b.sim_hr_adj)||parseFloat(b.sim_hr)||0;
+            const simHR    = parseFloat(b.sim_hr)||0;
             // Only show Gone Yard if the HR happened today (not yesterday's leftover data)
             const todayETStr = new Date().toLocaleDateString('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).split('/').reverse().join('-').replace(/-(\d{2})-(\d{2})$/,(_,m,d)=>'-'+m+'-'+d).replace(/(\d{4})-(\d{2})-(\d{2})/,(_,y,m,d)=>y+'-'+m+'-'+d);
             const etToday = (() => { const d=new Date(); const s=d.toLocaleDateString('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}); const [m,dy,y]=s.split('/'); return `${y}-${m.padStart(2,'0')}-${dy.padStart(2,'0')}`; })();
@@ -5161,7 +5161,7 @@ function MatchupEngineTab() {
                     {[
                       {label:'PA',   val:num(b.sim_pa,1),   raw:parseFloat(b.sim_pa)||0},
                       {label:'H',    val:num(b.sim_h,2),    raw:parseFloat(b.sim_h)||0},
-                      {label:'HR',   val:num(b.sim_hr_adj||b.sim_hr,2), raw:simHR, color:simHR>=0.15?'var(--accent)':undefined},
+                      {label:'HR',   val:num(b.sim_hr,2), raw:simHR, color:simHR>=0.15?'var(--accent)':undefined},
                       {label:'2B',   val:num(b.sim_2b,2),   raw:parseFloat(b.sim_2b)||0},
                       {label:'BB',   val:num(b.sim_bb,2),   raw:parseFloat(b.sim_bb)||0},
                       {label:'K',    val:num(b.sim_k,2),    raw:parseFloat(b.sim_k)||0},
