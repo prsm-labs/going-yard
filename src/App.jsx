@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-07 18:43 ET";
+const BUILD_TIMESTAMP = "2026-04-07 18:52 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -2215,9 +2215,10 @@ async function fetchLiftoffBatters(game) {
         const oSwing    = cachedP?.oSwing      || 0;
         // L7 window — prefer daily_picks.csv, fall back to players.json windows
         const w7        = cachedP?.windows?.last7;
-        const dp        = DAILY_PICKS_CACHE[String(bid)] || null;
+        const dp        = DAILY_PICKS_CACHE[String(bid)] || 
+          Object.values(DAILY_PICKS_CACHE).find(r => r.batter && r.batter.toLowerCase() === (name||'').toLowerCase()) || null;
         const recentBrl = (dp?.recent_barrel_pct != null && dp.recent_barrel_pct !== '' ? parseFloat(dp.recent_barrel_pct) : null) ?? w7?.barrel  ?? barrel;
-        const recentHH  = (dp?.recent_hh_pct     != null && dp.recent_hh_pct     !== '' ? parseFloat(dp.recent_hh_pct)     : null) ?? w7?.hardHit ?? hardHit;
+        const recentHH  = (dp?.recent_hh_pct != null && dp.recent_hh_pct !== '' ? parseFloat(dp.recent_hh_pct) : null) ?? w7?.hardHit ?? hardHit;
         const recentEV  = (dp?.recent_avg_ev     != null && dp.recent_avg_ev     !== '' ? parseFloat(dp.recent_avg_ev)     : null) ?? w7?.avgEV   ?? avgEV;
         const recentFB  = (dp?.recent_fb_pct     != null && dp.recent_fb_pct     !== '' ? parseFloat(dp.recent_fb_pct)     : null) ?? w7?.flyBall ?? flyBall;
         const recentPull= w7?.pullAir ?? pullAir;
@@ -2540,9 +2541,9 @@ function XRow({b}) {
       <div className="xb"><div className="xbl">Avg EV <span style={{fontSize:8,opacity:.6}}>Today</span></div><div className="xbv" style={{color:ec}}>{b.avgEV.toFixed(1)}</div><div className="xbs" style={{color:evUp?"var(--green)":"var(--ice)"}}>{evUp?"▲":"▼"} vs L7 ({(b.recentAvgEV??88).toFixed(1)})</div></div>
       <div className="xb"><div className="xbl">Launch Angle</div><div className="xbv" style={{color:inZ?"var(--green)":"var(--muted)"}}>{b.launchAngle.toFixed(1)}°</div><div className="xbs" style={{color:inZ?"var(--green)":"var(--muted)"}}>{zl??"Outside HR zone"}</div></div>
       <div className="xb"><div className="xbl">Hard Hits 95+</div><div className="xbv" style={{color:b.hardHits>=2?"#ff8020":b.hardHits===1?"#ffc840":"var(--muted)"}}>{b.hardHits}</div><div className="xbs" style={{color:"var(--muted)"}}>this game</div></div>
-      <div className="xb"><div className="xbl">Barrel% <span style={{fontSize:8,opacity:.6}}>L7</span></div><div className="xbv" style={{color:(b.recentBarrel!=null?b.recentBarrel:b.barrel??0)>=T.BAR_EL?"#ff4020":(b.recentBarrel!=null?b.recentBarrel:b.barrel??0)>=8?"#ff8020":"var(--text)"}}>{(b.recentBarrel!=null?b.recentBarrel:(b.barrel??0)).toFixed(1)}%</div><div className="xbs" style={{color:"var(--muted)"}}>{(b.recentBarrel??0)>0?"L7":"season"}</div></div>
-      <div className="xb"><div className="xbl">HH% <span style={{fontSize:8,opacity:.6}}>L7</span></div><div className="xbv" style={{color:(b.recentHardHit!=null?b.recentHardHit:b.hardHit??0)>=50?"#ff4020":(b.recentHardHit!=null?b.recentHardHit:b.hardHit??0)>=40?"#ff8020":"var(--text)"}}>{(b.recentHardHit!=null?b.recentHardHit:(b.hardHit??0)).toFixed(1)}%</div><div className="xbs" style={{color:"var(--muted)"}}>{(b.recentHardHit??0)>0?"L7":"season"}</div></div>
-      <div className="xb"><div className="xbl">FB% <span style={{fontSize:8,opacity:.6}}>L7</span></div><div className="xbv" style={{color:(b.recentFlyBall!=null?b.recentFlyBall:b.flyBall??0)>=35&&(b.recentFlyBall!=null?b.recentFlyBall:b.flyBall??0)<=45?"#ff8020":"var(--text)"}}>{(b.recentFlyBall!=null?b.recentFlyBall:(b.flyBall??0)).toFixed(1)}%</div><div className="xbs" style={{color:"var(--muted)"}}>{(b.recentFlyBall??0)>0?"L7":"season"}</div></div>
+      <div className="xb"><div className="xbl">Barrel% <span style={{fontSize:8,opacity:.6}}>L7</span></div><div className="xbv" style={{color:(b.recentBarrel!=null?b.recentBarrel:b.barrel??0)>=T.BAR_EL?"#ff4020":(b.recentBarrel!=null?b.recentBarrel:b.barrel??0)>=8?"#ff8020":"var(--text)"}}>{(b.recentBarrel!=null?b.recentBarrel:(b.barrel??0)).toFixed(1)}%</div><div className="xbs" style={{color:"var(--muted)"}}>L7</div></div>
+      <div className="xb"><div className="xbl">HH% <span style={{fontSize:8,opacity:.6}}>L7</span></div><div className="xbv" style={{color:(b.recentHardHit!=null?b.recentHardHit:b.hardHit??0)>=50?"#ff4020":(b.recentHardHit!=null?b.recentHardHit:b.hardHit??0)>=40?"#ff8020":"var(--text)"}}>{(b.recentHardHit!=null?b.recentHardHit:(b.hardHit??0)).toFixed(1)}%</div><div className="xbs" style={{color:"var(--muted)"}}>L7</div></div>
+      <div className="xb"><div className="xbl">FB% <span style={{fontSize:8,opacity:.6}}>L7</span></div><div className="xbv" style={{color:(b.recentFlyBall!=null?b.recentFlyBall:b.flyBall??0)>=35&&(b.recentFlyBall!=null?b.recentFlyBall:b.flyBall??0)<=45?"#ff8020":"var(--text)"}}>{(b.recentFlyBall!=null?b.recentFlyBall:(b.flyBall??0)).toFixed(1)}%</div><div className="xbs" style={{color:"var(--muted)"}}>L7</div></div>
     </div>
     <div style={{marginBottom:4,fontSize:9,color:"var(--muted)",fontFamily:"DM Mono,monospace",textTransform:"uppercase",letterSpacing:1}}>Today vs L7</div>
     <CBar label="Exit Velo" tv={b.avgEV} l7={b.recentAvgEV??88} max={112} col={ec}/>
