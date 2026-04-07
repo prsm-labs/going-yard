@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-07 10:24 ET";
+const BUILD_TIMESTAMP = "2026-04-07 10:49 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -5195,7 +5195,7 @@ function MatchupEngineTab() {
                       {[
                         {label:'Avg EV', val:num(s.ev,1), flag:s.flags[0], hi:95},
                         {label:'Barrel%',val:pct(s.brl),   flag:s.flags[1]},
-                        {label:'FB%',    val:pct(s.fb),    flag:s.flags[2]},
+                        {label:'FB%',    val:(s.fb!==undefined&&s.fb!==''&&s.fb!==null&&!isNaN(parseFloat(s.fb))?parseFloat(s.fb).toFixed(1)+'%':'—'),    flag:s.flags[2]},
                         {label:'Avg LA', val:s.la&&parseFloat(s.la)!==0?`${parseFloat(s.la).toFixed(1)}°`:'—', flag:s.flags[3]},
                       ].map(m=>(
                         <div key={m.label} style={{display:'flex',alignItems:'center',
