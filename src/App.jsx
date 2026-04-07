@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-07 18:52 ET";
+const BUILD_TIMESTAMP = "2026-04-07 18:59 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -1610,9 +1610,11 @@ async function loadDailyPicks() {
     const text = await res.text();
     const rows = parseCSVText(text);
     rows.forEach(r => {
-      const bid = String(r.batter_id || '').trim();
+      // Normalize id: strip pandas float suffix "691016.0" → "691016"
+      const rawBid = String(r.batter_id || '').trim();
+      const bid = rawBid.includes('.') ? String(parseInt(rawBid)) : rawBid;
       // Only store first row per batter — recent stats are same across all matchup rows
-      if (bid && !DAILY_PICKS_CACHE[bid]) DAILY_PICKS_CACHE[bid] = r;
+      if (bid && bid !== 'NaN' && !DAILY_PICKS_CACHE[bid]) DAILY_PICKS_CACHE[bid] = r;
     });
     console.log('[DailyPicks] Loaded', Object.keys(DAILY_PICKS_CACHE).length, 'batters');
   } catch(e) {
@@ -2215,7 +2217,9 @@ async function fetchLiftoffBatters(game) {
         const oSwing    = cachedP?.oSwing      || 0;
         // L7 window — prefer daily_picks.csv, fall back to players.json windows
         const w7        = cachedP?.windows?.last7;
-        const dp        = DAILY_PICKS_CACHE[String(bid)] || 
+        const bidKey = String(bid);
+        const dp = DAILY_PICKS_CACHE[bidKey] ||
+          // fallback: match by name (handles any remaining ID format mismatches)
           Object.values(DAILY_PICKS_CACHE).find(r => r.batter && r.batter.toLowerCase() === (name||'').toLowerCase()) || null;
         const recentBrl = (dp?.recent_barrel_pct != null && dp.recent_barrel_pct !== '' ? parseFloat(dp.recent_barrel_pct) : null) ?? w7?.barrel  ?? barrel;
         const recentHH  = (dp?.recent_hh_pct != null && dp.recent_hh_pct !== '' ? parseFloat(dp.recent_hh_pct) : null) ?? w7?.hardHit ?? hardHit;
