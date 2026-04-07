@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-07 16:49 ET";
+const BUILD_TIMESTAMP = "2026-04-07 18:28 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -1601,6 +1601,23 @@ async function fetchDaysSinceHR(pid) {
   } catch(e) { return null; }
 }
 
+
+// Load daily_picks.csv → DAILY_PICKS_CACHE keyed by batter_id
+async function loadDailyPicks() {
+  try {
+    const res = await fetch('/data/daily_picks.csv');
+    if (!res.ok) return;
+    const text = await res.text();
+    const rows = parseCSVText(text);
+    rows.forEach(r => {
+      if (r.batter_id) DAILY_PICKS_CACHE[String(r.batter_id).trim()] = r;
+    });
+    console.log('[DailyPicks] Loaded', Object.keys(DAILY_PICKS_CACHE).length, 'batters');
+  } catch(e) {
+    console.warn('[DailyPicks] Failed to load:', e.message);
+  }
+}
+
 async function fetchPlayers(setL, setP, setE, silent=false) {
   if (!silent) setL(true);
   setE(null);
@@ -2194,13 +2211,16 @@ async function fetchLiftoffBatters(game) {
         const bbPct     = cachedP?.bbPct       || 0;
         const kPct      = cachedP?.kPct        || 0;
         const oSwing    = cachedP?.oSwing      || 0;
-        // L7 window — use real rolling data from at-bat log if available
+        // L7 window — prefer daily_picks.csv, fall back to players.json windows
         const w7        = cachedP?.windows?.last7;
-        const recentBrl = w7?.barrel   ?? barrel;
-        const recentHH  = w7?.hardHit  ?? hardHit;
-        const recentEV  = w7?.avgEV    ?? avgEV;
-        const recentPull= w7?.pullAir  ?? pullAir;
-        const recentFB  = w7?.flyBall  ?? flyBall;
+        const dp        = DAILY_PICKS_CACHE[String(bid)] || null;
+        const recentBrl = (dp?.recent_barrel_pct != null && dp.recent_barrel_pct !== '' ? parseFloat(dp.recent_barrel_pct) : null) ?? w7?.barrel  ?? barrel;
+        const recentHH  = (dp?.recent_hh_pct     != null && dp.recent_hh_pct     !== '' ? parseFloat(dp.recent_hh_pct)     : null) ?? w7?.hardHit ?? hardHit;
+        const recentEV  = (dp?.recent_avg_ev     != null && dp.recent_avg_ev     !== '' ? parseFloat(dp.recent_avg_ev)     : null) ?? w7?.avgEV   ?? avgEV;
+        const recentFB  = (dp?.recent_fb_pct     != null && dp.recent_fb_pct     !== '' ? parseFloat(dp.recent_fb_pct)     : null) ?? w7?.flyBall ?? flyBall;
+        const recentPull= w7?.pullAir ?? pullAir;
+        const recentHRct= dp?.recent_hr_count != null ? parseInt(dp.recent_hr_count) || 0 : null;
+        const recentLA  = dp?.recent_avg_la != null && dp.recent_avg_la !== '' ? parseFloat(dp.recent_avg_la) : null;
 
         // ── Real days since last HR from game log ──────────────
         // Check today's HR ticker first (fastest)
@@ -4142,6 +4162,7 @@ let HR_DATA = [];
 let HR_DATA_DATE = '';
 let HR_LAST_FETCH = 0;
 const SEEN_HR_IDS = new Set();
+const DAILY_PICKS_CACHE = {}; // keyed by batter_id string
 let _notifyNewHR = null; // callback set by useHRNotifications hook
 const HR_CACHE_MS = 60000;
 
@@ -6144,6 +6165,7 @@ export default function App() {
   // Load player data at startup
   useEffect(() => {
     loadGlobalPlayerMap();
+    loadDailyPicks();
     const noop = () => {};
     fetchPlayers(noop, noop, noop, false);
   }, []);
