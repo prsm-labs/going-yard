@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-08 13:56 ET";
+const BUILD_TIMESTAMP = "2026-04-08 14:24 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -5760,24 +5760,99 @@ function envScore(s) {
                {c:'#38b8f2',l:'📉 Suppressor'};
 }
 
-// Wind direction arrow SVG — shows raw compass direction
-function WindArrow({ deg, size=36 }) {
-  const rad = (deg - 90) * Math.PI / 180;
-  const cx=size/2, cy=size/2, r=size/2-3;
-  const x2=cx+r*Math.cos(rad), y2=cy+r*Math.sin(rad);
-  const x1=cx-r*0.5*Math.cos(rad), y1=cy-r*0.5*Math.sin(rad);
+// Stadium wind diagram: top-down field with wind arrow
+// cfDir = bearing from home plate toward CF
+// windDeg = meteorological FROM direction
+function StadiumWindDiagram({ cfDir, windDeg, windDir, size=72 }) {
+  const cx=size/2, cy=size/2;
+
+  // Field shape: rotate entire field so CF points in cfDir direction
+  const fieldRot = cfDir - 90; // rotate so "up" = cfDir
+  const toRad = d => (d-90)*Math.PI/180;
+
+  // Outfield arc (CF = up in local coords, then rotated)
+  const arcR = size*0.42;
+  const lfAngle = fieldRot - 45;
+  const rfAngle = fieldRot + 45;
+  const lf = {x: cx+arcR*Math.cos(toRad(lfAngle)), y: cy+arcR*Math.sin(toRad(lfAngle))};
+  const rf = {x: cx+arcR*Math.cos(toRad(rfAngle)), y: cy+arcR*Math.sin(toRad(rfAngle))};
+  const cf = {x: cx+arcR*Math.cos(toRad(fieldRot)), y: cy+arcR*Math.sin(toRad(fieldRot))};
+
+  // Home plate (opposite of CF)
+  const hpR = size*0.3;
+  const hp = {x: cx+hpR*Math.cos(toRad(fieldRot+180)), y: cy+hpR*Math.sin(toRad(fieldRot+180))};
+
+  // Diamond points
+  const dR = size*0.18;
+  const d1b = {x: cx+dR*Math.cos(toRad(fieldRot+135)), y: cy+dR*Math.sin(toRad(fieldRot+135))};
+  const d3b = {x: cx+dR*Math.cos(toRad(fieldRot+225)), y: cy+dR*Math.sin(toRad(fieldRot+225))};
+  const d2b = {x: cx+dR*Math.cos(toRad(fieldRot)),     y: cy+dR*Math.sin(toRad(fieldRot))};
+
+  // Wind arrow (FROM direction = where wind comes from, arrow shows where it goes TO)
+  const windToward = (windDeg + 180) % 360;
+  const wRad = toRad(windToward);
+  const wLen = size*0.34;
+  const wx2 = cx + wLen*Math.cos(wRad);
+  const wy2 = cy + wLen*Math.sin(wRad);
+  const wx1 = cx - wLen*0.5*Math.cos(wRad);
+  const wy1 = cy - wLen*0.5*Math.sin(wRad);
+
+  const wCol = {'out-strong':'#ff4020','out':'#ff8020','in-strong':'#38b8f2','in':'#60a0d0','cross':'#f5a623','calm':'#888'}[windDir]||'#888';
+  const uid = `wd${Math.abs(windDeg)}`;
+
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}
       style={{display:'block',flexShrink:0}}>
-      <circle cx={cx} cy={cy} r={r} fill="rgba(255,255,255,.06)" stroke="var(--border)" strokeWidth="1"/>
+      {/* Background */}
+      <circle cx={cx} cy={cy} r={size/2-1} fill="rgba(10,15,20,.8)" stroke="rgba(255,255,255,.1)" strokeWidth="1"/>
+
+      {/* Outfield grass arc */}
+      <path d={`M ${lf.x} ${lf.y} A ${arcR} ${arcR} 0 0 1 ${rf.x} ${rf.y} L ${hp.x} ${hp.y} Z`}
+        fill="rgba(39,80,39,.5)" stroke="rgba(255,255,255,.15)" strokeWidth="0.5"/>
+
+      {/* Infield diamond */}
+      <polygon points={`${hp.x},${hp.y} ${d1b.x},${d1b.y} ${d2b.x},${d2b.y} ${d3b.x},${d3b.y}`}
+        fill="rgba(180,140,80,.25)" stroke="rgba(255,255,255,.2)" strokeWidth="0.5"/>
+
+      {/* CF label */}
+      <text x={cf.x} y={cf.y} textAnchor="middle" dominantBaseline="central"
+        fontSize="7" fill="rgba(255,255,255,.5)" fontFamily="monospace">CF</text>
+
+      {/* Wind arrow */}
       <defs>
-        <marker id="wh" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
-          <path d="M0,0 L6,3 L0,6 Z" fill="var(--accent2)"/>
+        <marker id={`${uid}h`} markerWidth="5" markerHeight="5" refX="2.5" refY="2.5" orient="auto">
+          <path d="M0,0 L5,2.5 L0,5 Z" fill={wCol}/>
+        </marker>
+      </defs>
+      <line x1={wx1} y1={wy1} x2={wx2} y2={wy2}
+        stroke={wCol} strokeWidth="2.5" strokeLinecap="round"
+        markerEnd={`url(#${uid}h)`}/>
+
+      {/* Home plate dot */}
+      <circle cx={hp.x} cy={hp.y} r="3" fill="rgba(255,255,255,.6)"/>
+    </svg>
+  );
+}
+
+// Simple arrow for hourly strip (smaller, no field)
+function WindArrow({ deg, size=36 }) {
+  const cx=size/2, cy=size/2, r=size/2-3;
+  const toward = (deg+180)%360;
+  const rad = (toward-90)*Math.PI/180;
+  const x2=cx+r*0.8*Math.cos(rad), y2=cy+r*0.8*Math.sin(rad);
+  const x1=cx-r*0.4*Math.cos(rad), y1=cy-r*0.4*Math.sin(rad);
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}
+      style={{display:'block',margin:'0 auto'}}>
+      <circle cx={cx} cy={cy} r={r} fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.1)" strokeWidth="1"/>
+      <defs>
+        <marker id={`ah${deg}`} markerWidth="4" markerHeight="4" refX="2" refY="2" orient="auto">
+          <path d="M0,0 L4,2 L0,4 Z" fill="rgba(245,166,35,.8)"/>
         </marker>
       </defs>
       <line x1={x1} y1={y1} x2={x2} y2={y2}
-        stroke="var(--accent2)" strokeWidth="2"
-        markerEnd="url(#wh)"/>
+        stroke="rgba(245,166,35,.8)" strokeWidth="1.5"
+        markerEnd={`url(#ah${deg})`}/>
     </svg>
   );
 }
@@ -5855,15 +5930,16 @@ function WeatherGameCard({ g, wd }) {
             </div>
           </div>
 
-          {/* Wind arrow + label */}
-          <div style={{display:'flex',alignItems:'center',gap:8,flex:1,minWidth:0,flexWrap:'wrap'}}>
-            <WindArrow deg={display.windDeg} size={38}/>
+          {/* Stadium diagram + wind label */}
+          <div style={{display:'flex',alignItems:'center',gap:10,flex:1,minWidth:0,flexWrap:'wrap'}}>
+            <StadiumWindDiagram cfDir={wd.cfDir||0} windDeg={display.windDeg} windDir={display.windDir} size={68}/>
             <div>
-              <div style={{marginBottom:4}}>
+              <div style={{marginBottom:5}}>
                 {windBadge(display.windDir, display.windLabel)}
               </div>
-              <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
-                from {display.windDirRaw} ({display.windDeg}°)
+              <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",lineHeight:1.6}}>
+                from {display.windDirRaw} ({display.windDeg}°)<br/>
+                <span style={{opacity:.6}}>CF faces {wd.cfDir}°</span>
               </div>
             </div>
           </div>
