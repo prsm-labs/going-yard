@@ -1,7 +1,6 @@
 // api/weather.js — MLB Game-Time Weather with Hourly Breakdown
-// Uses WeatherAPI.com hourly forecasts anchored to game start time
-// cfDir = compass bearing from home plate toward center field
-// Domes skip weather fetch entirely
+// WeatherAPI.com returns LOCAL time strings — parse hours directly, never via new Date()
+// cfDir = compass bearing from home plate toward center field (degrees)
 
 const WEATHER_API_KEY = "1a64b4c500b44b62884115954253006";
 
@@ -40,7 +39,7 @@ const STADIUMS = {
 };
 
 const PARK_FACTORS = {
-  COL:{hr:136,label:"Coors — Extreme HR park"},
+  COL:{hr:136,label:"Coors Field — Extreme HR park"},
   CIN:{hr:119,label:"Great American — HR friendly"},
   PHI:{hr:114,label:"Citizens Bank — Hitter friendly"},
   MIL:{hr:113,label:"Am. Family — Hitter friendly"},
@@ -73,39 +72,61 @@ const PARK_FACTORS = {
   TB: {hr:86, label:"Tropicana — Extreme suppressor"},
 };
 
-// Field-relative wind direction
-// windDeg: meteorological FROM direction (270 = FROM west, blowing east)
-// cfDir:   compass bearing from home plate toward center field
-function fieldWind(windDeg, windSpeed, cfDir) {
-  if (windSpeed < 3) return { label: "Calm", dir: "calm" };
+// Parse hour directly from WeatherAPI time string "2026-04-08 19:00"
+// NEVER use new Date() — Vercel runs UTC, WeatherAPI returns local time strings
+function parseHour(timeStr) {
+  try { return parseInt(timeStr.split(' ')[1].split(':')[0], 10); }
+  catch { return -1; }
+}
 
-  // Convert FROM direction to TOWARD direction
+// Parse game time string "7:05 PM" → 24hr integer (19)
+function parseGameHour(gameTime) {
+  if (!gameTime) return null;
+  try {
+    const m = String(gameTime).trim().match(/(\d+):(\d+)\s*(AM|PM)/i);
+    if (!m) return null;
+    let h = parseInt(m[1], 10);
+    if (m[3].toUpperCase() === 'PM' && h !== 12) h += 12;
+    if (m[3].toUpperCase() === 'AM' && h === 12) h = 0;
+    return h;
+  } catch { return null; }
+}
+
+// Field-relative wind: is wind blowing toward CF (out) or away from CF (in)?
+// windDeg: meteorological FROM direction (WeatherAPI wind_degree)
+//   e.g. 157 = FROM SSE, meaning wind blows TOWARD NNW
+// cfDir: bearing from home plate → center field
+function fieldWind(windDeg, windSpeed, cfDir) {
+  if (windSpeed < 3) return { label: 'Calm', dir: 'calm' };
+
+  // WHERE the wind is blowing TOWARD (opposite of FROM)
   const windToward = (windDeg + 180) % 360;
 
-  // Angular difference: 0 = wind blowing directly toward CF (out), 180 = directly in
+  // Angular difference between wind destination and CF direction
+  // 0° = wind going directly toward CF = blowing OUT
+  // 180° = wind going directly away from CF = blowing IN
   let diff = ((windToward - cfDir) % 360 + 360) % 360;
   if (diff > 180) diff = 360 - diff;
 
   if (diff <= 45) {
-    if (windSpeed >= 15) return { label: `Blowing Out ${windSpeed}mph`, dir: "out-strong" };
-    return { label: `Out ${windSpeed}mph`, dir: "out" };
+    return windSpeed >= 15
+      ? { label: `Blowing Out ${windSpeed}mph`, dir: 'out-strong' }
+      : { label: `Out ${windSpeed}mph`,         dir: 'out' };
   } else if (diff >= 135) {
-    if (windSpeed >= 12) return { label: `Blowing In ${windSpeed}mph`, dir: "in-strong" };
-    return { label: `In ${windSpeed}mph`, dir: "in" };
+    return windSpeed >= 12
+      ? { label: `Blowing In ${windSpeed}mph`,  dir: 'in-strong' }
+      : { label: `In ${windSpeed}mph`,          dir: 'in' };
   } else {
-    return { label: `Crosswind ${windSpeed}mph`, dir: "cross" };
+    return { label: `Crosswind ${windSpeed}mph`, dir: 'cross' };
   }
 }
 
-function hrScore(temp, windDir, pfHr, elv) {
-  const tempBonus  = temp >= 80 ? 1.08 : temp >= 70 ? 1.04 : temp >= 60 ? 1.0 : temp >= 50 ? 0.95 : 0.88;
-  const windFactor = windDir === 'out-strong' ? 1.15 : windDir === 'out' ? 1.06
-                   : windDir === 'in-strong'  ? 0.86 : windDir === 'in'  ? 0.93 : 1.0;
-  const pfNorm   = ((pfHr || 100) - 85) / 30;
-  const elevBonus = (elv||0) > 1000 ? 1.15 : (elv||0) > 500 ? 1.04 : 1.0;
-  return Math.round(Math.min(100, Math.max(0,
-    50 + (tempBonus-1)*80 + (windFactor-1)*60 + pfNorm*25 + (elevBonus-1)*40
-  )));
+function hrScore(temp, windDir, pfHr) {
+  const t = temp >= 80 ? 1.08 : temp >= 70 ? 1.04 : temp >= 60 ? 1.0 : temp >= 50 ? 0.95 : 0.88;
+  const w = windDir === 'out-strong' ? 1.15 : windDir === 'out' ? 1.06
+          : windDir === 'in-strong'  ? 0.86 : windDir === 'in'  ? 0.93 : 1.0;
+  const pf = ((pfHr || 100) - 85) / 30;
+  return Math.round(Math.min(100, Math.max(0, 50 + (t-1)*80 + (w-1)*60 + pf*25)));
 }
 
 export default async function handler(req, res) {
@@ -117,7 +138,7 @@ export default async function handler(req, res) {
     const stadium = STADIUMS[team];
     if (!stadium) return res.status(404).json({ error: `Unknown team: ${team}` });
 
-    const pf = PARK_FACTORS[team] || { hr:100, label:"Neutral park" };
+    const pf = PARK_FACTORS[team] || { hr: 100, label: 'Neutral park' };
 
     if (stadium.dome) {
       return res.status(200).json({
@@ -126,37 +147,25 @@ export default async function handler(req, res) {
       });
     }
 
-    // Parse game time string e.g. "7:05 PM" → start hour (24hr)
-    let gameHour = null;
-    if (gameTime) {
-      try {
-        const m = String(gameTime).trim().match(/(\d+):(\d+)\s*(AM|PM)/i);
-        if (m) {
-          let h = parseInt(m[1]);
-          if (m[3].toUpperCase() === 'PM' && h !== 12) h += 12;
-          if (m[3].toUpperCase() === 'AM' && h === 12) h = 0;
-          gameHour = h;
-        }
-      } catch(e) {}
-    }
+    const gameHour = parseGameHour(gameTime);
 
-    // Fetch 2 days of hourly data (handles late games / next-day UTC)
+    // Fetch 2 days so late games don't fall off the end
     const q = `${stadium.lat},${stadium.lon}`;
     const url = `https://api.weatherapi.com/v1/forecast.json?key=${WEATHER_API_KEY}&q=${q}&days=2&aqi=no&alerts=no`;
     const resp = await fetch(url, { headers: { Accept: 'application/json' } });
     if (!resp.ok) throw new Error(`WeatherAPI ${resp.status}`);
     const data = await resp.json();
 
-    // Flatten all hours from both days
+    // Flatten all hourly slots across both days
     const allHours = (data.forecast?.forecastday || []).flatMap(d => d.hour || []);
 
-    // Find game-time hour — match by hour number
+    // Match game-time hour using direct string parse (avoids UTC confusion on Vercel)
     let gameHourData = null;
     if (gameHour !== null) {
-      gameHourData = allHours.find(h => new Date(h.time).getHours() === gameHour) || null;
+      gameHourData = allHours.find(h => parseHour(h.time) === gameHour) || null;
     }
 
-    // Fallback to current conditions
+    // Fall back to current conditions if game hour not found
     const cur = data.current || {};
     const src = gameHourData || {
       temp_f: cur.temp_f, humidity: cur.humidity,
@@ -165,55 +174,57 @@ export default async function handler(req, res) {
       condition: cur.condition, chance_of_rain: 0,
     };
 
-    const temp      = Math.round(src.temp_f     || 72);
-    const humidity  = Math.round(src.humidity   || 50);
-    const windSpeed = Math.round(src.wind_mph   || 0);
-    const windDeg   = Math.round(src.wind_degree|| 0);
-    const windDirRaw= src.wind_dir || '';
-    const precip    = parseFloat(src.precip_in  || 0);
-    const rainChance= parseInt(src.chance_of_rain || 0);
-    const condition = src.condition?.text || '';
-    const wind      = fieldWind(windDeg, windSpeed, stadium.cfDir);
-    const envScore  = hrScore(temp, wind.dir, pf.hr, 0);
+    const temp       = Math.round(src.temp_f      || 72);
+    const humidity   = Math.round(src.humidity    || 50);
+    const windSpeed  = Math.round(src.wind_mph    || 0);
+    const windDeg    = Math.round(src.wind_degree || 0);
+    const windDirRaw = src.wind_dir || '';
+    const precip     = parseFloat(src.precip_in   || 0);
+    const rainChance = parseInt(src.chance_of_rain || 0);
+    const condition  = src.condition?.text || '';
+    const wind       = fieldWind(windDeg, windSpeed, stadium.cfDir);
+    const envScore   = hrScore(temp, wind.dir, pf.hr);
 
-    // Build hourly array — 5 hours starting from game time (or now if no game time)
-    const startHour = gameHour !== null ? gameHour : new Date().getHours();
+    // 5 hourly slots starting from game time (or current hour if no game time)
+    const startHour = gameHour !== null ? gameHour : parseHour(data.current?.last_updated || '00:00');
     const hourly = allHours
-      .filter(h => new Date(h.time).getHours() >= startHour)
+      .filter(h => parseHour(h.time) >= startHour)
       .slice(0, 5)
       .map(h => {
-        const hw = fieldWind(h.wind_degree||0, Math.round(h.wind_mph||0), stadium.cfDir);
+        const hw = fieldWind(Math.round(h.wind_degree||0), Math.round(h.wind_mph||0), stadium.cfDir);
         return {
-          time:      h.time,
-          hour:      new Date(h.time).getHours(),
-          temp:      Math.round(h.temp_f||72),
-          windSpeed: Math.round(h.wind_mph||0),
-          windDeg:   Math.round(h.wind_degree||0),
-          windDirRaw:h.wind_dir||'',
+          hour:      parseHour(h.time),
+          temp:      Math.round(h.temp_f    || 72),
+          windSpeed: Math.round(h.wind_mph  || 0),
+          windDeg:   Math.round(h.wind_degree || 0),
+          windDirRaw:h.wind_dir || '',
           windLabel: hw.label,
           windDir:   hw.dir,
-          condition: h.condition?.text||'',
-          humidity:  Math.round(h.humidity||50),
-          rainChance:parseInt(h.chance_of_rain||0),
-          hrScore:   hrScore(Math.round(h.temp_f||72), hw.dir, pf.hr, 0),
+          condition: h.condition?.text || '',
+          humidity:  Math.round(h.humidity  || 50),
+          rainChance:parseInt(h.chance_of_rain || 0),
+          hrScore:   hrScore(Math.round(h.temp_f||72), hw.dir, pf.hr),
         };
       });
 
-    console.log(`[Weather] ${team} | gameHour=${gameHour} | ${temp}F ${wind.label} | hrEnv=${envScore} | ${hourly.length} hours`);
+    console.log(`[Weather] ${team} | gameTime="${gameTime}" → gameHour=${gameHour} | src=${gameHourData?'hourly':'current'} | ${temp}F ${windDirRaw} ${windDeg}deg → ${wind.label} | hrEnv=${envScore}`);
 
     res.status(200).json({
       team, stadium: stadium.name, parkFactor: pf,
       weather: {
         isDome: false, temp, humidity, precip, rainChance,
         windSpeed, windDeg, windDirRaw,
-        windLabel: wind.label, windDir2: wind.dir,
-        condition, venueName: stadium.name, gameTimeHour: gameHour,
+        windLabel: wind.label,
+        windDir2:  wind.dir,
+        condition, venueName: stadium.name,
+        gameTimeHour: gameHour,
+        usedHourly: !!gameHourData,
       },
       hrEnvScore: envScore,
       hourly,
     });
 
-  } catch(err) {
+  } catch (err) {
     console.error('[Weather] Error:', err.message);
     res.status(500).json({ error: err.message });
   }

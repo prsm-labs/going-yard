@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-08 13:28 ET";
+const BUILD_TIMESTAMP = "2026-04-08 13:41 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -5762,6 +5762,8 @@ function WeatherGameCard({ g, weather }) {
         <div style={{flex:1,minWidth:100}}>
           <div style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
             {w?.venueName||'—'}{isDome&&<span style={{marginLeft:5}}>🏟️</span>}
+            {w?.usedHourly && <span style={{marginLeft:6,fontSize:9,color:'#27c97a',fontFamily:"'DM Mono',monospace"}}>⚾ game-time</span>}
+            {w && !w.isDome && !w?.usedHourly && <span style={{marginLeft:6,fontSize:9,color:'var(--accent2)',fontFamily:"'DM Mono',monospace"}}>⚡ current</span>}
           </div>
         </div>
 
