@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-08 13:41 ET";
+const BUILD_TIMESTAMP = "2026-04-08 13:47 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -1270,11 +1270,18 @@ async function fetchWeather(team, gameTime) {
   if (WEATHER_CACHE[cacheKey]) return WEATHER_CACHE[cacheKey];
   try {
     const gt = gameTime ? `&gameTime=${encodeURIComponent(gameTime)}` : '';
-    const res = await fetch(`/api/weather?team=${team}${gt}`);
+    // Cache-bust so Vercel edge cache doesn't serve stale weather
+    const cb = `&_t=${Math.floor(Date.now()/300000)}`; // refreshes every 5 min
+    const res = await fetch(`/api/weather?team=${team}${gt}${cb}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
+    if (data.error) throw new Error(data.error);
     WEATHER_CACHE[cacheKey] = data;
     return data;
-  } catch { return null; }
+  } catch(e) {
+    console.warn('[Weather] fetch failed:', team, e.message);
+    return null;
+  }
 }
 
 // Weather code → description
@@ -5762,8 +5769,13 @@ function WeatherGameCard({ g, weather }) {
         <div style={{flex:1,minWidth:100}}>
           <div style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
             {w?.venueName||'—'}{isDome&&<span style={{marginLeft:5}}>🏟️</span>}
-            {w?.usedHourly && <span style={{marginLeft:6,fontSize:9,color:'#27c97a',fontFamily:"'DM Mono',monospace"}}>⚾ game-time</span>}
-            {w && !w.isDome && !w?.usedHourly && <span style={{marginLeft:6,fontSize:9,color:'var(--accent2)',fontFamily:"'DM Mono',monospace"}}>⚡ current</span>}
+            {w?.usedHourly
+              ? <span style={{marginLeft:6,fontSize:9,color:'#27c97a',fontFamily:"'DM Mono',monospace",fontWeight:700}}>
+                  ⚾ {w.gameTimeHour%12||12}{w.gameTimeHour>=12?'PM':'AM'} forecast
+                </span>
+              : w && !w.isDome && <span style={{marginLeft:6,fontSize:9,color:'#ff8020',fontFamily:"'DM Mono',monospace"}}>
+                  ⚡ current (no game-time match)
+                </span>}
           </div>
         </div>
 
@@ -5780,12 +5792,12 @@ function WeatherGameCard({ g, weather }) {
           </div>
 
           {/* Wind */}
-          <div style={{textAlign:'center',minWidth:120}}>
-            <div style={{fontSize:12,fontFamily:"'DM Mono',monospace",fontWeight:700,color:windColor(w.windDir2)}}>
+          <div style={{textAlign:'center',minWidth:140}}>
+            <div style={{fontSize:13,fontFamily:"'DM Mono',monospace",fontWeight:700,color:windColor(w.windDir2)}}>
               {windEmoji(w.windDir2)} {w.windLabel}
             </div>
-            <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginTop:2}}>
-              {w.windDirRaw} · {w.windDeg}°
+            <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginTop:2,opacity:.6}}>
+              from {w.windDirRaw} ({w.windDeg}°)
             </div>
           </div>
 
