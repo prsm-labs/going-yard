@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-07 18:59 ET";
+const BUILD_TIMESTAMP = "2026-04-08 13:28 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -703,35 +703,50 @@ function PickButton({pid,name,team}) {
   const key = String(pid);
   const current = picks[key]?.type;
   const [open,setOpen] = useState(false);
+  const [pos,setPos] = useState({top:0,left:0});
+  const btnRef = useRef(null);
+  useEffect(()=>{
+    if(!open) return;
+    const handler = ()=>setOpen(false);
+    document.addEventListener('click', handler);
+    return ()=>document.removeEventListener('click', handler);
+  },[open]);
+  const handleOpen = (e) => {
+    e.stopPropagation();
+    if(!open && btnRef.current){
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 4, left: r.left });
+    }
+    setOpen(o=>!o);
+  };
   return (
-    <div style={{position:"relative",display:"inline-block"}}>
-      <button onClick={e=>{e.stopPropagation();setOpen(o=>!o);}}
-        style={{padding:"2px 7px",borderRadius:5,fontSize:10,fontFamily:"'DM Mono',monospace",
-          cursor:"pointer",border:`1px solid ${current?PICK_TYPES[current].color:"var(--border)"}`,
-          background:current?`${PICK_TYPES[current].color}20`:"var(--surface2)",
-          color:current?PICK_TYPES[current].color:"var(--muted)"}}>
-        {current?PICK_TYPES[current].label.split(" ")[0]:"＋"}
+    <div style={{position:'relative',display:'inline-block'}}>
+      <button ref={btnRef} onClick={handleOpen}
+        style={{padding:'2px 7px',borderRadius:5,fontSize:10,fontFamily:"'DM Mono',monospace",
+        cursor:'pointer',border:`1px solid ${current?PICK_TYPES[current].color:'var(--border)'}`,
+        background:current?`${PICK_TYPES[current].color}20`:'var(--surface2)',
+        color:current?PICK_TYPES[current].color:'var(--muted)'}}>
+        {current?PICK_TYPES[current].label.split(' ')[0]:'＋'}
       </button>
-      {open&&<div style={{position:"absolute",top:"calc(100% + 4px)",left:0,zIndex:500,
-        background:"#0d1318",border:"1px solid var(--border)",borderRadius:8,padding:5,
-        display:"flex",flexDirection:"column",gap:3,minWidth:130,boxShadow:"0 8px 24px rgba(0,0,0,.5)"}}
+      {open && <div style={{position:'fixed',top:pos.top,left:pos.left,zIndex:9999,
+        background:'#0d1318',border:'1px solid var(--border)',borderRadius:8,padding:5,
+        display:'flex',flexDirection:'column',gap:3,minWidth:130,
+        boxShadow:'0 8px 24px rgba(0,0,0,.7)'}}
         onClick={e=>e.stopPropagation()}>
         {Object.entries(PICK_TYPES).map(([type,cfg])=>(
-          <button key={type} onClick={()=>{
-              setPick(pid,name,getTeam(pid,team),type);setOpen(false);}}
-            style={{padding:"5px 9px",borderRadius:5,cursor:"pointer",textAlign:"left",
-              fontFamily:"'DM Mono',monospace",fontSize:11,
-              border:`1px solid ${current===type?cfg.color:"transparent"}`,
-              background:current===type?`${cfg.color}20`:"transparent",
-              color:current===type?cfg.color:"var(--text)"}}>
+          <button key={type} onClick={()=>{setPick(pid,name,getTeam(pid,team),type);setOpen(false);}}
+            style={{padding:'5px 9px',borderRadius:5,cursor:'pointer',textAlign:'left',
+            fontFamily:"'DM Mono',monospace",fontSize:11,
+            border:`1px solid ${current===type?cfg.color:'transparent'}`,
+            background:current===type?`${cfg.color}20`:'transparent',
+            color:current===type?cfg.color:'var(--text)'}}>
             {cfg.label}
           </button>
         ))}
-        {current&&<button onClick={()=>{
-              setPick(pid,name,getTeam(pid,team),current);setOpen(false);}}
-          style={{padding:"5px 9px",borderRadius:5,cursor:"pointer",textAlign:"left",
-            fontFamily:"'DM Mono',monospace",fontSize:11,border:"1px solid transparent",
-            background:"transparent",color:"var(--muted)"}}>✕ Remove</button>}
+        {current&&<button onClick={()=>{setPick(pid,name,getTeam(pid,team),current);setOpen(false);}}
+          style={{padding:'5px 9px',borderRadius:5,cursor:'pointer',textAlign:'left',
+          fontFamily:"'DM Mono',monospace",fontSize:11,border:'1px solid transparent',
+          background:'transparent',color:'var(--muted)'}}>✕ Remove</button>}
       </div>}
     </div>
   );
@@ -1250,12 +1265,14 @@ function PicksSlideout({onClose}) {
 // ── WEATHER + PARK FACTOR CACHE ─────────────────────────────
 const WEATHER_CACHE = {};
 
-async function fetchWeather(team) {
-  if (WEATHER_CACHE[team]) return WEATHER_CACHE[team];
+async function fetchWeather(team, gameTime) {
+  const cacheKey = gameTime ? `${team}_${gameTime}` : team;
+  if (WEATHER_CACHE[cacheKey]) return WEATHER_CACHE[cacheKey];
   try {
-    const res = await fetch(`/api/weather?team=${team}`);
+    const gt = gameTime ? `&gameTime=${encodeURIComponent(gameTime)}` : '';
+    const res = await fetch(`/api/weather?team=${team}${gt}`);
     const data = await res.json();
-    WEATHER_CACHE[team] = data;
+    WEATHER_CACHE[cacheKey] = data;
     return data;
   } catch { return null; }
 }
@@ -5695,6 +5712,137 @@ function StatcastTab() {
 
 
 // ── WEATHER TAB ───────────────────────────────────────────────
+function WeatherGameCard({ g, weather }) {
+  const homeW   = weather[g.home?.abbr];
+  const w       = homeW?.weather;
+  const pf      = homeW?.parkFactor;
+  const env     = homeW?.hrEnvScore || 50;
+  const hourly  = homeW?.hourly || [];
+  const isDome  = w?.isDome;
+  const [expanded, setExpanded] = useState(false);
+
+  const windEmoji = (dir) => ({'out-strong':'💨','out':'🌬️','in-strong':'❄️','in':'🧊','cross':'↔️','calm':'🌤️'}[dir]||'🌤️');
+  const windColor = (dir) => ({'out-strong':'#ff4020','out':'#ff8020','in-strong':'#38b8f2','in':'#60a0d0','cross':'var(--muted)','calm':'var(--muted)'}[dir]||'var(--muted)');
+  const envColor  = (s)   => s>=65?'#ff4020':s>=55?'#ff8020':s>=45?'var(--text)':'#38b8f2';
+  const fmtHour   = (h)   => { const ap=h>=12?'PM':'AM'; return `${h%12||12}:00 ${ap}`; };
+
+  const windImpact = (wx) => {
+    if (!wx || wx.isDome) return { label:'Dome', color:'var(--muted)' };
+    const label = wx.windLabel || '';
+    const spd   = wx.windSpeed || 0;
+    if (label.includes('out') && spd>=15) return { label:`💨 Blowing Out ${spd}mph`, color:'#ff4020' };
+    if (label.includes('out') && spd>=8)  return { label:`💨 Out ${spd}mph`,         color:'#ff8020' };
+    if (label.includes('in')  && spd>=12) return { label:`❄️ Blowing In ${spd}mph`,  color:'#38b8f2' };
+    if (label.includes('in')  && spd>=6)  return { label:`🌬️ In ${spd}mph`,          color:'#60a0d0' };
+    if (label.includes('cross'))           return { label:`↔️ Crosswind ${spd}mph`,   color:'var(--muted)' };
+    return { label:`${spd<3?'🌤️ Calm':`🌤️ ${spd}mph`}`, color:'var(--muted)' };
+  };
+
+  const wind   = windImpact(w);
+
+  return (
+    <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:12,overflow:'hidden'}}>
+      {/* Collapsed row */}
+      <div onClick={()=>!isDome&&hourly.length>0&&setExpanded(e=>!e)}
+        style={{padding:'12px 16px',display:'flex',alignItems:'center',
+          gap:12,flexWrap:'wrap',cursor:(!isDome&&hourly.length>0)?'pointer':'default'}}>
+
+        {/* Matchup + time */}
+        <div style={{minWidth:120}}>
+          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:16}}>
+            {g.away?.abbr} <span style={{color:'var(--muted)',fontSize:12}}>@</span> {g.home?.abbr}
+          </div>
+          <div style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginTop:2}}>
+            {g.gameTime||'—'} ET
+            {g.status==='Live'&&<span style={{color:'var(--accent)',marginLeft:6}}>● Live</span>}
+          </div>
+        </div>
+
+        {/* Venue */}
+        <div style={{flex:1,minWidth:100}}>
+          <div style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
+            {w?.venueName||'—'}{isDome&&<span style={{marginLeft:5}}>🏟️</span>}
+          </div>
+        </div>
+
+        {isDome?(
+          <div style={{fontSize:12,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>Retractable/Dome</div>
+        ):!homeW?(
+          <div style={{fontSize:12,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>Loading…</div>
+        ):(<>
+          {/* Temp */}
+          <div style={{textAlign:'center',minWidth:44}}>
+            <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:18,
+              color:w.temp>=80?'#ff8020':w.temp>=65?'var(--text)':'#38b8f2'}}>{w.temp}°</div>
+            <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:.5}}>Temp</div>
+          </div>
+
+          {/* Wind */}
+          <div style={{textAlign:'center',minWidth:120}}>
+            <div style={{fontSize:12,fontFamily:"'DM Mono',monospace",fontWeight:700,color:windColor(w.windDir2)}}>
+              {windEmoji(w.windDir2)} {w.windLabel}
+            </div>
+            <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginTop:2}}>
+              {w.windDirRaw} · {w.windDeg}°
+            </div>
+          </div>
+
+          {/* Conditions */}
+          <div style={{textAlign:'center',minWidth:80}}>
+            <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--text)'}}>{w.condition}</div>
+            {(w.rainChance||0)>0&&<div style={{fontSize:9,color:'#38b8f2',fontFamily:"'DM Mono',monospace"}}>🌧 {w.rainChance}%</div>}
+          </div>
+
+          {/* HR Env */}
+          <div style={{textAlign:'center',minWidth:44}}>
+            <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:18,color:envColor(env)}}>{env}</div>
+            <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:.5}}>HR Env</div>
+          </div>
+
+          {/* Park factor */}
+          <div style={{textAlign:'center',minWidth:36}}>
+            <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:18,color:getPFColor(pf?.hr||100)}}>{pf?.hr||100}</div>
+            <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:.5}}>Park</div>
+          </div>
+
+          {hourly.length>0&&<div style={{fontSize:12,color:'var(--muted)',marginLeft:4,transform:expanded?'rotate(180deg)':'none',transition:'transform .2s'}}>▾</div>}
+        </>)}
+      </div>
+
+      {/* Hourly breakdown */}
+      {expanded&&hourly.length>0&&(
+        <div style={{borderTop:'1px solid var(--border)',background:'rgba(0,0,0,.2)',padding:'10px 16px'}}>
+          <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1,marginBottom:8}}>
+            Hourly Forecast · Starting Game Time
+          </div>
+          <div style={{display:'flex',gap:8,overflowX:'auto',WebkitOverflowScrolling:'touch',paddingBottom:4}}>
+            {hourly.map((h,hi)=>(
+              <div key={hi} style={{flexShrink:0,minWidth:90,
+                background:hi===0?'rgba(232,65,26,.08)':'rgba(255,255,255,.03)',
+                border:`1px solid ${hi===0?'rgba(232,65,26,.25)':'var(--border)'}`,
+                borderRadius:8,padding:'8px 10px',textAlign:'center'}}>
+                <div style={{fontSize:9,color:hi===0?'var(--accent)':'var(--muted)',fontFamily:"'DM Mono',monospace",fontWeight:hi===0?700:400,marginBottom:4}}>
+                  {hi===0?'⚾ Game':fmtHour(h.hour)}
+                </div>
+                <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:16,
+                  color:h.temp>=80?'#ff8020':h.temp>=65?'var(--text)':'#38b8f2'}}>{h.temp}°</div>
+                <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:windColor(h.windDir),marginTop:3,lineHeight:1.3}}>
+                  {windEmoji(h.windDir)} {h.windLabel}
+                </div>
+                <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginTop:2}}>{h.windDirRaw}</div>
+                {(h.rainChance||0)>0&&<div style={{fontSize:9,color:'#38b8f2',fontFamily:"'DM Mono',monospace",marginTop:3}}>🌧 {h.rainChance}%</div>}
+                <div style={{marginTop:4,fontSize:9,fontFamily:"'DM Mono',monospace",color:envColor(h.hrScore),fontWeight:700}}>HR {h.hrScore}</div>
+              </div>
+            ))}
+          </div>
+          {pf?.label&&<div style={{marginTop:8,fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>{pf.label}</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 function WeatherTab() {
   const [games,    setGames]    = useState([]);
   const [weather,  setWeather]  = useState({});  // team → weather data
@@ -6206,8 +6354,7 @@ export default function App() {
               display:"flex",alignItems:"center",gap:5}}>
             🎯 Picks
           </button>
-          <div className="live-badge"><div className="live-dot"/>MLB 2026</div>
-        </div>
+            </div>
       </header>
       <HRTicker onHRClick={()=>setTab("homeruns")}/>
       <nav className="tabs">
@@ -6245,4 +6392,5 @@ export default function App() {
     <AtBatSlideIn/>
     {showPicksSlideout && <PicksSlideout onClose={()=>setShowPicksSlideout(false)}/>}
   </>;
+
 }
