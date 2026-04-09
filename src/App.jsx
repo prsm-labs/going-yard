@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-08 14:24 ET";
+const BUILD_TIMESTAMP = "2026-04-09 10:46 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -715,7 +715,10 @@ function PickButton({pid,name,team}) {
     e.stopPropagation();
     if(!open && btnRef.current){
       const r = btnRef.current.getBoundingClientRect();
-      setPos({ top: r.bottom + 4, left: r.left });
+      // Open left-aligned to button right edge so it doesn't overflow
+      const menuWidth = 140;
+      const left = Math.max(4, r.right - menuWidth);
+      setPos({ top: r.bottom + 4, left });
     }
     setOpen(o=>!o);
   };
@@ -4883,6 +4886,8 @@ function MatchupEngineTab() {
   const [selGrade, setSelGrade]    = useState('all');
   const [expandedId, setExpanded] = useState(null);
   const [generated, setGenerated] = useState(null);
+  const [showPicker, setShowPicker] = useState(false);
+  const [searchQ, setSearchQ]     = useState('');
   const picks = usePicks();
 
   useEffect(() => {
