@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-09 10:46 ET";
+const BUILD_TIMESTAMP = "2026-04-09 14:04 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -4993,6 +4993,96 @@ function MatchupEngineTab() {
     </button>
     </div>
 
+
+
+    {/* Add to My Picks — manual search */}
+    {!loading && !error && data.length > 0 && (() => {
+      const allPlayers = Object.values(PLAYER_DATA_CACHE);
+      const ini = n => n ? n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase() : '?';
+      const filtered = searchQ.trim().length > 1
+        ? allPlayers.filter(p => {
+            const q = searchQ.toLowerCase();
+            return (p.name||'').toLowerCase().includes(q) ||
+                   (getTeam(p.pid,p.team)||'').toLowerCase().includes(q);
+          }).slice(0,12)
+        : [];
+      return (
+        <div style={{marginBottom:14,background:'var(--surface)',
+          border:'1px solid var(--border)',borderRadius:10,padding:'10px 14px'}}>
+          <div style={{display:'flex',alignItems:'center',gap:10,
+            marginBottom:showPicker?10:0}}>
+            <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,
+              fontSize:13,letterSpacing:.5}}>🎯 Add to My Picks</span>
+            <span style={{fontSize:10,color:'var(--muted)',
+              fontFamily:"'DM Mono',monospace"}}>Search any batter</span>
+            <button onClick={()=>{setShowPicker(s=>!s);setSearchQ('');}}
+              style={{marginLeft:'auto',padding:'4px 12px',borderRadius:6,
+                border:'1px solid var(--border)',
+                background:showPicker?'var(--accent)':'var(--surface2)',
+                color:showPicker?'white':'var(--muted)',cursor:'pointer',
+                fontFamily:"'DM Mono',monospace",fontSize:11}}>
+              {showPicker?'✕ Close':'＋ Open'}
+            </button>
+          </div>
+          {showPicker && <>
+            <div style={{position:'relative',marginBottom:8}}>
+              <input autoFocus type="text" value={searchQ}
+                onChange={e=>setSearchQ(e.target.value)}
+                placeholder="Search player or team…"
+                style={{width:'100%',padding:'8px 12px 8px 30px',
+                  background:'var(--surface2)',border:'1px solid var(--border)',
+                  borderRadius:8,color:'var(--text)',
+                  fontFamily:"'DM Mono',monospace",fontSize:12,
+                  outline:'none',boxSizing:'border-box'}}/>
+              <span style={{position:'absolute',left:9,top:'50%',
+                transform:'translateY(-50%)',fontSize:12,color:'var(--muted)'}}>
+                🔍
+              </span>
+              {searchQ && <button onClick={()=>setSearchQ('')}
+                style={{position:'absolute',right:8,top:'50%',
+                  transform:'translateY(-50%)',background:'none',border:'none',
+                  color:'var(--muted)',cursor:'pointer',fontSize:13}}>✕</button>}
+            </div>
+            {searchQ.trim().length>1 && filtered.length===0 &&
+              <div style={{fontSize:11,color:'var(--muted)',
+                fontFamily:"'DM Mono',monospace",padding:'6px 0'}}>
+                No players found
+              </div>}
+            {filtered.length>0 &&
+              <div style={{display:'grid',
+                gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:7}}>
+                {filtered.map(p=>{
+                  const cur=picks[String(p.pid)]?.type;
+                  return (
+                    <div key={p.pid} style={{display:'flex',alignItems:'center',
+                      gap:8,padding:'7px 10px',borderRadius:8,
+                      background:'var(--surface2)',
+                      border:`1px solid ${cur?PICK_TYPES[cur].color:'var(--border)'}`}}>
+                      <div style={{width:28,height:28,borderRadius:'50%',
+                        background:'var(--surface)',border:'1px solid var(--border)',
+                        display:'flex',alignItems:'center',justifyContent:'center',
+                        fontFamily:"'Oswald',sans-serif",fontWeight:700,
+                        fontSize:10,flexShrink:0}}>
+                        {ini(p.name)}
+                      </div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontWeight:600,fontSize:12,
+                          whiteSpace:'nowrap',overflow:'hidden',
+                          textOverflow:'ellipsis'}}>{p.name}</div>
+                        <div style={{fontSize:9,color:'var(--muted)',
+                          fontFamily:"'DM Mono',monospace"}}>
+                          {getTeam(p.pid,p.team)}
+                        </div>
+                      </div>
+                      <PickButton pid={p.pid} name={p.name} team={p.team}/>
+                    </div>
+                  );
+                })}
+              </div>}
+          </>}
+        </div>
+      );
+    })()}
 
     {/* Grade legend */}
     <div style={{display:'flex',gap:6,marginBottom:14,flexWrap:'wrap'}}>
