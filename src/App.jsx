@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-09 14:04 ET";
+const BUILD_TIMESTAMP = "2026-04-09 14:18 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -6410,15 +6410,16 @@ export default function App() {
 
   const NAV = [
     {key:"homeruns",  label:"💥 HR Tracker"},
-    {key:"weather",   label:"🌤️ Weather"},
-    {key:"matchup",   label:"⚡ Key Matchups"},
     {key:"live",      label:"📡 Live"},
+    {key:"matchup",   label:"⚡ Key Matchups"},
+    {key:"weather",   label:"🌤️ Weather"},
     {key:"powerbi",   label:"📊 Data"},
     {key:"picks",     label:"🎯 My Picks"},
     {key:"statcast",  label:"📡 Statcast"},
     {key:"onlyhomers",label:"⚾ Only Homers"},
     {key:"linemate",  label:"📊 Linemate",  external:"https://linemate.io/mlb"},
     {key:"livesports",label:"📺 Live Sports",external:"https://thetvapp.to"},
+    {key:"gambly",    label:"🤖 Gambly Bot", external:"https://gambly.com"},
     {key:"getapp",    label:"📲 Get App"},
   ];
 
