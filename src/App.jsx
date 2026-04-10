@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-09 21:11 ET";
+const BUILD_TIMESTAMP = "2026-04-09 21:27 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -4893,10 +4893,10 @@ function PitcherCard({ pitcherId, pitcherName }) {
     if (e < 2.50) s += 3; else if (e < 3.50) s += 2; else if (e < 4.50) s += 1;
     if (k > 11.0) s += 3; else if (k > 9.0)  s += 2; else if (k > 7.0)  s += 1;
     if (w < 1.00) s += 2; else if (w < 1.20)  s += 1;
-    if (s >= 6) return { label:'⚠️ Elite Pitcher',   color:'#ff4020', bg:'rgba(255,64,32,.10)',   desc:'High K-rate & low ERA — tough matchup' };
-    if (s >= 4) return { label:'⚠️ Tough Pitcher',   color:'#ff8020', bg:'rgba(255,128,32,.08)',  desc:'Above-average — proceed with caution' };
-    if (s >= 2) return { label:'📊 Average Pitcher', color:'var(--muted)', bg:'rgba(255,255,255,.04)', desc:'League-average matchup' };
-    return             { label:'👍 Hittable',         color:'#27c97a', bg:'rgba(39,201,122,.08)', desc:'High ERA, low K-rate — hitter friendly' };
+    if (s >= 6) return { label:'(!) Elite Pitcher',   color:'#ff4020', bg:'rgba(255,64,32,.10)',   desc:'High K-rate & low ERA -- tough matchup' };
+    if (s >= 4) return { label:'(!) Tough Pitcher',   color:'#ff8020', bg:'rgba(255,128,32,.08)',  desc:'Above-average -- proceed with caution' };
+    if (s >= 2) return { label:'(~) Average Pitcher', color:'var(--muted)', bg:'rgba(255,255,255,.04)', desc:'League-average matchup' };
+    return             { label:'(+) Hittable',         color:'#27c97a', bg:'rgba(39,201,122,.08)', desc:'High ERA, low K-rate -- hitter friendly' };
   };
 
   const handleOpen = () => {
@@ -4920,7 +4920,7 @@ function PitcherCard({ pitcherId, pitcherName }) {
     <div style={{textAlign:'center',padding:'6px 10px',borderRadius:8,
       background:'rgba(255,255,255,.04)',border:'1px solid var(--border)',minWidth:52}}>
       <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:15,
-        color:color||'var(--text)',lineHeight:1}}>{val||'—'}</div>
+        color:color||'var(--text)',lineHeight:1}}>{val||'--'}</div>
       <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
         textTransform:'uppercase',letterSpacing:.5,marginTop:2}}>{label}</div>
     </div>
@@ -4934,11 +4934,11 @@ function PitcherCard({ pitcherId, pitcherName }) {
           border:'1px solid var(--border)',fontFamily:"'DM Mono',monospace",
           fontSize:11,color:'var(--muted)'}}>
         {loading
-          ? <span style={{fontSize:9}}>Loading…</span>
+          ? <span style={{fontSize:9}}>Loading...</span>
           : grade
             ? <span style={{color:grade.color,fontWeight:700}}>{grade.label}</span>
-            : <span>📋 Pitcher Stats</span>}
-        <span style={{opacity:.5,marginLeft:2}}>{open?'▴':'▾'}</span>
+            : <span>(i) Pitcher Stats</span>}
+        <span style={{opacity:.5,marginLeft:2}}>{open?'^':'v'}</span>
       </button>
 
       {open && (
@@ -4971,8 +4971,8 @@ function PitcherCard({ pitcherId, pitcherName }) {
               </div>
               <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
                 display:'flex',gap:12,flexWrap:'wrap'}}>
-                {stats.avg && stats.avg!=='—' && <span>AVG {stats.avg}</span>}
-                {stats.obp && stats.obp!=='—' && <span>OBP {stats.obp}</span>}
+                {stats.avg && stats.avg!=='--' && <span>AVG {stats.avg}</span>}
+                {stats.obp && stats.obp!=='--' && <span>OBP {stats.obp}</span>}
                 {stats.hr > 0 && <span>{stats.hr} HR allowed</span>}
               </div>
             </div>
@@ -4994,7 +4994,7 @@ function MatchupEngineTab() {
   const [generated, setGenerated] = useState(null);
   const [showPicker, setShowPicker] = useState(false);
   const [searchQ, setSearchQ]     = useState('');
-  const liveCache = React.useRef({});
+  const liveCache = useRef({});
   const picks = usePicks();
 
   useEffect(() => {
