@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-10 10:15 ET";
+const BUILD_TIMESTAMP = "2026-04-10 10:19 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -4883,7 +4883,7 @@ function LiveBatterBox({ batterId, gamePk, onData }) {
 function PitcherCard({ pitcherId, pitcherName }) {
   const [stats, setStats]     = useState(null);
   const [open, setOpen]       = useState(false);
-  const [loading, setLoading] = useState(true); // start loading immediately
+  const [loading, setLoading] = useState(false);
 
   const gradeStats = (era, k9, whip, bb9, hr9, avg, obp) => {
     const e  = parseFloat(era)  || 99;
@@ -4909,20 +4909,23 @@ function PitcherCard({ pitcherId, pitcherName }) {
     // OBP against
     if (ob <= .270) s += 2; else if (ob <= .310) s += 1;
     // max score ~18
-    if (s >= 13) return { label:'(!) Elite',    color:'#ff4020', bg:'rgba(255,64,32,.10)',   desc:'Elite ERA/K-rate/WHIP -- very tough matchup' };
-    if (s >= 9)  return { label:'(!) Tough',    color:'#ff8020', bg:'rgba(255,128,32,.08)',  desc:'Above-average -- proceed with caution' };
-    if (s >= 5)  return { label:'(~) Average',  color:'var(--muted)', bg:'rgba(255,255,255,.04)', desc:'League-average matchup' };
-    if (s >= 2)  return { label:'(+) Hittable', color:'#27c97a', bg:'rgba(39,201,122,.08)', desc:'High ERA/HR-rate -- hitter friendly' };
-    return              { label:'(*) Target',   color:'#38b8f2', bg:'rgba(56,184,242,.08)', desc:'ERA > 5.00 / WHIP > 1.45 -- prime target' };
+    if (s >= 13) return { label:'!! Elite',      color:'#ff4020', bg:'rgba(255,64,32,.10)',   desc:'Elite ERA/K-rate/WHIP -- very tough matchup' };
+    if (s >= 9)  return { label:'! Tough',       color:'#ff8020', bg:'rgba(255,128,32,.08)',  desc:'Above-average -- proceed with caution' };
+    if (s >= 5)  return { label:'~ Average',     color:'var(--muted)', bg:'rgba(255,255,255,.04)', desc:'League-average matchup' };
+    if (s >= 2)  return { label:'+ Hittable',    color:'#27c97a', bg:'rgba(39,201,122,.08)', desc:'High ERA/HR-rate -- hitter friendly' };
+    return              { label:'* Target',      color:'#38b8f2', bg:'rgba(56,184,242,.08)', desc:'ERA > 5.00 / WHIP > 1.45 -- prime target' };
   };
 
-  // Auto-fetch stats on mount so grade shows on button before expanding
+  // Auto-fetch on mount so grade shows immediately without clicking
   useEffect(() => {
     if (!pitcherId && !pitcherName) return;
     const cleanId = pitcherId ? String(parseInt(pitcherId) || pitcherId) : null;
+    if (!cleanId || cleanId === '0' || isNaN(parseInt(cleanId))) return;
+    setLoading(true);
     fetchPitcherData(cleanId, pitcherName)
       .then(d => { if (d?.stats) setStats(d.stats); })
-      .catch(() => {});
+      .catch(() => {})
+      .then(() => setLoading(false));
   }, [pitcherId, pitcherName]);
 
   const handleOpen = () => {
