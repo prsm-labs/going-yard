@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-09 21:27 ET";
+const BUILD_TIMESTAMP = "2026-04-10 06:06 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -4317,7 +4317,7 @@ function HRTrackerTab() {
   const todayET = new Date().toLocaleDateString("en-US",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"});
   const [mp,dp,yp] = todayET.split("/");
   const todayStr = `${yp}-${mp}-${dp}`;
-  // After midnight: if before 6 AM ET, default to yesterday so late night HRs still show
+  // After midnight: if before 6 AM ET, default to yesterday so late-night HRs still show
   const etHourNow = parseInt(new Date().toLocaleString('en-US',{timeZone:'America/New_York',hour:'numeric',hour12:false}));
   const defaultDate = (() => {
     if (etHourNow < 6) {
@@ -4902,7 +4902,9 @@ function PitcherCard({ pitcherId, pitcherName }) {
   const handleOpen = () => {
     if (!open && !stats) {
       setLoading(true);
-      fetchPitcherData(pitcherId, pitcherName)
+      // Normalize pitcher_id — pandas may write "621121.0", API needs "621121"
+      const cleanId = pitcherId ? String(parseInt(pitcherId) || pitcherId) : null;
+      fetchPitcherData(cleanId, pitcherName)
         .then(d => { if (d?.stats) setStats(d.stats); setLoading(false); })
         .catch(() => setLoading(false));
     }
@@ -5050,8 +5052,21 @@ function MatchupEngineTab() {
     grouped[key].teams[team].pitchMix = r.top_pitches;
   });
 
-  const exportCSV = () => {
+  const exportCSV = async () => {
     const bom = String.fromCharCode(65279);
+    // Fetch final/live box score for ALL batters grouped by game_id
+    // Works for live games, final games, and anything in between
+    const uniqueGames = [...new Set(data.map(b => b.game_id).filter(Boolean))];
+    await Promise.all(uniqueGames.map(async gameId => {
+      try {
+        const batters = await fetchLiveBatters(gameId);
+        if (!batters || batters.length === 0) return;
+        batters.forEach(bt => {
+          const key = String(bt.id);
+          if (key && key !== '0') liveCache.current[key] = bt;
+        });
+      } catch(e) {}
+    }));
     const headers = ['Grade','Gone Yard','Team','Batter','Hand','vs Pitcher',
       'Top Pitches','Game Time','Flags','Recent EV','Recent Barrel%',
       'Recent FB%','Recent LA','BvP EV','BvP Barrel%','BvP FB%','BvP LA',
@@ -5098,7 +5113,7 @@ function MatchupEngineTab() {
           {generated && <span style={{marginLeft:8,fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>anchored {generated}</span>}
         </div>
       </div>
-    <button onClick={exportCSV}
+    <button onClick={()=>exportCSV()}
       style={{padding:"5px 12px",borderRadius:6,cursor:"pointer",
         background:"var(--surface2)",border:"1px solid var(--border)",
         color:"var(--muted)",fontFamily:"'DM Mono',monospace",
