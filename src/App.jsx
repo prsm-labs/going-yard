@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-09 17:00 ET";
+const BUILD_TIMESTAMP = "2026-04-09 21:11 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -4881,43 +4881,46 @@ function LiveBatterBox({ batterId, gamePk, onData }) {
 
 // Graded pitcher stats fetched from existing pitcher API
 function PitcherCard({ pitcherId, pitcherName }) {
-  const [stats, setStats]   = useState(null);
-  const [open, setOpen]     = useState(false);
+  const [stats, setStats]     = useState(null);
+  const [open, setOpen]       = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Grade thresholds
   const gradeStats = (era, k9, whip) => {
-    const e = parseFloat(era) || 4.50;
-    const k = parseFloat(k9)  || 7.0;
-    const w = parseFloat(whip)|| 1.40;
-    let score = 0;
-    if (e < 2.50) score+=3; else if (e < 3.50) score+=2; else if (e < 4.50) score+=1;
-    if (k > 11.0) score+=3; else if (k > 9.0)  score+=2; else if (k > 7.0)  score+=1;
-    if (w < 1.00) score+=2; else if (w < 1.20)  score+=1;
-    if (score >= 6) return {label:'⚠️ Elite',   emoji:'⚠️', color:'#ff4020', bg:'rgba(255,64,32,.12)',  desc:'High K-rate, low ERA — tough matchup'};
-    if (score >= 4) return {label:'⚠️ Tough',   emoji:'⚠️', color:'#ff8020', bg:'rgba(255,128,32,.10)', desc:'Above-average pitcher — proceed with caution'};
-    if (score >= 2) return {label:'📊 Average', emoji:'📊', color:'var(--muted)', bg:'rgba(255,255,255,.04)', desc:'League-average — standard matchup'};
-    return               {label:'👍 Hittable', emoji:'👍', color:'#27c97a', bg:'rgba(39,201,122,.10)', desc:'High ERA, low K-rate — hitter-friendly'};
+    const e = parseFloat(era)  || 4.50;
+    const k = parseFloat(k9)   || 7.0;
+    const w = parseFloat(whip) || 1.40;
+    let s = 0;
+    if (e < 2.50) s += 3; else if (e < 3.50) s += 2; else if (e < 4.50) s += 1;
+    if (k > 11.0) s += 3; else if (k > 9.0)  s += 2; else if (k > 7.0)  s += 1;
+    if (w < 1.00) s += 2; else if (w < 1.20)  s += 1;
+    if (s >= 6) return { label:'⚠️ Elite Pitcher',   color:'#ff4020', bg:'rgba(255,64,32,.10)',   desc:'High K-rate & low ERA — tough matchup' };
+    if (s >= 4) return { label:'⚠️ Tough Pitcher',   color:'#ff8020', bg:'rgba(255,128,32,.08)',  desc:'Above-average — proceed with caution' };
+    if (s >= 2) return { label:'📊 Average Pitcher', color:'var(--muted)', bg:'rgba(255,255,255,.04)', desc:'League-average matchup' };
+    return             { label:'👍 Hittable',         color:'#27c97a', bg:'rgba(39,201,122,.08)', desc:'High ERA, low K-rate — hitter friendly' };
   };
 
   const handleOpen = () => {
     if (!open && !stats) {
       setLoading(true);
-      fetchPitcherData(pitcherId, pitcherName).then(d => {
-        if (d?.stats) setStats(d.stats);
-        setLoading(false);
-      }).catch(() => setLoading(false));
+      fetchPitcherData(pitcherId, pitcherName)
+        .then(d => { if (d?.stats) setStats(d.stats); setLoading(false); })
+        .catch(() => setLoading(false));
     }
     setOpen(o => !o);
   };
 
   const grade = stats ? gradeStats(stats.era, stats.k9, stats.whip) : null;
 
-  const StatPill = ({label, val, color}) => (
+  const eraColor  = (v) => { const n=parseFloat(v); if(n<2.50) return '#ff4020'; if(n<3.50) return '#ff8020'; if(n<4.50) return 'var(--text)'; return '#27c97a'; };
+  const whipColor = (v) => { const n=parseFloat(v); if(n<1.00) return '#ff4020'; if(n<1.20) return '#ff8020'; return 'var(--text)'; };
+  const k9Color   = (v) => { const n=parseFloat(v); if(n>11)   return '#ff4020'; if(n>9)    return '#ff8020'; return 'var(--text)'; };
+  const hr9Color  = (v) => { const n=parseFloat(v); if(n>1.5)  return '#27c97a'; if(n>1.0)  return '#ffc840'; return 'var(--text)'; };
+
+  const Stat = ({label, val, color}) => (
     <div style={{textAlign:'center',padding:'6px 10px',borderRadius:8,
       background:'rgba(255,255,255,.04)',border:'1px solid var(--border)',minWidth:52}}>
       <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:15,
-        color:color||'var(--text)',lineHeight:1}}>{val}</div>
+        color:color||'var(--text)',lineHeight:1}}>{val||'—'}</div>
       <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
         textTransform:'uppercase',letterSpacing:.5,marginTop:2}}>{label}</div>
     </div>
@@ -4928,51 +4931,52 @@ function PitcherCard({ pitcherId, pitcherName }) {
       <button onClick={handleOpen}
         style={{display:'flex',alignItems:'center',gap:7,padding:'4px 10px',
           borderRadius:7,cursor:'pointer',background:'rgba(255,255,255,.04)',
-          border:'1px solid var(--border)',
-          fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--muted)'}}>
-        {loading ? <span style={{fontSize:9}}>Loading…</span>
-          : grade ? <span style={{color:grade.color,fontWeight:700}}>{grade.label}</span>
-          : <span>📋 Pitcher Stats</span>}
+          border:'1px solid var(--border)',fontFamily:"'DM Mono',monospace",
+          fontSize:11,color:'var(--muted)'}}>
+        {loading
+          ? <span style={{fontSize:9}}>Loading…</span>
+          : grade
+            ? <span style={{color:grade.color,fontWeight:700}}>{grade.label}</span>
+            : <span>📋 Pitcher Stats</span>}
         <span style={{opacity:.5,marginLeft:2}}>{open?'▴':'▾'}</span>
       </button>
 
       {open && (
         <div style={{marginTop:6,padding:'10px 12px',borderRadius:8,
-          background:grade?.bg||'rgba(255,255,255,.04)',
-          border:`1px solid ${grade?.color||'var(--border)'}30`}}>
+          background:grade?grade.bg:'rgba(255,255,255,.04)',
+          border:'1px solid var(--border)'}}>
           {!stats && !loading && (
             <div style={{fontSize:11,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
               No stats available yet this season
             </div>
           )}
-          {stats && (<>
-            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
-              <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,
-                fontSize:14,color:grade?.color}}>{grade?.label}</span>
-              <span style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
-                {grade?.desc}
-              </span>
+          {stats && (
+            <div>
+              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,flexWrap:'wrap'}}>
+                <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,
+                  fontSize:13,color:grade?grade.color:'var(--text)'}}>
+                  {grade?grade.label:''}
+                </span>
+                <span style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
+                  {grade?grade.desc:''}
+                </span>
+              </div>
+              <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:8}}>
+                <Stat label="ERA"  val={stats.era}  color={eraColor(stats.era)}/>
+                <Stat label="WHIP" val={stats.whip} color={whipColor(stats.whip)}/>
+                <Stat label="K/9"  val={stats.k9}   color={k9Color(stats.k9)}/>
+                <Stat label="BB/9" val={stats.bb9}  color="var(--text)"/>
+                <Stat label="HR/9" val={stats.hr9}  color={hr9Color(stats.hr9)}/>
+                <Stat label="IP"   val={stats.ip}   color="var(--muted)"/>
+              </div>
+              <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+                display:'flex',gap:12,flexWrap:'wrap'}}>
+                {stats.avg && stats.avg!=='—' && <span>AVG {stats.avg}</span>}
+                {stats.obp && stats.obp!=='—' && <span>OBP {stats.obp}</span>}
+                {stats.hr > 0 && <span>{stats.hr} HR allowed</span>}
+              </div>
             </div>
-            <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:8}}>
-              <StatPill label="ERA"  val={stats.era}  color={
-                parseFloat(stats.era)<2.50?'#ff4020':parseFloat(stats.era)<3.50?'#ff8020':
-                parseFloat(stats.era)<4.50?'var(--text)':'#27c97a'}/>
-              <StatPill label="WHIP" val={stats.whip} color={
-                parseFloat(stats.whip)<1.00?'#ff4020':parseFloat(stats.whip)<1.20?'#ff8020':'var(--text)'}/>
-              <StatPill label="K/9"  val={stats.k9}   color={
-                parseFloat(stats.k9)>11?'#ff4020':parseFloat(stats.k9)>9?'#ff8020':'var(--text)'}/>
-              <StatPill label="BB/9" val={stats.bb9}  color={'var(--text)'}/>
-              <StatPill label="HR/9" val={stats.hr9}  color={
-                parseFloat(stats.hr9)>1.5?'#27c97a':parseFloat(stats.hr9)>1.0?'#ffc840':'var(--text)'}/>
-              <StatPill label="IP"   val={stats.ip}   color={'var(--muted)'}/>
-            </div>
-            <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
-              display:'flex',gap:12,flexWrap:'wrap'}}>
-              {stats.avg!=='—'&&<span>AVG {stats.avg}</span>}
-              {stats.obp!=='—'&&<span>OBP {stats.obp}</span>}
-              {stats.hr>0&&<span>{stats.hr} HR allowed</span>}
-            </div>
-          </>)}
+          )}
         </div>
       )}
     </div>
