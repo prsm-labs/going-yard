@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-10 10:04 ET";
+const BUILD_TIMESTAMP = "2026-04-10 10:15 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -4883,7 +4883,7 @@ function LiveBatterBox({ batterId, gamePk, onData }) {
 function PitcherCard({ pitcherId, pitcherName }) {
   const [stats, setStats]     = useState(null);
   const [open, setOpen]       = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // start loading immediately
 
   const gradeStats = (era, k9, whip, bb9, hr9, avg, obp) => {
     const e  = parseFloat(era)  || 99;
@@ -4916,14 +4916,16 @@ function PitcherCard({ pitcherId, pitcherName }) {
     return              { label:'(*) Target',   color:'#38b8f2', bg:'rgba(56,184,242,.08)', desc:'ERA > 5.00 / WHIP > 1.45 -- prime target' };
   };
 
+  // Auto-fetch stats on mount so grade shows on button before expanding
+  useEffect(() => {
+    if (!pitcherId && !pitcherName) return;
+    const cleanId = pitcherId ? String(parseInt(pitcherId) || pitcherId) : null;
+    fetchPitcherData(cleanId, pitcherName)
+      .then(d => { if (d?.stats) setStats(d.stats); })
+      .catch(() => {});
+  }, [pitcherId, pitcherName]);
+
   const handleOpen = () => {
-    if (!open && !stats) {
-      setLoading(true);
-      const cleanId = pitcherId ? String(parseInt(pitcherId) || pitcherId) : null;
-      fetchPitcherData(cleanId, pitcherName)
-        .then(d => { if (d?.stats) setStats(d.stats); setLoading(false); })
-        .catch(() => setLoading(false));
-    }
     setOpen(o => !o);
   };
 
@@ -4946,18 +4948,19 @@ function PitcherCard({ pitcherId, pitcherName }) {
 
   return (
     <div style={{marginTop:6}}>
-      <button onClick={handleOpen}
-        style={{display:'flex',alignItems:'center',gap:7,padding:'4px 10px',
-          borderRadius:7,cursor:'pointer',background:'rgba(255,255,255,.04)',
-          border:'1px solid var(--border)',fontFamily:"'DM Mono',monospace",
-          fontSize:11,color:'var(--muted)'}}>
-        {loading
-          ? <span style={{fontSize:9}}>Loading...</span>
-          : grade
-            ? <span style={{color:grade.color,fontWeight:700}}>{grade.label}</span>
-            : <span>(i) Pitcher Stats</span>}
-        <span style={{opacity:.5,marginLeft:2}}>{open?'^':'v'}</span>
-      </button>
+  <button onClick={handleOpen}
+    style={{display:'inline-flex',alignItems:'center',gap:6,padding:'3px 10px',
+      borderRadius:6,cursor:'pointer',
+      background:grade?grade.bg:'rgba(255,255,255,.04)',
+      border:`1px solid ${grade?grade.color+'40':'var(--border)'}`,
+      fontFamily:"'DM Mono',monospace",fontSize:11,marginTop:4}}>
+    {loading
+      ? <span style={{color:'var(--muted)',fontSize:9}}>...</span>
+      : grade
+        ? <span style={{color:grade.color,fontWeight:700,letterSpacing:.3}}>{grade.label}</span>
+        : <span style={{color:'var(--muted)'}}>--</span>}
+    <span style={{opacity:.4,marginLeft:3,fontSize:9}}>{open?'^':'v'}</span>
+  </button>
 
       {open && (
         <div style={{marginTop:6,padding:'10px 12px',borderRadius:8,
