@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-10 06:06 ET";
+const BUILD_TIMESTAMP = "2026-04-10 10:04 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -4885,24 +4885,40 @@ function PitcherCard({ pitcherId, pitcherName }) {
   const [open, setOpen]       = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const gradeStats = (era, k9, whip) => {
-    const e = parseFloat(era)  || 4.50;
-    const k = parseFloat(k9)   || 7.0;
-    const w = parseFloat(whip) || 1.40;
+  const gradeStats = (era, k9, whip, bb9, hr9, avg, obp) => {
+    const e  = parseFloat(era)  || 99;
+    const k  = parseFloat(k9)   || 0;
+    const w  = parseFloat(whip) || 99;
+    const b  = parseFloat(bb9)  || 99;
+    const h  = parseFloat(hr9)  || 99;
+    const av = parseFloat(avg)  || .999;
+    const ob = parseFloat(obp)  || .999;
     let s = 0;
-    if (e < 2.50) s += 3; else if (e < 3.50) s += 2; else if (e < 4.50) s += 1;
-    if (k > 11.0) s += 3; else if (k > 9.0)  s += 2; else if (k > 7.0)  s += 1;
-    if (w < 1.00) s += 2; else if (w < 1.20)  s += 1;
-    if (s >= 6) return { label:'(!) Elite Pitcher',   color:'#ff4020', bg:'rgba(255,64,32,.10)',   desc:'High K-rate & low ERA -- tough matchup' };
-    if (s >= 4) return { label:'(!) Tough Pitcher',   color:'#ff8020', bg:'rgba(255,128,32,.08)',  desc:'Above-average -- proceed with caution' };
-    if (s >= 2) return { label:'(~) Average Pitcher', color:'var(--muted)', bg:'rgba(255,255,255,.04)', desc:'League-average matchup' };
-    return             { label:'(+) Hittable',         color:'#27c97a', bg:'rgba(39,201,122,.08)', desc:'High ERA, low K-rate -- hitter friendly' };
+    // ERA
+    if (e <= 2.80) s += 3; else if (e <= 3.50) s += 2; else if (e <= 4.20) s += 1;
+    // K/9
+    if (k >= 10.0) s += 3; else if (k >= 8.5) s += 2; else if (k >= 7.0) s += 1;
+    // WHIP
+    if (w <= 1.05) s += 3; else if (w <= 1.20) s += 2; else if (w <= 1.32) s += 1;
+    // BB/9
+    if (b <= 2.0)  s += 2; else if (b <= 2.8)  s += 1;
+    // HR/9
+    if (h <= 0.8)  s += 2; else if (h <= 1.1)  s += 1;
+    // AVG against
+    if (av <= .210) s += 2; else if (av <= .235) s += 1;
+    // OBP against
+    if (ob <= .270) s += 2; else if (ob <= .310) s += 1;
+    // max score ~18
+    if (s >= 13) return { label:'(!) Elite',    color:'#ff4020', bg:'rgba(255,64,32,.10)',   desc:'Elite ERA/K-rate/WHIP -- very tough matchup' };
+    if (s >= 9)  return { label:'(!) Tough',    color:'#ff8020', bg:'rgba(255,128,32,.08)',  desc:'Above-average -- proceed with caution' };
+    if (s >= 5)  return { label:'(~) Average',  color:'var(--muted)', bg:'rgba(255,255,255,.04)', desc:'League-average matchup' };
+    if (s >= 2)  return { label:'(+) Hittable', color:'#27c97a', bg:'rgba(39,201,122,.08)', desc:'High ERA/HR-rate -- hitter friendly' };
+    return              { label:'(*) Target',   color:'#38b8f2', bg:'rgba(56,184,242,.08)', desc:'ERA > 5.00 / WHIP > 1.45 -- prime target' };
   };
 
   const handleOpen = () => {
     if (!open && !stats) {
       setLoading(true);
-      // Normalize pitcher_id — pandas may write "621121.0", API needs "621121"
       const cleanId = pitcherId ? String(parseInt(pitcherId) || pitcherId) : null;
       fetchPitcherData(cleanId, pitcherName)
         .then(d => { if (d?.stats) setStats(d.stats); setLoading(false); })
@@ -4911,7 +4927,7 @@ function PitcherCard({ pitcherId, pitcherName }) {
     setOpen(o => !o);
   };
 
-  const grade = stats ? gradeStats(stats.era, stats.k9, stats.whip) : null;
+  const grade = stats ? gradeStats(stats.era, stats.k9, stats.whip, stats.bb9, stats.hr9, stats.avg, stats.obp) : null;
 
   const eraColor  = (v) => { const n=parseFloat(v); if(n<2.50) return '#ff4020'; if(n<3.50) return '#ff8020'; if(n<4.50) return 'var(--text)'; return '#27c97a'; };
   const whipColor = (v) => { const n=parseFloat(v); if(n<1.00) return '#ff4020'; if(n<1.20) return '#ff8020'; return 'var(--text)'; };
@@ -4973,6 +4989,7 @@ function PitcherCard({ pitcherId, pitcherName }) {
               </div>
               <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
                 display:'flex',gap:12,flexWrap:'wrap'}}>
+                {stats.wins!=null && <span>{stats.wins}-{stats.losses} W-L</span>}
                 {stats.avg && stats.avg!=='--' && <span>AVG {stats.avg}</span>}
                 {stats.obp && stats.obp!=='--' && <span>OBP {stats.obp}</span>}
                 {stats.hr > 0 && <span>{stats.hr} HR allowed</span>}
