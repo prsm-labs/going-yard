@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 
-const BUILD_TIMESTAMP = "2026-04-10 10:19 ET";
+const BUILD_TIMESTAMP = "2026-04-10 19:36 ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -4214,13 +4214,15 @@ async function fetchHRs(force=false) {
     // This way the ticker stays alive past midnight until next day's games start
     if (newHRs.length >= 3) {
       HR_DATA = newHRs; HR_DATA_DATE = data.date || ''; // today has real data — use it
-      // Fire notifications for any HRs we haven't seen yet
-      if (_notifyNewHR && HR_DATA_DATE) {
-        newHRs.forEach(h => {
-          const id = `${h.gamePk}-${h.batterId}-${h.atBatIndex}`;
-          if (!SEEN_HR_IDS.has(id)) { SEEN_HR_IDS.add(id); _notifyNewHR(h); }
-        });
-      }
+      // Seed on first load; fire banners on subsequent fetches only
+      const isFirst = HR_LAST_FETCH === 0;
+      newHRs.forEach(h => {
+        const id = `${h.gamePk}-${h.batterId}-${h.atBatIndex}`;
+        if (!SEEN_HR_IDS.has(id)) {
+          SEEN_HR_IDS.add(id);
+          if (!isFirst && _notifyNewHR) _notifyNewHR(h); // skip on first load
+        }
+      });
     } else if (newHRs.length > 0) {
       HR_DATA = newHRs; HR_DATA_DATE = data.date || ''; // small amount — still show it
     } else if (HR_DATA.length === 0) {
@@ -4257,7 +4259,7 @@ function HRTicker({ onHRClick }) {
   const [tickerReady, setTickerReady] = useState(false);
   useEffect(() => {
     fetchHRs(true).then(d => { setHrs(d); setTickerReady(true); });
-    const id = setInterval(() => fetchHRs(false).then(setHrs), 60000);
+    const id = setInterval(() => fetchHRs(false).then(setHrs), 45000);
     return () => clearInterval(id);
   }, []);
 
@@ -4880,7 +4882,7 @@ function LiveBatterBox({ batterId, gamePk, onData }) {
 
 
 // Graded pitcher stats fetched from existing pitcher API
-function PitcherCard({ pitcherId, pitcherName }) {
+function PitcherCard({ pitcherId, pitcherName, onGrade }) {
   const [stats, setStats]     = useState(null);
   const [open, setOpen]       = useState(false);
   const [loading, setLoading] = useState(false);
@@ -4923,7 +4925,11 @@ function PitcherCard({ pitcherId, pitcherName }) {
     if (!cleanId || cleanId === '0' || isNaN(parseInt(cleanId))) return;
     setLoading(true);
     fetchPitcherData(cleanId, pitcherName)
-      .then(d => { if (d?.stats) setStats(d.stats); })
+      .then(d => {
+        if (d?.stats) {
+          setStats(d.stats);
+        }
+      })
       .catch(() => {})
       .then(() => setLoading(false));
   }, [pitcherId, pitcherName]);
@@ -4933,6 +4939,12 @@ function PitcherCard({ pitcherId, pitcherName }) {
   };
 
   const grade = stats ? gradeStats(stats.era, stats.k9, stats.whip, stats.bb9, stats.hr9, stats.avg, stats.obp) : null;
+  useEffect(() => {
+    if (grade && pitcherId && onGrade) {
+      const cleanId = String(parseInt(pitcherId) || pitcherId);
+      onGrade(cleanId, grade.label);
+    }
+  }, [grade?.label]);
 
   const eraColor  = (v) => { const n=parseFloat(v); if(n<2.50) return '#ff4020'; if(n<3.50) return '#ff8020'; if(n<4.50) return 'var(--text)'; return '#27c97a'; };
   const whipColor = (v) => { const n=parseFloat(v); if(n<1.00) return '#ff4020'; if(n<1.20) return '#ff8020'; return 'var(--text)'; };
@@ -5020,6 +5032,8 @@ function MatchupEngineTab() {
   const [showPicker, setShowPicker] = useState(false);
   const [searchQ, setSearchQ]     = useState('');
   const liveCache = useRef({});
+  const pitcherGradeCache = useRef({});
+  const [selPitcherGrade, setSelPitcherGrade] = useState('all');
   const picks = usePicks();
 
   useEffect(() => {
@@ -5090,7 +5104,7 @@ function MatchupEngineTab() {
         });
       } catch(e) {}
     }));
-    const headers = ['Grade','Gone Yard','Team','Batter','Hand','vs Pitcher',
+    const headers = ['Grade','Pitcher Grade','Gone Yard','Team','Batter','Hand','vs Pitcher',
       'Top Pitches','Game Time','Flags','Recent EV','Recent Barrel%',
       'Recent FB%','Recent LA','BvP EV','BvP Barrel%','BvP FB%','BvP LA',
       'Sim H','Sim 2B','Sim BB','Sim K','Sim TB','Sim RBI',
@@ -5102,7 +5116,9 @@ function MatchupEngineTab() {
       const gy = HR_DATA.some(h => h.batterId === bid ||
         (b.batter && h.batterName && h.batterName.toLowerCase() === b.batter.toLowerCase()));
       const live = liveCache.current[String(bid)] || null;
-      return [b.grade, gy?'YES':'', b.batting_team, b.batter, b.batter_hand,
+      const pitchCleanId = b.pitcher_id ? String(parseInt(b.pitcher_id)||b.pitcher_id) : '';
+      const pitcherGrade = pitcherGradeCache.current[pitchCleanId] || '';
+      return [b.grade, pitcherGrade, gy?'YES':'', b.batting_team, b.batter, b.batter_hand,
         b.pitcher, b.top_pitches, b.game_time, b.total_flags,
         b.recent_avg_ev, b.recent_barrel_pct, b.recent_fb_pct, b.recent_avg_la,
         b.bvp_avg_ev, b.bvp_barrel_pct, b.bvp_fb_pct, b.bvp_avg_la,
@@ -5302,6 +5318,22 @@ function MatchupEngineTab() {
       })}
     </div>}
     {loading && <div className="lw"><div className="sp"/><div className="lt">Loading matchup data…</div></div>}
+    {/* Pitcher grade filter */}
+    {!loading && !error && data.length > 0 && <div style={{display:'flex',gap:6,marginBottom:14,flexWrap:'wrap',alignItems:'center'}}>
+      <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1}}>Pitcher:</span>
+      {['all','!! Elite','! Tough','~ Average','+ Hittable','* Target'].map(g => {
+        const active = selPitcherGrade === g;
+        const col = g==='!! Elite'?'#ff4020':g==='! Tough'?'#ff8020':g==='~ Average'?'var(--muted)':g==='+ Hittable'?'#27c97a':g==='* Target'?'#38b8f2':'var(--text)';
+        return <button key={g} onClick={()=>setSelPitcherGrade(s=>s===g?'all':g)}
+          style={{padding:'3px 12px',borderRadius:6,cursor:'pointer',
+            background:active?'rgba(255,255,255,.08)':'transparent',
+            color:active?col:'var(--muted)',
+            border:`1px solid ${active?col:'var(--border)'}`,
+            fontFamily:"'DM Mono',monospace",fontWeight:active?700:400,fontSize:11}}>
+          {g==='all'?'All':g}
+        </button>;
+      })}
+    </div>}
     {error && <div style={{padding:'30px 20px',textAlign:'center',color:'var(--muted)',
       fontFamily:"'DM Mono',monospace",fontSize:12,lineHeight:1.8}}>
       <div style={{fontSize:20,marginBottom:8}}>📭</div>
@@ -5311,7 +5343,12 @@ function MatchupEngineTab() {
     </div>}
 
     {!loading && !error && Object.values(grouped).sort((a,b)=>timeToMins(a.gameTime)-timeToMins(b.gameTime)).map(game => {
-      const teamPairs = Object.values(game.teams);
+      const teamPairs = Object.values(game.teams).filter(team => {
+        if (selPitcherGrade === 'all') return true;
+        const cleanId = team.pitcherId ? String(parseInt(team.pitcherId) || team.pitcherId) : null;
+        return cleanId && pitcherGradeCache.current[cleanId] === selPitcherGrade;
+      });
+      if (teamPairs.length === 0) return null;
       // Format game time
       // game_time comes directly from daily_summary.csv — use as-is
       const displayTime = game.gameTime ? String(game.gameTime).trim() : '';
@@ -5354,7 +5391,7 @@ function MatchupEngineTab() {
                 vs {team.pitcher} · {team.pitchMix}
               </span>
             </div>
-            <PitcherCard pitcherId={team.pitcherId} pitcherName={team.pitcher}/>
+            <PitcherCard pitcherId={team.pitcherId} pitcherName={team.pitcher} onGrade={(id,g)=>{pitcherGradeCache.current[id]=g;}}/>
           </div>
 
           {/* Batters */}
@@ -6395,30 +6432,39 @@ function WeatherTab() {
 }
 
 
+let _hrLog = [];
+let _setHrLog = null;
+
 function useHRNotifications() {
   const [queue, setQueue] = useState([]);
+  const [log, setLog] = useState(_hrLog);
+
   useEffect(() => {
+    _setHrLog = setLog;
     _notifyNewHR = (hr) => {
-      const isXBH = /double|triple|home_run/i.test(hr.hrType||'');
-      if (!isXBH) return; // only HR and XBH
+      // hrType = "Solo","2-Run","3-Run","Grand Slam" — all are HRs from this feed
       const notif = {
         id: Date.now() + Math.random(),
         batterName: hr.batterName || 'Unknown',
         batterTeam: hr.batterTeam || '',
-        type: hr.hrType || 'home_run',
+        type: hr.hrType || 'Solo',
         rbi: hr.rbi || 0,
         exitVelo: hr.exitVelo || 0,
         distance: hr.distance || 0,
-        gameId: hr.gameId || '',
         inning: hr.inning || '',
         halfInning: hr.halfInning || 'top',
+        time: new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',timeZone:'America/New_York'}),
       };
-      setQueue(q => [...q.slice(-2), notif]); // keep max 3
+      setQueue(q => [...q.slice(-2), notif]);
+      _hrLog = [notif, ..._hrLog].slice(0, 20);
+      if (_setHrLog) _setHrLog([..._hrLog]);
     };
-    return () => { _notifyNewHR = null; };
+    return () => { _notifyNewHR = null; _setHrLog = null; };
   }, []);
+
   const dismiss = (id) => setQueue(q => q.filter(n => n.id !== id));
-  return { queue, dismiss };
+  const clearLog = () => { _hrLog = []; setLog([]); };
+  return { queue, dismiss, log, clearLog };
 }
 
 function HRNotificationBanner({ notif, onDismiss }) {
@@ -6428,11 +6474,12 @@ function HRNotificationBanner({ notif, onDismiss }) {
   const startY = useRef(0);
 
   const typeMap = {
-    home_run:    { icon:'💥', label:'HOME RUN',  color:'#ff4020', bg:'rgba(232,65,26,.18)' },
-    double:      { icon:'⚡', label:'DOUBLE',    color:'#ffc840', bg:'rgba(255,200,64,.14)' },
-    triple:      { icon:'🚀', label:'TRIPLE',    color:'#27c97a', bg:'rgba(39,201,122,.14)' },
+    'Grand Slam': { icon:'💥', label:'GRAND SLAM', color:'#ff4020', bg:'rgba(232,65,26,.22)' },
+    '3-Run':      { icon:'💥', label:'3-RUN HR',   color:'#ff4020', bg:'rgba(232,65,26,.18)' },
+    '2-Run':      { icon:'💥', label:'2-RUN HR',   color:'#ff8020', bg:'rgba(255,128,32,.16)' },
+    'Solo':       { icon:'💥', label:'SOLO HR',    color:'#ffc840', bg:'rgba(255,200,64,.14)' },
   };
-  const t = typeMap[notif.type?.toLowerCase()] || typeMap.home_run;
+  const t = typeMap[notif.type] || typeMap['Solo'];
 
   useEffect(() => {
     const tin = setTimeout(() => setVisible(true), 50);
@@ -6550,6 +6597,103 @@ function HRNotifications() {
 }
 
 
+function NotificationBell() {
+  const { log, clearLog } = useHRNotifications();
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const unread = log.length;
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const typeMap = {
+    'Grand Slam': { icon:'💥', label:'GRAND SLAM', color:'#ff4020' },
+    '3-Run':      { icon:'💥', label:'3-Run HR',   color:'#ff4020' },
+    '2-Run':      { icon:'💥', label:'2-Run HR',   color:'#ff8020' },
+    'Solo':       { icon:'💥', label:'Solo HR',    color:'#ffc840' },
+  };
+
+  return (
+    <div ref={ref} style={{position:'relative'}}>
+      <button onClick={()=>setOpen(o=>!o)}
+        style={{position:'relative',padding:'5px 10px',borderRadius:6,
+          border:'1px solid var(--border)',background:'var(--surface2)',
+          cursor:'pointer',display:'flex',alignItems:'center',gap:5,
+          color:unread>0?'var(--accent2)':'var(--muted)'}}>
+        <span style={{fontSize:14}}>🔔</span>
+        {unread > 0 && (
+          <span style={{position:'absolute',top:-4,right:-4,
+            background:'#ff4020',color:'white',borderRadius:'50%',
+            width:15,height:15,fontSize:9,fontWeight:700,
+            display:'flex',alignItems:'center',justifyContent:'center',
+            fontFamily:"'DM Mono',monospace"}}>
+            {unread > 9 ? '9+' : unread}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div style={{position:'fixed',top:52,right:8,width:300,zIndex:9998,
+          background:'#0d1318',border:'1px solid var(--border)',borderRadius:10,
+          boxShadow:'0 8px 32px rgba(0,0,0,.8)',overflow:'hidden'}}>
+          <div style={{padding:'8px 12px',borderBottom:'1px solid var(--border)',
+            display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+            <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,
+              fontSize:12,letterSpacing:.5,color:'var(--text)'}}>
+              LIVE ALERTS
+            </span>
+            {log.length > 0 && (
+              <button onClick={clearLog}
+                style={{fontSize:9,color:'var(--muted)',background:'none',
+                  border:'none',cursor:'pointer',fontFamily:"'DM Mono',monospace"}}>
+                Clear
+              </button>
+            )}
+          </div>
+          {log.length === 0 ? (
+            <div style={{padding:'20px 12px',textAlign:'center',
+              color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:11}}>
+              No alerts yet today
+            </div>
+          ) : (
+            <div style={{maxHeight:320,overflowY:'auto'}}>
+              {log.map((n,i) => {
+                const t = typeMap[n.type] || typeMap['Solo'];
+                return (
+                  <div key={n.id} style={{padding:'8px 12px',
+                    borderBottom:'1px solid rgba(255,255,255,.05)',
+                    display:'flex',alignItems:'center',gap:8}}>
+                    <span style={{fontSize:16,flexShrink:0}}>{t.icon}</span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,
+                        fontSize:12,color:'var(--text)',
+                        whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                        {n.batterName}
+                        <span style={{color:t.color,marginLeft:5,fontSize:10}}>{t.label}</span>
+                      </div>
+                      <div style={{fontSize:9,color:'var(--muted)',
+                        fontFamily:"'DM Mono',monospace",marginTop:1}}>
+                        {n.batterTeam} · Inn {n.inning} · {n.time}
+                        {n.exitVelo > 0 && <span> · {n.exitVelo}mph</span>}
+                        {n.distance > 0 && <span> · {n.distance}ft</span>}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 export default function App() {
   const [tab, setTab] = useState("homeruns");
   const [showPicksSlideout, setShowPicksSlideout] = useState(false);
@@ -6585,6 +6729,7 @@ export default function App() {
         <div className="logo"><div className="logo-dot"/>⚾ <span>GOING</span> YARD</div>
         <div style={{display:"flex",alignItems:"center",gap:8}}> 
           <DataStatusBadge/>
+          <NotificationBell/>
           <button onClick={()=>setShowPicksSlideout(s=>!s)}
             style={{padding:"5px 12px",borderRadius:6,border:"1px solid var(--border)",
               background:"var(--surface2)",color:"var(--accent2)",cursor:"pointer",
