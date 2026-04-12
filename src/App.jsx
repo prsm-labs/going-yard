@@ -5027,9 +5027,28 @@ function BatterLeaderboard() {
   const [sortDir, setSortDir] = useState('desc');
   const [teamFilter, setTeamFilter] = useState('all');
   const [searchQ, setSearchQ] = useState('');
+  const [minPA, setMinPA] = useState(10);
+  const [players, setPlayers] = useState([]);
   const picks = usePicks();
 
-  const allPlayers = Object.values(PLAYER_DATA_CACHE).filter(p => p.pa > 0 && p.avgEV > 0);
+  // PLAYER_DATA_CACHE is a module-level object (not React state) so we
+  // need to poll until fetchPlayers() has populated it at startup
+  useEffect(() => {
+    const load = () => {
+      const cached = Object.values(PLAYER_DATA_CACHE).filter(p => p.pid && p.name);
+      if (cached.length > 0) setPlayers(cached);
+    };
+    load();
+    if (Object.keys(PLAYER_DATA_CACHE).length < 5) {
+      const id = setInterval(() => {
+        const cached = Object.values(PLAYER_DATA_CACHE).filter(p => p.pid && p.name);
+        if (cached.length > 5) { setPlayers(cached); clearInterval(id); }
+      }, 400);
+      return () => clearInterval(id);
+    }
+  }, []);
+
+  const allPlayers = players;
   const teams = [...new Set(allPlayers.map(p => p.team).filter(t => t && t !== '—'))].sort();
 
   const handleSort = col => {
@@ -5038,19 +5057,21 @@ function BatterLeaderboard() {
   };
 
   const filtered = allPlayers
+    .filter(p => (p.pa || 0) >= minPA)
     .filter(p => teamFilter === 'all' || p.team === teamFilter)
     .filter(p => !searchQ || p.name?.toLowerCase().includes(searchQ.toLowerCase()))
     .sort((a, b) => {
-      const av = sortCol === 'name' ? (a.name||'') : (a[sortCol] || 0);
-      const bv = sortCol === 'name' ? (b.name||'') : (b[sortCol] || 0);
+      const av = sortCol === 'name' ? (a.name||'') : (a[sortCol] ?? 0);
+      const bv = sortCol === 'name' ? (b.name||'') : (b[sortCol] ?? 0);
       if (typeof av === 'string') return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
       return sortDir === 'desc' ? bv - av : av - bv;
     });
 
-  const fmtStat = v => v > 0 ? '.' + String(Math.round(v * 1000)).padStart(3, '0') : '—';
-  const fmtEV  = v => v > 0 ? v.toFixed(1) : '—';
-  const fmtPct = v => v > 0 ? v.toFixed(1) + '%' : '—';
-  const fmtLA  = v => v ? v.toFixed(1) + '°' : '—';
+  // fmtPct: show '—' only for null/undefined, show '0.0%' for actual zero
+  const fmtStat = v => (v != null && v > 0) ? '.' + String(Math.round(v * 1000)).padStart(3, '0') : '—';
+  const fmtEV   = v => (v != null && v > 0) ? v.toFixed(1) : '—';
+  const fmtPct  = v => v != null ? v.toFixed(1) + '%' : '—';
+  const fmtLA   = v => v != null ? v.toFixed(1) + '°' : '—';
 
   const evCol  = v => v >= 92 ? '#ff4020' : v >= 90 ? '#ff8020' : v >= 88 ? '#f5a623' : v >= 85 ? 'var(--text)' : 'var(--muted)';
   const brlCol = v => v >= 12 ? '#ff4020' : v >= 8 ? '#ff8020' : v >= 5 ? '#f5a623' : 'var(--muted)';
@@ -5110,12 +5131,20 @@ function BatterLeaderboard() {
           <option value="all">All Teams</option>
           {teams.map(t=><option key={t} value={t}>{t}</option>)}
         </select>
+        <div style={{display:'flex',alignItems:'center',gap:5}}>
+          <span style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace",whiteSpace:'nowrap'}}>Min PA:</span>
+          <input type="number" min={0} max={600} value={minPA}
+            onChange={e=>setMinPA(Math.max(0,parseInt(e.target.value)||0))}
+            style={{width:54,padding:'6px 8px',background:'var(--surface2)',
+              border:'1px solid var(--border)',borderRadius:7,color:'var(--text)',
+              fontFamily:"'DM Mono',monospace",fontSize:11,outline:'none',textAlign:'center'}}/>
+        </div>
         <span style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace",whiteSpace:'nowrap'}}>
           {filtered.length} batters · click header to sort
         </span>
       </div>
 
-      {allPlayers.length === 0 ? (
+      {players.length === 0 ? (
         <div style={{padding:'40px 20px',textAlign:'center',color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:11}}>
           <div className="sp" style={{margin:'0 auto 12px'}}/>
           Loading Statcast data… loads at app startup
@@ -5170,37 +5199,55 @@ function PitcherLeaderboard() {
   const [teamFilter, setTeamFilter] = useState('all');
   const [roleFilter, setRoleFilter] = useState('all'); // all | SP | RP
   const [searchQ, setSearchQ]       = useState('');
-  const [minIP, setMinIP]           = useState(10);
+  const [minIP, setMinIP]           = useState(5);
+
+  // Static MLB team ID → abbreviation map (IDs are stable across seasons)
+  const TEAM_ABBR = {
+    133:'OAK',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',
+    139:'TB',140:'TEX',141:'TOR',142:'MIN',143:'PHI',144:'ATL',
+    145:'CWS',146:'MIA',147:'NYY',158:'MIL',108:'LAA',109:'ARI',
+    110:'BAL',111:'BOS',112:'CHC',113:'CIN',114:'CLE',115:'COL',
+    116:'DET',117:'HOU',118:'KC',119:'LAD',120:'WSH',121:'NYM',
+  };
 
   useEffect(()=>{
     const season = new Date().getFullYear();
-    fetch(`https://statsapi.mlb.com/api/v1/stats?stats=season&group=pitching&gameType=R&season=${season}&sportId=1&limit=1000`)
+    fetch(`https://statsapi.mlb.com/api/v1/stats?stats=season&group=pitching&gameType=R&season=${season}&sportId=1&limit=2000`)
       .then(r=>{ if(!r.ok) throw new Error(`MLB API ${r.status}`); return r.json(); })
       .then(data=>{
         const splits = data.stats?.[0]?.splits || [];
-        const mapped = splits.map(s=>({
-          pid:        s.player?.id,
-          name:       s.player?.fullName || '—',
-          team:       s.team?.abbreviation || '—',
-          teamFull:   s.team?.name || '',
-          wins:       s.stat?.wins ?? 0,
-          losses:     s.stat?.losses ?? 0,
-          era:        parseFloat(s.stat?.era ?? 99),
-          whip:       parseFloat(s.stat?.whip ?? 0),
-          k9:         parseFloat(s.stat?.strikeoutsPer9Inn ?? 0),
-          bb9:        parseFloat(s.stat?.walksPer9Inn ?? 0),
-          hr9:        parseFloat(s.stat?.homeRunsPer9 ?? 0),
-          ip:         parseFloat(s.stat?.inningsPitched ?? 0),
-          gs:         s.stat?.gamesStarted ?? 0,
-          gp:         s.stat?.gamesPlayed ?? 0,
-          so:         s.stat?.strikeOuts ?? 0,
-          bb:         s.stat?.baseOnBalls ?? 0,
-          hr:         s.stat?.homeRuns ?? 0,
-          avg:        parseFloat(s.stat?.avg ?? 0),
-          obp:        parseFloat(s.stat?.obp ?? 0),
-          slg:        parseFloat(s.stat?.slg ?? 0),
-          ops:        parseFloat(s.stat?.ops ?? 0),
-        })).filter(p=>p.pid && p.ip > 0);
+        const mapped = splits.map(s=>{
+          const teamId  = s.team?.id;
+          const abbr    = TEAM_ABBR[teamId] || (s.team?.name||'').replace(/^(.*?)\s+\S+$/,'$1').slice(0,3).toUpperCase() || '—';
+          const ipRaw   = s.stat?.inningsPitched ?? '0';
+          // MLB API returns IP as "X.Y" where .1=1 out, .2=2 outs — parse correctly
+          const ipParts = String(ipRaw).split('.');
+          const ipVal   = parseFloat(ipParts[0]||0) + (parseFloat(ipParts[1]||0)/3);
+          return {
+            pid:      s.player?.id,
+            name:     s.player?.fullName || '—',
+            team:     abbr,
+            teamFull: s.team?.name || '',
+            wins:     s.stat?.wins ?? 0,
+            losses:   s.stat?.losses ?? 0,
+            era:      parseFloat(s.stat?.era ?? 99),
+            whip:     parseFloat(s.stat?.whip ?? 0),
+            k9:       parseFloat(s.stat?.strikeoutsPer9Inn ?? 0),
+            bb9:      parseFloat(s.stat?.walksPer9Inn ?? 0),
+            hr9:      parseFloat(s.stat?.homeRunsPer9 ?? 0),
+            ip:       ipVal,
+            ipDisplay:String(ipRaw),
+            gs:       s.stat?.gamesStarted ?? 0,
+            gp:       s.stat?.gamesPlayed ?? 0,
+            so:       s.stat?.strikeOuts ?? 0,
+            bb:       s.stat?.baseOnBalls ?? 0,
+            hr:       s.stat?.homeRuns ?? 0,
+            avg:      parseFloat(s.stat?.avg ?? 0),
+            obp:      parseFloat(s.stat?.obp ?? 0),
+            slg:      parseFloat(s.stat?.slg ?? 0),
+            ops:      parseFloat(s.stat?.ops ?? 0),
+          };
+        }).filter(p=>p.pid && p.ip > 0);
         setPitchers(mapped);
         setLoading(false);
       })
@@ -5259,7 +5306,7 @@ function PitcherLeaderboard() {
     { key:'k9',     label:'K/9',    render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:k9Col(p.k9)}}>{fmtDec(p.k9)}</span> },
     { key:'bb9',    label:'BB/9',   render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:bb9Col(p.bb9)}}>{fmtDec(p.bb9)}</span> },
     { key:'hr9',    label:'HR/9',   render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:hr9Col(p.hr9)}}>{fmtDec(p.hr9)}</span> },
-    { key:'ip',     label:'IP',     render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{fmtDec(p.ip,1)}</span> },
+    { key:'ip',     label:'IP',     render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{p.ipDisplay||fmtDec(p.ip,1)}</span> },
     { key:'so',     label:'K',      render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{p.so}</span> },
     { key:'hr',     label:'HR',     render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:p.hr>=15?'#ff4020':p.hr>=10?'#f5a623':'var(--text)',fontWeight:p.hr>=10?700:400}}>{p.hr}</span> },
     { key:'avg',    label:'BAA',    render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{fmtStat(p.avg)}</span> },
@@ -5304,7 +5351,7 @@ function PitcherLeaderboard() {
           <select value={minIP} onChange={e=>setMinIP(Number(e.target.value))}
             style={{padding:'7px 8px',background:'var(--surface2)',border:'1px solid var(--border)',
               borderRadius:7,color:'var(--text)',fontFamily:"'DM Mono',monospace",fontSize:11,cursor:'pointer'}}>
-            {[0,5,10,20,30,50].map(v=><option key={v} value={v}>{v}+</option>)}
+            {[0,5,10,20,30,50,75].map(v=><option key={v} value={v}>{v===0?'No min':v+'+'}</option>)}
           </select>
         </div>
         <span style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace",whiteSpace:'nowrap'}}>
