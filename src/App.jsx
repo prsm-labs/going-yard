@@ -5735,6 +5735,8 @@ function PitcherLeaderboard() {
           })}
         </div>
       )}
+
+      {loading && (
         <div style={{padding:'40px 20px',textAlign:'center',color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:11,display:'flex',flexDirection:'column',alignItems:'center',gap:12}}>
           <div className="sp"/>
           Fetching pitcher stats from MLB API…
