@@ -5218,14 +5218,28 @@ function BatterLeaderboard() {
   ];
 
   // Statcast cols that support windowing from at-bat log
+  // Statcast-only columns — windowed for both rolling and season windows
   const SC_WIN_KEYS = new Set(['avgEV','barrel','hardHit','flyBall','gbPct','launchAngle']);
+  // Full-season windows pull ALL stats from the window (not just Statcast)
+  const SEASON_WINS = new Set(['season2025','season2026']);
 
-  // Resolve a Statcast metric from the selected window, fall back to season
+  // Resolve a stat from the selected window with correct fallback logic:
+  // - Rolling windows (L7/L14/L30/L60): only Statcast cols are windowed;
+  //   traditional stats (BA/OBP/HR etc.) always show 2026 season from Savant
+  // - Season windows (season2025/season2026): ALL stats come from that season's window
   const ws = (p, key) => {
-    if (!SC_WIN_KEYS.has(key)) return p[key] ?? 0;
     const w = p.windows?.[selectedWin];
+    if (SEASON_WINS.has(selectedWin)) {
+      // For a full season window, use the pipeline value if it exists
+      if (w && w[key] != null && w[key] !== 0) return w[key];
+      // season2026 can fall back to top-level Savant fields (same season)
+      if (selectedWin === 'season2026') return p[key] ?? 0;
+      // season2025 with no data — show blank (0) rather than wrong 2026 data
+      return 0;
+    }
+    // Rolling window — only window Statcast cols, rest always from season top-level
+    if (!SC_WIN_KEYS.has(key)) return p[key] ?? 0;
     if (w && w[key] != null && w[key] !== 0) return w[key];
-    // Fallback: season2026 → top-level field (Savant season data)
     return p[key] ?? 0;
   };
 
@@ -5233,6 +5247,7 @@ function BatterLeaderboard() {
   const hasRealWindows = players.some(p =>
     p.windows?.last7?.avgEV > 0 || p.windows?.last14?.avgEV > 0
   );
+  const hasSeason2025 = players.some(p => p.windows?.season2025?.avgEV > 0);
 
   const allPlayers = players;
   const teams = [...new Set(allPlayers.map(p => p.team).filter(t => t && t !== '—'))].sort();
@@ -5276,14 +5291,14 @@ function BatterLeaderboard() {
     { key:'flyBall',    label:'FB%',    render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{fmtPct(ws(p,'flyBall'))}</span> },
     { key:'gbPct',      label:'GB%',    render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--muted)'}}>{fmtPct(ws(p,'gbPct'))}</span> },
     { key:'launchAngle',label:'Avg LA', render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{fmtLA(ws(p,'launchAngle'))}</span> },
-    // Traditional stats — always full season from Savant (no windowing)
-    { key:'avg',  label:'BA',  render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{fmtStat(p.avg)}</span> },
-    { key:'obp',  label:'OBP', render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{fmtStat(p.obp)}</span> },
-    { key:'slg',  label:'SLG', render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{fmtStat(p.slg)}</span> },
-    { key:'ops',  label:'OPS', render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:700,color:opsCol(p.ops)}}>{fmtStat(p.ops)}</span> },
-    { key:'hr',   label:'HR',  render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:p.hr>=10?700:400,color:hrCol(p.hr)}}>{p.hr||0}</span> },
-    { key:'kPct', label:'K%',  render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:p.kPct>=28?'var(--ice)':'var(--muted)'}}>{fmtPct(p.kPct)}</span> },
-    { key:'bbPct',label:'BB%', render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:p.bbPct>=12?'#27c97a':'var(--muted)'}}>{fmtPct(p.bbPct)}</span> },
+    // Traditional stats — windowed for season views, full-season for rolling windows
+    { key:'avg',  label:'BA',  render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{fmtStat(ws(p,'avg'))}</span> },
+    { key:'obp',  label:'OBP', render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{fmtStat(ws(p,'obp'))}</span> },
+    { key:'slg',  label:'SLG', render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{fmtStat(ws(p,'slg'))}</span> },
+    { key:'ops',  label:'OPS', render: p => { const v=(ws(p,'slg')||0)+(ws(p,'obp')||0); return <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:700,color:opsCol(v)}}>{fmtStat(v||ws(p,'ops'))}</span>; }},
+    { key:'hr',   label:'HR',  render: p => { const v=ws(p,'hr'); return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:v>=10?700:400,color:hrCol(v)}}>{v||0}</span>; }},
+    { key:'kPct', label:'K%',  render: p => { const v=ws(p,'kPct'); return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=28?'var(--ice)':'var(--muted)'}}>{fmtPct(v)}</span>; }},
+    { key:'bbPct',label:'BB%', render: p => { const v=ws(p,'bbPct'); return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=12?'#27c97a':'var(--muted)'}}>{fmtPct(v)}</span>; }},
   ];
 
   const SortIcon = ({col}) => sortCol===col
@@ -5381,14 +5396,14 @@ function BatterLeaderboard() {
         {/* Data source indicator */}
         <span style={{
           marginLeft:6,fontSize:9,fontFamily:"'DM Mono',monospace",
-          color: hasRealWindows ? '#27c97a' : '#f5a623',
+          color: (selectedWin==='season2025' ? hasSeason2025 : hasRealWindows) ? '#27c97a' : '#f5a623',
           padding:'2px 8px',borderRadius:5,
-          background: hasRealWindows ? 'rgba(39,201,122,.1)' : 'rgba(245,166,35,.1)',
-          border:`1px solid ${hasRealWindows?'rgba(39,201,122,.25)':'rgba(245,166,35,.25)'}`,
+          background: (selectedWin==='season2025' ? hasSeason2025 : hasRealWindows) ? 'rgba(39,201,122,.1)' : 'rgba(245,166,35,.1)',
+          border:`1px solid ${(selectedWin==='season2025' ? hasSeason2025 : hasRealWindows)?'rgba(39,201,122,.25)':'rgba(245,166,35,.25)'}`,
         }}>
-          {hasRealWindows
-            ? '✓ pipeline · EV/Brl/HH windowed'
-            : '⚠ run mlbdata_aggregate.py for real windows · showing season avg'}
+          {selectedWin === 'season2025'
+            ? (hasSeason2025 ? '✓ 2025 season · all stats from pipeline' : '⚠ no 2025 data · re-run mlbdata_aggregate.py')
+            : (hasRealWindows ? '✓ pipeline · EV/Brl/HH windowed' : '⚠ run mlbdata_aggregate.py for real windows · showing season avg')}
         </span>
       </div>
 
