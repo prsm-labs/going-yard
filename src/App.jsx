@@ -5045,41 +5045,36 @@ function LiveBatterBox({ batterId, gamePk, onData }) {
 
 
 // Graded pitcher stats fetched from existing pitcher API
+function gradePitcher(era, k9, whip, bb9, hr9, avg, obp) {
+  const e  = parseFloat(era)  || 99;
+  const k  = parseFloat(k9)   || 0;
+  const w  = parseFloat(whip) || 99;
+  const b  = parseFloat(bb9)  || 99;
+  const h  = parseFloat(hr9)  || 99;
+  const av = parseFloat(avg)  || .999;
+  const ob = parseFloat(obp)  || .999;
+  let s = 0;
+  if (e <= 2.80) s += 3; else if (e <= 3.50) s += 2; else if (e <= 4.20) s += 1;
+  if (k >= 10.0) s += 3; else if (k >= 8.5)  s += 2; else if (k >= 7.0)  s += 1;
+  if (w <= 1.05) s += 3; else if (w <= 1.20)  s += 2; else if (w <= 1.32) s += 1;
+  if (b <= 2.0)  s += 2; else if (b <= 2.8)   s += 1;
+  if (h <= 0.8)  s += 2; else if (h <= 1.1)   s += 1;
+  if (av <= .210) s += 2; else if (av <= .235) s += 1;
+  if (ob <= .270) s += 2; else if (ob <= .310) s += 1;
+  if (s >= 13) return { label:'‼️ Elite',   color:'#ff4020', bg:'rgba(255,64,32,.10)',    desc:'Elite ERA/K-rate/WHIP' };
+  if (s >= 9)  return { label:'⚠️ Tough',   color:'#ff8020', bg:'rgba(255,128,32,.08)',   desc:'Above-average pitcher' };
+  if (s >= 5)  return { label:'🤔 Average', color:'var(--muted)', bg:'rgba(255,255,255,.04)', desc:'League-average matchup' };
+  if (s >= 2)  return { label:'💥 Hittable',color:'#27c97a', bg:'rgba(39,201,122,.08)',   desc:'Elevated ERA/HR-rate' };
+  return              { label:'🎯 Target',  color:'#38b8f2', bg:'rgba(56,184,242,.08)',   desc:'ERA > 5.00 / WHIP > 1.45' };
+}
+
 function PitcherCard({ pitcherId, pitcherName, onGrade }) {
   const [stats, setStats]     = useState(null);
   const [open, setOpen]       = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const gradeStats = (era, k9, whip, bb9, hr9, avg, obp) => {
-    const e  = parseFloat(era)  || 99;
-    const k  = parseFloat(k9)   || 0;
-    const w  = parseFloat(whip) || 99;
-    const b  = parseFloat(bb9)  || 99;
-    const h  = parseFloat(hr9)  || 99;
-    const av = parseFloat(avg)  || .999;
-    const ob = parseFloat(obp)  || .999;
-    let s = 0;
-    // ERA
-    if (e <= 2.80) s += 3; else if (e <= 3.50) s += 2; else if (e <= 4.20) s += 1;
-    // K/9
-    if (k >= 10.0) s += 3; else if (k >= 8.5) s += 2; else if (k >= 7.0) s += 1;
-    // WHIP
-    if (w <= 1.05) s += 3; else if (w <= 1.20) s += 2; else if (w <= 1.32) s += 1;
-    // BB/9
-    if (b <= 2.0)  s += 2; else if (b <= 2.8)  s += 1;
-    // HR/9
-    if (h <= 0.8)  s += 2; else if (h <= 1.1)  s += 1;
-    // AVG against
-    if (av <= .210) s += 2; else if (av <= .235) s += 1;
-    // OBP against
-    if (ob <= .270) s += 2; else if (ob <= .310) s += 1;
-    // max score ~18
-    if (s >= 13) return { label:'!! Elite',      color:'#ff4020', bg:'rgba(255,64,32,.10)',   desc:'Elite ERA/K-rate/WHIP -- very tough matchup' };
-    if (s >= 9)  return { label:'! Tough',       color:'#ff8020', bg:'rgba(255,128,32,.08)',  desc:'Above-average -- proceed with caution' };
-    if (s >= 5)  return { label:'~ Average',     color:'var(--muted)', bg:'rgba(255,255,255,.04)', desc:'League-average matchup' };
-    if (s >= 2)  return { label:'+ Hittable',    color:'#27c97a', bg:'rgba(39,201,122,.08)', desc:'High ERA/HR-rate -- hitter friendly' };
-    return              { label:'* Target',      color:'#38b8f2', bg:'rgba(56,184,242,.08)', desc:'ERA > 5.00 / WHIP > 1.45 -- prime target' };
-  };
+  const gradeStats = (era, k9, whip, bb9, hr9, avg, obp) =>
+    gradePitcher(era, k9, whip, bb9, hr9, avg, obp);
 
   // Auto-fetch on mount so grade shows immediately without clicking
   useEffect(() => {
@@ -5510,6 +5505,7 @@ function PitcherLeaderboard() {
   const [roleFilter, setRoleFilter] = useState('SP'); // all | SP | RP
   const [searchQ, setSearchQ]       = useState('');
   const [minIP, setMinIP]           = useState(5);
+  const [gradeFilter, setGradeFilter] = useState('all');
 
   // Static MLB team ID → abbreviation map (IDs are stable across seasons)
   const TEAM_ABBR = {
@@ -5573,11 +5569,18 @@ function PitcherLeaderboard() {
 
   const teams = [...new Set(pitchers.map(p=>p.team).filter(Boolean))].sort();
 
-  const filtered = pitchers
+  // Pre-compute grade for every pitcher so we can filter + display it
+  const withGrades = pitchers.map(p => ({
+    ...p,
+    _grade: gradePitcher(p.era, p.k9, p.whip, p.bb9, p.hr9, p.avg, p.obp),
+  }));
+
+  const filtered = withGrades
     .filter(p => p.ip >= minIP)
     .filter(p => teamFilter === 'all' || p.team === teamFilter)
     .filter(p => roleFilter === 'all' || (roleFilter==='SP' ? p.gs > 0 : p.gs === 0))
     .filter(p => !searchQ || p.name.toLowerCase().includes(searchQ.toLowerCase()))
+    .filter(p => gradeFilter === 'all' || p._grade.label === gradeFilter)
     .sort((a,b)=>{
       const av = sortCol==='name'?(a.name||''):(a[sortCol]??99);
       const bv = sortCol==='name'?(b.name||''):(b[sortCol]??99);
@@ -5602,6 +5605,14 @@ function PitcherLeaderboard() {
       </div>
     },
     { key:'team',   label:'Team',   render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--accent2)',fontWeight:700}}>{p.team}</span> },
+    { key:'_grade', label:'Grade',  align:'center',
+      render: p => <span style={{
+        padding:'2px 8px',borderRadius:5,fontSize:10,fontWeight:700,
+        fontFamily:"'DM Mono',monospace",whiteSpace:'nowrap',
+        background:p._grade.bg, border:`1px solid ${p._grade.color}40`,
+        color:p._grade.color,
+      }}>{p._grade.label}</span>
+    },
     { key:'wins',   label:'W-L',    align:'center',
       render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:700}}>
         <span style={{color:'#27c97a'}}>{p.wins}</span>
@@ -5665,12 +5676,13 @@ function PitcherLeaderboard() {
         <button onClick={()=>{
           const esc = v => `"${String(v??'').replace(/"/g,'""')}"`;
           const role = roleFilter==='SP'?'SP':roleFilter==='RP'?'RP':'SP+RP';
-          const rows = [['Pitcher','Team','Role','W','L','ERA','WHIP','K/9','BB/9','HR/9','IP','K','HR','BAA','OBP','OPS'].map(esc).join(',')];
+          const rows = [['Pitcher','Team','Role','Grade','W','L','ERA','WHIP','K/9','BB/9','HR/9','IP','K','HR','BAA','OBP','OPS'].map(esc).join(',')];
           filtered.forEach(p => {
             const f2 = v => (v!=null&&!isNaN(v)&&v<99)?v.toFixed(2):'';
             const f3 = v => v>0?'.'+String(Math.round(v*1000)).padStart(3,'0'):'';
             rows.push([
               esc(p.name), esc(p.team), esc(p.gs>0?'SP':'RP'),
+              esc(p._grade?.label||''),
               esc(p.wins), esc(p.losses),
               esc(f2(p.era)), esc(f2(p.whip)),
               esc(f2(p.k9)), esc(f2(p.bb9)), esc(f2(p.hr9)),
@@ -5694,7 +5706,35 @@ function PitcherLeaderboard() {
         </span>
       </div>
 
-      {loading && (
+      {/* Grade filter chips */}
+      {!loading && !error && pitchers.length > 0 && (
+        <div style={{display:'flex',gap:5,marginBottom:10,alignItems:'center',flexWrap:'wrap'}}>
+          <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+            textTransform:'uppercase',letterSpacing:1,marginRight:2,whiteSpace:'nowrap'}}>
+            Grade:
+          </span>
+          {['all','‼️ Elite','⚠️ Tough','🤔 Average','💥 Hittable','🎯 Target'].map(g => {
+            const cfg = g==='all' ? null : {
+              '‼️ Elite':   {color:'#ff4020'}, '⚠️ Tough':   {color:'#ff8020'},
+              '🤔 Average': {color:'var(--muted)'}, '💥 Hittable': {color:'#27c97a'},
+              '🎯 Target':  {color:'#38b8f2'},
+            }[g];
+            const active = gradeFilter === g;
+            const col = cfg?.color || 'var(--accent2)';
+            return (
+              <button key={g} onClick={()=>setGradeFilter(g)}
+                style={{padding:'4px 11px',borderRadius:6,cursor:'pointer',transition:'all .15s',
+                  border:`1px solid ${active ? col : 'var(--border)'}`,
+                  background: active ? `${col}18` : 'var(--surface2)',
+                  color: active ? col : 'var(--muted)',
+                  fontFamily:"'DM Mono',monospace",fontSize:10,
+                  fontWeight: active ? 700 : 400}}>
+                {g === 'all' ? 'All Grades' : g}
+              </button>
+            );
+          })}
+        </div>
+      )}
         <div style={{padding:'40px 20px',textAlign:'center',color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:11,display:'flex',flexDirection:'column',alignItems:'center',gap:12}}>
           <div className="sp"/>
           Fetching pitcher stats from MLB API…
@@ -6085,9 +6125,9 @@ function MatchupEngineTab() {
     {/* Pitcher grade filter */}
     {!loading && !error && data.length > 0 && <div style={{display:'flex',gap:6,marginBottom:14,flexWrap:'wrap',alignItems:'center'}}>
       <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1}}>Pitcher:</span>
-      {['all','!! Elite','! Tough','~ Average','+ Hittable','* Target'].map(g => {
+      {['all','‼️ Elite','⚠️ Tough','🤔 Average','💥 Hittable','🎯 Target'].map(g => {
         const active = selPitcherGrade === g;
-        const col = g==='!! Elite'?'#ff4020':g==='! Tough'?'#ff8020':g==='~ Average'?'var(--muted)':g==='+ Hittable'?'#27c97a':g==='* Target'?'#38b8f2':'var(--text)';
+        const col = g==='‼️ Elite'?'#ff4020':g==='⚠️ Tough'?'#ff8020':g==='🤔 Average'?'var(--muted)':g==='💥 Hittable'?'#27c97a':g==='🎯 Target'?'#38b8f2':'var(--text)';
         return <button key={g} onClick={()=>setSelPitcherGrade(s=>s===g?'all':g)}
           style={{padding:'3px 12px',borderRadius:6,cursor:'pointer',
             background:active?'rgba(255,255,255,.08)':'transparent',
