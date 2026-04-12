@@ -1001,40 +1001,54 @@ function MyPicksTab() {
     const cfg = PICK_TYPES[p.type];
     const propVal = bprops[String(p.pid)];
     const propOpt = propVal ? BATTER_PROP_OPTS.find(o=>o.value===propVal) : null;
-    return <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderBottom:"1px solid rgba(30,45,58,.4)"}}>
-      <div style={{width:34,height:34,borderRadius:"50%",background:"var(--surface2)",
+    return <div style={{display:"flex",alignItems:"center",gap:8,padding:"9px 14px",borderBottom:"1px solid rgba(30,45,58,.4)"}}>
+      {/* Avatar */}
+      <div style={{width:32,height:32,borderRadius:"50%",background:"var(--surface2)",
         border:`2px solid ${cfg.color}`,display:"flex",alignItems:"center",justifyContent:"center",
-        fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,color:cfg.color,cursor:"pointer",flexShrink:0}}
+        fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:cfg.color,cursor:"pointer",flexShrink:0}}
         onClick={()=>openAtBatSlide(p)}>{ini(p.name)}</div>
+
+      {/* Name + team — clickable */}
       <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>openAtBatSlide(p)}>
-        <div style={{display:"flex",alignItems:"center",gap:6}}>
-          <span style={{fontWeight:600,fontSize:13,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{p.name}</span>
-          {propOpt && (
-            <span style={{
-              padding:"1px 7px",borderRadius:5,fontSize:10,fontWeight:700,flexShrink:0,
-              fontFamily:"'DM Mono',monospace",letterSpacing:.5,
-              background:`${propOpt.color === 'var(--muted)' ? 'rgba(90,112,128' : propOpt.color.startsWith('#') ? propOpt.color : 'rgba(232,65,26'},.15)`,
-              border:`1px solid ${propOpt.color}`,
-              color:propOpt.color,
-            }}>{propOpt.label}</span>
-          )}
-        </div>
-        <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",display:"flex",gap:6,alignItems:"center"}}>
+        <div style={{fontWeight:600,fontSize:11,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",letterSpacing:.2}}>{p.name}</div>
+        <div style={{fontSize:9,fontFamily:"'DM Mono',monospace",display:"flex",gap:5,alignItems:"center",marginTop:1}}>
           <span style={{color:"var(--accent2)",fontWeight:700}}>{getTeam(p.pid, p.team)}</span>
           {p.grade?.grade && <span style={{color:"var(--muted)"}}>· {p.grade.grade}</span>}
         </div>
       </div>
-      {/* Category switcher — change pick type inline */}
+
+      {/* Prop dropdown */}
+      <select
+        value={propVal}
+        onChange={e=>{e.stopPropagation();setBatterProp(p.pid,e.target.value);}}
+        onClick={e=>e.stopPropagation()}
+        style={{
+          padding:'3px 5px',flexShrink:0,
+          background: propVal ? 'rgba(0,0,0,.35)' : 'var(--surface2)',
+          border:`1px solid ${propVal ? (propOpt?.color||'var(--border)') : 'var(--border)'}`,
+          borderRadius:6,
+          color: propVal ? (propOpt?.color||'var(--text)') : 'var(--muted)',
+          fontFamily:"'DM Mono',monospace",fontSize:10,
+          fontWeight:propVal?700:400,cursor:'pointer',outline:'none',minWidth:60,
+        }}>
+        {BATTER_PROP_OPTS.map(o=>(
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+
+      {/* Pick type switcher */}
       <div style={{display:"flex",gap:3,flexShrink:0}}>
         {Object.entries(PICK_TYPES).map(([type,c])=>(
           <button key={type} onClick={()=>setPick(p.pid,p.name,p.team,type)} title={c.label}
-            style={{width:28,height:28,borderRadius:5,cursor:"pointer",fontSize:13,
+            style={{width:26,height:26,borderRadius:5,cursor:"pointer",fontSize:12,
               border:`1px solid ${p.type===type?c.color:"var(--border)"}`,
               background:p.type===type?`${c.color}20`:"var(--surface2)"}}>
             {c.label.split(" ")[0]}
           </button>
         ))}
       </div>
+
+      {/* Remove */}
       <button onClick={()=>setPick(p.pid,p.name,p.team,p.type)}
         style={{background:"none",border:"1px solid var(--border)",borderRadius:5,
           color:"var(--muted)",cursor:"pointer",padding:"2px 7px",fontSize:10,flexShrink:0}}>✕</button>
