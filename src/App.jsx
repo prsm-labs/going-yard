@@ -5219,30 +5219,29 @@ function BatterLeaderboard() {
     { key:'season2025',label:'2025',       tip:'2025 season' },
   ];
 
-  // Statcast cols that support windowing from at-bat log
-  // Statcast-only columns — windowed for both rolling and season windows
-  const SC_WIN_KEYS = new Set(['avgEV','barrel','hardHit','flyBall','gbPct','launchAngle','pa','ab']);
-  // Full-season windows pull ALL stats from the window (not just Statcast)
+  // All columns the pipeline computes per-window (Statcast + counting stats)
+  const SC_WIN_KEYS = new Set([
+    'avgEV','barrel','hardHit','flyBall','gbPct','launchAngle', // Statcast
+    'pa','ab','hr','avg','obp','slg','kPct','bbPct',            // pipeline counting stats
+  ]);
+  // Full-season windows pull ALL stats from the window
   const SEASON_WINS = new Set(['season2025','season2026']);
 
-  // Resolve a stat from the selected window with correct fallback logic:
-  // - Rolling windows (L7/L14/L30/L60): only Statcast cols are windowed;
-  //   traditional stats (BA/OBP/HR etc.) always show 2026 season from Savant
-  // - Season windows (season2025/season2026): ALL stats come from that season's window
+  // Resolve a stat from the selected window.
+  // Guard: use w.pa > 0 (window has real plate appearances) rather than
+  // w[key] !== 0 — otherwise "0 HRs this week" falls back to season total.
   const ws = (p, key) => {
     const w = p.windows?.[selectedWin];
+    const wHasData = w?.pa > 0;
     if (SEASON_WINS.has(selectedWin)) {
-      // For a full season window, use the pipeline value if it exists
-      if (w && w[key] != null && w[key] !== 0) return w[key];
-      // season2026 can fall back to top-level Savant fields (same season)
+      if (wHasData && w[key] != null) return w[key];
       if (selectedWin === 'season2026') return p[key] ?? 0;
-      // season2025 with no data — show blank (0) rather than wrong 2026 data
-      return 0;
+      return 0; // season2025 with no data → blank
     }
-    // Rolling window — only window Statcast cols, rest always from season top-level
+    // Rolling window: use pipeline value if the window has PA data
     if (!SC_WIN_KEYS.has(key)) return p[key] ?? 0;
-    if (w && w[key] != null && w[key] !== 0) return w[key];
-    return p[key] ?? 0;
+    if (wHasData && w[key] != null) return w[key];
+    return p[key] ?? 0; // fall back to season
   };
 
   // Detect whether real window data is available in the cache
