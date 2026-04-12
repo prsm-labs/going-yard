@@ -257,8 +257,8 @@ const styles = `
 // ── PLAYER DATA CACHE (module-level, persists across renders) ────
 const PLAYER_DATA_CACHE = {};
 let PLAYER_CACHE_DATE = null; // timestamp (ms) — refreshes every 3 hours
-function cachePlayer(p) { if (p.pid) PLAYER_DATA_CACHE[p.pid] = p; }
-function getCachedPlayer(pid) { return PLAYER_DATA_CACHE[pid] || null; }
+function cachePlayer(p) { if (p.pid) PLAYER_DATA_CACHE[String(p.pid)] = p; }
+function getCachedPlayer(pid) { return PLAYER_DATA_CACHE[String(pid)] || PLAYER_DATA_CACHE[parseInt(pid)] || null; }
 
 const T={
   EV_HH:95,       // Hard hit entry point
@@ -1109,6 +1109,19 @@ function AtBatSlideIn() {
 
   useEffect(() => {
     if (!player?.pid) return;
+
+    // Enrich pick objects (which only have pid/name/team/type) with
+    // full Statcast data from the cache before rendering the stat card
+    const cached = getCachedPlayer(player.pid);
+    if (cached && !player.avgEV) {
+      setPlayer(prev => ({
+        ...cached,          // all Statcast fields
+        ...prev,            // preserve pick-specific fields (type, ts)
+        name:  prev.name  || cached.name,
+        team:  prev.team  || cached.team,
+      }));
+    }
+
     setAtBats([]);
     setLoading(true);
     setLoading(true);
@@ -1187,23 +1200,36 @@ function AtBatSlideIn() {
       {/* Statcast Profile */}
       <div style={{padding:"14px 20px",borderBottom:"1px solid var(--border)"}}>
         <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>Statcast Profile — 2026 Season</div>
+        {!player.avgEV && !player.obp ? (
+          <div style={{fontSize:11,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>
+            Loading stats… if this persists, visit the Batters tab first to prime the cache.
+          </div>
+        ) : (
         <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
           {[
-            {label:"Avg EV",  val:player.avgEV,   suffix:"",  color: player.avgEV>=103?"var(--accent)":player.avgEV>=95?"#ff8020":"var(--text)"},
-            {label:"Barrel%", val:player.barrel,  suffix:"%", color: player.barrel>=12?"#ff8020":"var(--text)"},
-            {label:"HardHit%",val:player.hardHit, suffix:"%", color: player.hardHit>=50?"#ff8020":"var(--text)"},
-            {label:"FlyBall%",val:player.flyBall, suffix:"%", color:"var(--text)"},
-            {label:"Launch°", val:player.launchAngle, suffix:"°", color: player.launchAngle>=25&&player.launchAngle<=35?"var(--green)":"var(--text)"},
-            
-            {label:"xwOBA",   val:player.xwoba,   suffix:"",  color: player.xwoba>=0.380?"var(--accent)":player.xwoba>=0.320?"#ff8020":"var(--text)"},
-            {label:"Chase%",  val:player.oSwing,  suffix:"%", color: player.oSwing<=20?"var(--green)":player.oSwing>=30?"#ff8020":"var(--text)"},
-          ].filter(s=>s.val>0).map(s=>(
-            <div key={s.label} style={{background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8,padding:"8px 12px",minWidth:70,textAlign:"center"}}>
+            {label:"Avg EV",   val:player.avgEV,        suffix:"",   color: player.avgEV>=92?"var(--accent)":player.avgEV>=88?"#ff8020":"var(--text)"},
+            {label:"Barrel%",  val:player.barrel,       suffix:"%",  color: player.barrel>=12?"#ff4020":player.barrel>=8?"#ff8020":player.barrel>=5?"#f5a623":"var(--text)"},
+            {label:"HardHit%", val:player.hardHit,      suffix:"%",  color: player.hardHit>=50?"#ff4020":player.hardHit>=42?"#ff8020":"var(--text)"},
+            {label:"FB%",      val:player.flyBall,      suffix:"%",  color:"var(--text)"},
+            {label:"GB%",      val:player.gbPct,        suffix:"%",  color:"var(--muted)"},
+            {label:"Launch°",  val:player.launchAngle,  suffix:"°",  color: player.launchAngle>=20&&player.launchAngle<=35?"var(--green)":"var(--text)"},
+            {label:"BA",       val:player.avg,          suffix:"",   fmt: v=>v>0?'.'+String(Math.round(v*1000)).padStart(3,'0'):'—', color: player.avg>=0.300?"var(--accent)":player.avg>=0.260?"#ff8020":"var(--text)"},
+            {label:"OBP",      val:player.obp,          suffix:"",   fmt: v=>v>0?'.'+String(Math.round(v*1000)).padStart(3,'0'):'—', color: player.obp>=0.370?"var(--accent)":player.obp>=0.330?"#ff8020":"var(--text)"},
+            {label:"SLG",      val:player.slg,          suffix:"",   fmt: v=>v>0?'.'+String(Math.round(v*1000)).padStart(3,'0'):'—', color: player.slg>=0.500?"var(--accent)":player.slg>=0.420?"#ff8020":"var(--text)"},
+            {label:"xwOBA",    val:player.xwoba,        suffix:"",   fmt: v=>v>0?v.toFixed(3):'—', color: player.xwoba>=0.380?"var(--accent)":player.xwoba>=0.320?"#ff8020":"var(--text)"},
+            {label:"Chase%",   val:player.oSwing,       suffix:"%",  color: player.oSwing<=20?"var(--green)":player.oSwing>=30?"#ff8020":"var(--text)"},
+            {label:"K%",       val:player.kPct,         suffix:"%",  color: player.kPct>=28?"var(--ice)":"var(--muted)"},
+            {label:"BB%",      val:player.bbPct,        suffix:"%",  color: player.bbPct>=12?"#27c97a":"var(--muted)"},
+          ].filter(s => s.val != null && s.val > 0).map(s=>(
+            <div key={s.label} style={{background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8,padding:"8px 12px",minWidth:64,textAlign:"center"}}>
               <div style={{fontSize:8,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>{s.label}</div>
-              <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:18,color:s.color}}>{typeof s.val==="number"?s.val.toFixed(1):s.val}{s.suffix}</div>
+              <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:17,color:s.color}}>
+                {s.fmt ? s.fmt(s.val) : (typeof s.val==="number" ? s.val.toFixed(1) : s.val)}{s.fmt ? '' : s.suffix}
+              </div>
             </div>
           ))}
         </div>
+        )}
       </div>
 
       {/* Recent Game Log */}
