@@ -5260,7 +5260,7 @@ function BatterLeaderboard() {
   };
 
   const filtered = allPlayers
-    .filter(p => (p.pa || 0) >= minPA)
+    .filter(p => (ws(p,'pa') || 0) >= minPA)
     .filter(p => teamFilter === 'all' || p.team === teamFilter)
     .filter(p => !searchQ || p.name?.toLowerCase().includes(searchQ.toLowerCase()))
     .filter(p => !showPicksOnly || picks[String(p.pid)])
