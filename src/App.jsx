@@ -1143,10 +1143,14 @@ function AtBatSlideIn() {
         return games;
       })
       .then(games => {
-        const rows = games.slice(0,20).map(g => ({
+        // MLB Stats API returns oldest→newest — reverse for most recent first
+        const sorted = [...games].reverse();
+        // ID → abbreviation map so opponent shows NYM not MET, DET not TIG, etc.
+        const OPP_ABBR = {133:'OAK',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',139:'TB',140:'TEX',141:'TOR',142:'MIN',143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL',108:'LAA',109:'ARI',110:'BAL',111:'BOS',112:'CHC',113:'CIN',114:'CLE',115:'COL',116:'DET',117:'HOU',118:'KC',119:'LAD',120:'WSH',121:'NYM'};
+        const rows = sorted.slice(0,20).map(g => ({
           date: g.date?.slice(5) || "—",
-          opp:  g.opponent?.abbreviation ||
-                (g.opponent?.name||"").split(" ").pop()?.slice(0,3).toUpperCase() || "—",
+          opp:  OPP_ABBR[g.opponent?.id] ||
+                g.opponent?.abbreviation || "—",
           ab:   parseInt(g.stat?.atBats||0),
           hits: parseInt(g.stat?.hits||0),
           hr:   parseInt(g.stat?.homeRuns||0),
