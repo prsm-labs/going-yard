@@ -986,6 +986,67 @@ function PitcherTab() {
 }
 
 
+function ClearButton() {
+  const [open, setOpen] = useState(false);
+  const bprops = useBatterProps();
+  const hasProps = Object.keys(bprops).length > 0;
+  const clearPicks = () => {
+    Object.keys(GLOBAL_PICKS).forEach(k=>delete GLOBAL_PICKS[k]);
+    savePicks(GLOBAL_PICKS);
+    PICKS_LISTENERS.forEach(fn=>fn({...GLOBAL_PICKS}));
+  };
+  const clearProps = () => {
+    Object.keys(GLOBAL_BPROPS).forEach(k=>delete GLOBAL_BPROPS[k]);
+    saveBatterProps(GLOBAL_BPROPS);
+    BPROP_LISTENERS.forEach(fn=>fn({...GLOBAL_BPROPS}));
+  };
+  return (
+    <div style={{position:'relative',display:'inline-flex',flexShrink:0}}>
+      <button onClick={clearPicks}
+        style={{padding:"5px 10px",borderRadius:"6px 0 0 6px",
+          background:"rgba(232,65,26,.1)",border:"1px solid rgba(232,65,26,.3)",
+          borderRight:'none',color:"var(--accent)",cursor:"pointer",
+          fontFamily:"'DM Mono',monospace",fontSize:11}}>
+        ✕ Clear Picks
+      </button>
+      <button onClick={()=>setOpen(o=>!o)}
+        style={{padding:"5px 8px",borderRadius:"0 6px 6px 0",
+          background:"rgba(232,65,26,.1)",border:"1px solid rgba(232,65,26,.3)",
+          color:"var(--accent)",cursor:"pointer",fontSize:11,lineHeight:1}}>
+        ▾
+      </button>
+      {open && <>
+        <div onClick={()=>setOpen(false)} style={{position:'fixed',inset:0,zIndex:9998}}/>
+        <div style={{position:'absolute',top:'calc(100% + 4px)',right:0,zIndex:9999,
+          background:'#0d1318',border:'1px solid rgba(232,65,26,.3)',borderRadius:8,
+          padding:5,display:'flex',flexDirection:'column',gap:3,minWidth:160,
+          boxShadow:'0 8px 24px rgba(0,0,0,.7)'}}>
+          <button onClick={()=>{clearPicks();setOpen(false);}}
+            style={{padding:'7px 12px',borderRadius:5,cursor:'pointer',textAlign:'left',
+              fontFamily:"'DM Mono',monospace",fontSize:11,
+              border:'1px solid transparent',background:'transparent',color:'var(--accent)'}}>
+            ✕ Clear Picks only
+          </button>
+          <button onClick={()=>{clearProps();setOpen(false);}}
+            style={{padding:'7px 12px',borderRadius:5,cursor:'pointer',textAlign:'left',
+              fontFamily:"'DM Mono',monospace",fontSize:11,
+              border:'1px solid transparent',background:'transparent',
+              color:'#f5a623',opacity:hasProps?1:.4,cursor:hasProps?'pointer':'default'}}>
+            ✕ Clear Props only
+          </button>
+          <div style={{borderTop:'1px solid var(--border)',margin:'3px 0'}}/>
+          <button onClick={()=>{clearPicks();clearProps();setOpen(false);}}
+            style={{padding:'7px 12px',borderRadius:5,cursor:'pointer',textAlign:'left',
+              fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:700,
+              border:'1px solid transparent',background:'transparent',color:'var(--text)'}}>
+            ✕ Clear Both
+          </button>
+        </div>
+      </>}
+    </div>
+  );
+}
+
 function MyPicksTab() {
   const picks = usePicks();
   const bprops = useBatterProps();
@@ -1079,10 +1140,7 @@ function MyPicksTab() {
       }} style={{padding:"5px 12px",borderRadius:6,background:"rgba(56,184,242,.1)",
         border:"1px solid rgba(56,184,242,.3)",color:"var(--ice)",cursor:"pointer",
         fontFamily:"'DM Mono',monospace",fontSize:11}}>⬇ Export CSV</button>
-      <button onClick={()=>{Object.keys(GLOBAL_PICKS).forEach(k=>delete GLOBAL_PICKS[k]);savePicks(GLOBAL_PICKS);PICKS_LISTENERS.forEach(fn=>fn({...GLOBAL_PICKS}));}}
-        style={{padding:"5px 12px",borderRadius:6,background:"rgba(232,65,26,.1)",
-          border:"1px solid rgba(232,65,26,.3)",color:"var(--accent)",cursor:"pointer",
-          fontFamily:"'DM Mono',monospace",fontSize:11}}>✕ Clear All Picks</button>
+      <ClearButton/>
     </div>}
     {pickList.length===0
       ? <div style={{padding:"60px 20px",textAlign:"center",color:"var(--muted)",fontFamily:"'DM Mono',monospace",fontSize:12,lineHeight:2}}>
