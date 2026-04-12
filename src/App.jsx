@@ -5232,7 +5232,7 @@ function BatterLeaderboard() {
   // w[key] !== 0 — otherwise "0 HRs this week" falls back to season total.
   const ws = (p, key) => {
     const w = p.windows?.[selectedWin];
-    const wHasData = w?.pa > 0;
+    const wHasData = (w?.pa || w?.atBats) > 0;
     if (SEASON_WINS.has(selectedWin)) {
       if (wHasData && w[key] != null) return w[key];
       if (selectedWin === 'season2026') return p[key] ?? 0;
