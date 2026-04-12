@@ -5260,7 +5260,16 @@ function BatterLeaderboard() {
   };
 
   const filtered = allPlayers
-    .filter(p => (ws(p,'pa') || 0) >= minPA)
+    .filter(p => {
+      // For season2025: player must have actual 2025 pipeline data — no fallback
+      // This eliminates 2026 rookies, minPA=0 edge case, and unpopulated pipeline data
+      if (selectedWin === 'season2025') {
+        const w25 = p.windows?.season2025;
+        if (!w25 || !w25.pa) return false;
+        return w25.pa >= Math.max(minPA, 1);
+      }
+      return (ws(p,'pa') || 0) >= minPA;
+    })
     .filter(p => teamFilter === 'all' || p.team === teamFilter)
     .filter(p => !searchQ || p.name?.toLowerCase().includes(searchQ.toLowerCase()))
     .filter(p => !showPicksOnly || picks[String(p.pid)])
@@ -5413,6 +5422,19 @@ function BatterLeaderboard() {
         <div style={{padding:'40px 20px',textAlign:'center',color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:11}}>
           <div className="sp" style={{margin:'0 auto 12px'}}/>
           Loading Statcast data… loads at app startup
+        </div>
+      ) : selectedWin === 'season2025' && !hasSeason2025 ? (
+        <div style={{padding:'32px 20px',textAlign:'center',background:'rgba(245,166,35,.06)',
+          border:'1px solid rgba(245,166,35,.2)',borderRadius:9,
+          fontFamily:"'DM Mono',monospace",fontSize:11,color:'#f5a623',lineHeight:1.8}}>
+          ⚠ No 2025 season data in cache<br/>
+          <span style={{color:'var(--muted)',fontSize:10}}>
+            Re-run mlbdata_aggregate.py to populate season2025 window data, then commit players.json
+          </span>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div style={{padding:'24px 20px',textAlign:'center',color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:11}}>
+          No batters match current filters
         </div>
       ) : (
         <div className="tw">
