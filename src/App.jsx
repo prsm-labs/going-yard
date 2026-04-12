@@ -1047,12 +1047,14 @@ function MyPicksTab() {
     </div>
     {pickList.length>0&&<div style={{display:"flex",justifyContent:"flex-end",gap:8,marginBottom:12}}>
       <button onClick={()=>{
-        // Export picks to CSV — Pick Type, Team, Batter Name
-        const rows = [["Pick Type","Team","Batter Name"]];
+        // Export picks to CSV — Pick Type, Team, Batter Name, Prop
+        const rows = [["Pick Type","Team","Batter Name","Prop"]];
         pickList.forEach(p=>{
           const cfg = PICK_TYPES[p.type];
           const typeName = cfg?.label?.split(" ").slice(1).join(" ") || p.type;
-          rows.push([typeName, p.team||"-", p.name||"-"]);
+          const propVal = GLOBAL_BPROPS[String(p.pid)] || "";
+          const propOpt = propVal ? BATTER_PROP_OPTS.find(o=>o.value===propVal) : null;
+          rows.push([typeName, p.team||"-", p.name||"-", propOpt?.label||""]);
         });
         const csv = rows.map(r=>r.map(c=>`"${c}"`).join(",")).join("\n");
         const blob = new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
@@ -1137,24 +1139,14 @@ function AtBatSlideIn() {
     };
     fetchGameLog(player.pid, 2026)
       .then(async games => {
-        // If no 2026 games yet, try 2025
         if (games.length === 0) games = await fetchGameLog(player.pid, 2025);
         return games;
       })
       .then(games => {
-        const games2 = games;
-        // Flatten to at-bat level from game log
-        const rows = games2.slice(0,15).map(g => ({
+        const rows = games.slice(0,20).map(g => ({
           date: g.date?.slice(5) || "—",
-          // MLB gameLog: opponent.id maps to TEAM_ID_TO_ABB
-          opp: TEAM_ID_TO_ABB[g.opponent?.id] ||
-               g.opponent?.abbreviation ||
-               (() => {
-                 const name = g.opponent?.name || "";
-                 const found = Object.entries(TEAM_IDS).find(([,v]) => v === g.opponent?.id);
-                 if (found) return found[0];
-                 return name.split(" ").pop()?.slice(0,3).toUpperCase() || "—";
-               })(),
+          opp:  g.opponent?.abbreviation ||
+                (g.opponent?.name||"").split(" ").pop()?.slice(0,3).toUpperCase() || "—",
           ab:   parseInt(g.stat?.atBats||0),
           hits: parseInt(g.stat?.hits||0),
           hr:   parseInt(g.stat?.homeRuns||0),
@@ -1191,7 +1183,13 @@ function AtBatSlideIn() {
         <PosAvatar player={player} size={40} style={{border:"2px solid var(--accent)"}}/>
         <div style={{flex:1}}>
           <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:18,letterSpacing:1}}>{player.name}</div>
-          <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{player.team} · EV {player.avgEV||"—"} · {player.grade?.grade||"—"} Grade</div>
+          <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>
+            {player.team}
+            {player.avgEV > 0 && <span> · EV {player.avgEV.toFixed(1)}</span>}
+            {player.hr > 0  && <span style={{color:'var(--accent)',fontWeight:700}}> · {player.hr} HR</span>}
+            {player.avg > 0 && <span> · {'.'+String(Math.round(player.avg*1000)).padStart(3,'0')} AVG</span>}
+            {player.grade?.grade && <span> · {player.grade.grade} Grade</span>}
+          </div>
         </div>
         <PickButton pid={player.pid} name={player.name} team={player.team}/>
         <button onClick={()=>setPlayer(null)} style={{background:"none",border:"1px solid var(--border)",borderRadius:6,color:"var(--muted)",cursor:"pointer",padding:"5px 10px",fontFamily:"'DM Mono',monospace",fontSize:11}}>✕ Close</button>
@@ -2072,12 +2070,13 @@ async function fetchGames(setL, setG, setE, silent=false) {
       // Team abbreviation — try every possible path
       const awTeam = aw?.team || {};
       const hmTeam = hm?.team || {};
+      const _tAbbr = id => ({133:'OAK',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',139:'TB',140:'TEX',141:'TOR',142:'MIN',143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL',108:'LAA',109:'ARI',110:'BAL',111:'BOS',112:'CHC',113:'CIN',114:'CLE',115:'COL',116:'DET',117:'HOU',118:'KC',119:'LAD',120:'WSH',121:'NYM'})[id] || '???';
       const awAbbr = awTeam.abbreviation || awTeam.teamCode?.toUpperCase() ||
                      (awTeam.teamName ? awTeam.teamName.slice(0,3).toUpperCase() : null) ||
-                     TEAM_ID_TO_ABB[awTeam.id] || "???";
+                     _tAbbr(awTeam.id);
       const hmAbbr = hmTeam.abbreviation || hmTeam.teamCode?.toUpperCase() ||
                      (hmTeam.teamName ? hmTeam.teamName.slice(0,3).toUpperCase() : null) ||
-                     TEAM_ID_TO_ABB[hmTeam.id] || "???";
+                     _tAbbr(hmTeam.id);
       // Venue for home/away context
       const venue = g.venue?.name || "";
       // Probable pitchers
@@ -2462,7 +2461,8 @@ async function fetchRealPitcher(game, side) {
   const base = { name: name || `${ta} Starter`, hand: hand==="L"?"LHP":"RHP", team:ta, era:"—", whip:"—", fbVelo:0, pitchMix:[], loading:false };
   if (!name) return base;
   try {
-    const teamId = TEAM_IDS[ta];
+    const _TIDS = {ARI:109,ATL:144,BAL:110,BOS:111,CHC:112,CWS:145,CIN:113,CLE:114,COL:115,DET:116,HOU:117,KC:118,LAA:108,LAD:119,MIA:146,MIL:158,MIN:142,NYM:121,NYY:147,OAK:133,PHI:143,PIT:134,SD:135,SEA:136,SF:137,STL:138,TB:139,TEX:140,TOR:141,WSH:120};
+    const teamId = _TIDS[ta];
     if (!teamId) return base;
     const rRes = await fetch(`https://statsapi.mlb.com/api/v1/teams/${teamId}/roster?rosterType=active&season=2026`);
     const rData = await rRes.json();
@@ -2762,7 +2762,14 @@ function XRow({b}) {
 
 function LRow({b, rank}) {
   const vc = b.verdict.cls==="primed"?"#ff4020":b.verdict.cls==="hot"?"#ff8020":b.verdict.cls==="watch"?"#ffc840":"#38b8f2";
-  return <div className="lr">
+  const handleClick = () => {
+    const cached = getCachedPlayer(b.id);
+    openAtBatSlide(cached
+      ? {...cached, name: b.name, team: b.team}
+      : {pid: b.id, name: b.name, team: b.team, avgEV: b.avgEV, barrel: b.barrel, hardHit: b.hardHit, flyBall: b.flyBall, hr: b.hr}
+    );
+  };
+  return <div className="lr" style={{cursor:'pointer'}} onClick={handleClick}>
     <div className="lrk" style={{color:rank<=3?vc:"var(--muted)"}}>{rank}</div>
     <SRing score={b.liftoffScore} color={vc}/>
     <div className="li">
@@ -5245,6 +5252,34 @@ function BatterLeaderboard() {
             whiteSpace:'nowrap',transition:'all .15s'}}>
           🎯 {showPicksOnly ? 'My Picks ✓' : 'My Picks'}
         </button>
+        <button onClick={()=>{
+          const esc = v => `"${String(v??'').replace(/"/g,'""')}"`;
+          const hdrs = ['Team','PA','Avg EV','Brl%','HH%','FB%','GB%','Avg LA','BA','OBP','SLG','OPS','HR','K%','BB%'];
+          const rows = [['Batter','Prop',...hdrs].map(esc).join(',')];
+          filtered.forEach(p => {
+            const propVal = bprops[String(p.pid)]||'';
+            const propOpt = propVal ? BATTER_PROP_OPTS.find(o=>o.value===propVal) : null;
+            const f3 = v => v>0?'.'+String(Math.round(v*1000)).padStart(3,'0'):'';
+            const f1 = v => v>0?v.toFixed(1):'';
+            rows.push([
+              esc(p.name), esc(propOpt?.label||''),
+              esc(p.team||''), esc(p.pa||0),
+              esc(f1(p.avgEV)), esc(f1(p.barrel)), esc(f1(p.hardHit)),
+              esc(f1(p.flyBall)), esc(f1(p.gbPct)), esc(f1(p.launchAngle)),
+              esc(f3(p.avg)), esc(f3(p.obp)), esc(f3(p.slg)), esc(f3(p.ops)),
+              esc(p.hr||0), esc(f1(p.kPct)), esc(f1(p.bbPct)),
+            ].join(','));
+          });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(new Blob(['\uFEFF'+rows.join('\n')],{type:'text/csv;charset=utf-8;'}));
+          a.download = `batters-${selectedWin}-${new Date().toISOString().slice(0,10)}.csv`;
+          a.click();
+        }} style={{padding:'6px 11px',borderRadius:7,cursor:'pointer',
+          border:'1px solid var(--border)',background:'var(--surface2)',
+          color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:11,
+          whiteSpace:'nowrap',transition:'all .15s'}} title="Export current view to CSV">
+          ⬇ CSV
+        </button>
         <span style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace",whiteSpace:'nowrap'}}>
           {filtered.length} batters
         </span>
@@ -5529,6 +5564,33 @@ function PitcherLeaderboard() {
             {[0,5,10,20,30,50,75].map(v=><option key={v} value={v}>{v===0?'No min':v+'+'}</option>)}
           </select>
         </div>
+        <button onClick={()=>{
+          const esc = v => `"${String(v??'').replace(/"/g,'""')}"`;
+          const role = roleFilter==='SP'?'SP':roleFilter==='RP'?'RP':'SP+RP';
+          const rows = [['Pitcher','Team','Role','W','L','ERA','WHIP','K/9','BB/9','HR/9','IP','K','HR','BAA','OBP','OPS'].map(esc).join(',')];
+          filtered.forEach(p => {
+            const f2 = v => (v!=null&&!isNaN(v)&&v<99)?v.toFixed(2):'';
+            const f3 = v => v>0?'.'+String(Math.round(v*1000)).padStart(3,'0'):'';
+            rows.push([
+              esc(p.name), esc(p.team), esc(p.gs>0?'SP':'RP'),
+              esc(p.wins), esc(p.losses),
+              esc(f2(p.era)), esc(f2(p.whip)),
+              esc(f2(p.k9)), esc(f2(p.bb9)), esc(f2(p.hr9)),
+              esc(p.ipDisplay||f2(p.ip)),
+              esc(p.so), esc(p.hr),
+              esc(f3(p.avg)), esc(f3(p.obp)), esc(f3(p.ops)),
+            ].join(','));
+          });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(new Blob(['\uFEFF'+rows.join('\n')],{type:'text/csv;charset=utf-8;'}));
+          a.download = `pitchers-${role}-${new Date().toISOString().slice(0,10)}.csv`;
+          a.click();
+        }} style={{padding:'6px 11px',borderRadius:7,cursor:'pointer',
+          border:'1px solid var(--border)',background:'var(--surface2)',
+          color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:11,
+          whiteSpace:'nowrap',transition:'all .15s'}} title="Export current view to CSV">
+          ⬇ CSV
+        </button>
         <span style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace",whiteSpace:'nowrap'}}>
           {filtered.length} pitchers
         </span>
