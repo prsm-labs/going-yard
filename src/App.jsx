@@ -1175,6 +1175,7 @@ function AtBatSlideIn() {
   const [player, setPlayer] = useState(null);
   const [atBats, setAtBats] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [apiHr, setApiHr] = useState(null); // correct HR count from MLB Stats API
 
   useEffect(() => {
     AB_SLIDE_LISTENER = setPlayer;
@@ -1197,9 +1198,22 @@ function AtBatSlideIn() {
     }
 
     setAtBats([]);
+    setApiHr(null);
     setLoading(true);
     setLoading(true);
     setAtBats([]);
+
+    const season = new Date().getFullYear();
+
+    // Fetch real season HR from MLB Stats API — ground truth, bypasses pipeline ID issues
+    fetch(`https://statsapi.mlb.com/api/v1/people/${player.pid}/stats?stats=season&group=hitting&season=${season}&sportId=1`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        const hr = d?.stats?.[0]?.splits?.[0]?.stat?.homeRuns;
+        if (hr != null) setApiHr(parseInt(hr));
+      })
+      .catch(() => {});
+
     // Fetch real at-bat log from Baseball Savant statcast search
     const today = new Date().toLocaleDateString("en-US",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"}).split("/");
     const dateStr = `${today[2]}-${today[0]}-${today[1]}`;
@@ -1262,7 +1276,7 @@ function AtBatSlideIn() {
           <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>
             {player.team}
             {player.avgEV > 0 && <span> · EV {player.avgEV.toFixed(1)}</span>}
-            {player.hr > 0  && <span style={{color:'var(--accent)',fontWeight:700}}> · {player.hr} HR</span>}
+            {(apiHr != null ? apiHr : player.hr) > 0 && <span style={{color:'var(--accent)',fontWeight:700}}> · {apiHr != null ? apiHr : player.hr} HR</span>}
             {player.avg > 0 && <span> · {'.'+String(Math.round(player.avg*1000)).padStart(3,'0')} AVG</span>}
             {player.grade?.grade && <span> · {player.grade.grade} Grade</span>}
           </div>
