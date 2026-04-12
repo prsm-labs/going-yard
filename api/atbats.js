@@ -64,6 +64,15 @@ export default async function handler(req, res) {
 }
 
 function normalizePlayer(p) {
+  // App.jsx fetchPlayers reads barrelPct / hardHitPct (not barrel / hardHit)
+  // players.json stores them as barrel / hardHit — expose both names so either
+  // consumer finds what it expects without a mismatch.
+  const barrel   = p.barrel   || p.barrelPct   || 0;
+  const hardHit  = p.hardHit  || p.hardHitPct  || 0;
+  const gbPct    = p.gbPct    || 0;
+  const obp      = p.obp      || 0;
+  const slg      = p.slg      || 0;
+
   return {
     pid:          p.pid,
     team:         p.team          || '—',
@@ -71,8 +80,14 @@ function normalizePlayer(p) {
     pos:          p.pos           || '',
     avgEV:        p.avgEV         || 0,
     maxEV:        p.maxEV         || 0,
-    barrel:       p.barrel        || 0,
-    hardHit:      p.hardHit       || 0,
+    // Both naming conventions — App.jsx primary path reads barrelPct/hardHitPct
+    barrel,
+    barrelPct:    barrel,
+    hardHit,
+    hardHitPct:   hardHit,
+    gbPct,
+    obp,
+    slg,
     sweetSpot:    p.sweetSpot     || 0,
     launchAngle:  p.launchAngle   || 0,
     flyBall:      p.flyBall       || 0,
