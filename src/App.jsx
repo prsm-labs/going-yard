@@ -2007,7 +2007,8 @@ async function fetchPlayers(setL, setP, setE, silent=false) {
       }
     });
 
-    // ── STEP 6: Enrich with real HR counts from MLB Stats API ─
+    // ── STEP 6: Enrich HR counts from MLB Stats API only for players
+    // where the pipeline didn't provide a value (Savant fallback path)
     try {
       const hrRes = await fetch(
         'https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&season=2026&sportId=1&limit=500&statType=season'
@@ -2020,9 +2021,10 @@ async function fetchPlayers(setL, setP, setE, silent=false) {
         }
       }
       mapped.forEach(p => {
-        if (hrMap[p.pid]) {
+        // Only overwrite if pipeline gave us 0 — pipeline value is more accurate
+        // (pipeline counts from the actual at-bat log, API is leaders-only and may lag)
+        if (hrMap[p.pid] && (!p.hr || p.hr === 0)) {
           p.hr = hrMap[p.pid];
-          // Recalculate HRI with real HR count
           p.hri = calcHRI(p);
           p.os  = calcOS(p);
           p.grade = getSG(p.os);
@@ -2034,26 +2036,31 @@ async function fetchPlayers(setL, setP, setE, silent=false) {
     // ── Kick off async real window fetches in background ──────
     // These update the counting stats (H, AB, HR per window) from game logs
     // without blocking the initial render
+    const WIN_KEY_MAP = {3:'last7',7:'last7',14:'last14',15:'last14',30:'last30',60:'last60'};
     mapped.slice(0, 50).forEach(p => {
       if (p.pid) {
         fetchRealWindows(p.pid).then(realWin => {
           if (!realWin) return;
           const cached = getCachedPlayer(p.pid);
           if (!cached) return;
-          [3,7,15,30].forEach(w => {
-            if (realWin[w] && cached.windows?.[w]) {
-              Object.assign(cached.windows[w], {
-                hits:       realWin[w].hits,
-                hr:         realWin[w].hr,
-                atBats:     realWin[w].ab,
-                xbh:        realWin[w].xbh,
-                tb:         realWin[w].tb,
-                avg:        parseFloat(realWin[w].avg),
-                bbPct:      realWin[w].bbPct,
-                kPct:       realWin[w].kPct,
-                abPerHR:    realWin[w].abPerHR,
-                abSinceHR:  realWin[w].abSinceHR,
-                games:      realWin[w].games,
+          // realWin may have numeric keys (3,7,14,30) — map to string keys
+          Object.entries(realWin).forEach(([k, wData]) => {
+            const winKey = WIN_KEY_MAP[parseInt(k)] || (isNaN(k) ? k : null);
+            if (!winKey || !wData) return;
+            if (!cached.windows) cached.windows = {};
+            if (cached.windows[winKey]) {
+              Object.assign(cached.windows[winKey], {
+                hits:      wData.hits,
+                hr:        wData.hr,
+                atBats:    wData.ab,
+                xbh:       wData.xbh,
+                tb:        wData.tb,
+                avg:       parseFloat(wData.avg),
+                bbPct:     wData.bbPct,
+                kPct:      wData.kPct,
+                abPerHR:   wData.abPerHR,
+                abSinceHR: wData.abSinceHR,
+                games:     wData.games,
               });
             }
           });
@@ -5219,7 +5226,7 @@ function BatterLeaderboard() {
 
   // Statcast cols that support windowing from at-bat log
   // Statcast-only columns — windowed for both rolling and season windows
-  const SC_WIN_KEYS = new Set(['avgEV','barrel','hardHit','flyBall','gbPct','launchAngle']);
+  const SC_WIN_KEYS = new Set(['avgEV','barrel','hardHit','flyBall','gbPct','launchAngle','pa','ab']);
   // Full-season windows pull ALL stats from the window (not just Statcast)
   const SEASON_WINS = new Set(['season2025','season2026']);
 
@@ -5284,7 +5291,7 @@ function BatterLeaderboard() {
   // Statcast cols use ws() for window-aware values; traditional stats always season
   const STAT_COLS = [
     { key:'team',       label:'Team',   render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--accent2)',fontWeight:700}}>{p.team||'—'}</span> },
-    { key:'pa',         label:'PA',     render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{p.pa||0}</span> },
+    { key:'pa',         label:'PA',     render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{ws(p,'pa')||0}</span> },
     { key:'avgEV',      label:'Avg EV', render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:700,color:evCol(ws(p,'avgEV'))}}>{fmtEV(ws(p,'avgEV'))}</span> },
     { key:'barrel',     label:'Brl%',   render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:brlCol(ws(p,'barrel'))}}>{fmtPct(ws(p,'barrel'))}</span> },
     { key:'hardHit',    label:'HH%',    render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:hhCol(ws(p,'hardHit'))}}>{fmtPct(ws(p,'hardHit'))}</span> },
