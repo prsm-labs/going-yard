@@ -5028,7 +5028,6 @@ function BatterLeaderboard() {
   const [teamFilter, setTeamFilter] = useState('all');
   const [searchQ, setSearchQ] = useState('');
   const [minPA, setMinPA] = useState(10);
-  const [selectedWin, setSelectedWin] = useState('season'); // season | last7 | last14 | last30
   const [players, setPlayers] = useState([]);
   const picks = usePicks();
 
@@ -5049,20 +5048,6 @@ function BatterLeaderboard() {
     }
   }, []);
 
-  // Resolve a stat for a player, using the selected window when available,
-  // falling back to season value. Windows only carry Statcast metrics.
-  const ws = (p, key) => {
-    if (selectedWin === 'season') return p[key] ?? 0;
-    const w = p.windows?.[selectedWin];
-    // window keys match players.json window field names
-    const WIN_KEY_MAP = {
-      avgEV:'avgEV', barrel:'barrel', hardHit:'hardHit',
-      flyBall:'flyBall', gbPct:'gbPct', launchAngle:'launchAngle',
-    };
-    const wKey = WIN_KEY_MAP[key];
-    if (w && wKey && w[wKey] != null) return w[wKey];
-    return p[key] ?? 0; // fall back to season
-  };
 
   const allPlayers = players;
   const teams = [...new Set(allPlayers.map(p => p.team).filter(t => t && t !== '—'))].sort();
@@ -5077,8 +5062,8 @@ function BatterLeaderboard() {
     .filter(p => teamFilter === 'all' || p.team === teamFilter)
     .filter(p => !searchQ || p.name?.toLowerCase().includes(searchQ.toLowerCase()))
     .sort((a, b) => {
-      const av = sortCol === 'name' ? (a.name||'') : ws(a, sortCol) ?? (a[sortCol] ?? 0);
-      const bv = sortCol === 'name' ? (b.name||'') : ws(b, sortCol) ?? (b[sortCol] ?? 0);
+      const av = sortCol === 'name' ? (a.name||'') : (a[sortCol] ?? 0);
+      const bv = sortCol === 'name' ? (b.name||'') : (b[sortCol] ?? 0);
       if (typeof av === 'string') return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
       return sortDir === 'desc' ? bv - av : av - bv;
     });
@@ -5095,10 +5080,6 @@ function BatterLeaderboard() {
   const opsCol = v => v >= 1.0 ? '#ff4020' : v >= .900 ? '#ff8020' : v >= .800 ? '#f5a623' : 'var(--text)';
   const hrCol  = v => v >= 15 ? '#ff4020' : v >= 10 ? '#f5a623' : 'var(--text)';
 
-  const WIN_LABELS = { season:'This Season', last7:'Last 7D', last14:'Last 14D', last30:'Last 30D' };
-  // Statcast cols that support window switching
-  const SC_COLS = new Set(['avgEV','barrel','hardHit','flyBall','gbPct','launchAngle']);
-
   const COLS = [
     { key:'name',        label:'Batter',  align:'left',
       render: p => <div style={{display:'flex',alignItems:'center',gap:7}}>
@@ -5111,12 +5092,12 @@ function BatterLeaderboard() {
     },
     { key:'team',      label:'Team',  render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--accent2)',fontWeight:700}}>{p.team||'—'}</span> },
     { key:'pa',        label:'PA',    render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{p.pa||0}</span> },
-    { key:'avgEV',     label:'Avg EV',render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:700,color:evCol(ws(p,'avgEV'))}}>{fmtEV(ws(p,'avgEV'))}</span> },
-    { key:'barrel',    label:'Brl%',  render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:brlCol(ws(p,'barrel'))}}>{fmtPct(ws(p,'barrel'))}</span> },
-    { key:'hardHit',   label:'HH%',   render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:hhCol(ws(p,'hardHit'))}}>{fmtPct(ws(p,'hardHit'))}</span> },
-    { key:'flyBall',   label:'FB%',   render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{fmtPct(ws(p,'flyBall'))}</span> },
-    { key:'gbPct',     label:'GB%',   render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--muted)'}}>{fmtPct(ws(p,'gbPct'))}</span> },
-    { key:'launchAngle',label:'Avg LA',render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{fmtLA(ws(p,'launchAngle'))}</span> },
+    { key:'avgEV',     label:'Avg EV',render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:700,color:evCol((p.avgEV ?? 0))}}>{fmtEV((p.avgEV ?? 0))}</span> },
+    { key:'barrel',    label:'Brl%',  render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:brlCol((p.barrel ?? 0))}}>{fmtPct((p.barrel ?? 0))}</span> },
+    { key:'hardHit',   label:'HH%',   render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:hhCol((p.hardHit ?? 0))}}>{fmtPct((p.hardHit ?? 0))}</span> },
+    { key:'flyBall',   label:'FB%',   render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{fmtPct((p.flyBall ?? 0))}</span> },
+    { key:'gbPct',     label:'GB%',   render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--muted)'}}>{fmtPct((p.gbPct ?? 0))}</span> },
+    { key:'launchAngle',label:'Avg LA',render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{fmtLA((p.launchAngle ?? 0))}</span> },
     { key:'avg',       label:'BA',    render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{fmtStat(p.avg)}</span> },
     { key:'obp',       label:'OBP',   render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{fmtStat(p.obp)}</span> },
     { key:'slg',       label:'SLG',   render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{fmtStat(p.slg)}</span> },
@@ -5164,25 +5145,6 @@ function BatterLeaderboard() {
         </span>
       </div>
 
-      {/* Window selector */}
-      <div style={{display:'flex',gap:5,marginBottom:12,alignItems:'center',flexWrap:'wrap'}}>
-        <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1,marginRight:3}}>Statcast Window:</span>
-        {Object.entries(WIN_LABELS).map(([key,label])=>(
-          <button key={key} onClick={()=>setSelectedWin(key)}
-            style={{padding:'4px 11px',borderRadius:6,border:`1px solid ${selectedWin===key?'var(--accent2)':'var(--border)'}`,
-              background:selectedWin===key?'rgba(245,166,35,.12)':'var(--surface2)',
-              color:selectedWin===key?'var(--accent2)':'var(--muted)',
-              fontFamily:"'DM Mono',monospace",fontSize:10,cursor:'pointer',
-              fontWeight:selectedWin===key?700:400,transition:'all .15s'}}>
-            {label}
-          </button>
-        ))}
-        {selectedWin !== 'season' && (
-          <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginLeft:4}}>
-            · EV/Brl/HH/FB/GB/LA from window · BA/OBP/SLG/HR always season
-          </span>
-        )}
-      </div>
 
       {players.length === 0 ? (
         <div style={{padding:'40px 20px',textAlign:'center',color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:11}}>
@@ -5237,9 +5199,9 @@ function PitcherLeaderboard() {
   const [sortCol, setSortCol]       = useState('era');
   const [sortDir, setSortDir]       = useState('asc');
   const [teamFilter, setTeamFilter] = useState('all');
-  const [roleFilter, setRoleFilter] = useState('all'); // all | SP | RP
+  const [roleFilter, setRoleFilter] = useState('SP'); // all | SP | RP
   const [searchQ, setSearchQ]       = useState('');
-  const [minIP, setMinIP]           = useState(0);
+  const [minIP, setMinIP]           = useState(5);
 
   // Static MLB team ID → abbreviation map (IDs are stable across seasons)
   const TEAM_ABBR = {
