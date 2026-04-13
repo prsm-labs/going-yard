@@ -2022,31 +2022,13 @@ async function fetchPlayers(setL, setP, setE, silent=false) {
       }
     });
 
-    // ── STEP 6: Enrich HR counts from MLB Stats API only for players
-    // where the pipeline didn't provide a value (Savant fallback path)
-    try {
-      const hrRes = await fetch(
-        'https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&season=2026&sportId=1&limit=500&statType=season'
-      );
-      const hrData = await hrRes.json();
-      const hrMap = {};
-      for (const cat of (hrData.leagueLeaders || [])) {
-        for (const entry of (cat.leaders || [])) {
-          if (entry.person?.id) hrMap[entry.person.id] = parseInt(entry.value || 0);
-        }
-      }
-      mapped.forEach(p => {
-        // Only overwrite if pipeline gave us 0 — pipeline value is more accurate
-        // (pipeline counts from the actual at-bat log, API is leaders-only and may lag)
-        if (hrMap[p.pid] && (!p.hr || p.hr === 0)) {
-          p.hr = hrMap[p.pid];
-          p.hri = calcHRI(p);
-          p.os  = calcOS(p);
-          p.grade = getSG(p.os);
-        }
-      });
-      console.log('[Players] HR enrichment done. HR leaders mapped:', Object.keys(hrMap).length);
-    } catch(e) { console.warn('[Players] HR enrichment failed:', e.message); }
+    // ── STEP 6: Pipeline is source of truth for HR counts ─────
+    // HR leaders API was removed — it caused mismatches for traded players
+    // and players with 0 regular-season HRs (spring training inflated to 0,
+    // then API overwrote with a different player's count).
+    // The pipeline at-bat log now correctly excludes spring training (season_start 3/25)
+    // and deduplicates Play IDs, making it the accurate source.
+    console.log('[Players] HR counts from pipeline at-bat log only (no API overwrite)');
 
     // ── Kick off async real window fetches in background ──────
     // These update the counting stats (H, AB, HR per window) from game logs
