@@ -1124,6 +1124,17 @@ function MyPicksTab() {
       <button onClick={()=>{
         // Export picks to CSV — Pick Type, Team, Batter Name, Prop, Game Time, Matchup
         const rows = [["Pick Type","Team","Batter Name","Prop","Game Time","Matchup"]];
+
+        // Build game_id → [team1, team2] map from the full cache
+        const gameTeams = {};
+        Object.values(DAILY_PICKS_CACHE).forEach(r => {
+          const gid = r.game_id;
+          const t   = r.batting_team;
+          if (!gid || !t) return;
+          if (!gameTeams[gid]) gameTeams[gid] = new Set();
+          gameTeams[gid].add(t);
+        });
+
         pickList.forEach(p=>{
           const cfg = PICK_TYPES[p.type];
           const typeName = cfg?.label?.split(" ").slice(1).join(" ") || p.type;
@@ -1132,7 +1143,10 @@ function MyPicksTab() {
           const dp = DAILY_PICKS_CACHE[String(p.pid)] ||
             Object.values(DAILY_PICKS_CACHE).find(r=>r.batter_id&&parseInt(r.batter_id)===p.pid) || null;
           const gameTime = dp?.game_time || '—';
-          const matchup  = dp ? `${dp.batting_team||dp.home_team||p.team} vs ${dp.pitching_team||dp.away_team||'—'}` : '—';
+          const myTeam   = dp?.batting_team || p.team || '—';
+          const teams    = dp?.game_id ? [...(gameTeams[dp.game_id] || [])] : [];
+          const opponent = teams.find(t => t !== myTeam) || '—';
+          const matchup  = opponent !== '—' ? `${myTeam} vs ${opponent}` : '—';
           rows.push([typeName, p.team||"-", p.name||"-", propOpt?.label||"", gameTime, matchup]);
         });
         const csv = rows.map(r=>r.map(c=>`"${c}"`).join(",")).join("\n");
