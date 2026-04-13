@@ -14,7 +14,7 @@ const styles = `
   html,body{background:var(--bg);color:var(--text);font-family:'Oswald',sans-serif;min-height:100vh;overflow-x:clip;max-width:100%;width:100%;}
   .app{min-height:100vh;display:flex;flex-direction:column;overflow-x:clip;max-width:100%;width:100%;}
   .header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:linear-gradient(180deg,#0a1520 0%,var(--bg) 100%);gap:8px;overflow:hidden;}
-  .logo{font-family:'Oswald',sans-serif;font-weight:700;font-size:20px;text-transform:uppercase;letter-spacing:2px;color:var(--text);display:flex;align-items:center;gap:7px;min-width:0;flex-shrink:1;}
+  .logo{font-family:'Oswald',sans-serif;font-weight:700;font-size:17px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text);display:flex;align-items:center;gap:6px;min-width:0;flex-shrink:1;overflow:hidden;white-space:nowrap;}
   .logo span{color:var(--accent);}
   .logo-dot{width:9px;height:9px;background:var(--accent);border-radius:50%;animation:pulse 1.8s ease-in-out infinite;}
   @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.4)}}
@@ -1988,6 +1988,7 @@ async function fetchPlayers(setL, setP, setE, silent=false) {
         bbPct:        sc.bbPct        || 0,
         zContact:     sc.zContactPct  || 0,
         bbkRatio:     sc.bbPct > 0 && sc.kPct > 0 ? sc.bbPct / sc.kPct : 0.4,
+        recentAtBats: sc.recentAtBats || [],
       };
 
       // ── STEP 4: Calculate grades from REAL metrics ─────────
@@ -5825,51 +5826,24 @@ function PitcherLeaderboard() {
 }
 
 
-// Shows last 5 at-bat results from MLB playLog API — pregame context
+// Shows last 5 at-bats from the pipeline at-bat log — stored in players.json recentAtBats
 function RecentGameLog({ batterId }) {
-  const [abs, setAbs] = useState(null);
-
-  useEffect(() => {
-    if (!batterId) return;
-    const pid = parseInt(batterId);
-    if (!pid || pid <= 0) return;
-    const season = new Date().getFullYear();
-    fetch(`https://statsapi.mlb.com/api/v1/people/${pid}/stats?stats=playLog&group=hitting&season=${season}&sportId=1&limit=20`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => {
-        const splits = d?.stats?.[0]?.splits || [];
-        const OPP = {133:'OAK',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',139:'TB',140:'TEX',141:'TOR',142:'MIN',143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL',108:'LAA',109:'ARI',110:'BAL',111:'BOS',112:'CHC',113:'CIN',114:'CLE',115:'COL',116:'DET',117:'HOU',118:'KC',119:'LAD',120:'WSH',121:'NYM'};
-        const rows = [...splits].reverse().slice(0, 5).map(g => ({
-          date:   g.date?.slice(5) || '—',
-          opp:    OPP[g.opponent?.id] || g.opponent?.abbreviation || '—',
-          result: g.stat?.event || '—',
-          ev:     parseFloat(g.stat?.exitVelocity) || 0,
-          la:     parseFloat(g.stat?.launchAngle) || null,
-          dist:   parseInt(g.stat?.totalDistance) || 0,
-          pitch:  g.stat?.pitchType || '',
-        }));
-        if (rows.length > 0) setAbs(rows);
-      })
-      .catch(() => {});
-  }, [batterId]);
-
+  const abs = getCachedPlayer(batterId)?.recentAtBats;
   if (!abs || abs.length === 0) return null;
 
-  const fmtResult = r => {
-    const map = {
-      'Home Run':'💥 HR','Single':'1B','Double':'2B','Triple':'3B',
-      'Strikeout':'K','Walk':'BB','Hit By Pitch':'HBP',
-      'Field Out':'Out','Groundout':'Go','Flyout':'Fo','Lineout':'Lo',
-      'Double Play':'DP','Sac Fly':'SF','Sac Bunt':'SH',
-      'Intent Walk':'IBB','Field Error':'E',
-    };
-    return map[r] || r;
+  const RESULT_LABEL = {
+    home_run:'💥 HR', single:'1B', double:'2B', triple:'3B',
+    strikeout:'K', walk:'BB', hit_by_pitch:'HBP',
+    field_out:'Out', force_out:'FO', grounded_into_double_play:'DP',
+    double_play:'DP', sac_fly:'SF', sac_bunt:'SH',
+    intent_walk:'IBB', field_error:'E', fielders_choice:'FC',
+    strikeout_double_play:'KDP', catcher_interf:'CI',
   };
   const resultColor = r => {
-    if (r === 'Home Run') return 'var(--accent)';
-    if (['Single','Double','Triple'].includes(r)) return '#27c97a';
-    if (r === 'Walk' || r === 'Intent Walk' || r === 'Hit By Pitch') return '#38b8f2';
-    if (r === 'Strikeout') return 'var(--ice)';
+    if (r === 'home_run') return 'var(--accent)';
+    if (['single','double','triple'].includes(r)) return '#27c97a';
+    if (r === 'walk' || r === 'intent_walk' || r === 'hit_by_pitch') return '#38b8f2';
+    if (r === 'strikeout' || r === 'strikeout_double_play') return 'var(--ice)';
     return 'var(--muted)';
   };
 
@@ -5884,7 +5858,8 @@ function RecentGameLog({ batterId }) {
           <thead>
             <tr style={{background:'var(--surface2)'}}>
               {['Date','Opp','Result','EV','LA','Dist','Pitch'].map(h => (
-                <th key={h} style={{padding:'4px 7px',textAlign:h==='Result'?'left':'center',
+                <th key={h} style={{padding:'4px 7px',
+                  textAlign:h==='Result'?'left':'center',
                   fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
                   textTransform:'uppercase',letterSpacing:.5,whiteSpace:'nowrap',
                   borderBottom:'1px solid var(--border)'}}>{h}</th>
@@ -5893,16 +5868,17 @@ function RecentGameLog({ batterId }) {
           </thead>
           <tbody>
             {abs.map((a, i) => (
-              <tr key={i} style={{borderBottom:i<abs.length-1?'1px solid rgba(255,255,255,.04)':'none',
+              <tr key={i} style={{
+                borderBottom:i<abs.length-1?'1px solid rgba(255,255,255,.04)':'none',
                 background:i%2===0?'rgba(255,255,255,.01)':'transparent'}}>
-                <td style={{padding:'4px 7px',color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:9,whiteSpace:'nowrap'}}>{a.date}</td>
-                <td style={{padding:'4px 7px',textAlign:'center',fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'var(--accent2)'}}>{a.opp}</td>
-                <td style={{padding:'4px 7px',fontFamily:"'DM Mono',monospace",fontSize:9,
-                  color:resultColor(a.result),fontWeight:['Home Run','Single','Double','Triple'].includes(a.result)?700:400,
-                  whiteSpace:'nowrap'}}>{fmtResult(a.result)}</td>
+                <td style={{padding:'4px 7px',color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:9,whiteSpace:'nowrap'}}>{a.date?.slice(5)||'—'}</td>
+                <td style={{padding:'4px 7px',textAlign:'center',fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'var(--accent2)'}}>{a.opp||'—'}</td>
+                <td style={{padding:'4px 7px',fontFamily:"'DM Mono',monospace",fontSize:9,whiteSpace:'nowrap',
+                  color:resultColor(a.result),fontWeight:['home_run','single','double','triple'].includes(a.result)?700:400}}>
+                  {RESULT_LABEL[a.result] || a.result || '—'}</td>
                 <td style={{padding:'4px 7px',textAlign:'center',fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,
                   color:a.ev>=103?'#ff4020':a.ev>=95?'#ff8020':a.ev>=90?'#ffc840':a.ev>0?'var(--text)':'var(--muted)'}}>
-                  {a.ev > 0 ? a.ev.toFixed(1) : '—'}</td>
+                  {a.ev != null ? a.ev.toFixed(1) : '—'}</td>
                 <td style={{padding:'4px 7px',textAlign:'center',fontFamily:"'DM Mono',monospace",fontSize:9,
                   color:a.la!=null&&a.la>=20&&a.la<=35?'#27c97a':'var(--muted)'}}>
                   {a.la != null ? a.la.toFixed(0)+'°' : '—'}</td>
