@@ -1124,27 +1124,16 @@ function MyPicksTab() {
       <button onClick={()=>{
         // Export picks to CSV — Pick Type, Team, Batter Name, Prop, Game Time, Matchup
         const rows = [["Pick Type","Team","Batter Name","Prop","Game Time","Matchup"]];
-
-        // Build game_id → [team1, team2] map from the full cache
-        const gameTeams = {};
-        Object.values(DAILY_PICKS_CACHE).forEach(r => {
-          const gid = r.game_id;
-          const t   = r.batting_team;
-          if (!gid || !t) return;
-          if (!gameTeams[gid]) gameTeams[gid] = new Set();
-          gameTeams[gid].add(t);
-        });
-
         pickList.forEach(p=>{
           const cfg = PICK_TYPES[p.type];
           const typeName = cfg?.label?.split(" ").slice(1).join(" ") || p.type;
           const propVal = GLOBAL_BPROPS[String(p.pid)] || "";
           const propOpt = propVal ? BATTER_PROP_OPTS.find(o=>o.value===propVal) : null;
-          const dp = DAILY_PICKS_CACHE[String(p.pid)] ||
-            Object.values(DAILY_PICKS_CACHE).find(r=>r.batter_id&&parseInt(r.batter_id)===p.pid) || null;
+          const dp       = DAILY_PICKS_CACHE[String(p.pid)] || null;
           const gameTime = dp?.game_time || '—';
           const myTeam   = dp?.batting_team || p.team || '—';
-          const teams    = dp?.game_id ? [...(gameTeams[dp.game_id] || [])] : [];
+          const gid      = dp?._gid || '';
+          const teams    = gid ? [...(DAILY_GAME_MAP[gid] || [])] : [];
           const opponent = teams.find(t => t !== myTeam) || '—';
           const matchup  = opponent !== '—' ? `${myTeam} vs ${opponent}` : '—';
           rows.push([typeName, p.team||"-", p.name||"-", propOpt?.label||"", gameTime, matchup]);
@@ -1815,11 +1804,19 @@ async function loadDailyPicks() {
     const text = await res.text();
     const rows = parseCSVText(text);
     rows.forEach(r => {
-      // Normalize id: strip pandas float suffix "691016.0" → "691016"
+      // Build game_id → teams map from ALL rows (before per-batter dedup)
+      const rawGid = String(r.game_id || '').trim();
+      const gid = rawGid.includes('.') ? String(parseInt(rawGid)) : rawGid;
+      const team = String(r.batting_team || '').trim();
+      if (gid && gid !== 'NaN' && team) {
+        if (!DAILY_GAME_MAP[gid]) DAILY_GAME_MAP[gid] = new Set();
+        DAILY_GAME_MAP[gid].add(team);
+      }
+      // Normalize batter_id: strip pandas float suffix "691016.0" → "691016"
       const rawBid = String(r.batter_id || '').trim();
       const bid = rawBid.includes('.') ? String(parseInt(rawBid)) : rawBid;
       // Only store first row per batter — recent stats are same across all matchup rows
-      if (bid && bid !== 'NaN' && !DAILY_PICKS_CACHE[bid]) DAILY_PICKS_CACHE[bid] = r;
+      if (bid && bid !== 'NaN' && !DAILY_PICKS_CACHE[bid]) DAILY_PICKS_CACHE[bid] = { ...r, _gid: gid };
     });
     console.log('[DailyPicks] Loaded', Object.keys(DAILY_PICKS_CACHE).length, 'batters');
   } catch(e) {
@@ -4375,6 +4372,7 @@ let HR_DATA_DATE = '';
 let HR_LAST_FETCH = 0;
 const SEEN_HR_IDS = new Set();
 const DAILY_PICKS_CACHE = {}; // keyed by batter_id string
+const DAILY_GAME_MAP    = {}; // keyed by normalized game_id → Set of batting_teams
 let _notifyNewHR = null; // callback set by useHRNotifications hook
 const HR_CACHE_MS = 60000;
 
