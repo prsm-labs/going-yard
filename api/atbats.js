@@ -122,6 +122,7 @@ function normalizePlayer(p) {
     vsLHP:        p.vsLHP         || null,
     pitchSplits:  p.pitchSplits   || {},
     windows:      p.windows       || {},
+    recentAtBats: p.recentAtBats  || [],
   };
 }
 
@@ -199,6 +200,10 @@ async function savantFallback(res) {
       pullAir:     pf(r.pull_percent, 70),
       pullPct:     pf(r.pull_percent, 70),
       flyBall:     pf(r.flyballs_percent, 60),
+      gbPct:       pf(r.groundballs_percent, 60),
+      // App.jsx fetchPlayers reads barrelPct / hardHitPct — expose both names
+      barrelPct:   pf(r.barrel_batted_rate || r.barrel, 25),
+      hardHitPct:  pf(r.hard_hit_percent, 80),
       // xStats
       xwoba:       pf(r.xwoba || r.est_woba, 0.7),
       xba:         pf(r.xba || r.est_ba, 0.5),
