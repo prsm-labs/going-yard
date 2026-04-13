@@ -37,19 +37,23 @@ export default async function handler(req, res) {
       return res.status(200).json({ found: false, pitchMix: [], stats: {} });
     }
 
-    // ── Step 2: MLB Stats API season stats (always fetch this) ──
+    // ── Step 2: Pitcher hand + MLB Stats API season stats ───────
+    // Fetch both in parallel — hand from people endpoint, stats from pitching endpoint
     let stats = {};
+    let hand  = 'R';
     try {
-      const r = await fetch(
-        `https://statsapi.mlb.com/api/v1/people/${pitcherId}/stats?stats=season&group=pitching&season=${year}&sportId=1`,
-        { headers }
-      );
-      if (r.ok) {
-        const d = await r.json();
-        // Try current season first, fall back to previous
+      const [rPeople, rStats] = await Promise.all([
+        fetch(`https://statsapi.mlb.com/api/v1/people/${pitcherId}`, { headers }),
+        fetch(`https://statsapi.mlb.com/api/v1/people/${pitcherId}/stats?stats=season&group=pitching&season=${year}&sportId=1`, { headers }),
+      ]);
+      if (rPeople.ok) {
+        const dp = await rPeople.json();
+        hand = dp.people?.[0]?.pitchHand?.code || 'R';
+      }
+      if (rStats.ok) {
+        const d = await rStats.json();
         let s = d.stats?.[0]?.splits?.[0]?.stat;
         if (!s || !s.era) {
-          // Try previous season as fallback
           const r2 = await fetch(
             `https://statsapi.mlb.com/api/v1/people/${pitcherId}/stats?stats=season&group=pitching&season=${parseInt(year)-1}&sportId=1`,
             { headers }
@@ -75,6 +79,8 @@ export default async function handler(req, res) {
             avg:  s.avg    || '—',
             wins: s.wins   || 0,
             losses: s.losses || 0,
+            so:   s.strikeOuts || 0,
+            hand,
           };
         }
       }

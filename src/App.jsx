@@ -1122,14 +1122,18 @@ function MyPicksTab() {
     </div>
     {pickList.length>0&&<div style={{display:"flex",justifyContent:"flex-end",gap:8,marginBottom:12}}>
       <button onClick={()=>{
-        // Export picks to CSV — Pick Type, Team, Batter Name, Prop
-        const rows = [["Pick Type","Team","Batter Name","Prop"]];
+        // Export picks to CSV — Pick Type, Team, Batter Name, Prop, Game Time, Matchup
+        const rows = [["Pick Type","Team","Batter Name","Prop","Game Time","Matchup"]];
         pickList.forEach(p=>{
           const cfg = PICK_TYPES[p.type];
           const typeName = cfg?.label?.split(" ").slice(1).join(" ") || p.type;
           const propVal = GLOBAL_BPROPS[String(p.pid)] || "";
           const propOpt = propVal ? BATTER_PROP_OPTS.find(o=>o.value===propVal) : null;
-          rows.push([typeName, p.team||"-", p.name||"-", propOpt?.label||""]);
+          const dp = DAILY_PICKS_CACHE[String(p.pid)] ||
+            Object.values(DAILY_PICKS_CACHE).find(r=>r.batter_id&&parseInt(r.batter_id)===p.pid) || null;
+          const gameTime = dp?.game_time || '—';
+          const matchup  = dp ? `${dp.batting_team||dp.home_team||p.team} vs ${dp.pitching_team||dp.away_team||'—'}` : '—';
+          rows.push([typeName, p.team||"-", p.name||"-", propOpt?.label||"", gameTime, matchup]);
         });
         const csv = rows.map(r=>r.map(c=>`"${c}"`).join(",")).join("\n");
         const blob = new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
@@ -5135,7 +5139,13 @@ function PitcherCard({ pitcherId, pitcherName, onGrade }) {
     {loading
       ? <span style={{color:'var(--muted)',fontSize:9}}>...</span>
       : grade
-        ? <span style={{color:grade.color,fontWeight:700,letterSpacing:.3}}>{grade.label}</span>
+        ? <><span style={{color:grade.color,fontWeight:700,letterSpacing:.3}}>{grade.label}</span>
+            {stats?.hand && <span style={{
+              marginLeft:5,fontFamily:"'DM Mono',monospace",fontSize:9,fontWeight:700,
+              padding:'1px 5px',borderRadius:4,
+              background:stats.hand==='L'?'rgba(56,184,242,.12)':'rgba(255,128,32,.10)',
+              color:stats.hand==='L'?'#38b8f2':'#ff8020',
+            }}>{stats.hand==='L'?'LHP':'RHP'}</span>}</>
         : <span style={{color:'var(--muted)'}}>--</span>}
     <span style={{opacity:.4,marginLeft:3,fontSize:9}}>{open?'^':'v'}</span>
   </button>
@@ -5156,6 +5166,13 @@ function PitcherCard({ pitcherId, pitcherName, onGrade }) {
                   fontSize:13,color:grade?grade.color:'var(--text)'}}>
                   {grade?grade.label:''}
                 </span>
+                {stats.hand && <span style={{
+                  fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:700,
+                  padding:'1px 6px',borderRadius:4,
+                  background:stats.hand==='L'?'rgba(56,184,242,.12)':'rgba(255,128,32,.10)',
+                  color:stats.hand==='L'?'#38b8f2':'#ff8020',
+                  border:`1px solid ${stats.hand==='L'?'rgba(56,184,242,.3)':'rgba(255,128,32,.3)'}`,
+                }}>{stats.hand==='L'?'LHP':'RHP'}</span>}
                 <span style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
                   {grade?grade.desc:''}
                 </span>
@@ -5544,7 +5561,7 @@ function PitcherLeaderboard() {
 
   useEffect(()=>{
     const season = new Date().getFullYear();
-    fetch(`https://statsapi.mlb.com/api/v1/stats?stats=season&group=pitching&gameType=R&season=${season}&sportId=1&limit=2000&playerPool=ALL`)
+    fetch(`https://statsapi.mlb.com/api/v1/stats?stats=season&group=pitching&gameType=R&season=${season}&sportId=1&limit=2000&playerPool=ALL&hydrate=person`)
       .then(r=>{ if(!r.ok) throw new Error(`MLB API ${r.status}`); return r.json(); })
       .then(d=>{
         const splits = d.stats?.[0]?.splits || [];
@@ -5557,6 +5574,7 @@ function PitcherLeaderboard() {
           return {
             pid:      s.player?.id,
             name:     s.player?.fullName || '—',
+            hand:     s.player?.pitchHand?.code || '—',
             team:     abbr,
             wins:     s.stat?.wins      ?? 0,
             losses:   s.stat?.losses    ?? 0,
@@ -5631,6 +5649,15 @@ function PitcherLeaderboard() {
       </div>
     },
     { key:'team',   label:'Team',   render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--accent2)',fontWeight:700}}>{p.team}</span> },
+    { key:'hand',   label:'Hand',   align:'center',
+      render: p => <span style={{
+        fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:700,
+        padding:'1px 6px',borderRadius:4,
+        background: p.hand==='L'?'rgba(56,184,242,.12)':'rgba(255,128,32,.10)',
+        color: p.hand==='L'?'#38b8f2':'#ff8020',
+        border:`1px solid ${p.hand==='L'?'rgba(56,184,242,.3)':'rgba(255,128,32,.3)'}`,
+      }}>{p.hand==='L'?'LHP':p.hand==='R'?'RHP':'—'}</span>
+    },
     { key:'_grade', label:'Grade',  align:'center',
       render: p => <span style={{
         padding:'2px 8px',borderRadius:5,fontSize:10,fontWeight:700,
@@ -5702,12 +5729,12 @@ function PitcherLeaderboard() {
         <button onClick={()=>{
           const esc = v => `"${String(v??'').replace(/"/g,'""')}"`;
           const role = roleFilter==='SP'?'SP':roleFilter==='RP'?'RP':'SP+RP';
-          const rows = [['Pitcher','Team','Role','Grade','W','L','ERA','WHIP','K/9','BB/9','HR/9','IP','K','HR','BAA','OBP','OPS'].map(esc).join(',')];
+          const rows = [['Pitcher','Team','Hand','Role','Grade','W','L','ERA','WHIP','K/9','BB/9','HR/9','IP','K','HR','BAA','OBP','OPS'].map(esc).join(',')];
           filtered.forEach(p => {
             const f2 = v => (v!=null&&!isNaN(v)&&v<99)?v.toFixed(2):'';
             const f3 = v => v>0?'.'+String(Math.round(v*1000)).padStart(3,'0'):'';
             rows.push([
-              esc(p.name), esc(p.team), esc(p.gs>0?'SP':'RP'),
+              esc(p.name), esc(p.team), esc(p.hand==='L'?'LHP':p.hand==='R'?'RHP':'—'), esc(p.gs>0?'SP':'RP'),
               esc(p._grade?.label||''),
               esc(p.wins), esc(p.losses),
               esc(f2(p.era)), esc(f2(p.whip)),
