@@ -13,8 +13,8 @@ const styles = `
   }
   html,body{background:var(--bg);color:var(--text);font-family:'Oswald',sans-serif;min-height:100vh;overflow-x:clip;max-width:100%;width:100%;}
   .app{min-height:100vh;display:flex;flex-direction:column;overflow-x:clip;max-width:100%;width:100%;}
-  .header{padding:16px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:linear-gradient(180deg,#0a1520 0%,var(--bg) 100%);}
-  .logo{font-family:'Oswald',sans-serif;font-weight:700;font-size:26px;text-transform:uppercase;letter-spacing:3px;color:var(--text);display:flex;align-items:center;gap:10px;}
+  .header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:linear-gradient(180deg,#0a1520 0%,var(--bg) 100%);gap:8px;overflow:hidden;}
+  .logo{font-family:'Oswald',sans-serif;font-weight:700;font-size:20px;text-transform:uppercase;letter-spacing:2px;color:var(--text);display:flex;align-items:center;gap:7px;min-width:0;flex-shrink:1;}
   .logo span{color:var(--accent);}
   .logo-dot{width:9px;height:9px;background:var(--accent);border-radius:50%;animation:pulse 1.8s ease-in-out infinite;}
   @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.4)}}
@@ -5070,11 +5070,11 @@ function gradePitcher(era, k9, whip, bb9, hr9, avg, obp) {
   let s = 0;
   if (e <= 2.80) s += 3; else if (e <= 3.50) s += 2; else if (e <= 4.20) s += 1;
   if (k >= 10.0) s += 3; else if (k >= 8.5)  s += 2; else if (k >= 7.0)  s += 1;
-  if (w <= 1.05) s += 3; else if (w <= 1.20)  s += 2; else if (w <= 1.32) s += 1;
+  if (w <= 1.05) s += 3; else if (w <= 1.22)  s += 2; else if (w <= 1.35) s += 1;
   if (b <= 2.0)  s += 2; else if (b <= 2.8)   s += 1;
   if (h <= 0.8)  s += 2; else if (h <= 1.1)   s += 1;
-  if (av <= .210) s += 2; else if (av <= .235) s += 1;
-  if (ob <= .270) s += 2; else if (ob <= .310) s += 1;
+  if (av <= .210) s += 2; else if (av <= .240) s += 1;
+  if (ob <= .275) s += 2; else if (ob <= .320) s += 1;
   if (s >= 13) return { label:'‼️ Elite',   color:'#ff4020', bg:'rgba(255,64,32,.10)',    desc:'Elite ERA/K-rate/WHIP' };
   if (s >= 9)  return { label:'⚠️ Tough',   color:'#ff8020', bg:'rgba(255,128,32,.08)',   desc:'Above-average pitcher' };
   if (s >= 5)  return { label:'🤔 Average', color:'var(--muted)', bg:'rgba(255,255,255,.04)', desc:'League-average matchup' };
@@ -5110,7 +5110,15 @@ function PitcherCard({ pitcherId, pitcherName, onGrade }) {
     setOpen(o => !o);
   };
 
-  const grade = stats ? gradeStats(stats.era, stats.k9, stats.whip, stats.bb9, stats.hr9, stats.avg, stats.obp) : null;
+  const grade = stats ? gradeStats(
+    stats.era,
+    // K/9: use rate stat if available, otherwise calculate from SO + IP
+    (stats.k9 && stats.k9 !== '—' ? stats.k9 :
+      (parseFloat(stats.ip) > 0 && parseInt(stats.so||0) > 0
+        ? ((parseInt(stats.so) / parseFloat(stats.ip)) * 9).toFixed(2)
+        : '0')),
+    stats.whip, stats.bb9, stats.hr9, stats.avg, stats.obp
+  ) : null;
   useEffect(() => {
     if (grade && pitcherId && onGrade) {
       const cleanId = String(parseInt(pitcherId) || pitcherId);
@@ -5817,6 +5825,100 @@ function PitcherLeaderboard() {
 }
 
 
+// Shows last 5 at-bat results from MLB playLog API — pregame context
+function RecentGameLog({ batterId }) {
+  const [abs, setAbs] = useState(null);
+
+  useEffect(() => {
+    if (!batterId) return;
+    const pid = parseInt(batterId);
+    if (!pid || pid <= 0) return;
+    const season = new Date().getFullYear();
+    fetch(`https://statsapi.mlb.com/api/v1/people/${pid}/stats?stats=playLog&group=hitting&season=${season}&sportId=1&limit=20`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        const splits = d?.stats?.[0]?.splits || [];
+        const OPP = {133:'OAK',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',139:'TB',140:'TEX',141:'TOR',142:'MIN',143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL',108:'LAA',109:'ARI',110:'BAL',111:'BOS',112:'CHC',113:'CIN',114:'CLE',115:'COL',116:'DET',117:'HOU',118:'KC',119:'LAD',120:'WSH',121:'NYM'};
+        const rows = [...splits].reverse().slice(0, 5).map(g => ({
+          date:   g.date?.slice(5) || '—',
+          opp:    OPP[g.opponent?.id] || g.opponent?.abbreviation || '—',
+          result: g.stat?.event || '—',
+          ev:     parseFloat(g.stat?.exitVelocity) || 0,
+          la:     parseFloat(g.stat?.launchAngle) || null,
+          dist:   parseInt(g.stat?.totalDistance) || 0,
+          pitch:  g.stat?.pitchType || '',
+        }));
+        if (rows.length > 0) setAbs(rows);
+      })
+      .catch(() => {});
+  }, [batterId]);
+
+  if (!abs || abs.length === 0) return null;
+
+  const fmtResult = r => {
+    const map = {
+      'Home Run':'💥 HR','Single':'1B','Double':'2B','Triple':'3B',
+      'Strikeout':'K','Walk':'BB','Hit By Pitch':'HBP',
+      'Field Out':'Out','Groundout':'Go','Flyout':'Fo','Lineout':'Lo',
+      'Double Play':'DP','Sac Fly':'SF','Sac Bunt':'SH',
+      'Intent Walk':'IBB','Field Error':'E',
+    };
+    return map[r] || r;
+  };
+  const resultColor = r => {
+    if (r === 'Home Run') return 'var(--accent)';
+    if (['Single','Double','Triple'].includes(r)) return '#27c97a';
+    if (r === 'Walk' || r === 'Intent Walk' || r === 'Hit By Pitch') return '#38b8f2';
+    if (r === 'Strikeout') return 'var(--ice)';
+    return 'var(--muted)';
+  };
+
+  return (
+    <div style={{marginTop:10}}>
+      <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+        textTransform:'uppercase',letterSpacing:1,marginBottom:5}}>
+        📋 Recent At-Bats
+      </div>
+      <div style={{border:'1px solid var(--border)',borderRadius:7,overflow:'hidden'}}>
+        <table style={{width:'100%',borderCollapse:'collapse'}}>
+          <thead>
+            <tr style={{background:'var(--surface2)'}}>
+              {['Date','Opp','Result','EV','LA','Dist','Pitch'].map(h => (
+                <th key={h} style={{padding:'4px 7px',textAlign:h==='Result'?'left':'center',
+                  fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+                  textTransform:'uppercase',letterSpacing:.5,whiteSpace:'nowrap',
+                  borderBottom:'1px solid var(--border)'}}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {abs.map((a, i) => (
+              <tr key={i} style={{borderBottom:i<abs.length-1?'1px solid rgba(255,255,255,.04)':'none',
+                background:i%2===0?'rgba(255,255,255,.01)':'transparent'}}>
+                <td style={{padding:'4px 7px',color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:9,whiteSpace:'nowrap'}}>{a.date}</td>
+                <td style={{padding:'4px 7px',textAlign:'center',fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'var(--accent2)'}}>{a.opp}</td>
+                <td style={{padding:'4px 7px',fontFamily:"'DM Mono',monospace",fontSize:9,
+                  color:resultColor(a.result),fontWeight:['Home Run','Single','Double','Triple'].includes(a.result)?700:400,
+                  whiteSpace:'nowrap'}}>{fmtResult(a.result)}</td>
+                <td style={{padding:'4px 7px',textAlign:'center',fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,
+                  color:a.ev>=103?'#ff4020':a.ev>=95?'#ff8020':a.ev>=90?'#ffc840':a.ev>0?'var(--text)':'var(--muted)'}}>
+                  {a.ev > 0 ? a.ev.toFixed(1) : '—'}</td>
+                <td style={{padding:'4px 7px',textAlign:'center',fontFamily:"'DM Mono',monospace",fontSize:9,
+                  color:a.la!=null&&a.la>=20&&a.la<=35?'#27c97a':'var(--muted)'}}>
+                  {a.la != null ? a.la.toFixed(0)+'°' : '—'}</td>
+                <td style={{padding:'4px 7px',textAlign:'center',fontFamily:"'DM Mono',monospace",fontSize:9,
+                  color:a.dist>=400?'#ff4020':a.dist>=350?'#ff8020':a.dist>0?'var(--text)':'var(--muted)'}}>
+                  {a.dist > 0 ? a.dist+'ft' : '—'}</td>
+                <td style={{padding:'4px 7px',textAlign:'center',fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)'}}>{a.pitch||'—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function MatchupEngineTab() {
   const [subTab, setSubTab]        = useState('matchups');
   const [data, setData]           = useState([]);
@@ -6443,6 +6545,9 @@ function MatchupEngineTab() {
                 </div>
                 {/* Live box score — fetches real game data */}
                 <LiveBatterBox batterId={b.batter_id} gamePk={b.game_id} onData={(id,d)=>{liveCache.current[id]=d;}}/>
+
+                {/* Recent Game Log — pregame only, fetched from MLB Stats API */}
+                <RecentGameLog batterId={b.batter_id}/>
               </div>}
             </div>;
           })}
@@ -7574,10 +7679,10 @@ export default function App() {
           <DataStatusBadge/>
           <NotificationBell/>
           <button onClick={()=>setShowPicksSlideout(s=>!s)}
-            style={{padding:"5px 12px",borderRadius:6,border:"1px solid var(--border)",
+            style={{padding:"4px 9px",borderRadius:6,border:"1px solid var(--border)",
               background:"var(--surface2)",color:"var(--accent2)",cursor:"pointer",
-              fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,letterSpacing:1,
-              display:"flex",alignItems:"center",gap:5}}>
+              fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,letterSpacing:.8,
+              display:"flex",alignItems:"center",gap:4,flexShrink:0,whiteSpace:'nowrap'}}>
             🎯 Picks
           </button>
             </div>
