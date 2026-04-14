@@ -5937,6 +5937,7 @@ function MatchupEngineTab() {
   const [generated, setGenerated] = useState(null);
   const [showPicker, setShowPicker] = useState(false);
   const [searchQ, setSearchQ]     = useState('');
+  const [scheduleMap, setScheduleMap] = useState({}); // game_id → {away, home}
   const liveCache = useRef({});
   const pitcherGradeCache = useRef({});
   const [selPitcherGrade, setSelPitcherGrade] = useState('all');
@@ -5948,11 +5949,29 @@ function MatchupEngineTab() {
       .then(text => {
         const rows = parseCSVText(text);
         setData(rows);
-        // Extract generated date from first row if available
         if (rows.length > 0 && rows[0].data_anchor) setGenerated(rows[0].data_anchor);
         setLoading(false);
       })
       .catch(e => { setError(e.message); setLoading(false); });
+  }, []);
+
+  // Fetch schedule CSV for reliable AWAY @ HOME labels
+  // Schedule has columns: Game ID, Away Team, Home Team
+  useEffect(() => {
+    fetch('/data/mlb_schedule.csv')
+      .then(r => r.ok ? r.text() : Promise.reject('no schedule'))
+      .then(text => {
+        const rows = parseCSVText(text);
+        const map = {};
+        rows.forEach(r => {
+          const gid = String(r['Game ID'] || r['game_id'] || '').trim();
+          const away = String(r['Away Team'] || r['away_team'] || '').trim();
+          const home = String(r['Home Team'] || r['home_team'] || '').trim();
+          if (gid && away && home) map[gid] = { away, home };
+        });
+        setScheduleMap(map);
+      })
+      .catch(() => {}); // silent fail — labels fall back gracefully
   }, []);
 
   // Build unique game list
@@ -6228,32 +6247,20 @@ function MatchupEngineTab() {
         All Games
       </button>
       {games.map(g => {
-        // Build AWAY @ HOME label from the two teams in this game
-        // daily_summary.csv has batting_team and pitcher_team on every row
-        const rows = data.filter(r => r.game_id === g.id);
-        let label = String(g.id); // fallback: raw game_id
-        if (rows.length > 0) {
-          // Collect unique batting_team → pitcher_team pairs to find away/home
-          // The home team bats against an away pitcher and vice versa
-          // Each row: batting_team is the offense, pitcher_team is the defense
-          // So if batting_team=PHI and pitcher_team=CHC, PHI is batting at CHC → PHI away
-          const pairs = rows.reduce((acc, r) => {
-            const bt = r.batting_team, pt = r.pitcher_team;
-            if (bt && pt && bt !== pt) acc[bt] = pt;
-            return acc;
-          }, {});
-          const battingTeams = Object.keys(pairs);
-          if (battingTeams.length === 2) {
-            // Each batting team's pitcher_team is the home field
-            // batting_team A faces pitcher_team B (B is home) → A is away
-            // Pick the first pair: battingTeam=AWAY, pitcherTeam=HOME
-            const [away, home] = battingTeams[0] !== pairs[battingTeams[1]]
-              ? [battingTeams[0], pairs[battingTeams[0]]]
-              : [battingTeams[1], pairs[battingTeams[1]]];
-            label = `${away} @ ${home}`;
-          } else if (battingTeams.length === 1) {
-            label = `${battingTeams[0]} @ ${pairs[battingTeams[0]] || '?'}`;
-          }
+        const gid = String(g.id);
+        const rows = data.filter(r => String(r.game_id) === gid);
+        // Primary: home_team/away_team from engine output (authoritative — added to CSV)
+        const sample = rows.find(r => r.home_team && r.away_team);
+        let label;
+        if (sample?.home_team && sample?.away_team) {
+          label = `${sample.away_team} @ ${sample.home_team}`;
+        } else if (scheduleMap[gid]) {
+          // Secondary: schedule CSV fetched at startup
+          label = `${scheduleMap[gid].away} @ ${scheduleMap[gid].home}`;
+        } else {
+          // Last resort: show batting teams without home/away distinction
+          const teams = [...new Set(rows.map(r => r.batting_team).filter(Boolean))];
+          label = teams.length >= 2 ? `${teams[0]} vs ${teams[1]}` : (teams[0] || gid);
         }
         const active = selGame === g.id;
         return <button key={g.id} onClick={()=>setSelGame(g.id)}
@@ -6335,16 +6342,14 @@ function MatchupEngineTab() {
           <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:15,
             color:'var(--text)',letterSpacing:.5}}>
             {(() => {
-              // Build AWAY @ HOME from teams dict: key=batting_team, pitcher=pitcherTeam
+              const gid = String(game.gameId);
+              // Use engine-provided home/away (most reliable)
               const teamList = Object.values(game.teams);
-              if (teamList.length === 2) {
-                // teamList[i].team = batting team, teamList[i].pitcher team = pitching team
-                // Home team's pitcher faces the away batting team
-                const t0 = teamList[0], t1 = teamList[1];
-                // t0 bats against t1's pitcher (t1 is home field) → t0 away, t1 home
-                return `${t0.team} @ ${t1.team}`;
-              }
-              return teamList.map(t=>t.team).join(' @ ');
+              const anyRow = data.find(r => String(r.game_id) === gid && r.home_team && r.away_team);
+              if (anyRow) return `${anyRow.away_team} @ ${anyRow.home_team}`;
+              if (scheduleMap[gid]) return `${scheduleMap[gid].away} @ ${scheduleMap[gid].home}`;
+              // Fallback: batting teams
+              return teamList.length >= 2 ? `${teamList[0].team} vs ${teamList[1].team}` : (teamList[0]?.team || gid);
             })()}
           </span>
           {displayTime && <span style={{fontSize:10,color:'var(--accent2)',
