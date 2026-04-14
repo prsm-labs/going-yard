@@ -5399,30 +5399,46 @@ function BatterLeaderboard() {
         </button>
         <button onClick={()=>{
           const esc = v => `"${String(v??'').replace(/"/g,'""')}"`;
-          const hdrs = ['Team','PA','Avg EV','Brl%','HH%','FB%','GB%','Avg LA','BA','OBP','SLG','OPS','HR','K%','BB%'];
-          const rows = [['Batter','Prop',...hdrs].map(esc).join(',')];
+          const winLabel = selectedWin === 'season2026' ? 'Season2026'
+            : selectedWin === 'season2025' ? 'Season2025'
+            : selectedWin === 'last7' ? 'L7'
+            : selectedWin === 'last14' ? 'L14'
+            : selectedWin === 'last30' ? 'L30' : selectedWin;
+          const teamLabel = teamFilter !== 'all' ? `-${teamFilter}` : '';
+          const f3 = v => (v != null && v > 0) ? '.' + String(Math.round(v * 1000)).padStart(3, '0') : '';
+          const f1 = v => (v != null && v > 0) ? v.toFixed(1) : '';
+          const hdrs = ['Batter','Team','PA','Avg EV','Brl%','HH%','FB%','GB%','Avg LA','BA','OBP','SLG','OPS','HR','K%','BB%'];
+          const rows = [hdrs.map(esc).join(',')];
+          // Export the current filtered+sorted view — ws() gives window-aware values
           filtered.forEach(p => {
-            const propVal = bprops[String(p.pid)]||'';
-            const propOpt = propVal ? BATTER_PROP_OPTS.find(o=>o.value===propVal) : null;
-            const f3 = v => v>0?'.'+String(Math.round(v*1000)).padStart(3,'0'):'';
-            const f1 = v => v>0?v.toFixed(1):'';
+            const ops = (ws(p,'slg')||0) + (ws(p,'obp')||0);
             rows.push([
-              esc(p.name), esc(propOpt?.label||''),
-              esc(p.team||''), esc(p.pa||0),
-              esc(f1(p.avgEV)), esc(f1(p.barrel)), esc(f1(p.hardHit)),
-              esc(f1(p.flyBall)), esc(f1(p.gbPct)), esc(f1(p.launchAngle)),
-              esc(f3(p.avg)), esc(f3(p.obp)), esc(f3(p.slg)), esc(f3(p.ops)),
-              esc(p.hr||0), esc(f1(p.kPct)), esc(f1(p.bbPct)),
+              esc(p.name),
+              esc(p.team||''),
+              esc(ws(p,'pa')||0),
+              esc(f1(ws(p,'avgEV'))),
+              esc(f1(ws(p,'barrel'))),
+              esc(f1(ws(p,'hardHit'))),
+              esc(f1(ws(p,'flyBall'))),
+              esc(f1(ws(p,'gbPct'))),
+              esc(f1(ws(p,'launchAngle'))),
+              esc(f3(ws(p,'avg'))),
+              esc(f3(ws(p,'obp'))),
+              esc(f3(ws(p,'slg'))),
+              esc(f3(ops || ws(p,'ops'))),
+              esc(ws(p,'hr')||0),
+              esc(f1(ws(p,'kPct'))),
+              esc(f1(ws(p,'bbPct'))),
             ].join(','));
           });
           const a = document.createElement('a');
           a.href = URL.createObjectURL(new Blob(['\uFEFF'+rows.join('\n')],{type:'text/csv;charset=utf-8;'}));
-          a.download = `batters-${selectedWin}-${new Date().toISOString().slice(0,10)}.csv`;
+          a.download = `batters-${winLabel}${teamLabel}-${new Date().toISOString().slice(0,10)}.csv`;
           a.click();
         }} style={{padding:'6px 11px',borderRadius:7,cursor:'pointer',
           border:'1px solid var(--border)',background:'var(--surface2)',
           color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:11,
-          whiteSpace:'nowrap',transition:'all .15s'}} title="Export current view to CSV">
+          whiteSpace:'nowrap',transition:'all .15s'}} title="Export current filtered view to CSV">
           ⬇ CSV
         </button>
         <span style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace",whiteSpace:'nowrap'}}>
@@ -5751,7 +5767,10 @@ function PitcherLeaderboard() {
         <button onClick={()=>{
           const esc = v => `"${String(v??'').replace(/"/g,'""')}"`;
           const role = roleFilter==='SP'?'SP':roleFilter==='RP'?'RP':'SP+RP';
+          const teamLabel = teamFilter !== 'all' ? `-${teamFilter}` : '';
+          const ipLabel = minIP > 0 ? `-min${minIP}IP` : '';
           const rows = [['Pitcher','Team','Hand','Role','Grade','W','L','ERA','WHIP','K/9','BB/9','HR/9','IP','K','HR','BAA','OBP','OPS'].map(esc).join(',')];
+          // Export the current filtered view — team, role, minIP, search all applied
           filtered.forEach(p => {
             const f2 = v => (v!=null&&!isNaN(v)&&v<99)?v.toFixed(2):'';
             const f3 = v => v>0?'.'+String(Math.round(v*1000)).padStart(3,'0'):'';
@@ -5768,12 +5787,12 @@ function PitcherLeaderboard() {
           });
           const a = document.createElement('a');
           a.href = URL.createObjectURL(new Blob(['\uFEFF'+rows.join('\n')],{type:'text/csv;charset=utf-8;'}));
-          a.download = `pitchers-${role}-${new Date().toISOString().slice(0,10)}.csv`;
+          a.download = `pitchers-${role}${teamLabel}${ipLabel}-${new Date().toISOString().slice(0,10)}.csv`;
           a.click();
         }} style={{padding:'6px 11px',borderRadius:7,cursor:'pointer',
           border:'1px solid var(--border)',background:'var(--surface2)',
           color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:11,
-          whiteSpace:'nowrap',transition:'all .15s'}} title="Export current view to CSV">
+          whiteSpace:'nowrap',transition:'all .15s'}} title="Export current filtered view to CSV">
           ⬇ CSV
         </button>
         <span style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace",whiteSpace:'nowrap'}}>
