@@ -24,7 +24,7 @@ const styles = `
   .tab{padding:12px 14px;font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;border:none;background:none;color:var(--muted);border-bottom:2px solid transparent;transition:all .2s;font-family:'Oswald',sans-serif;font-weight:500;white-space:nowrap;}
   .tab:hover{color:var(--text);}
   .tab.active{color:var(--text);border-bottom-color:var(--accent);}
-  .content{flex:1;padding:22px;max-width:1440px;margin:0 auto;width:100%;}
+  .content{flex:1;padding:22px;width:100%;box-sizing:border-box;}
   .section-title{font-family:'Oswald',sans-serif;font-weight:700;font-size:26px;text-transform:uppercase;letter-spacing:2px;color:var(--text);}
   .section-sub{font-size:12px;color:var(--muted);margin-top:3px;font-family:'Oswald',sans-serif;font-weight:300;letter-spacing:.5px;}
   .section-header{margin-bottom:18px;}
