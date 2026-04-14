@@ -4548,23 +4548,35 @@ function HRTrackerTab() {
     return true;
   });
   const sorted = [...filtered].sort((a,b) => {
-    // chronoIndex is always the PRIMARY sort — newest HR first
-    // Other columns are secondary sort only
+    // Convert "9:45 PM" → minutes since midnight for reliable numeric sort
+    const toMins = (hr) => {
+      const t = hr.timeET || '';
+      const m = t.match(/(\d+):(\d+)\s*(AM|PM)/i);
+      if (!m) {
+        // Fall back to inning + plate appearance for in-game ordering
+        return (hr.inning || 0) * 100 + (hr.plateAppearance || hr.playIndex || 0);
+      }
+      let h = parseInt(m[1]), mins = parseInt(m[2]);
+      const ap = m[3].toUpperCase();
+      if (ap === 'PM' && h !== 12) h += 12;
+      if (ap === 'AM' && h === 12) h = 0;
+      return h * 60 + mins;
+    };
+
     if (sortKey === "timeET" || sortKey === "chronoIndex") {
-      // Primary: chronoIndex descending (newest first)
-      return (b.chronoIndex ?? 0) - (a.chronoIndex ?? 0);
+      // Newest (latest time) first — descending
+      return toMins(b) - toMins(a);
     }
-    // Secondary: sort by chosen column, then break ties with chronoIndex
+    // Secondary: sort by chosen column, break ties by latest time
     const av = a[sortKey], bv = b[sortKey];
-    if (av == null && bv == null) return (b.chronoIndex??0)-(a.chronoIndex??0);
+    if (av == null && bv == null) return toMins(b) - toMins(a);
     if (av == null) return 1;
     if (bv == null) return -1;
     const primary = typeof av === "string"
       ? sortDir * av.localeCompare(bv)
       : sortDir * (bv - av);
     if (primary !== 0) return primary;
-    // Tie-break: newest first
-    return (b.chronoIndex ?? 0) - (a.chronoIndex ?? 0);
+    return toMins(b) - toMins(a);
   });
 
   const totalHRs = hrs.length;
@@ -4846,10 +4858,8 @@ function LinemateTab() {
 
 // ── GRADE CONFIG ─────────────────────────────────────────────────
 const GRADE_CFG = {
-  "A+": {color:"#ff4020",bg:"rgba(255,64,32,.18)",border:"rgba(255,64,32,.4)",  label:"A+"},
-  "A":  {color:"#ff6535",bg:"rgba(255,101,53,.14)",border:"rgba(255,101,53,.35)",label:"A"},
-  "B+": {color:"#ff8020",bg:"rgba(255,128,32,.14)",border:"rgba(255,128,32,.3)", label:"B+"},
-  "B":  {color:"#ffa030",bg:"rgba(255,160,48,.12)",border:"rgba(255,160,48,.28)",label:"B"},
+  "A":  {color:"#ff4020",bg:"rgba(255,64,32,.18)",border:"rgba(255,64,32,.4)",  label:"A"},
+  "B":  {color:"#ff8020",bg:"rgba(255,128,32,.14)",border:"rgba(255,128,32,.3)", label:"B"},
   "C":  {color:"#ffc840",bg:"rgba(255,200,64,.10)",border:"rgba(255,200,64,.25)",label:"C"},
   "D":  {color:"#8899a6",bg:"rgba(136,153,166,.08)",border:"rgba(136,153,166,.2)",label:"D"},
 };
@@ -6218,9 +6228,33 @@ function MatchupEngineTab() {
         All Games
       </button>
       {games.map(g => {
-        // Build a nicer label by finding the two teams for this game
-        const teamsInGame = [...new Set(data.filter(r=>r.game_id===g.id).map(r=>r.batting_team))];
-        const label = teamsInGame.length === 2 ? `${teamsInGame[0]} vs ${teamsInGame[1]}` : g.id;
+        // Build AWAY @ HOME label from the two teams in this game
+        // daily_summary.csv has batting_team and pitcher_team on every row
+        const rows = data.filter(r => r.game_id === g.id);
+        let label = String(g.id); // fallback: raw game_id
+        if (rows.length > 0) {
+          // Collect unique batting_team → pitcher_team pairs to find away/home
+          // The home team bats against an away pitcher and vice versa
+          // Each row: batting_team is the offense, pitcher_team is the defense
+          // So if batting_team=PHI and pitcher_team=CHC, PHI is batting at CHC → PHI away
+          const pairs = rows.reduce((acc, r) => {
+            const bt = r.batting_team, pt = r.pitcher_team;
+            if (bt && pt && bt !== pt) acc[bt] = pt;
+            return acc;
+          }, {});
+          const battingTeams = Object.keys(pairs);
+          if (battingTeams.length === 2) {
+            // Each batting team's pitcher_team is the home field
+            // batting_team A faces pitcher_team B (B is home) → A is away
+            // Pick the first pair: battingTeam=AWAY, pitcherTeam=HOME
+            const [away, home] = battingTeams[0] !== pairs[battingTeams[1]]
+              ? [battingTeams[0], pairs[battingTeams[0]]]
+              : [battingTeams[1], pairs[battingTeams[1]]];
+            label = `${away} @ ${home}`;
+          } else if (battingTeams.length === 1) {
+            label = `${battingTeams[0]} @ ${pairs[battingTeams[0]] || '?'}`;
+          }
+        }
         const active = selGame === g.id;
         return <button key={g.id} onClick={()=>setSelGame(g.id)}
           style={{padding:'4px 14px',borderRadius:6,cursor:'pointer',
@@ -6300,7 +6334,18 @@ function MatchupEngineTab() {
           borderBottom:'none'}}>
           <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:15,
             color:'var(--text)',letterSpacing:.5}}>
-            {teamPairs.map(t=>t.team).join(' vs ')}
+            {(() => {
+              // Build AWAY @ HOME from teams dict: key=batting_team, pitcher=pitcherTeam
+              const teamList = Object.values(game.teams);
+              if (teamList.length === 2) {
+                // teamList[i].team = batting team, teamList[i].pitcher team = pitching team
+                // Home team's pitcher faces the away batting team
+                const t0 = teamList[0], t1 = teamList[1];
+                // t0 bats against t1's pitcher (t1 is home field) → t0 away, t1 home
+                return `${t0.team} @ ${t1.team}`;
+              }
+              return teamList.map(t=>t.team).join(' @ ');
+            })()}
           </span>
           {displayTime && <span style={{fontSize:10,color:'var(--accent2)',
             fontFamily:"'DM Mono',monospace",fontWeight:600}}>
@@ -6379,8 +6424,8 @@ function MatchupEngineTab() {
 
                   {/* Batter name + hand */}
                   <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,
-                      whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',
+                    <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,
+                      whiteSpace:'normal',wordBreak:'break-word',lineHeight:1.2,
                       color:'var(--text)'}}>
                       {b.batter}
                       <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
