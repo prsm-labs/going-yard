@@ -1672,6 +1672,8 @@ const STAT_COL_HEADERS = [
 // ── GLOBAL PLAYER→TEAM MAP ───────────────────────────────────
 let GLOBAL_PLAYER_TEAM_MAP = {};
 let GLOBAL_PLAYER_MAP_LOADED = false;
+let GLOBAL_PLAYER_MAP_TS = 0;           // timestamp of last successful load
+const PLAYER_MAP_TTL = 6 * 60 * 60 * 1000; // 6-hour TTL — picks up mid-season trades
 
 // ── LINEUP STATUS MAP — pid → "confirmed" | "playing_today" ──
 // Populated when MLB lineup API returns confirmed starters
@@ -1711,8 +1713,13 @@ async function loadTodayLineups() {
 }
 
 async function loadGlobalPlayerMap() {
-  if (GLOBAL_PLAYER_MAP_LOADED) return GLOBAL_PLAYER_TEAM_MAP;
+  const now = Date.now();
+  // Re-fetch after TTL expires — catches trades and free agent signings
+  if (GLOBAL_PLAYER_MAP_LOADED && (now - GLOBAL_PLAYER_MAP_TS) < PLAYER_MAP_TTL) {
+    return GLOBAL_PLAYER_TEAM_MAP;
+  }
   try {
+    // Step 1: season-level player list (names, positions, bats)
     for (const season of ['2025', '2026']) {
       try {
         const res2 = await fetch(`https://statsapi.mlb.com/api/v1/sports/1/players?season=${season}&sportId=1`);
@@ -1730,16 +1737,56 @@ async function loadGlobalPlayerMap() {
         }
       } catch(se) {}
     }
+
+    // Step 2: active rosters for all 30 teams — most accurate current team source
+    // This is what catches mid-season trades that the season list may lag on
+    const TEAM_IDS = [
+      108,109,110,111,112,113,114,115,116,117,
+      118,119,120,121,133,134,135,136,137,138,
+      139,140,141,142,143,144,145,146,147,158
+    ];
+    await Promise.all(TEAM_IDS.map(async tid => {
+      try {
+        const r = await fetch(`https://statsapi.mlb.com/api/v1/teams/${tid}/roster?rosterType=active&season=2026`);
+        if (!r.ok) return;
+        const d = await r.json();
+        const abbr = d.roster?.[0]?.parentTeamId ? undefined
+          : (d.teamId ? undefined : undefined); // abbr comes from schedule
+        for (const entry of (d.roster || [])) {
+          const pid = entry.person?.id;
+          const fullName = entry.person?.fullName;
+          if (!pid) continue;
+          const ex = GLOBAL_PLAYER_TEAM_MAP[pid] || {};
+          // Roster endpoint gives us the team from the URL — use TEAM_ABBR map
+          const ABBR_MAP = {
+            108:'LAA',109:'ARI',110:'BAL',111:'BOS',112:'CHC',113:'CIN',
+            114:'CLE',115:'COL',116:'DET',117:'HOU',118:'KC', 119:'LAD',
+            120:'WSH',121:'NYM',133:'OAK',134:'PIT',135:'SD', 136:'SEA',
+            137:'SF', 138:'STL',139:'TB', 140:'TEX',141:'TOR',142:'MIN',
+            143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL',
+          };
+          const teamAbbr = ABBR_MAP[tid] || ex.team || '';
+          GLOBAL_PLAYER_TEAM_MAP[pid] = {
+            ...ex,
+            team:   teamAbbr,  // active roster = authoritative current team
+            teamId: tid,
+            name:   fullName || ex.name || '',
+            pos:    entry.position?.abbreviation || ex.pos || '',
+          };
+        }
+      } catch(re) {}
+    }));
+
     GLOBAL_PLAYER_MAP_LOADED = true;
-    // Check if any known players still have no team — if so mark for re-fetch later
+    GLOBAL_PLAYER_MAP_TS = now;
     const emptyTeams = Object.values(GLOBAL_PLAYER_TEAM_MAP).filter(p=>!p.team||p.team==="").length;
     if (emptyTeams > 50) console.warn(`[PlayerMap] ${emptyTeams} players missing team abbreviation`);
-    console.log('[Going Yard] Player map loaded:', Object.keys(GLOBAL_PLAYER_TEAM_MAP).length);
-    // Backfill cached players missing team
+    console.log('[Going Yard] Player map loaded:', Object.keys(GLOBAL_PLAYER_TEAM_MAP).length, '— active rosters refreshed');
+    // Backfill cached players with fresh team data from active rosters
     for (const [pidStr, player] of Object.entries(PLAYER_DATA_CACHE)) {
-      if (!player.team || player.team === '—' || player.team === '-' || player.team === '') {
-        const m = GLOBAL_PLAYER_TEAM_MAP[parseInt(pidStr)]?.team;
-        if (m && m !== '—' && m !== '') player.team = m;
+      const freshTeam = GLOBAL_PLAYER_TEAM_MAP[parseInt(pidStr)]?.team;
+      if (freshTeam && freshTeam !== '—' && freshTeam !== '') {
+        player.team = freshTeam; // active roster always wins over stale pipeline data
       }
     }
   } catch(e) {
@@ -1752,16 +1799,16 @@ function getPlayerTeam(pid) {
   return GLOBAL_PLAYER_TEAM_MAP[pid]?.team || null;
 }
 
-// Resolve team name from all available sources — use everywhere instead of p.team directly
+// Resolve team — MLB API active roster is authoritative (catches trades)
+// Priority: global map (live active rosters) > PLAYER_DATA_CACHE (pipeline) > fallback
 function getTeam(pid, fallback) {
   const id = parseInt(pid);
-  // Check cache first (fastest)
+  // Global map is refreshed from active rosters — always the most current source
+  const mapped = GLOBAL_PLAYER_TEAM_MAP[id]?.team;
+  if (mapped && mapped !== '—' && mapped !== '-' && mapped !== '') return mapped;
+  // Cache from pipeline/players.json — may lag trades by days
   const cached = PLAYER_DATA_CACHE[id]?.team;
   if (cached && cached !== '—' && cached !== '-') return cached;
-  // Check global map (loaded from MLB API)
-  const mapped = GLOBAL_PLAYER_TEAM_MAP[id]?.team;
-  if (mapped && mapped !== '—' && mapped !== '-') return mapped;
-  // Use whatever was passed as fallback
   if (fallback && fallback !== '—' && fallback !== '-') return fallback;
   return '—';
 }
@@ -3394,6 +3441,238 @@ function HeatingUpSlideout({ games, onClose }) {
 }
 
 
+// ── LINEUPS VIEW ──────────────────────────────────────────────
+function LineupsView({ date }) {
+  const [lineupGames, setLineupGames] = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [lastUpdate, setLastUpdate]   = useState(null);
+  const [refreshing, setRefreshing]   = useState(false);
+
+  const todayET = new Date().toLocaleDateString("en-US",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"});
+  const [lm,ld,ly] = todayET.split("/");
+  const todayStr = `${ly}-${lm}-${ld}`;
+  const fetchDate = date || todayStr;
+
+  const fetchLineups = async (silent=false) => {
+    if (!silent) setLoading(true);
+    try {
+      const url = `https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${fetchDate}` +
+                  `&hydrate=lineups,probablePitcher(note),team&fields=dates,games,gamePk,gameDate,status,` +
+                  `abstractGameState,teams,away,home,team,id,abbreviation,name,probablePitcher,` +
+                  `fullName,primaryPosition,abbreviation,lineups,awayPlayers,homePlayers,` +
+                  `battingOrder,jerseyNumber`;
+      const r = await fetch(url);
+      if (!r.ok) throw new Error(`${r.status}`);
+      const data = await r.json();
+      const games = (data.dates?.[0]?.games || []).map(g => {
+        const away = g.teams?.away, home = g.teams?.home;
+        const awayLineup = g.lineups?.awayPlayers || [];
+        const homeLineup = g.lineups?.homePlayers || [];
+        const awayConfirmed = awayLineup.length >= 8;
+        const homeConfirmed = homeLineup.length >= 8;
+
+        // Sort by batting order (field is like 100, 200 ... 900)
+        const sort = arr => [...arr].sort((a,b) => (a.battingOrder||999) - (b.battingOrder||999));
+
+        const gameTime = (() => {
+          try { return new Date(g.gameDate).toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit",hour12:true}); }
+          catch { return ''; }
+        })();
+        const status = g.status?.abstractGameState || 'Preview';
+
+        return {
+          gamePk:        g.gamePk,
+          gameTime,
+          status,
+          away: {
+            abbr:      away?.team?.abbreviation || '???',
+            name:      away?.team?.name || '',
+            sp:        away?.probablePitcher?.fullName || null,
+            spNote:    away?.probablePitcher?.note || null,
+            lineup:    sort(awayLineup),
+            confirmed: awayConfirmed,
+          },
+          home: {
+            abbr:      home?.team?.abbreviation || '???',
+            name:      home?.team?.name || '',
+            sp:        home?.probablePitcher?.fullName || null,
+            spNote:    home?.probablePitcher?.note || null,
+            lineup:    sort(homeLineup),
+            confirmed: homeConfirmed,
+          },
+        };
+      });
+      setLineupGames(games);
+      setLastUpdate(new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}));
+    } catch(e) {
+      console.warn('[Lineups] fetch failed:', e.message);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchLineups(); }, [fetchDate]);
+  useEffect(() => {
+    const id = setInterval(() => fetchLineups(true), 120000); // refresh every 2 min
+    return () => clearInterval(id);
+  }, [fetchDate]);
+
+  const PosChip = ({pos}) => (
+    <span style={{fontSize:8,padding:'1px 4px',borderRadius:3,
+      background:'var(--surface2)',border:'1px solid var(--border)',
+      color:'var(--muted)',fontFamily:"'DM Mono',monospace",flexShrink:0}}>
+      {pos||'?'}
+    </span>
+  );
+
+  const StatusBadge = ({confirmed}) => confirmed
+    ? <span style={{display:'inline-flex',alignItems:'center',gap:3,fontSize:9,
+        padding:'2px 7px',borderRadius:10,fontFamily:"'DM Mono',monospace",fontWeight:700,
+        background:'rgba(39,201,122,.12)',border:'1px solid rgba(39,201,122,.3)',
+        color:'#27c97a',letterSpacing:.3}}>🟢 CONFIRMED</span>
+    : <span style={{display:'inline-flex',alignItems:'center',gap:3,fontSize:9,
+        padding:'2px 7px',borderRadius:10,fontFamily:"'DM Mono',monospace",fontWeight:700,
+        background:'rgba(245,166,35,.10)',border:'1px solid rgba(245,166,35,.28)',
+        color:'var(--accent2)',letterSpacing:.3}}>🟡 PROJECTED</span>;
+
+  const TeamLineup = ({side, gameStatus}) => (
+    <div style={{flex:1,minWidth:0}}>
+      {/* Team header */}
+      <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:7,flexWrap:'wrap'}}>
+        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:16,
+          letterSpacing:1,color:'var(--text)'}}>{side.abbr}</span>
+        <StatusBadge confirmed={side.confirmed}/>
+      </div>
+
+      {/* Starting pitcher */}
+      <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:8,
+        padding:'5px 8px',borderRadius:6,
+        background:'rgba(56,184,242,.07)',border:'1px solid rgba(56,184,242,.18)'}}>
+        <span style={{fontSize:9,color:'var(--ice)',fontFamily:"'DM Mono',monospace",
+          fontWeight:700,flexShrink:0,letterSpacing:.5}}>SP</span>
+        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:600,fontSize:12,
+          color:side.sp?'var(--text)':'var(--muted)',
+          whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+          {side.sp || 'TBD'}
+        </span>
+        {side.spNote && <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",flexShrink:0}}>
+          {side.spNote}
+        </span>}
+      </div>
+
+      {/* Batting order */}
+      {side.lineup.length > 0 ? (
+        <div style={{display:'flex',flexDirection:'column',gap:2}}>
+          {side.lineup.map((p,i) => {
+            const pos = p.primaryPosition?.abbreviation || '';
+            const name = p.fullName || `Player ${p.id}`;
+            const order = Math.round((p.battingOrder||((i+1)*100)) / 100);
+            return (
+              <div key={p.id||i} style={{display:'flex',alignItems:'center',gap:6,
+                padding:'3px 4px',borderRadius:4,
+                background:i%2===0?'rgba(255,255,255,.02)':'transparent'}}>
+                <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,
+                  color:order<=3?'var(--accent2)':'var(--muted)',
+                  minWidth:13,textAlign:'right',flexShrink:0}}>
+                  {order}
+                </span>
+                <PosChip pos={pos}/>
+                <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:600,fontSize:12,
+                  color:'var(--text)',flex:1,minWidth:0,
+                  whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                  {name}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div style={{padding:'12px 4px',color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+          fontSize:10,fontStyle:'italic'}}>
+          Lineup not yet posted
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14,flexWrap:'wrap'}}>
+        <div>
+          <div style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
+            🟡 Projected = probable pitcher only &nbsp;·&nbsp; 🟢 Confirmed = batting order locked in
+            &nbsp;·&nbsp; auto-refreshes every 2 min
+            {lastUpdate && <span style={{marginLeft:6}}>· Updated {lastUpdate}</span>}
+          </div>
+        </div>
+        <button onClick={async()=>{setRefreshing(true);await fetchLineups(true);setRefreshing(false);}}
+          style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:5,
+            padding:'5px 11px',borderRadius:6,cursor:'pointer',
+            border:'1px solid var(--border)',background:'var(--surface2)',
+            color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:11}}>
+          <span style={{display:'inline-block',animation:refreshing?'spin .8s linear infinite':'none'}}>↻</span>
+          Refresh
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="lw"><div className="sp"/><div className="lt">Fetching lineups…</div></div>
+      ) : lineupGames.length === 0 ? (
+        <div style={{padding:'40px 20px',textAlign:'center',color:'var(--muted)',
+          fontFamily:"'DM Mono',monospace",fontSize:11}}>
+          No games found for this date.
+        </div>
+      ) : (
+        <div style={{display:'flex',flexDirection:'column',gap:12}}>
+          {lineupGames.map(game => {
+            const bothConfirmed = game.away.confirmed && game.home.confirmed;
+            const eitherConfirmed = game.away.confirmed || game.home.confirmed;
+            const statusColor = game.status==='Live'?'var(--accent)':game.status==='Final'?'var(--muted)':'#27c97a';
+            const confirmed = game.away.confirmed && game.home.confirmed;
+            return (
+              <div key={game.gamePk} style={{
+                background:'var(--surface)',border:'1px solid var(--border)',
+                borderRadius:10,overflow:'hidden',
+                borderTop:`2px solid ${confirmed?'#27c97a':eitherConfirmed?'var(--accent2)':'var(--border)'}`,
+              }}>
+                {/* Game header */}
+                <div style={{display:'flex',alignItems:'center',gap:8,
+                  padding:'8px 12px',background:'var(--surface2)',
+                  borderBottom:'1px solid var(--border)'}}>
+                  <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,
+                    letterSpacing:.5,color:'var(--text)'}}>
+                    {game.away.abbr} <span style={{color:'var(--muted)',fontWeight:400}}>@</span> {game.home.abbr}
+                  </span>
+                  {game.gameTime && <span style={{fontSize:10,color:'var(--accent2)',
+                    fontFamily:"'DM Mono',monospace",fontWeight:600}}>
+                    {game.gameTime}
+                  </span>}
+                  <span style={{fontSize:9,color:statusColor,fontFamily:"'DM Mono',monospace",
+                    fontWeight:700,marginLeft:'auto',letterSpacing:.5,textTransform:'uppercase'}}>
+                    {game.status==='Live'?'🔴 LIVE':game.status==='Final'?'✓ FINAL':'⏳ '+game.gameTime}
+                  </span>
+                </div>
+
+                {/* Two-column lineup */}
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1px 1fr',gap:0,padding:'12px 0'}}>
+                  <div style={{padding:'0 12px'}}>
+                    <TeamLineup side={game.away} gameStatus={game.status}/>
+                  </div>
+                  {/* Divider */}
+                  <div style={{background:'var(--border)'}}/>
+                  <div style={{padding:'0 12px'}}>
+                    <TeamLineup side={game.home} gameStatus={game.status}/>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function LiveTab() {
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -3401,6 +3680,7 @@ function LiveTab() {
   const [lastUpdate, setLastUpdate] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [showHeatingUp, setShowHeatingUp] = useState(false);
+  const [liveView, setLiveView] = useState('games'); // 'games' | 'lineups'
   const todayET2 = new Date().toLocaleDateString("en-US",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"});
   const [lm2,ld2,ly2] = todayET2.split("/");
   const liveTodayStr = `${ly2}-${lm2}-${ld2}`;
@@ -3473,6 +3753,24 @@ function LiveTab() {
         <RefBtn refreshing={refreshing} onClick={async()=>{setRefreshing(true);await fetchGames(setLoading,setGames,setError,true);setLastUpdate(new Date().toLocaleTimeString());setRefreshing(false);}}/>
       </div>
     </div>
+
+    {/* Sub-view toggle */}
+    <div style={{display:'flex',gap:5,marginBottom:12,padding:'3px',background:'var(--surface)',borderRadius:8,border:'1px solid var(--border)',width:'fit-content'}}>
+      {[['games','🎮 Live Games'],['lineups','📋 Lineups']].map(([key,label])=>(
+        <button key={key} onClick={()=>setLiveView(key)}
+          style={{padding:'6px 14px',borderRadius:6,cursor:'pointer',border:'none',
+            fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,letterSpacing:.8,
+            textTransform:'uppercase',transition:'all .15s',
+            background:liveView===key?'var(--accent)':'transparent',
+            color:liveView===key?'white':'var(--muted)'}}>
+          {label}
+        </button>
+      ))}
+    </div>
+
+  {liveView==='lineups' && <LineupsView date={liveDate}/>}
+
+  {liveView==='games' && <>
   {/* Date picker */}
   <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,flexWrap:"wrap"}}>
     <span style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1}}>Date</span>
@@ -3511,6 +3809,7 @@ function LiveTab() {
       {pre.length>0&&<><div className="div" style={{marginTop:12}}>🟢 Upcoming — Tap for 🚀 Liftoff List</div><div className="gg">{pre.map(g=><GCard key={g.id} game={g}/>)}</div></>}
       {fin.length>0&&<><div className="div" style={{marginTop:12}}>✓ Final</div><div className="gg">{fin.map(g=><GCard key={g.id} game={g}/>)}</div></>}
     </>}
+  </>}
     {showHeatingUp && <HeatingUpSlideout games={games} onClose={()=>setShowHeatingUp(false)}/>}
 </div>;
 }
@@ -5224,6 +5523,464 @@ function PitcherCard({ pitcherId, pitcherName, onGrade }) {
 
 
 // ── BATTER LEADERBOARD ─────────────────────────────────────────
+// ── SIM LAB ────────────────────────────────────────────────────
+function SimLabView({ data }) {
+  const [view, setView]             = useState('slate');    // 'slate' | 'deepdive' | 'props'
+  const [selBatter, setSelBatter]   = useState(null);
+  const [aiNote, setAiNote]         = useState('');
+  const [aiLoading, setAiLoading]   = useState(false);
+  const [sortBy, setSortBy]         = useState('proj_hr_adj');
+  const [teamFilter, setTeamFilter] = useState('all');
+  const aiCache = useRef({});
+
+  const pf = (v, d=1) => v != null && !isNaN(parseFloat(v)) ? parseFloat(v).toFixed(d) : null;
+  const pct = v => { const n = parseFloat(v); return isNaN(n) ? null : (n * 100).toFixed(1) + '%'; };
+  const pctRaw = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n * 100; };
+  const num = (v, d=2) => { const n = parseFloat(v); return isNaN(n) || n === 0 ? '—' : n.toFixed(d); };
+
+  // Sort and filter the slate
+  const teams = [...new Set(data.map(r => r.batting_team).filter(Boolean))].sort();
+  const SORT_OPTS = [
+    { key: 'proj_hr_adj',  label: 'HR Prob%' },
+    { key: 'proj_hit_prob',label: 'Hit Prob%' },
+    { key: 'proj_xbh_prob',label: 'XBH Prob%' },
+    { key: 'proj_avg_tb',  label: 'Exp. TB' },
+    { key: 'weighted_flag_score', label: 'Engine Score' },
+    { key: 'hr_intent_score',     label: 'HR Intent' },
+  ];
+
+  const slate = [...data]
+    .filter(r => r.batter && r.batting_team)
+    .filter(r => teamFilter === 'all' || r.batting_team === teamFilter)
+    .sort((a, b) => (parseFloat(b[sortBy]) || 0) - (parseFloat(a[sortBy]) || 0));
+
+  // Auto-select top batter when data loads
+  useEffect(() => {
+    if (slate.length > 0 && !selBatter) setSelBatter(slate[0]);
+  }, [data]);
+
+  // AI scout note
+  const fetchAiNote = async (b) => {
+    const key = `${b.batter}|${b.pitcher}|${b.game_id}`;
+    if (aiCache.current[key]) { setAiNote(aiCache.current[key]); return; }
+    setAiLoading(true); setAiNote('');
+    const hrPct   = (parseFloat(b.proj_hr_adj) * 100).toFixed(1);
+    const hitPct  = (parseFloat(b.proj_hit_prob) * 100).toFixed(1);
+    const prompt  = `You are a sharp baseball analytics assistant. Write a 2-3 sentence scout note for this specific matchup. Be direct, specific, and analytical — avoid generic statements.
+
+BATTER: ${b.batter} (${b.batting_team}, ${b.batter_hand}HB)
+VS PITCHER: ${b.pitcher} (${b.pitcher_hand}HP) — arsenal: ${b.top_pitches || 'unknown'}
+GAME: ${b.away_team || b.batting_team} @ ${b.home_team || b.pitcher_team} · ${b.game_time}
+CONDITIONS: ${b.wind_effect || 'N/A'} · ${b.temp_f ? b.temp_f + '°F' : ''} · ${b.condition || ''} · Park factor: ${b.hr_factor || 1.0}
+
+KEY METRICS:
+- HR probability: ${hrPct}% · Hit probability: ${hitPct}%
+- Recent EV: ${b.recent_avg_ev || '—'} mph · Recent Barrel%: ${b.recent_barrel_pct || '—'}%
+- BvP EV: ${b.bvp_avg_ev || '—'} mph · BvP Barrel%: ${b.bvp_barrel_pct || '—'}% (${b.bvp_pa || 0} PA vs this pitch mix)
+- Pitcher allows barrel%: ${b.pitcher_barrel_pct_allowed || '—'}% · HH%: ${b.pitcher_hh_pct_allowed || '—'}%
+- Engine grade: ${b.grade} · Slump: ${b.in_slump === 'True' || b.in_slump === true ? 'YES' : 'no'} · HR intent: ${b.hr_intent_score || '—'}
+
+Write exactly 2-3 sentences. Focus on the single most important factor driving or limiting the HR/XBH probability tonight. Name specific pitches when relevant. Do not repeat numbers verbatim — interpret them.`;
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          messages: [{ role: 'user', content: prompt }],
+        }),
+      });
+      const d = await res.json();
+      const note = d.content?.map(c => c.text || '').join('').trim() || 'Analysis unavailable.';
+      aiCache.current[key] = note;
+      setAiNote(note);
+    } catch(e) {
+      setAiNote('Scout analysis unavailable — check API connection.');
+    }
+    setAiLoading(false);
+  };
+
+  useEffect(() => {
+    if (selBatter && view === 'deepdive') fetchAiNote(selBatter);
+  }, [selBatter, view]);
+
+  // Probability bar component
+  const ProbBar = ({ value, max = 25, color = 'var(--accent)' }) => {
+    const n = parseFloat(value) || 0;
+    const pctVal = n > 1 ? n : n * 100; // handle both 0.08 and 8.0
+    const pctClamped = Math.min(100, (pctVal / max) * 100);
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+        <div style={{ flex: 1, height: 5, borderRadius: 3, background: 'var(--border)', overflow: 'hidden' }}>
+          <div style={{ height: '100%', width: `${pctClamped}%`, background: color, borderRadius: 3, transition: 'width .4s ease' }} />
+        </div>
+        <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 13, color, minWidth: 40, textAlign: 'right' }}>
+          {pctVal.toFixed(1)}%
+        </span>
+      </div>
+    );
+  };
+
+  const vBtn = (key, label) => ({
+    padding: '5px 13px', borderRadius: 6, cursor: 'pointer', border: 'none',
+    fontFamily: "'DM Mono',monospace", fontWeight: view === key ? 700 : 400, fontSize: 10,
+    letterSpacing: .5, textTransform: 'uppercase', transition: 'all .15s',
+    background: view === key ? 'var(--accent)' : 'transparent',
+    color: view === key ? 'white' : 'var(--muted)',
+  });
+
+  if (data.length === 0) return (
+    <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--muted)', fontFamily: "'DM Mono',monospace", fontSize: 11 }}>
+      <div style={{ fontSize: 24, marginBottom: 10 }}>🧠</div>
+      <div>No matchup data loaded.</div>
+      <div style={{ fontSize: 9, marginTop: 6 }}>Run the engine and commit daily_summary.csv first.</div>
+    </div>
+  );
+
+  return (
+    <div>
+      {/* Inner view toggle */}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 16, padding: '3px', background: 'var(--surface)', borderRadius: 8, border: '1px solid var(--border)', width: 'fit-content' }}>
+        <button style={vBtn('slate', '📊 Slate')} onClick={() => setView('slate')}>📊 Slate Rankings</button>
+        <button style={vBtn('deepdive', '🔬')} onClick={() => setView('deepdive')}>🔬 Deep Dive</button>
+        <button style={vBtn('props', '🎰')} onClick={() => setView('props')}>🎰 Prop Match</button>
+      </div>
+
+      {/* ── SLATE RANKINGS ── */}
+      {view === 'slate' && (
+        <div>
+          {/* Controls */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+            <select value={sortBy} onChange={e => setSortBy(e.target.value)}
+              style={{ padding: '6px 10px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 7, color: 'var(--text)', fontFamily: "'DM Mono',monospace", fontSize: 11, cursor: 'pointer' }}>
+              {SORT_OPTS.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
+            </select>
+            <select value={teamFilter} onChange={e => setTeamFilter(e.target.value)}
+              style={{ padding: '6px 10px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 7, color: 'var(--text)', fontFamily: "'DM Mono',monospace", fontSize: 11, cursor: 'pointer' }}>
+              <option value="all">All Teams</option>
+              {teams.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+            <span style={{ fontSize: 10, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>
+              {slate.length} batters · click any row to Deep Dive
+            </span>
+          </div>
+
+          <div className="tw">
+            <table>
+              <thead>
+                <tr>
+                  {['#','Batter','Team','vs Pitcher','HR%','Hit%','XBH%','Exp TB','Exp RBI','Grade','Flags'].map(h => (
+                    <th key={h} style={{ textAlign: h === 'Batter' ? 'left' : 'right', whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {slate.map((b, i) => {
+                  const hrP = pctRaw(b.proj_hr_adj);
+                  const hitP = pctRaw(b.proj_hit_prob);
+                  const xbhP = pctRaw(b.proj_xbh_prob);
+                  const tb = parseFloat(b.proj_avg_tb) || 0;
+                  const rbi = parseFloat(b.proj_avg_rbi) || 0;
+                  const hrColor = hrP >= 12 ? '#ff4020' : hrP >= 8 ? '#ff8020' : hrP >= 5 ? '#f5a623' : 'var(--text)';
+                  const hitColor = hitP >= 35 ? '#27c97a' : hitP >= 28 ? '#f5a623' : 'var(--text)';
+                  const gc = GRADE_CFG[b.grade] || GRADE_CFG['D'];
+                  return (
+                    <tr key={`${b.batter_id}-${i}`} className="dr"
+                      onClick={() => { setSelBatter(b); setView('deepdive'); }}
+                      style={{ cursor: 'pointer' }}>
+                      <td style={{ textAlign: 'right' }}>
+                        <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 13, color: i < 3 ? 'var(--accent)' : 'var(--muted)' }}>{i + 1}</span>
+                      </td>
+                      <td style={{ textAlign: 'left' }}>
+                        <div style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 13 }}>{b.batter}</div>
+                        {(b.in_slump === 'True' || b.in_slump === true) &&
+                          <span style={{ fontSize: 8, color: 'var(--ice)', fontFamily: "'DM Mono',monospace" }}>📉 slump</span>}
+                        {(b.is_diamond === 'True' || b.is_diamond === true) &&
+                          <span style={{ fontSize: 8, color: '#ffcc00', fontFamily: "'DM Mono',monospace", marginLeft: 4 }}>💎 diamond</span>}
+                      </td>
+                      <td style={{ textAlign: 'right' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 11, color: 'var(--accent2)', fontWeight: 700 }}>{b.batting_team}</span></td>
+                      <td style={{ textAlign: 'right' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)' }}>{b.pitcher}</span></td>
+                      <td style={{ textAlign: 'right' }}><span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 14, color: hrColor }}>{hrP > 0 ? hrP.toFixed(1) + '%' : '—'}</span></td>
+                      <td style={{ textAlign: 'right' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 11, color: hitColor }}>{hitP > 0 ? hitP.toFixed(1) + '%' : '—'}</span></td>
+                      <td style={{ textAlign: 'right' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 11 }}>{xbhP > 0 ? xbhP.toFixed(1) + '%' : '—'}</span></td>
+                      <td style={{ textAlign: 'right' }}><span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 13, color: tb >= 1.5 ? '#ff8020' : tb >= 1.0 ? '#f5a623' : 'var(--text)' }}>{tb > 0 ? tb.toFixed(2) : '—'}</span></td>
+                      <td style={{ textAlign: 'right' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 11 }}>{rbi > 0 ? rbi.toFixed(2) : '—'}</span></td>
+                      <td style={{ textAlign: 'right' }}>
+                        <span style={{ padding: '2px 7px', borderRadius: 5, fontSize: 10, fontFamily: "'Oswald',sans-serif", fontWeight: 800, background: gc.bg, color: gc.color, border: `1px solid ${gc.border}` }}>{b.grade}</span>
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)' }}>
+                          {Array.from({ length: Math.min(parseInt(b.total_flags) || 0, 8) }).map((_, si) => '⭐').join('')}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── DEEP DIVE ── */}
+      {view === 'deepdive' && (
+        <div>
+          {/* Batter selector */}
+          <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+            <select value={selBatter ? `${selBatter.batter_id}|${selBatter.game_id}` : ''}
+              onChange={e => {
+                const [bid, gid] = e.target.value.split('|');
+                const found = data.find(r => String(r.batter_id) === bid && String(r.game_id) === gid);
+                if (found) setSelBatter(found);
+              }}
+              style={{ flex: '1 1 220px', padding: '8px 12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontFamily: "'DM Mono',monospace", fontSize: 12, cursor: 'pointer' }}>
+              {[...data].sort((a, b) => (parseFloat(b.proj_hr_adj) || 0) - (parseFloat(a.proj_hr_adj) || 0))
+                .map(b => (
+                  <option key={`${b.batter_id}|${b.game_id}`} value={`${b.batter_id}|${b.game_id}`}>
+                    {b.batter} ({b.batting_team}) vs {b.pitcher} · {(parseFloat(b.proj_hr_adj) * 100).toFixed(1)}% HR
+                  </option>
+                ))}
+            </select>
+          </div>
+
+          {selBatter && (() => {
+            const b = selBatter;
+            const hrP = pctRaw(b.proj_hr_adj);
+            const hitP = pctRaw(b.proj_hit_prob);
+            const xbhP = pctRaw(b.proj_xbh_prob);
+            const tb = parseFloat(b.proj_avg_tb) || 0;
+            const gc = GRADE_CFG[b.grade] || GRADE_CFG['D'];
+            const inSlump = b.in_slump === 'True' || b.in_slump === true;
+            const isDiamond = b.is_diamond === 'True' || b.is_diamond === true;
+            const hf = parseFloat(b.hr_factor) || 1.0;
+
+            return (
+              <div>
+                {/* Header card */}
+                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 16px', marginBottom: 14, borderLeft: `3px solid ${gc.color}` }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 22, color: 'var(--text)' }}>{b.batter}</span>
+                        <span style={{ padding: '3px 9px', borderRadius: 6, fontSize: 11, fontFamily: "'Oswald',sans-serif", fontWeight: 800, background: gc.bg, color: gc.color, border: `1px solid ${gc.border}` }}>{b.grade}</span>
+                        {isDiamond && <span style={{ fontSize: 11, color: '#ffcc00' }}>💎 Diamond</span>}
+                        {inSlump && <span style={{ padding: '2px 7px', borderRadius: 5, fontSize: 9, fontFamily: "'DM Mono',monospace", background: 'rgba(56,184,242,.1)', border: '1px solid rgba(56,184,242,.3)', color: 'var(--ice)' }}>📉 SLUMP</span>}
+                      </div>
+                      <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
+                        <span style={{ color: 'var(--accent2)', fontWeight: 700 }}>{b.batting_team}</span> · {b.batter_hand}HB
+                        <span style={{ marginLeft: 10 }}>vs <strong style={{ color: 'var(--text)' }}>{b.pitcher}</strong> ({b.pitcher_hand}HP)</span>
+                        <span style={{ marginLeft: 10, color: 'var(--accent2)' }}>{b.away_team || ''} @ {b.home_team || ''}</span>
+                        <span style={{ marginLeft: 10 }}>{b.game_time}</span>
+                      </div>
+                      <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)', marginTop: 3 }}>
+                        {b.top_pitches && <span>Arsenal: <strong style={{ color: 'var(--text)' }}>{b.top_pitches}</strong> · </span>}
+                        {b.wind_effect && <span>{b.wind_effect} · </span>}
+                        {b.temp_f && <span>{parseFloat(b.temp_f).toFixed(0)}°F · </span>}
+                        {b.condition && <span>{b.condition} · </span>}
+                        <span style={{ color: hf > 1.05 ? '#ff8020' : hf < 0.95 ? 'var(--ice)' : 'var(--muted)' }}>
+                          Park: {hf > 1.05 ? '📈 HR-friendly' : hf < 0.95 ? '📉 HR-suppressor' : '— Neutral'}
+                        </span>
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 36, color: hrP >= 10 ? '#ff4020' : hrP >= 6 ? '#ff8020' : 'var(--text)', lineHeight: 1 }}>
+                        {hrP.toFixed(1)}%
+                      </div>
+                      <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 9, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 1 }}>HR PROB</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Outcome probabilities */}
+                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 16px', marginBottom: 14 }}>
+                  <div style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>Outcome Probabilities</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {[
+                      { label: 'Home Run', value: b.proj_hr_adj, max: 20, color: '#ff4020' },
+                      { label: 'Hit (any)',  value: b.proj_hit_prob, max: 50, color: '#27c97a' },
+                      { label: 'XBH (2B/3B/HR)', value: b.proj_xbh_prob, max: 30, color: '#f5a623' },
+                    ].map(row => (
+                      <div key={row.label} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)', minWidth: 100 }}>{row.label}</span>
+                        <ProbBar value={row.value} max={row.max} color={row.color} />
+                      </div>
+                    ))}
+                    <div style={{ display: 'flex', gap: 12, marginTop: 4, flexWrap: 'wrap' }}>
+                      {[
+                        { label: 'Exp. TB',  val: tb.toFixed(2), color: tb >= 1.5 ? '#ff8020' : 'var(--text)' },
+                        { label: 'Exp. RBI', val: parseFloat(b.proj_avg_rbi)>0 ? parseFloat(b.proj_avg_rbi).toFixed(2) : '—', color: 'var(--text)' },
+                        { label: 'Sim H',    val: num(b.sim_h),   color: 'var(--text)' },
+                        { label: 'Sim HR',   val: num(b.sim_hr_adj || b.sim_hr), color: parseFloat(b.sim_hr_adj||0) >= 0.15 ? 'var(--accent)' : 'var(--text)' },
+                        { label: 'Sim BB',   val: num(b.sim_bb),  color: 'var(--text)' },
+                        { label: 'Sim K',    val: num(b.sim_k),   color: 'var(--text)' },
+                      ].map(s => (
+                        <div key={s.label} style={{ textAlign: 'center', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 7, padding: '6px 12px' }}>
+                          <div style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 15, color: s.color, lineHeight: 1 }}>{s.val}</div>
+                          <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 8, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: .5, marginTop: 3 }}>{s.label}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Three signal cards */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: 10, marginBottom: 14 }}>
+                  {/* Recent form */}
+                  <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 12px' }}>
+                    <div style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>📅 Recent (L7)</div>
+                    {[
+                      ['Avg EV', b.recent_avg_ev, ' mph', parseFloat(b.recent_avg_ev) >= 95 ? '#ff4020' : parseFloat(b.recent_avg_ev) >= 90 ? '#f5a623' : 'var(--text)'],
+                      ['Barrel%', b.recent_barrel_pct, '%', parseFloat(b.recent_barrel_pct) >= 10 ? '#ff4020' : parseFloat(b.recent_barrel_pct) >= 5 ? '#f5a623' : 'var(--text)'],
+                      ['HH%',    b.recent_hh_pct,    '%', 'var(--text)'],
+                      ['FB%',    b.recent_fb_pct,    '%', 'var(--text)'],
+                      ['Avg LA', b.recent_avg_la,    '°', 'var(--text)'],
+                    ].map(([lbl, val, unit, col]) => val && parseFloat(val) > 0 ? (
+                      <div key={lbl} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                        <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>{lbl}</span>
+                        <span style={{ fontSize: 11, fontFamily: "'Oswald',sans-serif", fontWeight: 700, color: col }}>{parseFloat(val).toFixed(1)}{unit}</span>
+                      </div>
+                    ) : null)}
+                    <div style={{ marginTop: 5, fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>
+                      {b.recent_pa} PA · {b.recent_hr_count || 0} HR · {parseInt(b.recent_flag_count) || 0} flags
+                    </div>
+                  </div>
+
+                  {/* BvP */}
+                  <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 12px' }}>
+                    <div style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>⚔️ BvP ({b.bvp_pa} PA)</div>
+                    {[
+                      ['Avg EV', b.bvp_avg_ev, ' mph', parseFloat(b.bvp_avg_ev) >= 95 ? '#ff4020' : parseFloat(b.bvp_avg_ev) >= 90 ? '#f5a623' : 'var(--text)'],
+                      ['Barrel%', b.bvp_barrel_pct, '%', parseFloat(b.bvp_barrel_pct) >= 10 ? '#ff4020' : parseFloat(b.bvp_barrel_pct) >= 5 ? '#f5a623' : 'var(--text)'],
+                      ['HH%',    b.bvp_hh_pct,    '%', 'var(--text)'],
+                      ['FB%',    b.bvp_fb_pct,    '%', 'var(--text)'],
+                      ['Avg LA', b.bvp_avg_la,    '°', 'var(--text)'],
+                    ].map(([lbl, val, unit, col]) => val && parseFloat(val) > 0 ? (
+                      <div key={lbl} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                        <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>{lbl}</span>
+                        <span style={{ fontSize: 11, fontFamily: "'Oswald',sans-serif", fontWeight: 700, color: col }}>{parseFloat(val).toFixed(1)}{unit}</span>
+                      </div>
+                    ) : null)}
+                    <div style={{ marginTop: 5, fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>
+                      {b.bvp_hr_count || 0} HR in sample · {parseInt(b.bvp_flag_count) || 0} flags
+                    </div>
+                  </div>
+
+                  {/* Pitcher vulnerability */}
+                  <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 12px' }}>
+                    <div style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>🎯 Pitcher Vuln.</div>
+                    {[
+                      ['Barrel Allowed', b.pitcher_barrel_pct_allowed, '%', parseFloat(b.pitcher_barrel_pct_allowed) >= 10 ? '#ff4020' : parseFloat(b.pitcher_barrel_pct_allowed) >= 6 ? '#f5a623' : 'var(--text)'],
+                      ['HH Allowed',     b.pitcher_hh_pct_allowed,    '%', parseFloat(b.pitcher_hh_pct_allowed) >= 45 ? '#ff4020' : 'var(--text)'],
+                      ['FB Allowed',     b.pitcher_fb_pct_allowed,    '%', 'var(--text)'],
+                    ].map(([lbl, val, unit, col]) => val && parseFloat(val) > 0 ? (
+                      <div key={lbl} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                        <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>{lbl}</span>
+                        <span style={{ fontSize: 11, fontFamily: "'Oswald',sans-serif", fontWeight: 700, color: col }}>{parseFloat(val).toFixed(1)}{unit}</span>
+                      </div>
+                    ) : null)}
+                    {b.pitcher_pa_faced && <div style={{ marginTop: 5, fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>{b.pitcher_pa_faced} PA faced this season</div>}
+                  </div>
+                </div>
+
+                {/* AI Scout Note */}
+                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                    <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", textTransform: 'uppercase', letterSpacing: 1 }}>🧠 AI Scout Note</span>
+                    <button onClick={() => {
+                      const key = `${b.batter}|${b.pitcher}|${b.game_id}`;
+                      delete aiCache.current[key];
+                      fetchAiNote(b);
+                    }}
+                      style={{ marginLeft: 'auto', padding: '3px 9px', borderRadius: 5, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--muted)', fontFamily: "'DM Mono',monospace", fontSize: 9, cursor: 'pointer' }}>
+                      ↻ Refresh
+                    </button>
+                  </div>
+                  {aiLoading ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", fontSize: 11 }}>
+                      <div className="sp" style={{ width: 18, height: 18, borderWidth: 2 }} />
+                      Analyzing matchup…
+                    </div>
+                  ) : aiNote ? (
+                    <p style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 400, fontSize: 14, color: 'var(--text)', lineHeight: 1.65, margin: 0 }}>{aiNote}</p>
+                  ) : (
+                    <div style={{ color: 'var(--muted)', fontFamily: "'DM Mono',monospace", fontSize: 10 }}>Select a batter to generate a scout note.</div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* ── PROP MATCH ── */}
+      {view === 'props' && (
+        <div>
+          <div style={{ marginBottom: 12, fontSize: 10, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>
+            Engine projections vs common prop market lines · green = proj above line · red = proj below line
+          </div>
+          <div className="tw">
+            <table>
+              <thead>
+                <tr>
+                  {['Batter','Team','vs','HR &gt;0.5','H &gt;0.5','H &gt;1.5','TB &gt;0.5','TB &gt;1.5','TB &gt;2.5','Grade'].map(h => (
+                    <th key={h} style={{ textAlign: h === 'Batter' || h === 'vs' ? 'left' : 'center', whiteSpace: 'nowrap' }} dangerouslySetInnerHTML={{__html: h}} />
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {[...data]
+                  .filter(r => r.batter)
+                  .sort((a, b) => (parseFloat(b.proj_hit_prob) || 0) - (parseFloat(a.proj_hit_prob) || 0))
+                  .map((b, i) => {
+                    const hrP = parseFloat(b.proj_hr_adj) || 0;
+                    const hitP = parseFloat(b.proj_hit_prob) || 0;
+                    const tb = parseFloat(b.proj_avg_tb) || 0;
+                    const gc = GRADE_CFG[b.grade] || GRADE_CFG['D'];
+
+                    const Cell = ({ pass, val }) => {
+                      const col = pass ? '#27c97a' : '#38b8f2';
+                      const bg = pass ? 'rgba(39,201,122,.1)' : 'rgba(56,184,242,.08)';
+                      const bdr = pass ? 'rgba(39,201,122,.3)' : 'rgba(56,184,242,.2)';
+                      return (
+                        <td style={{ textAlign: 'center' }}>
+                          <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 1,
+                            padding: '2px 6px', borderRadius: 5, background: bg, border: `1px solid ${bdr}`, minWidth: 44 }}>
+                            <span style={{ fontSize: 10, fontWeight: 700, color: col }}>{pass ? '✓' : '✗'}</span>
+                            <span style={{ fontSize: 8, color: col, fontFamily: "'DM Mono',monospace" }}>{val}</span>
+                          </span>
+                        </td>
+                      );
+                    };
+
+                    return (
+                      <tr key={`${b.batter_id}-${i}`} className="dr" onClick={() => { setSelBatter(b); setView('deepdive'); }} style={{ cursor: 'pointer' }}>
+                        <td style={{ textAlign: 'left' }}>
+                          <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 12 }}>{b.batter}</span>
+                        </td>
+                        <td><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 11, color: 'var(--accent2)', fontWeight: 700 }}>{b.batting_team}</span></td>
+                        <td style={{ textAlign: 'left' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)' }}>{b.pitcher}</span></td>
+                        <Cell pass={hrP >= 0.05}  val={`${(hrP*100).toFixed(1)}%`} />
+                        <Cell pass={hitP >= 0.28} val={`${(hitP*100).toFixed(1)}%`} />
+                        <Cell pass={hitP >= 0.55} val={`${(hitP*100).toFixed(1)}%`} />
+                        <Cell pass={tb >= 0.6}    val={tb.toFixed(2)} />
+                        <Cell pass={tb >= 1.0}    val={tb.toFixed(2)} />
+                        <Cell pass={tb >= 1.5}    val={tb.toFixed(2)} />
+                        <td style={{ textAlign: 'center' }}>
+                          <span style={{ padding: '2px 7px', borderRadius: 5, fontSize: 10, fontFamily: "'Oswald',sans-serif", fontWeight: 800, background: gc.bg, color: gc.color, border: `1px solid ${gc.border}` }}>{b.grade}</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function BatterLeaderboard() {
   const [sortCol, setSortCol] = useState('avgEV');
   const [sortDir, setSortDir] = useState('desc');
@@ -5233,6 +5990,7 @@ function BatterLeaderboard() {
   const [selectedWin, setSelectedWin] = useState('last7');
   const [players, setPlayers] = useState([]);
   const [showPicksOnly, setShowPicksOnly] = useState(false);
+  const [filterGoneYard, setFilterGoneYard] = useState(false);
   const picks = usePicks();
   const bprops = useBatterProps();
 
@@ -5302,10 +6060,14 @@ function BatterLeaderboard() {
     else { setSortCol(col); setSortDir('desc'); }
   };
 
+  // Gone Yard check — did this batter hit a HR today?
+  const isGoneYard = p => HR_DATA.some(h =>
+    h.batterId === p.pid ||
+    (h.batterName && p.name && h.batterName.toLowerCase() === p.name.toLowerCase())
+  );
+
   const filtered = allPlayers
     .filter(p => {
-      // For season2025: player must have actual 2025 pipeline data — no fallback
-      // This eliminates 2026 rookies, minPA=0 edge case, and unpopulated pipeline data
       if (selectedWin === 'season2025') {
         const w25 = p.windows?.season2025;
         if (!w25 || !w25.pa) return false;
@@ -5316,6 +6078,7 @@ function BatterLeaderboard() {
     .filter(p => teamFilter === 'all' || p.team === teamFilter)
     .filter(p => !searchQ || p.name?.toLowerCase().includes(searchQ.toLowerCase()))
     .filter(p => !showPicksOnly || picks[String(p.pid)])
+    .filter(p => !filterGoneYard || isGoneYard(p))
     .sort((a, b) => {
       const av = sortCol === 'name' ? (a.name||'') : ws(a, sortCol) ?? (a[sortCol] ?? 0);
       const bv = sortCol === 'name' ? (b.name||'') : ws(b, sortCol) ?? (b[sortCol] ?? 0);
@@ -5396,6 +6159,15 @@ function BatterLeaderboard() {
             fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:showPicksOnly?700:400,
             whiteSpace:'nowrap',transition:'all .15s'}}>
           🎯 {showPicksOnly ? 'My Picks ✓' : 'My Picks'}
+        </button>
+        <button onClick={()=>setFilterGoneYard(s=>!s)}
+          style={{padding:'6px 12px',borderRadius:7,cursor:'pointer',
+            border:`1px solid ${filterGoneYard?'rgba(255,20,0,.5)':'var(--border)'}`,
+            background:filterGoneYard?'rgba(255,20,0,.18)':'var(--surface2)',
+            color:filterGoneYard?'#ff4020':'var(--muted)',
+            fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:filterGoneYard?700:400,
+            whiteSpace:'nowrap',transition:'all .15s'}}>
+          💥 {filterGoneYard ? 'Gone Yard ✓' : 'Gone Yard'}
         </button>
         <button onClick={()=>{
           const esc = v => `"${String(v??'').replace(/"/g,'""')}"`;
@@ -5528,7 +6300,13 @@ function BatterLeaderboard() {
                       <div style={{display:'flex',alignItems:'center',gap:7}}>
                         <PosAvatar player={p} size={24}/>
                         <div>
-                          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,letterSpacing:.3}}>{p.name}</div>
+                          <div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}>
+                            <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,letterSpacing:.3}}>{p.name}</span>
+                            {isGoneYard(p) && <span style={{fontSize:8,padding:'1px 5px',borderRadius:4,
+                              background:'rgba(255,20,0,.25)',border:'1px solid rgba(255,20,0,.5)',
+                              color:'#fff',fontFamily:"'DM Mono',monospace",fontWeight:800,letterSpacing:.4,
+                              flexShrink:0}}>💥 GY</span>}
+                          </div>
                           <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)'}}>{p.hand}HB · {p.pos||'—'}</div>
                         </div>
                       </div>
@@ -5960,6 +6738,7 @@ function MatchupEngineTab() {
   const liveCache = useRef({});
   const pitcherGradeCache = useRef({});
   const [selPitcherGrade, setSelPitcherGrade] = useState('all');
+  const [filterGoneYard, setFilterGoneYard]   = useState(false);
   const picks = usePicks();
 
   useEffect(() => {
@@ -6023,6 +6802,12 @@ function MatchupEngineTab() {
   const grouped = {};
   (selGame === 'all' ? data : data.filter(r => r.game_id === selGame))
     .filter(r => selGrade === 'all' || r.grade === selGrade)
+    .filter(r => {
+      if (!filterGoneYard) return true;
+      const bid = parseInt(r.batter_id) || 0;
+      return HR_DATA.some(h => h.batterId === bid ||
+        (r.batter && h.batterName && h.batterName.toLowerCase() === r.batter.toLowerCase()));
+    })
     .forEach(r => {
     const key = r.game_id;
     if (!grouped[key]) grouped[key] = { gameId: key, gameTime: r.game_time, teams: {} };
@@ -6104,6 +6889,7 @@ function MatchupEngineTab() {
         <div className="section-title">⚡ Matchup Engine</div>
         <div className="section-sub">
           {subTab==='matchups' && <>Daily HR projections · flags · sim stats{generated && <span style={{marginLeft:8,fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>anchored {generated}</span>}</>}
+          {subTab==='simlab'   && '🧠 Outcome probabilities · AI scout notes · prop line matching'}
           {subTab==='batters'  && 'Season Statcast · sorted by Avg EV · Statcast-powered'}
           {subTab==='pitchers' && 'Season pitching stats · live from MLB Stats API'}
         </div>
@@ -6122,9 +6908,21 @@ function MatchupEngineTab() {
     {/* Sub-tab navigation */}
     <div style={{display:'flex',gap:6,marginBottom:18,padding:'4px',background:'var(--surface)',borderRadius:9,border:'1px solid var(--border)',width:'fit-content'}}>
       <button style={stBtn('matchups')} onClick={()=>setSubTab('matchups')}>⚡ Matchups</button>
+      <button style={stBtn('simlab')}   onClick={()=>setSubTab('simlab')}>🧠 Sim Lab</button>
       <button style={stBtn('batters')}  onClick={()=>setSubTab('batters')}>🧢 Batters</button>
       <button style={stBtn('pitchers')} onClick={()=>setSubTab('pitchers')}>⚾ Pitchers</button>
     </div>
+
+    {/* Sim Lab */}
+    {subTab==='simlab' && (
+      <div>
+        <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:9,padding:'10px 14px',marginBottom:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+          <span style={{fontSize:10,color:'var(--accent)',fontFamily:"'DM Mono',monospace",fontWeight:700}}>🧠 SIM LAB</span>
+          <span style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>Monte Carlo projections · probability analysis · AI scout notes · prop line matching · all from today's engine run</span>
+        </div>
+        <SimLabView data={data}/>
+      </div>
+    )}
 
     {/* Batter Leaderboard */}
     {subTab==='batters' && (
@@ -6316,6 +7114,15 @@ function MatchupEngineTab() {
           {g}
         </button>;
       })}
+      {/* Gone Yard filter — show only batters who have already hit a HR today */}
+      <button onClick={()=>setFilterGoneYard(s=>!s)}
+        style={{padding:'3px 12px',borderRadius:6,cursor:'pointer',marginLeft:4,
+          background:filterGoneYard?'rgba(255,20,0,.18)':'transparent',
+          color:filterGoneYard?'#ff4020':'var(--muted)',
+          border:`1px solid ${filterGoneYard?'rgba(255,20,0,.5)':'var(--border)'}`,
+          fontFamily:"'DM Mono',monospace",fontWeight:filterGoneYard?700:400,fontSize:11}}>
+        💥 {filterGoneYard ? 'Gone Yard ✓' : 'Gone Yard'}
+      </button>
     </div>}
     {loading && <div className="lw"><div className="sp"/><div className="lt">Loading matchup data…</div></div>}
     {/* Pitcher grade filter */}
