@@ -5534,9 +5534,12 @@ function SimLabView({ data }) {
   const aiCache = useRef({});
 
   const pf = (v, d=1) => v != null && !isNaN(parseFloat(v)) ? parseFloat(v).toFixed(d) : null;
-  // pctRaw: CSV stores proj_hr_adj etc as either 0-1 decimal OR 0-100 percentage
-  // If n > 1 it's already a percentage — don't multiply again
-  const pctRaw = v => { const n = parseFloat(v); if (isNaN(n)) return 0; return n > 1 ? n : n * 100; };
+  // toDecimal: normalizes prob values regardless of how they're stored in the CSV.
+  // Engine bug stored proj_hr_adj as proj_hr_prob * hr_factor where hr_factor was 106
+  // instead of 1.06 — resulting in values like 7.18 instead of 0.0718.
+  // Rule: if n > 1, it's been multiplied by 100 (or worse) → divide back down.
+  const toDecimal = v => { const n = parseFloat(v); if (isNaN(n)) return 0; return n > 1 ? n / 100 : n; };
+  const pctRaw = v => toDecimal(v) * 100;  // always returns 0-100 percentage
   const pct = v => { const n = pctRaw(v); return n === 0 ? null : n.toFixed(1) + '%'; };
   const num = (v, d=2) => { const n = parseFloat(v); return isNaN(n) || n === 0 ? '—' : n.toFixed(d); };
 
@@ -5651,17 +5654,13 @@ Write exactly 2-3 sentences. Focus on the single most important factor driving o
         <div>
           {/* Controls */}
           <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-            <select value={sortBy} onChange={e => setSortBy(e.target.value)}
-              style={{ padding: '6px 10px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 7, color: 'var(--text)', fontFamily: "'DM Mono',monospace", fontSize: 11, cursor: 'pointer' }}>
-              {SORT_OPTS.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
-            </select>
             <select value={teamFilter} onChange={e => setTeamFilter(e.target.value)}
               style={{ padding: '6px 10px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 7, color: 'var(--text)', fontFamily: "'DM Mono',monospace", fontSize: 11, cursor: 'pointer' }}>
               <option value="all">All Teams</option>
               {teams.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
             <span style={{ fontSize: 10, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>
-              {slate.length} batters · click any row to Deep Dive
+              {slate.length} batters · click column header to sort · click row to Deep Dive
             </span>
           </div>
 
@@ -5669,8 +5668,31 @@ Write exactly 2-3 sentences. Focus on the single most important factor driving o
             <table>
               <thead>
                 <tr>
-                  {['#','Batter','Team','vs Pitcher','HR%','Hit%','XBH%','Exp TB','Exp RBI','Grade','Flags'].map(h => (
-                    <th key={h} style={{ textAlign: h === 'Batter' ? 'left' : 'right', whiteSpace: 'nowrap' }}>{h}</th>
+                  {[
+                    { label: '#',        key: null },
+                    { label: 'Batter',   key: null },
+                    { label: 'Team',     key: null },
+                    { label: 'vs Pitcher',key: null },
+                    { label: 'HR%',      key: 'proj_hr_adj' },
+                    { label: 'Hit%',     key: 'proj_hit_prob' },
+                    { label: 'XBH%',     key: 'proj_xbh_prob' },
+                    { label: 'Exp TB',   key: 'proj_avg_tb' },
+                    { label: 'Exp RBI',  key: 'proj_avg_rbi' },
+                    { label: 'Score',    key: 'weighted_flag_score' },
+                    { label: 'Grade',    key: null },
+                    { label: 'Flags',    key: 'total_flags' },
+                  ].map(col => (
+                    <th key={col.label}
+                      onClick={() => col.key && setSortBy(col.key)}
+                      style={{
+                        textAlign: col.label === 'Batter' || col.label === 'vs Pitcher' ? 'left' : 'right',
+                        whiteSpace: 'nowrap',
+                        cursor: col.key ? 'pointer' : 'default',
+                        color: sortBy === col.key ? 'var(--accent)' : 'var(--muted)',
+                        userSelect: 'none',
+                      }}>
+                      {col.label}{sortBy === col.key ? ' ▼' : ''}
+                    </th>
                   ))}
                 </tr>
               </thead>
@@ -5932,10 +5954,10 @@ Write exactly 2-3 sentences. Focus on the single most important factor driving o
                   .filter(r => r.batter)
                   .sort((a, b) => (parseFloat(b.proj_hit_prob) || 0) - (parseFloat(a.proj_hit_prob) || 0))
                   .map((b, i) => {
-                    const hrP = parseFloat(b.proj_hr_adj) || 0;
-                    const hitP = parseFloat(b.proj_hit_prob) || 0;
-                    const tb = parseFloat(b.proj_avg_tb) || 0;
-                    const gc = GRADE_CFG[b.grade] || GRADE_CFG['D'];
+                    const hrP  = toDecimal(b.proj_hr_adj);
+                    const hitP = toDecimal(b.proj_hit_prob);
+                    const tb   = parseFloat(b.proj_avg_tb) || 0;
+                    const gc   = GRADE_CFG[b.grade] || GRADE_CFG['D'];
 
                     const Cell = ({ pass, val }) => {
                       const col = pass ? '#27c97a' : '#38b8f2';
@@ -5959,9 +5981,9 @@ Write exactly 2-3 sentences. Focus on the single most important factor driving o
                         </td>
                         <td><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 11, color: 'var(--accent2)', fontWeight: 700 }}>{b.batting_team}</span></td>
                         <td style={{ textAlign: 'left' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)' }}>{b.pitcher}</span></td>
-                        <Cell pass={hrP >= 0.05}  val={`${(hrP*100).toFixed(1)}%`} />
-                        <Cell pass={hitP >= 0.28} val={`${(hitP*100).toFixed(1)}%`} />
-                        <Cell pass={hitP >= 0.55} val={`${(hitP*100).toFixed(1)}%`} />
+                        <Cell pass={hrP  >= 0.05}  val={`${(hrP*100).toFixed(1)}%`} />
+                        <Cell pass={hitP >= 0.28}  val={`${(hitP*100).toFixed(1)}%`} />
+                        <Cell pass={hitP >= 0.55}  val={`${(hitP*100).toFixed(1)}%`} />
                         <Cell pass={tb >= 0.6}    val={tb.toFixed(2)} />
                         <Cell pass={tb >= 1.0}    val={tb.toFixed(2)} />
                         <Cell pass={tb >= 1.5}    val={tb.toFixed(2)} />
