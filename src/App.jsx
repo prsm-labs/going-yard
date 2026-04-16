@@ -3447,7 +3447,7 @@ function LineupsView({ date }) {
   const [loading, setLoading]         = useState(true);
   const [lastUpdate, setLastUpdate]   = useState(null);
   const [refreshing, setRefreshing]   = useState(false);
-  const [expandedId, setExpandedId]   = useState(null); // "gamePk_playerId"
+  const [selBatterInfo, setSelBatterInfo] = useState(null); // { player, teamAbbr }
 
   const todayET = new Date().toLocaleDateString("en-US",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"});
   const [lm,ld,ly] = todayET.split("/");
@@ -3623,7 +3623,7 @@ function LineupsView({ date }) {
     );
   };
 
-  const TeamLineup = ({side, gamePk}) => (
+  const TeamLineup = ({side, gamePk, onBatterClick}) => (
     <div style={{flex:1,minWidth:0}}>
       <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:7,flexWrap:'wrap'}}>
         <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:16,letterSpacing:1,color:'var(--text)'}}>{side.abbr}</span>
@@ -3642,35 +3642,31 @@ function LineupsView({ date }) {
             const pos   = p.primaryPosition?.abbreviation || '';
             const name  = p.fullName || `Player ${p.id}`;
             const order = Math.round((p.battingOrder||((i+1)*100)) / 100);
-            const uid   = `${gamePk}_${p.id}`;
-            const isExp = expandedId === uid;
             const cached = p.id ? getCachedPlayer(p.id) : null;
             const ev    = cached?.recentAvgEV ?? cached?.avgEV ?? 0;
             return (
-              <div key={p.id||i}>
-                <div onClick={()=>setExpandedId(id=>id===uid?null:uid)}
-                  style={{display:'flex',alignItems:'center',gap:6,
-                    padding:'4px 4px',borderRadius:4,cursor:'pointer',
-                    background:isExp?'rgba(255,255,255,.06)':i%2===0?'rgba(255,255,255,.02)':'transparent',
-                    borderLeft:isExp?'2px solid var(--accent2)':'2px solid transparent',
-                    transition:'background .12s'}}
-                  onMouseEnter={e=>{if(!isExp)e.currentTarget.style.background='rgba(255,255,255,.04)';}}
-                  onMouseLeave={e=>{if(!isExp)e.currentTarget.style.background=i%2===0?'rgba(255,255,255,.02)':'transparent';}}>
-                  <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,
-                    color:order<=3?'var(--accent2)':'var(--muted)',minWidth:13,textAlign:'right',flexShrink:0}}>
-                    {order}
-                  </span>
-                  <PosChip pos={pos}/>
-                  <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:600,fontSize:12,
-                    color:'var(--text)',flex:1,minWidth:0,
-                    whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                    {name}
-                  </span>
-                  {ev >= 90 && <span style={{fontSize:8,color:ev>=95?'#ff8020':'var(--muted)',
-                    fontFamily:"'DM Mono',monospace",flexShrink:0}}>{ev.toFixed(0)}</span>}
-                  <span style={{fontSize:9,color:isExp?'var(--accent2)':'rgba(255,255,255,.2)',flexShrink:0}}>{isExp?'▲':'▼'}</span>
-                </div>
-                {isExp && <BatterPanel player={p} teamAbbr={side.abbr}/>}
+              <div key={p.id||i}
+                onClick={() => onBatterClick({player: p, teamAbbr: side.abbr})}
+                style={{display:'flex',alignItems:'center',gap:6,
+                  padding:'5px 4px',borderRadius:4,cursor:'pointer',
+                  background: i%2===0?'rgba(255,255,255,.02)':'transparent',
+                  borderLeft:'2px solid transparent',
+                  transition:'background .12s'}}
+                onMouseEnter={e=>{e.currentTarget.style.background='rgba(255,255,255,.06)';e.currentTarget.style.borderLeftColor='var(--accent2)';}}
+                onMouseLeave={e=>{e.currentTarget.style.background=i%2===0?'rgba(255,255,255,.02)':'transparent';e.currentTarget.style.borderLeftColor='transparent';}}>
+                <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,
+                  color:order<=3?'var(--accent2)':'var(--muted)',minWidth:13,textAlign:'right',flexShrink:0}}>
+                  {order}
+                </span>
+                <PosChip pos={pos}/>
+                <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:600,fontSize:12,
+                  color:'var(--text)',flex:1,minWidth:0,
+                  whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                  {name}
+                </span>
+                {ev >= 90 && <span style={{fontSize:8,color:ev>=95?'#ff8020':'var(--muted)',
+                  fontFamily:"'DM Mono',monospace",flexShrink:0}}>{ev.toFixed(0)}</span>}
+                <span style={{fontSize:9,color:'rgba(255,255,255,.2)',flexShrink:0}}>›</span>
               </div>
             );
           })}
@@ -3722,15 +3718,57 @@ function LineupsView({ date }) {
                   </span>
                 </div>
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1px 1fr',gap:0,padding:'12px 0'}}>
-                  <div style={{padding:'0 12px'}}><TeamLineup side={game.away} gamePk={game.gamePk}/></div>
+                  <div style={{padding:'0 12px'}}><TeamLineup side={game.away} gamePk={game.gamePk} onBatterClick={setSelBatterInfo}/></div>
                   <div style={{background:'var(--border)'}}/>
-                  <div style={{padding:'0 12px'}}><TeamLineup side={game.home} gamePk={game.gamePk}/></div>
+                  <div style={{padding:'0 12px'}}><TeamLineup side={game.home} gamePk={game.gamePk} onBatterClick={setSelBatterInfo}/></div>
                 </div>
               </div>
             );
           })}
         </div>
       )}
+
+      {/* ── Batter slideout ─────────────────────────────────── */}
+      {selBatterInfo && (() => {
+        const { player, teamAbbr } = selBatterInfo;
+        const name  = player.fullName || `Player ${player.id}`;
+        const pos   = player.primaryPosition?.abbreviation || '';
+        const order = player.battingOrder ? Math.round(player.battingOrder / 100) : null;
+        return <>
+          <div onClick={() => setSelBatterInfo(null)}
+            style={{position:'fixed',inset:0,background:'rgba(0,0,0,.55)',zIndex:900}}/>
+          <div style={{position:'fixed',right:0,top:0,bottom:0,width:'min(400px,100vw)',
+            background:'var(--surface)',borderLeft:'1px solid var(--border)',
+            zIndex:901,display:'flex',flexDirection:'column'}}>
+
+            {/* Header */}
+            <div style={{padding:'14px 16px',borderBottom:'1px solid var(--border)',
+              display:'flex',alignItems:'flex-start',gap:10,flexShrink:0}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{display:'flex',alignItems:'center',gap:7,flexWrap:'wrap',marginBottom:3}}>
+                  {order && <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,
+                    color:order<=3?'var(--accent2)':'var(--muted)'}}>{order}</span>}
+                  <PosChip pos={pos}/>
+                  <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:18,color:'var(--text)'}}>{name}</span>
+                </div>
+                <div style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--muted)'}}>
+                  <span style={{color:'var(--accent2)',fontWeight:700}}>{teamAbbr}</span>
+                  {player.jerseyNumber && <span style={{marginLeft:6}}>#{player.jerseyNumber}</span>}
+                </div>
+              </div>
+              <button onClick={() => setSelBatterInfo(null)}
+                style={{background:'none',border:'1px solid var(--border)',borderRadius:6,
+                  padding:'4px 10px',color:'var(--muted)',cursor:'pointer',
+                  fontFamily:"'DM Mono',monospace",fontSize:11,flexShrink:0}}>✕</button>
+            </div>
+
+            {/* Body */}
+            <div style={{flex:1,overflowY:'auto',padding:'14px 16px'}}>
+              <BatterPanel player={player} teamAbbr={teamAbbr}/>
+            </div>
+          </div>
+        </>;
+      })()}
     </div>
   );
 }
