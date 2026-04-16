@@ -5534,8 +5534,10 @@ function SimLabView({ data }) {
   const aiCache = useRef({});
 
   const pf = (v, d=1) => v != null && !isNaN(parseFloat(v)) ? parseFloat(v).toFixed(d) : null;
-  const pct = v => { const n = parseFloat(v); return isNaN(n) ? null : (n * 100).toFixed(1) + '%'; };
-  const pctRaw = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n * 100; };
+  // pctRaw: CSV stores proj_hr_adj etc as either 0-1 decimal OR 0-100 percentage
+  // If n > 1 it's already a percentage — don't multiply again
+  const pctRaw = v => { const n = parseFloat(v); if (isNaN(n)) return 0; return n > 1 ? n : n * 100; };
+  const pct = v => { const n = pctRaw(v); return n === 0 ? null : n.toFixed(1) + '%'; };
   const num = (v, d=2) => { const n = parseFloat(v); return isNaN(n) || n === 0 ? '—' : n.toFixed(d); };
 
   // Sort and filter the slate
@@ -5564,8 +5566,8 @@ function SimLabView({ data }) {
     const key = `${b.batter}|${b.pitcher}|${b.game_id}`;
     if (aiCache.current[key]) { setAiNote(aiCache.current[key]); return; }
     setAiLoading(true); setAiNote('');
-    const hrPct   = (parseFloat(b.proj_hr_adj) * 100).toFixed(1);
-    const hitPct  = (parseFloat(b.proj_hit_prob) * 100).toFixed(1);
+    const hrPct   = pctRaw(b.proj_hr_adj).toFixed(1);
+    const hitPct  = pctRaw(b.proj_hit_prob).toFixed(1);
     const prompt  = `You are a sharp baseball analytics assistant. Write a 2-3 sentence scout note for this specific matchup. Be direct, specific, and analytical — avoid generic statements.
 
 BATTER: ${b.batter} (${b.batting_team}, ${b.batter_hand}HB)
@@ -5582,21 +5584,18 @@ KEY METRICS:
 
 Write exactly 2-3 sentences. Focus on the single most important factor driving or limiting the HR/XBH probability tonight. Name specific pitches when relevant. Do not repeat numbers verbatim — interpret them.`;
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      const res = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1000,
-          messages: [{ role: 'user', content: prompt }],
-        }),
+        body: JSON.stringify({ prompt }),
       });
+      if (!res.ok) throw new Error(`API ${res.status}`);
       const d = await res.json();
-      const note = d.content?.map(c => c.text || '').join('').trim() || 'Analysis unavailable.';
+      const note = d.text || 'Analysis unavailable.';
       aiCache.current[key] = note;
       setAiNote(note);
     } catch(e) {
-      setAiNote('Scout analysis unavailable — check API connection.');
+      setAiNote('Scout analysis unavailable — check that ANTHROPIC_API_KEY is set in Vercel environment variables.');
     }
     setAiLoading(false);
   };
