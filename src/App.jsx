@@ -3442,13 +3442,111 @@ function HeatingUpSlideout({ games, onClose }) {
 
 
 // ── LINEUPS VIEW ──────────────────────────────────────────────
+// Compact pitcher card for Lineups — grade badge inline, stats drop down on click
+function InlinePitcherCard({ pitcherId, pitcherName }) {
+  const [stats, setStats]   = useState(null);
+  const [open, setOpen]     = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const cleanId = pitcherId ? String(parseInt(pitcherId) || pitcherId) : null;
+    if (!cleanId || cleanId === '0' || isNaN(parseInt(cleanId))) return;
+    setLoading(true);
+    fetchPitcherData(cleanId, pitcherName)
+      .then(d => { if (d?.stats) setStats(d.stats); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [pitcherId, pitcherName]);
+
+  const grade = stats ? gradePitcher(
+    stats.era,
+    stats.k9 && stats.k9 !== '—' ? stats.k9
+      : (parseFloat(stats.ip) > 0 && parseInt(stats.so||0) > 0
+          ? ((parseInt(stats.so) / parseFloat(stats.ip)) * 9).toFixed(2) : '0'),
+    stats.whip, stats.bb9, stats.hr9, stats.avg, stats.obp
+  ) : null;
+
+  const eraC  = v => { const n=parseFloat(v); return n<2.5?'#ff4020':n<3.5?'#ff8020':n<4.5?'var(--text)':'#27c97a'; };
+  const whipC = v => { const n=parseFloat(v); return n<1.0?'#ff4020':n<1.22?'#ff8020':'var(--text)'; };
+  const k9C   = v => { const n=parseFloat(v); return n>11?'#ff4020':n>9?'#ff8020':'var(--text)'; };
+  const hr9C  = v => { const n=parseFloat(v); return n>1.5?'#27c97a':n>1.0?'#ffc840':'var(--text)'; };
+
+  const MiniStat = ({label, val, color}) => (
+    <div style={{textAlign:'center',padding:'4px 6px',borderRadius:6,flex:1,
+      background:'rgba(255,255,255,.04)',border:'1px solid var(--border)',minWidth:0}}>
+      <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,
+        color:color||'var(--text)',lineHeight:1}}>{val||'--'}</div>
+      <div style={{fontSize:7,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+        textTransform:'uppercase',letterSpacing:.4,marginTop:1}}>{label}</div>
+    </div>
+  );
+
+  return (
+    <div>
+      {/* SP row */}
+      <div style={{display:'flex',alignItems:'center',gap:5,marginBottom: open ? 4 : 8,
+        padding:'5px 8px',borderRadius: open ? '6px 6px 0 0' : 6,
+        background:'rgba(56,184,242,.07)',border:'1px solid rgba(56,184,242,.18)',
+        borderBottom: open ? '1px solid rgba(56,184,242,.1)' : '1px solid rgba(56,184,242,.18)'}}>
+        <span style={{fontSize:9,color:'var(--ice)',fontFamily:"'DM Mono',monospace",
+          fontWeight:700,flexShrink:0,letterSpacing:.5}}>SP</span>
+        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:600,fontSize:12,
+          color:'var(--text)',flex:1,minWidth:0,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+          {pitcherName || 'TBD'}
+        </span>
+        {stats?.hand && (
+          <span style={{fontSize:8,fontFamily:"'DM Mono',monospace",fontWeight:700,padding:'1px 4px',
+            borderRadius:3,flexShrink:0,
+            background:stats.hand==='L'?'rgba(56,184,242,.12)':'rgba(255,128,32,.10)',
+            color:stats.hand==='L'?'#38b8f2':'#ff8020'}}>
+            {stats.hand==='L'?'LHP':'RHP'}
+          </span>
+        )}
+        {loading && <span style={{fontSize:9,color:'var(--muted)',flexShrink:0}}>…</span>}
+        {grade && (
+          <button onClick={() => setOpen(o => !o)}
+            style={{display:'inline-flex',alignItems:'center',gap:3,padding:'1px 6px',
+              borderRadius:4,cursor:'pointer',border:`1px solid ${grade.color}40`,
+              background:grade.bg,flexShrink:0}}>
+            <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",fontWeight:700,
+              color:grade.color,whiteSpace:'nowrap'}}>{grade.label}</span>
+            <span style={{fontSize:8,color:grade.color,opacity:.7}}>{open?'▲':'▼'}</span>
+          </button>
+        )}
+      </div>
+
+      {/* Dropdown stats */}
+      {open && stats && (
+        <div style={{marginBottom:8,padding:'8px',borderRadius:'0 0 6px 6px',
+          background:grade?.bg||'rgba(255,255,255,.04)',
+          border:'1px solid rgba(56,184,242,.18)',borderTop:'none'}}>
+          <div style={{fontSize:8,color:grade?.color||'var(--muted)',fontFamily:"'DM Mono',monospace",
+            marginBottom:6,fontWeight:700,letterSpacing:.3}}>{grade?.desc}</div>
+          <div style={{display:'flex',gap:4,marginBottom:5}}>
+            <MiniStat label="ERA"  val={stats.era}  color={eraC(stats.era)}/>
+            <MiniStat label="WHIP" val={stats.whip} color={whipC(stats.whip)}/>
+            <MiniStat label="K/9"  val={stats.k9}   color={k9C(stats.k9)}/>
+            <MiniStat label="HR/9" val={stats.hr9}  color={hr9C(stats.hr9)}/>
+          </div>
+          <div style={{display:'flex',gap:4}}>
+            <MiniStat label="BB/9" val={stats.bb9}  color="var(--text)"/>
+            <MiniStat label="IP"   val={stats.ip}   color="var(--muted)"/>
+            {stats.wins!=null && <MiniStat label="W-L" val={`${stats.wins}-${stats.losses||0}`} color="var(--muted)"/>}
+            {stats.avg && stats.avg!=='--' && <MiniStat label="AVG" val={stats.avg} color="var(--muted)"/>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 function LineupsView({ date }) {
   const [lineupGames, setLineupGames] = useState([]);
   const [loading, setLoading]         = useState(true);
   const [lastUpdate, setLastUpdate]   = useState(null);
   const [refreshing, setRefreshing]   = useState(false);
   const [selBatterInfo, setSelBatterInfo]   = useState(null);
-  const [selPitcherInfo, setSelPitcherInfo] = useState(null); // { id, name, teamAbbr }
 
   const todayET = new Date().toLocaleDateString("en-US",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"});
   const [lm,ld,ly] = todayET.split("/");
@@ -3624,25 +3722,13 @@ function LineupsView({ date }) {
     );
   };
 
-  const TeamLineup = ({side, gamePk, onBatterClick, onPitcherClick}) => (
+  const TeamLineup = ({side, gamePk, onBatterClick}) => (
     <div style={{flex:1,minWidth:0}}>
       <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:7,flexWrap:'wrap'}}>
         <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:16,letterSpacing:1,color:'var(--text)'}}>{side.abbr}</span>
         <StatusBadge confirmed={side.confirmed}/>
       </div>
-      <div onClick={() => side.sp && onPitcherClick && onPitcherClick({id: side.spId, name: side.sp, teamAbbr: side.abbr})}
-        style={{display:'flex',alignItems:'center',gap:6,marginBottom:8,padding:'5px 8px',borderRadius:6,
-          background:'rgba(56,184,242,.07)',border:'1px solid rgba(56,184,242,.18)',
-          cursor: side.sp ? 'pointer' : 'default'}}
-        onMouseEnter={e=>{if(side.sp)e.currentTarget.style.background='rgba(56,184,242,.14)';}}
-        onMouseLeave={e=>{e.currentTarget.style.background='rgba(56,184,242,.07)';}}>
-        <span style={{fontSize:9,color:'var(--ice)',fontFamily:"'DM Mono',monospace",fontWeight:700,flexShrink:0,letterSpacing:.5}}>SP</span>
-        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:600,fontSize:12,color:side.sp?'var(--text)':'var(--muted)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',flex:1}}>
-          {side.sp || 'TBD'}
-        </span>
-        {side.spNote && <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",flexShrink:0}}>{side.spNote}</span>}
-        {side.sp && <span style={{fontSize:9,color:'rgba(56,184,242,.5)',flexShrink:0}}>›</span>}
-      </div>
+      <InlinePitcherCard pitcherId={side.spId} pitcherName={side.sp || 'TBD'}/>
       {side.lineup.length > 0 ? (
         <div style={{display:'flex',flexDirection:'column',gap:1}}>
           {side.lineup.map((p,i) => {
@@ -3725,59 +3811,15 @@ function LineupsView({ date }) {
                   </span>
                 </div>
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1px 1fr',gap:0,padding:'12px 0'}}>
-                  <div style={{padding:'0 12px'}}><TeamLineup side={game.away} gamePk={game.gamePk} onBatterClick={setSelBatterInfo} onPitcherClick={setSelPitcherInfo}/></div>
+                  <div style={{padding:'0 12px'}}><TeamLineup side={game.away} gamePk={game.gamePk} onBatterClick={setSelBatterInfo}/></div>
                   <div style={{background:'var(--border)'}}/>
-                  <div style={{padding:'0 12px'}}><TeamLineup side={game.home} gamePk={game.gamePk} onBatterClick={setSelBatterInfo} onPitcherClick={setSelPitcherInfo}/></div>
+                  <div style={{padding:'0 12px'}}><TeamLineup side={game.home} gamePk={game.gamePk} onBatterClick={setSelBatterInfo}/></div>
                 </div>
               </div>
             );
           })}
         </div>
       )}
-
-      {/* ── Pitcher slideout ─────────────────────────────────── */}
-      {selPitcherInfo && (() => {
-        const { id, name, teamAbbr } = selPitcherInfo;
-        return <>
-          <div onClick={() => setSelPitcherInfo(null)}
-            style={{position:'fixed',inset:0,background:'rgba(0,0,0,.55)',zIndex:900}}/>
-          <div style={{position:'fixed',right:0,top:0,bottom:0,width:'min(400px,100vw)',
-            background:'var(--surface)',borderLeft:'1px solid var(--border)',
-            zIndex:901,display:'flex',flexDirection:'column'}}>
-
-            {/* Header */}
-            <div style={{padding:'14px 16px',borderBottom:'1px solid var(--border)',
-              display:'flex',alignItems:'flex-start',gap:10,flexShrink:0}}>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{display:'flex',alignItems:'center',gap:7,flexWrap:'wrap',marginBottom:3}}>
-                  <span style={{fontSize:9,padding:'1px 5px',borderRadius:3,
-                    background:'rgba(56,184,242,.12)',border:'1px solid rgba(56,184,242,.3)',
-                    color:'var(--ice)',fontFamily:"'DM Mono',monospace",fontWeight:700}}>SP</span>
-                  <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:18,color:'var(--text)'}}>{name || 'TBD'}</span>
-                </div>
-                <div style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--muted)'}}>
-                  <span style={{color:'var(--accent2)',fontWeight:700}}>{teamAbbr}</span>
-                  <span style={{marginLeft:8}}>Click grade badge to expand stats</span>
-                </div>
-              </div>
-              <button onClick={() => setSelPitcherInfo(null)}
-                style={{background:'none',border:'1px solid var(--border)',borderRadius:6,
-                  padding:'4px 10px',color:'var(--muted)',cursor:'pointer',
-                  fontFamily:"'DM Mono',monospace",fontSize:11,flexShrink:0}}>✕</button>
-            </div>
-
-            {/* Body — reuse PitcherCard */}
-            <div style={{flex:1,overflowY:'auto',padding:'14px 16px'}}>
-              {id
-                ? <PitcherCard pitcherId={id} pitcherName={name}/>
-                : <div style={{fontSize:11,color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontStyle:'italic'}}>
-                    No pitcher ID available — stats cannot be loaded.
-                  </div>
-              }
-            </div>
-          </div>
-        </>;
-      })()}
 
       {/* ── Batter slideout ─────────────────────────────────── */}
       {selBatterInfo && (() => {
