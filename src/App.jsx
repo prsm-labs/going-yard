@@ -259,6 +259,9 @@ const PLAYER_DATA_CACHE = {};
 let PLAYER_CACHE_DATE = null; // timestamp (ms) — refreshes every 3 hours
 function cachePlayer(p) { if (p.pid) PLAYER_DATA_CACHE[String(p.pid)] = p; }
 function getCachedPlayer(pid) { return PLAYER_DATA_CACHE[String(pid)] || PLAYER_DATA_CACHE[parseInt(pid)] || null; }
+// Normalize team abbreviations — MLB API still returns legacy codes for relocated teams
+const TEAM_ABBR_MAP = { OAK: 'ATH' };
+const normTeam = t => (t && TEAM_ABBR_MAP[t]) || t || '—';
 
 const T={
   EV_HH:95,       // Hard hit entry point
@@ -1239,7 +1242,7 @@ function AtBatSlideIn() {
         // MLB Stats API returns oldest→newest — reverse for most recent first
         const sorted = [...games].reverse();
         // ID → abbreviation map so opponent shows NYM not MET, DET not TIG, etc.
-        const OPP_ABBR = {133:'OAK',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',139:'TB',140:'TEX',141:'TOR',142:'MIN',143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL',108:'LAA',109:'ARI',110:'BAL',111:'BOS',112:'CHC',113:'CIN',114:'CLE',115:'COL',116:'DET',117:'HOU',118:'KC',119:'LAD',120:'WSH',121:'NYM'};
+        const OPP_ABBR = {133:'ATH',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',139:'TB',140:'TEX',141:'TOR',142:'MIN',143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL',108:'LAA',109:'ARI',110:'BAL',111:'BOS',112:'CHC',113:'CIN',114:'CLE',115:'COL',116:'DET',117:'HOU',118:'KC',119:'LAD',120:'WSH',121:'NYM'};
         const rows = sorted.slice(0,20).map(g => ({
           date: g.date?.slice(5) || "—",
           opp:  OPP_ABBR[g.opponent?.id] ||
@@ -1733,7 +1736,7 @@ async function loadGlobalPlayerMap() {
           if (!p.id || !p.fullName) continue;
           const ex = GLOBAL_PLAYER_TEAM_MAP[p.id] || {};
           GLOBAL_PLAYER_TEAM_MAP[p.id] = {
-            team:   p.currentTeam?.abbreviation || ex.team || '',
+            team:   normTeam(p.currentTeam?.abbreviation || ex.team || ''),
             teamId: p.currentTeam?.id || ex.teamId || 0,
             name:   p.fullName,
             hand:   p.batSide?.code || ex.hand || 'R',
@@ -1766,11 +1769,11 @@ async function loadGlobalPlayerMap() {
           const ABBR_MAP = {
             108:'LAA',109:'ARI',110:'BAL',111:'BOS',112:'CHC',113:'CIN',
             114:'CLE',115:'COL',116:'DET',117:'HOU',118:'KC', 119:'LAD',
-            120:'WSH',121:'NYM',133:'OAK',134:'PIT',135:'SD', 136:'SEA',
+            120:'WSH',121:'NYM',133:'ATH',134:'PIT',135:'SD', 136:'SEA',
             137:'SF', 138:'STL',139:'TB', 140:'TEX',141:'TOR',142:'MIN',
             143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL',
           };
-          const teamAbbr = ABBR_MAP[tid] || ex.team || '';
+          const teamAbbr = normTeam(ABBR_MAP[tid] || ex.team || '');
           GLOBAL_PLAYER_TEAM_MAP[pid] = {
             ...ex,
             team:   teamAbbr,  // active roster = authoritative current team
@@ -1953,7 +1956,7 @@ async function fetchPlayers(setL, setP, setE, silent=false) {
             const fromMap = GLOBAL_PLAYER_TEAM_MAP[id]?.name;
             return fromMap || combined || `Unknown ${id}`;
           })(),
-          team:         (() => { const t = r.team || r.team_name_abbrev || GLOBAL_PLAYER_TEAM_MAP[r.pid]?.team || ''; return (t && t !== '—') ? t : '—'; })(),
+          team:         (() => { const t = r.team || r.team_name_abbrev || GLOBAL_PLAYER_TEAM_MAP[r.pid]?.team || ''; return normTeam((t && t !== '—') ? t : '—'); })(),
           // New atbats.js returns pre-calculated metrics from raw rows
           // Field names are direct — no leaderboard aliases needed
           avgEV:        r.avgEV        || parseFloat(r.exit_velocity_avg || r.avg_hit_speed || 0),
@@ -2217,7 +2220,7 @@ async function fetchGames(setL, setG, setE, silent=false) {
       // Team abbreviation — try every possible path
       const awTeam = aw?.team || {};
       const hmTeam = hm?.team || {};
-      const _tAbbr = id => ({133:'OAK',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',139:'TB',140:'TEX',141:'TOR',142:'MIN',143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL',108:'LAA',109:'ARI',110:'BAL',111:'BOS',112:'CHC',113:'CIN',114:'CLE',115:'COL',116:'DET',117:'HOU',118:'KC',119:'LAD',120:'WSH',121:'NYM'})[id] || '???';
+      const _tAbbr = id => ({133:'ATH',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',139:'TB',140:'TEX',141:'TOR',142:'MIN',143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL',108:'LAA',109:'ARI',110:'BAL',111:'BOS',112:'CHC',113:'CIN',114:'CLE',115:'COL',116:'DET',117:'HOU',118:'KC',119:'LAD',120:'WSH',121:'NYM'})[id] || '???';
       const awAbbr = awTeam.abbreviation || awTeam.teamCode?.toUpperCase() ||
                      (awTeam.teamName ? awTeam.teamName.slice(0,3).toUpperCase() : null) ||
                      _tAbbr(awTeam.id);
@@ -6647,7 +6650,7 @@ function PitcherLeaderboard() {
 
   // Static MLB team ID → abbreviation map (IDs are stable across seasons)
   const TEAM_ABBR = {
-    133:'OAK',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',
+    133:'ATH',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',
     139:'TB',140:'TEX',141:'TOR',142:'MIN',143:'PHI',144:'ATL',
     145:'CWS',146:'MIA',147:'NYY',158:'MIL',108:'LAA',109:'ARI',
     110:'BAL',111:'BOS',112:'CHC',113:'CIN',114:'CLE',115:'COL',
