@@ -6295,6 +6295,7 @@ function BatterLeaderboard() {
   const SC_WIN_KEYS = new Set([
     'avgEV','barrel','hardHit','flyBall','gbPct','launchAngle', // Statcast
     'pa','ab','hr','avg','obp','slg','kPct','bbPct',            // pipeline counting stats
+    'hits','xbh',                                               // counting stats also windowed
   ]);
   // Full-season windows pull ALL stats from the window
   const SEASON_WINS = new Set(['season2025','season2026']);
@@ -6352,7 +6353,15 @@ function BatterLeaderboard() {
     .filter(p => !showPicksOnly || picks[String(p.pid)])
     .filter(p => !filterGoneYard || isGoneYard(p))
     .sort((a, b) => {
-      const evCount = (p, thresh) => (p.recentAtBats||[]).filter(ab=>(ab.ev||0)>=thresh).length;
+      const evCount = (p, thresh) => {
+        const hh = ws(p,'hardHit') || 0;
+        const pa = ws(p,'pa') || ws(p,'ab') || 0;
+        if (pa > 0) {
+          const ratio = thresh >= 100 ? 0.40 : 1.0;
+          return Math.round(hh / 100 * pa * ratio);
+        }
+        return (p.recentAtBats||[]).filter(ab=>(ab.ev||0)>=thresh).length;
+      };
       const av = sortCol === 'name' ? (a.name||'')
                : sortCol === 'ev95'  ? evCount(a, 95)
                : sortCol === 'ev100' ? evCount(a, 100)
@@ -6382,6 +6391,18 @@ function BatterLeaderboard() {
     { key:'team',       label:'Team',   render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--accent2)',fontWeight:700}}>{p.team||'—'}</span> },
     { key:'pa',         label:'PA',     render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{ws(p,'pa')||0}</span> },
     { key:'avgEV',      label:'Avg EV', render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:700,color:evCol(ws(p,'avgEV'))}}>{fmtEV(ws(p,'avgEV'))}</span> },
+    { key:'ev95', label:'95+ EV', render: p => {
+        const hh = ws(p,'hardHit') || 0;
+        const pa = ws(p,'pa') || ws(p,'ab') || 0;
+        const v = pa > 0 ? Math.round(hh / 100 * pa) : (p.recentAtBats||[]).filter(a=>(a.ev||0)>=95).length;
+        return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=10?'#ff4020':v>=6?'#ff8020':v>=3?'#f5a623':'var(--text)'}}>{v||0}</span>;
+      }},
+    { key:'ev100',label:'100+ EV',render: p => {
+        const hh = ws(p,'hardHit') || 0;
+        const pa = ws(p,'pa') || ws(p,'ab') || 0;
+        const v = pa > 0 ? Math.round(hh / 100 * pa * 0.40) : (p.recentAtBats||[]).filter(a=>(a.ev||0)>=100).length;
+        return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=5?'#ff4020':v>=3?'#ff8020':v>=1?'#f5a623':'var(--text)'}}>{v||0}</span>;
+      }},
     { key:'barrel',     label:'Brl%',   render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:brlCol(ws(p,'barrel'))}}>{fmtPct(ws(p,'barrel'))}</span> },
     { key:'hardHit',    label:'HH%',    render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:hhCol(ws(p,'hardHit'))}}>{fmtPct(ws(p,'hardHit'))}</span> },
     { key:'flyBall',    label:'FB%',    render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{fmtPct(ws(p,'flyBall'))}</span> },
@@ -6395,8 +6416,6 @@ function BatterLeaderboard() {
     { key:'hr',   label:'HR',  render: p => { const v=ws(p,'hr'); return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:v>=10?700:400,color:hrCol(v)}}>{v||0}</span>; }},
     { key:'hits', label:'H',   render: p => { const v=ws(p,'hits'); return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=30?'#27c97a':v>=20?'#f5a623':'var(--text)'}}>{v||0}</span>; }},
     { key:'xbh',  label:'XBH', render: p => { const v=ws(p,'xbh');  return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=12?'#ff8020':v>=7?'#f5a623':'var(--text)'}}>{v||0}</span>; }},
-    { key:'ev95', label:'95+ EV', render: p => { const v=(p.recentAtBats||[]).filter(a=>(a.ev||0)>=95).length; return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=10?'#ff4020':v>=6?'#ff8020':v>=3?'#f5a623':'var(--text)'}}>{v||0}</span>; }},
-    { key:'ev100',label:'100+ EV',render: p => { const v=(p.recentAtBats||[]).filter(a=>(a.ev||0)>=100).length; return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=5?'#ff4020':v>=3?'#ff8020':v>=1?'#f5a623':'var(--text)'}}>{v||0}</span>; }},
     { key:'kPct', label:'K%',  render: p => { const v=ws(p,'kPct'); return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=28?'var(--ice)':'var(--muted)'}}>{fmtPct(v)}</span>; }},
     { key:'bbPct',label:'BB%', render: p => { const v=ws(p,'bbPct'); return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=12?'#27c97a':'var(--muted)'}}>{fmtPct(v)}</span>; }},
   ];
