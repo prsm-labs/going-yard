@@ -6157,6 +6157,10 @@ Write exactly 2-3 sentences. Focus on the single most important factor driving o
                     <div style={{ color: 'var(--muted)', fontFamily: "'DM Mono',monospace", fontSize: 10 }}>Select a batter to generate a scout note.</div>
                   )}
                 </div>
+
+                {/* Recent At-Bats */}
+                {b.batter_id && <RecentGameLog batterId={parseInt(b.batter_id)}/>}
+
               </div>
             );
           })()}
