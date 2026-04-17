@@ -3447,7 +3447,8 @@ function LineupsView({ date }) {
   const [loading, setLoading]         = useState(true);
   const [lastUpdate, setLastUpdate]   = useState(null);
   const [refreshing, setRefreshing]   = useState(false);
-  const [selBatterInfo, setSelBatterInfo] = useState(null); // { player, teamAbbr }
+  const [selBatterInfo, setSelBatterInfo]   = useState(null);
+  const [selPitcherInfo, setSelPitcherInfo] = useState(null); // { id, name, teamAbbr }
 
   const todayET = new Date().toLocaleDateString("en-US",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"});
   const [lm,ld,ly] = todayET.split("/");
@@ -3480,8 +3481,8 @@ function LineupsView({ date }) {
           gamePk: g.gamePk,
           gameTime,
           status: g.status?.abstractGameState || 'Preview',
-          away: { abbr: away?.team?.abbreviation||'???', name: away?.team?.name||'', sp: away?.probablePitcher?.fullName||null, spNote: away?.probablePitcher?.note||null, lineup: sort(awayLineup), confirmed: awayConfirmed },
-          home: { abbr: home?.team?.abbreviation||'???', name: home?.team?.name||'', sp: home?.probablePitcher?.fullName||null, spNote: home?.probablePitcher?.note||null, lineup: sort(homeLineup), confirmed: homeConfirmed },
+          away: { abbr: away?.team?.abbreviation||'???', name: away?.team?.name||'', sp: away?.probablePitcher?.fullName||null, spId: away?.probablePitcher?.id||null, spNote: away?.probablePitcher?.note||null, lineup: sort(awayLineup), confirmed: awayConfirmed },
+          home: { abbr: home?.team?.abbreviation||'???', name: home?.team?.name||'', sp: home?.probablePitcher?.fullName||null, spId: home?.probablePitcher?.id||null, spNote: home?.probablePitcher?.note||null, lineup: sort(homeLineup), confirmed: homeConfirmed },
         };
       });
       setLineupGames(games);
@@ -3623,18 +3624,24 @@ function LineupsView({ date }) {
     );
   };
 
-  const TeamLineup = ({side, gamePk, onBatterClick}) => (
+  const TeamLineup = ({side, gamePk, onBatterClick, onPitcherClick}) => (
     <div style={{flex:1,minWidth:0}}>
       <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:7,flexWrap:'wrap'}}>
         <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:16,letterSpacing:1,color:'var(--text)'}}>{side.abbr}</span>
         <StatusBadge confirmed={side.confirmed}/>
       </div>
-      <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:8,padding:'5px 8px',borderRadius:6,background:'rgba(56,184,242,.07)',border:'1px solid rgba(56,184,242,.18)'}}>
+      <div onClick={() => side.sp && onPitcherClick && onPitcherClick({id: side.spId, name: side.sp, teamAbbr: side.abbr})}
+        style={{display:'flex',alignItems:'center',gap:6,marginBottom:8,padding:'5px 8px',borderRadius:6,
+          background:'rgba(56,184,242,.07)',border:'1px solid rgba(56,184,242,.18)',
+          cursor: side.sp ? 'pointer' : 'default'}}
+        onMouseEnter={e=>{if(side.sp)e.currentTarget.style.background='rgba(56,184,242,.14)';}}
+        onMouseLeave={e=>{e.currentTarget.style.background='rgba(56,184,242,.07)';}}>
         <span style={{fontSize:9,color:'var(--ice)',fontFamily:"'DM Mono',monospace",fontWeight:700,flexShrink:0,letterSpacing:.5}}>SP</span>
-        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:600,fontSize:12,color:side.sp?'var(--text)':'var(--muted)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:600,fontSize:12,color:side.sp?'var(--text)':'var(--muted)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',flex:1}}>
           {side.sp || 'TBD'}
         </span>
         {side.spNote && <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",flexShrink:0}}>{side.spNote}</span>}
+        {side.sp && <span style={{fontSize:9,color:'rgba(56,184,242,.5)',flexShrink:0}}>›</span>}
       </div>
       {side.lineup.length > 0 ? (
         <div style={{display:'flex',flexDirection:'column',gap:1}}>
@@ -3718,15 +3725,59 @@ function LineupsView({ date }) {
                   </span>
                 </div>
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1px 1fr',gap:0,padding:'12px 0'}}>
-                  <div style={{padding:'0 12px'}}><TeamLineup side={game.away} gamePk={game.gamePk} onBatterClick={setSelBatterInfo}/></div>
+                  <div style={{padding:'0 12px'}}><TeamLineup side={game.away} gamePk={game.gamePk} onBatterClick={setSelBatterInfo} onPitcherClick={setSelPitcherInfo}/></div>
                   <div style={{background:'var(--border)'}}/>
-                  <div style={{padding:'0 12px'}}><TeamLineup side={game.home} gamePk={game.gamePk} onBatterClick={setSelBatterInfo}/></div>
+                  <div style={{padding:'0 12px'}}><TeamLineup side={game.home} gamePk={game.gamePk} onBatterClick={setSelBatterInfo} onPitcherClick={setSelPitcherInfo}/></div>
                 </div>
               </div>
             );
           })}
         </div>
       )}
+
+      {/* ── Pitcher slideout ─────────────────────────────────── */}
+      {selPitcherInfo && (() => {
+        const { id, name, teamAbbr } = selPitcherInfo;
+        return <>
+          <div onClick={() => setSelPitcherInfo(null)}
+            style={{position:'fixed',inset:0,background:'rgba(0,0,0,.55)',zIndex:900}}/>
+          <div style={{position:'fixed',right:0,top:0,bottom:0,width:'min(400px,100vw)',
+            background:'var(--surface)',borderLeft:'1px solid var(--border)',
+            zIndex:901,display:'flex',flexDirection:'column'}}>
+
+            {/* Header */}
+            <div style={{padding:'14px 16px',borderBottom:'1px solid var(--border)',
+              display:'flex',alignItems:'flex-start',gap:10,flexShrink:0}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{display:'flex',alignItems:'center',gap:7,flexWrap:'wrap',marginBottom:3}}>
+                  <span style={{fontSize:9,padding:'1px 5px',borderRadius:3,
+                    background:'rgba(56,184,242,.12)',border:'1px solid rgba(56,184,242,.3)',
+                    color:'var(--ice)',fontFamily:"'DM Mono',monospace",fontWeight:700}}>SP</span>
+                  <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:18,color:'var(--text)'}}>{name || 'TBD'}</span>
+                </div>
+                <div style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--muted)'}}>
+                  <span style={{color:'var(--accent2)',fontWeight:700}}>{teamAbbr}</span>
+                  <span style={{marginLeft:8}}>Click grade badge to expand stats</span>
+                </div>
+              </div>
+              <button onClick={() => setSelPitcherInfo(null)}
+                style={{background:'none',border:'1px solid var(--border)',borderRadius:6,
+                  padding:'4px 10px',color:'var(--muted)',cursor:'pointer',
+                  fontFamily:"'DM Mono',monospace",fontSize:11,flexShrink:0}}>✕</button>
+            </div>
+
+            {/* Body — reuse PitcherCard */}
+            <div style={{flex:1,overflowY:'auto',padding:'14px 16px'}}>
+              {id
+                ? <PitcherCard pitcherId={id} pitcherName={name}/>
+                : <div style={{fontSize:11,color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontStyle:'italic'}}>
+                    No pitcher ID available — stats cannot be loaded.
+                  </div>
+              }
+            </div>
+          </div>
+        </>;
+      })()}
 
       {/* ── Batter slideout ─────────────────────────────────── */}
       {selBatterInfo && (() => {
@@ -7528,9 +7579,9 @@ function MatchupEngineTab() {
                 {/* Two-column: Recent L7 vs BvP */}
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:12}}>
                   {[
-                    {title:'📅 Recent L7',pa:b.recent_pa,ev:b.recent_avg_ev,brl:b.recent_barrel_pct,fb:b.recent_fb_pct,la:b.recent_avg_la,
+                    {title:'📅 Recent L7',pa:b.recent_pa,ev:b.recent_avg_ev,brl:b.recent_barrel_pct,hh:b.recent_hh_pct,fb:b.recent_fb_pct,la:b.recent_avg_la,
                       flags:[flag(b.recent_ev_flag),flag(b.recent_barrel_flag),flag(b.recent_fb_flag),flag(b.recent_la_flag)]},
-                    {title:'🆚 BvP Pitch Mix',pa:b.bvp_pa,ev:b.bvp_avg_ev,brl:b.bvp_barrel_pct,fb:b.bvp_fb_pct,la:b.bvp_avg_la,
+                    {title:'🆚 BvP Pitch Mix',pa:b.bvp_pa,ev:b.bvp_avg_ev,brl:b.bvp_barrel_pct,hh:b.bvp_hh_pct,fb:b.bvp_fb_pct,la:b.bvp_avg_la,
                       flags:[flag(b.bvp_ev_flag),flag(b.bvp_barrel_flag),flag(b.bvp_fb_flag),flag(b.bvp_la_flag)]},
                   ].map(s=>(
                     <div key={s.title} style={{background:'rgba(255,255,255,.03)',
