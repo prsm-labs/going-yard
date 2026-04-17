@@ -5633,6 +5633,8 @@ function SimLabView({ data }) {
   const [sortBy, setSortBy]         = useState('proj_hr_adj');
   const [sortDir, setSortDir]       = useState('desc');
   const [teamFilter, setTeamFilter] = useState('all');
+  const [sortProp, setSortProp]     = useState('proj_hit_prob');
+  const [sortPropDir, setSortPropDir] = useState('desc');
   const aiCache = useRef({});
 
   const pf = (v, d=1) => v != null && !isNaN(parseFloat(v)) ? parseFloat(v).toFixed(d) : null;
@@ -5838,6 +5840,11 @@ Write exactly 2-3 sentences. Focus on the single most important factor driving o
                       <td style={{ textAlign: 'right' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 11 }}>{xbhP > 0 ? xbhP.toFixed(1) + '%' : '—'}</span></td>
                       <td style={{ textAlign: 'right' }}><span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 13, color: tb >= 1.5 ? '#ff8020' : tb >= 1.0 ? '#f5a623' : 'var(--text)' }}>{tb > 0 ? tb.toFixed(2) : '—'}</span></td>
                       <td style={{ textAlign: 'right' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 11 }}>{rbi > 0 ? rbi.toFixed(2) : '—'}</span></td>
+                      <td style={{ textAlign: 'right' }}>
+                        <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 12, color: 'var(--text)' }}>
+                          {parseFloat(b.weighted_flag_score) > 0 ? parseFloat(b.weighted_flag_score).toFixed(2) : '—'}
+                        </span>
+                      </td>
                       <td style={{ textAlign: 'right' }}>
                         <span style={{ padding: '2px 7px', borderRadius: 5, fontSize: 10, fontFamily: "'Oswald',sans-serif", fontWeight: 800, background: gc.bg, color: gc.color, border: `1px solid ${gc.border}` }}>{b.grade}</span>
                       </td>
@@ -6049,21 +6056,48 @@ Write exactly 2-3 sentences. Focus on the single most important factor driving o
       {view === 'props' && (
         <div>
           <div style={{ marginBottom: 12, fontSize: 10, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>
-            Engine projections vs common prop market lines · green = proj above line · red = proj below line
+            Engine projections vs common prop market lines · green = proj above line · blue = proj below line · click column to sort
           </div>
           <div className="tw">
             <table>
               <thead>
                 <tr>
-                  {['Batter','Team','vs','HR &gt;0.5','H &gt;0.5','H &gt;1.5','TB &gt;0.5','TB &gt;1.5','TB &gt;2.5','Grade'].map(h => (
-                    <th key={h} style={{ textAlign: h === 'Batter' || h === 'vs' ? 'left' : 'center', whiteSpace: 'nowrap' }} dangerouslySetInnerHTML={{__html: h}} />
-                  ))}
+                  {[
+                    { label: 'Batter',    key: null,             align: 'left'   },
+                    { label: 'Team',      key: null,             align: 'center' },
+                    { label: 'vs',        key: null,             align: 'left'   },
+                    { label: 'HR >0.5',   key: 'proj_hr_adj',    align: 'center' },
+                    { label: 'H >0.5',    key: 'proj_hit_prob',  align: 'center' },
+                    { label: 'H >1.5',    key: 'proj_hit_prob',  align: 'center' },
+                    { label: 'TB >0.5',   key: 'proj_avg_tb',    align: 'center' },
+                    { label: 'TB >1.5',   key: 'proj_avg_tb',    align: 'center' },
+                    { label: 'TB >2.5',   key: 'proj_avg_tb',    align: 'center' },
+                    { label: 'Grade',     key: null,             align: 'center' },
+                  ].map((col, ci) => {
+                    const active = sortProp === col.key && col.key;
+                    return (
+                      <th key={ci}
+                        onClick={() => {
+                          if (!col.key) return;
+                          if (col.key === sortProp) setSortPropDir(d => d === 'desc' ? 'asc' : 'desc');
+                          else { setSortProp(col.key); setSortPropDir('desc'); }
+                        }}
+                        style={{ textAlign: col.align, whiteSpace: 'nowrap', cursor: col.key ? 'pointer' : 'default',
+                          color: active ? 'var(--accent)' : 'var(--muted)', userSelect: 'none' }}>
+                        {col.label}{active ? (sortPropDir === 'desc' ? ' ▼' : ' ▲') : ''}
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>
                 {[...data]
                   .filter(r => r.batter)
-                  .sort((a, b) => (parseFloat(b.proj_hit_prob) || 0) - (parseFloat(a.proj_hit_prob) || 0))
+                  .sort((a, b) => {
+                    const va = parseFloat(a[sortProp]) || 0;
+                    const vb = parseFloat(b[sortProp]) || 0;
+                    return sortPropDir === 'desc' ? vb - va : va - vb;
+                  })
                   .map((b, i) => {
                     const hrP  = toDecimal(b.proj_hr_adj);
                     const hitP = toDecimal(b.proj_hit_prob);
