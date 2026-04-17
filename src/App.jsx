@@ -1679,6 +1679,10 @@ const PLAYER_MAP_TTL = 6 * 60 * 60 * 1000; // 6-hour TTL — picks up mid-season
 // Populated when MLB lineup API returns confirmed starters
 const LINEUP_STATUS = {}; // pid → {status:"confirmed"|"today", team}
 const TODAY_TEAMS = new Set(); // teams playing today
+let LINEUP_VERSION = 0; // increments each refresh so React components re-render
+const LINEUP_LISTENERS = new Set(); // components that want to re-render on lineup refresh
+function subscribeLineup(fn) { LINEUP_LISTENERS.add(fn); return () => LINEUP_LISTENERS.delete(fn); }
+function notifyLineupListeners() { LINEUP_VERSION++; LINEUP_LISTENERS.forEach(fn => fn(LINEUP_VERSION)); }
 
 async function loadTodayLineups() {
   try {
@@ -1707,6 +1711,7 @@ async function loadTodayLineups() {
     }
     console.log('[Lineups] Today teams:', [...TODAY_TEAMS].join(', '));
     console.log('[Lineups] Confirmed starters:', Object.keys(LINEUP_STATUS).length);
+    notifyLineupListeners();
   } catch(e) {
     console.warn('[Lineups] Load failed:', e.message);
   }
@@ -3484,34 +3489,40 @@ function InlinePitcherCard({ pitcherId, pitcherName }) {
   return (
     <div>
       {/* SP row */}
-      <div style={{display:'flex',alignItems:'center',gap:5,marginBottom: open ? 4 : 8,
-        padding:'5px 8px',borderRadius: open ? '6px 6px 0 0' : 6,
+      <div style={{marginBottom: open ? 4 : 8, padding:'5px 8px',
+        borderRadius: open ? '6px 6px 0 0' : 6,
         background:'rgba(56,184,242,.07)',border:'1px solid rgba(56,184,242,.18)',
         borderBottom: open ? '1px solid rgba(56,184,242,.1)' : '1px solid rgba(56,184,242,.18)'}}>
-        <span style={{fontSize:9,color:'var(--ice)',fontFamily:"'DM Mono',monospace",
-          fontWeight:700,flexShrink:0,letterSpacing:.5}}>SP</span>
-        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:600,fontSize:12,
-          color:'var(--text)',flex:1,minWidth:0,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-          {pitcherName || 'TBD'}
-        </span>
-        {stats?.hand && (
-          <span style={{fontSize:8,fontFamily:"'DM Mono',monospace",fontWeight:700,padding:'1px 4px',
-            borderRadius:3,flexShrink:0,
-            background:stats.hand==='L'?'rgba(56,184,242,.12)':'rgba(255,128,32,.10)',
-            color:stats.hand==='L'?'#38b8f2':'#ff8020'}}>
-            {stats.hand==='L'?'LHP':'RHP'}
+        {/* Row 1: SP label + name + LHP/RHP */}
+        <div style={{display:'flex',alignItems:'center',gap:5}}>
+          <span style={{fontSize:9,color:'var(--ice)',fontFamily:"'DM Mono',monospace",
+            fontWeight:700,flexShrink:0,letterSpacing:.5}}>SP</span>
+          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:600,fontSize:12,
+            color:'var(--text)',flex:1,minWidth:0,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+            {pitcherName || 'TBD'}
           </span>
-        )}
-        {loading && <span style={{fontSize:9,color:'var(--muted)',flexShrink:0}}>…</span>}
+          {stats?.hand && (
+            <span style={{fontSize:8,fontFamily:"'DM Mono',monospace",fontWeight:700,padding:'1px 4px',
+              borderRadius:3,flexShrink:0,
+              background:stats.hand==='L'?'rgba(56,184,242,.12)':'rgba(255,128,32,.10)',
+              color:stats.hand==='L'?'#38b8f2':'#ff8020'}}>
+              {stats.hand==='L'?'LHP':'RHP'}
+            </span>
+          )}
+          {loading && <span style={{fontSize:9,color:'var(--muted)',flexShrink:0}}>…</span>}
+        </div>
+        {/* Row 2: grade badge (only when loaded) */}
         {grade && (
-          <button onClick={() => setOpen(o => !o)}
-            style={{display:'inline-flex',alignItems:'center',gap:3,padding:'1px 6px',
-              borderRadius:4,cursor:'pointer',border:`1px solid ${grade.color}40`,
-              background:grade.bg,flexShrink:0}}>
-            <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",fontWeight:700,
-              color:grade.color,whiteSpace:'nowrap'}}>{grade.label}</span>
-            <span style={{fontSize:8,color:grade.color,opacity:.7}}>{open?'▲':'▼'}</span>
-          </button>
+          <div style={{marginTop:4}}>
+            <button onClick={() => setOpen(o => !o)}
+              style={{display:'inline-flex',alignItems:'center',gap:3,padding:'2px 7px',
+                borderRadius:4,cursor:'pointer',border:`1px solid ${grade.color}40`,
+                background:grade.bg}}>
+              <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",fontWeight:700,
+                color:grade.color,whiteSpace:'nowrap'}}>{grade.label}</span>
+              <span style={{fontSize:8,color:grade.color,opacity:.7}}>{open?'▲':'▼'}</span>
+            </button>
+          </div>
         )}
       </div>
 
@@ -6339,8 +6350,15 @@ function BatterLeaderboard() {
     .filter(p => !showPicksOnly || picks[String(p.pid)])
     .filter(p => !filterGoneYard || isGoneYard(p))
     .sort((a, b) => {
-      const av = sortCol === 'name' ? (a.name||'') : ws(a, sortCol) ?? (a[sortCol] ?? 0);
-      const bv = sortCol === 'name' ? (b.name||'') : ws(b, sortCol) ?? (b[sortCol] ?? 0);
+      const evCount = (p, thresh) => (p.recentAtBats||[]).filter(ab=>(ab.ev||0)>=thresh).length;
+      const av = sortCol === 'name' ? (a.name||'')
+               : sortCol === 'ev95'  ? evCount(a, 95)
+               : sortCol === 'ev100' ? evCount(a, 100)
+               : ws(a, sortCol) ?? (a[sortCol] ?? 0);
+      const bv = sortCol === 'name' ? (b.name||'')
+               : sortCol === 'ev95'  ? evCount(b, 95)
+               : sortCol === 'ev100' ? evCount(b, 100)
+               : ws(b, sortCol) ?? (b[sortCol] ?? 0);
       if (typeof av === 'string') return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
       return sortDir === 'desc' ? bv - av : av - bv;
     });
@@ -6373,6 +6391,10 @@ function BatterLeaderboard() {
     { key:'slg',  label:'SLG', render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{fmtStat(ws(p,'slg'))}</span> },
     { key:'ops',  label:'OPS', render: p => { const v=(ws(p,'slg')||0)+(ws(p,'obp')||0); return <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:700,color:opsCol(v)}}>{fmtStat(v||ws(p,'ops'))}</span>; }},
     { key:'hr',   label:'HR',  render: p => { const v=ws(p,'hr'); return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:v>=10?700:400,color:hrCol(v)}}>{v||0}</span>; }},
+    { key:'hits', label:'H',   render: p => { const v=ws(p,'hits'); return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=30?'#27c97a':v>=20?'#f5a623':'var(--text)'}}>{v||0}</span>; }},
+    { key:'xbh',  label:'XBH', render: p => { const v=ws(p,'xbh');  return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=12?'#ff8020':v>=7?'#f5a623':'var(--text)'}}>{v||0}</span>; }},
+    { key:'ev95', label:'95+ EV', render: p => { const v=(p.recentAtBats||[]).filter(a=>(a.ev||0)>=95).length; return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=10?'#ff4020':v>=6?'#ff8020':v>=3?'#f5a623':'var(--text)'}}>{v||0}</span>; }},
+    { key:'ev100',label:'100+ EV',render: p => { const v=(p.recentAtBats||[]).filter(a=>(a.ev||0)>=100).length; return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=5?'#ff4020':v>=3?'#ff8020':v>=1?'#f5a623':'var(--text)'}}>{v||0}</span>; }},
     { key:'kPct', label:'K%',  render: p => { const v=ws(p,'kPct'); return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=28?'var(--ice)':'var(--muted)'}}>{fmtPct(v)}</span>; }},
     { key:'bbPct',label:'BB%', render: p => { const v=ws(p,'bbPct'); return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=12?'#27c97a':'var(--muted)'}}>{fmtPct(v)}</span>; }},
   ];
@@ -6535,7 +6557,6 @@ function BatterLeaderboard() {
                 <th style={{textAlign:'left',cursor:'pointer',whiteSpace:'nowrap'}} className={sortCol==='name'?'sk':''} onClick={()=>handleSort('name')}>
                   Batter<SortIcon col="name"/>
                 </th>
-                <th style={{textAlign:'center',whiteSpace:'nowrap'}}>PROP</th>
                 {STAT_COLS.map(c=>(
                   <th key={c.key} className={sortCol===c.key?'sk':''} style={{textAlign:'right',cursor:'pointer',whiteSpace:'nowrap'}}
                     onClick={()=>handleSort(c.key)}>
@@ -6546,8 +6567,6 @@ function BatterLeaderboard() {
             </thead>
             <tbody>
               {filtered.slice(0,300).map(p=>{
-                const propVal = bprops[String(p.pid)] || '';
-                const propOpt = BATTER_PROP_OPTS.find(o=>o.value===propVal) || BATTER_PROP_OPTS[0];
                 return (
                   <tr key={p.pid} className="dr">
                     {/* Pick button — first */}
@@ -6569,26 +6588,6 @@ function BatterLeaderboard() {
                           <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)'}}>{p.hand}HB · {p.pos||'—'}</div>
                         </div>
                       </div>
-                    </td>
-                    {/* Prop dropdown — right after name */}
-                    <td style={{textAlign:'center',paddingLeft:4,paddingRight:4}}>
-                      <select
-                        value={propVal}
-                        onChange={e => setBatterProp(p.pid, e.target.value)}
-                        style={{
-                          padding:'3px 5px',
-                          background: propVal ? 'rgba(0,0,0,.35)' : 'var(--surface2)',
-                          border:`1px solid ${propVal ? propOpt.color : 'var(--border)'}`,
-                          borderRadius:6,
-                          color: propVal ? propOpt.color : 'var(--muted)',
-                          fontFamily:"'DM Mono',monospace",
-                          fontSize:10,fontWeight:propVal?700:400,
-                          cursor:'pointer',outline:'none',minWidth:62,
-                        }}>
-                        {BATTER_PROP_OPTS.map(o=>(
-                          <option key={o.value} value={o.value}>{o.label}</option>
-                        ))}
-                      </select>
                     </td>
                     {/* Stat columns */}
                     {STAT_COLS.map(c=>(
@@ -6999,6 +6998,14 @@ function MatchupEngineTab() {
   const [selPitcherGrade, setSelPitcherGrade] = useState('all');
   const [filterGoneYard, setFilterGoneYard]   = useState(false);
   const picks = usePicks();
+  // Re-render when confirmed lineups update (same 2-min cycle as Lineups tab)
+  const [lineupVer, setLineupVer] = useState(LINEUP_VERSION);
+  useEffect(() => {
+    const unsub = subscribeLineup(v => setLineupVer(v));
+    // Refresh lineup confirmation every 2 minutes
+    const id = setInterval(() => loadTodayLineups().catch(() => {}), 120000);
+    return () => { unsub(); clearInterval(id); };
+  }, []);
 
   useEffect(() => {
     fetch('/data/daily_summary.csv')
@@ -7564,11 +7571,12 @@ function MatchupEngineTab() {
 
                   {/* Key stats */}
                   <div style={{display:'flex',gap:8,flexShrink:0,alignItems:'center'}}>
-          {totalFlags > 0 && <div style={{textAlign:'center',flexShrink:0}}>
-            <div style={{letterSpacing:1,lineHeight:1,fontSize:11}}>
-              {Array.from({length:Math.min(totalFlags,8)}).map((_,si)=><span key={si}>⭐</span>)}
-            </div>
-          </div>}
+          {LINEUP_STATUS[pid]?.status === 'confirmed' && (
+            <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",fontWeight:700,
+              padding:'1px 5px',borderRadius:4,flexShrink:0,
+              background:'rgba(39,201,122,.12)',border:'1px solid rgba(39,201,122,.35)',
+              color:'#27c97a',letterSpacing:.3}}>✅ IN</span>
+          )}
                     {recentEV > 0 && <div style={{textAlign:'center'}}>
                       <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,
                         fontSize:14,color:recentEV>=95?'#ff8020':recentEV>=90?'#ffc840':'var(--text)',lineHeight:1}}>
