@@ -3743,7 +3743,7 @@ function LineupsView({ date }) {
   const TeamLineup = ({side, gamePk, onBatterClick}) => (
     <div style={{flex:1,minWidth:0}}>
       <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:7,flexWrap:'wrap'}}>
-        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:16,letterSpacing:1,color:'var(--text)'}}>{side.abbr}</span>
+        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,letterSpacing:1,color:'var(--text)'}}>{side.abbr}</span>
         <StatusBadge confirmed={side.confirmed}/>
       </div>
       <InlinePitcherCard pitcherId={side.spId} pitcherName={side.sp || 'TBD'}/>
@@ -3758,26 +3758,26 @@ function LineupsView({ date }) {
             return (
               <div key={p.id||i}
                 onClick={() => onBatterClick({player: p, teamAbbr: side.abbr})}
-                style={{display:'flex',alignItems:'center',gap:6,
-                  padding:'5px 4px',borderRadius:4,cursor:'pointer',
+                style={{display:'flex',alignItems:'center',gap:4,
+                  padding:'4px 3px',borderRadius:4,cursor:'pointer',
                   background: i%2===0?'rgba(255,255,255,.02)':'transparent',
                   borderLeft:'2px solid transparent',
                   transition:'background .12s'}}
                 onMouseEnter={e=>{e.currentTarget.style.background='rgba(255,255,255,.06)';e.currentTarget.style.borderLeftColor='var(--accent2)';}}
                 onMouseLeave={e=>{e.currentTarget.style.background=i%2===0?'rgba(255,255,255,.02)':'transparent';e.currentTarget.style.borderLeftColor='transparent';}}>
-                <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,
-                  color:order<=3?'var(--accent2)':'var(--muted)',minWidth:13,textAlign:'right',flexShrink:0}}>
+                <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,
+                  color:order<=3?'var(--accent2)':'var(--muted)',minWidth:12,textAlign:'right',flexShrink:0}}>
                   {order}
                 </span>
                 <PosChip pos={pos}/>
-                <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:600,fontSize:12,
+                <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:600,fontSize:11,
                   color:'var(--text)',flex:1,minWidth:0,
                   whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
                   {name}
                 </span>
                 {ev >= 90 && <span style={{fontSize:8,color:ev>=95?'#ff8020':'var(--muted)',
                   fontFamily:"'DM Mono',monospace",flexShrink:0}}>{ev.toFixed(0)}</span>}
-                <span style={{fontSize:9,color:'rgba(255,255,255,.2)',flexShrink:0}}>›</span>
+                <span style={{fontSize:8,color:'rgba(255,255,255,.2)',flexShrink:0}}>›</span>
               </div>
             );
           })}
@@ -5746,6 +5746,7 @@ function SimLabView({ data }) {
   const [teamFilter, setTeamFilter] = useState('all');
   const [sortProp, setSortProp]     = useState('proj_hit_prob');
   const [sortPropDir, setSortPropDir] = useState('desc');
+  const [lineupOnly, setLineupOnly]   = useState(false);
   const aiCache = useRef({});
 
   const pf = (v, d=1) => v != null && !isNaN(parseFloat(v)) ? parseFloat(v).toFixed(d) : null;
@@ -5776,12 +5777,19 @@ function SimLabView({ data }) {
     { key: 'hr_intent_score',     label: 'HR Intent' },
   ];
 
+  // Confirmed in lineup check — reads same LINEUP_STATUS as matchup tab
+  const isConfirmed = b => {
+    const pid = parseInt(b.batter_id) || 0;
+    return pid > 0 && LINEUP_STATUS[pid]?.status === 'confirmed';
+  };
+
   const slate = useMemo(() => {
     const filtered = data.filter(r => r.batter && r.batting_team)
-      .filter(r => teamFilter === 'all' || r.batting_team === teamFilter);
+      .filter(r => teamFilter === 'all' || r.batting_team === teamFilter)
+      .filter(r => !lineupOnly || isConfirmed(r));
     const mul = sortDir === 'desc' ? -1 : 1;
     return [...filtered].sort((a, b) => mul * ((parseFloat(a[sortBy]) || 0) - (parseFloat(b[sortBy]) || 0)));
-  }, [data, sortBy, sortDir, teamFilter]);
+  }, [data, sortBy, sortDir, teamFilter, lineupOnly]);
 
   // Auto-select top batter when data loads
   useEffect(() => {
@@ -5883,6 +5891,15 @@ Write exactly 2-3 sentences. Focus on the single most important factor driving o
               <option value="all">All Teams</option>
               {teams.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
+            <button onClick={() => setLineupOnly(v => !v)}
+              style={{ padding: '6px 12px', borderRadius: 7, cursor: 'pointer',
+                border: `1px solid ${lineupOnly ? 'rgba(39,201,122,.5)' : 'var(--border)'}`,
+                background: lineupOnly ? 'rgba(39,201,122,.12)' : 'var(--surface2)',
+                color: lineupOnly ? '#27c97a' : 'var(--muted)',
+                fontFamily: "'DM Mono',monospace", fontSize: 11, fontWeight: lineupOnly ? 700 : 400,
+                whiteSpace: 'nowrap' }}>
+              ✅ {lineupOnly ? 'Confirmed ✓' : 'Confirmed'}
+            </button>
             <span style={{ fontSize: 10, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>
               {slate.length} batters · click column header to sort · click row to Deep Dive
             </span>
@@ -5938,7 +5955,10 @@ Write exactly 2-3 sentences. Focus on the single most important factor driving o
                         <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 13, color: i < 3 ? 'var(--accent)' : 'var(--muted)' }}>{i + 1}</span>
                       </td>
                       <td style={{ textAlign: 'left' }}>
-                        <div style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 13 }}>{b.batter}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 13 }}>{b.batter}</span>
+                          {isConfirmed(b) && <span style={{ fontSize: 9, color: '#27c97a', flexShrink: 0 }}>✅</span>}
+                        </div>
                         {(b.in_slump === 'True' || b.in_slump === true) &&
                           <span style={{ fontSize: 8, color: 'var(--ice)', fontFamily: "'DM Mono',monospace" }}>📉 slump</span>}
                         {(b.is_diamond === 'True' || b.is_diamond === true) &&
@@ -7040,7 +7060,7 @@ function MatchupEngineTab() {
   }, []);
 
   useEffect(() => {
-    fetch('/data/daily_summary.csv')
+    fetch('/data/daily_picks.csv')
       .then(r => { if (!r.ok) throw new Error(`${r.status}`); return r.text(); })
       .then(text => {
         const rows = parseCSVText(text);
@@ -7336,6 +7356,24 @@ function MatchupEngineTab() {
       );
     })()}
 
+    {/* Emoji legend */}
+    <div style={{display:'flex',gap:10,marginBottom:10,flexWrap:'wrap',padding:'6px 10px',
+      background:'var(--surface)',border:'1px solid var(--border)',borderRadius:7}}>
+      <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontWeight:700,
+        textTransform:'uppercase',letterSpacing:1,alignSelf:'center'}}>Key:</span>
+      {[
+        ['✅','Confirmed in lineup'],
+        ['💥','Hit a HR today'],
+        ['📉','Slump'],
+        ['💎','Diamond pick'],
+      ].map(([emoji, label]) => (
+        <span key={emoji} style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+          display:'flex',alignItems:'center',gap:3}}>
+          <span style={{fontSize:11}}>{emoji}</span>{label}
+        </span>
+      ))}
+    </div>
+
     {/* Grade legend */}
     <div style={{display:'flex',gap:6,marginBottom:14,flexWrap:'wrap'}}>
       {Object.entries(GRADE_CFG).map(([g,c])=>(
@@ -7548,8 +7586,7 @@ function MatchupEngineTab() {
                     background:'rgba(255,20,0,.25)',border:'1px solid rgba(255,20,0,.5)',
                     color:'#fff',fontFamily:"'DM Mono',monospace",
                     fontWeight:800,fontSize:10,letterSpacing:.5}}>
-                    💥 Gone Yard
-                  </div>}
+                    💥</div>}
 
                   {/* Batter name + hand */}
                   <div style={{flex:1,minWidth:0}}>
@@ -7607,7 +7644,7 @@ function MatchupEngineTab() {
             <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",fontWeight:700,
               padding:'1px 5px',borderRadius:4,flexShrink:0,
               background:'rgba(39,201,122,.12)',border:'1px solid rgba(39,201,122,.35)',
-              color:'#27c97a',letterSpacing:.3}}>✅ IN</span>
+              color:'#27c97a',letterSpacing:.3}}>✅</span>
           )}
                     {recentEV > 0 && <div style={{textAlign:'center'}}>
                       <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,
