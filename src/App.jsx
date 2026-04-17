@@ -7792,7 +7792,7 @@ function PowerBITab() {
     }}>
       <iframe
         title="Going Yard Analytics"
-        src="https://app.powerbi.com/view?r=eyJrIjoiYTQzOGZmMWMtOWZmMy00Y2NhLWE1NWUtZDljZmFkYWFhODg0IiwidCI6IjgzOGY2MGI3LTc4NzYtNGEwZC1iM2MxLTg1Y2VlZWE1YmJhYiIsImMiOjF9"
+        src="https://app.powerbi.com/view?r=eyJrIjoiMTdmYTZiZDktOTA5ZC00OTFmLWE1NTktZDgwYmNhZDAwYTkwIiwidCI6IjgzOGY2MGI3LTc4NzYtNGEwZC1iM2MxLTg1Y2VlZWE1YmJhYiIsImMiOjF9"
         frameBorder="0"
         allowFullScreen
         style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",border:"none"}}
@@ -7801,7 +7801,7 @@ function PowerBITab() {
 
     {/* Open in Power BI button */}
     <div style={{marginTop:10,display:"flex",gap:8,justifyContent:"flex-end"}}>
-      <a href="https://app.powerbi.com/view?r=eyJrIjoiYTQzOGZmMWMtOWZmMy00Y2NhLWE1NWUtZDljZmFkYWFhODg0IiwidCI6IjgzOGY2MGI3LTc4NzYtNGEwZC1iM2MxLTg1Y2VlZWE1YmJhYiIsImMiOjF9" target="_blank" rel="noopener noreferrer"
+      <a href="https://app.powerbi.com/view?r=eyJrIjoiMTdmYTZiZDktOTA5ZC00OTFmLWE1NTktZDgwYmNhZDAwYTkwIiwidCI6IjgzOGY2MGI3LTc4NzYtNGEwZC1iM2MxLTg1Y2VlZWE1YmJhYiIsImMiOjF9" target="_blank" rel="noopener noreferrer"
         style={{display:"flex",alignItems:"center",gap:5,padding:"6px 12px",borderRadius:6,
           background:"var(--surface2)",border:"1px solid var(--border)",
           color:"var(--muted)",fontFamily:"'DM Mono',monospace",fontSize:11,textDecoration:"none"}}>
