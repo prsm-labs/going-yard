@@ -6330,8 +6330,10 @@ function BatterLeaderboard() {
     else { setSortCol(col); setSortDir('desc'); }
   };
 
-  // Gone Yard check — did this batter hit a HR today?
-  const isGoneYard = p => HR_DATA.some(h =>
+  // Gone Yard check — did this batter hit a HR *today* (same 6am ET reset as HR Tracker)
+  const etToday = (() => { const s=new Date().toLocaleDateString('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}); const [m,d,y]=s.split('/'); return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`; })();
+  const hrDataIsToday = HR_DATA_DATE === etToday;
+  const isGoneYard = p => hrDataIsToday && HR_DATA.some(h =>
     h.batterId === p.pid ||
     (h.batterName && p.name && h.batterName.toLowerCase() === p.name.toLowerCase())
   );
