@@ -2008,7 +2008,7 @@ async function fetchPlayers(setL, setP, setE, silent=false) {
     // ── STEP 3: Build player objects with REAL metrics only ─
     const mapped = statcastPlayers.map(sc => {
       const pid = sc.pid;
-      const team = pt[pid] || sc.team || '—';
+      const team = normTeam(pt[pid] || sc.team || '—');
 
       // ── Build player object — all fields map directly from /api/atbats ──
       // atbats.js now calculates FB%/Pull% from raw bb_type counts (Power BI method)
@@ -2020,7 +2020,7 @@ async function fetchPlayers(setL, setP, setE, silent=false) {
       const p = {
         pid,
         name,
-        team: team && team !== '—' ? team : (GLOBAL_PLAYER_TEAM_MAP[pid]?.team || '—'),
+        team: normTeam(team && team !== '—' ? team : (GLOBAL_PLAYER_TEAM_MAP[pid]?.team || '—')),
         // ── Statcast metrics — read directly from API, no modification ──
         avgEV:        sc.avgEV        || 0,
         maxEV:        sc.maxEV        || 0,
@@ -2085,10 +2085,12 @@ async function fetchPlayers(setL, setP, setE, silent=false) {
         const fromMap = GLOBAL_PLAYER_TEAM_MAP[p.pid]?.name;
         if (fromMap) p.name = fromMap;
       }
+      // Normalize legacy team abbreviations (e.g. OAK → ATH)
+      p.team = normTeam(p.team);
       // Fix team from global map if missing
       if (!p.team || p.team === '—') {
         const teamFromMap = GLOBAL_PLAYER_TEAM_MAP[p.pid]?.team;
-        if (teamFromMap) p.team = teamFromMap;
+        if (teamFromMap) p.team = normTeam(teamFromMap);
       }
     });
 
@@ -2141,9 +2143,11 @@ async function fetchPlayers(setL, setP, setE, silent=false) {
       PLAYER_CACHE_DATE = Date.now(); // timestamp for 3-hour TTL
       sorted.forEach(p => {
   // Enrich team from global map if still missing
+  // Normalize legacy team abbreviations (e.g. OAK → ATH)
+  p.team = normTeam(p.team);
   if (!p.team || p.team === '—' || p.team === '-') {
     const mapped = GLOBAL_PLAYER_TEAM_MAP[p.pid]?.team;
-    if (mapped && mapped !== '—') p.team = mapped;
+    if (mapped && mapped !== '—') p.team = normTeam(mapped);
   }
   cachePlayer(p);
 });
