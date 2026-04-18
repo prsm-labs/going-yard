@@ -1884,7 +1884,7 @@ async function fetchPlayers(setL, setP, setE, silent=false) {
   setE(null);
 
   // 3-hour TTL — keeps Statcast data fresh throughout the day
-  // Savant publishes previous day's at-bat data 6-10 AM ET daily
+  // Savant publishes previous day's at-bat data — pipeline runs 3am/6am/8am ET
   const THREE_HOURS = 3 * 60 * 60 * 1000;
   const now = Date.now();
   if (silent && PLAYER_CACHE_DATE && (now - PLAYER_CACHE_DATE) < THREE_HOURS && Object.keys(PLAYER_DATA_CACHE).length > 50) {
@@ -2179,12 +2179,12 @@ async function fetchGames(setL, setG, setE, silent=false) {
     const [m,d,y] = etDate.split("/");
     const today = `${y}-${m}-${d}`;
 
-    // After midnight check: if it's before 6 AM ET, also fetch yesterday's schedule
+    // After midnight check: if it's before 4 AM ET, also fetch yesterday's schedule
     // to catch games that started the night before and are still live/not final
     const etHour = new Date().toLocaleString("en-US", {
       timeZone: "America/New_York", hour: "numeric", hour12: false
     });
-    const isLateNight = parseInt(etHour) < 6; // midnight → 5:59 AM ET
+    const isLateNight = parseInt(etHour) < 4; // midnight → 3:59 AM ET — pipeline runs at 3am
 
     let allGameData = [];
 
@@ -5006,10 +5006,10 @@ function HRTrackerTab() {
   const todayET = new Date().toLocaleDateString("en-US",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"});
   const [mp,dp,yp] = todayET.split("/");
   const todayStr = `${yp}-${mp}-${dp}`;
-  // After midnight: if before 6 AM ET, default to yesterday so late-night HRs still show
+  // After midnight: if before 4 AM ET, default to yesterday so late-night HRs still show
   const etHourNow = parseInt(new Date().toLocaleString('en-US',{timeZone:'America/New_York',hour:'numeric',hour12:false}));
   const defaultDate = (() => {
-    if (etHourNow < 6) {
+    if (etHourNow < 4) {
       const y = new Date(); y.setDate(y.getDate()-1);
       const yd = y.toLocaleDateString('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'});
       const [ym2,yd2,yy2] = yd.split('/');
@@ -6362,7 +6362,7 @@ function BatterLeaderboard() {
     else { setSortCol(col); setSortDir('desc'); }
   };
 
-  // Gone Yard check — did this batter hit a HR *today* (same 6am ET reset as HR Tracker)
+  // Gone Yard check — did this batter hit a HR *today* (resets at 4am ET with pipeline)
   const etToday = (() => { const s=new Date().toLocaleDateString('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}); const [m,d,y]=s.split('/'); return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`; })();
   const hrDataIsToday = HR_DATA_DATE === etToday;
   const isGoneYard = p => hrDataIsToday && HR_DATA.some(h =>
