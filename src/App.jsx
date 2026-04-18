@@ -5747,6 +5747,7 @@ function SimLabView({ data }) {
   const [sortProp, setSortProp]     = useState('proj_hit_prob');
   const [sortPropDir, setSortPropDir] = useState('desc');
   const [lineupOnly, setLineupOnly]   = useState(false);
+  const [filterGoneYardSim, setFilterGoneYardSim] = useState(false);
   const aiCache = useRef({});
 
   const pf = (v, d=1) => v != null && !isNaN(parseFloat(v)) ? parseFloat(v).toFixed(d) : null;
@@ -5783,13 +5784,24 @@ function SimLabView({ data }) {
     return pid > 0 && LINEUP_STATUS[pid]?.status === 'confirmed';
   };
 
+  // Gone Yard check — same HR_DATA + date guard as rest of app (resets 4am ET)
+  const etTodaySim = (() => { const s = new Date().toLocaleDateString('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}); const [m,d,y]=s.split('/'); return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`; })();
+  const hrDataIsTodaySim = HR_DATA_DATE === etTodaySim;
+  const isGoneYardSim = b => {
+    if (!hrDataIsTodaySim) return false;
+    const pid = parseInt(b.batter_id) || 0;
+    const name = (b.batter || '').toLowerCase();
+    return HR_DATA.some(h => h.batterId === pid || (h.batterName && h.batterName.toLowerCase() === name));
+  };
+
   const slate = useMemo(() => {
     const filtered = data.filter(r => r.batter && r.batting_team)
       .filter(r => teamFilter === 'all' || r.batting_team === teamFilter)
-      .filter(r => !lineupOnly || isConfirmed(r));
+      .filter(r => !lineupOnly || isConfirmed(r))
+      .filter(r => !filterGoneYardSim || isGoneYardSim(r));
     const mul = sortDir === 'desc' ? -1 : 1;
     return [...filtered].sort((a, b) => mul * ((parseFloat(a[sortBy]) || 0) - (parseFloat(b[sortBy]) || 0)));
-  }, [data, sortBy, sortDir, teamFilter, lineupOnly]);
+  }, [data, sortBy, sortDir, teamFilter, lineupOnly, filterGoneYardSim]);
 
   // Auto-select top batter when data loads
   useEffect(() => {
@@ -5900,6 +5912,15 @@ Write exactly 2-3 sentences. Focus on the single most important factor driving o
                 whiteSpace: 'nowrap' }}>
               ✅ {lineupOnly ? 'Confirmed ✓' : 'Confirmed'}
             </button>
+            <button onClick={() => setFilterGoneYardSim(v => !v)}
+              style={{ padding: '6px 12px', borderRadius: 7, cursor: 'pointer',
+                border: `1px solid ${filterGoneYardSim ? 'rgba(255,64,32,.5)' : 'var(--border)'}`,
+                background: filterGoneYardSim ? 'rgba(255,64,32,.15)' : 'var(--surface2)',
+                color: filterGoneYardSim ? 'var(--accent)' : 'var(--muted)',
+                fontFamily: "'DM Mono',monospace", fontSize: 11, fontWeight: filterGoneYardSim ? 700 : 400,
+                whiteSpace: 'nowrap' }}>
+              💥 {filterGoneYardSim ? 'Gone Yard ✓' : 'Gone Yard'}
+            </button>
             <span style={{ fontSize: 10, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>
               {slate.length} batters · click column header to sort · click row to Deep Dive
             </span>
@@ -5958,6 +5979,7 @@ Write exactly 2-3 sentences. Focus on the single most important factor driving o
                         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                           <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 13 }}>{b.batter}</span>
                           {isConfirmed(b) && <span style={{ fontSize: 9, color: '#27c97a', flexShrink: 0 }}>✅</span>}
+                          {isGoneYardSim(b) && <span style={{ fontSize: 9, flexShrink: 0 }}>💥</span>}
                         </div>
                         {(b.in_slump === 'True' || b.in_slump === true) &&
                           <span style={{ fontSize: 8, color: 'var(--ice)', fontFamily: "'DM Mono',monospace" }}>📉 slump</span>}
