@@ -7060,7 +7060,7 @@ function MatchupEngineTab() {
   }, []);
 
   useEffect(() => {
-    fetch('/data/daily_picks.csv')
+    fetch('/data/daily_summary.csv')
       .then(r => { if (!r.ok) throw new Error(`${r.status}`); return r.text(); })
       .then(text => {
         const rows = parseCSVText(text);
