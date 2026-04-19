@@ -5827,6 +5827,8 @@ KEY METRICS:
 - Recent EV: ${b.recent_avg_ev || '—'} mph · Recent Barrel%: ${b.recent_barrel_pct || '—'}%
 - BvP EV: ${b.bvp_avg_ev || '—'} mph · BvP Barrel%: ${b.bvp_barrel_pct || '—'}% (${b.bvp_pa || 0} PA vs this pitch mix)
 - Pitcher allows barrel%: ${b.pitcher_barrel_pct_allowed || '—'}% · HH%: ${b.pitcher_hh_pct_allowed || '—'}%
+- Opposing bullpen ERA: ${b.bullpen_era ? parseFloat(b.bullpen_era).toFixed(2) : '—'} (${parseFloat(b.bullpen_era) >= 4.5 ? 'soft — late-inning HR opportunity' : parseFloat(b.bullpen_era) <= 3.0 ? 'elite — suppressed' : 'average'})
+- Meatball matchup score: ${b.meatball_matchup_score ? (parseFloat(b.meatball_matchup_score)*100).toFixed(1) : '0'} (pitcher 💣 zone% ${b.pitcher_meatball_pct || '—'}% · batter meatball score ${b.batter_meatball_score || '—'})
 - Engine grade: ${b.grade} · Slump: ${b.in_slump === 'True' || b.in_slump === true ? 'YES' : 'no'} · HR intent: ${b.hr_intent_score || '—'}
 
 Write exactly 2-3 sentences. Focus on the single most important factor driving or limiting the HR/XBH probability tonight. Name specific pitches when relevant. Do not repeat numbers verbatim — interpret them.`;
@@ -6165,13 +6167,37 @@ Write exactly 2-3 sentences. Focus on the single most important factor driving o
                       ['Barrel Allowed', b.pitcher_barrel_pct_allowed, '%', parseFloat(b.pitcher_barrel_pct_allowed) >= 10 ? '#ff4020' : parseFloat(b.pitcher_barrel_pct_allowed) >= 6 ? '#f5a623' : 'var(--text)'],
                       ['HH Allowed',     b.pitcher_hh_pct_allowed,    '%', parseFloat(b.pitcher_hh_pct_allowed) >= 45 ? '#ff4020' : 'var(--text)'],
                       ['FB Allowed',     b.pitcher_fb_pct_allowed,    '%', 'var(--text)'],
+                      ['💣 Zone%',       b.pitcher_meatball_pct,      '%', parseFloat(b.pitcher_meatball_pct) >= 60 ? '#ff4020' : parseFloat(b.pitcher_meatball_pct) >= 55 ? '#f5a623' : 'var(--muted)'],
                     ].map(([lbl, val, unit, col]) => val && parseFloat(val) > 0 ? (
                       <div key={lbl} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
                         <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>{lbl}</span>
                         <span style={{ fontSize: 11, fontFamily: "'Oswald',sans-serif", fontWeight: 700, color: col }}>{parseFloat(val).toFixed(1)}{unit}</span>
                       </div>
                     ) : null)}
+                    {/* Meatball matchup score */}
+                    {b.meatball_matchup_score && parseFloat(b.meatball_matchup_score) > 0 && (() => {
+                      const ms = parseFloat(b.meatball_matchup_score);
+                      const col = ms >= 0.15 ? '#ff4020' : ms >= 0.08 ? '#f5a623' : '#27c97a';
+                      return (
+                        <div style={{ marginTop: 5, paddingTop: 5, borderTop: '1px solid rgba(255,255,255,.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>💣 Meatball Matchup</span>
+                          <span style={{ fontSize: 11, fontFamily: "'Oswald',sans-serif", fontWeight: 700, color: col }}>{(ms * 100).toFixed(1)}</span>
+                        </div>
+                      );
+                    })()}
                     {b.pitcher_pa_faced && <div style={{ marginTop: 5, fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>{b.pitcher_pa_faced} PA faced this season</div>}
+                    {/* Bullpen ERA */}
+                    {b.bullpen_era && parseFloat(b.bullpen_era) > 0 && (() => {
+                      const era = parseFloat(b.bullpen_era);
+                      const col = era >= 4.50 ? '#27c97a' : era <= 3.00 ? '#ff4020' : 'var(--muted)';
+                      const label = era >= 4.50 ? '💥 Soft' : era <= 3.00 ? '🔒 Elite' : '— Avg';
+                      return (
+                        <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid rgba(255,255,255,.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>Opp. Bullpen ERA</span>
+                          <span style={{ fontSize: 11, fontFamily: "'Oswald',sans-serif", fontWeight: 700, color: col }}>{era.toFixed(2)} <span style={{ fontSize: 8 }}>{label}</span></span>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
 
@@ -7772,7 +7798,37 @@ function MatchupEngineTab() {
                     fontFamily:"'DM Mono',monospace",color:'var(--muted)'}}>
                     {b.condition}
                   </div>}
-                  
+                  {/* Pitcher barrel allowed */}
+                  {b.pitcher_barrel_pct_allowed && parseFloat(b.pitcher_barrel_pct_allowed) > 0 && (() => {
+                    const v = parseFloat(b.pitcher_barrel_pct_allowed);
+                    const col = v >= 10 ? '#ff4020' : v >= 6 ? '#f5a623' : 'var(--muted)';
+                    return <div style={{padding:'3px 10px',borderRadius:6,fontSize:10,
+                      background:'rgba(255,255,255,.04)',border:`1px solid ${v>=6?'rgba(255,128,32,.3)':'var(--border)'}`,
+                      fontFamily:"'DM Mono',monospace",color:col}}>
+                      🎯 {v.toFixed(1)}% Brl allowed
+                    </div>;
+                  })()}
+                  {/* Bullpen ERA */}
+                  {b.bullpen_era && parseFloat(b.bullpen_era) > 0 && (() => {
+                    const era = parseFloat(b.bullpen_era);
+                    const col = era >= 4.50 ? '#27c97a' : era <= 3.00 ? '#ff4020' : 'var(--muted)';
+                    const label = era >= 4.50 ? '💥 Soft BP' : era <= 3.00 ? '🔒 Elite BP' : '⚾ Avg BP';
+                    return <div style={{padding:'3px 10px',borderRadius:6,fontSize:10,
+                      background:'rgba(255,255,255,.04)',border:`1px solid ${era>=4.5?'rgba(39,201,122,.3)':era<=3.0?'rgba(255,64,32,.3)':'var(--border)'}`,
+                      fontFamily:"'DM Mono',monospace",color:col}}>
+                      {label} {era.toFixed(2)}
+                    </div>;
+                  })()}
+                  {/* Meatball matchup */}
+                  {b.meatball_matchup_score && parseFloat(b.meatball_matchup_score) > 0 && (() => {
+                    const ms = parseFloat(b.meatball_matchup_score);
+                    const col = ms >= 0.15 ? '#ff4020' : ms >= 0.08 ? '#f5a623' : '#27c97a';
+                    return <div style={{padding:'3px 10px',borderRadius:6,fontSize:10,
+                      background:'rgba(255,64,32,.08)',border:'1px solid rgba(255,64,32,.25)',
+                      fontFamily:"'DM Mono',monospace",color:col,fontWeight:700}}>
+                      💣 {(ms * 100).toFixed(0)} meatball
+                    </div>;
+                  })()}
                 </div>
                 {/* Live box score — fetches real game data */}
                 <LiveBatterBox batterId={b.batter_id} gamePk={b.game_id} onData={(id,d)=>{liveCache.current[id]=d;}}/>
