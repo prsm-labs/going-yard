@@ -5748,7 +5748,9 @@ function SimLabView({ data }) {
   const [sortPropDir, setSortPropDir] = useState('desc');
   const [lineupOnly, setLineupOnly]   = useState(false);
   const [filterGoneYardSim, setFilterGoneYardSim] = useState(false);
+  const [selPitcherGradeSim, setSelPitcherGradeSim] = useState('all');
   const aiCache = useRef({});
+  const simPitcherGrades = useRef({}); // pitcher_id → grade label
 
   const pf = (v, d=1) => v != null && !isNaN(parseFloat(v)) ? parseFloat(v).toFixed(d) : null;
   // toDecimal: normalizes prob values regardless of how they're stored in the CSV.
@@ -5798,10 +5800,15 @@ function SimLabView({ data }) {
     const filtered = data.filter(r => r.batter && r.batting_team)
       .filter(r => teamFilter === 'all' || r.batting_team === teamFilter)
       .filter(r => !lineupOnly || isConfirmed(r))
-      .filter(r => !filterGoneYardSim || isGoneYardSim(r));
+      .filter(r => !filterGoneYardSim || isGoneYardSim(r))
+      .filter(r => {
+        if (selPitcherGradeSim === 'all') return true;
+        const pid = r.pitcher_id ? String(parseInt(r.pitcher_id) || r.pitcher_id) : null;
+        return pid && simPitcherGrades.current[pid] === selPitcherGradeSim;
+      });
     const mul = sortDir === 'desc' ? -1 : 1;
     return [...filtered].sort((a, b) => mul * ((parseFloat(a[sortBy]) || 0) - (parseFloat(b[sortBy]) || 0)));
-  }, [data, sortBy, sortDir, teamFilter, lineupOnly, filterGoneYardSim]);
+  }, [data, sortBy, sortDir, teamFilter, lineupOnly, filterGoneYardSim, selPitcherGradeSim]);
 
   // Auto-select top batter when data loads
   useEffect(() => {
@@ -5928,6 +5935,31 @@ Write exactly 2-3 sentences. Focus on the single most important factor driving o
             </span>
           </div>
 
+          {/* Pitcher grade filter */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+            <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", textTransform: 'uppercase', letterSpacing: 1 }}>Pitcher:</span>
+            {['all', '‼️ Elite', '⚠️ Tough', '🤔 Average', '💥 Hittable', '🎯 Target'].map(g => {
+              const active = selPitcherGradeSim === g;
+              const col = g==='‼️ Elite'?'#ff4020':g==='⚠️ Tough'?'#ff8020':g==='🤔 Average'?'var(--muted)':g==='💥 Hittable'?'#27c97a':g==='🎯 Target'?'#38b8f2':'var(--text)';
+              return <button key={g} onClick={() => setSelPitcherGradeSim(s => s===g ? 'all' : g)}
+                style={{ padding:'3px 10px', borderRadius:6, cursor:'pointer',
+                  background: active ? 'rgba(255,255,255,.08)' : 'transparent',
+                  color: active ? col : 'var(--muted)',
+                  border: `1px solid ${active ? col : 'var(--border)'}`,
+                  fontFamily:"'DM Mono',monospace", fontWeight: active ? 700 : 400, fontSize: 10 }}>
+                {g === 'all' ? 'All' : g}
+              </button>;
+            })}
+          </div>
+
+          {/* Hidden PitcherCard renders to populate simPitcherGrades cache */}
+          <div style={{ display: 'none' }}>
+            {[...new Set(data.map(r => r.pitcher_id).filter(Boolean))].map(pid => (
+              <PitcherCard key={pid} pitcherId={pid} pitcherName=""
+                onGrade={(id, g) => { simPitcherGrades.current[id] = g; }}/>
+            ))}
+          </div>
+
           <div className="tw">
             <table>
               <thead>
@@ -5937,6 +5969,7 @@ Write exactly 2-3 sentences. Focus on the single most important factor driving o
                     { label: 'Batter',   key: null },
                     { label: 'Team',     key: null },
                     { label: 'vs Pitcher',key: null },
+                    { label: 'P.Grade',  key: null },
                     { label: 'HR%',      key: 'proj_hr_adj' },
                     { label: 'Hit%',     key: 'proj_hit_prob' },
                     { label: 'XBH%',     key: 'proj_xbh_prob' },
@@ -5990,6 +6023,15 @@ Write exactly 2-3 sentences. Focus on the single most important factor driving o
                       </td>
                       <td style={{ textAlign: 'right' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 11, color: 'var(--accent2)', fontWeight: 700 }}>{b.batting_team}</span></td>
                       <td style={{ textAlign: 'right' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)' }}>{b.pitcher}</span></td>
+                      <td style={{ textAlign: 'center' }}>
+                        {(() => {
+                          const pid = b.pitcher_id ? String(parseInt(b.pitcher_id) || b.pitcher_id) : null;
+                          const g = pid ? simPitcherGrades.current[pid] : null;
+                          if (!g) return <span style={{ color: 'rgba(255,255,255,.15)', fontSize: 9 }}>—</span>;
+                          const col = g==='‼️ Elite'?'#ff4020':g==='⚠️ Tough'?'#ff8020':g==='🤔 Average'?'var(--muted)':g==='💥 Hittable'?'#27c97a':g==='🎯 Target'?'#38b8f2':'var(--muted)';
+                          return <span style={{ fontFamily:"'DM Mono',monospace", fontSize: 9, color: col, fontWeight: 700, whiteSpace: 'nowrap' }}>{g}</span>;
+                        })()}
+                      </td>
                       <td style={{ textAlign: 'right' }}><span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 14, color: hrColor }}>{hrP > 0 ? hrP.toFixed(1) + '%' : '—'}</span></td>
                       <td style={{ textAlign: 'right' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 11, color: hitColor }}>{hitP > 0 ? hitP.toFixed(1) + '%' : '—'}</span></td>
                       <td style={{ textAlign: 'right' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 11 }}>{xbhP > 0 ? xbhP.toFixed(1) + '%' : '—'}</span></td>
@@ -6121,7 +6163,7 @@ Write exactly 2-3 sentences. Focus on the single most important factor driving o
                   </div>
                 </div>
 
-                {/* Three signal cards */}
+                {/* Three signal cards + pitcher grade */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: 10, marginBottom: 14 }}>
                   {/* Recent form */}
                   <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 12px' }}>
@@ -6209,6 +6251,15 @@ Write exactly 2-3 sentences. Focus on the single most important factor driving o
                         </div>
                       );
                     })()}
+                  </div>
+
+                  {/* Pitcher grade card — same card as shown in Lineups tab */}
+                  <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 12px' }}>
+                    <div style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>⚾ Pitcher Grade</div>
+                    <div style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 13, color: 'var(--text)', marginBottom: 6 }}>{b.pitcher}
+                      <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", fontWeight: 400, marginLeft: 6 }}>{b.pitcher_hand}HP</span>
+                    </div>
+                    <PitcherCard pitcherId={b.pitcher_id} pitcherName={b.pitcher} onGrade={()=>{}}/>
                   </div>
                 </div>
 
