@@ -261,6 +261,14 @@ function cachePlayer(p) { if (p.pid) PLAYER_DATA_CACHE[String(p.pid)] = p; }
 function getCachedPlayer(pid) { return PLAYER_DATA_CACHE[String(pid)] || PLAYER_DATA_CACHE[parseInt(pid)] || null; }
 // Normalize team abbreviations — MLB API still returns legacy codes for relocated teams
 const TEAM_ABBR_MAP = { OAK: 'ATH' };
+// Venue name overrides — MLB Stats API sometimes returns stale/old names
+const VENUE_NAME_MAP = {
+  'Oakland Coliseum':          'Sutter Health Park',
+  'RingCentral Coliseum':      'Sutter Health Park',
+  'Oakland-Alameda County Coliseum': 'Sutter Health Park',
+  'Tropicana Field':           'George M. Steinbrenner Field',
+};
+const normVenue = name => VENUE_NAME_MAP[name] || name;
 const normTeam = t => (t && TEAM_ABBR_MAP[t]) || t || '—';
 
 const T={
@@ -8555,7 +8563,7 @@ function WeatherGameCard({ g, wd }) {
             &nbsp;{g.home?.abbr||'?'}
           </div>
           <div style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginTop:3}}>
-            {wd.stadium}
+            {normVenue(wd.stadium)}
           </div>
           <div style={{fontSize:10,color:'var(--accent2)',fontFamily:"'DM Mono',monospace",marginTop:1}}>
             {g.gameTime||'TBD'} ET
@@ -8906,7 +8914,7 @@ function WeatherTab() {
                   return {
                     gameId: gid,
                     away: g.away?.abbr||'', home: g.home?.abbr||'',
-                    venue: wd.stadium||park?.venue||g.home?.abbr,
+                    venue: normVenue(wd.stadium||park?.venue||g.home?.abbr),
                     gameTime: g.gameTime,
                     isDome: wd.isDome,
                     hrPct, xbhPct, singPct, runPct,
