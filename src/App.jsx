@@ -5944,7 +5944,7 @@ Write exactly 2-3 sentences. Focus on the single most important factor driving o
                     { label: 'Exp RBI',  key: 'proj_avg_rbi' },
                     { label: 'Score',    key: 'weighted_flag_score' },
                     { label: 'Grade',    key: null },
-                    { label: 'Flags',    key: 'total_flags' },
+                    { label: '💣',       key: 'meatball_matchup_score' },
                   ].map(col => (
                     <th key={col.label}
                       onClick={() => handleSort(col.key)}
@@ -6004,9 +6004,11 @@ Write exactly 2-3 sentences. Focus on the single most important factor driving o
                         <span style={{ padding: '2px 7px', borderRadius: 5, fontSize: 10, fontFamily: "'Oswald',sans-serif", fontWeight: 800, background: gc.bg, color: gc.color, border: `1px solid ${gc.border}` }}>{b.grade}</span>
                       </td>
                       <td style={{ textAlign: 'right' }}>
-                        <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)' }}>
-                          {Array.from({ length: Math.min(parseInt(b.total_flags) || 0, 8) }).map((_, si) => '⭐').join('')}
-                        </span>
+                        {parseFloat(b.meatball_matchup_score) > 0 ? (() => {
+                          const ms = parseFloat(b.meatball_matchup_score);
+                          const col = ms >= 0.15 ? '#ff4020' : ms >= 0.08 ? '#f5a623' : '#27c97a';
+                          return <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: col, fontWeight: 700 }}>{(ms * 100).toFixed(0)}</span>;
+                        })() : <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'rgba(255,255,255,.15)' }}>—</span>}
                       </td>
                     </tr>
                   );
@@ -6177,11 +6179,19 @@ Write exactly 2-3 sentences. Focus on the single most important factor driving o
                     {/* Meatball matchup score */}
                     {b.meatball_matchup_score && parseFloat(b.meatball_matchup_score) > 0 && (() => {
                       const ms = parseFloat(b.meatball_matchup_score);
+                      const display = (ms * 100).toFixed(1);
+                      // Higher = better matchup. Color scale: green=weak, orange=solid, red=elite
                       const col = ms >= 0.15 ? '#ff4020' : ms >= 0.08 ? '#f5a623' : '#27c97a';
+                      const label = ms >= 0.15 ? '🔥 Elite' : ms >= 0.08 ? '⚡ Solid' : '✓ Mild';
                       return (
-                        <div style={{ marginTop: 5, paddingTop: 5, borderTop: '1px solid rgba(255,255,255,.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>💣 Meatball Matchup</span>
-                          <span style={{ fontSize: 11, fontFamily: "'Oswald',sans-serif", fontWeight: 700, color: col }}>{(ms * 100).toFixed(1)}</span>
+                        <div style={{ marginTop: 5, paddingTop: 5, borderTop: '1px solid rgba(255,255,255,.06)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>💣 Meatball Matchup</span>
+                            <span style={{ fontSize: 11, fontFamily: "'Oswald',sans-serif", fontWeight: 700, color: col }}>{display} <span style={{ fontSize: 8 }}>{label}</span></span>
+                          </div>
+                          <div style={{ fontSize: 8, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", marginTop: 2 }}>
+                            0–7 mild · 8–14 solid · 15–25 elite
+                          </div>
                         </div>
                       );
                     })()}
@@ -7822,11 +7832,13 @@ function MatchupEngineTab() {
                   {/* Meatball matchup */}
                   {b.meatball_matchup_score && parseFloat(b.meatball_matchup_score) > 0 && (() => {
                     const ms = parseFloat(b.meatball_matchup_score);
+                    const display = (ms * 100).toFixed(0);
                     const col = ms >= 0.15 ? '#ff4020' : ms >= 0.08 ? '#f5a623' : '#27c97a';
+                    const label = ms >= 0.15 ? '🔥 Elite' : ms >= 0.08 ? '⚡ Solid' : '✓ Mild';
                     return <div style={{padding:'3px 10px',borderRadius:6,fontSize:10,
                       background:'rgba(255,64,32,.08)',border:'1px solid rgba(255,64,32,.25)',
                       fontFamily:"'DM Mono',monospace",color:col,fontWeight:700}}>
-                      💣 {(ms * 100).toFixed(0)} meatball
+                      💣 {display} {label}
                     </div>;
                   })()}
                 </div>
