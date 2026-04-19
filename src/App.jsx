@@ -8691,6 +8691,55 @@ function WeatherTab() {
   const [weather, setWeather] = useState({});
   const [loading, setLoading] = useState(true);
   const [refreshed, setRefreshed] = useState(null);
+  const [subTab, setSubTab]   = useState('weather');
+  const [parksView, setParksView] = useState('today'); // 'today' | 'all'
+  const [parkSort, setParkSort] = useState({ col: 'hr_factor', dir: 'desc' });
+
+  const PARK_DATA = [
+    { abbr:'AZ',  venue:'Chase Field',                hr:103, cf:80,  notes:'Retractable roof · low altitude' },
+    { abbr:'ATL', venue:'Truist Park',                 hr:102, cf:120, notes:'Moderate hitter park' },
+    { abbr:'BAL', venue:'Oriole Park at Camden Yards', hr:106, cf:115, notes:'Short RF · hitter-friendly' },
+    { abbr:'BOS', venue:'Fenway Park',                 hr:91,  cf:115, notes:'Green Monster suppresses HRs' },
+    { abbr:'CHC', venue:'Wrigley Field',               hr:104, cf:75,  notes:'Wind-dependent · open bowl' },
+    { abbr:'CIN', venue:'Great American Ball Park',    hr:127, cf:110, notes:'Most HR-friendly park in MLB' },
+    { abbr:'CLE', venue:'Progressive Field',           hr:85,  cf:120, notes:'Large outfield · pitcher-friendly' },
+    { abbr:'COL', venue:'Coors Field',                 hr:125, cf:105, notes:'5,200ft altitude · massive HR boost' },
+    { abbr:'CWS', venue:'Guaranteed Rate Field',       hr:97,  cf:115, notes:'Slightly pitcher-friendly' },
+    { abbr:'DET', venue:'Comerica Park',               hr:92,  cf:115, notes:'Large CF · suppresses HRs' },
+    { abbr:'HOU', venue:'Daikin Park',                 hr:104, cf:135, notes:'Retractable roof · humid air' },
+    { abbr:'KC',  venue:'Kauffman Stadium',            hr:82,  cf:115, notes:'Large outfield · pitcher-friendly' },
+    { abbr:'LAA', venue:'Angel Stadium',               hr:113, cf:120, notes:'Marine layer cuts both ways' },
+    { abbr:'LAD', venue:'Dodger Stadium',              hr:128, cf:135, notes:'2nd most HR-friendly · warm air' },
+    { abbr:'MIA', venue:'loanDepot park',              hr:90,  cf:100, notes:'Retractable roof · humid' },
+    { abbr:'MIL', venue:'American Family Field',       hr:106, cf:125, notes:'Retractable roof · hitter-friendly' },
+    { abbr:'MIN', venue:'Target Field',                hr:106, cf:115, notes:'Cold air early season suppresses' },
+    { abbr:'NYM', venue:'Citi Field',                  hr:88,  cf:118, notes:'Deep CF · ocean winds' },
+    { abbr:'NYY', venue:'Yankee Stadium',              hr:121, cf:122, notes:'Short RF porch · very HR-friendly' },
+    { abbr:'ATH', venue:'Sutter Health Park',          hr:95,  cf:115, notes:'Temporary home 2025' },
+    { abbr:'PHI', venue:'Citizens Bank Park',          hr:113, cf:115, notes:'Hitter-friendly · humid summers' },
+    { abbr:'PIT', venue:'PNC Park',                    hr:78,  cf:120, notes:'Most pitcher-friendly park' },
+    { abbr:'SD',  venue:'Petco Park',                  hr:104, cf:115, notes:'Marine layer · cool air' },
+    { abbr:'SEA', venue:'T-Mobile Park',               hr:100, cf:120, notes:'Retractable roof · neutral' },
+    { abbr:'SF',  venue:'Oracle Park',                 hr:90,  cf:108, notes:'Marine layer · suppresses power' },
+    { abbr:'STL', venue:'Busch Stadium',               hr:89,  cf:115, notes:'Open air · pitcher-friendly' },
+    { abbr:'TB',  venue:'Steinbrenner Field',          hr:98,  cf:115, notes:'Temporary home 2025' },
+    { abbr:'TEX', venue:'Globe Life Field',            hr:102, cf:115, notes:'Retractable roof · neutral' },
+    { abbr:'TOR', venue:'Rogers Centre',               hr:103, cf:105, notes:'Artificial turf · domed' },
+    { abbr:'WSH', venue:'Nationals Park',              hr:95,  cf:115, notes:'River winds variable' },
+  ];
+
+  const sortedParks = [...PARK_DATA].sort((a,b) => {
+    const av = a[parkSort.col], bv = b[parkSort.col];
+    if (typeof av === 'number') return parkSort.dir==='desc' ? bv-av : av-bv;
+    return parkSort.dir==='desc' ? String(bv).localeCompare(String(av)) : String(av).localeCompare(String(bv));
+  });
+
+  const handleParkSort = col => setParkSort(s =>
+    s.col===col ? {col, dir: s.dir==='desc'?'asc':'desc'} : {col, dir: col==='abbr'||col==='venue'?'asc':'desc'}
+  );
+
+  const hrColor = v => v>=120?'#ff4020':v>=110?'#ff8020':v>=105?'#f5a623':v>=98?'var(--text)':v>=90?'var(--muted)':'#38b8f2';
+  const hrLabel = v => v>=120?'🔥 Very Hot':v>=110?'🔶 Hot':v>=105?'🟡 Warm':v>=98?'⚪ Neutral':v>=90?'🔵 Cool':'❄️ Cold';
 
   const loadWeather = async (gamesList) => {
     if (!gamesList || gamesList.length===0) return;
@@ -8704,15 +8753,12 @@ function WeatherTab() {
       } catch(e) {}
     }));
     setWeather(wMap);
-    setRefreshed(new Date().toLocaleTimeString('en-US',{
-      hour:'numeric',minute:'2-digit',timeZone:'America/New_York'
-    }));
+    setRefreshed(new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',timeZone:'America/New_York'}));
     setLoading(false);
   };
 
   const load = () => {
     setLoading(true); setGames([]); setWeather({});
-    // Clear cache for fresh data
     Object.keys(WEATHER_CACHE).forEach(k=>delete WEATHER_CACHE[k]);
     fetchGames(()=>{}, (gl)=>{
       const v=(gl||[]).filter(g=>g.home?.abbr&&g.home.abbr!=='???');
@@ -8722,74 +8768,268 @@ function WeatherTab() {
 
   useEffect(()=>{ load(); },[]);
 
-  // Summary stats
   const out   = games.filter(g=>{const w=weather[g.home?.abbr]; return w&&!w.isDome&&(w.hourly||[]).find(h=>h.hour===parseGameHour(g.gameTime))?.windDir?.includes('out');}).length;
   const inp   = games.filter(g=>{const w=weather[g.home?.abbr]; return w&&!w.isDome&&(w.hourly||[]).find(h=>h.hour===parseGameHour(g.gameTime))?.windDir?.includes('in');}).length;
   const domes = games.filter(g=>weather[g.home?.abbr]?.isDome).length;
   const rain  = games.filter(g=>{const w=weather[g.home?.abbr]; const s=(w?.hourly||[]).find(h=>h.hour===parseGameHour(g.gameTime)); return (s?.rainChance||0)>=30;}).length;
 
+  const stBtn = key => ({
+    padding:'6px 14px', borderRadius:7, cursor:'pointer', border:'none',
+    fontFamily:"'Oswald',sans-serif", fontWeight:700, fontSize:12, letterSpacing:.8,
+    textTransform:'uppercase',
+    background: subTab===key ? 'var(--accent)' : 'var(--surface2)',
+    color: subTab===key ? 'white' : 'var(--muted)',
+    transition:'all .15s',
+  });
+
+  const SortTri = ({col}) => parkSort.col===col
+    ? <span style={{marginLeft:3,fontSize:9}}>{parkSort.dir==='desc'?'▼':'▲'}</span> : null;
+
   return (
     <div>
-      {/* Header */}
-      <div className="hrow" style={{marginBottom:16}}>
+      <div className="hrow" style={{marginBottom:12}}>
         <div className="section-header">
-          <div className="section-title">🌤️ Game Day Weather</div>
+          <div className="section-title">🌤️ Weather & Parks</div>
           <div className="section-sub">
-            Game-time forecast · field-relative wind · HR environment
-            {refreshed&&<span style={{color:'var(--muted)',marginLeft:8}}>· Updated {refreshed}</span>}
+            {subTab==='weather'
+              ? <>Game-time forecast · field-relative wind · HR environment{refreshed&&<span style={{color:'var(--muted)',marginLeft:8}}>· Updated {refreshed}</span>}</>
+              : 'Season HR park factors · stadium context · sortable'}
           </div>
         </div>
-        <button onClick={load}
+        {subTab==='weather' && <button onClick={load}
           style={{padding:'6px 14px',borderRadius:6,border:'1px solid var(--border)',
             background:'var(--surface2)',color:'var(--text)',cursor:'pointer',
             fontFamily:"'DM Mono',monospace",fontSize:11,flexShrink:0}}>
           ↻ Refresh
-        </button>
+        </button>}
       </div>
 
-      {loading
+      <div style={{display:'flex',gap:6,marginBottom:16,padding:'4px',background:'var(--surface)',borderRadius:9,border:'1px solid var(--border)',width:'fit-content'}}>
+        <button style={stBtn('weather')} onClick={()=>setSubTab('weather')}>🌤️ Game Day</button>
+        <button style={stBtn('parks')}   onClick={()=>setSubTab('parks')}>🏟️ Park Factors</button>
+      </div>
+
+      {subTab==='weather' && (loading
         ? <div className="lw"><div className="sp"/><div className="lt">Loading weather…</div></div>
         : games.length===0
-        ? <div style={{padding:'60px 20px',textAlign:'center',color:'var(--muted)',
-            fontFamily:"'DM Mono',monospace",fontSize:13}}>No games today.</div>
+        ? <div style={{padding:'60px 20px',textAlign:'center',color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:13}}>No games today.</div>
         : <>
-          {/* Summary chips */}
           <div style={{display:'flex',gap:8,marginBottom:16,flexWrap:'wrap'}}>
             {[
-              {label:'💨 Blowing Out', count:out,  color:'#ff8020'},
-              {label:'❄️ Blowing In',  count:inp,  color:'#38b8f2'},
-              {label:'🏟️ Domes',       count:domes,color:'var(--muted)'},
-              {label:'🌧️ Rain Risk',   count:rain, color:'#60a0d0'},
+              {label:'💨 Blowing Out',count:out,  color:'#ff8020'},
+              {label:'❄️ Blowing In', count:inp,  color:'#38b8f2'},
+              {label:'🏟️ Domes',      count:domes,color:'var(--muted)'},
+              {label:'🌧️ Rain Risk',  count:rain, color:'#60a0d0'},
             ].filter(s=>s.count>0).map(s=>(
-              <div key={s.label} style={{padding:'5px 12px',borderRadius:8,
-                background:'var(--surface)',border:`1px solid ${s.color}30`,
-                fontFamily:"'DM Mono',monospace",fontSize:11,
-                display:'flex',alignItems:'center',gap:6}}>
+              <div key={s.label} style={{padding:'5px 12px',borderRadius:8,background:'var(--surface)',border:`1px solid ${s.color}30`,fontFamily:"'DM Mono',monospace",fontSize:11,display:'flex',alignItems:'center',gap:6}}>
                 <span style={{color:s.color,fontWeight:700,fontFamily:"'Oswald',sans-serif",fontSize:15}}>{s.count}</span>
                 <span style={{color:'var(--muted)'}}>{s.label}</span>
               </div>
             ))}
           </div>
-
-          {/* Disclaimer */}
-          <div style={{marginBottom:14,padding:'8px 14px',borderRadius:8,
-            background:'rgba(56,184,242,.05)',border:'1px solid rgba(56,184,242,.15)',
-            display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-            <span style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
-              ℹ️ Game-time hourly forecast · tap any game to expand hour-by-hour · wind direction relative to field
-            </span>
+          <div style={{marginBottom:14,padding:'8px 14px',borderRadius:8,background:'rgba(56,184,242,.05)',border:'1px solid rgba(56,184,242,.15)',display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+            <span style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>ℹ️ Game-time hourly forecast · tap any game to expand · wind direction relative to field</span>
             <a href="https://rotogrinders.com/weather/mlb" target="_blank" rel="noopener noreferrer"
-              style={{fontSize:10,color:'var(--ice)',fontFamily:"'DM Mono',monospace",
-                fontWeight:600,textDecoration:'none',flexShrink:0}}>
-              RotoGrinders ↗
-            </a>
+              style={{fontSize:10,color:'var(--ice)',fontFamily:"'DM Mono',monospace",fontWeight:600,textDecoration:'none',flexShrink:0}}>RotoGrinders ↗</a>
+            <a href="https://www.ballparkpal.com/Park-Factors.php" target="_blank" rel="noopener noreferrer"
+              style={{fontSize:10,color:'#27c97a',fontFamily:"'DM Mono',monospace",fontWeight:600,textDecoration:'none',flexShrink:0}}>BallparkPal ↗</a>
           </div>
-
-          {/* Game cards */}
           {games.map(g=>(
             <WeatherGameCard key={g.gamePk||g.id} g={g} wd={weather[g.home?.abbr]}/>
           ))}
-        </>}
+        </>)}
+
+      {subTab==='parks' && (
+        <div>
+          {/* Parks sub-nav: Today's Impact | All Parks */}
+          <div style={{display:'flex',gap:6,marginBottom:14}}>
+            {[{key:'today',label:"📅 Today's Impact"},{key:'all',label:'🏟️ All Parks'}].map(({key,label})=>(
+              <button key={key} onClick={()=>setParksView(key)}
+                style={{padding:'5px 14px',borderRadius:7,cursor:'pointer',border:'none',
+                  fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:parksView===key?700:400,
+                  background:parksView===key?'rgba(245,166,35,.15)':'var(--surface2)',
+                  color:parksView===key?'var(--accent2)':'var(--muted)'}}>
+                {label}
+              </button>
+            ))}
+            <a href="https://www.ballparkpal.com/Park-Factors.php" target="_blank" rel="noopener noreferrer"
+              style={{marginLeft:'auto',fontSize:10,color:'#27c97a',fontFamily:"'DM Mono',monospace",
+                fontWeight:600,textDecoration:'none',alignSelf:'center',flexShrink:0}}>
+              Full BallparkPal Data ↗
+            </a>
+          </div>
+
+          {/* ── TODAY'S IMPACT ── */}
+          {parksView==='today' && (loading
+            ? <div className="lw"><div className="sp"/><div className="lt">Loading game data…</div></div>
+            : games.length===0
+            ? <div style={{padding:'40px 20px',textAlign:'center',color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:12}}>No games today.</div>
+            : (() => {
+                // Compute today's combined park+weather impact for each game
+                const todayRows = games.map(g => {
+                  const wd = weather[g.home?.abbr];
+                  if (!wd) return null;
+                  const gameHour = parseGameHour(g.gameTime);
+                  const slot = gameHour!=null ? (wd.hourly||[]).find(h=>h.hour===gameHour) : null;
+                  const cur  = slot || wd.current;
+                  const park = PARK_DATA.find(p=>p.abbr===g.home?.abbr);
+                  const basePF = park?.hr || 100;
+
+                  // Combined HR factor = park factor already adjusted by weather in parkFactorHR
+                  const combinedHR = wd.parkFactorHR || basePF;
+                  const hrPct      = Math.round(combinedHR - 100);
+
+                  // Wind-only adjustment = combined minus base park
+                  const windAdj = combinedHR - basePF;
+
+                  // Temperature effect: 75°F neutral; +1% per 5°F above, -1% per 5°F below
+                  const temp = cur?.temp || 72;
+                  const tempAdj = (temp - 72) / 5 * 0.8; // % units
+
+                  // 2B/3B: wind has ~50% the effect on doubles/triples vs HRs
+                  // plus ~35% of base park factor (dimensions matter for doubles)
+                  const xbhPct = Math.round((basePF - 100) * 0.35 + windAdj * 0.50 + tempAdj * 0.6);
+
+                  // 1B: wind barely affects singles; mainly park dimensions
+                  const singPct = Math.round((basePF - 100) * 0.18 + windAdj * 0.20 + tempAdj * 1.0);
+
+                  // Runs: aggregate of all offensive adjustments
+                  const runPct = Math.round(hrPct * 0.45 + xbhPct * 0.30 + singPct * 0.15 + tempAdj * 0.5);
+
+                  const windDir   = cur?.windDir || (wd.isDome ? 'calm' : 'calm');
+                  const windLabel = cur?.windLabel || (wd.isDome ? 'Dome' : '—');
+                  const rainChance= cur?.rainChance || 0;
+                  const isRainRisk = rainChance >= 50;
+                  const isMaybePostpone = rainChance >= 70;
+
+                  return {
+                    gameId: g.gamePk||g.id,
+                    away: g.away?.abbr||'', home: g.home?.abbr||'',
+                    venue: wd.stadium||park?.venue||g.home?.abbr,
+                    gameTime: g.gameTime,
+                    isDome: wd.isDome,
+                    hrPct, xbhPct, singPct, runPct,
+                    windDir, windLabel, temp,
+                    rainChance, isRainRisk, isMaybePostpone,
+                    condition: cur?.condition||'',
+                  };
+                }).filter(Boolean);
+
+                const pctCell = (v) => {
+                  const col = v>12?'#ff4020':v>5?'#ff8020':v>0?'#f5a623':v<-12?'#38b8f2':v<-5?'#60a0d0':v<0?'var(--muted)':'var(--muted)';
+                  return <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:col}}>
+                    {v>0?'+':''}{v}%
+                  </span>;
+                };
+
+                return (
+                  <div>
+                    <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginBottom:10}}>
+                      Combined park + weather effect on today's games · percentages vs average park/conditions · 🟣 postponement risk
+                    </div>
+                    <div className="tw">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th style={{textAlign:'left'}}>Game</th>
+                            <th style={{textAlign:'center'}}>Wind</th>
+                            <th style={{textAlign:'center'}}>Temp</th>
+                            <th style={{textAlign:'center',color:'#ff8020'}}>HR</th>
+                            <th style={{textAlign:'center',color:'#f5a623'}}>2B/3B</th>
+                            <th style={{textAlign:'center',color:'var(--text)'}}>1B</th>
+                            <th style={{textAlign:'center',color:'#27c97a'}}>Runs</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {todayRows.map(r=>(
+                            <tr key={r.gameId}
+                              style={{
+                                background: r.isMaybePostpone ? 'rgba(168,85,247,.15)' :
+                                            r.isRainRisk       ? 'rgba(96,160,208,.10)' : undefined,
+                                borderLeft: r.isMaybePostpone ? '3px solid #a855f7' :
+                                            r.isRainRisk       ? '3px solid #38b8f2' : '3px solid transparent',
+                              }}>
+                              <td style={{textAlign:'left',minWidth:0}}>
+                                <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,color:'var(--text)',whiteSpace:'nowrap'}}>
+                                  {r.away} @ {r.home}
+                                </div>
+                                <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginTop:1}}>
+                                  {r.venue}{r.gameTime ? ` · ${r.gameTime}` : ''}
+                                </div>
+                                {r.isMaybePostpone && <span style={{fontSize:8,color:'#a855f7',fontFamily:"'DM Mono',monospace",fontWeight:700}}>🟣 PPD Risk {r.rainChance}%</span>}
+                                {r.isRainRisk && !r.isMaybePostpone && <span style={{fontSize:8,color:'#38b8f2',fontFamily:"'DM Mono',monospace"}}>🌧 Rain {r.rainChance}%</span>}
+                              </td>
+                              <td style={{textAlign:'center'}}>
+                                {r.isDome
+                                  ? <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>🏟️ Dome</span>
+                                  : <span style={{fontSize:10,color:WD_COLOR[r.windDir]||'var(--muted)',fontFamily:"'DM Mono',monospace",fontWeight:700}}>
+                                      {WD_EMOJI[r.windDir]||'—'} {r.windLabel}
+                                    </span>}
+                              </td>
+                              <td style={{textAlign:'center'}}>
+                                <span style={{fontSize:11,fontFamily:"'DM Mono',monospace",
+                                  color:r.temp>=85?'#ff4020':r.temp>=75?'#ff8020':r.temp>=60?'var(--text)':'#38b8f2'}}>
+                                  {Math.round(r.temp)}°
+                                </span>
+                              </td>
+                              <td style={{textAlign:'center'}}>{pctCell(r.hrPct)}</td>
+                              <td style={{textAlign:'center'}}>{pctCell(r.xbhPct)}</td>
+                              <td style={{textAlign:'center'}}>{pctCell(r.singPct)}</td>
+                              <td style={{textAlign:'center'}}>{pctCell(r.runPct)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })()
+          )}
+
+          {/* ── ALL PARKS (static table) ── */}
+          {parksView==='all' && (
+            <>
+              <div style={{marginBottom:10,padding:'6px 12px',borderRadius:7,background:'rgba(255,128,32,.05)',border:'1px solid rgba(255,128,32,.15)',fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
+                ℹ️ Season base HR factors · 100 = neutral · click headers to sort
+              </div>
+              <div className="tw">
+                <table>
+                  <thead>
+                    <tr>
+                      {[{l:'Team',col:'abbr'},{l:'Venue',col:'venue'},{l:'HR Factor',col:'hr_factor'},{l:'Rating',col:'hr_factor'},{l:'CF°',col:'cf'},{l:'Notes',col:null}].map(({l,col})=>(
+                        <th key={l} onClick={()=>col&&handleParkSort(col)}
+                          style={{textAlign:l==='Venue'||l==='Notes'?'left':'center',cursor:col?'pointer':'default',
+                            color:parkSort.col===col?'var(--accent)':'var(--muted)',whiteSpace:'nowrap',userSelect:'none'}}>
+                          {l}<SortTri col={col}/>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedParks.map(p=>(
+                      <tr key={p.abbr} className="dr">
+                        <td style={{textAlign:'center'}}><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color:'var(--accent2)'}}>{p.abbr}</span></td>
+                        <td style={{textAlign:'left'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{p.venue}</span></td>
+                        <td style={{textAlign:'center'}}><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:16,color:hrColor(p.hr)}}>{p.hr}</span></td>
+                        <td style={{textAlign:'center'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:hrColor(p.hr)}}>{hrLabel(p.hr)}</span></td>
+                        <td style={{textAlign:'center'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--muted)'}}>{p.cf}°</span></td>
+                        <td style={{textAlign:'left'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)'}}>{p.notes}</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{marginTop:14,display:'flex',gap:8,flexWrap:'wrap'}}>
+                {[{l:'🔥 Very Hot',r:'≥120',c:'#ff4020'},{l:'🔶 Hot',r:'110–119',c:'#ff8020'},{l:'🟡 Warm',r:'105–109',c:'#f5a623'},{l:'⚪ Neutral',r:'98–104',c:'var(--text)'},{l:'🔵 Cool',r:'90–97',c:'var(--muted)'},{l:'❄️ Cold',r:'<90',c:'#38b8f2'}].map(x=>(
+                  <div key={x.l} style={{padding:'3px 10px',borderRadius:6,fontSize:9,background:'var(--surface)',border:`1px solid ${x.c}30`,fontFamily:"'DM Mono',monospace",color:x.c,whiteSpace:'nowrap'}}>
+                    {x.l} <span style={{color:'rgba(255,255,255,.3)'}}>{x.r}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
