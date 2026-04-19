@@ -1245,45 +1245,77 @@ function openBetSlip(picks, bprops) {
       '</div>';
     container.appendChild(slipCard);
 
-    // Capture button
-    const captureBtn = document.createElement('button');
-    captureBtn.textContent = '📸 Copy Slip + Open Gambly';
-    captureBtn.style.cssText = 'padding:14px;border-radius:10px;border:none;background:#ff6018;color:white;font-size:14px;font-weight:700;cursor:pointer;font-family:Oswald,sans-serif;letter-spacing:1px;width:100%';
-    captureBtn.addEventListener('click', () => {
-      captureBtn.textContent = '📸 Capturing…';
-      captureBtn.disabled = true;
+    // Helper: render slip to canvas, then call cb(blob)
+    function getSlipBlob(cb, statusEl) {
+      statusEl.textContent = '📸 Capturing…';
       const el = document.getElementById('gy-slip');
       function doCapture() {
-        window.html2canvas(el, {backgroundColor:'#0d1117',scale:2,useCORS:true,logging:false}).then(canvas => {
-          canvas.toBlob(blob => {
-            navigator.clipboard.write([new ClipboardItem({'image/png':blob})])
-              .catch(() => {
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href=url; a.download='going-yard-slip.png'; a.click();
-                URL.revokeObjectURL(url);
-              })
-              .finally(() => {
-                window.open('https://gambly.com','_blank');
-                captureBtn.textContent = '✓ Copied — Gambly is open!';
-                captureBtn.style.background = '#27c97a';
-                setTimeout(close, 2500);
-              });
-          }, 'image/png');
-        }).catch(() => { window.open('https://gambly.com','_blank'); close(); });
+        window.html2canvas(el, {backgroundColor:'#0d1117',scale:2,useCORS:true,logging:false})
+          .then(canvas => canvas.toBlob(blob => cb(blob), 'image/png'))
+          .catch(() => { statusEl.textContent = '✗ Capture failed'; });
       }
       if(!window.html2canvas) {
         const s = document.createElement('script');
         s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
         s.onload = doCapture;
-        s.onerror = () => { window.open('https://gambly.com','_blank'); close(); };
+        s.onerror = () => { statusEl.textContent = '✗ Load failed'; };
         document.head.appendChild(s);
       } else { doCapture(); }
+    }
+
+    // Two-button row
+    const btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;gap:8px;width:100%';
+
+    // ① Download button
+    const dlBtn = document.createElement('button');
+    dlBtn.textContent = '⬇ Download';
+    dlBtn.style.cssText = 'flex:1;padding:11px 6px;border-radius:9px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.07);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:Oswald,sans-serif;letter-spacing:.5px';
+    dlBtn.addEventListener('click', () => {
+      dlBtn.disabled = true;
+      getSlipBlob(blob => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'going-yard-slip.png'; a.click();
+        URL.revokeObjectURL(url);
+        dlBtn.textContent = '✓ Saved!';
+        dlBtn.style.background = 'rgba(39,201,122,.25)';
+        dlBtn.style.borderColor = '#27c97a';
+        dlBtn.style.color = '#27c97a';
+        setTimeout(() => { dlBtn.textContent = '⬇ Download'; dlBtn.style.cssText = 'flex:1;padding:11px 6px;border-radius:9px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.07);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:Oswald,sans-serif;letter-spacing:.5px'; dlBtn.disabled = false; }, 2000);
+      }, dlBtn);
     });
-    container.appendChild(captureBtn);
+
+    // ② Copy + Gambly button
+    const copyBtn = document.createElement('button');
+    copyBtn.textContent = '📋 Copy + Gambly';
+    copyBtn.style.cssText = 'flex:1;padding:11px 6px;border-radius:9px;border:none;background:#ff6018;color:white;font-size:12px;font-weight:700;cursor:pointer;font-family:Oswald,sans-serif;letter-spacing:.5px';
+    copyBtn.addEventListener('click', () => {
+      copyBtn.disabled = true;
+      getSlipBlob(blob => {
+        navigator.clipboard.write([new ClipboardItem({'image/png': blob})])
+          .then(() => {
+            window.open('https://gambly.com', '_blank');
+            copyBtn.textContent = '✓ Copied!';
+            copyBtn.style.background = '#27c97a';
+            setTimeout(close, 2500);
+          })
+          .catch(() => {
+            // clipboard failed — tell user and still open Gambly
+            copyBtn.textContent = '⚠ Clipboard blocked';
+            copyBtn.style.background = '#f5a623';
+            window.open('https://gambly.com', '_blank');
+            setTimeout(() => { copyBtn.textContent = '📋 Copy + Gambly'; copyBtn.style.background = '#ff6018'; copyBtn.disabled = false; }, 2500);
+          });
+      }, copyBtn);
+    });
+
+    btnRow.appendChild(dlBtn);
+    btnRow.appendChild(copyBtn);
+    container.appendChild(btnRow);
 
     const note = document.createElement('div');
-    note.textContent = 'Slip image copied to clipboard · paste into Gambly to get your share link';
+    note.textContent = 'Download to share · or copy image to clipboard then paste into Gambly';
     note.style.cssText = 'text-align:center;font-size:10px;color:rgba(255,255,255,.3);font-family:DM Mono,monospace';
     container.appendChild(note);
   }
