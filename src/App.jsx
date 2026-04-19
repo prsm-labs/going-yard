@@ -1286,28 +1286,12 @@ function openBetSlip(picks, bprops) {
       }, dlBtn);
     });
 
-    // ② Copy + Gambly button
+    // ② Open Gambly button
     const copyBtn = document.createElement('button');
-    copyBtn.textContent = '📋 Copy + Gambly';
+    copyBtn.textContent = '🎰 Open Gambly';
     copyBtn.style.cssText = 'flex:1;padding:11px 6px;border-radius:9px;border:none;background:#ff6018;color:white;font-size:12px;font-weight:700;cursor:pointer;font-family:Oswald,sans-serif;letter-spacing:.5px';
     copyBtn.addEventListener('click', () => {
-      copyBtn.disabled = true;
-      getSlipBlob(blob => {
-        navigator.clipboard.write([new ClipboardItem({'image/png': blob})])
-          .then(() => {
-            window.open('https://gambly.com', '_blank');
-            copyBtn.textContent = '✓ Copied!';
-            copyBtn.style.background = '#27c97a';
-            setTimeout(close, 2500);
-          })
-          .catch(() => {
-            // clipboard failed — tell user and still open Gambly
-            copyBtn.textContent = '⚠ Clipboard blocked';
-            copyBtn.style.background = '#f5a623';
-            window.open('https://gambly.com', '_blank');
-            setTimeout(() => { copyBtn.textContent = '📋 Copy + Gambly'; copyBtn.style.background = '#ff6018'; copyBtn.disabled = false; }, 2500);
-          });
-      }, copyBtn);
+      window.open('https://gambly.com', '_blank');
     });
 
     btnRow.appendChild(dlBtn);
@@ -1315,7 +1299,7 @@ function openBetSlip(picks, bprops) {
     container.appendChild(btnRow);
 
     const note = document.createElement('div');
-    note.textContent = 'Download to share · or copy image to clipboard then paste into Gambly';
+    note.textContent = 'Download slip · then paste into Gambly to get your share link';
     note.style.cssText = 'text-align:center;font-size:10px;color:rgba(255,255,255,.3);font-family:DM Mono,monospace';
     container.appendChild(note);
   }
