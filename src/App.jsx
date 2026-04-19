@@ -7318,8 +7318,8 @@ function MatchupEngineTab() {
     {(subTab === 'matchups' || subTab === 'simlab') && (
       <div style={{display:'flex',gap:6,marginBottom:14,alignItems:'center'}}>
         {[
-          { slot: 'today',    label: `📅 Today · ${todayLabel}` },
-          { slot: 'tomorrow', label: `📅 Tomorrow · ${tomorrowLabel}` },
+          { slot: 'today',    label: todayLabel },
+          { slot: 'tomorrow', label: tomorrowLabel },
         ].map(({slot, label}) => {
           const isActive = dateSlot === slot;
           const hasTmrw  = slot === 'tomorrow' && tomorrowData.length === 0;
@@ -7327,23 +7327,18 @@ function MatchupEngineTab() {
             <button key={slot} onClick={() => { setDateSlot(slot); setSelGame('all'); setExpanded(null); }}
               disabled={hasTmrw}
               style={{
-                padding:'5px 14px', borderRadius:7, cursor: hasTmrw ? 'not-allowed' : 'pointer',
+                padding:'4px 10px', borderRadius:6, cursor: hasTmrw ? 'not-allowed' : 'pointer',
                 border:`1px solid ${isActive ? 'var(--accent2)' : 'var(--border)'}`,
                 background: isActive ? 'rgba(245,166,35,.12)' : 'var(--surface)',
-                color: hasTmrw ? 'rgba(255,255,255,.2)' : isActive ? 'var(--accent2)' : 'var(--muted)',
-                fontFamily:"'DM Mono',monospace", fontSize:11,
+                color: hasTmrw ? 'rgba(255,255,255,.15)' : isActive ? 'var(--accent2)' : 'var(--muted)',
+                fontFamily:"'DM Mono',monospace", fontSize:10,
                 fontWeight: isActive ? 700 : 400,
-                whiteSpace:'nowrap',
+                whiteSpace:'nowrap', opacity: hasTmrw ? 0.5 : 1,
               }}>
-              {label}{hasTmrw ? ' — pending' : ''}
+              {label}
             </button>
           );
         })}
-        {dateSlot === 'tomorrow' && tomorrowData.length > 0 && (
-          <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
-            engine projections for {tomorrowLabel}
-          </span>
-        )}
       </div>
     )}
 
