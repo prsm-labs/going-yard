@@ -1115,7 +1115,7 @@ function MyPicksTab() {
           backgroundRepeat:'no-repeat', backgroundPosition:'right 5px center',
         }}>
         {Object.entries(PICK_TYPES).map(([type,c])=>(
-          <option key={type} value={type}>{c.label}</option>
+          <option key={type} value={type}>{c.label.split(' ')[0]}</option>
         ))}
       </select>
 
