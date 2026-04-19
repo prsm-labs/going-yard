@@ -678,6 +678,7 @@ const PICK_TYPES = {
   darkhorse: {label:"⭐ Dark Horse",  cls:"darkhorse", color:"#f5a623"},
   longshot:  {label:"🎯 Longshot",    cls:"longshot",  color:"#38b8f2"},
   daylate:   {label:"📆 Day Late",    cls:"daylate",   color:"#a855f7"},
+  due:       {label:"⏳ Due",         cls:"due",        color:"#22d3ee"},
 };
 function loadPicks() { try { return JSON.parse(localStorage.getItem("gy_picks")||"{}"); } catch { return {}; } }
 function savePicks(p) { try { localStorage.setItem("gy_picks",JSON.stringify(p)); } catch {} }
@@ -705,7 +706,7 @@ const BATTER_PROP_OPTS = [
   { value:'2B',  label:'Double',  color:'#38b8f2' },
   { value:'3B',  label:'Triple',  color:'#f5a623' },
   { value:'RBI', label:'RBI',     color:'#ff8020' },
-  { value:'HRR', label:'HRR',     color:'var(--accent)' },
+  { value:'HRR', label:'H+R+R',   color:'var(--accent)' },
   { value:'HR',  label:'HR',      color:'#ff3010' },
 ];
 function loadBatterProps() { try { return JSON.parse(localStorage.getItem("gy_bprops")||"{}"); } catch { return {}; } }
@@ -1060,6 +1061,7 @@ function MyPicksTab() {
     darkhorse: pickList.filter(p=>p.type==="darkhorse"),
     longshot:  pickList.filter(p=>p.type==="longshot"),
     daylate:   pickList.filter(p=>p.type==="daylate"),
+    due:       pickList.filter(p=>p.type==="due"),
   };
   const PickRow = ({p})=>{
     const cfg = PICK_TYPES[p.type];
@@ -1100,17 +1102,22 @@ function MyPicksTab() {
         ))}
       </select>
 
-      {/* Pick type switcher */}
-      <div style={{display:"flex",gap:3,flexShrink:0}}>
+      {/* Pick type switcher — single compact dropdown */}
+      <select value={p.type} onChange={e=>setPick(p.pid,p.name,p.team,e.target.value)}
+        style={{
+          padding:'3px 6px', borderRadius:6, cursor:'pointer', outline:'none',
+          border:`1px solid ${PICK_TYPES[p.type]?.color||'var(--border)'}`,
+          background:`${PICK_TYPES[p.type]?.color||'transparent'}18`,
+          color:PICK_TYPES[p.type]?.color||'var(--muted)',
+          fontFamily:"'DM Mono',monospace", fontSize:10, fontWeight:700,
+          flexShrink:0, appearance:'none', WebkitAppearance:'none',
+          paddingRight:18, backgroundImage:`url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E")`,
+          backgroundRepeat:'no-repeat', backgroundPosition:'right 5px center',
+        }}>
         {Object.entries(PICK_TYPES).map(([type,c])=>(
-          <button key={type} onClick={()=>setPick(p.pid,p.name,p.team,type)} title={c.label}
-            style={{width:26,height:26,borderRadius:5,cursor:"pointer",fontSize:12,
-              border:`1px solid ${p.type===type?c.color:"var(--border)"}`,
-              background:p.type===type?`${c.color}20`:"var(--surface2)"}}>
-            {c.label.split(" ")[0]}
-          </button>
+          <option key={type} value={type}>{c.label}</option>
         ))}
-      </div>
+      </select>
 
       {/* Remove */}
       <button onClick={()=>setPick(p.pid,p.name,p.team,p.type)}
@@ -1121,7 +1128,7 @@ function MyPicksTab() {
   return <div>
     <div className="section-header" style={{marginBottom:16}}>
       <div className="section-title">🎯 My Picks</div>
-      <div className="section-sub">Your saved batters · 💣 Favorites · ⭐ Dark Horses · 🎯 Longshots · 📆 Day Late</div>
+      <div className="section-sub">Your saved batters · 💣 Favorites · ⭐ Dark Horses · 🎯 Longshots · 📆 Day Late · ⏳ Due</div>
     </div>
     {pickList.length>0&&<div style={{display:"flex",justifyContent:"flex-end",gap:8,marginBottom:12}}>
       <button onClick={()=>{
