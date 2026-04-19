@@ -2585,12 +2585,24 @@ async function fetchLiveBatters(gamePk) {
   const liveStatcast    = data.statcastByBatter || {};
   const currentBatterId = data.currentBatterId  || null;
   const onDeckId        = data.onDeckId         || null;
+  const inTheHoleId     = data.inTheHoleId      || null;
 
     const avg = (arr) => arr.length > 0 ? Math.round(arr.reduce((a,b)=>a+b,0)/arr.length*10)/10 : null;
 
     const batters = [];
     for (const side of ["away", "home"]) {
       const team = data.teams?.[side], ta = team?.team?.abbreviation || side.toUpperCase();
+      // Starting lineup = first 9 unique batting order slots (battingOrder 100-900)
+      // Anyone not in the original lineup who appears later is a sub
+      const startingBatterIds = new Set(
+        (team?.batters || []).filter(bid => {
+          const pp = team?.players?.[`ID${bid}`];
+          const bo = pp?.battingOrder;
+          // Starting batters have a clean battingOrder divisible by 100 (100,200,...900)
+          // Subs get fractional order like 101, 201 etc — or position code PH/PR
+          return bo && bo % 100 === 0;
+        })
+      );
       for (const bid of (team?.batters || [])) {
         const p = team?.players?.[`ID${bid}`]; if (!p) continue;
         const posCode = p?.position?.code || p?.person?.primaryPosition?.code || '';
@@ -2672,15 +2684,20 @@ async function fetchLiveBatters(gamePk) {
           atBats:          live?.atBats      || [],
           isAtBat:         bid === currentBatterId,
           isOnDeck:        bid === onDeckId,
+          isInTheHole:     bid === inTheHoleId,
+          isPinchHitter:   posCode === 'PH' || posCode === 'PR' || (!startingBatterIds.has(bid) && ab > 0),
+          isSubbedOut:     startingBatterIds.has(bid) && !!(team?.players?.[`ID${bid}`]?.gameStatus?.isOnBench),
         });
       }
     }
 
   return batters.sort((a,b) => {
-    if (a.isAtBat && !b.isAtBat)  return -1;
-    if (b.isAtBat && !a.isAtBat)  return  1;
-    if (a.isOnDeck && !b.isOnDeck) return -1;
-    if (b.isOnDeck && !a.isOnDeck) return  1;
+    if (a.isAtBat && !b.isAtBat)        return -1;
+    if (b.isAtBat && !a.isAtBat)        return  1;
+    if (a.isOnDeck && !b.isOnDeck)      return -1;
+    if (b.isOnDeck && !a.isOnDeck)      return  1;
+    if (a.isInTheHole && !b.isInTheHole) return -1;
+    if (b.isInTheHole && !a.isInTheHole) return  1;
     const o = {gone_yard:5,elite:4,hot:3,warm:2,avg:1,cold:0};
     return (o[b.heatLabel.cls]||0) - (o[a.heatLabel.cls]||0);
   });
@@ -3280,6 +3297,21 @@ function GPanel({game, isLive, isFinal=false}) {
                     background:"rgba(245,166,35,.12)",color:"var(--accent2)",
                     border:"1px solid rgba(245,166,35,.25)",flexShrink:0,
                     fontFamily:"'DM Mono',monospace"}}>👀 ON DECK</span>}
+                  {b.isInTheHole && !b.isOnDeck && !b.isAtBat && <span style={{
+                    padding:"1px 6px",borderRadius:4,fontSize:9,fontWeight:600,
+                    background:"rgba(56,184,242,.08)",color:"var(--ice)",
+                    border:"1px solid rgba(56,184,242,.2)",flexShrink:0,
+                    fontFamily:"'DM Mono',monospace"}}>⛳ IN THE HOLE</span>}
+                  {b.isPinchHitter && <span style={{
+                    padding:"1px 6px",borderRadius:4,fontSize:9,fontWeight:600,
+                    background:"rgba(168,85,247,.12)",color:"#a855f7",
+                    border:"1px solid rgba(168,85,247,.25)",flexShrink:0,
+                    fontFamily:"'DM Mono',monospace"}}>🙋‍♂️ PH</span>}
+                  {b.isSubbedOut && <span style={{
+                    padding:"1px 6px",borderRadius:4,fontSize:9,fontWeight:600,
+                    background:"rgba(90,112,128,.12)",color:"var(--muted)",
+                    border:"1px solid rgba(90,112,128,.25)",flexShrink:0,
+                    fontFamily:"'DM Mono',monospace"}}>✌️ OUT</span>}
                   <span className={`hl ${b.heatLabel.cls}`}
                     style={{flexShrink:0,fontSize:9}}>{b.heatLabel.label}</span>
                   {/* Today's line: H/AB HR */}
@@ -5742,6 +5774,21 @@ function LiveBatterBox({ batterId, gamePk, onData }) {
           background:'rgba(245,166,35,.12)',color:'var(--accent2)',
           fontFamily:"'DM Mono',monospace",fontWeight:600,
           border:'1px solid rgba(245,166,35,.25)'}}>👀 ON DECK</span>}
+        {stats.isInTheHole && !stats.isOnDeck && !stats.isAtBat && <span style={{
+          fontSize:8,padding:'1px 6px',borderRadius:4,
+          background:'rgba(56,184,242,.08)',color:'var(--ice)',
+          fontFamily:"'DM Mono',monospace",fontWeight:600,
+          border:'1px solid rgba(56,184,242,.2)'}}>⛳ IN THE HOLE</span>}
+        {stats.isPinchHitter && <span style={{
+          fontSize:8,padding:'1px 6px',borderRadius:4,
+          background:'rgba(168,85,247,.12)',color:'#a855f7',
+          fontFamily:"'DM Mono',monospace",fontWeight:600,
+          border:'1px solid rgba(168,85,247,.25)'}}>🙋‍♂️ PH</span>}
+        {stats.isSubbedOut && <span style={{
+          fontSize:8,padding:'1px 6px',borderRadius:4,
+          background:'rgba(90,112,128,.12)',color:'var(--muted)',
+          fontFamily:"'DM Mono',monospace",fontWeight:600,
+          border:'1px solid rgba(90,112,128,.25)'}}>✌️ OUT</span>}
       </div>
 
       {/* Box score strip */}
