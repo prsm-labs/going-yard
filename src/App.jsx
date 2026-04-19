@@ -8709,37 +8709,40 @@ function WeatherTab() {
   const [parkSort, setParkSort]   = useState({ col: 'hr', dir: 'desc' });
   const [todaySort, setTodaySort] = useState({ col: 'hrPct', dir: 'desc' });
 
+  // Park factors: 3-year blend (2022-2024). Base 100 = neutral.
+  // hr=HR factor, xbh=2B/3B factor, single=1B factor, runs=Runs factor
+  // Note: HR and XBH are often inversely correlated (e.g. Fenway low HR, high 2B)
   const PARK_DATA = [
-    { abbr:'AZ',  venue:'Chase Field',                hr:103, cf:80,  notes:'Retractable roof · low altitude' },
-    { abbr:'ATL', venue:'Truist Park',                 hr:102, cf:120, notes:'Moderate hitter park' },
-    { abbr:'BAL', venue:'Oriole Park at Camden Yards', hr:106, cf:115, notes:'Short RF · hitter-friendly' },
-    { abbr:'BOS', venue:'Fenway Park',                 hr:91,  cf:115, notes:'Green Monster suppresses HRs' },
-    { abbr:'CHC', venue:'Wrigley Field',               hr:104, cf:75,  notes:'Wind-dependent · open bowl' },
-    { abbr:'CIN', venue:'Great American Ball Park',    hr:127, cf:110, notes:'Most HR-friendly park in MLB' },
-    { abbr:'CLE', venue:'Progressive Field',           hr:85,  cf:120, notes:'Large outfield · pitcher-friendly' },
-    { abbr:'COL', venue:'Coors Field',                 hr:125, cf:105, notes:'5,200ft altitude · massive HR boost' },
-    { abbr:'CWS', venue:'Guaranteed Rate Field',       hr:97,  cf:115, notes:'Slightly pitcher-friendly' },
-    { abbr:'DET', venue:'Comerica Park',               hr:92,  cf:115, notes:'Large CF · suppresses HRs' },
-    { abbr:'HOU', venue:'Daikin Park',                 hr:104, cf:135, notes:'Retractable roof · humid air' },
-    { abbr:'KC',  venue:'Kauffman Stadium',            hr:82,  cf:115, notes:'Large outfield · pitcher-friendly' },
-    { abbr:'LAA', venue:'Angel Stadium',               hr:113, cf:120, notes:'Marine layer cuts both ways' },
-    { abbr:'LAD', venue:'Dodger Stadium',              hr:128, cf:135, notes:'2nd most HR-friendly · warm air' },
-    { abbr:'MIA', venue:'loanDepot park',              hr:90,  cf:100, notes:'Retractable roof · humid' },
-    { abbr:'MIL', venue:'American Family Field',       hr:106, cf:125, notes:'Retractable roof · hitter-friendly' },
-    { abbr:'MIN', venue:'Target Field',                hr:106, cf:115, notes:'Cold air early season suppresses' },
-    { abbr:'NYM', venue:'Citi Field',                  hr:88,  cf:118, notes:'Deep CF · ocean winds' },
-    { abbr:'NYY', venue:'Yankee Stadium',              hr:121, cf:122, notes:'Short RF porch · very HR-friendly' },
-    { abbr:'ATH', venue:'Sutter Health Park',          hr:95,  cf:115, notes:'Temporary home 2025' },
-    { abbr:'PHI', venue:'Citizens Bank Park',          hr:113, cf:115, notes:'Hitter-friendly · humid summers' },
-    { abbr:'PIT', venue:'PNC Park',                    hr:78,  cf:120, notes:'Most pitcher-friendly park' },
-    { abbr:'SD',  venue:'Petco Park',                  hr:104, cf:115, notes:'Marine layer · cool air' },
-    { abbr:'SEA', venue:'T-Mobile Park',               hr:100, cf:120, notes:'Retractable roof · neutral' },
-    { abbr:'SF',  venue:'Oracle Park',                 hr:90,  cf:108, notes:'Marine layer · suppresses power' },
-    { abbr:'STL', venue:'Busch Stadium',               hr:89,  cf:115, notes:'Open air · pitcher-friendly' },
-    { abbr:'TB',  venue:'Steinbrenner Field',          hr:98,  cf:115, notes:'Temporary home 2025' },
-    { abbr:'TEX', venue:'Globe Life Field',            hr:102, cf:115, notes:'Retractable roof · neutral' },
-    { abbr:'TOR', venue:'Rogers Centre',               hr:103, cf:105, notes:'Artificial turf · domed' },
-    { abbr:'WSH', venue:'Nationals Park',              hr:95,  cf:115, notes:'River winds variable' },
+    { abbr:'AZ',  venue:'Chase Field',                hr:103, xbh:100, single:100, runs:101, cf:80,  notes:'Retractable roof · neutral dimensions' },
+    { abbr:'ATL', venue:'Truist Park',                hr:102, xbh:101, single:100, runs:101, cf:120, notes:'Moderate hitter park' },
+    { abbr:'BAL', venue:'Oriole Park at Camden Yards',hr:106, xbh:101, single:101, runs:103, cf:115, notes:'Short RF · slightly hitter-friendly' },
+    { abbr:'BOS', venue:'Fenway Park',                hr:91,  xbh:121, single:106, runs:104, cf:115, notes:'Green Monster: low HR, very high 2B' },
+    { abbr:'CHC', venue:'Wrigley Field',              hr:104, xbh:104, single:101, runs:102, cf:75,  notes:'Wind-dependent · elevated 2B in gaps' },
+    { abbr:'CIN', venue:'Great American Ball Park',   hr:127, xbh:104, single:102, runs:110, cf:110, notes:'Most HR-friendly · warm humid air' },
+    { abbr:'CLE', venue:'Progressive Field',          hr:85,  xbh:97,  single:97,  runs:94,  cf:120, notes:'Large outfield · pitcher-friendly all stats' },
+    { abbr:'COL', venue:'Coors Field',                hr:125, xbh:114, single:113, runs:118, cf:105, notes:'Altitude boosts all hit types equally' },
+    { abbr:'CWS', venue:'Guaranteed Rate Field',      hr:97,  xbh:100, single:99,  runs:98,  cf:115, notes:'Slightly pitcher-friendly' },
+    { abbr:'DET', venue:'Comerica Park',              hr:92,  xbh:96,  single:97,  runs:95,  cf:115, notes:'Large CF gap · suppresses HRs and XBH' },
+    { abbr:'HOU', venue:'Daikin Park',                hr:104, xbh:100, single:100, runs:101, cf:135, notes:'Retractable roof · neutral' },
+    { abbr:'KC',  venue:'Kauffman Stadium',           hr:82,  xbh:96,  single:97,  runs:93,  cf:115, notes:'Large outfield · pitcher-friendly' },
+    { abbr:'LAA', venue:'Angel Stadium',              hr:113, xbh:102, single:101, runs:105, cf:120, notes:'Hitter-friendly · marine layer variable' },
+    { abbr:'LAD', venue:'Dodger Stadium',             hr:128, xbh:97,  single:98,  runs:108, cf:135, notes:'High HR · short fence = fewer doubles' },
+    { abbr:'MIA', venue:'loanDepot park',             hr:90,  xbh:99,  single:99,  runs:95,  cf:100, notes:'Retractable roof · neutral to slight pitcher' },
+    { abbr:'MIL', venue:'American Family Field',      hr:106, xbh:101, single:100, runs:102, cf:125, notes:'Retractable roof · hitter-friendly' },
+    { abbr:'MIN', venue:'Target Field',               hr:106, xbh:101, single:101, runs:103, cf:115, notes:'Hitter-friendly · cold air early season' },
+    { abbr:'NYM', venue:'Citi Field',                 hr:88,  xbh:101, single:101, runs:97,  cf:118, notes:'Spacious park · suppresses HRs' },
+    { abbr:'NYY', venue:'Yankee Stadium',             hr:121, xbh:94,  single:98,  runs:107, cf:122, notes:'Short RF porch = HRs not doubles' },
+    { abbr:'ATH', venue:'Sutter Health Park',         hr:95,  xbh:99,  single:100, runs:97,  cf:115, notes:'Temporary home 2025' },
+    { abbr:'PHI', venue:'Citizens Bank Park',         hr:113, xbh:103, single:101, runs:106, cf:115, notes:'Hitter-friendly · humid summers' },
+    { abbr:'PIT', venue:'PNC Park',                   hr:78,  xbh:95,  single:96,  runs:91,  cf:120, notes:'Most pitcher-friendly · large gaps' },
+    { abbr:'SD',  venue:'Petco Park',                 hr:104, xbh:101, single:100, runs:101, cf:115, notes:'Marine layer · neutral to slight hitter' },
+    { abbr:'SEA', venue:'T-Mobile Park',              hr:100, xbh:98,  single:99,  runs:98,  cf:120, notes:'Retractable roof · neutral' },
+    { abbr:'SF',  venue:'Oracle Park',                hr:90,  xbh:97,  single:98,  runs:94,  cf:108, notes:'Bay winds + marine layer suppress all' },
+    { abbr:'STL', venue:'Busch Stadium',              hr:89,  xbh:100, single:100, runs:96,  cf:115, notes:'Open air · slight pitcher-friendly' },
+    { abbr:'TB',  venue:'Steinbrenner Field',         hr:98,  xbh:100, single:100, runs:99,  cf:115, notes:'Temporary home 2025' },
+    { abbr:'TEX', venue:'Globe Life Field',           hr:102, xbh:100, single:100, runs:101, cf:115, notes:'Retractable roof · neutral' },
+    { abbr:'TOR', venue:'Rogers Centre',              hr:103, xbh:101, single:100, runs:101, cf:105, notes:'Artificial turf · domed' },
+    { abbr:'WSH', venue:'Nationals Park',             hr:95,  xbh:99,  single:100, runs:97,  cf:115, notes:'River winds variable · slight pitcher' },
   ];
 
   const sortedParks = [...PARK_DATA].sort((a,b) => {
@@ -8898,12 +8901,17 @@ function WeatherTab() {
                   const basePF = park?.hr || 100;
                   const combinedHR = wd.parkFactorHR || basePF;
                   const hrPct   = Math.round(combinedHR - 100);
+                  // Wind-only component (weather adjustment above base park)
                   const windAdj = combinedHR - basePF;
+                  // Temperature: neutral at 72°F, ±1% per 5°F
                   const temp    = cur?.temp || 72;
                   const tempAdj = (temp - 72) / 5 * 0.8;
-                  const xbhPct  = Math.round((basePF - 100) * 0.35 + windAdj * 0.50 + tempAdj * 0.6);
-                  const singPct = Math.round((basePF - 100) * 0.18 + windAdj * 0.20 + tempAdj * 1.0);
-                  const runPct  = Math.round(hrPct * 0.45 + xbhPct * 0.30 + singPct * 0.15 + tempAdj * 0.5);
+
+                  // Real park baselines for XBH, 1B, Runs — then add wind/temp on top
+                  // Wind moves XBH at ~50% the rate of HRs; barely moves singles
+                  const xbhPct  = Math.round((park?.xbh  ||100) - 100 + windAdj * 0.50 + tempAdj * 0.4);
+                  const singPct = Math.round((park?.single||100) - 100 + windAdj * 0.15 + tempAdj * 0.6);
+                  const runPct  = Math.round((park?.runs  ||100) - 100 + windAdj * 0.30 + tempAdj * 0.5);
                   const windDir   = cur?.windDir   || (wd.isDome ? 'calm' : 'calm');
                   const windLabel = cur?.windLabel || (wd.isDome ? 'Dome' : '—');
                   const weatherAlert = isWeatherAlert(cur, wd.isDome);
@@ -9019,7 +9027,7 @@ function WeatherTab() {
                 <table>
                   <thead>
                     <tr>
-                      {[{l:'Team',col:'abbr'},{l:'Venue',col:'venue'},{l:'HR Factor',col:'hr'},{l:'Rating',col:'hr'},{l:'CF°',col:'cf'},{l:'Notes',col:null}].map(({l,col})=>(
+                      {[{l:'Team',col:'abbr'},{l:'Venue',col:'venue'},{l:'HR',col:'hr'},{l:'2B/3B',col:'xbh'},{l:'1B',col:'single'},{l:'Runs',col:'runs'},{l:'CF°',col:'cf'},{l:'Notes',col:null}].map(({l,col})=>(
                         <th key={l} onClick={()=>col&&handleParkSort(col)}
                           style={{textAlign:l==='Venue'||l==='Notes'?'left':'center',cursor:col?'pointer':'default',
                             color:parkSort.col===col?'var(--accent)':'var(--muted)',whiteSpace:'nowrap',userSelect:'none'}}>
@@ -9033,8 +9041,10 @@ function WeatherTab() {
                       <tr key={p.abbr} className="dr">
                         <td style={{textAlign:'center'}}><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color:'var(--accent2)'}}>{p.abbr}</span></td>
                         <td style={{textAlign:'left'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{p.venue}</span></td>
-                        <td style={{textAlign:'center'}}><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:16,color:hrColor(p.hr)}}>{p.hr}</span></td>
-                        <td style={{textAlign:'center'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:hrColor(p.hr)}}>{hrLabel(p.hr)}</span></td>
+                        <td style={{textAlign:'center'}}><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:hrColor(p.hr)}}>{p.hr}</span></td>
+                        <td style={{textAlign:'center'}}><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:hrColor(p.xbh)}}>{p.xbh}</span></td>
+                        <td style={{textAlign:'center'}}><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:hrColor(p.single)}}>{p.single}</span></td>
+                        <td style={{textAlign:'center'}}><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:hrColor(p.runs)}}>{p.runs}</span></td>
                         <td style={{textAlign:'center'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--muted)'}}>{p.cf}°</span></td>
                         <td style={{textAlign:'left'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)'}}>{p.notes}</span></td>
                       </tr>
