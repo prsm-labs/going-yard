@@ -2592,14 +2592,13 @@ async function fetchLiveBatters(gamePk) {
     const batters = [];
     for (const side of ["away", "home"]) {
       const team = data.teams?.[side], ta = team?.team?.abbreviation || side.toUpperCase();
-      // Starting lineup = first 9 unique batting order slots (battingOrder 100-900)
-      // Anyone not in the original lineup who appears later is a sub
+      // active lineup = players currently IN the game (not subbed out)
+      const activeLineup = new Set(team?.lineup || []);
+      // Starting batters: clean battingOrder divisible by 100
       const startingBatterIds = new Set(
         (team?.batters || []).filter(bid => {
           const pp = team?.players?.[`ID${bid}`];
           const bo = pp?.battingOrder;
-          // Starting batters have a clean battingOrder divisible by 100 (100,200,...900)
-          // Subs get fractional order like 101, 201 etc — or position code PH/PR
           return bo && bo % 100 === 0;
         })
       );
@@ -2686,7 +2685,7 @@ async function fetchLiveBatters(gamePk) {
           isOnDeck:        bid === onDeckId,
           isInTheHole:     bid === inTheHoleId,
           isPinchHitter:   posCode === 'PH' || posCode === 'PR' || (!startingBatterIds.has(bid) && ab > 0),
-          isSubbedOut:     startingBatterIds.has(bid) && !!(team?.players?.[`ID${bid}`]?.gameStatus?.isOnBench),
+          isSubbedOut:     startingBatterIds.has(bid) && activeLineup.size > 0 && !activeLineup.has(bid),
         });
       }
     }
