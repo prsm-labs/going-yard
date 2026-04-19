@@ -1177,7 +1177,7 @@ function openBetSlip(picks, bprops) {
 }
 
 
-function PickRow({p}) {
+function PickRow({p, bprops}) {
     const cfg = PICK_TYPES[p.type];
     const propVal = bprops[String(p.pid)];
     const propOpt = propVal ? BATTER_PROP_OPTS.find(o=>o.value===propVal) : null;
@@ -1307,7 +1307,7 @@ function MyPicksTab() {
                 <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:cfgColor,letterSpacing:1}}>{cfgName}</span>
                 <span style={{marginLeft:"auto",fontFamily:"'DM Mono',monospace",fontSize:11,color:"var(--muted)"}}>{players.length} batter{players.length!==1?"s":""}</span>
               </div>
-              {players.map(p=><PickRow key={p.pid} p={p}/>)}
+              {players.map(p=><PickRow key={p.pid} p={p} bprops={bprops}/>)}
             </div>;
           })}
         </div>
