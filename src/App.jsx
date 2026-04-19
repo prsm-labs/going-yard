@@ -7094,6 +7094,7 @@ function RecentGameLog({ batterId }) {
 function MatchupEngineTab() {
   const [subTab, setSubTab]        = useState('matchups');
   const [data, setData]           = useState([]);
+  const [tomorrowData, setTomorrowData] = useState([]);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState(null);
   const [selGame, setSelGame]     = useState('all');
@@ -7107,6 +7108,8 @@ function MatchupEngineTab() {
   const pitcherGradeCache = useRef({});
   const [selPitcherGrade, setSelPitcherGrade] = useState('all');
   const [filterGoneYard, setFilterGoneYard]   = useState(false);
+  // Date slot — 'today' or 'tomorrow'. Respects 4am ET cutoff same as HR tracker.
+  const [dateSlot, setDateSlot] = useState('today');
   const picks = usePicks();
   // Re-render when confirmed lineups update (same 2-min cycle as Lineups tab)
   const [lineupVer, setLineupVer] = useState(LINEUP_VERSION);
@@ -7127,7 +7130,31 @@ function MatchupEngineTab() {
         setLoading(false);
       })
       .catch(e => { setError(e.message); setLoading(false); });
+    // Also fetch tomorrow's engine output (silently — may not exist yet)
+    fetch('/data/daily_summary_tomorrow.csv')
+      .then(r => r.ok ? r.text() : Promise.reject('no tomorrow data'))
+      .then(text => { const rows = parseCSVText(text); setTomorrowData(rows); })
+      .catch(() => {}); // silent — tomorrow file only exists after pipeline runs for that date
   }, []);
+
+  // Derive ET date labels for the buttons (respects 4am ET day cutoff)
+  const etDateLabel = (offsetDays) => {
+    const now = new Date();
+    const etStr = now.toLocaleDateString('en-US', { timeZone: 'America/New_York',
+      year: 'numeric', month: '2-digit', day: '2-digit' });
+    const [m, d, y] = etStr.split('/');
+    const base = new Date(Date.UTC(parseInt(y), parseInt(m) - 1, parseInt(d)));
+    // Before 4am ET = still "yesterday" in app terms
+    const etHour = parseInt(now.toLocaleString('en-US', { timeZone: 'America/New_York', hour: 'numeric', hour12: false }));
+    const dayOffset = etHour < 4 ? offsetDays - 1 : offsetDays;
+    base.setUTCDate(base.getUTCDate() + dayOffset);
+    return base.toISOString().slice(0, 10); // YYYY-MM-DD
+  };
+  const todayLabel    = etDateLabel(0);
+  const tomorrowLabel = etDateLabel(1);
+
+  // Active dataset — switches with dateSlot
+  const activeData = dateSlot === 'tomorrow' && tomorrowData.length > 0 ? tomorrowData : data;
 
   // Fetch schedule CSV for reliable AWAY @ HOME labels
   // Schedule has columns: Game ID, Away Team, Home Team
@@ -7165,7 +7192,7 @@ function MatchupEngineTab() {
 
   const games = [];
   const seen = new Set();
-  data.forEach(r => {
+  activeData.forEach(r => {
     if (r.game_id && !seen.has(r.game_id)) {
       seen.add(r.game_id);
       games.push({ id: r.game_id, time: r.game_time || '', label: `${r.batting_team} game` });
@@ -7176,7 +7203,7 @@ function MatchupEngineTab() {
 
   // Group by game_id, then by batting_team
   const grouped = {};
-  (selGame === 'all' ? data : data.filter(r => r.game_id === selGame))
+  (selGame === 'all' ? activeData : activeData.filter(r => r.game_id === selGame))
     .filter(r => selGrade === 'all' || r.grade === selGrade)
     .filter(r => {
       if (!filterGoneYard) return true;
@@ -7196,9 +7223,7 @@ function MatchupEngineTab() {
 
   const exportCSV = async () => {
     const bom = String.fromCharCode(65279);
-    // Fetch final/live box score for ALL batters grouped by game_id
-    // Works for live games, final games, and anything in between
-    const uniqueGames = [...new Set(data.map(b => b.game_id).filter(Boolean))];
+    const uniqueGames = [...new Set(activeData.map(b => b.game_id).filter(Boolean))];
     await Promise.all(uniqueGames.map(async gameId => {
       try {
         const batters = await fetchLiveBatters(gameId);
@@ -7216,7 +7241,7 @@ function MatchupEngineTab() {
       'Wind','Temp','Condition',
       'AB','H','HR','R','TB','RBI','BB','K','Avg EV','Launch Angle'];
     const esc = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
-    const rows = data.map(b => {
+    const rows = activeData.map(b => {
       const bid = parseInt(b.batter_id) || 0;
       const gy = HR_DATA.some(h => h.batterId === bid ||
         (b.batter && h.batterName && h.batterName.toLowerCase() === b.batter.toLowerCase()));
@@ -7289,6 +7314,39 @@ function MatchupEngineTab() {
       <button style={stBtn('pitchers')} onClick={()=>setSubTab('pitchers')}>⚾ Pitchers</button>
     </div>
 
+    {/* Date slot toggle — only shown for matchups and simlab */}
+    {(subTab === 'matchups' || subTab === 'simlab') && (
+      <div style={{display:'flex',gap:6,marginBottom:14,alignItems:'center'}}>
+        {[
+          { slot: 'today',    label: `📅 Today · ${todayLabel}` },
+          { slot: 'tomorrow', label: `📅 Tomorrow · ${tomorrowLabel}` },
+        ].map(({slot, label}) => {
+          const isActive = dateSlot === slot;
+          const hasTmrw  = slot === 'tomorrow' && tomorrowData.length === 0;
+          return (
+            <button key={slot} onClick={() => { setDateSlot(slot); setSelGame('all'); setExpanded(null); }}
+              disabled={hasTmrw}
+              style={{
+                padding:'5px 14px', borderRadius:7, cursor: hasTmrw ? 'not-allowed' : 'pointer',
+                border:`1px solid ${isActive ? 'var(--accent2)' : 'var(--border)'}`,
+                background: isActive ? 'rgba(245,166,35,.12)' : 'var(--surface)',
+                color: hasTmrw ? 'rgba(255,255,255,.2)' : isActive ? 'var(--accent2)' : 'var(--muted)',
+                fontFamily:"'DM Mono',monospace", fontSize:11,
+                fontWeight: isActive ? 700 : 400,
+                whiteSpace:'nowrap',
+              }}>
+              {label}{hasTmrw ? ' — pending' : ''}
+            </button>
+          );
+        })}
+        {dateSlot === 'tomorrow' && tomorrowData.length > 0 && (
+          <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
+            engine projections for {tomorrowLabel}
+          </span>
+        )}
+      </div>
+    )}
+
     {/* Sim Lab */}
     {subTab==='simlab' && (
       <div>
@@ -7296,7 +7354,7 @@ function MatchupEngineTab() {
           <span style={{fontSize:10,color:'var(--accent)',fontFamily:"'DM Mono',monospace",fontWeight:700}}>🧠 SIM LAB</span>
           <span style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>Monte Carlo projections · probability analysis · AI scout notes · prop line matching · all from today's engine run</span>
         </div>
-        <SimLabView data={data}/>
+        <SimLabView data={activeData}/>
       </div>
     )}
 
@@ -7326,7 +7384,7 @@ function MatchupEngineTab() {
     {subTab==='matchups' && <>
 
     {/* Add to My Picks — manual search */}
-    {!loading && !error && data.length > 0 && (() => {
+    {!loading && !error && activeData.length > 0 && (() => {
       const allPlayers = Object.values(PLAYER_DATA_CACHE);
       const ini = n => n ? n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase() : '?';
       const filtered = searchQ.trim().length > 1
@@ -7459,7 +7517,7 @@ function MatchupEngineTab() {
       </button>
       {games.map(g => {
         const gid = String(g.id);
-        const rows = data.filter(r => String(r.game_id) === gid);
+        const rows = activeData.filter(r => String(r.game_id) === gid);
         // Primary: home_team/away_team from engine output (authoritative — added to CSV)
         const sample = rows.find(r => r.home_team && r.away_team);
         let label;
@@ -7486,7 +7544,7 @@ function MatchupEngineTab() {
     </div>}
 
     {/* Grade filter */}
-    {!loading && !error && data.length > 0 && <div style={{display:'flex',gap:6,marginBottom:14,flexWrap:'wrap',alignItems:'center'}}>
+    {!loading && !error && activeData.length > 0 && <div style={{display:'flex',gap:6,marginBottom:14,flexWrap:'wrap',alignItems:'center'}}>
       <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1}}>Grade</span>
       <button onClick={()=>setSelGrade('all')}
         style={{padding:'3px 12px',borderRadius:6,cursor:'pointer',
@@ -7520,7 +7578,7 @@ function MatchupEngineTab() {
     </div>}
     {loading && <div className="lw"><div className="sp"/><div className="lt">Loading matchup data…</div></div>}
     {/* Pitcher grade filter */}
-    {!loading && !error && data.length > 0 && <div style={{display:'flex',gap:6,marginBottom:14,flexWrap:'wrap',alignItems:'center'}}>
+    {!loading && !error && activeData.length > 0 && <div style={{display:'flex',gap:6,marginBottom:14,flexWrap:'wrap',alignItems:'center'}}>
       <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1}}>Pitcher:</span>
       {['all','‼️ Elite','⚠️ Tough','🤔 Average','💥 Hittable','🎯 Target'].map(g => {
         const active = selPitcherGrade === g;
@@ -7565,7 +7623,7 @@ function MatchupEngineTab() {
               const gid = String(game.gameId);
               // Use engine-provided home/away (most reliable)
               const teamList = Object.values(game.teams);
-              const anyRow = data.find(r => String(r.game_id) === gid && r.home_team && r.away_team);
+              const anyRow = activeData.find(r => String(r.game_id) === gid && r.home_team && r.away_team);
               if (anyRow) return `${anyRow.away_team} @ ${anyRow.home_team}`;
               if (scheduleMap[gid]) return `${scheduleMap[gid].away} @ ${scheduleMap[gid].home}`;
               // Fallback: batting teams
