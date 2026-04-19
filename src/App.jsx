@@ -974,7 +974,7 @@ function PitcherTab() {
                               <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1,marginBottom:10}}>Pitch Arsenal — {p.name} ({year})</div>
                               <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
                                 {pitcherDetail.pitchMix.map(pitch=>(
-                                  <div key={pitch.name} style={{background:'var(--surface)',border:`1px solid ${pitch.color||'var(--border)'}40`,borderRadius:8,padding:'10px 14px',minWidth:120}}>
+                                  <div key={pitch.name} style={{background:'var(--surface)',border:"1px solid " + (pitch.color||"var(--border)") + "40",borderRadius:8,padding:'10px 14px',minWidth:120}}>
                                     <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:pitch.color||'var(--text)'}}>{pitch.name}</div>
                                     <div style={{fontFamily:"'DM Mono',monospace",fontSize:20,fontWeight:700,color:'var(--text)',margin:'4px 0'}}>{pitch.pct?.toFixed(1)}%</div>
                                     <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
@@ -1059,19 +1059,125 @@ function ClearButton() {
   );
 }
 
-function MyPicksTab() {
-  const picks = usePicks();
-  const bprops = useBatterProps();
-  const [selPlayer,setSelPlayer] = useState(null);
+function openBetSlip(picks, bprops) {
   const pickList = Object.values(picks).sort((a,b)=>a.type.localeCompare(b.type));
-  const grouped = {
-    favorite:  pickList.filter(p=>p.type==="favorite"),
-    darkhorse: pickList.filter(p=>p.type==="darkhorse"),
-    longshot:  pickList.filter(p=>p.type==="longshot"),
-    daylate:   pickList.filter(p=>p.type==="daylate"),
-    due:       pickList.filter(p=>p.type==="due"),
-  };
-  const PickRow = ({p})=>{
+  const today = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+
+  // Build slip HTML string
+  const rows = pickList.map(p => {
+    const cfg     = PICK_TYPES[p.type] || {};
+    const propVal = bprops[String(p.pid)] || '';
+    const propOpt = propVal ? BATTER_PROP_OPTS.find(o=>o.value===propVal) : null;
+    const dp      = DAILY_PICKS_CACHE[String(p.pid)];
+    const myTeam  = (dp && dp.batting_team) || p.team || '';
+    const gid     = (dp && dp._gid) || '';
+    const teams   = gid ? [...(DAILY_GAME_MAP[gid]||[])] : [];
+    const opp     = teams.find(t=>t!==myTeam) || '';
+    const matchup = opp ? myTeam+' vs '+opp : myTeam;
+    const gt      = (dp && dp.game_time) || '';
+    const col     = cfg.color || '#555555';
+    const ini     = (p.name||'').split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
+    const propHtml = propOpt ? '<div style="padding:2px 8px;border-radius:5px;margin-bottom:3px;background:'+
+      (propOpt.color||'#888')+'22;border:1px solid '+(propOpt.color||'#888')+'50;font-size:10px;font-weight:700;color:'+(propOpt.color||'#888')+'">'+propOpt.label+'</div>' : '';
+    const typeLabel = cfg.label ? cfg.label.split(' ').slice(1).join(' ') : '';
+    return '<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;margin-bottom:6px;border-radius:8px;background:rgba(255,255,255,.04);border:1px solid '+col+'50;border-left:3px solid '+col+'">'+
+      '<div style="width:32px;height:32px;border-radius:50%;flex-shrink:0;background:'+col+'22;border:1px solid '+col+'50;display:flex;align-items:center;justify-content:center;font-family:Oswald,sans-serif;font-weight:700;font-size:11px;color:'+col+'">'+ini+'</div>'+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="font-family:Oswald,sans-serif;font-weight:700;font-size:14px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+p.name+'</div>'+
+        '<div style="font-size:9px;color:rgba(255,255,255,.4);margin-top:1px">'+matchup+(gt?' · '+gt:'')+'</div>'+
+      '</div>'+
+      '<div style="text-align:right;flex-shrink:0">'+propHtml+'<div style="font-size:9px;color:'+col+';font-weight:700">'+typeLabel+'</div></div>'+
+    '</div>';
+  }).join('');
+
+  const slipHtml =
+    '<div id="gy-slip" style="background:#0d1117;border:1px solid #1e2d3a;border-radius:14px;padding:20px 18px;font-family:DM Mono,monospace;width:380px">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">'+
+        '<div style="display:flex;align-items:center;gap:8px">'+
+          '<span style="font-size:20px">💣</span>'+
+          '<div><div style="font-family:Oswald,sans-serif;font-weight:800;font-size:18px;color:#ff4020;letter-spacing:1px">GOING YARD</div>'+
+          '<div style="font-size:9px;color:#38b8f2;letter-spacing:2px">yard.prsmlabs.app</div></div>'+
+        '</div>'+
+        '<div style="text-align:right"><div style="font-size:10px;color:rgba(255,255,255,.4)">Bet Slip</div>'+
+        '<div style="font-size:10px;color:rgba(255,255,255,.4)">'+today+'</div></div>'+
+      '</div>'+
+      '<div style="height:1px;background:rgba(255,64,32,.25);margin-bottom:14px"></div>'+
+      (rows || '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:12px;padding:20px 0">No picks added yet</div>')+
+      '<div style="margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,.06);display:flex;justify-content:space-between">'+
+        '<div style="font-size:8px;color:rgba(255,255,255,.2);letter-spacing:1px">'+pickList.length+' PICK'+(pickList.length!==1?'S':'')+'</div>'+
+        '<div style="font-size:8px;color:rgba(255,255,255,.2);letter-spacing:1px">FOR ENTERTAINMENT PURPOSES ONLY</div>'+
+      '</div>'+
+    '</div>';
+
+  // Overlay
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;padding:16px';
+
+  const slip = document.createElement('div');
+  slip.innerHTML = slipHtml;
+
+  const btn = document.createElement('button');
+  btn.textContent = '📸 Copy Slip + Open Gambly';
+  btn.style.cssText = 'padding:14px 28px;border-radius:10px;border:none;background:#ff6018;color:white;font-size:14px;font-weight:700;cursor:pointer;font-family:Oswald,sans-serif;letter-spacing:1px;width:380px';
+
+  const note = document.createElement('div');
+  note.textContent = 'Slip image copied to clipboard · paste into Gambly to get your share link';
+  note.style.cssText = 'text-align:center;font-size:10px;color:rgba(255,255,255,.35);font-family:DM Mono,monospace;max-width:380px';
+
+  const closeBtn = document.createElement('button');
+  closeBtn.textContent = '✕ Close';
+  closeBtn.style.cssText = 'background:none;border:1px solid rgba(255,255,255,.15);border-radius:8px;color:rgba(255,255,255,.4);cursor:pointer;padding:8px 28px;font-family:DM Mono,monospace;font-size:11px;width:380px';
+
+  overlay.appendChild(slip);
+  overlay.appendChild(btn);
+  overlay.appendChild(note);
+  overlay.appendChild(closeBtn);
+  document.body.appendChild(overlay);
+
+  const close = () => document.body.removeChild(overlay);
+  closeBtn.addEventListener('click', close);
+  overlay.addEventListener('click', e => { if(e.target===overlay) close(); });
+
+  btn.addEventListener('click', () => {
+    btn.textContent = '📸 Capturing…';
+    btn.disabled = true;
+    const slipEl = document.getElementById('gy-slip');
+    if (!window.html2canvas) {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+      s.onload = () => doCapture(slipEl);
+      s.onerror = () => { window.open('https://gambly.com','_blank'); close(); };
+      document.head.appendChild(s);
+    } else {
+      doCapture(slipEl);
+    }
+    function doCapture(el) {
+      window.html2canvas(el, {backgroundColor:'#0d1117',scale:2,useCORS:true,logging:false}).then(canvas => {
+        canvas.toBlob(blob => {
+          navigator.clipboard.write([new ClipboardItem({'image/png':blob})])
+            .catch(() => {
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href=url; a.download='going-yard-slip.png'; a.click();
+              URL.revokeObjectURL(url);
+            })
+            .finally(() => {
+              window.open('https://gambly.com','_blank');
+              btn.textContent = '✓ Copied — Gambly is open!';
+              btn.style.background = '#27c97a';
+              setTimeout(close, 2500);
+            });
+        }, 'image/png');
+      }).catch(() => {
+        window.open('https://gambly.com','_blank');
+        close();
+      });
+    }
+  });
+}
+
+
+function PickRow({p}) {
     const cfg = PICK_TYPES[p.type];
     const propVal = bprops[String(p.pid)];
     const propOpt = propVal ? BATTER_PROP_OPTS.find(o=>o.value===propVal) : null;
@@ -1099,7 +1205,7 @@ function MyPicksTab() {
         style={{
           padding:'3px 5px',flexShrink:0,
           background: propVal ? 'rgba(0,0,0,.35)' : 'var(--surface2)',
-          border:`1px solid ${propVal ? (propOpt?.color||'var(--border)') : 'var(--border)'}`,
+          border:"1px solid " + (propVal ? (propOpt?.color||"var(--border)") : "var(--border)"),
           borderRadius:6,
           color: propVal ? (propOpt?.color||'var(--text)') : 'var(--muted)',
           fontFamily:"'DM Mono',monospace",fontSize:10,
@@ -1114,13 +1220,11 @@ function MyPicksTab() {
       <select value={p.type} onChange={e=>setPick(p.pid,p.name,p.team,e.target.value)}
         style={{
           padding:'3px 6px', borderRadius:6, cursor:'pointer', outline:'none',
-          border:`1px solid ${PICK_TYPES[p.type]?.color||'var(--border)'}`,
-          background:`${PICK_TYPES[p.type]?.color||'transparent'}18`,
+          border:"1px solid " + (PICK_TYPES[p.type]?.color||"var(--border)"),
+          background:(PICK_TYPES[p.type]?.color||"transparent") + "18",
           color:PICK_TYPES[p.type]?.color||'var(--muted)',
           fontFamily:"'DM Mono',monospace", fontSize:10, fontWeight:700,
-          flexShrink:0, appearance:'none', WebkitAppearance:'none',
-          paddingRight:18, backgroundImage:`url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E")`,
-          backgroundRepeat:'no-repeat', backgroundPosition:'right 5px center',
+          flexShrink:0,
         }}>
         {Object.entries(PICK_TYPES).map(([type,c])=>(
           <option key={type} value={type}>{c.label.split(' ')[0]}</option>
@@ -1133,30 +1237,49 @@ function MyPicksTab() {
           color:"var(--muted)",cursor:"pointer",padding:"2px 7px",fontSize:10,flexShrink:0}}>✕</button>
     </div>;
   };
+function MyPicksTab() {
+  const picks = usePicks();
+  const bprops = useBatterProps();
+  const [selPlayer,setSelPlayer] = useState(null);
+  const pickList = Object.values(picks).sort((a,b)=>a.type.localeCompare(b.type));
+  const grouped = {
+    favorite:  pickList.filter(p=>p.type==="favorite"),
+    darkhorse: pickList.filter(p=>p.type==="darkhorse"),
+    longshot:  pickList.filter(p=>p.type==="longshot"),
+    daylate:   pickList.filter(p=>p.type==="daylate"),
+    due:       pickList.filter(p=>p.type==="due"),
+  };
+
   return <div>
     <div className="section-header" style={{marginBottom:16}}>
       <div className="section-title">🎯 My Picks</div>
       <div className="section-sub">Your saved batters · 💣 Favorites · ⭐ Dark Horses · 🎯 Longshots · 📆 Day Late · ⏳ Due</div>
     </div>
-    {pickList.length>0&&<div style={{display:"flex",justifyContent:"flex-end",gap:8,marginBottom:12}}>
+    {pickList.length>0&&<div style={{display:"flex",justifyContent:"flex-end",gap:8,marginBottom:12,flexWrap:'wrap'}}>
+      <button onClick={()=>openBetSlip(picks, bprops)}
+        style={{padding:"5px 12px",borderRadius:6,
+          background:"rgba(255,100,20,.18)",
+          border:"1px solid rgba(255,128,32,.4)",color:"#ff8020",cursor:"pointer",
+          fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:700}}>
+        📸 Get Slip
+      </button>
       <button onClick={()=>{
-        // Export picks to CSV — Pick Type, Team, Batter Name, Prop, Game Time, Matchup
         const rows = [["Pick Type","Team","Batter Name","Prop","Game Time","Matchup"]];
         pickList.forEach(p=>{
           const cfg = PICK_TYPES[p.type];
-          const typeName = cfg?.label?.split(" ").slice(1).join(" ") || p.type;
+          const typeName = (cfg && cfg.label) ? cfg.label.split(" ").slice(1).join(" ") : p.type;
           const propVal = GLOBAL_BPROPS[String(p.pid)] || "";
           const propOpt = propVal ? BATTER_PROP_OPTS.find(o=>o.value===propVal) : null;
           const dp       = DAILY_PICKS_CACHE[String(p.pid)] || null;
-          const gameTime = dp?.game_time || '—';
-          const myTeam   = dp?.batting_team || p.team || '—';
-          const gid      = dp?._gid || '';
+          const gameTime = (dp && dp.game_time) || '—';
+          const myTeam   = (dp && dp.batting_team) || p.team || '—';
+          const gid      = (dp && dp._gid) || '';
           const teams    = gid ? [...(DAILY_GAME_MAP[gid] || [])] : [];
           const opponent = teams.find(t => t !== myTeam) || '—';
-          const matchup  = opponent !== '—' ? `${myTeam} vs ${opponent}` : '—';
-          rows.push([typeName, p.team||"-", p.name||"-", propOpt?.label||"", gameTime, matchup]);
+          const matchup  = opponent !== '—' ? myTeam+" vs "+opponent : '—';
+          rows.push([typeName, p.team||"-", p.name||"-", (propOpt && propOpt.label)||"", gameTime, matchup]);
         });
-        const csv = rows.map(r=>r.map(c=>`"${c}"`).join(",")).join("\n");
+        const csv = rows.map(r=>r.map(c=>'"'+c+'"').join(",")).join("\n");
         const blob = new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -1175,10 +1298,13 @@ function MyPicksTab() {
           {Object.entries(grouped).map(([type,players])=>{
             if(players.length===0) return null;
             const cfg=PICK_TYPES[type];
-            return <div key={type} style={{background:"var(--surface)",border:`1px solid ${cfg.color}30`,borderRadius:10,overflow:"hidden"}}>
-              <div style={{padding:"10px 14px",background:`${cfg.color}10`,borderBottom:`1px solid ${cfg.color}20`,display:"flex",alignItems:"center",gap:8}}>
-                <span style={{fontSize:16}}>{cfg.label.split(" ")[0]}</span>
-                <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:cfg.color,letterSpacing:1}}>{cfg.label.split(" ").slice(1).join(" ").toUpperCase()}</span>
+            const cfgColor = cfg.color || '#888';
+            const cfgEmoji = cfg.label ? cfg.label.split(" ")[0] : '';
+            const cfgName  = cfg.label ? cfg.label.split(" ").slice(1).join(" ").toUpperCase() : type.toUpperCase();
+            return <div key={type} style={{background:"var(--surface)",border:"1px solid "+cfgColor+"30",borderRadius:10,overflow:"hidden"}}>
+              <div style={{padding:"10px 14px",background:cfgColor+"10",borderBottom:"1px solid "+cfgColor+"20",display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontSize:16}}>{cfgEmoji}</span>
+                <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:cfgColor,letterSpacing:1}}>{cfgName}</span>
                 <span style={{marginLeft:"auto",fontFamily:"'DM Mono',monospace",fontSize:11,color:"var(--muted)"}}>{players.length} batter{players.length!==1?"s":""}</span>
               </div>
               {players.map(p=><PickRow key={p.pid} p={p}/>)}
@@ -8030,7 +8156,7 @@ function GetAppTab() {
     {/* App icon preview */}
     <div style={{textAlign:"center",marginBottom:24}}>
       <div style={{display:"inline-flex",flexDirection:"column",alignItems:"center",gap:8}}>
-        <div style={{width:80,height:80,borderRadius:18,background:"linear-gradient(135deg,#0d1a28,#1a2a38)",
+        <div style={{width:80,height:80,borderRadius:18,background:"#0d1a28",
           border:"2px solid rgba(232,65,26,.4)",display:"flex",alignItems:"center",
           justifyContent:"center",fontSize:42,boxShadow:"0 8px 32px rgba(232,65,26,.25)"}}>
           💥
