@@ -1063,117 +1063,232 @@ function openBetSlip(picks, bprops) {
   const pickList = Object.values(picks).sort((a,b)=>a.type.localeCompare(b.type));
   const today = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
 
-  // Build slip HTML string
-  const rows = pickList.map(p => {
-    const cfg     = PICK_TYPES[p.type] || {};
-    const propVal = bprops[String(p.pid)] || '';
-    const propOpt = propVal ? BATTER_PROP_OPTS.find(o=>o.value===propVal) : null;
-    const dp      = DAILY_PICKS_CACHE[String(p.pid)];
-    const myTeam  = (dp && dp.batting_team) || p.team || '';
-    const gid     = (dp && dp._gid) || '';
-    const teams   = gid ? [...(DAILY_GAME_MAP[gid]||[])] : [];
-    const opp     = teams.find(t=>t!==myTeam) || '';
-    const matchup = opp ? myTeam+' vs '+opp : myTeam;
-    const gt      = (dp && dp.game_time) || '';
-    const col     = cfg.color || '#555555';
-    const ini     = (p.name||'').split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
-    const propHtml = propOpt ? '<div style="padding:2px 8px;border-radius:5px;margin-bottom:3px;background:'+
-      (propOpt.color||'#888')+'22;border:1px solid '+(propOpt.color||'#888')+'50;font-size:10px;font-weight:700;color:'+(propOpt.color||'#888')+'">'+propOpt.label+'</div>' : '';
-    const typeLabel = cfg.label ? cfg.label.split(' ').slice(1).join(' ') : '';
-    return '<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;margin-bottom:6px;border-radius:8px;background:rgba(255,255,255,.04);border:1px solid '+col+'50;border-left:3px solid '+col+'">'+
-      '<div style="width:32px;height:32px;border-radius:50%;flex-shrink:0;background:'+col+'22;border:1px solid '+col+'50;display:flex;align-items:center;justify-content:center;font-family:Oswald,sans-serif;font-weight:700;font-size:11px;color:'+col+'">'+ini+'</div>'+
-      '<div style="flex:1;min-width:0">'+
-        '<div style="font-family:Oswald,sans-serif;font-weight:700;font-size:14px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+p.name+'</div>'+
-        '<div style="font-size:9px;color:rgba(255,255,255,.4);margin-top:1px">'+matchup+(gt?' · '+gt:'')+'</div>'+
-      '</div>'+
-      '<div style="text-align:right;flex-shrink:0">'+propHtml+'<div style="font-size:9px;color:'+col+';font-weight:700">'+typeLabel+'</div></div>'+
-    '</div>';
-  }).join('');
+  // State
+  const slipState = {}; // pid -> { checked, prop }
+  pickList.forEach(p => {
+    const existing = bprops[String(p.pid)] || '';
+    slipState[p.pid] = { checked: !!existing, prop: existing };
+  });
 
-  const slipHtml =
-    '<div id="gy-slip" style="background:#0d1117;border:1px solid #1e2d3a;border-radius:14px;padding:20px 18px;font-family:DM Mono,monospace;width:380px">'+
+  // Overlay — scrollable on mobile
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px 12px 32px';
+
+  const container = document.createElement('div');
+  container.style.cssText = 'max-width:420px;margin:0 auto;display:flex;flex-direction:column;gap:10px';
+  overlay.appendChild(container);
+  document.body.appendChild(overlay);
+
+  const close = () => { if(document.body.contains(overlay)) document.body.removeChild(overlay); };
+  overlay.addEventListener('click', e => { if(e.target===overlay) close(); });
+
+  // ── PHASE 1: BUILDER ───────────────────────────────────────────
+  function renderBuilder() {
+    container.innerHTML = '';
+
+    // Header
+    const hdr = document.createElement('div');
+    hdr.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:4px 0 8px';
+    hdr.innerHTML = '<div style="font-family:Oswald,sans-serif;font-weight:800;font-size:16px;color:#ff4020;letter-spacing:1px">📸 BUILD SLIP</div>'+
+      '<button id="gy-close-btn" style="background:none;border:1px solid rgba(255,255,255,.15);border-radius:6px;color:rgba(255,255,255,.4);cursor:pointer;padding:4px 10px;font-size:11px;font-family:DM Mono,monospace">✕</button>';
+    container.appendChild(hdr);
+    hdr.querySelector('#gy-close-btn').addEventListener('click', close);
+
+    const hint = document.createElement('div');
+    hint.textContent = 'Check batters to include · set a prop for each one';
+    hint.style.cssText = 'font-size:10px;color:rgba(255,255,255,.35);font-family:DM Mono,monospace;padding-bottom:4px';
+    container.appendChild(hint);
+
+    // Batter rows
+    pickList.forEach(p => {
+      const cfg  = PICK_TYPES[p.type] || {};
+      const col  = cfg.color || '#888';
+      const ini  = (p.name||'').split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
+      const st   = slipState[p.pid];
+
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:8px;background:'+(st.checked?'rgba(255,255,255,.06)':'rgba(255,255,255,.02)')+';border:1px solid '+(st.checked?col+'50':'rgba(255,255,255,.08)')+';transition:all .15s';
+
+      // Checkbox
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = st.checked;
+      cb.style.cssText = 'width:16px;height:16px;flex-shrink:0;cursor:pointer;accent-color:'+col;
+      cb.addEventListener('change', () => {
+        st.checked = cb.checked;
+        row.style.background = st.checked ? 'rgba(255,255,255,.06)' : 'rgba(255,255,255,.02)';
+        row.style.border = '1px solid '+(st.checked ? col+'50' : 'rgba(255,255,255,.08)');
+        updatePreviewBtn();
+      });
+
+      // Avatar
+      const av = document.createElement('div');
+      av.textContent = ini;
+      av.style.cssText = 'width:30px;height:30px;border-radius:50%;flex-shrink:0;background:'+col+'22;border:1px solid '+col+'50;display:flex;align-items:center;justify-content:center;font-family:Oswald,sans-serif;font-weight:700;font-size:10px;color:'+col;
+
+      // Name + type
+      const info = document.createElement('div');
+      info.style.cssText = 'flex:1;min-width:0';
+      info.innerHTML = '<div style="font-family:Oswald,sans-serif;font-weight:700;font-size:13px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+p.name+'</div>'+
+        '<div style="font-size:9px;color:'+col+';font-weight:700">'+(cfg.label?cfg.label.split(' ').slice(1).join(' '):'')+'</div>';
+
+      // Prop selector
+      const sel = document.createElement('select');
+      sel.style.cssText = 'padding:4px 6px;border-radius:6px;background:#0d1117;border:1px solid rgba(255,255,255,.15);color:#fff;font-size:11px;font-family:DM Mono,monospace;cursor:pointer;flex-shrink:0;max-width:90px';
+      BATTER_PROP_OPTS.forEach(o => {
+        const opt = document.createElement('option');
+        opt.value = o.value;
+        opt.textContent = o.label;
+        if(o.value === st.prop) opt.selected = true;
+        sel.appendChild(opt);
+      });
+      sel.addEventListener('change', () => {
+        st.prop = sel.value;
+        if(sel.value && !st.checked) { cb.checked = true; st.checked = true; row.style.background='rgba(255,255,255,.06)'; row.style.border='1px solid '+col+'50'; }
+        updatePreviewBtn();
+      });
+
+      row.appendChild(cb);
+      row.appendChild(av);
+      row.appendChild(info);
+      row.appendChild(sel);
+      container.appendChild(row);
+    });
+
+    // Preview button
+    const previewBtn = document.createElement('button');
+    previewBtn.id = 'gy-preview-btn';
+    previewBtn.style.cssText = 'padding:13px;border-radius:10px;border:none;background:#ff6018;color:white;font-size:14px;font-weight:700;cursor:pointer;font-family:Oswald,sans-serif;letter-spacing:1px;width:100%;margin-top:6px;opacity:0.4';
+    previewBtn.textContent = '👁 Preview Slip';
+    previewBtn.disabled = true;
+    previewBtn.addEventListener('click', renderPreview);
+    container.appendChild(previewBtn);
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = '✕ Cancel';
+    cancelBtn.style.cssText = 'background:none;border:1px solid rgba(255,255,255,.1);border-radius:8px;color:rgba(255,255,255,.3);cursor:pointer;padding:8px;font-family:DM Mono,monospace;font-size:11px;width:100%';
+    cancelBtn.addEventListener('click', close);
+    container.appendChild(cancelBtn);
+
+    updatePreviewBtn();
+  }
+
+  function updatePreviewBtn() {
+    const btn = document.getElementById('gy-preview-btn');
+    if(!btn) return;
+    const anyChecked = pickList.some(p => slipState[p.pid].checked);
+    btn.disabled = !anyChecked;
+    btn.style.opacity = anyChecked ? '1' : '0.4';
+    btn.style.cursor = anyChecked ? 'pointer' : 'not-allowed';
+    const n = pickList.filter(p=>slipState[p.pid].checked).length;
+    btn.textContent = anyChecked ? '👁 Preview Slip ('+n+' pick'+(n!==1?'s':'')+')'  : '👁 Preview Slip';
+  }
+
+  // ── PHASE 2: PREVIEW ──────────────────────────────────────────
+  function renderPreview() {
+    const selected = pickList.filter(p => slipState[p.pid].checked);
+    container.innerHTML = '';
+
+    // Back button
+    const backBtn = document.createElement('button');
+    backBtn.textContent = '← Back';
+    backBtn.style.cssText = 'background:none;border:none;color:rgba(255,255,255,.4);cursor:pointer;padding:4px 0;font-family:DM Mono,monospace;font-size:11px;text-align:left;width:fit-content';
+    backBtn.addEventListener('click', renderBuilder);
+    container.appendChild(backBtn);
+
+    // Slip card (screenshot target)
+    const slipRows = selected.map(p => {
+      const cfg     = PICK_TYPES[p.type] || {};
+      const propVal = slipState[p.pid].prop;
+      const propOpt = propVal ? BATTER_PROP_OPTS.find(o=>o.value===propVal) : null;
+      const dp      = DAILY_PICKS_CACHE[String(p.pid)];
+      const myTeam  = (dp && dp.batting_team) || p.team || '';
+      const gid     = (dp && dp._gid) || '';
+      const teams   = gid ? [...(DAILY_GAME_MAP[gid]||[])] : [];
+      const opp     = teams.find(t=>t!==myTeam) || '';
+      const matchup = opp ? myTeam+' vs '+opp : myTeam;
+      const gt      = (dp && dp.game_time) || '';
+      const col     = cfg.color || '#555555';
+      const ini     = (p.name||'').split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
+      const propHtml = propOpt ? '<div style="padding:2px 8px;border-radius:5px;margin-bottom:3px;background:'+(propOpt.color||'#888')+'22;border:1px solid '+(propOpt.color||'#888')+'50;font-size:10px;font-weight:700;color:'+(propOpt.color||'#888')+'">'+propOpt.label+'</div>' : '';
+      const typeLabel = cfg.label ? cfg.label.split(' ').slice(1).join(' ') : '';
+      return '<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;margin-bottom:6px;border-radius:8px;background:rgba(255,255,255,.04);border:1px solid '+col+'50;border-left:3px solid '+col+'">'+
+        '<div style="width:32px;height:32px;border-radius:50%;flex-shrink:0;background:'+col+'22;border:1px solid '+col+'50;display:flex;align-items:center;justify-content:center;font-family:Oswald,sans-serif;font-weight:700;font-size:11px;color:'+col+'">'+ini+'</div>'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="font-family:Oswald,sans-serif;font-weight:700;font-size:14px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+p.name+'</div>'+
+          '<div style="font-size:9px;color:rgba(255,255,255,.4);margin-top:1px">'+matchup+(gt?' · '+gt:'')+'</div>'+
+        '</div>'+
+        '<div style="text-align:right;flex-shrink:0">'+propHtml+'<div style="font-size:9px;color:'+col+';font-weight:700">'+typeLabel+'</div></div>'+
+      '</div>';
+    }).join('');
+
+    const slipCard = document.createElement('div');
+    slipCard.id = 'gy-slip';
+    slipCard.style.cssText = 'background:#0d1117;border:1px solid #1e2d3a;border-radius:14px;padding:20px 18px;font-family:DM Mono,monospace';
+    slipCard.innerHTML =
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">'+
         '<div style="display:flex;align-items:center;gap:8px">'+
           '<span style="font-size:20px">💣</span>'+
           '<div><div style="font-family:Oswald,sans-serif;font-weight:800;font-size:18px;color:#ff4020;letter-spacing:1px">GOING YARD</div>'+
-          '<div style="font-size:9px;color:#38b8f2;letter-spacing:2px">yard.prsmlabs.app</div></div>'+
+          '<div style="font-size:9px;color:#38b8f2;letter-spacing:2px">goingyard.app</div></div>'+
         '</div>'+
-        '<div style="text-align:right"><div style="font-size:10px;color:rgba(255,255,255,.4)">Bet Slip</div>'+
-        '<div style="font-size:10px;color:rgba(255,255,255,.4)">'+today+'</div></div>'+
+        '<div style="text-align:right">'+
+          '<div style="font-size:10px;color:rgba(255,255,255,.4)">Bet Slip</div>'+
+          '<div style="font-size:10px;color:rgba(255,255,255,.4)">'+today+'</div>'+
+        '</div>'+
       '</div>'+
       '<div style="height:1px;background:rgba(255,64,32,.25);margin-bottom:14px"></div>'+
-      (rows || '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:12px;padding:20px 0">No picks added yet</div>')+
+      slipRows+
       '<div style="margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,.06);display:flex;justify-content:space-between">'+
-        '<div style="font-size:8px;color:rgba(255,255,255,.2);letter-spacing:1px">'+pickList.length+' PICK'+(pickList.length!==1?'S':'')+'</div>'+
+        '<div style="font-size:8px;color:rgba(255,255,255,.2);letter-spacing:1px">'+selected.length+' PICK'+(selected.length!==1?'S':'')+'</div>'+
         '<div style="font-size:8px;color:rgba(255,255,255,.2);letter-spacing:1px">FOR ENTERTAINMENT PURPOSES ONLY</div>'+
-      '</div>'+
-    '</div>';
+      '</div>';
+    container.appendChild(slipCard);
 
-  // Overlay
-  const overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;padding:16px';
+    // Capture button
+    const captureBtn = document.createElement('button');
+    captureBtn.textContent = '📸 Copy Slip + Open Gambly';
+    captureBtn.style.cssText = 'padding:14px;border-radius:10px;border:none;background:#ff6018;color:white;font-size:14px;font-weight:700;cursor:pointer;font-family:Oswald,sans-serif;letter-spacing:1px;width:100%';
+    captureBtn.addEventListener('click', () => {
+      captureBtn.textContent = '📸 Capturing…';
+      captureBtn.disabled = true;
+      const el = document.getElementById('gy-slip');
+      function doCapture() {
+        window.html2canvas(el, {backgroundColor:'#0d1117',scale:2,useCORS:true,logging:false}).then(canvas => {
+          canvas.toBlob(blob => {
+            navigator.clipboard.write([new ClipboardItem({'image/png':blob})])
+              .catch(() => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href=url; a.download='going-yard-slip.png'; a.click();
+                URL.revokeObjectURL(url);
+              })
+              .finally(() => {
+                window.open('https://gambly.com','_blank');
+                captureBtn.textContent = '✓ Copied — Gambly is open!';
+                captureBtn.style.background = '#27c97a';
+                setTimeout(close, 2500);
+              });
+          }, 'image/png');
+        }).catch(() => { window.open('https://gambly.com','_blank'); close(); });
+      }
+      if(!window.html2canvas) {
+        const s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+        s.onload = doCapture;
+        s.onerror = () => { window.open('https://gambly.com','_blank'); close(); };
+        document.head.appendChild(s);
+      } else { doCapture(); }
+    });
+    container.appendChild(captureBtn);
 
-  const slip = document.createElement('div');
-  slip.innerHTML = slipHtml;
+    const note = document.createElement('div');
+    note.textContent = 'Slip image copied to clipboard · paste into Gambly to get your share link';
+    note.style.cssText = 'text-align:center;font-size:10px;color:rgba(255,255,255,.3);font-family:DM Mono,monospace';
+    container.appendChild(note);
+  }
 
-  const btn = document.createElement('button');
-  btn.textContent = '📸 Copy Slip + Open Gambly';
-  btn.style.cssText = 'padding:14px 28px;border-radius:10px;border:none;background:#ff6018;color:white;font-size:14px;font-weight:700;cursor:pointer;font-family:Oswald,sans-serif;letter-spacing:1px;width:380px';
-
-  const note = document.createElement('div');
-  note.textContent = 'Slip image copied to clipboard · paste into Gambly to get your share link';
-  note.style.cssText = 'text-align:center;font-size:10px;color:rgba(255,255,255,.35);font-family:DM Mono,monospace;max-width:380px';
-
-  const closeBtn = document.createElement('button');
-  closeBtn.textContent = '✕ Close';
-  closeBtn.style.cssText = 'background:none;border:1px solid rgba(255,255,255,.15);border-radius:8px;color:rgba(255,255,255,.4);cursor:pointer;padding:8px 28px;font-family:DM Mono,monospace;font-size:11px;width:380px';
-
-  overlay.appendChild(slip);
-  overlay.appendChild(btn);
-  overlay.appendChild(note);
-  overlay.appendChild(closeBtn);
-  document.body.appendChild(overlay);
-
-  const close = () => document.body.removeChild(overlay);
-  closeBtn.addEventListener('click', close);
-  overlay.addEventListener('click', e => { if(e.target===overlay) close(); });
-
-  btn.addEventListener('click', () => {
-    btn.textContent = '📸 Capturing…';
-    btn.disabled = true;
-    const slipEl = document.getElementById('gy-slip');
-    if (!window.html2canvas) {
-      const s = document.createElement('script');
-      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-      s.onload = () => doCapture(slipEl);
-      s.onerror = () => { window.open('https://gambly.com','_blank'); close(); };
-      document.head.appendChild(s);
-    } else {
-      doCapture(slipEl);
-    }
-    function doCapture(el) {
-      window.html2canvas(el, {backgroundColor:'#0d1117',scale:2,useCORS:true,logging:false}).then(canvas => {
-        canvas.toBlob(blob => {
-          navigator.clipboard.write([new ClipboardItem({'image/png':blob})])
-            .catch(() => {
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href=url; a.download='going-yard-slip.png'; a.click();
-              URL.revokeObjectURL(url);
-            })
-            .finally(() => {
-              window.open('https://gambly.com','_blank');
-              btn.textContent = '✓ Copied — Gambly is open!';
-              btn.style.background = '#27c97a';
-              setTimeout(close, 2500);
-            });
-        }, 'image/png');
-      }).catch(() => {
-        window.open('https://gambly.com','_blank');
-        close();
-      });
-    }
-  });
+  renderBuilder();
 }
 
 
