@@ -4890,6 +4890,7 @@ let HR_DATA_DATE = '';
 let HR_LAST_FETCH = 0;
 const SEEN_HR_IDS = new Set();
 const DAILY_PICKS_CACHE = {}; // keyed by batter_id string
+const WEATHER_ALERT_GAME_IDS = new Set(); // game_ids with weather concerns at game time
 const DAILY_GAME_MAP    = {}; // keyed by normalized game_id → Set of batting_teams
 let _notifyNewHR = null; // callback set by useHRNotifications hook
 const HR_CACHE_MS = 60000;
@@ -6022,6 +6023,7 @@ Write exactly 2-3 sentences. Focus on the single most important factor driving o
                           <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 13 }}>{b.batter}</span>
                           {isConfirmed(b) && <span style={{ fontSize: 9, color: '#27c97a', flexShrink: 0 }}>✅</span>}
                           {isGoneYardSim(b) && <span style={{ fontSize: 9, flexShrink: 0 }}>💥</span>}
+                          {WEATHER_ALERT_GAME_IDS.has(String(b.game_id)) && <span title="Weather may impact this game" style={{ fontSize: 9, flexShrink: 0 }}>⚠️</span>}
                         </div>
                         {(b.in_slump === 'True' || b.in_slump === true) &&
                           <span style={{ fontSize: 8, color: 'var(--ice)', fontFamily: "'DM Mono',monospace" }}>📉 slump</span>}
@@ -7596,7 +7598,7 @@ function MatchupEngineTab() {
             color:active?'var(--accent)':'var(--muted)',
             border:`1px solid ${active?'rgba(232,65,26,.35)':'var(--border)'}`,
             fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:active?700:400}}>
-          {label}
+          {label}{WEATHER_ALERT_GAME_IDS.has(gid) ? ' ⚠️' : ''}
         </button>;
       })}
     </div>}
@@ -7688,6 +7690,9 @@ function MatchupEngineTab() {
               return teamList.length >= 2 ? `${teamList[0].team} vs ${teamList[1].team}` : (teamList[0]?.team || gid);
             })()}
           </span>
+          {WEATHER_ALERT_GAME_IDS.has(String(game.gameId)) && (
+            <span title="Weather may impact this game — use caution" style={{fontSize:13}}>⚠️</span>
+          )}
           {displayTime && <span style={{fontSize:10,color:'var(--accent2)',
             fontFamily:"'DM Mono',monospace",fontWeight:600}}>
             {displayTime}
@@ -8693,7 +8698,8 @@ function WeatherTab() {
   const [refreshed, setRefreshed] = useState(null);
   const [subTab, setSubTab]   = useState('weather');
   const [parksView, setParksView] = useState('today'); // 'today' | 'all'
-  const [parkSort, setParkSort] = useState({ col: 'hr_factor', dir: 'desc' });
+  const [parkSort, setParkSort]   = useState({ col: 'hr', dir: 'desc' });
+  const [todaySort, setTodaySort] = useState({ col: 'hrPct', dir: 'desc' });
 
   const PARK_DATA = [
     { abbr:'AZ',  venue:'Chase Field',                hr:103, cf:80,  notes:'Retractable roof · low altitude' },
@@ -8865,7 +8871,15 @@ function WeatherTab() {
             : games.length===0
             ? <div style={{padding:'40px 20px',textAlign:'center',color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:12}}>No games today.</div>
             : (() => {
-                // Compute today's combined park+weather impact for each game
+                // Weather alert: outdoor + game-time rain chance >= 40% + rain keyword in condition
+                const RAIN_WORDS = /rain|drizzle|shower|storm|thunder|precipitation/i;
+                const isWeatherAlert = (slot, isDome) => {
+                  if (isDome) return false;
+                  const rc = slot?.rainChance || 0;
+                  const cond = slot?.condition || '';
+                  return rc >= 40 && RAIN_WORDS.test(cond);
+                };
+
                 const todayRows = games.map(g => {
                   const wd = weather[g.home?.abbr];
                   if (!wd) return null;
@@ -8874,46 +8888,41 @@ function WeatherTab() {
                   const cur  = slot || wd.current;
                   const park = PARK_DATA.find(p=>p.abbr===g.home?.abbr);
                   const basePF = park?.hr || 100;
-
-                  // Combined HR factor = park factor already adjusted by weather in parkFactorHR
                   const combinedHR = wd.parkFactorHR || basePF;
-                  const hrPct      = Math.round(combinedHR - 100);
-
-                  // Wind-only adjustment = combined minus base park
+                  const hrPct   = Math.round(combinedHR - 100);
                   const windAdj = combinedHR - basePF;
-
-                  // Temperature effect: 75°F neutral; +1% per 5°F above, -1% per 5°F below
-                  const temp = cur?.temp || 72;
-                  const tempAdj = (temp - 72) / 5 * 0.8; // % units
-
-                  // 2B/3B: wind has ~50% the effect on doubles/triples vs HRs
-                  // plus ~35% of base park factor (dimensions matter for doubles)
-                  const xbhPct = Math.round((basePF - 100) * 0.35 + windAdj * 0.50 + tempAdj * 0.6);
-
-                  // 1B: wind barely affects singles; mainly park dimensions
+                  const temp    = cur?.temp || 72;
+                  const tempAdj = (temp - 72) / 5 * 0.8;
+                  const xbhPct  = Math.round((basePF - 100) * 0.35 + windAdj * 0.50 + tempAdj * 0.6);
                   const singPct = Math.round((basePF - 100) * 0.18 + windAdj * 0.20 + tempAdj * 1.0);
-
-                  // Runs: aggregate of all offensive adjustments
-                  const runPct = Math.round(hrPct * 0.45 + xbhPct * 0.30 + singPct * 0.15 + tempAdj * 0.5);
-
-                  const windDir   = cur?.windDir || (wd.isDome ? 'calm' : 'calm');
+                  const runPct  = Math.round(hrPct * 0.45 + xbhPct * 0.30 + singPct * 0.15 + tempAdj * 0.5);
+                  const windDir   = cur?.windDir   || (wd.isDome ? 'calm' : 'calm');
                   const windLabel = cur?.windLabel || (wd.isDome ? 'Dome' : '—');
-                  const rainChance= cur?.rainChance || 0;
-                  const isRainRisk = rainChance >= 50;
-                  const isMaybePostpone = rainChance >= 70;
-
+                  const weatherAlert = isWeatherAlert(cur, wd.isDome);
+                  // Populate global set for use across all tabs
+                  const gid = String(g.gamePk||g.id);
+                  if (weatherAlert) WEATHER_ALERT_GAME_IDS.add(gid);
+                  else WEATHER_ALERT_GAME_IDS.delete(gid);
                   return {
-                    gameId: g.gamePk||g.id,
+                    gameId: gid,
                     away: g.away?.abbr||'', home: g.home?.abbr||'',
                     venue: wd.stadium||park?.venue||g.home?.abbr,
                     gameTime: g.gameTime,
                     isDome: wd.isDome,
                     hrPct, xbhPct, singPct, runPct,
                     windDir, windLabel, temp,
-                    rainChance, isRainRisk, isMaybePostpone,
+                    rainChance: cur?.rainChance||0,
+                    weatherAlert,
                     condition: cur?.condition||'',
                   };
                 }).filter(Boolean);
+
+                // Sort today rows
+                const tSorted = [...todayRows].sort((a,b) => {
+                  const v = todaySort.col;
+                  const av = a[v]??0, bv = b[v]??0;
+                  return todaySort.dir==='desc' ? bv-av : av-bv;
+                });
 
                 const pctCell = (v) => {
                   const col = v>12?'#ff4020':v>5?'#ff8020':v>0?'#f5a623':v<-12?'#38b8f2':v<-5?'#60a0d0':v<0?'var(--muted)':'var(--muted)';
@@ -8922,42 +8931,48 @@ function WeatherTab() {
                   </span>;
                 };
 
+                const TH = ({col,label,color}) => {
+                  const active = todaySort.col===col;
+                  return <th onClick={()=>setTodaySort(s=>s.col===col?{col,dir:s.dir==='desc'?'asc':'desc'}:{col,dir:'desc'})}
+                    style={{textAlign:'center',cursor:'pointer',userSelect:'none',whiteSpace:'nowrap',
+                      color:active?'var(--accent)':(color||'var(--muted)')}}>
+                    {label}{active?<span style={{marginLeft:3,fontSize:9}}>{todaySort.dir==='desc'?'▼':'▲'}</span>:null}
+                  </th>;
+                };
+
                 return (
                   <div>
-                    <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginBottom:10}}>
-                      Combined park + weather effect on today's games · percentages vs average park/conditions · 🟣 postponement risk
+                    <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginBottom:8}}>
+                      Combined park + weather · vs average park/conditions · ⚠️ = weather may impact game · click stat headers to sort
                     </div>
                     <div className="tw">
                       <table>
                         <thead>
                           <tr>
                             <th style={{textAlign:'left'}}>Game</th>
-                            <th style={{textAlign:'center'}}>Wind</th>
-                            <th style={{textAlign:'center'}}>Temp</th>
-                            <th style={{textAlign:'center',color:'#ff8020'}}>HR</th>
-                            <th style={{textAlign:'center',color:'#f5a623'}}>2B/3B</th>
-                            <th style={{textAlign:'center',color:'var(--text)'}}>1B</th>
-                            <th style={{textAlign:'center',color:'#27c97a'}}>Runs</th>
+                            <th style={{textAlign:'center',cursor:'default',color:'var(--muted)'}}>Wind</th>
+                            <th style={{textAlign:'center',cursor:'default',color:'var(--muted)'}}>Temp</th>
+                            <TH col="hrPct"   label="HR"   color="#ff8020"/>
+                            <TH col="xbhPct"  label="2B/3B" color="#f5a623"/>
+                            <TH col="singPct" label="1B"   color="var(--text)"/>
+                            <TH col="runPct"  label="Runs" color="#27c97a"/>
                           </tr>
                         </thead>
                         <tbody>
-                          {todayRows.map(r=>(
+                          {tSorted.map(r=>(
                             <tr key={r.gameId}
                               style={{
-                                background: r.isMaybePostpone ? 'rgba(168,85,247,.15)' :
-                                            r.isRainRisk       ? 'rgba(96,160,208,.10)' : undefined,
-                                borderLeft: r.isMaybePostpone ? '3px solid #a855f7' :
-                                            r.isRainRisk       ? '3px solid #38b8f2' : '3px solid transparent',
+                                background: r.weatherAlert ? 'rgba(168,85,247,.12)' : undefined,
+                                borderLeft: r.weatherAlert ? '3px solid #a855f7' : '3px solid transparent',
                               }}>
                               <td style={{textAlign:'left',minWidth:0}}>
-                                <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,color:'var(--text)',whiteSpace:'nowrap'}}>
+                                <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,color:'var(--text)',display:'flex',alignItems:'center',gap:5}}>
                                   {r.away} @ {r.home}
+                                  {r.weatherAlert && <span title="Weather may impact game — use caution" style={{fontSize:11}}>⚠️</span>}
                                 </div>
                                 <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginTop:1}}>
                                   {r.venue}{r.gameTime ? ` · ${r.gameTime}` : ''}
                                 </div>
-                                {r.isMaybePostpone && <span style={{fontSize:8,color:'#a855f7',fontFamily:"'DM Mono',monospace",fontWeight:700}}>🟣 PPD Risk {r.rainChance}%</span>}
-                                {r.isRainRisk && !r.isMaybePostpone && <span style={{fontSize:8,color:'#38b8f2',fontFamily:"'DM Mono',monospace"}}>🌧 Rain {r.rainChance}%</span>}
                               </td>
                               <td style={{textAlign:'center'}}>
                                 {r.isDome
@@ -8996,7 +9011,7 @@ function WeatherTab() {
                 <table>
                   <thead>
                     <tr>
-                      {[{l:'Team',col:'abbr'},{l:'Venue',col:'venue'},{l:'HR Factor',col:'hr_factor'},{l:'Rating',col:'hr_factor'},{l:'CF°',col:'cf'},{l:'Notes',col:null}].map(({l,col})=>(
+                      {[{l:'Team',col:'abbr'},{l:'Venue',col:'venue'},{l:'HR Factor',col:'hr'},{l:'Rating',col:'hr'},{l:'CF°',col:'cf'},{l:'Notes',col:null}].map(({l,col})=>(
                         <th key={l} onClick={()=>col&&handleParkSort(col)}
                           style={{textAlign:l==='Venue'||l==='Notes'?'left':'center',cursor:col?'pointer':'default',
                             color:parkSort.col===col?'var(--accent)':'var(--muted)',whiteSpace:'nowrap',userSelect:'none'}}>
