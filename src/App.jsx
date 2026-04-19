@@ -5933,7 +5933,7 @@ Write exactly 2-3 sentences. Focus on the single most important factor driving o
               <thead>
                 <tr>
                   {[
-                    { label: '#',        key: null },
+                    { label: '+',        key: null },
                     { label: 'Batter',   key: null },
                     { label: 'Team',     key: null },
                     { label: 'vs Pitcher',key: null },
@@ -5974,8 +5974,8 @@ Write exactly 2-3 sentences. Focus on the single most important factor driving o
                     <tr key={`${b.batter_id}-${i}`} className="dr"
                       onClick={() => { setSelBatter(b); setView('deepdive'); }}
                       style={{ cursor: 'pointer' }}>
-                      <td style={{ textAlign: 'right' }}>
-                        <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 13, color: i < 3 ? 'var(--accent)' : 'var(--muted)' }}>{i + 1}</span>
+                      <td style={{ textAlign: 'center' }}>
+                        <PickButton pid={parseInt(b.batter_id)||0} name={b.batter} team={b.batting_team}/>
                       </td>
                       <td style={{ textAlign: 'left' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -6060,6 +6060,7 @@ Write exactly 2-3 sentences. Focus on the single most important factor driving o
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                         <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 22, color: 'var(--text)' }}>{b.batter}</span>
                         <span style={{ padding: '3px 9px', borderRadius: 6, fontSize: 11, fontFamily: "'Oswald',sans-serif", fontWeight: 800, background: gc.bg, color: gc.color, border: `1px solid ${gc.border}` }}>{b.grade}</span>
+                        <PickButton pid={parseInt(b.batter_id)||0} name={b.batter} team={b.batting_team}/>
                         {isDiamond && <span style={{ fontSize: 11, color: '#ffcc00' }}>💎 Diamond</span>}
                         {inSlump && <span style={{ padding: '2px 7px', borderRadius: 5, fontSize: 9, fontFamily: "'DM Mono',monospace", background: 'rgba(56,184,242,.1)', border: '1px solid rgba(56,184,242,.3)', color: 'var(--ice)' }}>📉 SLUMP</span>}
                       </div>
@@ -6256,6 +6257,7 @@ Write exactly 2-3 sentences. Focus on the single most important factor driving o
               <thead>
                 <tr>
                   {[
+                    { label: '+',        key: null,             align: 'center' },
                     { label: 'Batter',    key: null,             align: 'left'   },
                     { label: 'Team',      key: null,             align: 'center' },
                     { label: 'vs',        key: null,             align: 'left'   },
@@ -6314,6 +6316,9 @@ Write exactly 2-3 sentences. Focus on the single most important factor driving o
 
                     return (
                       <tr key={`${b.batter_id}-${i}`} className="dr" onClick={() => { setSelBatter(b); setView('deepdive'); }} style={{ cursor: 'pointer' }}>
+                        <td style={{ textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+                          <PickButton pid={parseInt(b.batter_id)||0} name={b.batter} team={b.batting_team}/>
+                        </td>
                         <td style={{ textAlign: 'left' }}>
                           <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 12 }}>{b.batter}</span>
                         </td>
