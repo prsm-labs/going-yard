@@ -6359,16 +6359,21 @@ Write exactly 2-3 sentences. Focus on the single most important factor driving o
                         <PickButton pid={parseInt(b.batter_id)||0} name={b.batter} team={b.batting_team}/>
                       </td>
                       <td style={{ textAlign: 'left' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                          <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 13 }}>{b.batter}</span>
-                          {isConfirmed(b) && <span style={{ fontSize: 9, color: '#27c97a', flexShrink: 0 }}>✅</span>}
-                          {isGoneYardSim(b) && <span style={{ fontSize: 9, flexShrink: 0 }}>💥</span>}
-                          {WEATHER_ALERT_GAME_IDS.has(String(b.game_id)) && <span title="Weather may impact this game" style={{ fontSize: 9, flexShrink: 0 }}>⚠️</span>}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <PlayerAvatar pid={parseInt(b.batter_id)||0} name={b.batter} size={26}/>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+                              <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 13 }}>{b.batter}</span>
+                              {isConfirmed(b) && <span style={{ fontSize: 9, color: '#27c97a', flexShrink: 0 }}>✅</span>}
+                              {isGoneYardSim(b) && <span style={{ fontSize: 9, flexShrink: 0 }}>💥</span>}
+                              {WEATHER_ALERT_GAME_IDS.has(String(b.game_id)) && <span title="Weather may impact this game" style={{ fontSize: 9, flexShrink: 0 }}>⚠️</span>}
+                              {(b.is_diamond === 'True' || b.is_diamond === true) &&
+                                <span style={{ padding: '1px 5px', borderRadius: 4, fontSize: 9, fontWeight: 700, background: 'rgba(255,204,0,.15)', color: '#ffcc00', border: '1px solid rgba(255,204,0,.3)', flexShrink: 0 }}>💎</span>}
+                            </div>
+                            {(b.in_slump === 'True' || b.in_slump === true) &&
+                              <span style={{ fontSize: 8, color: 'var(--ice)', fontFamily: "'DM Mono',monospace" }}>📉 slump</span>}
+                          </div>
                         </div>
-                        {(b.in_slump === 'True' || b.in_slump === true) &&
-                          <span style={{ fontSize: 8, color: 'var(--ice)', fontFamily: "'DM Mono',monospace" }}>📉 slump</span>}
-                        {(b.is_diamond === 'True' || b.is_diamond === true) &&
-                          <span style={{ fontSize: 8, color: '#ffcc00', fontFamily: "'DM Mono',monospace", marginLeft: 4 }}>💎 diamond</span>}
                       </td>
                       <td style={{ textAlign: 'right' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 11, color: 'var(--accent2)', fontWeight: 700 }}>{b.batting_team}</span></td>
                       <td style={{ textAlign: 'right' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)' }}>{b.pitcher}</span></td>
@@ -6452,7 +6457,7 @@ Write exactly 2-3 sentences. Focus on the single most important factor driving o
                         <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 22, color: 'var(--text)' }}>{b.batter}</span>
                         <span style={{ padding: '3px 9px', borderRadius: 6, fontSize: 11, fontFamily: "'Oswald',sans-serif", fontWeight: 800, background: gc.bg, color: gc.color, border: `1px solid ${gc.border}` }}>{b.grade}</span>
                         <PickButton pid={parseInt(b.batter_id)||0} name={b.batter} team={b.batting_team}/>
-                        {isDiamond && <span style={{ fontSize: 11, color: '#ffcc00' }}>💎 Diamond</span>}
+                        {isDiamond && <span style={{ padding: '2px 8px', borderRadius: 5, fontSize: 10, fontWeight: 700, background: 'rgba(255,204,0,.15)', color: '#ffcc00', border: '1px solid rgba(255,204,0,.35)' }}>💎 Diamond Pick</span>}
                         {inSlump && <span style={{ padding: '2px 7px', borderRadius: 5, fontSize: 9, fontFamily: "'DM Mono',monospace", background: 'rgba(56,184,242,.1)', border: '1px solid rgba(56,184,242,.3)', color: 'var(--ice)' }}>📉 SLUMP</span>}
                       </div>
                       <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
