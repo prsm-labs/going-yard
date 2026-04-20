@@ -351,8 +351,8 @@ function PlayerAvatar({ pid, name, size=32, border='1.5px solid var(--border)', 
     <div style={{width:size,height:size,borderRadius:'50%',flexShrink:0,
       overflow:'hidden',border,...style}}>
       <img src={src} alt={name||''} onError={()=>setFailed(true)}
-        style={{width:'100%',height:'130%',objectFit:'cover',
-          objectPosition:'center 10%',marginTop:'-5%'}}/>
+        style={{width:'100%',height:'145%',objectFit:'cover',
+          objectPosition:'center 18%',marginTop:'-10%'}}/>
     </div>
   );
 }
@@ -1151,10 +1151,20 @@ function openBetSlip(picks, bprops) {
         updatePreviewBtn();
       });
 
-      // Avatar
+      // Avatar — MLB headshot with initials fallback
+      const cleanPid = p.pid ? String(parseInt(p.pid)||0) : '0';
       const av = document.createElement('div');
-      av.textContent = ini;
-      av.style.cssText = 'width:30px;height:30px;border-radius:50%;flex-shrink:0;background:'+col+'22;border:1px solid '+col+'50;display:flex;align-items:center;justify-content:center;font-family:Oswald,sans-serif;font-weight:700;font-size:10px;color:'+col;
+      av.style.cssText = 'width:30px;height:30px;border-radius:50%;flex-shrink:0;overflow:hidden;border:1px solid '+col+'50;flex-shrink:0';
+      if (cleanPid !== '0') {
+        const img = document.createElement('img');
+        img.src = 'https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/'+cleanPid+'/headshot/67/current';
+        img.style.cssText = 'width:100%;height:145%;object-fit:cover;object-position:center 18%;margin-top:-10%';
+        img.onerror = () => { av.removeChild(img); av.textContent = ini; av.style.cssText += ';display:flex;align-items:center;justify-content:center;font-family:Oswald,sans-serif;font-weight:700;font-size:10px;color:'+col+';background:'+col+'22'; };
+        av.appendChild(img);
+      } else {
+        av.textContent = ini;
+        av.style.cssText = 'width:30px;height:30px;border-radius:50%;flex-shrink:0;background:'+col+'22;border:1px solid '+col+'50;display:flex;align-items:center;justify-content:center;font-family:Oswald,sans-serif;font-weight:700;font-size:10px;color:'+col;
+      }
 
       // Name + type
       const info = document.createElement('div');
@@ -1240,10 +1250,14 @@ function openBetSlip(picks, bprops) {
       const gt      = (dp && dp.game_time) || '';
       const col     = cfg.color || '#555555';
       const ini     = (p.name||'').split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
+      const spid    = p.pid ? String(parseInt(p.pid)||0) : '0';
+      const avatarHtml = spid !== '0'
+        ? '<div style="width:32px;height:32px;border-radius:50%;flex-shrink:0;overflow:hidden;border:1px solid '+col+'50"><img src="https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/'+spid+'/headshot/67/current" style="width:100%;height:145%;object-fit:cover;object-position:center 18%;margin-top:-10%" onerror="this.parentNode.innerHTML=\''+ini+'\'"/></div>'
+        : '<div style="width:32px;height:32px;border-radius:50%;flex-shrink:0;background:'+col+'22;border:1px solid '+col+'50;display:flex;align-items:center;justify-content:center;font-family:Oswald,sans-serif;font-weight:700;font-size:11px;color:'+col+'">'+ini+'</div>';
       const propHtml = propOpt ? '<div style="padding:2px 8px;border-radius:5px;margin-bottom:3px;background:'+(propOpt.color||'#888')+'22;border:1px solid '+(propOpt.color||'#888')+'50;font-size:10px;font-weight:700;color:'+(propOpt.color||'#888')+'">'+propOpt.label+'</div>' : '';
       const typeLabel = cfg.label ? cfg.label.split(' ').slice(1).join(' ') : '';
       return '<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;margin-bottom:6px;border-radius:8px;background:rgba(255,255,255,.04);border:1px solid '+col+'50;border-left:3px solid '+col+'">'+
-        '<div style="width:32px;height:32px;border-radius:50%;flex-shrink:0;background:'+col+'22;border:1px solid '+col+'50;display:flex;align-items:center;justify-content:center;font-family:Oswald,sans-serif;font-weight:700;font-size:11px;color:'+col+'">'+ini+'</div>'+
+        avatarHtml+
         '<div style="flex:1;min-width:0">'+
           '<div style="font-family:Oswald,sans-serif;font-weight:700;font-size:14px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+p.name+'</div>'+
           '<div style="font-size:9px;color:rgba(255,255,255,.4);margin-top:1px">'+matchup+(gt?' · '+gt:'')+'</div>'+
