@@ -327,6 +327,33 @@ const getLHL = (ev, la, hh) => {
 };
 const ini = (n) => n?.split(" ").map(p => p[0]).join("").toUpperCase().slice(0, 2) || "?";
 
+// PlayerAvatar — MLB headshot with initials fallback
+// Uses MLB's public CDN: no auth, served by player ID
+function PlayerAvatar({ pid, name, size=32, border='1.5px solid var(--border)', style={} }) {
+  const [failed, setFailed] = React.useState(false);
+  const cleanId = pid ? String(parseInt(pid)||0) : '0';
+  const src = cleanId !== '0'
+    ? 'https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/'+cleanId+'/headshot/67/current'
+    : null;
+  const initials = ini(name||'');
+  if (!src || failed) {
+    return (
+      <div style={{width:size,height:size,borderRadius:'50%',flexShrink:0,
+        background:'var(--surface2)',border,
+        display:'flex',alignItems:'center',justifyContent:'center',
+        fontFamily:"'DM Mono',monospace",fontWeight:700,
+        fontSize:Math.round(size*0.35),color:'var(--muted)',...style}}>
+        {initials}
+      </div>
+    );
+  }
+  return (
+    <img src={src} alt={name||''} onError={()=>setFailed(true)}
+      style={{width:size,height:size,borderRadius:'50%',flexShrink:0,
+        objectFit:'cover',objectPosition:'top',border,...style}}/>
+  );
+}
+
 // Position abbreviation → color mapping
 const POS_COLORS = {
   "C":   "#38b8f2", // catcher — blue
@@ -1314,10 +1341,9 @@ function PickRow({p, bprops}) {
     const propOpt = propVal ? BATTER_PROP_OPTS.find(o=>o.value===propVal) : null;
     return <div style={{display:"flex",alignItems:"center",gap:8,padding:"9px 14px",borderBottom:"1px solid rgba(30,45,58,.4)"}}>
       {/* Avatar */}
-      <div style={{width:32,height:32,borderRadius:"50%",background:"var(--surface2)",
-        border:`2px solid ${cfg.color}`,display:"flex",alignItems:"center",justifyContent:"center",
-        fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:cfg.color,cursor:"pointer",flexShrink:0}}
-        onClick={()=>openAtBatSlide(p)}>{ini(p.name)}</div>
+      <div onClick={()=>openAtBatSlide(p)} style={{cursor:"pointer",flexShrink:0}}>
+        <PlayerAvatar pid={p.pid} name={p.name} size={32} border={"2px solid "+cfg.color}/>
+      </div>
 
       {/* Name + team — clickable */}
       <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>openAtBatSlide(p)}>
@@ -1552,7 +1578,7 @@ function AtBatSlideIn() {
     }}>
       {/* Header */}
       <div style={{padding:"16px 20px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",gap:12,position:"sticky",top:0,background:"var(--surface)",zIndex:10}}>
-        <PosAvatar player={player} size={40} style={{border:"2px solid var(--accent)"}}/>
+        <PlayerAvatar pid={player?.pid} name={player?.name} size={40} style={{border:"2px solid var(--accent)"}}/>
         <div style={{flex:1}}>
           <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:18,letterSpacing:1}}>{player.name}</div>
           <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>
@@ -1671,7 +1697,7 @@ function PicksSlideout({onClose}) {
             {pickList.map(p=>{
               const cfg=PICK_TYPES[p.type];
               return <div key={p.pid} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 16px",borderBottom:"1px solid rgba(30,45,58,.4)"}}>
-                <div style={{width:34,height:34,borderRadius:"50%",background:"var(--surface2)",border:`2px solid ${cfg.color}`,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,color:cfg.color,flexShrink:0}}>{ini(p.name)}</div>
+                <PlayerAvatar pid={p.pid} name={p.name} size={34} border={"2px solid "+cfg.color}/>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontWeight:600,fontSize:13,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{p.name}</div>
                   <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",display:"flex",gap:5}}>
@@ -3277,7 +3303,7 @@ function GPanel({game, isLive, isFinal=false}) {
                   <span className={`cv2 ${isE?"op":""}`}
                     style={{fontSize:11,color:"var(--muted)",flexShrink:0}}>▾</span>
                   <div className="pc" style={{flex:1,minWidth:0}}>
-                    <PosAvatar player={b} size={26}/>
+                    <PlayerAvatar pid={b.id} name={b.name} size={26}/>
                     <div style={{minWidth:0}}>
                       <div className="pn" style={{fontSize:12}}>{b.name}</div>
                       <div style={{fontSize:9,color:"var(--accent2)",fontFamily:"'DM Mono',monospace",fontWeight:700}}>
@@ -4618,7 +4644,7 @@ function ScoutingTab() {
         return <tr key={p.pid}>
           <td><span className="sv avg" style={{fontSize:10}}>{i+1}</span></td>
           <td><div className="pc" style={{cursor:"pointer"}} onClick={()=>openAtBatSlide(p)}>
-            <PosAvatar player={p} size={30}/>
+            <PlayerAvatar pid={p.pid||p.id} name={p.name} size={30}/>
             <div>
               <div className="pn">{p.name}</div>
               <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",display:"flex",gap:4,alignItems:"center",marginTop:1}}>
@@ -4819,7 +4845,7 @@ function BvPTab() {
           const matchupHighlight = b.matchup?.cls==="pos"?"rgba(39,201,122,.05)":b.matchup?.cls==="neg"?"rgba(56,184,242,.04)":"";
           return <tr key={b.id} style={{background:matchupHighlight}}>
             <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:15,color:i<3?"var(--accent2)":"var(--muted)"}}>{i+1}</span></td>
-            <td><div className="pc"><PosAvatar player={b} size={30}/><div><div className="pn">{b.name}</div><div className="pt">{b.team} · {b.hr} HR</div></div></div></td>
+            <td><div className="pc"><PlayerAvatar pid={b.id} name={b.name} size={30}/><div><div className="pn">{b.name}</div><div className="pt">{b.team} · {b.hr} HR</div></div></div></td>
             <td>
               <div style={{display:"flex",flexDirection:"column",gap:3}}>
                 <div style={{display:"inline-flex",alignItems:"center",gap:4,padding:"2px 8px",borderRadius:5,background:"var(--surface2)",border:"1px solid var(--border)",width:"fit-content"}}>
@@ -5151,7 +5177,7 @@ function PitchBuilderTab() {
               const rowBg=matchup?.cls==="pos"?"rgba(39,201,122,.04)":matchup?.cls==="neg"?"rgba(56,184,242,.03)":"";
               return <tr key={p.id} style={{background:rowBg}}>
                 <td><div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:15,color:top3?pitchCol:"var(--muted)"}}>{i+1}</div></td>
-                <td><div className="pc"><PosAvatar player={p} size={30} style={{border:`1px solid ${top3?pitchCol+"50":"var(--border)"}`}}/><div><div className="pn">{p.name}</div><div className="pt">{p.team} · {p.hr} HR</div></div></div></td>
+                <td><div className="pc"><PlayerAvatar pid={p.id} name={p.name} size={30} style={{border:"1px solid "+(top3?pitchCol+"50":"var(--border)")}}/><div><div className="pn">{p.name}</div><div className="pt">{p.team} · {p.hr} HR</div></div></div></td>
                 <td>
                   <div style={{display:"flex",flexDirection:"column",gap:2}}>
                     <div style={{display:"inline-flex",alignItems:"center",gap:4,padding:"2px 7px",borderRadius:5,background:"var(--surface2)",border:"1px solid var(--border)",width:"fit-content"}}>
@@ -7062,7 +7088,7 @@ function BatterLeaderboard() {
                     {/* Batter name */}
                     <td style={{textAlign:'left'}}>
                       <div style={{display:'flex',alignItems:'center',gap:7}}>
-                        <PosAvatar player={p} size={24}/>
+                        <PlayerAvatar pid={p.pid||p.id} name={p.name} size={24}/>
                         <div>
                           <div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}>
                             <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,letterSpacing:.3}}>{p.name}</span>
@@ -7817,13 +7843,7 @@ function MatchupEngineTab() {
                       gap:8,padding:'7px 10px',borderRadius:8,
                       background:'var(--surface2)',
                       border:`1px solid ${cur?PICK_TYPES[cur].color:'var(--border)'}`}}>
-                      <div style={{width:28,height:28,borderRadius:'50%',
-                        background:'var(--surface)',border:'1px solid var(--border)',
-                        display:'flex',alignItems:'center',justifyContent:'center',
-                        fontFamily:"'Oswald',sans-serif",fontWeight:700,
-                        fontSize:10,flexShrink:0}}>
-                        {ini(p.name)}
-                      </div>
+                      <PlayerAvatar pid={p.pid} name={p.name} size={28}/>
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{fontWeight:600,fontSize:12,
                           whiteSpace:'nowrap',overflow:'hidden',
@@ -8491,11 +8511,7 @@ function PowerBITab() {
               padding:"8px 10px",borderRadius:8,background:"var(--surface2)",
               border:`1px solid ${current?PICK_TYPES[current].color:"var(--border)"}`,
               transition:"all .15s"}}>
-              <div style={{width:30,height:30,borderRadius:"50%",background:"var(--surface)",
-                border:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"center",
-                fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,flexShrink:0}}>
-                {ini(p.name)}
-              </div>
+              <PlayerAvatar pid={p.pid} name={p.name} size={30}/>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontWeight:600,fontSize:12,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}> {p.name}</div>
                 <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}> {getTeam(p.pid,p.team)} · {p.grade?.grade||"—"}</div>
@@ -8643,7 +8659,7 @@ function StatcastTab() {
           {filtered.map(p=>{
             const key=String(p.pid),current=picks[key]?.type;
             return <div key={p.pid} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,background:"var(--surface2)",border:`1px solid ${current?PICK_TYPES[current].color:"var(--border)"}`}}>
-              <PosAvatar player={p} size={30}/>
+              <PlayerAvatar pid={p.pid||p.id} name={p.name} size={30}/>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontWeight:600,fontSize:12,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{p.name}</div>
                 <div style={{fontSize:9,fontFamily:"'DM Mono',monospace",display:"flex",gap:5}}>
