@@ -348,9 +348,12 @@ function PlayerAvatar({ pid, name, size=32, border='1.5px solid var(--border)', 
     );
   }
   return (
-    <img src={src} alt={name||''} onError={()=>setFailed(true)}
-      style={{width:size,height:size,borderRadius:'50%',flexShrink:0,
-        objectFit:'cover',objectPosition:'top',border,...style}}/>
+    <div style={{width:size,height:size,borderRadius:'50%',flexShrink:0,
+      overflow:'hidden',border,...style}}>
+      <img src={src} alt={name||''} onError={()=>setFailed(true)}
+        style={{width:'100%',height:'130%',objectFit:'cover',
+          objectPosition:'center 10%',marginTop:'-5%'}}/>
+    </div>
   );
 }
 
