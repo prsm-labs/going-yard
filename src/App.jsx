@@ -351,8 +351,8 @@ function PlayerAvatar({ pid, name, size=32, border='1.5px solid var(--border)', 
     <div style={{width:size,height:size,borderRadius:'50%',flexShrink:0,
       overflow:'hidden',border,...style}}>
       <img src={src} alt={name||''} onError={()=>setFailed(true)}
-        style={{width:'100%',height:'145%',objectFit:'cover',
-          objectPosition:'center 18%',marginTop:'-10%'}}/>
+        style={{width:'100%',height:'150%',objectFit:'cover',
+          objectPosition:'center 22%',marginTop:'-14%'}}/>
     </div>
   );
 }
@@ -1158,7 +1158,7 @@ function openBetSlip(picks, bprops) {
       if (cleanPid !== '0') {
         const img = document.createElement('img');
         img.src = 'https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/'+cleanPid+'/headshot/67/current';
-        img.style.cssText = 'width:100%;height:145%;object-fit:cover;object-position:center 18%;margin-top:-10%';
+        img.style.cssText = 'width:100%;height:150%;object-fit:cover;object-position:center 22%;margin-top:-14%';
         img.onerror = () => { av.removeChild(img); av.textContent = ini; av.style.cssText += ';display:flex;align-items:center;justify-content:center;font-family:Oswald,sans-serif;font-weight:700;font-size:10px;color:'+col+';background:'+col+'22'; };
         av.appendChild(img);
       } else {
@@ -1252,7 +1252,7 @@ function openBetSlip(picks, bprops) {
       const ini     = (p.name||'').split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
       const spid    = p.pid ? String(parseInt(p.pid)||0) : '0';
       const avatarHtml = spid !== '0'
-        ? '<div style="width:32px;height:32px;border-radius:50%;flex-shrink:0;overflow:hidden;border:1px solid '+col+'50"><img src="https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/'+spid+'/headshot/67/current" style="width:100%;height:145%;object-fit:cover;object-position:center 18%;margin-top:-10%" onerror="this.parentNode.innerHTML=\''+ini+'\'"/></div>'
+        ? '<div style="width:32px;height:32px;border-radius:50%;flex-shrink:0;overflow:hidden;border:1px solid '+col+'50"><img src="https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/'+spid+'/headshot/67/current" style="width:100%;height:150%;object-fit:cover;object-position:center 22%;margin-top:-14%" onerror="this.parentNode.innerHTML=\''+ini+'\'"/></div>'
         : '<div style="width:32px;height:32px;border-radius:50%;flex-shrink:0;background:'+col+'22;border:1px solid '+col+'50;display:flex;align-items:center;justify-content:center;font-family:Oswald,sans-serif;font-weight:700;font-size:11px;color:'+col+'">'+ini+'</div>';
       const propHtml = propOpt ? '<div style="padding:2px 8px;border-radius:5px;margin-bottom:3px;background:'+(propOpt.color||'#888')+'22;border:1px solid '+(propOpt.color||'#888')+'50;font-size:10px;font-weight:700;color:'+(propOpt.color||'#888')+'">'+propOpt.label+'</div>' : '';
       const typeLabel = cfg.label ? cfg.label.split(' ').slice(1).join(' ') : '';
@@ -2629,6 +2629,15 @@ async function fetchLiveBatters(gamePk) {
   const currentBatterId = data.currentBatterId  || null;
   const onDeckId        = data.onDeckId         || null;
   const inTheHoleId     = data.inTheHoleId      || null;
+  // Base runners from linescore offense
+  const offense         = data.linescore?.offense || {};
+  const runners = {
+    first:  !!(offense.first),
+    second: !!(offense.second),
+    third:  !!(offense.third),
+  };
+  // Last play description from live feed
+  const lastPlay = data.lastPlay || null; // { event, description, batterId }
 
     const avg = (arr) => arr.length > 0 ? Math.round(arr.reduce((a,b)=>a+b,0)/arr.length*10)/10 : null;
 
@@ -2729,23 +2738,28 @@ async function fetchLiveBatters(gamePk) {
           isInTheHole:     bid === inTheHoleId,
           isPinchHitter:   posCode === 'PH' || posCode === 'PR' || (!startingBatterIds.has(bid) && ab > 0),
           isSubbedOut:     startingBatterIds.has(bid) && activeLineup.size > 0 && !activeLineup.has(bid),
+          lineupSlot:      p?.battingOrder ? Math.round(p.battingOrder / 100) : null,
         });
       }
     }
 
-  return batters.sort((a,b) => {
-    if (a.isAtBat && !b.isAtBat)        return -1;
-    if (b.isAtBat && !a.isAtBat)        return  1;
-    if (a.isOnDeck && !b.isOnDeck)      return -1;
-    if (b.isOnDeck && !a.isOnDeck)      return  1;
-    if (a.isInTheHole && !b.isInTheHole) return -1;
-    if (b.isInTheHole && !a.isInTheHole) return  1;
-    const o = {gone_yard:5,elite:4,hot:3,warm:2,avg:1,cold:0};
-    return (o[b.heatLabel.cls]||0) - (o[a.heatLabel.cls]||0);
-  });
+  return {
+    batters: batters.sort((a,b) => {
+      if (a.isAtBat && !b.isAtBat)        return -1;
+      if (b.isAtBat && !a.isAtBat)        return  1;
+      if (a.isOnDeck && !b.isOnDeck)      return -1;
+      if (b.isOnDeck && !a.isOnDeck)      return  1;
+      if (a.isInTheHole && !b.isInTheHole) return -1;
+      if (b.isInTheHole && !a.isInTheHole) return  1;
+      const o = {gone_yard:5,elite:4,hot:3,warm:2,avg:1,cold:0};
+      return (o[b.heatLabel.cls]||0) - (o[a.heatLabel.cls]||0);
+    }),
+    runners,
+    lastPlay,
+  };
   } catch(e) {
     console.warn('[LiveBatters]', e.message);
-    return SLB;
+    return { batters: SLB, runners: {first:false,second:false,third:false}, lastPlay: null };
   }
 }
 
@@ -3278,32 +3292,101 @@ function GPanel({game, isLive, isFinal=false}) {
   const [loading, setLoading] = useState(true);
   const [expId, setExpId] = useState(null);
   useEffect(() => {
-    // Initial load only — don't reset expId or clear data on background updates
     setLoading(true);
     (async () => {
-      // Final games show the full box score (same as live batters — it has final stats)
       const d = (isLive || isFinal) ? await fetchLiveBatters(game.gamePk) : await fetchLiftoffBatters(game);
       setData(d); setLoading(false);
     })();
   }, [game.gamePk, isLive]);
 
-  // Background refresh for live games — silent, preserves expanded rows
   useEffect(() => {
     if (!isLive) return;
     const id = setInterval(async () => {
       const d = await fetchLiveBatters(game.gamePk);
-      setData(d); // update data without resetting expId or scroll
+      setData(d);
     }, 60000);
     return () => clearInterval(id);
   }, [game.gamePk, isLive]);
+
+  // Destructure batters + runners + lastPlay for live/final; liftoff returns plain array
+  const batters   = (isLive || isFinal) ? (data?.batters  || []) : (data || []);
+  const runners   = (isLive || isFinal) ? (data?.runners  || {first:false,second:false,third:false}) : null;
+  const lastPlay  = isLive              ? (data?.lastPlay || null) : null;
+
+  // Event → badge color
+  const eventColor = (evt) => {
+    if (!evt) return 'var(--muted)';
+    const e = evt.toLowerCase();
+    if (e.includes('home run'))  return '#ff4020';
+    if (e.includes('triple'))    return '#f5a623';
+    if (e.includes('double'))    return '#f5a623';
+    if (e.includes('single'))    return '#27c97a';
+    if (e.includes('walk') || e.includes('hit by pitch')) return '#38b8f2';
+    if (e.includes('strikeout') || e.includes('struck out')) return '#5a7080';
+    return 'var(--muted)';
+  };
+
+  // Baseball diamond component (SVG, top-down view)
+  const BaseDiamond = ({r}) => {
+    if (!r) return null;
+    const base = (filled, x, y) => (
+      <rect x={x-5} y={y-5} width={10} height={10} rx={1}
+        fill={filled ? '#f5a623' : 'none'}
+        stroke={filled ? '#f5a623' : 'rgba(255,255,255,.25)'}
+        strokeWidth={1.5}
+        transform={"rotate(45," + x + "," + y + ")"}/>
+    );
+    return (
+      <svg width={40} height={40} viewBox="0 0 40 40" style={{flexShrink:0}}>
+        {base(r.second, 20, 5)}
+        {base(r.third,  5, 20)}
+        {base(r.first,  35, 20)}
+        {/* Home plate */}
+        <polygon points="20,38 16,34 16,30 24,30 24,34"
+          fill="rgba(255,255,255,.15)" stroke="rgba(255,255,255,.3)" strokeWidth={1}/>
+      </svg>
+    );
+  };
+
   return <div className="gp">
-    <div className="gph">
-      <div className="gpt">{isLive ? "🔥 Live Heat — Who's Going Yard?" : isFinal ? "📋 Final Box Score" : "🚀 Ready for Liftoff"}</div>
-      <div className="gps">{isLive ? "Click any batter → today vs L7 comparison" : isFinal ? "Final game stats · click any batter for detail" : "Ranked: streak 40% · due factor 25% · vs pitcher 15% · home/away 10%"}</div>
+    <div className="gph" style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+      <div>
+        <div className="gpt">{isLive ? "🔥 Live Heat — Who's Going Yard?" : isFinal ? "📋 Final Box Score" : "🚀 Ready for Liftoff"}</div>
+        <div className="gps">{isLive ? "Click any batter → today vs L7 comparison" : isFinal ? "Final game stats · click any batter for detail" : "Ranked: streak 40% · due factor 25% · vs pitcher 15% · home/away 10%"}</div>
+      </div>
+      {runners && <BaseDiamond r={runners}/>}
     </div>
     {loading ? <div style={{padding:"20px 15px",display:"flex",alignItems:"center",gap:8}}><div className="sp" style={{width:18,height:18,borderWidth:2}}/><span style={{fontFamily:"DM Mono,monospace",fontSize:10,color:"var(--muted)"}}>Loading…</span></div>
 : (isLive || isFinal) ? <div>
-          {(data||[]).map(b => {
+          {/* Last play banner */}
+          {lastPlay && lastPlay.description && (
+            <div style={{display:'flex',alignItems:'center',gap:10,
+              padding:'8px 12px',background:'var(--surface2)',
+              borderBottom:'1px solid var(--border)'}}>
+              {lastPlay.batterId && (
+                <PlayerAvatar pid={lastPlay.batterId} name={lastPlay.batterName||''} size={34}
+                  border={"1.5px solid "+eventColor(lastPlay.event)+"60"}/>
+              )}
+              <div style={{flex:1,minWidth:0}}>
+                {lastPlay.event && (
+                  <span style={{
+                    display:'inline-block',padding:'1px 8px',borderRadius:20,
+                    fontSize:10,fontWeight:700,fontFamily:"'DM Mono',monospace",
+                    background:eventColor(lastPlay.event)+'22',
+                    border:'1px solid '+eventColor(lastPlay.event)+'50',
+                    color:eventColor(lastPlay.event),marginBottom:3}}>
+                    {lastPlay.event}
+                  </span>
+                )}
+                <div style={{fontSize:11,color:'var(--text)',fontFamily:"'DM Mono',monospace",
+                  lineHeight:1.4,overflow:'hidden',display:'-webkit-box',
+                  WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>
+                  {lastPlay.description}
+                </div>
+              </div>
+            </div>
+          )}
+          {batters.map(b => {
             const isE = expId === b.id;
             const ec  = b.avgEV>=T.EV_EL?"hot":b.avgEV>=T.EV_HH?"warm":"avg";
             const zl  = getLAZ(b.launchAngle);
@@ -3315,10 +3398,15 @@ function GPanel({game, isLive, isFinal=false}) {
                 style={{padding:"8px 12px",borderBottom:"1px solid rgba(30,45,58,.5)",
                   cursor:"pointer",background:isE?"rgba(255,255,255,.10)":"transparent",borderLeft:isE?"3px solid var(--accent)":"3px solid transparent"}}>
 
-                {/* Row 1: expand + avatar/name + heat badge + today line */}
+                {/* Row 1: expand + lineup# + avatar/name + badges + today line */}
                 <div style={{display:"flex",alignItems:"center",gap:8}}>
                   <span className={`cv2 ${isE?"op":""}`}
                     style={{fontSize:11,color:"var(--muted)",flexShrink:0}}>▾</span>
+                  {b.lineupSlot && <span style={{
+                    fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,
+                    color:'var(--muted)',flexShrink:0,minWidth:10,textAlign:'center'}}>
+                    {b.lineupSlot}
+                  </span>}
                   <div className="pc" style={{flex:1,minWidth:0}}>
                     <PlayerAvatar pid={b.id} name={b.name} size={26}/>
                     <div style={{minWidth:0}}>
@@ -3356,6 +3444,9 @@ function GPanel({game, isLive, isFinal=false}) {
                     fontFamily:"'DM Mono',monospace"}}>✌️ OUT</span>}
                   <span className={`hl ${b.heatLabel.cls}`}
                     style={{flexShrink:0,fontSize:9}}>{b.heatLabel.label}</span>
+                  <div onClick={e=>e.stopPropagation()} style={{flexShrink:0}}>
+                    <PickButton pid={b.id} name={b.name} team={b.team}/>
+                  </div>
                   {/* Today's line: H/AB HR */}
                   <div style={{textAlign:"right",flexShrink:0}}>
                     <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,
