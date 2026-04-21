@@ -6612,6 +6612,10 @@ Write exactly 2-3 sentences. Focus on the single most important factor driving o
                               {WEATHER_ALERT_GAME_IDS.has(String(b.game_id)) && <span title="Weather may impact this game" style={{ fontSize: 9, flexShrink: 0 }}>⚠️</span>}
                               {(b.is_diamond === 'True' || b.is_diamond === true) &&
                                 <span style={{ padding: '1px 5px', borderRadius: 4, fontSize: 9, fontWeight: 700, background: 'rgba(255,204,0,.15)', color: '#ffcc00', border: '1px solid rgba(255,204,0,.3)', flexShrink: 0 }}>💎</span>}
+                              {(b.is_hit_specialist === 'True' || b.is_hit_specialist === true) &&
+                                <span style={{ padding: '1px 5px', borderRadius: 4, fontSize: 9, fontWeight: 700, background: 'rgba(39,201,122,.15)', color: '#27c97a', border: '1px solid rgba(39,201,122,.35)', flexShrink: 0 }} title="Hit Specialist">📈 H</span>}
+                              {(b.is_xbh_specialist === 'True' || b.is_xbh_specialist === true) &&
+                                <span style={{ padding: '1px 5px', borderRadius: 4, fontSize: 9, fontWeight: 700, background: 'rgba(245,166,35,.15)', color: 'var(--accent2)', border: '1px solid rgba(245,166,35,.35)', flexShrink: 0 }} title="XBH Specialist">🔥 XBH</span>}
                             </div>
                             {(b.in_slump === 'True' || b.in_slump === true) &&
                               <span style={{ fontSize: 8, color: 'var(--ice)', fontFamily: "'DM Mono',monospace" }}>📉 slump</span>}
@@ -8352,6 +8356,22 @@ function MatchupEngineTab() {
                     color:'#fff',fontFamily:"'DM Mono',monospace",
                     fontWeight:800,fontSize:10,letterSpacing:.5}}>
                     💥</div>}
+                  {(b.is_hit_specialist==='True'||b.is_hit_specialist===true) && (
+                    <div style={{padding:'2px 7px',borderRadius:5,flexShrink:0,
+                      background:'rgba(39,201,122,.15)',border:'1px solid rgba(39,201,122,.35)',
+                      color:'#27c97a',fontFamily:"'DM Mono',monospace",fontWeight:800,fontSize:9,letterSpacing:.5}}
+                      title="Hit Specialist — strong proj hit rate vs this pitch mix">
+                      📈 H
+                    </div>
+                  )}
+                  {(b.is_xbh_specialist==='True'||b.is_xbh_specialist===true) && (
+                    <div style={{padding:'2px 7px',borderRadius:5,flexShrink:0,
+                      background:'rgba(245,166,35,.15)',border:'1px solid rgba(245,166,35,.35)',
+                      color:'var(--accent2)',fontFamily:"'DM Mono',monospace",fontWeight:800,fontSize:9,letterSpacing:.5}}
+                      title="XBH Specialist — strong projected extra-base hit rate">
+                      🔥 XBH
+                    </div>
+                  )}
 
                   {/* Avatar + Batter name + hand */}
                   <div style={{display:'flex',alignItems:'center',gap:7,flex:1,minWidth:0}}>
