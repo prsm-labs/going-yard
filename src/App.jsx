@@ -351,8 +351,8 @@ function PlayerAvatar({ pid, name, size=32, border='1.5px solid var(--border)', 
     <div style={{width:size,height:size,borderRadius:'50%',flexShrink:0,
       overflow:'hidden',border,...style}}>
       <img src={src} alt={name||''} onError={()=>setFailed(true)}
-        style={{width:'100%',height:'150%',objectFit:'cover',
-          objectPosition:'center 22%',marginTop:'-14%'}}/>
+        style={{width:'100%',height:'160%',objectFit:'cover',
+          objectPosition:'center 28%',marginTop:'-18%'}}/>
     </div>
   );
 }
@@ -1158,7 +1158,7 @@ function openBetSlip(picks, bprops) {
       if (cleanPid !== '0') {
         const img = document.createElement('img');
         img.src = 'https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/'+cleanPid+'/headshot/67/current';
-        img.style.cssText = 'width:100%;height:150%;object-fit:cover;object-position:center 22%;margin-top:-14%';
+        img.style.cssText = 'width:100%;height:160%;object-fit:cover;object-position:center 28%;margin-top:-18%';
         img.onerror = () => { av.removeChild(img); av.textContent = ini; av.style.cssText += ';display:flex;align-items:center;justify-content:center;font-family:Oswald,sans-serif;font-weight:700;font-size:10px;color:'+col+';background:'+col+'22'; };
         av.appendChild(img);
       } else {
@@ -1252,7 +1252,7 @@ function openBetSlip(picks, bprops) {
       const ini     = (p.name||'').split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
       const spid    = p.pid ? String(parseInt(p.pid)||0) : '0';
       const avatarHtml = spid !== '0'
-        ? '<div style="width:32px;height:32px;border-radius:50%;flex-shrink:0;overflow:hidden;border:1px solid '+col+'50"><img src="https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/'+spid+'/headshot/67/current" style="width:100%;height:150%;object-fit:cover;object-position:center 22%;margin-top:-14%" onerror="this.parentNode.innerHTML=\''+ini+'\'"/></div>'
+        ? '<div style="width:32px;height:32px;border-radius:50%;flex-shrink:0;overflow:hidden;border:1px solid '+col+'50"><img src="https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/'+spid+'/headshot/67/current" style="width:100%;height:160%;object-fit:cover;object-position:center 28%;margin-top:-18%" onerror="this.parentNode.innerHTML=\''+ini+'\'"/></div>'
         : '<div style="width:32px;height:32px;border-radius:50%;flex-shrink:0;background:'+col+'22;border:1px solid '+col+'50;display:flex;align-items:center;justify-content:center;font-family:Oswald,sans-serif;font-weight:700;font-size:11px;color:'+col+'">'+ini+'</div>';
       const propHtml = propOpt ? '<div style="padding:2px 8px;border-radius:5px;margin-bottom:3px;background:'+(propOpt.color||'#888')+'22;border:1px solid '+(propOpt.color||'#888')+'50;font-size:10px;font-weight:700;color:'+(propOpt.color||'#888')+'">'+propOpt.label+'</div>' : '';
       const typeLabel = cfg.label ? cfg.label.split(' ').slice(1).join(' ') : '';
@@ -2198,10 +2198,13 @@ async function loadDailyPicks() {
         const todayET = getETDateStr();
         KEY_MATCHUP_DATE = todayET;
         KEY_MATCHUP_BATTER_IDS.clear();
+        KEY_MATCHUP_BATTER_NAMES.clear();
         summaryRows.forEach(r => {
           const rawBid = String(r.batter_id || '').trim();
           const bid = rawBid.includes('.') ? String(parseInt(rawBid)) : rawBid;
           if (bid && bid !== 'NaN') KEY_MATCHUP_BATTER_IDS.add(bid);
+          const name = String(r.batter || '').trim().toLowerCase();
+          if (name) KEY_MATCHUP_BATTER_NAMES.add(name);
         });
         console.log('[KeyMatchups] Orange highlight:', KEY_MATCHUP_BATTER_IDS.size, 'batters for', todayET);
       }
@@ -4323,7 +4326,9 @@ function LineupsView({ date }) {
             {/* Header */}
             <div style={{padding:'14px 16px',borderBottom:'1px solid var(--border)',
               display:'flex',alignItems:'flex-start',gap:10,flexShrink:0}}>
-              <div style={{flex:1,minWidth:0}}>
+              <div style={{display:'flex',gap:10,alignItems:'flex-start',flex:1,minWidth:0}}>
+                <PlayerAvatar pid={player?.id} name={name} size={44}/>
+                <div style={{flex:1,minWidth:0}}>
                 <div style={{display:'flex',alignItems:'center',gap:7,flexWrap:'wrap',marginBottom:3}}>
                   {order && <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,
                     color:order<=3?'var(--accent2)':'var(--muted)'}}>{order}</span>}
@@ -4334,6 +4339,7 @@ function LineupsView({ date }) {
                   <span style={{color:'var(--accent2)',fontWeight:700}}>{teamAbbr}</span>
                   {player.jerseyNumber && <span style={{marginLeft:6}}>#{player.jerseyNumber}</span>}
                 </div>
+              </div>
               </div>
               <button onClick={() => setSelBatterInfo(null)}
                 style={{background:'none',border:'1px solid var(--border)',borderRadius:6,
@@ -5353,17 +5359,20 @@ const SEEN_HR_IDS = new Set();
 const DAILY_PICKS_CACHE = {}; // keyed by batter_id string
 // Key matchup batter IDs for today — orange highlight across all tabs
 // Keyed to ET date so it auto-resets each day
-const KEY_MATCHUP_BATTER_IDS = new Set();
+const KEY_MATCHUP_BATTER_IDS   = new Set();
+const KEY_MATCHUP_BATTER_NAMES = new Set(); // lowercase name fallback
 let   KEY_MATCHUP_DATE = '';
 const getETDateStr = () => {
   const d = new Date();
   const s = d.toLocaleDateString('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'});
   const [m,dy,y] = s.split('/'); return `${y}-${m}-${dy}`;
 };
-const isKeyMatchup = (pid) => {
+const isKeyMatchup = (pid, name) => {
   // Only valid for today — stale data from a previous day is ignored
   if (KEY_MATCHUP_DATE !== getETDateStr()) return false;
-  return pid ? KEY_MATCHUP_BATTER_IDS.has(String(parseInt(pid)||pid)) : false;
+  if (pid && KEY_MATCHUP_BATTER_IDS.has(String(parseInt(pid)||pid))) return true;
+  if (name && KEY_MATCHUP_BATTER_NAMES.has(String(name).toLowerCase().trim())) return true;
+  return false;
 };
 const KEY_MATCHUP_STYLE = {color:'#ff8020',fontWeight:700}; // orange like "Heating Up"
 const WEATHER_ALERT_GAME_IDS = new Set(); // game_ids with weather concerns at game time
@@ -5457,7 +5466,7 @@ function HRTicker({ onHRClick }) {
             {items.map((hr, i) => (
               <div key={i} className="ticker-item">
                 <span style={{color:"var(--accent)",fontWeight:700}}>💥</span>
-                <span style={{color:isKeyMatchup(hr.batterId)?"#ff8020":"var(--accent2)",fontWeight:700}}>{hr.batterName}</span>
+                <span style={{color:isKeyMatchup(hr.batterId, hr.batterName)?"#ff8020":"var(--accent2)",fontWeight:700}}>{hr.batterName}</span>
                 <span style={{color:"var(--muted)"}}>({hr.batterTeam})</span>
                 <span style={{color:"var(--text)"}}>{hr.hrType}</span>
                 {hr.distance && <span style={{color:"var(--green)",fontWeight:600}}>{hr.distance}ft</span>}
@@ -5707,7 +5716,7 @@ function HRTrackerTab() {
                 <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:i<3?"var(--accent)":"var(--muted)"}}>{i+1}</span></td>
                 <td><span style={{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:600,color:"var(--text)"}}>{hr.timeET&&hr.timeET!==""?hr.timeET:`Inn. ${hr.inning}`}</span></td>
                 <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color:"var(--text)"}}>{hr.batterTeam}</span></td>
-                <td><div style={{display:'flex',alignItems:'center',gap:6}}><PlayerAvatar pid={hr.batterId} name={hr.batterName} size={24}/><div className="pn" style={{...(isKeyMatchup(hr.batterId)?{color:'#ff8020',fontWeight:700}:{})}}>{hr.batterName}</div></div></td>
+                <td><div style={{display:'flex',alignItems:'center',gap:6}}><PlayerAvatar pid={hr.batterId} name={hr.batterName} size={24}/><div className="pn" style={{...(isKeyMatchup(hr.batterId, hr.batterName)?{color:'#ff8020',fontWeight:700}:{})}}>{hr.batterName}</div></div></td>
                 <td>
                 <div style={{display:"flex",alignItems:"center",gap:6}}>
                 <span className={`hr-badge ${badgeCls}`}>{hr.hrType}</span>
@@ -6459,6 +6468,32 @@ Write exactly 2-3 sentences. Focus on the single most important factor driving o
             ))}
           </div>
 
+          {/* Export current filtered slate */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+            <button onClick={() => {
+              const cols = ['batter','batting_team','pitcher','pitcher_team','batter_hand','pitcher_hand',
+                'grade','proj_hr_adj','proj_hit_prob','proj_xbh_prob','proj_avg_tb','proj_avg_rbi',
+                'recent_avg_ev','bvp_avg_ev','top_pitches','game_time','lineup_confirmed'];
+              const header = cols.join(',');
+              const rows = slate.map(r => cols.map(k => {
+                const v = r[k] ?? '';
+                const s = String(v);
+                return s.includes(',') || s.includes('"') ? '"'+s.replace(/"/g,'""')+'"' : s;
+              }).join(','));
+              const csv = [header, ...rows].join('\n');
+              const blob = new Blob([csv], { type: 'text/csv' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url; a.download = `slate_${new Date().toISOString().slice(0,10)}.csv`;
+              a.click(); URL.revokeObjectURL(url);
+            }} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px',
+              borderRadius: 6, cursor: 'pointer', border: '1px solid var(--border)',
+              background: 'var(--surface2)', color: 'var(--muted)',
+              fontFamily: "'DM Mono',monospace", fontSize: 11 }}>
+              ⬇ Export CSV ({slate.length})
+            </button>
+          </div>
+
           <div className="tw">
             <table>
               <thead>
@@ -6605,6 +6640,7 @@ Write exactly 2-3 sentences. Focus on the single most important factor driving o
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <PlayerAvatar pid={parseInt(b.batter_id)||0} name={b.batter} size={40}/>
                         <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 22, color: 'var(--text)' }}>{b.batter}</span>
                         <span style={{ padding: '3px 9px', borderRadius: 6, fontSize: 11, fontFamily: "'Oswald',sans-serif", fontWeight: 800, background: gc.bg, color: gc.color, border: `1px solid ${gc.border}` }}>{b.grade}</span>
                         <PickButton pid={parseInt(b.batter_id)||0} name={b.batter} team={b.batting_team}/>
@@ -6876,7 +6912,10 @@ Write exactly 2-3 sentences. Focus on the single most important factor driving o
                           <PickButton pid={parseInt(b.batter_id)||0} name={b.batter} team={b.batting_team}/>
                         </td>
                         <td style={{ textAlign: 'left' }}>
-                          <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 12 }}>{b.batter}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <PlayerAvatar pid={parseInt(b.batter_id)||0} name={b.batter} size={24}/>
+                            <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 12 }}>{b.batter}</span>
+                          </div>
                         </td>
                         <td><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 11, color: 'var(--accent2)', fontWeight: 700 }}>{b.batting_team}</span></td>
                         <td style={{ textAlign: 'left' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)' }}>{b.pitcher}</span></td>
