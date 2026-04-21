@@ -130,7 +130,7 @@ export default async function handler(req, res) {
       currentBatterId,
       onDeckId,
       inTheHoleId,
-      linescore,
+      liveLinescore: linescore,   // renamed to avoid collision with boxscore's own linescore
       lastPlay,
       // Attach active lineup arrays to each team so front-end can detect subs
       teams: {

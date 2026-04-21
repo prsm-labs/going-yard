@@ -2629,8 +2629,8 @@ async function fetchLiveBatters(gamePk) {
   const currentBatterId = data.currentBatterId  || null;
   const onDeckId        = data.onDeckId         || null;
   const inTheHoleId     = data.inTheHoleId      || null;
-  // Base runners from linescore offense
-  const offense         = data.linescore?.offense || {};
+  // Base runners — read from liveLinescore (renamed to avoid collision with boxscore's own linescore key)
+  const offense         = data.liveLinescore?.offense || data.linescore?.offense || {};
   const runners = {
     first:  !!(offense.first),
     second: !!(offense.second),
@@ -3329,21 +3329,21 @@ function GPanel({game, isLive, isFinal=false}) {
   // Baseball diamond component (SVG, top-down view)
   const BaseDiamond = ({r}) => {
     if (!r) return null;
-    const base = (filled, x, y) => (
-      <rect x={x-5} y={y-5} width={10} height={10} rx={1}
-        fill={filled ? '#f5a623' : 'none'}
-        stroke={filled ? '#f5a623' : 'rgba(255,255,255,.25)'}
+    // Each base is a small rotated square; filled=orange when occupied
+    const Base = ({filled, cx, cy}) => (
+      <rect x={cx-4} y={cy-4} width={8} height={8} rx={0.5}
+        fill={filled ? '#f5a623' : 'transparent'}
+        stroke={filled ? '#f5a623' : 'rgba(255,255,255,.3)'}
         strokeWidth={1.5}
-        transform={"rotate(45," + x + "," + y + ")"}/>
+        transform={"rotate(45 " + cx + " " + cy + ")"}/>
     );
     return (
-      <svg width={40} height={40} viewBox="0 0 40 40" style={{flexShrink:0}}>
-        {base(r.second, 20, 5)}
-        {base(r.third,  5, 20)}
-        {base(r.first,  35, 20)}
-        {/* Home plate */}
-        <polygon points="20,38 16,34 16,30 24,30 24,34"
-          fill="rgba(255,255,255,.15)" stroke="rgba(255,255,255,.3)" strokeWidth={1}/>
+      <svg width={28} height={28} viewBox="0 0 28 28" style={{flexShrink:0}}>
+        <Base filled={r.second} cx={14} cy={4}/>
+        <Base filled={r.third}  cx={4}  cy={14}/>
+        <Base filled={r.first}  cx={24} cy={14}/>
+        <polygon points="14,26 11,23 11,20 17,20 17,23"
+          fill="rgba(255,255,255,.2)" stroke="rgba(255,255,255,.35)" strokeWidth={1}/>
       </svg>
     );
   };
@@ -3386,6 +3386,18 @@ function GPanel({game, isLive, isFinal=false}) {
               </div>
             </div>
           )}
+          {/* Legend */}
+          {isLive && <div style={{
+            display:'flex',gap:10,padding:'5px 12px',
+            background:'var(--surface)',borderBottom:'1px solid var(--border)',
+            flexWrap:'wrap',alignItems:'center'}}>
+            <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontWeight:700,letterSpacing:1,textTransform:'uppercase'}}>Key:</span>
+            {[['⚡','At Bat'],['👀','On Deck'],['⛳','In Hole'],['🙋‍♂️','PH'],['✌️','Subbed Out']].map(([e,l])=>(
+              <span key={e} style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",display:'flex',alignItems:'center',gap:3}}>
+                <span style={{fontSize:12}}>{e}</span>{l}
+              </span>
+            ))}
+          </div>}
           {batters.map(b => {
             const isE = expId === b.id;
             const ec  = b.avgEV>=T.EV_EL?"hot":b.avgEV>=T.EV_HH?"warm":"avg";
@@ -3398,8 +3410,8 @@ function GPanel({game, isLive, isFinal=false}) {
                 style={{padding:"8px 12px",borderBottom:"1px solid rgba(30,45,58,.5)",
                   cursor:"pointer",background:isE?"rgba(255,255,255,.10)":"transparent",borderLeft:isE?"3px solid var(--accent)":"3px solid transparent"}}>
 
-                {/* Row 1: expand + lineup# + avatar/name + badges + today line */}
-                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                {/* Row 1: ▾ · # · avatar · name+team · emoji badges · heat · + · stats */}
+                <div style={{display:"flex",alignItems:"center",gap:6}}>
                   <span className={`cv2 ${isE?"op":""}`}
                     style={{fontSize:11,color:"var(--muted)",flexShrink:0}}>▾</span>
                   {b.lineupSlot && <span style={{
@@ -3416,32 +3428,14 @@ function GPanel({game, isLive, isFinal=false}) {
                       </div>
                     </div>
                   </div>
-                  {b.isAtBat && <span style={{
-                    padding:"1px 6px",borderRadius:4,fontSize:9,fontWeight:800,
-                    background:"rgba(39,201,122,.2)",color:"#27c97a",
-                    border:"1px solid rgba(39,201,122,.4)",flexShrink:0,
-                    fontFamily:"'DM Mono',monospace",letterSpacing:.5,
-                    animation:"pulse 1.2s ease-in-out infinite"}}>⚡ AT BAT</span>}
-                  {b.isOnDeck && !b.isAtBat && <span style={{
-                    padding:"1px 6px",borderRadius:4,fontSize:9,fontWeight:600,
-                    background:"rgba(245,166,35,.12)",color:"var(--accent2)",
-                    border:"1px solid rgba(245,166,35,.25)",flexShrink:0,
-                    fontFamily:"'DM Mono',monospace"}}>👀 ON DECK</span>}
-                  {b.isInTheHole && !b.isOnDeck && !b.isAtBat && <span style={{
-                    padding:"1px 6px",borderRadius:4,fontSize:9,fontWeight:600,
-                    background:"rgba(56,184,242,.08)",color:"var(--ice)",
-                    border:"1px solid rgba(56,184,242,.2)",flexShrink:0,
-                    fontFamily:"'DM Mono',monospace"}}>⛳ IN THE HOLE</span>}
-                  {b.isPinchHitter && <span style={{
-                    padding:"1px 6px",borderRadius:4,fontSize:9,fontWeight:600,
-                    background:"rgba(168,85,247,.12)",color:"#a855f7",
-                    border:"1px solid rgba(168,85,247,.25)",flexShrink:0,
-                    fontFamily:"'DM Mono',monospace"}}>🙋‍♂️ PH</span>}
-                  {b.isSubbedOut && <span style={{
-                    padding:"1px 6px",borderRadius:4,fontSize:9,fontWeight:600,
-                    background:"rgba(90,112,128,.12)",color:"var(--muted)",
-                    border:"1px solid rgba(90,112,128,.25)",flexShrink:0,
-                    fontFamily:"'DM Mono',monospace"}}>✌️ OUT</span>}
+                  {/* Compact emoji status indicators — no text labels */}
+                  <div style={{display:'flex',gap:2,flexShrink:0,alignItems:'center'}}>
+                    {b.isAtBat      && <span title="At Bat"     style={{fontSize:14,animation:"pulse 1.2s ease-in-out infinite"}}>⚡</span>}
+                    {b.isOnDeck     && !b.isAtBat && <span title="On Deck"    style={{fontSize:14}}>👀</span>}
+                    {b.isInTheHole  && !b.isOnDeck && !b.isAtBat && <span title="In the Hole" style={{fontSize:14}}>⛳</span>}
+                    {b.isPinchHitter && <span title="Pinch Hitter" style={{fontSize:13}}>🙋‍♂️</span>}
+                    {b.isSubbedOut  && <span title="Subbed Out"  style={{fontSize:13}}>✌️</span>}
+                  </div>
                   <span className={`hl ${b.heatLabel.cls}`}
                     style={{flexShrink:0,fontSize:9}}>{b.heatLabel.label}</span>
                   <div onClick={e=>e.stopPropagation()} style={{flexShrink:0}}>
