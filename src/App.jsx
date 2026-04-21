@@ -1100,6 +1100,8 @@ function openBetSlip(picks, bprops) {
     slipState[p.pid] = { checked: !!existing, prop: existing };
   });
 
+  let activeTypeFilter = 'all'; // tracks which category pill is active
+
   // Overlay — scrollable on mobile
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px 12px 32px';
@@ -1126,11 +1128,66 @@ function openBetSlip(picks, bprops) {
 
     const hint = document.createElement('div');
     hint.textContent = 'Check batters to include · set a prop for each one';
-    hint.style.cssText = 'font-size:10px;color:rgba(255,255,255,.35);font-family:DM Mono,monospace;padding-bottom:4px';
+    hint.style.cssText = 'font-size:10px;color:rgba(255,255,255,.35);font-family:DM Mono,monospace;padding-bottom:6px';
     container.appendChild(hint);
 
-    // Batter rows
-    pickList.forEach(p => {
+    // ── Toolbar: Select All + category filter pills ──────────────
+    const toolbar = document.createElement('div');
+    toolbar.style.cssText = 'display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:6px 0 8px;border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:8px';
+
+    // Select All / Deselect All button
+    const selAllBtn = document.createElement('button');
+    const visiblePicks = () => activeTypeFilter === 'all'
+      ? pickList
+      : pickList.filter(p => p.type === activeTypeFilter);
+    const allVisible  = () => visiblePicks().every(p => slipState[p.pid].checked);
+    const updateSelAllBtn = () => {
+      const all = allVisible();
+      selAllBtn.textContent = all ? '☐ Deselect All' : '☑ Select All';
+      selAllBtn.style.background = all ? 'rgba(255,255,255,.06)' : 'rgba(255,96,24,.15)';
+      selAllBtn.style.borderColor = all ? 'rgba(255,255,255,.2)' : 'rgba(255,96,24,.4)';
+      selAllBtn.style.color = all ? 'rgba(255,255,255,.5)' : '#ff6018';
+    };
+    selAllBtn.style.cssText = 'padding:4px 10px;border-radius:6px;border:1px solid rgba(255,96,24,.4);background:rgba(255,96,24,.15);color:#ff6018;font-family:DM Mono,monospace;font-size:10px;font-weight:700;cursor:pointer;flex-shrink:0';
+    selAllBtn.addEventListener('click', () => {
+      const shouldCheckAll = !allVisible();
+      visiblePicks().forEach(p => {
+        slipState[p.pid].checked = shouldCheckAll;
+      });
+      renderBuilder();
+    });
+    toolbar.appendChild(selAllBtn);
+
+    // Spacer
+    const sp = document.createElement('div');
+    sp.style.cssText = 'flex:1;min-width:4px';
+    toolbar.appendChild(sp);
+
+    // Category filter pills — one per type present in pickList
+    const typesPresent = [...new Set(pickList.map(p => p.type))];
+    ['all', ...typesPresent].forEach(type => {
+      const cfg = type === 'all' ? { label: '🗂 All', color: 'rgba(255,255,255,.5)' } : (PICK_TYPES[type] || {});
+      const pill = document.createElement('button');
+      const isActive = activeTypeFilter === type;
+      const col = cfg.color || '#888';
+      pill.textContent = type === 'all' ? '🗂 All' : (cfg.label || type);
+      pill.style.cssText = `padding:3px 9px;border-radius:20px;border:1px solid ${isActive ? col : 'rgba(255,255,255,.1)'};background:${isActive ? col+'25' : 'transparent'};color:${isActive ? col : 'rgba(255,255,255,.3)'};font-family:DM Mono,monospace;font-size:10px;font-weight:${isActive?700:400};cursor:pointer;white-space:nowrap`;
+      pill.addEventListener('click', () => {
+        activeTypeFilter = type;
+        renderBuilder();
+      });
+      toolbar.appendChild(pill);
+    });
+
+    container.appendChild(toolbar);
+    updateSelAllBtn();
+
+    // Batter rows — filtered by activeTypeFilter
+    const filteredList = activeTypeFilter === 'all'
+      ? pickList
+      : pickList.filter(p => p.type === activeTypeFilter);
+
+    filteredList.forEach(p => {
       const cfg  = PICK_TYPES[p.type] || {};
       const col  = cfg.color || '#888';
       const ini  = (p.name||'').split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
