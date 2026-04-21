@@ -24,20 +24,45 @@ export default async function handler(req, res) {
     const statcastByBatter = {};
 
     let currentBatterId = null;
-    let onDeckId = null;
+    let onDeckId        = null;
+    let inTheHoleId     = null;
+    let linescore       = null;
+    let lastPlay        = null;
+    let lineupHome      = [];
+    let lineupAway      = [];
 
     if (liveRes.ok) {
       const liveData = await liveRes.json();
-      const plays = liveData?.liveData?.plays?.allPlays || [];
+      const plays    = liveData?.liveData?.plays?.allPlays || [];
 
-      // Extract who is currently at-bat and on-deck from the linescore offense
-      const offense = liveData?.liveData?.linescore?.offense || {};
+      // ── Linescore (base runners, inning, outs, score) ──────────
+      linescore = liveData?.liveData?.linescore || null;
+
+      // ── Current batter / on-deck / in-the-hole ─────────────────
+      const offense = linescore?.offense || {};
       currentBatterId = offense.batter?.id || null;
       onDeckId        = offense.onDeck?.id  || null;
+      inTheHoleId     = offense.inHole?.id  || null;
 
+      // ── Active lineup arrays (used to detect subbed-out players) ─
+      const boxTeams = liveData?.liveData?.boxscore?.teams || {};
+      lineupHome = (boxTeams.home?.battingOrder || []).map(id => Number(id));
+      lineupAway = (boxTeams.away?.battingOrder || []).map(id => Number(id));
+
+      // ── Last completed play (for live at-bat result banner) ──────
+      const currentPlay = liveData?.liveData?.plays?.currentPlay;
+      if (currentPlay?.result?.event) {
+        lastPlay = {
+          event:       currentPlay.result.event              || null,
+          description: currentPlay.result.description        || null,
+          batterId:    currentPlay.matchup?.batter?.id       || null,
+          batterName:  currentPlay.matchup?.batter?.fullName || null,
+        };
+      }
+
+      // ── Statcast per batter ─────────────────────────────────────
       for (const play of plays) {
-        const batterId  = play.matchup?.batter?.id;
-        const pitcherId = play.matchup?.pitcher?.id;
+        const batterId    = play.matchup?.batter?.id;
         const pitcherName = play.matchup?.pitcher?.fullName || null;
         if (!batterId) continue;
 
@@ -45,22 +70,18 @@ export default async function handler(req, res) {
           statcastByBatter[batterId] = {
             evs: [], las: [], distances: [],
             hardHits: 0, barrels: 0,
-            atBats: [],   // per-AB detail rows
+            atBats: [],
           };
         }
 
         const sc = statcastByBatter[batterId];
-
-        // Result from play outcome
-        const result = play.result?.event || play.result?.description || null;
-        const inning = play.about?.inning || null;
-        const halfInning = play.about?.halfInning || null;
+        const result     = play.result?.event || play.result?.description || null;
+        const inning     = play.about?.inning      || null;
+        const halfInning = play.about?.halfInning   || null;
 
         let ev = null, la = null, dist = null, pitchType = null;
 
-        // Each play has playEvents — find the terminal batted ball / last pitch event
         for (const evt of (play.playEvents || [])) {
-          // Capture last pitch type thrown
           if (evt.details?.type?.code) {
             pitchType = evt.details.type.description || evt.details.type.code;
           }
@@ -77,7 +98,6 @@ export default async function handler(req, res) {
           sc.evs.push(ev);
           sc.las.push(la);
           if (dist > 0) sc.distances.push(dist);
-
           if (ev >= 95) sc.hardHits++;
 
           const barrel =
@@ -91,14 +111,9 @@ export default async function handler(req, res) {
           if (barrel) sc.barrels++;
         }
 
-        // Only log at-bats that have a result (not walks-mid-AB etc.)
         if (result) {
           sc.atBats.push({
-            result,
-            inning,
-            halfInning,
-            pitcherName,
-            pitchType,
+            result, inning, halfInning, pitcherName, pitchType,
             ev:   ev   ? Math.round(ev * 10) / 10 : null,
             la:   ev   ? Math.round(la * 10) / 10 : null,
             dist: dist ? Math.round(dist)          : null,
@@ -114,6 +129,15 @@ export default async function handler(req, res) {
       statcastByBatter,
       currentBatterId,
       onDeckId,
+      inTheHoleId,
+      linescore,
+      lastPlay,
+      // Attach active lineup arrays to each team so front-end can detect subs
+      teams: {
+        ...(boxData.teams || {}),
+        home: { ...(boxData.teams?.home || {}), lineup: lineupHome },
+        away: { ...(boxData.teams?.away || {}), lineup: lineupAway },
+      },
     });
 
   } catch (err) {
