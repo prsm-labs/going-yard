@@ -2188,13 +2188,28 @@ async function loadDailyPicks() {
       // Only store first row per batter — recent stats are same across all matchup rows
       if (bid && bid !== 'NaN' && !DAILY_PICKS_CACHE[bid]) DAILY_PICKS_CACHE[bid] = { ...r, _gid: gid };
     });
-    // Populate key matchup batter set for today's orange highlight
-    const todayET = getETDateStr();
-    KEY_MATCHUP_DATE = todayET;
-    KEY_MATCHUP_BATTER_IDS.clear();
-    Object.keys(DAILY_PICKS_CACHE).forEach(bid => KEY_MATCHUP_BATTER_IDS.add(bid));
+    // Populate key matchup batter set — ONLY batters in daily_summary.csv (Key Matchups tab)
+    // daily_picks has ALL batters; daily_summary has only the engine's top picks shown in Key Matchups
+    try {
+      const summaryRes = await fetch('/data/daily_summary.csv');
+      if (summaryRes.ok) {
+        const summaryText = await summaryRes.text();
+        const summaryRows = parseCSVText(summaryText);
+        const todayET = getETDateStr();
+        KEY_MATCHUP_DATE = todayET;
+        KEY_MATCHUP_BATTER_IDS.clear();
+        summaryRows.forEach(r => {
+          const rawBid = String(r.batter_id || '').trim();
+          const bid = rawBid.includes('.') ? String(parseInt(rawBid)) : rawBid;
+          if (bid && bid !== 'NaN') KEY_MATCHUP_BATTER_IDS.add(bid);
+        });
+        console.log('[KeyMatchups] Orange highlight:', KEY_MATCHUP_BATTER_IDS.size, 'batters for', todayET);
+      }
+    } catch(e) {
+      console.warn('[KeyMatchups] Could not load summary for highlights:', e.message);
+    }
     console.log('[DailyPicks] Loaded', Object.keys(DAILY_PICKS_CACHE).length, 'batters |',
-      KEY_MATCHUP_BATTER_IDS.size, 'key matchup IDs for', todayET);
+      KEY_MATCHUP_BATTER_IDS.size, 'key matchup IDs for', getETDateStr());
   } catch(e) {
     console.warn('[DailyPicks] Failed to load:', e.message);
   }
