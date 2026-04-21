@@ -2188,7 +2188,13 @@ async function loadDailyPicks() {
       // Only store first row per batter — recent stats are same across all matchup rows
       if (bid && bid !== 'NaN' && !DAILY_PICKS_CACHE[bid]) DAILY_PICKS_CACHE[bid] = { ...r, _gid: gid };
     });
-    console.log('[DailyPicks] Loaded', Object.keys(DAILY_PICKS_CACHE).length, 'batters');
+    // Populate key matchup batter set for today's orange highlight
+    const todayET = getETDateStr();
+    KEY_MATCHUP_DATE = todayET;
+    KEY_MATCHUP_BATTER_IDS.clear();
+    Object.keys(DAILY_PICKS_CACHE).forEach(bid => KEY_MATCHUP_BATTER_IDS.add(bid));
+    console.log('[DailyPicks] Loaded', Object.keys(DAILY_PICKS_CACHE).length, 'batters |',
+      KEY_MATCHUP_BATTER_IDS.size, 'key matchup IDs for', todayET);
   } catch(e) {
     console.warn('[DailyPicks] Failed to load:', e.message);
   }
@@ -2631,10 +2637,12 @@ async function fetchLiveBatters(gamePk) {
   const inTheHoleId     = data.inTheHoleId      || null;
   // Base runners — read from liveLinescore (renamed to avoid collision with boxscore's own linescore key)
   const offense         = data.liveLinescore?.offense || data.linescore?.offense || {};
+  const linescoreData   = data.liveLinescore || data.linescore || {};
   const runners = {
     first:  !!(offense.first),
     second: !!(offense.second),
     third:  !!(offense.third),
+    outs:   linescoreData.outs ?? null,
   };
   // Last play description from live feed
   const lastPlay = data.lastPlay || null; // { event, description, batterId }
@@ -3329,7 +3337,6 @@ function GPanel({game, isLive, isFinal=false}) {
   // Baseball diamond component (SVG, top-down view)
   const BaseDiamond = ({r}) => {
     if (!r) return null;
-    // Each base is a small rotated square; filled=orange when occupied
     const Base = ({filled, cx, cy}) => (
       <rect x={cx-4} y={cy-4} width={8} height={8} rx={0.5}
         fill={filled ? '#f5a623' : 'transparent'}
@@ -3337,14 +3344,29 @@ function GPanel({game, isLive, isFinal=false}) {
         strokeWidth={1.5}
         transform={"rotate(45 " + cx + " " + cy + ")"}/>
     );
+    // Outs dots: 0=none, 1=one filled, 2=two filled
+    const outs = r.outs ?? null;
     return (
-      <svg width={28} height={28} viewBox="0 0 28 28" style={{flexShrink:0}}>
-        <Base filled={r.second} cx={14} cy={4}/>
-        <Base filled={r.third}  cx={4}  cy={14}/>
-        <Base filled={r.first}  cx={24} cy={14}/>
-        <polygon points="14,26 11,23 11,20 17,20 17,23"
-          fill="rgba(255,255,255,.2)" stroke="rgba(255,255,255,.35)" strokeWidth={1}/>
-      </svg>
+      <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:3,flexShrink:0}}>
+        <svg width={28} height={28} viewBox="0 0 28 28">
+          <Base filled={r.second} cx={14} cy={4}/>
+          <Base filled={r.third}  cx={4}  cy={14}/>
+          <Base filled={r.first}  cx={24} cy={14}/>
+          <polygon points="14,26 11,23 11,20 17,20 17,23"
+            fill="rgba(255,255,255,.2)" stroke="rgba(255,255,255,.35)" strokeWidth={1}/>
+        </svg>
+        {outs !== null && (
+          <div style={{display:'flex',gap:3,alignItems:'center'}}>
+            {[0,1].map(i=>(
+              <div key={i} style={{
+                width:6,height:6,borderRadius:'50%',
+                background: i < outs ? '#ff8020' : 'transparent',
+                border:'1px solid ' + (i < outs ? '#ff8020' : 'rgba(255,255,255,.25)'),
+              }}/>
+            ))}
+          </div>
+        )}
+      </div>
     );
   };
 
@@ -3422,7 +3444,7 @@ function GPanel({game, isLive, isFinal=false}) {
                   <div className="pc" style={{flex:1,minWidth:0}}>
                     <PlayerAvatar pid={b.id} name={b.name} size={26}/>
                     <div style={{minWidth:0}}>
-                      <div className="pn" style={{fontSize:12}}>{b.name}</div>
+                      <div className="pn" style={{fontSize:12,...(isKeyMatchup(b.id)?{color:'#ff8020',fontWeight:700}:{})}}>{b.name}</div>
                       <div style={{fontSize:9,color:"var(--accent2)",fontFamily:"'DM Mono',monospace",fontWeight:700}}>
                         {getTeam(b.id,b.team)}
                       </div>
@@ -4202,7 +4224,7 @@ function LineupsView({ date }) {
                 </span>
                 <PosChip pos={pos}/>
                 <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:600,fontSize:11,
-                  color:'var(--text)',flex:1,minWidth:0,
+                  color:isKeyMatchup(p.id)?'#ff8020':'var(--text)',flex:1,minWidth:0,
                   whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
                   {name}
                 </span>
@@ -5314,6 +5336,21 @@ let HR_DATA_DATE = '';
 let HR_LAST_FETCH = 0;
 const SEEN_HR_IDS = new Set();
 const DAILY_PICKS_CACHE = {}; // keyed by batter_id string
+// Key matchup batter IDs for today — orange highlight across all tabs
+// Keyed to ET date so it auto-resets each day
+const KEY_MATCHUP_BATTER_IDS = new Set();
+let   KEY_MATCHUP_DATE = '';
+const getETDateStr = () => {
+  const d = new Date();
+  const s = d.toLocaleDateString('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'});
+  const [m,dy,y] = s.split('/'); return `${y}-${m}-${dy}`;
+};
+const isKeyMatchup = (pid) => {
+  // Only valid for today — stale data from a previous day is ignored
+  if (KEY_MATCHUP_DATE !== getETDateStr()) return false;
+  return pid ? KEY_MATCHUP_BATTER_IDS.has(String(parseInt(pid)||pid)) : false;
+};
+const KEY_MATCHUP_STYLE = {color:'#ff8020',fontWeight:700}; // orange like "Heating Up"
 const WEATHER_ALERT_GAME_IDS = new Set(); // game_ids with weather concerns at game time
 const DAILY_GAME_MAP    = {}; // keyed by normalized game_id → Set of batting_teams
 let _notifyNewHR = null; // callback set by useHRNotifications hook
@@ -5405,7 +5442,7 @@ function HRTicker({ onHRClick }) {
             {items.map((hr, i) => (
               <div key={i} className="ticker-item">
                 <span style={{color:"var(--accent)",fontWeight:700}}>💥</span>
-                <span style={{color:"var(--accent2)",fontWeight:700}}>{hr.batterName}</span>
+                <span style={{color:isKeyMatchup(hr.batterId)?"#ff8020":"var(--accent2)",fontWeight:700}}>{hr.batterName}</span>
                 <span style={{color:"var(--muted)"}}>({hr.batterTeam})</span>
                 <span style={{color:"var(--text)"}}>{hr.hrType}</span>
                 {hr.distance && <span style={{color:"var(--green)",fontWeight:600}}>{hr.distance}ft</span>}
@@ -5655,7 +5692,7 @@ function HRTrackerTab() {
                 <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:i<3?"var(--accent)":"var(--muted)"}}>{i+1}</span></td>
                 <td><span style={{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:600,color:"var(--text)"}}>{hr.timeET&&hr.timeET!==""?hr.timeET:`Inn. ${hr.inning}`}</span></td>
                 <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color:"var(--text)"}}>{hr.batterTeam}</span></td>
-                <td><div className="pn">{hr.batterName}</div></td>
+                <td><div style={{display:'flex',alignItems:'center',gap:6}}><PlayerAvatar pid={hr.batterId} name={hr.batterName} size={24}/><div className="pn" style={{...(isKeyMatchup(hr.batterId)?{color:'#ff8020',fontWeight:700}:{})}}>{hr.batterName}</div></div></td>
                 <td>
                 <div style={{display:"flex",alignItems:"center",gap:6}}>
                 <span className={`hr-badge ${badgeCls}`}>{hr.hrType}</span>
