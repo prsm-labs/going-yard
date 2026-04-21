@@ -7954,6 +7954,7 @@ function MatchupEngineTab() {
           {subTab==='simlab'   && '🧠 Outcome probabilities · AI scout notes · prop line matching'}
           {subTab==='batters'  && 'Season Statcast · sorted by Avg EV · Statcast-powered'}
           {subTab==='pitchers' && 'Season pitching stats · live from MLB Stats API'}
+          {subTab==='barrel'   && 'At-bat log explorer · filter by pitch type, handedness, EV, barrel · season from 3/25'}
         </div>
       </div>
       {subTab==='matchups' && (
@@ -7973,6 +7974,7 @@ function MatchupEngineTab() {
       <button style={stBtn('simlab')}   onClick={()=>setSubTab('simlab')}>🧠 Sim Lab</button>
       <button style={stBtn('batters')}  onClick={()=>setSubTab('batters')}>🧢 Batters</button>
       <button style={stBtn('pitchers')} onClick={()=>setSubTab('pitchers')}>⚾ Pitchers</button>
+      <button style={stBtn('barrel')}   onClick={()=>setSubTab('barrel')}>🛢 Daily Barrel</button>
     </div>
 
     {/* Date slot toggle — only shown for matchups and simlab */}
@@ -8015,6 +8017,8 @@ function MatchupEngineTab() {
     )}
 
     {/* Batter Leaderboard */}
+    {subTab==='barrel' && <DailyBarrelTab/>}
+
     {subTab==='batters' && (
       <div>
         <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:9,padding:'10px 14px',marginBottom:14,display:'flex',alignItems:'center',gap:8}}>
@@ -8584,6 +8588,475 @@ function MatchupEngineTab() {
       </div>;
     })}
     </>}
+  </div>;
+}
+
+
+// ─────────────────────────────────────────────────────────────
+// DAILY BARREL TAB — filterable at-bat log explorer
+// Loads mlb_atbat_log_full.csv, filters to 2026 season,
+// resolves IDs via PLAYER_DATA_CACHE, derives ALL filters
+// dynamically from actual data — nothing hardcoded.
+// ─────────────────────────────────────────────────────────────
+function DailyBarrelTab() {
+  const [rows,      setRows]      = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [error,     setError]     = useState(null);
+  const [view,      setView]      = useState('batters'); // 'batters'|'pitchers'|'log'
+
+  // Filters — all derived from data
+  const [fBatTeam,  setFBatTeam]  = useState('all');
+  const [fPitTeam,  setFPitTeam]  = useState('all');
+  const [fBatHand,  setFBatHand]  = useState('all');
+  const [fPitHand,  setFPitHand]  = useState('all');
+  const [fPitches,  setFPitches]  = useState(new Set()); // empty = all
+  const [fMinEV,    setFMinEV]    = useState(0);
+  const [fBarrel,   setFBarrel]   = useState(false);
+  const [fHardHit,  setFHardHit]  = useState(false);
+  const [fHR,       setFHR]       = useState(false);
+  const [fDays,     setFDays]     = useState('season'); // 'season'|'30'|'14'|'7'
+  const [sortBat,   setSortBat]   = useState({col:'avgEV', dir:'desc'});
+  const [sortPit,   setSortPit]   = useState({col:'barrelPct', dir:'desc'});
+  const [sortLog,   setSortLog]   = useState({col:'date', dir:'desc'});
+  const [logPage,   setLogPage]   = useState(0);
+  const LOG_PAGE_SIZE = 50;
+
+  const SEASON_START_DB = '2026-03-25';
+
+  // Name resolution — uses PLAYER_DATA_CACHE populated at app start
+  const resolveName = (id) => {
+    const cached = getCachedPlayer(id);
+    if (cached?.name) return cached.name;
+    // Fallback: scan PLAYER_DATA_CACHE by pid
+    const str = String(id);
+    for (const k of Object.keys(PLAYER_DATA_CACHE)) {
+      if (k === str) return PLAYER_DATA_CACHE[k].name || str;
+    }
+    return `#${id}`;
+  };
+
+  useEffect(() => {
+    setLoading(true);
+    fetch('/data/mlb_atbat_log_full.csv')
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text(); })
+      .then(text => {
+        const parsed = parseCSVText(text);
+        // Filter to current season only
+        const season = parsed.filter(r => (r['Date']||'') >= SEASON_START_DB);
+        setRows(season);
+        setLoading(false);
+      })
+      .catch(e => { setError(e.message); setLoading(false); });
+  }, []);
+
+  // Derived filter options — always from actual data
+  const allBatTeams  = useMemo(() => ['all', ...[...new Set(rows.map(r=>r['Batter Team']).filter(Boolean))].sort()], [rows]);
+  const allPitTeams  = useMemo(() => ['all', ...[...new Set(rows.map(r=>r['Pitcher Team']).filter(Boolean))].sort()], [rows]);
+  const allPitches   = useMemo(() => [...new Set(rows.map(r=>r['Pitch Type']).filter(Boolean))].sort(), [rows]);
+  const allBatHands  = useMemo(() => ['all', ...[...new Set(rows.map(r=>r['Batter Hand']).filter(v=>v==='L'||v==='R'||v==='S'))].sort()], [rows]);
+  const allPitHands  = useMemo(() => ['all', ...[...new Set(rows.map(r=>r['Pitcher Hand']).filter(v=>v==='L'||v==='R'))].sort()], [rows]);
+
+  // Date cutoff
+  const dateCutoff = useMemo(() => {
+    if (fDays === 'season') return SEASON_START_DB;
+    const d = new Date(); d.setDate(d.getDate() - parseInt(fDays));
+    return d.toISOString().slice(0,10);
+  }, [fDays]);
+
+  // Apply all filters
+  const filtered = useMemo(() => {
+    return rows.filter(r => {
+      if ((r['Date']||'') < dateCutoff) return false;
+      if (fBatTeam !== 'all' && r['Batter Team'] !== fBatTeam) return false;
+      if (fPitTeam !== 'all' && r['Pitcher Team'] !== fPitTeam) return false;
+      if (fBatHand !== 'all' && r['Batter Hand'] !== fBatHand) return false;
+      if (fPitHand !== 'all' && r['Pitcher Hand'] !== fPitHand) return false;
+      if (fPitches.size > 0 && !fPitches.has(r['Pitch Type'])) return false;
+      if (fMinEV > 0 && (parseFloat(r['Exit Velocity'])||0) < fMinEV) return false;
+      if (fBarrel   && parseInt(r['Is Barrel']||0) !== 1) return false;
+      if (fHardHit  && parseInt(r['Is Hard Hit']||0) !== 1) return false;
+      if (fHR       && parseInt(r['Is Home Run']||0) !== 1) return false;
+      return true;
+    });
+  }, [rows, dateCutoff, fBatTeam, fPitTeam, fBatHand, fPitHand, fPitches, fMinEV, fBarrel, fHardHit, fHR]);
+
+  // Batter aggregates from filtered rows
+  const batterStats = useMemo(() => {
+    const map = {};
+    filtered.forEach(r => {
+      const id = String(r['Batter']||'');
+      if (!id || id==='nan') return;
+      if (!map[id]) map[id] = { id, team: r['Batter Team']||'', pa:0, evs:[], barrels:0, hh:0, hrs:0, fbs:0, las:[] };
+      const m = map[id];
+      m.pa++;
+      const ev = parseFloat(r['Exit Velocity']);
+      if (!isNaN(ev) && ev > 0) { m.evs.push(ev); }
+      if (parseInt(r['Is Barrel']||0)===1) m.barrels++;
+      if (parseInt(r['Is Hard Hit']||0)===1) m.hh++;
+      if (parseInt(r['Is Home Run']||0)===1) m.hrs++;
+      const bbt = (r['Batted Ball Type']||'').toLowerCase();
+      if (bbt==='fly_ball'||bbt==='line_drive') m.fbs++;
+      const la = parseFloat(r['Launch Angle']);
+      if (!isNaN(la)) m.las.push(la);
+    });
+    return Object.values(map).map(m => ({
+      id: m.id, name: resolveName(m.id), team: m.team,
+      pa: m.pa,
+      avgEV: m.evs.length ? +(m.evs.reduce((a,b)=>a+b,0)/m.evs.length).toFixed(1) : null,
+      barrelPct: m.pa ? +(m.barrels/m.pa*100).toFixed(1) : 0,
+      hhPct: m.pa ? +(m.hh/m.pa*100).toFixed(1) : 0,
+      hrCount: m.hrs, hrRate: m.pa ? +(m.hrs/m.pa*100).toFixed(1) : 0,
+      fbPct: m.pa ? +(m.fbs/m.pa*100).toFixed(1) : 0,
+      avgLA: m.las.length ? +(m.las.reduce((a,b)=>a+b,0)/m.las.length).toFixed(1) : null,
+    })).filter(m => m.pa >= 3);
+  }, [filtered]);
+
+  // Pitcher aggregates from filtered rows
+  const pitcherStats = useMemo(() => {
+    const map = {};
+    filtered.forEach(r => {
+      const id = String(r['Pitcher']||'');
+      if (!id || id==='nan') return;
+      if (!map[id]) map[id] = { id, team: r['Pitcher Team']||'', pa:0, evs:[], barrels:0, hh:0, hrs:0, pitches:{} };
+      const m = map[id];
+      m.pa++;
+      const ev = parseFloat(r['Exit Velocity']);
+      if (!isNaN(ev) && ev > 0) m.evs.push(ev);
+      if (parseInt(r['Is Barrel']||0)===1) m.barrels++;
+      if (parseInt(r['Is Hard Hit']||0)===1) m.hh++;
+      if (parseInt(r['Is Home Run']||0)===1) m.hrs++;
+      const pt = r['Pitch Type']||'';
+      if (pt) m.pitches[pt] = (m.pitches[pt]||0)+1;
+    });
+    return Object.values(map).map(m => {
+      const topPitch = Object.entries(m.pitches).sort((a,b)=>b[1]-a[1]).map(([k])=>k).slice(0,3).join(', ');
+      return {
+        id: m.id, name: resolveName(m.id), team: m.team,
+        pa: m.pa,
+        avgEV: m.evs.length ? +(m.evs.reduce((a,b)=>a+b,0)/m.evs.length).toFixed(1) : null,
+        barrelPct: m.pa ? +(m.barrels/m.pa*100).toFixed(1) : 0,
+        hhPct: m.pa ? +(m.hh/m.pa*100).toFixed(1) : 0,
+        hrAllowed: m.hrs, hrRate: m.pa ? +(m.hrs/m.pa*100).toFixed(1) : 0,
+        topPitches: topPitch,
+      };
+    }).filter(m => m.pa >= 5);
+  }, [filtered]);
+
+  const sortArr = (arr, col, dir) => [...arr].sort((a,b) => {
+    const av = a[col] ?? -Infinity, bv = b[col] ?? -Infinity;
+    return dir==='desc' ? bv-av : av-bv;
+  });
+
+  const thStyle = (col, state, setState) => ({
+    padding:'6px 8px', textAlign:'right', cursor:'pointer', userSelect:'none',
+    fontFamily:"'DM Mono',monospace", fontSize:9, fontWeight:700,
+    color: state.col===col ? 'var(--accent2)' : 'var(--muted)',
+    textTransform:'uppercase', letterSpacing:.8, whiteSpace:'nowrap',
+  });
+  const thClick = (col, state, setState) => () => setState(s => ({col, dir: s.col===col&&s.dir==='desc'?'asc':'desc'}));
+  const thArrow = (col, state) => state.col===col ? (state.dir==='desc'?' ▼':' ▲') : '';
+
+  const togglePitch = (pt) => {
+    setFPitches(prev => {
+      const next = new Set(prev);
+      if (next.has(pt)) next.delete(pt); else next.add(pt);
+      return next;
+    });
+    setLogPage(0);
+  };
+
+  const evCol = (v) => v==null?'var(--muted)': v>=95?'#ff4020':v>=92?'#ff8020':v>=90?'var(--accent2)':'var(--text)';
+  const brlCol = (v) => v>=10?'#ff4020':v>=6?'#ff8020':v>=3?'var(--accent2)':'var(--text)';
+
+  const pillStyle = (active, color='var(--accent2)') => ({
+    padding:'3px 9px', borderRadius:20, cursor:'pointer', fontSize:10, fontWeight:active?700:400,
+    fontFamily:"'DM Mono',monospace", border:`1px solid ${active?color:'var(--border)'}`,
+    background: active?`${color}20`:'transparent', color: active?color:'var(--muted)',
+    transition:'all .12s', whiteSpace:'nowrap',
+  });
+
+  const logRows = useMemo(() => {
+    const sorted = sortArr(filtered.map(r=>({
+      date: r['Date']||'',
+      batter: resolveName(r['Batter']),
+      batTeam: r['Batter Team']||'',
+      pitcher: resolveName(r['Pitcher']),
+      pitTeam: r['Pitcher Team']||'',
+      pitHand: r['Pitcher Hand']||'',
+      pitch: r['Pitch Type']||'',
+      ev: parseFloat(r['Exit Velocity'])||null,
+      la: parseFloat(r['Launch Angle'])||null,
+      dist: parseFloat(r['Hit Distance'])||null,
+      result: r['At-Bat Result']||'',
+      bbt: r['Batted Ball Type']||'',
+      barrel: parseInt(r['Is Barrel']||0),
+      hh: parseInt(r['Is Hard Hit']||0),
+      hr: parseInt(r['Is Home Run']||0),
+      pitVelo: parseFloat(r['Pitch Velocity'])||null,
+    })), sortLog.col, sortLog.dir);
+    return sorted;
+  }, [filtered, sortLog]);
+
+  const logPageRows = logRows.slice(logPage*LOG_PAGE_SIZE, (logPage+1)*LOG_PAGE_SIZE);
+  const logTotalPages = Math.ceil(logRows.length / LOG_PAGE_SIZE);
+
+  const resetFilters = () => {
+    setFBatTeam('all'); setFPitTeam('all'); setFBatHand('all'); setFPitHand('all');
+    setFPitches(new Set()); setFMinEV(0); setFBarrel(false); setFHardHit(false); setFHR(false);
+    setFDays('season'); setLogPage(0);
+  };
+
+  const hasFilters = fBatTeam!=='all'||fPitTeam!=='all'||fBatHand!=='all'||fPitHand!=='all'||
+    fPitches.size>0||fMinEV>0||fBarrel||fHardHit||fHR||fDays!=='season';
+
+  if (loading) return <div style={{padding:'40px 20px',textAlign:'center'}}>
+    <div className="sp" style={{margin:'0 auto 12px',width:24,height:24,borderWidth:2}}/>
+    <div style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--muted)'}}>Loading at-bat log…</div>
+  </div>;
+
+  if (error) return <div style={{padding:'20px',background:'rgba(255,64,32,.08)',borderRadius:8,
+    border:'1px solid rgba(255,64,32,.25)',fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--accent)'}}>
+    ✗ {error} — make sure mlb_atbat_log_full.csv is in public/data/
+  </div>;
+
+  return <div>
+    {/* ── Filter panel ─────────────────────────────────────── */}
+    <div style={{background:'var(--surface)',border:'1px solid var(--border)',
+      borderRadius:10,padding:'12px 14px',marginBottom:14}}>
+
+      {/* Row 1: teams + hands + date */}
+      <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',marginBottom:10}}>
+        {/* Bat team */}
+        <select value={fBatTeam} onChange={e=>{setFBatTeam(e.target.value);setLogPage(0);}}
+          style={{padding:'5px 8px',borderRadius:7,background:'var(--surface2)',
+            border:'1px solid var(--border)',color:'var(--text)',fontFamily:"'DM Mono',monospace",fontSize:11,cursor:'pointer'}}>
+          {allBatTeams.map(t=><option key={t} value={t}>{t==='all'?'🧢 All Teams (Bat)':t}</option>)}
+        </select>
+        {/* Pit team */}
+        <select value={fPitTeam} onChange={e=>{setFPitTeam(e.target.value);setLogPage(0);}}
+          style={{padding:'5px 8px',borderRadius:7,background:'var(--surface2)',
+            border:'1px solid var(--border)',color:'var(--text)',fontFamily:"'DM Mono',monospace",fontSize:11,cursor:'pointer'}}>
+          {allPitTeams.map(t=><option key={t} value={t}>{t==='all'?'⚾ All Teams (Pit)':t}</option>)}
+        </select>
+        {/* Bat hand */}
+        {allBatHands.map(h=><button key={h} onClick={()=>{setFBatHand(h);setLogPage(0);}}
+          style={pillStyle(fBatHand===h,'#27c97a')}>{h==='all'?'All Hands (B)':h+'HB'}</button>)}
+        <span style={{width:1,height:20,background:'var(--border)'}}/>
+        {/* Pit hand */}
+        {allPitHands.map(h=><button key={h} onClick={()=>{setFPitHand(h);setLogPage(0);}}
+          style={pillStyle(fPitHand===h,'#38b8f2')}>{h==='all'?'All Hands (P)':h+'HP'}</button>)}
+        <span style={{width:1,height:20,background:'var(--border)'}}/>
+        {/* Date range */}
+        {[['season','Season'],['30','L30'],['14','L14'],['7','L7']].map(([v,l])=>
+          <button key={v} onClick={()=>{setFDays(v);setLogPage(0);}} style={pillStyle(fDays===v,'var(--accent2)')}>{l}</button>
+        )}
+        {hasFilters && <button onClick={resetFilters}
+          style={{padding:'3px 9px',borderRadius:20,fontSize:10,fontFamily:"'DM Mono',monospace",
+            cursor:'pointer',border:'1px solid rgba(255,64,32,.4)',background:'rgba(255,64,32,.1)',color:'var(--accent)',fontWeight:700}}>
+          ✕ Reset
+        </button>}
+      </div>
+
+      {/* Row 2: pitch type pills — fully dynamic from data */}
+      <div style={{display:'flex',gap:5,flexWrap:'wrap',alignItems:'center',marginBottom:10}}>
+        <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+          textTransform:'uppercase',letterSpacing:1,flexShrink:0}}>Pitch:</span>
+        <button onClick={()=>{setFPitches(new Set());setLogPage(0);}}
+          style={pillStyle(fPitches.size===0,'var(--text)')}>All</button>
+        {allPitches.map(pt=><button key={pt} onClick={()=>togglePitch(pt)}
+          style={pillStyle(fPitches.has(pt),'var(--accent2)')}>{pt}</button>)}
+      </div>
+
+      {/* Row 3: EV slider + boolean toggles */}
+      <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'center'}}>
+        <div style={{display:'flex',alignItems:'center',gap:6}}>
+          <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+            textTransform:'uppercase',letterSpacing:1}}>Min EV:</span>
+          <input type="range" min={0} max={115} step={1} value={fMinEV}
+            onChange={e=>{setFMinEV(parseInt(e.target.value));setLogPage(0);}}
+            style={{width:80,accentColor:'var(--accent2)'}}/>
+          <span style={{fontSize:11,fontFamily:"'DM Mono',monospace",
+            color:fMinEV>0?'var(--accent2)':'var(--muted)',fontWeight:fMinEV>0?700:400,minWidth:32}}>
+            {fMinEV>0?fMinEV+'+':`Any`}
+          </span>
+        </div>
+        {[
+          [fBarrel,  setFBarrel,  '🛢 Barrel',  'rgba(255,128,32,.4)'],
+          [fHardHit, setFHardHit, '⚡ Hard Hit', 'rgba(245,166,35,.4)'],
+          [fHR,      setFHR,      '💥 HR Only',  'rgba(255,64,32,.4)'],
+        ].map(([val,set,label,col])=>(
+          <button key={label} onClick={()=>{set(v=>!v);setLogPage(0);}}
+            style={{padding:'4px 11px',borderRadius:20,cursor:'pointer',fontSize:10,
+              fontFamily:"'DM Mono',monospace",fontWeight:val?700:400,
+              border:`1px solid ${val?col:'var(--border)'}`,
+              background:val?col.replace('.4)','.1)'):'transparent',
+              color:val?'var(--text)':'var(--muted)',transition:'all .12s'}}>
+            {label}
+          </button>
+        ))}
+        <span style={{marginLeft:'auto',fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
+          {filtered.length.toLocaleString()} at-bats
+        </span>
+      </div>
+    </div>
+
+    {/* ── View toggle ──────────────────────────────────────── */}
+    <div style={{display:'flex',gap:5,marginBottom:14,padding:'3px',
+      background:'var(--surface)',borderRadius:8,border:'1px solid var(--border)',width:'fit-content'}}>
+      {[['batters','🧢 Batters Box'],['pitchers','⚾ On The Mound'],['log','📋 At-Bat Log']].map(([k,l])=>(
+        <button key={k} onClick={()=>setView(k)} style={{
+          padding:'5px 13px',borderRadius:6,cursor:'pointer',border:'none',
+          fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,letterSpacing:.5,
+          background:view===k?'var(--accent)':'transparent',
+          color:view===k?'white':'var(--muted)',transition:'all .15s'}}>
+          {l}
+        </button>
+      ))}
+    </div>
+
+    {/* ── Batters Box ──────────────────────────────────────── */}
+    {view==='batters' && <div className="tw"><table>
+      <thead><tr>
+        {[
+          ['name','Batter',false,'left'],['team','Team',false,'center'],['pa','PA',true,'right'],
+          ['avgEV','Avg EV',true,'right'],['barrelPct','Brl%',true,'right'],
+          ['hhPct','HH%',true,'right'],['hrCount','HR',true,'right'],
+          ['hrRate','HR%',true,'right'],['fbPct','FB%',true,'right'],['avgLA','Avg LA',true,'right'],
+        ].map(([col,label,sortable,align])=>(
+          <th key={col} onClick={sortable?thClick(col,sortBat,setSortBat):undefined}
+            style={{...thStyle(col,sortBat,setSortBat),textAlign:align,cursor:sortable?'pointer':'default'}}>
+            {label}{sortable?thArrow(col,sortBat):''}
+          </th>
+        ))}
+      </tr></thead>
+      <tbody>
+        {sortArr(batterStats,sortBat.col,sortBat.dir).map(m=>(
+          <tr key={m.id} className="dr">
+            <td><div style={{display:'flex',alignItems:'center',gap:6}}>
+              <PlayerAvatar pid={m.id} name={m.name} size={22}/>
+              <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,
+                color:isKeyMatchup(m.id)?'#ff8020':'var(--text)'}}>{m.name}</span>
+            </div></td>
+            <td style={{textAlign:'center'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--accent2)',fontWeight:700}}>{m.team}</span></td>
+            <td style={{textAlign:'right'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{m.pa}</span></td>
+            <td style={{textAlign:'right'}}><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color:evCol(m.avgEV)}}>{m.avgEV??'—'}</span></td>
+            <td style={{textAlign:'right'}}><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,color:brlCol(m.barrelPct)}}>{m.barrelPct}%</span></td>
+            <td style={{textAlign:'right'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:m.hhPct>=40?'var(--accent2)':'var(--text)'}}>{m.hhPct}%</span></td>
+            <td style={{textAlign:'right'}}><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color:m.hrCount>0?'var(--accent)':'var(--text)'}}>{m.hrCount}</span></td>
+            <td style={{textAlign:'right'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:m.hrRate>=10?'var(--accent)':'var(--text)'}}>{m.hrRate}%</span></td>
+            <td style={{textAlign:'right'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{m.fbPct}%</span></td>
+            <td style={{textAlign:'right'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:m.avgLA>=18&&m.avgLA<=35?'#27c97a':'var(--text)'}}>{m.avgLA??'—'}°</span></td>
+          </tr>
+        ))}
+      </tbody>
+    </table></div>}
+
+    {/* ── On The Mound ─────────────────────────────────────── */}
+    {view==='pitchers' && <div className="tw"><table>
+      <thead><tr>
+        {[
+          ['name','Pitcher',false,'left'],['team','Team',false,'center'],['pa','PA Faced',true,'right'],
+          ['avgEV','Avg EV Allow',true,'right'],['barrelPct','Brl% Allow',true,'right'],
+          ['hhPct','HH% Allow',true,'right'],['hrAllowed','HR',true,'right'],
+          ['hrRate','HR%',true,'right'],['topPitches','Top Pitches',false,'left'],
+        ].map(([col,label,sortable,align])=>(
+          <th key={col} onClick={sortable?thClick(col,sortPit,setSortPit):undefined}
+            style={{...thStyle(col,sortPit,setSortPit),textAlign:align,cursor:sortable?'pointer':'default'}}>
+            {label}{sortable?thArrow(col,sortPit):''}
+          </th>
+        ))}
+      </tr></thead>
+      <tbody>
+        {sortArr(pitcherStats,sortPit.col,sortPit.dir).map(m=>(
+          <tr key={m.id} className="dr">
+            <td><div style={{display:'flex',alignItems:'center',gap:6}}>
+              <PlayerAvatar pid={m.id} name={m.name} size={22}/>
+              <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12}}>{m.name}</span>
+            </div></td>
+            <td style={{textAlign:'center'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--ice)',fontWeight:700}}>{m.team}</span></td>
+            <td style={{textAlign:'right'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{m.pa}</span></td>
+            <td style={{textAlign:'right'}}><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color:evCol(m.avgEV)}}>{m.avgEV??'—'}</span></td>
+            <td style={{textAlign:'right'}}><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,color:brlCol(m.barrelPct)}}>{m.barrelPct}%</span></td>
+            <td style={{textAlign:'right'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:m.hhPct>=40?'#ff8020':'var(--text)'}}>{m.hhPct}%</span></td>
+            <td style={{textAlign:'right'}}><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color:m.hrAllowed>0?'var(--accent)':'var(--text)'}}>{m.hrAllowed}</span></td>
+            <td style={{textAlign:'right'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:m.hrRate>=10?'var(--accent)':'var(--text)'}}>{m.hrRate}%</span></td>
+            <td><span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--muted)'}}>{m.topPitches}</span></td>
+          </tr>
+        ))}
+      </tbody>
+    </table></div>}
+
+    {/* ── At-Bat Log ───────────────────────────────────────── */}
+    {view==='log' && <div>
+      <div className="tw"><table>
+        <thead><tr>
+          {[
+            ['date','Date',true,'left'],['batter','Batter',false,'left'],
+            ['batTeam','Bat',false,'center'],['pitcher','Pitcher',false,'left'],
+            ['pitTeam','Pit',false,'center'],['pitHand','HP',false,'center'],
+            ['pitch','Pitch',false,'center'],['pitVelo','Velo',true,'right'],
+            ['ev','EV',true,'right'],['la','LA',true,'right'],
+            ['dist','Dist',true,'right'],['result','Result',false,'left'],
+          ].map(([col,label,sortable,align])=>(
+            <th key={col} onClick={sortable?thClick(col,sortLog,setSortLog):undefined}
+              style={{...thStyle(col,sortLog,setSortLog),textAlign:align,cursor:sortable?'pointer':'default'}}>
+              {label}{sortable?thArrow(col,sortLog):''}
+            </th>
+          ))}
+          <th style={{textAlign:'center',fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)'}}>Flags</th>
+        </tr></thead>
+        <tbody>
+          {logPageRows.map((r,i)=>(
+            <tr key={i} className="dr" style={{opacity:r.barrel||r.hh||r.hr?1:0.7}}>
+              <td><span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)'}}>{r.date}</span></td>
+              <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,
+                color:isKeyMatchup(r.batterId)?'#ff8020':'var(--text)'}}>{r.batter}</span></td>
+              <td style={{textAlign:'center'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--accent2)'}}>{r.batTeam}</span></td>
+              <td><span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--muted)'}}>{r.pitcher}</span></td>
+              <td style={{textAlign:'center'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--ice)'}}>{r.pitTeam}</span></td>
+              <td style={{textAlign:'center'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)'}}>{r.pitHand}HP</span></td>
+              <td style={{textAlign:'center'}}><span style={{padding:'1px 5px',borderRadius:4,
+                fontFamily:"'DM Mono',monospace",fontSize:9,fontWeight:700,
+                background:'rgba(255,255,255,.05)',border:'1px solid rgba(255,255,255,.1)',
+                color:'var(--text)'}}>{r.pitch}</span></td>
+              <td style={{textAlign:'right'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--muted)'}}>{r.pitVelo??'—'}</span></td>
+              <td style={{textAlign:'right'}}><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,color:evCol(r.ev)}}>{r.ev??'—'}</span></td>
+              <td style={{textAlign:'right'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:r.la>=18&&r.la<=35?'#27c97a':'var(--text)'}}>{r.la!=null?r.la+'°':'—'}</span></td>
+              <td style={{textAlign:'right'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--text)'}}>{r.dist??'—'}</span></td>
+              <td><span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',
+                whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:80,display:'block'}}>
+                {r.result.replace(/_/g,' ')}</span></td>
+              <td style={{textAlign:'center'}}>
+                <div style={{display:'flex',gap:2,justifyContent:'center'}}>
+                  {r.hr===1 && <span style={{fontSize:11}}>💥</span>}
+                  {r.barrel===1 && <span style={{fontSize:11}}>🛢</span>}
+                  {r.hh===1 && !r.barrel && <span style={{fontSize:11}}>⚡</span>}
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table></div>
+      {/* Pagination */}
+      {logTotalPages > 1 && <div style={{display:'flex',gap:6,justifyContent:'center',
+        alignItems:'center',marginTop:12,padding:'8px 0'}}>
+        <button onClick={()=>setLogPage(p=>Math.max(0,p-1))} disabled={logPage===0}
+          style={{padding:'4px 12px',borderRadius:6,cursor:logPage===0?'not-allowed':'pointer',
+            border:'1px solid var(--border)',background:'var(--surface2)',
+            color:logPage===0?'var(--muted)':'var(--text)',fontFamily:"'DM Mono',monospace",fontSize:11}}>
+          ← Prev
+        </button>
+        <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--muted)'}}>
+          {logPage+1} / {logTotalPages} · {logRows.length.toLocaleString()} rows
+        </span>
+        <button onClick={()=>setLogPage(p=>Math.min(logTotalPages-1,p+1))} disabled={logPage===logTotalPages-1}
+          style={{padding:'4px 12px',borderRadius:6,cursor:logPage===logTotalPages-1?'not-allowed':'pointer',
+            border:'1px solid var(--border)',background:'var(--surface2)',
+            color:logPage===logTotalPages-1?'var(--muted)':'var(--text)',fontFamily:"'DM Mono',monospace",fontSize:11}}>
+          Next →
+        </button>
+      </div>}
+    </div>}
   </div>;
 }
 
