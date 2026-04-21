@@ -8,8 +8,8 @@ const styles = `
   :root{
     --bg:#080c10;--surface:#0d1318;--surface2:#131b22;--border:#1e2d3a;
     --accent:#e8411a;--accent2:#f5a623;--ice:#38b8f2;--green:#27c97a;
-    --text:#e8edf2;--muted:#5a7080;--fire2:#ff7a00;--fire3:#ffb700;
-    --aplus:#ff3010;--a:#ff7000;--b:#f5a623;--c:#8bc4e8;--d:#5a7080;--f:#38b8f2;
+    --text:#e8edf2;--muted:#8a9db0;--fire2:#ff7a00;--fire3:#ffb700;
+    --aplus:#ff3010;--a:#ff7000;--b:#f5a623;--c:#8bc4e8;--d:#8a9db0;--f:#38b8f2;
   }
   html,body{background:var(--bg);color:var(--text);font-family:'Oswald',sans-serif;min-height:100vh;overflow-x:clip;max-width:100%;width:100%;}
   .app{min-height:100vh;display:flex;flex-direction:column;overflow-x:clip;max-width:100%;width:100%;}
@@ -1122,13 +1122,13 @@ function openBetSlip(picks, bprops) {
     const hdr = document.createElement('div');
     hdr.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:4px 0 8px';
     hdr.innerHTML = '<div style="font-family:Oswald,sans-serif;font-weight:800;font-size:16px;color:#ff4020;letter-spacing:1px">📸 BUILD SLIP</div>'+
-      '<button id="gy-close-btn" style="background:none;border:1px solid rgba(255,255,255,.15);border-radius:6px;color:rgba(255,255,255,.4);cursor:pointer;padding:4px 10px;font-size:11px;font-family:DM Mono,monospace">✕</button>';
+      '<button id="gy-close-btn" style="background:none;border:1px solid rgba(255,255,255,.15);border-radius:6px;color:rgba(255,255,255,.65);cursor:pointer;padding:4px 10px;font-size:11px;font-family:DM Mono,monospace">✕</button>';
     container.appendChild(hdr);
     hdr.querySelector('#gy-close-btn').addEventListener('click', close);
 
     const hint = document.createElement('div');
     hint.textContent = 'Check batters to include · set a prop for each one';
-    hint.style.cssText = 'font-size:10px;color:rgba(255,255,255,.35);font-family:DM Mono,monospace;padding-bottom:6px';
+    hint.style.cssText = 'font-size:10px;color:rgba(255,255,255,.6);font-family:DM Mono,monospace;padding-bottom:6px';
     container.appendChild(hint);
 
     // ── Toolbar: Select All + category filter pills ──────────────
@@ -1263,7 +1263,7 @@ function openBetSlip(picks, bprops) {
 
     const cancelBtn = document.createElement('button');
     cancelBtn.textContent = '✕ Cancel';
-    cancelBtn.style.cssText = 'background:none;border:1px solid rgba(255,255,255,.1);border-radius:8px;color:rgba(255,255,255,.3);cursor:pointer;padding:8px;font-family:DM Mono,monospace;font-size:11px;width:100%';
+    cancelBtn.style.cssText = 'background:none;border:1px solid rgba(255,255,255,.1);border-radius:8px;color:rgba(255,255,255,.55);cursor:pointer;padding:8px;font-family:DM Mono,monospace;font-size:11px;width:100%';
     cancelBtn.addEventListener('click', close);
     container.appendChild(cancelBtn);
 
@@ -1289,7 +1289,7 @@ function openBetSlip(picks, bprops) {
     // Back button
     const backBtn = document.createElement('button');
     backBtn.textContent = '← Back';
-    backBtn.style.cssText = 'background:none;border:none;color:rgba(255,255,255,.4);cursor:pointer;padding:4px 0;font-family:DM Mono,monospace;font-size:11px;text-align:left;width:fit-content';
+    backBtn.style.cssText = 'background:none;border:none;color:rgba(255,255,255,.65);cursor:pointer;padding:4px 0;font-family:DM Mono,monospace;font-size:11px;text-align:left;width:fit-content';
     backBtn.addEventListener('click', renderBuilder);
     container.appendChild(backBtn);
 
@@ -1317,7 +1317,7 @@ function openBetSlip(picks, bprops) {
         avatarHtml+
         '<div style="flex:1;min-width:0">'+
           '<div style="font-family:Oswald,sans-serif;font-weight:700;font-size:14px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+p.name+'</div>'+
-          '<div style="font-size:9px;color:rgba(255,255,255,.4);margin-top:1px">'+matchup+(gt?' · '+gt:'')+'</div>'+
+          '<div style="font-size:9px;color:rgba(255,255,255,.65);margin-top:1px">'+matchup+(gt?' · '+gt:'')+'</div>'+
         '</div>'+
         '<div style="text-align:right;flex-shrink:0">'+propHtml+'<div style="font-size:9px;color:'+col+';font-weight:700">'+typeLabel+'</div></div>'+
       '</div>';
@@ -1334,8 +1334,8 @@ function openBetSlip(picks, bprops) {
           '<div style="font-size:9px;color:#38b8f2;letter-spacing:2px">goingyard.app</div></div>'+
         '</div>'+
         '<div style="text-align:right">'+
-          '<div style="font-size:10px;color:rgba(255,255,255,.4)">Bet Slip</div>'+
-          '<div style="font-size:10px;color:rgba(255,255,255,.4)">'+today+'</div>'+
+          '<div style="font-size:10px;color:rgba(255,255,255,.65)">Bet Slip</div>'+
+          '<div style="font-size:10px;color:rgba(255,255,255,.65)">'+today+'</div>'+
         '</div>'+
       '</div>'+
       '<div style="height:1px;background:rgba(255,64,32,.25);margin-bottom:14px"></div>'+
@@ -1401,7 +1401,7 @@ function openBetSlip(picks, bprops) {
 
     const note = document.createElement('div');
     note.textContent = 'Download slip · then paste into Gambly to get your share link';
-    note.style.cssText = 'text-align:center;font-size:10px;color:rgba(255,255,255,.3);font-family:DM Mono,monospace';
+    note.style.cssText = 'text-align:center;font-size:10px;color:rgba(255,255,255,.55);font-family:DM Mono,monospace';
     container.appendChild(note);
   }
 
@@ -9632,7 +9632,7 @@ function WeatherTab() {
               <div style={{marginTop:14,display:'flex',gap:8,flexWrap:'wrap'}}>
                 {[{l:'🔥 Very Hot',r:'≥120',c:'#ff4020'},{l:'🔶 Hot',r:'110–119',c:'#ff8020'},{l:'🟡 Warm',r:'105–109',c:'#f5a623'},{l:'⚪ Neutral',r:'98–104',c:'var(--text)'},{l:'🔵 Cool',r:'90–97',c:'var(--muted)'},{l:'❄️ Cold',r:'<90',c:'#38b8f2'}].map(x=>(
                   <div key={x.l} style={{padding:'3px 10px',borderRadius:6,fontSize:9,background:'var(--surface)',border:`1px solid ${x.c}30`,fontFamily:"'DM Mono',monospace",color:x.c,whiteSpace:'nowrap'}}>
-                    {x.l} <span style={{color:'rgba(255,255,255,.3)'}}>{x.r}</span>
+                    {x.l} <span style={{color:'rgba(255,255,255,.55)'}}>{x.r}</span>
                   </div>
                 ))}
               </div>
