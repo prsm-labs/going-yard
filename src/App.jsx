@@ -8205,15 +8205,17 @@ function MatchupEngineTab() {
                     fontWeight:800,fontSize:10,letterSpacing:.5}}>
                     💥</div>}
 
-                  {/* Batter name + hand */}
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,
-                      whiteSpace:'normal',wordBreak:'break-word',lineHeight:1.2,
-                      color:'var(--text)'}}>
-                      {b.batter}
-                      <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
-                        marginLeft:6}}>{b.batter_hand}HB</span>
-                    </div>
+                  {/* Avatar + Batter name + hand */}
+                  <div style={{display:'flex',alignItems:'center',gap:7,flex:1,minWidth:0}}>
+                    <PlayerAvatar pid={pid} name={b.batter} size={28}/>
+                    <div style={{minWidth:0}}>
+                      <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,
+                        whiteSpace:'normal',wordBreak:'break-word',lineHeight:1.2,
+                        color:'var(--text)'}}>
+                        {b.batter}
+                        <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+                          marginLeft:6}}>{b.batter_hand}HB</span>
+                      </div>
                     {/* Flag pills */}
                     <div style={{display:'flex',gap:4,marginTop:3,flexWrap:'wrap'}}>
                       {flag(b.recent_ev_flag) &&
@@ -8253,6 +8255,7 @@ function MatchupEngineTab() {
                           BvP🛢
                         </span>}
                     </div>
+                  </div>
                   </div>
 
                   {/* Key stats */}
