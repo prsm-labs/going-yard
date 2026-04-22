@@ -2978,7 +2978,7 @@ async function fetchLiftoffBatters(game) {
 
         const b = {
           id: bid, name, team: ta, isHome,
-          grade: 'C', gradeColor: '#8bc4e8', gradeLabel: '👀 C',
+          grade: null, gradeColor: 'var(--muted)', gradeLabel: '— No data',
           projHR: 0, recentEV: avgEV, recentBrl: barrel, recentFB: flyBall,
           totalFlags: 0, weightedScore: 0,
           barrel, hardHit, avgEV, flyBall, hr,
@@ -2987,7 +2987,7 @@ async function fetchLiftoffBatters(game) {
           pitcherHand,
           pos: p?.position?.abbreviation || cachedP?.pos || '',
           liftoffScore: Math.round(avgEV * 0.3 + barrel * 0.5),
-          verdict: {label:'👀 C', cls:'watch'},
+          verdict: {label:'— No grade', cls:'cold'},
           atBats: [],
         };
         batters.push(b);
@@ -3373,7 +3373,7 @@ function XRow({b}) {
 }
 
 function LRow({b, rank}) {
-  const vc = b.gradeColor || (b.verdict?.cls==="primed"?"#ff4020":b.verdict?.cls==="hot"?"#ff8020":b.verdict?.cls==="watch"?"#ffc840":"#38b8f2");
+  const vc = b.gradeColor || (b.grade === null ? 'var(--muted)' : b.verdict?.cls==="primed"?"#ff4020":b.verdict?.cls==="hot"?"#ff8020":b.verdict?.cls==="watch"?"#ffc840":"#38b8f2");
   const handleClick = () => {
     const cached = getCachedPlayer(b.id);
     openAtBatSlide(cached
@@ -3390,12 +3390,12 @@ function LRow({b, rank}) {
     <PlayerAvatar pid={b.id} name={b.name} size={34} border={"1.5px solid "+vc+"60"}/>
     <div className="li">
       <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginBottom:2}}>
-        {/* Engine grade badge */}
-        <span style={{padding:'1px 7px',borderRadius:5,fontSize:10,fontWeight:800,
+        {/* Engine grade badge — only shown when real engine data exists */}
+        {b.grade && <span style={{padding:'1px 7px',borderRadius:5,fontSize:10,fontWeight:800,
           fontFamily:"'Oswald',sans-serif",letterSpacing:.5,
           background:vc+'18',border:'1px solid '+vc+'40',color:vc,flexShrink:0}}>
-          {b.grade||'C'}
-        </span>
+          {b.grade}
+        </span>}
         {LINEUP_STATUS[b.id]?.status === 'confirmed' && (
           <span style={{fontSize:11,flexShrink:0}} title="Confirmed in lineup">✅</span>
         )}
@@ -3669,9 +3669,9 @@ function GPanel({game, isLive, isFinal=false}) {
         : (() => {
             const GRADE_ORDER = {'diamond':0,'A+':1,'A':2,'B':3,'C':4,'D':5};
             const sorted = [...(data||[])].sort((a,b) => {
-              // 1. Engine grade (diamond > A+ > A > B > C > D)
-              const ga = GRADE_ORDER[a.grade] ?? 5;
-              const gb = GRADE_ORDER[b.grade] ?? 5;
+              // Ungraded batters go to the bottom
+              const ga = a.grade ? (GRADE_ORDER[a.grade] ?? 5) : 99;
+              const gb = b.grade ? (GRADE_ORDER[b.grade] ?? 5) : 99;
               if (ga !== gb) return ga - gb;
               // 2. Due batters next within same grade
               if (a.due !== b.due) return a.due ? -1 : 1;
