@@ -5793,13 +5793,18 @@ function HRTrackerTab() {
                 const distC = (hr.distance||0)>=440?"dng":(hr.distance||0)>=420?"hot":(hr.distance||0)>=400?"warm":"avg";
                 // Live season HR# = cached season total (end of yesterday) + today's rank for this batter
                 const cachedHR = getCachedPlayer(hr.batterId)?.hr || 0;
-                const allBatterToday = HR_DATA.filter(h => String(h.batterId)===String(hr.batterId));
+                // allBatterToday uses `hrs` (component state) not HR_DATA global
+                // so it's always in sync with what's displayed
+                const allBatterToday = hrs.filter(h => String(h.batterId)===String(hr.batterId));
                 const todayRank = allBatterToday.findIndex(h =>
                   h.gamePk===hr.gamePk &&
                   (h.atBatIndex||h.playIndex||h.plateAppearance||0)===
                   (hr.atBatIndex||hr.playIndex||hr.plateAppearance||0)
                 );
-                const seasonNum = cachedHR + (todayRank >= 0 ? todayRank + 1 : allBatterToday.length || 1);
+                const todayNum = todayRank >= 0 ? todayRank + 1 : 1;
+                // Season HR# = end-of-yesterday total + today's rank for this batter
+                // If cache not loaded yet (cachedHR=0), show today's count only
+                const seasonNum = cachedHR > 0 ? cachedHR + todayNum : todayNum;
                 return <tr key={i}>
                 <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:i<3?"var(--accent)":"var(--muted)"}}>{i+1}</span></td>
                 <td><span style={{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:600,color:"var(--text)"}}>{hr.timeET&&hr.timeET!==""?hr.timeET:`Inn. ${hr.inning}`}</span></td>
@@ -10179,18 +10184,22 @@ function useHRNotifications() {
   const [log, setLog] = useState(_hrLog);
 
   useEffect(() => {
+    // Register this instance's setLog so new HRs update the bell
     _setHrLog = setLog;
+
+    // Register queue setter — stored separately so banner and bell don't fight
+    const prevNotify = _notifyNewHR;
     _notifyNewHR = (hr) => {
-      // hrType = "Solo","2-Run","3-Run","Grand Slam" — all are HRs from this feed
       const notif = {
         id: Date.now() + Math.random(),
         batterName: hr.batterName || 'Unknown',
         batterTeam: hr.batterTeam || '',
-        type: hr.hrType || 'Solo',
-        rbi: hr.rbi || 0,
-        exitVelo: hr.exitVelo || 0,
-        distance: hr.distance || 0,
-        inning: hr.inning || '',
+        batterId:   hr.batterId   || null,
+        type:       hr.hrType     || 'Solo',
+        rbi:        hr.rbi        || 0,
+        exitVelo:   hr.exitVelo   || 0,
+        distance:   hr.distance   || 0,
+        inning:     hr.inning     || '',
         halfInning: hr.halfInning || 'top',
         time: new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',timeZone:'America/New_York'}),
       };
@@ -10198,12 +10207,32 @@ function useHRNotifications() {
       _hrLog = [notif, ..._hrLog].slice(0, 20);
       if (_setHrLog) _setHrLog([..._hrLog]);
     };
-    return () => { _notifyNewHR = null; _setHrLog = null; };
+    return () => {
+      // Only clear if we're still the registered handler
+      if (_notifyNewHR !== prevNotify) return;
+      _notifyNewHR = null; _setHrLog = null;
+    };
   }, []);
 
   const dismiss = (id) => setQueue(q => q.filter(n => n.id !== id));
   const clearLog = () => { _hrLog = []; setLog([]); };
   return { queue, dismiss, log, clearLog };
+}
+
+// Lightweight log-only hook for NotificationBell — doesn't fight over _notifyNewHR
+function useHRLog() {
+  const [log, setLog] = useState(_hrLog);
+  useEffect(() => {
+    // Subscribe to log updates without overwriting the queue handler
+    const prev = _setHrLog;
+    _setHrLog = (newLog) => {
+      setLog(newLog);
+      if (prev && prev !== _setHrLog) prev(newLog);
+    };
+    return () => { if (_setHrLog !== prev) _setHrLog = prev; };
+  }, []);
+  const clearLog = () => { _hrLog = []; setLog([]); };
+  return { log, clearLog };
 }
 
 function HRNotificationBanner({ notif, onDismiss }) {
@@ -10381,7 +10410,7 @@ function HRNotifications() {
 
 
 function NotificationBell() {
-  const { log, clearLog } = useHRNotifications();
+  const { log, clearLog } = useHRLog();
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const unread = log.length;
