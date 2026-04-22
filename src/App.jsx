@@ -3863,7 +3863,8 @@ function HeatingUpSlideout({ games, onClose }) {
       // Live games only — real in-game Statcast data
       await Promise.all(liveGames.map(async (game) => {
         try {
-          const liveBatters = await fetchLiveBatters(game.gamePk);
+          const result = await fetchLiveBatters(game.gamePk);
+          const liveBatters = result?.batters || result || [];
           liveBatters.forEach(b => {
             // REQUIRE at least 1 real AB in this game — no pre-AB ghost appearances
             if ((b.ab || 0) < 1) return;
