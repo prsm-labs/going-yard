@@ -3390,8 +3390,8 @@ function LRow({b, rank}) {
     <PlayerAvatar pid={b.id} name={b.name} size={34} border={"1.5px solid "+vc+"60"}/>
     <div className="li">
       <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginBottom:2}}>
-        {/* Engine grade badge — only shown when real engine data exists */}
-        {b.grade && <span style={{padding:'1px 7px',borderRadius:5,fontSize:10,fontWeight:800,
+        {/* Engine grade badge — only for key matchup batters (orange names) */}
+        {b.grade && isKeyMatchup(b.id) && <span style={{padding:'1px 7px',borderRadius:5,fontSize:10,fontWeight:800,
           fontFamily:"'Oswald',sans-serif",letterSpacing:.5,
           background:vc+'18',border:'1px solid '+vc+'40',color:vc,flexShrink:0}}>
           {b.grade}
@@ -3669,11 +3669,17 @@ function GPanel({game, isLive, isFinal=false}) {
         : (() => {
             const GRADE_ORDER = {'diamond':0,'A+':1,'A':2,'B':3,'C':4,'D':5};
             const sorted = [...(data||[])].sort((a,b) => {
-              // Ungraded batters go to the bottom
-              const ga = a.grade ? (GRADE_ORDER[a.grade] ?? 5) : 99;
-              const gb = b.grade ? (GRADE_ORDER[b.grade] ?? 5) : 99;
-              if (ga !== gb) return ga - gb;
-              // 2. Due batters next within same grade
+              const aKM = isKeyMatchup(a.id), bKM = isKeyMatchup(b.id);
+              // Key matchup batters always first
+              if (aKM !== bKM) return aKM ? -1 : 1;
+              // Within key matchup batters: grade → due → projHR
+              if (aKM && bKM) {
+                const ga = a.grade ? (GRADE_ORDER[a.grade] ?? 5) : 99;
+                const gb = b.grade ? (GRADE_ORDER[b.grade] ?? 5) : 99;
+                if (ga !== gb) return ga - gb;
+                if (a.due !== b.due) return a.due ? -1 : 1;
+              }
+              // All others: due first, then projHR
               if (a.due !== b.due) return a.due ? -1 : 1;
               // 3. Hot bat: proj HR% descending
               return (b.projHR||0) - (a.projHR||0);
