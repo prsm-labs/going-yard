@@ -8012,7 +8012,7 @@ function MatchupEngineTab() {
       <button style={stBtn('batters')}  onClick={()=>setSubTab('batters')}>🧢 Batters</button>
       <button style={stBtn('pitchers')} onClick={()=>setSubTab('pitchers')}>⚾ Pitchers</button>
       {/* Daily Barrel — hidden until data pipeline and UI are ready */}
-      {/* <button style={stBtn('barrel')} onClick={()=>setSubTab('barrel')}>🛢 Daily Barrel</button> */}
+      <button style={stBtn('barrel')} onClick={()=>setSubTab('barrel')}>🛢 Daily Barrel</button>
     </div>
 
     {/* Date slot toggle — only shown for matchups and simlab */}
