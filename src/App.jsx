@@ -2850,13 +2850,98 @@ async function fetchLiveBatters(gamePk) {
 const LIFTOFF_CACHE = {};
 
 async function fetchLiftoffBatters(game) {
-  if (LIFTOFF_CACHE[game.gamePk]) return LIFTOFF_CACHE[game.gamePk];
-  // Ensure player cache is populated before computing stats
-  if (Object.keys(PLAYER_DATA_CACHE).length < 5) {
-    await new Promise(res => fetchPlayers(()=>{}, ()=>{}, ()=>{}, true));
-    await new Promise(r => setTimeout(r, 800));
-  }
+  // Invalidate cache every 5 minutes so engine updates propagate
+  const cacheKey = `${game.gamePk}_${Math.floor(Date.now()/300000)}`;
+  if (LIFTOFF_CACHE[cacheKey]) return LIFTOFF_CACHE[cacheKey];
+
   try {
+    // ── Source 1: DAILY_PICKS_CACHE (matchup engine output) ──────────────
+    // Prefer engine data — same source as Key Matchups and Sim Lab
+    // Find all batters in daily_picks.csv for this game
+    const gameId = String(game.gamePk);
+    const teamsInGame = DAILY_GAME_MAP[gameId] || new Set();
+
+    // Collect engine rows for this game's batting teams
+    const engineRows = Object.values(DAILY_PICKS_CACHE).filter(r => {
+      const rGid = String(r._gid || r.game_id || '').replace(/\.0$/,'');
+      return rGid === gameId;
+    });
+
+    if (engineRows.length > 0) {
+      // Sort by weighted_flag_score desc, then proj_hr_adj desc
+      const sorted = [...engineRows].sort((a,b) =>
+        (parseFloat(b.weighted_flag_score)||0) - (parseFloat(a.weighted_flag_score)||0) ||
+        (parseFloat(b.proj_hr_adj)||0) - (parseFloat(a.proj_hr_adj)||0)
+      ).slice(0, 12);
+
+      const GRADE_CFG_LO = {
+        'diamond': {color:'#ffcc00', label:'💎 Diamond'},
+        'A+': {color:'#ff3010', label:'🔴 A+'},
+        'A':  {color:'#ff7000', label:'🔥 A'},
+        'B':  {color:'#f5a623', label:'⚡ B'},
+        'C':  {color:'#8bc4e8', label:'👀 C'},
+        'D':  {color:'#8a9db0', label:'❄️ D'},
+      };
+
+      const result = sorted.map(r => {
+        const bid = parseInt(r.batter_id) || 0;
+        const cachedP = getCachedPlayer(bid);
+        const grade = r.grade || 'D';
+        const cfg = GRADE_CFG_LO[grade] || GRADE_CFG_LO['D'];
+        const projHR = parseFloat(r.proj_hr_adj) || 0;
+        const recentEV = parseFloat(r.recent_avg_ev) || cachedP?.avgEV || 0;
+        const recentBrl = parseFloat(r.recent_barrel_pct) || cachedP?.barrel || 0;
+        const daysSinceHR = cachedP?.daysSinceHR ?? null;
+        const due = isDueFromRow(r, bid);
+        const inSlump = r.in_slump === 'True' || r.in_slump === true;
+        const isDiamond = r.is_diamond === 'True' || r.is_diamond === true;
+
+        // Build signals from engine flags — same as Key Matchups
+        const signals = [];
+        if (isDiamond) signals.push({t:'💎 Diamond', c:'fire'});
+        if (due) signals.push({t:'⏳ Due', c:'ice'});
+        if (r.recent_ev_flag==='True'||r.recent_ev_flag===true) signals.push({t:`${recentEV.toFixed(0)} mph EV`, c:'pos'});
+        if (r.recent_barrel_flag==='True'||r.recent_barrel_flag===true) signals.push({t:`${recentBrl.toFixed(0)}% Brl L7`, c:'pos'});
+        if (r.bvp_ev_flag==='True'||r.bvp_ev_flag===true) signals.push({t:'Hard BvP contact', c:'pos'});
+        if (inSlump) signals.push({t:'📉 Slump', c:'neg'});
+        if (daysSinceHR>=4&&daysSinceHR<=10) signals.push({t:`${daysSinceHR}d since HR`, c:'fire'});
+
+        return {
+          id: bid, name: r.batter || `Player ${bid}`,
+          team: r.batting_team || '',
+          isHome: r.batting_team === r.home_team,
+          grade, gradeColor: cfg.color, gradeLabel: cfg.label,
+          projHR, recentEV, recentBrl,
+          bvpEV: parseFloat(r.bvp_avg_ev)||0,
+          totalFlags: parseInt(r.total_flags)||0,
+          weightedScore: parseFloat(r.weighted_flag_score)||0,
+          daysSinceHR,
+          due, inSlump, isDiamond,
+          signals: signals.slice(0,4),
+          pitcher: r.pitcher || '',
+          pitcherHand: r.pitcher_hand || '',
+          hr: cachedP?.hr || 0,
+          pos: cachedP?.pos || '',
+          // Keep for slide-out compatibility
+          barrel: cachedP?.barrel || 0,
+          hardHit: cachedP?.hardHit || 0,
+          avgEV: cachedP?.avgEV || 0,
+          flyBall: cachedP?.flyBall || 0,
+          // Legacy liftoff fields (for LRow render)
+          liftoffScore: Math.round(parseFloat(r.weighted_flag_score)*20 + projHR*100),
+          verdict: {
+            label: cfg.label,
+            cls: grade==='A+'||grade==='diamond'?'primed': grade==='A'?'hot': grade==='B'?'watch':'cold'
+          },
+          atBats: [],
+        };
+      });
+
+      LIFTOFF_CACHE[cacheKey] = result;
+      return result;
+    }
+
+    // ── Fallback: boxscore + player cache (no engine data yet) ───────────
     const res = await fetch(`/api/boxscore?gamePk=${game.gamePk}`);
     const data = await res.json();
     const batters = [];
@@ -2868,105 +2953,49 @@ async function fetchLiftoffBatters(game) {
       const batterIds = team?.batters?.length > 0
         ? team.batters.slice(0, 9)
         : Object.keys(team?.players || {}).slice(0, 9).map(k => parseInt(k.replace("ID","")));
-
-      // Determine pitcher handedness for matchup factor
       const pitchSide = side === "away" ? "home" : "away";
       const pitcherHand = game[pitchSide]?.pitcherHand || "R";
 
       for (const bid of batterIds) {
         const p = team?.players?.[`ID${bid}`]; if (!p) continue;
-        const liftPos = p?.position?.code || p?.position?.abbreviation || p?.person?.primaryPosition?.code || '';
+        const liftPos = p?.position?.code || p?.person?.primaryPosition?.code || '';
         if (liftPos === '1' || liftPos === 'P') continue;
-
         const name = p?.person?.fullName || `Player ${bid}`;
-
-        // ── Use REAL Statcast data from player cache ───────────
         const cachedP = getCachedPlayer(bid);
+        const avgEV = cachedP?.avgEV || 0;
+        const barrel = cachedP?.barrel || 0;
+        const hardHit = cachedP?.hardHit || 0;
+        const flyBall = cachedP?.flyBall || 0;
+        const hr = cachedP?.hr || 0;
+        const daysSinceHR = DAYS_SINCE_HR_CACHE[bid]?.days ?? null;
+        const due = isDue(bid);
 
-        // Season metrics from Baseball Savant (via /api/atbats or players.json)
-        const barrel    = cachedP?.barrel      || 0;
-        const hardHit   = cachedP?.hardHit     || 0;
-        const avgEV     = cachedP?.avgEV       || 0;
-        const sweetSpot = cachedP?.sweetSpot   || 0;
-        const pullAir   = cachedP?.pullAir     || 0;
-        const flyBall   = cachedP?.flyBall     || 0;
-        const xwoba     = cachedP?.xwoba       || 0;
-        const xslg      = cachedP?.xslg        || 0;
-        const hr        = cachedP?.hr          || 0;
-        const bbPct     = cachedP?.bbPct       || 0;
-        const kPct      = cachedP?.kPct        || 0;
-        const oSwing    = cachedP?.oSwing      || 0;
-        // L7 window — prefer daily_picks.csv, fall back to players.json windows
-        const w7        = cachedP?.windows?.last7;
-        const bidKey = String(bid);
-        const dp = DAILY_PICKS_CACHE[bidKey] ||
-          // fallback: match by name (handles any remaining ID format mismatches)
-          Object.values(DAILY_PICKS_CACHE).find(r => r.batter && r.batter.toLowerCase() === (name||'').toLowerCase()) || null;
-        const recentBrl = (dp?.recent_barrel_pct != null && dp.recent_barrel_pct !== '' ? parseFloat(dp.recent_barrel_pct) : null) ?? w7?.barrel  ?? barrel;
-        const recentHH  = (dp?.recent_hh_pct != null && dp.recent_hh_pct !== '' ? parseFloat(dp.recent_hh_pct) : null) ?? w7?.hardHit ?? hardHit;
-        const recentEV  = (dp?.recent_avg_ev     != null && dp.recent_avg_ev     !== '' ? parseFloat(dp.recent_avg_ev)     : null) ?? w7?.avgEV   ?? avgEV;
-        const recentFB  = (dp?.recent_fb_pct     != null && dp.recent_fb_pct     !== '' ? parseFloat(dp.recent_fb_pct)     : null) ?? w7?.flyBall ?? flyBall;
-        const recentPull= w7?.pullAir ?? pullAir;
-        const recentHRct= dp?.recent_hr_count != null ? parseInt(dp.recent_hr_count) || 0 : null;
-        const recentLA  = dp?.recent_avg_la != null && dp.recent_avg_la !== '' ? parseFloat(dp.recent_avg_la) : null;
-
-        // ── Real days since last HR from game log ──────────────
-        // Check today's HR ticker first (fastest)
-        const todayHR = HR_DATA.find(h => h.batterId === bid || h.batterName === name);
-        let daysSinceHR = todayHR ? 0 : null;
-
-        // Async fetch real days since HR (doesn't block render)
-        if (daysSinceHR === null) {
-          fetchDaysSinceHR(bid).then(days => {
-            if (days !== null && LIFTOFF_CACHE[game.gamePk]) {
-              const b = LIFTOFF_CACHE[game.gamePk].find(b => b.id === bid);
-              if (b) {
-                b.daysSinceHR = days;
-                b.liftoffScore = calcLS(b);
-                b.verdict = getLV(b.liftoffScore);
-                b.signals = getLSigs(b);
-              }
-            }
-          }).catch(() => {});
-          // Use cached value while async runs
-          daysSinceHR = DAYS_SINCE_HR_CACHE[bid]?.days ?? null;
-        }
-
-        // ── Pitcher matchup factor ─────────────────────────────
-        const batterHand = p?.person?.batSide?.code || GLOBAL_PLAYER_TEAM_MAP[bid]?.hand || 'R';
-        const hasMatchupAdv = (batterHand === 'L' && pitcherHand === 'R') ||
-                              (batterHand === 'R' && pitcherHand === 'L');
-        const pitcherFactor = hasMatchupAdv ? 1 : 0;
+        const signals = [];
+        if (due) signals.push({t:'⏳ Due', c:'ice'});
+        if (avgEV >= 95) signals.push({t:`${avgEV.toFixed(0)} mph EV`, c:'pos'});
+        if (barrel >= 10) signals.push({t:`${barrel.toFixed(0)}% Barrel`, c:'pos'});
 
         const b = {
           id: bid, name, team: ta, isHome,
-          // ── REAL Statcast season metrics ──
-          barrel, hardHit, avgEV, sweetSpot, pullAir, flyBall,
-          xwoba, xslg, hr, bbPct, kPct, oSwing,
-          // For calcLS compatibility
-          recentBarrel:   recentBrl,
-          recentHardHit:  recentHH,
-          recentAvgEV:    recentEV,
-          recentPullAir:  recentPull,
-          recentFlyBall:  recentFB,
-          daysSinceHR,
-          pitcherFactor,
-          homeHR: hr > 0 ? (hr / 162) * 1.05 : 0.04,
-          awayHR: hr > 0 ? (hr / 162) * 0.95 : 0.03,
+          grade: 'C', gradeColor: '#8bc4e8', gradeLabel: '👀 C',
+          projHR: 0, recentEV: avgEV, recentBrl: barrel,
+          totalFlags: 0, weightedScore: 0,
+          barrel, hardHit, avgEV, flyBall, hr,
+          daysSinceHR, due, signals,
+          pitcher: game[pitchSide]?.probablePitcher || '',
+          pitcherHand,
           pos: p?.position?.abbreviation || cachedP?.pos || '',
-          avgDist: cachedP?.avgDist || 0,
+          liftoffScore: Math.round(avgEV * 0.3 + barrel * 0.5),
+          verdict: {label:'👀 C', cls:'watch'},
           atBats: [],
         };
-        b.liftoffScore = calcLS(b);
-        b.verdict = getLV(b.liftoffScore);
-        b.signals = getLSigs(b);
         batters.push(b);
       }
     }
 
     if (batters.length === 0) return genSL();
-    const result = batters.sort((a, b) => b.liftoffScore - a.liftoffScore).slice(0, 12);
-    LIFTOFF_CACHE[game.gamePk] = result;
+    const result = batters.sort((a,b) => b.liftoffScore - a.liftoffScore).slice(0,12);
+    LIFTOFF_CACHE[cacheKey] = result;
     return result;
   } catch(err) {
     console.warn("fetchLiftoffBatters failed:", err.message);
@@ -3343,29 +3372,46 @@ function XRow({b}) {
 }
 
 function LRow({b, rank}) {
-  const vc = b.verdict.cls==="primed"?"#ff4020":b.verdict.cls==="hot"?"#ff8020":b.verdict.cls==="watch"?"#ffc840":"#38b8f2";
+  const vc = b.gradeColor || (b.verdict?.cls==="primed"?"#ff4020":b.verdict?.cls==="hot"?"#ff8020":b.verdict?.cls==="watch"?"#ffc840":"#38b8f2");
   const handleClick = () => {
     const cached = getCachedPlayer(b.id);
     openAtBatSlide(cached
       ? {...cached, name: b.name, team: b.team}
-      : {pid: b.id, name: b.name, team: b.team, avgEV: b.avgEV, barrel: b.barrel, hardHit: b.hardHit, flyBall: b.flyBall, hr: b.hr}
+      : {pid: b.id, name: b.name, team: b.team, avgEV: b.avgEV||b.recentEV||0, barrel: b.barrel||b.recentBrl||0, hardHit: b.hardHit||0, flyBall: b.flyBall||0, hr: b.hr||0}
     );
   };
+  const recentBrl = b.recentBrl ?? b.recentBarrel ?? b.barrel ?? 0;
+  const recentEV  = b.recentEV  ?? b.recentAvgEV  ?? b.avgEV  ?? 0;
+  const projHR    = b.projHR ?? 0;
   return <div className="lr" style={{cursor:'pointer'}} onClick={handleClick}>
     <div className="lrk" style={{color:rank<=3?vc:"var(--muted)"}}>{rank}</div>
-    <SRing score={b.liftoffScore} color={vc}/>
+    {/* Avatar replaces SRing */}
+    <PlayerAvatar pid={b.id} name={b.name} size={34} border={"1.5px solid "+vc+"60"}/>
     <div className="li">
-      <div className="ln">{b.name}</div>
-      <div className="lm">{getTeam(b.id, b.team)} · {b.isHome?"Home":"Away"} · {b.hr} HR</div>
+      <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginBottom:2}}>
+        {/* Engine grade badge */}
+        <span style={{padding:'1px 7px',borderRadius:5,fontSize:10,fontWeight:800,
+          fontFamily:"'Oswald',sans-serif",letterSpacing:.5,
+          background:vc+'18',border:'1px solid '+vc+'40',color:vc,flexShrink:0}}>
+          {b.grade||'C'}
+        </span>
+        {b.due && DUE_BADGE}
+        {b.isDiamond && <span style={{padding:'1px 5px',borderRadius:4,fontSize:9,fontWeight:700,
+          background:'rgba(255,204,0,.15)',color:'#ffcc00',border:'1px solid rgba(255,204,0,.3)',flexShrink:0}}>💎</span>}
+        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color:isKeyMatchup(b.id)?'#ff8020':'var(--text)'}}>{b.name}</span>
+      </div>
+      <div className="lm">{getTeam(b.id, b.team)} · {b.isHome?"Home":"Away"}{b.pitcher?` · vs ${b.pitcher}`:''}</div>
       <div className="ls">
-        <span className={`lv ${b.verdict.cls}`}>{b.verdict.label}</span>
-        {b.signals.map((s, i) => <span key={i} className={`stag ${s.c}`}>{s.t}</span>)}
+        {projHR > 0 && <span className="stag pos">{(projHR*100).toFixed(1)}% HR proj</span>}
+        {(b.signals||[]).filter(s=>s.t!=='⏳ Due'&&s.t!=='💎 Diamond').slice(0,3).map((s,i)=>(
+          <span key={i} className={`stag ${s.c}`}>{s.t}</span>
+        ))}
       </div>
     </div>
     <div className="lmini">
-      <div className="lms"><div className="lmsv" style={{color:((b.recentBarrel??0)>0?(b.recentBarrel??0):(b.barrel??0))>=12?"#ff8020":"var(--text)"}}>{((b.recentBarrel??0)>0?(b.recentBarrel??0):(b.barrel??0)).toFixed(0)}%</div><div className="lmsl">Barrel L7</div></div>
-      <div className="lms"><div className="lmsv" style={{color:(b.recentAvgEV??0)>=T.EV_HH?"#ff8020":"var(--text)"}}>{(b.recentAvgEV??0).toFixed(0)}</div><div className="lmsl">EV L7</div></div>
-      <div className="lms"><div className="lmsv" style={{color:b.daysSinceHR>=4&&b.daysSinceHR<=10?"#ffc840":"var(--text)"}}>{b.daysSinceHR!=null?`${b.daysSinceHR != null ? `${b.daysSinceHR}d` : "—"}`:"—"}</div><div className="lmsl">Since HR</div></div>
+      <div className="lms"><div className="lmsv" style={{color:recentBrl>=12?"#ff8020":"var(--text)"}}>{recentBrl.toFixed(0)}%</div><div className="lmsl">Brl L7</div></div>
+      <div className="lms"><div className="lmsv" style={{color:recentEV>=T.EV_HH?"#ff8020":"var(--text)"}}>{recentEV.toFixed(0)}</div><div className="lmsl">EV L7</div></div>
+      <div className="lms"><div className="lmsv" style={{color:b.daysSinceHR>=4&&b.daysSinceHR<=10?"#ffc840":"var(--text)"}}>{b.daysSinceHR!=null?`${b.daysSinceHR}d`:"—"}</div><div className="lmsl">Since HR</div></div>
     </div>
   </div>;
 }
@@ -5453,6 +5499,47 @@ const isKeyMatchup = (pid, name) => {
   return false;
 };
 const KEY_MATCHUP_STYLE = {color:'#ff8020',fontWeight:700}; // orange like "Heating Up"
+
+// Due sticker — batter's AB since last HR exceeds their season AB/HR rate
+// Uses PLAYER_DATA_CACHE (from players.json) for abPerHR and abSinceHR
+// Falls back to daysSinceHR * 3.8 AB/game if abSinceHR not in cache
+const isDue = (pid) => {
+  const p = getCachedPlayer(pid);
+  if (!p) return false;
+  // abPerHR: season AB / season HR (how often they homer on average)
+  const seasonHR = p.hr || 0;
+  const seasonPA = p.pa || p.ab || 0;
+  if (seasonHR < 3 || seasonPA < 20) return false; // need real sample
+  const abPerHR = seasonPA / seasonHR; // e.g. 18 AB per HR
+  // abSinceHR: from real window data or estimate from days since HR
+  const w7 = p.windows?.last7;
+  const abSinceHR = w7?.abSinceHR != null ? w7.abSinceHR
+    : p.daysSinceHR != null ? Math.round(p.daysSinceHR * 3.8)
+    : null;
+  if (abSinceHR == null) return false;
+  // "Due" = has gone more than 1.15x their normal AB/HR rate without a HR
+  return abSinceHR > abPerHR * 1.15;
+};
+// For daily_picks.csv rows (has season_pa and recent_hr_count)
+const isDueFromRow = (row, pid) => {
+  // Try player cache first (most accurate)
+  if (pid && isDue(pid)) return true;
+  // Fallback: use season_pa from engine row + hr from player cache
+  const seasonPA = parseFloat(row?.season_pa || 0);
+  const seasonHR = getCachedPlayer(pid)?.hr || 0;
+  const recentHRCount = parseInt(row?.recent_hr_count || 0);
+  if (seasonHR < 3 || seasonPA < 20) return false;
+  const abPerHR = seasonPA / seasonHR;
+  // If no HRs in the recent window and season rate suggests they should have
+  const recentPA = parseFloat(row?.recent_pa || 0);
+  return recentHRCount === 0 && recentPA > abPerHR * 1.0;
+};
+const DUE_BADGE = (
+  <span style={{padding:'2px 6px',borderRadius:4,fontSize:9,fontWeight:700,
+    background:'rgba(56,184,242,.15)',border:'1px solid rgba(56,184,242,.35)',
+    color:'var(--ice)',fontFamily:"'DM Mono',monospace",letterSpacing:.3,flexShrink:0}}
+    title="Due — AB since last HR exceeds their normal AB/HR rate">⏳ Due</span>
+);
 const WEATHER_ALERT_GAME_IDS = new Set(); // game_ids with weather concerns at game time
 const DAILY_GAME_MAP    = {}; // keyed by normalized game_id → Set of batting_teams
 let _notifyNewHR = null; // callback set by useHRNotifications hook
@@ -6653,6 +6740,7 @@ Write exactly 2-3 sentences. Focus on the single most important factor driving o
                                 <span style={{ padding: '1px 5px', borderRadius: 4, fontSize: 9, fontWeight: 700, background: 'rgba(39,201,122,.15)', color: '#27c97a', border: '1px solid rgba(39,201,122,.35)', flexShrink: 0 }} title="Hit Specialist">📈 H</span>}
                               {(b.is_xbh_specialist === 'True' || b.is_xbh_specialist === true) &&
                                 <span style={{ padding: '1px 5px', borderRadius: 4, fontSize: 9, fontWeight: 700, background: 'rgba(245,166,35,.15)', color: 'var(--accent2)', border: '1px solid rgba(245,166,35,.35)', flexShrink: 0 }} title="XBH Specialist">🔥 XBH</span>}
+                              {isDueFromRow(b, parseInt(b.batter_id)||0) && <span style={{ padding: '1px 5px', borderRadius: 4, fontSize: 9, fontWeight: 700, background: 'rgba(56,184,242,.15)', color: 'var(--ice)', border: '1px solid rgba(56,184,242,.35)', flexShrink: 0 }} title="Due — AB since last HR exceeds normal rate">⏳ Due</span>}
                             </div>
                             {(b.in_slump === 'True' || b.in_slump === true) &&
                               <span style={{ fontSize: 8, color: 'var(--ice)', fontFamily: "'DM Mono',monospace" }}>📉 slump</span>}
@@ -8414,6 +8502,7 @@ function MatchupEngineTab() {
                       🔥 XBH
                     </div>
                   )}
+                  {isDueFromRow(b, pid) && DUE_BADGE}
 
                   {/* Avatar + Batter name + hand */}
                   <div style={{display:'flex',alignItems:'center',gap:7,flex:1,minWidth:0}}>
