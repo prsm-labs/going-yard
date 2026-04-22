@@ -5774,8 +5774,7 @@ function HRTrackerTab() {
                                 {key:"launchAngle",label:"Angle",    tip:"Launch angle °. 25–35° = HR sweet spot"},
                 {key:"exitVelo",   label:"Exit Velo",tip:"Exit velocity mph. 95+ = hard hit, 103+ = elite"},
                 {key:"distance",   label:"Distance", tip:"Estimated distance in feet"},
-                {key:"pitchVelo",  label:"Pitch Velo",tip:"Pitch velocity mph when HR was hit"},
-                {key:"pitchType",  label:"Pitch",    tip:"Pitch type thrown"},
+{key:"pitchType",  label:"Pitch",    tip:"Pitch type thrown"},
                 {key:"pitcherName",label:"vs Pitcher",tip:"Pitcher who gave it up"},
                 {key:"gameId",     label:"Game",     tip:"Matchup"},
               ].map(c => (
@@ -5792,12 +5791,21 @@ function HRTrackerTab() {
                 const badgeCls = hr.rbi===4?"slam":hr.rbi>=2?"multi":"solo";
                 const evC = (hr.exitVelo||0)>=103?"dng":(hr.exitVelo||0)>=95?"hot":(hr.exitVelo||0)>=90?"warm":"avg";
                 const distC = (hr.distance||0)>=440?"dng":(hr.distance||0)>=420?"hot":(hr.distance||0)>=400?"warm":"avg";
+                // Live season HR# = cached season total (end of yesterday) + today's rank for this batter
+                const cachedHR = getCachedPlayer(hr.batterId)?.hr || 0;
+                const allBatterToday = HR_DATA.filter(h => String(h.batterId)===String(hr.batterId));
+                const todayRank = allBatterToday.findIndex(h =>
+                  h.gamePk===hr.gamePk &&
+                  (h.atBatIndex||h.playIndex||h.plateAppearance||0)===
+                  (hr.atBatIndex||hr.playIndex||hr.plateAppearance||0)
+                );
+                const seasonNum = cachedHR + (todayRank >= 0 ? todayRank + 1 : allBatterToday.length || 1);
                 return <tr key={i}>
                 <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:i<3?"var(--accent)":"var(--muted)"}}>{i+1}</span></td>
                 <td><span style={{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:600,color:"var(--text)"}}>{hr.timeET&&hr.timeET!==""?hr.timeET:`Inn. ${hr.inning}`}</span></td>
                 <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color:"var(--text)"}}>{hr.batterTeam}</span></td>
                 <td><div style={{display:'flex',alignItems:'center',gap:6}}><PlayerAvatar pid={hr.batterId} name={hr.batterName} size={24}/><div className="pn" style={{...(isKeyMatchup(hr.batterId, hr.batterName)?{color:'#ff8020',fontWeight:700}:{})}}>{hr.batterName}</div></div></td>
-                <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:15,color:'var(--accent)'}}>{getCachedPlayer(hr.batterId)?.hr||'—'}</span></td>
+                <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:15,color:'var(--accent)'}}>{seasonNum}</span></td>
                 <td>
                 <div style={{display:"flex",alignItems:"center",gap:6}}>
                 <span className={`hr-badge ${badgeCls}`}>{hr.hrType}</span>
@@ -5808,7 +5816,6 @@ function HRTrackerTab() {
                           <td><span className={`sv ${hr.launchAngle>=25&&hr.launchAngle<=35?"good":"avg"}`}>{hr.launchAngle!=null?`${hr.launchAngle}°`:"—"}</span></td>
                 <td><span className={`sv ${evC}`}>{hr.exitVelo!=null?`${hr.exitVelo}`:"—"}</span></td>
                 <td><span className={`sv ${distC}`}>{hr.distance!=null?`${hr.distance}ft`:"—"}</span></td>
-                <td><span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--muted)'}}>{hr.pitchVelo?`${hr.pitchVelo}mph`:"—"}</span></td>
                 <td>{hr.pitchType?<span style={{fontSize:10,fontFamily:"'DM Mono',monospace",padding:"2px 7px",borderRadius:4,background:"var(--surface2)",border:"1px solid var(--border)"}}>{hr.pitchType}</span>:"—"}</td>
                 <td><div style={{fontSize:11,fontWeight:500}}>{hr.pitcherName}</div><div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{hr.pitcherTeam}</div></td>
                 <td><span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:"var(--muted)"}}>{hr.gameId}</span></td>
