@@ -10235,18 +10235,14 @@ function WeatherTab() {
 
 
 let _hrLog = [];
-let _setHrLog = null;
+let _setHrLog = null;   // bell log setter — owned exclusively by useHRLog
+let _setQueue = null;   // banner queue setter — owned exclusively by useHRNotifications
 
 function useHRNotifications() {
   const [queue, setQueue] = useState([]);
-  const [log, setLog] = useState(_hrLog);
-
   useEffect(() => {
-    // Register this instance's setLog so new HRs update the bell
-    _setHrLog = setLog;
-
-    // Register queue setter — stored separately so banner and bell don't fight
-    const prevNotify = _notifyNewHR;
+    _setQueue = setQueue;
+    // Wire up the global notifier — calls both queue AND log setters
     _notifyNewHR = (hr) => {
       const notif = {
         id: Date.now() + Math.random(),
@@ -10261,33 +10257,22 @@ function useHRNotifications() {
         halfInning: hr.halfInning || 'top',
         time: new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',timeZone:'America/New_York'}),
       };
-      setQueue(q => [...q.slice(-2), notif]);
+      if (_setQueue) _setQueue(q => [...q.slice(-2), notif]);
       _hrLog = [notif, ..._hrLog].slice(0, 20);
       if (_setHrLog) _setHrLog([..._hrLog]);
     };
-    return () => {
-      // Only clear if we're still the registered handler
-      if (_notifyNewHR !== prevNotify) return;
-      _notifyNewHR = null; _setHrLog = null;
-    };
+    return () => { _setQueue = null; _notifyNewHR = null; };
   }, []);
-
   const dismiss = (id) => setQueue(q => q.filter(n => n.id !== id));
-  const clearLog = () => { _hrLog = []; setLog([]); };
-  return { queue, dismiss, log, clearLog };
+  return { queue, dismiss };
 }
 
-// Lightweight log-only hook for NotificationBell — doesn't fight over _notifyNewHR
+// Bell-only hook — reads log, never touches _notifyNewHR or queue
 function useHRLog() {
   const [log, setLog] = useState(_hrLog);
   useEffect(() => {
-    // Subscribe to log updates without overwriting the queue handler
-    const prev = _setHrLog;
-    _setHrLog = (newLog) => {
-      setLog(newLog);
-      if (prev && prev !== _setHrLog) prev(newLog);
-    };
-    return () => { if (_setHrLog !== prev) _setHrLog = prev; };
+    _setHrLog = setLog;
+    return () => { _setHrLog = null; };
   }, []);
   const clearLog = () => { _hrLog = []; setLog([]); };
   return { log, clearLog };
