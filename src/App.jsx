@@ -137,7 +137,8 @@ const styles = `
   .stag.neg{background:rgba(56,184,242,.08);color:var(--ice);border:1px solid rgba(56,184,242,.15);}
   .stag.neu{background:rgba(90,112,128,.1);color:var(--muted);border:1px solid var(--border);}
   .stag.fire{background:rgba(255,90,0,.14);color:#ff7020;border:1px solid rgba(255,90,0,.25);}
-  .lr{padding:10px 15px;border-bottom:1px solid rgba(30,45,58,.4);display:flex;align-items:center;gap:10px;transition:background .15s;}
+  .lr{padding:10px 12px;border-bottom:1px solid rgba(30,45,58,.4);display:flex;align-items:center;gap:8px;transition:background .15s;}
+  .lr .lmini{width:104px;flex-shrink:0;}
   .lr:last-child{border-bottom:none;}
   .lr:hover{background:rgba(255,255,255,.02);}
   .lrk{font-family:'Oswald',sans-serif;font-size:17px;color:var(--muted);min-width:17px;}
@@ -150,10 +151,10 @@ const styles = `
   .lv.hot{background:rgba(255,122,0,.15);color:#ff9a30;border:1px solid rgba(255,122,0,.3);}
   .lv.watch{background:rgba(255,183,0,.12);color:#ffc840;border:1px solid rgba(255,183,0,.22);}
   .lv.cold{background:rgba(56,184,242,.1);color:var(--ice);border:1px solid rgba(56,184,242,.2);}
-  .lmini{display:flex;gap:8px;align-items:center;flex-shrink:0;}
-  .lms{text-align:center;}
-  .lmsv{font-family:'DM Mono',monospace;font-size:11px;font-weight:600;}
-  .lmsl{font-size:8px;color:var(--muted);font-family:'DM Mono',monospace;text-transform:uppercase;}
+  .lmini{display:grid;grid-template-columns:repeat(4,1fr);gap:3px;flex-shrink:0;min-width:0;}
+  .lms{text-align:center;padding:2px 3px;background:rgba(255,255,255,.03);border-radius:4px;}
+  .lmsv{font-family:'DM Mono',monospace;font-size:10px;font-weight:700;line-height:1.2;}
+  .lmsl{font-size:7px;color:var(--muted);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:.3px;}
   .sr{position:relative;width:42px;height:42px;flex-shrink:0;}
   .sr svg{transform:rotate(-90deg);}
   .srv{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Oswald',sans-serif;font-size:13px;}
@@ -3404,7 +3405,6 @@ function LRow({b, rank}) {
           background:'rgba(255,204,0,.15)',color:'#ffcc00',border:'1px solid rgba(255,204,0,.3)',flexShrink:0}}>💎</span>}
         <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color:isKeyMatchup(b.id)?'#ff8020':'var(--text)'}}>{b.name}</span>
       </div>
-      <div className="lm">{getTeam(b.id, b.team)} · {b.isHome?"Home":"Away"}{b.pitcher?` · vs ${b.pitcher}`:''}</div>
       <div className="ls">
         {projHR > 0 && <span className="stag pos">{(projHR*100).toFixed(1)}% HR proj</span>}
         {(b.signals||[]).filter(s=>s.t!=='⏳ Due'&&s.t!=='💎 Diamond').slice(0,3).map((s,i)=>(
