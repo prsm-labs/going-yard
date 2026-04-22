@@ -3424,11 +3424,17 @@ function LRow({b, rank}) {
       const brl     = b.recentBrl ?? b.barrel  ?? 0;
       const fb      = b.recentFB  ?? b.flyBall ?? 0;
       const ev      = b.recentEV  ?? b.avgEV   ?? 0;
-      const seasonHR = cp?.hr || 0;
-      const seasonPA = cp?.pa || cp?.ab || 0;
-      const abPerHR  = seasonHR>0 ? Math.round(seasonPA/seasonHR) : null;
-      const abSinceHR = cp?.windows?.last7?.abSinceHR
-        ?? (cp?.daysSinceHR!=null ? Math.round(cp.daysSinceHR*3.8) : null);
+      // abPerHR — use pipeline value directly (ab/hr_count from players.json)
+      // fallback: compute from pa/hr if abPerHR not stored
+      const abPerHR  = cp?.abPerHR && cp.abPerHR < 99
+        ? Math.round(cp.abPerHR)
+        : (cp?.hr > 0 ? Math.round((cp.pa || cp.ab || 1) / cp.hr) : null);
+      // abSinceHR — from real window data, then daysSinceHR * 3.8 estimate
+      const abSinceHR = cp?.windows?.last7?.abSinceHR != null
+        ? cp.windows.last7.abSinceHR
+        : cp?.daysSinceHR != null
+          ? Math.round(cp.daysSinceHR * 3.8)
+          : null;
       const due = abSinceHR!=null && abPerHR!=null && abSinceHR > abPerHR*1.15;
       return <div className="lmini">
         <div className="lms"><div className="lmsv" style={{color:brl>=10?'#ff8020':brl>=6?'var(--accent2)':'var(--text)'}}>{brl>0?brl.toFixed(0)+'%':'—'}</div><div className="lmsl">Brl</div></div>
