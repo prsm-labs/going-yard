@@ -4033,7 +4033,7 @@ function InlinePitcherCard({ pitcherId, pitcherName }) {
           <span style={{fontSize:9,color:'var(--ice)',fontFamily:"'DM Mono',monospace",
             fontWeight:700,flexShrink:0,letterSpacing:.5}}>SP</span>
           <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:600,fontSize:12,
-            color:'var(--text)',flex:1,minWidth:0,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+            color:'var(--text)',flex:1,minWidth:0,whiteSpace:'normal',wordBreak:'break-word',lineHeight:1.2}}>
             {pitcherName || 'TBD'}
           </span>
           {stats?.hand && (
@@ -4089,6 +4089,7 @@ function InlinePitcherCard({ pitcherId, pitcherName }) {
 
 function LineupsView({ date }) {
   const [lineupGames, setLineupGames] = useState([]);
+  const [lineupGameFilter, setLineupGameFilter] = useState('all'); // gamePk or 'all'
   const [loading, setLoading]         = useState(true);
   const [lastUpdate, setLastUpdate]   = useState(null);
   const [refreshing, setRefreshing]   = useState(false);
@@ -4300,7 +4301,7 @@ function LineupsView({ date }) {
                 <PosChip pos={pos}/>
                 <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:600,fontSize:11,
                   color:isKeyMatchup(p.id)?'#ff8020':'var(--text)',flex:1,minWidth:0,
-                  whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                  whiteSpace:'normal',wordBreak:'break-word',lineHeight:1.2}}>
                   {name}
                 </span>
                 {ev >= 90 && <span style={{fontSize:8,color:ev>=95?'#ff8020':'var(--muted)',
@@ -4333,6 +4334,26 @@ function LineupsView({ date }) {
         </button>
       </div>
 
+      {!loading && lineupGames.length > 0 && (
+        <div style={{marginBottom:12,display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+          <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1}}>Jump to game:</span>
+          <select value={lineupGameFilter} onChange={e=>setLineupGameFilter(e.target.value)}
+            style={{padding:'5px 10px',borderRadius:7,background:'var(--surface2)',
+              border:'1px solid var(--border)',color:'var(--text)',
+              fontFamily:"'DM Mono',monospace",fontSize:11,cursor:'pointer'}}>
+            <option value='all'>All Games</option>
+            {lineupGames.map(g=>(
+              <option key={g.gamePk} value={String(g.gamePk)}>
+                {g.away.abbr} @ {g.home.abbr}{g.gameTime ? ' · '+g.gameTime : ''}{g.status==='Live'?' 🔴':g.status==='Final'?' ✓':''}
+              </option>
+            ))}
+          </select>
+          {lineupGameFilter!=='all' && <button onClick={()=>setLineupGameFilter('all')}
+            style={{padding:'4px 10px',borderRadius:6,border:'1px solid rgba(255,64,32,.3)',
+              background:'rgba(255,64,32,.08)',color:'var(--accent)',
+              fontFamily:"'DM Mono',monospace",fontSize:10,cursor:'pointer',fontWeight:700}}>✕ All</button>}
+        </div>
+      )}
       {loading ? (
         <div className="lw"><div className="sp"/><div className="lt">Fetching lineups…</div></div>
       ) : lineupGames.length === 0 ? (
@@ -4341,7 +4362,7 @@ function LineupsView({ date }) {
         </div>
       ) : (
         <div style={{display:'flex',flexDirection:'column',gap:12}}>
-          {lineupGames.map(game => {
+          {lineupGames.filter(g=>lineupGameFilter==='all'||String(g.gamePk)===lineupGameFilter).map(game => {
             const eitherConfirmed = game.away.confirmed || game.home.confirmed;
             const confirmed = game.away.confirmed && game.home.confirmed;
             const statusColor = game.status==='Live'?'var(--accent)':game.status==='Final'?'var(--muted)':'#27c97a';
@@ -5664,7 +5685,7 @@ function HRTrackerTab() {
             h.timeET||"",h.batterTeam||"",h.batterName||"",h.hrType||"",h.rbi||0,
             `${h.halfInning==="top"?"▲":"▼"}${h.inning}`,h.outs||0,
             h.launchAngle>0?h.launchAngle.toFixed(1):"",
-            h.exitVelo>0?h.exitVelo.toFixed(1):"",
+            h.exitVelo>0?h.exitVelo.toFixed(1):"",h.pitchVelo>0?h.pitchVelo.toFixed(1):"",h._seasonHRNum||"",
             h.distance||"",h.pitchType||"",h.pitcherName||"",
             `${h.awayAbbr} @ ${h.homeAbbr}`
           ].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(","));
@@ -5747,11 +5768,13 @@ function HRTrackerTab() {
                 {key:"chronoIndex",label:"Time (ET)", tip:"Sorted newest HR first by inning/at-bat"},
                 {key:"batterTeam", label:"Team",     tip:"Batter's team"},
                 {key:"batterName", label:"Batter",   tip:"Batter name"},
+                {key:"seasonHRs",  label:"HR#",      tip:"Batter's season HR total after this home run"},
                 {key:"rbi",        label:"Type / RBI",tip:"HR type and RBIs"},
                 {key:"inning",     label:"Inning",   tip:"Inning hit"},
                                 {key:"launchAngle",label:"Angle",    tip:"Launch angle °. 25–35° = HR sweet spot"},
                 {key:"exitVelo",   label:"Exit Velo",tip:"Exit velocity mph. 95+ = hard hit, 103+ = elite"},
                 {key:"distance",   label:"Distance", tip:"Estimated distance in feet"},
+                {key:"pitchVelo",  label:"Pitch Velo",tip:"Pitch velocity mph when HR was hit"},
                 {key:"pitchType",  label:"Pitch",    tip:"Pitch type thrown"},
                 {key:"pitcherName",label:"vs Pitcher",tip:"Pitcher who gave it up"},
                 {key:"gameId",     label:"Game",     tip:"Matchup"},
@@ -5774,6 +5797,7 @@ function HRTrackerTab() {
                 <td><span style={{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:600,color:"var(--text)"}}>{hr.timeET&&hr.timeET!==""?hr.timeET:`Inn. ${hr.inning}`}</span></td>
                 <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color:"var(--text)"}}>{hr.batterTeam}</span></td>
                 <td><div style={{display:'flex',alignItems:'center',gap:6}}><PlayerAvatar pid={hr.batterId} name={hr.batterName} size={24}/><div className="pn" style={{...(isKeyMatchup(hr.batterId, hr.batterName)?{color:'#ff8020',fontWeight:700}:{})}}>{hr.batterName}</div></div></td>
+                <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:15,color:'var(--accent)'}}>{getCachedPlayer(hr.batterId)?.hr||'—'}</span></td>
                 <td>
                 <div style={{display:"flex",alignItems:"center",gap:6}}>
                 <span className={`hr-badge ${badgeCls}`}>{hr.hrType}</span>
@@ -5784,6 +5808,7 @@ function HRTrackerTab() {
                           <td><span className={`sv ${hr.launchAngle>=25&&hr.launchAngle<=35?"good":"avg"}`}>{hr.launchAngle!=null?`${hr.launchAngle}°`:"—"}</span></td>
                 <td><span className={`sv ${evC}`}>{hr.exitVelo!=null?`${hr.exitVelo}`:"—"}</span></td>
                 <td><span className={`sv ${distC}`}>{hr.distance!=null?`${hr.distance}ft`:"—"}</span></td>
+                <td><span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--muted)'}}>{hr.pitchVelo?`${hr.pitchVelo}mph`:"—"}</span></td>
                 <td>{hr.pitchType?<span style={{fontSize:10,fontFamily:"'DM Mono',monospace",padding:"2px 7px",borderRadius:4,background:"var(--surface2)",border:"1px solid var(--border)"}}>{hr.pitchType}</span>:"—"}</td>
                 <td><div style={{fontSize:11,fontWeight:500}}>{hr.pitcherName}</div><div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{hr.pitcherTeam}</div></td>
                 <td><span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:"var(--muted)"}}>{hr.gameId}</span></td>
@@ -7974,7 +7999,8 @@ function MatchupEngineTab() {
       <button style={stBtn('simlab')}   onClick={()=>setSubTab('simlab')}>🧠 Sim Lab</button>
       <button style={stBtn('batters')}  onClick={()=>setSubTab('batters')}>🧢 Batters</button>
       <button style={stBtn('pitchers')} onClick={()=>setSubTab('pitchers')}>⚾ Pitchers</button>
-      <button style={stBtn('barrel')}   onClick={()=>setSubTab('barrel')}>🛢 Daily Barrel</button>
+      {/* Daily Barrel — hidden until data pipeline and UI are ready */}
+      {/* <button style={stBtn('barrel')} onClick={()=>setSubTab('barrel')}>🛢 Daily Barrel</button> */}
     </div>
 
     {/* Date slot toggle — only shown for matchups and simlab */}
@@ -10189,7 +10215,47 @@ function HRNotificationBanner({ notif, onDismiss }) {
 
   useEffect(() => {
     const tin = setTimeout(() => setVisible(true), 50);
-    const tout = setTimeout(() => { setVisible(false); setTimeout(onDismiss, 400); }, 6000);
+    const tout = setTimeout(() => { setVisible(false); setTimeout(onDismiss, 400); }, 30000); // 30s — user must swipe/tap to dismiss
+
+    // Audio alert — Web Audio API crack + crowd roar simulation
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const playSound = () => {
+        const now = ctx.currentTime;
+        // Bat crack — sharp transient
+        const crack = ctx.createOscillator();
+        const crackGain = ctx.createGain();
+        crack.connect(crackGain); crackGain.connect(ctx.destination);
+        crack.type = 'sawtooth';
+        crack.frequency.setValueAtTime(800, now);
+        crack.frequency.exponentialRampToValueAtTime(120, now + 0.08);
+        crackGain.gain.setValueAtTime(0.35, now);
+        crackGain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+        crack.start(now); crack.stop(now + 0.12);
+        // Crowd roar — noise burst that swells
+        const bufSize = ctx.sampleRate * 1.2;
+        const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1);
+        const noise = ctx.createBufferSource();
+        noise.buffer = buf;
+        const noiseFilter = ctx.createBiquadFilter();
+        noiseFilter.type = 'bandpass';
+        noiseFilter.frequency.value = 400;
+        noiseFilter.Q.value = 0.5;
+        const noiseGain = ctx.createGain();
+        noise.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(ctx.destination);
+        noiseGain.gain.setValueAtTime(0, now + 0.05);
+        noiseGain.gain.linearRampToValueAtTime(0.18, now + 0.3);
+        noiseGain.gain.linearRampToValueAtTime(0.22, now + 0.6);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+        noise.start(now + 0.05); noise.stop(now + 1.2);
+      };
+      // Resume context if suspended (browser autoplay policy)
+      if (ctx.state === 'suspended') ctx.resume().then(playSound);
+      else playSound();
+    } catch(e) { /* audio not supported — silent fallback */ }
+
     return () => { clearTimeout(tin); clearTimeout(tout); };
   }, []);
 
@@ -10274,9 +10340,13 @@ function HRNotificationBanner({ notif, onDismiss }) {
 
         {/* Dismiss */}
         <div style={{
+          display:'flex',flexDirection:'column',alignItems:'center',gap:2,
           fontSize:16, color:'var(--muted)', flexShrink:0,
           padding:'4px 8px', cursor:'pointer',
-        }}>×</div>
+        }}>
+          <span>×</span>
+          <span style={{fontSize:7,fontFamily:"'DM Mono',monospace",color:'var(--muted)',letterSpacing:.5}}>SWIPE</span>
+        </div>
       </div>
     </div>
   );
