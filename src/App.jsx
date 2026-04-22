@@ -137,11 +137,11 @@ const styles = `
   .stag.neg{background:rgba(56,184,242,.08);color:var(--ice);border:1px solid rgba(56,184,242,.15);}
   .stag.neu{background:rgba(90,112,128,.1);color:var(--muted);border:1px solid var(--border);}
   .stag.fire{background:rgba(255,90,0,.14);color:#ff7020;border:1px solid rgba(255,90,0,.25);}
-  .lr{padding:10px 12px;border-bottom:1px solid rgba(30,45,58,.4);display:flex;align-items:center;gap:8px;transition:background .15s;}
-  .lr .lmini{width:104px;flex-shrink:0;}
+  .lr{padding:9px 12px;border-bottom:1px solid rgba(30,45,58,.4);display:flex;flex-direction:column;gap:5px;transition:background .15s;}
+  .lr-top{display:flex;align-items:center;gap:7px;min-width:0;}
   .lr:last-child{border-bottom:none;}
   .lr:hover{background:rgba(255,255,255,.02);}
-  .lrk{font-family:'Oswald',sans-serif;font-size:17px;color:var(--muted);min-width:17px;}
+  .lrk{font-family:'Oswald',sans-serif;font-size:14px;color:var(--muted);min-width:14px;flex-shrink:0;}
   .li{flex:1;min-width:0;}
   .ln{font-weight:600;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .lm{font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:1px;}
@@ -151,8 +151,8 @@ const styles = `
   .lv.hot{background:rgba(255,122,0,.15);color:#ff9a30;border:1px solid rgba(255,122,0,.3);}
   .lv.watch{background:rgba(255,183,0,.12);color:#ffc840;border:1px solid rgba(255,183,0,.22);}
   .lv.cold{background:rgba(56,184,242,.1);color:var(--ice);border:1px solid rgba(56,184,242,.2);}
-  .lmini{display:grid;grid-template-columns:repeat(4,1fr);gap:3px;flex-shrink:0;min-width:0;}
-  .lms{text-align:center;padding:2px 3px;background:rgba(255,255,255,.03);border-radius:4px;}
+  .lmini{display:grid;grid-template-columns:repeat(5,1fr);gap:3px;width:100%;}
+  .lms{text-align:center;padding:3px 2px;background:rgba(255,255,255,.04);border-radius:4px;}
   .lmsv{font-family:'DM Mono',monospace;font-size:10px;font-weight:700;line-height:1.2;}
   .lmsl{font-size:7px;color:var(--muted);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:.3px;}
   .sr{position:relative;width:42px;height:42px;flex-shrink:0;}
@@ -244,7 +244,7 @@ const styles = `
     html,body,#root,.app{overflow-x:clip;max-width:100%;width:100%;}
     .content{padding:10px;}.header{padding:10px 12px;}
     .gg{grid-template-columns:1fr;}.cards{grid-template-columns:repeat(2,1fr);}
-    .xg{grid-template-columns:repeat(2,1fr);}.lmini{display:none;}
+    .xg{grid-template-columns:repeat(2,1fr);}
     .bvr{grid-template-columns:auto 1fr;}.h2h{display:none;}.pmg{grid-template-columns:repeat(2,1fr);}
     .tabs{overflow-x:auto;-webkit-overflow-scrolling:touch;flex-wrap:nowrap;padding:0 8px;}
     @media(orientation:landscape){.landscape-hint{display:none!important;}}
@@ -3386,44 +3386,56 @@ function LRow({b, rank}) {
   const recentEV  = b.recentEV  ?? b.recentAvgEV  ?? b.avgEV  ?? 0;
   const projHR    = b.projHR ?? 0;
   return <div className="lr" style={{cursor:'pointer'}} onClick={handleClick}>
-    <div className="lrk" style={{color:rank<=3?vc:"var(--muted)"}}>{rank}</div>
-    {/* Avatar replaces SRing */}
-    <PlayerAvatar pid={b.id} name={b.name} size={34} border={"1.5px solid "+vc+"60"}/>
-    <div className="li">
-      <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginBottom:2}}>
-        {/* Engine grade badge — only for key matchup batters (orange names) */}
-        {b.grade && isKeyMatchup(b.id) && <span style={{padding:'1px 7px',borderRadius:5,fontSize:10,fontWeight:800,
-          fontFamily:"'Oswald',sans-serif",letterSpacing:.5,
-          background:vc+'18',border:'1px solid '+vc+'40',color:vc,flexShrink:0}}>
-          {b.grade}
-        </span>}
-        {LINEUP_STATUS[b.id]?.status === 'confirmed' && (
-          <span style={{fontSize:11,flexShrink:0}} title="Confirmed in lineup">✅</span>
+    {/* Row 1: rank + avatar + name/badges/signals */}
+    <div className="lr-top">
+      <div className="lrk" style={{color:rank<=3?vc:"var(--muted)"}}>{rank}</div>
+      <PlayerAvatar pid={b.id} name={b.name} size={30} border={"1.5px solid "+vc+"60"}/>
+      <div className="li">
+        <div style={{display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>
+          {b.grade && isKeyMatchup(b.id) && <span style={{padding:'1px 6px',borderRadius:4,fontSize:9,fontWeight:800,
+            fontFamily:"'Oswald',sans-serif",letterSpacing:.5,
+            background:vc+'18',border:'1px solid '+vc+'40',color:vc,flexShrink:0}}>
+            {b.grade}
+          </span>}
+          {LINEUP_STATUS[b.id]?.status === 'confirmed' && (
+            <span style={{fontSize:10,flexShrink:0}} title="Confirmed in lineup">✅</span>
+          )}
+          {b.due && DUE_BADGE}
+          {b.isDiamond && <span style={{padding:'1px 4px',borderRadius:4,fontSize:9,fontWeight:700,
+            background:'rgba(255,204,0,.15)',color:'#ffcc00',border:'1px solid rgba(255,204,0,.3)',flexShrink:0}}>💎</span>}
+          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,
+            color:isKeyMatchup(b.id)?'#ff8020':'var(--text)',
+            whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:140}}>{b.name}</span>
+        </div>
+        {/* Signals — only if there's something meaningful */}
+        {(projHR>0 || (b.signals||[]).filter(s=>s.t!=='⏳ Due'&&s.t!=='💎 Diamond').length>0) && (
+          <div className="ls">
+            {projHR > 0 && <span className="stag pos">{(projHR*100).toFixed(1)}% proj</span>}
+            {(b.signals||[]).filter(s=>s.t!=='⏳ Due'&&s.t!=='💎 Diamond').slice(0,2).map((s,i)=>(
+              <span key={i} className={`stag ${s.c}`}>{s.t}</span>
+            ))}
+          </div>
         )}
-        {b.due && DUE_BADGE}
-        {b.isDiamond && <span style={{padding:'1px 5px',borderRadius:4,fontSize:9,fontWeight:700,
-          background:'rgba(255,204,0,.15)',color:'#ffcc00',border:'1px solid rgba(255,204,0,.3)',flexShrink:0}}>💎</span>}
-        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color:isKeyMatchup(b.id)?'#ff8020':'var(--text)'}}>{b.name}</span>
-      </div>
-      <div className="ls">
-        {projHR > 0 && <span className="stag pos">{(projHR*100).toFixed(1)}% HR proj</span>}
-        {(b.signals||[]).filter(s=>s.t!=='⏳ Due'&&s.t!=='💎 Diamond').slice(0,3).map((s,i)=>(
-          <span key={i} className={`stag ${s.c}`}>{s.t}</span>
-        ))}
       </div>
     </div>
-    {/* lmini: Brl% · FB% · EV L7 · AB/HR — all from engine recent window */}
+    {/* Row 2: 5-stat strip — full width, always visible */}
     {(()=>{
       const cp = getCachedPlayer(b.id);
-      const brl    = b.recentBrl ?? b.barrel ?? 0;
-      const fb     = b.recentFB  ?? b.flyBall ?? 0;
-      const ev     = b.recentEV  ?? b.avgEV   ?? 0;
-      const abPerHR = cp?.hr>0 ? Math.round((cp.pa||cp.ab||1)/cp.hr) : null;
+      const brl     = b.recentBrl ?? b.barrel  ?? 0;
+      const fb      = b.recentFB  ?? b.flyBall ?? 0;
+      const ev      = b.recentEV  ?? b.avgEV   ?? 0;
+      const seasonHR = cp?.hr || 0;
+      const seasonPA = cp?.pa || cp?.ab || 0;
+      const abPerHR  = seasonHR>0 ? Math.round(seasonPA/seasonHR) : null;
+      const abSinceHR = cp?.windows?.last7?.abSinceHR
+        ?? (cp?.daysSinceHR!=null ? Math.round(cp.daysSinceHR*3.8) : null);
+      const due = abSinceHR!=null && abPerHR!=null && abSinceHR > abPerHR*1.15;
       return <div className="lmini">
-        <div className="lms"><div className="lmsv" style={{color:brl>=10?'#ff8020':brl>=6?'var(--accent2)':'var(--text)'}}>{brl>0?brl.toFixed(0)+'%':'—'}</div><div className="lmsl">Brl L7</div></div>
-        <div className="lms"><div className="lmsv" style={{color:fb>=30?'#ff8020':fb>=22?'var(--accent2)':'var(--text)'}}>{fb>0?fb.toFixed(0)+'%':'—'}</div><div className="lmsl">FB% L7</div></div>
-        <div className="lms"><div className="lmsv" style={{color:ev>=T.EV_HH?'#ff8020':'var(--text)'}}>{ev>0?ev.toFixed(0):'—'}</div><div className="lmsl">EV L7</div></div>
+        <div className="lms"><div className="lmsv" style={{color:brl>=10?'#ff8020':brl>=6?'var(--accent2)':'var(--text)'}}>{brl>0?brl.toFixed(0)+'%':'—'}</div><div className="lmsl">Brl</div></div>
+        <div className="lms"><div className="lmsv" style={{color:fb>=30?'#ff8020':fb>=22?'var(--accent2)':'var(--text)'}}>{fb>0?fb.toFixed(0)+'%':'—'}</div><div className="lmsl">FB%</div></div>
+        <div className="lms"><div className="lmsv" style={{color:ev>=T.EV_HH?'#ff8020':'var(--text)'}}>{ev>0?ev.toFixed(0):'—'}</div><div className="lmsl">EV</div></div>
         <div className="lms"><div className="lmsv" style={{color:abPerHR&&abPerHR<=18?'#ff8020':abPerHR&&abPerHR<=25?'#ffc840':'var(--text)'}}>{abPerHR||'—'}</div><div className="lmsl">AB/HR</div></div>
+        <div className="lms" style={{background:due?'rgba(56,184,242,.1)':undefined}}><div className="lmsv" style={{color:due?'var(--ice)':abSinceHR!=null&&abSinceHR>=5?'#ffc840':'var(--text)'}}>{abSinceHR!=null?abSinceHR:'—'}</div><div className="lmsl">Since HR</div></div>
       </div>;
     })()}
   </div>;
