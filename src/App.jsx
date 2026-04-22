@@ -5654,7 +5654,7 @@ function HRTicker({ onHRClick }) {
   const [tickerReady, setTickerReady] = useState(false);
   useEffect(() => {
     fetchHRs(true).then(d => { setHrs(d); setTickerReady(true); });
-    const id = setInterval(() => fetchHRs(false).then(setHrs), 45000);
+    const id = setInterval(() => fetchHRs(false).then(setHrs), 20000);
     return () => clearInterval(id);
   }, []);
 
@@ -5929,18 +5929,18 @@ function HRTrackerTab() {
                 const evC = (hr.exitVelo||0)>=103?"dng":(hr.exitVelo||0)>=95?"hot":(hr.exitVelo||0)>=90?"warm":"avg";
                 const distC = (hr.distance||0)>=440?"dng":(hr.distance||0)>=420?"hot":(hr.distance||0)>=400?"warm":"avg";
                 // Live season HR# = cached season total (end of yesterday) + today's rank for this batter
+                // HR# = season total from players.json (updated 3am daily by pipeline)
+                // players.json hr count = end of yesterday. Today's HRs in `hrs` add on top.
                 const cachedHR = getCachedPlayer(hr.batterId)?.hr || 0;
-                // allBatterToday uses `hrs` (component state) not HR_DATA global
-                // so it's always in sync with what's displayed
+                // Build ordered list of today's HRs for this batter using simple array index
                 const allBatterToday = hrs.filter(h => String(h.batterId)===String(hr.batterId));
-                const todayRank = allBatterToday.findIndex(h =>
-                  h.gamePk===hr.gamePk &&
-                  (h.atBatIndex||h.playIndex||h.plateAppearance||0)===
-                  (hr.atBatIndex||hr.playIndex||hr.plateAppearance||0)
-                );
-                const todayNum = todayRank >= 0 ? todayRank + 1 : 1;
-                // Season HR# = end-of-yesterday total + today's rank for this batter
-                // If cache not loaded yet (cachedHR=0), show today's count only
+                // Use index in the displayed sorted list (i is already sorted by time)
+                // Count HRs for this batter that appear at or before position i
+                const todayNum = sorted
+                  .slice(0, i + 1)
+                  .filter(h => String(h.batterId)===String(hr.batterId))
+                  .length;
+                // seasonNum = pipeline total + today's running count
                 const seasonNum = cachedHR > 0 ? cachedHR + todayNum : todayNum;
                 return <tr key={i}>
                 <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:i<3?"var(--accent)":"var(--muted)"}}>{i+1}</span></td>
@@ -10238,6 +10238,57 @@ let _hrLog = [];
 let _setHrLog = null;   // bell log setter — owned exclusively by useHRLog
 let _setQueue = null;   // banner queue setter — owned exclusively by useHRNotifications
 
+// Shared AudioContext — created once, resumed on first user gesture
+let _audioCtx = null;
+const getAudioCtx = () => {
+  if (!_audioCtx) {
+    try { _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {}
+  }
+  return _audioCtx;
+};
+// Prime the audio context on any user interaction so autoplay policy is satisfied
+if (typeof window !== 'undefined') {
+  const primeAudio = () => { const ctx = getAudioCtx(); if (ctx?.state === 'suspended') ctx.resume(); };
+  ['click','touchstart','keydown'].forEach(e => window.addEventListener(e, primeAudio, {once:false, passive:true}));
+}
+function playHRSound() {
+  try {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    const play = () => {
+      const now = ctx.currentTime;
+      // Bat crack — sharp sawtooth transient
+      const crack = ctx.createOscillator();
+      const crackGain = ctx.createGain();
+      crack.connect(crackGain); crackGain.connect(ctx.destination);
+      crack.type = 'sawtooth';
+      crack.frequency.setValueAtTime(900, now);
+      crack.frequency.exponentialRampToValueAtTime(80, now + 0.09);
+      crackGain.gain.setValueAtTime(0.4, now);
+      crackGain.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
+      crack.start(now); crack.stop(now + 0.13);
+      // Crowd roar — bandpass noise swell
+      const bufSize = ctx.sampleRate * 1.5;
+      const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let k = 0; k < bufSize; k++) data[k] = Math.random() * 2 - 1;
+      const noise = ctx.createBufferSource();
+      noise.buffer = buf;
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'bandpass'; filter.frequency.value = 450; filter.Q.value = 0.6;
+      const noiseGain = ctx.createGain();
+      noise.connect(filter); filter.connect(noiseGain); noiseGain.connect(ctx.destination);
+      noiseGain.gain.setValueAtTime(0, now + 0.06);
+      noiseGain.gain.linearRampToValueAtTime(0.20, now + 0.35);
+      noiseGain.gain.linearRampToValueAtTime(0.25, now + 0.7);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
+      noise.start(now + 0.06); noise.stop(now + 1.5);
+    };
+    if (ctx.state === 'suspended') ctx.resume().then(play);
+    else play();
+  } catch(e) { /* silent fallback */ }
+}
+
 function useHRNotifications() {
   const [queue, setQueue] = useState([]);
   useEffect(() => {
@@ -10260,6 +10311,7 @@ function useHRNotifications() {
       if (_setQueue) _setQueue(q => [...q.slice(-2), notif]);
       _hrLog = [notif, ..._hrLog].slice(0, 20);
       if (_setHrLog) _setHrLog([..._hrLog]);
+      playHRSound();
     };
     return () => { _setQueue = null; _notifyNewHR = null; };
   }, []);
@@ -10293,48 +10345,8 @@ function HRNotificationBanner({ notif, onDismiss }) {
   const t = typeMap[notif.type] || typeMap['Solo'];
 
   useEffect(() => {
-    const tin = setTimeout(() => setVisible(true), 50);
-    const tout = setTimeout(() => { setVisible(false); setTimeout(onDismiss, 400); }, 30000); // 30s — user must swipe/tap to dismiss
-
-    // Audio alert — Web Audio API crack + crowd roar simulation
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const playSound = () => {
-        const now = ctx.currentTime;
-        // Bat crack — sharp transient
-        const crack = ctx.createOscillator();
-        const crackGain = ctx.createGain();
-        crack.connect(crackGain); crackGain.connect(ctx.destination);
-        crack.type = 'sawtooth';
-        crack.frequency.setValueAtTime(800, now);
-        crack.frequency.exponentialRampToValueAtTime(120, now + 0.08);
-        crackGain.gain.setValueAtTime(0.35, now);
-        crackGain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
-        crack.start(now); crack.stop(now + 0.12);
-        // Crowd roar — noise burst that swells
-        const bufSize = ctx.sampleRate * 1.2;
-        const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
-        const data = buf.getChannelData(0);
-        for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1);
-        const noise = ctx.createBufferSource();
-        noise.buffer = buf;
-        const noiseFilter = ctx.createBiquadFilter();
-        noiseFilter.type = 'bandpass';
-        noiseFilter.frequency.value = 400;
-        noiseFilter.Q.value = 0.5;
-        const noiseGain = ctx.createGain();
-        noise.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(ctx.destination);
-        noiseGain.gain.setValueAtTime(0, now + 0.05);
-        noiseGain.gain.linearRampToValueAtTime(0.18, now + 0.3);
-        noiseGain.gain.linearRampToValueAtTime(0.22, now + 0.6);
-        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
-        noise.start(now + 0.05); noise.stop(now + 1.2);
-      };
-      // Resume context if suspended (browser autoplay policy)
-      if (ctx.state === 'suspended') ctx.resume().then(playSound);
-      else playSound();
-    } catch(e) { /* audio not supported — silent fallback */ }
-
+    const tin = setTimeout(() => setVisible(true), 10); // near-instant slide-in
+    const tout = setTimeout(() => { setVisible(false); setTimeout(onDismiss, 400); }, 30000);
     return () => { clearTimeout(tin); clearTimeout(tout); };
   }, []);
 
