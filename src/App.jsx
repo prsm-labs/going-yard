@@ -2891,6 +2891,7 @@ async function fetchLiftoffBatters(game) {
         const projHR = parseFloat(r.proj_hr_adj) || 0;
         const recentEV = parseFloat(r.recent_avg_ev) || cachedP?.avgEV || 0;
         const recentBrl = parseFloat(r.recent_barrel_pct) || cachedP?.barrel || 0;
+        const recentFB  = parseFloat(r.recent_fb_pct)  || cachedP?.flyBall || 0;
         const daysSinceHR = cachedP?.daysSinceHR ?? null;
         const due = isDueFromRow(r, bid);
         const inSlump = r.in_slump === 'True' || r.in_slump === true;
@@ -2911,7 +2912,7 @@ async function fetchLiftoffBatters(game) {
           team: r.batting_team || '',
           isHome: r.batting_team === r.home_team,
           grade, gradeColor: cfg.color, gradeLabel: cfg.label,
-          projHR, recentEV, recentBrl,
+          projHR, recentEV, recentBrl, recentFB,
           bvpEV: parseFloat(r.bvp_avg_ev)||0,
           totalFlags: parseInt(r.total_flags)||0,
           weightedScore: parseFloat(r.weighted_flag_score)||0,
@@ -2978,7 +2979,7 @@ async function fetchLiftoffBatters(game) {
         const b = {
           id: bid, name, team: ta, isHome,
           grade: 'C', gradeColor: '#8bc4e8', gradeLabel: '👀 C',
-          projHR: 0, recentEV: avgEV, recentBrl: barrel,
+          projHR: 0, recentEV: avgEV, recentBrl: barrel, recentFB: flyBall,
           totalFlags: 0, weightedScore: 0,
           barrel, hardHit, avgEV, flyBall, hr,
           daysSinceHR, due, signals,
@@ -3395,6 +3396,9 @@ function LRow({b, rank}) {
           background:vc+'18',border:'1px solid '+vc+'40',color:vc,flexShrink:0}}>
           {b.grade||'C'}
         </span>
+        {LINEUP_STATUS[b.id]?.status === 'confirmed' && (
+          <span style={{fontSize:11,flexShrink:0}} title="Confirmed in lineup">✅</span>
+        )}
         {b.due && DUE_BADGE}
         {b.isDiamond && <span style={{padding:'1px 5px',borderRadius:4,fontSize:9,fontWeight:700,
           background:'rgba(255,204,0,.15)',color:'#ffcc00',border:'1px solid rgba(255,204,0,.3)',flexShrink:0}}>💎</span>}
@@ -3408,11 +3412,20 @@ function LRow({b, rank}) {
         ))}
       </div>
     </div>
-    <div className="lmini">
-      <div className="lms"><div className="lmsv" style={{color:recentBrl>=12?"#ff8020":"var(--text)"}}>{recentBrl.toFixed(0)}%</div><div className="lmsl">Brl L7</div></div>
-      <div className="lms"><div className="lmsv" style={{color:recentEV>=T.EV_HH?"#ff8020":"var(--text)"}}>{recentEV.toFixed(0)}</div><div className="lmsl">EV L7</div></div>
-      <div className="lms"><div className="lmsv" style={{color:b.daysSinceHR>=4&&b.daysSinceHR<=10?"#ffc840":"var(--text)"}}>{b.daysSinceHR!=null?`${b.daysSinceHR}d`:"—"}</div><div className="lmsl">Since HR</div></div>
-    </div>
+    {/* lmini: Brl% · FB% · EV L7 · AB/HR — all from engine recent window */}
+    {(()=>{
+      const cp = getCachedPlayer(b.id);
+      const brl    = b.recentBrl ?? b.barrel ?? 0;
+      const fb     = b.recentFB  ?? b.flyBall ?? 0;
+      const ev     = b.recentEV  ?? b.avgEV   ?? 0;
+      const abPerHR = cp?.hr>0 ? Math.round((cp.pa||cp.ab||1)/cp.hr) : null;
+      return <div className="lmini">
+        <div className="lms"><div className="lmsv" style={{color:brl>=10?'#ff8020':brl>=6?'var(--accent2)':'var(--text)'}}>{brl>0?brl.toFixed(0)+'%':'—'}</div><div className="lmsl">Brl L7</div></div>
+        <div className="lms"><div className="lmsv" style={{color:fb>=30?'#ff8020':fb>=22?'var(--accent2)':'var(--text)'}}>{fb>0?fb.toFixed(0)+'%':'—'}</div><div className="lmsl">FB% L7</div></div>
+        <div className="lms"><div className="lmsv" style={{color:ev>=T.EV_HH?'#ff8020':'var(--text)'}}>{ev>0?ev.toFixed(0):'—'}</div><div className="lmsl">EV L7</div></div>
+        <div className="lms"><div className="lmsv" style={{color:abPerHR&&abPerHR<=18?'#ff8020':abPerHR&&abPerHR<=25?'#ffc840':'var(--text)'}}>{abPerHR||'—'}</div><div className="lmsl">AB/HR</div></div>
+      </div>;
+    })()}
   </div>;
 }
 
@@ -3653,7 +3666,20 @@ function GPanel({game, isLive, isFinal=false}) {
     : <div>
       {(data||[]).length === 0
         ? <div style={{padding:"16px 15px",color:"var(--muted)",fontFamily:"DM Mono,monospace",fontSize:11}}>Lineup not confirmed.</div>
-        : (data||[]).map((b, i) => <LRow key={b.id} b={b} rank={i+1}/>)
+        : (() => {
+            const GRADE_ORDER = {'diamond':0,'A+':1,'A':2,'B':3,'C':4,'D':5};
+            const sorted = [...(data||[])].sort((a,b) => {
+              // 1. Engine grade (diamond > A+ > A > B > C > D)
+              const ga = GRADE_ORDER[a.grade] ?? 5;
+              const gb = GRADE_ORDER[b.grade] ?? 5;
+              if (ga !== gb) return ga - gb;
+              // 2. Due batters next within same grade
+              if (a.due !== b.due) return a.due ? -1 : 1;
+              // 3. Hot bat: proj HR% descending
+              return (b.projHR||0) - (a.projHR||0);
+            });
+            return sorted.map((b, i) => <LRow key={b.id} b={b} rank={i+1}/>);
+          })()
       }
     </div>}
   </div>;
@@ -8648,6 +8674,52 @@ function MatchupEngineTab() {
                     </div>
                   ))}
                 </div>
+
+                {/* AB/HR data card — from player cache */}
+                {(() => {
+                  const cp = getCachedPlayer(pid);
+                  const seasonHR = cp?.hr || 0;
+                  const seasonPA = cp?.pa || cp?.ab || 0;
+                  if (seasonHR < 2 || seasonPA < 10) return null;
+                  const abPerHR   = Math.round(seasonPA / seasonHR);
+                  const abSinceHR = cp?.windows?.last7?.abSinceHR
+                    ?? (cp?.daysSinceHR != null ? Math.round(cp.daysSinceHR * 3.8) : null);
+                  const due = isDue(pid);
+                  const abPHRColor = abPerHR<=15?'#ff4020':abPerHR<=22?'#ff8020':abPerHR<=30?'var(--accent2)':'var(--text)';
+                  const abSHRColor = abSinceHR!=null&&abSinceHR>abPerHR*1.15?'var(--ice)':'var(--muted)';
+                  return (
+                    <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:12,
+                      padding:'8px 12px',borderRadius:8,
+                      background:due?'rgba(56,184,242,.06)':'rgba(255,255,255,.03)',
+                      border:due?'1px solid rgba(56,184,242,.25)':'1px solid var(--border)'}}>
+                      <div style={{textAlign:'center',minWidth:44}}>
+                        <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:18,
+                          color:abPHRColor,lineHeight:1}}>{abPerHR}</div>
+                        <div style={{fontSize:7,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+                          textTransform:'uppercase',letterSpacing:.5,marginTop:1}}>AB / HR</div>
+                      </div>
+                      <div style={{width:1,height:28,background:'var(--border)'}}/>
+                      <div style={{textAlign:'center',minWidth:44}}>
+                        <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:18,
+                          color:abSHRColor,lineHeight:1}}>{abSinceHR!=null?abSinceHR:'—'}</div>
+                        <div style={{fontSize:7,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+                          textTransform:'uppercase',letterSpacing:.5,marginTop:1}}>AB Since HR</div>
+                      </div>
+                      <div style={{width:1,height:28,background:'var(--border)'}}/>
+                      <div style={{textAlign:'center',minWidth:44}}>
+                        <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:18,
+                          color:'var(--text)',lineHeight:1}}>{seasonHR}</div>
+                        <div style={{fontSize:7,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+                          textTransform:'uppercase',letterSpacing:.5,marginTop:1}}>Season HR</div>
+                      </div>
+                      {due && <div style={{marginLeft:'auto'}}>{DUE_BADGE}</div>}
+                      {!due && abSinceHR!=null && <div style={{marginLeft:'auto',
+                        fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
+                        {Math.round(abSinceHR/abPerHR*100)}% of rate
+                      </div>}
+                    </div>
+                  );
+                })()}
 
                 {/* Environment */}
                 <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
