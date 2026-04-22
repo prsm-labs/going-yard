@@ -6488,6 +6488,10 @@ function SimLabView({ data }) {
   const [sortPropDir, setSortPropDir] = useState('desc');
   const [lineupOnly, setLineupOnly]   = useState(false);
   const [filterGoneYardSim, setFilterGoneYardSim] = useState(false);
+  const [minHRScore, setMinHRScore]   = useState('');
+  const [minHRPct,   setMinHRPct]     = useState('');
+  const [minMeatball,setMinMeatball]  = useState('');
+  const [minHitPct,  setMinHitPct]    = useState('');
   const [selPitcherGradeSim, setSelPitcherGradeSim] = useState('all');
   const aiCache = useRef({});
   const simPitcherGrades = useRef({}); // pitcher_id → grade label
@@ -6545,10 +6549,14 @@ function SimLabView({ data }) {
         if (selPitcherGradeSim === 'all') return true;
         const pid = r.pitcher_id ? String(parseInt(r.pitcher_id) || r.pitcher_id) : null;
         return pid && simPitcherGrades.current[pid] === selPitcherGradeSim;
-      });
+      })
+      .filter(r => !minHRScore  || (parseFloat(r.weighted_flag_score)||0) >= parseFloat(minHRScore))
+      .filter(r => !minHRPct    || pctRaw(r.proj_hr_adj)               >= parseFloat(minHRPct))
+      .filter(r => !minMeatball || (parseFloat(r.meatball_matchup_score)||0)*100 >= parseFloat(minMeatball))
+      .filter(r => !minHitPct   || pctRaw(r.proj_hit_prob)              >= parseFloat(minHitPct));
     const mul = sortDir === 'desc' ? -1 : 1;
     return [...filtered].sort((a, b) => mul * ((parseFloat(a[sortBy]) || 0) - (parseFloat(b[sortBy]) || 0)));
-  }, [data, sortBy, sortDir, teamFilter, lineupOnly, filterGoneYardSim, selPitcherGradeSim]);
+  }, [data, sortBy, sortDir, teamFilter, lineupOnly, filterGoneYardSim, selPitcherGradeSim, minHRScore, minHRPct, minMeatball, minHitPct]);
 
   // Auto-select top batter when data loads
   useEffect(() => {
@@ -6700,6 +6708,34 @@ Write exactly 2-3 sentences. Focus on the single most important factor driving o
             ))}
           </div>
 
+          {/* Min-value filter bar */}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
+            <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", textTransform: 'uppercase', letterSpacing: 1, flexShrink: 0 }}>Min:</span>
+            {[
+              { label: 'HR Score', val: minHRScore, set: setMinHRScore, placeholder: 'e.g. 2.0' },
+              { label: 'HR%',      val: minHRPct,   set: setMinHRPct,   placeholder: 'e.g. 5' },
+              { label: '💣',       val: minMeatball,set: setMinMeatball, placeholder: 'e.g. 10' },
+              { label: 'Hit%',     val: minHitPct,  set: setMinHitPct,  placeholder: 'e.g. 25' },
+            ].map(({ label, val, set, placeholder }) => (
+              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", flexShrink: 0 }}>{label}</span>
+                <input type="number" value={val} onChange={e => set(e.target.value)}
+                  placeholder={placeholder}
+                  style={{ width: 60, padding: '3px 6px', borderRadius: 5, border: `1px solid ${val ? 'var(--accent2)' : 'var(--border)'}`,
+                    background: 'var(--surface2)', color: 'var(--text)',
+                    fontFamily: "'DM Mono',monospace", fontSize: 10 }}/>
+              </div>
+            ))}
+            {(minHRScore || minHRPct || minMeatball || minHitPct) && (
+              <button onClick={() => { setMinHRScore(''); setMinHRPct(''); setMinMeatball(''); setMinHitPct(''); }}
+                style={{ padding: '3px 9px', borderRadius: 5, border: '1px solid rgba(255,64,32,.3)',
+                  background: 'rgba(255,64,32,.08)', color: 'var(--accent)',
+                  fontFamily: "'DM Mono',monospace", fontSize: 9, cursor: 'pointer', fontWeight: 700 }}>
+                ✕ Clear
+              </button>
+            )}
+          </div>
+
           {/* Export current filtered slate */}
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
             <button onClick={() => {
@@ -6740,7 +6776,6 @@ Write exactly 2-3 sentences. Focus on the single most important factor driving o
                     { label: 'Hit%',     key: 'proj_hit_prob' },
                     { label: 'XBH%',     key: 'proj_xbh_prob' },
                     { label: 'Exp TB',   key: 'proj_avg_tb' },
-                    { label: 'Exp RBI',  key: 'proj_avg_rbi' },
                     { label: 'Score',    key: 'weighted_flag_score' },
                     { label: 'Grade',    key: null },
                     { label: '💣',       key: 'meatball_matchup_score' },
@@ -6813,7 +6848,6 @@ Write exactly 2-3 sentences. Focus on the single most important factor driving o
                       <td style={{ textAlign: 'right' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 11, color: hitColor }}>{hitP > 0 ? hitP.toFixed(1) + '%' : '—'}</span></td>
                       <td style={{ textAlign: 'right' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 11 }}>{xbhP > 0 ? xbhP.toFixed(1) + '%' : '—'}</span></td>
                       <td style={{ textAlign: 'right' }}><span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 13, color: tb >= 1.5 ? '#ff8020' : tb >= 1.0 ? '#f5a623' : 'var(--text)' }}>{tb > 0 ? tb.toFixed(2) : '—'}</span></td>
-                      <td style={{ textAlign: 'right' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 11 }}>{rbi > 0 ? rbi.toFixed(2) : '—'}</span></td>
                       <td style={{ textAlign: 'right' }}>
                         <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 12, color: 'var(--text)' }}>
                           {parseFloat(b.weighted_flag_score) > 0 ? parseFloat(b.weighted_flag_score).toFixed(2) : '—'}
