@@ -1655,7 +1655,10 @@ function AtBatSlideIn() {
       <div style={{padding:"16px 20px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",gap:12,position:"sticky",top:0,background:"var(--surface)",zIndex:10}}>
         <PlayerAvatar pid={player?.pid} name={player?.name} size={40} style={{border:"2px solid var(--accent)"}}/>
         <div style={{flex:1}}>
-          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:18,letterSpacing:1}}>{player.name}</div>
+          <div style={{display:'flex',alignItems:'center',gap:6}}>
+            <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:18,letterSpacing:1}}>{player.name}</span>
+            <SavantLink pid={player?.pid} type="batter"/>
+          </div>
           <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>
             {player.team}
             {player.avgEV > 0 && <span> · EV {player.avgEV.toFixed(1)}</span>}
@@ -3427,7 +3430,6 @@ function LRow({b, rank}) {
           <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,
             color:isKeyMatchup(b.id)?'#ff8020':'var(--text)',
             whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',display:'block',maxWidth:140}}>{b.name}</span>
-          <SavantLink pid={b.id} type="batter" size={8}/>
         </div>
         </div>
         {/* Signals — only if there's something meaningful */}
@@ -4536,7 +4538,7 @@ function LineupsView({ date }) {
                 <div style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--muted)'}}>
                   <span style={{color:'var(--accent2)',fontWeight:700}}>{teamAbbr}</span>
                   {player.jerseyNumber && <span style={{marginLeft:6}}>#{player.jerseyNumber}</span>}
-                  <span style={{marginLeft:8}}><SavantLink pid={player?.id} type="batter" size={9}/></span>
+
                 </div>
               </div>
               </div>
@@ -6912,6 +6914,7 @@ function SimLabView({ data }) {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                         <PlayerAvatar pid={parseInt(b.batter_id)||0} name={b.batter} size={40}/>
                         <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 22, color: 'var(--text)' }}>{b.batter}</span>
+                        <SavantLink pid={parseInt(b.batter_id)||0} type="batter"/>
                         <span style={{ padding: '3px 9px', borderRadius: 6, fontSize: 11, fontFamily: "'Oswald',sans-serif", fontWeight: 800, background: gc.bg, color: gc.color, border: `1px solid ${gc.border}` }}>{b.grade}</span>
                         <PickButton pid={parseInt(b.batter_id)||0} name={b.batter} team={b.batting_team}/>
                         {isDiamond && <span style={{ padding: '2px 8px', borderRadius: 5, fontSize: 10, fontWeight: 700, background: 'rgba(255,204,0,.15)', color: '#ffcc00', border: '1px solid rgba(255,204,0,.35)' }}>💎 Diamond Pick</span>}
@@ -7070,7 +7073,7 @@ function SimLabView({ data }) {
                     <div style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 13, color: 'var(--text)' }}>{b.pitcher}
                       <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", fontWeight: 400, marginLeft: 6 }}>{b.pitcher_hand}HP</span>
                     </div>
-                    <div style={{marginTop:3,marginBottom:4}}><SavantLink pid={b.pitcher_id} type="pitcher"/></div>
+
                     <PitcherCard pitcherId={b.pitcher_id} pitcherName={b.pitcher} onGrade={()=>{}}/>
                   </div>
                 </div>
@@ -7521,6 +7524,7 @@ function BatterLeaderboard() {
                     {c.label}<SortIcon col={c.key}/>
                   </th>
                 ))}
+                <th style={{textAlign:'center',width:24}}></th>
               </tr>
             </thead>
             <tbody>
@@ -7553,6 +7557,9 @@ function BatterLeaderboard() {
                         {c.render(p)}
                       </td>
                     ))}
+                    <td style={{textAlign:'center'}}>
+                      <SavantLink pid={p.pid||p.id} type="batter"/>
+                    </td>
                   </tr>
                 );
               })}
@@ -9367,7 +9374,7 @@ function LockInTab() {
                       {b.game_time && ` · ${b.game_time}`}
                     </div>
                   </div>
-                  <SavantLink pid={pid} type="batter" size={9}/>
+
                 </div>
 
                 {/* Stat strip */}
@@ -9458,7 +9465,7 @@ function LockInTab() {
                     <div>
                       <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,
                         color:isKeyMatchup(pid)?'#ff8020':'var(--text)'}}>{b.batter}</div>
-                      <SavantLink pid={pid} type="batter" size={8}/>
+
                     </div>
                   </div></td>
                   <td style={{textAlign:'right'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--accent2)',fontWeight:700}}>{b.batting_team}</span></td>
