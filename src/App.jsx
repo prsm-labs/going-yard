@@ -3229,6 +3229,29 @@ function HBar({score}) {
   return <div className="hbc"><div className="hbb"><div className="hbf" style={{width:`${score}%`,background:c}}/></div><span className="hbn" style={{color:c}}>{score}</span></div>;
 }
 
+
+// Savant/Statcast deep link — opens batter or pitcher page on Baseball Savant
+// pid = MLB player ID, type = 'batter' | 'pitcher'
+function SavantLink({ pid, type='batter', size=9 }) {
+  if (!pid || parseInt(pid) <= 0) return null;
+  const url = `https://baseballsavant.mlb.com/savant-player/${pid}`;
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer"
+      onClick={e => e.stopPropagation()}
+      style={{display:'inline-flex',alignItems:'center',gap:2,
+        fontFamily:"'DM Mono',monospace",fontSize:size,
+        color:'rgba(56,184,242,.7)',textDecoration:'none',
+        padding:'1px 4px',borderRadius:3,
+        border:'1px solid rgba(56,184,242,.2)',
+        background:'rgba(56,184,242,.06)',
+        transition:'all .12s',flexShrink:0}}
+      onMouseEnter={e=>{e.currentTarget.style.color='var(--ice)';e.currentTarget.style.borderColor='rgba(56,184,242,.5)';}}
+      onMouseLeave={e=>{e.currentTarget.style.color='rgba(56,184,242,.7)';e.currentTarget.style.borderColor='rgba(56,184,242,.2)';}}>
+      ⚡ Savant
+    </a>
+  );
+}
+
 function SRing({score, color}) {
   const r = 16, ci = 2 * Math.PI * r, fill = (score / 100) * ci;
   return <div className="sr"><svg width="42" height="42" viewBox="0 0 42 42"><circle cx="21" cy="21" r={r} fill="none" stroke="var(--border)" strokeWidth="4"/><circle cx="21" cy="21" r={r} fill="none" stroke={color} strokeWidth="4" strokeDasharray={`${fill} ${ci}`} strokeLinecap="round"/></svg><div className="srv" style={{color}}>{score}</div></div>;
@@ -3403,9 +3426,12 @@ function LRow({b, rank}) {
           {b.due && DUE_BADGE}
           {b.isDiamond && <span style={{padding:'1px 4px',borderRadius:4,fontSize:9,fontWeight:700,
             background:'rgba(255,204,0,.15)',color:'#ffcc00',border:'1px solid rgba(255,204,0,.3)',flexShrink:0}}>💎</span>}
+          <div style={{minWidth:0,flex:1}}>
           <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,
             color:isKeyMatchup(b.id)?'#ff8020':'var(--text)',
-            whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:140}}>{b.name}</span>
+            whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',display:'block',maxWidth:140}}>{b.name}</span>
+          <SavantLink pid={b.id} type="batter" size={8}/>
+        </div>
         </div>
         {/* Signals — only if there's something meaningful */}
         {(projHR>0 || (b.signals||[]).filter(s=>s.t!=='⏳ Due'&&s.t!=='💎 Diamond').length>0) && (
@@ -4513,6 +4539,7 @@ function LineupsView({ date }) {
                 <div style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--muted)'}}>
                   <span style={{color:'var(--accent2)',fontWeight:700}}>{teamAbbr}</span>
                   {player.jerseyNumber && <span style={{marginLeft:6}}>#{player.jerseyNumber}</span>}
+                  <span style={{marginLeft:8}}><SavantLink pid={player?.id} type="batter" size={9}/></span>
                 </div>
               </div>
               </div>
@@ -4542,6 +4569,7 @@ function LiveTab() {
   const [refreshing, setRefreshing] = useState(false);
   const [showHeatingUp, setShowHeatingUp] = useState(false);
   const [liveView, setLiveView] = useState('games'); // 'games' | 'lineups'
+  const [liveGameFilter, setLiveGameFilter] = useState('all');
   const todayET2 = new Date().toLocaleDateString("en-US",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"});
   const [lm2,ld2,ly2] = todayET2.split("/");
   const liveTodayStr = `${ly2}-${lm2}-${ld2}`;
@@ -4666,9 +4694,31 @@ function LiveTab() {
     </div>
     {loading ? <div className="lw"><div className="sp"/><div className="lt">Fetching schedule…</div></div> : <>
       {error && <div className="warn">⚠️ {error} — Showing sample.</div>}
-      {live.length>0&&<><div className="div" style={{marginTop:8}}>🔴 Live Now</div><div className="gg">{live.map(g=><GCard key={g.id} game={g}/>)}</div></>}
-      {pre.length>0&&<><div className="div" style={{marginTop:12}}>🟢 Upcoming — Tap for 🚀 Liftoff List</div><div className="gg">{pre.map(g=><GCard key={g.id} game={g}/>)}</div></>}
-      {fin.length>0&&<><div className="div" style={{marginTop:12}}>✓ Final</div><div className="gg">{fin.map(g=><GCard key={g.id} game={g}/>)}</div></>}
+      {/* Game filter dropdown — only shows when there are multiple games */}
+      {games.length > 1 && (
+        <div style={{display:'flex',gap:8,marginBottom:10,alignItems:'center',flexWrap:'wrap'}}>
+          <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1,flexShrink:0}}>Game:</span>
+          <select value={liveGameFilter} onChange={e=>setLiveGameFilter(e.target.value)}
+            style={{padding:'5px 10px',borderRadius:7,background:'var(--surface2)',
+              border:`1px solid ${liveGameFilter==='all'?'var(--border)':'rgba(56,184,242,.4)'}`,
+              color:liveGameFilter==='all'?'var(--muted)':'var(--ice)',
+              fontFamily:"'DM Mono',monospace",fontSize:11,cursor:'pointer',fontWeight:600}}>
+            <option value="all">All Games</option>
+            {games.map(g=>(
+              <option key={g.id} value={String(g.id)}>
+                {g.away?.abbr||'?'} @ {g.home?.abbr||'?'}{g.status==='Live'?' 🔴':g.status==='Final'?' ✓':''}
+              </option>
+            ))}
+          </select>
+          {liveGameFilter!=='all'&&<button onClick={()=>setLiveGameFilter('all')}
+            style={{padding:'3px 9px',borderRadius:5,border:'1px solid rgba(255,64,32,.3)',
+              background:'rgba(255,64,32,.08)',color:'var(--accent)',
+              fontFamily:"'DM Mono',monospace",fontSize:9,cursor:'pointer',fontWeight:700}}>✕</button>}
+        </div>
+      )}
+      {live.length>0&&<><div className="div" style={{marginTop:8}}>🔴 Live Now</div><div className="gg">{live.filter(g=>liveGameFilter==='all'||String(g.id)===liveGameFilter).map(g=><GCard key={g.id} game={g}/>)}</div></>}
+      {pre.length>0&&<><div className="div" style={{marginTop:12}}>🟢 Upcoming — Tap for 🚀 Liftoff List</div><div className="gg">{pre.filter(g=>liveGameFilter==='all'||String(g.id)===liveGameFilter).map(g=><GCard key={g.id} game={g}/>)}</div></>}
+      {fin.length>0&&<><div className="div" style={{marginTop:12}}>✓ Final</div><div className="gg">{fin.filter(g=>liveGameFilter==='all'||String(g.id)===liveGameFilter).map(g=><GCard key={g.id} game={g}/>)}</div></>}
     </>}
   </>}
     {showHeatingUp && <HeatingUpSlideout games={games} onClose={()=>setShowHeatingUp(false)}/>}
@@ -7068,9 +7118,10 @@ Write exactly 2-3 sentences. Focus on the single most important factor driving o
                   {/* Pitcher grade card — same card as shown in Lineups tab */}
                   <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 12px' }}>
                     <div style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>⚾ Pitcher Grade</div>
-                    <div style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 13, color: 'var(--text)', marginBottom: 6 }}>{b.pitcher}
+                    <div style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 13, color: 'var(--text)' }}>{b.pitcher}
                       <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", fontWeight: 400, marginLeft: 6 }}>{b.pitcher_hand}HP</span>
                     </div>
+                    <div style={{marginTop:3,marginBottom:4}}><SavantLink pid={b.pitcher_id} type="pitcher"/></div>
                     <PitcherCard pitcherId={b.pitcher_id} pitcherName={b.pitcher} onGrade={()=>{}}/>
                   </div>
                 </div>
@@ -8017,7 +8068,8 @@ function MatchupEngineTab() {
     const base = new Date(Date.UTC(parseInt(y), parseInt(m) - 1, parseInt(d)));
     // Before 4am ET = still "yesterday" in app terms
     const etHour = parseInt(now.toLocaleString('en-US', { timeZone: 'America/New_York', hour: 'numeric', hour12: false }));
-    const dayOffset = etHour < 4 ? offsetDays - 1 : offsetDays;
+    // Extend "today" until 3am ET — games often run past midnight
+    const dayOffset = etHour < 3 ? offsetDays - 1 : offsetDays;
     base.setUTCDate(base.getUTCDate() + dayOffset);
     return base.toISOString().slice(0, 10); // YYYY-MM-DD
   };
@@ -8097,8 +8149,9 @@ function MatchupEngineTab() {
     const uniqueGames = [...new Set(activeData.map(b => b.game_id).filter(Boolean))];
     await Promise.all(uniqueGames.map(async gameId => {
       try {
-        const batters = await fetchLiveBatters(gameId);
-        if (!batters || batters.length === 0) return;
+        const result = await fetchLiveBatters(gameId);
+        const batters = result?.batters || result || [];
+        if (!batters.length) return;
         batters.forEach(bt => {
           const key = String(bt.id);
           if (key && key !== '0') liveCache.current[key] = bt;
@@ -8370,42 +8423,30 @@ function MatchupEngineTab() {
       </div>
     </div>
 
-    {/* Game filter */}
-    {games.length > 1 && <div style={{display:'flex',gap:8,marginBottom:16,flexWrap:'wrap'}}>
-      <button onClick={()=>setSelGame('all')}
-        style={{padding:'4px 14px',borderRadius:6,cursor:'pointer',
-          background:selGame==='all'?'var(--accent)':'var(--surface2)',
-          color:selGame==='all'?'white':'var(--muted)',
-          border:`1px solid ${selGame==='all'?'var(--accent)':'var(--border)'}`,
-          fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:selGame==='all'?700:400}}>
-        All Games
-      </button>
-      {games.map(g => {
-        const gid = String(g.id);
-        const rows = activeData.filter(r => String(r.game_id) === gid);
-        // Primary: home_team/away_team from engine output (authoritative — added to CSV)
-        const sample = rows.find(r => r.home_team && r.away_team);
-        let label;
-        if (sample?.home_team && sample?.away_team) {
-          label = `${sample.away_team} @ ${sample.home_team}`;
-        } else if (scheduleMap[gid]) {
-          // Secondary: schedule CSV fetched at startup
-          label = `${scheduleMap[gid].away} @ ${scheduleMap[gid].home}`;
-        } else {
-          // Last resort: show batting teams without home/away distinction
-          const teams = [...new Set(rows.map(r => r.batting_team).filter(Boolean))];
-          label = teams.length >= 2 ? `${teams[0]} vs ${teams[1]}` : (teams[0] || gid);
-        }
-        const active = selGame === g.id;
-        return <button key={g.id} onClick={()=>setSelGame(g.id)}
-          style={{padding:'4px 14px',borderRadius:6,cursor:'pointer',
-            background:active?'rgba(232,65,26,.15)':'var(--surface2)',
-            color:active?'var(--accent)':'var(--muted)',
-            border:`1px solid ${active?'rgba(232,65,26,.35)':'var(--border)'}`,
-            fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:active?700:400}}>
-          {label}{WEATHER_ALERT_GAME_IDS.has(gid) ? ' ⚠️' : ''}
-        </button>;
-      })}
+    {/* Game filter — dropdown */}
+    {games.length > 1 && <div style={{display:'flex',gap:8,marginBottom:14,alignItems:'center',flexWrap:'wrap'}}>
+      <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1,flexShrink:0}}>Game:</span>
+      <select value={String(selGame)} onChange={e=>setSelGame(e.target.value==='all'?'all':parseInt(e.target.value)||e.target.value)}
+        style={{padding:'5px 10px',borderRadius:7,background:'var(--surface2)',
+          border:`1px solid ${selGame==='all'?'var(--border)':'rgba(232,65,26,.4)'}`,
+          color:selGame==='all'?'var(--muted)':'var(--accent)',
+          fontFamily:"'DM Mono',monospace",fontSize:11,cursor:'pointer',fontWeight:600}}>
+        <option value="all">All Games</option>
+        {games.map(g => {
+          const gid = String(g.id);
+          const rows = activeData.filter(r => String(r.game_id) === gid);
+          const sample = rows.find(r => r.home_team && r.away_team);
+          let label;
+          if (sample?.home_team && sample?.away_team) label = `${sample.away_team} @ ${sample.home_team}`;
+          else if (scheduleMap[gid]) label = `${scheduleMap[gid].away} @ ${scheduleMap[gid].home}`;
+          else { const teams=[...new Set(rows.map(r=>r.batting_team).filter(Boolean))]; label=teams.length>=2?`${teams[0]} vs ${teams[1]}`:(teams[0]||gid); }
+          return <option key={g.id} value={String(g.id)}>{label}{WEATHER_ALERT_GAME_IDS.has(gid)?' ⚠️':''}</option>;
+        })}
+      </select>
+      {selGame!=='all'&&<button onClick={()=>setSelGame('all')}
+        style={{padding:'3px 9px',borderRadius:5,border:'1px solid rgba(255,64,32,.3)',
+          background:'rgba(255,64,32,.08)',color:'var(--accent)',
+          fontFamily:"'DM Mono',monospace",fontSize:9,cursor:'pointer',fontWeight:700}}>✕</button>}
     </div>}
 
     {/* Grade filter */}
@@ -8600,6 +8641,7 @@ function MatchupEngineTab() {
                         <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
                           marginLeft:6}}>{b.batter_hand}HB</span>
                       </div>
+                      <div style={{marginTop:2}}><SavantLink pid={pid} type="batter"/></div>
                     {/* Flag pills */}
                     <div style={{display:'flex',gap:4,marginTop:3,flexWrap:'wrap'}}>
                       {flag(b.recent_ev_flag) &&
@@ -9191,6 +9233,710 @@ function DailyBarrelTab() {
   </div>;
 }
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔒 LOCK IN TAB
+// Sub-pages: Discover (top plays today), Props (hit rates), Odds, Bet Slip
+// Sportsbook deep links: affiliate URLs that pre-populate bet slips
+// Odds data: The Odds API (free tier 500 req/mo → swap in key when ready)
+// ─────────────────────────────────────────────────────────────────────────────
+const SPORTSBOOKS = [
+  { id:'fanduel',   label:'FanDuel',  color:'#1493ff', logo:'FD' },
+  { id:'draftkings',label:'DraftKings',color:'#62bd19', logo:'DK' },
+  { id:'betmgm',    label:'BetMGM',  color:'#c9a84c', logo:'MGM' },
+  { id:'caesars',   label:'Caesars', color:'#006341', logo:'CZR' },
+];
+
+// Build affiliate deep link — swap selectionId once enrolled in affiliate program
+function buildBetLink(book, playerName, propType, line) {
+  const bases = {
+    fanduel:    'https://www.fanduel.com/sports/baseball/mlb',
+    draftkings: 'https://sportsbook.draftkings.com/leagues/baseball/mlb',
+    betmgm:     'https://sports.betmgm.com/en/sports/baseball-23/betting',
+    caesars:    'https://sportsbook.caesars.com/us/nj/sport/baseball',
+  };
+  return bases[book] || bases.fanduel;
+}
+
+function LockInTab() {
+  const [page, setPage]             = useState('discover'); // discover | props | odds | betslip
+  const [slip, setSlip]             = useState([]);
+  const [selBook, setSelBook]       = useState('fanduel');
+  const [oddsLoading, setOddsLoading] = useState(false);
+  const [odds, setOdds]             = useState([]);
+  const [oddsError, setOddsError]   = useState(null);
+  const [oddsMarket, setOddsMarket] = useState('h2h'); // h2h | spreads | totals | props
+  const [oddsQuota, setOddsQuota]   = useState(null);
+  const [oddsEvents, setOddsEvents] = useState([]);    // event list for game picker
+  const [oddsEventId, setOddsEventId] = useState('all'); // selected game for props
+  const [oddsProps, setOddsProps]   = useState([]);    // normalized prop lines
+
+  // ── Discover: pull from DAILY_PICKS_CACHE (engine top batters) ─────────────
+  const discoverBatters = useMemo(() => {
+    const rows = Object.values(DAILY_PICKS_CACHE);
+    if (rows.length === 0) return [];
+    return rows
+      .filter(r => r.grade && ['diamond','A+','A','B'].includes(r.grade))
+      .sort((a,b) =>
+        (parseFloat(b.proj_hr_adj)||0) - (parseFloat(a.proj_hr_adj)||0) ||
+        (parseFloat(b.weighted_flag_score)||0) - (parseFloat(a.weighted_flag_score)||0)
+      )
+      .slice(0, 20);
+  }, []);
+
+  // ── Odds fetch — calls our /api/odds.js proxy (key stays server-side) ───────
+  const fetchOdds = async (market = oddsMarket, evId = oddsEventId) => {
+    setOddsLoading(true); setOddsError(null);
+    try {
+      const isProp = ['props','props_alt','hrr'].includes(market);
+      const url = isProp
+        ? `/api/odds?type=${market}${evId && evId !== 'all' ? `&eventId=${evId}` : ''}`
+        : `/api/odds?type=${market}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.error === 'not_configured') {
+        setOddsError('odds_api_needed');
+      } else if (data.status === 'not_cached') {
+        // Cache empty — cron hasn't run yet today or it's outside 8am-8pm ET
+        setOddsError('not_cached');
+      } else if (data.error) {
+        setOddsError(data.message || 'API error');
+      } else if (isProp) {
+        setOddsProps(data.props || []);
+        if (data.events?.length) setOddsEvents(data.events);
+      } else {
+        setOdds(data.markets || []);
+      }
+    } catch(e) { setOddsError(e.message); }
+    setOddsLoading(false);
+  };
+
+  const addToSlip = (batter, prop, line, book='fanduel') => {
+    setSlip(s => {
+      const key = `${batter.batter||batter.name}|${prop}`;
+      if (s.find(x => `${x.name}|${x.prop}` === key)) return s;
+      return [...s, {
+        name: batter.batter || batter.name,
+        team: batter.batting_team || batter.team || '',
+        prop, line, book,
+        pid: parseInt(batter.batter_id || batter.id) || 0,
+        grade: batter.grade || '',
+        projHR: parseFloat(batter.proj_hr_adj)||0,
+      }];
+    });
+    setPage('betslip');
+  };
+
+  const removeFromSlip = (idx) => setSlip(s => s.filter((_,i)=>i!==idx));
+
+  const pillStyle = (active, col='var(--accent)') => ({
+    padding:'6px 14px', borderRadius:7, cursor:'pointer',
+    fontFamily:"'Oswald',sans-serif", fontWeight:700, fontSize:11, letterSpacing:.5,
+    textTransform:'uppercase', transition:'all .15s',
+    background: active ? col : 'var(--surface2)',
+    color: active ? 'white' : 'var(--muted)',
+    border: `1px solid ${active ? col : 'var(--border)'}`,
+    flexShrink:0,
+  });
+
+  return <div>
+    {/* Header */}
+    <div className="hrow" style={{marginBottom:16}}>
+      <div>
+        <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:900,fontSize:22,
+          color:'var(--text)',letterSpacing:.5}}>
+          🔒 Lock In
+        </div>
+        <div style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginTop:2}}>
+          Top plays · odds · build your slip
+        </div>
+      </div>
+      {slip.length > 0 && (
+        <button onClick={()=>setPage('betslip')}
+          style={{position:'relative',padding:'7px 14px',borderRadius:8,cursor:'pointer',
+            background:'rgba(232,65,26,.15)',border:'1px solid rgba(232,65,26,.35)',
+            color:'var(--accent)',fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12}}>
+          🎯 Slip
+          <span style={{position:'absolute',top:-6,right:-6,background:'var(--accent)',
+            color:'white',borderRadius:'50%',width:16,height:16,fontSize:9,fontWeight:700,
+            display:'flex',alignItems:'center',justifyContent:'center',
+            fontFamily:"'DM Mono',monospace"}}>{slip.length}</span>
+        </button>
+      )}
+    </div>
+
+    {/* Sub-nav */}
+    <div style={{display:'flex',gap:6,marginBottom:18,flexWrap:'wrap'}}>
+      {[['discover','🌊 Discover'],['props','🎯 Props'],['odds','📊 Odds'],['betslip','🎰 Bet Slip']].map(([key,label])=>(
+        <button key={key} onClick={()=>setPage(key)} style={pillStyle(page===key)}>
+          {label}{key==='betslip'&&slip.length>0?` (${slip.length})`:''}
+        </button>
+      ))}
+    </div>
+
+    {/* ── DISCOVER ── */}
+    {page === 'discover' && <div>
+      <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+        textTransform:'uppercase',letterSpacing:1,marginBottom:12}}>
+        Today's Top Plays — Engine Grade A+ & Above · Sorted by HR Probability
+      </div>
+      {discoverBatters.length === 0
+        ? <div style={{padding:'32px',textAlign:'center',color:'var(--muted)',
+            fontFamily:"'DM Mono',monospace",fontSize:11,background:'var(--surface)',
+            borderRadius:10,border:'1px solid var(--border)'}}>
+            No engine data yet — run the pipeline first
+          </div>
+        : <div style={{display:'flex',flexDirection:'column',gap:10}}>
+          {discoverBatters.map((b,i) => {
+            const pid = parseInt(b.batter_id)||0;
+            const cfg = GRADE_CFG[b.grade] || GRADE_CFG['D'];
+            const projHR = parseFloat(b.proj_hr_adj)||0;
+            const projHit = parseFloat(b.proj_hit_prob)||0;
+            const due = isDueFromRow(b, pid);
+            return (
+              <div key={`${b.batter_id}-${i}`}
+                style={{background:'var(--surface)',border:'1px solid var(--border)',
+                  borderRadius:10,padding:'12px 14px',
+                  borderLeft:`3px solid ${cfg.color}`}}>
+                <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}>
+                  <PlayerAvatar pid={pid} name={b.batter} size={34}/>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                      <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:15,
+                        color:isKeyMatchup(pid)?'#ff8020':'var(--text)'}}>{b.batter}</span>
+                      <span style={{padding:'1px 6px',borderRadius:4,fontSize:9,fontWeight:800,
+                        fontFamily:"'Oswald',sans-serif",background:cfg.bg,
+                        border:`1px solid ${cfg.border}`,color:cfg.color}}>{b.grade}</span>
+                      {due && DUE_BADGE}
+                      {LINEUP_STATUS[pid]?.status==='confirmed' && <span style={{fontSize:10}}>✅</span>}
+                    </div>
+                    <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginTop:2}}>
+                      {b.batting_team} · vs {b.pitcher} ({b.pitcher_hand}HP)
+                      {b.game_time && ` · ${b.game_time}`}
+                    </div>
+                  </div>
+                  <SavantLink pid={pid} type="batter" size={9}/>
+                </div>
+
+                {/* Stat strip */}
+                <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:6,marginBottom:10}}>
+                  {[
+                    {label:'HR Proj', val:projHR>0?`${(projHR*100).toFixed(1)}%`:'—',
+                      color:projHR>=0.08?'var(--accent)':projHR>=0.05?'var(--accent2)':'var(--text)'},
+                    {label:'Hit Proj', val:projHit>0?`${(projHit*100).toFixed(0)}%`:'—',
+                      color:projHit>=0.30?'#27c97a':'var(--text)'},
+                    {label:'Score', val:b.weighted_flag_score?parseFloat(b.weighted_flag_score).toFixed(1):'—',
+                      color:'var(--text)'},
+                    {label:'Flags', val:b.total_flags||'0', color:'var(--text)'},
+                  ].map(s=>(
+                    <div key={s.label} style={{textAlign:'center',padding:'5px 3px',
+                      background:'rgba(255,255,255,.03)',borderRadius:5,
+                      border:'1px solid var(--border)'}}>
+                      <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,
+                        color:s.color,lineHeight:1}}>{s.val}</div>
+                      <div style={{fontSize:7,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+                        textTransform:'uppercase',letterSpacing:.4,marginTop:2}}>{s.label}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Quick-add buttons */}
+                <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                  <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+                    alignSelf:'center',flexShrink:0}}>Add to slip:</span>
+                  {[
+                    {prop:'HR', line:'Yes', label:'💥 HR'},
+                    {prop:'Hit', line:'Yes', label:'🎯 Hit'},
+                    {prop:'XBH', line:'Yes', label:'🔥 XBH'},
+                  ].map(p=>(
+                    <button key={p.prop} onClick={()=>addToSlip(b, p.prop, p.line, selBook)}
+                      style={{padding:'3px 10px',borderRadius:5,cursor:'pointer',fontSize:9,
+                        fontFamily:"'DM Mono',monospace",fontWeight:700,
+                        border:'1px solid rgba(232,65,26,.3)',
+                        background:slip.find(x=>x.name===b.batter&&x.prop===p.prop)
+                          ?'rgba(232,65,26,.25)':'rgba(232,65,26,.08)',
+                        color:slip.find(x=>x.name===b.batter&&x.prop===p.prop)
+                          ?'white':'var(--accent)'}}>
+                      {slip.find(x=>x.name===b.batter&&x.prop===p.prop)?'✓ ':''}{p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      }
+    </div>}
+
+    {/* ── PROPS ── */}
+    {page === 'props' && <div>
+      <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+        textTransform:'uppercase',letterSpacing:1,marginBottom:12}}>
+        Player Props — Historical Hit Rates from Engine Data
+      </div>
+      {discoverBatters.length === 0
+        ? <div style={{padding:'32px',textAlign:'center',color:'var(--muted)',
+            fontFamily:"'DM Mono',monospace",fontSize:11}}>No data — run the pipeline first</div>
+        : <div className="tw"><table>
+            <thead><tr style={{background:'var(--surface2)'}}>
+              {['Batter','Team','vs','HR%','Hit%','XBH%','Score','Grade','AB/HR','+Slip'].map(h=>(
+                <th key={h} style={{padding:'6px 8px',textAlign:h==='Batter'?'left':'right',
+                  fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',
+                  textTransform:'uppercase',letterSpacing:.8,whiteSpace:'nowrap'}}>{h}</th>
+              ))}
+            </tr></thead>
+            <tbody>
+              {discoverBatters.map((b,i)=>{
+                const pid = parseInt(b.batter_id)||0;
+                const cfg = GRADE_CFG[b.grade]||GRADE_CFG['D'];
+                const cp = getCachedPlayer(pid);
+                const abPerHR = cp?.abPerHR && cp.abPerHR<99 ? Math.round(cp.abPerHR) : null;
+                const projHR = (parseFloat(b.proj_hr_adj)||0)*100;
+                const projHit = (parseFloat(b.proj_hit_prob)||0)*100;
+                const projXBH = (parseFloat(b.proj_xbh_prob)||0)*100;
+                return <tr key={i} className="dr">
+                  <td><div style={{display:'flex',alignItems:'center',gap:6}}>
+                    <PlayerAvatar pid={pid} name={b.batter} size={22}/>
+                    <div>
+                      <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,
+                        color:isKeyMatchup(pid)?'#ff8020':'var(--text)'}}>{b.batter}</div>
+                      <SavantLink pid={pid} type="batter" size={8}/>
+                    </div>
+                  </div></td>
+                  <td style={{textAlign:'right'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--accent2)',fontWeight:700}}>{b.batting_team}</span></td>
+                  <td style={{textAlign:'right'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)'}}>{b.pitcher}</span></td>
+                  <td style={{textAlign:'right'}}><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color:projHR>=8?'var(--accent)':projHR>=5?'var(--accent2)':'var(--text)'}}>{projHR>0?projHR.toFixed(1)+'%':'—'}</span></td>
+                  <td style={{textAlign:'right'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:projHit>=30?'#27c97a':'var(--text)'}}>{projHit>0?projHit.toFixed(0)+'%':'—'}</span></td>
+                  <td style={{textAlign:'right'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{projXBH>0?projXBH.toFixed(0)+'%':'—'}</span></td>
+                  <td style={{textAlign:'right'}}><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11}}>{b.weighted_flag_score?parseFloat(b.weighted_flag_score).toFixed(1):'—'}</span></td>
+                  <td style={{textAlign:'right'}}><span style={{padding:'1px 5px',borderRadius:4,fontSize:9,fontWeight:800,fontFamily:"'Oswald',sans-serif",background:cfg.bg,color:cfg.color,border:`1px solid ${cfg.border}`}}>{b.grade}</span></td>
+                  <td style={{textAlign:'right'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{abPerHR||'—'}</span></td>
+                  <td style={{textAlign:'right'}}>
+                    <button onClick={()=>addToSlip(b,'HR','Yes',selBook)}
+                      style={{padding:'2px 7px',borderRadius:4,cursor:'pointer',fontSize:8,
+                        fontFamily:"'DM Mono',monospace",fontWeight:700,
+                        border:`1px solid ${slip.find(x=>x.name===b.batter&&x.prop==='HR')?'var(--accent)':'var(--border)'}`,
+                        background:slip.find(x=>x.name===b.batter&&x.prop==='HR')?'rgba(232,65,26,.2)':'transparent',
+                        color:slip.find(x=>x.name===b.batter&&x.prop==='HR')?'var(--accent)':'var(--muted)'}}>
+                      {slip.find(x=>x.name===b.batter&&x.prop==='HR')?'✓':'+'} HR
+                    </button>
+                  </td>
+                </tr>;
+              })}
+            </tbody>
+          </table></div>
+      }
+    </div>}
+
+    {/* ── ODDS ── */}
+    {page === 'odds' && <div>
+      {/* Market selector + load button */}
+      <div style={{display:'flex',gap:8,marginBottom:14,alignItems:'center',flexWrap:'wrap'}}>
+        {[
+          ['h2h',      '💰 Moneyline'],
+          ['spreads',  '📊 Run Line'],
+          ['totals',   '⚾ Totals'],
+          ['props',    '🎯 Props'],
+          ['props_alt','📈 Alt Lines'],
+          ['hrr',      '🔥 H+R+RBI'],
+        ].map(([key,label])=>(
+          <button key={key} onClick={()=>{ setOddsMarket(key); fetchOdds(key); }}
+            style={{padding:'5px 12px',borderRadius:6,cursor:'pointer',
+              fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:oddsMarket===key?700:400,
+              background:oddsMarket===key?'rgba(56,184,242,.15)':'var(--surface2)',
+              color:oddsMarket===key?'var(--ice)':'var(--muted)',
+              border:`1px solid ${oddsMarket===key?'rgba(56,184,242,.4)':'var(--border)'}`}}>
+            {label}
+          </button>
+        ))}
+        <span style={{marginLeft:'auto',fontSize:9,fontFamily:"'DM Mono',monospace",
+          color:'var(--muted)',fontStyle:'italic'}}>
+          ⏱ Odds refresh automatically every hour · 8am–8pm ET · subject to change
+        </span>
+      </div>
+
+      {/* Props: game picker dropdown */}
+      {['props','props_alt','hrr'].includes(oddsMarket) && oddsEvents.length > 0 && (
+        <div style={{display:'flex',gap:8,marginBottom:12,alignItems:'center'}}>
+          <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+            textTransform:'uppercase',letterSpacing:1,flexShrink:0}}>Game:</span>
+          <select value={oddsEventId} onChange={e=>{
+              setOddsEventId(e.target.value);
+              fetchOdds('props', e.target.value);
+            }}
+            style={{padding:'5px 10px',borderRadius:7,background:'var(--surface2)',
+              border:'1px solid var(--border)',color:'var(--text)',
+              fontFamily:"'DM Mono',monospace",fontSize:11,cursor:'pointer'}}>
+            <option value="all">All Games (uses more quota)</option>
+            {oddsEvents.map(e=>(
+              <option key={e.id} value={e.id}>
+                {e.away_team} @ {e.home_team}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {/* States */}
+      {oddsError === 'not_cached' && (
+        <div style={{padding:'20px',textAlign:'center',background:'rgba(56,184,242,.06)',
+          border:'1px solid rgba(56,184,242,.15)',borderRadius:10,
+          fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--muted)',lineHeight:1.9}}>
+          <div style={{fontSize:20,marginBottom:8}}>⏱</div>
+          <div style={{color:'var(--ice)',fontWeight:700,marginBottom:4}}>Odds haven't loaded yet</div>
+          Odds refresh automatically every hour between <strong style={{color:'var(--text)'}}>8am – 8pm ET</strong>.<br/>
+          Check back during game hours — data loads in the background.
+        </div>
+      )}
+      {oddsError === 'odds_api_needed' && (
+        <div style={{background:'rgba(245,166,35,.06)',border:'1px solid rgba(245,166,35,.2)',
+          borderRadius:10,padding:'20px 18px'}}>
+          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:15,
+            color:'var(--accent2)',marginBottom:8}}>⚡ Activate Live Odds</div>
+          <div style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--muted)',lineHeight:1.9}}>
+            Live odds requires a free API key from{' '}
+            <a href="https://the-odds-api.com" target="_blank" rel="noopener noreferrer"
+              style={{color:'var(--ice)'}}>the-odds-api.com</a> (500 req/mo free).<br/><br/>
+            <strong style={{color:'var(--text)'}}>3-step setup:</strong><br/>
+            1. Sign up at the-odds-api.com → copy your API key<br/>
+            2. Vercel dashboard → Settings → Environment Variables<br/>
+            3. Add <code style={{background:'rgba(255,255,255,.08)',padding:'1px 4px',borderRadius:3}}>ODDS_API_KEY</code> = your key → Redeploy
+          </div>
+        </div>
+      )}
+      {oddsError && oddsError !== 'odds_api_needed' && (
+        <div style={{padding:'12px 14px',borderRadius:8,background:'rgba(255,64,32,.08)',
+          border:'1px solid rgba(255,64,32,.25)',fontFamily:"'DM Mono',monospace",
+          fontSize:11,color:'var(--accent)'}}>
+          ✗ {oddsError}
+          <button onClick={()=>fetchOdds(oddsMarket)}
+            style={{marginLeft:12,padding:'2px 8px',borderRadius:4,cursor:'pointer',
+              background:'rgba(255,64,32,.15)',border:'1px solid rgba(255,64,32,.3)',
+              color:'var(--accent)',fontFamily:"'DM Mono',monospace",fontSize:9}}>
+            Retry
+          </button>
+        </div>
+      )}
+      {oddsLoading && <div className="lw"><div className="sp"/><div className="lt">Fetching odds…</div></div>}
+      {!oddsLoading && !oddsError && odds.length === 0 && oddsProps.length === 0 && (
+        <div style={{padding:'20px',textAlign:'center',color:'var(--muted)',
+          fontFamily:"'DM Mono',monospace",fontSize:11,lineHeight:1.9}}>
+          Odds refresh automatically between <strong style={{color:'var(--text)'}}>8am – 8pm ET</strong>.<br/>
+          <span style={{fontSize:9}}>Select a market above to view available lines.</span>
+        </div>
+      )}
+
+      {/* Batter props cards — standard, alternate lines, and H+R+RBI */}
+      {!oddsLoading && ['props','props_alt','hrr'].includes(oddsMarket) && oddsProps.length > 0 && (
+        <div style={{display:'flex',flexDirection:'column',gap:14}}>
+          {oddsProps.map(game => {
+            const gameTime = game.commence
+              ? new Date(game.commence).toLocaleTimeString('en-US',{timeZone:'America/New_York',hour:'numeric',minute:'2-digit',hour12:true})
+              : '';
+            // Group players by market type
+            const byMarket = {};
+            (game.players||[]).forEach(p => {
+              if (!byMarket[p.label]) byMarket[p.label] = [];
+              byMarket[p.label].push(p);
+            });
+            return (
+              <div key={game.eventId} style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:10,overflow:'hidden'}}>
+                {/* Game header */}
+                <div style={{padding:'8px 12px',background:'var(--surface2)',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',gap:8}}>
+                  <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13}}>
+                    {game.away_team} @ {game.home_team}
+                  </span>
+                  {gameTime && <span style={{fontSize:9,color:'var(--accent2)',fontFamily:"'DM Mono',monospace"}}>{gameTime} ET</span>}
+                </div>
+                {/* Props by market */}
+                {Object.entries(byMarket).map(([mktLabel, players]) => (
+                  <div key={mktLabel} style={{padding:'10px 12px',borderBottom:'1px solid rgba(255,255,255,.04)'}}>
+                    <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+                      textTransform:'uppercase',letterSpacing:1,marginBottom:8,fontWeight:700}}>
+                      {mktLabel === 'HR' ? '💥' : mktLabel === 'Hits' ? '🎯' : mktLabel === 'Total Bases' ? '📊' : mktLabel === 'RBIs' ? '🏃' : '⚡'} {mktLabel}
+                    </div>
+                    <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                      {players.map(p => {
+                        // Check if this player is a key matchup batter
+                        const isKM = KEY_MATCHUP_BATTER_NAMES.has(p.playerName.toLowerCase());
+                        return (
+                          <div key={p.playerName} style={{display:'flex',alignItems:'center',gap:8,
+                            padding:'5px 8px',borderRadius:6,
+                            background:isKM?'rgba(255,128,32,.06)':'rgba(255,255,255,.02)',
+                            border:`1px solid ${isKM?'rgba(255,128,32,.2)':'transparent'}`}}>
+                            <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,
+                              color:isKM?'#ff8020':'var(--text)',flex:1,minWidth:0,
+                              whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                              {p.playerName}
+                              {isKM && <span style={{fontSize:8,color:'#ff8020',marginLeft:4}}>⚡ KM</span>}
+                            </span>
+                            {p.point != null && <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",flexShrink:0}}>
+                              O/U {p.point}
+                            </span>}
+                            {/* Best Over */}
+                            {p.bestOver && (
+                              <div style={{textAlign:'center',flexShrink:0}}>
+                                <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:13,
+                                  color:p.bestOver.price>0?'#27c97a':'var(--text)',lineHeight:1}}>
+                                  {p.bestOver.price>0?'+':''}{p.bestOver.price}
+                                </div>
+                                <div style={{fontSize:6,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
+                                  OVER · {p.bestOver.book?.split(' ')[0]}★
+                                </div>
+                              </div>
+                            )}
+                            {/* Best Under */}
+                            {p.bestUnder && (
+                              <div style={{textAlign:'center',flexShrink:0}}>
+                                <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,
+                                  color:'var(--muted)',lineHeight:1}}>
+                                  {p.bestUnder.price>0?'+':''}{p.bestUnder.price}
+                                </div>
+                                <div style={{fontSize:6,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
+                                  UNDER · {p.bestUnder.book?.split(' ')[0]}★
+                                </div>
+                              </div>
+                            )}
+                            {/* All books inline — show price spread */}
+                            {(p.allBooks||[]).filter(b=>b.overPrice!=null).length > 1 && (
+                              <div style={{display:'flex',gap:3,flexWrap:'wrap',flexShrink:0}}>
+                                {(p.allBooks||[]).filter(b=>b.overPrice!=null).map(b=>(
+                                  <span key={b.title} style={{fontSize:8,fontFamily:"'DM Mono',monospace",
+                                    color:b.overPrice===p.bestOver?.price?'#27c97a':'rgba(255,255,255,.3)',
+                                    padding:'1px 3px',borderRadius:3,
+                                    background:'rgba(255,255,255,.04)'}}>
+                                    {b.title?.slice(0,2)} {b.overPrice>0?'+':''}{b.overPrice}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            {/* Add to slip */}
+                            <button onClick={()=>addToSlip(
+                                {batter:p.playerName,team:'',batter_id:0},
+                                mktLabel, `O${p.point??''}`, selBook
+                              )}
+                              style={{padding:'2px 7px',borderRadius:4,cursor:'pointer',
+                                fontSize:8,fontFamily:"'DM Mono',monospace",fontWeight:700,
+                                border:`1px solid ${slip.find(x=>x.name===p.playerName&&x.prop===mktLabel)?'var(--accent)':'var(--border)'}`,
+                                background:slip.find(x=>x.name===p.playerName&&x.prop===mktLabel)?'rgba(232,65,26,.2)':'transparent',
+                                color:slip.find(x=>x.name===p.playerName&&x.prop===mktLabel)?'var(--accent)':'var(--muted)',
+                                flexShrink:0}}>
+                              {slip.find(x=>x.name===p.playerName&&x.prop===mktLabel)?'✓':'+'}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Game odds cards */}
+      {!oddsLoading && odds.length > 0 && (
+        <div style={{display:'flex',flexDirection:'column',gap:10}}>
+          {odds.map(game => {
+            const gameTime = game.commence
+              ? new Date(game.commence).toLocaleTimeString('en-US',{timeZone:'America/New_York',
+                  hour:'numeric',minute:'2-digit',hour12:true})
+              : '';
+            const BOOK_IDS = {
+              'FanDuel':'fanduel','DraftKings':'draftkings',
+              'BetMGM':'betmgm','Caesars':'caesars','BetRivers':'betrivers',
+              'PointsBet (US)':'pointsbet','ESPN BET':'espnbet',
+            };
+            return (
+              <div key={game.id} style={{background:'var(--surface)',border:'1px solid var(--border)',
+                borderRadius:10,padding:'12px 14px'}}>
+                {/* Game header */}
+                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
+                  <div>
+                    <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:'var(--text)'}}>
+                      {game.away_team} <span style={{color:'var(--muted)',fontWeight:400}}>@</span> {game.home_team}
+                    </span>
+                    {gameTime && <div style={{fontSize:9,color:'var(--accent2)',fontFamily:"'DM Mono',monospace",marginTop:1}}>{gameTime} ET</div>}
+                  </div>
+                  {/* Best line badge */}
+                  {game.best && Object.keys(game.best).length > 0 && (
+                    <div style={{marginLeft:'auto',display:'flex',gap:6}}>
+                      {Object.entries(game.best).map(([team, o])=>(
+                        <div key={team} style={{textAlign:'center',padding:'3px 8px',
+                          borderRadius:5,background:'rgba(255,255,255,.04)',border:'1px solid var(--border)'}}>
+                          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:13,
+                            color:o.price>0?'#27c97a':'var(--text)',lineHeight:1}}>
+                            {o.price>0?'+':''}{o.price}
+                          </div>
+                          <div style={{fontSize:7,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginTop:1}}>
+                            {team.split(' ').pop()}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Per-book odds table */}
+                {Object.keys(game.books).length > 0 && (
+                  <div style={{overflowX:'auto'}}>
+                    <table style={{width:'100%',borderCollapse:'collapse'}}>
+                      <thead>
+                        <tr>
+                          <th style={{padding:'3px 6px',textAlign:'left',fontSize:8,
+                            color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase'}}>Book</th>
+                          {Object.keys(game.best||{}).map(t=>(
+                            <th key={t} style={{padding:'3px 6px',textAlign:'right',fontSize:8,
+                              color:'var(--muted)',fontFamily:"'DM Mono',monospace",whiteSpace:'nowrap'}}>
+                              {t.split(' ').slice(-1)[0]}
+                            </th>
+                          ))}
+                          <th style={{padding:'3px 6px',textAlign:'center',fontSize:8,
+                            color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>Slip</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(game.books).map(([bookKey, bk])=>(
+                          <tr key={bookKey} style={{borderTop:'1px solid rgba(255,255,255,.04)'}}>
+                            <td style={{padding:'4px 6px',fontFamily:"'DM Mono',monospace",
+                              fontSize:10,color:'var(--text)',whiteSpace:'nowrap',fontWeight:600}}>
+                              {bk.title}
+                            </td>
+                            {(bk.outcomes||[]).map(o=>{
+                              const isBest = game.best?.[o.name]?.price === o.price;
+                              return (
+                                <td key={o.name} style={{padding:'4px 6px',textAlign:'right'}}>
+                                  <span style={{
+                                    fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,
+                                    color:isBest?'#27c97a':o.price>0?'var(--accent2)':'var(--muted)',
+                                  }}>
+                                    {o.price>0?'+':''}{o.price}
+                                    {isBest&&<span style={{fontSize:7,marginLeft:2,color:'#27c97a'}}>★</span>}
+                                  </span>
+                                </td>
+                              );
+                            })}
+                            <td style={{padding:'4px 6px',textAlign:'center'}}>
+                              <button onClick={()=>{
+                                const firstOutcome = bk.outcomes?.[0];
+                                if (firstOutcome) addToSlip(
+                                  {batter:game.away_team,team:game.away_team,batter_id:0},
+                                  oddsMarket==='h2h'?'Moneyline':oddsMarket==='spreads'?'Run Line':'Total',
+                                  `${firstOutcome.price>0?'+':''}${firstOutcome.price}`,
+                                  BOOK_IDS[bk.title]||'fanduel'
+                                );
+                              }}
+                                style={{padding:'2px 6px',borderRadius:4,cursor:'pointer',
+                                  border:'1px solid var(--border)',background:'transparent',
+                                  color:'var(--muted)',fontSize:9,fontFamily:"'DM Mono',monospace"}}>
+                                +
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>}
+
+    {/* ── BET SLIP ── */}
+    {page === 'betslip' && <div>
+      {/* Sportsbook selector */}
+      <div style={{display:'flex',gap:6,marginBottom:14,flexWrap:'wrap',alignItems:'center'}}>
+        <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+          textTransform:'uppercase',letterSpacing:1,flexShrink:0}}>Open on:</span>
+        {SPORTSBOOKS.map(bk=>(
+          <button key={bk.id} onClick={()=>setSelBook(bk.id)}
+            style={{padding:'4px 12px',borderRadius:6,cursor:'pointer',
+              fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:selBook===bk.id?700:400,
+              background:selBook===bk.id?bk.color+'22':'var(--surface2)',
+              color:selBook===bk.id?bk.color:'var(--muted)',
+              border:`1px solid ${selBook===bk.id?bk.color+'60':'var(--border)'}`}}>
+            {bk.label}
+          </button>
+        ))}
+      </div>
+
+      {slip.length === 0
+        ? <div style={{padding:'40px',textAlign:'center',color:'var(--muted)',
+            fontFamily:"'DM Mono',monospace",fontSize:11,background:'var(--surface)',
+            borderRadius:10,border:'1px solid var(--border)'}}>
+            Your slip is empty — add picks from Discover or Props
+          </div>
+        : <>
+          <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:16}}>
+            {slip.map((pick,i)=>{
+              const sb = SPORTSBOOKS.find(b=>b.id===pick.book)||SPORTSBOOKS[0];
+              return (
+                <div key={i} style={{display:'flex',alignItems:'center',gap:10,
+                  background:'var(--surface)',border:'1px solid var(--border)',
+                  borderRadius:8,padding:'10px 12px'}}>
+                  <PlayerAvatar pid={pick.pid} name={pick.name} size={28}/>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
+                      <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13}}>{pick.name}</span>
+                      <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--accent2)'}}>{pick.team}</span>
+                      {pick.grade&&<span style={{fontSize:9,padding:'1px 5px',borderRadius:4,fontWeight:800,
+                        fontFamily:"'Oswald',sans-serif",background:(GRADE_CFG[pick.grade]||GRADE_CFG['D']).bg,
+                        color:(GRADE_CFG[pick.grade]||GRADE_CFG['D']).color,
+                        border:`1px solid ${(GRADE_CFG[pick.grade]||GRADE_CFG['D']).border}`}}>{pick.grade}</span>}
+                    </div>
+                    <div style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--muted)',marginTop:2}}>
+                      {pick.prop} · {pick.line}
+                      {pick.projHR>0&&<span style={{marginLeft:6,color:'var(--accent)'}}>
+                        {(pick.projHR*100).toFixed(1)}% HR proj
+                      </span>}
+                    </div>
+                  </div>
+                  <button onClick={()=>removeFromSlip(i)}
+                    style={{background:'none',border:'none',color:'var(--muted)',
+                      cursor:'pointer',fontSize:16,padding:'2px 6px',flexShrink:0}}>×</button>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Open sportsbook buttons */}
+          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+            {SPORTSBOOKS.map(bk=>(
+              <a key={bk.id} href={buildBetLink(bk.id)} target="_blank" rel="noopener noreferrer"
+                style={{flex:'1 1 140px',padding:'10px 14px',borderRadius:8,cursor:'pointer',
+                  textDecoration:'none',textAlign:'center',
+                  background:bk.id===selBook?bk.color+'22':'rgba(255,255,255,.04)',
+                  border:`1px solid ${bk.id===selBook?bk.color+'60':'var(--border)'}`,
+                  color:bk.id===selBook?bk.color:'var(--muted)',
+                  fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,
+                  letterSpacing:.5,display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
+                <span style={{fontSize:16,fontWeight:900}}>{bk.logo}</span>
+                Open {bk.label}
+              </a>
+            ))}
+          </div>
+
+          <div style={{marginTop:10,fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+            textAlign:'center',lineHeight:1.6}}>
+            ⚠️ Direct bet slip pre-population requires affiliate enrollment with each sportsbook.<br/>
+            These links open the sportsbook MLB page. Affiliate deep links activate once enrolled.
+          </div>
+
+          <button onClick={()=>setSlip([])}
+            style={{marginTop:12,width:'100%',padding:'8px',borderRadius:7,cursor:'pointer',
+              background:'rgba(255,64,32,.08)',border:'1px solid rgba(255,64,32,.25)',
+              color:'var(--accent)',fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:700}}>
+            🗑 Clear Slip
+          </button>
+        </>
+      }
+    </div>}
+  </div>;
+}
 
 function GetAppTab() {
   const url = "https://goingyard.app";
@@ -10612,6 +11358,7 @@ export default function App() {
     {key:"homeruns",  label:"💥 HR Tracker"},
     {key:"live",      label:"📡 Live"},
     {key:"matchup",   label:"⚡ Key Matchups"},
+    {key:"lockin",    label:"🔒 Lock In"},
     {key:"weather",   label:"🌤️ Weather"},
     {key:"powerbi",   label:"📊 Data"},
     {key:"picks",     label:"🎯 My Picks"},
@@ -10667,6 +11414,7 @@ export default function App() {
         <div style={{display:tab==="onlyhomers"?"block":"none"}}><OnlyHomersTab/></div>
         <div style={{display:tab==="getapp"?"block":"none"}}><GetAppTab/></div>
         <div style={{display:tab==="matchup"?"block":"none"}}><MatchupEngineTab/></div>
+        {tab==="lockin" && <LockInTab/>}
       </main>
       <div style={{textAlign:"center",padding:"12px 0 8px",borderTop:"1px solid var(--border)",marginTop:24}}>
         <span style={{fontSize:10,color:"#2a3a48",fontFamily:"'DM Mono',monospace",letterSpacing:1}}>
