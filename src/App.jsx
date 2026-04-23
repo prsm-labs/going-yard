@@ -5847,6 +5847,22 @@ function HRTrackerTab() {
   });
 
   const totalHRs = hrs.length;
+
+  // Pre-compute chronological rank per batter (oldest HR = rank 1)
+  const hrRankMap = (() => {
+    const chrono = [...hrs].sort((a,b) =>
+      ((a.inning||0)*10000+(a.plateAppearance||a.playIndex||a.atBatIndex||0)) -
+      ((b.inning||0)*10000+(b.plateAppearance||b.playIndex||b.atBatIndex||0))
+    );
+    const counts = {};
+    const map = {};
+    chrono.forEach(h => {
+      const bid = String(h.batterId);
+      counts[bid] = (counts[bid]||0) + 1;
+      map[`${h.batterId}_${h.gamePk}_${h.atBatIndex||h.playIndex||h.plateAppearance||0}`] = counts[bid];
+    });
+    return map;
+  })();
   const slamCount = hrs.filter(h => h.rbi === 4).length;
   const avgDist = hrs.filter(h=>h.distance).length
     ? Math.round(hrs.filter(h=>h.distance).reduce((s,h)=>s+h.distance,0)/hrs.filter(h=>h.distance).length)
@@ -5857,29 +5873,33 @@ function HRTrackerTab() {
   const topShot = hrs.filter(h=>h.distance).sort((a,b)=>b.distance-a.distance)[0];
   const hardest = hrs.filter(h=>h.exitVelo).sort((a,b)=>b.exitVelo-a.exitVelo)[0];
 
+  const exportHRCsv = () => {
+    const dq = String.fromCharCode(34);
+    const esc = v => dq + String(v==null?'':v).replace(new RegExp(dq,'g'), dq+dq) + dq;
+    const headers = ['Time','Team','Batter','HR#','Type','RBI','Inn','Angle','EV','Dist','Pitch','Pitcher','Game'];
+    const rows = sorted.map(h=>[
+      h.timeET||'', h.batterTeam||'', h.batterName||'',
+      hrRankMap[h.batterId+'_'+h.gamePk+'_'+(h.atBatIndex||h.playIndex||h.plateAppearance||0)]||'',
+      h.hrType||'', h.rbi||0,
+      (h.halfInning==='top'?'T':'B')+(h.inning||''),
+      h.launchAngle||'', h.exitVelo||'', h.distance||'',
+      h.pitchType||'', h.pitcherName||'',
+      (h.awayAbbr||'')+' @ '+(h.homeAbbr||'')
+    ].map(esc).join(","));
+    const csv = "\uFEFF" + headers.join(",") + "\n" + rows.join("\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
+    a.download = "hr-tracker-"+selDate+".csv";
+    a.click();
+  };
+
   return <div>
     <div className="hrow">
       <div className="section-header">
         <div className="section-title">💥 Home Run Tracker</div>
         <div className="section-sub">{isToday ? "Today's homers · live · auto-refreshes" : `HRs from ${displayDate}`} · exit velo · distance · pitch type</div>
       </div>
-      <button onClick={()=>{
-          const bom = "﻿";
-          const headers = ["Time","Team","Batter","Type","RBI","Inn","Outs","Angle","EV","Dist","Pitch","Pitcher","Game"];
-          const rows = sorted.map(h=>[
-            h.timeET||"",h.batterTeam||"",h.batterName||"",h.hrType||"",h.rbi||0,
-            `${h.halfInning==="top"?"▲":"▼"}${h.inning}`,h.outs||0,
-            h.launchAngle>0?h.launchAngle.toFixed(1):"",
-            h.exitVelo>0?h.exitVelo.toFixed(1):"",h.pitchVelo>0?h.pitchVelo.toFixed(1):"",h._seasonHRNum||"",
-            h.distance||"",h.pitchType||"",h.pitcherName||"",
-            `${h.awayAbbr} @ ${h.homeAbbr}`
-          ].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(","));
-          const csv = bom + headers.join(",") + "\n" + rows.join("\n");
-          const a = document.createElement("a");
-          a.href = URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
-          a.download = `hr-tracker-${selDate}.csv`;
-          a.click();
-        }}
+      <button onClick={exportHRCsv}
         style={{padding:"4px 12px",borderRadius:6,border:"1px solid var(--border)",
           background:"var(--surface2)",color:"var(--muted)",cursor:"pointer",
           fontFamily:"'DM Mono',monospace",fontSize:11,display:"flex",alignItems:"center",gap:5}}>
@@ -5976,19 +5996,8 @@ function HRTrackerTab() {
                 const badgeCls = hr.rbi===4?"slam":hr.rbi>=2?"multi":"solo";
                 const evC = (hr.exitVelo||0)>=103?"dng":(hr.exitVelo||0)>=95?"hot":(hr.exitVelo||0)>=90?"warm":"avg";
                 const distC = (hr.distance||0)>=440?"dng":(hr.distance||0)>=420?"hot":(hr.distance||0)>=400?"warm":"avg";
-                // Live season HR# = cached season total (end of yesterday) + today's rank for this batter
-                // HR# = season total from players.json (updated 3am daily by pipeline)
-                // players.json hr count = end of yesterday. Today's HRs in `hrs` add on top.
                 const cachedHR = getCachedPlayer(hr.batterId)?.hr || 0;
-                // Build ordered list of today's HRs for this batter using simple array index
-                const allBatterToday = hrs.filter(h => String(h.batterId)===String(hr.batterId));
-                // Use index in the displayed sorted list (i is already sorted by time)
-                // Count HRs for this batter that appear at or before position i
-                const todayNum = sorted
-                  .slice(0, i + 1)
-                  .filter(h => String(h.batterId)===String(hr.batterId))
-                  .length;
-                // seasonNum = pipeline total + today's running count
+                const todayNum = hrRankMap[`${hr.batterId}_${hr.gamePk}_${hr.atBatIndex||hr.playIndex||hr.plateAppearance||0}`] || 1;
                 const seasonNum = cachedHR > 0 ? cachedHR + todayNum : todayNum;
                 return <tr key={i}>
                 <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:i<3?"var(--accent)":"var(--muted)"}}>{i+1}</span></td>
