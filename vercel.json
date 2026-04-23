@@ -10,5 +10,11 @@
         { "key": "Access-Control-Allow-Origin", "value": "*" }
       ]
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/odds?type=refresh",
+      "schedule": "0 12-23 * * *"
+    }
   ]
 }
