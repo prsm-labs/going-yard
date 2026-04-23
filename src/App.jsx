@@ -3238,16 +3238,13 @@ function SavantLink({ pid, type='batter', size=9 }) {
   return (
     <a href={url} target="_blank" rel="noopener noreferrer"
       onClick={e => e.stopPropagation()}
-      style={{display:'inline-flex',alignItems:'center',gap:2,
-        fontFamily:"'DM Mono',monospace",fontSize:size,
-        color:'rgba(56,184,242,.7)',textDecoration:'none',
-        padding:'1px 4px',borderRadius:3,
-        border:'1px solid rgba(56,184,242,.2)',
-        background:'rgba(56,184,242,.06)',
-        transition:'all .12s',flexShrink:0}}
-      onMouseEnter={e=>{e.currentTarget.style.color='var(--ice)';e.currentTarget.style.borderColor='rgba(56,184,242,.5)';}}
-      onMouseLeave={e=>{e.currentTarget.style.color='rgba(56,184,242,.7)';e.currentTarget.style.borderColor='rgba(56,184,242,.2)';}}>
-      ⚡ Savant
+      title="View on Baseball Savant"
+      style={{display:'inline-flex',alignItems:'center',
+        fontSize:10,textDecoration:'none',flexShrink:0,
+        opacity:.5,transition:'opacity .12s'}}
+      onMouseEnter={e=>e.currentTarget.style.opacity='1'}
+      onMouseLeave={e=>e.currentTarget.style.opacity='.5'}>
+      🔗
     </a>
   );
 }
@@ -9199,19 +9196,37 @@ function LockInTab() {
   const [oddsEvents, setOddsEvents] = useState([]);    // event list for game picker
   const [oddsEventId, setOddsEventId] = useState('all'); // selected game for props
   const [oddsProps, setOddsProps]   = useState([]);    // normalized prop lines
+  const [lockSearch, setLockSearch] = useState('');   // batter search filter
 
   // ── Discover: pull from DAILY_PICKS_CACHE (engine top batters) ─────────────
-  const discoverBatters = useMemo(() => {
+  const allDiscoverBatters = useMemo(() => {
     const rows = Object.values(DAILY_PICKS_CACHE);
     if (rows.length === 0) return [];
-    return rows
-      .filter(r => r.grade && ['diamond','A+','A','B'].includes(r.grade))
+    // Dedupe by batter_id (keep highest weighted score)
+    const seen = {};
+    rows.forEach(r => {
+      const bid = String(r.batter_id||'');
+      if (!bid || bid==='NaN') return;
+      if (!seen[bid] || (parseFloat(r.weighted_flag_score)||0) > (parseFloat(seen[bid].weighted_flag_score)||0))
+        seen[bid] = r;
+    });
+    return Object.values(seen)
+      .filter(r => r.grade && ['diamond','A+','A','B','C'].includes(r.grade))
       .sort((a,b) =>
         (parseFloat(b.proj_hr_adj)||0) - (parseFloat(a.proj_hr_adj)||0) ||
         (parseFloat(b.weighted_flag_score)||0) - (parseFloat(a.weighted_flag_score)||0)
-      )
-      .slice(0, 20);
+      );
   }, []);
+
+  const discoverBatters = useMemo(() => {
+    if (!lockSearch.trim()) return allDiscoverBatters.slice(0, 30);
+    const q = lockSearch.toLowerCase();
+    return allDiscoverBatters.filter(r =>
+      (r.batter||'').toLowerCase().includes(q) ||
+      (r.batting_team||'').toLowerCase().includes(q) ||
+      (r.pitcher||'').toLowerCase().includes(q)
+    );
+  }, [allDiscoverBatters, lockSearch]);
 
   // ── Odds fetch — calls our /api/odds.js proxy (key stays server-side) ───────
   const fetchOdds = async (market = oddsMarket, evId = oddsEventId) => {
@@ -9305,9 +9320,17 @@ function LockInTab() {
 
     {/* ── DISCOVER ── */}
     {page === 'discover' && <div>
+      {/* Search */}
+      <input value={lockSearch} onChange={e=>setLockSearch(e.target.value)}
+        placeholder="Search batter, team, or pitcher…"
+        style={{width:'100%',padding:'8px 12px',borderRadius:8,marginBottom:12,
+          border:`1px solid ${lockSearch?'var(--accent2)':'var(--border)'}`,
+          background:'var(--surface2)',color:'var(--text)',
+          fontFamily:"'DM Mono',monospace",fontSize:11,boxSizing:'border-box'}}/>
       <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
         textTransform:'uppercase',letterSpacing:1,marginBottom:12}}>
-        Today's Top Plays — Engine Grade A+ & Above · Sorted by HR Probability
+        Today's Top Plays — Grades A+→C · Sorted by HR Probability
+        {discoverBatters.length > 0 && <span style={{marginLeft:6,color:'var(--accent2)'}}>({discoverBatters.length})</span>}
       </div>
       {discoverBatters.length === 0
         ? <div style={{padding:'32px',textAlign:'center',color:'var(--muted)',
@@ -9399,9 +9422,15 @@ function LockInTab() {
 
     {/* ── PROPS ── */}
     {page === 'props' && <div>
+      <input value={lockSearch} onChange={e=>setLockSearch(e.target.value)}
+        placeholder="Search batter, team, or pitcher…"
+        style={{width:'100%',padding:'8px 12px',borderRadius:8,marginBottom:12,
+          border:`1px solid ${lockSearch?'var(--accent2)':'var(--border)'}`,
+          background:'var(--surface2)',color:'var(--text)',
+          fontFamily:"'DM Mono',monospace",fontSize:11,boxSizing:'border-box'}}/>
       <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
         textTransform:'uppercase',letterSpacing:1,marginBottom:12}}>
-        Player Props — Historical Hit Rates from Engine Data
+        Player Props — Engine Grades A+→C · {discoverBatters.length} batters
       </div>
       {discoverBatters.length === 0
         ? <div style={{padding:'32px',textAlign:'center',color:'var(--muted)',
