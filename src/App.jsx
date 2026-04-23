@@ -8059,7 +8059,7 @@ function MatchupEngineTab() {
 
   // Group by game_id, then by batting_team
   const grouped = {};
-  (selGame === 'all' ? activeData : activeData.filter(r => r.game_id === selGame))
+  (selGame === 'all' ? activeData : activeData.filter(r => String(r.game_id) === String(selGame)))
     .filter(r => selGrade === 'all' || r.grade === selGrade)
     .filter(r => {
       if (!filterGoneYard) return true;
@@ -8574,7 +8574,7 @@ function MatchupEngineTab() {
                         <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
                           marginLeft:6}}>{b.batter_hand}HB</span>
                       </div>
-                      <div style={{marginTop:2}}><SavantLink pid={pid} type="batter"/></div>
+
                     {/* Flag pills */}
                     <div style={{display:'flex',gap:4,marginTop:3,flexWrap:'wrap'}}>
                       {flag(b.recent_ev_flag) &&
@@ -8741,8 +8741,11 @@ function MatchupEngineTab() {
                       </div>
                       <div style={{width:1,height:28,background:'var(--border)'}}/>
                       <div style={{textAlign:'center',minWidth:44}}>
-                        <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:18,
-                          color:'var(--text)',lineHeight:1}}>{seasonHR}</div>
+                        <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:4}}>
+                          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:18,
+                            color:'var(--text)',lineHeight:1}}>{seasonHR}</span>
+                          <SavantLink pid={pid} type="batter"/>
+                        </div>
                         <div style={{fontSize:7,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
                           textTransform:'uppercase',letterSpacing:.5,marginTop:1}}>Season HR</div>
                       </div>
