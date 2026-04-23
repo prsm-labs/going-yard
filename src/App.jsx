@@ -5643,7 +5643,7 @@ const DUE_BADGE = (
 const WEATHER_ALERT_GAME_IDS = new Set(); // game_ids with weather concerns at game time
 const DAILY_GAME_MAP    = {}; // keyed by normalized game_id → Set of batting_teams
 let _notifyNewHR = null; // callback set by useHRNotifications hook
-const HR_CACHE_MS = 60000;
+const HR_CACHE_MS = 18000; // match to poll interval — real fetch every 18s during games
 
 async function fetchHRs(force=false) {
   const now = Date.now();
@@ -5657,8 +5657,8 @@ async function fetchHRs(force=false) {
     const newHRs = data.homeruns || [];
     // Keep yesterday's HRs in ticker until today's games produce at least 3 HRs
     // This way the ticker stays alive past midnight until next day's games start
-    if (newHRs.length >= 3) {
-      HR_DATA = newHRs; HR_DATA_DATE = data.date || ''; // today has real data — use it
+    if (newHRs.length > 0) {
+      HR_DATA = newHRs; HR_DATA_DATE = data.date || '';
       // Seed on first load; fire banners on subsequent fetches only
       const isFirst = HR_LAST_FETCH === 0;
       newHRs.forEach(h => {
@@ -5668,8 +5668,6 @@ async function fetchHRs(force=false) {
           if (!isFirst && _notifyNewHR) _notifyNewHR(h); // skip on first load
         }
       });
-    } else if (newHRs.length > 0) {
-      HR_DATA = newHRs; HR_DATA_DATE = data.date || ''; // small amount — still show it
     } else if (HR_DATA.length === 0) {
       // Truly no data yet — try fetching yesterday
       try {
@@ -11042,7 +11040,7 @@ function useHRNotifications() {
   const [queue, setQueue] = useState([]);
   useEffect(() => {
     _setQueue = setQueue;
-    // Wire up the global notifier — calls both queue AND log setters
+    // Wire up the global notifier — persist across remounts, only replace not null
     _notifyNewHR = (hr) => {
       const notif = {
         id: Date.now() + Math.random(),
@@ -11062,7 +11060,7 @@ function useHRNotifications() {
       if (_setHrLog) _setHrLog([..._hrLog]);
       playHRSound();
     };
-    return () => { _setQueue = null; _notifyNewHR = null; };
+    return () => { _setQueue = null; }; // keep _notifyNewHR alive — avoids missed HRs during remounts
   }, []);
   const dismiss = (id) => setQueue(q => q.filter(n => n.id !== id));
   return { queue, dismiss };
