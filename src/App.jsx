@@ -13,6 +13,7 @@ const styles = `
   }
   html,body{background:var(--bg);color:var(--text);font-family:'Oswald',sans-serif;min-height:100vh;overflow-x:clip;max-width:100%;width:100%;}
   .app{min-height:100vh;display:flex;flex-direction:column;overflow-x:clip;max-width:100%;width:100%;}
+  .app-inner{width:100%;max-width:1280px;margin:0 auto;display:flex;flex-direction:column;min-height:100vh;}
   .header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:linear-gradient(180deg,#0a1520 0%,var(--bg) 100%);gap:8px;overflow:hidden;}
   .logo{font-family:'Oswald',sans-serif;font-weight:700;font-size:17px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text);display:flex;align-items:center;gap:6px;min-width:0;flex-shrink:1;overflow:hidden;white-space:nowrap;}
   .logo span{color:var(--accent);}
@@ -25,6 +26,11 @@ const styles = `
   .tab:hover{color:var(--text);}
   .tab.active{color:var(--text);border-bottom-color:var(--accent);}
   .content{flex:1;padding:22px;width:100%;box-sizing:border-box;}
+@media(min-width:769px){
+  .content{padding:28px 32px;}
+  .tab{padding:12px 14px;font-size:11px;}
+  body{font-size:14px;}
+}
   .section-title{font-family:'Oswald',sans-serif;font-weight:700;font-size:26px;text-transform:uppercase;letter-spacing:2px;color:var(--text);}
   .section-sub{font-size:12px;color:var(--muted);margin-top:3px;font-family:'Oswald',sans-serif;font-weight:300;letter-spacing:.5px;}
   .section-header{margin-bottom:18px;}
@@ -11082,6 +11088,7 @@ export default function App() {
   return <>
     <style>{styles}</style>
     <div className="app">
+      <div className="app-inner">
       <HRNotifications/>
       <header className="header">
         <div className="logo"><div className="logo-dot"/>⚾ <span>GOING</span> YARD</div>
@@ -11163,6 +11170,7 @@ export default function App() {
         </span>
       </div>
     </div>
+    </div>{/* end app-inner */}
     <AtBatSlideIn/>
     <PitcherSlideIn/>
     {showPicksSlideout && <PicksSlideout onClose={()=>setShowPicksSlideout(false)}/>}
