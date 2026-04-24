@@ -11333,13 +11333,13 @@ export default function App() {
     {key:"homeruns",  label:"💥 HR Tracker"},
     {key:"live",      label:"📡 Live"},
     {key:"matchup",   label:"⚡ Key Matchups"},
-    {key:"lockin",    label:"🔒 Lock In"},
+    // {key:"lockin",    label:"🔒 Lock In"}, // hidden
     {key:"weather",   label:"🌤️ Weather"},
     {key:"powerbi",   label:"📊 Data"},
     {key:"picks",     label:"🎯 My Picks"},
     {key:"statcast",  label:"📡 Statcast"},
     {key:"onlyhomers",label:"⚾ Only Homers"},
-    {key:"doink",     label:"🎯 Doink"},
+    {key:"doink",     label:"👾 DOINK"},
     {key:"linemate",  label:"📊 Linemate",  external:"https://linemate.io/mlb"},
     {key:"livesports",label:"📺 Live Sports",external:"https://thetvapp.to"},
     {key:"gambly",    label:"🤖 Gambly Bot", external:"https://gambly.com"},
@@ -11388,7 +11388,19 @@ export default function App() {
         <div style={{display:tab==="statcast"?"block":"none"}}><StatcastTab/></div>
         <div style={{display:tab==="homeruns"?"block":"none"}}><HRTrackerTab/></div>
         <div style={{display:tab==="onlyhomers"?"block":"none"}}><OnlyHomersTab/></div>
-        {tab==="doink" && <div style={{margin:"-16px"}}>
+        {tab==="doink" && <div>
+          <div style={{padding:"8px 14px",background:"rgba(245,166,35,.1)",
+            borderBottom:"1px solid rgba(245,166,35,.25)",
+            display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+            <span style={{fontSize:12}}>👾</span>
+            <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--text)"}}>New users — sign up with code</span>
+            <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:13,
+              color:"var(--accent2)",letterSpacing:.5,padding:"1px 8px",borderRadius:4,
+              background:"rgba(245,166,35,.15)",border:"1px solid rgba(245,166,35,.3)"}}>
+              SHARP9346
+            </span>
+            <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--muted)"}}>for 25% off</span>
+          </div>
           <iframe src="https://doinksports.com/research/mlb/"
             style={{width:"100%",height:"calc(100vh - 48px)",border:"none",display:"block"}}
             title="Doink Sports MLB Research"/>
