@@ -11388,7 +11388,7 @@ export default function App() {
         <div style={{display:tab==="statcast"?"block":"none"}}><StatcastTab/></div>
         <div style={{display:tab==="homeruns"?"block":"none"}}><HRTrackerTab/></div>
         <div style={{display:tab==="onlyhomers"?"block":"none"}}><OnlyHomersTab/></div>
-        {tab==="doink" && <div>
+        <div style={{display:tab==="doink"?'block':'none'}}>
           <div style={{padding:"8px 14px",background:"rgba(245,166,35,.1)",
             borderBottom:"1px solid rgba(245,166,35,.25)",
             display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
@@ -11399,12 +11399,18 @@ export default function App() {
               background:"rgba(245,166,35,.15)",border:"1px solid rgba(245,166,35,.3)"}}>
               SHARP9346
             </span>
-            <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--muted)"}}>for 25% off</span>
+            <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--muted)"}}>for 25% off —</span>
+            <a href="https://doinksports.com/research/mlb/" target="_blank" rel="noopener noreferrer"
+              style={{fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:700,
+                color:"var(--ice)",textDecoration:"underline",textUnderlineOffset:3}}>
+              Sign Up / Log In
+            </a>
           </div>
           <iframe src="https://doinksports.com/research/mlb/"
-            style={{width:"100%",height:"calc(100vh - 48px)",border:"none",display:"block"}}
+            style={{width:'125%',height:'calc((100vh - 80px) * 1.25)',border:'none',display:'block',
+              transform:'scale(0.8)',transformOrigin:'top left'}}
             title="Doink Sports MLB Research"/>
-        </div>}
+        </div>
         <div style={{display:tab==="getapp"?"block":"none"}}><GetAppTab/></div>
         <div style={{display:tab==="matchup"?"block":"none"}}><MatchupEngineTab/></div>
         {tab==="lockin" && <LockInTab/>}
