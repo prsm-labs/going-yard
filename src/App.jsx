@@ -7432,7 +7432,7 @@ function BvPHistoryTab({ data }) {
   const [loading, setLoading]     = useState(false);
   const [loaded, setLoaded]       = useState(false);
   const [sortCol, setSortCol]     = useState('hr');
-  const [sortDir, setSortDir]     = useState(-1); // -1 = desc
+  const [sortDir, setSortDir]     = useState(1);  // 1 with (bn-an) = descending
   const [minPA, setMinPA]         = useState(0);
   const [search, setSearch]       = useState('');
 
@@ -7448,12 +7448,18 @@ function BvPHistoryTab({ data }) {
       const k = `${bid}_${pid}`;
       if (seen.has(k)) return;
       seen.add(k);
+      // Derive pitcher's team: find the other team in this game from DAILY_GAME_MAP
+      const battingTeam = r.batting_team || '—';
+      const rawGid = String(r.game_id||'').trim();
+      const gid = rawGid.includes('.')?String(parseInt(rawGid)):rawGid;
+      const gameTeams = gid ? [...(DAILY_GAME_MAP[gid]||[])] : [];
+      const pitcherTeam = gameTeams.find(t => t !== battingTeam) || '—';
       out.push({
         batterId:    bid,
         pitcherId:   pid,
         batter:      r.batter      || '—',
-        team:        r.batting_team || '—',
-        opp:         r.pitching_team|| '—',
+        team:        battingTeam,
+        opp:         pitcherTeam,
         pitcher:     r.pitcher     || '—',
         pitcherHand: r.pitcher_hand || '?',
         grade:       r.grade       || '—',
@@ -7491,7 +7497,7 @@ function BvPHistoryTab({ data }) {
 
   const handleSort = (col) => {
     if (sortCol === col) setSortDir(d => -d);
-    else { setSortCol(col); setSortDir(-1); }
+    else { setSortCol(col); setSortDir(1); } // 1 = desc with bn-an formula
   };
 
   const filtered = useMemo(() => {
@@ -7517,11 +7523,14 @@ function BvPHistoryTab({ data }) {
   const COLS = [
     {key:'team',    label:'Tm',      align:'left',  render:r=><span style={{color:'var(--accent2)',fontWeight:700,fontFamily:"'Oswald',sans-serif",fontSize:11}}>{r.team}</span>},
     {key:'batter',  label:'Batter',  align:'left',  render:r=>(
-      <div style={{cursor:'pointer',display:'flex',alignItems:'center',gap:4}}
-        onClick={()=>{const cp=getCachedPlayer(r.batterId)||{};openAtBatSlide({pid:r.batterId,name:r.batter,team:r.team,avgEV:cp.avgEV,barrel:cp.barrel,hr:cp.hr,avg:cp.avg,obp:cp.obp,slg:cp.slg});}}>
+      <div style={{display:'flex',alignItems:'center',gap:5}}>
+        <PickButton pid={r.batterId} name={r.batter} team={r.team}/>
         <PlayerAvatar pid={r.batterId} name={r.batter} size={20}/>
-        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11}}>{r.batter}</span>
-        <span style={{fontSize:9,opacity:.4}}>›</span>
+        <div style={{cursor:'pointer',display:'flex',alignItems:'center',gap:3}}
+          onClick={()=>{const cp=getCachedPlayer(r.batterId)||{};openAtBatSlide({pid:r.batterId,name:r.batter,team:r.team,avgEV:cp.avgEV,barrel:cp.barrel,hr:cp.hr,avg:cp.avg,obp:cp.obp,slg:cp.slg});}}>
+          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11}}>{r.batter}</span>
+          <span style={{fontSize:9,opacity:.4}}>›</span>
+        </div>
       </div>
     )},
     {key:'opp',     label:'Opp',     align:'left',  render:r=><span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--muted)'}}>{r.opp}</span>},
