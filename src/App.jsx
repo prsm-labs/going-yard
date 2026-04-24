@@ -981,7 +981,9 @@ function PitcherTab() {
                   <tr key={p.pid} className={isSelected?'ex':''} style={{cursor:'pointer'}}
                     onClick={()=>{ setSelPitcher(isSelected?null:p); if(!isSelected){setPitcherDetail(null);loadDetail(p);} }}>
                     <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:i<3?'var(--accent)':'var(--muted)'}}>{i+1}</span></td>
-                    <td><div className="pn" style={{fontSize:13}}>{p.name}</div></td>
+                    <td><div className="pn" style={{fontSize:13,cursor:'pointer',display:'flex',alignItems:'center',gap:4}}
+                      onClick={e=>{e.stopPropagation();openPitcherSlide({pid:p.pid,name:p.name,team:p.team,hand:p.hand,pitchMix:[]});}}
+                    >{p.name}<span style={{fontSize:10,color:'var(--muted)',opacity:.5}}>›</span></div></td>
                     <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,color:'var(--accent2)'}}>{p.team}</span></td>
                     <td><span style={{fontSize:10,fontFamily:"'DM Mono',monospace",padding:'2px 6px',borderRadius:4,background:p.hand==='LHP'?'rgba(56,184,242,.15)':'rgba(232,65,26,.1)',color:p.hand==='LHP'?'var(--ice)':'var(--accent)'}}>{p.hand}</span></td>
                     <td><span className="sv avg">{p.gs}</span></td>
@@ -7909,8 +7911,12 @@ function PitcherLeaderboard() {
 
   const COLS = [
     { key:'name',   label:'Pitcher',   align:'left',
-      render: p => <div>
-        <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,letterSpacing:.3}}>{p.name}</div>
+      render: p => <div style={{cursor:'pointer'}}
+        onClick={e=>{e.stopPropagation();openPitcherSlide({pid:p.pid,name:p.name,team:p.team,hand:p.hand,pitchMix:[]});}}>
+        <div style={{display:'flex',alignItems:'center',gap:5}}>
+          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,letterSpacing:.3}}>{p.name}</span>
+          <span style={{fontSize:10,color:'var(--muted)',opacity:.5}}>›</span>
+        </div>
         <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)'}}>{p.gs>0?'SP':'RP'} · {p.gp}G{p.gs>0?` · ${p.gs}GS`:''}</div>
       </div>
     },
@@ -8800,7 +8806,7 @@ function MatchupEngineTab() {
                     <PlayerAvatar pid={pid} name={b.batter} size={28}/>
                     <div style={{minWidth:0}}>
                       <div style={{display:'flex',alignItems:'center',gap:5,cursor:'pointer'}}
-                        onClick={e=>{e.stopPropagation();openAtBatSlide({pid:pid||parseInt(b.batter_id)||0,name:b.batter,team:b.batting_team,...(getCachedPlayer(pid)||{})});}}>
+                        onClick={e=>{e.stopPropagation();const cp=getCachedPlayer(pid)||{};openAtBatSlide({pid:pid||parseInt(b.batter_id)||0,name:b.batter,team:b.batting_team,avgEV:cp.avgEV,barrel:cp.barrel,hardHit:cp.hardHit,flyBall:cp.flyBall,hr:cp.hr,avg:cp.avg,obp:cp.obp,slg:cp.slg,xwoba:cp.xwoba,oSwing:cp.oSwing,kPct:cp.kPct,bbPct:cp.bbPct,gbPct:cp.gbPct,launchAngle:cp.launchAngle,sweetSpot:cp.sweetSpot});}}> 
                         <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,
                           whiteSpace:'normal',wordBreak:'break-word',lineHeight:1.2,
                           color:'var(--text)'}}>
