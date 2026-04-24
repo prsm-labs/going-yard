@@ -1914,7 +1914,7 @@ function PitcherSlideIn() {
                 <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:14,
                   color:'var(--text)'}}>{p.name||p.code}</div>
                 <div style={{fontSize:9,color:'var(--accent2)',fontFamily:"'DM Mono',monospace",
-                  fontWeight:700,marginTop:2}}>{p.pct||p.usage}%</div>
+                  fontWeight:700,marginTop:2}}>{typeof (p.pct||p.usage)==='number'?(p.pct||p.usage)<1.5?(((p.pct||p.usage)*100).toFixed(1)):(p.pct||p.usage).toFixed(1):p.pct||p.usage}%</div>
                 {p.velo>0&&<div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
                   marginTop:1}}>{parseFloat(p.velo).toFixed(1)} mph</div>}
               </div>
@@ -8768,7 +8768,16 @@ function MatchupEngineTab() {
                 {team.team}
               </span>
               <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
-                vs {team.pitcher} · {team.pitchMix}
+                vs
+              </span>
+              <span style={{fontSize:11,fontFamily:"'Oswald',sans-serif",fontWeight:700,
+                color:'var(--text)',cursor:'pointer',display:'flex',alignItems:'center',gap:4}}
+                onClick={e=>{e.stopPropagation();openPitcherSlide({pid:parseInt(team.pitcherId)||0,name:team.pitcher,team:team.team,hand:'',pitchMix:[]});}}>
+                {team.pitcher}
+                <span style={{fontSize:10,color:'var(--ice)',fontFamily:"'DM Mono',monospace",fontWeight:700}}>› Stats</span>
+              </span>
+              <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
+                · {team.pitchMix}
               </span>
             </div>
             <PitcherCard pitcherId={team.pitcherId} pitcherName={team.pitcher} onGrade={(id,g)=>{pitcherGradeCache.current[id]=g;}}/>
