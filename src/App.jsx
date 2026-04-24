@@ -11680,13 +11680,13 @@ export default function App() {
               SHARP9346
             </span>
             <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--muted)"}}>for 25% off —</span>
-            <a href="https://doinksports.com/research/mlb/" target="_blank" rel="noopener noreferrer"
+            <a href="https://doinksports.com/research/mlb/weather-man" target="_blank" rel="noopener noreferrer"
               style={{fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:700,
                 color:"var(--ice)",textDecoration:"underline",textUnderlineOffset:3}}>
               Sign Up / Log In ↗
             </a>
           </div>
-          <iframe src="https://doinksports.com/research/mlb/"
+          <iframe src="https://doinksports.com/research/mlb/weather-man"
             style={{width:'125%',height:'calc((100vh - 80px) * 1.25)',border:'none',display:'block',
               transform:'scale(0.8)',transformOrigin:'top left'}}
             title="Doink Sports MLB Research"/>
