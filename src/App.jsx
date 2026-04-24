@@ -7431,7 +7431,7 @@ function BvPHistoryTab({ data }) {
   const [rows, setRows]           = useState([]); // [{...batter, ...bvpStats}]
   const [loading, setLoading]     = useState(false);
   const [loaded, setLoaded]       = useState(false);
-  const [sortCol, setSortCol]     = useState('pa');
+  const [sortCol, setSortCol]     = useState('hr');
   const [sortDir, setSortDir]     = useState(-1); // -1 = desc
   const [minPA, setMinPA]         = useState(0);
   const [search, setSearch]       = useState('');
@@ -7476,8 +7476,8 @@ function BvPHistoryTab({ data }) {
         const batch = pairs.slice(i, i + BATCH);
         const batchResults = await Promise.all(
           batch.map(async p => {
-            const stats = await fetchBvP(p.batterId, p.pitcherId);
-            return { ...p, ...stats };
+            const { batter: _bid, pitcher: _pid, ...statFields } = await fetchBvP(p.batterId, p.pitcherId);
+            return { ...p, ...statFields };
           })
         );
         results.push(...batchResults);
