@@ -1,11 +1,11 @@
 // api/pitcher.js
 // Fetches pitcher season stats from MLB Stats API (always works)
-// Savant pitch mix data is optional/bonus — never blocks the response
+// Savant pitch mix + batted ball stats (GB%, FB%, HH%) optional/bonus
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET');
-  res.setHeader('Cache-Control', 'public, s-maxage=3600'); // cache 1hr
+  res.setHeader('Cache-Control', 'public, s-maxage=3600');
 
   const { pid, name, year = '2026' } = req.query;
   const headers = {
@@ -30,15 +30,14 @@ export default async function handler(req, res) {
           );
           if (p) pitcherId = String(p.id);
         }
-      } catch(e) { /* search failed — continue without ID */ }
+      } catch(e) {}
     }
 
     if (!pitcherId) {
       return res.status(200).json({ found: false, pitchMix: [], stats: {} });
     }
 
-    // ── Step 2: Pitcher hand + MLB Stats API season stats ───────
-    // Fetch both in parallel — hand from people endpoint, stats from pitching endpoint
+    // ── Step 2: MLB Stats API season stats ──────────────────────
     let stats = {};
     let hand  = 'R';
     try {
@@ -65,15 +64,15 @@ export default async function handler(req, res) {
         }
         if (s) {
           stats = {
-            era:  s.era              || '—',
-            whip: s.whip             || '—',
-            ip:   s.inningsPitched   || '0',
-            k9:   s.strikeoutsPer9Inn|| '—',
-            bb9:  s.walksPer9Inn     || '—',
-            hr9:  s.homeRunsPer9     || '—',
+            era:  s.era               || '—',
+            whip: s.whip              || '—',
+            ip:   s.inningsPitched    || '0',
+            k9:   s.strikeoutsPer9Inn || '—',
+            bb9:  s.walksPer9Inn      || '—',
+            hr9:  s.homeRunsPer9      || '—',
             kPct: s.strikeoutPercentage || '—',
-            bbPct:s.walkPercentage   || '—',
-            hits: s.hits  || 0,
+            bbPct:s.walkPercentage    || '—',
+            hits: s.hits   || 0,
             hr:   s.homeRuns || 0,
             obp:  s.obp    || '—',
             avg:  s.avg    || '—',
@@ -88,15 +87,26 @@ export default async function handler(req, res) {
       console.warn('[Pitcher] MLB Stats API failed:', e.message);
     }
 
-    // ── Step 3: Savant pitch mix (optional — don't block) ───────
+    // ── Step 3: Savant pitch mix + batted ball stats ────────────
+    // Batted ball: GB%, FB%, HH% (hard hit allowed %), barrel% allowed
     let pitchMix = [];
+    let battedBall = {};
     try {
-      const r = await fetch(
-        `https://baseballsavant.mlb.com/leaderboard/pitch-movement?year=${year}&team=&min=1&type=pitcher&pitcher_hand=&pitch_type=&run_value_sort=run_value_per_100&csv=true`,
-        { headers, signal: AbortSignal.timeout(5000) }
-      );
-      if (r.ok) {
-        const csv = await r.text();
+      // Fetch pitch mix and batted ball leaderboards in parallel
+      const [rMix, rBB] = await Promise.all([
+        fetch(
+          `https://baseballsavant.mlb.com/leaderboard/pitch-movement?year=${year}&team=&min=1&type=pitcher&pitcher_hand=&pitch_type=&run_value_sort=run_value_per_100&csv=true`,
+          { headers, signal: AbortSignal.timeout(5000) }
+        ),
+        fetch(
+          `https://baseballsavant.mlb.com/leaderboard/custom?year=${year}&type=pitcher&filter=&min=1&selections=pa,barrel_batted_rate,hard_hit_percent,groundballs_percent,flyballs_percent,linedrives_percent&csv=true`,
+          { headers, signal: AbortSignal.timeout(5000) }
+        ),
+      ]);
+
+      // Pitch mix
+      if (rMix.ok) {
+        const csv = await rMix.text();
         const rows = csv.trim().split('\n');
         const hdrs = rows[0].split(',').map(h => h.replace(/"/g,'').trim());
         const playerRows = rows.slice(1)
@@ -126,16 +136,42 @@ export default async function handler(req, res) {
           })).filter(p => p.pct > 0).sort((a,b) => b.pct - a.pct);
         }
       }
+
+      // Batted ball stats (opponent)
+      if (rBB.ok) {
+        const csv2 = await rBB.text();
+        const rows2 = csv2.trim().split('\n');
+        const hdrs2 = rows2[0].split(',').map(h => h.replace(/"/g,'').trim());
+        const found = rows2.slice(1).find(row => {
+          const vals = row.split(',').map(v => v.replace(/"/g,'').trim());
+          const o = {};
+          hdrs2.forEach((h,i) => { o[h] = vals[i] || ''; });
+          return (o.player_id || o.pitcher_id) === pitcherId;
+        });
+        if (found) {
+          const vals = found.split(',').map(v => v.replace(/"/g,'').trim());
+          const o = {};
+          hdrs2.forEach((h,i) => { o[h] = vals[i] || ''; });
+          battedBall = {
+            gbPct:      parseFloat(o.groundballs_percent || o.gb_percent || 0)  || null,
+            fbPct:      parseFloat(o.flyballs_percent    || o.fb_percent || 0)  || null,
+            ldPct:      parseFloat(o.linedrives_percent  || o.ld_percent || 0)  || null,
+            hhPct:      parseFloat(o.hard_hit_percent    || 0)                  || null,
+            barrelPct:  parseFloat(o.barrel_batted_rate  || 0)                  || null,
+          };
+        }
+      }
     } catch(e) {
       console.warn('[Pitcher] Savant fetch skipped:', e.message);
     }
 
-    console.log(`[Pitcher] ${pitcherId} | ERA ${stats.era} K/9 ${stats.k9} | ${pitchMix.length} pitches`);
+    console.log(`[Pitcher] ${pitcherId} | ERA ${stats.era} K/9 ${stats.k9} | ${pitchMix.length} pitches | GB ${battedBall.gbPct} FB ${battedBall.fbPct} HH ${battedBall.hhPct}`);
 
     return res.status(200).json({
       found: true,
       pid: pitcherId,
       pitchMix,
+      battedBall,
       stats,
     });
 

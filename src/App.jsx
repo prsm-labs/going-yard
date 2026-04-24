@@ -1550,6 +1550,9 @@ function MyPicksTab() {
 // ── GLOBAL AT-BAT SLIDE-IN ────────────────────────────────────
 // Single global state — any page can trigger it
 let AB_SLIDE_LISTENER = null;
+let PITCHER_SLIDE_LISTENER = null;
+function openPitcherSlide(pitcher) { if (PITCHER_SLIDE_LISTENER) PITCHER_SLIDE_LISTENER(pitcher); }
+
 function openAtBatSlide(player) {
   if (AB_SLIDE_LISTENER) AB_SLIDE_LISTENER(player);
 }
@@ -1734,6 +1737,219 @@ function AtBatSlideIn() {
                         <td style={{padding:"7px 8px",fontFamily:"'DM Mono',monospace",fontSize:11,textAlign:"center",color:g.bb>0?"var(--green)":"var(--muted)"}}>{g.bb}</td>
                         <td style={{padding:"7px 8px",fontFamily:"'DM Mono',monospace",fontSize:11,textAlign:"center",color:g.k>=3?"var(--ice)":"var(--muted)"}}>{g.k}</td>
                         <td style={{padding:"7px 8px",fontFamily:"'DM Mono',monospace",fontSize:11,textAlign:"center",color:parseFloat(g.avg)>=0.300?"var(--accent)":parseFloat(g.avg)>=0.250?"#ff8020":"var(--text)"}}>{g.avg}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+        }
+      </div>
+    </div>
+  </>;
+}
+
+
+// ── PITCHER SLIDE-OUT ──────────────────────────────────────────────────────────
+function PitcherSlideIn() {
+  const [pitcher, setPitcher] = useState(null);
+  const [stats, setStats]     = useState(null);
+  const [gameLog, setGameLog] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [battedBall, setBattedBall] = useState(null);
+
+  useEffect(() => {
+    PITCHER_SLIDE_LISTENER = setPitcher;
+    return () => { PITCHER_SLIDE_LISTENER = null; };
+  }, []);
+
+  useEffect(() => {
+    if (!pitcher?.pid && !pitcher?.name) return;
+    setStats(null); setGameLog([]); setLoading(true); setBattedBall(null);
+
+    // Fetch season stats + pitch mix via existing pitcher API
+    const fetchAll = async () => {
+      try {
+        const url = pitcher.pid
+          ? `/api/pitcher?pid=${pitcher.pid}&year=2026`
+          : `/api/pitcher?name=${encodeURIComponent(pitcher.name)}&year=2026`;
+        const r = await fetch(url);
+        const d = await r.json();
+        if (d.found) { setStats(d); if (d.battedBall) setBattedBall(d.battedBall); }
+      } catch(e) {}
+
+      // Game log via MLB Stats API
+      try {
+        const pid = pitcher.pid;
+        if (!pid) return;
+        const r = await fetch(`https://statsapi.mlb.com/api/v1/people/${pid}/stats?stats=gameLog&group=pitching&season=2026&sportId=1&limit=20`);
+        const d = await r.json();
+        const OPP_ABBR = {133:'ATH',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',139:'TB',140:'TEX',141:'TOR',142:'MIN',143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL',108:'LAA',109:'ARI',110:'BAL',111:'BOS',112:'CHC',113:'CIN',114:'CLE',115:'COL',116:'DET',117:'HOU',118:'KC',119:'LAD',120:'WSH',121:'NYM'};
+        const rows = (d.stats?.[0]?.splits||[]).reverse().slice(0,20).map(g=>({
+          date: g.date?.slice(5)||'—',
+          opp:  OPP_ABBR[g.opponent?.id]||g.opponent?.abbreviation||'—',
+          ip:   g.stat?.inningsPitched||'0',
+          h:    parseInt(g.stat?.hits||0),
+          er:   parseInt(g.stat?.earnedRuns||0),
+          bb:   parseInt(g.stat?.baseOnBalls||0),
+          k:    parseInt(g.stat?.strikeOuts||0),
+          hr:   parseInt(g.stat?.homeRuns||0),
+          era:  g.stat?.era||'—',
+        }));
+        setGameLog(rows);
+      } catch(e) {}
+      setLoading(false);
+    };
+    fetchAll();
+  }, [pitcher?.pid, pitcher?.name]);
+
+  if (!pitcher) return null;
+  const pitchMix = stats?.pitchMix || pitcher.pitchMix || [];
+  const hand = pitcher.hand || stats?.hand || 'R';
+
+  return <>
+    <div onClick={()=>setPitcher(null)} style={{
+      position:'fixed',inset:0,background:'rgba(0,0,0,.55)',zIndex:900,
+      transition:'opacity .25s',pointerEvents:'all'
+    }}/>
+    <div style={{
+      position:'fixed',right:0,top:0,bottom:0,width:'min(540px,100vw)',
+      background:'var(--surface)',borderLeft:'1px solid var(--border)',
+      zIndex:901,transform:'translateX(0)',
+      transition:'transform .3s cubic-bezier(.4,0,.2,1)',
+      display:'flex',flexDirection:'column',overflowY:'auto'
+    }}>
+      {/* Header */}
+      <div style={{padding:'16px 20px',borderBottom:'1px solid var(--border)',
+        display:'flex',alignItems:'center',gap:12,position:'sticky',top:0,
+        background:'var(--surface)',zIndex:10}}>
+        <PlayerAvatar pid={pitcher.pid} name={pitcher.name} size={40}/>
+        <div style={{flex:1}}>
+          <div style={{display:'flex',alignItems:'center',gap:6}}>
+            <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:18,letterSpacing:1}}>{pitcher.name}</span>
+            <SavantLink pid={pitcher.pid} type="pitcher"/>
+          </div>
+          <div style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
+            {pitcher.team && <span style={{color:'var(--accent2)',fontWeight:700}}>{pitcher.team}</span>}
+            <span style={{marginLeft:6}}>{hand}HP</span>
+            {stats?.era && stats.era !== '—' && <span style={{marginLeft:6}}>· ERA {stats.era}</span>}
+            {stats?.whip && stats.whip !== '—' && <span style={{marginLeft:6}}>· WHIP {stats.whip}</span>}
+          </div>
+        </div>
+        <button onClick={()=>setPitcher(null)} style={{background:'none',border:'1px solid var(--border)',
+          borderRadius:6,color:'var(--muted)',cursor:'pointer',padding:'5px 10px',
+          fontFamily:"'DM Mono',monospace",fontSize:11}}>✕ Close</button>
+      </div>
+
+      {/* Season Stats */}
+      <div style={{padding:'14px 20px',borderBottom:'1px solid var(--border)'}}>
+        <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+          textTransform:'uppercase',letterSpacing:1,marginBottom:10}}>Season Stats — 2026</div>
+        {loading && !stats
+          ? <div style={{fontSize:11,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>Loading…</div>
+          : <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
+            {[
+              {label:'ERA',  val:stats?.era,   color: parseFloat(stats?.era)<=3?'#27c97a':parseFloat(stats?.era)>=4.5?'var(--accent)':'var(--text)'},
+              {label:'WHIP', val:stats?.whip,  color: parseFloat(stats?.whip)<=1.1?'#27c97a':parseFloat(stats?.whip)>=1.4?'var(--accent)':'var(--text)'},
+              {label:'K/9',  val:stats?.k9,    color: parseFloat(stats?.k9)>=10?'#27c97a':'var(--text)'},
+              {label:'BB/9', val:stats?.bb9,   color: parseFloat(stats?.bb9)<=2.5?'#27c97a':parseFloat(stats?.bb9)>=4?'var(--accent)':'var(--text)'},
+              {label:'HR/9', val:stats?.hr9,   color: parseFloat(stats?.hr9)>=1.5?'var(--accent)':'var(--text)'},
+              {label:'FB Vel',val:stats?.fbVelo>0?stats.fbVelo.toFixed(1):null, color:'var(--text)'},
+            ].filter(s=>s.val&&s.val!=='—'&&s.val!=='0'&&s.val!==0).map(s=>(
+              <div key={s.label} style={{background:'var(--surface2)',border:'1px solid var(--border)',
+                borderRadius:8,padding:'8px 12px',minWidth:64,textAlign:'center'}}>
+                <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+                  textTransform:'uppercase',letterSpacing:1,marginBottom:4}}>{s.label}</div>
+                <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:17,color:s.color}}>
+                  {s.val}
+                </div>
+              </div>
+            ))}
+          </div>
+        }
+      </div>
+
+      {/* Batted Ball Stats (opponent) */}
+      {battedBall && (battedBall.gbPct || battedBall.fbPct || battedBall.hhPct) && (
+        <div style={{padding:'14px 20px',borderBottom:'1px solid var(--border)'}}>
+          <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+            textTransform:'uppercase',letterSpacing:1,marginBottom:10}}>Opponent Batted Ball — Allowed</div>
+          <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
+            {[
+              {label:'GB%',   val:battedBall.gbPct,   color: battedBall.gbPct>=50?'#27c97a':battedBall.gbPct>=44?'var(--accent2)':'var(--text)', tip:'Ground ball % allowed — higher is better for pitcher'},
+              {label:'FB%',   val:battedBall.fbPct,   color: battedBall.fbPct>=40?'var(--accent)':battedBall.fbPct>=35?'#ff8020':'var(--text)', tip:'Fly ball % allowed — lower is better'},
+              {label:'LD%',   val:battedBall.ldPct,   color: battedBall.ldPct>=24?'var(--accent)':'var(--text)', tip:'Line drive % allowed — lower is better'},
+              {label:'HH%',   val:battedBall.hhPct,   color: battedBall.hhPct>=42?'var(--accent)':battedBall.hhPct<=36?'#27c97a':'var(--text)', tip:'Hard hit % allowed — lower is better'},
+              {label:'Barrel%',val:battedBall.barrelPct, color: battedBall.barrelPct>=9?'var(--accent)':battedBall.barrelPct<=5?'#27c97a':'var(--text)', tip:'Barrel % allowed — lower is better'},
+            ].filter(s=>s.val!=null&&s.val>0).map(s=>(
+              <div key={s.label} title={s.tip} style={{background:'var(--surface2)',border:'1px solid var(--border)',
+                borderRadius:8,padding:'8px 12px',minWidth:64,textAlign:'center'}}>
+                <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+                  textTransform:'uppercase',letterSpacing:1,marginBottom:4}}>{s.label}</div>
+                <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:17,color:s.color}}>
+                  {s.val.toFixed(1)}%
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Pitch Mix */}
+      {pitchMix.length > 0 && (
+        <div style={{padding:'14px 20px',borderBottom:'1px solid var(--border)'}}>
+          <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+            textTransform:'uppercase',letterSpacing:1,marginBottom:10}}>Pitch Arsenal</div>
+          <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
+            {pitchMix.map((p,i)=>(
+              <div key={i} style={{background:'var(--surface2)',border:'1px solid var(--border)',
+                borderRadius:8,padding:'8px 12px',textAlign:'center',minWidth:70}}>
+                <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:14,
+                  color:'var(--text)'}}>{p.name||p.code}</div>
+                <div style={{fontSize:9,color:'var(--accent2)',fontFamily:"'DM Mono',monospace",
+                  fontWeight:700,marginTop:2}}>{p.pct||p.usage}%</div>
+                {p.velo>0&&<div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+                  marginTop:1}}>{parseFloat(p.velo).toFixed(1)} mph</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Game Log */}
+      <div style={{padding:'14px 20px',flex:1}}>
+        <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+          textTransform:'uppercase',letterSpacing:1,marginBottom:10}}>Recent Game Log — 2026</div>
+        {loading
+          ? <div style={{display:'flex',alignItems:'center',gap:8,color:'var(--muted)',
+              fontFamily:"'DM Mono',monospace",fontSize:11}}>
+              <div className="sp" style={{width:14,height:14,borderWidth:2}}/> Loading…
+            </div>
+          : gameLog.length === 0
+            ? <div style={{color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:11}}>
+                No game log available yet this season.
+              </div>
+            : <div style={{overflowX:'auto'}}>
+                <table style={{width:'100%',borderCollapse:'collapse'}}>
+                  <thead>
+                    <tr style={{borderBottom:'2px solid var(--border)'}}>
+                      {['Date','Opp','IP','H','ER','BB','K','HR'].map(h=>(
+                        <th key={h} style={{padding:'6px 8px',fontSize:9,color:'var(--muted)',
+                          fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1,
+                          textAlign:h==='Date'||h==='Opp'?'left':'center',whiteSpace:'nowrap'}}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {gameLog.map((g,i)=>(
+                      <tr key={i} style={{borderBottom:'1px solid rgba(30,45,58,.4)'}}>
+                        <td style={{padding:'7px 8px',fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--muted)'}}>{g.date}</td>
+                        <td style={{padding:'7px 8px',fontFamily:"'Oswald',sans-serif",fontWeight:600,fontSize:12}}>{g.opp}</td>
+                        <td style={{padding:'7px 8px',fontFamily:"'DM Mono',monospace",fontSize:11,textAlign:'center'}}>{g.ip}</td>
+                        <td style={{padding:'7px 8px',fontFamily:"'DM Mono',monospace",fontSize:11,textAlign:'center',color:g.h>=5?'var(--accent)':'var(--muted)'}}>{g.h}</td>
+                        <td style={{padding:'7px 8px',fontFamily:"'DM Mono',monospace",fontSize:11,textAlign:'center',color:g.er>=4?'var(--accent)':g.er===0?'#27c97a':'var(--text)',fontWeight:g.er===0?700:400}}>{g.er}</td>
+                        <td style={{padding:'7px 8px',fontFamily:"'DM Mono',monospace",fontSize:11,textAlign:'center',color:g.bb>=3?'var(--accent)':'var(--muted)'}}>{g.bb}</td>
+                        <td style={{padding:'7px 8px',fontFamily:"'DM Mono',monospace",fontSize:11,textAlign:'center',color:g.k>=8?'#27c97a':g.k>=6?'var(--accent2)':'var(--text)',fontWeight:g.k>=8?700:400}}>{g.k}</td>
+                        <td style={{padding:'7px 8px',fontFamily:"'DM Mono',monospace",fontSize:11,textAlign:'center',color:g.hr>0?'var(--accent)':'var(--muted)'}}>{g.hr}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -6028,32 +6244,25 @@ function HRTrackerTab() {
 
 
 function OnlyHomersTab() {
-  return <div>
-    <div className="section-header" style={{marginBottom:16}}>
-      <div className="section-title">⚾ Only Homers</div>
-      <div className="section-sub">Affiliate partner · the #1 home run community</div>
-    </div>
-    {/* Affiliate disclosure */}
-    <div style={{background:"rgba(245,166,35,.06)",border:"1px solid rgba(245,166,35,.2)",borderRadius:8,padding:"8px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
-      <span style={{fontSize:10,color:"var(--accent2)",fontFamily:"'DM Mono',monospace"}}>🤝 Affiliate Partner</span>
-      <span style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>— Going Yard may earn a commission when you sign up via this link.</span>
+  return <div style={{margin:"-16px"}}>
+    {/* iframe — scaled 80% like Doink, full height */}
+    <iframe
+      title="Only Homers"
+      src="https://www.onlyhomers.com/"
+      frameBorder="0"
+      allowFullScreen
+      style={{width:"125%",height:"calc((100vh - 48px) * 1.25)",border:"none",display:"block",
+        transform:"scale(0.8)",transformOrigin:"top left"}}
+    />
+    {/* Open in new tab below frame */}
+    <div style={{padding:"8px 14px",borderTop:"1px solid var(--border)",
+      display:"flex",justifyContent:"flex-end",background:"var(--surface)"}}>
       <a href="https://www.onlyhomers.com/" target="_blank" rel="noopener noreferrer"
-        style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:6,background:"var(--accent)",color:"white",fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,letterSpacing:1,textDecoration:"none",flexShrink:0}}>
+        style={{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:6,
+          background:"var(--accent)",color:"white",fontFamily:"'Oswald',sans-serif",
+          fontWeight:700,fontSize:12,letterSpacing:1,textDecoration:"none"}}>
         ↗ Open in New Tab
       </a>
-    </div>
-    {/* Embedded iframe */}
-    <div style={{borderRadius:10,overflow:"hidden",border:"1px solid var(--border)",background:"var(--surface)",position:"relative",paddingBottom:"75%",height:0}}>
-      <iframe
-        title="Only Homers"
-        src="https://www.onlyhomers.com/"
-        frameBorder="0"
-        allowFullScreen
-        style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",border:"none"}}
-      />
-    </div>
-    <div style={{marginTop:8,fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textAlign:"center"}}>
-      If the embed is blocked by the site, use the ↗ Open in New Tab button above.
     </div>
   </div>;
 }
@@ -7077,8 +7286,11 @@ function SimLabView({ data }) {
                   {/* Pitcher grade card — same card as shown in Lineups tab */}
                   <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 12px' }}>
                     <div style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>⚾ Pitcher Grade</div>
-                    <div style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 13, color: 'var(--text)' }}>{b.pitcher}
-                      <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", fontWeight: 400, marginLeft: 6 }}>{b.pitcher_hand}HP</span>
+                    <div style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', marginBottom:4 }}
+                      onClick={e=>{ e.stopPropagation(); openPitcherSlide({pid:parseInt(b.pitcher_id)||0, name:b.pitcher, team:b.pitcher_team||'', hand:b.pitcher_hand, pitchMix:[]}); }}>
+                      <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 13, color: 'var(--text)' }}>{b.pitcher}</span>
+                      <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", fontWeight: 400 }}>{b.pitcher_hand}HP</span>
+                      <span style={{ fontSize: 11, color: 'var(--muted)', opacity:.5, marginLeft:'auto' }}>› Stats</span>
                     </div>
 
                     <PitcherCard pitcherId={b.pitcher_id} pitcherName={b.pitcher} onGrade={()=>{}}/>
@@ -7417,6 +7629,14 @@ function BatterLeaderboard() {
             fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:filterGoneYard?700:400,
             whiteSpace:'nowrap',transition:'all .15s'}}>
           💥 {filterGoneYard ? 'Gone Yard ✓' : 'Gone Yard'}
+        </button>
+        <button onClick={()=>setFilterDue(v=>!v)}
+          style={{padding:'4px 10px',borderRadius:6,cursor:'pointer',
+            background:filterDue?'rgba(56,184,242,.18)':'transparent',
+            color:filterDue?'var(--ice)':'var(--muted)',
+            border:`1px solid ${filterDue?'rgba(56,184,242,.5)':'var(--border)'}`,
+            fontFamily:"'DM Mono',monospace",fontWeight:filterDue?700:400,fontSize:11}}>
+          ⏳ {filterDue ? 'Due ✓' : 'Due'}
         </button>
         <button onClick={()=>{
           const esc = v => `"${String(v??'').replace(/"/g,'""')}"`;
@@ -7970,6 +8190,7 @@ function MatchupEngineTab() {
   const pitcherGradeCache = useRef({});
   const [selPitcherGrade, setSelPitcherGrade] = useState('all');
   const [filterGoneYard, setFilterGoneYard]   = useState(false);
+  const [filterDue, setFilterDue]             = useState(false);
   // Date slot — 'today' or 'tomorrow'. Respects 4am ET cutoff same as HR tracker.
   const [dateSlot, setDateSlot] = useState('today');
   const picks = usePicks();
@@ -8069,6 +8290,10 @@ function MatchupEngineTab() {
   (selGame === 'all' ? activeData : activeData.filter(r => String(r.game_id) === String(selGame)))
     .filter(r => selGrade === 'all' || r.grade === selGrade)
     .filter(r => {
+      if (filterDue) {
+        const bid = parseInt(r.batter_id)||0;
+        if (!isDueFromRow(r, bid)) return false;
+      }
       if (!filterGoneYard) return true;
       const bid = parseInt(r.batter_id) || 0;
       return HR_DATA.some(h => h.batterId === bid ||
@@ -8570,16 +8795,20 @@ function MatchupEngineTab() {
                   )}
                   {isDueFromRow(b, pid) && DUE_BADGE}
 
-                  {/* Avatar + Batter name + hand */}
+                  {/* Avatar + Batter name + hand — click opens season stats slideout */}
                   <div style={{display:'flex',alignItems:'center',gap:7,flex:1,minWidth:0}}>
                     <PlayerAvatar pid={pid} name={b.batter} size={28}/>
                     <div style={{minWidth:0}}>
-                      <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,
-                        whiteSpace:'normal',wordBreak:'break-word',lineHeight:1.2,
-                        color:'var(--text)'}}>
-                        {b.batter}
+                      <div style={{display:'flex',alignItems:'center',gap:5,cursor:'pointer'}}
+                        onClick={e=>{e.stopPropagation();openAtBatSlide({pid:pid||parseInt(b.batter_id)||0,name:b.batter,team:b.batting_team,...(getCachedPlayer(pid)||{})});}}>
+                        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,
+                          whiteSpace:'normal',wordBreak:'break-word',lineHeight:1.2,
+                          color:'var(--text)'}}>
+                          {b.batter}
+                        </span>
                         <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
-                          marginLeft:6}}>{b.batter_hand}HB</span>
+                          marginLeft:2}}>{b.batter_hand}HB</span>
+                        <span style={{fontSize:10,color:'var(--muted)',opacity:.5}}>›</span>
                       </div>
 
                     {/* Flag pills */}
@@ -10076,16 +10305,10 @@ function PowerBITab() {
         .slice(0, 12)
     : [];
 
-  return <div>
-    {/* Header */}
-    <div className="section-header" style={{marginBottom:16}}>
-      <div className="section-title">📊 Data</div>
-      <div className="section-sub">Power BI · interactive analytics · full screen available</div>
-    </div>
-
-    {/* Add to My Picks — now at top */}
-    {/* Add to My Picks */}
-    <div style={{marginTop:14,background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,padding:"12px 14px"}}>
+  return <div style={{margin:"-16px"}}>
+    {/* Add to My Picks — above frame */}
+    <div style={{padding:"8px 14px",borderBottom:"1px solid var(--border)",background:"var(--surface)"}}>
+    <div style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,padding:"10px 14px"}}>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:showPicker?10:0}}>
         <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,letterSpacing:1}}>🎯 Add to My Picks</span>
         <span style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>Search any batter while browsing the dashboard</span>
@@ -10134,27 +10357,20 @@ function PowerBITab() {
           Start typing to search {players.length} batters
         </div>}
       </>}
-    </div>
-
-    {/* Power BI iframe */}
-    <div style={{
-      borderRadius:10, overflow:"hidden",
-      border:"1px solid var(--border)", background:"var(--surface)",
-      position:"relative", paddingBottom:"56.25%", height:0,
-    }}>
-      <iframe
-        title="Going Yard Analytics"
-        src="https://app.powerbi.com/view?r=eyJrIjoiMTdmYTZiZDktOTA5ZC00OTFmLWE1NTktZDgwYmNhZDAwYTkwIiwidCI6IjgzOGY2MGI3LTc4NzYtNGEwZC1iM2MxLTg1Y2VlZWE1YmJhYiIsImMiOjF9"
-        frameBorder="0"
-        allowFullScreen
-        style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",border:"none"}}
-      />
-    </div>
-
-    {/* Open in Power BI button */}
-    <div style={{marginTop:10,display:"flex",gap:8,justifyContent:"flex-end"}}>
+    </div></div>
+    {/* iframe — full height, no scale needed for PowerBI */}
+    <iframe
+      title="Going Yard Analytics"
+      src="https://app.powerbi.com/view?r=eyJrIjoiMTdmYTZiZDktOTA5ZC00OTFmLWE1NTktZDgwYmNhZDAwYTkwIiwidCI6IjgzOGY2MGI3LTc4NzYtNGEwZC1iM2MxLTg1Y2VlZWE1YmJhYiIsImMiOjF9"
+      frameBorder="0"
+      allowFullScreen
+      style={{width:"100%",height:"calc(100vh - 130px)",border:"none",display:"block"}}
+    />
+    {/* Open in new tab below frame */}
+    <div style={{padding:"8px 14px",borderTop:"1px solid var(--border)",
+      display:"flex",justifyContent:"flex-end",background:"var(--surface)"}}>
       <a href="https://app.powerbi.com/view?r=eyJrIjoiMTdmYTZiZDktOTA5ZC00OTFmLWE1NTktZDgwYmNhZDAwYTkwIiwidCI6IjgzOGY2MGI3LTc4NzYtNGEwZC1iM2MxLTg1Y2VlZWE1YmJhYiIsImMiOjF9" target="_blank" rel="noopener noreferrer"
-        style={{display:"flex",alignItems:"center",gap:5,padding:"6px 12px",borderRadius:6,
+        style={{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:6,
           background:"var(--surface2)",border:"1px solid var(--border)",
           color:"var(--muted)",fontFamily:"'DM Mono',monospace",fontSize:11,textDecoration:"none"}}>
         ↗ Open in Power BI
@@ -10236,14 +10452,10 @@ function StatcastTab() {
   const filtered = searchQ.trim()
     ? players.filter(p => p.name?.toLowerCase().includes(searchQ.toLowerCase()) || p.team?.toLowerCase().includes(searchQ.toLowerCase())).slice(0,12)
     : [];
-  return <div>
-    <div className="section-header" style={{marginBottom:16}}>
-      <div className="section-title">📊 Baseball Savant</div>
-      <div className="section-sub">Affiliate partner · Statcast data, spray charts, leaderboards</div>
-    </div>
-
-    {/* Player Picker */}
-    <div style={{marginBottom:14,background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,padding:"12px 14px"}}>
+  return <div style={{margin:"-16px"}}>
+    {/* Add to My Picks — above frame */}
+    <div style={{padding:"8px 14px",borderBottom:"1px solid var(--border)",background:"var(--surface)"}}>
+    <div style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,padding:"10px 14px"}}>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:showPicker?10:0}}>
         <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,letterSpacing:1}}>🎯 Add to My Picks</span>
         <span style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>Add players while browsing Statcast</span>
@@ -10283,27 +10495,26 @@ function StatcastTab() {
         </div>}
         {!searchQ&&<div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",padding:"4px 0"}}>Start typing to search {players.length} batters</div>}
       </>}
-    </div>
-
-    <div style={{background:"rgba(56,184,242,.06)",border:"1px solid rgba(56,184,242,.2)",borderRadius:8,padding:"8px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
-      <span style={{fontSize:10,color:"var(--ice)",fontFamily:"'DM Mono',monospace"}}>🤝 Affiliate Partner</span>
-      <span style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>— Going Yard uses Baseball Savant data to power its Statcast metrics.</span>
+    </div></div>
+    {/* iframe — scaled 80% like Doink */}
+    <iframe
+      title="Baseball Savant"
+      src="https://baseballsavant.mlb.com/"
+      frameBorder="0"
+      allowFullScreen
+      style={{width:"125%",height:"calc((100vh - 130px) * 1.25)",border:"none",display:"block",
+        transform:"scale(0.8)",transformOrigin:"top left"}}
+    />
+    {/* Open in new tab below frame */}
+    <div style={{padding:"8px 14px",borderTop:"1px solid var(--border)",
+      display:"flex",justifyContent:"flex-end",background:"var(--surface)"}}>
       <a href="https://baseballsavant.mlb.com/" target="_blank" rel="noopener noreferrer"
-        style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:6,background:"var(--ice)",color:"#0a1218",fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,letterSpacing:1,textDecoration:"none",flexShrink:0}}>
+        style={{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:6,
+          background:"rgba(56,184,242,.15)",border:"1px solid rgba(56,184,242,.3)",
+          color:"var(--ice)",fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,
+          letterSpacing:1,textDecoration:"none"}}>
         ↗ Open in New Tab
       </a>
-    </div>
-    <div style={{borderRadius:10,overflow:"hidden",border:"1px solid var(--border)",background:"var(--surface)",position:"relative",paddingBottom:"75%",height:0}}>
-      <iframe
-        title="Baseball Savant"
-        src="https://baseballsavant.mlb.com/"
-        frameBorder="0"
-        allowFullScreen
-        style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",border:"none"}}
-      />
-    </div>
-    <div style={{marginTop:8,fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textAlign:"center"}}>
-      If the embed is blocked, use the ↗ Open in New Tab button above.
     </div>
   </div>;
 }
@@ -11425,7 +11636,7 @@ export default function App() {
             <a href="https://doinksports.com/research/mlb/" target="_blank" rel="noopener noreferrer"
               style={{fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:700,
                 color:"var(--ice)",textDecoration:"underline",textUnderlineOffset:3}}>
-              Sign Up / Log In
+              Sign Up / Log In ↗
             </a>
           </div>
           <iframe src="https://doinksports.com/research/mlb/"
@@ -11444,6 +11655,7 @@ export default function App() {
       </div>
     </div>
     <AtBatSlideIn/>
+    <PitcherSlideIn/>
     {showPicksSlideout && <PicksSlideout onClose={()=>setShowPicksSlideout(false)}/>}
   </>;
 
