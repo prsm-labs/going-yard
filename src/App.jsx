@@ -8000,6 +8000,7 @@ function BatterLeaderboard() {
                         <PlayerAvatar pid={p.pid||p.id} name={p.name} size={20}/>
                         <div style={{cursor:'pointer',display:'flex',alignItems:'center',gap:3}} onClick={()=>{const cp=getCachedPlayer(p.pid||p.id)||{};openAtBatSlide({pid:p.pid||p.id,name:p.name,team:p.team,avgEV:cp.avgEV||p.avgEV,barrel:cp.barrel,hardHit:cp.hardHit,flyBall:cp.flyBall,hr:cp.hr,avg:cp.avg,obp:cp.obp,slg:cp.slg,xwoba:cp.xwoba,oSwing:cp.oSwing,kPct:cp.kPct,bbPct:cp.bbPct,launchAngle:cp.launchAngle});}}>
                           <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,letterSpacing:.2}}>{p.name}</span>
+                          <span style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",opacity:.7}}>({p.hand==='L'?'L':p.hand==='S'?'S':'R'})</span>
                           <span style={{fontSize:9,color:'var(--muted)',opacity:.4}}>›</span>
                         </div>
                         {isGoneYard(p) && <span style={{fontSize:7,padding:'1px 4px',borderRadius:3,
