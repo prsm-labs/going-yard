@@ -8622,15 +8622,20 @@ function MatchupEngineTab() {
       </div>
     )}
 
-    {/* Sub-tab navigation */}
-    <div style={{display:'flex',gap:6,marginBottom:18,padding:'4px',background:'var(--surface)',borderRadius:9,border:'1px solid var(--border)',width:'fit-content'}}>
-      <button style={stBtn('matchups')} onClick={()=>setSubTab('matchups')}>⚡ Matchups</button>
-      <button style={stBtn('simlab')}   onClick={()=>setSubTab('simlab')}>🧠 Sim Lab</button>
-      <button style={stBtn('batters')}  onClick={()=>setSubTab('batters')}>🧢 Batters</button>
-      <button style={stBtn('pitchers')} onClick={()=>setSubTab('pitchers')}>⚾ Pitchers</button>
-      {/* Daily Barrel — hidden until data pipeline and UI are ready */}
-      {/* <button style={stBtn('barrel')} onClick={()=>setSubTab('barrel')}>🛢 Daily Barrel</button> */}
-      <button style={stBtn('history')} onClick={()=>setSubTab('history')}>📜 BvP History</button>
+    {/* Sub-tab navigation — two rows on mobile */}
+    <div style={{display:'flex',flexDirection:'column',gap:4,marginBottom:14}}>
+      {/* Row 1: primary tabs */}
+      <div style={{display:'flex',gap:4,flexWrap:'nowrap'}}>
+        <button style={stBtn('matchups')} onClick={()=>setSubTab('matchups')}>⚡ Matchups</button>
+        <button style={stBtn('simlab')}   onClick={()=>setSubTab('simlab')}>🧠 Sim Lab</button>
+        <button style={stBtn('history')} onClick={()=>setSubTab('history')}>📜 BvP History</button>
+      </div>
+      {/* Row 2: data tabs */}
+      <div style={{display:'flex',gap:4,flexWrap:'nowrap'}}>
+        <button style={stBtn('batters')}  onClick={()=>setSubTab('batters')}>🧢 Batters</button>
+        <button style={stBtn('pitchers')} onClick={()=>setSubTab('pitchers')}>⚾ Pitchers</button>
+        {/* <button style={stBtn('barrel')} onClick={()=>setSubTab('barrel')}>🛢 Daily Barrel</button> */}
+      </div>
     </div>
 
     {/* Date slot toggle — only shown for matchups and simlab */}
