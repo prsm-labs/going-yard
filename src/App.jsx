@@ -1860,6 +1860,7 @@ function PitcherSlideIn() {
               {label:'K/9',  val:stats?.k9,    color: parseFloat(stats?.k9)>=10?'#27c97a':'var(--text)'},
               {label:'BB/9', val:stats?.bb9,   color: parseFloat(stats?.bb9)<=2.5?'#27c97a':parseFloat(stats?.bb9)>=4?'var(--accent)':'var(--text)'},
               {label:'HR/9', val:stats?.hr9,   color: parseFloat(stats?.hr9)>=1.5?'var(--accent)':'var(--text)'},
+              {label:'HR',   val:stats?.hr>0?stats.hr:null, color: (stats?.hr||0)>=15?'var(--accent)':(stats?.hr||0)>=8?'#ff8020':'var(--text)'},
               {label:'FB Vel', val:(()=>{ const fb = activePitchMix.find(px=>px.code==='FF'||px.code==='SI'||px.name?.includes('Fastball')); return fb?.velo>0?parseFloat(fb.velo).toFixed(1):null; })(), color:'var(--text)'},
             ].filter(s=>s.val&&s.val!=='—'&&s.val!=='0'&&s.val!==0).map(s=>(
               <div key={s.label} style={{background:'var(--surface2)',border:'1px solid var(--border)',
@@ -6758,6 +6759,7 @@ function SimLabView({ data }) {
   const [sortPropDir, setSortPropDir] = useState('desc');
   const [lineupOnly, setLineupOnly]   = useState(false);
   const [filterGoneYardSim, setFilterGoneYardSim] = useState(false);
+  const [filterDueSim, setFilterDueSim] = useState(false);
   const [minHRScore, setMinHRScore]   = useState('');
   const [minHRPct,   setMinHRPct]     = useState('');
   const [minMeatball,setMinMeatball]  = useState('');
@@ -6814,6 +6816,7 @@ function SimLabView({ data }) {
       .filter(r => teamFilter === 'all' || r.batting_team === teamFilter)
       .filter(r => !lineupOnly || isConfirmed(r))
       .filter(r => !filterGoneYardSim || isGoneYardSim(r))
+      .filter(r => !filterDueSim || isDueFromRow(r, parseInt(r.batter_id)||0))
       .filter(r => {
         if (selPitcherGradeSim === 'all') return true;
         const pid = r.pitcher_id ? String(parseInt(r.pitcher_id) || r.pitcher_id) : null;
@@ -6825,7 +6828,7 @@ function SimLabView({ data }) {
       .filter(r => !minHitPct   || pctRaw(r.proj_hit_prob)              >= parseFloat(minHitPct));
     const mul = sortDir === 'desc' ? -1 : 1;
     return [...filtered].sort((a, b) => mul * ((parseFloat(a[sortBy]) || 0) - (parseFloat(b[sortBy]) || 0)));
-  }, [data, sortBy, sortDir, teamFilter, lineupOnly, filterGoneYardSim, selPitcherGradeSim, minHRScore, minHRPct, minMeatball, minHitPct]);
+  }, [data, sortBy, sortDir, teamFilter, lineupOnly, filterGoneYardSim, filterDueSim, selPitcherGradeSim, minHRScore, minHRPct, minMeatball, minHitPct]);
 
   // Auto-select top batter when data loads
   useEffect(() => {
@@ -6901,6 +6904,14 @@ function SimLabView({ data }) {
                 fontFamily: "'DM Mono',monospace", fontSize: 11, fontWeight: filterGoneYardSim ? 700 : 400,
                 whiteSpace: 'nowrap' }}>
               💥 {filterGoneYardSim ? 'Gone Yard ✓' : 'Gone Yard'}
+            </button>
+            <button onClick={() => setFilterDueSim(v => !v)}
+              style={{ padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
+                background: filterDueSim ? 'rgba(56,184,242,.18)' : 'transparent',
+                color: filterDueSim ? 'var(--ice)' : 'var(--muted)',
+                border: `1px solid ${filterDueSim ? 'rgba(56,184,242,.5)' : 'var(--border)'}`,
+                fontFamily: "'DM Mono',monospace", fontWeight: filterDueSim ? 700 : 400, fontSize: 11 }}>
+              ⏳ {filterDueSim ? 'Due ✓' : 'Due'}
             </button>
             <span style={{ fontSize: 10, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>
               {slate.length} batters · click column header to sort · click row to Deep Dive
@@ -7771,13 +7782,14 @@ function BatterLeaderboard() {
                     <td style={{textAlign:'center',paddingRight:2}}>
                       <PickButton pid={p.pid} name={p.name} team={p.team}/>
                     </td>
-                    {/* Batter name */}
+                    {/* Batter name — click opens season stats slideout */}
                     <td style={{textAlign:'left'}}>
                       <div style={{display:'flex',alignItems:'center',gap:7}}>
                         <PlayerAvatar pid={p.pid||p.id} name={p.name} size={24}/>
-                        <div>
+                        <div style={{cursor:'pointer'}} onClick={()=>{const cp=getCachedPlayer(p.pid||p.id)||{};openAtBatSlide({pid:p.pid||p.id,name:p.name,team:p.team,avgEV:cp.avgEV||p.avgEV,barrel:cp.barrel,hardHit:cp.hardHit,flyBall:cp.flyBall,hr:cp.hr,avg:cp.avg,obp:cp.obp,slg:cp.slg,xwoba:cp.xwoba,oSwing:cp.oSwing,kPct:cp.kPct,bbPct:cp.bbPct,launchAngle:cp.launchAngle});}}>
                           <div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}>
                             <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,letterSpacing:.3}}>{p.name}</span>
+                            <span style={{fontSize:10,color:'var(--muted)',opacity:.5}}>›</span>
                             {isGoneYard(p) && <span style={{fontSize:8,padding:'1px 5px',borderRadius:4,
                               background:'rgba(255,20,0,.25)',border:'1px solid rgba(255,20,0,.5)',
                               color:'#fff',fontFamily:"'DM Mono',monospace",fontWeight:800,letterSpacing:.4,
@@ -8658,6 +8670,14 @@ function MatchupEngineTab() {
           border:`1px solid ${filterGoneYard?'rgba(255,20,0,.5)':'var(--border)'}`,
           fontFamily:"'DM Mono',monospace",fontWeight:filterGoneYard?700:400,fontSize:11}}>
         💥 {filterGoneYard ? 'Gone Yard ✓' : 'Gone Yard'}
+      </button>
+      <button onClick={()=>setFilterDue(v=>!v)}
+        style={{padding:'3px 12px',borderRadius:6,cursor:'pointer',marginLeft:4,
+          background:filterDue?'rgba(56,184,242,.18)':'transparent',
+          color:filterDue?'var(--ice)':'var(--muted)',
+          border:`1px solid ${filterDue?'rgba(56,184,242,.5)':'var(--border)'}`,
+          fontFamily:"'DM Mono',monospace",fontWeight:filterDue?700:400,fontSize:11}}>
+        ⏳ {filterDue ? 'Due ✓' : 'Due'}
       </button>
     </div>}
     {loading && <div className="lw"><div className="sp"/><div className="lt">Loading matchup data…</div></div>}
