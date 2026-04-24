@@ -5792,37 +5792,34 @@ function PitchBuilderTab() {
 // Global HR data — shared between ticker and tracker tab
 let HR_DATA = [];
 const VIDEO_LINK_CACHE = {}; // gamePk_atBatIndex → savant video URL
-const VIDEO_GAMES_FETCHED = new Set(); // gamePks already fetched
-
 async function fetchVideoLinks(hrs) {
-  // Get unique gamePks from today's HRs that we haven't fetched yet
-  const newGames = [...new Set(hrs.map(h => h.gamePk).filter(Boolean))]
-    .filter(gid => !VIDEO_GAMES_FETCHED.has(String(gid)));
-  if (!newGames.length) return;
+  // Fetch play-by-play for all unique gamePks in today's HR data
+  // Always re-fetch — games progress and new HRs may appear
+  const games = [...new Set(hrs.map(h => String(h.gamePk)).filter(Boolean))];
+  if (!games.length) return;
 
-  for (const gamePk of newGames) {
+  for (const gamePk of games) {
     try {
+      // No fields filter — need full play data to reliably find eventType + playId
       const r = await fetch(
-        `https://statsapi.mlb.com/api/v1/game/${gamePk}/playByPlay?fields=allPlays,result,about,atBatIndex,playId,eventType`,
-        { signal: AbortSignal.timeout(6000) }
+        `https://statsapi.mlb.com/api/v1/game/${gamePk}/playByPlay`,
+        { signal: AbortSignal.timeout(8000) }
       );
       if (!r.ok) continue;
       const d = await r.json();
-      const plays = d.allPlays || [];
-      let foundAny = false;
-      plays.forEach(play => {
-        if (play.result?.eventType === 'home_run') {
+      (d.allPlays || []).forEach(play => {
+        // Check multiple event type field locations
+        const evt = play.result?.eventType || play.result?.event || '';
+        if (/home.?run/i.test(evt)) {
           const idx = play.about?.atBatIndex;
           const uuid = play.about?.playId;
           if (idx != null && uuid) {
-            const key = `${gamePk}_${idx}`;
-            VIDEO_LINK_CACHE[key] = `https://baseballsavant.mlb.com/sporty-videos?playId=${uuid}`;
-            foundAny = true;
+            VIDEO_LINK_CACHE[`${gamePk}_${idx}`] =
+              `https://baseballsavant.mlb.com/sporty-videos?playId=${uuid}`;
           }
         }
       });
-      if (foundAny) VIDEO_GAMES_FETCHED.add(String(gamePk));
-    } catch(e) { console.warn('[Video] gamePk', gamePk, e.message); }
+    } catch(e) { /* silent — non-critical */ }
   }
 }
 
@@ -6229,7 +6226,7 @@ function HRTrackerTab() {
 {key:"pitchType",  label:"Pitch",    tip:"Pitch type thrown"},
                 {key:"pitcherName",label:"vs Pitcher",tip:"Pitcher who gave it up"},
                 {key:"gameId",     label:"Game",     tip:"Matchup"},
-                {key:"video",      label:"📹",       tip:"Video — click to watch on Baseball Savant (available ~1 min after the HR)"},
+                {key:"video",      label:"📹",       tip:"Video — available ~1 min after the HR", width:32},
               ].map(c => (
                 <th key={c.key} className={sortKey===c.key?"sk":""} onClick={()=>hs(c.key)} style={{cursor:"pointer"}}>
                   <div style={{display:"flex",alignItems:"center",gap:2}}>
@@ -6266,20 +6263,14 @@ function HRTrackerTab() {
                 <td>{hr.pitchType?<span style={{fontSize:10,fontFamily:"'DM Mono',monospace",padding:"2px 7px",borderRadius:4,background:"var(--surface2)",border:"1px solid var(--border)"}}>{hr.pitchType}</span>:"—"}</td>
                 <td><div style={{fontSize:11,fontWeight:500}}>{hr.pitcherName}</div><div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{hr.pitcherTeam}</div></td>
                 <td><span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:"var(--muted)"}}>{hr.gameId}</span></td>
-                <td style={{textAlign:"center"}}>{(() => {
-                  const vKey = `${hr.gamePk}_${hr.atBatIndex??hr.playIndex??hr.plateAppearance??0}`;
-                  const url = VIDEO_LINK_CACHE[vKey];
-                  return url
-                    ? <a href={url} target="_blank" rel="noopener noreferrer"
-                        onClick={e=>e.stopPropagation()}
-                        title="Watch on Baseball Savant"
-                        style={{fontSize:16,textDecoration:"none",opacity:.8,transition:"opacity .15s"}}
-                        onMouseEnter={e=>e.currentTarget.style.opacity="1"}
-                        onMouseLeave={e=>e.currentTarget.style.opacity=".8"}>
-                        📹
-                      </a>
-                    : <span style={{color:"var(--border)",fontSize:10,fontFamily:"'DM Mono',monospace"}}>—</span>;
-                })()}</td>
+                <td style={{textAlign:"center",width:32,minWidth:32,maxWidth:32}}>
+                  {VIDEO_LINK_CACHE[`${hr.gamePk}_${hr.atBatIndex??hr.playIndex??hr.plateAppearance??0}`]
+                    ? <a href={VIDEO_LINK_CACHE[`${hr.gamePk}_${hr.atBatIndex??hr.playIndex??hr.plateAppearance??0}`]}
+                        target="_blank" rel="noopener noreferrer"
+                        onClick={e=>e.stopPropagation()} title="Watch on Baseball Savant"
+                        style={{fontSize:15,textDecoration:"none"}}>📹</a>
+                    : null}
+                </td>
                 </tr>;
               })}
             </tbody>
