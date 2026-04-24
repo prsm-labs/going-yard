@@ -7972,18 +7972,18 @@ function BatterLeaderboard() {
         <div className="tw">
           <table>
             <thead>
-              <tr>
-                <th style={{width:36,textAlign:'center'}}></th>
-                <th style={{textAlign:'left',cursor:'pointer',whiteSpace:'nowrap'}} className={sortCol==='name'?'sk':''} onClick={()=>handleSort('name')}>
+              <tr style={{lineHeight:1.2}}>
+                <th style={{width:28,textAlign:'center'}}></th>
+                <th style={{textAlign:'left',cursor:'pointer',whiteSpace:'nowrap',minWidth:90}} className={sortCol==='name'?'sk':''} onClick={()=>handleSort('name')}>
                   Batter<SortIcon col="name"/>
                 </th>
                 {STAT_COLS.map(c=>(
-                  <th key={c.key} className={sortCol===c.key?'sk':''} style={{textAlign:'right',cursor:'pointer',whiteSpace:'nowrap'}}
+                  <th key={c.key} className={sortCol===c.key?'sk':''} style={{textAlign:'right',cursor:'pointer',whiteSpace:'normal',wordBreak:'break-word',maxWidth:36,fontSize:8,lineHeight:1.2,padding:'4px 4px'}}
                     onClick={()=>handleSort(c.key)}>
                     {c.label}<SortIcon col={c.key}/>
                   </th>
                 ))}
-                <th style={{textAlign:'center',width:24}}></th>
+                <th style={{textAlign:'center',width:20}}></th>
               </tr>
             </thead>
             <tbody>
@@ -7994,25 +7994,22 @@ function BatterLeaderboard() {
                     <td style={{textAlign:'center',paddingRight:2}}>
                       <PickButton pid={p.pid} name={p.name} team={p.team}/>
                     </td>
-                    {/* Batter name — click opens season stats slideout */}
-                    <td style={{textAlign:'left'}}>
-                      <div style={{display:'flex',alignItems:'center',gap:7}}>
-                        <PlayerAvatar pid={p.pid||p.id} name={p.name} size={24}/>
-                        <div style={{cursor:'pointer'}} onClick={()=>{const cp=getCachedPlayer(p.pid||p.id)||{};openAtBatSlide({pid:p.pid||p.id,name:p.name,team:p.team,avgEV:cp.avgEV||p.avgEV,barrel:cp.barrel,hardHit:cp.hardHit,flyBall:cp.flyBall,hr:cp.hr,avg:cp.avg,obp:cp.obp,slg:cp.slg,xwoba:cp.xwoba,oSwing:cp.oSwing,kPct:cp.kPct,bbPct:cp.bbPct,launchAngle:cp.launchAngle});}}>
-                          <div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}>
-                            <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,letterSpacing:.2}}>{p.name}</span><span style={{fontSize:9,color:'var(--muted)',opacity:.4,marginLeft:3}}>›</span>
-                            {isGoneYard(p) && <span style={{fontSize:8,padding:'1px 5px',borderRadius:4,
-                              background:'rgba(255,20,0,.25)',border:'1px solid rgba(255,20,0,.5)',
-                              color:'#fff',fontFamily:"'DM Mono',monospace",fontWeight:800,letterSpacing:.4,
-                              flexShrink:0}}>💥 GY</span>}
-                          </div>
-                          <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)'}}>{p.hand}HB · {p.pos||'—'}</div>
+                    {/* Batter name — single line, click opens slideout */}
+                    <td style={{textAlign:'left',whiteSpace:'nowrap'}}>
+                      <div style={{display:'flex',alignItems:'center',gap:5}}>
+                        <PlayerAvatar pid={p.pid||p.id} name={p.name} size={20}/>
+                        <div style={{cursor:'pointer',display:'flex',alignItems:'center',gap:3}} onClick={()=>{const cp=getCachedPlayer(p.pid||p.id)||{};openAtBatSlide({pid:p.pid||p.id,name:p.name,team:p.team,avgEV:cp.avgEV||p.avgEV,barrel:cp.barrel,hardHit:cp.hardHit,flyBall:cp.flyBall,hr:cp.hr,avg:cp.avg,obp:cp.obp,slg:cp.slg,xwoba:cp.xwoba,oSwing:cp.oSwing,kPct:cp.kPct,bbPct:cp.bbPct,launchAngle:cp.launchAngle});}}>
+                          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,letterSpacing:.2}}>{p.name}</span>
+                          <span style={{fontSize:9,color:'var(--muted)',opacity:.4}}>›</span>
                         </div>
+                        {isGoneYard(p) && <span style={{fontSize:7,padding:'1px 4px',borderRadius:3,
+                          background:'rgba(255,20,0,.25)',border:'1px solid rgba(255,20,0,.5)',
+                          color:'#fff',fontFamily:"'DM Mono',monospace",fontWeight:800,flexShrink:0}}>GY</span>}
                       </div>
                     </td>
                     {/* Stat columns */}
                     {STAT_COLS.map(c=>(
-                      <td key={c.key} style={{textAlign:'right'}}>
+                      <td key={c.key} style={{textAlign:'right',padding:'5px 4px'}}>
                         {c.render(p)}
                       </td>
                     ))}
