@@ -5791,6 +5791,41 @@ function PitchBuilderTab() {
 // ── HR TICKER + TRACKER ──────────────────────────────────────
 // Global HR data — shared between ticker and tracker tab
 let HR_DATA = [];
+const VIDEO_LINK_CACHE = {}; // gamePk_atBatIndex → savant video URL
+const VIDEO_GAMES_FETCHED = new Set(); // gamePks already fetched
+
+async function fetchVideoLinks(hrs) {
+  // Get unique gamePks from today's HRs that we haven't fetched yet
+  const newGames = [...new Set(hrs.map(h => h.gamePk).filter(Boolean))]
+    .filter(gid => !VIDEO_GAMES_FETCHED.has(String(gid)));
+  if (!newGames.length) return;
+
+  for (const gamePk of newGames) {
+    try {
+      const r = await fetch(
+        `https://statsapi.mlb.com/api/v1/game/${gamePk}/playByPlay?fields=allPlays,result,about,atBatIndex,playId,eventType`,
+        { signal: AbortSignal.timeout(6000) }
+      );
+      if (!r.ok) continue;
+      const d = await r.json();
+      const plays = d.allPlays || [];
+      let foundAny = false;
+      plays.forEach(play => {
+        if (play.result?.eventType === 'home_run') {
+          const idx = play.about?.atBatIndex;
+          const uuid = play.about?.playId;
+          if (idx != null && uuid) {
+            const key = `${gamePk}_${idx}`;
+            VIDEO_LINK_CACHE[key] = `https://baseballsavant.mlb.com/sporty-videos?playId=${uuid}`;
+            foundAny = true;
+          }
+        }
+      });
+      if (foundAny) VIDEO_GAMES_FETCHED.add(String(gamePk));
+    } catch(e) { console.warn('[Video] gamePk', gamePk, e.message); }
+  }
+}
+
 let HR_DATA_DATE = '';
 let HR_LAST_FETCH = 0;
 const SEEN_HR_IDS = new Set();
@@ -5903,6 +5938,8 @@ async function fetchHRs(force=false) {
     // else: HR_DATA already has yesterday's data — keep showing it
     HR_LAST_FETCH = now;
     console.log("[HRs] Fetched:", newHRs.length, "HRs today, showing:", HR_DATA.length);
+    // Fire-and-forget: fetch play-by-play for video UUIDs
+    if (HR_DATA.length > 0) fetchVideoLinks(HR_DATA).catch(() => {});
     return HR_DATA;
   } catch(e) {
     console.warn("[HRs] Fetch failed:", e.message);
@@ -6192,6 +6229,7 @@ function HRTrackerTab() {
 {key:"pitchType",  label:"Pitch",    tip:"Pitch type thrown"},
                 {key:"pitcherName",label:"vs Pitcher",tip:"Pitcher who gave it up"},
                 {key:"gameId",     label:"Game",     tip:"Matchup"},
+                {key:"video",      label:"📹",       tip:"Video — click to watch on Baseball Savant (available ~1 min after the HR)"},
               ].map(c => (
                 <th key={c.key} className={sortKey===c.key?"sk":""} onClick={()=>hs(c.key)} style={{cursor:"pointer"}}>
                   <div style={{display:"flex",alignItems:"center",gap:2}}>
@@ -6228,6 +6266,20 @@ function HRTrackerTab() {
                 <td>{hr.pitchType?<span style={{fontSize:10,fontFamily:"'DM Mono',monospace",padding:"2px 7px",borderRadius:4,background:"var(--surface2)",border:"1px solid var(--border)"}}>{hr.pitchType}</span>:"—"}</td>
                 <td><div style={{fontSize:11,fontWeight:500}}>{hr.pitcherName}</div><div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{hr.pitcherTeam}</div></td>
                 <td><span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:"var(--muted)"}}>{hr.gameId}</span></td>
+                <td style={{textAlign:"center"}}>{(() => {
+                  const vKey = `${hr.gamePk}_${hr.atBatIndex??hr.playIndex??hr.plateAppearance??0}`;
+                  const url = VIDEO_LINK_CACHE[vKey];
+                  return url
+                    ? <a href={url} target="_blank" rel="noopener noreferrer"
+                        onClick={e=>e.stopPropagation()}
+                        title="Watch on Baseball Savant"
+                        style={{fontSize:16,textDecoration:"none",opacity:.8,transition:"opacity .15s"}}
+                        onMouseEnter={e=>e.currentTarget.style.opacity="1"}
+                        onMouseLeave={e=>e.currentTarget.style.opacity=".8"}>
+                        📹
+                      </a>
+                    : <span style={{color:"var(--border)",fontSize:10,fontFamily:"'DM Mono',monospace"}}>—</span>;
+                })()}</td>
                 </tr>;
               })}
             </tbody>
@@ -7444,7 +7496,7 @@ function BvPHistoryTab({ data }) {
   const [loaded, setLoaded]       = useState(false);
   const [sortCol, setSortCol]     = useState('hr');
   const [sortDir, setSortDir]     = useState(1);  // 1 with (bn-an) = descending
-  const [minPA, setMinPA]         = useState(0);
+  const [minPA, setMinPA]         = useState(1);
   const [search, setSearch]       = useState('');
 
   // Build unique batter+pitcher pairs from engine data
@@ -7605,6 +7657,33 @@ function BvPHistoryTab({ data }) {
           </span>
         )}
       </div>
+
+      {/* CSV Export */}
+      {filtered.length > 0 && (
+        <div style={{display:'flex',justifyContent:'flex-end',marginBottom:8}}>
+          <button onClick={()=>{
+            const dq = String.fromCharCode(34);
+            const esc = v => dq+String(v==null?'':v).replace(new RegExp(dq,'g'),dq+dq)+dq;
+            const headers = ['Tm','Batter','Opp','Pitcher','Hand','PA','AB','H','HR','1B','2B','3B','BB','K','SB','AVG','OBP','SLG'];
+            const rows2 = filtered.map(r=>[
+              r.team, r.batter, r.opp, r.pitcher, r.pitcherHand+'HP',
+              r.pa, r.ab, r.h, r.hr, r.b1, r.b2, r.b3, r.bb, r.k, r.sb,
+              r.avg, r.obp, r.slg
+            ].map(esc).join(','));
+            const csv = '\uFEFF' + headers.join(',') + '\n' + rows2.join('\n');
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+            a.download = 'bvp-history.csv';
+            a.click();
+          }}
+          style={{padding:'4px 12px',borderRadius:6,cursor:'pointer',
+            background:'var(--surface2)',border:'1px solid var(--border)',
+            color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:10,
+            display:'flex',alignItems:'center',gap:5}}>
+            ⬇ CSV
+          </button>
+        </div>
+      )}
 
       {/* Table */}
       {rows.length === 0 && !loading
