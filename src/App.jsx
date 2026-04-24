@@ -7050,8 +7050,9 @@ function SimLabView({ data }) {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <PlayerAvatar pid={parseInt(b.batter_id)||0} name={b.batter} size={26}/>
                           <div style={{ minWidth: 0 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
-                              <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 13 }}>{b.batter}</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', cursor:'pointer' }}
+                              onClick={e=>{e.stopPropagation();const cp=getCachedPlayer(parseInt(b.batter_id)||0)||{};openAtBatSlide({pid:parseInt(b.batter_id)||0,name:b.batter,team:b.batting_team,avgEV:cp.avgEV,barrel:cp.barrel,hardHit:cp.hardHit,flyBall:cp.flyBall,hr:cp.hr,avg:cp.avg,obp:cp.obp,slg:cp.slg,xwoba:cp.xwoba,kPct:cp.kPct,bbPct:cp.bbPct,launchAngle:cp.launchAngle});}}>
+                              <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 11 }}>{b.batter}</span><span style={{fontSize:9,color:'var(--muted)',opacity:.4,marginLeft:2}}>›</span>
                               {isConfirmed(b) && <span style={{ fontSize: 9, color: '#27c97a', flexShrink: 0 }}>✅</span>}
                               {isGoneYardSim(b) && <span style={{ fontSize: 9, flexShrink: 0 }}>💥</span>}
                               {WEATHER_ALERT_GAME_IDS.has(String(b.game_id)) && <span title="Weather may impact this game" style={{ fontSize: 9, flexShrink: 0 }}>⚠️</span>}
@@ -7069,7 +7070,12 @@ function SimLabView({ data }) {
                         </div>
                       </td>
                       <td style={{ textAlign: 'right' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 11, color: 'var(--accent2)', fontWeight: 700 }}>{b.batting_team}</span></td>
-                      <td style={{ textAlign: 'right' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)' }}>{b.pitcher}</span></td>
+                      <td style={{ textAlign: 'right' }}>
+                        <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)', cursor:'pointer' }}
+                          onClick={e=>{e.stopPropagation();if(b.pitcher_id)openPitcherSlide({pid:parseInt(b.pitcher_id)||0,name:b.pitcher,team:'',hand:b.pitcher_hand,pitchMix:[]});}}>
+                          {b.pitcher}<span style={{fontSize:9,opacity:.4,marginLeft:2}}>›</span>
+                        </span>
+                      </td>
                       <td style={{ textAlign: 'center' }}>
                         {(() => {
                           const pid = b.pitcher_id ? String(parseInt(b.pitcher_id) || b.pitcher_id) : null;
@@ -7308,7 +7314,7 @@ function SimLabView({ data }) {
                       onClick={e=>{ e.stopPropagation(); openPitcherSlide({pid:parseInt(b.pitcher_id)||0, name:b.pitcher, team:b.pitcher_team||'', hand:b.pitcher_hand, pitchMix:[]}); }}>
                       <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 13, color: 'var(--text)' }}>{b.pitcher}</span>
                       <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", fontWeight: 400 }}>{b.pitcher_hand}HP</span>
-                      <span style={{ fontSize: 11, color: 'var(--muted)', opacity:.5, marginLeft:'auto' }}>› Stats</span>
+                      <span style={{ fontSize: 11, color: 'var(--ice)', fontFamily:"'DM Mono',monospace", fontWeight:700, marginLeft:'auto' }}>› Stats</span>
                     </div>
 
                     <PitcherCard pitcherId={b.pitcher_id} pitcherName={b.pitcher} onGrade={()=>{}}/>
@@ -7788,8 +7794,7 @@ function BatterLeaderboard() {
                         <PlayerAvatar pid={p.pid||p.id} name={p.name} size={24}/>
                         <div style={{cursor:'pointer'}} onClick={()=>{const cp=getCachedPlayer(p.pid||p.id)||{};openAtBatSlide({pid:p.pid||p.id,name:p.name,team:p.team,avgEV:cp.avgEV||p.avgEV,barrel:cp.barrel,hardHit:cp.hardHit,flyBall:cp.flyBall,hr:cp.hr,avg:cp.avg,obp:cp.obp,slg:cp.slg,xwoba:cp.xwoba,oSwing:cp.oSwing,kPct:cp.kPct,bbPct:cp.bbPct,launchAngle:cp.launchAngle});}}>
                           <div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}>
-                            <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,letterSpacing:.3}}>{p.name}</span>
-                            <span style={{fontSize:10,color:'var(--muted)',opacity:.5}}>›</span>
+                            <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,letterSpacing:.2}}>{p.name}</span><span style={{fontSize:9,color:'var(--muted)',opacity:.4,marginLeft:3}}>›</span>
                             {isGoneYard(p) && <span style={{fontSize:8,padding:'1px 5px',borderRadius:4,
                               background:'rgba(255,20,0,.25)',border:'1px solid rgba(255,20,0,.5)',
                               color:'#fff',fontFamily:"'DM Mono',monospace",fontWeight:800,letterSpacing:.4,

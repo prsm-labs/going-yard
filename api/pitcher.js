@@ -1,6 +1,7 @@
 // api/pitcher.js
-// Fetches pitcher season stats from MLB Stats API (always works)
-// Savant pitch mix + batted ball stats (GB%, FB%, HH%) optional/bonus
+// Season stats: MLB Stats API (reliable)
+// Pitch arsenal: MLB Stats API pitchArsenal endpoint (reliable, no Savant needed)
+// Batted ball: Savant custom leaderboard (optional, best-effort)
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -8,172 +9,117 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'public, s-maxage=3600');
 
   const { pid, name, year = '2026' } = req.query;
-  const headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-    'Accept': 'application/json,*/*',
-  };
+  const H = { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json,*/*' };
 
   try {
-    // ── Step 1: Resolve pitcher ID ─────────────────────────────
+    // ── Step 1: Resolve pitcher ID ──────────────────────────────
     let pitcherId = pid ? String(parseInt(pid) || pid) : null;
-
     if (!pitcherId && name) {
       try {
-        const r = await fetch(
-          `https://statsapi.mlb.com/api/v1/people/search?names=${encodeURIComponent(name)}&sportId=1`,
-          { headers }
-        );
+        const r = await fetch(`https://statsapi.mlb.com/api/v1/people/search?names=${encodeURIComponent(name)}&sportId=1`, { headers: H });
         if (r.ok) {
           const d = await r.json();
-          const p = d.people?.find(p =>
-            p.primaryPosition?.code === '1' || p.primaryPosition?.type === 'Pitcher'
-          );
+          const p = d.people?.find(p => p.primaryPosition?.code === '1' || p.primaryPosition?.type === 'Pitcher');
           if (p) pitcherId = String(p.id);
         }
       } catch(e) {}
     }
+    if (!pitcherId) return res.status(200).json({ found: false, pitchMix: [], stats: {} });
 
-    if (!pitcherId) {
-      return res.status(200).json({ found: false, pitchMix: [], stats: {} });
+    // ── Step 2: Season stats + pitch arsenal in parallel ────────
+    let stats = {}, hand = 'R', pitchMix = [], battedBall = {};
+
+    const [rPeople, rStats, rArsenal] = await Promise.allSettled([
+      fetch(`https://statsapi.mlb.com/api/v1/people/${pitcherId}`, { headers: H }),
+      fetch(`https://statsapi.mlb.com/api/v1/people/${pitcherId}/stats?stats=season&group=pitching&season=${year}&sportId=1`, { headers: H }),
+      fetch(`https://statsapi.mlb.com/api/v1/people/${pitcherId}/stats?stats=pitchArsenal&season=${year}&sportId=1`, { headers: H }),
+    ]);
+
+    // Handedness
+    if (rPeople.status === 'fulfilled' && rPeople.value.ok) {
+      const d = await rPeople.value.json();
+      hand = d.people?.[0]?.pitchHand?.code || 'R';
     }
 
-    // ── Step 2: MLB Stats API season stats ──────────────────────
-    let stats = {};
-    let hand  = 'R';
-    try {
-      const [rPeople, rStats] = await Promise.all([
-        fetch(`https://statsapi.mlb.com/api/v1/people/${pitcherId}`, { headers }),
-        fetch(`https://statsapi.mlb.com/api/v1/people/${pitcherId}/stats?stats=season&group=pitching&season=${year}&sportId=1`, { headers }),
-      ]);
-      if (rPeople.ok) {
-        const dp = await rPeople.json();
-        hand = dp.people?.[0]?.pitchHand?.code || 'R';
+    // Season stats (try current year, fall back to prior)
+    if (rStats.status === 'fulfilled' && rStats.value.ok) {
+      const d = await rStats.value.json();
+      let s = d.stats?.[0]?.splits?.[0]?.stat;
+      if (!s || !s.era) {
+        try {
+          const r2 = await fetch(`https://statsapi.mlb.com/api/v1/people/${pitcherId}/stats?stats=season&group=pitching&season=${parseInt(year)-1}&sportId=1`, { headers: H });
+          if (r2.ok) { const d2 = await r2.json(); s = d2.stats?.[0]?.splits?.[0]?.stat; }
+        } catch(e) {}
       }
-      if (rStats.ok) {
-        const d = await rStats.json();
-        let s = d.stats?.[0]?.splits?.[0]?.stat;
-        if (!s || !s.era) {
-          const r2 = await fetch(
-            `https://statsapi.mlb.com/api/v1/people/${pitcherId}/stats?stats=season&group=pitching&season=${parseInt(year)-1}&sportId=1`,
-            { headers }
-          );
-          if (r2.ok) {
-            const d2 = await r2.json();
-            s = d2.stats?.[0]?.splits?.[0]?.stat;
-          }
-        }
-        if (s) {
-          stats = {
-            era:  s.era               || '—',
-            whip: s.whip              || '—',
-            ip:   s.inningsPitched    || '0',
-            k9:   s.strikeoutsPer9Inn || '—',
-            bb9:  s.walksPer9Inn      || '—',
-            hr9:  s.homeRunsPer9      || '—',
-            kPct: s.strikeoutPercentage || '—',
-            bbPct:s.walkPercentage    || '—',
-            hits: s.hits   || 0,
-            hr:   s.homeRuns || 0,
-            obp:  s.obp    || '—',
-            avg:  s.avg    || '—',
-            wins: s.wins   || 0,
-            losses: s.losses || 0,
-            so:   s.strikeOuts || 0,
-            hand,
-          };
-        }
-      }
-    } catch(e) {
-      console.warn('[Pitcher] MLB Stats API failed:', e.message);
+      if (s) stats = {
+        era:   s.era               || '—',
+        whip:  s.whip              || '—',
+        ip:    s.inningsPitched    || '0',
+        k9:    s.strikeoutsPer9Inn || '—',
+        bb9:   s.walksPer9Inn      || '—',
+        hr9:   s.homeRunsPer9      || '—',
+        hr:    s.homeRuns          || 0,
+        hits:  s.hits              || 0,
+        avg:   s.avg               || '—',
+        obp:   s.obp               || '—',
+        wins:  s.wins              || 0,
+        losses:s.losses            || 0,
+        so:    s.strikeOuts        || 0,
+        bb:    s.baseOnBalls       || 0,
+        kPct:  s.strikeoutPercentage || '—',
+        bbPct: s.walkPercentage    || '—',
+        hand,
+      };
     }
 
-    // ── Step 3: Savant pitch mix + batted ball stats ────────────
-    // Batted ball: GB%, FB%, HH% (hard hit allowed %), barrel% allowed
-    let pitchMix = [];
-    let battedBall = {};
-    try {
-      // Fetch pitch mix and batted ball leaderboards in parallel
-      const [rMix, rBB] = await Promise.all([
-        fetch(
-          `https://baseballsavant.mlb.com/leaderboard/pitch-movement?year=${year}&team=&min=1&type=pitcher&pitcher_hand=&pitch_type=&run_value_sort=run_value_per_100&csv=true`,
-          { headers, signal: AbortSignal.timeout(5000) }
-        ),
-        fetch(
-          `https://baseballsavant.mlb.com/leaderboard/custom?year=${year}&type=pitcher&filter=&min=1&selections=pa,barrel_batted_rate,hard_hit_percent,groundballs_percent,flyballs_percent,linedrives_percent&csv=true`,
-          { headers, signal: AbortSignal.timeout(5000) }
-        ),
-      ]);
+    // Pitch arsenal from MLB Stats API — much more reliable than Savant CSV
+    if (rArsenal.status === 'fulfilled' && rArsenal.value.ok) {
+      const d = await rArsenal.value.json();
+      const splits = d.stats?.[0]?.splits || [];
+      const COLORS = { FF:'#ff4020', SI:'#ff8020', FC:'#f5a623', SL:'#38b8f2',
+        SV:'#38b8f2', ST:'#38b8f2', CU:'#f5a623', KC:'#f5a623', CH:'#27c97a', FS:'#27c97a', CS:'#f5a623' };
+      pitchMix = splits.map(s => ({
+        name:     s.stat?.pitchName || s.stat?.type?.description || '?',
+        code:     s.stat?.type?.code || '',
+        pct:      parseFloat(s.stat?.percentage || 0),
+        velo:     parseFloat(s.stat?.averageSpeed || 0),
+        color:    COLORS[s.stat?.type?.code] || '#8899aa',
+        whiffPct: parseFloat(s.stat?.whiffPercent || 0),
+      })).filter(p => p.pct > 0).sort((a, b) => b.pct - a.pct);
+    }
 
-      // Pitch mix
-      if (rMix.ok) {
-        const csv = await rMix.text();
+    // Batted ball from Savant (optional — don't block if it fails)
+    try {
+      const rBB = await fetch(
+        `https://baseballsavant.mlb.com/leaderboard/custom?year=${year}&type=pitcher&filter=&min=1&selections=pa,barrel_batted_rate,hard_hit_percent,groundballs_percent,flyballs_percent,linedrives_percent&csv=true`,
+        { headers: H, signal: AbortSignal.timeout(4000) }
+      );
+      if (rBB.ok) {
+        const csv = await rBB.text();
         const rows = csv.trim().split('\n');
         const hdrs = rows[0].split(',').map(h => h.replace(/"/g,'').trim());
-        const playerRows = rows.slice(1)
-          .map(row => {
-            const vals = row.split(',').map(v => v.replace(/"/g,'').trim());
-            const o = {};
-            hdrs.forEach((h,i) => { o[h] = vals[i] || ''; });
-            return o;
-          })
-          .filter(r => (r.pitcher_id || r.player_id) === pitcherId);
-
-        if (playerRows.length > 0) {
-          const COLORS = {
-            FF:'#ff4020',SI:'#ff8020',FC:'#f5a623',
-            SL:'#38b8f2',SV:'#38b8f2',ST:'#38b8f2',
-            CU:'#f5a623',KC:'#f5a623',
-            CH:'#27c97a',FS:'#27c97a',
-          };
-          pitchMix = playerRows.map(r => ({
-            name:     r.pitch_name || r.pitch_type || '?',
-            code:     r.pitch_type || '',
-            pct:      parseFloat(r.pitch_usage_pct || r.pitch_percent || 0),
-            velo:     parseFloat(r.avg_speed || 0).toFixed(1),
-            color:    COLORS[r.pitch_type] || '#8899aa',
-            whiffPct: parseFloat(r.whiff_percent || 0),
-            runValue: parseFloat(r.run_value_per_100 || 0),
-          })).filter(p => p.pct > 0).sort((a,b) => b.pct - a.pct);
-        }
-      }
-
-      // Batted ball stats (opponent)
-      if (rBB.ok) {
-        const csv2 = await rBB.text();
-        const rows2 = csv2.trim().split('\n');
-        const hdrs2 = rows2[0].split(',').map(h => h.replace(/"/g,'').trim());
-        const found = rows2.slice(1).find(row => {
-          const vals = row.split(',').map(v => v.replace(/"/g,'').trim());
-          const o = {};
-          hdrs2.forEach((h,i) => { o[h] = vals[i] || ''; });
-          return (o.player_id || o.pitcher_id) === pitcherId;
+        const found = rows.slice(1).find(row => {
+          const vals = row.split(',');
+          const o = {}; hdrs.forEach((h,i)=>{ o[h]=vals[i]?.replace(/"/g,'').trim()||''; });
+          return (o.player_id||o.pitcher_id||o.mlbam_id) === pitcherId;
         });
         if (found) {
-          const vals = found.split(',').map(v => v.replace(/"/g,'').trim());
-          const o = {};
-          hdrs2.forEach((h,i) => { o[h] = vals[i] || ''; });
+          const vals = found.split(',');
+          const o = {}; hdrs.forEach((h,i)=>{ o[h]=vals[i]?.replace(/"/g,'').trim()||''; });
           battedBall = {
-            gbPct:      parseFloat(o.groundballs_percent || o.gb_percent || 0)  || null,
-            fbPct:      parseFloat(o.flyballs_percent    || o.fb_percent || 0)  || null,
-            ldPct:      parseFloat(o.linedrives_percent  || o.ld_percent || 0)  || null,
-            hhPct:      parseFloat(o.hard_hit_percent    || 0)                  || null,
-            barrelPct:  parseFloat(o.barrel_batted_rate  || 0)                  || null,
+            gbPct:     parseFloat(o.groundballs_percent||0)||null,
+            fbPct:     parseFloat(o.flyballs_percent||0)||null,
+            ldPct:     parseFloat(o.linedrives_percent||0)||null,
+            hhPct:     parseFloat(o.hard_hit_percent||0)||null,
+            barrelPct: parseFloat(o.barrel_batted_rate||0)||null,
           };
         }
       }
-    } catch(e) {
-      console.warn('[Pitcher] Savant fetch skipped:', e.message);
-    }
+    } catch(e) { console.warn('[Pitcher] Savant batted ball skipped:', e.message); }
 
-    console.log(`[Pitcher] ${pitcherId} | ERA ${stats.era} K/9 ${stats.k9} | ${pitchMix.length} pitches | GB ${battedBall.gbPct} FB ${battedBall.fbPct} HH ${battedBall.hhPct}`);
+    console.log(`[Pitcher] ${pitcherId} ERA:${stats.era} K/9:${stats.k9} Pitches:${pitchMix.length} GB%:${battedBall.gbPct}`);
 
-    return res.status(200).json({
-      found: true,
-      pid: pitcherId,
-      pitchMix,
-      battedBall,
-      stats,
-    });
+    return res.status(200).json({ found: true, pid: pitcherId, pitchMix, battedBall, stats });
 
   } catch(err) {
     console.error('[Pitcher] Fatal:', err.message);
