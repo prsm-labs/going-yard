@@ -11339,6 +11339,7 @@ export default function App() {
     {key:"picks",     label:"🎯 My Picks"},
     {key:"statcast",  label:"📡 Statcast"},
     {key:"onlyhomers",label:"⚾ Only Homers"},
+    {key:"doink",     label:"🎯 Doink"},
     {key:"linemate",  label:"📊 Linemate",  external:"https://linemate.io/mlb"},
     {key:"livesports",label:"📺 Live Sports",external:"https://thetvapp.to"},
     {key:"gambly",    label:"🤖 Gambly Bot", external:"https://gambly.com"},
@@ -11387,6 +11388,11 @@ export default function App() {
         <div style={{display:tab==="statcast"?"block":"none"}}><StatcastTab/></div>
         <div style={{display:tab==="homeruns"?"block":"none"}}><HRTrackerTab/></div>
         <div style={{display:tab==="onlyhomers"?"block":"none"}}><OnlyHomersTab/></div>
+        {tab==="doink" && <div style={{margin:"-16px"}}>
+          <iframe src="https://doinksports.com/research/mlb/"
+            style={{width:"100%",height:"calc(100vh - 48px)",border:"none",display:"block"}}
+            title="Doink Sports MLB Research"/>
+        </div>}
         <div style={{display:tab==="getapp"?"block":"none"}}><GetAppTab/></div>
         <div style={{display:tab==="matchup"?"block":"none"}}><MatchupEngineTab/></div>
         {tab==="lockin" && <LockInTab/>}
