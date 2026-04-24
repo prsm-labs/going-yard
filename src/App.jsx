@@ -21,7 +21,7 @@ const styles = `
   .live-badge{display:flex;align-items:center;gap:6px;background:rgba(232,65,26,.15);border:1px solid rgba(232,65,26,.3);padding:4px 11px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:1.5px;color:var(--accent);text-transform:uppercase;}
   .live-dot{width:6px;height:6px;background:var(--accent);border-radius:50%;animation:pulse 1s infinite;}
   .tabs{display:flex;padding:0 16px;background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto;}
-  .tab{padding:12px 14px;font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;border:none;background:none;color:var(--muted);border-bottom:2px solid transparent;transition:all .2s;font-family:'Oswald',sans-serif;font-weight:500;white-space:nowrap;}
+  .tab{padding:10px 9px;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;cursor:pointer;border:none;background:none;color:var(--muted);border-bottom:2px solid transparent;transition:all .2s;font-family:'Oswald',sans-serif;font-weight:500;white-space:nowrap;}
   .tab:hover{color:var(--text);}
   .tab.active{color:var(--text);border-bottom-color:var(--accent);}
   .content{flex:1;padding:22px;width:100%;box-sizing:border-box;}
@@ -8748,11 +8748,8 @@ function MatchupEngineTab() {
                       </div>
                       <div style={{width:1,height:28,background:'var(--border)'}}/>
                       <div style={{textAlign:'center',minWidth:44}}>
-                        <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:4}}>
-                          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:18,
-                            color:'var(--text)',lineHeight:1}}>{seasonHR}</span>
-                          <SavantLink pid={pid} type="batter"/>
-                        </div>
+                        <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:18,
+                          color:'var(--text)',lineHeight:1}}>{seasonHR}</div>
                         <div style={{fontSize:7,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
                           textTransform:'uppercase',letterSpacing:.5,marginTop:1}}>Season HR</div>
                       </div>
@@ -8767,6 +8764,16 @@ function MatchupEngineTab() {
 
                 {/* Environment */}
                 <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+                  {/* Statcast link pill — left of wind */}
+                  <a href={`https://baseballsavant.mlb.com/savant-player/${pid}`}
+                    target="_blank" rel="noopener noreferrer"
+                    onClick={e=>e.stopPropagation()}
+                    style={{padding:'3px 10px',borderRadius:6,fontSize:10,
+                      background:'rgba(56,184,242,.08)',border:'1px solid rgba(56,184,242,.25)',
+                      fontFamily:"'DM Mono',monospace",color:'var(--ice)',
+                      textDecoration:'none',display:'flex',alignItems:'center',gap:4}}>
+                    ⚡ Statcast
+                  </a>
                   {b.wind_effect && b.wind_effect !== 'N/A' && <div style={{
                     padding:'3px 10px',borderRadius:6,fontSize:10,
                     background:'rgba(255,255,255,.04)',border:'1px solid var(--border)',
@@ -11331,18 +11338,23 @@ export default function App() {
 
   const NAV = [
     {key:"homeruns",  label:"💥 HR Tracker"},
+    {key:"_sep1",     label:"|", sep:true},
     {key:"live",      label:"📡 Live"},
     {key:"matchup",   label:"⚡ Key Matchups"},
-    // {key:"lockin",    label:"🔒 Lock In"}, // hidden
+    {key:"_sep2",     label:"|", sep:true},
     {key:"weather",   label:"🌤️ Weather"},
     {key:"powerbi",   label:"📊 Data"},
     {key:"picks",     label:"🎯 My Picks"},
+    {key:"_sep3",     label:"|", sep:true},
     {key:"statcast",  label:"📡 Statcast"},
     {key:"onlyhomers",label:"⚾ Only Homers"},
     {key:"doink",     label:"👾 DOINK"},
+    {key:"_sep4",     label:"|", sep:true},
+    // {key:"lockin",    label:"🔒 Lock In"}, // hidden
     {key:"linemate",  label:"📊 Linemate",  external:"https://linemate.io/mlb"},
     {key:"livesports",label:"📺 Live Sports",external:"https://thetvapp.to"},
     {key:"gambly",    label:"🤖 Gambly Bot", external:"https://gambly.com"},
+    {key:"_sep5",     label:"|", sep:true},
     {key:"getapp",    label:"📲 Get App"},
   ];
 
@@ -11366,19 +11378,29 @@ export default function App() {
       </header>
       <HRTicker onHRClick={()=>setTab("homeruns")}/>
       <nav className="tabs">
-        {NAV.map(n=>(
-          n.external
-            ? <button key={n.key} className="tab"
-                onClick={()=>window.open(n.external,"_blank","noopener,noreferrer")}
-                style={{color:"var(--muted)",fontWeight:400,display:"flex",alignItems:"center",gap:4}}>
-                {n.label} <span style={{fontSize:9,opacity:.6}}>↗</span>
-              </button>
-            : <button key={n.key} className={`tab ${tab===n.key?"active":""}`}
-                onClick={()=>setTab(n.key)}
-                style={{color:tab===n.key?"var(--accent)":undefined,fontWeight:tab===n.key?700:400}}>
-                {n.label}
-              </button>
-        ))}
+        {NAV.flatMap((n, i) => {
+          const el = n.sep
+            ? <span key={n.key} style={{color:'rgba(255,255,255,.12)',fontSize:14,
+                alignSelf:'center',flexShrink:0,padding:'0 2px',userSelect:'none'}}>|</span>
+            : n.external
+              ? <button key={n.key} className="tab"
+                  onClick={()=>window.open(n.external,"_blank","noopener,noreferrer")}
+                  style={{color:"var(--muted)",fontWeight:400,display:"flex",alignItems:"center",gap:4}}>
+                  {n.label} <span style={{fontSize:9,opacity:.6}}>↗</span>
+                </button>
+              : <button key={n.key} className={`tab ${tab===n.key?"active":""}`}
+                  onClick={()=>setTab(n.key)}
+                  style={{color:tab===n.key?"var(--accent)":undefined,fontWeight:tab===n.key?700:400}}>
+                  {n.label}
+                </button>;
+          // Add a thin divider after every non-sep tab (except before/after group seps)
+          const next = NAV[i+1];
+          const addDiv = !n.sep && next && !next.sep;
+          return addDiv
+            ? [el, <span key={n.key+'_d'} style={{color:'rgba(255,255,255,.07)',fontSize:12,
+                alignSelf:'center',flexShrink:0,userSelect:'none'}}>|</span>]
+            : [el];
+        })}
       </nav>
       <main className="content">
         <div style={{display:tab==="weather"?"block":"none"}}><WeatherTab/></div>
