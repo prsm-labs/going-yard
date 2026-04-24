@@ -1755,6 +1755,7 @@ function AtBatSlideIn() {
 function PitcherSlideIn() {
   const [pitcher, setPitcher] = useState(null);
   const [stats, setStats]     = useState(null);
+  const [pitchMix, setPitchMix] = useState([]);
   const [gameLog, setGameLog] = useState([]);
   const [loading, setLoading] = useState(false);
   const [battedBall, setBattedBall] = useState(null);
@@ -1766,7 +1767,7 @@ function PitcherSlideIn() {
 
   useEffect(() => {
     if (!pitcher?.pid && !pitcher?.name) return;
-    setStats(null); setGameLog([]); setLoading(true); setBattedBall(null);
+    setStats(null); setGameLog([]); setLoading(true); setBattedBall(null); setPitchMix([]);
 
     // Fetch season stats + pitch mix via existing pitcher API
     const fetchAll = async () => {
@@ -1776,7 +1777,11 @@ function PitcherSlideIn() {
           : `/api/pitcher?name=${encodeURIComponent(pitcher.name)}&year=2026`;
         const r = await fetch(url);
         const d = await r.json();
-        if (d.found) { setStats(d); if (d.battedBall) setBattedBall(d.battedBall); }
+        if (d.found) {
+          setStats(d.stats || {});
+          setPitchMix(d.pitchMix || []);
+          if (d.battedBall) setBattedBall(d.battedBall);
+        }
       } catch(e) {}
 
       // Game log via MLB Stats API
@@ -1805,7 +1810,7 @@ function PitcherSlideIn() {
   }, [pitcher?.pid, pitcher?.name]);
 
   if (!pitcher) return null;
-  const pitchMix = stats?.pitchMix || pitcher.pitchMix || [];
+  const activePitchMix = pitchMix.length > 0 ? pitchMix : (pitcher.pitchMix || []);
   const hand = pitcher.hand || stats?.hand || 'R';
 
   return <>
@@ -1855,7 +1860,7 @@ function PitcherSlideIn() {
               {label:'K/9',  val:stats?.k9,    color: parseFloat(stats?.k9)>=10?'#27c97a':'var(--text)'},
               {label:'BB/9', val:stats?.bb9,   color: parseFloat(stats?.bb9)<=2.5?'#27c97a':parseFloat(stats?.bb9)>=4?'var(--accent)':'var(--text)'},
               {label:'HR/9', val:stats?.hr9,   color: parseFloat(stats?.hr9)>=1.5?'var(--accent)':'var(--text)'},
-              {label:'FB Vel',val:stats?.fbVelo>0?stats.fbVelo.toFixed(1):null, color:'var(--text)'},
+              {label:'FB Vel', val:(()=>{ const fb = activePitchMix.find(px=>px.code==='FF'||px.code==='SI'||px.name?.includes('Fastball')); return fb?.velo>0?parseFloat(fb.velo).toFixed(1):null; })(), color:'var(--text)'},
             ].filter(s=>s.val&&s.val!=='—'&&s.val!=='0'&&s.val!==0).map(s=>(
               <div key={s.label} style={{background:'var(--surface2)',border:'1px solid var(--border)',
                 borderRadius:8,padding:'8px 12px',minWidth:64,textAlign:'center'}}>
@@ -1897,12 +1902,12 @@ function PitcherSlideIn() {
       )}
 
       {/* Pitch Mix */}
-      {pitchMix.length > 0 && (
+      {activePitchMix.length > 0 && (
         <div style={{padding:'14px 20px',borderBottom:'1px solid var(--border)'}}>
           <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
             textTransform:'uppercase',letterSpacing:1,marginBottom:10}}>Pitch Arsenal</div>
           <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
-            {pitchMix.map((p,i)=>(
+            {activePitchMix.map((p,i)=>(
               <div key={i} style={{background:'var(--surface2)',border:'1px solid var(--border)',
                 borderRadius:8,padding:'8px 12px',textAlign:'center',minWidth:70}}>
                 <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:14,
@@ -7422,6 +7427,7 @@ function BatterLeaderboard() {
   const [players, setPlayers] = useState([]);
   const [showPicksOnly, setShowPicksOnly] = useState(false);
   const [filterGoneYard, setFilterGoneYard] = useState(false);
+  const [filterDue, setFilterDue] = useState(false);
   const picks = usePicks();
   const bprops = useBatterProps();
 
@@ -7513,6 +7519,7 @@ function BatterLeaderboard() {
     .filter(p => !searchQ || p.name?.toLowerCase().includes(searchQ.toLowerCase()))
     .filter(p => !showPicksOnly || picks[String(p.pid)])
     .filter(p => !filterGoneYard || isGoneYard(p))
+    .filter(p => !filterDue || isDue(p.pid||p.id))
     .sort((a, b) => {
       const evCount = (p, thresh) => {
         const hh = ws(p,'hardHit') || 0;
