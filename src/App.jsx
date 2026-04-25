@@ -6228,13 +6228,13 @@ function HRTrackerTab() {
             <thead><tr style={{position:"sticky",top:0,zIndex:20,background:"var(--surface2)"}}>
               <th style={{width:24,cursor:"default",background:"var(--surface2)"}}>#</th>
               {[
-                {key:"chronoIndex",label:"Time (ET)"},
-                {key:"batterTeam", label:"Team"},
+                {key:"chronoIndex",label:"Time"},
+                {key:"batterTeam", label:"Tm"},
                 {key:"batterName", label:"Batter"},
                 {key:"seasonHRs",  label:"HR#"},
-                {key:"rbi",        label:"Type/RBI"},
-                {key:"inning",     label:"Inn."},
-                {key:"launchAngle",label:"Angle"},
+                {key:"rbi",        label:"Type"},
+                {key:"inning",     label:"Inn"},
+                {key:"launchAngle",label:"Ang"},
                 {key:"exitVelo",   label:"EV"},
                 {key:"distance",   label:"Dist"},
                 {key:"pitchType",  label:"Pitch"},
@@ -6243,8 +6243,9 @@ function HRTrackerTab() {
                 {key:"video",      label:"📹"},
               ].map(c => (
                 <th key={c.key} className={sortKey===c.key?"sk":""} onClick={()=>hs(c.key)}
-                  style={{cursor:"pointer",whiteSpace:"nowrap",fontSize:10,padding:"6px 6px"}}>
-                  {c.label}{sortKey===c.key && <span style={{color:"var(--accent)",marginLeft:2}}>{sortDir<0?"↓":"↑"}</span>}
+                  style={{cursor:"pointer",whiteSpace:"normal",wordBreak:"break-word",
+                    fontSize:9,lineHeight:1.2,padding:"5px 5px",textAlign:"center",verticalAlign:"bottom"}}>
+                  {c.label}{sortKey===c.key && <span style={{color:"var(--accent)"}}>{sortDir<0?"↓":"↑"}</span>}
                 </th>
               ))}
             </tr></thead>
@@ -6258,14 +6259,14 @@ function HRTrackerTab() {
                 const seasonNum = cachedHR > 0 ? cachedHR + todayNum : todayNum;
                 return <tr key={i}>
                 <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:i<3?"var(--accent)":"var(--muted)"}}>{i+1}</span></td>
-                <td><span style={{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:600,color:"var(--text)"}}>{hr.timeET&&hr.timeET!==""?hr.timeET:`Inn. ${hr.inning}`}</span></td>
+                <td><span style={{fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:600,color:"var(--text)"}}>{hr.timeET&&hr.timeET!==""?hr.timeET:`Inn. ${hr.inning}`}</span></td>
                 <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color:"var(--text)"}}>{hr.batterTeam}</span></td>
-                <td><div style={{display:'flex',alignItems:'center',gap:6}}><PlayerAvatar pid={hr.batterId} name={hr.batterName} size={24}/><div className="pn" style={{...(isKeyMatchup(hr.batterId, hr.batterName)?{color:'#ff8020',fontWeight:700}:{})}}>{hr.batterName}</div></div></td>
-                <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:15,color:'var(--accent)'}}>{seasonNum}</span></td>
+                <td style={{whiteSpace:"nowrap"}}><div style={{display:"flex",alignItems:"center",gap:5}}><PlayerAvatar pid={hr.batterId} name={hr.batterName} size={20}/><span className="pn" style={{fontSize:11,...(isKeyMatchup(hr.batterId,hr.batterName)?{color:"#ff8020",fontWeight:700}:{})}}>{hr.batterName}</span></div></td>
+                <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:12,color:'var(--accent)'}}>{seasonNum}</span></td>
                 <td>
                 <div style={{display:"flex",alignItems:"center",gap:6}}>
                 <span className={`hr-badge ${badgeCls}`}>{hr.hrType}</span>
-                <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:16,color:hr.rbi>=2?"var(--accent)":"var(--text)"}}>{hr.rbi} RBI</span>
+                <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:hr.rbi>=2?"var(--accent)":"var(--text)"}}>{hr.rbi}R</span>
                 </div>
                 </td>
                 <td><span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{hr.halfInning==="top"?"▲":"▼"} {hr.inning}</span></td>
@@ -6273,7 +6274,7 @@ function HRTrackerTab() {
                 <td><span className={`sv ${evC}`}>{hr.exitVelo!=null?`${hr.exitVelo}`:"—"}</span></td>
                 <td><span className={`sv ${distC}`}>{hr.distance!=null?`${hr.distance}ft`:"—"}</span></td>
                 <td>{hr.pitchType?<span style={{fontSize:10,fontFamily:"'DM Mono',monospace",padding:"2px 7px",borderRadius:4,background:"var(--surface2)",border:"1px solid var(--border)"}}>{hr.pitchType}</span>:"—"}</td>
-                <td><div style={{fontSize:11,fontWeight:500}}>{hr.pitcherName}</div><div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{hr.pitcherTeam}</div></td>
+                <td style={{whiteSpace:"nowrap"}}><span style={{fontSize:10,fontWeight:500}}>{hr.pitcherName}</span></td>
                 <td><span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:"var(--muted)"}}>{hr.gameId}</span></td>
                 <td style={{textAlign:"center",width:32,minWidth:32,maxWidth:32}}>
                   {VIDEO_LINK_CACHE[`${hr.gamePk}_${hr.atBatIndex??0}`]
@@ -7051,13 +7052,14 @@ function SimLabView({ data }) {
                     <th key={col.label}
                       onClick={() => handleSort(col.key)}
                       style={{
-                        textAlign: col.label === 'Batter' || col.label === 'vs Pitcher' ? 'left' : 'right',
-                        whiteSpace: 'nowrap',
+                        textAlign: col.label === 'Batter' || col.label === 'vs Pitcher' ? 'left' : 'center',
+                        whiteSpace: 'normal', wordBreak: 'break-word',
+                        fontSize: 9, lineHeight: 1.2, padding: '5px 5px', verticalAlign: 'bottom',
                         cursor: col.key ? 'pointer' : 'default',
                         color: sortBy === col.key ? 'var(--accent)' : 'var(--muted)',
                         userSelect: 'none',
                       }}>
-                      {col.label}{sortBy === col.key ? (sortDir === 'desc' ? ' ▼' : ' ▲') : ''}
+                      {col.label}{sortBy === col.key ? (sortDir === 'desc' ? '▼' : '▲') : ''}
                     </th>
                   ))}
                 </tr>
@@ -7102,7 +7104,7 @@ function SimLabView({ data }) {
                           </div>
                         </div>
                       </td>
-                      <td style={{ textAlign: 'right' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 11, color: 'var(--accent2)', fontWeight: 700 }}>{b.batting_team}</span></td>
+                      <td style={{ textAlign: 'right' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--accent2)', fontWeight: 700 }}>{b.batting_team}</span></td>
                       <td style={{ textAlign: 'right' }}>
                         <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)', cursor:'pointer' }}
                           onClick={e=>{e.stopPropagation();if(b.pitcher_id)openPitcherSlide({pid:parseInt(b.pitcher_id)||0,name:b.pitcher,team:'',hand:b.pitcher_hand,pitchMix:[]});}}>
@@ -7119,7 +7121,7 @@ function SimLabView({ data }) {
                         })()}
                       </td>
                       <td style={{ textAlign: 'right' }}><span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 14, color: hrColor }}>{hrP > 0 ? hrP.toFixed(1) + '%' : '—'}</span></td>
-                      <td style={{ textAlign: 'right' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 11, color: hitColor }}>{hitP > 0 ? hitP.toFixed(1) + '%' : '—'}</span></td>
+                      <td style={{ textAlign: 'right' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: hitColor }}>{hitP > 0 ? hitP.toFixed(1) + '%' : '—'}</span></td>
                       <td style={{ textAlign: 'right' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 11 }}>{xbhP > 0 ? xbhP.toFixed(1) + '%' : '—'}</span></td>
                       <td style={{ textAlign: 'right' }}><span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 13, color: tb >= 1.5 ? '#ff8020' : tb >= 1.0 ? '#f5a623' : 'var(--text)' }}>{tb > 0 ? tb.toFixed(2) : '—'}</span></td>
                       <td style={{ textAlign: 'right' }}>
@@ -7444,7 +7446,7 @@ function SimLabView({ data }) {
                             <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 12 }}>{b.batter}</span>
                           </div>
                         </td>
-                        <td><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 11, color: 'var(--accent2)', fontWeight: 700 }}>{b.batting_team}</span></td>
+                        <td><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--accent2)', fontWeight: 700 }}>{b.batting_team}</span></td>
                         <td style={{ textAlign: 'left' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)' }}>{b.pitcher}</span></td>
                         <Cell pass={hrP  >= 0.05}  val={`${(hrP*100).toFixed(1)}%`} />
                         <Cell pass={hitP >= 0.28}  val={`${(hitP*100).toFixed(1)}%`} />
@@ -8232,13 +8234,12 @@ function PitcherLeaderboard() {
 
   const COLS = [
     { key:'name',   label:'Pitcher',   align:'left',
-      render: p => <div style={{cursor:'pointer'}}
+      render: p => <div style={{cursor:'pointer',whiteSpace:'nowrap'}}
         onClick={e=>{e.stopPropagation();openPitcherSlide({pid:p.pid,name:p.name,team:p.team,hand:p.hand,pitchMix:[]});}}>
-        <div style={{display:'flex',alignItems:'center',gap:5}}>
-          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,letterSpacing:.3}}>{p.name}</span>
-          <span style={{fontSize:10,color:'var(--muted)',opacity:.5}}>›</span>
+        <div style={{display:'flex',alignItems:'center',gap:4}}>
+          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,letterSpacing:.2}}>{p.name}</span>
+          <span style={{fontSize:9,color:'var(--muted)',opacity:.4}}>›</span>
         </div>
-        <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)'}}>{p.gs>0?'SP':'RP'} · {p.gp}G{p.gs>0?` · ${p.gs}GS`:''}</div>
       </div>
     },
     { key:'team',   label:'Team',   render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--accent2)',fontWeight:700}}>{p.team}</span> },
@@ -8266,11 +8267,11 @@ function PitcherLeaderboard() {
         <span style={{color:'var(--ice)'}}>{p.losses}</span>
       </span>
     },
-    { key:'era',    label:'ERA',    render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:700,color:eraCol(p.era)}}>{fmtDec(p.era)}</span> },
-    { key:'whip',   label:'WHIP',   render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:whipCol(p.whip)}}>{fmtDec(p.whip)}</span> },
-    { key:'k9',     label:'K/9',    render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:k9Col(p.k9)}}>{fmtDec(p.k9)}</span> },
-    { key:'bb9',    label:'BB/9',   render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:bb9Col(p.bb9)}}>{fmtDec(p.bb9)}</span> },
-    { key:'hr9',    label:'HR/9',   render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:hr9Col(p.hr9)}}>{fmtDec(p.hr9)}</span> },
+    { key:'era',    label:'ERA',    render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:700,color:eraCol(p.era)}}>{fmtDec(p.era)}</span> },
+    { key:'whip',   label:'WHIP',   render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:whipCol(p.whip)}}>{fmtDec(p.whip)}</span> },
+    { key:'k9',     label:'K/9',    render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:k9Col(p.k9)}}>{fmtDec(p.k9)}</span> },
+    { key:'bb9',    label:'BB/9',   render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:bb9Col(p.bb9)}}>{fmtDec(p.bb9)}</span> },
+    { key:'hr9',    label:'HR/9',   render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:hr9Col(p.hr9)}}>{fmtDec(p.hr9)}</span> },
     { key:'ip',     label:'IP',     render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{p.ipDisplay||fmtDec(p.ip,1)}</span> },
     { key:'so',     label:'K',      render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{p.so}</span> },
     { key:'hr',     label:'HR',     render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:p.hr>=15?'#ff4020':p.hr>=10?'#f5a623':'var(--text)',fontWeight:p.hr>=10?700:400}}>{p.hr}</span> },
@@ -8400,7 +8401,9 @@ function PitcherLeaderboard() {
             <thead>
               <tr>
                 {COLS.map(c=>(
-                  <th key={c.key} className={sortCol===c.key?'sk':''} style={{textAlign:c.align||'right',cursor:'pointer',whiteSpace:'nowrap'}}
+                  <th key={c.key} className={sortCol===c.key?'sk':''} style={{textAlign:c.align||'center',cursor:'pointer',
+                    whiteSpace:'normal',wordBreak:'break-word',fontSize:9,lineHeight:1.2,
+                    padding:'5px 5px',verticalAlign:'bottom'}}
                     onClick={()=>handleSort(c.key)}>
                     {c.label}<SortIcon col={c.key}/>
                   </th>
