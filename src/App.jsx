@@ -5796,48 +5796,26 @@ async function fetchVideoLinks(hrs) {
   const games = [...new Set(hrs.map(h => String(h.gamePk)).filter(Boolean))];
   if (!games.length) return;
 
-  // Build a lookup: gamePk → Set of batterIds who hit HRs (for matching)
-  const hrBattersByGame = {};
-  hrs.forEach(h => {
-    const g = String(h.gamePk);
-    if (!hrBattersByGame[g]) hrBattersByGame[g] = new Set();
-    hrBattersByGame[g].add(String(h.batterId));
-  });
-
   for (const gamePk of games) {
     try {
+      // Use same endpoint as homeruns.js — v1.1 live feed
       const r = await fetch(
-        `https://statsapi.mlb.com/api/v1/game/${gamePk}/playByPlay`,
+        `https://statsapi.mlb.com/api/v1.1/game/${gamePk}/feed/live`,
         { signal: AbortSignal.timeout(8000) }
       );
       if (!r.ok) continue;
       const d = await r.json();
-      const batterSet = hrBattersByGame[gamePk] || new Set();
+      const plays = d?.liveData?.plays?.allPlays || [];
 
-      (d.allPlays || []).forEach(play => {
-        const evt = (play.result?.eventType || play.result?.event || '').toLowerCase();
-        if (!evt.includes('home') && !evt.includes('hr')) return;
-
+      plays.forEach(play => {
+        const evt = (play.result?.event || '').toLowerCase();
+        if (evt !== 'home run') return;
         const uuid = play.about?.playId;
-        if (!uuid) return;
-
-        // Match by batterId (most reliable) — try both matchup.batter.id and any available
-        const batterId = String(play.matchup?.batter?.id || play.about?.batterId || '');
-        const atBatIdx = play.about?.atBatIndex;
-
-        // Store by batterId+gamePk (used for display lookup)
-        if (batterId && batterSet.has(batterId)) {
-          VIDEO_LINK_CACHE[`${gamePk}_batter_${batterId}`] =
-            `https://bdata-producedclips.mlb.com/${uuid}.mp4`;
-        }
-        // Also store by atBatIndex as fallback
-        if (atBatIdx != null) {
-          VIDEO_LINK_CACHE[`${gamePk}_${atBatIdx}`] =
-            `https://bdata-producedclips.mlb.com/${uuid}.mp4`;
-          // 0-based → 1-based fallback
-          VIDEO_LINK_CACHE[`${gamePk}_${atBatIdx + 1}`] =
-            `https://bdata-producedclips.mlb.com/${uuid}.mp4`;
-        }
+        const idx  = play.about?.atBatIndex;
+        if (!uuid || idx == null) return;
+        // Key matches exactly how homeruns.js stores atBatIndex
+        VIDEO_LINK_CACHE[`${gamePk}_${idx}`] =
+          `https://bdata-producedclips.mlb.com/${uuid}.mp4`;
       });
     } catch(e) { /* silent */ }
   }
@@ -6230,29 +6208,43 @@ function HRTrackerTab() {
         ? <div style={{padding:"40px",textAlign:"center",color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>
             {totalHRs === 0 ? `No home runs ${isToday?"yet today — check back once games start":"for "+displayDate}. ⚾` : "No HRs match the current filter."}
           </div>
-        : <div className="tw" style={{overflowX:"auto"}}><table style={{width:"100%",tableLayout:"fixed"}}>
+        : <div className="tw"><table style={{width:"100%"}}>
+            <colgroup>
+              <col style={{width:24}}/>  {/* # */}
+              <col style={{width:68}}/>  {/* Time */}
+              <col style={{width:40}}/>  {/* Team */}
+              <col style={{width:130}}/> {/* Batter */}
+              <col style={{width:38}}/>  {/* HR# */}
+              <col style={{width:90}}/>  {/* Type/RBI */}
+              <col style={{width:50}}/>  {/* Inning */}
+              <col style={{width:46}}/>  {/* Angle */}
+              <col style={{width:58}}/>  {/* Exit Velo */}
+              <col style={{width:68}}/>  {/* Distance */}
+              <col style={{width:52}}/>  {/* Pitch */}
+              <col style={{width:110}}/> {/* vs Pitcher */}
+              <col style={{width:80}}/>  {/* Game */}
+              <col style={{width:32}}/>  {/* 📹 */}
+            </colgroup>
             <thead><tr style={{position:"sticky",top:0,zIndex:20,background:"var(--surface2)"}}>
               <th style={{width:24,cursor:"default",background:"var(--surface2)"}}>#</th>
               {[
-                {key:"chronoIndex",label:"Time (ET)", tip:"Sorted newest HR first by inning/at-bat"},
-                {key:"batterTeam", label:"Team",     tip:"Batter's team"},
-                {key:"batterName", label:"Batter",   tip:"Batter name"},
-                {key:"seasonHRs",  label:"HR#",      tip:"Batter's season HR total after this home run"},
-                {key:"rbi",        label:"Type / RBI",tip:"HR type and RBIs"},
-                {key:"inning",     label:"Inning",   tip:"Inning hit"},
-                                {key:"launchAngle",label:"Angle",    tip:"Launch angle °. 25–35° = HR sweet spot"},
-                {key:"exitVelo",   label:"Exit Velo",tip:"Exit velocity mph. 95+ = hard hit, 103+ = elite"},
-                {key:"distance",   label:"Distance", tip:"Estimated distance in feet"},
-{key:"pitchType",  label:"Pitch",    tip:"Pitch type thrown"},
-                {key:"pitcherName",label:"vs Pitcher",tip:"Pitcher who gave it up"},
-                {key:"gameId",     label:"Game",     tip:"Matchup"},
-                {key:"video",      label:"📹",       tip:"Video — available ~1 min after the HR", width:32},
+                {key:"chronoIndex",label:"Time (ET)"},
+                {key:"batterTeam", label:"Team"},
+                {key:"batterName", label:"Batter"},
+                {key:"seasonHRs",  label:"HR#"},
+                {key:"rbi",        label:"Type/RBI"},
+                {key:"inning",     label:"Inn."},
+                {key:"launchAngle",label:"Angle"},
+                {key:"exitVelo",   label:"EV"},
+                {key:"distance",   label:"Dist"},
+                {key:"pitchType",  label:"Pitch"},
+                {key:"pitcherName",label:"Pitcher"},
+                {key:"gameId",     label:"Game"},
+                {key:"video",      label:"📹"},
               ].map(c => (
-                <th key={c.key} className={sortKey===c.key?"sk":""} onClick={()=>hs(c.key)} style={{cursor:"pointer"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:2}}>
-                    <Tip text={c.tip}><span>{c.label}</span></Tip>
-                    {sortKey===c.key && <span style={{color:"var(--accent)"}}>{sortDir<0?"↓":"↑"}</span>}
-                  </div>
+                <th key={c.key} className={sortKey===c.key?"sk":""} onClick={()=>hs(c.key)}
+                  style={{cursor:"pointer",whiteSpace:"nowrap",fontSize:10,padding:"6px 6px"}}>
+                  {c.label}{sortKey===c.key && <span style={{color:"var(--accent)",marginLeft:2}}>{sortDir<0?"↓":"↑"}</span>}
                 </th>
               ))}
             </tr></thead>
@@ -6284,19 +6276,12 @@ function HRTrackerTab() {
                 <td><div style={{fontSize:11,fontWeight:500}}>{hr.pitcherName}</div><div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{hr.pitcherTeam}</div></td>
                 <td><span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:"var(--muted)"}}>{hr.gameId}</span></td>
                 <td style={{textAlign:"center",width:32,minWidth:32,maxWidth:32}}>
-                  {(()=>{
-                    const gp = String(hr.gamePk||'');
-                    const bid = String(hr.batterId||'');
-                    const idx = hr.atBatIndex??hr.playIndex??hr.plateAppearance??0;
-                    const url = VIDEO_LINK_CACHE[`${gp}_batter_${bid}`]
-                             || VIDEO_LINK_CACHE[`${gp}_${idx}`]
-                             || VIDEO_LINK_CACHE[`${gp}_${Number(idx)-1}`];
-                    return url
-                      ? <a href={url} target="_blank" rel="noopener noreferrer"
-                          onClick={e=>e.stopPropagation()} title="Watch HR video"
-                          style={{fontSize:15,textDecoration:"none",display:"block",textAlign:"center"}}>📹</a>
-                      : null;
-                  })()}
+                  {VIDEO_LINK_CACHE[`${hr.gamePk}_${hr.atBatIndex??0}`]
+                    ? <a href={VIDEO_LINK_CACHE[`${hr.gamePk}_${hr.atBatIndex??0}`]}
+                        target="_blank" rel="noopener noreferrer"
+                        onClick={e=>e.stopPropagation()} title="Watch HR video"
+                        style={{fontSize:15,textDecoration:"none",display:"block",textAlign:"center"}}>📹</a>
+                    : null}
                 </td>
                 </tr>;
               })}
