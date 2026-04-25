@@ -5793,33 +5793,53 @@ function PitchBuilderTab() {
 let HR_DATA = [];
 const VIDEO_LINK_CACHE = {}; // gamePk_atBatIndex → savant video URL
 async function fetchVideoLinks(hrs) {
-  // Fetch play-by-play for all unique gamePks in today's HR data
-  // Always re-fetch — games progress and new HRs may appear
   const games = [...new Set(hrs.map(h => String(h.gamePk)).filter(Boolean))];
   if (!games.length) return;
 
+  // Build a lookup: gamePk → Set of batterIds who hit HRs (for matching)
+  const hrBattersByGame = {};
+  hrs.forEach(h => {
+    const g = String(h.gamePk);
+    if (!hrBattersByGame[g]) hrBattersByGame[g] = new Set();
+    hrBattersByGame[g].add(String(h.batterId));
+  });
+
   for (const gamePk of games) {
     try {
-      // No fields filter — need full play data to reliably find eventType + playId
       const r = await fetch(
         `https://statsapi.mlb.com/api/v1/game/${gamePk}/playByPlay`,
         { signal: AbortSignal.timeout(8000) }
       );
       if (!r.ok) continue;
       const d = await r.json();
+      const batterSet = hrBattersByGame[gamePk] || new Set();
+
       (d.allPlays || []).forEach(play => {
-        // Check multiple event type field locations
-        const evt = play.result?.eventType || play.result?.event || '';
-        if (/home.?run/i.test(evt)) {
-          const idx = play.about?.atBatIndex;
-          const uuid = play.about?.playId;
-          if (idx != null && uuid) {
-            VIDEO_LINK_CACHE[`${gamePk}_${idx}`] =
-              `https://baseballsavant.mlb.com/sporty-videos?playId=${uuid}`;
-          }
+        const evt = (play.result?.eventType || play.result?.event || '').toLowerCase();
+        if (!evt.includes('home') && !evt.includes('hr')) return;
+
+        const uuid = play.about?.playId;
+        if (!uuid) return;
+
+        // Match by batterId (most reliable) — try both matchup.batter.id and any available
+        const batterId = String(play.matchup?.batter?.id || play.about?.batterId || '');
+        const atBatIdx = play.about?.atBatIndex;
+
+        // Store by batterId+gamePk (used for display lookup)
+        if (batterId && batterSet.has(batterId)) {
+          VIDEO_LINK_CACHE[`${gamePk}_batter_${batterId}`] =
+            `https://bdata-producedclips.mlb.com/${uuid}.mp4`;
+        }
+        // Also store by atBatIndex as fallback
+        if (atBatIdx != null) {
+          VIDEO_LINK_CACHE[`${gamePk}_${atBatIdx}`] =
+            `https://bdata-producedclips.mlb.com/${uuid}.mp4`;
+          // 0-based → 1-based fallback
+          VIDEO_LINK_CACHE[`${gamePk}_${atBatIdx + 1}`] =
+            `https://bdata-producedclips.mlb.com/${uuid}.mp4`;
         }
       });
-    } catch(e) { /* silent — non-critical */ }
+    } catch(e) { /* silent */ }
   }
 }
 
@@ -6210,7 +6230,7 @@ function HRTrackerTab() {
         ? <div style={{padding:"40px",textAlign:"center",color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>
             {totalHRs === 0 ? `No home runs ${isToday?"yet today — check back once games start":"for "+displayDate}. ⚾` : "No HRs match the current filter."}
           </div>
-        : <div className="tw"><table style={{width:"100%"}}>
+        : <div className="tw" style={{overflowX:"auto"}}><table style={{width:"100%",tableLayout:"fixed"}}>
             <thead><tr style={{position:"sticky",top:0,zIndex:20,background:"var(--surface2)"}}>
               <th style={{width:24,cursor:"default",background:"var(--surface2)"}}>#</th>
               {[
@@ -6264,12 +6284,19 @@ function HRTrackerTab() {
                 <td><div style={{fontSize:11,fontWeight:500}}>{hr.pitcherName}</div><div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{hr.pitcherTeam}</div></td>
                 <td><span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:"var(--muted)"}}>{hr.gameId}</span></td>
                 <td style={{textAlign:"center",width:32,minWidth:32,maxWidth:32}}>
-                  {VIDEO_LINK_CACHE[`${hr.gamePk}_${hr.atBatIndex??hr.playIndex??hr.plateAppearance??0}`]
-                    ? <a href={VIDEO_LINK_CACHE[`${hr.gamePk}_${hr.atBatIndex??hr.playIndex??hr.plateAppearance??0}`]}
-                        target="_blank" rel="noopener noreferrer"
-                        onClick={e=>e.stopPropagation()} title="Watch on Baseball Savant"
-                        style={{fontSize:15,textDecoration:"none"}}>📹</a>
-                    : null}
+                  {(()=>{
+                    const gp = String(hr.gamePk||'');
+                    const bid = String(hr.batterId||'');
+                    const idx = hr.atBatIndex??hr.playIndex??hr.plateAppearance??0;
+                    const url = VIDEO_LINK_CACHE[`${gp}_batter_${bid}`]
+                             || VIDEO_LINK_CACHE[`${gp}_${idx}`]
+                             || VIDEO_LINK_CACHE[`${gp}_${Number(idx)-1}`];
+                    return url
+                      ? <a href={url} target="_blank" rel="noopener noreferrer"
+                          onClick={e=>e.stopPropagation()} title="Watch HR video"
+                          style={{fontSize:15,textDecoration:"none",display:"block",textAlign:"center"}}>📹</a>
+                      : null;
+                  })()}
                 </td>
                 </tr>;
               })}
