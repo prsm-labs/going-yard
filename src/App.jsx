@@ -7793,11 +7793,11 @@ function BatterLeaderboard() {
   const [showPicksOnly, setShowPicksOnly] = useState(false);
   const [filterGoneYard, setFilterGoneYard] = useState(false);
   const [filterDue, setFilterDue] = useState(false);
-  const [handSplit, setHandSplit]   = useState('all'); // all|vsL|vsR
-  const [locSplit,  setLocSplit]    = useState('all'); // all|home|away
-  const [timeSplit, setTimeSplit]   = useState('all'); // all|day|night
+  const [handSplit, setHandSplit]   = useState('all');
+  const [locSplit,  setLocSplit]    = useState('all');
+  const [timeSplit, setTimeSplit]   = useState('all');
+  const [splitData, setSplitData]   = useState({}); // pid → {avg,obp,slg,homeRuns,...}
   const [splitLoading, setSplitLoading] = useState(false);
-  const [splitVersion, setSplitVersion] = useState(0); // bump to re-render on fetch complete
   const picks = usePicks();
   const bprops = useBatterProps();
 
@@ -7840,22 +7840,21 @@ function BatterLeaderboard() {
   // Resolve a stat from the selected window.
   // Guard: use w.pa > 0 (window has real plate appearances) rather than
   // w[key] !== 0 — otherwise "0 HRs this week" falls back to season total.
-  // MLB API stat field name map
   const SPLIT_STAT_MAP = {
     avg:'avg', obp:'obp', slg:'slg', hr:'homeRuns', pa:'plateAppearances',
     kPct:'strikeoutPercentage', bbPct:'walkPercentage', ab:'atBats', hits:'hits',
   };
-  // Helper: get split-adjusted stat value (null if no split active/available)
+  // Read split value directly from React state (like p.windows[selectedWin])
   const splitVal = (p, key) => {
     if (!anySplitActive) return null;
+    const s = splitData[String(p.pid)];
+    if (!s) return null;
     const mlbKey = SPLIT_STAT_MAP[key];
     if (!mlbKey) return null;
-    const r = getSplitStat(p.pid, 'hitting', handSplit, locSplit, timeSplit, mlbKey);
-    if (!r) return null;
-    return typeof r.value === 'string' ? parseFloat(r.value)||0 : r.value;
+    const v = s[mlbKey];
+    return v != null ? (typeof v === 'string' ? parseFloat(v)||0 : v) : null;
   };
   const ws = (p, key) => {
-    // Check split override first
     const sv = splitVal(p, key);
     if (sv != null) return sv;
     const w = p.windows?.[selectedWin];
@@ -7885,14 +7884,32 @@ function BatterLeaderboard() {
     else { setSortCol(col); setSortDir('desc'); }
   };
 
-  // Fetch splits when any filter changes
   const anySplitActive = handSplit!=='all'||locSplit!=='all'||timeSplit!=='all';
+
+  // Fetch splits and store directly in React state — same pattern as window stats
   useEffect(() => {
-    if (!anySplitActive || players.length === 0) return;
+    if (!anySplitActive) { setSplitData({}); return; }
+    if (players.length === 0) return;
     setSplitLoading(true);
     const pids = players.slice(0, 300).map(p => p.pid).filter(Boolean);
-    fetchSplits(pids, 'hitting').then(() => {
-      setSplitVersion(v => v+1); // trigger re-render
+    const season = new Date().getFullYear();
+    // Determine active split code (priority: hand > location > time)
+    const code = SPLIT_CODES[handSplit] || SPLIT_CODES[locSplit] || SPLIT_CODES[timeSplit];
+    Promise.all(pids.map(async pid => {
+      try {
+        const r = await fetch(
+          `https://statsapi.mlb.com/api/v1/people/${pid}/stats?stats=statSplits&group=hitting&season=${season}&sportId=1&gameType=R`,
+          { signal: AbortSignal.timeout(6000) }
+        );
+        if (!r.ok) return null;
+        const d = await r.json();
+        const split = (d.stats?.[0]?.splits || []).find(s => s.split?.code === code);
+        return split ? { pid, stat: split.stat } : null;
+      } catch(e) { return null; }
+    })).then(results => {
+      const map = {};
+      results.forEach(r => { if (r) map[String(r.pid)] = r.stat; });
+      setSplitData(map);  // React state update → triggers re-render immediately
       setSplitLoading(false);
     });
   }, [handSplit, locSplit, timeSplit, players.length]);
@@ -7992,7 +8009,7 @@ function BatterLeaderboard() {
     : null;
 
   return (
-    <div data-sv={splitVersion}>
+    <div>
       {/* Split filters — 3 independent groups */}
       {(()=>{
         const SplitRow = ({label, options, value, onChange}) => (
@@ -8259,11 +8276,11 @@ function PitcherLeaderboard() {
   const [searchQ, setSearchQ]       = useState('');
   const [minIP, setMinIP]           = useState(5);
   const [gradeFilter, setGradeFilter] = useState('all');
-  const [handSplit, setHandSplit]   = useState('all'); // all|vsL|vsR
-  const [locSplit,  setLocSplit]    = useState('all'); // all|home|away
-  const [timeSplit, setTimeSplit]   = useState('all'); // all|day|night
+  const [handSplit, setHandSplit]   = useState('all');
+  const [locSplit,  setLocSplit]    = useState('all');
+  const [timeSplit, setTimeSplit]   = useState('all');
+  const [splitData, setSplitData]   = useState({});
   const [splitLoading, setSplitLoading] = useState(false);
-  const [splitVersion, setSplitVersion] = useState(0);
 
   // Static MLB team ID → abbreviation map (IDs are stable across seasons)
   const TEAM_ABBR = {
@@ -8391,26 +8408,43 @@ function PitcherLeaderboard() {
         <span style={{color:'var(--ice)'}}>{p.losses}</span>
       </span>
     },
-    { key:'era',    label:'ERA',    render: p => { const r=getSplitStat(p.pid,'pitching',handSplit,locSplit,timeSplit,'era'); const val=r?parseFloat(r.value)||p.era:p.era; return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:700,color:eraCol(val)}}>{fmtDec(val)}{r&&<span style={{fontSize:7,color:'var(--accent2)',marginLeft:2}}>*</span>}</span>; } },
-    { key:'whip',   label:'WHIP',   render: p => { const r=getSplitStat(p.pid,'pitching',handSplit,locSplit,timeSplit,'whip'); const val=r?parseFloat(r.value)||p.whip:p.whip; return <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:whipCol(val)}}>{fmtDec(val)}{r&&<span style={{fontSize:7,color:'var(--accent2)',marginLeft:2}}>*</span>}</span>; } },
+    { key:'era',    label:'ERA',    render: p => { const s=splitData[String(p.pid)]; const val=s?.era?parseFloat(s.era)||p.era:p.era; return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:700,color:eraCol(val)}}>{fmtDec(val)}{s&&<span style={{fontSize:7,color:'var(--accent2)',marginLeft:2}}>*</span>}</span>; } },
+    { key:'whip',   label:'WHIP',   render: p => { const s=splitData[String(p.pid)]; const val=s?.whip?parseFloat(s.whip)||p.whip:p.whip; return <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:whipCol(val)}}>{fmtDec(val)}{s&&<span style={{fontSize:7,color:'var(--accent2)',marginLeft:2}}>*</span>}</span>; } },
     { key:'k9',     label:'K/9',    render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:k9Col(p.k9)}}>{fmtDec(p.k9)}</span> },
     { key:'bb9',    label:'BB/9',   render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:bb9Col(p.bb9)}}>{fmtDec(p.bb9)}</span> },
     { key:'hr9',    label:'HR/9',   render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:hr9Col(p.hr9)}}>{fmtDec(p.hr9)}</span> },
     { key:'ip',     label:'IP',     render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{p.ipDisplay||fmtDec(p.ip,1)}</span> },
     { key:'so',     label:'K',      render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{p.so}</span> },
-    { key:'hr',     label:'HR',     render: p => { const r=getSplitStat(p.pid,'pitching',handSplit,locSplit,timeSplit,'homeRuns'); const val=r?r.value:p.hr; return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:val>=15?'#ff4020':val>=10?'#f5a623':'var(--text)',fontWeight:val>=10?700:400}}>{val}{r&&<span style={{fontSize:7,color:'var(--accent2)',marginLeft:2}}>*</span>}</span>; } },
+    { key:'hr',     label:'HR',     render: p => { const s=splitData[String(p.pid)]; const val=s?.homeRuns??p.hr; return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:val>=15?'#ff4020':val>=10?'#f5a623':'var(--text)',fontWeight:val>=10?700:400}}>{val}{s&&<span style={{fontSize:7,color:'var(--accent2)',marginLeft:2}}>*</span>}</span>; } },
     { key:'avg',    label:'BAA',    render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{fmtStat(p.avg)}</span> },
     { key:'obp',    label:'OBP',    render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{fmtStat(p.obp)}</span> },
     { key:'ops',    label:'OPS',    render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{fmtStat(p.ops)}</span> },
   ];
 
   const anySplitActive = handSplit!=='all'||locSplit!=='all'||timeSplit!=='all';
+
   useEffect(() => {
-    if (!anySplitActive || pitchers.length === 0) return;
+    if (!anySplitActive) { setSplitData({}); return; }
+    if (pitchers.length === 0) return;
     setSplitLoading(true);
     const pids = pitchers.slice(0, 300).map(p => p.pid).filter(Boolean);
-    fetchSplits(pids, 'pitching').then(() => {
-      setSplitVersion(v => v+1);
+    const season = new Date().getFullYear();
+    const code = SPLIT_CODES[handSplit] || SPLIT_CODES[locSplit] || SPLIT_CODES[timeSplit];
+    Promise.all(pids.map(async pid => {
+      try {
+        const r = await fetch(
+          `https://statsapi.mlb.com/api/v1/people/${pid}/stats?stats=statSplits&group=pitching&season=${season}&sportId=1&gameType=R`,
+          { signal: AbortSignal.timeout(6000) }
+        );
+        if (!r.ok) return null;
+        const d = await r.json();
+        const split = (d.stats?.[0]?.splits || []).find(s => s.split?.code === code);
+        return split ? { pid, stat: split.stat } : null;
+      } catch(e) { return null; }
+    })).then(results => {
+      const map = {};
+      results.forEach(r => { if (r) map[String(r.pid)] = r.stat; });
+      setSplitData(map);
       setSplitLoading(false);
     });
   }, [handSplit, locSplit, timeSplit, pitchers.length]);
@@ -8420,7 +8454,7 @@ function PitcherLeaderboard() {
     : null;
 
   return (
-    <div data-sv={splitVersion}>
+    <div>
       {/* Split filters — 3 independent groups */}
       {(()=>{
         const SplitRow = ({label, options, value, onChange}) => (
