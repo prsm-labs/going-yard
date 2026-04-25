@@ -6266,7 +6266,6 @@ function HRTrackerTab() {
                 <td>
                 <div style={{display:"flex",alignItems:"center",gap:6}}>
                 <span className={`hr-badge ${badgeCls}`}>{hr.hrType}</span>
-                <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:hr.rbi>=2?"var(--accent)":"var(--text)"}}>{hr.rbi}R</span>
                 </div>
                 </td>
                 <td><span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{hr.halfInning==="top"?"▲":"▼"} {hr.inning}</span></td>
