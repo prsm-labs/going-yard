@@ -7976,11 +7976,11 @@ function BatterLeaderboard() {
     { key:'gbPct',      label:'GB%',    render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--muted)'}}>{fmtPct(ws(p,'gbPct'))}</span> },
     { key:'launchAngle',label:'Avg LA', render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{fmtLA(ws(p,'launchAngle'))}</span> },
     // Traditional stats — windowed for season views, full-season for rolling windows
-    { key:'avg',  label:'BA',  render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{fmtStat(ws(p,'avg'))}</span> },
-    { key:'obp',  label:'OBP', render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{fmtStat(ws(p,'obp'))}</span> },
-    { key:'slg',  label:'SLG', render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{fmtStat(ws(p,'slg'))}</span> },
+    { key:'avg',  label:'BA',  render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:anySplitActive&&splitVal(p,'avg')!=null?'var(--ice)':'var(--text)'}}>{fmtStat(ws(p,'avg'))}{anySplitActive&&splitVal(p,'avg')!=null&&<sup style={{fontSize:7,color:'var(--accent2)'}}>*</sup>}</span> },
+    { key:'obp',  label:'OBP', render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:anySplitActive&&splitVal(p,'obp')!=null?'var(--ice)':'var(--text)'}}>{fmtStat(ws(p,'obp'))}{anySplitActive&&splitVal(p,'obp')!=null&&<sup style={{fontSize:7,color:'var(--accent2)'}}>*</sup>}</span> },
+    { key:'slg',  label:'SLG', render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:anySplitActive&&splitVal(p,'slg')!=null?'var(--ice)':'var(--text)'}}>{fmtStat(ws(p,'slg'))}{anySplitActive&&splitVal(p,'slg')!=null&&<sup style={{fontSize:7,color:'var(--accent2)'}}>*</sup>}</span> },
     { key:'ops',  label:'OPS', render: p => { const v=(ws(p,'slg')||0)+(ws(p,'obp')||0); return <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:700,color:opsCol(v)}}>{fmtStat(v||ws(p,'ops'))}</span>; }},
-    { key:'hr',   label:'HR',  render: p => { const v=ws(p,'hr'); return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:v>=10?700:400,color:hrCol(v)}}>{v||0}</span>; }},
+    { key:'hr',   label:'HR',  render: p => { const v=ws(p,'hr'); return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:v>=10?700:400,color:hrCol(v)}}>{v||0}{anySplitActive&&splitVal(p,'hr')!=null&&<sup style={{fontSize:7,color:'var(--accent2)'}}>*</sup>}</span>; }},
     { key:'hits', label:'H',   render: p => { const v=ws(p,'hits'); return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=30?'#27c97a':v>=20?'#f5a623':'var(--text)'}}>{v||0}</span>; }},
     { key:'xbh',  label:'XBH', render: p => { const v=ws(p,'xbh');  return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=12?'#ff8020':v>=7?'#f5a623':'var(--text)'}}>{v||0}</span>; }},
     { key:'kPct', label:'K%',  render: p => { const v=ws(p,'kPct'); return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=28?'var(--ice)':'var(--muted)'}}>{fmtPct(v)}</span>; }},
@@ -7992,7 +7992,7 @@ function BatterLeaderboard() {
     : null;
 
   return (
-    <div>
+    <div data-sv={splitVersion}>
       {/* Split filters — 3 independent groups */}
       {(()=>{
         const SplitRow = ({label, options, value, onChange}) => (
@@ -8420,7 +8420,7 @@ function PitcherLeaderboard() {
     : null;
 
   return (
-    <div>
+    <div data-sv={splitVersion}>
       {/* Split filters — 3 independent groups */}
       {(()=>{
         const SplitRow = ({label, options, value, onChange}) => (
@@ -8431,7 +8431,7 @@ function PitcherLeaderboard() {
               <button key={k} onClick={()=>onChange(k)}
                 style={{padding:'2px 8px',borderRadius:5,cursor:'pointer',fontSize:9,
                   fontFamily:"'DM Mono',monospace",fontWeight:value===k?700:400,
-                  background:value===k?'rgba(56,184,242,.18)':' transparent',
+                  background:value===k?'rgba(56,184,242,.18)':'transparent',
                   color:value===k?'var(--ice)':'var(--muted)',
                   border:`1px solid ${value===k?'rgba(56,184,242,.4)':'var(--border)'}`}}>
                 {l}
@@ -8449,7 +8449,7 @@ function PitcherLeaderboard() {
               <div style={{display:'flex',alignItems:'center',gap:8,marginTop:4}}>
                 {splitLoading
                   ? <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>⏳ loading splits…</span>
-                  : <span style={{fontSize:9,color:'var(--accent2)',fontFamily:"'DM Mono',monospace"}}>📊 ERA/WHIP/HR adjusted · * = split value</span>}
+                  : <span style={{fontSize:9,color:'var(--accent2)',fontFamily:"'DM Mono',monospace"}}>📊 ERA/WHIP/HR show split · * = split value</span>}
                 <button onClick={()=>{setHandSplit('all');setLocSplit('all');setTimeSplit('all');}}
                   style={{marginLeft:'auto',padding:'2px 8px',borderRadius:4,cursor:'pointer',fontSize:9,
                     background:'rgba(255,64,32,.08)',border:'1px solid rgba(255,64,32,.3)',color:'var(--accent)',
