@@ -6817,6 +6817,7 @@ function SimLabView({ data }) {
   const [filterGoneYardSim, setFilterGoneYardSim] = useState(false);
   const [filterDueSim, setFilterDueSim] = useState(false);
   const [filterDiamondSim, setFilterDiamondSim] = useState(false);
+  const [simPicksOnly, setSimPicksOnly]           = useState(false);
   const [minHRScore, setMinHRScore]   = useState('');
   const [minHRPct,   setMinHRPct]     = useState('');
   const [minMeatball,setMinMeatball]  = useState('');
@@ -6875,6 +6876,7 @@ function SimLabView({ data }) {
       .filter(r => !lineupOnly || isConfirmed(r))
       .filter(r => !filterGoneYardSim || isGoneYardSim(r))
       .filter(r => !filterDueSim || isDueFromRow(r, parseInt(r.batter_id)||0))
+      .filter(r => !simPicksOnly || picks[String(parseInt(r.batter_id)||0)])
       .filter(r => {
         if (!filterDiamondSim) return true;
         const stb = parseFloat(r.sim_tb)||0;
@@ -6893,7 +6895,7 @@ function SimLabView({ data }) {
       .filter(r => !minSimTB    || (parseFloat(r.sim_tb)||0)             >= parseFloat(minSimTB));
     const mul = sortDir === 'desc' ? -1 : 1;
     return [...filtered].sort((a, b) => mul * ((parseFloat(a[sortBy]) || 0) - (parseFloat(b[sortBy]) || 0)));
-  }, [data, sortBy, sortDir, teamFilter, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, selPitcherGradesSim, minHRScore, minHRPct, minMeatball, minHitPct, minSimTB]);
+  }, [data, sortBy, sortDir, teamFilter, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, selPitcherGradesSim, minHRScore, minHRPct, minMeatball, minHitPct, minSimTB]);
 
   // Auto-select top batter when data loads
   useEffect(() => {
@@ -7558,6 +7560,78 @@ async function fetchBvP(batterId, pitcherId) {
 }
 
 // ── CHEAT CODE SLIDEOUT ──────────────────────────────────────────────────────
+// ── COMPACT PICKS FILTER BAR ─────────────────────────────────────────────────
+// Reusable single-row bar: search/add picker + My Picks filter toggle
+// Props: showPicksOnly, setShowPicksOnly, players (for search dropdown)
+function PicksFilterBar({ showPicksOnly, setShowPicksOnly, players = [] }) {
+  const [searchQ, setSearchQ]     = useState('');
+  const [showPicker, setShowPicker] = useState(false);
+  const picks = usePicks();
+  const addPick = useAddPick();
+
+  const filtered = searchQ.trim().length >= 1
+    ? players.filter(p => p.name?.toLowerCase().includes(searchQ.toLowerCase())).slice(0, 8)
+    : [];
+
+  return (
+    <div style={{marginBottom:10}}>
+      {/* Single compact row */}
+      <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+        {/* Search input */}
+        <div style={{position:'relative',flex:'1 1 160px',minWidth:120}}>
+          <input
+            value={searchQ}
+            onChange={e=>{ setSearchQ(e.target.value); setShowPicker(true); }}
+            onFocus={()=>setShowPicker(true)}
+            placeholder="＋ Add to My Picks…"
+            style={{width:'100%',padding:'4px 10px',background:'var(--surface2)',
+              border:`1px solid ${searchQ?'var(--accent2)':'var(--border)'}`,
+              borderRadius:6,color:'var(--text)',fontFamily:"'DM Mono',monospace",
+              fontSize:10,outline:'none',boxSizing:'border-box'}}/>
+          {/* Dropdown */}
+          {showPicker && filtered.length > 0 && (
+            <div style={{position:'absolute',top:'100%',left:0,right:0,zIndex:200,
+              background:'var(--surface)',border:'1px solid var(--border)',borderRadius:7,
+              boxShadow:'0 8px 24px rgba(0,0,0,.4)',marginTop:3,maxHeight:220,overflowY:'auto'}}>
+              {filtered.map(p => (
+                <div key={p.pid} onClick={()=>{
+                  addPick(p.pid, p.name, p.team);
+                  setSearchQ(''); setShowPicker(false);
+                }}
+                  style={{padding:'8px 12px',cursor:'pointer',display:'flex',
+                    alignItems:'center',gap:8,borderBottom:'1px solid rgba(30,45,58,.3)'}}
+                  onMouseEnter={e=>e.currentTarget.style.background='var(--surface2)'}
+                  onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                  <PlayerAvatar pid={p.pid} name={p.name} size={22}/>
+                  <div>
+                    <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12}}>{p.name}</div>
+                    <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)'}}>{p.team} · {p.pos||'—'}</div>
+                  </div>
+                  {picks[String(p.pid)] && <span style={{marginLeft:'auto',fontSize:9,color:'var(--accent2)'}}>✓</span>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        {/* My Picks filter toggle */}
+        <button onClick={()=>setShowPicksOnly(s=>!s)}
+          style={{padding:'4px 10px',borderRadius:6,cursor:'pointer',whiteSpace:'nowrap',
+            border:`1px solid ${showPicksOnly?'var(--accent2)':'var(--border)'}`,
+            background:showPicksOnly?'rgba(245,166,35,.12)':'transparent',
+            color:showPicksOnly?'var(--accent2)':'var(--muted)',
+            fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:showPicksOnly?700:400,
+            transition:'all .15s', flexShrink:0}}>
+          🎯 {showPicksOnly ? 'My Picks ✓' : 'My Picks'}
+        </button>
+        {/* Dismiss picker on outside click */}
+        {showPicker && filtered.length > 0 &&
+          <div onClick={()=>setShowPicker(false)}
+            style={{position:'fixed',inset:0,zIndex:199}}/>}
+      </div>
+    </div>
+  );
+}
+
 function CheatCodeButton() {
   const [open, setOpen] = useState(false);
 
@@ -7731,6 +7805,7 @@ function BvPHistoryTab({ data }) {
   const [loaded, setLoaded]       = useState(false);
   const [sortCol, setSortCol]     = useState('hr');
   const [sortDir, setSortDir]     = useState(1);  // 1 with (bn-an) = descending
+  const [bvpPicksOnly, setBvpPicksOnly] = useState(false);
   const [minPA, setMinPA]         = useState(1);
   const [search, setSearch]       = useState('');
 
@@ -7800,6 +7875,7 @@ function BvPHistoryTab({ data }) {
 
   const filtered = useMemo(() => {
     let r = rows;
+    if (bvpPicksOnly) r = r.filter(x => picks[String(x.batterId)]);
     if (minPA > 0) r = r.filter(x => (x.pa||0) >= minPA);
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -7812,8 +7888,9 @@ function BvPHistoryTab({ data }) {
       const bn = typeof bv === 'string' ? parseFloat(bv)||0 : bv;
       return sortDir * (bn - an);
     });
-  }, [rows, sortCol, sortDir, minPA, search]);
+  }, [rows, sortCol, sortDir, minPA, search, bvpPicksOnly]);
 
+  const picks = usePicks();
   const SortIcon = ({col}) => sortCol===col
     ? <span style={{marginLeft:3,fontSize:8}}>{sortDir===-1?'▼':'▲'}</span>
     : null;
@@ -7860,6 +7937,8 @@ function BvPHistoryTab({ data }) {
 
   return (
     <div>
+      <PicksFilterBar showPicksOnly={bvpPicksOnly} setShowPicksOnly={setBvpPicksOnly}
+        players={pairs.map(p=>({pid:p.batterId,name:p.batter,team:p.team,pos:''}))}/>
       {/* Controls */}
       <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
         <input value={search} onChange={e=>setSearch(e.target.value)}
@@ -8750,9 +8829,11 @@ function MatchupEngineTab() {
   const [filterGoneYard, setFilterGoneYard]   = useState(false);
   const [filterDue, setFilterDue]             = useState(false);
   const [filterDiamond, setFilterDiamond]     = useState(false);
+  const [kmPicksOnly, setKmPicksOnly]         = useState(false);
   // Date slot — 'today' or 'tomorrow'. Respects 4am ET cutoff same as HR tracker.
   const [dateSlot, setDateSlot] = useState('today');
   const picks = usePicks();
+  const kmPlayers = useMemo(() => Object.values(DAILY_PICKS_CACHE).map(p => ({pid:parseInt(p.batter_id)||0,name:p.batter,team:p.batting_team,pos:''})).filter(p=>p.pid>0), [data?.length]);
   // Re-render when confirmed lineups update (same 2-min cycle as Lineups tab)
   const [lineupVer, setLineupVer] = useState(LINEUP_VERSION);
   useEffect(() => {
@@ -8848,6 +8929,7 @@ function MatchupEngineTab() {
   const grouped = {};
   (selGame === 'all' ? activeData : activeData.filter(r => String(r.game_id) === String(selGame)))
     .filter(r => selGrade === 'all' || r.grade === selGrade)
+    .filter(r => !kmPicksOnly || picks[String(parseInt(r.batter_id)||0)])
     .filter(r => {
       if (filterDiamond) {
         const simTB = parseFloat(r.sim_tb)||0;
@@ -8997,6 +9079,7 @@ function MatchupEngineTab() {
     {/* Sim Lab */}
     {subTab==='simlab' && (
       <div>
+        <PicksFilterBar showPicksOnly={simPicksOnly} setShowPicksOnly={setSimPicksOnly} players={data?data.map(r=>({pid:parseInt(r.batter_id)||0,name:r.batter,team:r.batting_team,pos:''})).filter(p=>p.pid>0):[]} />
         <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:9,padding:'10px 14px',marginBottom:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
           <span style={{fontSize:10,color:'var(--accent)',fontFamily:"'DM Mono',monospace",fontWeight:700}}>🧠 SIM LAB</span>
           <span style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>Monte Carlo projections · probability analysis · prop line matching · all from today's engine run</span>
@@ -9177,6 +9260,10 @@ function MatchupEngineTab() {
           fontFamily:"'DM Mono',monospace",fontSize:9,cursor:'pointer',fontWeight:700}}>✕</button>}
     </div>}
 
+    {/* Picks filter bar */}
+    {!loading && !error && activeData.length > 0 && (
+      <PicksFilterBar showPicksOnly={kmPicksOnly} setShowPicksOnly={setKmPicksOnly} players={kmPlayers}/>
+    )}
     {/* Grade filter */}
     {!loading && !error && activeData.length > 0 && <div style={{display:'flex',gap:6,marginBottom:14,flexWrap:'wrap',alignItems:'center'}}>
       <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1}}>Grade</span>
