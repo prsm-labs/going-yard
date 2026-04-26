@@ -7895,21 +7895,25 @@ function BatterLeaderboard() {
     const season = new Date().getFullYear();
     // Determine active split code (priority: hand > location > time)
     const code = SPLIT_CODES[handSplit] || SPLIT_CODES[locSplit] || SPLIT_CODES[timeSplit];
-    Promise.all(pids.map(async pid => {
+    Promise.all(pids.slice(0,3).map(async pid => { // debug: just first 3 players
       try {
         const r = await fetch(
-          `https://statsapi.mlb.com/api/v1/people/${pid}/stats?stats=statSplits&group=hitting&season=${season}&sportId=1&gameType=R`,
+          `https://statsapi.mlb.com/api/v1/people/${pid}/stats?stats=statSplits&group=hitting&season=${season}&sportId=1&sitCodes=vl,vr,h,a,d,n`,
           { signal: AbortSignal.timeout(6000) }
         );
-        if (!r.ok) return null;
+        if (!r.ok) { console.log('[Split] HTTP', r.status, 'for pid', pid); return null; }
         const d = await r.json();
-        const split = (d.stats?.[0]?.splits || []).find(s => s.split?.code === code);
+        const splits = d.stats?.[0]?.splits || [];
+        console.log(`[Split] pid=${pid} got ${splits.length} splits. Codes:`, splits.map(s=>s.split?.code).join(','));
+        console.log(`[Split] Looking for code="${code}". Found:`, splits.find(s=>s.split?.code===code));
+        const split = splits.find(s => s.split?.code === code);
         return split ? { pid, stat: split.stat } : null;
-      } catch(e) { return null; }
+      } catch(e) { console.log('[Split] Error pid', pid, e.message); return null; }
     })).then(results => {
+      console.log('[Split] Results:', results);
       const map = {};
       results.forEach(r => { if (r) map[String(r.pid)] = r.stat; });
-      setSplitData(map);  // React state update → triggers re-render immediately
+      setSplitData(map);
       setSplitLoading(false);
     });
   }, [handSplit, locSplit, timeSplit, players.length]);
@@ -8433,7 +8437,7 @@ function PitcherLeaderboard() {
     Promise.all(pids.map(async pid => {
       try {
         const r = await fetch(
-          `https://statsapi.mlb.com/api/v1/people/${pid}/stats?stats=statSplits&group=pitching&season=${season}&sportId=1&gameType=R`,
+          `https://statsapi.mlb.com/api/v1/people/${pid}/stats?stats=statSplits&group=pitching&season=${season}&sportId=1&sitCodes=vl,vr,h,a,d,n`,
           { signal: AbortSignal.timeout(6000) }
         );
         if (!r.ok) return null;
