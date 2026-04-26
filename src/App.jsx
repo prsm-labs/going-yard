@@ -6292,6 +6292,28 @@ function HRTrackerTab() {
 }
 
 
+function MLBScoresTab() {
+  return <div style={{margin:"-16px"}}>
+    <iframe
+      title="MLB Scores"
+      src="https://www.mlb.com/scores"
+      frameBorder="0"
+      allowFullScreen
+      style={{width:"125%",height:"calc((100vh - 48px) * 1.25)",border:"none",display:"block",
+        transform:"scale(0.8)",transformOrigin:"top left"}}
+    />
+    <div style={{padding:"8px 14px",borderTop:"1px solid var(--border)",
+      display:"flex",justifyContent:"flex-end",background:"var(--surface)"}}>
+      <a href="https://www.mlb.com/scores" target="_blank" rel="noopener noreferrer"
+        style={{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:6,
+          background:"var(--accent)",color:"white",fontFamily:"'Oswald',sans-serif",
+          fontWeight:700,fontSize:12,letterSpacing:1,textDecoration:"none"}}>
+        ↗ Open in New Tab
+      </a>
+    </div>
+  </div>;
+}
+
 function OnlyHomersTab() {
   return <div style={{margin:"-16px"}}>
     {/* iframe — scaled 80% like Doink, full height */}
@@ -7472,54 +7494,6 @@ function SimLabView({ data }) {
 // 📜 BvP HISTORY TAB — Career batter vs scheduled pitcher stats
 // Data: MLB Stats API vsPlayer endpoint (career, all-time)
 // Columns: Tm, Batter, Opp, Pitcher, PA, AB, H, HR, 1B, 2B, 3B, BB, K, SB, AVG, OBP, SLG
-// ─────────────────────────────────────────────────────────────────────────────
-// ── Split stats cache (vs L/R, Home/Away, Day/Night) ────────────────────────
-const SPLIT_CACHE = {}; // pid_group → {vl:{...}, vr:{...}, h:{...}, ...}
-
-// MLB API split codes
-const SPLIT_CODES = { vsL:'vl', vsR:'vr', home:'h', away:'a', day:'d', night:'n' };
-
-async function fetchSplits(pids, group='hitting') {
-  const season = new Date().getFullYear();
-  const toFetch = pids.map(String).filter(pid => !SPLIT_CACHE[`${pid}_${group}`]);
-  if (!toFetch.length) return;
-  const BATCH = 5;
-  for (let i = 0; i < toFetch.length; i += BATCH) {
-    await Promise.all(toFetch.slice(i, i+BATCH).map(async pid => {
-      const k = `${pid}_${group}`;
-      if (SPLIT_CACHE[k]) return;
-      SPLIT_CACHE[k] = {}; // mark as fetching to avoid duplicate fetches
-      try {
-        const r = await fetch(
-          `https://statsapi.mlb.com/api/v1/people/${pid}/stats?stats=statSplits&group=${group}&season=${season}&sportId=1&gameType=R`,
-          { signal: AbortSignal.timeout(7000) }
-        );
-        if (!r.ok) return;
-        const d = await r.json();
-        const byCode = {};
-        (d.stats?.[0]?.splits || []).forEach(s => {
-          if (s.split?.code) byCode[s.split.code] = s.stat;
-        });
-        SPLIT_CACHE[k] = byCode;
-      } catch(e) { delete SPLIT_CACHE[k]; }
-    }));
-  }
-}
-
-// Get stat value for a player given active split filters
-// Priority: hand > location > time (MLB API doesn't provide true combined splits)
-function getSplitStat(pid, group, handSplit, locSplit, timeSplit, statKey) {
-  const cache = SPLIT_CACHE[`${String(pid)}_${group}`];
-  if (!cache) return null;
-  // Try each active filter in priority order
-  for (const key of [handSplit, locSplit, timeSplit]) {
-    if (key === 'all') continue;
-    const code = SPLIT_CODES[key];
-    const stat = cache[code];
-    if (stat && stat[statKey] != null) return { value: stat[statKey], split: key };
-  }
-  return null;
-}
 
 const BVP_CACHE = {}; // module-level cache: "batterId_pitcherId" → {data, ts}
 const BVP_TTL   = 4 * 60 * 60 * 1000;
@@ -7793,11 +7767,6 @@ function BatterLeaderboard() {
   const [showPicksOnly, setShowPicksOnly] = useState(false);
   const [filterGoneYard, setFilterGoneYard] = useState(false);
   const [filterDue, setFilterDue] = useState(false);
-  const [handSplit, setHandSplit]   = useState('all');
-  const [locSplit,  setLocSplit]    = useState('all');
-  const [timeSplit, setTimeSplit]   = useState('all');
-  const [splitData, setSplitData]   = useState({}); // pid → {avg,obp,slg,homeRuns,...}
-  const [splitLoading, setSplitLoading] = useState(false);
   const picks = usePicks();
   const bprops = useBatterProps();
 
@@ -7840,23 +7809,7 @@ function BatterLeaderboard() {
   // Resolve a stat from the selected window.
   // Guard: use w.pa > 0 (window has real plate appearances) rather than
   // w[key] !== 0 — otherwise "0 HRs this week" falls back to season total.
-  const SPLIT_STAT_MAP = {
-    avg:'avg', obp:'obp', slg:'slg', hr:'homeRuns', pa:'plateAppearances',
-    kPct:'strikeoutPercentage', bbPct:'walkPercentage', ab:'atBats', hits:'hits',
-  };
-  // Read split value directly from React state (like p.windows[selectedWin])
-  const splitVal = (p, key) => {
-    if (!anySplitActive) return null;
-    const s = splitData[String(p.pid)];
-    if (!s) return null;
-    const mlbKey = SPLIT_STAT_MAP[key];
-    if (!mlbKey) return null;
-    const v = s[mlbKey];
-    return v != null ? (typeof v === 'string' ? parseFloat(v)||0 : v) : null;
-  };
   const ws = (p, key) => {
-    const sv = splitVal(p, key);
-    if (sv != null) return sv;
     const w = p.windows?.[selectedWin];
     const wHasData = (w?.pa || w?.atBats) > 0;
     if (SEASON_WINS.has(selectedWin)) {
@@ -7883,40 +7836,6 @@ function BatterLeaderboard() {
     if (sortCol === col) setSortDir(d => d === 'desc' ? 'asc' : 'desc');
     else { setSortCol(col); setSortDir('desc'); }
   };
-
-  const anySplitActive = handSplit!=='all'||locSplit!=='all'||timeSplit!=='all';
-
-  // Fetch splits and store directly in React state — same pattern as window stats
-  useEffect(() => {
-    if (!anySplitActive) { setSplitData({}); return; }
-    if (players.length === 0) return;
-    setSplitLoading(true);
-    const pids = players.slice(0, 300).map(p => p.pid).filter(Boolean);
-    const season = new Date().getFullYear();
-    // Determine active split code (priority: hand > location > time)
-    const code = SPLIT_CODES[handSplit] || SPLIT_CODES[locSplit] || SPLIT_CODES[timeSplit];
-    Promise.all(pids.slice(0,3).map(async pid => { // debug: just first 3 players
-      try {
-        const r = await fetch(
-          `https://statsapi.mlb.com/api/v1/people/${pid}/stats?stats=statSplits&group=hitting&season=${season}&sportId=1&sitCodes=vl,vr,h,a,d,n`,
-          { signal: AbortSignal.timeout(6000) }
-        );
-        if (!r.ok) { console.log('[Split] HTTP', r.status, 'for pid', pid); return null; }
-        const d = await r.json();
-        const splits = d.stats?.[0]?.splits || [];
-        console.log(`[Split] pid=${pid} got ${splits.length} splits. Codes:`, splits.map(s=>s.split?.code).join(','));
-        console.log(`[Split] Looking for code="${code}". Found:`, splits.find(s=>s.split?.code===code));
-        const split = splits.find(s => s.split?.code === code);
-        return split ? { pid, stat: split.stat } : null;
-      } catch(e) { console.log('[Split] Error pid', pid, e.message); return null; }
-    })).then(results => {
-      console.log('[Split] Results:', results);
-      const map = {};
-      results.forEach(r => { if (r) map[String(r.pid)] = r.stat; });
-      setSplitData(map);
-      setSplitLoading(false);
-    });
-  }, [handSplit, locSplit, timeSplit, players.length]);
 
   // Gone Yard check — did this batter hit a HR *today* (resets at 4am ET with pipeline)
   const etToday = (() => { const s=new Date().toLocaleDateString('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}); const [m,d,y]=s.split('/'); return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`; })();
@@ -7997,11 +7916,11 @@ function BatterLeaderboard() {
     { key:'gbPct',      label:'GB%',    render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--muted)'}}>{fmtPct(ws(p,'gbPct'))}</span> },
     { key:'launchAngle',label:'Avg LA', render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{fmtLA(ws(p,'launchAngle'))}</span> },
     // Traditional stats — windowed for season views, full-season for rolling windows
-    { key:'avg',  label:'BA',  render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:anySplitActive&&splitVal(p,'avg')!=null?'var(--ice)':'var(--text)'}}>{fmtStat(ws(p,'avg'))}{anySplitActive&&splitVal(p,'avg')!=null&&<sup style={{fontSize:7,color:'var(--accent2)'}}>*</sup>}</span> },
-    { key:'obp',  label:'OBP', render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:anySplitActive&&splitVal(p,'obp')!=null?'var(--ice)':'var(--text)'}}>{fmtStat(ws(p,'obp'))}{anySplitActive&&splitVal(p,'obp')!=null&&<sup style={{fontSize:7,color:'var(--accent2)'}}>*</sup>}</span> },
-    { key:'slg',  label:'SLG', render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:anySplitActive&&splitVal(p,'slg')!=null?'var(--ice)':'var(--text)'}}>{fmtStat(ws(p,'slg'))}{anySplitActive&&splitVal(p,'slg')!=null&&<sup style={{fontSize:7,color:'var(--accent2)'}}>*</sup>}</span> },
+    { key:'avg',  label:'BA',  render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{fmtStat(ws(p,'avg'))}</span> },
+    { key:'obp',  label:'OBP', render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{fmtStat(ws(p,'obp'))}</span> },
+    { key:'slg',  label:'SLG', render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{fmtStat(ws(p,'slg'))}</span> },
     { key:'ops',  label:'OPS', render: p => { const v=(ws(p,'slg')||0)+(ws(p,'obp')||0); return <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:700,color:opsCol(v)}}>{fmtStat(v||ws(p,'ops'))}</span>; }},
-    { key:'hr',   label:'HR',  render: p => { const v=ws(p,'hr'); return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:v>=10?700:400,color:hrCol(v)}}>{v||0}{anySplitActive&&splitVal(p,'hr')!=null&&<sup style={{fontSize:7,color:'var(--accent2)'}}>*</sup>}</span>; }},
+    { key:'hr',   label:'HR',  render: p => { const v=ws(p,'hr'); return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:v>=10?700:400,color:hrCol(v)}}>{v||0}</span>; }},
     { key:'hits', label:'H',   render: p => { const v=ws(p,'hits'); return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=30?'#27c97a':v>=20?'#f5a623':'var(--text)'}}>{v||0}</span>; }},
     { key:'xbh',  label:'XBH', render: p => { const v=ws(p,'xbh');  return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=12?'#ff8020':v>=7?'#f5a623':'var(--text)'}}>{v||0}</span>; }},
     { key:'kPct', label:'K%',  render: p => { const v=ws(p,'kPct'); return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=28?'var(--ice)':'var(--muted)'}}>{fmtPct(v)}</span>; }},
@@ -8013,46 +7932,7 @@ function BatterLeaderboard() {
     : null;
 
   return (
-    <div>
-      {/* Split filters — 3 independent groups */}
-      {(()=>{
-        const SplitRow = ({label, options, value, onChange}) => (
-          <div style={{display:'flex',gap:4,alignItems:'center',marginBottom:4}}>
-            <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
-              width:36,flexShrink:0,textAlign:'right'}}>{label}</span>
-            {options.map(([k,l])=>(
-              <button key={k} onClick={()=>onChange(k)}
-                style={{padding:'2px 8px',borderRadius:5,cursor:'pointer',fontSize:9,
-                  fontFamily:"'DM Mono',monospace",fontWeight:value===k?700:400,
-                  background:value===k?'rgba(56,184,242,.18)':'transparent',
-                  color:value===k?'var(--ice)':'var(--muted)',
-                  border:`1px solid ${value===k?'rgba(56,184,242,.4)':'var(--border)'}`}}>
-                {l}
-              </button>
-            ))}
-          </div>
-        );
-        return (
-          <div style={{marginBottom:10,padding:'8px 10px',background:'var(--surface)',
-            border:'1px solid var(--border)',borderRadius:8}}>
-            <SplitRow label="Hand:" options={[['all','All'],['vsL','vs LHP'],['vsR','vs RHP']]} value={handSplit} onChange={setHandSplit}/>
-            <SplitRow label="Venue:" options={[['all','All'],['home','Home'],['away','Away']]} value={locSplit} onChange={setLocSplit}/>
-            <SplitRow label="Time:" options={[['all','All'],['day','Day'],['night','Night']]} value={timeSplit} onChange={setTimeSplit}/>
-            {anySplitActive && (
-              <div style={{display:'flex',alignItems:'center',gap:8,marginTop:4}}>
-                {splitLoading
-                  ? <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>⏳ loading splits…</span>
-                  : <span style={{fontSize:9,color:'var(--accent2)',fontFamily:"'DM Mono',monospace"}}>📊 AVG/OBP/SLG/HR adjusted · Statcast = full season</span>}
-                <button onClick={()=>{setHandSplit('all');setLocSplit('all');setTimeSplit('all');}}
-                  style={{marginLeft:'auto',padding:'2px 8px',borderRadius:4,cursor:'pointer',fontSize:9,
-                    background:'rgba(255,64,32,.08)',border:'1px solid rgba(255,64,32,.3)',color:'var(--accent)',
-                    fontFamily:"'DM Mono',monospace"}}>✕ Clear</button>
-              </div>
-            )}
-          </div>
-        );
-      })()}
-      {/* Controls row */}
+    <div>      {/* Controls row */}
       <div style={{display:'flex',gap:8,marginBottom:10,flexWrap:'wrap',alignItems:'center'}}>
         <div style={{position:'relative',flex:'1 1 200px',minWidth:160}}>
           <input type="text" value={searchQ} onChange={e=>setSearchQ(e.target.value)}
@@ -8280,12 +8160,6 @@ function PitcherLeaderboard() {
   const [searchQ, setSearchQ]       = useState('');
   const [minIP, setMinIP]           = useState(5);
   const [gradeFilter, setGradeFilter] = useState('all');
-  const [handSplit, setHandSplit]   = useState('all');
-  const [locSplit,  setLocSplit]    = useState('all');
-  const [timeSplit, setTimeSplit]   = useState('all');
-  const [splitData, setSplitData]   = useState({});
-  const [splitLoading, setSplitLoading] = useState(false);
-
   // Static MLB team ID → abbreviation map (IDs are stable across seasons)
   const TEAM_ABBR = {
     133:'ATH',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',
@@ -8412,92 +8286,26 @@ function PitcherLeaderboard() {
         <span style={{color:'var(--ice)'}}>{p.losses}</span>
       </span>
     },
-    { key:'era',    label:'ERA',    render: p => { const s=splitData[String(p.pid)]; const val=s?.era?parseFloat(s.era)||p.era:p.era; return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:700,color:eraCol(val)}}>{fmtDec(val)}{s&&<span style={{fontSize:7,color:'var(--accent2)',marginLeft:2}}>*</span>}</span>; } },
-    { key:'whip',   label:'WHIP',   render: p => { const s=splitData[String(p.pid)]; const val=s?.whip?parseFloat(s.whip)||p.whip:p.whip; return <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:whipCol(val)}}>{fmtDec(val)}{s&&<span style={{fontSize:7,color:'var(--accent2)',marginLeft:2}}>*</span>}</span>; } },
+    { key:'era',    label:'ERA',    render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:700,color:eraCol(p.era)}}>{fmtDec(p.era)}</span> },
+    { key:'whip',   label:'WHIP',   render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:whipCol(p.whip)}}>{fmtDec(p.whip)}</span> },
     { key:'k9',     label:'K/9',    render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:k9Col(p.k9)}}>{fmtDec(p.k9)}</span> },
     { key:'bb9',    label:'BB/9',   render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:bb9Col(p.bb9)}}>{fmtDec(p.bb9)}</span> },
     { key:'hr9',    label:'HR/9',   render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:hr9Col(p.hr9)}}>{fmtDec(p.hr9)}</span> },
     { key:'ip',     label:'IP',     render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{p.ipDisplay||fmtDec(p.ip,1)}</span> },
     { key:'so',     label:'K',      render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{p.so}</span> },
-    { key:'hr',     label:'HR',     render: p => { const s=splitData[String(p.pid)]; const val=s?.homeRuns??p.hr; return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:val>=15?'#ff4020':val>=10?'#f5a623':'var(--text)',fontWeight:val>=10?700:400}}>{val}{s&&<span style={{fontSize:7,color:'var(--accent2)',marginLeft:2}}>*</span>}</span>; } },
+    { key:'hr',     label:'HR',     render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:p.hr>=15?'#ff4020':p.hr>=10?'#f5a623':'var(--text)',fontWeight:p.hr>=10?700:400}}>{p.hr}</span> },
     { key:'avg',    label:'BAA',    render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{fmtStat(p.avg)}</span> },
     { key:'obp',    label:'OBP',    render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{fmtStat(p.obp)}</span> },
     { key:'ops',    label:'OPS',    render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{fmtStat(p.ops)}</span> },
   ];
 
-  const anySplitActive = handSplit!=='all'||locSplit!=='all'||timeSplit!=='all';
-
-  useEffect(() => {
-    if (!anySplitActive) { setSplitData({}); return; }
-    if (pitchers.length === 0) return;
-    setSplitLoading(true);
-    const pids = pitchers.slice(0, 300).map(p => p.pid).filter(Boolean);
-    const season = new Date().getFullYear();
-    const code = SPLIT_CODES[handSplit] || SPLIT_CODES[locSplit] || SPLIT_CODES[timeSplit];
-    Promise.all(pids.map(async pid => {
-      try {
-        const r = await fetch(
-          `https://statsapi.mlb.com/api/v1/people/${pid}/stats?stats=statSplits&group=pitching&season=${season}&sportId=1&sitCodes=vl,vr,h,a,d,n`,
-          { signal: AbortSignal.timeout(6000) }
-        );
-        if (!r.ok) return null;
-        const d = await r.json();
-        const split = (d.stats?.[0]?.splits || []).find(s => s.split?.code === code);
-        return split ? { pid, stat: split.stat } : null;
-      } catch(e) { return null; }
-    })).then(results => {
-      const map = {};
-      results.forEach(r => { if (r) map[String(r.pid)] = r.stat; });
-      setSplitData(map);
-      setSplitLoading(false);
-    });
-  }, [handSplit, locSplit, timeSplit, pitchers.length]);
 
   const SortIcon = ({col}) => sortCol===col
     ? <span style={{marginLeft:3,fontSize:9,opacity:.8}}>{sortDir==='asc'?'▲':'▼'}</span>
     : null;
 
   return (
-    <div>
-      {/* Split filters — 3 independent groups */}
-      {(()=>{
-        const SplitRow = ({label, options, value, onChange}) => (
-          <div style={{display:'flex',gap:4,alignItems:'center',marginBottom:4}}>
-            <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
-              width:36,flexShrink:0,textAlign:'right'}}>{label}</span>
-            {options.map(([k,l])=>(
-              <button key={k} onClick={()=>onChange(k)}
-                style={{padding:'2px 8px',borderRadius:5,cursor:'pointer',fontSize:9,
-                  fontFamily:"'DM Mono',monospace",fontWeight:value===k?700:400,
-                  background:value===k?'rgba(56,184,242,.18)':'transparent',
-                  color:value===k?'var(--ice)':'var(--muted)',
-                  border:`1px solid ${value===k?'rgba(56,184,242,.4)':'var(--border)'}`}}>
-                {l}
-              </button>
-            ))}
-          </div>
-        );
-        return (
-          <div style={{marginBottom:10,padding:'8px 10px',background:'var(--surface)',
-            border:'1px solid var(--border)',borderRadius:8}}>
-            <SplitRow label="Hand:" options={[['all','All'],['vsL','vs LHB'],['vsR','vs RHB']]} value={handSplit} onChange={setHandSplit}/>
-            <SplitRow label="Venue:" options={[['all','All'],['home','Home'],['away','Away']]} value={locSplit} onChange={setLocSplit}/>
-            <SplitRow label="Time:" options={[['all','All'],['day','Day'],['night','Night']]} value={timeSplit} onChange={setTimeSplit}/>
-            {anySplitActive && (
-              <div style={{display:'flex',alignItems:'center',gap:8,marginTop:4}}>
-                {splitLoading
-                  ? <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>⏳ loading splits…</span>
-                  : <span style={{fontSize:9,color:'var(--accent2)',fontFamily:"'DM Mono',monospace"}}>📊 ERA/WHIP/HR show split · * = split value</span>}
-                <button onClick={()=>{setHandSplit('all');setLocSplit('all');setTimeSplit('all');}}
-                  style={{marginLeft:'auto',padding:'2px 8px',borderRadius:4,cursor:'pointer',fontSize:9,
-                    background:'rgba(255,64,32,.08)',border:'1px solid rgba(255,64,32,.3)',color:'var(--accent)',
-                    fontFamily:"'DM Mono',monospace"}}>✕ Clear</button>
-              </div>
-            )}
-          </div>
-        );
-      })()}
-      {/* Controls */}
+    <div>      {/* Controls */}
       <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
         <div style={{position:'relative',flex:'1 1 180px',minWidth:150}}>
           <input type="text" value={searchQ} onChange={e=>setSearchQ(e.target.value)}
@@ -11376,6 +11184,7 @@ export default function App() {
     {key:"picks",     label:"🎯 My Picks"},
     {key:"_sep3",     label:"|", sep:true},
     {key:"statcast",  label:"📡 Statcast"},
+    {key:"mlbscores",  label:"⚾ MLB"},
     {key:"onlyhomers",label:"⚾ Only Homers"},
     {key:"doink",     label:"👾 DOINK"},
     {key:"_sep4",     label:"|", sep:true},
@@ -11392,7 +11201,10 @@ export default function App() {
       <div className="app-inner">
       <HRNotifications/>
       <header className="header">
-        <div className="logo"><div className="logo-dot"/>⚾ <span>GOING</span> YARD</div>
+        <div style={{display:"flex",flexDirection:"column",gap:0}}>
+          <div className="logo"><div className="logo-dot"/>⚾ <span>GOING</span> YARD</div>
+          <div className="landscape-hint" style={{fontSize:8,color:"var(--muted)",fontFamily:"'DM Mono',monospace",letterSpacing:.3,paddingLeft:2,lineHeight:1}}>📱↔️ Rotate to landscape</div>
+        </div>
         <div style={{display:"flex",alignItems:"center",gap:8}}> 
           <DataStatusBadge/>
           <NotificationBell/>
@@ -11438,6 +11250,7 @@ export default function App() {
         <div style={{display:tab==="powerbi"?"block":"none"}}><PowerBITab/></div>
         <div style={{display:tab==="statcast"?"block":"none"}}><StatcastTab/></div>
         <div style={{display:tab==="homeruns"?"block":"none"}}><HRTrackerTab/></div>
+        <div style={{display:tab==="mlbscores"?"block":"none"}}><MLBScoresTab/></div>
         <div style={{display:tab==="onlyhomers"?"block":"none"}}><OnlyHomersTab/></div>
         <div style={{display:tab==="doink"?'block':'none'}}>
           <div style={{padding:"8px 14px",background:"rgba(245,166,35,.1)",
