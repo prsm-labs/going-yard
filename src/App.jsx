@@ -7519,6 +7519,174 @@ async function fetchBvP(batterId, pitcherId) {
   }
 }
 
+// ── CHEAT CODE SLIDEOUT ──────────────────────────────────────────────────────
+function CheatCodeButton() {
+  const [open, setOpen] = useState(false);
+
+  const Section = ({emoji, title, color, children}) => (
+    <div style={{marginBottom:20}}>
+      <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:8,
+        borderBottom:'1px solid var(--border)',paddingBottom:6}}>
+        <span style={{fontSize:13}}>{emoji}</span>
+        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,
+          letterSpacing:.8,color:color||'var(--text)',textTransform:'uppercase'}}>{title}</span>
+      </div>
+      {children}
+    </div>
+  );
+
+  const Row = ({label, value, color, sub}) => (
+    <div style={{display:'flex',alignItems:'baseline',gap:6,marginBottom:5}}>
+      <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--muted)',
+        flexShrink:0,width:14}}>›</span>
+      <div>
+        <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--text)'}}>{label}</span>
+        {value && <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,
+          color:color||'var(--accent2)',marginLeft:6}}>{value}</span>}
+        {sub && <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',
+          marginTop:1,lineHeight:1.3}}>{sub}</div>}
+      </div>
+    </div>
+  );
+
+  const Fade = ({label, sub}) => (
+    <div style={{display:'flex',alignItems:'baseline',gap:6,marginBottom:5}}>
+      <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--accent)',flexShrink:0}}>✕</span>
+      <div>
+        <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--text)'}}>{label}</span>
+        {sub && <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',marginTop:1,lineHeight:1.3}}>{sub}</div>}
+      </div>
+    </div>
+  );
+
+  return <>
+    {/* Subtle trigger — looks like part of the UI */}
+    <button onClick={()=>setOpen(true)}
+      title="Blueprint"
+      style={{marginLeft:'auto',background:'none',border:'none',cursor:'pointer',
+        padding:'2px 6px',borderRadius:4,opacity:.35,
+        fontSize:11,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+        transition:'opacity .2s'}}
+      onMouseEnter={e=>e.currentTarget.style.opacity='.9'}
+      onMouseLeave={e=>e.currentTarget.style.opacity='.35'}>
+      ⚡
+    </button>
+
+    {open && <>
+      {/* Backdrop */}
+      <div onClick={()=>setOpen(false)} style={{position:'fixed',inset:0,
+        background:'rgba(0,0,0,.6)',zIndex:900}}/>
+
+      {/* Panel */}
+      <div style={{position:'fixed',right:0,top:0,bottom:0,width:'min(480px,100vw)',
+        background:'var(--surface)',borderLeft:'2px solid var(--border)',
+        zIndex:901,overflowY:'auto',display:'flex',flexDirection:'column'}}>
+
+        {/* Header */}
+        <div style={{padding:'16px 20px 12px',borderBottom:'1px solid var(--border)',
+          position:'sticky',top:0,background:'var(--surface)',zIndex:10,
+          display:'flex',alignItems:'flex-start',justifyContent:'space-between'}}>
+          <div>
+            <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:20,
+              letterSpacing:1.5,color:'var(--accent)',textTransform:'uppercase'}}>
+              Blueprint
+            </div>
+            <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',
+              marginTop:2,letterSpacing:.5}}>
+              Derived from 15-day HR tracker · 99 HRs · 756 played rows · base rate 13.1%
+            </div>
+          </div>
+          <button onClick={()=>setOpen(false)}
+            style={{background:'none',border:'1px solid var(--border)',borderRadius:6,
+              color:'var(--muted)',cursor:'pointer',padding:'4px 10px',
+              fontFamily:"'DM Mono',monospace",fontSize:10,marginLeft:12,flexShrink:0}}>
+            ✕
+          </button>
+        </div>
+
+        {/* Content */}
+        <div style={{padding:'20px',flex:1}}>
+
+          <Section emoji="🔒" title="Tier 1 Lock — All 3 = strongest play" color="var(--accent)">
+            <div style={{background:'rgba(255,64,32,.06)',border:'1px solid rgba(255,64,32,.2)',
+              borderRadius:8,padding:'10px 14px',marginBottom:8}}>
+              <Row label="Grade A+" value="46.7% HR rate when stacked" color="var(--accent)"/>
+              <Row label="Sim TB ≥ 2.0" value="+5.2% lift" color="#f5a623"
+                sub="→ Filter this in Sim Lab using the Sim TB box"/>
+              <Row label="Pitcher 💥 Hittable or 🎯 Target" value="+2.0% lift" color="#27c97a"
+                sub="A+ vs Target alone = 50% HR rate in tracker"/>
+            </div>
+            <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',
+              lineHeight:1.4}}>All three together → 46.7% HR rate vs 13.1% base. That's your lock.</div>
+          </Section>
+
+          <Section emoji="🔥" title="Tier 2 — Any 2 = solid play" color="var(--accent2)">
+            <Row label="Recent EV > 98 mph" value="23.5% HR rate" color="var(--accent)"
+              sub="Hot bat signal — biggest non-grade individual predictor"/>
+            <Row label="Temp 70–75°F" value="22.3% HR rate" color="#f5a623"
+              sub="Strongest environmental signal in the dataset (+9.2% lift)"/>
+            <Row label="BvP FB% 28–36%" value="22.2% HR rate" color="#27c97a"
+              sub="Above 36% = popup territory, actually reverses below base"/>
+            <Row label="BvP EV 92–98 mph" value="16–17% HR rate" color="var(--accent2)"
+              sub="Above 98 shows diminishing returns — sweet spot is 92-98"/>
+            <Row label="Sim TB > 2.5" value="21.6% HR rate" color="var(--accent)"
+              sub="Elite zone — filter to ≥2.5 for highest confidence plays"/>
+          </Section>
+
+          <Section emoji="📐" title="The Narrowest Sweet Spots" color="var(--ice)">
+            <Row label="BvP Launch Angle 20–24°" value="+4.1% lift" color="var(--ice)"
+              sub="HR corridor. Below 16° = groundball. Above 24° = popup."/>
+            <Row label="Recent Barrel% 3–6%" value="18.6% HR rate" color="var(--ice)"
+              sub="0-3% is the WORST zone (7.1%). Extreme barrel rates also fade."/>
+            <Row label="Signal Flags 4–6" value="14–15% HR rate" color="var(--ice)"
+              sub="Sweet spot. Flags 7 = 8.5% — looks great, underperforms."/>
+          </Section>
+
+          <Section emoji="❌" title="Dead Zones — Fade These" color="var(--accent)">
+            <Fade label="Sim TB 1.6–2.0" sub="Worse than 1.3-1.6. The mystery dip — real, not noise."/>
+            <Fade label="Recent EV 92–94 mph" sub="Dead zone, -3% vs base. Skip this band entirely."/>
+            <Fade label="BvP EV 90–92 mph" sub="Worst BvP EV range in the data (-3.5% lift)."/>
+            <Fade label="Temp below 65°F" sub="HR rate drops to 8.1-8.9%. Hard avoid."/>
+            <Fade label="Grade B vs Target/Hittable" sub="9.3% HR rate — below base! Only trust pitcher targeting for A/A+."/>
+            <Fade label="Flags = 7" sub="Grade A concentration problem. Their Sim TB is high but they consistently underdeliver."/>
+          </Section>
+
+          <Section emoji="🗺️" title="Daily Scan Order" color="#27c97a">
+            <div style={{fontFamily:"'DM Mono',monospace",fontSize:10,lineHeight:1.8,color:'var(--text)'}}>
+              <div><span style={{color:'var(--accent2)',fontWeight:700}}>1.</span> Set Sim TB filter ≥ 1.5 in Sim Lab</div>
+              <div><span style={{color:'var(--accent2)',fontWeight:700}}>2.</span> Look for Grade A+ in that list first</div>
+              <div><span style={{color:'var(--accent2)',fontWeight:700}}>3.</span> Check pitcher: Hittable or Target = green light</div>
+              <div><span style={{color:'var(--accent2)',fontWeight:700}}>4.</span> Confirm HR% ≥ 8% and flags 4–6</div>
+              <div><span style={{color:'var(--accent2)',fontWeight:700}}>5.</span> Weather tab: 70–75°F games get a bump</div>
+              <div><span style={{color:'var(--accent2)',fontWeight:700}}>6.</span> Cross-check BvP FB% — is it 28–36%?</div>
+            </div>
+          </Section>
+
+          <Section emoji="👤" title="Composite HR Hitter Profile" color="var(--muted)">
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px 12px'}}>
+              {[['Grade','A+ (highest rate)'],['Pitcher','💥 Hittable'],['Flags avg','4.7'],
+                ['Sim TB median','1.54'],['Recent EV','93.1 mph'],['BvP EV','92.8 mph'],
+                ['BvP FB%','23.4%'],['BvP LA','17.7°'],['Temp','70.9°F'],['Handedness','65% LHB']
+              ].map(([k,v])=>(
+                <div key={k} style={{padding:'4px 0',borderBottom:'1px solid rgba(30,45,58,.3)'}}>
+                  <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.6}}>{k}</div>
+                  <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'var(--text)'}}>{v}</div>
+                </div>
+              ))}
+            </div>
+          </Section>
+
+          <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--muted)',
+            textAlign:'center',marginTop:8,lineHeight:1.5,borderTop:'1px solid var(--border)',paddingTop:12}}>
+            Analysis based on April 10–24 2026 · 15 days · 99 HRs · 756 played rows<br/>
+            Re-run analysis periodically as sample size grows
+          </div>
+        </div>
+      </div>
+    </>}
+  </>;
+}
+
 function BvPHistoryTab({ data }) {
   const [rows, setRows]           = useState([]); // [{...batter, ...bvpStats}]
   const [loading, setLoading]     = useState(false);
@@ -8788,6 +8956,7 @@ function MatchupEngineTab() {
         <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:9,padding:'10px 14px',marginBottom:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
           <span style={{fontSize:10,color:'var(--accent)',fontFamily:"'DM Mono',monospace",fontWeight:700}}>🧠 SIM LAB</span>
           <span style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>Monte Carlo projections · probability analysis · prop line matching · all from today's engine run</span>
+          <CheatCodeButton/>
         </div>
         <SimLabView data={activeData}/>
       </div>
