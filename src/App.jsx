@@ -6806,6 +6806,7 @@ function PitcherCard({ pitcherId, pitcherName, onGrade }) {
 // ── BATTER LEADERBOARD ─────────────────────────────────────────
 // ── SIM LAB ────────────────────────────────────────────────────
 function SimLabView({ data }) {
+  const picks = usePicks();
   const [view, setView]             = useState('slate');    // 'slate' | 'deepdive' | 'props'
   const [selBatter, setSelBatter]   = useState(null);
   const [sortBy, setSortBy]         = useState('proj_hr_adj');
@@ -7737,6 +7738,7 @@ function CheatCodeButton() {
 }
 
 function BvPHistoryTab({ data }) {
+  const picks = usePicks();
   const [rows, setRows]           = useState([]); // [{...batter, ...bvpStats}]
   const [loading, setLoading]     = useState(false);
   const [loaded, setLoaded]       = useState(false);
@@ -7827,7 +7829,6 @@ function BvPHistoryTab({ data }) {
     });
   }, [rows, sortCol, sortDir, minPA, search, bvpPicksOnly]);
 
-  const picks = usePicks();
   const SortIcon = ({col}) => sortCol===col
     ? <span style={{marginLeft:3,fontSize:8}}>{sortDir===-1?'▼':'▲'}</span>
     : null;
