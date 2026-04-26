@@ -6293,14 +6293,20 @@ function HRTrackerTab() {
 
 
 function MLBScoresTab() {
-  return <div style={{margin:"-16px"}}>
+  return <div style={{margin:"-16px",overflow:"hidden"}}>
     <iframe
       title="MLB Scores"
       src="https://www.mlb.com/scores"
       frameBorder="0"
       allowFullScreen
-      style={{width:"125%",height:"calc((100vh - 48px) * 1.25)",border:"none",display:"block",
-        transform:"scale(0.8)",transformOrigin:"top left"}}
+      style={{
+        width:"77%",
+        height:"calc((100vh - 48px) * 0.77)",
+        border:"none",
+        display:"block",
+        transform:"scale(1.3) translateY(-7%)",
+        transformOrigin:"top left",
+      }}
     />
     <div style={{padding:"8px 14px",borderTop:"1px solid var(--border)",
       display:"flex",justifyContent:"flex-end",background:"var(--surface)"}}>
