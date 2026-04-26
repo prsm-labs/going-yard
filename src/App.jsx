@@ -7561,13 +7561,10 @@ async function fetchBvP(batterId, pitcherId) {
 
 // ── CHEAT CODE SLIDEOUT ──────────────────────────────────────────────────────
 // ── COMPACT PICKS FILTER BAR ─────────────────────────────────────────────────
-// Reusable single-row bar: search/add picker + My Picks filter toggle
-// Props: showPicksOnly, setShowPicksOnly, players (for search dropdown)
 function PicksFilterBar({ showPicksOnly, setShowPicksOnly, players = [] }) {
-  const [searchQ, setSearchQ]     = useState('');
+  const [searchQ, setSearchQ]       = useState('');
   const [showPicker, setShowPicker] = useState(false);
   const picks = usePicks();
-  const addPick = useAddPick();
 
   const filtered = searchQ.trim().length >= 1
     ? players.filter(p => p.name?.toLowerCase().includes(searchQ.toLowerCase())).slice(0, 8)
@@ -7575,7 +7572,6 @@ function PicksFilterBar({ showPicksOnly, setShowPicksOnly, players = [] }) {
 
   return (
     <div style={{marginBottom:10}}>
-      {/* Single compact row */}
       <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
         {/* Search input */}
         <div style={{position:'relative',flex:'1 1 160px',minWidth:120}}>
@@ -7589,29 +7585,30 @@ function PicksFilterBar({ showPicksOnly, setShowPicksOnly, players = [] }) {
               borderRadius:6,color:'var(--text)',fontFamily:"'DM Mono',monospace",
               fontSize:10,outline:'none',boxSizing:'border-box'}}/>
           {/* Dropdown */}
-          {showPicker && filtered.length > 0 && (
+          {showPicker && filtered.length > 0 && <>
+            <div style={{position:'fixed',inset:0,zIndex:199}} onClick={()=>setShowPicker(false)}/>
             <div style={{position:'absolute',top:'100%',left:0,right:0,zIndex:200,
               background:'var(--surface)',border:'1px solid var(--border)',borderRadius:7,
               boxShadow:'0 8px 24px rgba(0,0,0,.4)',marginTop:3,maxHeight:220,overflowY:'auto'}}>
               {filtered.map(p => (
                 <div key={p.pid} onClick={()=>{
-                  addPick(p.pid, p.name, p.team);
+                  setPick(p.pid, p.name, p.team, 'fav');
                   setSearchQ(''); setShowPicker(false);
                 }}
-                  style={{padding:'8px 12px',cursor:'pointer',display:'flex',
+                  style={{padding:'7px 12px',cursor:'pointer',display:'flex',
                     alignItems:'center',gap:8,borderBottom:'1px solid rgba(30,45,58,.3)'}}
                   onMouseEnter={e=>e.currentTarget.style.background='var(--surface2)'}
                   onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
                   <PlayerAvatar pid={p.pid} name={p.name} size={22}/>
                   <div>
                     <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12}}>{p.name}</div>
-                    <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)'}}>{p.team} · {p.pos||'—'}</div>
+                    <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)'}}>{p.team}</div>
                   </div>
-                  {picks[String(p.pid)] && <span style={{marginLeft:'auto',fontSize:9,color:'var(--accent2)'}}>✓</span>}
+                  {picks[String(p.pid)] && <span style={{marginLeft:'auto',fontSize:9,color:'var(--accent2)',fontWeight:700}}>✓</span>}
                 </div>
               ))}
             </div>
-          )}
+          </>}
         </div>
         {/* My Picks filter toggle */}
         <button onClick={()=>setShowPicksOnly(s=>!s)}
@@ -7620,13 +7617,9 @@ function PicksFilterBar({ showPicksOnly, setShowPicksOnly, players = [] }) {
             background:showPicksOnly?'rgba(245,166,35,.12)':'transparent',
             color:showPicksOnly?'var(--accent2)':'var(--muted)',
             fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:showPicksOnly?700:400,
-            transition:'all .15s', flexShrink:0}}>
+            flexShrink:0}}>
           🎯 {showPicksOnly ? 'My Picks ✓' : 'My Picks'}
         </button>
-        {/* Dismiss picker on outside click */}
-        {showPicker && filtered.length > 0 &&
-          <div onClick={()=>setShowPicker(false)}
-            style={{position:'fixed',inset:0,zIndex:199}}/>}
       </div>
     </div>
   );
