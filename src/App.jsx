@@ -6820,7 +6820,7 @@ function SimLabView({ data }) {
   const [minMeatball,setMinMeatball]  = useState('');
   const [minHitPct,  setMinHitPct]    = useState('');
   const [minSimTB,   setMinSimTB]     = useState('');
-  const [selPitcherGradeSim, setSelPitcherGradeSim] = useState('all');
+  const [selPitcherGradesSim, setSelPitcherGradesSim] = useState(new Set()); // empty = All
   const simPitcherGrades = useRef({}); // pitcher_id → grade label
 
   const pf = (v, d=1) => v != null && !isNaN(parseFloat(v)) ? parseFloat(v).toFixed(d) : null;
@@ -6874,9 +6874,9 @@ function SimLabView({ data }) {
       .filter(r => !filterGoneYardSim || isGoneYardSim(r))
       .filter(r => !filterDueSim || isDueFromRow(r, parseInt(r.batter_id)||0))
       .filter(r => {
-        if (selPitcherGradeSim === 'all') return true;
+        if (selPitcherGradesSim.size === 0) return true;
         const pid = r.pitcher_id ? String(parseInt(r.pitcher_id) || r.pitcher_id) : null;
-        return pid && simPitcherGrades.current[pid] === selPitcherGradeSim;
+        return pid && selPitcherGradesSim.has(simPitcherGrades.current[pid]);
       })
       .filter(r => !minHRScore  || (parseFloat(r.weighted_flag_score)||0) >= parseFloat(minHRScore))
       .filter(r => !minHRPct    || pctRaw(r.proj_hr_adj)               >= parseFloat(minHRPct))
@@ -6885,7 +6885,7 @@ function SimLabView({ data }) {
       .filter(r => !minSimTB    || (parseFloat(r.sim_tb)||0)             >= parseFloat(minSimTB));
     const mul = sortDir === 'desc' ? -1 : 1;
     return [...filtered].sort((a, b) => mul * ((parseFloat(a[sortBy]) || 0) - (parseFloat(b[sortBy]) || 0)));
-  }, [data, sortBy, sortDir, teamFilter, lineupOnly, filterGoneYardSim, filterDueSim, selPitcherGradeSim, minHRScore, minHRPct, minMeatball, minHitPct, minSimTB]);
+  }, [data, sortBy, sortDir, teamFilter, lineupOnly, filterGoneYardSim, filterDueSim, selPitcherGradesSim, minHRScore, minHRPct, minMeatball, minHitPct, minSimTB]);
 
   // Auto-select top batter when data loads
   useEffect(() => {
@@ -6975,19 +6975,32 @@ function SimLabView({ data }) {
             </span>
           </div>
 
-          {/* Pitcher grade filter */}
+          {/* Pitcher grade filter — multi-select */}
           <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
             <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", textTransform: 'uppercase', letterSpacing: 1 }}>Pitcher:</span>
-            {['all', '‼️ Elite', '⚠️ Tough', '🤔 Average', '💥 Hittable', '🎯 Target'].map(g => {
-              const active = selPitcherGradeSim === g;
-              const col = g==='‼️ Elite'?'#ff4020':g==='⚠️ Tough'?'#ff8020':g==='🤔 Average'?'var(--muted)':g==='💥 Hittable'?'#27c97a':g==='🎯 Target'?'#38b8f2':'var(--text)';
-              return <button key={g} onClick={() => setSelPitcherGradeSim(s => s===g ? 'all' : g)}
+            {/* All button — clears selection */}
+            <button onClick={() => setSelPitcherGradesSim(new Set())}
+              style={{ padding:'3px 10px', borderRadius:6, cursor:'pointer',
+                background: selPitcherGradesSim.size===0 ? 'rgba(255,255,255,.08)' : 'transparent',
+                color: selPitcherGradesSim.size===0 ? 'var(--text)' : 'var(--muted)',
+                border: `1px solid ${selPitcherGradesSim.size===0 ? 'var(--text)' : 'var(--border)'}`,
+                fontFamily:"'DM Mono',monospace", fontWeight: selPitcherGradesSim.size===0 ? 700 : 400, fontSize: 10 }}>
+              All
+            </button>
+            {['‼️ Elite', '⚠️ Tough', '🤔 Average', '💥 Hittable', '🎯 Target'].map(g => {
+              const active = selPitcherGradesSim.has(g);
+              const col = g==='‼️ Elite'?'#ff4020':g==='⚠️ Tough'?'#ff8020':g==='🤔 Average'?'var(--muted)':g==='💥 Hittable'?'#27c97a':'#38b8f2';
+              return <button key={g} onClick={() => setSelPitcherGradesSim(prev => {
+                  const next = new Set(prev);
+                  next.has(g) ? next.delete(g) : next.add(g);
+                  return next;
+                })}
                 style={{ padding:'3px 10px', borderRadius:6, cursor:'pointer',
                   background: active ? 'rgba(255,255,255,.08)' : 'transparent',
                   color: active ? col : 'var(--muted)',
                   border: `1px solid ${active ? col : 'var(--border)'}`,
                   fontFamily:"'DM Mono',monospace", fontWeight: active ? 700 : 400, fontSize: 10 }}>
-                {g === 'all' ? 'All' : g}
+                {g}
               </button>;
             })}
           </div>
