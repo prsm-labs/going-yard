@@ -6980,6 +6980,15 @@ function SimLabView({ data }) {
                 fontFamily: "'DM Mono',monospace", fontWeight: filterDueSim ? 700 : 400, fontSize: 11 }}>
               ⏳ {filterDueSim ? 'Due ✓' : 'Due'}
             </button>
+            <button onClick={() => setSimPicksOnly(s => !s)}
+              style={{ padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
+                border: `1px solid ${simPicksOnly ? 'var(--accent2)' : 'var(--border)'}`,
+                background: simPicksOnly ? 'rgba(245,166,35,.12)' : 'transparent',
+                color: simPicksOnly ? 'var(--accent2)' : 'var(--muted)',
+                fontFamily: "'DM Mono',monospace", fontWeight: simPicksOnly ? 700 : 400, fontSize: 11,
+                whiteSpace: 'nowrap' }}>
+              🎯 {simPicksOnly ? 'My Picks ✓' : 'My Picks'}
+            </button>
             <button onClick={() => setFilterDiamondSim(v => !v)}
               style={{ padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
                 background: filterDiamondSim ? 'rgba(255,204,0,.18)' : 'transparent',
@@ -7560,71 +7569,6 @@ async function fetchBvP(batterId, pitcherId) {
 }
 
 // ── CHEAT CODE SLIDEOUT ──────────────────────────────────────────────────────
-// ── COMPACT PICKS FILTER BAR ─────────────────────────────────────────────────
-function PicksFilterBar({ showPicksOnly, setShowPicksOnly, players = [] }) {
-  const [searchQ, setSearchQ]       = useState('');
-  const [showPicker, setShowPicker] = useState(false);
-  const picks = usePicks();
-
-  const filtered = searchQ.trim().length >= 1
-    ? players.filter(p => p.name?.toLowerCase().includes(searchQ.toLowerCase())).slice(0, 8)
-    : [];
-
-  return (
-    <div style={{marginBottom:10}}>
-      <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
-        {/* Search input */}
-        <div style={{position:'relative',flex:'1 1 160px',minWidth:120}}>
-          <input
-            value={searchQ}
-            onChange={e=>{ setSearchQ(e.target.value); setShowPicker(true); }}
-            onFocus={()=>setShowPicker(true)}
-            placeholder="＋ Add to My Picks…"
-            style={{width:'100%',padding:'4px 10px',background:'var(--surface2)',
-              border:`1px solid ${searchQ?'var(--accent2)':'var(--border)'}`,
-              borderRadius:6,color:'var(--text)',fontFamily:"'DM Mono',monospace",
-              fontSize:10,outline:'none',boxSizing:'border-box'}}/>
-          {/* Dropdown */}
-          {showPicker && filtered.length > 0 && <>
-            <div style={{position:'fixed',inset:0,zIndex:199}} onClick={()=>setShowPicker(false)}/>
-            <div style={{position:'absolute',top:'100%',left:0,right:0,zIndex:200,
-              background:'var(--surface)',border:'1px solid var(--border)',borderRadius:7,
-              boxShadow:'0 8px 24px rgba(0,0,0,.4)',marginTop:3,maxHeight:220,overflowY:'auto'}}>
-              {filtered.map(p => (
-                <div key={p.pid} onClick={()=>{
-                  setPick(p.pid, p.name, p.team, 'fav');
-                  setSearchQ(''); setShowPicker(false);
-                }}
-                  style={{padding:'7px 12px',cursor:'pointer',display:'flex',
-                    alignItems:'center',gap:8,borderBottom:'1px solid rgba(30,45,58,.3)'}}
-                  onMouseEnter={e=>e.currentTarget.style.background='var(--surface2)'}
-                  onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-                  <PlayerAvatar pid={p.pid} name={p.name} size={22}/>
-                  <div>
-                    <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12}}>{p.name}</div>
-                    <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)'}}>{p.team}</div>
-                  </div>
-                  {picks[String(p.pid)] && <span style={{marginLeft:'auto',fontSize:9,color:'var(--accent2)',fontWeight:700}}>✓</span>}
-                </div>
-              ))}
-            </div>
-          </>}
-        </div>
-        {/* My Picks filter toggle */}
-        <button onClick={()=>setShowPicksOnly(s=>!s)}
-          style={{padding:'4px 10px',borderRadius:6,cursor:'pointer',whiteSpace:'nowrap',
-            border:`1px solid ${showPicksOnly?'var(--accent2)':'var(--border)'}`,
-            background:showPicksOnly?'rgba(245,166,35,.12)':'transparent',
-            color:showPicksOnly?'var(--accent2)':'var(--muted)',
-            fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:showPicksOnly?700:400,
-            flexShrink:0}}>
-          🎯 {showPicksOnly ? 'My Picks ✓' : 'My Picks'}
-        </button>
-      </div>
-    </div>
-  );
-}
-
 function CheatCodeButton() {
   const [open, setOpen] = useState(false);
 
@@ -7930,8 +7874,6 @@ function BvPHistoryTab({ data }) {
 
   return (
     <div>
-      <PicksFilterBar showPicksOnly={bvpPicksOnly} setShowPicksOnly={setBvpPicksOnly}
-        players={pairs.map(p=>({pid:p.batterId,name:p.batter,team:p.team,pos:''}))}/>
       {/* Controls */}
       <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
         <input value={search} onChange={e=>setSearch(e.target.value)}
@@ -7952,6 +7894,15 @@ function BvPHistoryTab({ data }) {
             </button>
           ))}
         </div>
+        <button onClick={()=>setBvpPicksOnly(s=>!s)}
+          style={{padding:'3px 10px',borderRadius:6,cursor:'pointer',
+            border:`1px solid ${bvpPicksOnly?'var(--accent2)':'var(--border)'}`,
+            background:bvpPicksOnly?'rgba(245,166,35,.12)':'transparent',
+            color:bvpPicksOnly?'var(--accent2)':'var(--muted)',
+            fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:bvpPicksOnly?700:400,
+            whiteSpace:'nowrap',flexShrink:0}}>
+          🎯 {bvpPicksOnly ? 'My Picks ✓' : 'My Picks'}
+        </button>
         {loading && (
           <div style={{display:'flex',alignItems:'center',gap:6,color:'var(--muted)',
             fontFamily:"'DM Mono',monospace",fontSize:10}}>
@@ -9072,7 +9023,6 @@ function MatchupEngineTab() {
     {/* Sim Lab */}
     {subTab==='simlab' && (
       <div>
-        <PicksFilterBar showPicksOnly={simPicksOnly} setShowPicksOnly={setSimPicksOnly} players={data?data.map(r=>({pid:parseInt(r.batter_id)||0,name:r.batter,team:r.batting_team,pos:''})).filter(p=>p.pid>0):[]} />
         <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:9,padding:'10px 14px',marginBottom:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
           <span style={{fontSize:10,color:'var(--accent)',fontFamily:"'DM Mono',monospace",fontWeight:700}}>🧠 SIM LAB</span>
           <span style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>Monte Carlo projections · probability analysis · prop line matching · all from today's engine run</span>
@@ -9253,10 +9203,6 @@ function MatchupEngineTab() {
           fontFamily:"'DM Mono',monospace",fontSize:9,cursor:'pointer',fontWeight:700}}>✕</button>}
     </div>}
 
-    {/* Picks filter bar */}
-    {!loading && !error && activeData.length > 0 && (
-      <PicksFilterBar showPicksOnly={kmPicksOnly} setShowPicksOnly={setKmPicksOnly} players={kmPlayers}/>
-    )}
     {/* Grade filter */}
     {!loading && !error && activeData.length > 0 && <div style={{display:'flex',gap:6,marginBottom:14,flexWrap:'wrap',alignItems:'center'}}>
       <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1}}>Grade</span>
@@ -9296,6 +9242,15 @@ function MatchupEngineTab() {
           border:`1px solid ${filterDue?'rgba(56,184,242,.5)':'var(--border)'}`,
           fontFamily:"'DM Mono',monospace",fontWeight:filterDue?700:400,fontSize:11}}>
         ⏳ {filterDue ? 'Due ✓' : 'Due'}
+      </button>
+      <button onClick={()=>setKmPicksOnly(s=>!s)}
+        style={{padding:'3px 12px',borderRadius:6,cursor:'pointer',
+          border:`1px solid ${kmPicksOnly?'var(--accent2)':'var(--border)'}`,
+          background:kmPicksOnly?'rgba(245,166,35,.12)':'transparent',
+          color:kmPicksOnly?'var(--accent2)':'var(--muted)',
+          fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:kmPicksOnly?700:400,
+          whiteSpace:'nowrap',marginLeft:4}}>
+        🎯 {kmPicksOnly ? 'My Picks ✓' : 'My Picks'}
       </button>
       <button onClick={()=>setFilterDiamond(v=>!v)}
         style={{padding:'3px 12px',borderRadius:6,cursor:'pointer',marginLeft:4,
