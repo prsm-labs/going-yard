@@ -6422,7 +6422,8 @@ function LinemateTab() {
 
 // ── GRADE CONFIG ─────────────────────────────────────────────────
 const GRADE_CFG = {
-  "A":  {color:"#ff4020",bg:"rgba(255,64,32,.18)",border:"rgba(255,64,32,.4)",  label:"A"},
+  "A+": {color:"#ffcc00",bg:"rgba(255,204,0,.18)", border:"rgba(255,204,0,.5)",  label:"A+"},
+  "A":  {color:"#ff4020",bg:"rgba(255,64,32,.18)", border:"rgba(255,64,32,.4)",  label:"A"},
   "B":  {color:"#ff8020",bg:"rgba(255,128,32,.14)",border:"rgba(255,128,32,.3)", label:"B"},
   "C":  {color:"#ffc840",bg:"rgba(255,200,64,.10)",border:"rgba(255,200,64,.25)",label:"C"},
   "D":  {color:"#8899a6",bg:"rgba(136,153,166,.08)",border:"rgba(136,153,166,.2)",label:"D"},
@@ -6815,6 +6816,7 @@ function SimLabView({ data }) {
   const [lineupOnly, setLineupOnly]   = useState(false);
   const [filterGoneYardSim, setFilterGoneYardSim] = useState(false);
   const [filterDueSim, setFilterDueSim] = useState(false);
+  const [filterDiamondSim, setFilterDiamondSim] = useState(false);
   const [minHRScore, setMinHRScore]   = useState('');
   const [minHRPct,   setMinHRPct]     = useState('');
   const [minMeatball,setMinMeatball]  = useState('');
@@ -6874,6 +6876,12 @@ function SimLabView({ data }) {
       .filter(r => !filterGoneYardSim || isGoneYardSim(r))
       .filter(r => !filterDueSim || isDueFromRow(r, parseInt(r.batter_id)||0))
       .filter(r => {
+        if (!filterDiamondSim) return true;
+        const stb = parseFloat(r.sim_tb)||0;
+        const spg = simPitcherGrades.current[String(parseInt(r.pitcher_id)||0)];
+        return r.grade==='A+' && stb>=2.0 && (spg==='💥 Hittable'||spg==='🎯 Target');
+      })
+      .filter(r => {
         if (selPitcherGradesSim.size === 0) return true;
         const pid = r.pitcher_id ? String(parseInt(r.pitcher_id) || r.pitcher_id) : null;
         return pid && selPitcherGradesSim.has(simPitcherGrades.current[pid]);
@@ -6885,7 +6893,7 @@ function SimLabView({ data }) {
       .filter(r => !minSimTB    || (parseFloat(r.sim_tb)||0)             >= parseFloat(minSimTB));
     const mul = sortDir === 'desc' ? -1 : 1;
     return [...filtered].sort((a, b) => mul * ((parseFloat(a[sortBy]) || 0) - (parseFloat(b[sortBy]) || 0)));
-  }, [data, sortBy, sortDir, teamFilter, lineupOnly, filterGoneYardSim, filterDueSim, selPitcherGradesSim, minHRScore, minHRPct, minMeatball, minHitPct, minSimTB]);
+  }, [data, sortBy, sortDir, teamFilter, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, selPitcherGradesSim, minHRScore, minHRPct, minMeatball, minHitPct, minSimTB]);
 
   // Auto-select top batter when data loads
   useEffect(() => {
@@ -6969,6 +6977,15 @@ function SimLabView({ data }) {
                 border: `1px solid ${filterDueSim ? 'rgba(56,184,242,.5)' : 'var(--border)'}`,
                 fontFamily: "'DM Mono',monospace", fontWeight: filterDueSim ? 700 : 400, fontSize: 11 }}>
               ⏳ {filterDueSim ? 'Due ✓' : 'Due'}
+            </button>
+            <button onClick={() => setFilterDiamondSim(v => !v)}
+              style={{ padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
+                background: filterDiamondSim ? 'rgba(255,204,0,.18)' : 'transparent',
+                color: filterDiamondSim ? '#ffcc00' : 'var(--muted)',
+                border: `1px solid ${filterDiamondSim ? 'rgba(255,204,0,.5)' : 'var(--border)'}`,
+                fontFamily: "'DM Mono',monospace", fontWeight: filterDiamondSim ? 700 : 400, fontSize: 11 }}
+              title="Tier 1 Locks: A+ grade + Sim TB≥2.0 + Hittable/Target pitcher">
+              💎 {filterDiamondSim ? 'Diamond ✓' : 'Diamond'}
             </button>
             <span style={{ fontSize: 10, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>
               {slate.length} batters · click column header to sort · click row to Deep Dive
@@ -7134,7 +7151,15 @@ function SimLabView({ data }) {
                                 <span style={{ padding: '1px 5px', borderRadius: 4, fontSize: 9, fontWeight: 700, background: 'rgba(39,201,122,.15)', color: '#27c97a', border: '1px solid rgba(39,201,122,.35)', flexShrink: 0 }} title="Hit Specialist">📈 H</span>}
                               {(b.is_xbh_specialist === 'True' || b.is_xbh_specialist === true) &&
                                 <span style={{ padding: '1px 5px', borderRadius: 4, fontSize: 9, fontWeight: 700, background: 'rgba(245,166,35,.15)', color: 'var(--accent2)', border: '1px solid rgba(245,166,35,.35)', flexShrink: 0 }} title="XBH Specialist">🔥 XBH</span>}
-                              {isDueFromRow(b, parseInt(b.batter_id)||0) && <span style={{ padding: '1px 5px', borderRadius: 4, fontSize: 9, fontWeight: 700, background: 'rgba(56,184,242,.15)', color: 'var(--ice)', border: '1px solid rgba(56,184,242,.35)', flexShrink: 0 }} title="Due — AB since last HR exceeds normal rate">⏳ Due</span>}
+                              {(()=>{
+                            const stb = parseFloat(b.sim_tb)||0;
+                            const spg = simPitcherGrades.current[String(parseInt(b.pitcher_id)||0)];
+                            const isDmd = b.grade==='A+' && stb>=2.0 && (spg==='💥 Hittable'||spg==='🎯 Target');
+                            return isDmd && <span style={{padding:'1px 5px',borderRadius:4,fontSize:9,fontWeight:700,
+                              background:'rgba(255,204,0,.15)',color:'#ffcc00',
+                              border:'1px solid rgba(255,204,0,.4)',flexShrink:0}} title="Tier 1 Lock: A+ + Sim TB≥2.0 + Hittable/Target pitcher">💎</span>;
+                          })()}
+                          {isDueFromRow(b, parseInt(b.batter_id)||0) && <span style={{ padding: '1px 5px', borderRadius: 4, fontSize: 9, fontWeight: 700, background: 'rgba(56,184,242,.15)', color: 'var(--ice)', border: '1px solid rgba(56,184,242,.35)', flexShrink: 0 }} title="Due — AB since last HR exceeds normal rate">⏳ Due</span>}
                             </div>
                             {(b.in_slump === 'True' || b.in_slump === true) &&
                               <span style={{ fontSize: 8, color: 'var(--ice)', fontFamily: "'DM Mono',monospace" }}>📉 slump</span>}
@@ -8724,6 +8749,7 @@ function MatchupEngineTab() {
   const [selPitcherGrade, setSelPitcherGrade] = useState('all');
   const [filterGoneYard, setFilterGoneYard]   = useState(false);
   const [filterDue, setFilterDue]             = useState(false);
+  const [filterDiamond, setFilterDiamond]     = useState(false);
   // Date slot — 'today' or 'tomorrow'. Respects 4am ET cutoff same as HR tracker.
   const [dateSlot, setDateSlot] = useState('today');
   const picks = usePicks();
@@ -8823,6 +8849,11 @@ function MatchupEngineTab() {
   (selGame === 'all' ? activeData : activeData.filter(r => String(r.game_id) === String(selGame)))
     .filter(r => selGrade === 'all' || r.grade === selGrade)
     .filter(r => {
+      if (filterDiamond) {
+        const simTB = parseFloat(r.sim_tb)||0;
+        const pg = pitcherGradeCache.current[String(parseInt(r.pitcher_id)||0)];
+        if (!(r.grade==='A+' && simTB>=2.0 && (pg==='💥 Hittable'||pg==='🎯 Target'))) return false;
+      }
       if (filterDue) {
         const bid = parseInt(r.batter_id)||0;
         if (!isDueFromRow(r, bid)) return false;
@@ -9186,6 +9217,15 @@ function MatchupEngineTab() {
           fontFamily:"'DM Mono',monospace",fontWeight:filterDue?700:400,fontSize:11}}>
         ⏳ {filterDue ? 'Due ✓' : 'Due'}
       </button>
+      <button onClick={()=>setFilterDiamond(v=>!v)}
+        style={{padding:'3px 12px',borderRadius:6,cursor:'pointer',marginLeft:4,
+          background:filterDiamond?'rgba(255,204,0,.18)':'transparent',
+          color:filterDiamond?'#ffcc00':'var(--muted)',
+          border:`1px solid ${filterDiamond?'rgba(255,204,0,.5)':'var(--border)'}`,
+          fontFamily:"'DM Mono',monospace",fontWeight:filterDiamond?700:400,fontSize:11}}
+        title="Tier 1 Locks: A+ grade + Sim TB≥2.0 + Hittable/Target pitcher">
+        💎 {filterDiamond ? 'Diamond ✓' : 'Diamond'}
+      </button>
     </div>}
     {loading && <div className="lw"><div className="sp"/><div className="lt">Loading matchup data…</div></div>}
     {/* Pitcher grade filter */}
@@ -9343,6 +9383,15 @@ function MatchupEngineTab() {
                     </div>
                   )}
                   {isDueFromRow(b, pid) && DUE_BADGE}
+                  {(()=>{
+                    const kmTB = parseFloat(b.sim_tb)||0;
+                    const kmPG = pitcherGradeCache.current[String(parseInt(b.pitcher_id)||0)];
+                    const isDmd = b.grade==='A+' && kmTB>=2.0 && (kmPG==='💥 Hittable'||kmPG==='🎯 Target');
+                    return isDmd && <span style={{padding:'1px 5px',borderRadius:4,fontSize:9,fontWeight:700,
+                      background:'rgba(255,204,0,.15)',color:'#ffcc00',
+                      border:'1px solid rgba(255,204,0,.4)',flexShrink:0,marginLeft:2}}
+                      title="💎 Tier 1 Lock: A+ + Sim TB≥2.0 + Hittable/Target pitcher">💎</span>;
+                  })()}
 
                   {/* Avatar + Batter name + hand — click opens season stats slideout */}
                   <div style={{display:'flex',alignItems:'center',gap:7,flex:1,minWidth:0}}>
