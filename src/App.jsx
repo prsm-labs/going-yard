@@ -6819,6 +6819,7 @@ function SimLabView({ data }) {
   const [minHRPct,   setMinHRPct]     = useState('');
   const [minMeatball,setMinMeatball]  = useState('');
   const [minHitPct,  setMinHitPct]    = useState('');
+  const [minSimTB,   setMinSimTB]     = useState('');
   const [selPitcherGradeSim, setSelPitcherGradeSim] = useState('all');
   const simPitcherGrades = useRef({}); // pitcher_id → grade label
 
@@ -6845,7 +6846,7 @@ function SimLabView({ data }) {
     { key: 'proj_hr_adj',  label: 'HR Prob%' },
     { key: 'proj_hit_prob',label: 'Hit Prob%' },
     { key: 'proj_xbh_prob',label: 'XBH Prob%' },
-    { key: 'proj_avg_tb',  label: 'Exp. TB' },
+    { key: 'sim_tb',       label: 'Sim TB' },
     { key: 'weighted_flag_score', label: 'Engine Score' },
     { key: 'hr_intent_score',     label: 'HR Intent' },
   ];
@@ -6880,10 +6881,11 @@ function SimLabView({ data }) {
       .filter(r => !minHRScore  || (parseFloat(r.weighted_flag_score)||0) >= parseFloat(minHRScore))
       .filter(r => !minHRPct    || pctRaw(r.proj_hr_adj)               >= parseFloat(minHRPct))
       .filter(r => !minMeatball || (parseFloat(r.meatball_matchup_score)||0)*100 >= parseFloat(minMeatball))
-      .filter(r => !minHitPct   || pctRaw(r.proj_hit_prob)              >= parseFloat(minHitPct));
+      .filter(r => !minHitPct   || pctRaw(r.proj_hit_prob)              >= parseFloat(minHitPct))
+      .filter(r => !minSimTB    || (parseFloat(r.sim_tb)||0)             >= parseFloat(minSimTB));
     const mul = sortDir === 'desc' ? -1 : 1;
     return [...filtered].sort((a, b) => mul * ((parseFloat(a[sortBy]) || 0) - (parseFloat(b[sortBy]) || 0)));
-  }, [data, sortBy, sortDir, teamFilter, lineupOnly, filterGoneYardSim, filterDueSim, selPitcherGradeSim, minHRScore, minHRPct, minMeatball, minHitPct]);
+  }, [data, sortBy, sortDir, teamFilter, lineupOnly, filterGoneYardSim, filterDueSim, selPitcherGradeSim, minHRScore, minHRPct, minMeatball, minHitPct, minSimTB]);
 
   // Auto-select top batter when data loads
   useEffect(() => {
@@ -7006,6 +7008,7 @@ function SimLabView({ data }) {
               { label: 'HR%',      val: minHRPct,   set: setMinHRPct,   placeholder: 'e.g. 5' },
               { label: '💣',       val: minMeatball,set: setMinMeatball, placeholder: 'e.g. 10' },
               { label: 'Hit%',     val: minHitPct,  set: setMinHitPct,  placeholder: 'e.g. 25' },
+              { label: 'Sim TB',   val: minSimTB,   set: setMinSimTB,   placeholder: 'e.g. 1.5' },
             ].map(({ label, val, set, placeholder }) => (
               <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", flexShrink: 0 }}>{label}</span>
@@ -7017,7 +7020,7 @@ function SimLabView({ data }) {
               </div>
             ))}
             {(minHRScore || minHRPct || minMeatball || minHitPct) && (
-              <button onClick={() => { setMinHRScore(''); setMinHRPct(''); setMinMeatball(''); setMinHitPct(''); }}
+              <button onClick={() => { setMinHRScore(''); setMinHRPct(''); setMinMeatball(''); setMinHitPct(''); setMinSimTB(''); }}
                 style={{ padding: '3px 9px', borderRadius: 5, border: '1px solid rgba(255,64,32,.3)',
                   background: 'rgba(255,64,32,.08)', color: 'var(--accent)',
                   fontFamily: "'DM Mono',monospace", fontSize: 9, cursor: 'pointer', fontWeight: 700 }}>
@@ -7065,7 +7068,7 @@ function SimLabView({ data }) {
                     { label: 'HR%',      key: 'proj_hr_adj' },
                     { label: 'Hit%',     key: 'proj_hit_prob' },
                     { label: 'XBH%',     key: 'proj_xbh_prob' },
-                    { label: 'Exp TB',   key: 'proj_avg_tb' },
+                    { label: 'Sim TB',   key: 'sim_tb' },
                     { label: 'Score',    key: 'weighted_flag_score' },
                     { label: 'Grade',    key: null },
                     { label: '💣',       key: 'meatball_matchup_score' },
@@ -7090,7 +7093,7 @@ function SimLabView({ data }) {
                   const hrP = pctRaw(b.proj_hr_adj);
                   const hitP = pctRaw(b.proj_hit_prob);
                   const xbhP = pctRaw(b.proj_xbh_prob);
-                  const tb = parseFloat(b.proj_avg_tb) || 0;
+                  const tb = parseFloat(b.sim_tb) || 0;  // sim_tb = rate × proj PA (can exceed 1.5)
                   const rbi = parseFloat(b.proj_avg_rbi) || 0;
                   const hrColor = hrP >= 12 ? '#ff4020' : hrP >= 8 ? '#ff8020' : hrP >= 5 ? '#f5a623' : 'var(--text)';
                   const hitColor = hitP >= 35 ? '#27c97a' : hitP >= 28 ? '#f5a623' : 'var(--text)';
@@ -7195,7 +7198,7 @@ function SimLabView({ data }) {
             const hrP = pctRaw(b.proj_hr_adj);
             const hitP = pctRaw(b.proj_hit_prob);
             const xbhP = pctRaw(b.proj_xbh_prob);
-            const tb = parseFloat(b.proj_avg_tb) || 0;
+            const tb = parseFloat(b.sim_tb) || 0;
             const gc = GRADE_CFG[b.grade] || GRADE_CFG['D'];
             const inSlump = b.in_slump === 'True' || b.in_slump === true;
             const isDiamond = b.is_diamond === 'True' || b.is_diamond === true;
