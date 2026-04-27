@@ -8007,8 +8007,8 @@ function BvPHistoryTab({ data }) {
 }
 
 function BatterLeaderboard() {
-  const [slateFilter, setSlateFilter]     = useState('all'); // all|today|tomorrow
-  const [expandedBatter, setExpandedBatter] = useState(null); // pid of expanded row
+  const [slateFilter, setSlateFilter]     = useState('all');
+  const [expandedBatter, setExpandedBatter] = useState(null);
   const [sortCol, setSortCol] = useState('avgEV');
   const [sortDir, setSortDir] = useState('desc');
   const [teamFilter, setTeamFilter] = useState('all');
@@ -8371,12 +8371,10 @@ function BatterLeaderboard() {
               </tr>
             </thead>
             <tbody>
-              {filtered.slice(0,300).map(p=>{
+              {filtered.slice(0,300).flatMap(p=>{
                 const isExpanded = expandedBatter === (p.pid||p.id);
-                return (<React.Fragment key={p.pid}>
-                  <tr key={p.pid} className="dr"
+                const mainRow = (<tr key={p.pid} className="dr"
                     onClick={e=>{
-                      // Don't expand if clicking name/avatar (they open slideout)
                       if (e.target.closest('.batter-name-cell')) return;
                       setExpandedBatter(isExpanded ? null : (p.pid||p.id));
                     }}
@@ -8411,29 +8409,29 @@ function BatterLeaderboard() {
                       <SavantLink pid={p.pid||p.id} type="batter"/>
                     </td>
                   </tr>
-                  {/* AB Log dropdown row */}
-                  {isExpanded && (
-                    <tr key={String(p.pid)+'-ablog'}>
-                      <td colSpan={STAT_COLS.length+3}
-                        style={{padding:'0 12px 12px 12px',
-                          background:'rgba(56,184,242,.04)',
-                          borderBottom:'2px solid rgba(56,184,242,.2)'}}>
-                        <div style={{display:'flex',alignItems:'center',gap:8,
-                          padding:'8px 0 4px',borderBottom:'1px solid var(--border)',marginBottom:4}}>
-                          <PlayerAvatar pid={p.pid||p.id} name={p.name} size={24}/>
-                          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,
-                            fontSize:13,letterSpacing:.5}}>{p.name}</span>
-                          <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,
-                            color:'var(--accent2)'}}>{p.team}</span>
-                          <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,
-                            color:'var(--muted)',marginLeft:'auto'}}>📋 Recent At-Bats</span>
-                        </div>
-                        <RecentGameLog batterId={p.pid||p.id}/>
-                      </td>
-                    </tr>
-                  )}
-                  </React.Fragment>)
-              })
+                );
+                const logRow = isExpanded ? (
+                  <tr key={String(p.pid)+'ab'}>
+                    <td colSpan={STAT_COLS.length+3}
+                      style={{padding:'0 12px 12px 12px',
+                        background:'rgba(56,184,242,.04)',
+                        borderBottom:'2px solid rgba(56,184,242,.2)'}}>
+                      <div style={{display:'flex',alignItems:'center',gap:8,
+                        padding:'8px 0 4px',borderBottom:'1px solid var(--border)',marginBottom:4}}>
+                        <PlayerAvatar pid={p.pid||p.id} name={p.name} size={24}/>
+                        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,
+                          fontSize:13,letterSpacing:.5}}>{p.name}</span>
+                        <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,
+                          color:'var(--accent2)'}}>{p.team}</span>
+                        <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,
+                          color:'var(--muted)',marginLeft:'auto'}}>Recent ABs</span>
+                      </div>
+                      <RecentGameLog batterId={p.pid||p.id}/>
+                    </td>
+                  </tr>
+                ) : null;
+                return [mainRow, logRow].filter(Boolean);
+              })}
             </tbody>
           </table>
           {filtered.length > 300 && (
