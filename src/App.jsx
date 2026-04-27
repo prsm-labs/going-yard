@@ -2286,7 +2286,8 @@ const PLAYER_MAP_TTL = 6 * 60 * 60 * 1000; // 6-hour TTL — picks up mid-season
 // ── LINEUP STATUS MAP — pid → "confirmed" | "playing_today" ──
 // Populated when MLB lineup API returns confirmed starters
 const LINEUP_STATUS = {}; // pid → {status:"confirmed"|"today", team}
-const TODAY_TEAMS = new Set(); // teams playing today
+const TODAY_TEAMS    = new Set(); // teams playing today
+const TOMORROW_TEAMS = new Set(); // teams playing tomorrow
 let LINEUP_VERSION = 0; // increments each refresh so React components re-render
 const LINEUP_LISTENERS = new Set(); // components that want to re-render on lineup refresh
 function subscribeLineup(fn) { LINEUP_LISTENERS.add(fn); return () => LINEUP_LISTENERS.delete(fn); }
@@ -2318,6 +2319,22 @@ async function loadTodayLineups() {
       }
     }
     console.log('[Lineups] Today teams:', [...TODAY_TEAMS].join(', '));
+    // Also fetch tomorrow's schedule to populate TOMORROW_TEAMS
+    try {
+      const tmDate = new Date(); tmDate.setDate(tmDate.getDate() + 1);
+      const tmStr = tmDate.toLocaleDateString('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'});
+      const [tm,td,ty] = tmStr.split('/');
+      const tmFormatted = `${ty}-${tm}-${td}`;
+      const tmRes = await fetch(`https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${tmFormatted}&hydrate=team`);
+      const tmData = await tmRes.json();
+      TOMORROW_TEAMS.clear();
+      (tmData.dates?.[0]?.games || []).forEach(g => {
+        const aw = g.teams?.away?.team?.abbreviation;
+        const hm = g.teams?.home?.team?.abbreviation;
+        if (aw) TOMORROW_TEAMS.add(aw);
+        if (hm) TOMORROW_TEAMS.add(hm);
+      });
+    } catch(e) {}
     console.log('[Lineups] Confirmed starters:', Object.keys(LINEUP_STATUS).length);
     notifyLineupListeners();
   } catch(e) {
@@ -6811,7 +6828,8 @@ function SimLabView({ data }) {
   const [selBatter, setSelBatter]   = useState(null);
   const [sortBy, setSortBy]         = useState('proj_hr_adj');
   const [sortDir, setSortDir]       = useState('desc');
-  const [teamFilter, setTeamFilter] = useState('all');
+  const [teamFilter, setTeamFilter]   = useState('all');
+  const [slateFilter, setSlateFilter] = useState('all'); // all|today|tomorrow
   const [sortProp, setSortProp]     = useState('proj_hit_prob');
   const [sortPropDir, setSortPropDir] = useState('desc');
   const [lineupOnly, setLineupOnly]   = useState(false);
@@ -7612,7 +7630,7 @@ function CheatCodeButton() {
   return <>
     {/* Subtle trigger — looks like part of the UI */}
     <button onClick={()=>setOpen(true)}
-      title="Blueprint"
+      title="The Sauce"
       style={{marginLeft:'auto',background:'none',border:'none',cursor:'pointer',
         padding:'2px 6px',borderRadius:4,opacity:.35,
         fontSize:11,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
@@ -7639,7 +7657,7 @@ function CheatCodeButton() {
           <div>
             <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:20,
               letterSpacing:1.5,color:'var(--accent)',textTransform:'uppercase'}}>
-              Blueprint
+              The Sauce
             </div>
             <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',
               marginTop:2,letterSpacing:.5}}>
@@ -8088,6 +8106,12 @@ function BatterLeaderboard() {
       return (ws(p,'pa') || 0) >= minPA;
     })
     .filter(p => teamFilter === 'all' || p.team === teamFilter)
+    .filter(p => {
+      if (slateFilter === 'all') return true;
+      if (slateFilter === 'today') return TODAY_TEAMS.has(p.team);
+      if (slateFilter === 'tomorrow') return TOMORROW_TEAMS.has(p.team);
+      return true;
+    })
     .filter(p => !searchQ || p.name?.toLowerCase().includes(searchQ.toLowerCase()))
     .filter(p => !showPicksOnly || picks[String(p.pid)])
     .filter(p => !filterGoneYard || isGoneYard(p))
@@ -8184,6 +8208,17 @@ function BatterLeaderboard() {
           <option value="all">All Teams</option>
           {teams.map(t=><option key={t} value={t}>{t}</option>)}
         </select>
+        {/* Slate filter — today/tomorrow */}
+        {[['all','All'],['today',`📅 Today (${TODAY_TEAMS.size})`],['tomorrow',`📅 Tomorrow (${TOMORROW_TEAMS.size})`]].map(([k,l])=>(
+          <button key={k} onClick={()=>setSlateFilter(k)}
+            style={{padding:'6px 10px',borderRadius:7,cursor:'pointer',whiteSpace:'nowrap',
+              border:`1px solid ${slateFilter===k?'var(--ice)':'var(--border)'}`,
+              background:slateFilter===k?'rgba(56,184,242,.12)':'var(--surface2)',
+              color:slateFilter===k?'var(--ice)':'var(--muted)',
+              fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:slateFilter===k?700:400}}>
+            {l}
+          </button>
+        ))}
         <div style={{display:'flex',alignItems:'center',gap:5}}>
           <span style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace",whiteSpace:'nowrap'}}>Min PA:</span>
           <input type="number" min={0} max={600} value={minPA}
