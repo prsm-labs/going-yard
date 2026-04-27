@@ -6829,7 +6829,6 @@ function SimLabView({ data }) {
   const [sortBy, setSortBy]         = useState('proj_hr_adj');
   const [sortDir, setSortDir]       = useState('desc');
   const [teamFilter, setTeamFilter]   = useState('all');
-  const [slateFilter, setSlateFilter] = useState('all'); // all|today|tomorrow
   const [sortProp, setSortProp]     = useState('proj_hit_prob');
   const [sortPropDir, setSortPropDir] = useState('desc');
   const [lineupOnly, setLineupOnly]   = useState(false);
@@ -8008,6 +8007,7 @@ function BvPHistoryTab({ data }) {
 }
 
 function BatterLeaderboard() {
+  const [slateFilter, setSlateFilter] = useState('all'); // all|today|tomorrow
   const [sortCol, setSortCol] = useState('avgEV');
   const [sortDir, setSortDir] = useState('desc');
   const [teamFilter, setTeamFilter] = useState('all');
