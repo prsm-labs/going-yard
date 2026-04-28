@@ -7943,7 +7943,7 @@ function NotifyBell() {
   return (
     <button onClick={handleClick} title={tip}
       style={{background:'none',border:'none',cursor: state==='subscribed'||state==='denied'?'default':'pointer',
-        padding:'2px 4px',fontSize:14,opacity:active?1:0.45,
+        padding:'2px 3px',fontSize:12,opacity:active?1:0.45,
         transition:'opacity .2s',flexShrink:0,lineHeight:1}}>
       {busy ? '⏳' : label}
     </button>
@@ -9224,9 +9224,10 @@ async function fetchGameLog(pid) {
     if (!r.ok) return [];
     const d = await r.json();
     const splits = d?.stats?.[0]?.splits || [];
+    const ABBR = {133:'ATH',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',139:'TB',140:'TEX',141:'TOR',142:'MIN',143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL',108:'LAA',109:'ARI',110:'BAL',111:'BOS',112:'CHC',113:'CIN',114:'CLE',115:'COL',116:'DET',117:'HOU',118:'KC',119:'LAD',120:'WSH',121:'NYM'};
     const games = splits.map(s => ({
       date: s.date || '',
-      opp:  s.opponent?.abbreviation || s.opponent?.name || '?',
+      opp:  ABBR[s.opponent?.id] || s.opponent?.abbreviation || s.opponent?.name?.replace(/^.* /,'') || '?',
       loc:  s.isHome ? 'home' : 'away',
       hrs:  parseInt(s.stat?.homeRuns ?? 0),
       ab:   parseInt(s.stat?.atBats   ?? 0),
@@ -11002,9 +11003,9 @@ function DataStatusBadge() {
   }[status] || {dot:"#5a7080",text:"—",tip:""};
 
   return (
-    <div title={cfg.tip + (lastOk ? ` · ${lastOk}` : "")} style={{display:"flex",alignItems:"center",gap:5,padding:"3px 9px",borderRadius:20,background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.08)",cursor:"default"}}>
+    <div title={cfg.tip + (lastOk ? ` · ${lastOk}` : "")} style={{display:"flex",alignItems:"center",gap:4,padding:"2px 7px",borderRadius:20,background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.08)",cursor:"default"}}>
       <div style={{width:6,height:6,borderRadius:"50%",background:cfg.dot,boxShadow:status==="live"?`0 0 6px ${cfg.dot}`:"none",animation:status==="live"?"pulse 1.5s ease-in-out infinite":"none"}}/>
-      <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:cfg.dot,letterSpacing:.5,textTransform:"uppercase"}}>{cfg.text}</span>
+      <span style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:cfg.dot,letterSpacing:.3,textTransform:"uppercase"}}>{cfg.text}</span>
     </div>
   );
 }
@@ -12040,7 +12041,7 @@ function NotificationBell() {
           border:'1px solid var(--border)',background:'var(--surface2)',
           cursor:'pointer',display:'flex',alignItems:'center',gap:5,
           color:unread>0?'var(--accent2)':'var(--muted)'}}>
-        <span style={{fontSize:14}}>🚨</span>
+        <span style={{fontSize:12}}>🚨</span>
         {unread > 0 && (
           <span style={{position:'absolute',top:-4,right:-4,
             background:'#ff4020',color:'white',borderRadius:'50%',
@@ -12152,19 +12153,19 @@ export default function App() {
       <header className="header">
         <div style={{display:"flex",flexDirection:"column",gap:0}}>
           <div style={{display:'flex',alignItems:'center',gap:8}}>
-            <div className="logo"><div className="logo-dot"/>⚾ <span>GOING</span> YARD</div>
+            <div className="logo" style={{fontSize:14}}><div className="logo-dot"/>⚾ <span>GOING</span> YARD</div>
             <NotifyBell/>
           </div>
           <div className="landscape-hint" style={{fontSize:8,color:"var(--muted)",fontFamily:"'DM Mono',monospace",letterSpacing:.3,paddingLeft:2,lineHeight:1}}>📱↔️ Rotate to landscape</div>
         </div>
-        <div style={{display:"flex",alignItems:"center",gap:8}}> 
+        <div style={{display:"flex",alignItems:"center",gap:5}}> 
           <DataStatusBadge/>
           <NotificationBell/>
           <button onClick={()=>setShowPicksSlideout(s=>!s)}
-            style={{padding:"4px 9px",borderRadius:6,border:"1px solid var(--border)",
+            style={{padding:"3px 7px",borderRadius:6,border:"1px solid var(--border)",
               background:"var(--surface2)",color:"var(--accent2)",cursor:"pointer",
-              fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,letterSpacing:.8,
-              display:"flex",alignItems:"center",gap:4,flexShrink:0,whiteSpace:'nowrap'}}>
+              fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:9,letterSpacing:.6,
+              display:"flex",alignItems:"center",gap:3,flexShrink:0,whiteSpace:'nowrap'}}>
             🎯 Picks
           </button>
             </div>
