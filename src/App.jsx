@@ -1783,6 +1783,12 @@ function AtBatSlideIn() {
           <InjuryBanner pid={player.pid}/>
         </div>
       )}
+      {/* Last 7 Games HR Chart */}
+      {player?.pid && (
+        <div style={{padding:'0 20px'}}>
+          <Last7HRChart batterId={player.pid}/>
+        </div>
+      )}
       {/* Statcast Profile */}
       <div style={{padding:"14px 20px",borderBottom:"1px solid var(--border)"}}>
         <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>Statcast Profile — 2026 Season</div>
@@ -7519,6 +7525,7 @@ function SimLabView({ data }) {
                       </div>
                       {/* Injury banner — always visible, key for mobile */}
                       <InjuryBanner pid={parseInt(b.batter_id)||0} style={{marginTop:8,marginBottom:0}}/>
+                      <Last7HRChart batterId={parseInt(b.batter_id)||0}/>
                       <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)', marginTop: 3 }}>
                         {b.top_pitches && <span>Arsenal: <strong style={{ color: 'var(--text)' }}>{b.top_pitches}</strong> · </span>}
                         {b.wind_effect && <span>{b.wind_effect} · </span>}
@@ -7677,7 +7684,7 @@ function SimLabView({ data }) {
 
 
                 {/* Recent At-Bats */}
-                {b.batter_id && <RecentGameLog batterId={parseInt(b.batter_id)}/>}
+                {b.batter_id && <><Last7HRChart batterId={parseInt(b.batter_id)}/><RecentGameLog batterId={parseInt(b.batter_id)}/></>}
 
               </div>
             );
@@ -8869,6 +8876,7 @@ function BatterLeaderboard() {
                           color:'var(--muted)',marginLeft:'auto'}}>Recent ABs</span>
                       </div>
                       <InjuryBanner pid={p.pid||p.id} style={{margin:'6px 0 4px'}}/>
+                      <Last7HRChart batterId={p.pid||p.id}/>
                       <RecentGameLog batterId={p.pid||p.id}/>
                     </td>
                   </tr>
@@ -9199,6 +9207,106 @@ function PitcherLeaderboard() {
 
 
 // Shows last 5 at-bats from the pipeline at-bat log — stored in players.json recentAtBats
+
+// ── LAST 7 GAMES HR CHART ────────────────────────────────────────────────────
+function Last7HRChart({ batterId }) {
+  const abs = getCachedPlayer(batterId)?.recentAtBats;
+  if (!abs || abs.length === 0) return null;
+
+  // Group at-bats by game (date + opp)
+  const gameMap = {};
+  for (const a of abs) {
+    const key = a.date + '|' + (a.opp||'');
+    if (!gameMap[key]) gameMap[key] = { date: a.date, opp: a.opp||'?', hrs: 0, pa: 0 };
+    gameMap[key].pa++;
+    if (a.result === 'home_run') gameMap[key].hrs++;
+  }
+  const games = Object.values(gameMap)
+    .sort((a,b) => a.date > b.date ? 1 : -1)
+    .slice(-7);
+  if (games.length === 0) return null;
+
+  const hitGames = games.filter(g => g.hrs > 0).length;
+  const totalHR  = games.reduce((s,g) => s + g.hrs, 0);
+  const pct      = Math.round((hitGames / games.length) * 100);
+  const maxHR    = Math.max(1, ...games.map(g => g.hrs));
+  const BAR_H    = 120;
+  const pctColor = pct >= 57 ? '#27c97a' : pct >= 43 ? '#ffc840' : 'var(--muted)';
+
+  return (
+    <div style={{background:'var(--surface)',border:'1px solid var(--border)',
+      borderRadius:12,padding:'14px 16px',marginTop:12}}>
+      {/* Header row */}
+      <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',marginBottom:12}}>
+        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:15,letterSpacing:.5,
+          color:'var(--text)'}}>LAST 7</span>
+        <div style={{display:'flex',alignItems:'baseline',gap:8}}>
+          <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--muted)'}}>
+            {hitGames} of {games.length}
+          </span>
+          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:22,
+            color:pctColor}}>{pct}%</span>
+        </div>
+      </div>
+
+      {/* Chart */}
+      <div style={{display:'flex',alignItems:'flex-end',gap:4,height:BAR_H,position:'relative',
+        paddingLeft:14,paddingRight:14}}>
+        {/* Y labels */}
+        <span style={{position:'absolute',left:0,top:0,fontFamily:"'DM Mono',monospace",
+          fontSize:8,color:'var(--muted)',lineHeight:1}}>1</span>
+        <span style={{position:'absolute',left:0,bottom:0,fontFamily:"'DM Mono',monospace",
+          fontSize:8,color:'var(--muted)',lineHeight:1}}>0</span>
+        {/* 0.5 reference line */}
+        <div style={{position:'absolute',left:10,right:10,top:BAR_H/2,
+          borderTop:'1px solid rgba(255,255,255,.12)',zIndex:0,pointerEvents:'none'}}/>
+        <span style={{position:'absolute',right:0,top:BAR_H/2-12,fontFamily:"'DM Mono',monospace",
+          fontSize:8,color:'rgba(255,255,255,.3)'}}>0.5</span>
+
+        {games.map((g, i) => {
+          const isHR = g.hrs > 0;
+          const barH = isHR
+            ? Math.max(Math.round(BAR_H * (g.hrs / Math.max(maxHR, 1))), Math.round(BAR_H * 0.5))
+            : 0;
+          return (
+            <div key={i} style={{flex:1,display:'flex',flexDirection:'column',
+              alignItems:'center',justifyContent:'flex-end',height:'100%',gap:2,zIndex:1}}>
+              <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,
+                lineHeight:1,color:isHR?'#27c97a':'#ff4020'}}>
+                {g.hrs}
+              </span>
+              <div style={{
+                width:'100%',borderRadius:'4px 4px 0 0',
+                height:isHR?barH:2,
+                background:isHR
+                  ?'linear-gradient(180deg,#27c97a,#1aa862)'
+                  :'rgba(255,64,32,.15)',
+                minHeight:2,
+              }}/>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Date + opp labels */}
+      <div style={{display:'flex',gap:4,marginTop:6,paddingLeft:14,paddingRight:14}}>
+        {games.map((g,i) => (
+          <div key={i} style={{flex:1,textAlign:'center'}}>
+            <div style={{fontFamily:"'DM Mono',monospace",fontSize:7.5,color:'var(--muted)',
+              lineHeight:1.4}}>
+              {(g.date||'').slice(5).replace('-','/')}
+            </div>
+            <div style={{fontFamily:"'DM Mono',monospace",fontSize:7.5,color:'var(--muted)',
+              lineHeight:1.3,opacity:.6}}>
+              {g.opp||'—'}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function RecentGameLog({ batterId }) {
   const abs = getCachedPlayer(batterId)?.recentAtBats;
   if (!abs || abs.length === 0) return null;
@@ -10242,6 +10350,7 @@ function MatchupEngineTab() {
                 <LiveBatterBox batterId={b.batter_id} gamePk={b.game_id} onData={(id,d)=>{liveCache.current[id]=d;}}/>
 
                 {/* Recent Game Log — pregame only, fetched from MLB Stats API */}
+                <Last7HRChart batterId={b.batter_id}/>
                 <RecentGameLog batterId={b.batter_id}/>
               </div>}
             </div>;
