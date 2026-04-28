@@ -771,6 +771,8 @@ const PICK_TYPES = {
   longshot:  {label:"🎯 Longshot",    cls:"longshot",  color:"#38b8f2"},
   daylate:   {label:"📆 Day Late",    cls:"daylate",   color:"#a855f7"},
   due:       {label:"⏳ Due",         cls:"due",        color:"#22d3ee"},
+  tailed:    {label:"🤝 Tailed",      cls:"tailed",    color:"#34d399"},
+  hotbat:    {label:"🔥 Hot Bat",     cls:"hotbat",    color:"#fb923c"},
 };
 function loadPicks() { try { return JSON.parse(localStorage.getItem("gy_picks")||"{}"); } catch { return {}; } }
 function savePicks(p) { try { localStorage.setItem("gy_picks",JSON.stringify(p)); } catch {} }
@@ -1532,6 +1534,8 @@ function MyPicksTab() {
     longshot:  pickList.filter(p=>p.type==="longshot"),
     daylate:   pickList.filter(p=>p.type==="daylate"),
     due:       pickList.filter(p=>p.type==="due"),
+    tailed:    pickList.filter(p=>p.type==="tailed"),
+    hotbat:    pickList.filter(p=>p.type==="hotbat"),
   };
 
   return <div>
@@ -1571,6 +1575,48 @@ function MyPicksTab() {
         fontFamily:"'DM Mono',monospace",fontSize:11}}>⬇ Export CSV</button>
       <ClearButton/>
     </div>}
+    <div style={{marginBottom:14,padding:'12px 14px',background:'var(--surface)',
+      border:'1px solid var(--border)',borderRadius:10}}>
+      <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',
+        textTransform:'uppercase',letterSpacing:1,marginBottom:8}}>Pick Type Legend</div>
+      <div style={{display:'flex',flexWrap:'wrap',gap:'2px 20px'}}>
+        <div style={{display:'flex',alignItems:'center',gap:5,minWidth:200,marginBottom:2}}>
+          <span style={{fontSize:13}}>💣</span>
+          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'#ff4020',minWidth:78}}>Favorite</span>
+          <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',lineHeight:1.4}}>Your highest-confidence play today</span>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:5,minWidth:200,marginBottom:2}}>
+          <span style={{fontSize:13}}>⭐</span>
+          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'#f5a623',minWidth:78}}>Dark Horse</span>
+          <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',lineHeight:1.4}}>Good matchup, flying under the radar</span>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:5,minWidth:200,marginBottom:2}}>
+          <span style={{fontSize:13}}>🎯</span>
+          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'#38b8f2',minWidth:78}}>Longshot</span>
+          <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',lineHeight:1.4}}>Higher risk, higher reward</span>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:5,minWidth:200,marginBottom:2}}>
+          <span style={{fontSize:13}}>📆</span>
+          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'#a855f7',minWidth:78}}>Day Late</span>
+          <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',lineHeight:1.4}}>Missed it yesterday — doubling down</span>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:5,minWidth:200,marginBottom:2}}>
+          <span style={{fontSize:13}}>⏳</span>
+          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'#22d3ee',minWidth:78}}>Due</span>
+          <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',lineHeight:1.4}}>Overdue based on HR rate — variance play</span>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:5,minWidth:200,marginBottom:2}}>
+          <span style={{fontSize:13}}>🤝</span>
+          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'#34d399',minWidth:78}}>Tailed</span>
+          <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',lineHeight:1.4}}>Picked up from someone else's card</span>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:5,minWidth:200,marginBottom:2}}>
+          <span style={{fontSize:13}}>🔥</span>
+          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'#fb923c',minWidth:78}}>Hot Bat</span>
+          <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',lineHeight:1.4}}>On a tear — riding the hot hand</span>
+        </div>
+      </div>
+    </div>
     {pickList.length===0
       ? <div style={{padding:"60px 20px",textAlign:"center",color:"var(--muted)",fontFamily:"'DM Mono',monospace",fontSize:12,lineHeight:2}}>
           No picks yet.<br/>Click the <strong style={{color:"var(--text)"}}>＋</strong> button next to any batter on Pregame or Scouting tabs.
