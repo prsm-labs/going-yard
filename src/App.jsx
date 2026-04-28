@@ -9829,6 +9829,7 @@ function MatchupEngineTab() {
                           color:'var(--text)'}}>
                           {b.batter}
                         </span>
+                        <InjuryBadge pid={pid} name={b.batter}/>
                         <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
                           marginLeft:2}}>{b.batter_hand}HB</span>
                         <span style={{fontSize:10,color:'var(--muted)',opacity:.5}}>›</span>
