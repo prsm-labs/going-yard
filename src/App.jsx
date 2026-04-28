@@ -1,5 +1,42 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 
+// ── PWA Push Notifications ───────────────────────────────────────────────────
+const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY || '';
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
+async function subscribeToPush() {
+  try {
+    if (!('PushManager' in window)) return 'unsupported';
+    const reg = await navigator.serviceWorker.ready;
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') return 'denied';
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: VAPID_PUBLIC_KEY,
+    });
+    const r = await fetch('/api/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subscription: sub }),
+    });
+    return r.ok ? 'subscribed' : 'error';
+  } catch(e) { console.warn('[Push]', e); return 'error'; }
+}
+async function getPushState() {
+  if (!('Notification' in window)) return 'unsupported';
+  if (Notification.permission === 'denied') return 'denied';
+  if (Notification.permission === 'granted') {
+    const reg = await navigator.serviceWorker.ready.catch(() => null);
+    if (!reg) return 'unsupported';
+    const sub = await reg.pushManager.getSubscription().catch(() => null);
+    return sub ? 'subscribed' : 'granted';
+  }
+  return 'default';
+}
+
 const BUILD_TIMESTAMP = "2026-04-11 07:32 ET";
 
 const styles = `
@@ -7590,6 +7627,41 @@ async function fetchBvP(batterId, pitcherId) {
 }
 
 // ── CHEAT CODE SLIDEOUT ──────────────────────────────────────────────────────
+// ── NOTIFICATION BELL ────────────────────────────────────────────────────────
+function NotifyBell() {
+  const [state, setState] = useState('loading'); // loading|unsupported|default|subscribed|denied|error
+  const [busy, setBusy]   = useState(false);
+
+  useEffect(() => {
+    getPushState().then(setState);
+  }, []);
+
+  if (state === 'unsupported' || state === 'loading') return null;
+
+  const label = state === 'subscribed' ? '🔔' : state === 'denied' ? '🔕' : '🔔';
+  const tip   = state === 'subscribed' ? 'Notifications on'
+              : state === 'denied'     ? 'Notifications blocked — enable in browser settings'
+              : 'Tap to get daily pick alerts';
+  const active = state === 'subscribed';
+
+  const handleClick = async () => {
+    if (state === 'denied' || state === 'subscribed' || busy) return;
+    setBusy(true);
+    const result = await subscribeToPush();
+    setState(result);
+    setBusy(false);
+  };
+
+  return (
+    <button onClick={handleClick} title={tip}
+      style={{background:'none',border:'none',cursor: state==='subscribed'||state==='denied'?'default':'pointer',
+        padding:'2px 4px',fontSize:14,opacity:active?1:0.45,
+        transition:'opacity .2s',flexShrink:0,lineHeight:1}}>
+      {busy ? '⏳' : label}
+    </button>
+  );
+}
+
 function CheatCodeButton() {
   const [open, setOpen] = useState(false);
 
@@ -11539,7 +11611,10 @@ export default function App() {
       <HRNotifications/>
       <header className="header">
         <div style={{display:"flex",flexDirection:"column",gap:0}}>
-          <div className="logo"><div className="logo-dot"/>⚾ <span>GOING</span> YARD</div>
+          <div style={{display:'flex',alignItems:'center',gap:8}}>
+            <div className="logo"><div className="logo-dot"/>⚾ <span>GOING</span> YARD</div>
+            <NotifyBell/>
+          </div>
           <div className="landscape-hint" style={{fontSize:8,color:"var(--muted)",fontFamily:"'DM Mono',monospace",letterSpacing:.3,paddingLeft:2,lineHeight:1}}>📱↔️ Rotate to landscape</div>
         </div>
         <div style={{display:"flex",alignItems:"center",gap:8}}> 
