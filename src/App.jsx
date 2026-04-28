@@ -1723,6 +1723,12 @@ function AtBatSlideIn() {
         <button onClick={()=>setPlayer(null)} style={{background:"none",border:"1px solid var(--border)",borderRadius:6,color:"var(--muted)",cursor:"pointer",padding:"5px 10px",fontFamily:"'DM Mono',monospace",fontSize:11}}>✕ Close</button>
       </div>
 
+      {/* Injury banner — visible on mobile */}
+      {player?.pid && INJURY_MAP[String(player.pid)] && (
+        <div style={{padding:'0 20px'}}>
+          <InjuryBanner pid={player.pid}/>
+        </div>
+      )}
       {/* Statcast Profile */}
       <div style={{padding:"14px 20px",borderBottom:"1px solid var(--border)"}}>
         <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>Statcast Profile — 2026 Season</div>
@@ -7418,6 +7424,7 @@ function SimLabView({ data }) {
                         <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 22, color: 'var(--text)' }}>{b.batter}</span>
                         <SavantLink pid={parseInt(b.batter_id)||0} type="batter"/>
                         <span style={{ padding: '3px 9px', borderRadius: 6, fontSize: 11, fontFamily: "'Oswald',sans-serif", fontWeight: 800, background: gc.bg, color: gc.color, border: `1px solid ${gc.border}` }}>{b.grade}</span>
+                        <InjuryBadge pid={parseInt(b.batter_id)||0} name={b.batter}/>
                         <PickButton pid={parseInt(b.batter_id)||0} name={b.batter} team={b.batting_team}/>
                         {isDiamond && <span style={{ padding: '2px 8px', borderRadius: 5, fontSize: 10, fontWeight: 700, background: 'rgba(255,204,0,.15)', color: '#ffcc00', border: '1px solid rgba(255,204,0,.35)' }}>💎 Diamond Pick</span>}
                         {inSlump && <span style={{ padding: '2px 7px', borderRadius: 5, fontSize: 9, fontFamily: "'DM Mono',monospace", background: 'rgba(56,184,242,.1)', border: '1px solid rgba(56,184,242,.3)', color: 'var(--ice)' }}>📉 SLUMP</span>}
@@ -7428,6 +7435,8 @@ function SimLabView({ data }) {
                         <span style={{ marginLeft: 10, color: 'var(--accent2)' }}>{b.away_team || ''} @ {b.home_team || ''}</span>
                         <span style={{ marginLeft: 10 }}>{b.game_time}</span>
                       </div>
+                      {/* Injury banner — always visible, key for mobile */}
+                      <InjuryBanner pid={parseInt(b.batter_id)||0} style={{marginTop:8,marginBottom:0}}/>
                       <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)', marginTop: 3 }}>
                         {b.top_pitches && <span>Arsenal: <strong style={{ color: 'var(--text)' }}>{b.top_pitches}</strong> · </span>}
                         {b.wind_effect && <span>{b.wind_effect} · </span>}
@@ -7736,6 +7745,35 @@ function InjuryBadge({ pid, name }) {
         display:'inline-flex',alignItems:'center'}}>
       {inj.emoji}
     </span>
+  );
+}
+
+// Inline injury banner — used inside slideouts/dropdowns for mobile
+function InjuryBanner({ pid, style = {} }) {
+  const inj = INJURY_MAP[String(pid || '')];
+  if (!inj) return null;
+  const col = inj.emoji==='🚫'?'#ff4020':inj.emoji==='🤕'?'#ff8020':'#38b8f2';
+  return (
+    <div style={{
+      display:'flex',alignItems:'flex-start',gap:10,
+      padding:'10px 14px',borderRadius:8,margin:'10px 0',
+      background:`${col}12`,border:`1px solid ${col}40`,
+      ...style
+    }}>
+      <span style={{fontSize:18,lineHeight:1,flexShrink:0}}>{inj.emoji}</span>
+      <div style={{minWidth:0}}>
+        <div style={{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:700,
+          color:col,marginBottom:2}}>{inj.label}</div>
+        {inj.shortDesc && (
+          <div style={{fontFamily:"'DM Mono',monospace",fontSize:11,
+            color:'var(--text)',lineHeight:1.5}}>{inj.shortDesc}</div>
+        )}
+        {inj.date && (
+          <div style={{fontFamily:"'DM Mono',monospace",fontSize:10,
+            color:'var(--muted)',marginTop:3}}>Since {inj.date}</div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -8697,6 +8735,7 @@ function BatterLeaderboard() {
                         <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,
                           color:'var(--muted)',marginLeft:'auto'}}>Recent ABs</span>
                       </div>
+                      <InjuryBanner pid={p.pid||p.id} style={{margin:'6px 0 4px'}}/>
                       <RecentGameLog batterId={p.pid||p.id}/>
                     </td>
                   </tr>
