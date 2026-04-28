@@ -5172,6 +5172,12 @@ function ScoutingTab() {
     return { ...p, ...w, isFiltered: false };
   };
 
+  // Hot bat — 2+ HRs in last 7 days
+  const isHotBat = (p) => {
+    const l7hr = parseFloat(p.windows?.last7?.hr ?? p.l7hr ?? 0);
+    return l7hr >= 2;
+  };
+
   // Teams playing today
   const todayTeamsS = new Set(games.flatMap(g=>[g.away.abbr,g.home.abbr]).filter(t=>t&&t!=="???"));
   const matchupTeamsS = selMatchup
@@ -5949,7 +5955,7 @@ async function fetchInjuries() {
         if (!placements[pid] || t.date > placements[pid].date) {
           const full = t.description || '';
           const lo   = full.toLowerCase();
-          const emoji = lo.includes('60-day') ? '🚫' : lo.includes('15-day') ? '🤕' : '🩼';
+          const emoji = lo.includes('60-day') ? '🚫' : lo.includes('15-day') ? '🤕' : '🤕';
           const label = lo.includes('60-day') ? '60-Day IL' : lo.includes('15-day') ? '15-Day IL' : '10-Day IL';
           placements[pid] = {
             date: t.date, emoji, label,
@@ -8751,6 +8757,8 @@ function BatterLeaderboard() {
                         {isGoneYard(p) && <span style={{fontSize:7,padding:'1px 4px',borderRadius:3,
                           background:'rgba(255,20,0,.25)',border:'1px solid rgba(255,20,0,.5)',
                           color:'#fff',fontFamily:"'DM Mono',monospace",fontWeight:800,flexShrink:0}}>GY</span>}
+                        {isHotBat(p) && <span style={{fontSize:10,flexShrink:0,lineHeight:1}}
+                          title={`🔥 Hot Bat — ${parseFloat(p.windows?.last7?.hr??0).toFixed(0)} HR in last 7 days`}>🔥</span>}
                         <InjuryBadge pid={p.pid||p.id} name={p.name}/>
                       </div>
                     </td>
@@ -11797,7 +11805,7 @@ function NotificationBell() {
           border:'1px solid var(--border)',background:'var(--surface2)',
           cursor:'pointer',display:'flex',alignItems:'center',gap:5,
           color:unread>0?'var(--accent2)':'var(--muted)'}}>
-        <span style={{fontSize:14}}>🔔</span>
+        <span style={{fontSize:14}}>🚨</span>
         {unread > 0 && (
           <span style={{position:'absolute',top:-4,right:-4,
             background:'#ff4020',color:'white',borderRadius:'50%',
