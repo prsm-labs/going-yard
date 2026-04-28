@@ -3911,7 +3911,7 @@ function GPanel({game, isLive, isFinal=false}) {
                     <div style={{minWidth:0}}>
                       <div style={{display:'flex',alignItems:'center',gap:3}}>
                         <div className="pn" style={{fontSize:12,...(isKeyMatchup(b.id)?{color:'#ff8020',fontWeight:700}:{})}}>{b.name}</div>
-                        <InjuryBadge pid={parseInt(b.batter_id||b.id)||0}/>
+                        <InjuryBadge pid={parseInt(b.batter_id||b.id)||0} name={b.name||b.batter}/>
                       </div>
                       <div style={{fontSize:9,color:"var(--accent2)",fontFamily:"'DM Mono',monospace",fontWeight:700}}>
                         {getTeam(b.id,b.team)}
@@ -5822,7 +5822,7 @@ function PitchBuilderTab() {
               const rowBg=matchup?.cls==="pos"?"rgba(39,201,122,.04)":matchup?.cls==="neg"?"rgba(56,184,242,.03)":"";
               return <tr key={p.id} style={{background:rowBg}}>
                 <td><div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:15,color:top3?pitchCol:"var(--muted)"}}>{i+1}</div></td>
-                <td><div className="pc"><PlayerAvatar pid={p.id} name={p.name} size={30} style={{border:"1px solid "+(top3?pitchCol+"50":"var(--border)")}}/><div><div style={{display:"flex",alignItems:"center",gap:3}}><div className="pn">{p.name}</div><InjuryBadge pid={p.pid}/></div><div className="pt">{p.team} · {p.hr} HR</div></div></div></td>
+                <td><div className="pc"><PlayerAvatar pid={p.id} name={p.name} size={30} style={{border:"1px solid "+(top3?pitchCol+"50":"var(--border)")}}/><div><div style={{display:"flex",alignItems:"center",gap:3}}><div className="pn">{p.name}</div><InjuryBadge pid={p.pid} name={p.name}/></div><div className="pt">{p.team} · {p.hr} HR</div></div></div></td>
                 <td>
                   <div style={{display:"flex",flexDirection:"column",gap:2}}>
                     <div style={{display:"inline-flex",alignItems:"center",gap:4,padding:"2px 7px",borderRadius:5,background:"var(--surface2)",border:"1px solid var(--border)",width:"fit-content"}}>
@@ -5855,13 +5855,21 @@ function PitchBuilderTab() {
 let HR_DATA = [];
 const VIDEO_LINK_CACHE = {}; // gamePk_atBatIndex → savant video URL
 
-// ── Injury Report — MLB Stats API IL transactions ─────────────────────────────
-const INJURY_MAP = {};  // pid → { emoji, label, desc, date, team }
+// ── Injury Report — MLB Stats API SC transactions ────────────────────────────
+const INJURY_MAP = {};  // pid → { emoji, label, shortDesc, fullDesc, date, team }
 const INJURY_LISTENERS = new Set();
 let   INJURY_LOADED = false;
+let   INJURY_MODAL_CB = null; // set by InjuryModal component
 
 function subscribeInjuries(fn) { INJURY_LISTENERS.add(fn); return () => INJURY_LISTENERS.delete(fn); }
 function notifyInjuryListeners() { INJURY_LISTENERS.forEach(fn => fn(Date.now())); }
+function openInjuryModal(pid, name) { if (INJURY_MODAL_CB) INJURY_MODAL_CB({ pid: String(pid||''), name: name||'' }); }
+
+function extractInjuryDetail(desc) {
+  // Pull the injury description after 'injured list.'
+  const m = desc.match(/injured list[^.]*\.\s*(.+)/i);
+  return m ? m[1].replace(/\.$/, '').trim() : '';
+}
 
 async function fetchInjuries() {
   if (INJURY_LOADED) return;
@@ -5869,42 +5877,43 @@ async function fetchInjuries() {
     const today = new Date().toISOString().slice(0,10);
     const ago90 = new Date(Date.now()-90*864e5).toISOString().slice(0,10);
     const r = await fetch(
-      `https://statsapi.mlb.com/api/v1/transactions?sportId=1&startDate=${ago90}&endDate=${today}&gameType=R`,
+      `https://statsapi.mlb.com/api/v1/transactions?sportId=1&startDate=${ago90}&endDate=${today}`,
       { signal: AbortSignal.timeout(9000) }
     );
     if (!r.ok) return;
     const d = await r.json();
-    const IL_EMOJI = { IL10:'🩼', IL15:'🤕', IL60:'🚫', DL10:'🩼', DL15:'🤕', DL60:'🚫' };
-    const IL_LABEL = { IL10:'10-Day IL', IL15:'15-Day IL', IL60:'60-Day IL',
-                       DL10:'10-Day IL', DL15:'15-Day IL', DL60:'60-Day IL' };
-    // Track placements and activations
-    const placements  = {};   // pid → latest IL transaction
-    const activations = {};   // pid → latest activation date
+    const placements  = {}; // pid → latest IL placement
+    const activations = {}; // pid → latest activation date
     for (const t of (d.transactions || [])) {
+      if (t.typeCode !== 'SC') continue;
       const pid  = String(t.person?.id || '');
-      const code = (t.typeCode || '').toUpperCase();
+      const desc = (t.description || '').toLowerCase();
       if (!pid) continue;
-      if (code in IL_EMOJI) {
-        if (!placements[pid] || t.date > placements[pid].date)
-          placements[pid] = { code, date: t.date, effectiveDate: t.effectiveDate,
-                              desc: t.description || IL_LABEL[code],
-                              team: t.toTeam?.abbreviation || '' };
-      } else if (/^(RL|ACTML|RCTML|OUTRL)/.test(code)) {
-        // Activation / return from IL
+      const isPlacement = desc.includes('injured list') &&
+        (desc.includes('placed') || desc.includes('transferred'));
+      const isActivation = desc.includes('injured list') &&
+        (desc.includes('activated') || desc.includes('reinstated') || desc.includes('recalled'));
+      if (isPlacement) {
+        if (!placements[pid] || t.date > placements[pid].date) {
+          const full = t.description || '';
+          const lo   = full.toLowerCase();
+          const emoji = lo.includes('60-day') ? '🚫' : lo.includes('15-day') ? '🤕' : '🩼';
+          const label = lo.includes('60-day') ? '60-Day IL' : lo.includes('15-day') ? '15-Day IL' : '10-Day IL';
+          placements[pid] = {
+            date: t.date, emoji, label,
+            fullDesc:  full,
+            shortDesc: extractInjuryDetail(full),
+            team: t.toTeam?.abbreviation || '',
+          };
+        }
+      } else if (isActivation) {
         if (!activations[pid] || t.date > activations[pid]) activations[pid] = t.date;
       }
     }
-    // Build map: only players still on IL (no activation after placement)
+    // Keep only players still on IL
     Object.entries(placements).forEach(([pid, t]) => {
-      const activatedAfter = activations[pid] && activations[pid] >= t.date;
-      if (!activatedAfter) {
-        INJURY_MAP[pid] = {
-          emoji: IL_EMOJI[t.code],
-          label: IL_LABEL[t.code],
-          desc:  t.desc,
-          date:  t.date,
-          team:  t.team,
-        };
+      if (!(activations[pid] && activations[pid] >= t.date)) {
+        INJURY_MAP[pid] = t;
       }
     });
     INJURY_LOADED = true;
@@ -6392,7 +6401,7 @@ function HRTrackerTab() {
                 <td><span style={{fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:600,color:"var(--text)"}}>{hr.timeET&&hr.timeET!==""?hr.timeET:`Inn. ${hr.inning}`}</span></td>
                 <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color:"var(--text)"}}>{hr.batterTeam}</span></td>
                 <td style={{whiteSpace:"nowrap"}}><div style={{display:"flex",alignItems:"center",gap:5}}><PlayerAvatar pid={hr.batterId} name={hr.batterName} size={20}/><span className="pn" style={{fontSize:11,...(isKeyMatchup(hr.batterId,hr.batterName)?{color:"#ff8020",fontWeight:700}:{})}}>{hr.batterName}</span>
-                <InjuryBadge pid={hr.batterId}/></div></td>
+                <InjuryBadge pid={hr.batterId} name={hr.batterName}/></div></td>
                 <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:12,color:'var(--accent)'}}>{seasonNum}</span></td>
                 <td>
                 <div style={{display:"flex",alignItems:"center",gap:6}}>
@@ -6950,6 +6959,7 @@ function SimLabView({ data }) {
   const [filterDueSim, setFilterDueSim] = useState(false);
   const [filterDiamondSim, setFilterDiamondSim] = useState(false);
   const [simPicksOnly, setSimPicksOnly]           = useState(false);
+  const [simActiveOnly, setSimActiveOnly]         = useState(false);
   const [minHRScore, setMinHRScore]   = useState('');
   const [minHRPct,   setMinHRPct]     = useState('');
   const [minMeatball,setMinMeatball]  = useState('');
@@ -7009,6 +7019,7 @@ function SimLabView({ data }) {
       .filter(r => !filterGoneYardSim || isGoneYardSim(r))
       .filter(r => !filterDueSim || isDueFromRow(r, parseInt(r.batter_id)||0))
       .filter(r => !simPicksOnly || picks[String(parseInt(r.batter_id)||0)])
+      .filter(r => !simActiveOnly || !INJURY_MAP[String(parseInt(r.batter_id)||0)])
       .filter(r => {
         if (!filterDiamondSim) return true;
         const stb = parseFloat(r.sim_tb)||0;
@@ -7027,7 +7038,7 @@ function SimLabView({ data }) {
       .filter(r => !minSimTB    || (parseFloat(r.sim_tb)||0)             >= parseFloat(minSimTB));
     const mul = sortDir === 'desc' ? -1 : 1;
     return [...filtered].sort((a, b) => mul * ((parseFloat(a[sortBy]) || 0) - (parseFloat(b[sortBy]) || 0)));
-  }, [data, sortBy, sortDir, teamFilter, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, selPitcherGradesSim, minHRScore, minHRPct, minMeatball, minHitPct, minSimTB]);
+  }, [data, sortBy, sortDir, teamFilter, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, selPitcherGradesSim, minHRScore, minHRPct, minMeatball, minHitPct, minSimTB]);
 
   // Auto-select top batter when data loads
   useEffect(() => {
@@ -7112,9 +7123,18 @@ function SimLabView({ data }) {
                 fontFamily: "'DM Mono',monospace", fontWeight: filterDueSim ? 700 : 400, fontSize: 11 }}>
               ⏳ {filterDueSim ? 'Due ✓' : 'Due'}
             </button>
+            <button onClick={() => setSimActiveOnly(s => !s)}
+              style={{ padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
+                border: `1px solid ${simActiveOnly ? 'var(--ice)' : 'var(--border)'}`,
+                background: simActiveOnly ? 'rgba(56,184,242,.12)' : 'transparent',
+                color: simActiveOnly ? 'var(--ice)' : 'var(--muted)',
+                fontFamily: "'DM Mono',monospace", fontWeight: simActiveOnly ? 700 : 400, fontSize: 11,
+                whiteSpace: 'nowrap' }}>
+              ✅ {simActiveOnly ? 'Active Only ✓' : 'Active Only'}
+            </button>
             <button onClick={() => setSimPicksOnly(s => !s)}
               style={{ padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
-                border: `1px solid ${simPicksOnly ? 'var(--accent2)' : 'var(--border)'}`,
+                border: `1px solid ${simPicksOnly ? 'var(--accent2)' : 'var(--border)'}}`,
                 background: simPicksOnly ? 'rgba(245,166,35,.12)' : 'transparent',
                 color: simPicksOnly ? 'var(--accent2)' : 'var(--muted)',
                 fontFamily: "'DM Mono',monospace", fontWeight: simPicksOnly ? 700 : 400, fontSize: 11,
@@ -7285,7 +7305,7 @@ function SimLabView({ data }) {
                             <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', cursor:'pointer' }}
                               onClick={e=>{e.stopPropagation();const cp=getCachedPlayer(parseInt(b.batter_id)||0)||{};openAtBatSlide({pid:parseInt(b.batter_id)||0,name:b.batter,team:b.batting_team,avgEV:cp.avgEV,barrel:cp.barrel,hardHit:cp.hardHit,flyBall:cp.flyBall,hr:cp.hr,avg:cp.avg,obp:cp.obp,slg:cp.slg,xwoba:cp.xwoba,kPct:cp.kPct,bbPct:cp.bbPct,launchAngle:cp.launchAngle});}}>
                               <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 11 }}>{b.batter}</span>
-              <InjuryBadge pid={parseInt(b.batter_id)||0}/>
+              <InjuryBadge pid={parseInt(b.batter_id)||0} name={b.batter}/>
               <span style={{fontSize:9,color:'var(--muted)',opacity:.4,marginLeft:2}}>›</span>
                               {isConfirmed(b) && <span style={{ fontSize: 9, color: '#27c97a', flexShrink: 0 }}>✅</span>}
                               {isGoneYardSim(b) && <span style={{ fontSize: 9, flexShrink: 0 }}>💥</span>}
@@ -7704,17 +7724,69 @@ async function fetchBvP(batterId, pitcherId) {
 
 // ── CHEAT CODE SLIDEOUT ──────────────────────────────────────────────────────
 // ── NOTIFICATION BELL ────────────────────────────────────────────────────────
-// ── INJURY BADGE ─────────────────────────────────────────────────────────────
-function InjuryBadge({ pid }) {
+// ── INJURY BADGE + MODAL ─────────────────────────────────────────────────────
+function InjuryBadge({ pid, name }) {
   const inj = INJURY_MAP[String(pid || '')];
   if (!inj) return null;
-  const tip = `${inj.label} · ${inj.desc || 'Injured List'}${inj.date ? ' (since '+inj.date+')' : ''}`;
+  const tip = `${inj.label}${inj.shortDesc ? ' · '+inj.shortDesc : ''}`;
   return (
     <span title={tip} aria-label={tip}
-      style={{cursor:'help',fontSize:11,flexShrink:0,lineHeight:1,
+      onClick={e => { e.stopPropagation(); openInjuryModal(pid, name); }}
+      style={{cursor:'pointer',fontSize:11,flexShrink:0,lineHeight:1,
         display:'inline-flex',alignItems:'center'}}>
       {inj.emoji}
     </span>
+  );
+}
+
+function InjuryModal() {
+  const [data, setData] = useState(null);
+  useEffect(() => { INJURY_MODAL_CB = setData; return () => { INJURY_MODAL_CB = null; }; }, []);
+  if (!data) return null;
+  const inj = INJURY_MAP[data.pid];
+  if (!inj) return null;
+  const col = inj.emoji==='🚫'?'#ff4020':inj.emoji==='🤕'?'#ff8020':'#38b8f2';
+  return (
+    <div onClick={() => setData(null)}
+      style={{position:'fixed',inset:0,zIndex:2000,background:'rgba(0,0,0,.72)',
+        display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
+      <div onClick={e => e.stopPropagation()}
+        style={{background:'var(--surface)',border:`1px solid ${col}55`,borderRadius:14,
+          padding:'22px 24px',maxWidth:360,width:'100%',
+          boxShadow:`0 0 40px ${col}22`}}>
+        {/* Header */}
+        <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:16}}>
+          <span style={{fontSize:32,lineHeight:1}}>{inj.emoji}</span>
+          <div>
+            <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:17,letterSpacing:.3}}>{data.name}</div>
+            <div style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--muted)',marginTop:2}}>{inj.team}</div>
+          </div>
+        </div>
+        {/* IL badge */}
+        <div style={{display:'inline-flex',alignItems:'center',gap:6,padding:'4px 10px',
+          borderRadius:6,background:`${col}18`,border:`1px solid ${col}55`,marginBottom:14}}>
+          <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:700,color:col}}>{inj.label}</span>
+        </div>
+        {/* Injury description */}
+        {inj.shortDesc && (
+          <div style={{fontFamily:"'DM Mono',monospace",fontSize:12,color:'var(--text)',
+            lineHeight:1.6,marginBottom:12,padding:'10px 14px',
+            background:'var(--surface2)',borderRadius:8}}>
+            {inj.shortDesc}
+          </div>
+        )}
+        {/* Date */}
+        <div style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--muted)',marginBottom:16}}>
+          Placed: {inj.date}
+        </div>
+        <button onClick={() => setData(null)}
+          style={{width:'100%',padding:'9px',borderRadius:8,cursor:'pointer',
+            background:'var(--surface2)',border:'1px solid var(--border)',
+            color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:11}}>
+          Close
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -7926,7 +7998,8 @@ function BvPHistoryTab({ data }) {
   const [loaded, setLoaded]       = useState(false);
   const [sortCol, setSortCol]     = useState('hr');
   const [sortDir, setSortDir]     = useState(1);  // 1 with (bn-an) = descending
-  const [bvpPicksOnly, setBvpPicksOnly] = useState(false);
+  const [bvpPicksOnly, setBvpPicksOnly]   = useState(false);
+  const [bvpActiveOnly, setBvpActiveOnly] = useState(false);
   const [minPA, setMinPA]         = useState(1);
   const [search, setSearch]       = useState('');
 
@@ -7997,6 +8070,7 @@ function BvPHistoryTab({ data }) {
   const filtered = useMemo(() => {
     let r = rows;
     if (bvpPicksOnly) r = r.filter(x => picks[String(x.batterId)]);
+    if (bvpActiveOnly) r = r.filter(x => !INJURY_MAP[String(x.batterId)]);
     if (minPA > 0) r = r.filter(x => (x.pa||0) >= minPA);
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -8009,7 +8083,7 @@ function BvPHistoryTab({ data }) {
       const bn = typeof bv === 'string' ? parseFloat(bv)||0 : bv;
       return sortDir * (bn - an);
     });
-  }, [rows, sortCol, sortDir, minPA, search, bvpPicksOnly]);
+  }, [rows, sortCol, sortDir, minPA, search, bvpPicksOnly, bvpActiveOnly]);
 
   const SortIcon = ({col}) => sortCol===col
     ? <span style={{marginLeft:3,fontSize:8}}>{sortDir===-1?'▼':'▲'}</span>
@@ -8024,7 +8098,7 @@ function BvPHistoryTab({ data }) {
         <div style={{cursor:'pointer',display:'flex',alignItems:'center',gap:3}}
           onClick={()=>{const cp=getCachedPlayer(r.batterId)||{};openAtBatSlide({pid:r.batterId,name:r.batter,team:r.team,avgEV:cp.avgEV,barrel:cp.barrel,hr:cp.hr,avg:cp.avg,obp:cp.obp,slg:cp.slg});}}>
           <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11}}>{r.batter}</span>
-          <InjuryBadge pid={r.batterId}/>
+          <InjuryBadge pid={r.batterId} name={r.batter}/>
           <span style={{fontSize:9,opacity:.4}}>›</span>
         </div>
       </div>
@@ -8034,7 +8108,7 @@ function BvPHistoryTab({ data }) {
       <div style={{cursor:'pointer',display:'flex',alignItems:'center',gap:4}}
         onClick={()=>openPitcherSlide({pid:r.pitcherId,name:r.pitcher,team:r.opp,hand:r.pitcherHand,pitchMix:[]})}>
         <span style={{fontFamily:"'DM Mono',monospace",fontSize:10}}>{r.pitcher}</span>
-          <InjuryBadge pid={r.pitcherId}/>
+          <InjuryBadge pid={r.pitcherId} name={r.pitcher}/>
         <span style={{fontSize:8,color:'var(--muted)',opacity:.4}}>({r.pitcherHand}HP)</span>
         <span style={{fontSize:9,opacity:.4}}>›</span>
       </div>
@@ -8079,6 +8153,15 @@ function BvPHistoryTab({ data }) {
             </button>
           ))}
         </div>
+        <button onClick={()=>setBvpActiveOnly(s=>!s)}
+          style={{padding:'3px 10px',borderRadius:6,cursor:'pointer',
+            border:`1px solid ${bvpActiveOnly?'var(--ice)':'var(--border)'}`,
+            background:bvpActiveOnly?'rgba(56,184,242,.12)':'transparent',
+            color:bvpActiveOnly?'var(--ice)':'var(--muted)',
+            fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:bvpActiveOnly?700:400,
+            whiteSpace:'nowrap',flexShrink:0}}>
+          ✅ {bvpActiveOnly?'Active Only ✓':'Active Only'}
+        </button>
         <button onClick={()=>setBvpPicksOnly(s=>!s)}
           style={{padding:'3px 10px',borderRadius:6,cursor:'pointer',
             border:`1px solid ${bvpPicksOnly?'var(--accent2)':'var(--border)'}`,
@@ -8174,7 +8257,8 @@ function BvPHistoryTab({ data }) {
 }
 
 function BatterLeaderboard() {
-  useInjuries(); // re-render when injury data loads
+  useInjuries();
+  const [activeOnly, setActiveOnly]           = useState(false);
   const [slateFilter, setSlateFilter]     = useState('all');
   const [expandedBatter, setExpandedBatter] = useState(null);
   const [sortCol, setSortCol] = useState('avgEV');
@@ -8283,6 +8367,7 @@ function BatterLeaderboard() {
     })
     .filter(p => !searchQ || p.name?.toLowerCase().includes(searchQ.toLowerCase()))
     .filter(p => !showPicksOnly || picks[String(p.pid)])
+    .filter(p => !activeOnly || !INJURY_MAP[String(p.pid||p.id)])
     .filter(p => !filterGoneYard || isGoneYard(p))
     .filter(p => !filterDue || isDue(p.pid||p.id))
     .sort((a, b) => {
@@ -8405,6 +8490,15 @@ function BatterLeaderboard() {
             whiteSpace:'nowrap',transition:'all .15s'}}>
           🎯 {showPicksOnly ? 'My Picks ✓' : 'My Picks'}
         </button>
+        <button onClick={()=>setActiveOnly(s=>!s)}
+          style={{padding:'6px 12px',borderRadius:7,cursor:'pointer',
+            border:`1px solid ${activeOnly?'var(--ice)':'var(--border)'}`,
+            background:activeOnly?'rgba(56,184,242,.12)':'var(--surface2)',
+            color:activeOnly?'var(--ice)':'var(--muted)',
+            fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:activeOnly?700:400,
+            whiteSpace:'nowrap'}}>
+          ✅ {activeOnly?'Active Only ✓':'Active Only'}
+        </button>
         <button onClick={()=>setFilterGoneYard(s=>!s)}
           style={{padding:'6px 12px',borderRadius:7,cursor:'pointer',
             border:`1px solid ${filterGoneYard?'rgba(255,20,0,.5)':'var(--border)'}`,
@@ -8421,6 +8515,14 @@ function BatterLeaderboard() {
             border:`1px solid ${filterDue?'rgba(56,184,242,.5)':'var(--border)'}`,
             fontFamily:"'DM Mono',monospace",fontWeight:filterDue?700:400,fontSize:11}}>
           ⏳ {filterDue ? 'Due ✓' : 'Due'}
+        </button>
+        <button onClick={()=>setActiveOnly(s=>!s)}
+          style={{padding:'3px 10px',borderRadius:6,cursor:'pointer',
+            border:`1px solid ${activeOnly?'var(--ice)':'var(--border)'}`,
+            background:activeOnly?'rgba(56,184,242,.12)':'transparent',
+            color:activeOnly?'var(--ice)':'var(--muted)',
+            fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:activeOnly?700:400}}>
+          ✅ {activeOnly?'Active Only ✓':'Active Only'}
         </button>
         <button onClick={()=>{
           const esc = v => `"${String(v??'').replace(/"/g,'""')}"`;
@@ -8565,7 +8667,7 @@ function BatterLeaderboard() {
                         {isGoneYard(p) && <span style={{fontSize:7,padding:'1px 4px',borderRadius:3,
                           background:'rgba(255,20,0,.25)',border:'1px solid rgba(255,20,0,.5)',
                           color:'#fff',fontFamily:"'DM Mono',monospace",fontWeight:800,flexShrink:0}}>GY</span>}
-                        <InjuryBadge pid={p.pid||p.id}/>
+                        <InjuryBadge pid={p.pid||p.id} name={p.name}/>
                       </div>
                     </td>
                     {/* Stat columns */}
@@ -8617,6 +8719,7 @@ function BatterLeaderboard() {
 // ── PITCHER LEADERBOARD ────────────────────────────────────────
 function PitcherLeaderboard() {
   useInjuries();
+  const [activeOnly, setActiveOnly] = useState(false);
   const [pitchers, setPitchers]     = useState([]);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState(null);
@@ -8702,6 +8805,7 @@ function PitcherLeaderboard() {
     .filter(p => roleFilter === 'all' || (roleFilter==='SP' ? p.gs > 0 : p.gs === 0))
     .filter(p => !searchQ || p.name.toLowerCase().includes(searchQ.toLowerCase()))
     .filter(p => gradeFilter === 'all' || p._grade.label === gradeFilter)
+    .filter(p => !activeOnly || !INJURY_MAP[String(p.pid)])
     .sort((a,b)=>{
       const av = sortCol==='name'?(a.name||''):(a[sortCol]??99);
       const bv = sortCol==='name'?(b.name||''):(b[sortCol]??99);
@@ -9006,6 +9110,7 @@ function MatchupEngineTab() {
   const pitcherGradeCache = useRef({});
   const [selPitcherGrade, setSelPitcherGrade] = useState('all');
   useInjuries();
+  const [kmActiveOnly, setKmActiveOnly]       = useState(false);
   const [filterGoneYard, setFilterGoneYard]   = useState(false);
   const [filterDue, setFilterDue]             = useState(false);
   const [filterDiamond, setFilterDiamond]     = useState(false);
@@ -9110,6 +9215,7 @@ function MatchupEngineTab() {
   (selGame === 'all' ? activeData : activeData.filter(r => String(r.game_id) === String(selGame)))
     .filter(r => selGrade === 'all' || r.grade === selGrade)
     .filter(r => !kmPicksOnly || picks[String(parseInt(r.batter_id)||0)])
+    .filter(r => !kmActiveOnly || !INJURY_MAP[String(parseInt(r.batter_id)||0)])
     .filter(r => {
       if (filterDiamond) {
         const simTB = parseFloat(r.sim_tb)||0;
@@ -9478,6 +9584,15 @@ function MatchupEngineTab() {
           border:`1px solid ${filterDue?'rgba(56,184,242,.5)':'var(--border)'}`,
           fontFamily:"'DM Mono',monospace",fontWeight:filterDue?700:400,fontSize:11}}>
         ⏳ {filterDue ? 'Due ✓' : 'Due'}
+      </button>
+      <button onClick={()=>setKmActiveOnly(s=>!s)}
+        style={{padding:'3px 12px',borderRadius:6,cursor:'pointer',
+          border:`1px solid ${kmActiveOnly?'var(--ice)':'var(--border)'}`,
+          background:kmActiveOnly?'rgba(56,184,242,.12)':'transparent',
+          color:kmActiveOnly?'var(--ice)':'var(--muted)',
+          fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:kmActiveOnly?700:400,
+          whiteSpace:'nowrap',marginLeft:4}}>
+        ✅ {kmActiveOnly?'Active Only ✓':'Active Only'}
       </button>
       <button onClick={()=>setKmPicksOnly(s=>!s)}
         style={{padding:'3px 12px',borderRadius:6,cursor:'pointer',
@@ -11796,6 +11911,7 @@ export default function App() {
     <AtBatSlideIn/>
     <PitcherSlideIn/>
     {showPicksSlideout && <PicksSlideout onClose={()=>setShowPicksSlideout(false)}/>}
+    <InjuryModal/>
   </>;
 
 }
