@@ -5172,12 +5172,6 @@ function ScoutingTab() {
     return { ...p, ...w, isFiltered: false };
   };
 
-  // Hot bat — 2+ HRs in last 7 days
-  const isHotBat = (p) => {
-    const l7hr = parseFloat(p.windows?.last7?.hr ?? p.l7hr ?? 0);
-    return l7hr >= 2;
-  };
-
   // Teams playing today
   const todayTeamsS = new Set(games.flatMap(g=>[g.away.abbr,g.home.abbr]).filter(t=>t&&t!=="???"));
   const matchupTeamsS = selMatchup
@@ -8370,6 +8364,7 @@ function BvPHistoryTab({ data }) {
 
 function BatterLeaderboard() {
   useInjuries();
+  const isHotBat = (p) => parseFloat(p.windows?.last7?.hr ?? 0) >= 2;
   const [activeOnly, setActiveOnly]           = useState(false);
   const [injuredOnly, setInjuredOnly]         = useState(false);
   const [slateFilter, setSlateFilter]     = useState('all');
