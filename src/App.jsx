@@ -9207,39 +9207,69 @@ function PitcherLeaderboard() {
 
 // Shows last 5 at-bats from the pipeline at-bat log — stored in players.json recentAtBats
 
-// ── LAST 7 GAMES HR CHART ────────────────────────────────────────────────────
+// ── LAST 7 GAMES HR CHART — fetches from MLB Stats API game log ──────────────
+const GAME_LOG_CACHE = {}; // pid → { games, ts }
+
+async function fetchGameLog(pid) {
+  if (!pid) return [];
+  const key = String(pid);
+  const cached = GAME_LOG_CACHE[key];
+  if (cached && Date.now() - cached.ts < 3600000) return cached.games; // 1hr cache
+  try {
+    const season = new Date().getFullYear();
+    const r = await fetch(
+      `https://statsapi.mlb.com/api/v1/people/${pid}/stats?stats=gameLog&group=hitting&season=${season}`,
+      { signal: AbortSignal.timeout(6000) }
+    );
+    if (!r.ok) return [];
+    const d = await r.json();
+    const splits = d?.stats?.[0]?.splits || [];
+    const games = splits.map(s => ({
+      date: s.date || '',
+      opp:  s.opponent?.abbreviation || s.opponent?.name || '?',
+      loc:  s.isHome ? 'home' : 'away',
+      hrs:  parseInt(s.stat?.homeRuns ?? 0),
+      ab:   parseInt(s.stat?.atBats   ?? 0),
+      h:    parseInt(s.stat?.hits     ?? 0),
+    })).sort((a,b) => a.date > b.date ? 1 : -1);
+    GAME_LOG_CACHE[key] = { games, ts: Date.now() };
+    return games;
+  } catch { return []; }
+}
+
 function Last7HRChart({ batterId }) {
-  // Use pipeline recentGames (last 7 game summaries), fall back to grouping recentAtBats
-  const cached = getCachedPlayer(batterId);
-  let games = cached?.recentGames || [];
-  if (games.length === 0) {
-    // Fallback: group recentAtBats by game
-    const abs = cached?.recentAtBats || [];
-    const gameMap = {};
-    for (const a of abs) {
-      const key = a.date + '|' + (a.opp||'');
-      if (!gameMap[key]) gameMap[key] = { date: a.date, opp: a.opp||'?', hrs: 0, pa: 0 };
-      gameMap[key].pa++;
-      if (a.result === 'home_run') gameMap[key].hrs++;
-    }
-    games = Object.values(gameMap).sort((a,b) => a.date > b.date ? 1 : -1);
-  }
+  const [games, setGames] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!batterId) return;
+    setLoading(true);
+    fetchGameLog(batterId).then(g => {
+      setGames(g.slice(-7)); // last 7 games
+      setLoading(false);
+    });
+  }, [batterId]);
+
+  if (loading) return (
+    <div style={{padding:'12px 0',textAlign:'center',fontFamily:"'DM Mono',monospace",
+      fontSize:9,color:'var(--muted)'}}>Loading game log…</div>
+  );
   if (games.length === 0) return null;
 
   const hitGames = games.filter(g => g.hrs > 0).length;
-  const totalHR  = games.reduce((s,g) => s + g.hrs, 0);
   const pct      = Math.round((hitGames / games.length) * 100);
   const maxHR    = Math.max(1, ...games.map(g => g.hrs));
   const BAR_H    = 120;
   const pctColor = pct >= 57 ? '#27c97a' : pct >= 43 ? '#ffc840' : 'var(--muted)';
+  const label    = games.length < 7 ? `LAST ${games.length}` : 'LAST 7';
 
   return (
     <div style={{background:'var(--surface)',border:'1px solid var(--border)',
       borderRadius:12,padding:'14px 16px',marginTop:12}}>
-      {/* Header row */}
+      {/* Header */}
       <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',marginBottom:12}}>
-        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:15,letterSpacing:.5,
-          color:'var(--text)'}}>LAST 7</span>
+        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:15,
+          letterSpacing:.5,color:'var(--text)'}}>{label}</span>
         <div style={{display:'flex',alignItems:'baseline',gap:8}}>
           <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--muted)'}}>
             {hitGames} of {games.length}
@@ -9249,40 +9279,31 @@ function Last7HRChart({ batterId }) {
         </div>
       </div>
 
-      {/* Chart */}
-      <div style={{display:'flex',alignItems:'flex-end',gap:4,height:BAR_H,position:'relative',
-        paddingLeft:14,paddingRight:14}}>
-        {/* Y labels */}
+      {/* Bars */}
+      <div style={{display:'flex',alignItems:'flex-end',gap:4,height:BAR_H,
+        position:'relative',paddingLeft:14,paddingRight:14}}>
         <span style={{position:'absolute',left:0,top:0,fontFamily:"'DM Mono',monospace",
           fontSize:8,color:'var(--muted)',lineHeight:1}}>1</span>
         <span style={{position:'absolute',left:0,bottom:0,fontFamily:"'DM Mono',monospace",
           fontSize:8,color:'var(--muted)',lineHeight:1}}>0</span>
-        {/* 0.5 reference line */}
         <div style={{position:'absolute',left:10,right:10,top:BAR_H/2,
           borderTop:'1px solid rgba(255,255,255,.12)',zIndex:0,pointerEvents:'none'}}/>
         <span style={{position:'absolute',right:0,top:BAR_H/2-12,fontFamily:"'DM Mono',monospace",
           fontSize:8,color:'rgba(255,255,255,.3)'}}>0.5</span>
-
         {games.map((g, i) => {
           const isHR = g.hrs > 0;
           const barH = isHR
-            ? Math.max(Math.round(BAR_H * (g.hrs / Math.max(maxHR, 1))), Math.round(BAR_H * 0.5))
+            ? Math.max(Math.round(BAR_H * (g.hrs / maxHR)), Math.round(BAR_H * 0.5))
             : 0;
           return (
             <div key={i} style={{flex:1,display:'flex',flexDirection:'column',
               alignItems:'center',justifyContent:'flex-end',height:'100%',gap:2,zIndex:1}}>
               <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,
-                lineHeight:1,color:isHR?'#27c97a':'#ff4020'}}>
-                {g.hrs}
-              </span>
-              <div style={{
-                width:'100%',borderRadius:'4px 4px 0 0',
-                height:isHR?barH:2,
-                background:isHR
-                  ?'linear-gradient(180deg,#27c97a,#1aa862)'
-                  :'rgba(255,64,32,.15)',
-                minHeight:2,
-              }}/>
+                lineHeight:1,color:isHR?'#27c97a':'#ff4020'}}>{g.hrs}</span>
+              <div style={{width:'100%',borderRadius:'4px 4px 0 0',
+                height:isHR ? barH : 2,
+                background:isHR?'linear-gradient(180deg,#27c97a,#1aa862)':'rgba(255,64,32,.15)',
+                minHeight:2}}/>
             </div>
           );
         })}
@@ -9292,13 +9313,13 @@ function Last7HRChart({ batterId }) {
       <div style={{display:'flex',gap:4,marginTop:6,paddingLeft:14,paddingRight:14}}>
         {games.map((g,i) => (
           <div key={i} style={{flex:1,textAlign:'center'}}>
-            <div style={{fontFamily:"'DM Mono',monospace",fontSize:7.5,color:'var(--muted)',
-              lineHeight:1.4}}>
+            <div style={{fontFamily:"'DM Mono',monospace",fontSize:7.5,
+              color:'var(--muted)',lineHeight:1.4}}>
               {(g.date||'').slice(5).replace('-','/')}
             </div>
-            <div style={{fontFamily:"'DM Mono',monospace",fontSize:7.5,color:'var(--muted)',
-              lineHeight:1.3,opacity:.6}}>
-              {g.opp||'—'}
+            <div style={{fontFamily:"'DM Mono',monospace",fontSize:7.5,
+              color:'var(--muted)',lineHeight:1.3,opacity:.6}}>
+              {(g.loc==='away'?'@':'vs')} {g.opp}
             </div>
           </div>
         ))}
