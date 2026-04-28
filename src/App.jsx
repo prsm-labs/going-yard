@@ -313,13 +313,13 @@ const PLAYER_DATA_CACHE = {};
 let PLAYER_CACHE_DATE = null; // timestamp (ms) — refreshes every 3 hours
 function cachePlayer(p) { if (p.pid) PLAYER_DATA_CACHE[String(p.pid)] = p; }
 function getCachedPlayer(pid) { return PLAYER_DATA_CACHE[String(pid)] || PLAYER_DATA_CACHE[parseInt(pid)] || null; }
-// Hot bat: 2+ HRs in last 7 days — works on player cache AND engine rows
+// Hot bat: 3+ HRs in last 7 days — works on player cache AND engine rows
 function isHotBatPlayer(p) {
   if (!p) return false;
   const fromCache = parseFloat(p.windows?.last7?.hr ?? p.l7hr ?? -1);
   const fromRow   = parseFloat(p.recent_hr_count ?? -1);
   const val = fromCache >= 0 ? fromCache : fromRow >= 0 ? fromRow : -1;
-  return val >= 2;
+  return val >= 3;
 }
 // Normalize team abbreviations — MLB API still returns legacy codes for relocated teams
 const TEAM_ABBR_MAP = { OAK: 'ATH' };
@@ -3775,7 +3775,7 @@ function LRow({b, rank}) {
           {b.isDiamond && <span style={{padding:'1px 4px',borderRadius:4,fontSize:9,fontWeight:700,
             background:'rgba(255,204,0,.15)',color:'#ffcc00',border:'1px solid rgba(255,204,0,.3)',flexShrink:0}}>💎</span>}
           {isHotBatPlayer(getCachedPlayer(b.id)) && <span style={{fontSize:10,flexShrink:0,lineHeight:1}}
-            title='🔥 Hot Bat — 2+ HRs in last 7 days'>🔥</span>}
+            title='🔥 Hot Bat — 3+ HRs in last 7 days'>🔥</span>}
           <InjuryBadge pid={b.id} name={b.name}/>
           <div style={{minWidth:0,flex:1}}>
           <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,
@@ -3975,7 +3975,7 @@ function GPanel({game, isLive, isFinal=false}) {
                       <div style={{display:'flex',alignItems:'center',gap:3}}>
                         <div className="pn" style={{fontSize:12,...(isKeyMatchup(b.id)?{color:'#ff8020',fontWeight:700}:{})}}>{b.name}</div>
                         {isHotBatPlayer(b) && <span style={{fontSize:10,flexShrink:0,lineHeight:1}}
-                          title='🔥 Hot Bat — 2+ HRs in last 7 days'>🔥</span>}
+                          title='🔥 Hot Bat — 3+ HRs in last 7 days'>🔥</span>}
                         <InjuryBadge pid={parseInt(b.batter_id||b.id)||0} name={b.name||b.batter}/>
                       </div>
                       <div style={{fontSize:9,color:"var(--accent2)",fontFamily:"'DM Mono',monospace",fontWeight:700}}>
@@ -7393,7 +7393,7 @@ function SimLabView({ data }) {
                               onClick={e=>{e.stopPropagation();const cp=getCachedPlayer(parseInt(b.batter_id)||0)||{};openAtBatSlide({pid:parseInt(b.batter_id)||0,name:b.batter,team:b.batting_team,avgEV:cp.avgEV,barrel:cp.barrel,hardHit:cp.hardHit,flyBall:cp.flyBall,hr:cp.hr,avg:cp.avg,obp:cp.obp,slg:cp.slg,xwoba:cp.xwoba,kPct:cp.kPct,bbPct:cp.bbPct,launchAngle:cp.launchAngle});}}>
                               <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 11 }}>{b.batter}</span>
               <InjuryBadge pid={parseInt(b.batter_id)||0} name={b.batter}/>
-              {isHotBatPlayer(b) && <span style={{fontSize:10,flexShrink:0,lineHeight:1}} title='🔥 Hot Bat — 2+ HRs in last 7 days'>🔥</span>}
+              {isHotBatPlayer(b) && <span style={{fontSize:10,flexShrink:0,lineHeight:1}} title='🔥 Hot Bat — 3+ HRs in last 7 days'>🔥</span>}
               <span style={{fontSize:9,color:'var(--muted)',opacity:.4,marginLeft:2}}>›</span>
                               {isConfirmed(b) && <span style={{ fontSize: 9, color: '#27c97a', flexShrink: 0 }}>✅</span>}
                               {isGoneYardSim(b) && <span style={{ fontSize: 9, flexShrink: 0 }}>💥</span>}
@@ -9987,6 +9987,8 @@ function MatchupEngineTab() {
                           {b.batter}
                         </span>
                         <InjuryBadge pid={pid} name={b.batter}/>
+                        {isHotBatPlayer(b) && <span style={{fontSize:10,flexShrink:0,lineHeight:1}}
+                          title="🔥 Hot Bat — 3+ HRs in last 7 days">🔥</span>}
                         <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
                           marginLeft:2}}>{b.batter_hand}HB</span>
                         <span style={{fontSize:10,color:'var(--muted)',opacity:.5}}>›</span>
