@@ -313,6 +313,14 @@ const PLAYER_DATA_CACHE = {};
 let PLAYER_CACHE_DATE = null; // timestamp (ms) — refreshes every 3 hours
 function cachePlayer(p) { if (p.pid) PLAYER_DATA_CACHE[String(p.pid)] = p; }
 function getCachedPlayer(pid) { return PLAYER_DATA_CACHE[String(pid)] || PLAYER_DATA_CACHE[parseInt(pid)] || null; }
+// Hot bat: 2+ HRs in last 7 days — works on player cache AND engine rows
+function isHotBatPlayer(p) {
+  if (!p) return false;
+  const fromCache = parseFloat(p.windows?.last7?.hr ?? p.l7hr ?? -1);
+  const fromRow   = parseFloat(p.recent_hr_count ?? -1);
+  const val = fromCache >= 0 ? fromCache : fromRow >= 0 ? fromRow : -1;
+  return val >= 2;
+}
 // Normalize team abbreviations — MLB API still returns legacy codes for relocated teams
 const TEAM_ABBR_MAP = { OAK: 'ATH' };
 // Venue name overrides — MLB Stats API sometimes returns stale/old names
@@ -3766,8 +3774,11 @@ function LRow({b, rank}) {
           {b.due && DUE_BADGE}
           {b.isDiamond && <span style={{padding:'1px 4px',borderRadius:4,fontSize:9,fontWeight:700,
             background:'rgba(255,204,0,.15)',color:'#ffcc00',border:'1px solid rgba(255,204,0,.3)',flexShrink:0}}>💎</span>}
+          {isHotBatPlayer(getCachedPlayer(b.id)) && <span style={{fontSize:10,flexShrink:0,lineHeight:1}}
+            title='🔥 Hot Bat — 2+ HRs in last 7 days'>🔥</span>}
+          <InjuryBadge pid={b.id} name={b.name}/>
           <div style={{minWidth:0,flex:1}}>
-          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,
+          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,
             color:isKeyMatchup(b.id)?'#ff8020':'var(--text)',
             whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',display:'block',maxWidth:140}}>{b.name}</span>
         </div>
@@ -3963,6 +3974,8 @@ function GPanel({game, isLive, isFinal=false}) {
                     <div style={{minWidth:0}}>
                       <div style={{display:'flex',alignItems:'center',gap:3}}>
                         <div className="pn" style={{fontSize:12,...(isKeyMatchup(b.id)?{color:'#ff8020',fontWeight:700}:{})}}>{b.name}</div>
+                        {isHotBatPlayer(b) && <span style={{fontSize:10,flexShrink:0,lineHeight:1}}
+                          title='🔥 Hot Bat — 2+ HRs in last 7 days'>🔥</span>}
                         <InjuryBadge pid={parseInt(b.batter_id||b.id)||0} name={b.name||b.batter}/>
                       </div>
                       <div style={{fontSize:9,color:"var(--accent2)",fontFamily:"'DM Mono',monospace",fontWeight:700}}>
@@ -7013,6 +7026,7 @@ function SimLabView({ data }) {
   const [simPicksOnly, setSimPicksOnly]           = useState(false);
   const [simActiveOnly, setSimActiveOnly]         = useState(false);
   const [simInjuredOnly, setSimInjuredOnly]       = useState(false);
+  const [simHotOnly, setSimHotOnly]               = useState(false);
   const [minHRScore, setMinHRScore]   = useState('');
   const [minHRPct,   setMinHRPct]     = useState('');
   const [minMeatball,setMinMeatball]  = useState('');
@@ -7074,6 +7088,7 @@ function SimLabView({ data }) {
       .filter(r => !simPicksOnly || picks[String(parseInt(r.batter_id)||0)])
       .filter(r => !simActiveOnly || !INJURY_MAP[String(parseInt(r.batter_id)||0)])
       .filter(r => !simInjuredOnly || !!INJURY_MAP[String(parseInt(r.batter_id)||0)])
+      .filter(r => !simHotOnly || isHotBatPlayer(r))
       .filter(r => {
         if (!filterDiamondSim) return true;
         const stb = parseFloat(r.sim_tb)||0;
@@ -7092,7 +7107,7 @@ function SimLabView({ data }) {
       .filter(r => !minSimTB    || (parseFloat(r.sim_tb)||0)             >= parseFloat(minSimTB));
     const mul = sortDir === 'desc' ? -1 : 1;
     return [...filtered].sort((a, b) => mul * ((parseFloat(a[sortBy]) || 0) - (parseFloat(b[sortBy]) || 0)));
-  }, [data, sortBy, sortDir, teamFilter, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, selPitcherGradesSim, minHRScore, minHRPct, minMeatball, minHitPct, minSimTB]);
+  }, [data, sortBy, sortDir, teamFilter, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, minHRScore, minHRPct, minMeatball, minHitPct, minSimTB]);
 
   // Auto-select top batter when data loads
   useEffect(() => {
@@ -7194,6 +7209,15 @@ function SimLabView({ data }) {
                 fontFamily:"'DM Mono',monospace",fontWeight:simInjuredOnly?700:400,fontSize:11,
                 whiteSpace:'nowrap'}}>
               🤕 {simInjuredOnly?'Injured ✓':'Injured'}
+            </button>
+            <button onClick={() => setSimHotOnly(s => !s)}
+              style={{ padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
+                border: `1px solid ${simHotOnly?'#fb923c':'var(--border)'}`,
+                background: simHotOnly?'rgba(251,146,60,.12)':'transparent',
+                color: simHotOnly?'#fb923c':'var(--muted)',
+                fontFamily: "'DM Mono',monospace", fontWeight: simHotOnly?700:400, fontSize: 11,
+                whiteSpace: 'nowrap' }}>
+              🔥 {simHotOnly?'Hot Bat ✓':'Hot Bat'}
             </button>
             <button onClick={() => setSimPicksOnly(s => !s)}
               style={{ padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
@@ -7369,6 +7393,7 @@ function SimLabView({ data }) {
                               onClick={e=>{e.stopPropagation();const cp=getCachedPlayer(parseInt(b.batter_id)||0)||{};openAtBatSlide({pid:parseInt(b.batter_id)||0,name:b.batter,team:b.batting_team,avgEV:cp.avgEV,barrel:cp.barrel,hardHit:cp.hardHit,flyBall:cp.flyBall,hr:cp.hr,avg:cp.avg,obp:cp.obp,slg:cp.slg,xwoba:cp.xwoba,kPct:cp.kPct,bbPct:cp.bbPct,launchAngle:cp.launchAngle});}}>
                               <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 11 }}>{b.batter}</span>
               <InjuryBadge pid={parseInt(b.batter_id)||0} name={b.batter}/>
+              {isHotBatPlayer(b) && <span style={{fontSize:10,flexShrink:0,lineHeight:1}} title='🔥 Hot Bat — 2+ HRs in last 7 days'>🔥</span>}
               <span style={{fontSize:9,color:'var(--muted)',opacity:.4,marginLeft:2}}>›</span>
                               {isConfirmed(b) && <span style={{ fontSize: 9, color: '#27c97a', flexShrink: 0 }}>✅</span>}
                               {isGoneYardSim(b) && <span style={{ fontSize: 9, flexShrink: 0 }}>💥</span>}
@@ -8364,9 +8389,9 @@ function BvPHistoryTab({ data }) {
 
 function BatterLeaderboard() {
   useInjuries();
-  const isHotBat = (p) => parseFloat(p.windows?.last7?.hr ?? 0) >= 2;
   const [activeOnly, setActiveOnly]           = useState(false);
   const [injuredOnly, setInjuredOnly]         = useState(false);
+  const [hotBatOnly, setHotBatOnly]           = useState(false);
   const [slateFilter, setSlateFilter]     = useState('all');
   const [expandedBatter, setExpandedBatter] = useState(null);
   const [sortCol, setSortCol] = useState('avgEV');
@@ -8477,6 +8502,7 @@ function BatterLeaderboard() {
     .filter(p => !showPicksOnly || picks[String(p.pid)])
     .filter(p => !activeOnly || !INJURY_MAP[String(p.pid||p.id)])
     .filter(p => !injuredOnly || !!INJURY_MAP[String(p.pid||p.id)])
+    .filter(p => !hotBatOnly || isHotBatPlayer(p))
     .filter(p => !filterGoneYard || isGoneYard(p))
     .filter(p => !filterDue || isDue(p.pid||p.id))
     .sort((a, b) => {
@@ -8617,6 +8643,15 @@ function BatterLeaderboard() {
             whiteSpace:'nowrap'}}>
           🤕 {injuredOnly?'Injured ✓':'Injured'}
         </button>
+        <button onClick={()=>setHotBatOnly(s=>!s)}
+          style={{padding:'6px 12px',borderRadius:7,cursor:'pointer',
+            border:`1px solid ${hotBatOnly?'#fb923c':'var(--border)'}`,
+            background:hotBatOnly?'rgba(251,146,60,.12)':'var(--surface2)',
+            color:hotBatOnly?'#fb923c':'var(--muted)',
+            fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:hotBatOnly?700:400,
+            whiteSpace:'nowrap'}}>
+          🔥 {hotBatOnly?'Hot Bat ✓':'Hot Bat'}
+        </button>
         <button onClick={()=>setFilterGoneYard(s=>!s)}
           style={{padding:'6px 12px',borderRadius:7,cursor:'pointer',
             border:`1px solid ${filterGoneYard?'rgba(255,20,0,.5)':'var(--border)'}`,
@@ -8649,6 +8684,14 @@ function BatterLeaderboard() {
             color:injuredOnly?'#fb923c':'var(--muted)',
             fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:injuredOnly?700:400}}>
           🤕 {injuredOnly?'Injured ✓':'Injured'}
+        </button>
+        <button onClick={()=>setHotBatOnly(s=>!s)}
+          style={{padding:'3px 10px',borderRadius:6,cursor:'pointer',
+            border:`1px solid ${hotBatOnly?'#fb923c':'var(--border)'}`,
+            background:hotBatOnly?'rgba(251,146,60,.12)':'transparent',
+            color:hotBatOnly?'#fb923c':'var(--muted)',
+            fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:hotBatOnly?700:400}}>
+          🔥 {hotBatOnly?'Hot Bat ✓':'Hot Bat'}
         </button>
         <button onClick={()=>{
           const esc = v => `"${String(v??'').replace(/"/g,'""')}"`;
@@ -8793,7 +8836,7 @@ function BatterLeaderboard() {
                         {isGoneYard(p) && <span style={{fontSize:7,padding:'1px 4px',borderRadius:3,
                           background:'rgba(255,20,0,.25)',border:'1px solid rgba(255,20,0,.5)',
                           color:'#fff',fontFamily:"'DM Mono',monospace",fontWeight:800,flexShrink:0}}>GY</span>}
-                        {isHotBat(p) && <span style={{fontSize:10,flexShrink:0,lineHeight:1}}
+                        {isHotBatPlayer(p) && <span style={{fontSize:10,flexShrink:0,lineHeight:1}}
                           title={`🔥 Hot Bat — ${parseFloat(p.windows?.last7?.hr??0).toFixed(0)} HR in last 7 days`}>🔥</span>}
                         <InjuryBadge pid={p.pid||p.id} name={p.name}/>
                       </div>
@@ -9243,6 +9286,7 @@ function MatchupEngineTab() {
   useInjuries();
   const [kmActiveOnly, setKmActiveOnly]         = useState(false);
   const [kmInjuredOnly, setKmInjuredOnly]       = useState(false);
+  const [kmHotOnly, setKmHotOnly]               = useState(false);
   const [filterGoneYard, setFilterGoneYard]   = useState(false);
   const [filterDue, setFilterDue]             = useState(false);
   const [filterDiamond, setFilterDiamond]     = useState(false);
@@ -9349,6 +9393,7 @@ function MatchupEngineTab() {
     .filter(r => !kmPicksOnly || picks[String(parseInt(r.batter_id)||0)])
     .filter(r => !kmActiveOnly || !INJURY_MAP[String(parseInt(r.batter_id)||0)])
     .filter(r => !kmInjuredOnly || !!INJURY_MAP[String(parseInt(r.batter_id)||0)])
+    .filter(r => !kmHotOnly || isHotBatPlayer(r))
     .filter(r => {
       if (filterDiamond) {
         const simTB = parseFloat(r.sim_tb)||0;
@@ -9735,6 +9780,15 @@ function MatchupEngineTab() {
           fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:kmInjuredOnly?700:400,
           whiteSpace:'nowrap',marginLeft:4}}>
         🤕 {kmInjuredOnly?'Injured ✓':'Injured'}
+      </button>
+      <button onClick={()=>setKmHotOnly(s=>!s)}
+        style={{padding:'3px 12px',borderRadius:6,cursor:'pointer',
+          border:`1px solid ${kmHotOnly?'#fb923c':'var(--border)'}`,
+          background:kmHotOnly?'rgba(251,146,60,.12)':'transparent',
+          color:kmHotOnly?'#fb923c':'var(--muted)',
+          fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:kmHotOnly?700:400,
+          whiteSpace:'nowrap',marginLeft:4}}>
+        🔥 {kmHotOnly?'Hot Bat ✓':'Hot Bat'}
       </button>
       <button onClick={()=>setKmPicksOnly(s=>!s)}
         style={{padding:'3px 12px',borderRadius:6,cursor:'pointer',
