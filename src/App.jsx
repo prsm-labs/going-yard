@@ -7525,7 +7525,6 @@ function SimLabView({ data }) {
                       </div>
                       {/* Injury banner — always visible, key for mobile */}
                       <InjuryBanner pid={parseInt(b.batter_id)||0} style={{marginTop:8,marginBottom:0}}/>
-                      <Last7HRChart batterId={parseInt(b.batter_id)||0}/>
                       <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)', marginTop: 3 }}>
                         {b.top_pitches && <span>Arsenal: <strong style={{ color: 'var(--text)' }}>{b.top_pitches}</strong> · </span>}
                         {b.wind_effect && <span>{b.wind_effect} · </span>}
@@ -9210,20 +9209,21 @@ function PitcherLeaderboard() {
 
 // ── LAST 7 GAMES HR CHART ────────────────────────────────────────────────────
 function Last7HRChart({ batterId }) {
-  const abs = getCachedPlayer(batterId)?.recentAtBats;
-  if (!abs || abs.length === 0) return null;
-
-  // Group at-bats by game (date + opp)
-  const gameMap = {};
-  for (const a of abs) {
-    const key = a.date + '|' + (a.opp||'');
-    if (!gameMap[key]) gameMap[key] = { date: a.date, opp: a.opp||'?', hrs: 0, pa: 0 };
-    gameMap[key].pa++;
-    if (a.result === 'home_run') gameMap[key].hrs++;
+  // Use pipeline recentGames (last 7 game summaries), fall back to grouping recentAtBats
+  const cached = getCachedPlayer(batterId);
+  let games = cached?.recentGames || [];
+  if (games.length === 0) {
+    // Fallback: group recentAtBats by game
+    const abs = cached?.recentAtBats || [];
+    const gameMap = {};
+    for (const a of abs) {
+      const key = a.date + '|' + (a.opp||'');
+      if (!gameMap[key]) gameMap[key] = { date: a.date, opp: a.opp||'?', hrs: 0, pa: 0 };
+      gameMap[key].pa++;
+      if (a.result === 'home_run') gameMap[key].hrs++;
+    }
+    games = Object.values(gameMap).sort((a,b) => a.date > b.date ? 1 : -1);
   }
-  const games = Object.values(gameMap)
-    .sort((a,b) => a.date > b.date ? 1 : -1)
-    .slice(-7);
   if (games.length === 0) return null;
 
   const hitGames = games.filter(g => g.hrs > 0).length;
