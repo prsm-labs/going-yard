@@ -9269,8 +9269,8 @@ function Last7HRChart({ batterId }) {
       borderRadius:12,padding:'14px 16px',marginTop:12}}>
       {/* Header */}
       <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',marginBottom:12}}>
-        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:15,
-          letterSpacing:.5,color:'var(--text)'}}>{label}</span>
+        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:12,
+          letterSpacing:.5,color:'var(--text)'}}>💥 Gone Yard</span>
         <div style={{display:'flex',alignItems:'baseline',gap:8}}>
           <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--muted)'}}>
             {hitGames} of {games.length}
