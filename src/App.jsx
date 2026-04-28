@@ -7018,6 +7018,7 @@ function SimLabView({ data }) {
   const [filterDiamondSim, setFilterDiamondSim] = useState(false);
   const [simPicksOnly, setSimPicksOnly]           = useState(false);
   const [simActiveOnly, setSimActiveOnly]         = useState(false);
+  const [simInjuredOnly, setSimInjuredOnly]       = useState(false);
   const [minHRScore, setMinHRScore]   = useState('');
   const [minHRPct,   setMinHRPct]     = useState('');
   const [minMeatball,setMinMeatball]  = useState('');
@@ -7078,6 +7079,7 @@ function SimLabView({ data }) {
       .filter(r => !filterDueSim || isDueFromRow(r, parseInt(r.batter_id)||0))
       .filter(r => !simPicksOnly || picks[String(parseInt(r.batter_id)||0)])
       .filter(r => !simActiveOnly || !INJURY_MAP[String(parseInt(r.batter_id)||0)])
+      .filter(r => !simInjuredOnly || !!INJURY_MAP[String(parseInt(r.batter_id)||0)])
       .filter(r => {
         if (!filterDiamondSim) return true;
         const stb = parseFloat(r.sim_tb)||0;
@@ -7096,7 +7098,7 @@ function SimLabView({ data }) {
       .filter(r => !minSimTB    || (parseFloat(r.sim_tb)||0)             >= parseFloat(minSimTB));
     const mul = sortDir === 'desc' ? -1 : 1;
     return [...filtered].sort((a, b) => mul * ((parseFloat(a[sortBy]) || 0) - (parseFloat(b[sortBy]) || 0)));
-  }, [data, sortBy, sortDir, teamFilter, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, selPitcherGradesSim, minHRScore, minHRPct, minMeatball, minHitPct, minSimTB]);
+  }, [data, sortBy, sortDir, teamFilter, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, selPitcherGradesSim, minHRScore, minHRPct, minMeatball, minHitPct, minSimTB]);
 
   // Auto-select top batter when data loads
   useEffect(() => {
@@ -7181,14 +7183,23 @@ function SimLabView({ data }) {
                 fontFamily: "'DM Mono',monospace", fontWeight: filterDueSim ? 700 : 400, fontSize: 11 }}>
               ⏳ {filterDueSim ? 'Due ✓' : 'Due'}
             </button>
-            <button onClick={() => setSimActiveOnly(s => !s)}
-              style={{ padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
-                border: `1px solid ${simActiveOnly ? 'var(--ice)' : 'var(--border)'}`,
-                background: simActiveOnly ? 'rgba(56,184,242,.12)' : 'transparent',
-                color: simActiveOnly ? 'var(--ice)' : 'var(--muted)',
-                fontFamily: "'DM Mono',monospace", fontWeight: simActiveOnly ? 700 : 400, fontSize: 11,
-                whiteSpace: 'nowrap' }}>
-              ✅ {simActiveOnly ? 'Active Only ✓' : 'Active Only'}
+            <button onClick={()=>{setSimActiveOnly(s=>!s);if(!simActiveOnly)setSimInjuredOnly(false);}}
+              style={{padding:'4px 10px',borderRadius:6,cursor:'pointer',
+                border:`1px solid ${simActiveOnly?'#34d399':'var(--border)'}`,
+                background:simActiveOnly?'rgba(52,211,153,.12)':'transparent',
+                color:simActiveOnly?'#34d399':'var(--muted)',
+                fontFamily:"'DM Mono',monospace",fontWeight:simActiveOnly?700:400,fontSize:11,
+                whiteSpace:'nowrap'}}>
+              ☑️ {simActiveOnly?'Active ✓':'Active'}
+            </button>
+            <button onClick={()=>{setSimInjuredOnly(s=>!s);if(!simInjuredOnly)setSimActiveOnly(false);}}
+              style={{padding:'4px 10px',borderRadius:6,cursor:'pointer',
+                border:`1px solid ${simInjuredOnly?'#fb923c':'var(--border)'}`,
+                background:simInjuredOnly?'rgba(251,146,60,.12)':'transparent',
+                color:simInjuredOnly?'#fb923c':'var(--muted)',
+                fontFamily:"'DM Mono',monospace",fontWeight:simInjuredOnly?700:400,fontSize:11,
+                whiteSpace:'nowrap'}}>
+              🤕 {simInjuredOnly?'Injured ✓':'Injured'}
             </button>
             <button onClick={() => setSimPicksOnly(s => !s)}
               style={{ padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
@@ -8088,8 +8099,9 @@ function BvPHistoryTab({ data }) {
   const [loaded, setLoaded]       = useState(false);
   const [sortCol, setSortCol]     = useState('hr');
   const [sortDir, setSortDir]     = useState(1);  // 1 with (bn-an) = descending
-  const [bvpPicksOnly, setBvpPicksOnly]   = useState(false);
-  const [bvpActiveOnly, setBvpActiveOnly] = useState(false);
+  const [bvpPicksOnly, setBvpPicksOnly]     = useState(false);
+  const [bvpActiveOnly, setBvpActiveOnly]   = useState(false);
+  const [bvpInjuredOnly, setBvpInjuredOnly] = useState(false);
   const [minPA, setMinPA]         = useState(1);
   const [search, setSearch]       = useState('');
 
@@ -8161,6 +8173,7 @@ function BvPHistoryTab({ data }) {
     let r = rows;
     if (bvpPicksOnly) r = r.filter(x => picks[String(x.batterId)]);
     if (bvpActiveOnly) r = r.filter(x => !INJURY_MAP[String(x.batterId)]);
+    if (bvpInjuredOnly) r = r.filter(x => !!INJURY_MAP[String(x.batterId)]);
     if (minPA > 0) r = r.filter(x => (x.pa||0) >= minPA);
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -8173,7 +8186,7 @@ function BvPHistoryTab({ data }) {
       const bn = typeof bv === 'string' ? parseFloat(bv)||0 : bv;
       return sortDir * (bn - an);
     });
-  }, [rows, sortCol, sortDir, minPA, search, bvpPicksOnly, bvpActiveOnly]);
+  }, [rows, sortCol, sortDir, minPA, search, bvpPicksOnly, bvpActiveOnly, bvpInjuredOnly]);
 
   const SortIcon = ({col}) => sortCol===col
     ? <span style={{marginLeft:3,fontSize:8}}>{sortDir===-1?'▼':'▲'}</span>
@@ -8243,14 +8256,23 @@ function BvPHistoryTab({ data }) {
             </button>
           ))}
         </div>
-        <button onClick={()=>setBvpActiveOnly(s=>!s)}
+        <button onClick={()=>{setBvpActiveOnly(s=>!s);if(!bvpActiveOnly)setBvpInjuredOnly(false);}}
           style={{padding:'3px 10px',borderRadius:6,cursor:'pointer',
-            border:`1px solid ${bvpActiveOnly?'var(--ice)':'var(--border)'}`,
-            background:bvpActiveOnly?'rgba(56,184,242,.12)':'transparent',
-            color:bvpActiveOnly?'var(--ice)':'var(--muted)',
+            border:`1px solid ${bvpActiveOnly?'#34d399':'var(--border)'}`,
+            background:bvpActiveOnly?'rgba(52,211,153,.12)':'transparent',
+            color:bvpActiveOnly?'#34d399':'var(--muted)',
             fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:bvpActiveOnly?700:400,
             whiteSpace:'nowrap',flexShrink:0}}>
-          ✅ {bvpActiveOnly?'Active Only ✓':'Active Only'}
+          ☑️ {bvpActiveOnly?'Active ✓':'Active'}
+        </button>
+        <button onClick={()=>{setBvpInjuredOnly(s=>!s);if(!bvpInjuredOnly)setBvpActiveOnly(false);}}
+          style={{padding:'3px 10px',borderRadius:6,cursor:'pointer',
+            border:`1px solid ${bvpInjuredOnly?'#fb923c':'var(--border)'}`,
+            background:bvpInjuredOnly?'rgba(251,146,60,.12)':'transparent',
+            color:bvpInjuredOnly?'#fb923c':'var(--muted)',
+            fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:bvpInjuredOnly?700:400,
+            whiteSpace:'nowrap',flexShrink:0}}>
+          🤕 {bvpInjuredOnly?'Injured ✓':'Injured'}
         </button>
         <button onClick={()=>setBvpPicksOnly(s=>!s)}
           style={{padding:'3px 10px',borderRadius:6,cursor:'pointer',
@@ -8349,6 +8371,7 @@ function BvPHistoryTab({ data }) {
 function BatterLeaderboard() {
   useInjuries();
   const [activeOnly, setActiveOnly]           = useState(false);
+  const [injuredOnly, setInjuredOnly]         = useState(false);
   const [slateFilter, setSlateFilter]     = useState('all');
   const [expandedBatter, setExpandedBatter] = useState(null);
   const [sortCol, setSortCol] = useState('avgEV');
@@ -8458,6 +8481,7 @@ function BatterLeaderboard() {
     .filter(p => !searchQ || p.name?.toLowerCase().includes(searchQ.toLowerCase()))
     .filter(p => !showPicksOnly || picks[String(p.pid)])
     .filter(p => !activeOnly || !INJURY_MAP[String(p.pid||p.id)])
+    .filter(p => !injuredOnly || !!INJURY_MAP[String(p.pid||p.id)])
     .filter(p => !filterGoneYard || isGoneYard(p))
     .filter(p => !filterDue || isDue(p.pid||p.id))
     .sort((a, b) => {
@@ -8580,14 +8604,23 @@ function BatterLeaderboard() {
             whiteSpace:'nowrap',transition:'all .15s'}}>
           🎯 {showPicksOnly ? 'My Picks ✓' : 'My Picks'}
         </button>
-        <button onClick={()=>setActiveOnly(s=>!s)}
+        <button onClick={()=>{setActiveOnly(s=>!s);if(!activeOnly)setInjuredOnly(false);}}
           style={{padding:'6px 12px',borderRadius:7,cursor:'pointer',
-            border:`1px solid ${activeOnly?'var(--ice)':'var(--border)'}`,
-            background:activeOnly?'rgba(56,184,242,.12)':'var(--surface2)',
-            color:activeOnly?'var(--ice)':'var(--muted)',
+            border:`1px solid ${activeOnly?'#34d399':'var(--border)'}`,
+            background:activeOnly?'rgba(52,211,153,.12)':'var(--surface2)',
+            color:activeOnly?'#34d399':'var(--muted)',
             fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:activeOnly?700:400,
             whiteSpace:'nowrap'}}>
-          ✅ {activeOnly?'Active Only ✓':'Active Only'}
+          ☑️ {activeOnly?'Active ✓':'Active'}
+        </button>
+        <button onClick={()=>{setInjuredOnly(s=>!s);if(!injuredOnly)setActiveOnly(false);}}
+          style={{padding:'6px 12px',borderRadius:7,cursor:'pointer',
+            border:`1px solid ${injuredOnly?'#fb923c':'var(--border)'}`,
+            background:injuredOnly?'rgba(251,146,60,.12)':'var(--surface2)',
+            color:injuredOnly?'#fb923c':'var(--muted)',
+            fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:injuredOnly?700:400,
+            whiteSpace:'nowrap'}}>
+          🤕 {injuredOnly?'Injured ✓':'Injured'}
         </button>
         <button onClick={()=>setFilterGoneYard(s=>!s)}
           style={{padding:'6px 12px',borderRadius:7,cursor:'pointer',
@@ -8606,13 +8639,21 @@ function BatterLeaderboard() {
             fontFamily:"'DM Mono',monospace",fontWeight:filterDue?700:400,fontSize:11}}>
           ⏳ {filterDue ? 'Due ✓' : 'Due'}
         </button>
-        <button onClick={()=>setActiveOnly(s=>!s)}
+        <button onClick={()=>{setActiveOnly(s=>!s);if(!activeOnly)setInjuredOnly(false);}}
           style={{padding:'3px 10px',borderRadius:6,cursor:'pointer',
-            border:`1px solid ${activeOnly?'var(--ice)':'var(--border)'}`,
-            background:activeOnly?'rgba(56,184,242,.12)':'transparent',
-            color:activeOnly?'var(--ice)':'var(--muted)',
+            border:`1px solid ${activeOnly?'#34d399':'var(--border)'}`,
+            background:activeOnly?'rgba(52,211,153,.12)':'transparent',
+            color:activeOnly?'#34d399':'var(--muted)',
             fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:activeOnly?700:400}}>
-          ✅ {activeOnly?'Active Only ✓':'Active Only'}
+          ☑️ {activeOnly?'Active ✓':'Active'}
+        </button>
+        <button onClick={()=>{setInjuredOnly(s=>!s);if(!injuredOnly)setActiveOnly(false);}}
+          style={{padding:'3px 10px',borderRadius:6,cursor:'pointer',
+            border:`1px solid ${injuredOnly?'#fb923c':'var(--border)'}`,
+            background:injuredOnly?'rgba(251,146,60,.12)':'transparent',
+            color:injuredOnly?'#fb923c':'var(--muted)',
+            fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:injuredOnly?700:400}}>
+          🤕 {injuredOnly?'Injured ✓':'Injured'}
         </button>
         <button onClick={()=>{
           const esc = v => `"${String(v??'').replace(/"/g,'""')}"`;
@@ -8812,8 +8853,9 @@ function BatterLeaderboard() {
 // ── PITCHER LEADERBOARD ────────────────────────────────────────
 function PitcherLeaderboard() {
   useInjuries();
-  const [activeOnly, setActiveOnly] = useState(false);
-  const [pitchers, setPitchers]     = useState([]);
+  const [activeOnly, setActiveOnly]   = useState(false);
+  const [injuredOnly, setInjuredOnly] = useState(false);
+  const [pitchers, setPitchers]       = useState([]);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState(null);
   const [sortCol, setSortCol]       = useState('era');
@@ -8899,6 +8941,7 @@ function PitcherLeaderboard() {
     .filter(p => !searchQ || p.name.toLowerCase().includes(searchQ.toLowerCase()))
     .filter(p => gradeFilter === 'all' || p._grade.label === gradeFilter)
     .filter(p => !activeOnly || !INJURY_MAP[String(p.pid)])
+    .filter(p => !injuredOnly || !!INJURY_MAP[String(p.pid)])
     .sort((a,b)=>{
       const av = sortCol==='name'?(a.name||''):(a[sortCol]??99);
       const bv = sortCol==='name'?(b.name||''):(b[sortCol]??99);
@@ -9203,7 +9246,8 @@ function MatchupEngineTab() {
   const pitcherGradeCache = useRef({});
   const [selPitcherGrade, setSelPitcherGrade] = useState('all');
   useInjuries();
-  const [kmActiveOnly, setKmActiveOnly]       = useState(false);
+  const [kmActiveOnly, setKmActiveOnly]         = useState(false);
+  const [kmInjuredOnly, setKmInjuredOnly]       = useState(false);
   const [filterGoneYard, setFilterGoneYard]   = useState(false);
   const [filterDue, setFilterDue]             = useState(false);
   const [filterDiamond, setFilterDiamond]     = useState(false);
@@ -9309,6 +9353,7 @@ function MatchupEngineTab() {
     .filter(r => selGrade === 'all' || r.grade === selGrade)
     .filter(r => !kmPicksOnly || picks[String(parseInt(r.batter_id)||0)])
     .filter(r => !kmActiveOnly || !INJURY_MAP[String(parseInt(r.batter_id)||0)])
+    .filter(r => !kmInjuredOnly || !!INJURY_MAP[String(parseInt(r.batter_id)||0)])
     .filter(r => {
       if (filterDiamond) {
         const simTB = parseFloat(r.sim_tb)||0;
@@ -9678,14 +9723,23 @@ function MatchupEngineTab() {
           fontFamily:"'DM Mono',monospace",fontWeight:filterDue?700:400,fontSize:11}}>
         ⏳ {filterDue ? 'Due ✓' : 'Due'}
       </button>
-      <button onClick={()=>setKmActiveOnly(s=>!s)}
+      <button onClick={()=>{setKmActiveOnly(s=>!s);if(!kmActiveOnly)setKmInjuredOnly(false);}}
         style={{padding:'3px 12px',borderRadius:6,cursor:'pointer',
-          border:`1px solid ${kmActiveOnly?'var(--ice)':'var(--border)'}`,
-          background:kmActiveOnly?'rgba(56,184,242,.12)':'transparent',
-          color:kmActiveOnly?'var(--ice)':'var(--muted)',
+          border:`1px solid ${kmActiveOnly?'#34d399':'var(--border)'}`,
+          background:kmActiveOnly?'rgba(52,211,153,.12)':'transparent',
+          color:kmActiveOnly?'#34d399':'var(--muted)',
           fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:kmActiveOnly?700:400,
           whiteSpace:'nowrap',marginLeft:4}}>
-        ✅ {kmActiveOnly?'Active Only ✓':'Active Only'}
+        ☑️ {kmActiveOnly?'Active ✓':'Active'}
+      </button>
+      <button onClick={()=>{setKmInjuredOnly(s=>!s);if(!kmInjuredOnly)setKmActiveOnly(false);}}
+        style={{padding:'3px 12px',borderRadius:6,cursor:'pointer',
+          border:`1px solid ${kmInjuredOnly?'#fb923c':'var(--border)'}`,
+          background:kmInjuredOnly?'rgba(251,146,60,.12)':'transparent',
+          color:kmInjuredOnly?'#fb923c':'var(--muted)',
+          fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:kmInjuredOnly?700:400,
+          whiteSpace:'nowrap',marginLeft:4}}>
+        🤕 {kmInjuredOnly?'Injured ✓':'Injured'}
       </button>
       <button onClick={()=>setKmPicksOnly(s=>!s)}
         style={{padding:'3px 12px',borderRadius:6,cursor:'pointer',
