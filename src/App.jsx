@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 
 // ── PWA Push Notifications ───────────────────────────────────────────────────
-const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY || '';
+const VAPID_PUBLIC_KEY = (typeof window !== 'undefined' && window.__VAPID_KEY__) || '';
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   });
 }
+// Kick off injury fetch early
+fetchInjuries();
 async function subscribeToPush() {
   try {
     if (!('PushManager' in window)) return 'unsupported';
@@ -3907,7 +3909,10 @@ function GPanel({game, isLive, isFinal=false}) {
                   <div className="pc" style={{flex:1,minWidth:0}}>
                     <PlayerAvatar pid={b.id} name={b.name} size={26}/>
                     <div style={{minWidth:0}}>
-                      <div className="pn" style={{fontSize:12,...(isKeyMatchup(b.id)?{color:'#ff8020',fontWeight:700}:{})}}>{b.name}</div>
+                      <div style={{display:'flex',alignItems:'center',gap:3}}>
+                        <div className="pn" style={{fontSize:12,...(isKeyMatchup(b.id)?{color:'#ff8020',fontWeight:700}:{})}}>{b.name}</div>
+                        <InjuryBadge pid={parseInt(b.batter_id||b.id)||0}/>
+                      </div>
                       <div style={{fontSize:9,color:"var(--accent2)",fontFamily:"'DM Mono',monospace",fontWeight:700}}>
                         {getTeam(b.id,b.team)}
                       </div>
@@ -5817,7 +5822,7 @@ function PitchBuilderTab() {
               const rowBg=matchup?.cls==="pos"?"rgba(39,201,122,.04)":matchup?.cls==="neg"?"rgba(56,184,242,.03)":"";
               return <tr key={p.id} style={{background:rowBg}}>
                 <td><div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:15,color:top3?pitchCol:"var(--muted)"}}>{i+1}</div></td>
-                <td><div className="pc"><PlayerAvatar pid={p.id} name={p.name} size={30} style={{border:"1px solid "+(top3?pitchCol+"50":"var(--border)")}}/><div><div className="pn">{p.name}</div><div className="pt">{p.team} · {p.hr} HR</div></div></div></td>
+                <td><div className="pc"><PlayerAvatar pid={p.id} name={p.name} size={30} style={{border:"1px solid "+(top3?pitchCol+"50":"var(--border)")}}/><div><div style={{display:"flex",alignItems:"center",gap:3}}><div className="pn">{p.name}</div><InjuryBadge pid={p.pid}/></div><div className="pt">{p.team} · {p.hr} HR</div></div></div></td>
                 <td>
                   <div style={{display:"flex",flexDirection:"column",gap:2}}>
                     <div style={{display:"inline-flex",alignItems:"center",gap:4,padding:"2px 7px",borderRadius:5,background:"var(--surface2)",border:"1px solid var(--border)",width:"fit-content"}}>
@@ -5849,6 +5854,74 @@ function PitchBuilderTab() {
 // Global HR data — shared between ticker and tracker tab
 let HR_DATA = [];
 const VIDEO_LINK_CACHE = {}; // gamePk_atBatIndex → savant video URL
+
+// ── Injury Report — MLB Stats API IL transactions ─────────────────────────────
+const INJURY_MAP = {};  // pid → { emoji, label, desc, date, team }
+const INJURY_LISTENERS = new Set();
+let   INJURY_LOADED = false;
+
+function subscribeInjuries(fn) { INJURY_LISTENERS.add(fn); return () => INJURY_LISTENERS.delete(fn); }
+function notifyInjuryListeners() { INJURY_LISTENERS.forEach(fn => fn(Date.now())); }
+
+async function fetchInjuries() {
+  if (INJURY_LOADED) return;
+  try {
+    const today = new Date().toISOString().slice(0,10);
+    const ago90 = new Date(Date.now()-90*864e5).toISOString().slice(0,10);
+    const r = await fetch(
+      `https://statsapi.mlb.com/api/v1/transactions?sportId=1&startDate=${ago90}&endDate=${today}&gameType=R`,
+      { signal: AbortSignal.timeout(9000) }
+    );
+    if (!r.ok) return;
+    const d = await r.json();
+    const IL_EMOJI = { IL10:'🩼', IL15:'🤕', IL60:'🚫', DL10:'🩼', DL15:'🤕', DL60:'🚫' };
+    const IL_LABEL = { IL10:'10-Day IL', IL15:'15-Day IL', IL60:'60-Day IL',
+                       DL10:'10-Day IL', DL15:'15-Day IL', DL60:'60-Day IL' };
+    // Track placements and activations
+    const placements  = {};   // pid → latest IL transaction
+    const activations = {};   // pid → latest activation date
+    for (const t of (d.transactions || [])) {
+      const pid  = String(t.person?.id || '');
+      const code = (t.typeCode || '').toUpperCase();
+      if (!pid) continue;
+      if (code in IL_EMOJI) {
+        if (!placements[pid] || t.date > placements[pid].date)
+          placements[pid] = { code, date: t.date, effectiveDate: t.effectiveDate,
+                              desc: t.description || IL_LABEL[code],
+                              team: t.toTeam?.abbreviation || '' };
+      } else if (/^(RL|ACTML|RCTML|OUTRL)/.test(code)) {
+        // Activation / return from IL
+        if (!activations[pid] || t.date > activations[pid]) activations[pid] = t.date;
+      }
+    }
+    // Build map: only players still on IL (no activation after placement)
+    Object.entries(placements).forEach(([pid, t]) => {
+      const activatedAfter = activations[pid] && activations[pid] >= t.date;
+      if (!activatedAfter) {
+        INJURY_MAP[pid] = {
+          emoji: IL_EMOJI[t.code],
+          label: IL_LABEL[t.code],
+          desc:  t.desc,
+          date:  t.date,
+          team:  t.team,
+        };
+      }
+    });
+    INJURY_LOADED = true;
+    notifyInjuryListeners();
+    console.log(`[Injuries] ${Object.keys(INJURY_MAP).length} players on IL`);
+  } catch(e) { console.warn('[Injuries] fetch failed:', e.message); }
+}
+
+function useInjuries() {
+  const [v, setV] = useState(0);
+  useEffect(() => {
+    fetchInjuries();
+    const unsub = subscribeInjuries(() => setV(n => n+1));
+    return unsub;
+  }, []);
+  return v;
+}
 async function fetchVideoLinks(hrs) {
   const games = [...new Set(hrs.map(h => String(h.gamePk)).filter(Boolean))];
   if (!games.length) return;
@@ -6315,10 +6388,11 @@ function HRTrackerTab() {
                 const todayNum = hrRankMap[`${hr.batterId}_${hr.gamePk}_${hr.atBatIndex||hr.playIndex||hr.plateAppearance||0}`] || 1;
                 const seasonNum = cachedHR > 0 ? cachedHR + todayNum : todayNum;
                 return <tr key={i}>
-                <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:i<3?"var(--accent)":"var(--muted)"}}>{i+1}</span></td>
+                <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:i<3?"var(--accent)":"var(--muted)"}}>{sorted.length - i}</span></td>
                 <td><span style={{fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:600,color:"var(--text)"}}>{hr.timeET&&hr.timeET!==""?hr.timeET:`Inn. ${hr.inning}`}</span></td>
                 <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color:"var(--text)"}}>{hr.batterTeam}</span></td>
-                <td style={{whiteSpace:"nowrap"}}><div style={{display:"flex",alignItems:"center",gap:5}}><PlayerAvatar pid={hr.batterId} name={hr.batterName} size={20}/><span className="pn" style={{fontSize:11,...(isKeyMatchup(hr.batterId,hr.batterName)?{color:"#ff8020",fontWeight:700}:{})}}>{hr.batterName}</span></div></td>
+                <td style={{whiteSpace:"nowrap"}}><div style={{display:"flex",alignItems:"center",gap:5}}><PlayerAvatar pid={hr.batterId} name={hr.batterName} size={20}/><span className="pn" style={{fontSize:11,...(isKeyMatchup(hr.batterId,hr.batterName)?{color:"#ff8020",fontWeight:700}:{})}}>{hr.batterName}</span>
+                <InjuryBadge pid={hr.batterId}/></div></td>
                 <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:12,color:'var(--accent)'}}>{seasonNum}</span></td>
                 <td>
                 <div style={{display:"flex",alignItems:"center",gap:6}}>
@@ -7210,7 +7284,9 @@ function SimLabView({ data }) {
                           <div style={{ minWidth: 0 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', cursor:'pointer' }}
                               onClick={e=>{e.stopPropagation();const cp=getCachedPlayer(parseInt(b.batter_id)||0)||{};openAtBatSlide({pid:parseInt(b.batter_id)||0,name:b.batter,team:b.batting_team,avgEV:cp.avgEV,barrel:cp.barrel,hardHit:cp.hardHit,flyBall:cp.flyBall,hr:cp.hr,avg:cp.avg,obp:cp.obp,slg:cp.slg,xwoba:cp.xwoba,kPct:cp.kPct,bbPct:cp.bbPct,launchAngle:cp.launchAngle});}}>
-                              <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 11 }}>{b.batter}</span><span style={{fontSize:9,color:'var(--muted)',opacity:.4,marginLeft:2}}>›</span>
+                              <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 11 }}>{b.batter}</span>
+              <InjuryBadge pid={parseInt(b.batter_id)||0}/>
+              <span style={{fontSize:9,color:'var(--muted)',opacity:.4,marginLeft:2}}>›</span>
                               {isConfirmed(b) && <span style={{ fontSize: 9, color: '#27c97a', flexShrink: 0 }}>✅</span>}
                               {isGoneYardSim(b) && <span style={{ fontSize: 9, flexShrink: 0 }}>💥</span>}
                               {WEATHER_ALERT_GAME_IDS.has(String(b.game_id)) && <span title="Weather may impact this game" style={{ fontSize: 9, flexShrink: 0 }}>⚠️</span>}
@@ -7628,6 +7704,20 @@ async function fetchBvP(batterId, pitcherId) {
 
 // ── CHEAT CODE SLIDEOUT ──────────────────────────────────────────────────────
 // ── NOTIFICATION BELL ────────────────────────────────────────────────────────
+// ── INJURY BADGE ─────────────────────────────────────────────────────────────
+function InjuryBadge({ pid }) {
+  const inj = INJURY_MAP[String(pid || '')];
+  if (!inj) return null;
+  const tip = `${inj.label} · ${inj.desc || 'Injured List'}${inj.date ? ' (since '+inj.date+')' : ''}`;
+  return (
+    <span title={tip} aria-label={tip}
+      style={{cursor:'help',fontSize:11,flexShrink:0,lineHeight:1,
+        display:'inline-flex',alignItems:'center'}}>
+      {inj.emoji}
+    </span>
+  );
+}
+
 function NotifyBell() {
   const [state, setState] = useState('loading'); // loading|unsupported|default|subscribed|denied|error
   const [busy, setBusy]   = useState(false);
@@ -7934,6 +8024,7 @@ function BvPHistoryTab({ data }) {
         <div style={{cursor:'pointer',display:'flex',alignItems:'center',gap:3}}
           onClick={()=>{const cp=getCachedPlayer(r.batterId)||{};openAtBatSlide({pid:r.batterId,name:r.batter,team:r.team,avgEV:cp.avgEV,barrel:cp.barrel,hr:cp.hr,avg:cp.avg,obp:cp.obp,slg:cp.slg});}}>
           <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11}}>{r.batter}</span>
+          <InjuryBadge pid={r.batterId}/>
           <span style={{fontSize:9,opacity:.4}}>›</span>
         </div>
       </div>
@@ -7943,6 +8034,7 @@ function BvPHistoryTab({ data }) {
       <div style={{cursor:'pointer',display:'flex',alignItems:'center',gap:4}}
         onClick={()=>openPitcherSlide({pid:r.pitcherId,name:r.pitcher,team:r.opp,hand:r.pitcherHand,pitchMix:[]})}>
         <span style={{fontFamily:"'DM Mono',monospace",fontSize:10}}>{r.pitcher}</span>
+          <InjuryBadge pid={r.pitcherId}/>
         <span style={{fontSize:8,color:'var(--muted)',opacity:.4}}>({r.pitcherHand}HP)</span>
         <span style={{fontSize:9,opacity:.4}}>›</span>
       </div>
@@ -8082,6 +8174,7 @@ function BvPHistoryTab({ data }) {
 }
 
 function BatterLeaderboard() {
+  useInjuries(); // re-render when injury data loads
   const [slateFilter, setSlateFilter]     = useState('all');
   const [expandedBatter, setExpandedBatter] = useState(null);
   const [sortCol, setSortCol] = useState('avgEV');
@@ -8472,6 +8565,7 @@ function BatterLeaderboard() {
                         {isGoneYard(p) && <span style={{fontSize:7,padding:'1px 4px',borderRadius:3,
                           background:'rgba(255,20,0,.25)',border:'1px solid rgba(255,20,0,.5)',
                           color:'#fff',fontFamily:"'DM Mono',monospace",fontWeight:800,flexShrink:0}}>GY</span>}
+                        <InjuryBadge pid={p.pid||p.id}/>
                       </div>
                     </td>
                     {/* Stat columns */}
@@ -8522,6 +8616,7 @@ function BatterLeaderboard() {
 
 // ── PITCHER LEADERBOARD ────────────────────────────────────────
 function PitcherLeaderboard() {
+  useInjuries();
   const [pitchers, setPitchers]     = useState([]);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState(null);
@@ -8910,6 +9005,7 @@ function MatchupEngineTab() {
   const liveCache = useRef({});
   const pitcherGradeCache = useRef({});
   const [selPitcherGrade, setSelPitcherGrade] = useState('all');
+  useInjuries();
   const [filterGoneYard, setFilterGoneYard]   = useState(false);
   const [filterDue, setFilterDue]             = useState(false);
   const [filterDiamond, setFilterDiamond]     = useState(false);
