@@ -1,11 +1,11 @@
 // api/notify.js
 // Sends a push notification to all subscribed devices
-// Called by the browser (live alerts) or your pipeline (scheduled alerts)
 
 import webpush from 'web-push';
+import { Redis } from '@upstash/redis';
 
 webpush.setVapidDetails(
-  'mailto:' + (process.env.VAPID_EMAIL || 'you@example.com'),
+  'mailto:' + (process.env.VAPID_EMAIL || 'admin@goingyard.app'),
   process.env.VAPID_PUBLIC_KEY  || '',
   process.env.VAPID_PRIVATE_KEY || ''
 );
@@ -18,34 +18,21 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
 
-  // Verify secret so only your app/pipeline can trigger notifications
+  // Verify secret
   if (req.body?.secret !== process.env.NOTIFY_SECRET) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const {
-    title = '⚾ Going Yard',
-    body  = "Check today's picks",
-    url   = '/',
-  } = req.body;
-
-  const upstashUrl   = process.env.KV_REST_API_URL;
-  const upstashToken = process.env.KV_REST_API_TOKEN;
-
-  if (!upstashUrl || !upstashToken) {
-    return res.status(200).json({ ok: true, sent: 0, note: 'Upstash not configured' });
-  }
+  const { title = '⚾ Going Yard', body = "Check today's picks", url = '/' } = req.body;
 
   try {
-    // Get all subscription keys from Upstash
-    const keysRes = await fetch(`${upstashUrl}/keys/sub:*`, {
-      headers: { Authorization: `Bearer ${upstashToken}` },
-    });
-    const keysData = await keysRes.json();
-    const keys = keysData.result || [];
+    const redis = Redis.fromEnv();
 
-    if (keys.length === 0) {
-      return res.status(200).json({ ok: true, sent: 0, note: 'No subscribers' });
+    // Get all subscription keys
+    const keys = await redis.keys('sub:*');
+
+    if (!keys || keys.length === 0) {
+      return res.status(200).json({ ok: true, sent: 0, note: 'No subscribers yet' });
     }
 
     const payload = JSON.stringify({ title, body, url });
@@ -53,24 +40,16 @@ export default async function handler(req, res) {
 
     await Promise.all(keys.map(async (key) => {
       try {
-        // Get the subscription from Upstash
-        const getRes = await fetch(`${upstashUrl}/get/${key}`, {
-          headers: { Authorization: `Bearer ${upstashToken}` },
-        });
-        const getData = await getRes.json();
-        if (!getData.result) return;
-
-        const sub = JSON.parse(getData.result);
+        const subStr = await redis.get(key);
+        if (!subStr) return;
+        const sub = typeof subStr === 'string' ? JSON.parse(subStr) : subStr;
         await webpush.sendNotification(sub, payload);
         sent++;
       } catch (e) {
         failed++;
-        // Remove expired/invalid subscriptions automatically
+        // Remove expired/invalid subscriptions
         if (e.statusCode === 410 || e.statusCode === 404) {
-          await fetch(`${upstashUrl}/del/${key}`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${upstashToken}` },
-          }).catch(() => {});
+          await redis.del(key).catch(() => {});
         }
       }
     }));

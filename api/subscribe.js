@@ -1,6 +1,7 @@
 // api/subscribe.js
 // Saves a push subscription to Upstash Redis
-// Called by the browser when user taps the 🔔 bell and grants permission
+
+import { Redis } from '@upstash/redis';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -16,32 +17,11 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'No subscription provided' });
     }
 
-    // Create a short unique key from the endpoint URL
+    const redis = Redis.fromEnv();
+
+    // Use endpoint as key (base64 encoded, trimmed)
     const key = 'sub:' + Buffer.from(subscription.endpoint).toString('base64').slice(0, 40);
-
-    // Save to Upstash Redis
-    const upstashUrl   = process.env.KV_REST_API_URL;
-    const upstashToken = process.env.KV_REST_API_TOKEN;
-
-    if (!upstashUrl || !upstashToken) {
-      console.warn('[Push] Upstash not configured — subscription not saved');
-      return res.status(200).json({ ok: true, note: 'Upstash not configured' });
-    }
-
-    const r = await fetch(`${upstashUrl}/set/${key}`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${upstashToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(JSON.stringify(subscription)),
-    });
-
-    if (!r.ok) {
-      const err = await r.text();
-      console.error('[Push] Upstash save failed:', err);
-      return res.status(500).json({ error: 'Failed to save subscription' });
-    }
+    await redis.set(key, JSON.stringify(subscription));
 
     console.log('[Push] Subscription saved:', subscription.endpoint.slice(0, 60));
     return res.status(200).json({ ok: true });
