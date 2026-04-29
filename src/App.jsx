@@ -2444,6 +2444,30 @@ async function loadTodayLineups() {
       });
     } catch(e) {}
     console.log('[Lineups] Confirmed starters:', Object.keys(LINEUP_STATUS).length);
+    // Fire lineup confirmation notifications for newly confirmed teams
+    const confirmedTeams = {};
+    Object.values(LINEUP_STATUS).forEach(v => {
+      if (v.team && !LINEUP_NOTIF_SENT.has(v.team)) confirmedTeams[v.team] = true;
+    });
+    const newTeams = Object.keys(confirmedTeams);
+    if (newTeams.length > 0) {
+      newTeams.forEach(team => LINEUP_NOTIF_SENT.add(team));
+      const teamsStr = newTeams.join(', ');
+      // In-app notification
+      if (_setQueue && _setNotifLog) {
+        const lnNotif = { id: Date.now()+Math.random(), notifType:'lineup',
+          title: newTeams.length === 1 ? `${newTeams[0]} lineup is in` : `${newTeams.length} lineups confirmed`,
+          subtitle: teamsStr, time: new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',timeZone:'America/New_York'}) };
+        _setQueue(q => [...q.slice(-2), lnNotif]);
+        _notifLog = [lnNotif, ..._notifLog].slice(0, 50);
+        if (_setNotifLog) _setNotifLog([..._notifLog]);
+      }
+      // Push notification
+      sendLivePush(
+        newTeams.length === 1 ? `📋 ${newTeams[0]} Lineup Confirmed` : `📋 ${newTeams.length} Lineups Confirmed`,
+        teamsStr
+      );
+    }
     notifyLineupListeners();
   } catch(e) {
     console.warn('[Lineups] Load failed:', e.message);
@@ -6097,6 +6121,35 @@ const DUE_BADGE = (
 const WEATHER_ALERT_GAME_IDS = new Set(); // game_ids with weather concerns at game time
 const DAILY_GAME_MAP    = {}; // keyed by normalized game_id → Set of batting_teams
 let _notifyNewHR = null; // callback set by useHRNotifications hook
+
+// ── Generic notification system ─────────────────────────────────────────────
+const NOTIF_TYPES = {
+  hr:       { icon:'💥', label:'GONE YARD',         color:'#ff4020', bg:'rgba(255,64,32,.18)' },
+  onFire:   { icon:'🔥', label:'ON FIRE',           color:'#fb923c', bg:'rgba(251,146,60,.18)' },
+  lineup:   { icon:'📋', label:'LINEUP CONFIRMED',  color:'#38b8f2', bg:'rgba(56,184,242,.15)' },
+};
+let _notifyNew = null; // set by useNotifications
+let _notifLog  = [];   // all notification history
+let _setNotifLog = null;
+
+// Track multi-HR games for On Fire detection
+const GAME_HR_MAP = {}; // 'gamePk_batterId' → count
+
+// Track which teams have already fired lineup notifications
+const LINEUP_NOTIF_SENT = new Set();
+
+// Push helper — calls /api/notify from browser for live events
+async function sendLivePush(title, body) {
+  try {
+    const secret = window.__NOTIFY_SECRET__ || '';
+    if (!secret) return;
+    await fetch('/api/notify', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({secret, title, body, url:'/'}),
+    });
+  } catch {}
+}
 const HR_CACHE_MS = 18000; // match to poll interval — real fetch every 18s during games
 
 async function fetchHRs(force=false) {
@@ -8674,30 +8727,6 @@ function BatterLeaderboard() {
             border:`1px solid ${filterDue?'rgba(56,184,242,.5)':'var(--border)'}`,
             fontFamily:"'DM Mono',monospace",fontWeight:filterDue?700:400,fontSize:11}}>
           ⏳ {filterDue ? 'Due ✓' : 'Due'}
-        </button>
-        <button onClick={()=>{setActiveOnly(s=>!s);if(!activeOnly)setInjuredOnly(false);}}
-          style={{padding:'3px 10px',borderRadius:6,cursor:'pointer',
-            border:`1px solid ${activeOnly?'#34d399':'var(--border)'}`,
-            background:activeOnly?'rgba(52,211,153,.12)':'transparent',
-            color:activeOnly?'#34d399':'var(--muted)',
-            fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:activeOnly?700:400}}>
-          ☑️ {activeOnly?'Active ✓':'Active'}
-        </button>
-        <button onClick={()=>{setInjuredOnly(s=>!s);if(!injuredOnly)setActiveOnly(false);}}
-          style={{padding:'3px 10px',borderRadius:6,cursor:'pointer',
-            border:`1px solid ${injuredOnly?'#fb923c':'var(--border)'}`,
-            background:injuredOnly?'rgba(251,146,60,.12)':'transparent',
-            color:injuredOnly?'#fb923c':'var(--muted)',
-            fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:injuredOnly?700:400}}>
-          🤕 {injuredOnly?'Injured ✓':'Injured'}
-        </button>
-        <button onClick={()=>setHotBatOnly(s=>!s)}
-          style={{padding:'3px 10px',borderRadius:6,cursor:'pointer',
-            border:`1px solid ${hotBatOnly?'#fb923c':'var(--border)'}`,
-            background:hotBatOnly?'rgba(251,146,60,.12)':'transparent',
-            color:hotBatOnly?'#fb923c':'var(--muted)',
-            fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:hotBatOnly?700:400}}>
-          🔥 {hotBatOnly?'Hot Bat ✓':'Hot Bat'}
         </button>
         <button onClick={()=>{
           const esc = v => `"${String(v??'').replace(/"/g,'""')}"`;
@@ -11843,10 +11872,12 @@ function useHRNotifications() {
   const [queue, setQueue] = useState([]);
   useEffect(() => {
     _setQueue = setQueue;
+    _setNotifLog = (log) => { _notifLog = log; if (_setHrLog) _setHrLog(log); };
     // Wire up the global notifier — persist across remounts, only replace not null
     _notifyNewHR = (hr) => {
       const notif = {
         id: Date.now() + Math.random(),
+        notifType:  'hr',
         batterName: hr.batterName || 'Unknown',
         batterTeam: hr.batterTeam || '',
         batterId:   hr.batterId   || null,
@@ -11859,9 +11890,29 @@ function useHRNotifications() {
         time: new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',timeZone:'America/New_York'}),
       };
       if (_setQueue) _setQueue(q => [...q.slice(-2), notif]);
-      _hrLog = [notif, ..._hrLog].slice(0, 20);
-      if (_setHrLog) _setHrLog([..._hrLog]);
+      _notifLog = [notif, ..._notifLog].slice(0, 50);
+      if (_setNotifLog) _setNotifLog([..._notifLog]);
       playHRSound();
+      // Send live push
+      const hrLabel = notif.type === 'Grand Slam' ? 'GRAND SLAM' : notif.type + ' HR';
+      sendLivePush(`💥 ${hrLabel} — ${notif.batterName}`,
+        `${notif.batterTeam} · ${notif.exitVelo > 0 ? notif.exitVelo.toFixed(0)+'mph' : ''} ${notif.distance > 0 ? notif.distance+'ft' : ''}`.trim());
+      // On Fire detection — same batter hits 2nd HR in same game
+      if (hr.gamePk && hr.batterId) {
+        const key = `${hr.gamePk}_${hr.batterId}`;
+        GAME_HR_MAP[key] = (GAME_HR_MAP[key] || 0) + 1;
+        if (GAME_HR_MAP[key] === 2 && _setQueue) {
+          const fireNotif = { id: Date.now()+Math.random(), notifType:'onFire',
+            batterName: hr.batterName||'Unknown', batterTeam: hr.batterTeam||'',
+            batterId: hr.batterId, subtitle: `${GAME_HR_MAP[key]} HRs this game!`,
+            time: notif.time };
+          _setQueue(q => [...q.slice(-2), fireNotif]);
+          _notifLog = [fireNotif, ..._notifLog].slice(0, 50);
+          if (_setNotifLog) _setNotifLog([..._notifLog]);
+          sendLivePush(`🔥 ON FIRE — ${hr.batterName}`,
+            `${GAME_HR_MAP[key]} home runs this game! ${hr.batterTeam}`);
+        }
+      }
     };
     return () => { _setQueue = null; }; // keep _notifyNewHR alive — avoids missed HRs during remounts
   }, []);
@@ -11886,6 +11937,62 @@ function HRNotificationBanner({ notif, onDismiss }) {
   const [dragY, setDragY] = useState(0);
   const startY = useRef(0);
 
+  // Non-HR notification types
+  if (notif.notifType === 'onFire') {
+    const t = { icon:'🔥', color:'#fb923c', bg:'rgba(251,146,60,.18)', label:'ON FIRE' };
+    return (
+      <div onClick={() => { setVisible(false); setTimeout(onDismiss, 300); }}
+        style={{ position:'fixed',top:0,left:0,right:0,zIndex:9999,display:'flex',justifyContent:'center',
+          pointerEvents:'auto', transform:visible?`translateY(${dragY}px)`:'translateY(-110%)',
+          transition:touching?'none':'transform 0.35s cubic-bezier(.34,1.56,.64,1)' }}
+        onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
+        <div style={{margin:'12px 16px 0',maxWidth:480,width:'100%',background:'rgba(10,15,20,.96)',
+          border:`1px solid ${t.color}44`,borderRadius:14,padding:'12px 16px',
+          display:'flex',alignItems:'center',gap:12,backdropFilter:'blur(16px)'}}>
+          <div style={{width:44,height:44,borderRadius:10,flexShrink:0,background:t.bg,
+            border:`1px solid ${t.color}44`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:22}}>{t.icon}</div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:11,
+              color:t.color,letterSpacing:1,textTransform:'uppercase',marginBottom:2}}>{t.label}</div>
+            <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:15,
+              color:'var(--text)'}}>{notif.batterName}</div>
+            <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginTop:2}}>
+              {notif.batterTeam} · {notif.subtitle}
+            </div>
+          </div>
+          <div style={{fontSize:16,color:'var(--muted)',flexShrink:0,padding:'4px 8px',cursor:'pointer'}}>×</div>
+        </div>
+      </div>
+    );
+  }
+  if (notif.notifType === 'lineup') {
+    const t = { icon:'📋', color:'#38b8f2', bg:'rgba(56,184,242,.15)', label:'LINEUPS' };
+    return (
+      <div onClick={() => { setVisible(false); setTimeout(onDismiss, 300); }}
+        style={{ position:'fixed',top:0,left:0,right:0,zIndex:9999,display:'flex',justifyContent:'center',
+          pointerEvents:'auto', transform:visible?`translateY(${dragY}px)`:'translateY(-110%)',
+          transition:touching?'none':'transform 0.35s cubic-bezier(.34,1.56,.64,1)' }}
+        onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
+        <div style={{margin:'12px 16px 0',maxWidth:480,width:'100%',background:'rgba(10,15,20,.96)',
+          border:`1px solid ${t.color}44`,borderRadius:14,padding:'12px 16px',
+          display:'flex',alignItems:'center',gap:12,backdropFilter:'blur(16px)'}}>
+          <div style={{width:44,height:44,borderRadius:10,flexShrink:0,background:t.bg,
+            border:`1px solid ${t.color}44`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:22}}>{t.icon}</div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:11,
+              color:t.color,letterSpacing:1,textTransform:'uppercase',marginBottom:2}}>{t.label}</div>
+            <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,
+              color:'var(--text)'}}>{notif.title}</div>
+            <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginTop:2}}>
+              {notif.subtitle}
+            </div>
+          </div>
+          <div style={{fontSize:16,color:'var(--muted)',flexShrink:0,padding:'4px 8px',cursor:'pointer'}}>×</div>
+        </div>
+      </div>
+    );
+  }
+  // Default: HR notification
   const typeMap = {
     'Grand Slam': { icon:'💥', label:'GRAND SLAM', color:'#ff4020', bg:'rgba(232,65,26,.22)' },
     '3-Run':      { icon:'💥', label:'3-RUN HR',   color:'#ff4020', bg:'rgba(232,65,26,.18)' },
@@ -12015,7 +12122,7 @@ function HRNotifications() {
 
 
 function NotificationBell() {
-  const { log, clearLog } = useHRLog();
+  const { log, clearLog } = useHRLog(); // now includes all notif types
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const unread = log.length;
@@ -12032,6 +12139,11 @@ function NotificationBell() {
     '3-Run':      { icon:'💥', label:'3-Run HR',   color:'#ff4020' },
     '2-Run':      { icon:'💥', label:'2-Run HR',   color:'#ff8020' },
     'Solo':       { icon:'💥', label:'Solo HR',    color:'#ffc840' },
+  };
+  const notifTypeMap = {
+    onFire:  { icon:'🔥', label:'On Fire',           color:'#fb923c' },
+    lineup:  { icon:'📋', label:'Lineup Confirmed',  color:'#38b8f2' },
+    hr:      { icon:'💥', label:'Gone Yard',         color:'#ff4020' },
   };
 
   return (
@@ -12079,7 +12191,9 @@ function NotificationBell() {
           ) : (
             <div style={{maxHeight:320,overflowY:'auto'}}>
               {log.map((n,i) => {
-                const t = typeMap[n.type] || typeMap['Solo'];
+                const t = n.notifType && n.notifType !== 'hr'
+                  ? (notifTypeMap[n.notifType] || { icon:'🔔', label:'Alert', color:'var(--muted)' })
+                  : (typeMap[n.type] || typeMap['Solo']);
                 return (
                   <div key={n.id} style={{padding:'8px 12px',
                     borderBottom:'1px solid rgba(255,255,255,.05)',
@@ -12089,7 +12203,7 @@ function NotificationBell() {
                       <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,
                         fontSize:12,color:'var(--text)',
                         whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                        {n.batterName}
+                        {n.notifType==='lineup' ? n.title : n.notifType==='onFire' ? n.batterName+' 🔥' : n.batterName}
                         <span style={{color:t.color,marginLeft:5,fontSize:10}}>{t.label}</span>
                       </div>
                       <div style={{fontSize:9,color:'var(--muted)',
