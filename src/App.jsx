@@ -8186,17 +8186,27 @@ function BvPHistoryTab({ data }) {
   const [bvpActiveOnly, setBvpActiveOnly]   = useState(false);
   const [bvpInjuredOnly, setBvpInjuredOnly] = useState(false);
   const [bvpSlate, setBvpSlate]             = useState('today');
+  const [bvpTomorrowData, setBvpTomorrowData] = useState([]);
   const [minPA, setMinPA]         = useState(1);
+
+  // Fetch tomorrow's picks data (silently — may not exist yet)
+  useEffect(() => {
+    fetch('/data/daily_picks_tomorrow.csv')
+      .then(r => r.ok ? r.text() : Promise.reject('no tomorrow'))
+      .then(text => { const rows = parseCSVText(text); setBvpTomorrowData(rows); })
+      .catch(() => {});
+  }, []);
   const [search, setSearch]       = useState('');
 
   // Build unique batter+pitcher pairs from engine data
   const pairs = useMemo(() => {
-    if (!data?.length) return [];
-    const seen = new Set();
-    // Slate filter — filter source data before building pairs
-    const slateData = bvpSlate === 'tomorrow'
-      ? data.filter(r => TOMORROW_TEAMS.has(r.batting_team) || TOMORROW_TEAMS.has(r.pitcher_team))
+    // Use tomorrow's dataset if that slate is selected
+    const sourceData = bvpSlate === 'tomorrow' && bvpTomorrowData.length > 0
+      ? bvpTomorrowData
       : data;
+    if (!sourceData?.length) return [];
+    const seen = new Set();
+    const slateData = sourceData;
     const out = [];
     slateData.forEach(r => {
       const bid = parseInt(r.batter_id)||0;
@@ -8223,10 +8233,10 @@ function BvPHistoryTab({ data }) {
       });
     });
     return out;
-  }, [data, bvpSlate]);
+  }, [data, bvpSlate, bvpTomorrowData]);
 
-  // Reset when slate changes
-  useEffect(() => { setLoaded(false); setRows([]); }, [bvpSlate]);
+  // Reset when slate changes or tomorrow data arrives
+  useEffect(() => { setLoaded(false); setRows([]); }, [bvpSlate, bvpTomorrowData.length]);
 
   // Load BvP data when tab first shown
   useEffect(() => {
@@ -8366,24 +8376,18 @@ function BvPHistoryTab({ data }) {
             whiteSpace:'nowrap',flexShrink:0}}>
           🤕 {bvpInjuredOnly?'Injured ✓':'Injured'}
         </button>
-        <button onClick={()=>setBvpSlate('today')}
-          style={{padding:'3px 10px',borderRadius:6,cursor:'pointer',
-            border:`1px solid ${bvpSlate==='today'?'var(--accent2)':'var(--border)'}`,
-            background:bvpSlate==='today'?'rgba(245,166,35,.12)':'transparent',
-            color:bvpSlate==='today'?'var(--accent2)':'var(--muted)',
-            fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:bvpSlate==='today'?700:400,
-            whiteSpace:'nowrap',flexShrink:0}}>
-          📅 Today
-        </button>
-        <button onClick={()=>setBvpSlate('tomorrow')}
-          style={{padding:'3px 10px',borderRadius:6,cursor:'pointer',
-            border:`1px solid ${bvpSlate==='tomorrow'?'var(--accent2)':'var(--border)'}`,
-            background:bvpSlate==='tomorrow'?'rgba(245,166,35,.12)':'transparent',
-            color:bvpSlate==='tomorrow'?'var(--accent2)':'var(--muted)',
-            fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:bvpSlate==='tomorrow'?700:400,
-            whiteSpace:'nowrap',flexShrink:0}}>
-          📅 Tomorrow
-        </button>
+        {[['today', new Date().toLocaleDateString('en-CA')],
+          ['tomorrow', new Date(Date.now()+864e5).toLocaleDateString('en-CA')]].map(([k,l])=>(
+          <button key={k} onClick={()=>setBvpSlate(k)}
+            style={{padding:'4px 12px',borderRadius:20,cursor:'pointer',
+              border:`1px solid ${bvpSlate===k?'#f5a623':'var(--border)'}`,
+              background:bvpSlate===k?'transparent':'transparent',
+              color:bvpSlate===k?'#f5a623':'var(--muted)',
+              fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:bvpSlate===k?700:400,
+              whiteSpace:'nowrap',flexShrink:0}}>
+            {l}
+          </button>
+        ))}
         <button onClick={()=>setBvpPicksOnly(s=>!s)}
           style={{padding:'3px 10px',borderRadius:6,cursor:'pointer',
             border:`1px solid ${bvpPicksOnly?'var(--accent2)':'var(--border)'}`,
