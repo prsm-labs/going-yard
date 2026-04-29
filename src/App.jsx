@@ -2466,9 +2466,11 @@ async function loadTodayLineups() {
         if (_setNotifLog) _setNotifLog([..._notifLog]);
       }
       // Push notification
+      const lineupDedupKey = `lineup-${today}-${newTeams.sort().join('-')}`;
       sendLivePush(
         newTeams.length === 1 ? `📋 ${newTeams[0]} Lineup Confirmed` : `📋 ${newTeams.length} Lineups Confirmed`,
-        teamsStr
+        teamsStr,
+        lineupDedupKey
       );
       } // end else (not first load)
     }
@@ -6144,14 +6146,14 @@ const LINEUP_NOTIF_SENT = new Set();
 let LINEUP_NOTIF_FIRST_LOAD = true; // skip notifications on first load
 
 // Push helper — calls /api/notify from browser for live events
-async function sendLivePush(title, body) {
+async function sendLivePush(title, body, dedupKey = '') {
   try {
     const secret = window.__NOTIFY_SECRET__ || '';
     if (!secret) return;
     await fetch('/api/notify', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({secret, title, body, url:'/'}),
+      body:JSON.stringify({secret, title, body, url:'/', dedupKey}),
     });
   } catch {}
 }
@@ -11897,10 +11899,12 @@ function useHRNotifications() {
       _notifLog = [notif, ..._notifLog].slice(0, 50);
       if (_setNotifLog) _setNotifLog([..._notifLog]);
       playHRSound();
-      // Send live push
+      // Send live push — dedup key = gamePk+batterId+atBatIndex, unique per HR event
+      const hrDedupKey = `hr-${hr.gamePk}-${hr.batterId}-${hr.atBatIndex}`;
       const hrLabel = notif.type === 'Grand Slam' ? 'GRAND SLAM' : notif.type + ' HR';
       sendLivePush(`💥 ${hrLabel} — ${notif.batterName}`,
-        `${notif.batterTeam} · ${notif.exitVelo > 0 ? notif.exitVelo.toFixed(0)+'mph' : ''} ${notif.distance > 0 ? notif.distance+'ft' : ''}`.trim());
+        `${notif.batterTeam} · ${notif.exitVelo > 0 ? notif.exitVelo.toFixed(0)+'mph' : ''} ${notif.distance > 0 ? notif.distance+'ft' : ''}`.trim(),
+        hrDedupKey);
       // On Fire detection — same batter hits 2nd HR in same game
       if (hr.gamePk && hr.batterId) {
         const key = `${hr.gamePk}_${hr.batterId}`;
