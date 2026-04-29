@@ -7868,12 +7868,12 @@ async function fetchBvP(batterId, pitcherId) {
       `/api/bvp?batter=${batterId}&pitcher=${pitcherId}`
     );
     const d = await r.json();
-    BVP_CACHE[k] = { data: d, ts: Date.now() };
+    // Only cache if we got real data — don't lock in zero-PA responses
+    if ((d.pa||0) > 0) BVP_CACHE[k] = { data: d, ts: Date.now() };
     return d;
   } catch(e) {
-    const empty = { pa:0, ab:0, h:0, hr:0, b1:0, b2:0, b3:0, bb:0, k:0, sb:0, avg:'—', obp:'—', slg:'—' };
-    BVP_CACHE[k] = { data: empty, ts: Date.now() };
-    return empty;
+    // Don't cache errors — allow retry on next load
+    return { pa:0, ab:0, h:0, hr:0, b1:0, b2:0, b3:0, bb:0, k:0, sb:0, avg:'—', obp:'—', slg:'—' };
   }
 }
 
@@ -8185,28 +8185,15 @@ function BvPHistoryTab({ data }) {
   const [bvpPicksOnly, setBvpPicksOnly]     = useState(false);
   const [bvpActiveOnly, setBvpActiveOnly]   = useState(false);
   const [bvpInjuredOnly, setBvpInjuredOnly] = useState(false);
-  const [bvpSlate, setBvpSlate]             = useState('today');
-  const [bvpTomorrowData, setBvpTomorrowData] = useState([]);
   const [minPA, setMinPA]         = useState(1);
-
-  // Fetch tomorrow's picks data (silently — may not exist yet)
-  useEffect(() => {
-    fetch('/data/daily_picks_tomorrow.csv')
-      .then(r => r.ok ? r.text() : Promise.reject('no tomorrow'))
-      .then(text => { const rows = parseCSVText(text); setBvpTomorrowData(rows); })
-      .catch(() => {});
-  }, []);
   const [search, setSearch]       = useState('');
 
   // Build unique batter+pitcher pairs from engine data
-  const activeData = bvpSlate === 'tomorrow' && bvpTomorrowData.length > 0
-    ? bvpTomorrowData : data;
-
   const pairs = useMemo(() => {
-    if (!activeData?.length) return [];
+    if (!data?.length) return [];
     const seen = new Set();
     const out = [];
-    activeData.forEach(r => {
+    data.forEach(r => {
       const bid = parseInt(r.batter_id)||0;
       const pid = parseInt(r.pitcher_id)||0;
       if (!bid || !pid) return;
@@ -8230,11 +8217,7 @@ function BvPHistoryTab({ data }) {
       });
     });
     return out;
-  }, [activeData]);
-
-  // Reset rows when pairs change (slate switched or tomorrow data loaded)
-  const pairsKey = pairs.map(p=>`${p.batterId}_${p.pitcherId}`).join(',');
-  useEffect(() => { setLoaded(false); setRows([]); }, [pairsKey]);
+  }, [data]);
 
   // Load BvP data when tab first shown
   useEffect(() => {
@@ -8374,18 +8357,7 @@ function BvPHistoryTab({ data }) {
             whiteSpace:'nowrap',flexShrink:0}}>
           🤕 {bvpInjuredOnly?'Injured ✓':'Injured'}
         </button>
-        {[['today', new Date().toLocaleDateString('en-CA')],
-          ['tomorrow', new Date(Date.now()+864e5).toLocaleDateString('en-CA')]].map(([k,l])=>(
-          <button key={k} onClick={()=>setBvpSlate(k)}
-            style={{padding:'4px 12px',borderRadius:20,cursor:'pointer',
-              border:`1px solid ${bvpSlate===k?'#f5a623':'var(--border)'}`,
-              background:bvpSlate===k?'transparent':'transparent',
-              color:bvpSlate===k?'#f5a623':'var(--muted)',
-              fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:bvpSlate===k?700:400,
-              whiteSpace:'nowrap',flexShrink:0}}>
-            {l}
-          </button>
-        ))}
+
         <button onClick={()=>setBvpPicksOnly(s=>!s)}
           style={{padding:'3px 10px',borderRadius:6,cursor:'pointer',
             border:`1px solid ${bvpPicksOnly?'var(--accent2)':'var(--border)'}`,
