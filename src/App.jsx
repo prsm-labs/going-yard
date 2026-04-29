@@ -2452,6 +2452,9 @@ async function loadTodayLineups() {
     const newTeams = Object.keys(confirmedTeams);
     if (newTeams.length > 0) {
       newTeams.forEach(team => LINEUP_NOTIF_SENT.add(team));
+      // Skip notifications on first load — just seed the seen set
+      if (LINEUP_NOTIF_FIRST_LOAD) { LINEUP_NOTIF_FIRST_LOAD = false; }
+      else {
       const teamsStr = newTeams.join(', ');
       // In-app notification
       if (_setQueue && _setNotifLog) {
@@ -2467,6 +2470,7 @@ async function loadTodayLineups() {
         newTeams.length === 1 ? `📋 ${newTeams[0]} Lineup Confirmed` : `📋 ${newTeams.length} Lineups Confirmed`,
         teamsStr
       );
+      } // end else (not first load)
     }
     notifyLineupListeners();
   } catch(e) {
@@ -6137,6 +6141,7 @@ const GAME_HR_MAP = {}; // 'gamePk_batterId' → count
 
 // Track which teams have already fired lineup notifications
 const LINEUP_NOTIF_SENT = new Set();
+let LINEUP_NOTIF_FIRST_LOAD = true; // skip notifications on first load
 
 // Push helper — calls /api/notify from browser for live events
 async function sendLivePush(title, body) {
