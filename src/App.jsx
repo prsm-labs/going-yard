@@ -10810,11 +10810,9 @@ function GetAppTab() {
     {/* App icon preview */}
     <div style={{textAlign:"center",marginBottom:24}}>
       <div style={{display:"inline-flex",flexDirection:"column",alignItems:"center",gap:8}}>
-        <div style={{width:80,height:80,borderRadius:18,background:"#0d1a28",
-          border:"2px solid rgba(232,65,26,.4)",display:"flex",alignItems:"center",
-          justifyContent:"center",fontSize:42,boxShadow:"0 8px 32px rgba(232,65,26,.25)"}}>
-          💥
-        </div>
+        <img src="/icon-192.png" alt="Going Yard" style={{width:80,height:80,
+          borderRadius:18,border:"2px solid rgba(232,65,26,.4)",
+          boxShadow:"0 8px 32px rgba(232,65,26,.25)",objectFit:"cover"}}/>
         <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,
           color:"var(--text)",letterSpacing:.5}}>Going Yard</div>
         <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>
@@ -10828,7 +10826,7 @@ function GetAppTab() {
       <Step n="1" text={<>Open <strong style={{color:"var(--accent2)"}}>goingyard.app</strong> in Safari (must be Safari, not Chrome)</>}/>
       <Step n="2" text={<>Tap the <strong>Share</strong> button <span style={{fontSize:16}}>⎙</span> at the bottom of the screen</>}/>
       <Step n="3" text={<>Scroll down and tap <strong>"Add to Home Screen"</strong></>}/>
-      <Step n="4" text={<>Tap <strong>"Add"</strong> in the top right — the 💥 icon appears on your home screen</>}/>
+      <Step n="4" text={<>Tap <strong>"Add"</strong> in the top right — the Going Yard icon appears on your home screen</>}/>
       <div style={{marginTop:10,padding:"8px 12px",borderRadius:8,
         background:"rgba(39,201,122,.06)",border:"1px solid rgba(39,201,122,.15)",
         fontSize:10,color:"#27c97a",fontFamily:"'DM Mono',monospace"}}>
@@ -12272,7 +12270,7 @@ export default function App() {
       <header className="header">
         <div style={{display:"flex",flexDirection:"column",gap:0}}>
           <div style={{display:'flex',alignItems:'center',gap:8}}>
-            <div className="logo" style={{fontSize:14}}><div className="logo-dot"/>⚾ <span>GOING</span> YARD</div>
+            <div className="logo" style={{fontSize:14}}><div className="logo-dot"/><img src="/icon-192.png" alt="Going Yard" style={{width:16,height:16,borderRadius:3,objectFit:"cover",flexShrink:0,verticalAlign:"middle"}}/> <span>GOING</span> YARD</div>
             <NotifyBell/>
           </div>
           <div className="landscape-hint" style={{fontSize:8,color:"var(--muted)",fontFamily:"'DM Mono',monospace",letterSpacing:.3,paddingLeft:2,lineHeight:1}}>📱↔️ Rotate to landscape</div>
