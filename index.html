@@ -20,6 +20,12 @@
     <link rel="apple-touch-icon" href="/icon-192.png">
     <!-- ────────────────────────────────────────────────────────────── -->
 
+    <!-- Push notification keys (injected at build time by Vite) -->
+    <script>
+      window.__VAPID_KEY__     = "%VITE_VAPID_PUBLIC_KEY%";
+      window.__NOTIFY_SECRET__ = "%VITE_NOTIFY_SECRET%";
+    </script>
+
   </head>
   <body>
     <div id="root"></div>
