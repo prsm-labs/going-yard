@@ -8199,28 +8199,25 @@ function BvPHistoryTab({ data }) {
   const [search, setSearch]       = useState('');
 
   // Build unique batter+pitcher pairs from engine data
+  const activeData = bvpSlate === 'tomorrow' && bvpTomorrowData.length > 0
+    ? bvpTomorrowData : data;
+
   const pairs = useMemo(() => {
-    // Use tomorrow's dataset if that slate is selected
-    const sourceData = bvpSlate === 'tomorrow' && bvpTomorrowData.length > 0
-      ? bvpTomorrowData
-      : data;
-    if (!sourceData?.length) return [];
+    if (!activeData?.length) return [];
     const seen = new Set();
-    const slateData = sourceData;
     const out = [];
-    slateData.forEach(r => {
+    activeData.forEach(r => {
       const bid = parseInt(r.batter_id)||0;
       const pid = parseInt(r.pitcher_id)||0;
       if (!bid || !pid) return;
       const k = `${bid}_${pid}`;
       if (seen.has(k)) return;
       seen.add(k);
-      // Derive pitcher's team: find the other team in this game from DAILY_GAME_MAP
       const battingTeam = r.batting_team || '—';
       const rawGid = String(r.game_id||'').trim();
       const gid = rawGid.includes('.')?String(parseInt(rawGid)):rawGid;
       const gameTeams = gid ? [...(DAILY_GAME_MAP[gid]||[])] : [];
-      const pitcherTeam = gameTeams.find(t => t !== battingTeam) || '—';
+      const pitcherTeam = gameTeams.find(t => t !== battingTeam) || r.pitcher_team || '—';
       out.push({
         batterId:    bid,
         pitcherId:   pid,
@@ -8233,10 +8230,11 @@ function BvPHistoryTab({ data }) {
       });
     });
     return out;
-  }, [data, bvpSlate, bvpTomorrowData]);
+  }, [activeData]);
 
-  // Reset when slate changes or tomorrow data arrives
-  useEffect(() => { setLoaded(false); setRows([]); }, [bvpSlate, bvpTomorrowData.length]);
+  // Reset rows when pairs change (slate switched or tomorrow data loaded)
+  const pairsKey = pairs.map(p=>`${p.batterId}_${p.pitcherId}`).join(',');
+  useEffect(() => { setLoaded(false); setRows([]); }, [pairsKey]);
 
   // Load BvP data when tab first shown
   useEffect(() => {
