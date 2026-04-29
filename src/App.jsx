@@ -8185,6 +8185,7 @@ function BvPHistoryTab({ data }) {
   const [bvpPicksOnly, setBvpPicksOnly]     = useState(false);
   const [bvpActiveOnly, setBvpActiveOnly]   = useState(false);
   const [bvpInjuredOnly, setBvpInjuredOnly] = useState(false);
+  const [bvpSlate, setBvpSlate]             = useState('today');
   const [minPA, setMinPA]         = useState(1);
   const [search, setSearch]       = useState('');
 
@@ -8192,8 +8193,12 @@ function BvPHistoryTab({ data }) {
   const pairs = useMemo(() => {
     if (!data?.length) return [];
     const seen = new Set();
+    // Slate filter — filter source data before building pairs
+    const slateData = bvpSlate === 'tomorrow'
+      ? data.filter(r => TOMORROW_TEAMS.has(r.batting_team) || TOMORROW_TEAMS.has(r.pitcher_team))
+      : data;
     const out = [];
-    data.forEach(r => {
+    slateData.forEach(r => {
       const bid = parseInt(r.batter_id)||0;
       const pid = parseInt(r.pitcher_id)||0;
       if (!bid || !pid) return;
@@ -8218,7 +8223,10 @@ function BvPHistoryTab({ data }) {
       });
     });
     return out;
-  }, [data]);
+  }, [data, bvpSlate]);
+
+  // Reset when slate changes
+  useEffect(() => { setLoaded(false); setRows([]); }, [bvpSlate]);
 
   // Load BvP data when tab first shown
   useEffect(() => {
@@ -8227,6 +8235,7 @@ function BvPHistoryTab({ data }) {
     setLoaded(true);
 
     // Fetch in batches of 8 to avoid hammering the API
+    // NOTE: rows only set AFTER all batches complete to avoid partial display bug
     const fetchAll = async () => {
       const results = [];
       const BATCH = 8;
@@ -8239,9 +8248,9 @@ function BvPHistoryTab({ data }) {
           })
         );
         results.push(...batchResults);
-        setRows([...results]); // update progressively
-        if (i + BATCH < pairs.length) await new Promise(r => setTimeout(r, 120)); // gentle throttle
+        if (i + BATCH < pairs.length) await new Promise(r => setTimeout(r, 120));
       }
+      setRows([...results]); // set ALL at once — no partial display
       setLoading(false);
     };
     fetchAll();
@@ -8356,6 +8365,24 @@ function BvPHistoryTab({ data }) {
             fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:bvpInjuredOnly?700:400,
             whiteSpace:'nowrap',flexShrink:0}}>
           🤕 {bvpInjuredOnly?'Injured ✓':'Injured'}
+        </button>
+        <button onClick={()=>setBvpSlate('today')}
+          style={{padding:'3px 10px',borderRadius:6,cursor:'pointer',
+            border:`1px solid ${bvpSlate==='today'?'var(--accent2)':'var(--border)'}`,
+            background:bvpSlate==='today'?'rgba(245,166,35,.12)':'transparent',
+            color:bvpSlate==='today'?'var(--accent2)':'var(--muted)',
+            fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:bvpSlate==='today'?700:400,
+            whiteSpace:'nowrap',flexShrink:0}}>
+          📅 Today
+        </button>
+        <button onClick={()=>setBvpSlate('tomorrow')}
+          style={{padding:'3px 10px',borderRadius:6,cursor:'pointer',
+            border:`1px solid ${bvpSlate==='tomorrow'?'var(--accent2)':'var(--border)'}`,
+            background:bvpSlate==='tomorrow'?'rgba(245,166,35,.12)':'transparent',
+            color:bvpSlate==='tomorrow'?'var(--accent2)':'var(--muted)',
+            fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:bvpSlate==='tomorrow'?700:400,
+            whiteSpace:'nowrap',flexShrink:0}}>
+          📅 Tomorrow
         </button>
         <button onClick={()=>setBvpPicksOnly(s=>!s)}
           style={{padding:'3px 10px',borderRadius:6,cursor:'pointer',
@@ -11940,15 +11967,31 @@ function HRNotificationBanner({ notif, onDismiss }) {
   const [dragY, setDragY] = useState(0);
   const startY = useRef(0);
 
-  // Non-HR notification types
+  // ALL hooks must be before any early returns (React rules)
+  useEffect(() => {
+    const tin  = setTimeout(() => setVisible(true), 10);
+    const tout = setTimeout(() => { setVisible(false); setTimeout(onDismiss, 400); }, 30000);
+    return () => { clearTimeout(tin); clearTimeout(tout); };
+  }, []);
+
+  const handleTouchStart = (e) => { startY.current = e.touches[0].clientY; setTouching(true); };
+  const handleTouchMove  = (e) => { const dy = e.touches[0].clientY - startY.current; if (dy < 0) setDragY(dy); };
+  const handleTouchEnd   = () => { setTouching(false); if (dragY < -40) { setVisible(false); setTimeout(onDismiss, 300); } else setDragY(0); };
+
+  const wrapStyle = {
+    position:'fixed', top:0, left:0, right:0, zIndex:9999,
+    display:'flex', justifyContent:'center', pointerEvents:'auto',
+    transform: visible ? `translateY(${dragY}px)` : 'translateY(-110%)',
+    transition: touching ? 'none' : 'transform 0.35s cubic-bezier(.34,1.56,.64,1)',
+  };
+  const touchProps = { onTouchStart:handleTouchStart, onTouchMove:handleTouchMove, onTouchEnd:handleTouchEnd,
+    onClick:() => { setVisible(false); setTimeout(onDismiss, 300); } };
+
+  // ── Non-HR types ────────────────────────────────────────────────────────
   if (notif.notifType === 'onFire') {
     const t = { icon:'🔥', color:'#fb923c', bg:'rgba(251,146,60,.18)', label:'ON FIRE' };
     return (
-      <div onClick={() => { setVisible(false); setTimeout(onDismiss, 300); }}
-        style={{ position:'fixed',top:0,left:0,right:0,zIndex:9999,display:'flex',justifyContent:'center',
-          pointerEvents:'auto', transform:visible?`translateY(${dragY}px)`:'translateY(-110%)',
-          transition:touching?'none':'transform 0.35s cubic-bezier(.34,1.56,.64,1)' }}
-        onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
+      <div {...touchProps} style={wrapStyle}>
         <div style={{margin:'12px 16px 0',maxWidth:480,width:'100%',background:'rgba(10,15,20,.96)',
           border:`1px solid ${t.color}44`,borderRadius:14,padding:'12px 16px',
           display:'flex',alignItems:'center',gap:12,backdropFilter:'blur(16px)'}}>
@@ -11957,25 +12000,19 @@ function HRNotificationBanner({ notif, onDismiss }) {
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:11,
               color:t.color,letterSpacing:1,textTransform:'uppercase',marginBottom:2}}>{t.label}</div>
-            <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:15,
-              color:'var(--text)'}}>{notif.batterName}</div>
-            <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginTop:2}}>
-              {notif.batterTeam} · {notif.subtitle}
-            </div>
+            <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:15,color:'var(--text)'}}>{notif.batterName}</div>
+            <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginTop:2}}>{notif.batterTeam} · {notif.subtitle}</div>
           </div>
           <div style={{fontSize:16,color:'var(--muted)',flexShrink:0,padding:'4px 8px',cursor:'pointer'}}>×</div>
         </div>
       </div>
     );
   }
+
   if (notif.notifType === 'lineup') {
     const t = { icon:'📋', color:'#38b8f2', bg:'rgba(56,184,242,.15)', label:'LINEUPS' };
     return (
-      <div onClick={() => { setVisible(false); setTimeout(onDismiss, 300); }}
-        style={{ position:'fixed',top:0,left:0,right:0,zIndex:9999,display:'flex',justifyContent:'center',
-          pointerEvents:'auto', transform:visible?`translateY(${dragY}px)`:'translateY(-110%)',
-          transition:touching?'none':'transform 0.35s cubic-bezier(.34,1.56,.64,1)' }}
-        onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
+      <div {...touchProps} style={wrapStyle}>
         <div style={{margin:'12px 16px 0',maxWidth:480,width:'100%',background:'rgba(10,15,20,.96)',
           border:`1px solid ${t.color}44`,borderRadius:14,padding:'12px 16px',
           display:'flex',alignItems:'center',gap:12,backdropFilter:'blur(16px)'}}>
@@ -11984,17 +12021,15 @@ function HRNotificationBanner({ notif, onDismiss }) {
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:11,
               color:t.color,letterSpacing:1,textTransform:'uppercase',marginBottom:2}}>{t.label}</div>
-            <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,
-              color:'var(--text)'}}>{notif.title}</div>
-            <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginTop:2}}>
-              {notif.subtitle}
-            </div>
+            <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:'var(--text)'}}>{notif.title}</div>
+            <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginTop:2}}>{notif.subtitle}</div>
           </div>
           <div style={{fontSize:16,color:'var(--muted)',flexShrink:0,padding:'4px 8px',cursor:'pointer'}}>×</div>
         </div>
       </div>
     );
   }
+
   // Default: HR notification
   const typeMap = {
     'Grand Slam': { icon:'💥', label:'GRAND SLAM', color:'#ff4020', bg:'rgba(232,65,26,.22)' },
@@ -12004,36 +12039,8 @@ function HRNotificationBanner({ notif, onDismiss }) {
   };
   const t = typeMap[notif.type] || typeMap['Solo'];
 
-  useEffect(() => {
-    const tin = setTimeout(() => setVisible(true), 10); // near-instant slide-in
-    const tout = setTimeout(() => { setVisible(false); setTimeout(onDismiss, 400); }, 30000);
-    return () => { clearTimeout(tin); clearTimeout(tout); };
-  }, []);
-
-  const handleTouchStart = (e) => { startY.current = e.touches[0].clientY; setTouching(true); };
-  const handleTouchMove = (e) => {
-    const dy = e.touches[0].clientY - startY.current;
-    if (dy < 0) setDragY(dy);
-  };
-  const handleTouchEnd = () => {
-    setTouching(false);
-    if (dragY < -40) { setVisible(false); setTimeout(onDismiss, 300); }
-    else setDragY(0);
-  };
-
   return (
-    <div
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      onClick={() => { setVisible(false); setTimeout(onDismiss, 300); }}
-      style={{
-        position:'fixed', top:0, left:0, right:0, zIndex:9999,
-        display:'flex', justifyContent:'center',
-        pointerEvents:'auto',
-        transform: visible ? `translateY(${dragY}px)` : 'translateY(-110%)',
-        transition: touching ? 'none' : 'transform 0.35s cubic-bezier(.34,1.56,.64,1)',
-      }}>
+    <div {...touchProps} style={wrapStyle}>
       <div style={{
         margin:'12px 16px 0',
         maxWidth:480, width:'100%',
