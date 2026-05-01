@@ -9,6 +9,7 @@ if ('serviceWorker' in navigator) {
 }
 // Kick off injury fetch early
 fetchInjuries();
+// HR odds fetched on demand via useHROdds() hooks
 async function subscribeToPush() {
   try {
     if (!('PushManager' in window)) return 'unsupported';
@@ -2466,7 +2467,7 @@ async function loadTodayLineups() {
         if (_setNotifLog) _setNotifLog([..._notifLog]);
       }
       // Push notification
-      const lineupDedupKey = `lineup-${today}-${newTeams.sort().join('-')}`;
+      const lineupDedupKey = `lineup-${today}-${[...newTeams].sort().join('-')}`;
       sendLivePush(
         newTeams.length === 1 ? `📋 ${newTeams[0]} Lineup Confirmed` : `📋 ${newTeams.length} Lineups Confirmed`,
         teamsStr,
@@ -3728,7 +3729,7 @@ function XRow({b}) {
                   color:"var(--muted)",fontFamily:"'DM Mono',monospace",
                   textTransform:"uppercase",letterSpacing:.5,whiteSpace:"nowrap"}}>{h}</th>
               ))}
-            </tr>
+            <th style={{padding:"4px 8px",textAlign:"right",whiteSpace:"nowrap",fontFamily:"'DM Mono',monospace",fontSize:9,color:"var(--muted)",cursor:"default"}}>HR Odds</th></tr>
           </thead>
           <tbody>
             {(b.atBats||[]).map((ab,i)=>{
@@ -5956,6 +5957,102 @@ function PitchBuilderTab() {
 let HR_DATA = [];
 const VIDEO_LINK_CACHE = {}; // gamePk_atBatIndex → savant video URL
 
+// ── HR Odds — from /api/odds (odds.js), refreshes every 65 min ──────────────────
+// odds.js already handles fetching, caching, and serving player props
+const HR_ODDS_MAP = {};  // pid → { odds, implied, book }
+const HR_ODDS_LISTENERS = new Set();
+let HR_ODDS_TS = 0;
+const HR_ODDS_TTL = 65 * 60 * 1000; // match odds.js TTL
+
+function subscribeHROdds(fn) { HR_ODDS_LISTENERS.add(fn); return () => HR_ODDS_LISTENERS.delete(fn); }
+function notifyHROddsListeners() { HR_ODDS_LISTENERS.forEach(fn => fn(Date.now())); }
+
+async function fetchHROdds(force = false) {
+  if (!force && Date.now() - HR_ODDS_TS < HR_ODDS_TTL) return;
+  try {
+    const r = await fetch('/api/odds?type=props', { signal: AbortSignal.timeout(10000) });
+    if (!r.ok) return;
+    const d = await r.json();
+    if (d.status !== 'ok' || !d.props?.length) return;
+
+    // Build name→pid lookup from PLAYER_DATA_CACHE for matching
+    const nameMap = {};
+    Object.values(PLAYER_DATA_CACHE).forEach(p => {
+      if (p?.name && p?.pid) nameMap[p.name.toLowerCase().trim()] = String(p.pid);
+    });
+
+    // Clear and rebuild HR_ODDS_MAP
+    Object.keys(HR_ODDS_MAP).forEach(k => delete HR_ODDS_MAP[k]);
+
+    for (const game of d.props) {
+      for (const player of (game.players || [])) {
+        // Only HR props, point 0.5 = anytime HR market
+        if (player.market !== 'batter_home_runs') continue;
+        if (player.point !== null && player.point !== 0.5) continue;
+        const overOdds = player.bestOver?.price;
+        if (!overOdds) continue;
+
+        // Match player name to pid
+        const norm = (player.playerName || '').toLowerCase().trim();
+        let pid = nameMap[norm];
+
+        // Fuzzy fallback — last name match
+        if (!pid) {
+          const last = norm.split(' ').pop();
+          pid = Object.entries(nameMap).find(([n]) => n.split(' ').pop() === last &&
+            norm.split(' ')[0]?.[0] === n.split(' ')[0]?.[0])?.[1];
+        }
+
+        if (!pid) continue;
+
+        const implied = overOdds > 0
+          ? 100 / (overOdds + 100)
+          : Math.abs(overOdds) / (Math.abs(overOdds) + 100);
+
+        HR_ODDS_MAP[pid] = {
+          odds    : overOdds,
+          implied : Math.round(implied * 1000) / 1000,
+          book    : player.bestOver?.book || '',
+          name    : player.playerName,
+        };
+      }
+    }
+
+    HR_ODDS_TS = Date.now();
+    notifyHROddsListeners();
+    console.log(`[HROdds] ${Object.keys(HR_ODDS_MAP).length} players mapped from odds.js`);
+  } catch(e) { console.warn('[HROdds]', e.message); }
+}
+
+function useHROdds() {
+  const [v, setV] = useState(0);
+  useEffect(() => {
+    fetchHROdds();
+    const unsub = subscribeHROdds(() => setV(n => n+1));
+    const id = setInterval(() => fetchHROdds(true), HR_ODDS_TTL);
+    return () => { unsub(); clearInterval(id); };
+  }, []);
+  return v;
+}
+
+function HROddsCell({ pid }) {
+  const d = HR_ODDS_MAP[String(pid||'')];
+  if (!d?.odds) return (
+    <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--border)'}}>—</span>
+  );
+  const o   = d.odds;
+  const pct = (d.implied * 100).toFixed(0) + '%';
+  const col = o >= 500 ? '#f5a623' : o >= 300 ? 'var(--ice)' : o >= 150 ? 'var(--text)' : '#27c97a';
+  const tip = `HR Odds: ${o>0?'+':''}${o} · ${pct} implied · ${d.book}`;
+  return (
+    <span title={tip}
+      style={{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:700,
+        color:col,cursor:'help',whiteSpace:'nowrap'}}>
+      {o > 0 ? '+' : ''}{o}
+    </span>
+  );
+}
+
 // ── Injury Report — MLB Stats API SC transactions ────────────────────────────
 const INJURY_MAP = {};  // pid → { emoji, label, shortDesc, fullDesc, date, team }
 const INJURY_LISTENERS = new Set();
@@ -7077,6 +7174,7 @@ function PitcherCard({ pitcherId, pitcherName, onGrade }) {
 // ── BATTER LEADERBOARD ─────────────────────────────────────────
 // ── SIM LAB ────────────────────────────────────────────────────
 function SimLabView({ data }) {
+  useHROdds();
   const picks = usePicks();
   const [view, setView]             = useState('slate');    // 'slate' | 'deepdive' | 'props'
   const [selBatter, setSelBatter]   = useState(null);
@@ -7418,6 +7516,7 @@ function SimLabView({ data }) {
                     { label: 'Score',    key: 'weighted_flag_score' },
                     { label: 'Grade',    key: null },
                     { label: '💣',       key: 'meatball_matchup_score' },
+                    { label: 'HR Odds',  key: null },
                   ].map(col => (
                     <th key={col.label}
                       onClick={() => handleSort(col.key)}
@@ -7519,6 +7618,9 @@ function SimLabView({ data }) {
                           const col = ms >= 0.15 ? '#ff4020' : ms >= 0.08 ? '#f5a623' : '#27c97a';
                           return <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: col, fontWeight: 700 }}>{(ms * 100).toFixed(0)}</span>;
                         })() : <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'rgba(255,255,255,.15)' }}>—</span>}
+                      </td>
+                      <td style={{textAlign:'center',padding:'2px 6px'}}>
+                        <HROddsCell pid={parseInt(b.batter_id)||0}/>
                       </td>
                     </tr>
                   );
@@ -8178,6 +8280,7 @@ function CheatCodeButton() {
 }
 
 function BvPHistoryTab({ data }) {
+  useHROdds();
   const picks = usePicks();
   const [rows, setRows]           = useState([]); // [{...batter, ...bvpStats}]
   const [loading, setLoading]     = useState(false);
@@ -8314,6 +8417,7 @@ function BvPHistoryTab({ data }) {
     {key:'avg',  label:'AVG', align:'right', render:r=>r.pa>0?<span style={{color:parseFloat(r.avg)>=.300?'#27c97a':parseFloat(r.avg)<=.200?'var(--accent)':'var(--text)',fontWeight:600}}>{r.avg}</span>:'—'},
     {key:'obp',  label:'OBP', align:'right', render:r=>r.pa>0?<span style={{color:parseFloat(r.obp)>=.370?'#27c97a':'var(--text)'}}>{r.obp}</span>:'—'},
     {key:'slg',  label:'SLG', align:'right', render:r=>r.pa>0?<span style={{color:parseFloat(r.slg)>=.500?'#27c97a':'var(--text)'}}>{r.slg}</span>:'—'},
+    {key:'hrOdds',label:'HR Odds',align:'right',render:r=><HROddsCell pid={r.batterId}/>},
   ];
 
   const noPA = filtered.filter(r => (r.pa||0) === 0).length;
@@ -8456,6 +8560,7 @@ function BvPHistoryTab({ data }) {
 
 function BatterLeaderboard() {
   useInjuries();
+  useHROdds();
   const [activeOnly, setActiveOnly]           = useState(false);
   const [injuredOnly, setInjuredOnly]         = useState(false);
   const [hotBatOnly, setHotBatOnly]           = useState(false);
@@ -8638,6 +8743,7 @@ function BatterLeaderboard() {
     { key:'xbh',  label:'XBH', render: p => { const v=ws(p,'xbh');  return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=12?'#ff8020':v>=7?'#f5a623':'var(--text)'}}>{v||0}</span>; }},
     { key:'kPct', label:'K%',  render: p => { const v=ws(p,'kPct'); return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=28?'var(--ice)':'var(--muted)'}}>{fmtPct(v)}</span>; }},
     { key:'bbPct',label:'BB%', render: p => { const v=ws(p,'bbPct'); return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=12?'#27c97a':'var(--muted)'}}>{fmtPct(v)}</span>; }},
+    { key:'hrOdds',label:'HR Odds', render: p => <HROddsCell pid={p.pid||p.id}/> },
   ];
 
   const SortIcon = ({col}) => sortCol===col
