@@ -1,202 +1,154 @@
-// api/odds.js  — The Odds API integration for Going Yard
-// Cache lives in-memory for warm instances; falls back to live fetch on cold starts.
-// Cron job pre-warms the cache but is NOT a hard dependency.
+// api/odds.js
+// READ + CONTROLLED WRITE
+// Visitors: read cache only — zero API calls
+// First load of day / cache empty: one auto-fetch allowed per cold start
+// Manual refresh: protected by CRON_SECRET (your use only)
+// Cron: GET /api/odds?type=refresh with Authorization: Bearer <CRON_SECRET>
 
-const CACHE_TTL_MS = 65 * 60 * 1000; // 65 minutes
+const CACHE = {};
+const TTL   = 65 * 60 * 1000; // 65 min
+let   COLD_START_DONE = false; // one auto-fetch on cold start only
 
-let cache = null;       // { data, fetchedAt }
-let inflight = null;    // Promise — prevents stampede on concurrent cold-starts
+const set = (k,v) => { CACHE[k]={data:v,ts:Date.now()}; };
+const get = k => { const e=CACHE[k]; return (e&&Date.now()-e.ts<TTL)?e.data:null; };
 
-// ─── helpers ──────────────────────────────────────────────────────────────────
+const BASE = 'https://api.the-odds-api.com/v4/sports/baseball_mlb';
+const STD  = ['batter_home_runs','batter_hits','batter_total_bases','batter_rbis',
+               'batter_stolen_bases','batter_singles','batter_doubles',
+               'batter_triples','batter_walks'].join(',');
+const ALT  = ['batter_home_runs_alternate','batter_hits_alternate',
+               'batter_total_bases_alternate'].join(',');
+const HRR  = 'batter_hits_runs_rbis';
 
-function isCacheValid() {
-  return cache && (Date.now() - cache.fetchedAt) < CACHE_TTL_MS;
+const PROP_LABELS = {
+  batter_home_runs:'HR', batter_home_runs_alternate:'HR (Alt)',
+  batter_hits:'Hits', batter_hits_alternate:'Hits (Alt)',
+  batter_total_bases:'Total Bases', batter_total_bases_alternate:'Total Bases (Alt)',
+  batter_rbis:'RBIs', batter_stolen_bases:'SB',
+  batter_singles:'Singles', batter_doubles:'Doubles',
+  batter_triples:'Triples', batter_walks:'Walks',
+  batter_hits_runs_rbis:'H+R+RBI',
+};
+const MORDER = Object.keys(PROP_LABELS);
+
+function normalizeProps(event, pd) {
+  const pm={};
+  (pd.bookmakers||[]).forEach(bk=>{
+    (bk.markets||[]).forEach(mkt=>{
+      const label=PROP_LABELS[mkt.key]; if(!label) return;
+      (mkt.outcomes||[]).forEach(o=>{
+        let pname,dir,point;
+        if(o.description){pname=o.description;dir=o.name;point=o.point;}
+        else{const m=(o.name||'').match(/^(.+?)\s+(Over|Under)\s+([\d.]+)$/i);if(!m)return;[,pname,dir,point]=m;point=parseFloat(point);}
+        const k=`${pname}|${mkt.key}|${point}`;
+        if(!pm[k]) pm[k]={playerName:pname,market:mkt.key,label,point:point??null,books:{}};
+        if(!pm[k].books[bk.key]) pm[k].books[bk.key]={title:bk.title};
+        if(/over/i.test(dir)) pm[k].books[bk.key].overPrice=o.price;
+        else pm[k].books[bk.key].underPrice=o.price;
+      });
+    });
+  });
+  const players=Object.values(pm).map(p=>{
+    const bl=Object.values(p.books);
+    const bestOver =bl.reduce((b,x)=>x.overPrice !=null&&(b==null||x.overPrice >b.price)?{price:x.overPrice, book:x.title}:b,null);
+    const bestUnder=bl.reduce((b,x)=>x.underPrice!=null&&(b==null||x.underPrice>b.price)?{price:x.underPrice,book:x.title}:b,null);
+    return {...p,bestOver,bestUnder,allBooks:Object.values(p.books)};
+  }).sort((a,b)=>MORDER.indexOf(a.market)-MORDER.indexOf(b.market)||(a.point??99)-(b.point??99)||a.playerName.localeCompare(b.playerName));
+  return {eventId:event.id,home_team:event.home_team||pd.home_team,away_team:event.away_team||pd.away_team,commence:event.commence_time||pd.commence_time,players};
 }
 
-async function fetchFromOddsAPI() {
-  const apiKey = process.env.ODDS_API_KEY;
-  if (!apiKey) throw new Error("ODDS_API_KEY env var is not set");
-
-  // Fetch MLB HR props from The Odds API
-  // markets: batter_home_runs (player props)
-  const url = new URL("https://api.the-odds-api.com/v4/sports/baseball_mlb/events");
-  url.searchParams.set("apiKey", apiKey);
-  url.searchParams.set("dateFormat", "iso");
-
-  const eventsRes = await fetch(url.toString());
-  if (!eventsRes.ok) {
-    const errText = await eventsRes.text();
-    throw new Error(`Events fetch failed ${eventsRes.status}: ${errText}`);
-  }
-  const events = await eventsRes.json();
-
-  // For each event, fetch HR props
-  const propsResults = await Promise.allSettled(
-    events.map(async (event) => {
-      const propUrl = new URL(
-        `https://api.the-odds-api.com/v4/sports/baseball_mlb/events/${event.id}/odds`
-      );
-      propUrl.searchParams.set("apiKey", apiKey);
-      propUrl.searchParams.set("regions", "us");
-      propUrl.searchParams.set("markets", "batter_home_runs");
-      propUrl.searchParams.set("oddsFormat", "american");
-      propUrl.searchParams.set("dateFormat", "iso");
-
-      const r = await fetch(propUrl.toString());
-      if (!r.ok) return null;
-      const d = await r.json();
-      return {
-        eventId:    event.id,
-        homeTeam:   event.home_team,
-        awayTeam:   event.away_team,
-        commenceTime: event.commence_time,
-        players:    buildPlayerProps(d.bookmakers || []),
-      };
-    })
-  );
-
-  const props = propsResults
-    .filter((r) => r.status === "fulfilled" && r.value)
-    .map((r) => r.value);
-
-  return { events, props };
-}
-
-// Flatten bookmaker odds into per-player structures
-function buildPlayerProps(bookmakers) {
-  const playerMap = {};
-
-  for (const bk of bookmakers) {
-    for (const market of bk.markets || []) {
-      if (market.key !== "batter_home_runs") continue;
-      for (const outcome of market.outcomes || []) {
-        const key = outcome.description; // player name
-        if (!playerMap[key]) {
-          playerMap[key] = {
-            player:  outcome.description,
-            market:  market.key,
-            point:   outcome.point ?? 0.5,
-            lines:   {},
-          };
-        }
-        if (!playerMap[key].lines[bk.key]) {
-          playerMap[key].lines[bk.key] = {};
-        }
-        // outcome.name is "Over" or "Under"
-        playerMap[key].lines[bk.key][outcome.name.toLowerCase()] = outcome.price;
-      }
-    }
-  }
-
-  // Pick best available Over line across books
-  return Object.values(playerMap).map((p) => {
-    const overLines = Object.values(p.lines)
-      .map((bk) => bk.over)
-      .filter((v) => v !== undefined);
-
-    // Best Over = highest american odds (least juice / most favorable)
-    const bestOver = overLines.length
-      ? Math.max(...overLines)
-      : null;
-
-    // Consensus implied probability
-    const impliedProbs = overLines.map((o) =>
-      o < 0 ? (-o) / (-o + 100) : 100 / (o + 100)
-    );
-    const avgImplied = impliedProbs.length
-      ? impliedProbs.reduce((a, b) => a + b, 0) / impliedProbs.length
-      : null;
-
-    return {
-      ...p,
-      bestOver,
-      avgImplied: avgImplied ? Math.round(avgImplied * 1000) / 10 : null, // e.g. 18.4%
-      bookCount: overLines.length,
-    };
+function normalizeGame(raw,type){
+  return (raw||[]).map(g=>{
+    const books={};
+    (g.bookmakers||[]).forEach(bk=>{(bk.markets||[]).forEach(mkt=>{if(mkt.key!==type)return;books[bk.key]={title:bk.title,outcomes:(mkt.outcomes||[]).map(o=>({name:o.name,price:o.price,point:o.point??null}))};});});
+    const best={};
+    Object.values(books).forEach(bk=>(bk.outcomes||[]).forEach(o=>{if(!best[o.name]||o.price>best[o.name].price)best[o.name]={...o,book:bk.title};}));
+    return {id:g.id,home_team:g.home_team,away_team:g.away_team,commence:g.commence_time,books,best};
   });
 }
 
-// ─── populate cache (with inflight guard) ─────────────────────────────────────
-
-async function refreshCache() {
-  if (inflight) return inflight; // already fetching — wait on same promise
-
-  inflight = (async () => {
-    try {
-      const data = await fetchFromOddsAPI();
-      cache = { data, fetchedAt: Date.now() };
-      console.log(
-        `[Odds] Cache refreshed — ${data.events.length} events, ` +
-        `${data.props.reduce((s, e) => s + e.players.length, 0)} HR props`
-      );
-      return data;
-    } finally {
-      inflight = null;
+async function warmCache(apiKey, slim=false) {
+  const results={};
+  for(const mkt of ['h2h','spreads','totals']){
+    try{const r=await fetch(`${BASE}/odds/?apiKey=${apiKey}&regions=us&markets=${mkt}&oddsFormat=american&dateFormat=iso`);if(r.ok){set(mkt,await r.json());results[mkt]='ok';}else results[mkt]=`${r.status}`;}catch(e){results[mkt]='fail';}
+  }
+  let events=[];
+  try{const r=await fetch(`${BASE}/events?apiKey=${apiKey}&dateFormat=iso`);if(r.ok){events=await r.json();set('events',events);results.events=`${events.length}`;}else results.events=`${r.status}`;}catch(e){results.events='fail';}
+  if(slim) return results;
+  for(const evt of events.slice(0,6)){
+    for(const [pt,mkts] of [['std',STD],['alt',ALT],['hrr',HRR]]){
+      try{const r=await fetch(`${BASE}/events/${evt.id}/odds?apiKey=${apiKey}&regions=us&markets=${mkts}&oddsFormat=american&dateFormat=iso`);if(r.ok){set(`${pt}_${evt.id}`,await r.json());results[`${pt}_${evt.away_team}@${evt.home_team}`]='ok';}else results[`${pt}_${evt.id}`]=`${r.status}`;}catch(e){}
     }
-  })();
-
-  return inflight;
+  }
+  return results;
 }
 
-// ─── request handler ──────────────────────────────────────────────────────────
+function notCached(res,events){
+  return res.status(200).json({status:'not_cached',message:'Odds refresh automatically every hour between noon–midnight ET',markets:[],props:[],events:(events||[]).map(e=>({id:e.id,home_team:e.home_team,away_team:e.away_team,commence:e.commence_time}))});
+}
 
-export default async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Cache-Control", "no-store");
+export default async function handler(req,res){
+  res.setHeader('Access-Control-Allow-Origin','*');
+  res.setHeader('Access-Control-Allow-Methods','GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers','Content-Type');
+  if(req.method==='OPTIONS') return res.status(200).end();
 
-  const type = req.query.type || "props";
+  const {type='h2h',eventId}=req.query;
+  const apiKey=process.env.ODDS_API_KEY;
 
-  // ── /api/odds?type=refresh  (called by cron + cron-job.org) ──────────────
-  if (type === "refresh") {
-    // Verify CRON_SECRET so random browsers can't hammer The Odds API
-    const secret = process.env.CRON_SECRET;
-    const auth   = req.headers.authorization || "";
-    if (secret && auth !== `Bearer ${secret}`) {
-      return res.status(401).json({ error: "Unauthorized" });
+  // ── PROTECTED REFRESH (cron or manual with secret) ────────────────────
+  if(type==='refresh'){
+    const secret=process.env.CRON_SECRET;
+    const auth=req.headers.authorization||'';
+    if(secret && auth!==`Bearer ${secret}`){
+      console.warn('[Odds] Blocked unauthorized refresh');
+      return res.status(401).json({error:'Unauthorized'});
     }
-
-    try {
-      const data = await refreshCache();
-      return res.status(200).json({
-        status:      "ok",
-        eventsCount: data.events.length,
-        propsCount:  data.props.reduce((s, e) => s + e.players.length, 0),
-        fetchedAt:   cache?.fetchedAt,
-      });
-    } catch (err) {
-      console.error("[Odds] Refresh failed:", err.message);
-      return res.status(500).json({ error: err.message });
-    }
+    if(!apiKey) return res.status(200).json({error:'ODDS_API_KEY not configured'});
+    try{
+      const results=await warmCache(apiKey,false);
+      return res.status(200).json({ok:true,results,ts:new Date().toISOString()});
+    }catch(e){return res.status(500).json({error:e.message});}
   }
 
-  // ── /api/odds?type=props  (called by the frontend) ───────────────────────
-  if (type === "props") {
-    try {
-      // If cache is valid, return immediately
-      if (isCacheValid()) {
-        return res.status(200).json({
-          status:    "ok",
-          source:    "cache",
-          fetchedAt: cache.fetchedAt,
-          ...cache.data,
-        });
+  // ── AUTO COLD-START: fetch game lines once if cache totally empty ──────
+  if(apiKey && !COLD_START_DONE && !get('h2h')){
+    COLD_START_DONE = true;
+    console.log('[Odds] Cold start — warming game lines + events');
+    warmCache(apiKey, true).catch(e=>console.warn('[Odds] Cold start failed:',e.message));
+    return notCached(res);
+  }
+
+  // ── PROPS (read cache, auto-fetch per event if missing) ───────────────
+  if(['props','props_alt','hrr'].includes(type)){
+    const pt=type==='props'?'std':type==='props_alt'?'alt':'hrr';
+    const events=get('events');
+    if(!events) return notCached(res);
+    const targets=eventId?events.filter(e=>e.id===eventId):events;
+    const results=[];
+    for(const evt of targets){
+      if(apiKey && !get(`${pt}_${evt.id}`)){
+        try{
+          const mkts=pt==='std'?STD:pt==='alt'?ALT:HRR;
+          const r=await fetch(`${BASE}/events/${evt.id}/odds?apiKey=${apiKey}&regions=us&markets=${mkts}&oddsFormat=american&dateFormat=iso`);
+          if(r.ok) set(`${pt}_${evt.id}`,await r.json());
+        }catch(e){}
       }
-
-      // Cache cold or stale — fetch live right now (no more "not_cached"!)
-      console.log("[Odds] Cache cold — fetching live from The Odds API...");
-      const data = await refreshCache();
-
-      return res.status(200).json({
-        status:    "ok",
-        source:    "live",
-        fetchedAt: cache.fetchedAt,
-        ...data,
-      });
-    } catch (err) {
-      console.error("[Odds] Props fetch failed:", err.message);
-      return res.status(500).json({ error: err.message });
+      const c=get(`${pt}_${evt.id}`);
+      if(c) results.push(normalizeProps(evt,c));
     }
+    if(!results.length) return notCached(res,events);
+    return res.status(200).json({status:'ok',fromCache:true,props:results,events:events.map(e=>({id:e.id,home_team:e.home_team,away_team:e.away_team,commence:e.commence_time}))});
   }
 
-  return res.status(400).json({ error: `Unknown type: ${type}` });
+  // ── GAME ODDS (read + auto-fetch if empty) ────────────────────────────
+  if(apiKey && !get(type)){
+    try{
+      const r=await fetch(`${BASE}/odds/?apiKey=${apiKey}&regions=us&markets=${type}&oddsFormat=american&dateFormat=iso`);
+      if(r.ok) set(type,await r.json());
+    }catch(e){}
+  }
+  const cached=get(type);
+  if(!cached) return notCached(res);
+  return res.status(200).json({status:'ok',fromCache:true,markets:normalizeGame(cached,type),type});
 }
