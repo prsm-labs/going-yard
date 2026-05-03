@@ -9947,17 +9947,15 @@ function MatchupEngineTab() {
       </div>
     )}
 
-    {/* Sim Lab */}
-    {subTab==='simlab' && (
-      <div>
-        <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:9,padding:'10px 14px',marginBottom:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-          <span style={{fontSize:10,color:'var(--accent)',fontFamily:"'DM Mono',monospace",fontWeight:700}}>🧠 SIM LAB</span>
-          <span style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>Monte Carlo projections · probability analysis · prop line matching · all from today's engine run</span>
-          <CheatCodeButton/>
-        </div>
-        <SimLabView data={activeData}/>
+    {/* Sim Lab — display:none keeps component mounted so filters/sort persist across sub-tab switches */}
+    <div style={{display: subTab==='simlab' ? 'block' : 'none'}}>
+      <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:9,padding:'10px 14px',marginBottom:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+        <span style={{fontSize:10,color:'var(--accent)',fontFamily:"'DM Mono',monospace",fontWeight:700}}>🧠 SIM LAB</span>
+        <span style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>Monte Carlo projections · probability analysis · prop line matching · all from today's engine run</span>
+        <CheatCodeButton/>
       </div>
-    )}
+      <SimLabView data={activeData}/>
+    </div>
 
     {/* Batter Leaderboard */}
     {subTab==='barrel' && <DailyBarrelTab/>}
