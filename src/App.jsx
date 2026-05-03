@@ -7180,7 +7180,7 @@ function SimLabView({ data }) {
   const [selBatter, setSelBatter]   = useState(null);
   const [sortBy, setSortBy]         = useState('proj_hr_adj');
   const [sortDir, setSortDir]       = useState('desc');
-  const [teamFilter, setTeamFilter]   = useState('all');
+  const [selMatchups, setSelMatchups] = useState(new Set()); // empty = all matchups
   const [sortProp, setSortProp]     = useState('proj_hit_prob');
   const [sortPropDir, setSortPropDir] = useState('desc');
   const [lineupOnly, setLineupOnly]   = useState(false);
@@ -7216,8 +7216,35 @@ function SimLabView({ data }) {
     else { setSortBy(key); setSortDir('desc'); }
   };
 
+  // Build matchup list from data sorted by start time
+  const matchupList = useMemo(() => {
+    const seen = new Set();
+    const list = [];
+    data.forEach(r => {
+      if (!r.game_id || !r.home_team || !r.away_team) return;
+      const key = String(r.game_id);
+      if (!seen.has(key)) {
+        seen.add(key);
+        list.push({ id: key, home: r.home_team, away: r.away_team, time: r.game_time || '' });
+      }
+    });
+    // Sort by game_time (12-hr format e.g. "01:10 PM")
+    list.sort((a, b) => {
+      const parseT = t => {
+        if (!t) return 9999;
+        const m = t.match(/(\d+):(\d+)\s*(AM|PM)/i);
+        if (!m) return 9999;
+        let h = parseInt(m[1]), min = parseInt(m[2]), ap = m[3].toUpperCase();
+        if (ap === 'PM' && h !== 12) h += 12;
+        if (ap === 'AM' && h === 12) h = 0;
+        return h * 60 + min;
+      };
+      return parseT(a.time) - parseT(b.time);
+    });
+    return list;
+  }, [data]);
+
   // Sort and filter the slate
-  const teams = [...new Set(data.map(r => r.batting_team).filter(Boolean))].sort();
   const SORT_OPTS = [
     { key: 'proj_hr_adj',  label: 'HR Prob%' },
     { key: 'proj_hit_prob',label: 'Hit Prob%' },
@@ -7245,7 +7272,7 @@ function SimLabView({ data }) {
 
   const slate = useMemo(() => {
     const filtered = data.filter(r => r.batter && r.batting_team)
-      .filter(r => teamFilter === 'all' || r.batting_team === teamFilter)
+      .filter(r => selMatchups.size === 0 || selMatchups.has(String(r.game_id)))
       .filter(r => !lineupOnly || isConfirmed(r))
       .filter(r => !filterGoneYardSim || isGoneYardSim(r))
       .filter(r => !filterDueSim || isDueFromRow(r, parseInt(r.batter_id)||0))
@@ -7270,8 +7297,15 @@ function SimLabView({ data }) {
       .filter(r => !minHitPct   || pctRaw(r.proj_hit_prob)              >= parseFloat(minHitPct))
       .filter(r => !minSimTB    || (parseFloat(r.sim_tb)||0)             >= parseFloat(minSimTB));
     const mul = sortDir === 'desc' ? -1 : 1;
-    return [...filtered].sort((a, b) => mul * ((parseFloat(a[sortBy]) || 0) - (parseFloat(b[sortBy]) || 0)));
-  }, [data, sortBy, sortDir, teamFilter, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, minHRScore, minHRPct, minMeatball, minHitPct, minSimTB]);
+    return [...filtered].sort((a, b) => {
+      if (sortBy === 'hr_odds_implied') {
+        const aO = HR_ODDS_MAP[String(parseInt(a.batter_id)||0)]?.implied || 0;
+        const bO = HR_ODDS_MAP[String(parseInt(b.batter_id)||0)]?.implied || 0;
+        return mul * (aO - bO);
+      }
+      return mul * ((parseFloat(a[sortBy]) || 0) - (parseFloat(b[sortBy]) || 0));
+    });
+  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, minHRScore, minHRPct, minMeatball, minHitPct, minSimTB]);
 
   // Auto-select top batter when data loads
   useEffect(() => {
@@ -7325,11 +7359,61 @@ function SimLabView({ data }) {
         <div>
           {/* Controls */}
           <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-            <select value={teamFilter} onChange={e => setTeamFilter(e.target.value)}
-              style={{ padding: '6px 10px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 7, color: 'var(--text)', fontFamily: "'DM Mono',monospace", fontSize: 11, cursor: 'pointer' }}>
-              <option value="all">All Teams</option>
-              {teams.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
+            {/* ── Matchup multi-select (checkbox, sorted by game time) ── */}
+            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center',
+              background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8,
+              padding: '7px 10px', marginBottom: 4, width: '100%' }}>
+              <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace",
+                textTransform: 'uppercase', letterSpacing: 1, marginRight: 2, whiteSpace: 'nowrap' }}>
+                🗓 Games:
+              </span>
+              {/* All button — clears selection */}
+              <button
+                onClick={() => setSelMatchups(new Set())}
+                style={{ padding: '3px 10px', borderRadius: 6, cursor: 'pointer', border: `1px solid ${selMatchups.size === 0 ? 'var(--accent)' : 'var(--border)'}`,
+                  background: selMatchups.size === 0 ? 'rgba(232,65,26,.12)' : 'var(--surface2)',
+                  color: selMatchups.size === 0 ? 'var(--accent)' : 'var(--muted)',
+                  fontFamily: "'DM Mono',monospace", fontWeight: selMatchups.size === 0 ? 700 : 400,
+                  fontSize: 10, whiteSpace: 'nowrap' }}>
+                All
+              </button>
+              {matchupList.map(g => {
+                const isChecked = selMatchups.has(g.id);
+                const toggle = () => setSelMatchups(prev => {
+                  const next = new Set(prev);
+                  isChecked ? next.delete(g.id) : next.add(g.id);
+                  return next;
+                });
+                return (
+                  <button key={g.id} onClick={toggle}
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '3px 9px',
+                      borderRadius: 6, cursor: 'pointer',
+                      border: `1px solid ${isChecked ? 'var(--accent)' : 'var(--border)'}`,
+                      background: isChecked ? 'rgba(232,65,26,.12)' : 'var(--surface2)',
+                      color: isChecked ? 'var(--accent)' : 'var(--muted)',
+                      fontFamily: "'Oswald',sans-serif", fontWeight: isChecked ? 700 : 500,
+                      fontSize: 11, whiteSpace: 'nowrap', transition: 'all .15s' }}>
+                    {/* Checkbox indicator */}
+                    <span style={{ width: 11, height: 11, borderRadius: 3, flexShrink: 0,
+                      border: `1.5px solid ${isChecked ? 'var(--accent)' : 'var(--muted)'}`,
+                      background: isChecked ? 'var(--accent)' : 'transparent',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8,
+                      color: 'white', lineHeight: 1 }}>
+                      {isChecked ? '✓' : ''}
+                    </span>
+                    <span>{g.away} @ {g.home}</span>
+                    {g.time && <span style={{ fontSize: 8, color: isChecked ? 'rgba(232,65,26,.7)' : 'var(--muted)', marginLeft: 1 }}>{g.time}</span>}
+                  </button>
+                );
+              })}
+              {selMatchups.size > 0 && (
+                <span style={{ fontSize: 9, color: 'var(--accent)', fontFamily: "'DM Mono',monospace",
+                  marginLeft: 4, cursor: 'pointer', textDecoration: 'underline' }}
+                  onClick={() => setSelMatchups(new Set())}>
+                  clear
+                </span>
+              )}
+            </div>
             <button onClick={() => setLineupOnly(v => !v)}
               style={{ padding: '6px 12px', borderRadius: 7, cursor: 'pointer',
                 border: `1px solid ${lineupOnly ? 'rgba(39,201,122,.5)' : 'var(--border)'}`,
@@ -7516,7 +7600,7 @@ function SimLabView({ data }) {
                     { label: 'Score',    key: 'weighted_flag_score' },
                     { label: 'Grade',    key: null },
                     { label: '💣',       key: 'meatball_matchup_score' },
-                    { label: 'HR Odds',  key: null },
+                    { label: 'HR Odds',  key: 'hr_odds_implied' },
                   ].map(col => (
                     <th key={col.label}
                       onClick={() => handleSort(col.key)}
