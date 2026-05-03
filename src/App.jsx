@@ -7181,6 +7181,18 @@ function SimLabView({ data }) {
   const [sortBy, setSortBy]         = useState('proj_hr_adj');
   const [sortDir, setSortDir]       = useState('desc');
   const [selMatchups, setSelMatchups] = useState(new Set()); // empty = all matchups
+  const [showMatchupDrop, setShowMatchupDrop] = useState(false);
+  const matchupDropRef = useRef(null);
+  // Close matchup dropdown on outside click
+  useEffect(() => {
+    if (!showMatchupDrop) return;
+    const handler = e => {
+      if (matchupDropRef.current && !matchupDropRef.current.contains(e.target))
+        setShowMatchupDrop(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showMatchupDrop]);
   const [sortProp, setSortProp]     = useState('proj_hit_prob');
   const [sortPropDir, setSortPropDir] = useState('desc');
   const [lineupOnly, setLineupOnly]   = useState(false);
@@ -7359,59 +7371,89 @@ function SimLabView({ data }) {
         <div>
           {/* Controls */}
           <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-            {/* ── Matchup multi-select (checkbox, sorted by game time) ── */}
-            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center',
-              background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8,
-              padding: '7px 10px', marginBottom: 4, width: '100%' }}>
-              <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace",
-                textTransform: 'uppercase', letterSpacing: 1, marginRight: 2, whiteSpace: 'nowrap' }}>
-                🗓 Games:
-              </span>
-              {/* All button — clears selection */}
+            {/* ── Matchup dropdown multi-select ── */}
+            <div ref={matchupDropRef} style={{ position: 'relative' }}>
+              {/* Trigger button */}
               <button
-                onClick={() => setSelMatchups(new Set())}
-                style={{ padding: '3px 10px', borderRadius: 6, cursor: 'pointer', border: `1px solid ${selMatchups.size === 0 ? 'var(--accent)' : 'var(--border)'}`,
-                  background: selMatchups.size === 0 ? 'rgba(232,65,26,.12)' : 'var(--surface2)',
-                  color: selMatchups.size === 0 ? 'var(--accent)' : 'var(--muted)',
-                  fontFamily: "'DM Mono',monospace", fontWeight: selMatchups.size === 0 ? 700 : 400,
-                  fontSize: 10, whiteSpace: 'nowrap' }}>
-                All
+                onClick={() => setShowMatchupDrop(v => !v)}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px',
+                  borderRadius: 7, cursor: 'pointer',
+                  border: `1px solid ${selMatchups.size > 0 ? 'var(--accent)' : 'var(--border)'}`,
+                  background: selMatchups.size > 0 ? 'rgba(232,65,26,.10)' : 'var(--surface2)',
+                  color: selMatchups.size > 0 ? 'var(--accent)' : 'var(--muted)',
+                  fontFamily: "'DM Mono',monospace", fontSize: 11,
+                  fontWeight: selMatchups.size > 0 ? 700 : 400, whiteSpace: 'nowrap' }}>
+                🗓 {selMatchups.size === 0
+                  ? 'All Games'
+                  : `${selMatchups.size} Game${selMatchups.size > 1 ? 's' : ''} ✓`}
+                <span style={{ fontSize: 9, opacity: .6, marginLeft: 2 }}>{showMatchupDrop ? '▲' : '▼'}</span>
               </button>
-              {matchupList.map(g => {
-                const isChecked = selMatchups.has(g.id);
-                const toggle = () => setSelMatchups(prev => {
-                  const next = new Set(prev);
-                  isChecked ? next.delete(g.id) : next.add(g.id);
-                  return next;
-                });
-                return (
-                  <button key={g.id} onClick={toggle}
-                    style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '3px 9px',
-                      borderRadius: 6, cursor: 'pointer',
-                      border: `1px solid ${isChecked ? 'var(--accent)' : 'var(--border)'}`,
-                      background: isChecked ? 'rgba(232,65,26,.12)' : 'var(--surface2)',
-                      color: isChecked ? 'var(--accent)' : 'var(--muted)',
-                      fontFamily: "'Oswald',sans-serif", fontWeight: isChecked ? 700 : 500,
-                      fontSize: 11, whiteSpace: 'nowrap', transition: 'all .15s' }}>
-                    {/* Checkbox indicator */}
-                    <span style={{ width: 11, height: 11, borderRadius: 3, flexShrink: 0,
-                      border: `1.5px solid ${isChecked ? 'var(--accent)' : 'var(--muted)'}`,
-                      background: isChecked ? 'var(--accent)' : 'transparent',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8,
-                      color: 'white', lineHeight: 1 }}>
-                      {isChecked ? '✓' : ''}
+
+              {/* Dropdown panel */}
+              {showMatchupDrop && (
+                <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 200,
+                  background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8,
+                  padding: '8px 6px', minWidth: 220, boxShadow: '0 8px 24px rgba(0,0,0,.5)',
+                  display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {/* All option */}
+                  <button onClick={() => { setSelMatchups(new Set()); setShowMatchupDrop(false); }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px',
+                      borderRadius: 5, cursor: 'pointer', border: 'none', textAlign: 'left',
+                      background: selMatchups.size === 0 ? 'rgba(232,65,26,.12)' : 'transparent',
+                      color: selMatchups.size === 0 ? 'var(--accent)' : 'var(--muted)',
+                      fontFamily: "'DM Mono',monospace", fontSize: 11,
+                      fontWeight: selMatchups.size === 0 ? 700 : 400, width: '100%' }}>
+                    <span style={{ width: 12, height: 12, borderRadius: 3, flexShrink: 0,
+                      border: `1.5px solid ${selMatchups.size === 0 ? 'var(--accent)' : 'var(--muted)'}`,
+                      background: selMatchups.size === 0 ? 'var(--accent)' : 'transparent',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 8, color: 'white' }}>
+                      {selMatchups.size === 0 ? '✓' : ''}
                     </span>
-                    <span>{g.away} @ {g.home}</span>
-                    {g.time && <span style={{ fontSize: 8, color: isChecked ? 'rgba(232,65,26,.7)' : 'var(--muted)', marginLeft: 1 }}>{g.time}</span>}
+                    All Games
                   </button>
-                );
-              })}
-              {selMatchups.size > 0 && (
-                <span style={{ fontSize: 9, color: 'var(--accent)', fontFamily: "'DM Mono',monospace",
-                  marginLeft: 4, cursor: 'pointer', textDecoration: 'underline' }}
-                  onClick={() => setSelMatchups(new Set())}>
-                  clear
-                </span>
+                  {/* Divider */}
+                  <div style={{ height: 1, background: 'var(--border)', margin: '3px 0' }}/>
+                  {/* One row per matchup */}
+                  {matchupList.map(g => {
+                    const isChecked = selMatchups.has(g.id);
+                    const toggle = () => setSelMatchups(prev => {
+                      const next = new Set(prev);
+                      isChecked ? next.delete(g.id) : next.add(g.id);
+                      return next;
+                    });
+                    return (
+                      <button key={g.id} onClick={toggle}
+                        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px',
+                          borderRadius: 5, cursor: 'pointer', border: 'none', textAlign: 'left',
+                          background: isChecked ? 'rgba(232,65,26,.10)' : 'transparent',
+                          color: isChecked ? 'var(--accent)' : 'var(--text)',
+                          fontFamily: "'Oswald',sans-serif", fontSize: 12,
+                          fontWeight: isChecked ? 700 : 500, width: '100%', whiteSpace: 'nowrap' }}>
+                        <span style={{ width: 12, height: 12, borderRadius: 3, flexShrink: 0,
+                          border: `1.5px solid ${isChecked ? 'var(--accent)' : 'var(--muted)'}`,
+                          background: isChecked ? 'var(--accent)' : 'transparent',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 8, color: 'white' }}>
+                          {isChecked ? '✓' : ''}
+                        </span>
+                        <span style={{ flex: 1 }}>{g.away} @ {g.home}</span>
+                        {g.time && <span style={{ fontSize: 9, color: 'var(--muted)', marginLeft: 4 }}>{g.time}</span>}
+                      </button>
+                    );
+                  })}
+                  {/* Clear link if anything selected */}
+                  {selMatchups.size > 0 && (
+                    <div style={{ marginTop: 4, paddingTop: 4, borderTop: '1px solid var(--border)',
+                      textAlign: 'right' }}>
+                      <span onClick={() => { setSelMatchups(new Set()); setShowMatchupDrop(false); }}
+                        style={{ fontSize: 9, color: 'var(--accent)', fontFamily: "'DM Mono',monospace",
+                          cursor: 'pointer', textDecoration: 'underline' }}>
+                        clear all
+                      </span>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
             <button onClick={() => setLineupOnly(v => !v)}
