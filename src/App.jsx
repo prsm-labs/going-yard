@@ -5037,7 +5037,7 @@ function LiveTab() {
 
     {/* Sub-view toggle */}
     <div style={{display:'flex',gap:5,marginBottom:12,padding:'3px',background:'var(--surface)',borderRadius:8,border:'1px solid var(--border)',width:'fit-content'}}>
-      {[['games','🎮 Live Games'],['lineups','📋 Lineups']].map(([key,label])=>(
+      {[['games','🎮 Live Games'],['gameday','📺 Gameday'],['lineups','📋 Lineups']].map(([key,label])=>(
         <button key={key} onClick={()=>setLiveView(key)}
           style={{padding:'6px 14px',borderRadius:6,cursor:'pointer',border:'none',
             fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,letterSpacing:.8,
@@ -5050,6 +5050,7 @@ function LiveTab() {
     </div>
 
   {liveView==='lineups' && <LineupsView date={liveDate}/>}
+  {liveView==='gameday' && <GamedayTab/>}
 
   {liveView==='games' && <>
   {/* Date picker */}
@@ -5956,6 +5957,508 @@ function PitchBuilderTab() {
 // Global HR data — shared between ticker and tracker tab
 let HR_DATA = [];
 const VIDEO_LINK_CACHE = {}; // gamePk_atBatIndex → savant video URL
+
+
+// ── GAMEDAY TAB ──────────────────────────────────────────────────────────────
+function GamedayTab() {
+  const etToday = () => {
+    const s = new Date().toLocaleDateString('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'});
+    const [m,d,y] = s.split('/');
+    return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+  };
+  const [selDate,   setSelDate]   = useState(etToday);
+  const [games,     setGames]     = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [selGamePk, setSelGamePk] = useState(null);
+  const [live,      setLive]      = useState(null);
+  const [liveLoad,  setLiveLoad]  = useState(false);
+  const [boxTab,    setBoxTab]    = useState('batting'); // 'batting' | 'pitching'
+  const pollRef = useRef(null);
+
+  // ── Fetch schedule ──────────────────────────────────────────────────────────
+  const loadSchedule = useCallback(async (date) => {
+    setLoading(true); setGames([]);
+    try {
+      const r = await fetch(
+        `https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${date}` +
+        `&hydrate=probablePitcher,linescore,decisions,team&gameType=R`
+      );
+      const d = await r.json();
+      setGames(d.dates?.[0]?.games || []);
+    } catch(e) { setGames([]); }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { loadSchedule(selDate); }, [selDate]);
+
+  // ── Fetch live box score ────────────────────────────────────────────────────
+  const loadLive = useCallback(async (pk) => {
+    if (!pk) return;
+    setLiveLoad(true);
+    try {
+      const r = await fetch(`/api/boxscore?gamePk=${pk}`);
+      const d = await r.json();
+      setLive(d);
+    } catch(e) {}
+    setLiveLoad(false);
+  }, []);
+
+  useEffect(() => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    if (!selGamePk) { setLive(null); return; }
+    loadLive(selGamePk);
+    const g = games.find(x => x.gamePk === selGamePk);
+    if (g?.status?.abstractGameState === 'Live') {
+      pollRef.current = setInterval(() => loadLive(selGamePk), 20000);
+    }
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [selGamePk]);
+
+  // ── Date strip (−3 → +3 days around selDate) ───────────────────────────────
+  const dateStrip = useMemo(() => {
+    const arr = [];
+    for (let i = -3; i <= 3; i++) {
+      const dt = new Date(selDate + 'T12:00:00Z');
+      dt.setUTCDate(dt.getUTCDate() + i);
+      const iso  = dt.toISOString().slice(0,10);
+      const dow  = dt.toLocaleDateString('en-US',{weekday:'short',timeZone:'UTC'}).toUpperCase();
+      const mday = dt.toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'}).toUpperCase();
+      arr.push({ iso, dow, mday, isSelected: i === 0, isToday: iso === etToday() });
+    }
+    return arr;
+  }, [selDate]);
+
+  // ── Helpers ─────────────────────────────────────────────────────────────────
+  const gameStatus = (g) => {
+    const abs  = g.status?.abstractGameState || '';
+    const det  = g.status?.detailedState     || '';
+    const ls   = g.linescore || {};
+    if (abs === 'Final') {
+      const extra = ls.currentInning > 9 ? `/F${ls.currentInning}` : '';
+      return { label: `FINAL${extra}`, color: 'var(--muted)', dot: false };
+    }
+    if (abs === 'Live') {
+      const half = ls.inningHalf === 'Top' ? '▲' : '▼';
+      return { label: `${half}${ls.currentInning || ''}`, color: '#27c97a', dot: true };
+    }
+    if (det === 'Warmup' || det === 'Pre-Game') return { label: 'WARMUP', color: '#f5a623', dot: true };
+    if (det === 'Postponed')  return { label: 'PPD', color: 'var(--muted)', dot: false };
+    if (det === 'Cancelled')  return { label: 'CNCL', color: 'var(--muted)', dot: false };
+    const gt = g.gameDate
+      ? new Date(g.gameDate).toLocaleTimeString('en-US',{timeZone:'America/New_York',hour:'numeric',minute:'2-digit'})
+      : '—';
+    return { label: gt, color: 'var(--muted)', dot: false };
+  };
+
+  const rhe = (g, side) => {
+    const ls = g.linescore?.teams?.[side];
+    const abs = g.status?.abstractGameState;
+    if (!ls || abs === 'Preview') return { r:'—', h:'—', e:'—' };
+    return { r: ls.runs ?? '—', h: ls.hits ?? '—', e: ls.errors ?? '—' };
+  };
+
+  // ── Selected game data ──────────────────────────────────────────────────────
+  const selGame = games.find(g => g.gamePk === selGamePk) || null;
+  const isLive  = selGame?.status?.abstractGameState === 'Live';
+  const isFinal = selGame?.status?.abstractGameState === 'Final';
+
+  // Linescore innings
+  const innings = live?.linescore?.innings || selGame?.linescore?.innings || [];
+  const lsTeams = live?.linescore?.teams   || selGame?.linescore?.teams   || {};
+  const lsOuts  = live?.linescore?.outs    ?? live?.liveLinescore?.outs   ?? null;
+
+  // At-bat / offense state from /api/boxscore proxy
+  const offense   = live?.liveLinescore?.offense || live?.linescore?.offense || {};
+  const curBatId  = live?.currentBatterId  || null;
+  const onDeckId  = live?.onDeckId         || null;
+  const inHoleId  = live?.inTheHoleId      || null;
+  const runners   = { first: !!offense.first, second: !!offense.second, third: !!offense.third };
+  const lastPlay  = live?.lastPlay         || null;
+
+  // Helper: get player name from live box
+  const pname = (id, side) => {
+    if (!id || !live?.teams) return '—';
+    for (const s of ['away','home']) {
+      const p = live.teams[s]?.players?.[`ID${id}`];
+      if (p) return p.person?.fullName || '—';
+    }
+    return '—';
+  };
+
+  // Box score rows
+  const boxRows = (side) => {
+    const team = live?.teams?.[side];
+    if (!team) return [];
+    return (team.batters || []).map(bid => {
+      const p   = team.players?.[`ID${bid}`];
+      if (!p) return null;
+      const bo  = p.battingOrder;
+      const pos = p.position?.abbreviation || '';
+      const s   = p.stats?.batting || {};
+      return {
+        id: bid, name: p.person?.fullName || '—', pos,
+        slot: bo && bo % 100 === 0 ? Math.floor(bo / 100) : null,
+        sub: bo && bo % 100 !== 0,
+        ab: s.atBats ?? '—', r: s.runs ?? '—', h: s.hits ?? '—',
+        rbi: s.rbi ?? '—', bb: s.baseOnBalls ?? '—', k: s.strikeOuts ?? '—',
+        avg: p.seasonStats?.batting?.avg || '—',
+        ops: p.seasonStats?.batting?.ops || '—',
+      };
+    }).filter(Boolean);
+  };
+
+  const pitchRows = (side) => {
+    const team = live?.teams?.[side];
+    if (!team) return [];
+    return (team.pitchers || []).map(pid => {
+      const p  = team.players?.[`ID${pid}`];
+      if (!p) return null;
+      const s  = p.stats?.pitching || {};
+      return {
+        id: pid, name: p.person?.fullName || '—',
+        ip: s.inningsPitched ?? '—', h: s.hits ?? '—', r: s.runs ?? '—',
+        er: s.earnedRuns ?? '—', bb: s.baseOnBalls ?? '—', k: s.strikeOuts ?? '—',
+        hr: s.homeRuns ?? '—', era: p.seasonStats?.pitching?.era || '—',
+      };
+    }).filter(Boolean);
+  };
+
+  // ── Styles ──────────────────────────────────────────────────────────────────
+  const mono  = "'DM Mono',monospace";
+  const osw   = "'Oswald',sans-serif";
+  const cell  = { padding:'5px 8px', fontFamily:mono, fontSize:11, borderBottom:'1px solid rgba(30,45,58,.5)', verticalAlign:'middle' };
+  const thSt  = { padding:'5px 8px', fontFamily:mono, fontSize:9, fontWeight:600, letterSpacing:1, textTransform:'uppercase', color:'var(--muted)', borderBottom:'2px solid var(--border)', background:'var(--surface2)', whiteSpace:'nowrap' };
+
+  // ── Render ──────────────────────────────────────────────────────────────────
+  return (
+    <div style={{margin:'-4px 0', minHeight:'70vh'}}>
+
+      {/* Date navigation strip */}
+      <div style={{display:'flex', alignItems:'center', gap:0, overflowX:'auto',
+        borderBottom:'2px solid var(--border)', background:'var(--surface)',
+        padding:'0 8px', position:'sticky', top:0, zIndex:10}}>
+        <button onClick={() => { setSelDate(d => { const dt=new Date(d+'T12:00:00Z'); dt.setUTCDate(dt.getUTCDate()-1); return dt.toISOString().slice(0,10); }); setSelGamePk(null); }}
+          style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',padding:'10px 8px',fontSize:16}}>‹</button>
+        {dateStrip.map(d => (
+          <button key={d.iso} onClick={() => { setSelDate(d.iso); setSelGamePk(null); }}
+            style={{display:'flex',flexDirection:'column',alignItems:'center',padding:'8px 12px',
+              border:'none',background:'none',cursor:'pointer',borderBottom:`2px solid ${d.isSelected?'var(--accent)':'transparent'}`,
+              color: d.isSelected ? 'var(--text)' : 'var(--muted)', minWidth:56, flexShrink:0, gap:1}}>
+            <span style={{fontFamily:mono,fontSize:9,fontWeight:600,letterSpacing:.5}}>{d.dow}</span>
+            <span style={{fontFamily:osw,fontSize:11,fontWeight:d.isToday?700:400,color:d.isToday&&!d.isSelected?'var(--accent2)':undefined}}>{d.mday}</span>
+          </button>
+        ))}
+        <button onClick={() => { setSelDate(d => { const dt=new Date(d+'T12:00:00Z'); dt.setUTCDate(dt.getUTCDate()+1); return dt.toISOString().slice(0,10); }); setSelGamePk(null); }}
+          style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',padding:'10px 8px',fontSize:16}}>›</button>
+        <button onClick={() => { setSelDate(etToday()); setSelGamePk(null); }}
+          style={{marginLeft:'auto',padding:'4px 10px',borderRadius:5,border:'1px solid var(--border)',
+            background:'var(--surface2)',color:'var(--muted)',fontFamily:mono,fontSize:9,cursor:'pointer',whiteSpace:'nowrap',flexShrink:0}}>
+          Today
+        </button>
+      </div>
+
+      <div style={{display:'flex', minHeight:'calc(100vh - 48px)'}}>
+
+        {/* Games list */}
+        <div style={{width: selGamePk ? '320px' : '100%', flexShrink:0,
+          overflowY:'auto', borderRight: selGamePk ? '1px solid var(--border)' : 'none',
+          transition:'width .2s'}}>
+          {loading ? (
+            <div style={{display:'flex',alignItems:'center',justifyContent:'center',padding:48,color:'var(--muted)',fontFamily:mono,fontSize:11}}>
+              <div className="sp" style={{marginRight:12}}/> Loading games…
+            </div>
+          ) : games.length === 0 ? (
+            <div style={{padding:48,textAlign:'center',color:'var(--muted)',fontFamily:mono,fontSize:11}}>No games scheduled</div>
+          ) : (
+            <div style={{display: selGamePk ? 'flex' : 'grid', flexDirection:'column',
+              gridTemplateColumns: selGamePk ? undefined : 'repeat(auto-fill,minmax(260px,1fr))',
+              gap: selGamePk ? 0 : 10, padding: selGamePk ? 0 : 16}}>
+              {games.map(g => {
+                const st  = gameStatus(g);
+                const aw  = g.teams?.away;
+                const hm  = g.teams?.home;
+                const awR = rhe(g,'away'); const hmR = rhe(g,'home');
+                const abs = g.status?.abstractGameState;
+                const sel = g.gamePk === selGamePk;
+                const awWin = abs==='Final' && (aw?.score??0) > (hm?.score??0);
+                const hmWin = abs==='Final' && (hm?.score??0) > (aw?.score??0);
+                return (
+                  <div key={g.gamePk} onClick={() => setSelGamePk(sel ? null : g.gamePk)}
+                    style={{background: sel ? 'var(--surface2)' : 'var(--surface)',
+                      border:`1px solid ${sel ? 'var(--accent)' : 'var(--border)'}`,
+                      borderRadius: selGamePk ? 0 : 9, cursor:'pointer', padding:'10px 14px',
+                      borderLeft: selGamePk ? `3px solid ${sel ? 'var(--accent)' : 'transparent'}` : undefined,
+                      transition:'all .15s'}}>
+                    {/* Status */}
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+                      <div style={{display:'flex',alignItems:'center',gap:5}}>
+                        {st.dot && <div style={{width:6,height:6,borderRadius:'50%',background:st.color,animation:'pulse 1s infinite'}}/>}
+                        <span style={{fontFamily:mono,fontSize:9,fontWeight:700,color:st.color,letterSpacing:.8}}>{st.label}</span>
+                      </div>
+                      {isLive && g.gamePk === selGamePk && lsOuts !== null &&
+                        <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>
+                          {lsOuts} out{lsOuts !== 1 ? 's' : ''}
+                        </span>}
+                      <span style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.2)'}}>{g.gamePk}</span>
+                    </div>
+
+                    {/* Scoreboard rows */}
+                    {[[aw, awR, awWin], [hm, hmR, hmWin]].map(([team, rhe, win], ti) => (
+                      <div key={ti} style={{display:'flex',alignItems:'center',gap:8,marginBottom: ti===0 ? 3 : 0}}>
+                        <span style={{fontFamily:osw,fontWeight:700,fontSize:13,
+                          color: win ? 'var(--text)' : abs==='Final' ? 'var(--muted)' : 'var(--text)',
+                          minWidth:32}}>{team?.team?.abbreviation || '—'}</span>
+                        <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)',flex:1}}>
+                          {team?.team?.record ? `${team.team.record.wins}-${team.team.record.losses}` : ''}
+                        </span>
+                        {abs !== 'Preview' && <>
+                          <span style={{fontFamily:osw,fontWeight:win?800:400,fontSize:16,minWidth:20,textAlign:'right',
+                            color: win ? 'var(--text)' : 'var(--muted)'}}>{team?.score ?? '—'}</span>
+                          <span style={{fontFamily:mono,fontSize:9,color:'rgba(255,255,255,.25)',minWidth:12,textAlign:'right'}}>{rhe.h}</span>
+                          <span style={{fontFamily:mono,fontSize:9,color: rhe.e>0?'var(--accent)':'rgba(255,255,255,.2)',minWidth:12,textAlign:'right'}}>{rhe.e}</span>
+                        </>}
+                        {abs === 'Preview' && <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>
+                          {team?.probablePitcher?.fullName?.split(' ').pop() || 'TBD'}
+                        </span>}
+                      </div>
+                    ))}
+
+                    {/* Win/Loss/Save pitchers */}
+                    {abs === 'Final' && g.decisions && (
+                      <div style={{marginTop:7,paddingTop:7,borderTop:'1px solid rgba(255,255,255,.05)',display:'flex',gap:12}}>
+                        {g.decisions.winner && <span style={{fontFamily:mono,fontSize:8,color:'#27c97a'}}>W: {g.decisions.winner.fullName?.split(' ').pop()}</span>}
+                        {g.decisions.loser  && <span style={{fontFamily:mono,fontSize:8,color:'var(--accent)'}}>L: {g.decisions.loser.fullName?.split(' ').pop()}</span>}
+                        {g.decisions.save   && <span style={{fontFamily:mono,fontSize:8,color:'var(--accent2)'}}>S: {g.decisions.save.fullName?.split(' ').pop()}</span>}
+                      </div>
+                    )}
+                    {abs === 'Preview' && (g.teams?.away?.probablePitcher || g.teams?.home?.probablePitcher) && (
+                      <div style={{marginTop:6,paddingTop:6,borderTop:'1px solid rgba(255,255,255,.05)',display:'flex',justifyContent:'space-between'}}>
+                        <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>
+                          {aw?.probablePitcher?.fullName?.split(' ').pop() || 'TBD'}
+                        </span>
+                        <span style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.25)'}}>vs</span>
+                        <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>
+                          {hm?.probablePitcher?.fullName?.split(' ').pop() || 'TBD'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Game detail panel */}
+        {selGame && (
+          <div style={{flex:1,overflowY:'auto',padding:'16px 20px', minWidth:0}}>
+            {liveLoad && !live ? (
+              <div style={{display:'flex',alignItems:'center',gap:8,padding:24,color:'var(--muted)',fontFamily:mono,fontSize:11}}>
+                <div className="sp"/>Loading game data…
+              </div>
+            ) : live ? <>
+
+              {/* Game header */}
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16,flexWrap:'wrap',gap:8}}>
+                <div style={{display:'flex',alignItems:'center',gap:16}}>
+                  <span style={{fontFamily:osw,fontWeight:700,fontSize:22}}>{selGame.teams?.away?.team?.abbreviation}</span>
+                  <span style={{fontFamily:osw,fontWeight:800,fontSize:28,color:(() => {
+                    const aw = selGame.teams?.away?.score ?? 0;
+                    const hm = selGame.teams?.home?.score ?? 0;
+                    const abs = selGame.status?.abstractGameState;
+                    return abs==='Final' && aw > hm ? 'var(--text)' : abs==='Final' ? 'var(--muted)' : 'var(--text)';
+                  })()}}>{selGame.teams?.away?.score ?? '—'}</span>
+                  <span style={{fontFamily:mono,fontSize:11,color:'var(--muted)'}}>—</span>
+                  <span style={{fontFamily:osw,fontWeight:800,fontSize:28,color:(() => {
+                    const aw = selGame.teams?.away?.score ?? 0;
+                    const hm = selGame.teams?.home?.score ?? 0;
+                    const abs = selGame.status?.abstractGameState;
+                    return abs==='Final' && hm > aw ? 'var(--text)' : abs==='Final' ? 'var(--muted)' : 'var(--text)';
+                  })()}}>{selGame.teams?.home?.score ?? '—'}</span>
+                  <span style={{fontFamily:osw,fontWeight:700,fontSize:22}}>{selGame.teams?.home?.team?.abbreviation}</span>
+                </div>
+                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                  {(() => { const st=gameStatus(selGame); return <>
+                    {st.dot && <div style={{width:7,height:7,borderRadius:'50%',background:st.color,animation:'pulse 1s infinite'}}/>}
+                    <span style={{fontFamily:mono,fontSize:10,fontWeight:700,color:st.color}}>{st.label}</span>
+                  </>; })()}
+                  {liveLoad && <div className="sp" style={{width:14,height:14,borderWidth:2}}/>}
+                </div>
+              </div>
+
+              {/* Linescore */}
+              {innings.length > 0 && (
+                <div style={{overflowX:'auto',marginBottom:16}}>
+                  <table style={{borderCollapse:'separate',borderSpacing:0,border:'1px solid var(--border)',borderRadius:8,overflow:'hidden',width:'100%'}}>
+                    <thead>
+                      <tr>
+                        <th style={{...thSt,textAlign:'left',minWidth:40}}>Team</th>
+                        {innings.map((_,i) => <th key={i} style={{...thSt,textAlign:'center',minWidth:24}}>{i+1}</th>)}
+                        {innings.length < 9 && Array.from({length:9-innings.length},(_,i) =>
+                          <th key={`e${i}`} style={{...thSt,textAlign:'center',minWidth:24,opacity:.3}}>{innings.length+i+1}</th>
+                        )}
+                        <th style={{...thSt,textAlign:'center',minWidth:28,borderLeft:'2px solid var(--border)'}}>R</th>
+                        <th style={{...thSt,textAlign:'center',minWidth:24}}>H</th>
+                        <th style={{...thSt,textAlign:'center',minWidth:24}}>E</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {['away','home'].map(side => (
+                        <tr key={side}>
+                          <td style={{...cell,fontFamily:osw,fontWeight:700,fontSize:12}}>{selGame.teams?.[side]?.team?.abbreviation}</td>
+                          {innings.map((inn,i) => {
+                            const v = inn[side]?.runs;
+                            return <td key={i} style={{...cell,textAlign:'center',color: v>0?'var(--text)':'var(--muted)',fontSize:11}}>{v ?? (isLive && i===innings.length-1 ? 'X' : '—')}</td>;
+                          })}
+                          {innings.length < 9 && Array.from({length:9-innings.length},(_,i) =>
+                            <td key={`e${i}`} style={{...cell,textAlign:'center',color:'rgba(255,255,255,.12)'}}>{isLive ? '—' : ''}</td>
+                          )}
+                          <td style={{...cell,textAlign:'center',fontFamily:osw,fontWeight:700,fontSize:13,borderLeft:'2px solid var(--border)'}}>{lsTeams?.[side]?.runs ?? '—'}</td>
+                          <td style={{...cell,textAlign:'center'}}>{lsTeams?.[side]?.hits ?? '—'}</td>
+                          <td style={{...cell,textAlign:'center',color: (lsTeams?.[side]?.errors ?? 0)>0 ? 'var(--accent)' : undefined}}>{lsTeams?.[side]?.errors ?? '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Live at-bat panel */}
+              {isLive && (curBatId || onDeckId) && (
+                <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:9,padding:'12px 16px',marginBottom:16}}>
+                  <div style={{display:'flex',alignItems:'flex-start',gap:16,flexWrap:'wrap'}}>
+                    {/* Bases + Outs */}
+                    <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:8}}>
+                      {/* Diamond */}
+                      <div style={{position:'relative',width:52,height:52}}>
+                        {[
+                          {key:'second',top:0,left:'50%',transform:'translate(-50%,0) rotate(45deg)'},
+                          {key:'third', top:'50%',left:0,transform:'translate(0,-50%) rotate(45deg)'},
+                          {key:'first', top:'50%',right:0,transform:'translate(0,-50%) rotate(45deg)'},
+                        ].map(b => (
+                          <div key={b.key} style={{position:'absolute',width:14,height:14,borderRadius:2,
+                            background: runners[b.key] ? '#f5a623' : 'var(--surface2)',
+                            border: `1.5px solid ${runners[b.key] ? '#f5a623' : 'var(--border)'}`,
+                            top:b.top,left:b.left,right:b.right,transform:b.transform}}/>
+                        ))}
+                      </div>
+                      {/* Outs */}
+                      <div style={{display:'flex',gap:4}}>
+                        {[0,1,2].map(i => (
+                          <div key={i} style={{width:9,height:9,borderRadius:'50%',
+                            background: i < (lsOuts??0) ? '#f5a623' : 'var(--surface2)',
+                            border:`1.5px solid ${i < (lsOuts??0) ? '#f5a623' : 'var(--border)'}`}}/>
+                        ))}
+                      </div>
+                      <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>{lsOuts ?? 0} out{(lsOuts??0)!==1?'s':''}</span>
+                    </div>
+
+                    {/* At bat / On deck / In hole */}
+                    <div style={{flex:1,display:'flex',flexDirection:'column',gap:6}}>
+                      {curBatId && <div style={{display:'flex',alignItems:'center',gap:8}}>
+                        <span style={{fontFamily:mono,fontSize:8,color:'var(--accent)',fontWeight:700,minWidth:48,textTransform:'uppercase'}}>At Bat</span>
+                        <span style={{fontFamily:osw,fontWeight:700,fontSize:14}}>{pname(curBatId)}</span>
+                      </div>}
+                      {onDeckId && <div style={{display:'flex',alignItems:'center',gap:8}}>
+                        <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',minWidth:48,textTransform:'uppercase'}}>On Deck</span>
+                        <span style={{fontFamily:osw,fontSize:12,color:'var(--muted)'}}>{pname(onDeckId)}</span>
+                      </div>}
+                      {inHoleId && <div style={{display:'flex',alignItems:'center',gap:8}}>
+                        <span style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.25)',minWidth:48,textTransform:'uppercase'}}>In Hole</span>
+                        <span style={{fontFamily:osw,fontSize:11,color:'rgba(255,255,255,.35)'}}>{pname(inHoleId)}</span>
+                      </div>}
+                      {/* Last play */}
+                      {lastPlay?.description && <div style={{marginTop:4,paddingTop:6,borderTop:'1px solid rgba(255,255,255,.06)'}}>
+                        <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{lastPlay.description}</span>
+                      </div>}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Box score tab switcher */}
+              <div style={{display:'flex',gap:4,marginBottom:10}}>
+                {[['batting','🧢 Batting'],['pitching','⚾ Pitching']].map(([k,l]) => (
+                  <button key={k} onClick={() => setBoxTab(k)}
+                    style={{padding:'4px 12px',borderRadius:6,border:'none',cursor:'pointer',
+                      fontFamily:mono,fontSize:10,fontWeight:boxTab===k?700:400,
+                      background: boxTab===k ? 'var(--accent)' : 'var(--surface2)',
+                      color: boxTab===k ? 'white' : 'var(--muted)'}}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+
+              {/* Box score tables */}
+              {['away','home'].map(side => {
+                const teamAbbr = selGame?.teams?.[side]?.team?.abbreviation || side.toUpperCase();
+                const rows = boxTab === 'batting' ? boxRows(side) : pitchRows(side);
+                if (!rows.length) return null;
+                return (
+                  <div key={side} style={{marginBottom:20}}>
+                    <div style={{fontFamily:osw,fontWeight:700,fontSize:13,color:'var(--accent2)',marginBottom:6,letterSpacing:.5}}>
+                      {teamAbbr}
+                    </div>
+                    <div style={{overflowX:'auto',border:'1px solid var(--border)',borderRadius:8}}>
+                      <table style={{borderCollapse:'separate',borderSpacing:0,width:'100%'}}>
+                        <thead>
+                          {boxTab === 'batting'
+                            ? <tr><th style={{...thSt,textAlign:'left',minWidth:140}}>Batter</th><th style={thSt}>AB</th><th style={thSt}>R</th><th style={thSt}>H</th><th style={thSt}>RBI</th><th style={thSt}>BB</th><th style={thSt}>K</th><th style={thSt}>AVG</th><th style={thSt}>OPS</th></tr>
+                            : <tr><th style={{...thSt,textAlign:'left',minWidth:140}}>Pitcher</th><th style={thSt}>IP</th><th style={thSt}>H</th><th style={thSt}>R</th><th style={thSt}>ER</th><th style={thSt}>BB</th><th style={thSt}>K</th><th style={thSt}>HR</th><th style={thSt}>ERA</th></tr>
+                          }
+                        </thead>
+                        <tbody>
+                          {boxTab === 'batting'
+                            ? rows.map((r,i) => (
+                              <tr key={r.id} style={{background: r.id===curBatId ? 'rgba(232,65,26,.08)' : undefined}}>
+                                <td style={{...cell,textAlign:'left'}}>
+                                  <span style={{fontFamily:mono,fontSize:9,color:'rgba(255,255,255,.3)',marginRight:6}}>{r.slot || ''}</span>
+                                  <span style={{fontFamily:osw,fontSize:11,fontWeight:r.id===curBatId?700:400,color: r.id===curBatId?'var(--accent)':r.sub?'var(--muted)':undefined}}>{r.name}</span>
+                                  <span style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.3)',marginLeft:4}}>{r.pos}</span>
+                                </td>
+                                {[r.ab,r.r,r.h,r.rbi,r.bb,r.k,r.avg,r.ops].map((v,j) => (
+                                  <td key={j} style={{...cell,textAlign:'center',color: j===2&&v>0?'#27c97a':j===3&&v>0?'var(--accent2)':undefined}}>{v}</td>
+                                ))}
+                              </tr>
+                            ))
+                            : rows.map((r,i) => (
+                              <tr key={r.id}>
+                                <td style={{...cell,textAlign:'left'}}><span style={{fontFamily:osw,fontSize:11}}>{r.name}</span></td>
+                                {[r.ip,r.h,r.r,r.er,r.bb,r.k,r.hr,r.era].map((v,j) => (
+                                  <td key={j} style={{...cell,textAlign:'center',color: j===6&&v>0?'var(--accent)':undefined}}>{v}</td>
+                                ))}
+                              </tr>
+                            ))
+                          }
+                          {/* Totals row for batting */}
+                          {boxTab === 'batting' && (() => {
+                            const t = live?.teams?.[side]?.teamStats?.batting;
+                            if (!t) return null;
+                            return <tr style={{background:'var(--surface2)'}}>
+                              <td style={{...cell,textAlign:'left',fontFamily:osw,fontWeight:700,fontSize:10,color:'var(--muted)'}}>TOTALS</td>
+                              {[t.atBats,t.runs,t.hits,t.rbi,t.baseOnBalls,t.strikeOuts,'','' ].map((v,j) => (
+                                <td key={j} style={{...cell,textAlign:'center',fontFamily:osw,fontWeight:700,fontSize:11}}>{v ?? '—'}</td>
+                              ))}
+                            </tr>;
+                          })()}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })}
+            </> : (
+              <div style={{padding:24,color:'var(--muted)',fontFamily:mono,fontSize:11}}>
+                {liveLoad ? 'Loading…' : 'No data available for this game yet.'}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 
 // ── HR Odds — from /api/odds (odds.js), refreshes every 65 min ──────────────────
 // odds.js already handles fetching, caching, and serving player props
@@ -7208,6 +7711,7 @@ function SimLabView({ data }) {
   const [minMeatball,setMinMeatball]  = useState('');
   const [minHitPct,  setMinHitPct]    = useState('');
   const [minSimTB,   setMinSimTB]     = useState('');
+  const [minOdds,    setMinOdds]      = useState('');
   const [selPitcherGradesSim, setSelPitcherGradesSim] = useState(new Set()); // empty = All
   const simPitcherGrades = useRef({}); // pitcher_id → grade label
 
@@ -7307,7 +7811,8 @@ function SimLabView({ data }) {
       .filter(r => !minHRPct    || pctRaw(r.proj_hr_adj)               >= parseFloat(minHRPct))
       .filter(r => !minMeatball || (parseFloat(r.meatball_matchup_score)||0)*100 >= parseFloat(minMeatball))
       .filter(r => !minHitPct   || pctRaw(r.proj_hit_prob)              >= parseFloat(minHitPct))
-      .filter(r => !minSimTB    || (parseFloat(r.sim_tb)||0)             >= parseFloat(minSimTB));
+      .filter(r => !minSimTB    || (parseFloat(r.sim_tb)||0)             >= parseFloat(minSimTB))
+      .filter(r => !minOdds     || (() => { const d = HR_ODDS_MAP[String(parseInt(r.batter_id)||0)]; return d?.implied && (d.implied * 100) >= parseFloat(minOdds); })());
     const mul = sortDir === 'desc' ? -1 : 1;
     return [...filtered].sort((a, b) => {
       if (sortBy === 'hr_odds_implied') {
@@ -7317,7 +7822,7 @@ function SimLabView({ data }) {
       }
       return mul * ((parseFloat(a[sortBy]) || 0) - (parseFloat(b[sortBy]) || 0));
     });
-  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, minHRScore, minHRPct, minMeatball, minHitPct, minSimTB]);
+  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, minHRScore, minHRPct, minMeatball, minHitPct, minSimTB, minOdds]);
 
   // Auto-select top batter when data loads
   useEffect(() => {
@@ -7579,6 +8084,7 @@ function SimLabView({ data }) {
               { label: '💣',       val: minMeatball,set: setMinMeatball, placeholder: 'e.g. 10' },
               { label: 'Hit%',     val: minHitPct,  set: setMinHitPct,  placeholder: 'e.g. 25' },
               { label: 'Sim TB',   val: minSimTB,   set: setMinSimTB,   placeholder: 'e.g. 1.5' },
+              { label: 'Odds %',   val: minOdds,    set: setMinOdds,    placeholder: 'e.g. 8' },
             ].map(({ label, val, set, placeholder }) => (
               <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", flexShrink: 0 }}>{label}</span>
@@ -7589,8 +8095,8 @@ function SimLabView({ data }) {
                     fontFamily: "'DM Mono',monospace", fontSize: 10 }}/>
               </div>
             ))}
-            {(minHRScore || minHRPct || minMeatball || minHitPct) && (
-              <button onClick={() => { setMinHRScore(''); setMinHRPct(''); setMinMeatball(''); setMinHitPct(''); setMinSimTB(''); }}
+            {(minHRScore || minHRPct || minMeatball || minHitPct || minSimTB || minOdds) && (
+              <button onClick={() => { setMinHRScore(''); setMinHRPct(''); setMinMeatball(''); setMinHitPct(''); setMinSimTB(''); setMinOdds(''); }}
                 style={{ padding: '3px 9px', borderRadius: 5, border: '1px solid rgba(255,64,32,.3)',
                   background: 'rgba(255,64,32,.08)', color: 'var(--accent)',
                   fontFamily: "'DM Mono',monospace", fontSize: 9, cursor: 'pointer', fontWeight: 700 }}>
