@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/odds?type=refresh",
-      "schedule": "0 12-23 * * *"
+      "schedule": "0 11,14,17,20,23 * * *"
     }
   ]
 }
