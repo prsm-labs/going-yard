@@ -6584,6 +6584,102 @@ function GamedayTab() {
                 <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>{hm?.probablePitcher?.fullName?.split(' ').pop()||'TBD'}</span>
               </div>
             )}
+
+            {/* ── Live game detail: pitcher+batter (active) or due up (end of half) ── */}
+            {sel && abs==='Live' && live && (() => {
+              const ls           = live.liveLinescore || live.linescore || {};
+              const half         = ls.inningHalf || selGame?.linescore?.inningHalf || '';
+              const battingSide  = half === 'Bottom' ? 'home' : 'away';
+              const pitchingSide = half === 'Bottom' ? 'away' : 'home';
+              const battingAbbr  = g.teams?.[battingSide]?.team?.abbreviation  || '';
+              const pitchingAbbr = g.teams?.[pitchingSide]?.team?.abbreviation || '';
+
+              // Current pitcher = last in pitching team's pitchers list
+              const pitcherIds = live.teams?.[pitchingSide]?.pitchers || [];
+              const curPitchId = pitcherIds[pitcherIds.length - 1];
+              const pitcherPl  = curPitchId ? live.teams?.[pitchingSide]?.players?.[`ID${curPitchId}`] : null;
+              const pitcherName= (pitcherPl?.person?.fullName || '—').split(' ').pop();
+              const pitcherIP  = pitcherPl?.stats?.pitching?.inningsPitched ?? '—';
+              const pitcherERA = pitcherPl?.seasonStats?.pitching?.era ?? '—';
+
+              // Current batter
+              const batPl   = curBatId ? live.teams?.[battingSide]?.players?.[`ID${curBatId}`] : null;
+              const batName = (batPl?.person?.fullName || pname(curBatId)).split(' ').pop();
+              const batSt   = batPl?.stats?.batting || {};
+              const batOPS  = batPl?.seasonStats?.batting?.ops ?? '—';
+
+              const inningOver = (lsOuts ?? 0) >= 3;
+              const hasDueUp   = curBatId || onDeckId;
+
+              if (!curPitchId && !curBatId && !hasDueUp) return null;
+
+              return (
+                <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid rgba(255,255,255,.06)'}}>
+                  {!inningOver && (curPitchId || curBatId) ? (
+                    /* Active inning — pitcher + batter side by side */
+                    <div style={{display:'flex',gap:8}}>
+                      {curPitchId && (
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',
+                            textTransform:'uppercase',letterSpacing:.8,marginBottom:2}}>
+                            Pitching {pitchingAbbr}
+                          </div>
+                          <div style={{fontFamily:osw,fontWeight:700,fontSize:11,
+                            overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                            {pitcherName}
+                          </div>
+                          <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>
+                            {pitcherIP} IP · {pitcherERA} ERA
+                          </div>
+                        </div>
+                      )}
+                      {curBatId && (
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontFamily:mono,fontSize:7,color:'var(--accent)',
+                            textTransform:'uppercase',letterSpacing:.8,marginBottom:2}}>
+                            At Bat {battingAbbr}
+                          </div>
+                          <div style={{fontFamily:osw,fontWeight:700,fontSize:11,
+                            overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                            {batName}
+                          </div>
+                          <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>
+                            {batSt.hits??0}-{batSt.atBats??0} · {batOPS} OPS
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : hasDueUp ? (
+                    /* End of half-inning — due up next */
+                    <div>
+                      <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',
+                        textTransform:'uppercase',letterSpacing:.8,marginBottom:6}}>
+                        Due Up {battingAbbr}
+                      </div>
+                      <div style={{display:'flex',gap:4}}>
+                        {[curBatId, onDeckId, inHoleId].filter(Boolean).slice(0,3).map(id => {
+                          const pl       = live.teams?.[battingSide]?.players?.[`ID${id}`];
+                          const lastName = (pl?.person?.fullName || '—').split(' ').pop();
+                          const st       = pl?.stats?.batting || {};
+                          return (
+                            <div key={id} style={{flex:1,textAlign:'center',minWidth:0}}>
+                              <PlayerAvatar pid={id} name={pl?.person?.fullName||''} size={26}/>
+                              <div style={{fontFamily:osw,fontSize:9,fontWeight:600,marginTop:2,
+                                overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                                {lastName}
+                              </div>
+                              <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)'}}>
+                                {st.hits??0}-{st.atBats??0}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })()}
           </div>
         );
       })}
