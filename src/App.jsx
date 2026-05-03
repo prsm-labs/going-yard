@@ -7721,9 +7721,17 @@ function SimLabView({ data }) {
                         {(() => {
                           const pid = b.pitcher_id ? String(parseInt(b.pitcher_id) || b.pitcher_id) : null;
                           const g = pid ? simPitcherGrades.current[pid] : null;
+                          const ws = b.pitcher_lineup_weak_spot ? parseInt(b.pitcher_lineup_weak_spot) : null;
                           if (!g) return <span style={{ color: 'rgba(255,255,255,.15)', fontSize: 9 }}>—</span>;
                           const col = g==='‼️ Elite'?'#ff4020':g==='⚠️ Tough'?'#ff8020':g==='🤔 Average'?'var(--muted)':g==='💥 Hittable'?'#27c97a':g==='🎯 Target'?'#38b8f2':'var(--muted)';
-                          return <span style={{ fontFamily:"'DM Mono',monospace", fontSize: 9, color: col, fontWeight: 700, whiteSpace: 'nowrap' }}>{g}</span>;
+                          return <span style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:2 }}>
+                            <span style={{ fontFamily:"'DM Mono',monospace", fontSize: 9, color: col, fontWeight: 700, whiteSpace: 'nowrap' }}>{g}</span>
+                            {ws && <span title={`Lineup weak spot: #${ws} slot has highest HR rate vs this pitcher`}
+                              style={{ fontFamily:"'DM Mono',monospace", fontSize: 8, fontWeight: 700,
+                                color:'#f5a623', background:'rgba(245,166,35,.12)',
+                                border:'1px solid rgba(245,166,35,.3)', borderRadius:3,
+                                padding:'0px 4px', lineHeight:1.4 }}>#{ws}</span>}
+                          </span>;
                         })()}
                       </td>
                       <td style={{ textAlign: 'right' }}><span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 14, color: hrColor }}>{hrP > 0 ? hrP.toFixed(1) + '%' : '—'}</span></td>
@@ -7940,15 +7948,15 @@ function SimLabView({ data }) {
                       );
                     })()}
                     {b.pitcher_pa_faced && <div style={{ marginTop: 5, fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>{b.pitcher_pa_faced} PA faced this season</div>}
-                    {/* Bullpen ERA */}
-                    {b.bullpen_era && parseFloat(b.bullpen_era) > 0 && (() => {
-                      const era = parseFloat(b.bullpen_era);
-                      const col = era >= 4.50 ? '#27c97a' : era <= 3.00 ? '#ff4020' : 'var(--muted)';
-                      const label = era >= 4.50 ? '💥 Soft' : era <= 3.00 ? '🔒 Elite' : '— Avg';
+                    {/* Bullpen HR Rank */}
+                    {b.bullpen_hr_rank && parseInt(b.bullpen_hr_rank) > 0 && (() => {
+                      const rank = parseInt(b.bullpen_hr_rank);
+                      const col = rank <= 10 ? '#27c97a' : rank <= 20 ? '#f5a623' : '#ff4020';
+                      const label = rank <= 10 ? '💥 Soft Pen' : rank <= 20 ? '— Avg Pen' : '🔒 Tough Pen';
                       return (
                         <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid rgba(255,255,255,.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>Opp. Bullpen ERA</span>
-                          <span style={{ fontSize: 11, fontFamily: "'Oswald',sans-serif", fontWeight: 700, color: col }}>{era.toFixed(2)} <span style={{ fontSize: 8 }}>{label}</span></span>
+                          <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>Opp. Bullpen HR Rank</span>
+                          <span style={{ fontSize: 11, fontFamily: "'Oswald',sans-serif", fontWeight: 700, color: col }}>#{rank}/30 <span style={{ fontSize: 8 }}>{label}</span></span>
                         </div>
                       );
                     })()}
@@ -10613,15 +10621,26 @@ function MatchupEngineTab() {
                       🎯 {v.toFixed(1)}% Brl allowed
                     </div>;
                   })()}
-                  {/* Bullpen ERA */}
-                  {b.bullpen_era && parseFloat(b.bullpen_era) > 0 && (() => {
-                    const era = parseFloat(b.bullpen_era);
-                    const col = era >= 4.50 ? '#27c97a' : era <= 3.00 ? '#ff4020' : 'var(--muted)';
-                    const label = era >= 4.50 ? '💥 Soft BP' : era <= 3.00 ? '🔒 Elite BP' : '⚾ Avg BP';
+                  {/* Bullpen HR Rank */}
+                  {b.bullpen_hr_rank && parseInt(b.bullpen_hr_rank) > 0 && (() => {
+                    const rank = parseInt(b.bullpen_hr_rank);
+                    const col = rank <= 10 ? '#27c97a' : rank <= 20 ? '#f5a623' : '#ff4020';
+                    const label = rank <= 10 ? '💥 Soft Pen' : rank <= 20 ? '⚾ Avg Pen' : '🔒 Tough Pen';
+                    const borderCol = rank <= 10 ? 'rgba(39,201,122,.3)' : rank <= 20 ? 'rgba(245,166,35,.3)' : 'rgba(255,64,32,.3)';
                     return <div style={{padding:'3px 10px',borderRadius:6,fontSize:10,
-                      background:'rgba(255,255,255,.04)',border:`1px solid ${era>=4.5?'rgba(39,201,122,.3)':era<=3.0?'rgba(255,64,32,.3)':'var(--border)'}`,
+                      background:'rgba(255,255,255,.04)',border:`1px solid ${borderCol}`,
                       fontFamily:"'DM Mono',monospace",color:col}}>
-                      {label} {era.toFixed(2)}
+                      {label} #{rank}/30
+                    </div>;
+                  })()}
+                  {/* Lineup weak spot */}
+                  {b.pitcher_lineup_weak_spot && parseInt(b.pitcher_lineup_weak_spot) > 0 && (() => {
+                    const ws = parseInt(b.pitcher_lineup_weak_spot);
+                    return <div style={{padding:'3px 10px',borderRadius:6,fontSize:10,
+                      background:'rgba(245,166,35,.08)',border:'1px solid rgba(245,166,35,.3)',
+                      fontFamily:"'DM Mono',monospace",color:'#f5a623',fontWeight:700}}
+                      title={`This pitcher gives up the most HRs to the #${ws} lineup spot`}>
+                      ⚠️ Weak vs #{ws}
                     </div>;
                   })()}
                   {/* Meatball matchup */}
