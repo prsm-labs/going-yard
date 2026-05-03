@@ -6498,10 +6498,10 @@ function GamedayTab() {
                             {section.title}
                           </div>
                         )}
-                        {(section.fieldList || []).map((f, fi) => (
-                          <div key={fi} style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:2}}>
-                            <span style={{fontWeight:700,color:'var(--text)',whiteSpace:'nowrap'}}>{f.label}</span>
-                            <span style={{color:'var(--muted)',flex:1}}>{f.value}</span>
+                        {(section.fieldList || []).filter(f => !f.label?.toLowerCase().startsWith('runners left')).map((f, fi) => (
+                          <div key={fi} style={{marginBottom:3,textAlign:'left'}}>
+                            <span style={{fontWeight:700,color:'var(--text)'}}>{f.label} </span>
+                            <span style={{color:'var(--muted)'}}>{f.value}</span>
                           </div>
                         ))}
                       </div>
