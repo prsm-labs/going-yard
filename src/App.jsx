@@ -40,7 +40,7 @@ async function getPushState() {
   return 'default';
 }
 
-const BUILD_TIMESTAMP = "2026-04-11 07:32 ET";
+const BUILD_TIMESTAMP = "2026-05-03 11:09 PM ET";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
@@ -10778,7 +10778,10 @@ function MatchupEngineTab() {
     const csv = bom + headers.map(esc).join(',') + String.fromCharCode(10) + rows.join(String.fromCharCode(10));
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}));
-    a.download = 'key-matchups-' + new Date().toISOString().slice(0,10) + '.csv';
+    // Use ET date (not UTC) so a late-night download on May 3 isn't labelled May 4
+    const _etNow = new Date(new Date().toLocaleString('en-US', {timeZone:'America/New_York'}));
+    const _etDate = _etNow.getFullYear()+'-'+String(_etNow.getMonth()+1).padStart(2,'0')+'-'+String(_etNow.getDate()).padStart(2,'0');
+    a.download = 'key-matchups-' + _etDate + '.csv';
     a.click();
   };
 
