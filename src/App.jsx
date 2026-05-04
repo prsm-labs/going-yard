@@ -6036,17 +6036,10 @@ function GamedayTab() {
     if (!pk) return;
     setPlaysLoad(true);
     try {
-      const r = await fetch(
-        `https://statsapi.mlb.com/api/v1.1/game/${pk}/feed/live` +
-        `?fields=liveData,plays,allPlays,result,event,description,rbi,about,` +
-        `inning,halfInning,isComplete,matchup,batter,pitcher,fullName,` +
-        `playEvents,isPitch,pitchNumber,details,call,code,isInPlay,isStrike,isBall,` +
-        `type,pitchData,startSpeed,strikeZoneTop,strikeZoneBottom,coordinates,pX,pZ,` +
-        `hitData,launchSpeed,launchAngle,totalDistance`
-      );
+      // playByPlay endpoint reliably returns playEvents with full pitch data
+      const r = await fetch(`https://statsapi.mlb.com/api/v1/game/${pk}/playByPlay`);
       const d = await r.json();
-      const all = d.liveData?.plays?.allPlays || [];
-      // Show completed plays most-recent-first
+      const all = d.allPlays || [];
       setPlays([...all].filter(p => p.about?.isComplete).reverse());
     } catch(e) { setPlays([]); }
     setPlaysLoad(false);
@@ -6360,51 +6353,56 @@ function GamedayTab() {
 
         {/* Plays tab */}
         {boxTab === 'plays' && (() => {
-          // ── Pitch zone SVG ──────────────────────────────────────────────────
+          // ── PitchZone SVG (defined once, used in detail panel) ──────────────
+          const pitchCol = code => {
+            if (!code) return 'var(--muted)';
+            if ('BI*V'.includes(code)) return '#27c97a';
+            if (code === 'X')          return '#38b8f2';
+            if ('CF'.includes(code))   return '#f5a623';
+            return '#ff4020';
+          };
           const PitchZone = ({ pitches, szTop=3.5, szBot=1.5 }) => {
-            const W = 100, H = 120;
-            const mapX = px => ((px + 1.6) / 3.2) * W;
-            const mapY = pz => ((5.0 - pz) / 4.5) * H;
-            const szL = mapX(-0.83), szR = mapX(0.83);
-            const szT = mapY(szTop), szB = mapY(szBot);
-            const szW = szR - szL, szH = szB - szT;
-            const pitchCol = code => {
-              if ('BI*V'.includes(code)) return '#27c97a';
-              if (code === 'X')          return '#38b8f2';
-              if ('CF'.includes(code))   return '#f5a623';
-              return '#ff4020'; // strikes, fouls-tip, swinging
-            };
+            const W=100, H=120;
+            const mx = px => ((px+1.6)/3.2)*W;
+            const my = pz => ((5.0-pz)/4.5)*H;
+            const [szL,szR,szT,szB] = [mx(-0.83),mx(0.83),my(szTop),my(szBot)];
+            const [szW,szH] = [szR-szL, szB-szT];
             return (
               <svg viewBox={`0 0 ${W} ${H}`} width={100} height={120}
                 style={{background:'#101820',borderRadius:5,border:'1px solid var(--border)',flexShrink:0}}>
-                {/* Strike zone box */}
-                <rect x={szL} y={szT} width={szW} height={szH}
-                  fill="none" stroke="rgba(255,255,255,.5)" strokeWidth={1.5}/>
-                {/* 3×3 grid */}
-                {[1,2].map(n => <>
-                  <line key={`v${n}`} x1={szL+szW*n/3} y1={szT} x2={szL+szW*n/3} y2={szB}
-                    stroke="rgba(255,255,255,.15)" strokeWidth={.5}/>
-                  <line key={`h${n}`} x1={szL} y1={szT+szH*n/3} x2={szR} y2={szT+szH*n/3}
-                    stroke="rgba(255,255,255,.15)" strokeWidth={.5}/>
-                </>)}
-                {/* Pitch dots */}
-                {pitches.map((p, i) => {
-                  if (p.pX == null || p.pZ == null) return null;
-                  const cx = mapX(p.pX), cy = mapY(p.pZ);
-                  const col = pitchCol(p.code);
-                  return (
-                    <g key={i}>
-                      <circle cx={cx} cy={cy} r={9} fill={col} opacity={.92}/>
-                      <text x={cx} y={cy+3.5} textAnchor="middle"
-                        fontSize={8} fill="white" fontWeight="bold" fontFamily="monospace">
-                        {p.num}
-                      </text>
-                    </g>
-                  );
-                })}
+                <rect x={szL} y={szT} width={szW} height={szH} fill="none" stroke="rgba(255,255,255,.5)" strokeWidth={1.5}/>
+                {[1,2].flatMap(n=>[
+                  <line key={`v${n}`} x1={szL+szW*n/3} y1={szT} x2={szL+szW*n/3} y2={szB} stroke="rgba(255,255,255,.15)" strokeWidth={.5}/>,
+                  <line key={`h${n}`} x1={szL} y1={szT+szH*n/3} x2={szR} y2={szT+szH*n/3} stroke="rgba(255,255,255,.15)" strokeWidth={.5}/>
+                ])}
+                {pitches.map((p,i) => p.pX==null||p.pZ==null ? null : (
+                  <g key={i}>
+                    <circle cx={mx(p.pX)} cy={my(p.pZ)} r={9} fill={pitchCol(p.code)} opacity={.9}/>
+                    <text x={mx(p.pX)} y={my(p.pZ)+3.5} textAnchor="middle"
+                      fontSize={8} fill="white" fontWeight="bold" fontFamily="monospace">{p.num}</text>
+                  </g>
+                ))}
               </svg>
             );
           };
+
+          const selPl = expandedPlayIdx !== null ? plays[expandedPlayIdx] : null;
+          const selPitches = selPl
+            ? (selPl.playEvents||[]).filter(e=>e.isPitch||e.type==='pitch').map((e,j)=>({
+                num:  e.pitchNumber||j+1,
+                code: e.details?.code||'',
+                pX:   e.pitchData?.coordinates?.pX??null,
+                pZ:   e.pitchData?.coordinates?.pZ??null,
+                desc: e.details?.description||'',
+                type: e.details?.type?.description||'',
+                velo: e.pitchData?.startSpeed??null,
+                szTop:e.pitchData?.strikeZoneTop??3.5,
+                szBot:e.pitchData?.strikeZoneBottom??1.5,
+              }))
+            : [];
+          const selHit = selPl
+            ? (selPl.playEvents||[]).slice().reverse().find(e=>e.hitData?.launchSpeed)?.hitData
+            : null;
 
           return (
             <div>
@@ -6415,136 +6413,102 @@ function GamedayTab() {
               ) : plays.length === 0 ? (
                 <div style={{padding:16,color:'var(--muted)',fontFamily:mono,fontSize:10}}>No plays yet</div>
               ) : (
-                <div style={{display:'flex',flexDirection:'column',gap:3,maxHeight:'65vh',overflowY:'auto'}}>
-                  {plays.map((pl, i) => {
-                    const ev      = pl.result?.event        || '';
-                    const desc    = pl.result?.description  || '';
-                    const inn     = pl.about?.inning        || '';
-                    const half    = pl.about?.halfInning === 'top' ? '▲' : '▼';
-                    const batter  = pl.matchup?.batter?.fullName  || '';
-                    const pitcher = pl.matchup?.pitcher?.fullName || '';
-                    const rbi     = pl.result?.rbi || 0;
-                    const col     = evColor(ev);
-                    const isOpen  = expandedPlayIdx === i;
-
-                    // Extract pitch events
-                    const pitchEvents = (pl.playEvents || []).filter(e => e.isPitch || e.type === 'pitch');
-                    const szTop = pitchEvents[0]?.pitchData?.strikeZoneTop    ?? 3.5;
-                    const szBot = pitchEvents[0]?.pitchData?.strikeZoneBottom ?? 1.5;
-                    const pitchDots = pitchEvents.map((e, j) => ({
-                      num:  e.pitchNumber || j+1,
-                      code: e.details?.code || '',
-                      pX:   e.pitchData?.coordinates?.pX ?? null,
-                      pZ:   e.pitchData?.coordinates?.pZ ?? null,
-                    }));
-
-                    // Hit data from last in-play event
-                    const lastEvent  = pitchEvents[pitchEvents.length - 1] || {};
-                    const hitData    = lastEvent.hitData || null;
-
-                    return (
-                      <div key={i} style={{borderRadius:8,background:'var(--surface)',
-                        border:`1px solid ${isOpen ? col+'60' : 'var(--border)'}`,
-                        borderLeft:`3px solid ${col}`,overflow:'hidden'}}>
-
-                        {/* Play header — always visible, click to expand */}
-                        <div onClick={() => setExpandedPlayIdx(isOpen ? null : i)}
-                          style={{padding:'8px 10px',cursor:'pointer'}}>
-                          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:3}}>
-                            <div style={{display:'flex',alignItems:'center',gap:6}}>
-                              <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',minWidth:26}}>{half}{inn}</span>
-                              <span style={{fontFamily:mono,fontSize:9,fontWeight:700,color:col,
-                                padding:'1px 6px',borderRadius:4,background:`${col}18`,border:`1px solid ${col}40`}}>
-                                {ev || '—'}
-                              </span>
-                              {rbi > 0 && <span style={{fontFamily:mono,fontSize:8,color:'var(--accent2)'}}>{rbi} RBI</span>}
-                              {pitchEvents.length > 0 && <span style={{fontFamily:mono,fontSize:7,color:'rgba(255,255,255,.2)'}}>
-                                {pitchEvents.length}p
-                              </span>}
-                            </div>
-                            <span style={{fontFamily:mono,fontSize:10,color:'rgba(255,255,255,.25)'}}>
-                              {isOpen ? '▲' : '▼'}
-                            </span>
-                          </div>
-                          <div style={{fontFamily:osw,fontSize:12,fontWeight:600,marginBottom:1}}>{batter}</div>
-                          <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',lineHeight:1.3}}>{desc}</div>
-                          {pitcher && <div style={{fontFamily:mono,fontSize:7,color:'rgba(255,255,255,.2)',marginTop:1}}>vs {pitcher}</div>}
+                <div>
+                  {/* ── Compact scrollable play list ── */}
+                  <div style={{maxHeight:'38vh',overflowY:'auto',display:'flex',flexDirection:'column',gap:3,marginBottom:10}}>
+                    {plays.map((pl, i) => {
+                      const ev   = pl.result?.event || '';
+                      const inn  = pl.about?.inning || '';
+                      const half = pl.about?.halfInning === 'top' ? '▲' : '▼';
+                      const batter = pl.matchup?.batter?.fullName || '';
+                      const rbi  = pl.result?.rbi || 0;
+                      const col  = evColor(ev);
+                      const nPitches = (pl.playEvents||[]).filter(e=>e.isPitch||e.type==='pitch').length;
+                      const isSel = expandedPlayIdx === i;
+                      return (
+                        <div key={i}
+                          onClick={() => setExpandedPlayIdx(isSel ? null : i)}
+                          style={{display:'flex',alignItems:'center',gap:8,padding:'6px 10px',
+                            borderRadius:6,cursor:'pointer',
+                            background: isSel ? 'rgba(255,255,255,.05)' : 'var(--surface)',
+                            border:`1px solid ${isSel ? col+'70' : 'var(--border)'}`,
+                            borderLeft:`3px solid ${col}`}}>
+                          <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',minWidth:24,flexShrink:0}}>{half}{inn}</span>
+                          <span style={{fontFamily:mono,fontSize:9,fontWeight:700,color:col,
+                            padding:'0 5px',borderRadius:3,background:`${col}15`,border:`1px solid ${col}35`,flexShrink:0}}>
+                            {ev||'—'}
+                          </span>
+                          <span style={{fontFamily:osw,fontSize:11,fontWeight:600,flex:1,
+                            overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{batter}</span>
+                          {rbi>0 && <span style={{fontFamily:mono,fontSize:8,color:'var(--accent2)',flexShrink:0}}>{rbi}R</span>}
+                          {nPitches>0 && <span style={{fontFamily:mono,fontSize:7,color:'rgba(255,255,255,.2)',flexShrink:0}}>{nPitches}p</span>}
                         </div>
+                      );
+                    })}
+                  </div>
 
-                        {/* Expanded: pitch zone + sequence + hit data */}
-                        {isOpen && (
-                          <div style={{borderTop:'1px solid rgba(255,255,255,.06)',padding:'10px 10px 12px',
-                            background:'rgba(0,0,0,.2)'}}>
-                            <div style={{display:'flex',gap:12,alignItems:'flex-start',flexWrap:'wrap'}}>
-
-                              {/* Pitch zone SVG */}
-                              {pitchDots.length > 0 && (
-                                <PitchZone pitches={pitchDots} szTop={szTop} szBot={szBot}/>
-                              )}
-
-                              {/* Pitch sequence list */}
-                              {pitchEvents.length > 0 && (
-                                <div style={{flex:1,minWidth:130,display:'flex',flexDirection:'column',gap:5}}>
-                                  {[...pitchEvents].reverse().map((e, j) => {
-                                    const code    = e.details?.code || '';
-                                    const pdesc   = e.details?.description || '';
-                                    const ptype   = e.details?.type?.description || '';
-                                    const velo    = e.pitchData?.startSpeed;
-                                    const pnum    = e.pitchNumber || (pitchEvents.length - j);
-                                    const pcol    = code === 'B' || code === 'I' || code === 'V' ? '#27c97a'
-                                                  : code === 'X' ? '#38b8f2'
-                                                  : code === 'C' || code === 'F' ? '#f5a623'
-                                                  : '#ff4020';
-                                    return (
-                                      <div key={j} style={{display:'flex',alignItems:'center',gap:8}}>
-                                        {/* Numbered circle */}
-                                        <div style={{width:18,height:18,borderRadius:'50%',background:pcol,
-                                          display:'flex',alignItems:'center',justifyContent:'center',
-                                          flexShrink:0,fontSize:9,fontWeight:700,fontFamily:mono,color:'white'}}>
-                                          {pnum}
-                                        </div>
-                                        <div style={{minWidth:0}}>
-                                          <div style={{fontFamily:osw,fontSize:11,fontWeight:600,color:'var(--text)'}}>{pdesc}</div>
-                                          <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>
-                                            {ptype}{ptype && velo ? ' · ' : ''}{velo ? `${velo.toFixed(1)} mph` : ''}
-                                          </div>
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Hit data row */}
-                            {hitData && (hitData.launchSpeed || hitData.launchAngle || hitData.totalDistance) && (
-                              <div style={{display:'flex',gap:16,marginTop:10,paddingTop:8,
-                                borderTop:'1px solid rgba(255,255,255,.06)',flexWrap:'wrap'}}>
-                                {hitData.launchSpeed   && <div>
-                                  <div style={{fontFamily:osw,fontWeight:700,fontSize:13}}>{hitData.launchSpeed.toFixed(1)} mph</div>
-                                  <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>Exit Velo</div>
-                                </div>}
-                                {hitData.launchAngle != null && <div>
-                                  <div style={{fontFamily:osw,fontWeight:700,fontSize:13}}>{hitData.launchAngle.toFixed(0)}°</div>
-                                  <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>Launch Angle</div>
-                                </div>}
-                                {hitData.totalDistance && <div>
-                                  <div style={{fontFamily:osw,fontWeight:700,fontSize:13}}>{hitData.totalDistance} ft</div>
-                                  <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>Distance</div>
-                                </div>}
-                              </div>
-                            )}
-                          </div>
-                        )}
+                  {/* ── Selected play detail panel ── */}
+                  {selPl && (
+                    <div style={{background:'var(--surface)',border:'1px solid var(--border)',
+                      borderRadius:9,padding:'12px 14px'}}>
+                      {/* Header */}
+                      <div style={{marginBottom:10}}>
+                        <div style={{fontFamily:osw,fontWeight:700,fontSize:14,marginBottom:2}}>
+                          {selPl.matchup?.batter?.fullName||'—'}
+                        </div>
+                        <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>
+                          {selPl.result?.description||''}
+                        </div>
+                        {selPl.matchup?.pitcher?.fullName &&
+                          <div style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.3)',marginTop:2}}>
+                            vs {selPl.matchup.pitcher.fullName}
+                          </div>}
                       </div>
-                    );
-                  })}
+
+                      {/* Pitch zone + sequence */}
+                      {selPitches.length > 0 && (
+                        <div style={{display:'flex',gap:12,alignItems:'flex-start',flexWrap:'wrap',marginBottom:10}}>
+                          <PitchZone pitches={selPitches}
+                            szTop={selPitches[0]?.szTop} szBot={selPitches[0]?.szBot}/>
+                          <div style={{flex:1,minWidth:130,display:'flex',flexDirection:'column',gap:5}}>
+                            {[...selPitches].reverse().map((p,j) => (
+                              <div key={j} style={{display:'flex',alignItems:'center',gap:8}}>
+                                <div style={{width:18,height:18,borderRadius:'50%',
+                                  background:pitchCol(p.code),flexShrink:0,
+                                  display:'flex',alignItems:'center',justifyContent:'center',
+                                  fontSize:9,fontWeight:700,fontFamily:mono,color:'white'}}>
+                                  {p.num}
+                                </div>
+                                <div>
+                                  <div style={{fontFamily:osw,fontSize:11,fontWeight:600}}>{p.desc}</div>
+                                  <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>
+                                    {p.type}{p.type&&p.velo?' · ':''}{p.velo?`${p.velo.toFixed(1)} mph`:''}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Hit data */}
+                      {selHit && (selHit.launchSpeed||selHit.launchAngle||selHit.totalDistance) && (
+                        <div style={{display:'flex',gap:16,paddingTop:8,
+                          borderTop:'1px solid rgba(255,255,255,.06)',flexWrap:'wrap'}}>
+                          {selHit.launchSpeed    && <div><div style={{fontFamily:osw,fontWeight:700,fontSize:13}}>{selHit.launchSpeed.toFixed(1)} mph</div><div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>Exit Velo</div></div>}
+                          {selHit.launchAngle!=null && <div><div style={{fontFamily:osw,fontWeight:700,fontSize:13}}>{selHit.launchAngle.toFixed(0)}°</div><div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>Launch Angle</div></div>}
+                          {selHit.totalDistance  && <div><div style={{fontFamily:osw,fontWeight:700,fontSize:13}}>{selHit.totalDistance} ft</div><div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>Distance</div></div>}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           );
         })()}
 
+        {/* Batting / Pitching box score */}
         {/* Batting / Pitching box score */}
         {(boxTab === 'batting' || boxTab === 'pitching') && ['away','home'].map(side => {
           const teamAbbr = selGame?.teams?.[side]?.team?.abbreviation || side.toUpperCase();
@@ -6828,18 +6792,19 @@ function GamedayTab() {
                       </div>
                       <div style={{display:'flex',gap:4}}>
                         {[gCurBat, gOnDeck, gInHole].filter(Boolean).slice(0,3).map(id => {
-                          const pl       = gLive.teams?.[battingSide]?.players?.[`ID${id}`];
-                          const lastName = (pl?.person?.fullName || '—').split(' ').pop();
-                          const st       = pl?.stats?.batting || {};
+                          // Search both sides — battingSide can be wrong at end-of-half
+                          let fullName = '';
+                          for (const s of ['away','home']) {
+                            const p = gLive.teams?.[s]?.players?.[`ID${id}`];
+                            if (p?.person?.fullName) { fullName = p.person.fullName; break; }
+                          }
+                          const lastName = fullName ? fullName.split(' ').pop() : '—';
                           return (
                             <div key={id} style={{flex:1,textAlign:'center',minWidth:0}}>
-                              <PlayerAvatar pid={id} name={pl?.person?.fullName||''} size={26}/>
+                              <PlayerAvatar pid={id} name={fullName} size={26}/>
                               <div style={{fontFamily:osw,fontSize:9,fontWeight:600,marginTop:2,
                                 overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
                                 {lastName}
-                              </div>
-                              <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)'}}>
-                                {st.hits??0}-{st.atBats??0}
                               </div>
                             </div>
                           );
