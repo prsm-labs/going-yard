@@ -5970,11 +5970,13 @@ function GamedayTab() {
   const [games,     setGames]     = useState([]);
   const [loading,   setLoading]   = useState(true);
   const [selGamePk, setSelGamePk] = useState(null);
-  const [live,      setLive]      = useState(null);
+  const [liveDataMap, setLiveDataMap] = useState({});   // gamePk → boxscore data
   const [liveLoad,  setLiveLoad]  = useState(false);
+  const live = liveDataMap[selGamePk] || null;              // derived — detail panel
   const [boxTab,    setBoxTab]    = useState('batting'); // 'batting'|'pitching'|'plays'
   const [plays,     setPlays]     = useState([]);
   const [playsLoad, setPlaysLoad] = useState(false);
+  const [expandedPlayIdx, setExpandedPlayIdx] = useState(null);
   const [notes,     setNotes]     = useState({});    // {away:[...], home:[...]} batting/baserunning info
   const pollRef  = useRef(null);
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
@@ -6001,16 +6003,32 @@ function GamedayTab() {
 
   useEffect(() => { loadSchedule(selDate); }, [selDate]);
 
-  // ── Fetch box score ─────────────────────────────────────────────────────────
-  const loadLive = useCallback(async (pk) => {
+  // Auto-fetch live data for all live games when schedule loads
+  useEffect(() => { if (games.length) loadAllLive(games); }, [games]);
+
+  // ── Fetch box score for one game → writes to liveDataMap ──────────────────
+  const loadLive = useCallback(async (pk, showSpinner=true) => {
     if (!pk) return;
-    setLiveLoad(true);
+    if (showSpinner) setLiveLoad(true);
     try {
       const r = await fetch(`/api/boxscore?gamePk=${pk}`);
       const d = await r.json();
-      setLive(d);
+      setLiveDataMap(prev => ({...prev, [pk]: d}));
     } catch(e) {}
-    setLiveLoad(false);
+    if (showSpinner) setLiveLoad(false);
+  }, []);
+
+  // ── Batch-fetch all currently-live games (silently) ─────────────────────────
+  const loadAllLive = useCallback(async (gameList) => {
+    const liveGames = (gameList || []).filter(g => g.status?.abstractGameState === 'Live');
+    if (!liveGames.length) return;
+    await Promise.allSettled(liveGames.map(async g => {
+      try {
+        const r = await fetch(`/api/boxscore?gamePk=${g.gamePk}`);
+        const d = await r.json();
+        setLiveDataMap(prev => ({...prev, [g.gamePk]: d}));
+      } catch(e) {}
+    }));
   }, []);
 
   // ── Fetch play-by-play from live feed ───────────────────────────────────────
@@ -6021,7 +6039,10 @@ function GamedayTab() {
       const r = await fetch(
         `https://statsapi.mlb.com/api/v1.1/game/${pk}/feed/live` +
         `?fields=liveData,plays,allPlays,result,event,description,rbi,about,` +
-        `inning,halfInning,isComplete,matchup,batter,pitcher,fullName`
+        `inning,halfInning,isComplete,matchup,batter,pitcher,fullName,` +
+        `playEvents,isPitch,pitchNumber,details,call,code,isInPlay,isStrike,isBall,` +
+        `type,pitchData,startSpeed,strikeZoneTop,strikeZoneBottom,coordinates,pX,pZ,` +
+        `hitData,launchSpeed,launchAngle,totalDistance`
       );
       const d = await r.json();
       const all = d.liveData?.plays?.allPlays || [];
@@ -6033,14 +6054,14 @@ function GamedayTab() {
 
   useEffect(() => {
     if (pollRef.current) clearInterval(pollRef.current);
-    if (!selGamePk) { setLive(null); setPlays([]); setNotes({}); return; }
-    loadLive(selGamePk);
+    if (!selGamePk) { setPlays([]); setNotes({}); return; }
+    loadLive(selGamePk, true);
     loadPlays(selGamePk);
     loadNotes(selGamePk);
     const g = games.find(x => x.gamePk === selGamePk);
     if (g?.status?.abstractGameState === 'Live') {
       pollRef.current = setInterval(() => {
-        loadLive(selGamePk);
+        loadAllLive(games);   // refresh all live cards
         loadPlays(selGamePk);
         loadNotes(selGamePk);
       }, 20000);
@@ -6081,10 +6102,10 @@ function GamedayTab() {
   }, [selDate]);
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
-  const gameStatus = (g) => {
+  const gameStatus = (g, lsOverride) => {
     const abs = g.status?.abstractGameState || '';
     const det = g.status?.detailedState     || '';
-    const ls  = g.linescore || {};
+    const ls  = lsOverride || g.linescore || {};
     if (abs === 'Final') {
       const extra = ls.currentInning > 9 ? `/F${ls.currentInning}` : '';
       return { label: `FINAL${extra}`, color: 'var(--muted)', dot: false };
@@ -6230,7 +6251,7 @@ function GamedayTab() {
             <span style={{fontFamily:osw,fontWeight:700,fontSize:20}}>{selGame.teams?.home?.team?.abbreviation}</span>
           </div>
           <div style={{display:'flex',alignItems:'center',gap:8}}>
-            {(() => { const st=gameStatus(selGame); return <>
+            {(() => { const st=gameStatus(selGame, live?.linescore || live?.liveLinescore); return <>
               {st.dot && <div style={{width:7,height:7,borderRadius:'50%',background:st.color,animation:'pulse 1s infinite'}}/>}
               <span style={{fontFamily:mono,fontSize:10,fontWeight:700,color:st.color}}>{st.label}</span>
             </>; })()}
@@ -6338,48 +6359,191 @@ function GamedayTab() {
         </div>
 
         {/* Plays tab */}
-        {boxTab === 'plays' && (
-          <div>
-            {playsLoad ? (
-              <div style={{display:'flex',alignItems:'center',gap:8,padding:16,color:'var(--muted)',fontFamily:mono,fontSize:11}}>
-                <div className="sp"/>Loading plays…
-              </div>
-            ) : plays.length === 0 ? (
-              <div style={{padding:16,color:'var(--muted)',fontFamily:mono,fontSize:10}}>No plays yet</div>
-            ) : (
-              <div style={{display:'flex',flexDirection:'column',gap:2,maxHeight:'60vh',overflowY:'auto'}}>
-                {plays.map((pl, i) => {
-                  const ev   = pl.result?.event || '';
-                  const desc = pl.result?.description || '';
-                  const inn  = pl.about?.inning || '';
-                  const half = pl.about?.halfInning === 'top' ? '▲' : '▼';
-                  const batter  = pl.matchup?.batter?.fullName || '';
-                  const pitcher = pl.matchup?.pitcher?.fullName || '';
-                  const rbi  = pl.result?.rbi || 0;
-                  const col  = evColor(ev);
+        {boxTab === 'plays' && (() => {
+          // ── Pitch zone SVG ──────────────────────────────────────────────────
+          const PitchZone = ({ pitches, szTop=3.5, szBot=1.5 }) => {
+            const W = 100, H = 120;
+            const mapX = px => ((px + 1.6) / 3.2) * W;
+            const mapY = pz => ((5.0 - pz) / 4.5) * H;
+            const szL = mapX(-0.83), szR = mapX(0.83);
+            const szT = mapY(szTop), szB = mapY(szBot);
+            const szW = szR - szL, szH = szB - szT;
+            const pitchCol = code => {
+              if ('BI*V'.includes(code)) return '#27c97a';
+              if (code === 'X')          return '#38b8f2';
+              if ('CF'.includes(code))   return '#f5a623';
+              return '#ff4020'; // strikes, fouls-tip, swinging
+            };
+            return (
+              <svg viewBox={`0 0 ${W} ${H}`} width={100} height={120}
+                style={{background:'#101820',borderRadius:5,border:'1px solid var(--border)',flexShrink:0}}>
+                {/* Strike zone box */}
+                <rect x={szL} y={szT} width={szW} height={szH}
+                  fill="none" stroke="rgba(255,255,255,.5)" strokeWidth={1.5}/>
+                {/* 3×3 grid */}
+                {[1,2].map(n => <>
+                  <line key={`v${n}`} x1={szL+szW*n/3} y1={szT} x2={szL+szW*n/3} y2={szB}
+                    stroke="rgba(255,255,255,.15)" strokeWidth={.5}/>
+                  <line key={`h${n}`} x1={szL} y1={szT+szH*n/3} x2={szR} y2={szT+szH*n/3}
+                    stroke="rgba(255,255,255,.15)" strokeWidth={.5}/>
+                </>)}
+                {/* Pitch dots */}
+                {pitches.map((p, i) => {
+                  if (p.pX == null || p.pZ == null) return null;
+                  const cx = mapX(p.pX), cy = mapY(p.pZ);
+                  const col = pitchCol(p.code);
                   return (
-                    <div key={i} style={{padding:'8px 10px',borderRadius:7,background:'var(--surface)',
-                      border:'1px solid var(--border)',borderLeft:`3px solid ${col}`}}>
-                      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:3}}>
-                        <div style={{display:'flex',alignItems:'center',gap:6}}>
-                          <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',minWidth:28}}>{half}{inn}</span>
-                          <span style={{fontFamily:mono,fontSize:9,fontWeight:700,color:col,
-                            padding:'1px 6px',borderRadius:4,background:`${col}18`,border:`1px solid ${col}40`}}>
-                            {ev || '—'}
-                          </span>
-                          {rbi > 0 && <span style={{fontFamily:mono,fontSize:8,color:'var(--accent2)'}}>{rbi} RBI</span>}
-                        </div>
-                      </div>
-                      <div style={{fontFamily:osw,fontSize:12,fontWeight:600,marginBottom:2}}>{batter}</div>
-                      <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',lineHeight:1.4}}>{desc}</div>
-                      {pitcher && <div style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.25)',marginTop:2}}>vs {pitcher}</div>}
-                    </div>
+                    <g key={i}>
+                      <circle cx={cx} cy={cy} r={9} fill={col} opacity={.92}/>
+                      <text x={cx} y={cy+3.5} textAnchor="middle"
+                        fontSize={8} fill="white" fontWeight="bold" fontFamily="monospace">
+                        {p.num}
+                      </text>
+                    </g>
                   );
                 })}
-              </div>
-            )}
-          </div>
-        )}
+              </svg>
+            );
+          };
+
+          return (
+            <div>
+              {playsLoad ? (
+                <div style={{display:'flex',alignItems:'center',gap:8,padding:16,color:'var(--muted)',fontFamily:mono,fontSize:11}}>
+                  <div className="sp"/>Loading plays…
+                </div>
+              ) : plays.length === 0 ? (
+                <div style={{padding:16,color:'var(--muted)',fontFamily:mono,fontSize:10}}>No plays yet</div>
+              ) : (
+                <div style={{display:'flex',flexDirection:'column',gap:3,maxHeight:'65vh',overflowY:'auto'}}>
+                  {plays.map((pl, i) => {
+                    const ev      = pl.result?.event        || '';
+                    const desc    = pl.result?.description  || '';
+                    const inn     = pl.about?.inning        || '';
+                    const half    = pl.about?.halfInning === 'top' ? '▲' : '▼';
+                    const batter  = pl.matchup?.batter?.fullName  || '';
+                    const pitcher = pl.matchup?.pitcher?.fullName || '';
+                    const rbi     = pl.result?.rbi || 0;
+                    const col     = evColor(ev);
+                    const isOpen  = expandedPlayIdx === i;
+
+                    // Extract pitch events
+                    const pitchEvents = (pl.playEvents || []).filter(e => e.isPitch || e.type === 'pitch');
+                    const szTop = pitchEvents[0]?.pitchData?.strikeZoneTop    ?? 3.5;
+                    const szBot = pitchEvents[0]?.pitchData?.strikeZoneBottom ?? 1.5;
+                    const pitchDots = pitchEvents.map((e, j) => ({
+                      num:  e.pitchNumber || j+1,
+                      code: e.details?.code || '',
+                      pX:   e.pitchData?.coordinates?.pX ?? null,
+                      pZ:   e.pitchData?.coordinates?.pZ ?? null,
+                    }));
+
+                    // Hit data from last in-play event
+                    const lastEvent  = pitchEvents[pitchEvents.length - 1] || {};
+                    const hitData    = lastEvent.hitData || null;
+
+                    return (
+                      <div key={i} style={{borderRadius:8,background:'var(--surface)',
+                        border:`1px solid ${isOpen ? col+'60' : 'var(--border)'}`,
+                        borderLeft:`3px solid ${col}`,overflow:'hidden'}}>
+
+                        {/* Play header — always visible, click to expand */}
+                        <div onClick={() => setExpandedPlayIdx(isOpen ? null : i)}
+                          style={{padding:'8px 10px',cursor:'pointer'}}>
+                          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:3}}>
+                            <div style={{display:'flex',alignItems:'center',gap:6}}>
+                              <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',minWidth:26}}>{half}{inn}</span>
+                              <span style={{fontFamily:mono,fontSize:9,fontWeight:700,color:col,
+                                padding:'1px 6px',borderRadius:4,background:`${col}18`,border:`1px solid ${col}40`}}>
+                                {ev || '—'}
+                              </span>
+                              {rbi > 0 && <span style={{fontFamily:mono,fontSize:8,color:'var(--accent2)'}}>{rbi} RBI</span>}
+                              {pitchEvents.length > 0 && <span style={{fontFamily:mono,fontSize:7,color:'rgba(255,255,255,.2)'}}>
+                                {pitchEvents.length}p
+                              </span>}
+                            </div>
+                            <span style={{fontFamily:mono,fontSize:10,color:'rgba(255,255,255,.25)'}}>
+                              {isOpen ? '▲' : '▼'}
+                            </span>
+                          </div>
+                          <div style={{fontFamily:osw,fontSize:12,fontWeight:600,marginBottom:1}}>{batter}</div>
+                          <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',lineHeight:1.3}}>{desc}</div>
+                          {pitcher && <div style={{fontFamily:mono,fontSize:7,color:'rgba(255,255,255,.2)',marginTop:1}}>vs {pitcher}</div>}
+                        </div>
+
+                        {/* Expanded: pitch zone + sequence + hit data */}
+                        {isOpen && (
+                          <div style={{borderTop:'1px solid rgba(255,255,255,.06)',padding:'10px 10px 12px',
+                            background:'rgba(0,0,0,.2)'}}>
+                            <div style={{display:'flex',gap:12,alignItems:'flex-start',flexWrap:'wrap'}}>
+
+                              {/* Pitch zone SVG */}
+                              {pitchDots.length > 0 && (
+                                <PitchZone pitches={pitchDots} szTop={szTop} szBot={szBot}/>
+                              )}
+
+                              {/* Pitch sequence list */}
+                              {pitchEvents.length > 0 && (
+                                <div style={{flex:1,minWidth:130,display:'flex',flexDirection:'column',gap:5}}>
+                                  {[...pitchEvents].reverse().map((e, j) => {
+                                    const code    = e.details?.code || '';
+                                    const pdesc   = e.details?.description || '';
+                                    const ptype   = e.details?.type?.description || '';
+                                    const velo    = e.pitchData?.startSpeed;
+                                    const pnum    = e.pitchNumber || (pitchEvents.length - j);
+                                    const pcol    = code === 'B' || code === 'I' || code === 'V' ? '#27c97a'
+                                                  : code === 'X' ? '#38b8f2'
+                                                  : code === 'C' || code === 'F' ? '#f5a623'
+                                                  : '#ff4020';
+                                    return (
+                                      <div key={j} style={{display:'flex',alignItems:'center',gap:8}}>
+                                        {/* Numbered circle */}
+                                        <div style={{width:18,height:18,borderRadius:'50%',background:pcol,
+                                          display:'flex',alignItems:'center',justifyContent:'center',
+                                          flexShrink:0,fontSize:9,fontWeight:700,fontFamily:mono,color:'white'}}>
+                                          {pnum}
+                                        </div>
+                                        <div style={{minWidth:0}}>
+                                          <div style={{fontFamily:osw,fontSize:11,fontWeight:600,color:'var(--text)'}}>{pdesc}</div>
+                                          <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>
+                                            {ptype}{ptype && velo ? ' · ' : ''}{velo ? `${velo.toFixed(1)} mph` : ''}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Hit data row */}
+                            {hitData && (hitData.launchSpeed || hitData.launchAngle || hitData.totalDistance) && (
+                              <div style={{display:'flex',gap:16,marginTop:10,paddingTop:8,
+                                borderTop:'1px solid rgba(255,255,255,.06)',flexWrap:'wrap'}}>
+                                {hitData.launchSpeed   && <div>
+                                  <div style={{fontFamily:osw,fontWeight:700,fontSize:13}}>{hitData.launchSpeed.toFixed(1)} mph</div>
+                                  <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>Exit Velo</div>
+                                </div>}
+                                {hitData.launchAngle != null && <div>
+                                  <div style={{fontFamily:osw,fontWeight:700,fontSize:13}}>{hitData.launchAngle.toFixed(0)}°</div>
+                                  <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>Launch Angle</div>
+                                </div>}
+                                {hitData.totalDistance && <div>
+                                  <div style={{fontFamily:osw,fontWeight:700,fontSize:13}}>{hitData.totalDistance} ft</div>
+                                  <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>Distance</div>
+                                </div>}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Batting / Pitching box score */}
         {(boxTab === 'batting' || boxTab === 'pitching') && ['away','home'].map(side => {
@@ -6528,7 +6692,7 @@ function GamedayTab() {
       gap: !isMobile && selGamePk ? 0 : 10,
       padding: !isMobile && selGamePk ? 0 : 12}}>
       {games.map(g => {
-        const st  = gameStatus(g);
+        const st  = gameStatus(g, liveDataMap[g.gamePk]?.linescore || liveDataMap[g.gamePk]?.liveLinescore);
         const aw  = g.teams?.away; const hm = g.teams?.home;
         const awR = rhe(g,'away'); const hmR = rhe(g,'home');
         const abs = g.status?.abstractGameState;
@@ -6586,36 +6750,42 @@ function GamedayTab() {
             )}
 
             {/* ── Live game detail: pitcher+batter (active) or due up (end of half) ── */}
-            {sel && abs==='Live' && live && (() => {
-              const ls           = live.liveLinescore || live.linescore || {};
-              const half         = ls.inningHalf || selGame?.linescore?.inningHalf || '';
+            {abs==='Live' && (() => {
+              const gLive        = liveDataMap[g.gamePk];
+              if (!gLive) return null;
+              const ls           = gLive.liveLinescore || gLive.linescore || {};
+              const half         = ls.inningHalf || g.linescore?.inningHalf || '';
               const battingSide  = half === 'Bottom' ? 'home' : 'away';
               const pitchingSide = half === 'Bottom' ? 'away' : 'home';
               const battingAbbr  = g.teams?.[battingSide]?.team?.abbreviation  || '';
               const pitchingAbbr = g.teams?.[pitchingSide]?.team?.abbreviation || '';
 
               // Current pitcher = last in pitching team's pitchers list
-              const pitcherIds = live.teams?.[pitchingSide]?.pitchers || [];
+              const pitcherIds = gLive.teams?.[pitchingSide]?.pitchers || [];
               const curPitchId = pitcherIds[pitcherIds.length - 1];
-              const pitcherPl  = curPitchId ? live.teams?.[pitchingSide]?.players?.[`ID${curPitchId}`] : null;
+              const pitcherPl  = curPitchId ? gLive.teams?.[pitchingSide]?.players?.[`ID${curPitchId}`] : null;
               const pitcherName= (pitcherPl?.person?.fullName || '—').split(' ').pop();
               const pitcherIP  = pitcherPl?.stats?.pitching?.inningsPitched ?? '—';
               const pitcherERA = pitcherPl?.seasonStats?.pitching?.era ?? '—';
 
               // Current batter
-              const batPl   = curBatId ? live.teams?.[battingSide]?.players?.[`ID${curBatId}`] : null;
-              const batName = (batPl?.person?.fullName || pname(curBatId)).split(' ').pop();
+              const gCurBat = gLive.currentBatterId || null;
+              const gOnDeck = gLive.onDeckId        || null;
+              const gInHole = gLive.inTheHoleId     || null;
+              const gOuts   = ls.outs ?? null;
+              const batPl   = gCurBat ? gLive.teams?.[battingSide]?.players?.[`ID${gCurBat}`] : null;
+              const batName = (batPl?.person?.fullName || '—').split(' ').pop();
               const batSt   = batPl?.stats?.batting || {};
               const batOPS  = batPl?.seasonStats?.batting?.ops ?? '—';
 
-              const inningOver = (lsOuts ?? 0) >= 3;
-              const hasDueUp   = curBatId || onDeckId;
+              const inningOver = (gOuts ?? 0) >= 3;
+              const hasDueUp   = gCurBat || gOnDeck;
 
-              if (!curPitchId && !curBatId && !hasDueUp) return null;
+              if (!curPitchId && !gCurBat && !hasDueUp) return null;
 
               return (
                 <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid rgba(255,255,255,.06)'}}>
-                  {!inningOver && (curPitchId || curBatId) ? (
+                  {!inningOver && (curPitchId || gCurBat) ? (
                     /* Active inning — pitcher + batter side by side */
                     <div style={{display:'flex',gap:8}}>
                       {curPitchId && (
@@ -6633,7 +6803,7 @@ function GamedayTab() {
                           </div>
                         </div>
                       )}
-                      {curBatId && (
+                      {gCurBat && (
                         <div style={{flex:1,minWidth:0}}>
                           <div style={{fontFamily:mono,fontSize:7,color:'var(--accent)',
                             textTransform:'uppercase',letterSpacing:.8,marginBottom:2}}>
@@ -6657,8 +6827,8 @@ function GamedayTab() {
                         Due Up {battingAbbr}
                       </div>
                       <div style={{display:'flex',gap:4}}>
-                        {[curBatId, onDeckId, inHoleId].filter(Boolean).slice(0,3).map(id => {
-                          const pl       = live.teams?.[battingSide]?.players?.[`ID${id}`];
+                        {[gCurBat, gOnDeck, gInHole].filter(Boolean).slice(0,3).map(id => {
+                          const pl       = gLive.teams?.[battingSide]?.players?.[`ID${id}`];
                           const lastName = (pl?.person?.fullName || '—').split(' ').pop();
                           const st       = pl?.stats?.batting || {};
                           return (
