@@ -6655,7 +6655,16 @@ function GamedayTab() {
       gridTemplateColumns: !isMobile && selGamePk ? undefined : 'repeat(auto-fill,minmax(240px,1fr))',
       gap: !isMobile && selGamePk ? 0 : 10,
       padding: !isMobile && selGamePk ? 0 : 12}}>
-      {games.map(g => {
+      {[...games].sort((a, b) => {
+        // Sort order: Live → Preview (by time) → Final (by time)
+        const order = s => s?.abstractGameState === 'Live' ? 0 : s?.abstractGameState === 'Final' ? 2 : 1;
+        const oa = order(a.status), ob = order(b.status);
+        if (oa !== ob) return oa - ob;
+        // Within same group, sort by game start time
+        const ta = a.gameDate ? new Date(a.gameDate).getTime() : 0;
+        const tb = b.gameDate ? new Date(b.gameDate).getTime() : 0;
+        return ta - tb;
+      }).map(g => {
         const st  = gameStatus(g, liveDataMap[g.gamePk]?.linescore || liveDataMap[g.gamePk]?.liveLinescore);
         const aw  = g.teams?.away; const hm = g.teams?.home;
         const awR = rhe(g,'away'); const hmR = rhe(g,'home');
