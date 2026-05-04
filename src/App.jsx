@@ -6844,17 +6844,17 @@ function GamedayTab() {
       ) : isMobile ? (
         /* ── MOBILE: full-screen list OR full-screen detail ── */
         selGamePk && selGame
-          ? <DetailPanel/>
-          : <div style={{padding:10}}><GamesList/></div>
+          ? DetailPanel()
+          : <div style={{padding:10}}>{GamesList()}</div>
       ) : (
         /* ── DESKTOP: side-by-side split ── */
         <div style={{display:'flex', minHeight:'65vh'}}>
           <div style={{width: selGamePk ? '300px' : '100%', flexShrink:0,
             overflowY:'auto', borderRight: selGamePk ? '1px solid var(--border)' : 'none',
             transition:'width .2s', padding: selGamePk ? 0 : 0}}>
-            {<GamesList/>}
+            {GamesList()}
           </div>
-          {selGame && <DetailPanel/>}
+          {selGame && DetailPanel()}
         </div>
       )}
     </div>
