@@ -1,7 +1,7 @@
 Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitcher ID (Away),Game ID,Day of Week,Day Abbr,Series Game #,Games in Series,Series Position,Day Context
 2026-05-04,05:40 PM,COL,NYM,608372.0,623211.0,824363,Monday,Mon,1,3,Opener,~ Solid
-2026-05-04,06:10 PM,DET,BOS,669373.0,801139.0,824283,Monday,Mon,1,3,Opener,~ Solid
-2026-05-04,06:40 PM,TB,TOR,607259.0,,822984,Monday,Mon,1,3,Opener,~ Solid
+2026-05-04,06:10 PM,DET,BOS,663947.0,801139.0,824283,Monday,Mon,1,3,Opener,~ Solid
+2026-05-04,06:40 PM,TB,TOR,607259.0,641778.0,822984,Monday,Mon,1,3,Opener,~ Solid
 2026-05-04,06:40 PM,MIA,PHI,676083.0,605400.0,823874,Monday,Mon,4,4,Finale,~ Solid
 2026-05-04,07:05 PM,NYY,BAL,693645.0,669358.0,823552,Monday,Mon,4,4,Finale,~ Solid
 2026-05-04,07:10 PM,CHC,CIN,665795.0,695534.0,824684,Monday,Mon,1,4,Opener,~ Solid
@@ -13,7 +13,7 @@ Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitc
 2026-05-04,09:45 PM,SF,SD,686790.0,681190.0,823228,Monday,Mon,1,3,Opener,~ Solid
 2026-05-05,06:40 PM,DET,BOS,664285.0,678394.0,824281,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
 2026-05-05,06:40 PM,TB,TOR,656876.0,592332.0,822986,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
-2026-05-05,06:40 PM,PHI,ATH,,622663.0,823469,Tuesday,Tue,1,3,Opener,⚠️ Weakest Day
+2026-05-05,06:40 PM,PHI,ATH,650911.0,622663.0,823469,Tuesday,Tue,1,3,Opener,⚠️ Weakest Day
 2026-05-05,06:40 PM,MIA,BAL,645261.0,,823873,Tuesday,Tue,1,3,Opener,⚠️ Weakest Day
 2026-05-05,06:45 PM,WSH,MIN,676917.0,671737.0,822743,Tuesday,Tue,1,3,Opener,⚠️ Weakest Day
 2026-05-05,07:05 PM,NYY,TEX,,594798.0,823553,Tuesday,Tue,1,3,Opener,⚠️ Weakest Day
