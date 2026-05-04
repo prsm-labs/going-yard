@@ -1,28 +1,28 @@
 Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitcher ID (Away),Game ID,Day of Week,Day Abbr,Series Game #,Games in Series,Series Position,Day Context
-2026-05-03,12:45 PM,MIN,TOR,657746.0,702056.0,823711,Sunday,Sun,4,4,Finale,~ Neutral (check pitcher)
-2026-05-03,01:35 PM,BOS,HOU,624133.0,675989.0,824769,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-05-03,01:35 PM,PIT,CIN,677952.0,695505.0,823387,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-05-03,01:35 PM,NYY,BAL,608331.0,694346.0,823555,Sunday,Sun,3,4,Middle,~ Neutral (check pitcher)
-2026-05-03,01:35 PM,WSH,MIL,676571.0,701656.0,822742,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-05-03,01:40 PM,TB,SF,571927.0,641816.0,822987,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-05-03,01:40 PM,MIA,PHI,663978.0,666200.0,823875,Sunday,Sun,3,4,Middle,~ Neutral (check pitcher)
-2026-05-03,02:15 PM,STL,LAD,669160.0,680736.0,823065,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-05-03,02:20 PM,CHC,AZ,571510.0,518876.0,824687,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-05-03,03:10 PM,COL,ATL,607536.0,675911.0,824364,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-05-03,04:05 PM,ATH,CLE,650644.0,800048.0,825013,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-05-03,04:07 PM,LAA,NYM,686799.0,605280.0,824043,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-05-03,04:10 PM,SEA,KC,622491.0,663460.0,823145,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-05-03,04:10 PM,SD,CWS,656288.0,641743.0,823307,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-05-03,07:20 PM,DET,TEX,663947.0,683004.0,824285,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-05-04,06:40 PM,DET,BOS,,801139.0,824283,Monday,Mon,1,3,Opener,~ Solid
+2026-05-04,05:40 PM,COL,NYM,608372.0,,824363,Monday,Mon,1,3,Opener,~ Solid
+2026-05-04,06:40 PM,DET,BOS,669373.0,801139.0,824283,Monday,Mon,1,3,Opener,~ Solid
 2026-05-04,06:40 PM,TB,TOR,607259.0,,822984,Monday,Mon,1,3,Opener,~ Solid
 2026-05-04,06:40 PM,MIA,PHI,676083.0,605400.0,823874,Monday,Mon,4,4,Finale,~ Solid
 2026-05-04,07:05 PM,NYY,BAL,693645.0,669358.0,823552,Monday,Mon,4,4,Finale,~ Solid
 2026-05-04,07:40 PM,CHC,CIN,665795.0,695534.0,824684,Monday,Mon,1,4,Opener,~ Solid
 2026-05-04,07:40 PM,KC,CLE,608379.0,676440.0,824120,Monday,Mon,1,4,Opener,~ Solid
 2026-05-04,07:45 PM,STL,MIL,681517.0,694477.0,823064,Monday,Mon,1,3,Opener,~ Solid
-2026-05-04,08:10 PM,HOU,LAD,,808967.0,824201,Monday,Mon,1,3,Opener,~ Solid
-2026-05-04,08:40 PM,COL,NYM,608372.0,,824363,Monday,Mon,1,3,Opener,~ Solid
+2026-05-04,08:10 PM,HOU,LAD,595345.0,808967.0,824201,Monday,Mon,1,3,Opener,~ Solid
 2026-05-04,09:38 PM,LAA,CWS,667755.0,663436.0,824039,Monday,Mon,1,3,Opener,~ Solid
 2026-05-04,09:40 PM,SEA,ATL,669302.0,702275.0,823143,Monday,Mon,1,3,Opener,~ Solid
-2026-05-04,09:45 PM,SF,SD,,681190.0,823228,Monday,Mon,1,3,Opener,~ Solid
+2026-05-04,09:45 PM,SF,SD,686790.0,681190.0,823228,Monday,Mon,1,3,Opener,~ Solid
+2026-05-05,06:40 PM,DET,BOS,664285.0,678394.0,824281,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
+2026-05-05,06:40 PM,TB,TOR,656876.0,592332.0,822986,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
+2026-05-05,06:40 PM,PHI,ATH,,622663.0,823469,Tuesday,Tue,1,3,Opener,⚠️ Weakest Day
+2026-05-05,06:40 PM,MIA,BAL,645261.0,,823873,Tuesday,Tue,1,3,Opener,⚠️ Weakest Day
+2026-05-05,06:45 PM,WSH,MIN,676917.0,671737.0,822743,Tuesday,Tue,1,3,Opener,⚠️ Weakest Day
+2026-05-05,07:05 PM,NYY,TEX,,594798.0,823553,Tuesday,Tue,1,3,Opener,⚠️ Weakest Day
+2026-05-05,07:40 PM,CHC,CIN,592791.0,671096.0,824682,Tuesday,Tue,2,4,Middle,⚠️ Weakest Day
+2026-05-05,07:40 PM,KC,CLE,702070.0,668909.0,824119,Tuesday,Tue,2,4,Middle,⚠️ Weakest Day
+2026-05-05,07:45 PM,STL,MIL,669467.0,687075.0,823062,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
+2026-05-05,08:10 PM,HOU,LAD,663567.0,660271.0,824200,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
+2026-05-05,08:40 PM,COL,NYM,547179.0,642547.0,824362,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
+2026-05-05,09:38 PM,LAA,CWS,,607200.0,824040,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
+2026-05-05,09:40 PM,AZ,PIT,593958.0,696149.0,825092,Tuesday,Tue,1,3,Opener,⚠️ Weakest Day
+2026-05-05,09:40 PM,SEA,ATL,669923.0,693821.0,823142,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
+2026-05-05,09:45 PM,SF,SD,,621111.0,823227,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
