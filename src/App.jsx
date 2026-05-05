@@ -7,6 +7,18 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   });
+  // Handle deep-link navigation posted by the service worker on notification click
+  navigator.serviceWorker.addEventListener('message', e => {
+    if (!e.data || e.data.type !== 'NOTIFY_NAV') return;
+    const hash  = (e.data.url || '').split('#')[1] || '';
+    const parts = hash.replace(/^[/]/, '').split('/');
+    const targetTab  = parts[0] || 'live';
+    const targetView = parts[1] || null;
+    if (_GLOBAL_NAV) {
+      _GLOBAL_NAV.setTab(targetTab);
+      if (targetView && _GLOBAL_NAV.setLiveView) _GLOBAL_NAV.setLiveView(targetView);
+    }
+  });
 }
 // Kick off injury fetch early
 fetchInjuries();
@@ -2496,7 +2508,8 @@ async function loadTodayLineups() {
       sendLivePush(
         newTeams.length === 1 ? `📋 ${newTeams[0]} Lineup Confirmed` : `📋 ${newTeams.length} Lineups Confirmed`,
         teamsStr,
-        lineupDedupKey
+        lineupDedupKey,
+        '/#live/lineups'
       );
       } // end else (not first load)
     }
@@ -7227,14 +7240,14 @@ const LINEUP_NOTIF_SENT = new Set();
 let LINEUP_NOTIF_FIRST_LOAD = true; // skip notifications on first load
 
 // Push helper — calls /api/notify from browser for live events
-async function sendLivePush(title, body, dedupKey = '') {
+async function sendLivePush(title, body, dedupKey = '', url = '/#live/gameday') {
   try {
     const secret = window.__NOTIFY_SECRET__ || '';
     if (!secret) return;
     await fetch('/api/notify', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({secret, title, body, url:'/', dedupKey}),
+      body:JSON.stringify({secret, title, body, url, dedupKey}),
     });
   } catch {}
 }

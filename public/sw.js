@@ -1,60 +1,59 @@
+// public/sw.js
 // Going Yard — Service Worker
-// Handles: PWA install + Web Push Notifications
+// Handles push notifications and notification click deep-linking
 
-const CACHE = 'going-yard-v1';
-const STATIC = ['/', '/index.html'];
+self.addEventListener('install',  () => self.skipWaiting());
+self.addEventListener('activate', e  => e.waitUntil(self.clients.claim()));
 
-// ── Install: cache shell ──────────────────────────────────────────────────
-self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(STATIC)).then(() => self.skipWaiting())
-  );
-});
-
-// ── Activate: clean old caches ───────────────────────────────────────────
-self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    ).then(() => self.clients.claim())
-  );
-});
-
-// ── Fetch: network-first, fall back to cache for navigation ─────────────
-self.addEventListener('fetch', e => {
-  if (e.request.mode === 'navigate') {
-    e.respondWith(
-      fetch(e.request).catch(() => caches.match('/index.html'))
-    );
-  }
-});
-
-// ── Push: show notification ───────────────────────────────────────────────
+// ── Push received — show notification ────────────────────────────────────────
 self.addEventListener('push', e => {
-  let data = { title: '⚾ Going Yard', body: "Today's picks are ready!", url: '/' };
-  try { data = { ...data, ...e.data.json() }; } catch {}
+  if (!e.data) return;
+  let payload = {};
+  try { payload = e.data.json(); } catch { payload = { title: e.data.text(), body: '' }; }
+
+  const title   = payload.title || 'Going Yard';
+  const body    = payload.body  || '';
+  const url     = payload.url   || '/#live/gameday';
+  const icon    = '/icons/icon-192.png';
+  const badge   = '/icons/badge-72.png';
+  const tag     = payload.dedupKey || `gy-${Date.now()}`;
 
   e.waitUntil(
-    self.registration.showNotification(data.title, {
-      body:    data.body,
-      icon:    '/icon-192.png',
-      badge:   '/icon-192.png',
-      data:    { url: data.url },
-      vibrate: [200, 100, 200],
-      requireInteraction: false,
+    self.registration.showNotification(title, {
+      body,
+      icon,
+      badge,
+      tag,                   // dedup — same tag replaces previous
+      renotify: false,       // don't vibrate again for same tag
+      data: { url },         // store deep-link for click handler
+      vibrate: [100, 50, 100],
     })
   );
 });
 
-// ── Notification click: open/focus the app ────────────────────────────────
+// ── Notification clicked — navigate to deep-link URL ─────────────────────────
 self.addEventListener('notificationclick', e => {
   e.notification.close();
-  const url = e.notification.data?.url || '/';
+
+  const targetUrl = (e.notification.data && e.notification.data.url)
+    ? e.notification.data.url
+    : '/#live/gameday';
+
+  // Resolve to absolute URL
+  const absolute = new URL(targetUrl, self.location.origin).href;
+
   e.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
-      const existing = list.find(c => c.url.includes(self.location.origin));
-      if (existing) return existing.focus();
-      return clients.openWindow(url);
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
+      // If app is already open in a tab, focus it and navigate
+      for (const client of clients) {
+        if (client.url.startsWith(self.location.origin)) {
+          // Post message so App.jsx can handle the hash-based routing
+          client.postMessage({ type: 'NOTIFY_NAV', url: absolute });
+          return client.focus();
+        }
+      }
+      // No open tab — open a new one at the target URL
+      return self.clients.openWindow(absolute);
     })
   );
 });
