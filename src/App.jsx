@@ -847,10 +847,18 @@ function PickButton({pid,name,team}) {
     e.stopPropagation();
     if(!open && btnRef.current){
       const r = btnRef.current.getBoundingClientRect();
-      // Open left-aligned to button right edge so it doesn't overflow
-      const menuWidth = 140;
-      const left = Math.max(4, r.right - menuWidth);
-      setPos({ top: r.bottom + 4, left });
+      const menuW = 148;
+      const menuH = 240; // approx height of the menu
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      // Horizontal: prefer right-aligned to button, clamp to viewport
+      let left = r.right - menuW;
+      if (left < 4) left = Math.min(4, r.left);
+      if (left + menuW > vw - 4) left = vw - menuW - 4;
+      // Vertical: open below by default, flip above if not enough room below
+      let top = r.bottom + 4;
+      if (top + menuH > vh - 8) top = Math.max(8, r.top - menuH - 4);
+      setPos({ top, left });
     }
     setOpen(o=>!o);
   };
