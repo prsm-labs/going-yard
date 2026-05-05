@@ -9496,9 +9496,9 @@ function CheatCodeButton() {
           </Section>
 
           <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--muted)',
-            textAlign:'center',marginTop:8,lineHeight:1.5,borderTop:'1px solid var(--border)',paddingTop:12}}>
-            Analysis based on April 10–24 2026 · 15 days · 99 HRs · 756 played rows<br/>
-            Re-run analysis periodically as sample size grows
+            textAlign:'center',marginTop:8,lineHeight:1.6,borderTop:'1px solid var(--border)',paddingTop:12}}>
+            ⚠️ The Sauce is a living model — signals, thresholds and weights are updated<br/>
+            periodically as the season sample grows. Treat it as directional, not prescriptive.
           </div>
         </div>
       </div>
@@ -13566,7 +13566,6 @@ function NotificationBell() {
 function LegendButton() {
   const [open, setOpen] = useState(false);
   const tabs = [
-    { tab:'💥 HR Tracker',    items:['💥 Home run hit','🔥 On Fire (2+ HRs same game)','⚡ Key matchup batter','📈 Trending up','🏠 Home team advantage'] },
     { tab:'📡 Live',          items:['⚡ At Bat — current batter','👀 On Deck','⛳ In the Hole','✅ Lineup confirmed','💫 Liftoff — high HR probability','📋 Lineups sub-tab','📺 Gameday sub-tab'] },
     { tab:'⚡ Key Matchups',  items:['💥 Gone Yard today','💎 Diamond — Tier 1 Lock pick','⏳ Due — AB count since last HR exceeds normal rate','🔥 Hot Bat — 3+ HRs last 7 days','🤕 Injured / IL','🟢 Disciplined — low chase rate, high BB%','🔴 Chase Risk — chasing pitches, fade signal'] },
     { tab:'🧠 Sim Lab',       items:['⚡ The Sauce — tap for the full HR model cheat sheet','💥 Gone Yard filter','💎 Diamond filter','⏳ Due filter','🔥 Hot Bat filter','🤕 Injured filter','📊 Grade filters A+/A/B/C/D'] },
