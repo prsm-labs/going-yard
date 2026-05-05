@@ -9464,6 +9464,37 @@ function CheatCodeButton() {
             </div>
           </Section>
 
+          <Section emoji="📅" title="Day of Week — Target Profiles" color="#f5a623">
+            <div style={{display:'flex',flexDirection:'column',gap:4}}>
+              {[
+                ['Thursday','✅ Best Day','14.3%','Getaway day — SimTB ≥ 2.0 = 27.3%. Even Elite pitchers get hit. A/A+ + SimTB is your lock.'],
+                ['Saturday','✅ Strong','12.9%','Hittable pitchers = 20.4%. A/A+ + Target/Hittable stack = 20%. Target No. 2 starters.'],
+                ['Monday','~ Solid','13.2%','Play normally. No specific unlock — standard Sauce filters apply.'],
+                ['Sunday','~ Neutral','11.6%','Target pitchers specifically = 22.2%. Only play if pitcher is Target.'],
+                ['Wednesday','~ Neutral','11.3%','Target pitchers = 21.7%. Otherwise nothing special.'],
+                ['Friday','⚠️ Trap','9.4%','Ace openers — Elite pitchers = 5.0%. FADE unless pitcher is Target/Hittable.'],
+                ['Tuesday','⚠️ Weakest','9.1%','Worst raw day. Target pitchers = 23.8% exception. Avoid everything else.'],
+              ].map(([day, badge, rate, tip]) => {
+                const col = badge.includes('✅') ? '#27c97a' : badge.includes('⚠️') ? 'var(--accent)' : 'var(--muted)';
+                return (
+                  <div key={day} style={{display:'flex',alignItems:'flex-start',gap:8,
+                    padding:'6px 8px',borderRadius:6,background:'rgba(255,255,255,.03)',
+                    border:`1px solid rgba(255,255,255,.06)`}}>
+                    <div style={{flexShrink:0,minWidth:80}}>
+                      <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11}}>{day}</div>
+                      <div style={{display:'flex',alignItems:'center',gap:4,marginTop:1}}>
+                        <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:col,fontWeight:700}}>{badge}</span>
+                        <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)'}}>{rate}</span>
+                      </div>
+                    </div>
+                    <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',
+                      lineHeight:1.4,flex:1}}>{tip}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </Section>
+
           <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--muted)',
             textAlign:'center',marginTop:8,lineHeight:1.5,borderTop:'1px solid var(--border)',paddingTop:12}}>
             Analysis based on April 10–24 2026 · 15 days · 99 HRs · 756 played rows<br/>
@@ -11025,9 +11056,8 @@ function MatchupEngineTab() {
 
     {/* Sim Lab — display:none keeps component mounted so filters/sort persist across sub-tab switches */}
     <div style={{display: subTab==='simlab' ? 'block' : 'none'}}>
-      <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:9,padding:'10px 14px',marginBottom:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-        <span style={{fontSize:10,color:'var(--accent)',fontFamily:"'DM Mono',monospace",fontWeight:700}}>🧠 SIM LAB</span>
-        <span style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>Monte Carlo projections · probability analysis · prop line matching · all from today's engine run</span>
+      <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:10}}>
+        <span style={{fontSize:10,color:'var(--accent)',fontFamily:"'DM Mono',monospace",fontWeight:700,opacity:.6}}>🧠</span>
         <CheatCodeButton/>
       </div>
       <SimLabView data={activeData}/>
@@ -11163,20 +11193,7 @@ function MatchupEngineTab() {
       ))}
     </div>
 
-    {/* Grade legend */}
-    <div style={{display:'flex',gap:6,marginBottom:14,flexWrap:'wrap'}}>
-      {Object.entries(GRADE_CFG).map(([g,c])=>(
-        <div key={g} style={{padding:'2px 10px',borderRadius:6,background:c.bg,
-          border:`1px solid ${c.border}`,color:c.color,
-          fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:11,letterSpacing:.5}}>
-          {g}
-        </div>
-      ))}
-      <div style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
-        alignSelf:'center',marginLeft:4}}>
-        A+(6-8 flags) A(4-5) B+(3) B(2) C(1) D(0)
-      </div>
-    </div>
+
 
     {/* Game filter — dropdown */}
     {games.length > 1 && <div style={{display:'flex',gap:8,marginBottom:14,alignItems:'center',flexWrap:'wrap'}}>
@@ -13546,6 +13563,77 @@ function NotificationBell() {
 }
 
 
+function LegendButton() {
+  const [open, setOpen] = useState(false);
+  const tabs = [
+    { tab:'💥 HR Tracker',    items:['💥 Home run hit','🔥 On Fire (2+ HRs same game)','⚡ Key matchup batter','📈 Trending up','🏠 Home team advantage'] },
+    { tab:'📡 Live',          items:['⚡ At Bat — current batter','👀 On Deck','⛳ In the Hole','✅ Lineup confirmed','💫 Liftoff — high HR probability','📋 Lineups sub-tab','📺 Gameday sub-tab'] },
+    { tab:'⚡ Key Matchups',  items:['💥 Gone Yard today','💎 Diamond — Tier 1 Lock pick','⏳ Due — AB count since last HR exceeds normal rate','🔥 Hot Bat — 3+ HRs last 7 days','🤕 Injured / IL','🟢 Disciplined — low chase rate, high BB%','🔴 Chase Risk — chasing pitches, fade signal'] },
+    { tab:'🧠 Sim Lab',       items:['⚡ The Sauce — tap for the full HR model cheat sheet','💥 Gone Yard filter','💎 Diamond filter','⏳ Due filter','🔥 Hot Bat filter','🤕 Injured filter','📊 Grade filters A+/A/B/C/D'] },
+    { tab:'Grades',           items:['A+ = 6–8 flags · highest HR rate','A  = 4–5 flags','B  = 2–3 flags','C  = 1 flag','D  = 0 flags','🔒 Tier 1: A+ + Target/Hittable + SimTB ≥ 2.0','Grade hidden for injured/IL players'] },
+    { tab:'Pitcher Grades',   items:['🎯 Target — softest matchup, highest batter HR rate','💥 Hittable — green light','🤔 Average — play carefully','⚠️ Tough — fade unless A+ batter','‼️ Elite — avoid, especially on Fridays'] },
+    { tab:'Weather',          items:['✅ Wind Out — boosts HR','⚠️ Wind In — suppresses HR','🌡️ 70–75°F = peak HR temp (+9.2% lift)','❄️ Below 65°F = hard fade','☀️ Sunny/Clear = favorable','🌧️ Rain Risk = watch for postponements'] },
+    { tab:'Discipline',       items:['🟢 Disciplined: Chase K% < 8%, BB% > 8%','🟡 Watch: Chase K% 12–20% or behind in counts > 50%','🔴 Chase Risk: Chase K% > 20% — engine fades this batter −0.20','Score: 0–100, higher = more patient plate approach'] },
+  ];
+  return <>
+    <button onClick={()=>setOpen(true)}
+      title="App Legend"
+      style={{padding:'3px 8px',borderRadius:6,border:'1px solid var(--border)',
+        background:'var(--surface2)',color:'var(--muted)',cursor:'pointer',
+        fontFamily:"'DM Mono',monospace",fontSize:11,flexShrink:0,
+        transition:'all .15s',lineHeight:1}}
+      onMouseEnter={e=>{e.currentTarget.style.color='var(--text)';e.currentTarget.style.borderColor='rgba(255,255,255,.3)';}}
+      onMouseLeave={e=>{e.currentTarget.style.color='var(--muted)';e.currentTarget.style.borderColor='var(--border)';}}>
+      🗺️
+    </button>
+    {open && <>
+      <div onClick={()=>setOpen(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.65)',zIndex:900}}/>
+      <div style={{position:'fixed',right:0,top:0,bottom:0,width:'min(440px,100vw)',
+        background:'var(--surface)',borderLeft:'2px solid var(--border)',
+        zIndex:901,overflowY:'auto',display:'flex',flexDirection:'column'}}>
+        <div style={{padding:'16px 20px 12px',borderBottom:'1px solid var(--border)',
+          position:'sticky',top:0,background:'var(--surface)',zIndex:10,
+          display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+          <div>
+            <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:18,
+              letterSpacing:1,color:'var(--text)',textTransform:'uppercase'}}>🗺️ Legend</div>
+            <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',marginTop:2}}>
+              Emoji guide · tab descriptions · signal reference
+            </div>
+          </div>
+          <button onClick={()=>setOpen(false)}
+            style={{background:'none',border:'1px solid var(--border)',borderRadius:6,
+              color:'var(--muted)',cursor:'pointer',padding:'4px 10px',
+              fontFamily:"'DM Mono',monospace",fontSize:10,flexShrink:0}}>✕</button>
+        </div>
+        <div style={{padding:20,flex:1,display:'flex',flexDirection:'column',gap:16}}>
+          {tabs.map(({tab, items}) => (
+            <div key={tab}>
+              <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,
+                color:'var(--accent2)',textTransform:'uppercase',letterSpacing:.8,
+                marginBottom:6,paddingBottom:4,borderBottom:'1px solid var(--border)'}}>
+                {tab}
+              </div>
+              <div style={{display:'flex',flexDirection:'column',gap:3}}>
+                {items.map((item,i) => (
+                  <div key={i} style={{fontFamily:"'DM Mono',monospace",fontSize:10,
+                    color:'var(--muted)',lineHeight:1.4,paddingLeft:4}}>
+                    {item}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+          <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'rgba(255,255,255,.2)',
+            textAlign:'center',paddingTop:8,borderTop:'1px solid var(--border)'}}>
+            Going Yard · goingyard.app
+          </div>
+        </div>
+      </div>
+    </>}
+  </>;
+}
+
 export default function App() {
   const [tab, setTab] = useState("homeruns");
   const [showPicksSlideout, setShowPicksSlideout] = useState(false);
@@ -13602,6 +13690,7 @@ export default function App() {
         <div style={{display:"flex",alignItems:"center",gap:5}}> 
           <DataStatusBadge/>
           <NotificationBell/>
+          <LegendButton/>
           <button onClick={()=>setShowPicksSlideout(s=>!s)}
             style={{padding:"3px 7px",borderRadius:6,border:"1px solid var(--border)",
               background:"var(--surface2)",color:"var(--accent2)",cursor:"pointer",
