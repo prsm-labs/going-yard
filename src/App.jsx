@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import ReactDOM from "react-dom";
 
 // ── PWA Push Notifications ───────────────────────────────────────────────────
 const VAPID_PUBLIC_KEY = (typeof window !== 'undefined' && window.__VAPID_KEY__) || '';
@@ -862,6 +863,32 @@ function PickButton({pid,name,team}) {
     }
     setOpen(o=>!o);
   };
+  // Portal menu — rendered into document.body so CSS transform on
+  // parent slideouts (which break position:fixed) can't clip it
+  const menu = open ? ReactDOM.createPortal(
+    <div style={{position:'fixed',top:pos.top,left:pos.left,zIndex:99999,
+      background:'#0d1318',border:'1px solid var(--border)',borderRadius:8,padding:5,
+      display:'flex',flexDirection:'column',gap:3,minWidth:148,
+      boxShadow:'0 8px 28px rgba(0,0,0,.85)'}}
+      onClick={e=>e.stopPropagation()}>
+      {Object.entries(PICK_TYPES).map(([type,cfg])=>(
+        <button key={type} onClick={()=>{setPick(pid,name,getTeam(pid,team),type);setOpen(false);}}
+          style={{padding:'5px 9px',borderRadius:5,cursor:'pointer',textAlign:'left',
+          fontFamily:"'DM Mono',monospace",fontSize:11,
+          border:`1px solid ${current===type?cfg.color:'transparent'}`,
+          background:current===type?`${cfg.color}20`:'transparent',
+          color:current===type?cfg.color:'var(--text)'}}>
+          {cfg.label}
+        </button>
+      ))}
+      {current&&<button onClick={()=>{setPick(pid,name,getTeam(pid,team),current);setOpen(false);}}
+        style={{padding:'5px 9px',borderRadius:5,cursor:'pointer',textAlign:'left',
+        fontFamily:"'DM Mono',monospace",fontSize:11,border:'1px solid transparent',
+        background:'transparent',color:'var(--muted)'}}>✕ Remove</button>}
+    </div>,
+    document.body
+  ) : null;
+
   return (
     <div style={{position:'relative',display:'inline-block'}}>
       <button ref={btnRef} onClick={handleOpen}
@@ -871,26 +898,7 @@ function PickButton({pid,name,team}) {
         color:current?PICK_TYPES[current].color:'var(--muted)'}}>
         {current?PICK_TYPES[current].label.split(' ')[0]:'＋'}
       </button>
-      {open && <div style={{position:'fixed',top:pos.top,left:pos.left,zIndex:9999,
-        background:'#0d1318',border:'1px solid var(--border)',borderRadius:8,padding:5,
-        display:'flex',flexDirection:'column',gap:3,minWidth:130,
-        boxShadow:'0 8px 24px rgba(0,0,0,.7)'}}
-        onClick={e=>e.stopPropagation()}>
-        {Object.entries(PICK_TYPES).map(([type,cfg])=>(
-          <button key={type} onClick={()=>{setPick(pid,name,getTeam(pid,team),type);setOpen(false);}}
-            style={{padding:'5px 9px',borderRadius:5,cursor:'pointer',textAlign:'left',
-            fontFamily:"'DM Mono',monospace",fontSize:11,
-            border:`1px solid ${current===type?cfg.color:'transparent'}`,
-            background:current===type?`${cfg.color}20`:'transparent',
-            color:current===type?cfg.color:'var(--text)'}}>
-            {cfg.label}
-          </button>
-        ))}
-        {current&&<button onClick={()=>{setPick(pid,name,getTeam(pid,team),current);setOpen(false);}}
-          style={{padding:'5px 9px',borderRadius:5,cursor:'pointer',textAlign:'left',
-          fontFamily:"'DM Mono',monospace",fontSize:11,border:'1px solid transparent',
-          background:'transparent',color:'var(--muted)'}}>✕ Remove</button>}
-      </div>}
+      {menu}
     </div>
   );
 }
