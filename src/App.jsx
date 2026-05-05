@@ -8773,7 +8773,7 @@ function SimLabView({ data }) {
                         </span>
                       </td>
                       <td style={{ textAlign: 'right' }}>
-                        {!INJURY_MAP[String(parseInt(b.batter_id)||0)] && {!INJURY_MAP[String(parseInt(b.batter_id)||0)] && <span style={{ padding: '2px 7px', borderRadius: 5, fontSize: 10, fontFamily: "'Oswald',sans-serif", fontWeight: 800, background: gc.bg, color: gc.color, border: `1px solid ${gc.border}` }}>{b.grade}</span>}}
+                        {!INJURY_MAP[String(parseInt(b.batter_id)||0)] && <span style={{ padding: '2px 7px', borderRadius: 5, fontSize: 10, fontFamily: "'Oswald',sans-serif", fontWeight: 800, background: gc.bg, color: gc.color, border: `1px solid ${gc.border}` }}>{b.grade}</span>}
                       </td>
                       <td style={{ textAlign: 'right' }}>
                         {parseFloat(b.meatball_matchup_score) > 0 ? (() => {
