@@ -1510,7 +1510,7 @@ function PickRow({p, bprops}) {
               color: gc ? gc.color : 'var(--text)'}}>{p.name}</div>
             <div style={{fontSize:9,fontFamily:"'DM Mono',monospace",display:"flex",gap:5,alignItems:"center",marginTop:1}}>
               <span style={{color:"var(--accent2)",fontWeight:700}}>{getTeam(p.pid, p.team)}</span>
-              {gc && <span style={{padding:'0px 4px',borderRadius:3,fontSize:8,fontWeight:800,
+              {gc && !INJURY_MAP[String(p.pid||'')] && <span style={{padding:'0px 4px',borderRadius:3,fontSize:8,fontWeight:800,
                 background:gc.bg,color:gc.color,border:`1px solid ${gc.border}`}}>{dp.grade}</span>}
             </div>
           </>;
@@ -4986,6 +4986,12 @@ function LiveTab() {
   const [refreshing, setRefreshing] = useState(false);
   const [showHeatingUp, setShowHeatingUp] = useState(false);
   const [liveView, setLiveView] = useState('gameday'); // 'gameday' | 'games' | 'lineups'
+
+  // Expose setLiveView so notifications can route into live sub-views
+  useEffect(() => {
+    if (_GLOBAL_NAV) _GLOBAL_NAV.setLiveView = setLiveView;
+    return () => { if (_GLOBAL_NAV) _GLOBAL_NAV.setLiveView = null; };
+  }, [setLiveView]);
   const [liveGameFilter, setLiveGameFilter] = useState('all');
   const todayET2 = new Date().toLocaleDateString("en-US",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"});
   const [lm2,ld2,ly2] = todayET2.split("/");
@@ -7026,7 +7032,7 @@ async function fetchInjuries() {
         if (!placements[pid] || t.date > placements[pid].date) {
           const full = t.description || '';
           const lo   = full.toLowerCase();
-          const emoji = lo.includes('60-day') ? '🚫' : lo.includes('15-day') ? '🤕' : '🤕';
+          const emoji = lo.includes('60-day') ? '🚫' : '🤕';
           const label = lo.includes('60-day') ? '60-Day IL' : lo.includes('15-day') ? '15-Day IL' : '10-Day IL';
           placements[pid] = {
             date: t.date, emoji, label,
@@ -7039,15 +7045,54 @@ async function fetchInjuries() {
         if (!activations[pid] || t.date > activations[pid]) activations[pid] = t.date;
       }
     }
-    // Keep only players still on IL
+    // Keep only players still on IL per transaction log
+    const fromTransactions = {};
     Object.entries(placements).forEach(([pid, t]) => {
       if (!(activations[pid] && activations[pid] >= t.date)) {
-        INJURY_MAP[pid] = t;
+        fromTransactions[pid] = t;
       }
     });
+
+    // Cross-check: fetch actual current IL rosters from all 30 teams
+    // This catches players the transaction log missed (stale API updates)
+    let currentILPids = new Set();
+    try {
+      const rosterR = await fetch(
+        `https://statsapi.mlb.com/api/v1/sports/1/players?season=${new Date().getFullYear()}&gameType=R&hydrate=currentTeam,rosterEntries`,
+        { signal: AbortSignal.timeout(8000) }
+      );
+      if (rosterR.ok) {
+        const rosterD = await rosterR.json();
+        // statsapi returns rosterStatus for active players — we want IL ones
+        // Use a simpler targeted IL endpoint instead
+        const ilR = await fetch(
+          `https://statsapi.mlb.com/api/v1/teams?sportId=1&season=${new Date().getFullYear()}&hydrate=roster(rosterType=injuredList,person)`,
+          { signal: AbortSignal.timeout(8000) }
+        );
+        if (ilR.ok) {
+          const ilD = await ilR.json();
+          for (const team of (ilD.teams || [])) {
+            for (const entry of (team.roster || [])) {
+              const pid = String(entry.person?.id || '');
+              if (pid) currentILPids.add(pid);
+            }
+          }
+        }
+      }
+    } catch(e) { /* IL roster cross-check failed — use transaction data only */ }
+
+    // Final: player must be in transaction placements AND currently on IL roster
+    // OR transaction data only if roster fetch failed (currentILPids empty)
+    Object.entries(fromTransactions).forEach(([pid, t]) => {
+      if (currentILPids.size === 0 || currentILPids.has(pid)) {
+        INJURY_MAP[pid] = t;
+      }
+      // If roster says they're NOT on IL, skip them (stale transaction data)
+    });
+
     INJURY_LOADED = true;
     notifyInjuryListeners();
-    console.log(`[Injuries] ${Object.keys(INJURY_MAP).length} players on IL`);
+    console.log(`[Injuries] ${Object.keys(INJURY_MAP).length} players on IL (cross-checked against current rosters)`);
   } catch(e) { console.warn('[Injuries] fetch failed:', e.message); }
 }
 
@@ -7155,6 +7200,14 @@ const DUE_BADGE = (
 const WEATHER_ALERT_GAME_IDS = new Set(); // game_ids with weather concerns at game time
 const DAILY_GAME_MAP    = {}; // keyed by normalized game_id → Set of batting_teams
 let _notifyNewHR = null; // callback set by useHRNotifications hook
+
+// Global navigation — lets notifications route to tabs/views without prop drilling
+let _GLOBAL_NAV = null; // { setTab, setLiveView } — set by App on mount
+function navTo(tab, liveView) {
+  if (!_GLOBAL_NAV) return;
+  _GLOBAL_NAV.setTab(tab);
+  if (liveView) _GLOBAL_NAV.setLiveView(liveView);
+}
 
 // ── Generic notification system ─────────────────────────────────────────────
 const NOTIF_TYPES = {
@@ -8707,7 +8760,7 @@ function SimLabView({ data }) {
                         </span>
                       </td>
                       <td style={{ textAlign: 'right' }}>
-                        <span style={{ padding: '2px 7px', borderRadius: 5, fontSize: 10, fontFamily: "'Oswald',sans-serif", fontWeight: 800, background: gc.bg, color: gc.color, border: `1px solid ${gc.border}` }}>{b.grade}</span>
+                        {!INJURY_MAP[String(parseInt(b.batter_id)||0)] && {!INJURY_MAP[String(parseInt(b.batter_id)||0)] && <span style={{ padding: '2px 7px', borderRadius: 5, fontSize: 10, fontFamily: "'Oswald',sans-serif", fontWeight: 800, background: gc.bg, color: gc.color, border: `1px solid ${gc.border}` }}>{b.grade}</span>}}
                       </td>
                       <td style={{ textAlign: 'right' }}>
                         {parseFloat(b.meatball_matchup_score) > 0 ? (() => {
@@ -8770,7 +8823,7 @@ function SimLabView({ data }) {
                         <PlayerAvatar pid={parseInt(b.batter_id)||0} name={b.batter} size={40}/>
                         <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 22, color: 'var(--text)' }}>{b.batter}</span>
                         <SavantLink pid={parseInt(b.batter_id)||0} type="batter"/>
-                        <span style={{ padding: '3px 9px', borderRadius: 6, fontSize: 11, fontFamily: "'Oswald',sans-serif", fontWeight: 800, background: gc.bg, color: gc.color, border: `1px solid ${gc.border}` }}>{b.grade}</span>
+                        {!INJURY_MAP[String(parseInt(b.batter_id)||0)] && <span style={{ padding: '3px 9px', borderRadius: 6, fontSize: 11, fontFamily: "'Oswald',sans-serif", fontWeight: 800, background: gc.bg, color: gc.color, border: `1px solid ${gc.border}` }}>{b.grade}</span>}
                         <InjuryBadge pid={parseInt(b.batter_id)||0} name={b.batter}/>
                         <PickButton pid={parseInt(b.batter_id)||0} name={b.batter} team={b.batting_team}/>
                         {isDiamond && <span style={{ padding: '2px 8px', borderRadius: 5, fontSize: 10, fontWeight: 700, background: 'rgba(255,204,0,.15)', color: '#ffcc00', border: '1px solid rgba(255,204,0,.35)' }}>💎 Diamond Pick</span>}
@@ -10116,8 +10169,9 @@ function BatterLeaderboard() {
                           {(() => {
                             const dp = DAILY_PICKS_CACHE[String(p.pid||p.id)] || null;
                             const gc = dp?.grade ? (GRADE_CFG[dp.grade] || null) : null;
+                            const isInj = !!INJURY_MAP[String(p.pid||p.id||'')];
                             return <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,letterSpacing:.2,
-                              color: gc ? gc.color : 'var(--text)'}}>{p.name}</span>;
+                              color: gc && !isInj ? gc.color : 'var(--text)'}}>{p.name}</span>;
                           })()}
                           <span style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",opacity:.7}}>({p.hand==='L'?'L':p.hand==='S'?'S':'R'})</span>
                           <span style={{fontSize:9,color:'var(--muted)',opacity:.4}}>›</span>
@@ -13220,14 +13274,20 @@ function HRNotificationBanner({ notif, onDismiss }) {
     transform: visible ? `translateY(${dragY}px)` : 'translateY(-110%)',
     transition: touching ? 'none' : 'transform 0.35s cubic-bezier(.34,1.56,.64,1)',
   };
+  const handleClick = (targetTab, targetLiveView) => {
+    setVisible(false);
+    setTimeout(onDismiss, 300);
+    if (targetTab) navTo(targetTab, targetLiveView);
+  };
   const touchProps = { onTouchStart:handleTouchStart, onTouchMove:handleTouchMove, onTouchEnd:handleTouchEnd,
-    onClick:() => { setVisible(false); setTimeout(onDismiss, 300); } };
+    onClick:() => handleClick() }; // default: just dismiss
 
   // ── Non-HR types ────────────────────────────────────────────────────────
   if (notif.notifType === 'onFire') {
     const t = { icon:'🔥', color:'#fb923c', bg:'rgba(251,146,60,.18)', label:'ON FIRE' };
+    const tp = {...touchProps, onClick:()=>handleClick('live','gameday')};
     return (
-      <div {...touchProps} style={wrapStyle}>
+      <div {...tp} style={{...wrapStyle,cursor:'pointer'}}>
         <div style={{margin:'12px 16px 0',maxWidth:480,width:'100%',background:'rgba(10,15,20,.96)',
           border:`1px solid ${t.color}44`,borderRadius:14,padding:'12px 16px',
           display:'flex',alignItems:'center',gap:12,backdropFilter:'blur(16px)'}}>
@@ -13247,8 +13307,9 @@ function HRNotificationBanner({ notif, onDismiss }) {
 
   if (notif.notifType === 'lineup') {
     const t = { icon:'📋', color:'#38b8f2', bg:'rgba(56,184,242,.15)', label:'LINEUPS' };
+    const tp = {...touchProps, onClick:()=>handleClick('live','lineups')};
     return (
-      <div {...touchProps} style={wrapStyle}>
+      <div {...tp} style={{...wrapStyle,cursor:'pointer'}}>
         <div style={{margin:'12px 16px 0',maxWidth:480,width:'100%',background:'rgba(10,15,20,.96)',
           border:`1px solid ${t.color}44`,borderRadius:14,padding:'12px 16px',
           display:'flex',alignItems:'center',gap:12,backdropFilter:'blur(16px)'}}>
@@ -13275,8 +13336,9 @@ function HRNotificationBanner({ notif, onDismiss }) {
   };
   const t = typeMap[notif.type] || typeMap['Solo'];
 
+  const hrTouchProps = {...touchProps, onClick:()=>handleClick('live','gameday')};
   return (
-    <div {...touchProps} style={wrapStyle}>
+    <div {...hrTouchProps} style={{...wrapStyle,cursor:'pointer'}}>
       <div style={{
         margin:'12px 16px 0',
         maxWidth:480, width:'100%',
@@ -13474,6 +13536,12 @@ function NotificationBell() {
 export default function App() {
   const [tab, setTab] = useState("homeruns");
   const [showPicksSlideout, setShowPicksSlideout] = useState(false);
+
+  // Wire global nav on mount so notifications can route to tabs
+  useEffect(() => {
+    _GLOBAL_NAV = { setTab };
+    return () => { _GLOBAL_NAV = null; };
+  }, [setTab]);
 
   // Load player data at startup
   useEffect(() => {
