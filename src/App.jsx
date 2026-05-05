@@ -1483,13 +1483,22 @@ function PickRow({p, bprops}) {
         <PlayerAvatar pid={p.pid} name={p.name} size={32} border={"2px solid "+cfg.color}/>
       </div>
 
-      {/* Name + team — clickable */}
+      {/* Name + team — clickable, grade-colored from DAILY_PICKS_CACHE */}
       <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>openAtBatSlide(p)}>
-        <div style={{fontWeight:600,fontSize:11,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",letterSpacing:.2}}>{p.name}</div>
-        <div style={{fontSize:9,fontFamily:"'DM Mono',monospace",display:"flex",gap:5,alignItems:"center",marginTop:1}}>
-          <span style={{color:"var(--accent2)",fontWeight:700}}>{getTeam(p.pid, p.team)}</span>
-          {p.grade?.grade && <span style={{color:"var(--muted)"}}>· {p.grade.grade}</span>}
-        </div>
+        {(() => {
+          const dp = DAILY_PICKS_CACHE[String(p.pid)] || null;
+          const gc = dp?.grade ? (GRADE_CFG[dp.grade] || null) : null;
+          return <>
+            <div style={{fontWeight:700,fontSize:11,whiteSpace:"nowrap",overflow:"hidden",
+              textOverflow:"ellipsis",letterSpacing:.2,
+              color: gc ? gc.color : 'var(--text)'}}>{p.name}</div>
+            <div style={{fontSize:9,fontFamily:"'DM Mono',monospace",display:"flex",gap:5,alignItems:"center",marginTop:1}}>
+              <span style={{color:"var(--accent2)",fontWeight:700}}>{getTeam(p.pid, p.team)}</span>
+              {gc && <span style={{padding:'0px 4px',borderRadius:3,fontSize:8,fontWeight:800,
+                background:gc.bg,color:gc.color,border:`1px solid ${gc.border}`}}>{dp.grade}</span>}
+            </div>
+          </>;
+        })()}
       </div>
 
       {/* Prop dropdown */}
@@ -4960,7 +4969,7 @@ function LiveTab() {
   const [lastUpdate, setLastUpdate] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [showHeatingUp, setShowHeatingUp] = useState(false);
-  const [liveView, setLiveView] = useState('games'); // 'games' | 'lineups'
+  const [liveView, setLiveView] = useState('gameday'); // 'gameday' | 'games' | 'lineups'
   const [liveGameFilter, setLiveGameFilter] = useState('all');
   const todayET2 = new Date().toLocaleDateString("en-US",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"});
   const [lm2,ld2,ly2] = todayET2.split("/");
@@ -5037,7 +5046,7 @@ function LiveTab() {
 
     {/* Sub-view toggle */}
     <div style={{display:'flex',gap:5,marginBottom:12,padding:'3px',background:'var(--surface)',borderRadius:8,border:'1px solid var(--border)',width:'fit-content'}}>
-      {[['games','🎮 Live Games'],['gameday','📺 Gameday'],['lineups','📋 Lineups']].map(([key,label])=>(
+      {[['gameday','📺 Gameday'],['games','🎮 Live Games'],['lineups','📋 Lineups']].map(([key,label])=>(
         <button key={key} onClick={()=>setLiveView(key)}
           style={{padding:'6px 14px',borderRadius:6,cursor:'pointer',border:'none',
             fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,letterSpacing:.8,
@@ -8116,6 +8125,7 @@ function SimLabView({ data }) {
   const [minSimTB,   setMinSimTB]     = useState('');
   const [minOdds,    setMinOdds]      = useState('');
   const [selPitcherGradesSim, setSelPitcherGradesSim] = useState(new Set()); // empty = All
+  const [selBatterGradesSim,  setSelBatterGradesSim]  = useState(new Set()); // empty = All grades
   const simPitcherGrades = useRef({}); // pitcher_id → grade label
 
   const pf = (v, d=1) => v != null && !isNaN(parseFloat(v)) ? parseFloat(v).toFixed(d) : null;
@@ -8192,6 +8202,7 @@ function SimLabView({ data }) {
   const slate = useMemo(() => {
     const filtered = data.filter(r => r.batter && r.batting_team)
       .filter(r => selMatchups.size === 0 || selMatchups.has(String(r.game_id)))
+      .filter(r => selBatterGradesSim.size === 0 || selBatterGradesSim.has(r.grade))
       .filter(r => !lineupOnly || isConfirmed(r))
       .filter(r => !filterGoneYardSim || isGoneYardSim(r))
       .filter(r => !filterDueSim || isDueFromRow(r, parseInt(r.batter_id)||0))
@@ -8225,7 +8236,7 @@ function SimLabView({ data }) {
       }
       return mul * ((parseFloat(a[sortBy]) || 0) - (parseFloat(b[sortBy]) || 0));
     });
-  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, minHRScore, minHRPct, minMeatball, minHitPct, minSimTB, minOdds]);
+  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, minHRScore, minHRPct, minMeatball, minHitPct, minSimTB, minOdds]);
 
   // Auto-select top batter when data loads
   useEffect(() => {
@@ -8271,7 +8282,7 @@ function SimLabView({ data }) {
       <div style={{ display: 'flex', gap: 4, marginBottom: 16, padding: '3px', background: 'var(--surface)', borderRadius: 8, border: '1px solid var(--border)', width: 'fit-content' }}>
         <button style={vBtn('slate', '📊 Slate')} onClick={() => setView('slate')}>📊 Slate Rankings</button>
         <button style={vBtn('deepdive', '🔬')} onClick={() => setView('deepdive')}>🔬 Deep Dive</button>
-        <button style={vBtn('props', '🎰')} onClick={() => setView('props')}>🎰 Prop Match</button>
+        {/* Prop Match hidden — too bulky, not required */}
       </div>
 
       {/* ── SLATE RANKINGS ── */}
@@ -8442,6 +8453,33 @@ function SimLabView({ data }) {
 
           {/* Pitcher grade filter — multi-select */}
           <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+            {/* Batter grade filter */}
+            <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", textTransform: 'uppercase', letterSpacing: 1 }}>Grade:</span>
+            {['A+','A','B','C','D'].map(g => {
+              const active = selBatterGradesSim.has(g);
+              const GCFG = { 'A+': '#f5a623', 'A': '#e8411a', 'B': '#38b8f2', 'C': 'var(--muted)', 'D': 'var(--muted)' };
+              const col = GCFG[g] || 'var(--muted)';
+              return (
+                <button key={g} onClick={() => setSelBatterGradesSim(prev => {
+                  const next = new Set(prev);
+                  active ? next.delete(g) : next.add(g);
+                  return next;
+                })}
+                  style={{ padding: '3px 10px', borderRadius: 5, cursor: 'pointer', fontWeight: active ? 800 : 500,
+                    border: `1px solid ${active ? col : 'var(--border)'}`,
+                    background: active ? `${col}20` : 'transparent',
+                    color: active ? col : 'var(--muted)',
+                    fontFamily: "'DM Mono',monospace", fontSize: 11 }}>
+                  {g}
+                </button>
+              );
+            })}
+            {selBatterGradesSim.size > 0 && (
+              <span onClick={() => setSelBatterGradesSim(new Set())}
+                style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace",
+                  cursor: 'pointer', textDecoration: 'underline' }}>clear</span>
+            )}
+            <span style={{ fontSize: 9, color: 'rgba(255,255,255,.15)', fontFamily: "'DM Mono',monospace" }}>|</span>
             <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", textTransform: 'uppercase', letterSpacing: 1 }}>Pitcher:</span>
             {/* All button — clears selection */}
             <button onClick={() => setSelPitcherGradesSim(new Set())}
@@ -8869,6 +8907,39 @@ function SimLabView({ data }) {
                         </div>
                       );
                     })()}
+                    {/* Discipline flag */}
+                    {b.discipline_flag && b.discipline_flag.trim() && (() => {
+                      const flag  = String(b.discipline_flag);
+                      const score = b.discipline_score ? parseFloat(b.discipline_score).toFixed(0) : null;
+                      const chase = b.recent_chase_k_pct || b.season_chase_k_pct;
+                      const bb    = b.recent_bb_pct || b.season_bb_pct;
+                      const col   = flag.includes('Chase Risk') ? '#ff4020'
+                                  : flag.includes('Watch')       ? '#f5a623'
+                                  : flag.includes('Disciplined') ? '#27c97a'
+                                  : 'var(--muted)';
+                      return (
+                        <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid rgba(255,255,255,.06)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                            <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>Plate Discipline</span>
+                            <span style={{ fontSize: 10, fontFamily: "'DM Mono',monospace", fontWeight: 700, color: col,
+                              padding: '1px 6px', borderRadius: 4, background: `${col}18`, border: `1px solid ${col}40` }}>
+                              {flag}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', gap: 10 }}>
+                            {chase != null && <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 8, color: 'var(--muted)' }}>
+                              Chase K: <span style={{ color: parseFloat(chase) > 15 ? '#ff4020' : 'var(--text)' }}>{parseFloat(chase).toFixed(1)}%</span>
+                            </span>}
+                            {bb != null && <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 8, color: 'var(--muted)' }}>
+                              BB%: <span style={{ color: parseFloat(bb) > 8 ? '#27c97a' : 'var(--text)' }}>{parseFloat(bb).toFixed(1)}%</span>
+                            </span>}
+                            {score && <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 8, color: 'var(--muted)' }}>
+                              Score: <span style={{ color: 'var(--text)' }}>{score}/100</span>
+                            </span>}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Pitcher grade card — same card as shown in Lineups tab */}
@@ -8897,7 +8968,7 @@ function SimLabView({ data }) {
       )}
 
       {/* ── PROP MATCH ── */}
-      {view === 'props' && (
+      {false && view === 'props' && (
         <div>
           <div style={{ marginBottom: 12, fontSize: 10, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>
             Engine projections vs common prop market lines · green = proj above line · blue = proj below line · click column to sort
@@ -9431,7 +9502,12 @@ function BvPHistoryTab({ data }) {
         <PlayerAvatar pid={r.batterId} name={r.batter} size={20}/>
         <div style={{cursor:'pointer',display:'flex',alignItems:'center',gap:3}}
           onClick={()=>{const cp=getCachedPlayer(r.batterId)||{};openAtBatSlide({pid:r.batterId,name:r.batter,team:r.team,avgEV:cp.avgEV,barrel:cp.barrel,hr:cp.hr,avg:cp.avg,obp:cp.obp,slg:cp.slg});}}>
-          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11}}>{r.batter}</span>
+          {(() => {
+            const dp = DAILY_PICKS_CACHE[String(r.batterId)] || null;
+            const gc = dp?.grade ? (GRADE_CFG[dp.grade] || null) : (r.grade && GRADE_CFG[r.grade] ? GRADE_CFG[r.grade] : null);
+            return <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,
+              color: gc ? gc.color : 'var(--text)'}}>{r.batter}</span>;
+          })()}
           <InjuryBadge pid={r.batterId} name={r.batter}/>
           <span style={{fontSize:9,opacity:.4}}>›</span>
         </div>
@@ -10021,7 +10097,12 @@ function BatterLeaderboard() {
                       <div style={{display:'flex',alignItems:'center',gap:5}}>
                         <PlayerAvatar pid={p.pid||p.id} name={p.name} size={20}/>
                         <div style={{cursor:'pointer',display:'flex',alignItems:'center',gap:3}} onClick={()=>{const cp=getCachedPlayer(p.pid||p.id)||{};openAtBatSlide({pid:p.pid||p.id,name:p.name,team:p.team,avgEV:cp.avgEV||p.avgEV,barrel:cp.barrel,hardHit:cp.hardHit,flyBall:cp.flyBall,hr:cp.hr,avg:cp.avg,obp:cp.obp,slg:cp.slg,xwoba:cp.xwoba,oSwing:cp.oSwing,kPct:cp.kPct,bbPct:cp.bbPct,launchAngle:cp.launchAngle});}}>
-                          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,letterSpacing:.2}}>{p.name}</span>
+                          {(() => {
+                            const dp = DAILY_PICKS_CACHE[String(p.pid||p.id)] || null;
+                            const gc = dp?.grade ? (GRADE_CFG[dp.grade] || null) : null;
+                            return <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,letterSpacing:.2,
+                              color: gc ? gc.color : 'var(--text)'}}>{p.name}</span>;
+                          })()}
                           <span style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",opacity:.7}}>({p.hand==='L'?'L':p.hand==='S'?'S':'R'})</span>
                           <span style={{fontSize:9,color:'var(--muted)',opacity:.4}}>›</span>
                         </div>
