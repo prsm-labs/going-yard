@@ -11240,7 +11240,7 @@ function MatchupEngineTab() {
           All graded batters vs today's probable pitchers · {(dateSlot==='tomorrow'&&allPicksTomorrowData.length>0?allPicksTomorrowData:allPicksData).length} batters
         </span>
       </div>
-      <SimLabView data={dateSlot==='tomorrow'&&allPicksTomorrowData.length>0 ? allPicksTomorrowData : allPicksData}/>
+      <SimLabView key={`allmatches-${dateSlot}`} data={dateSlot==='tomorrow'&&allPicksTomorrowData.length>0 ? allPicksTomorrowData : allPicksData}/>
     </div>
 
     {/* Sim Lab — display:none keeps component mounted so filters/sort persist across sub-tab switches */}
