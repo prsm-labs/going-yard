@@ -7262,7 +7262,11 @@ const KEY_MATCHUP_BATTER_IDS   = new Set();
 const KEY_MATCHUP_BATTER_NAMES = new Set(); // lowercase name fallback
 let   KEY_MATCHUP_DATE = '';
 const getETDateStr = () => {
+  // Slate day runs 4am ET → 3:59am ET next day.
+  // Before 3am ET = still "yesterday's" slate — subtract one day.
+  const etHour = parseInt(new Date().toLocaleString('en-US',{timeZone:'America/New_York',hour:'numeric',hour12:false}));
   const d = new Date();
+  if (etHour < 3) d.setDate(d.getDate() - 1); // rewind to previous calendar day
   const s = d.toLocaleDateString('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'});
   const [m,dy,y] = s.split('/'); return `${y}-${m}-${dy}`;
 };
@@ -8749,24 +8753,59 @@ function SimLabView({ data }) {
             )}
           </div>
 
-          {/* Export current filtered slate */}
+          {/* Export current filtered slate — same format as Key Matchups CSV */}
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
-            <button onClick={() => {
-              const cols = ['batter','batting_team','pitcher','pitcher_team','batter_hand','pitcher_hand',
-                'grade','proj_hr_adj','proj_hit_prob','proj_xbh_prob','proj_avg_tb','proj_avg_rbi',
-                'recent_avg_ev','bvp_avg_ev','top_pitches','game_time','lineup_confirmed'];
-              const header = cols.join(',');
-              const rows = slate.map(r => cols.map(k => {
-                const v = r[k] ?? '';
-                const s = String(v);
-                return s.includes(',') || s.includes('"') ? '"'+s.replace(/"/g,'""')+'"' : s;
-              }).join(','));
-              const csv = [header, ...rows].join('\n');
-              const blob = new Blob([csv], { type: 'text/csv' });
-              const url = URL.createObjectURL(blob);
+            <button onClick={async () => {
+              // Fetch live box scores for all games in current slate
+              const slateGameIds = [...new Set(slate.map(r => r.game_id).filter(Boolean))];
+              const slateLiveCache = {};
+              await Promise.all(slateGameIds.map(async gid => {
+                try {
+                  const result = await fetchLiveBatters(gid);
+                  const batters = result?.batters || result || [];
+                  batters.forEach(bt => { if (bt.id) slateLiveCache[String(bt.id)] = bt; });
+                } catch(e) {}
+              }));
+              const bom = '\uFEFF';
+              const esc = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+              const headers = ['Grade','Pitcher Grade','Gone Yard','Team','Batter','Hand','vs Pitcher',
+                'Top Pitches','Game Time','Flags','Recent EV','Recent Barrel%',
+                'Recent FB%','Recent LA','BvP EV','BvP Barrel%','BvP FB%','BvP LA',
+                'Sim H','Sim 2B','Sim BB','Sim K','Sim TB','Sim RBI',
+                'Wind','Temp','Condition',
+                'AB','H','HR','R','TB','RBI','BB','K','Avg EV','Launch Angle'];
+              const rows = slate.map(b => {
+                const bid = parseInt(b.batter_id) || 0;
+                const gy  = HR_DATA.some(h => h.batterId === bid ||
+                  (b.batter && h.batterName && h.batterName?.toLowerCase() === b.batter?.toLowerCase()));
+                const lv  = slateGameIds.length > 0 ? (slateLiveCache[String(bid)] || null) : null;
+                const pitchCleanId = b.pitcher_id ? String(parseInt(b.pitcher_id)||b.pitcher_id) : '';
+                const pitcherGrade = simPitcherGrades.current[pitchCleanId] || '';
+                return [b.grade, pitcherGrade, gy?'YES':'', b.batting_team, b.batter, b.batter_hand,
+                  b.pitcher, b.top_pitches, b.game_time, b.total_flags,
+                  b.recent_avg_ev, b.recent_barrel_pct, b.recent_fb_pct, b.recent_avg_la,
+                  b.bvp_avg_ev, b.bvp_barrel_pct, b.bvp_fb_pct, b.bvp_avg_la,
+                  b.sim_h, b.sim_2b, b.sim_bb, b.sim_k, b.sim_tb, b.sim_rbi,
+                  b.wind_effect, b.temp_f, b.condition,
+                  lv?.ab??'', lv?.hits??'', lv?.hr??'', lv?.runs??'',
+                  lv?.totalBases??'', lv?.rbi??'', lv?.bb??'', lv?.so??'',
+                  lv?.avgEV>0?lv.avgEV.toFixed(1):'',
+                  lv?.launchAngle>0?lv.launchAngle.toFixed(1):'',
+                ].map(esc).join(',');
+              });
+              const csv = bom + headers.map(esc).join(',') + '\n' + rows.join('\n');
               const a = document.createElement('a');
-              a.href = url; a.download = `slate_${new Date().toISOString().slice(0,10)}.csv`;
-              a.click(); URL.revokeObjectURL(url);
+              a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}));
+              // ET date — same as Key Matchups export
+              // ET date with 3am cutoff — before 3am ET still counts as "yesterday's" slate
+              const _etRaw  = new Date().toLocaleString('en-US', {timeZone:'America/New_York',hour:'numeric',hour12:false});
+              const _etH    = parseInt(_etRaw);
+              const _etBase = new Date();
+              if (_etH < 3) _etBase.setDate(_etBase.getDate() - 1);
+              const _etNow  = new Date(_etBase.toLocaleString('en-US', {timeZone:'America/New_York'}));
+              const _etDate = _etNow.getFullYear()+'-'+String(_etNow.getMonth()+1).padStart(2,'0')+'-'+String(_etNow.getDate()).padStart(2,'0');
+              a.download = 'all-matchups-' + _etDate + '.csv';
+              a.click();
             }} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px',
               borderRadius: 6, cursor: 'pointer', border: '1px solid var(--border)',
               background: 'var(--surface2)', color: 'var(--muted)',
@@ -11107,8 +11146,12 @@ function MatchupEngineTab() {
     const csv = bom + headers.map(esc).join(',') + String.fromCharCode(10) + rows.join(String.fromCharCode(10));
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}));
-    // Use ET date (not UTC) so a late-night download on May 3 isn't labelled May 4
-    const _etNow = new Date(new Date().toLocaleString('en-US', {timeZone:'America/New_York'}));
+    // ET date with 3am cutoff — before 3am ET still counts as "yesterday's" slate
+    const _etRaw  = new Date().toLocaleString('en-US', {timeZone:'America/New_York',hour:'numeric',hour12:false});
+    const _etH    = parseInt(_etRaw);
+    const _etBase = new Date();
+    if (_etH < 3) _etBase.setDate(_etBase.getDate() - 1);
+    const _etNow  = new Date(_etBase.toLocaleString('en-US', {timeZone:'America/New_York'}));
     const _etDate = _etNow.getFullYear()+'-'+String(_etNow.getMonth()+1).padStart(2,'0')+'-'+String(_etNow.getDate()).padStart(2,'0');
     a.download = 'key-matchups-' + _etDate + '.csv';
     a.click();
