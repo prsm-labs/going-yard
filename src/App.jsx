@@ -7111,7 +7111,7 @@ function HROddsCell({ pid }) {
 // ── Injury Report — MLB Stats API SC transactions ────────────────────────────
 const INJURY_MAP = {};  // pid → { emoji, label, shortDesc, fullDesc, date, team }
 const INJURY_LISTENERS = new Set();
-let   INJURY_LOADED = false;
+let   INJURY_LOADED = 0; // timestamp — refreshes every 4hrs (DTD status changes during day)
 let   INJURY_MODAL_CB = null; // set by InjuryModal component
 
 function subscribeInjuries(fn) { INJURY_LISTENERS.add(fn); return () => INJURY_LISTENERS.delete(fn); }
@@ -7125,93 +7125,105 @@ function extractInjuryDetail(desc) {
 }
 
 async function fetchInjuries() {
-  if (INJURY_LOADED) return;
+  const INJURY_TTL = 4 * 60 * 60 * 1000; // 4 hours
+  if (INJURY_LOADED && Date.now() - INJURY_LOADED < INJURY_TTL) return;
+  // Clear stale data before refresh
+  Object.keys(INJURY_MAP).forEach(k => delete INJURY_MAP[k]);
+  // Source of truth: fetch ALL 30 teams' full rosters with injury status in one call.
+  // This catches both IL placements AND day-to-day (DTD) statuses, and is always current.
+  // Replaces the transaction log approach which was stale and missed DTD entirely.
   try {
-    const today = new Date().toISOString().slice(0,10);
-    const ago90 = new Date(Date.now()-90*864e5).toISOString().slice(0,10);
+    const season = new Date().getFullYear();
     const r = await fetch(
-      `https://statsapi.mlb.com/api/v1/transactions?sportId=1&startDate=${ago90}&endDate=${today}`,
-      { signal: AbortSignal.timeout(9000) }
+      `https://statsapi.mlb.com/api/v1/teams?sportId=1&season=${season}` +
+      `&hydrate=roster(rosterType=fullRoster,person,injury)`,
+      { signal: AbortSignal.timeout(12000) }
     );
-    if (!r.ok) return;
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const d = await r.json();
-    const placements  = {}; // pid → latest IL placement
-    const activations = {}; // pid → latest activation date
-    for (const t of (d.transactions || [])) {
-      if (t.typeCode !== 'SC') continue;
-      const pid  = String(t.person?.id || '');
-      const desc = (t.description || '').toLowerCase();
-      if (!pid) continue;
-      const isPlacement = desc.includes('injured list') &&
-        (desc.includes('placed') || desc.includes('transferred'));
-      const isActivation = desc.includes('injured list') &&
-        (desc.includes('activated') || desc.includes('reinstated') || desc.includes('recalled'));
-      if (isPlacement) {
-        if (!placements[pid] || t.date > placements[pid].date) {
-          const full = t.description || '';
-          const lo   = full.toLowerCase();
-          const emoji = lo.includes('60-day') ? '🚫' : '🤕';
-          const label = lo.includes('60-day') ? '60-Day IL' : lo.includes('15-day') ? '15-Day IL' : '10-Day IL';
-          placements[pid] = {
-            date: t.date, emoji, label,
-            fullDesc:  full,
-            shortDesc: extractInjuryDetail(full),
-            team: t.toTeam?.abbreviation || '',
+
+    let ilCount = 0, dtdCount = 0;
+    for (const team of (d.teams || [])) {
+      const abbr = team.abbreviation || '';
+      for (const entry of (team.roster || [])) {
+        const pid    = String(entry.person?.id || '');
+        const status = entry.status?.code || '';      // 'IL10','IL15','IL60','DTD','D7','Active',...
+        const desc   = entry.status?.description || '';
+        if (!pid || !status) continue;
+
+        // IL placements — 10/15/60 day
+        if (status === 'IL10' || status === 'IL15' || status === 'IL60'
+            || status === 'D7' || desc.toLowerCase().includes('injured list')) {
+          const emoji = status === 'IL60' ? '🚫' : '🤕';
+          const label = status === 'IL60' ? '60-Day IL' : status === 'IL15' ? '15-Day IL' : '10-Day IL';
+          const note  = entry.person?.injuryDescription || entry.note || '';
+          INJURY_MAP[pid] = {
+            emoji, label, team: abbr,
+            shortDesc: note,
+            fullDesc:  note,
+            date: entry.injuryDate || entry.statusDate || '',
           };
+          ilCount++;
+
+        // Day-to-day — formally listed as DTD in roster
+        } else if (status === 'DTD') {
+          const note = entry.person?.injuryDescription || entry.note || 'Day-To-Day';
+          INJURY_MAP[pid] = {
+            emoji: '🩹', label: 'Day-To-Day', team: abbr,
+            shortDesc: note,
+            fullDesc:  note,
+            date: entry.statusDate || '',
+          };
+          dtdCount++;
         }
-      } else if (isActivation) {
-        if (!activations[pid] || t.date > activations[pid]) activations[pid] = t.date;
       }
     }
-    // Keep only players still on IL per transaction log
-    const fromTransactions = {};
-    Object.entries(placements).forEach(([pid, t]) => {
-      if (!(activations[pid] && activations[pid] >= t.date)) {
-        fromTransactions[pid] = t;
-      }
-    });
 
-    // Cross-check: fetch actual current IL rosters from all 30 teams
-    // This catches players the transaction log missed (stale API updates)
-    let currentILPids = new Set();
+    INJURY_LOADED = Date.now();
+    notifyInjuryListeners();
+    console.log(`[Injuries] ${ilCount} IL + ${dtdCount} DTD players loaded from roster API`);
+  } catch(e) {
+    console.warn('[Injuries] roster fetch failed:', e.message);
+    // Fallback: transaction log (old method — catches IL only, may be stale)
     try {
-      const rosterR = await fetch(
-        `https://statsapi.mlb.com/api/v1/sports/1/players?season=${new Date().getFullYear()}&gameType=R&hydrate=currentTeam,rosterEntries`,
-        { signal: AbortSignal.timeout(8000) }
+      const today = new Date().toISOString().slice(0,10);
+      const ago60 = new Date(Date.now()-60*864e5).toISOString().slice(0,10);
+      const r2 = await fetch(
+        `https://statsapi.mlb.com/api/v1/transactions?sportId=1&startDate=${ago60}&endDate=${today}`,
+        { signal: AbortSignal.timeout(9000) }
       );
-      if (rosterR.ok) {
-        const rosterD = await rosterR.json();
-        // statsapi returns rosterStatus for active players — we want IL ones
-        // Use a simpler targeted IL endpoint instead
-        const ilR = await fetch(
-          `https://statsapi.mlb.com/api/v1/teams?sportId=1&season=${new Date().getFullYear()}&hydrate=roster(rosterType=injuredList,person)`,
-          { signal: AbortSignal.timeout(8000) }
-        );
-        if (ilR.ok) {
-          const ilD = await ilR.json();
-          for (const team of (ilD.teams || [])) {
-            for (const entry of (team.roster || [])) {
-              const pid = String(entry.person?.id || '');
-              if (pid) currentILPids.add(pid);
-            }
+      if (!r2.ok) return;
+      const d2 = await r2.json();
+      const placements = {}, activations = {};
+      for (const t of (d2.transactions || [])) {
+        if (t.typeCode !== 'SC') continue;
+        const pid  = String(t.person?.id || '');
+        const desc = (t.description || '').toLowerCase();
+        if (!pid) continue;
+        if (desc.includes('injured list') && (desc.includes('placed') || desc.includes('transferred'))) {
+          if (!placements[pid] || t.date > placements[pid].date) {
+            const full = t.description || '';
+            const lo   = full.toLowerCase();
+            placements[pid] = {
+              date: t.date,
+              emoji: lo.includes('60-day') ? '🚫' : '🤕',
+              label: lo.includes('60-day') ? '60-Day IL' : lo.includes('15-day') ? '15-Day IL' : '10-Day IL',
+              fullDesc: full, shortDesc: extractInjuryDetail(full),
+              team: t.toTeam?.abbreviation || '',
+            };
           }
+        } else if (desc.includes('injured list') && (desc.includes('activated') || desc.includes('reinstated'))) {
+          if (!activations[pid] || t.date > activations[pid]) activations[pid] = t.date;
         }
       }
-    } catch(e) { /* IL roster cross-check failed — use transaction data only */ }
-
-    // Final: player must be in transaction placements AND currently on IL roster
-    // OR transaction data only if roster fetch failed (currentILPids empty)
-    Object.entries(fromTransactions).forEach(([pid, t]) => {
-      if (currentILPids.size === 0 || currentILPids.has(pid)) {
-        INJURY_MAP[pid] = t;
-      }
-      // If roster says they're NOT on IL, skip them (stale transaction data)
-    });
-
-    INJURY_LOADED = true;
-    notifyInjuryListeners();
-    console.log(`[Injuries] ${Object.keys(INJURY_MAP).length} players on IL (cross-checked against current rosters)`);
-  } catch(e) { console.warn('[Injuries] fetch failed:', e.message); }
+      Object.entries(placements).forEach(([pid, t]) => {
+        if (!(activations[pid] && activations[pid] >= t.date)) INJURY_MAP[pid] = t;
+      });
+      INJURY_LOADED = Date.now();
+      notifyInjuryListeners();
+      console.log(`[Injuries] fallback: ${Object.keys(INJURY_MAP).length} IL players from transactions`);
+    } catch(e2) { console.warn('[Injuries] fallback also failed:', e2.message); }
+  }
 }
 
 function useInjuries() {
@@ -8863,88 +8875,75 @@ function SimLabView({ data }) {
                     <tr key={`${b.batter_id}-${i}`} className="dr"
                       onClick={() => { setSelBatter(b); setView('deepdive'); }}
                       style={{ cursor: 'pointer' }}>
-                      <td style={{ textAlign: 'center' }}>
+                      <td style={{ textAlign: 'center', padding: '3px 4px' }}>
                         <PickButton pid={parseInt(b.batter_id)||0} name={b.batter} team={b.batting_team}/>
                       </td>
-                      <td style={{ textAlign: 'left' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <PlayerAvatar pid={parseInt(b.batter_id)||0} name={b.batter} size={26}/>
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', cursor:'pointer' }}
-                              onClick={e=>{e.stopPropagation();const cp=getCachedPlayer(parseInt(b.batter_id)||0)||{};openAtBatSlide({pid:parseInt(b.batter_id)||0,name:b.batter,team:b.batting_team,avgEV:cp.avgEV,barrel:cp.barrel,hardHit:cp.hardHit,flyBall:cp.flyBall,hr:cp.hr,avg:cp.avg,obp:cp.obp,slg:cp.slg,xwoba:cp.xwoba,kPct:cp.kPct,bbPct:cp.bbPct,launchAngle:cp.launchAngle});}}>
-                              <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 11,
-                                color: isKeyMatchup(parseInt(b.batter_id)||0, b.batter) ? '#ff8020' : 'var(--text)' }}>{b.batter}</span>
-              <InjuryBadge pid={parseInt(b.batter_id)||0} name={b.batter}/>
-              {isHotBatPlayer(b) && <span style={{fontSize:10,flexShrink:0,lineHeight:1}} title='🔥 Hot Bat — 3+ HRs in last 7 days'>🔥</span>}
-              <span style={{fontSize:9,color:'var(--muted)',opacity:.4,marginLeft:2}}>›</span>
-                              {isConfirmed(b) && <span style={{ fontSize: 9, color: '#27c97a', flexShrink: 0 }}>✅</span>}
-                              {isGoneYardSim(b) && <span style={{ fontSize: 9, flexShrink: 0 }}>💥</span>}
-                              {WEATHER_ALERT_GAME_IDS.has(String(b.game_id)) && <span title="Weather may impact this game" style={{ fontSize: 9, flexShrink: 0 }}>⚠️</span>}
-                              {(b.is_diamond === 'True' || b.is_diamond === true) &&
-                                <span style={{ padding: '1px 5px', borderRadius: 4, fontSize: 9, fontWeight: 700, background: 'rgba(255,204,0,.15)', color: '#ffcc00', border: '1px solid rgba(255,204,0,.3)', flexShrink: 0 }}>💎</span>}
-                              {(b.is_hit_specialist === 'True' || b.is_hit_specialist === true) &&
-                                <span style={{ padding: '1px 5px', borderRadius: 4, fontSize: 9, fontWeight: 700, background: 'rgba(39,201,122,.15)', color: '#27c97a', border: '1px solid rgba(39,201,122,.35)', flexShrink: 0 }} title="Hit Specialist">📈 H</span>}
-                              {(b.is_xbh_specialist === 'True' || b.is_xbh_specialist === true) &&
-                                <span style={{ padding: '1px 5px', borderRadius: 4, fontSize: 9, fontWeight: 700, background: 'rgba(245,166,35,.15)', color: 'var(--accent2)', border: '1px solid rgba(245,166,35,.35)', flexShrink: 0 }} title="XBH Specialist">🔥 XBH</span>}
-                              {(()=>{
-                            const stb = parseFloat(b.sim_tb)||0;
-                            const spg = simPitcherGrades.current[String(parseInt(b.pitcher_id)||0)];
-                            const isDmd = b.grade==='A+' && stb>=2.0 && (spg==='💥 Hittable'||spg==='🎯 Target');
-                            return isDmd && <span style={{padding:'1px 5px',borderRadius:4,fontSize:9,fontWeight:700,
-                              background:'rgba(255,204,0,.15)',color:'#ffcc00',
-                              border:'1px solid rgba(255,204,0,.4)',flexShrink:0}} title="Tier 1 Lock: A+ + Sim TB≥2.0 + Hittable/Target pitcher">💎</span>;
-                          })()}
-                          {isDueFromRow(b, parseInt(b.batter_id)||0) && <span style={{ padding: '1px 5px', borderRadius: 4, fontSize: 9, fontWeight: 700, background: 'rgba(56,184,242,.15)', color: 'var(--ice)', border: '1px solid rgba(56,184,242,.35)', flexShrink: 0 }} title="Due — AB since last HR exceeds normal rate">⏳ Due</span>}
-                            </div>
-                            {(b.in_slump === 'True' || b.in_slump === true) &&
-                              <span style={{ fontSize: 8, color: 'var(--ice)', fontFamily: "'DM Mono',monospace" }}>📉 slump</span>}
+                      {/* ── Batter name — single-line, no wrap ── */}
+                      <td style={{ textAlign: 'left', maxWidth: 180 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, overflow: 'hidden' }}>
+                          <PlayerAvatar pid={parseInt(b.batter_id)||0} name={b.batter} size={22}/>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 3, overflow: 'hidden', cursor:'pointer', minWidth:0 }}
+                            onClick={e=>{e.stopPropagation();const cp=getCachedPlayer(parseInt(b.batter_id)||0)||{};openAtBatSlide({pid:parseInt(b.batter_id)||0,name:b.batter,team:b.batting_team,avgEV:cp.avgEV,barrel:cp.barrel,hardHit:cp.hardHit,flyBall:cp.flyBall,hr:cp.hr,avg:cp.avg,obp:cp.obp,slg:cp.slg,xwoba:cp.xwoba,kPct:cp.kPct,bbPct:cp.bbPct,launchAngle:cp.launchAngle});}}>
+                            <span style={{ fontFamily:"'Oswald',sans-serif", fontWeight:700, fontSize:11, whiteSpace:'nowrap',
+                              overflow:'hidden', textOverflow:'ellipsis',
+                              color: isKeyMatchup(parseInt(b.batter_id)||0, b.batter) ? '#ff8020' : 'var(--text)' }}>{b.batter}</span>
+                            <span style={{fontSize:9,color:'var(--muted)',opacity:.4,flexShrink:0}}>›</span>
+                            {/* Stickers — inline, no wrap */}
+                            <InjuryBadge pid={parseInt(b.batter_id)||0} name={b.batter}/>
+                            {isHotBatPlayer(b)     && <span style={{fontSize:9,flexShrink:0}} title="🔥 Hot Bat">🔥</span>}
+                            {isConfirmed(b)         && <span style={{fontSize:9,flexShrink:0,color:'#27c97a'}}>✅</span>}
+                            {isGoneYardSim(b)       && <span style={{fontSize:9,flexShrink:0}}>💥</span>}
+                            {isDueFromRow(b,parseInt(b.batter_id)||0) && <span style={{fontSize:9,flexShrink:0}} title="Due">⏳</span>}
+                            {(b.is_diamond==='True'||b.is_diamond===true) && <span style={{fontSize:9,flexShrink:0}}>💎</span>}
+                            {(b.in_slump==='True'||b.in_slump===true) && <span style={{fontSize:9,flexShrink:0}} title="Slump">📉</span>}
+                            {WEATHER_ALERT_GAME_IDS.has(String(b.game_id)) && <span style={{fontSize:9,flexShrink:0}} title="Weather alert">⚠️</span>}
                           </div>
                         </div>
                       </td>
-                      <td style={{ textAlign: 'right' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--accent2)', fontWeight: 700 }}>{b.batting_team}</span></td>
-                      <td style={{ textAlign: 'right' }}>
-                        <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)', cursor:'pointer' }}
+                      <td style={{ textAlign: 'right', padding:'3px 6px' }}><span style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:'var(--accent2)', fontWeight:700 }}>{b.batting_team}</span></td>
+                      <td style={{ textAlign: 'right', padding:'3px 6px' }}>
+                        <span style={{ fontFamily:"'DM Mono',monospace", fontSize:9, color:'var(--muted)', cursor:'pointer', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:90, display:'inline-block' }}
                           onClick={e=>{e.stopPropagation();if(b.pitcher_id)openPitcherSlide({pid:parseInt(b.pitcher_id)||0,name:b.pitcher,team:'',hand:b.pitcher_hand,pitchMix:[]});}}>
-                          {b.pitcher}<span style={{fontSize:9,opacity:.4,marginLeft:2}}>›</span>
+                          {b.pitcher}<span style={{fontSize:8,opacity:.4,marginLeft:1}}>›</span>
                         </span>
                       </td>
-                      <td style={{ textAlign: 'center' }}>
+                      {/* P.Grade + weak spot inline */}
+                      <td style={{ textAlign: 'center', padding:'3px 4px' }}>
                         {(() => {
-                          const pid = b.pitcher_id ? String(parseInt(b.pitcher_id) || b.pitcher_id) : null;
-                          const g = pid ? simPitcherGrades.current[pid] : null;
-                          const ws = b.pitcher_lineup_weak_spot ? parseInt(b.pitcher_lineup_weak_spot) : null;
-                          if (!g) return <span style={{ color: 'rgba(255,255,255,.15)', fontSize: 9 }}>—</span>;
+                          const pid = b.pitcher_id ? String(parseInt(b.pitcher_id)||b.pitcher_id) : null;
+                          const g   = pid ? simPitcherGrades.current[pid] : null;
+                          const ws  = b.pitcher_lineup_weak_spot ? parseInt(b.pitcher_lineup_weak_spot) : null;
+                          if (!g) return <span style={{color:'rgba(255,255,255,.15)',fontSize:9}}>—</span>;
                           const col = g==='‼️ Elite'?'#ff4020':g==='⚠️ Tough'?'#ff8020':g==='🤔 Average'?'var(--muted)':g==='💥 Hittable'?'#27c97a':g==='🎯 Target'?'#38b8f2':'var(--muted)';
-                          return <span style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:2 }}>
-                            <span style={{ fontFamily:"'DM Mono',monospace", fontSize: 9, color: col, fontWeight: 700, whiteSpace: 'nowrap' }}>{g}</span>
-                            {ws && <span title={`Lineup weak spot: #${ws} slot has highest HR rate vs this pitcher`}
-                              style={{ fontFamily:"'DM Mono',monospace", fontSize: 8, fontWeight: 700,
-                                color:'#f5a623', background:'rgba(245,166,35,.12)',
-                                border:'1px solid rgba(245,166,35,.3)', borderRadius:3,
-                                padding:'0px 4px', lineHeight:1.4 }}>#{ws}</span>}
+                          return <span style={{display:'flex',alignItems:'center',gap:3,justifyContent:'center'}}>
+                            <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:col,fontWeight:700,whiteSpace:'nowrap'}}>{g}</span>
+                            {ws && <span title={`Weak vs #${ws}`} style={{fontFamily:"'DM Mono',monospace",fontSize:7,fontWeight:700,
+                              color:'#f5a623',background:'rgba(245,166,35,.12)',
+                              border:'1px solid rgba(245,166,35,.3)',borderRadius:3,padding:'0 3px'}}>#{ws}</span>}
                           </span>;
                         })()}
                       </td>
-                      <td style={{ textAlign: 'right' }}><span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 14, color: hrColor }}>{hrP > 0 ? hrP.toFixed(1) + '%' : '—'}</span></td>
-                      <td style={{ textAlign: 'right' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: hitColor }}>{hitP > 0 ? hitP.toFixed(1) + '%' : '—'}</span></td>
-                      <td style={{ textAlign: 'right' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 11 }}>{xbhP > 0 ? xbhP.toFixed(1) + '%' : '—'}</span></td>
-                      <td style={{ textAlign: 'right' }}><span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 13, color: tb >= 1.5 ? '#ff8020' : tb >= 1.0 ? '#f5a623' : 'var(--text)' }}>{tb > 0 ? tb.toFixed(2) : '—'}</span></td>
-                      <td style={{ textAlign: 'right' }}>
-                        <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 12, color: 'var(--text)' }}>
+                      {/* HR% — shrunk font */}
+                      <td style={{ textAlign: 'right', padding:'3px 6px' }}><span style={{ fontFamily:"'Oswald',sans-serif", fontWeight:700, fontSize:11, color:hrColor }}>{hrP > 0 ? hrP.toFixed(1)+'%' : '—'}</span></td>
+                      <td style={{ textAlign: 'right', padding:'3px 6px' }}><span style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:hitColor }}>{hitP > 0 ? hitP.toFixed(1)+'%' : '—'}</span></td>
+                      <td style={{ textAlign: 'right', padding:'3px 6px' }}><span style={{ fontFamily:"'DM Mono',monospace", fontSize:10 }}>{xbhP > 0 ? xbhP.toFixed(1)+'%' : '—'}</span></td>
+                      <td style={{ textAlign: 'right', padding:'3px 6px' }}><span style={{ fontFamily:"'Oswald',sans-serif", fontWeight:700, fontSize:11, color:tb>=1.5?'#ff8020':tb>=1.0?'#f5a623':'var(--text)' }}>{tb > 0 ? tb.toFixed(2) : '—'}</span></td>
+                      <td style={{ textAlign: 'right', padding:'3px 6px' }}>
+                        <span style={{ fontFamily:"'Oswald',sans-serif", fontWeight:700, fontSize:11, color:'var(--text)' }}>
                           {parseFloat(b.weighted_flag_score) > 0 ? parseFloat(b.weighted_flag_score).toFixed(2) : '—'}
                         </span>
                       </td>
-                      <td style={{ textAlign: 'right' }}>
-                        {!INJURY_MAP[String(parseInt(b.batter_id)||0)] && <span style={{ padding: '2px 7px', borderRadius: 5, fontSize: 10, fontFamily: "'Oswald',sans-serif", fontWeight: 800, background: gc.bg, color: gc.color, border: `1px solid ${gc.border}` }}>{b.grade}</span>}
+                      <td style={{ textAlign: 'right', padding:'3px 4px' }}>
+                        {!INJURY_MAP[String(parseInt(b.batter_id)||0)] && <span style={{ padding:'1px 6px', borderRadius:4, fontSize:9, fontFamily:"'Oswald',sans-serif", fontWeight:800, background:gc.bg, color:gc.color, border:`1px solid ${gc.border}` }}>{b.grade}</span>}
                       </td>
-                      <td style={{ textAlign: 'right' }}>
+                      <td style={{ textAlign: 'right', padding:'3px 6px' }}>
                         {parseFloat(b.meatball_matchup_score) > 0 ? (() => {
                           const ms = parseFloat(b.meatball_matchup_score);
                           const col = ms >= 0.15 ? '#ff4020' : ms >= 0.08 ? '#f5a623' : '#27c97a';
-                          return <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: col, fontWeight: 700 }}>{(ms * 100).toFixed(0)}</span>;
-                        })() : <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'rgba(255,255,255,.15)' }}>—</span>}
+                          return <span style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:col, fontWeight:700 }}>{(ms*100).toFixed(0)}</span>;
+                        })() : <span style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:'rgba(255,255,255,.15)' }}>—</span>}
                       </td>
-                      <td style={{textAlign:'center',padding:'2px 6px'}}>
+                      <td style={{textAlign:'center',padding:'3px 4px'}}>
                         <HROddsCell pid={parseInt(b.batter_id)||0}/>
                       </td>
                     </tr>
