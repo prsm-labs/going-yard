@@ -8311,6 +8311,7 @@ function SimLabView({ data }) {
   const [minHitPct,  setMinHitPct]    = useState('');
   const [minSimTB,   setMinSimTB]     = useState('');
   const [minOdds,    setMinOdds]      = useState('');
+  const [simSearch,   setSimSearch]    = useState('');  // batter name search
   const [selPitcherGradesSim, setSelPitcherGradesSim] = useState(new Set()); // empty = All
   const [selBatterGradesSim,  setSelBatterGradesSim]  = useState(new Set()); // empty = All grades
   const simPitcherGrades = useRef({}); // pitcher_id → grade label
@@ -8413,7 +8414,8 @@ function SimLabView({ data }) {
       .filter(r => !minMeatball || (parseFloat(r.meatball_matchup_score)||0)*100 >= parseFloat(minMeatball))
       .filter(r => !minHitPct   || pctRaw(r.proj_hit_prob)              >= parseFloat(minHitPct))
       .filter(r => !minSimTB    || (parseFloat(r.sim_tb)||0)             >= parseFloat(minSimTB))
-      .filter(r => !minOdds     || (() => { const d = HR_ODDS_MAP[String(parseInt(r.batter_id)||0)]; return d?.implied && (d.implied * 100) >= parseFloat(minOdds); })());
+      .filter(r => !minOdds     || (() => { const d = HR_ODDS_MAP[String(parseInt(r.batter_id)||0)]; return d?.implied && (d.implied * 100) >= parseFloat(minOdds); })())
+      .filter(r => !simSearch || (r.batter||'').toLowerCase().includes(simSearch.toLowerCase()));
     const mul = sortDir === 'desc' ? -1 : 1;
     return [...filtered].sort((a, b) => {
       if (sortBy === 'hr_odds_implied') {
@@ -8423,7 +8425,7 @@ function SimLabView({ data }) {
       }
       return mul * ((parseFloat(a[sortBy]) || 0) - (parseFloat(b[sortBy]) || 0));
     });
-  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, minHRScore, minHRPct, minMeatball, minHitPct, minSimTB, minOdds]);
+  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, minHRScore, minHRPct, minMeatball, minHitPct, minSimTB, minOdds, simSearch]);
 
   // Auto-select top batter when data loads
   useEffect(() => {
@@ -8633,6 +8635,20 @@ function SimLabView({ data }) {
               title="Tier 1 Locks: A+ grade + Sim TB≥2.0 + Hittable/Target pitcher">
               💎 {filterDiamondSim ? 'Diamond ✓' : 'Diamond'}
             </button>
+            {/* Batter search */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginLeft: 'auto' }}>
+              <input
+                type="text" value={simSearch} onChange={e => setSimSearch(e.target.value)}
+                placeholder="Search batter…"
+                style={{ padding: '4px 10px', borderRadius: 6, fontSize: 10,
+                  fontFamily: "'DM Mono',monospace",
+                  border: `1px solid ${simSearch ? 'var(--accent2)' : 'var(--border)'}`,
+                  background: 'var(--surface2)', color: 'var(--text)', width: 130,
+                  outline: 'none' }}/>
+              {simSearch && <button onClick={() => setSimSearch('')}
+                style={{ background: 'none', border: 'none', color: 'var(--muted)',
+                  cursor: 'pointer', fontFamily: "'DM Mono',monospace", fontSize: 10, padding: '0 2px' }}>✕</button>}
+            </div>
             <span style={{ fontSize: 10, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>
               {slate.length} batters · click column header to sort · click row to Deep Dive
             </span>
@@ -8816,7 +8832,8 @@ function SimLabView({ data }) {
                           <div style={{ minWidth: 0 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', cursor:'pointer' }}
                               onClick={e=>{e.stopPropagation();const cp=getCachedPlayer(parseInt(b.batter_id)||0)||{};openAtBatSlide({pid:parseInt(b.batter_id)||0,name:b.batter,team:b.batting_team,avgEV:cp.avgEV,barrel:cp.barrel,hardHit:cp.hardHit,flyBall:cp.flyBall,hr:cp.hr,avg:cp.avg,obp:cp.obp,slg:cp.slg,xwoba:cp.xwoba,kPct:cp.kPct,bbPct:cp.bbPct,launchAngle:cp.launchAngle});}}>
-                              <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 11 }}>{b.batter}</span>
+                              <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 11,
+                                color: isKeyMatchup(parseInt(b.batter_id)||0, b.batter) ? '#ff8020' : 'var(--text)' }}>{b.batter}</span>
               <InjuryBadge pid={parseInt(b.batter_id)||0} name={b.batter}/>
               {isHotBatPlayer(b) && <span style={{fontSize:10,flexShrink:0,lineHeight:1}} title='🔥 Hot Bat — 3+ HRs in last 7 days'>🔥</span>}
               <span style={{fontSize:9,color:'var(--muted)',opacity:.4,marginLeft:2}}>›</span>
