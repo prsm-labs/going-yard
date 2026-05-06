@@ -7128,102 +7128,71 @@ async function fetchInjuries() {
   const INJURY_TTL = 4 * 60 * 60 * 1000;
   if (INJURY_LOADED && Date.now() - INJURY_LOADED < INJURY_TTL) return;
   Object.keys(INJURY_MAP).forEach(k => delete INJURY_MAP[k]);
-  const season = new Date().getFullYear();
 
-  // ── Primary: injuredList roster — always current, no staleness ─────────────
-  // Only players CURRENTLY on IL appear here. Activated players drop off immediately.
-  let ilLoaded = false;
-  try {
-    const r = await fetch(
-      `https://statsapi.mlb.com/api/v1/teams?sportId=1&season=${season}` +
-      `&hydrate=roster(rosterType=injuredList,person)`,
-      { signal: AbortSignal.timeout(10000) }
-    );
-    if (r.ok) {
-      const d = await r.json();
-      let ilCount = 0;
-      for (const team of (d.teams || [])) {
-        const abbr = team.abbreviation || '';
-        for (const entry of (team.roster || [])) {
-          const pid = String(entry.person?.id || '');
-          if (!pid) continue;
-          const statusDesc = (entry.status?.description || entry.statusDescription || '').toLowerCase();
-          const note  = entry.note || '';
-          const emoji = statusDesc.includes('60') ? '🚫' : '🤕';
-          const label = statusDesc.includes('60') ? '60-Day IL'
-                      : statusDesc.includes('15') ? '15-Day IL' : '10-Day IL';
-          INJURY_MAP[pid] = { emoji, label, team: abbr,
-            shortDesc: note, fullDesc: note,
-            date: entry.injuryStartDate || entry.statusDate || '' };
-          ilCount++;
-        }
-      }
-      // Consider it loaded if we got any teams back (even with 0 IL — valid)
-      if ((d.teams || []).length > 0) {
-        ilLoaded = true;
-        console.log(`[Injuries] ${ilCount} IL players from injuredList roster`);
-      }
-    }
-  } catch(e) { console.warn('[Injuries] injuredList fetch failed:', e.message); }
-
-  // ── Secondary: transaction log — enriches descriptions + fallback ──────────
+  // ── Transaction log — the only reliable source ─────────────────────────────
+  // Key fix: MLB uses "Placed on the 10-Day Injured List" for placements
+  // but "Activated from the 10-Day IL" (abbreviation!) for activations.
+  // Previous versions checked desc.includes('injured list') for BOTH which meant
+  // activations were silently dropped (they use 'IL' not 'injured list').
   try {
     const today = new Date().toISOString().slice(0,10);
     const ago60 = new Date(Date.now()-60*864e5).toISOString().slice(0,10);
-    const r2 = await fetch(
+    const r = await fetch(
       `https://statsapi.mlb.com/api/v1/transactions?sportId=1&startDate=${ago60}&endDate=${today}`,
       { signal: AbortSignal.timeout(9000) }
     );
-    if (r2.ok) {
-      const d2 = await r2.json();
-      const placements = {}, activations = {};
-      for (const t of (d2.transactions || [])) {
-        if (t.typeCode !== 'SC') continue;
-        const pid  = String(t.person?.id || '');
-        const desc = (t.description || '').toLowerCase();
-        if (!pid) continue;
-        if (desc.includes('injured list') && (desc.includes('placed') || desc.includes('transferred'))) {
-          if (!placements[pid] || t.date > placements[pid].date) {
-            const full = t.description || '';
-            const lo   = full.toLowerCase();
-            placements[pid] = { date: t.date,
-              emoji: lo.includes('60-day') ? '🚫' : '🤕',
-              label: lo.includes('60-day') ? '60-Day IL' : lo.includes('15-day') ? '15-Day IL' : '10-Day IL',
-              fullDesc: full, shortDesc: extractInjuryDetail(full),
-              team: t.toTeam?.abbreviation || '' };
-          }
-        } else if (desc.includes('injured list') && (desc.includes('activated') || desc.includes('reinstated'))) {
-          if (!activations[pid] || t.date > activations[pid]) activations[pid] = t.date;
-        }
-      }
+    if (!r.ok) return;
+    const d = await r.json();
+    const placements  = {};
+    const activations = {};
 
-      if (!ilLoaded) {
-        // Roster endpoint failed — use transaction log as sole source
-        Object.entries(placements).forEach(([pid, t]) => {
-          if (!(activations[pid] && activations[pid] >= t.date)) INJURY_MAP[pid] = t;
-        });
-        console.log(`[Injuries] fallback: ${Object.keys(INJURY_MAP).length} IL from transactions`);
-      } else {
-        // Remove anyone the transaction log says was activated after their placement
-        const activated = new Set(Object.entries(placements)
-          .filter(([pid, t]) => activations[pid] && activations[pid] >= t.date)
-          .map(([pid]) => pid));
-        activated.forEach(pid => delete INJURY_MAP[pid]);
-        // Enrich descriptions from transaction log
-        Object.entries(INJURY_MAP).forEach(([pid, entry]) => {
-          if (placements[pid] && placements[pid].shortDesc && !entry.shortDesc) {
-            entry.shortDesc = placements[pid].shortDesc;
-            entry.fullDesc  = placements[pid].fullDesc;
-            entry.date      = placements[pid].date || entry.date;
-          }
-        });
+    for (const t of (d.transactions || [])) {
+      if (t.typeCode !== 'SC') continue;
+      const pid  = String(t.person?.id || '');
+      const desc = (t.description || '').toLowerCase();
+      if (!pid) continue;
+
+      // PLACEMENT: "Placed on the 10-Day Injured List" — always uses full words
+      const isPlacement = (desc.includes('injured list') || desc.includes(' il ') || desc.endsWith(' il'))
+        && (desc.includes('placed') || desc.includes('transferred'));
+
+      // ACTIVATION: "Activated from the 10-Day IL" OR "Activated from the 10-Day Injured List"
+      // MLB inconsistently uses both "IL" and "Injured List" in activation descriptions
+      const isActivation =
+        (desc.includes('activated') || desc.includes('reinstated') || desc.includes('recalled')) &&
+        (desc.includes('injured list') || desc.includes(' il') || desc.includes('10-day') || desc.includes('15-day') || desc.includes('60-day'));
+
+      if (isPlacement) {
+        if (!placements[pid] || t.date > placements[pid].date) {
+          const full = t.description || '';
+          const lo   = full.toLowerCase();
+          placements[pid] = {
+            date: t.date,
+            emoji: lo.includes('60') ? '🚫' : '🤕',
+            label: lo.includes('60') ? '60-Day IL' : lo.includes('15') ? '15-Day IL' : '10-Day IL',
+            fullDesc: full,
+            shortDesc: extractInjuryDetail(full),
+            team: t.toTeam?.abbreviation || t.fromTeam?.abbreviation || '',
+          };
+        }
+      } else if (isActivation) {
+        if (!activations[pid] || t.date > activations[pid]) activations[pid] = t.date;
       }
     }
-  } catch(e2) { console.warn('[Injuries] transaction enrichment failed:', e2.message); }
 
-  INJURY_LOADED = Date.now();
-  notifyInjuryListeners();
-  console.log(`[Injuries] ${Object.keys(INJURY_MAP).length} total players flagged`);
+    // Only keep players whose latest placement was NOT followed by an activation
+    let ilCount = 0;
+    Object.entries(placements).forEach(([pid, info]) => {
+      if (!(activations[pid] && activations[pid] >= info.date)) {
+        INJURY_MAP[pid] = info;
+        ilCount++;
+      }
+    });
+
+    INJURY_LOADED = Date.now();
+    notifyInjuryListeners();
+    console.log(`[Injuries] ${ilCount} IL players (${Object.keys(placements).length} placed, ${Object.keys(activations).length} activated)`);
+  } catch(e) { console.warn('[Injuries] fetch failed:', e.message); }
 }
 
 function useInjuries() {
