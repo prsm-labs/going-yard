@@ -8768,7 +8768,7 @@ function SimLabView({ data }) {
               }));
               const bom = '\uFEFF';
               const esc = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
-              const headers = ['Grade','Pitcher Grade','Gone Yard','Team','Batter','Hand','vs Pitcher',
+              const headers = ['Grade','Pitcher Grade','Gone Yard','Is Key Matchup','Team','Batter','Hand','vs Pitcher',
                 'Top Pitches','Game Time','Flags','Recent EV','Recent Barrel%',
                 'Recent FB%','Recent LA','BvP EV','BvP Barrel%','BvP FB%','BvP LA',
                 'Sim H','Sim 2B','Sim BB','Sim K','Sim TB','Sim RBI',
@@ -8781,7 +8781,8 @@ function SimLabView({ data }) {
                 const lv  = slateGameIds.length > 0 ? (slateLiveCache[String(bid)] || null) : null;
                 const pitchCleanId = b.pitcher_id ? String(parseInt(b.pitcher_id)||b.pitcher_id) : '';
                 const pitcherGrade = simPitcherGrades.current[pitchCleanId] || '';
-                return [b.grade, pitcherGrade, gy?'YES':'', b.batting_team, b.batter, b.batter_hand,
+                const isKM = isKeyMatchup(parseInt(b.batter_id)||0, b.batter) ? 'YES' : '';
+                return [b.grade, pitcherGrade, gy?'YES':'', isKM, b.batting_team, b.batter, b.batter_hand,
                   b.pitcher, b.top_pitches, b.game_time, b.total_flags,
                   b.recent_avg_ev, b.recent_barrel_pct, b.recent_fb_pct, b.recent_avg_la,
                   b.bvp_avg_ev, b.bvp_barrel_pct, b.bvp_fb_pct, b.bvp_avg_la,
