@@ -7125,74 +7125,56 @@ function extractInjuryDetail(desc) {
 }
 
 async function fetchInjuries() {
-  const INJURY_TTL = 4 * 60 * 60 * 1000; // 4 hours
+  const INJURY_TTL = 4 * 60 * 60 * 1000;
   if (INJURY_LOADED && Date.now() - INJURY_LOADED < INJURY_TTL) return;
-  // Clear stale data before refresh
   Object.keys(INJURY_MAP).forEach(k => delete INJURY_MAP[k]);
-  // Source of truth: fetch ALL 30 teams' full rosters with injury status in one call.
-  // This catches both IL placements AND day-to-day (DTD) statuses, and is always current.
-  // Replaces the transaction log approach which was stale and missed DTD entirely.
+  const season = new Date().getFullYear();
+
+  // ── Primary: injuredList roster — always current, no staleness ─────────────
+  // Only players CURRENTLY on IL appear here. Activated players drop off immediately.
+  let ilLoaded = false;
   try {
-    const season = new Date().getFullYear();
     const r = await fetch(
       `https://statsapi.mlb.com/api/v1/teams?sportId=1&season=${season}` +
-      `&hydrate=roster(rosterType=fullRoster,person,injury)`,
-      { signal: AbortSignal.timeout(12000) }
+      `&hydrate=roster(rosterType=injuredList,person)`,
+      { signal: AbortSignal.timeout(10000) }
     );
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const d = await r.json();
-
-    let ilCount = 0, dtdCount = 0;
-    for (const team of (d.teams || [])) {
-      const abbr = team.abbreviation || '';
-      for (const entry of (team.roster || [])) {
-        const pid    = String(entry.person?.id || '');
-        const status = entry.status?.code || '';      // 'IL10','IL15','IL60','DTD','D7','Active',...
-        const desc   = entry.status?.description || '';
-        if (!pid || !status) continue;
-
-        // IL placements — 10/15/60 day
-        if (status === 'IL10' || status === 'IL15' || status === 'IL60'
-            || status === 'D7' || desc.toLowerCase().includes('injured list')) {
-          const emoji = status === 'IL60' ? '🚫' : '🤕';
-          const label = status === 'IL60' ? '60-Day IL' : status === 'IL15' ? '15-Day IL' : '10-Day IL';
-          const note  = entry.person?.injuryDescription || entry.note || '';
-          INJURY_MAP[pid] = {
-            emoji, label, team: abbr,
-            shortDesc: note,
-            fullDesc:  note,
-            date: entry.injuryDate || entry.statusDate || '',
-          };
+    if (r.ok) {
+      const d = await r.json();
+      let ilCount = 0;
+      for (const team of (d.teams || [])) {
+        const abbr = team.abbreviation || '';
+        for (const entry of (team.roster || [])) {
+          const pid = String(entry.person?.id || '');
+          if (!pid) continue;
+          const statusDesc = (entry.status?.description || entry.statusDescription || '').toLowerCase();
+          const note  = entry.note || '';
+          const emoji = statusDesc.includes('60') ? '🚫' : '🤕';
+          const label = statusDesc.includes('60') ? '60-Day IL'
+                      : statusDesc.includes('15') ? '15-Day IL' : '10-Day IL';
+          INJURY_MAP[pid] = { emoji, label, team: abbr,
+            shortDesc: note, fullDesc: note,
+            date: entry.injuryStartDate || entry.statusDate || '' };
           ilCount++;
-
-        // Day-to-day — formally listed as DTD in roster
-        } else if (status === 'DTD') {
-          const note = entry.person?.injuryDescription || entry.note || 'Day-To-Day';
-          INJURY_MAP[pid] = {
-            emoji: '🩹', label: 'Day-To-Day', team: abbr,
-            shortDesc: note,
-            fullDesc:  note,
-            date: entry.statusDate || '',
-          };
-          dtdCount++;
         }
       }
+      // Consider it loaded if we got any teams back (even with 0 IL — valid)
+      if ((d.teams || []).length > 0) {
+        ilLoaded = true;
+        console.log(`[Injuries] ${ilCount} IL players from injuredList roster`);
+      }
     }
+  } catch(e) { console.warn('[Injuries] injuredList fetch failed:', e.message); }
 
-    INJURY_LOADED = Date.now();
-    notifyInjuryListeners();
-    console.log(`[Injuries] ${ilCount} IL + ${dtdCount} DTD players loaded from roster API`);
-  } catch(e) {
-    console.warn('[Injuries] roster fetch failed:', e.message);
-    // Fallback: transaction log (old method — catches IL only, may be stale)
-    try {
-      const today = new Date().toISOString().slice(0,10);
-      const ago60 = new Date(Date.now()-60*864e5).toISOString().slice(0,10);
-      const r2 = await fetch(
-        `https://statsapi.mlb.com/api/v1/transactions?sportId=1&startDate=${ago60}&endDate=${today}`,
-        { signal: AbortSignal.timeout(9000) }
-      );
-      if (!r2.ok) return;
+  // ── Secondary: transaction log — enriches descriptions + fallback ──────────
+  try {
+    const today = new Date().toISOString().slice(0,10);
+    const ago60 = new Date(Date.now()-60*864e5).toISOString().slice(0,10);
+    const r2 = await fetch(
+      `https://statsapi.mlb.com/api/v1/transactions?sportId=1&startDate=${ago60}&endDate=${today}`,
+      { signal: AbortSignal.timeout(9000) }
+    );
+    if (r2.ok) {
       const d2 = await r2.json();
       const placements = {}, activations = {};
       for (const t of (d2.transactions || [])) {
@@ -7204,26 +7186,44 @@ async function fetchInjuries() {
           if (!placements[pid] || t.date > placements[pid].date) {
             const full = t.description || '';
             const lo   = full.toLowerCase();
-            placements[pid] = {
-              date: t.date,
+            placements[pid] = { date: t.date,
               emoji: lo.includes('60-day') ? '🚫' : '🤕',
               label: lo.includes('60-day') ? '60-Day IL' : lo.includes('15-day') ? '15-Day IL' : '10-Day IL',
               fullDesc: full, shortDesc: extractInjuryDetail(full),
-              team: t.toTeam?.abbreviation || '',
-            };
+              team: t.toTeam?.abbreviation || '' };
           }
         } else if (desc.includes('injured list') && (desc.includes('activated') || desc.includes('reinstated'))) {
           if (!activations[pid] || t.date > activations[pid]) activations[pid] = t.date;
         }
       }
-      Object.entries(placements).forEach(([pid, t]) => {
-        if (!(activations[pid] && activations[pid] >= t.date)) INJURY_MAP[pid] = t;
-      });
-      INJURY_LOADED = Date.now();
-      notifyInjuryListeners();
-      console.log(`[Injuries] fallback: ${Object.keys(INJURY_MAP).length} IL players from transactions`);
-    } catch(e2) { console.warn('[Injuries] fallback also failed:', e2.message); }
-  }
+
+      if (!ilLoaded) {
+        // Roster endpoint failed — use transaction log as sole source
+        Object.entries(placements).forEach(([pid, t]) => {
+          if (!(activations[pid] && activations[pid] >= t.date)) INJURY_MAP[pid] = t;
+        });
+        console.log(`[Injuries] fallback: ${Object.keys(INJURY_MAP).length} IL from transactions`);
+      } else {
+        // Remove anyone the transaction log says was activated after their placement
+        const activated = new Set(Object.entries(placements)
+          .filter(([pid, t]) => activations[pid] && activations[pid] >= t.date)
+          .map(([pid]) => pid));
+        activated.forEach(pid => delete INJURY_MAP[pid]);
+        // Enrich descriptions from transaction log
+        Object.entries(INJURY_MAP).forEach(([pid, entry]) => {
+          if (placements[pid] && placements[pid].shortDesc && !entry.shortDesc) {
+            entry.shortDesc = placements[pid].shortDesc;
+            entry.fullDesc  = placements[pid].fullDesc;
+            entry.date      = placements[pid].date || entry.date;
+          }
+        });
+      }
+    }
+  } catch(e2) { console.warn('[Injuries] transaction enrichment failed:', e2.message); }
+
+  INJURY_LOADED = Date.now();
+  notifyInjuryListeners();
+  console.log(`[Injuries] ${Object.keys(INJURY_MAP).length} total players flagged`);
 }
 
 function useInjuries() {
