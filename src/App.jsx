@@ -1703,6 +1703,8 @@ function AtBatSlideIn() {
   const [atBats, setAtBats] = useState([]);
   const [loading, setLoading] = useState(false);
   const [apiHr, setApiHr] = useState(null); // correct HR count from MLB Stats API
+  const [bvpData, setBvpData] = useState(null);  // BvP vs today's pitcher
+  const [bvpLoading, setBvpLoading] = useState(false);
 
   useEffect(() => {
     AB_SLIDE_LISTENER = setPlayer;
@@ -1726,11 +1728,22 @@ function AtBatSlideIn() {
 
     setAtBats([]);
     setApiHr(null);
-    setLoading(true);
+    setBvpData(null);
     setLoading(true);
     setAtBats([]);
 
     const season = new Date().getFullYear();
+
+    // Fetch BvP vs today's probable pitcher (from DAILY_PICKS_CACHE)
+    const dp = DAILY_PICKS_CACHE[String(player.pid)];
+    const pitcherId = dp?.pitcher_id ? String(dp.pitcher_id).split('.')[0] : null;
+    const pitcherName = dp?.pitcher || null;
+    if (pitcherId && parseInt(pitcherId) > 0) {
+      setBvpLoading(true);
+      fetchBvP(parseInt(player.pid), parseInt(pitcherId))
+        .then(d => { setBvpData({ ...d, pitcherName }); setBvpLoading(false); })
+        .catch(() => setBvpLoading(false));
+    }
 
     // Fetch real season HR from MLB Stats API — ground truth, bypasses pipeline ID issues
     fetch(`https://statsapi.mlb.com/api/v1/people/${player.pid}/stats?stats=season&group=hitting&season=${season}&sportId=1`)
@@ -1861,6 +1874,68 @@ function AtBatSlideIn() {
         </div>
         )}
       </div>
+
+      {/* BvP vs Today's Pitcher */}
+      {(bvpData || bvpLoading) && (
+        <div style={{padding:"14px 20px",borderBottom:"1px solid var(--border)"}}>
+          <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",
+            textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>
+            BvP vs {bvpData?.pitcherName || 'Today's Pitcher'}
+          </div>
+          {bvpLoading ? (
+            <div style={{display:"flex",alignItems:"center",gap:6,color:"var(--muted)",
+              fontFamily:"'DM Mono',monospace",fontSize:10}}>
+              <div className="sp" style={{width:12,height:12,borderWidth:2}}/> Loading BvP…
+            </div>
+          ) : bvpData?.pa > 0 ? (
+            <div style={{overflowX:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse"}}>
+                <thead>
+                  <tr style={{borderBottom:"2px solid var(--border)"}}>
+                    {["PA","AB","H","HR","2B","BB","K","AVG","OBP","SLG"].map(h=>(
+                      <th key={h} style={{padding:"4px 8px",fontSize:9,color:"var(--muted)",
+                        fontFamily:"'DM Mono',monospace",textTransform:"uppercase",
+                        letterSpacing:1,textAlign:"center",whiteSpace:"nowrap"}}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    {[
+                      [bvpData.pa,  null],
+                      [bvpData.ab,  null],
+                      [bvpData.h,   bvpData.h>0?"var(--green)":null],
+                      [bvpData.hr,  bvpData.hr>0?"var(--accent)":null],
+                      [bvpData.b2 ?? bvpData.doubles ?? '—', null],
+                      [bvpData.bb,  bvpData.bb>0?"#27c97a":null],
+                      [bvpData.k,   bvpData.k>0?"var(--ice)":null],
+                      [bvpData.avg, null],
+                      [bvpData.obp, null],
+                      [bvpData.slg, null],
+                    ].map(([v,col],i)=>(
+                      <td key={i} style={{padding:"7px 8px",fontFamily:i>=7?"'DM Mono',monospace":"'Oswald',sans-serif",
+                        fontWeight:i>=7?400:700,fontSize:i>=7?11:13,textAlign:"center",
+                        color:col||(i===3&&bvpData.hr>0?"var(--accent)":"var(--text)")}}>
+                        {v ?? '—'}
+                      </td>
+                    ))}
+                  </tr>
+                </tbody>
+              </table>
+              {bvpData.pa > 0 && (
+                <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:"var(--muted)",
+                  marginTop:6,textAlign:"center"}}>
+                  {bvpData.pa} career plate appearance{bvpData.pa!==1?'s':''} vs this pitcher
+                </div>
+              )}
+            </div>
+          ) : (
+            <div style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--muted)"}}>
+              No career history vs this pitcher
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Recent Game Log */}
       <div style={{padding:"14px 20px",flex:1}}>
@@ -11014,20 +11089,21 @@ function MatchupEngineTab() {
     <div style={{display:'flex',flexDirection:'column',gap:4,marginBottom:14}}>
       {/* Row 1: primary tabs */}
       <div style={{display:'flex',gap:4,flexWrap:'nowrap'}}>
-        <button style={stBtn('matchups')} onClick={()=>setSubTab('matchups')}>⚡ Matchups</button>
-        <button style={stBtn('simlab')}   onClick={()=>setSubTab('simlab')}>🧠 Sim Lab</button>
-        <button style={stBtn('history')} onClick={()=>setSubTab('history')}>📜 BvP History</button>
+        <button style={stBtn('matchups')}   onClick={()=>setSubTab('matchups')}>⚡ Matchups</button>
+        <button style={stBtn('simlab')}     onClick={()=>setSubTab('simlab')}>🧠 Sim Lab</button>
+        <button style={stBtn('allmatches')} onClick={()=>setSubTab('allmatches')}>📋 All Matchups</button>
       </div>
       {/* Row 2: data tabs */}
       <div style={{display:'flex',gap:4,flexWrap:'nowrap'}}>
         <button style={stBtn('batters')}  onClick={()=>setSubTab('batters')}>🧢 Batters</button>
         <button style={stBtn('pitchers')} onClick={()=>setSubTab('pitchers')}>⚾ Pitchers</button>
+        <button style={stBtn('history')}  onClick={()=>setSubTab('history')}>📜 BvP History</button>
         {/* <button style={stBtn('barrel')} onClick={()=>setSubTab('barrel')}>🛢 Daily Barrel</button> */}
       </div>
     </div>
 
     {/* Date slot toggle — only shown for matchups and simlab */}
-    {(subTab === 'matchups' || subTab === 'simlab') && (
+    {(subTab === 'matchups' || subTab === 'simlab' || subTab === 'allmatches') && (
       <div style={{display:'flex',gap:6,marginBottom:14,alignItems:'center'}}>
         {[
           { slot: 'today',    label: todayLabel },
@@ -11053,6 +11129,24 @@ function MatchupEngineTab() {
         })}
       </div>
     )}
+
+    {/* All Matchups — full slate of all batters vs today's probable pitchers */}
+    <div style={{display: subTab==='allmatches' ? 'block' : 'none'}}>
+      <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:10}}>
+        <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)'}}>
+          All active batters vs today's probable pitchers · graded · filterable · last 14 days activity required
+        </span>
+      </div>
+      <SimLabView data={activeData.filter(r => {
+        // Safeguard: only include batters with recent engine data
+        // The engine already filters by recent window, but extra guard here
+        const slot = parseFloat(r.lineup_slot) || 0;
+        const ev   = parseFloat(r.recent_avg_ev) || 0;
+        const flags = parseFloat(r.total_flags) || 0;
+        // Must have either a lineup slot, recent EV data, or at least 1 flag
+        return slot > 0 || ev > 0 || flags > 0;
+      })}/>
+    </div>
 
     {/* Sim Lab — display:none keeps component mounted so filters/sort persist across sub-tab switches */}
     <div style={{display: subTab==='simlab' ? 'block' : 'none'}}>
