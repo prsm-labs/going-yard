@@ -1880,7 +1880,7 @@ function AtBatSlideIn() {
         <div style={{padding:"14px 20px",borderBottom:"1px solid var(--border)"}}>
           <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",
             textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>
-            BvP vs {bvpData?.pitcherName || 'Today's Pitcher'}
+            BvP vs {bvpData?.pitcherName || "Today's Pitcher"}
           </div>
           {bvpLoading ? (
             <div style={{display:"flex",alignItems:"center",gap:6,color:"var(--muted)",
