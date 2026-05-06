@@ -1734,14 +1734,44 @@ function AtBatSlideIn() {
 
     const season = new Date().getFullYear();
 
-    // Fetch BvP vs today's probable pitcher (from DAILY_PICKS_CACHE)
+    // Fetch BvP vs today's probable pitcher
+    // First try DAILY_PICKS_CACHE (has pitcher_id for all engine batters)
+    // Fall back to schedule API lookup by player's team if not found
     const dp = DAILY_PICKS_CACHE[String(player.pid)];
-    const pitcherId = dp?.pitcher_id ? String(dp.pitcher_id).split('.')[0] : null;
-    const pitcherName = dp?.pitcher || null;
-    if (pitcherId && parseInt(pitcherId) > 0) {
+    let pitcherId   = dp?.pitcher_id ? String(dp.pitcher_id).split('.')[0] : null;
+    let pitcherName = dp?.pitcher    || null;
+
+    const doBvpFetch = (pid, pname) => {
+      if (!pid || parseInt(pid) <= 0) return;
       setBvpLoading(true);
-      fetchBvP(parseInt(player.pid), parseInt(pitcherId))
-        .then(d => { setBvpData({ ...d, pitcherName }); setBvpLoading(false); })
+      fetchBvP(parseInt(player.pid), parseInt(pid))
+        .then(d => { setBvpData({ ...d, pitcherName: pname }); setBvpLoading(false); })
+        .catch(() => setBvpLoading(false));
+    };
+
+    if (pitcherId) {
+      doBvpFetch(pitcherId, pitcherName);
+    } else if (player.team) {
+      // Fall back: look up probable pitcher from MLB schedule API
+      setBvpLoading(true);
+      const today = new Date().toLocaleDateString('en-US',{timeZone:'America/New_York',
+        year:'numeric',month:'2-digit',day:'2-digit'}).replace(/(\d+)\/(\d+)\/(\d+)/,'$3-$1-$2');
+      fetch(`https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${today}&hydrate=probablePitcher,team&gameType=R`)
+        .then(r => r.json())
+        .then(d => {
+          const games = d.dates?.[0]?.games || [];
+          for (const g of games) {
+            for (const side of ['away','home']) {
+              const abbr = g.teams?.[side]?.team?.abbreviation;
+              if (abbr === player.team) {
+                const opp  = side === 'away' ? 'home' : 'away';
+                const pp   = g.teams?.[opp]?.probablePitcher;
+                if (pp?.id) { doBvpFetch(String(pp.id), pp.fullName); return; }
+              }
+            }
+          }
+          setBvpLoading(false); // no game found
+        })
         .catch(() => setBvpLoading(false));
     }
 
@@ -10857,6 +10887,9 @@ function MatchupEngineTab() {
   const [subTab, setSubTab]        = useState('matchups');
   const [data, setData]           = useState([]);
   const [tomorrowData, setTomorrowData] = useState([]);
+  // Full engine output (all batters) for the All Matchups tab
+  const [allPicksData, setAllPicksData]           = useState([]);
+  const [allPicksTomorrowData, setAllPicksTomorrowData] = useState([]);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState(null);
   const [selGame, setSelGame]     = useState('all');
@@ -10900,11 +10933,20 @@ function MatchupEngineTab() {
         setLoading(false);
       })
       .catch(e => { setError(e.message); setLoading(false); });
+    // Load full batter slate (daily_picks.csv = all batters, not just top 3/team)
+    fetch('/data/daily_picks.csv')
+      .then(r => r.ok ? r.text() : Promise.reject('no picks'))
+      .then(text => { setAllPicksData(parseCSVText(text)); })
+      .catch(() => {});
     // Also fetch tomorrow's engine output (silently — may not exist yet)
     fetch('/data/daily_summary_tomorrow.csv')
       .then(r => r.ok ? r.text() : Promise.reject('no tomorrow data'))
       .then(text => { const rows = parseCSVText(text); setTomorrowData(rows); })
       .catch(() => {}); // silent — tomorrow file only exists after pipeline runs for that date
+    fetch('/data/daily_picks_tomorrow.csv')
+      .then(r => r.ok ? r.text() : Promise.reject('no tomorrow picks'))
+      .then(text => { setAllPicksTomorrowData(parseCSVText(text)); })
+      .catch(() => {});
   }, []);
 
   // Derive ET date labels for the buttons (respects 4am ET day cutoff)
@@ -11130,22 +11172,14 @@ function MatchupEngineTab() {
       </div>
     )}
 
-    {/* All Matchups — full slate of all batters vs today's probable pitchers */}
+    {/* All Matchups — full slate from daily_picks.csv (all batters, not just top 3/team) */}
     <div style={{display: subTab==='allmatches' ? 'block' : 'none'}}>
       <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:10}}>
         <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)'}}>
-          All active batters vs today's probable pitchers · graded · filterable · last 14 days activity required
+          All graded batters vs today's probable pitchers · {(dateSlot==='tomorrow'&&allPicksTomorrowData.length>0?allPicksTomorrowData:allPicksData).length} batters
         </span>
       </div>
-      <SimLabView data={activeData.filter(r => {
-        // Safeguard: only include batters with recent engine data
-        // The engine already filters by recent window, but extra guard here
-        const slot = parseFloat(r.lineup_slot) || 0;
-        const ev   = parseFloat(r.recent_avg_ev) || 0;
-        const flags = parseFloat(r.total_flags) || 0;
-        // Must have either a lineup slot, recent EV data, or at least 1 flag
-        return slot > 0 || ev > 0 || flags > 0;
-      })}/>
+      <SimLabView data={dateSlot==='tomorrow'&&allPicksTomorrowData.length>0 ? allPicksTomorrowData : allPicksData}/>
     </div>
 
     {/* Sim Lab — display:none keeps component mounted so filters/sort persist across sub-tab switches */}
