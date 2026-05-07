@@ -3188,6 +3188,13 @@ async function fetchGames(setL, setG, setE, silent=false) {
     innings: (ls.innings||[]).map(inn=>({num:inn.num,away:inn.away?.runs??'',home:inn.home?.runs??''})),
     awayRuns: ls.teams?.away?.runs??aw?.score??'-',
     homeRuns: ls.teams?.home?.runs??hm?.score??'-',
+    outs: ls.outs ?? null,
+    runners: {
+      first:  !!(ls.offense?.first),
+      second: !!(ls.offense?.second),
+      third:  !!(ls.offense?.third),
+      outs:   ls.outs ?? null,
+    },
         venue,
         gameTime: (() => {
           // Game start time in ET
@@ -4319,17 +4326,50 @@ function GCard({game}) {
           </div>
         </div>
 
-        {/* Center divider */}
+        {/* Center divider — inning + bases + outs when live */}
         <div style={{display:'flex',flexDirection:'column',alignItems:'center',
-          gap:2,flexShrink:0,width:36}}>
-          {(isLive||isFin) && game.inning ? <>
-            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',letterSpacing:.5,
-              textAlign:'center',lineHeight:1}}>{game.inning}</div>
-            {game.outs != null && <div style={{fontFamily:mono,fontSize:7,
-              color:'rgba(255,255,255,.3)'}}>
-              {game.outs} out{game.outs!==1?'s':''}
-            </div>}
-          </> : <div style={{fontFamily:mono,fontSize:10,color:'rgba(255,255,255,.2)'}}>VS</div>}
+          gap:2,flexShrink:0,width:44}}>
+          {isLive ? <>
+            {/* Inning indicator */}
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',
+              letterSpacing:.5,textAlign:'center',lineHeight:1}}>
+              {game.inning||''}
+            </div>
+            {/* Base diamond */}
+            {game.runners && (() => {
+              const r = game.runners;
+              const outs = r.outs ?? game.outs ?? null;
+              const Base = ({filled,cx,cy}) => (
+                <rect x={cx-4} y={cy-4} width={8} height={8} rx={0.5}
+                  fill={filled?'#f5a623':'transparent'}
+                  stroke={filled?'#f5a623':'rgba(255,255,255,.3)'}
+                  strokeWidth={1.5}
+                  transform={`rotate(45 ${cx} ${cy})`}/>
+              );
+              return <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:2}}>
+                <svg width={24} height={24} viewBox="0 0 28 28">
+                  <Base filled={r.second} cx={14} cy={4}/>
+                  <Base filled={r.third}  cx={4}  cy={14}/>
+                  <Base filled={r.first}  cx={24} cy={14}/>
+                  <polygon points="14,26 11,23 11,20 17,20 17,23"
+                    fill="rgba(255,255,255,.2)" stroke="rgba(255,255,255,.35)" strokeWidth={1}/>
+                </svg>
+                {outs !== null && (
+                  <div style={{display:'flex',gap:3,alignItems:'center'}}>
+                    {[0,1].map(i=>(
+                      <div key={i} style={{width:5,height:5,borderRadius:'50%',
+                        background:i<outs?'#ff8020':'transparent',
+                        border:'1px solid '+(i<outs?'#ff8020':'rgba(255,255,255,.25)')}}/>
+                    ))}
+                  </div>
+                )}
+              </div>;
+            })()}
+          </> : isFin ? (
+            <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',letterSpacing:.5}}>F</div>
+          ) : (
+            <div style={{fontFamily:mono,fontSize:10,color:'rgba(255,255,255,.2)'}}>VS</div>
+          )}
         </div>
 
         {/* Home team */}
@@ -10138,6 +10178,9 @@ function BatterLeaderboard() {
   const [filterDue, setFilterDue] = useState(false);
   const picks = usePicks();
   const bprops = useBatterProps();
+  // L7 HR fallback for batters not in daily_picks (not scheduled today)
+  // Uses same fetchGameLog/GAME_LOG_CACHE as the Gone Yard chart
+  const [l7FallbackCache, setL7FallbackCache] = useState({});
 
   // PLAYER_DATA_CACHE is a module-level object (not React state) so we
   // need to poll until fetchPlayers() has populated it at startup
@@ -10155,6 +10198,35 @@ function BatterLeaderboard() {
       return () => clearInterval(id);
     }
   }, []);
+
+  // Batch-fetch L7 HR data for batters not in daily_picks (not scheduled today)
+  // Uses GAME_LOG_CACHE — same cache as Gone Yard chart — max 40 fetches to avoid spam
+  useEffect(() => {
+    if (players.length === 0) return;
+    const toFetch = players
+      .filter(p => {
+        const pid = String(p.pid||p.id||'');
+        return pid && !DAILY_PICKS_CACHE[pid] && !l7FallbackCache[pid];
+      })
+      .slice(0, 40); // cap at 40 per load
+    if (toFetch.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const updates = {};
+      for (const p of toFetch) {
+        if (cancelled) break;
+        const pid = p.pid || p.id;
+        try {
+          const games = await fetchGameLog(pid);
+          const last7 = games.slice(-7);
+          updates[String(pid)] = last7.reduce((s, g) => s + (g.hrs||0), 0);
+        } catch {}
+      }
+      if (!cancelled && Object.keys(updates).length > 0)
+        setL7FallbackCache(prev => ({...prev, ...updates}));
+    })();
+    return () => { cancelled = true; };
+  }, [players.length]);
 
   // Window buttons config
   const WIN_BTNS = [
@@ -10300,7 +10372,10 @@ function BatterLeaderboard() {
     { key:'ops',  label:'OPS', render: p => { const v=(ws(p,'slg')||0)+(ws(p,'obp')||0); return <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:700,color:opsCol(v)}}>{fmtStat(v||ws(p,'ops'))}</span>; }},
     { key:'hr',   label:'HR',  render: p => { const v=ws(p,'hr'); return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:v>=10?700:400,color:hrCol(v)}}>{v||0}</span>; }},
     { key:'l7hr', label:'💥 L7', render: p => {
-        const n = parseInt(DAILY_PICKS_CACHE[String(p.pid||p.id||'')]?.recent_hr_count || p.windows?.last7?.hr || 0);
+        // daily_picks.csv for scheduled batters; game log API fallback for the rest
+        const pid = String(p.pid||p.id||'');
+        const fromPicks = DAILY_PICKS_CACHE[pid]?.recent_hr_count;
+        const n = parseInt(fromPicks != null ? fromPicks : (l7FallbackCache[pid] ?? 0));
         const col = n>=3?'#ff4020':n>=1?'#f5a623':'rgba(255,255,255,.2)';
         return <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:col}}>{n>0?n:'—'}</span>;
       }},
