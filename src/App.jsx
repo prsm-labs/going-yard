@@ -7156,11 +7156,22 @@ async function fetchInjuries() {
       const isPlacement = (desc.includes('injured list') || desc.includes(' il ') || desc.endsWith(' il'))
         && (desc.includes('placed') || desc.includes('transferred'));
 
-      // ACTIVATION: "Activated from the 10-Day IL" OR "Activated from the 10-Day Injured List"
-      // MLB inconsistently uses both "IL" and "Injured List" in activation descriptions
+      // ACTIVATION: MLB uses several patterns — catch all of them:
+      // "Activated from the 10-Day IL" / "Activated from the 10-Day Injured List"
+      // "Reinstated from the 15-Day IL"
+      // "Recalled from Rehabilitation Assignment" (player returns from rehab to active roster)
+      // "Selected from" (minor league callup that effectively ends IL stint)
       const isActivation =
-        (desc.includes('activated') || desc.includes('reinstated') || desc.includes('recalled')) &&
-        (desc.includes('injured list') || desc.includes(' il') || desc.includes('10-day') || desc.includes('15-day') || desc.includes('60-day'));
+        // Explicit IL activation/reinstatement
+        ((desc.includes('activated') || desc.includes('reinstated')) &&
+          (desc.includes('injured list') || desc.includes(' il') ||
+           desc.includes('10-day') || desc.includes('15-day') || desc.includes('60-day')))
+        ||
+        // Rehab recall (player returning from rehab assignment to active roster)
+        (desc.includes('recalled') && desc.includes('rehabilitation'))
+        ||
+        // Outrighted or transferred off IL entirely
+        (desc.includes('outrighted') && (desc.includes(' il') || desc.includes('injured')));
 
       if (isPlacement) {
         if (!placements[pid] || t.date > placements[pid].date) {
@@ -7189,6 +7200,35 @@ async function fetchInjuries() {
       }
     });
 
+    // ── Cross-check against mlb_injury_report.csv from the pipeline ────────────
+    // This file is generated nightly and is the most accurate status source.
+    // If a player is listed as 'Active' there but still in our INJURY_MAP, remove them.
+    try {
+      const cr = await fetch('/data/mlb_injury_report.csv');
+      if (cr.ok) {
+        const text = await cr.text();
+        const lines = text.replace(/^\uFEFF/, '').trim().split('\n');
+        const headers = lines[0].split(',').map(h => h.replace(/^"|"$/g, '').trim());
+        const bidIdx = headers.findIndex(h => h.toLowerCase().includes('batter id') || h.toLowerCase().includes('playerid') || h === 'Batter ID');
+        const descIdx = headers.findIndex(h => h.toLowerCase().includes('injury description') || h.toLowerCase().includes('description'));
+        if (bidIdx >= 0 && descIdx >= 0) {
+          let cleared = 0;
+          for (const line of lines.slice(1)) {
+            if (!line.trim()) continue;
+            const cols = line.split(',').map(c => c.replace(/^"|"$/g, '').trim());
+            const bid  = cols[bidIdx];
+            const desc = (cols[descIdx] || '').toLowerCase();
+            // If pipeline says Active but we have them as injured → remove
+            if (bid && desc === 'active' && INJURY_MAP[bid]) {
+              delete INJURY_MAP[bid];
+              cleared++;
+            }
+          }
+          if (cleared > 0) console.log(`[Injuries] ${cleared} player(s) cleared by mlb_injury_report.csv (pipeline says Active)`);
+        }
+      }
+    } catch(e2) { /* pipeline CSV not available — skip cross-check */ }
+
     INJURY_LOADED = Date.now();
     notifyInjuryListeners();
     console.log(`[Injuries] ${ilCount} IL players (${Object.keys(placements).length} placed, ${Object.keys(activations).length} activated)`);
@@ -7210,9 +7250,9 @@ async function fetchVideoLinks(hrs) {
 
   for (const gamePk of games) {
     try {
-      // Use same endpoint as homeruns.js — v1.1 live feed
       const r = await fetch(
-        `https://statsapi.mlb.com/api/v1.1/game/${gamePk}/feed/live`,
+        `https://statsapi.mlb.com/api/v1.1/game/${gamePk}/feed/live` +
+        `?fields=liveData,plays,allPlays,result,event,about,atBatIndex,playId,matchup,batter,id`,
         { signal: AbortSignal.timeout(8000) }
       );
       if (!r.ok) continue;
@@ -7222,12 +7262,15 @@ async function fetchVideoLinks(hrs) {
       plays.forEach(play => {
         const evt = (play.result?.event || '').toLowerCase();
         if (evt !== 'home run') return;
-        const uuid = play.about?.playId;
-        const idx  = play.about?.atBatIndex;
-        if (!uuid || idx == null) return;
-        // Key matches exactly how homeruns.js stores atBatIndex
-        VIDEO_LINK_CACHE[`${gamePk}_${idx}`] =
-          `https://bdata-producedclips.mlb.com/${uuid}.mp4`;
+        const uuid   = play.about?.playId;
+        const idx    = play.about?.atBatIndex;
+        const batId  = play.matchup?.batter?.id;
+        if (!uuid) return;
+        const url = `https://bdata-producedclips.mlb.com/${uuid}.mp4`;
+        // Store by multiple keys so lookup always finds it
+        if (idx != null) VIDEO_LINK_CACHE[`${gamePk}_${idx}`] = url;
+        if (batId != null) VIDEO_LINK_CACHE[`${gamePk}_${batId}`] = url;
+        VIDEO_LINK_CACHE[uuid] = url; // also by raw UUID
       });
     } catch(e) { /* silent */ }
   }
@@ -7731,8 +7774,14 @@ function HRTrackerTab() {
                 <td style={{whiteSpace:"nowrap"}}><span style={{fontSize:10,fontWeight:500}}>{hr.pitcherName}</span></td>
                 <td><span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:"var(--muted)"}}>{hr.gameId}</span></td>
                 <td style={{textAlign:"center",width:32,minWidth:32,maxWidth:32}}>
-                  {VIDEO_LINK_CACHE[`${hr.gamePk}_${hr.atBatIndex??0}`]
-                    ? <a href={VIDEO_LINK_CACHE[`${hr.gamePk}_${hr.atBatIndex??0}`]}
+                  {(VIDEO_LINK_CACHE[`${hr.gamePk}_${hr.atBatIndex}`]
+                    || VIDEO_LINK_CACHE[`${hr.gamePk}_${hr.batterId}`]
+                    || VIDEO_LINK_CACHE[hr.playId]
+                    || VIDEO_LINK_CACHE[hr.uuid])
+                    ? <a href={VIDEO_LINK_CACHE[`${hr.gamePk}_${hr.atBatIndex}`]
+                        || VIDEO_LINK_CACHE[`${hr.gamePk}_${hr.batterId}`]
+                        || VIDEO_LINK_CACHE[hr.playId]
+                        || VIDEO_LINK_CACHE[hr.uuid]}
                         target="_blank" rel="noopener noreferrer"
                         onClick={e=>e.stopPropagation()} title="Watch HR video"
                         style={{fontSize:15,textDecoration:"none",display:"block",textAlign:"center"}}>📹</a>
