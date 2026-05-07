@@ -7245,12 +7245,24 @@ function useInjuries() {
   return v;
 }
 async function fetchVideoLinks(hrs) {
-  const games = [...new Set(hrs.map(h => String(h.gamePk)).filter(Boolean))];
+  // The real Baseball Savant playId is a UUID from play.about.playId in the MLB Stats API.
+  // We match by atBatIndex (which HR_DATA has) — no event name matching needed.
+  // UUID → https://baseballsavant.mlb.com/sporty-videos?playId={uuid}
+  const games = [...new Set((hrs||[]).map(h => String(h.gamePk||'')).filter(Boolean))];
   if (!games.length) return;
 
+  // Build atBatIndex lookup from HR_DATA for fast matching
+  const hrByGame = {};
+  (hrs||[]).forEach(h => {
+    const gk = String(h.gamePk||'');
+    if (!gk) return;
+    if (!hrByGame[gk]) hrByGame[gk] = [];
+    hrByGame[gk].push(h);
+  });
+
+  let totalFound = 0;
   for (const gamePk of games) {
     try {
-      // Use playByPlay endpoint — same one used in Gameday plays tab, reliable for finished games
       const r = await fetch(
         `https://statsapi.mlb.com/api/v1/game/${gamePk}/playByPlay`,
         { signal: AbortSignal.timeout(10000) }
@@ -7258,24 +7270,34 @@ async function fetchVideoLinks(hrs) {
       if (!r.ok) continue;
       const d = await r.json();
       const plays = d?.allPlays || [];
+      const gameHRs = hrByGame[gamePk] || [];
 
-      let hrFound = 0;
+      // Build atBatIndex → UUID map from every play in this game
+      const idxToUUID = {};
       plays.forEach(play => {
-        // MLB Stats API playByPlay uses "Home Run" (capitalized, space)
-        if (play.result?.event !== 'Home Run') return;
-        const uuid  = play.about?.playId;
-        const idx   = play.about?.atBatIndex;
-        const batId = play.matchup?.batter?.id;
-        if (!uuid) return;
-        const url = `https://bdata-producedclips.mlb.com/${uuid}.mp4`;
-        if (idx  != null) VIDEO_LINK_CACHE[`${gamePk}_${idx}`]   = url;
-        if (batId != null) VIDEO_LINK_CACHE[`${gamePk}_${batId}`] = url;
-        VIDEO_LINK_CACHE[uuid] = url;
-        hrFound++;
+        const idx  = play.about?.atBatIndex;
+        const uuid = play.about?.playId;
+        if (idx != null && uuid) idxToUUID[idx] = uuid;
       });
-      console.log(`[Video] game ${gamePk}: ${plays.length} plays, ${hrFound} HR videos found`);
-    } catch(e) { /* silent */ }
+
+      // Match each HR by atBatIndex → get UUID → build Savant URL
+      let found = 0;
+      gameHRs.forEach(h => {
+        const idx  = h.atBatIndex ?? h.playIndex;
+        const bid  = h.batterId;
+        const uuid = idx != null ? idxToUUID[idx] : null;
+        if (!uuid) return;
+        const url = `https://baseballsavant.mlb.com/sporty-videos?playId=${uuid}`;
+        if (idx  != null) VIDEO_LINK_CACHE[`${gamePk}_${idx}`]  = url;
+        if (bid  != null) VIDEO_LINK_CACHE[`${gamePk}_${bid}`]  = url;
+        VIDEO_LINK_CACHE[uuid] = url;
+        found++;
+      });
+      totalFound += found;
+      console.log(`[Video] game ${gamePk}: ${found}/${gameHRs.length} HR videos resolved`);
+    } catch(e) { console.warn(`[Video] game ${gamePk} failed:`, e.message); }
   }
+  console.log(`[Video] Total: ${totalFound} HR video links built`);
 }
 
 let HR_DATA_DATE = '';
@@ -7776,7 +7798,6 @@ function HRTrackerTab() {
                 <td style={{whiteSpace:"nowrap"}}><span style={{fontSize:10,fontWeight:500}}>{hr.pitcherName}</span></td>
                 <td><span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:"var(--muted)"}}>{hr.gameId}</span></td>
                 <td style={{textAlign:"center",width:32,minWidth:32,maxWidth:32}}>
-                  {(()=>{ const keys=[`${hr.gamePk}_${hr.atBatIndex}`,`${hr.gamePk}_${hr.batterId}`,hr.playId,hr.uuid]; if(hr===HR_DATA[0]) console.log('[Video] HR lookup keys:',keys,'cache size:',Object.keys(VIDEO_LINK_CACHE).length,'sample cache keys:',Object.keys(VIDEO_LINK_CACHE).slice(0,4)); return null;})()}
                   {(VIDEO_LINK_CACHE[`${hr.gamePk}_${hr.atBatIndex}`]
                     || VIDEO_LINK_CACHE[`${hr.gamePk}_${hr.batterId}`]
                     || VIDEO_LINK_CACHE[hr.playId]
