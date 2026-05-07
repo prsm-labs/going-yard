@@ -7251,12 +7251,17 @@ async function fetchVideoLinks(hrs) {
   const games = [...new Set((hrs||[]).map(h => String(h.gamePk||'')).filter(Boolean))];
   if (!games.length) return;
 
-  // Index HRs by batterId for keyword matching
-  const hrByBatter = {};
+  // Index HRs by batterId — use array to handle multiple HRs per batter per game
+  // Headlines appear in chronological order so we pop the earliest unmatched HR first
+  const hrByBatter = {};   // batterId → [hr, hr, ...] sorted by atBatIndex ascending
   (hrs||[]).forEach(h => {
     const bid = String(h.batterId||'');
-    if (bid) hrByBatter[bid] = h;
+    if (!bid) return;
+    if (!hrByBatter[bid]) hrByBatter[bid] = [];
+    hrByBatter[bid].push(h);
   });
+  // Sort each batter's HRs by atBatIndex so we match in play order
+  Object.values(hrByBatter).forEach(arr => arr.sort((a,b) => (a.atBatIndex||0)-(b.atBatIndex||0)));
 
   let totalFound = 0;
   for (const gamePk of games) {
@@ -7289,17 +7294,35 @@ async function fetchVideoLinks(hrs) {
         const keywords = item.keywordsAll || item.keywordsDisplay || [];
         for (const kw of keywords) {
           const val = String(kw.value || kw || '');
-          if (hrByBatter[val]) return hrByBatter[val];
+          if (hrByBatter[val]?.length > 0) {
+            // Shift = consume the earliest unmatched HR (chronological headline order)
+            return hrByBatter[val].shift();
+          }
         }
         return null;
       };
 
-      // PASS 1: broadcast clips only (mlb-cuts-diamond = real HR video)
+      // PASS 1: broadcast clips only — prefer direct MP4 over HLS playlist
+      // HTTP_CLOUD_WIRED / HTTP_CLOUD_WIRED_60 = _1280x720_59_4000K.mp4 (what realapp.com uses)
+      // hlsCloud = .m3u8 HLS playlist (doesn't play natively in Chrome/Edge)
+      const MP4_NAMES = ['HTTP_CLOUD_WIRED_60','HTTP_CLOUD_WIRED','mp4Avc','highBit'];
+      const getBroadcastUrl = (playbacks) => {
+        // Try preferred MP4 names first
+        for (const name of MP4_NAMES) {
+          const p = playbacks.find(pb => pb.name === name && (pb.url||'').includes('mlb-cuts-diamond'));
+          if (p?.url) return p.url;
+        }
+        // Any mlb-cuts-diamond URL that's not HLS
+        const nonHls = playbacks.find(p => (p.url||'').includes('mlb-cuts-diamond') && !(p.url||'').endsWith('.m3u8'));
+        if (nonHls?.url) return nonHls.url;
+        // Last resort: any mlb-cuts-diamond (may be .m3u8)
+        return playbacks.find(p => (p.url||'').includes('mlb-cuts-diamond'))?.url || null;
+      };
+
       const matched = new Set();
       items.forEach(item => {
         const playbacks = item.playbacks || [];
-        const broadcastUrl = playbacks.find(p => (p.url||'').includes('mlb-cuts-diamond'))?.url
-                          || playbacks.find(p => (p.url||'').includes('mediadownloads.mlb'))?.url;
+        const broadcastUrl = getBroadcastUrl(playbacks);
         if (!broadcastUrl) return;
         const h = matchBatter(item);
         if (!h) return;
@@ -7309,10 +7332,12 @@ async function fetchVideoLinks(hrs) {
         matched.add(bid);
       });
 
-      // PASS 2: fallback to any clip (incl. Statcast viz) for unmatched batters
+      // PASS 2: fallback to any clip for unmatched batters — still prefer MP4 over .m3u8
       items.forEach(item => {
         const playbacks = item.playbacks || [];
-        const anyUrl = playbacks.find(p => (p.url||'').endsWith('.mp4'))?.url || playbacks[0]?.url;
+        const anyUrl = getBroadcastUrl(playbacks)
+                    || playbacks.find(p => (p.url||'').endsWith('.mp4'))?.url
+                    || playbacks[0]?.url;
         if (!anyUrl) return;
         const h = matchBatter(item);
         if (!h || matched.has(String(h.batterId||''))) return;
