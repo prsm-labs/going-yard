@@ -7271,9 +7271,14 @@ async function fetchVideoLinks(hrs) {
 
       let found = 0;
       items.forEach(item => {
-        // Best available mp4
+        // Prefer broadcast clip (mlb-cuts-diamond) over Statcast viz (darkroom-clips)
+        // darkroom-clips.mlb.com = 3D Statcast trajectory animation (6 sec, no broadcast)
+        // mlb-cuts-diamond.mlb.com = actual HR broadcast clip
         const playbacks = item.playbacks || [];
-        const mp4 = playbacks.find(p => p.name === 'mp4Avc')?.url
+        const broadcast = playbacks.find(p => (p.url||'').includes('mlb-cuts-diamond'))
+                       || playbacks.find(p => (p.url||'').includes('mediadownloads.mlb'))
+                       || playbacks.find(p => !(p.url||'').includes('darkroom-clips'));
+        const mp4 = broadcast?.url
                  || playbacks.find(p => (p.url||'').endsWith('.mp4'))?.url
                  || playbacks[0]?.url;
         if (!mp4) return;
