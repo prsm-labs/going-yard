@@ -7269,6 +7269,16 @@ async function fetchVideoLinks(hrs) {
       const d = await r.json();
       const items = d?.highlights?.highlights?.items || [];
 
+      // DEBUG: log item structure for first game only
+      if (gamePk === games[0] && items.length > 0) {
+        const sample = items.slice(0,3).map(it => ({
+          headline: (it.headline||'').slice(0,60),
+          urls: (it.playbacks||[]).map(p => (p.url||'').replace('https://','').split('/')[0] + '/' + (p.name||'')),
+          keywords: (it.keywordsAll||[]).slice(0,5).map(k => `${k.type||''}:${k.value||''}`)
+        }));
+        console.log('[Video] content sample:', JSON.stringify(sample, null, 1));
+      }
+
       // Helper: match item keywords to a batter, return batter HR object or null
       const matchBatter = (item) => {
         const keywords = item.keywordsAll || item.keywordsDisplay || [];
