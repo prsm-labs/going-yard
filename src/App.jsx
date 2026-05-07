@@ -7281,6 +7281,11 @@ async function fetchVideoLinks(hrs) {
 
       // Helper: match item keywords to a batter, return batter HR object or null
       const matchBatter = (item) => {
+        // Only match HR-related clips — skip recaps, interviews, condensed games etc.
+        const hl = (item.headline || '').toLowerCase();
+        const isHR = hl.includes('home run') || hl.includes('homer')
+                  || hl.includes('grand slam') || hl.includes('solo shot');
+        if (!isHR) return null;
         const keywords = item.keywordsAll || item.keywordsDisplay || [];
         for (const kw of keywords) {
           const val = String(kw.value || kw || '');
@@ -7578,12 +7583,15 @@ function HRTrackerTab() {
       const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      setHrs(data.homeruns || []);
+      const loaded = data.homeruns || [];
+      setHrs(loaded);
+      if (loaded.length > 0) fetchVideoLinks(loaded).catch(() => {});
     } catch(e) {
       console.warn("[HRTracker] Load failed:", e.message);
       if (date === todayStr) {
         const cached = await fetchHRs(true);
         setHrs(cached);
+        if (cached.length > 0) fetchVideoLinks(cached).catch(() => {});
       }
     }
     setLoading(false);
@@ -7804,38 +7812,28 @@ function HRTrackerTab() {
                 const cachedHR = getCachedPlayer(hr.batterId)?.hr || 0;
                 const todayNum = hrRankMap[`${hr.batterId}_${hr.gamePk}_${hr.atBatIndex||hr.playIndex||hr.plateAppearance||0}`] || 1;
                 const seasonNum = cachedHR > 0 ? cachedHR + todayNum : todayNum;
-                return <tr key={i}>
-                <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:i<3?"var(--accent)":"var(--muted)"}}>{sorted.length - i}</span></td>
-                <td><span style={{fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:600,color:"var(--text)"}}>{hr.timeET&&hr.timeET!==""?hr.timeET:`Inn. ${hr.inning}`}</span></td>
-                <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color:"var(--text)"}}>{hr.batterTeam}</span></td>
-                <td style={{whiteSpace:"nowrap"}}><div style={{display:"flex",alignItems:"center",gap:5}}><PlayerAvatar pid={hr.batterId} name={hr.batterName} size={20}/><span className="pn" style={{fontSize:11,...(isKeyMatchup(hr.batterId,hr.batterName)?{color:"#ff8020",fontWeight:700}:{})}}>{hr.batterName}</span>
-                <InjuryBadge pid={hr.batterId} name={hr.batterName}/></div></td>
-                <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:12,color:'var(--accent)'}}>{seasonNum}</span></td>
-                <td>
-                <div style={{display:"flex",alignItems:"center",gap:6}}>
-                <span className={`hr-badge ${badgeCls}`}>{hr.hrType}</span>
-                </div>
-                </td>
-                <td><span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{hr.halfInning==="top"?"▲":"▼"} {hr.inning}</span></td>
-                          <td><span className={`sv ${hr.launchAngle>=25&&hr.launchAngle<=35?"good":"avg"}`}>{hr.launchAngle!=null?`${hr.launchAngle}°`:"—"}</span></td>
-                <td><span className={`sv ${evC}`}>{hr.exitVelo!=null?`${hr.exitVelo}`:"—"}</span></td>
-                <td><span className={`sv ${distC}`}>{hr.distance!=null?`${hr.distance}ft`:"—"}</span></td>
-                <td>{hr.pitchType?<span style={{fontSize:10,fontFamily:"'DM Mono',monospace",padding:"2px 7px",borderRadius:4,background:"var(--surface2)",border:"1px solid var(--border)"}}>{hr.pitchType}</span>:"—"}</td>
-                <td style={{whiteSpace:"nowrap"}}><span style={{fontSize:10,fontWeight:500}}>{hr.pitcherName}</span></td>
-                <td><span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:"var(--muted)"}}>{hr.gameId}</span></td>
-                <td style={{textAlign:"center",width:32,minWidth:32,maxWidth:32}}>
-                  {(VIDEO_LINK_CACHE[`${hr.gamePk}_${hr.atBatIndex}`]
-                    || VIDEO_LINK_CACHE[`${hr.gamePk}_${hr.batterId}`]
-                    || VIDEO_LINK_CACHE[hr.playId]
-                    || VIDEO_LINK_CACHE[hr.uuid])
-                    ? <a href={VIDEO_LINK_CACHE[`${hr.gamePk}_${hr.atBatIndex}`]
-                        || VIDEO_LINK_CACHE[`${hr.gamePk}_${hr.batterId}`]
-                        || VIDEO_LINK_CACHE[hr.playId]
-                        || VIDEO_LINK_CACHE[hr.uuid]}
-                        target="_blank" rel="noopener noreferrer"
-                        onClick={e=>e.stopPropagation()} title="Watch HR video"
-                        style={{fontSize:15,textDecoration:"none",display:"block",textAlign:"center"}}>📹</a>
-                    : null}
+                const videoUrl = VIDEO_LINK_CACHE[`${hr.gamePk}_${hr.atBatIndex}`]
+                  || VIDEO_LINK_CACHE[`${hr.gamePk}_${hr.batterId}`]
+                  || VIDEO_LINK_CACHE[hr.playId]
+                  || VIDEO_LINK_CACHE[hr.uuid];
+                return <tr key={i} style={{height:26}}>
+                <td style={{padding:"1px 3px"}}><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,color:i<3?"var(--accent)":"var(--muted)"}}>{sorted.length - i}</span></td>
+                <td style={{padding:"1px 3px"}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:"var(--text)"}}>{hr.timeET&&hr.timeET!==""?hr.timeET:`I${hr.inning}`}</span></td>
+                <td style={{padding:"1px 3px"}}><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,color:"var(--text)"}}>{hr.batterTeam}</span></td>
+                <td style={{padding:"1px 3px",whiteSpace:"nowrap"}}><div style={{display:"flex",alignItems:"center",gap:3}}><PlayerAvatar pid={hr.batterId} name={hr.batterName} size={18}/><span className="pn" style={{fontSize:10,whiteSpace:"nowrap",...(isKeyMatchup(hr.batterId,hr.batterName)?{color:"#ff8020",fontWeight:700}:{})}}>{hr.batterName}</span><InjuryBadge pid={hr.batterId} name={hr.batterName}/></div></td>
+                <td style={{padding:"1px 3px"}}><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:10,color:"var(--accent)"}}>{seasonNum}</span></td>
+                <td style={{padding:"1px 3px"}}><span className={`hr-badge ${badgeCls}`} style={{fontSize:8,padding:"1px 4px"}}>{hr.hrType}</span></td>
+                <td style={{padding:"1px 3px"}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:9}}>{hr.halfInning==="top"?"▲":"▼"}{hr.inning}</span></td>
+                <td style={{padding:"1px 3px"}}><span className={`sv ${hr.launchAngle>=25&&hr.launchAngle<=35?"good":"avg"}`} style={{fontSize:9}}>{hr.launchAngle!=null?`${hr.launchAngle}°`:"—"}</span></td>
+                <td style={{padding:"1px 3px"}}><span className={`sv ${evC}`} style={{fontSize:9}}>{hr.exitVelo!=null?`${hr.exitVelo}`:"—"}</span></td>
+                <td style={{padding:"1px 3px"}}><span className={`sv ${distC}`} style={{fontSize:9}}>{hr.distance!=null?`${hr.distance}ft`:"—"}</span></td>
+                <td style={{padding:"1px 3px"}}>{hr.pitchType?<span style={{fontSize:8,fontFamily:"'DM Mono',monospace",padding:"1px 4px",borderRadius:3,background:"var(--surface2)",border:"1px solid var(--border)",whiteSpace:"nowrap"}}>{hr.pitchType}</span>:"—"}</td>
+                <td style={{padding:"1px 3px",whiteSpace:"nowrap"}}><span style={{fontSize:9}}>{hr.pitcherName}</span></td>
+                <td style={{padding:"1px 3px"}}><span style={{fontSize:8,fontFamily:"'DM Mono',monospace",color:"var(--muted)"}}>{hr.gameId}</span></td>
+                <td style={{textAlign:"center",padding:"1px 2px"}}>
+                  {videoUrl ? <a href={videoUrl} target="_blank" rel="noopener noreferrer"
+                    onClick={e=>e.stopPropagation()} title="Watch HR video"
+                    style={{fontSize:12,textDecoration:"none",display:"block",textAlign:"center"}}>📹</a> : null}
                 </td>
                 </tr>;
               })}
