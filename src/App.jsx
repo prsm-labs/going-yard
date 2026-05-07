@@ -7262,7 +7262,7 @@ async function fetchVideoLinks(hrs) {
       let hrFound = 0;
       plays.forEach(play => {
         const evt = (play.result?.event || '').toLowerCase();
-        if (evt !== 'home run') return;
+        if (!evt.includes('home_run') && !evt.includes('home run')) return;
         // playId lives in play.about.playId OR play.playId depending on API version
         const uuid  = play.about?.playId || play.playId;
         const idx   = play.about?.atBatIndex ?? play.atBatIndex;
