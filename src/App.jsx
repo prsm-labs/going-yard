@@ -7250,10 +7250,10 @@ async function fetchVideoLinks(hrs) {
 
   for (const gamePk of games) {
     try {
+      // No field filter — it strips playId. Fetch full feed, extract what we need.
       const r = await fetch(
-        `https://statsapi.mlb.com/api/v1.1/game/${gamePk}/feed/live` +
-        `?fields=liveData,plays,allPlays,result,event,about,atBatIndex,playId,matchup,batter,id`,
-        { signal: AbortSignal.timeout(8000) }
+        `https://statsapi.mlb.com/api/v1.1/game/${gamePk}/feed/live`,
+        { signal: AbortSignal.timeout(10000) }
       );
       if (!r.ok) continue;
       const d = await r.json();
@@ -7263,19 +7263,22 @@ async function fetchVideoLinks(hrs) {
       plays.forEach(play => {
         const evt = (play.result?.event || '').toLowerCase();
         if (evt !== 'home run') return;
-        const uuid   = play.about?.playId;
-        const idx    = play.about?.atBatIndex;
-        const batId  = play.matchup?.batter?.id;
-        const name   = play.matchup?.batter?.fullName || '';
-        console.log(`[Video] HR play: batId=${batId} name=${name} idx=${idx} uuid=${uuid?.slice(0,8)}...`);
-        if (!uuid) { console.warn('[Video] No playId for HR play!', play.about); return; }
+        // playId lives in play.about.playId OR play.playId depending on API version
+        const uuid  = play.about?.playId || play.playId;
+        const idx   = play.about?.atBatIndex ?? play.atBatIndex;
+        const batId = play.matchup?.batter?.id;
+        if (!uuid) {
+          // Last resort: use MLB content API highlights keyed by batter+game
+          if (batId) VIDEO_LINK_CACHE[`${gamePk}_${batId}_pending`] = 'pending';
+          return;
+        }
         const url = `https://bdata-producedclips.mlb.com/${uuid}.mp4`;
-        if (idx != null) VIDEO_LINK_CACHE[`${gamePk}_${idx}`] = url;
+        if (idx != null)  VIDEO_LINK_CACHE[`${gamePk}_${idx}`]   = url;
         if (batId != null) VIDEO_LINK_CACHE[`${gamePk}_${batId}`] = url;
         VIDEO_LINK_CACHE[uuid] = url;
         hrFound++;
       });
-      console.log(`[Video] game ${gamePk}: ${plays.length} plays, ${hrFound} HRs cached`);
+      console.log(`[Video] game ${gamePk}: ${plays.length} plays, ${hrFound} HR videos found`);
     } catch(e) { /* silent */ }
   }
 }
