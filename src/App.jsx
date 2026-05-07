@@ -7250,30 +7250,25 @@ async function fetchVideoLinks(hrs) {
 
   for (const gamePk of games) {
     try {
-      // No field filter — it strips playId. Fetch full feed, extract what we need.
+      // Use playByPlay endpoint — same one used in Gameday plays tab, reliable for finished games
       const r = await fetch(
-        `https://statsapi.mlb.com/api/v1.1/game/${gamePk}/feed/live`,
+        `https://statsapi.mlb.com/api/v1/game/${gamePk}/playByPlay`,
         { signal: AbortSignal.timeout(10000) }
       );
       if (!r.ok) continue;
       const d = await r.json();
-      const plays = d?.liveData?.plays?.allPlays || [];
+      const plays = d?.allPlays || [];
 
       let hrFound = 0;
       plays.forEach(play => {
-        const evt = (play.result?.event || '').toLowerCase();
-        if (!evt.includes('home_run') && !evt.includes('home run')) return;
-        // playId lives in play.about.playId OR play.playId depending on API version
-        const uuid  = play.about?.playId || play.playId;
-        const idx   = play.about?.atBatIndex ?? play.atBatIndex;
+        // MLB Stats API playByPlay uses "Home Run" (capitalized, space)
+        if (play.result?.event !== 'Home Run') return;
+        const uuid  = play.about?.playId;
+        const idx   = play.about?.atBatIndex;
         const batId = play.matchup?.batter?.id;
-        if (!uuid) {
-          // Last resort: use MLB content API highlights keyed by batter+game
-          if (batId) VIDEO_LINK_CACHE[`${gamePk}_${batId}_pending`] = 'pending';
-          return;
-        }
+        if (!uuid) return;
         const url = `https://bdata-producedclips.mlb.com/${uuid}.mp4`;
-        if (idx != null)  VIDEO_LINK_CACHE[`${gamePk}_${idx}`]   = url;
+        if (idx  != null) VIDEO_LINK_CACHE[`${gamePk}_${idx}`]   = url;
         if (batId != null) VIDEO_LINK_CACHE[`${gamePk}_${batId}`] = url;
         VIDEO_LINK_CACHE[uuid] = url;
         hrFound++;
