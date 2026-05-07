@@ -7245,60 +7245,59 @@ function useInjuries() {
   return v;
 }
 async function fetchVideoLinks(hrs) {
-  // The real Baseball Savant playId is a UUID from play.about.playId in the MLB Stats API.
-  // We match by atBatIndex (which HR_DATA has) — no event name matching needed.
-  // UUID → https://baseballsavant.mlb.com/sporty-videos?playId={uuid}
+  // playId UUID not available for completed games in live feed or playByPlay.
+  // Use game content/highlights endpoint — same source as MLB.com video player.
+  // Each highlight item has keywords (player IDs) and playbacks (real mp4 URLs).
   const games = [...new Set((hrs||[]).map(h => String(h.gamePk||'')).filter(Boolean))];
   if (!games.length) return;
 
-  // Build atBatIndex lookup from HR_DATA for fast matching
-  const hrByGame = {};
+  // Index HRs by batterId for keyword matching
+  const hrByBatter = {};
   (hrs||[]).forEach(h => {
-    const gk = String(h.gamePk||'');
-    if (!gk) return;
-    if (!hrByGame[gk]) hrByGame[gk] = [];
-    hrByGame[gk].push(h);
+    const bid = String(h.batterId||'');
+    if (bid) hrByBatter[bid] = h;
   });
 
   let totalFound = 0;
   for (const gamePk of games) {
     try {
-      // v1.1 live feed — the ONLY endpoint that includes play.about.playId (UUID)
-      // playByPlay confirmed via debug to have idxToUUID size=0 (no playId field)
       const r = await fetch(
-        `https://statsapi.mlb.com/api/v1.1/game/${gamePk}/feed/live`,
-        { signal: AbortSignal.timeout(12000) }
+        `https://statsapi.mlb.com/api/v1/game/${gamePk}/content?language=en`,
+        { signal: AbortSignal.timeout(10000) }
       );
       if (!r.ok) continue;
       const d = await r.json();
-      const plays = d?.liveData?.plays?.allPlays || [];
-      const gameHRs = hrByGame[gamePk] || [];
+      const items = d?.highlights?.highlights?.items || [];
 
-      // Build atBatIndex → UUID map
-      const idxToUUID = {};
-      plays.forEach(play => {
-        const idx  = play.about?.atBatIndex;
-        const uuid = play.about?.playId;
-        if (idx != null && uuid) idxToUUID[idx] = uuid;
-      });
-      console.log(`[Video] game ${gamePk}: ${plays.length} plays, ${Object.keys(idxToUUID).length} with playId`);
-
-      // Match each HR by atBatIndex → get UUID → build Savant URL
       let found = 0;
-      gameHRs.forEach(h => {
-        const idx  = h.atBatIndex ?? h.playIndex;
-        const bid  = h.batterId;
-        const uuid = idx != null ? idxToUUID[idx] : null;
-        if (!uuid) return;
-        const url = `https://baseballsavant.mlb.com/sporty-videos?playId=${uuid}`;
-        if (idx  != null) VIDEO_LINK_CACHE[`${gamePk}_${idx}`]  = url;
-        if (bid  != null) VIDEO_LINK_CACHE[`${gamePk}_${bid}`]  = url;
-        VIDEO_LINK_CACHE[uuid] = url;
-        found++;
+      items.forEach(item => {
+        // Best available mp4
+        const playbacks = item.playbacks || [];
+        const mp4 = playbacks.find(p => p.name === 'mp4Avc')?.url
+                 || playbacks.find(p => (p.url||'').endsWith('.mp4'))?.url
+                 || playbacks[0]?.url;
+        if (!mp4) return;
+
+        // Match to a batter via keyword player IDs
+        const keywords = item.keywordsAll || item.keywordsDisplay || [];
+        for (const kw of keywords) {
+          const val = String(kw.value || kw || '');
+          if (hrByBatter[val]) {
+            const h   = hrByBatter[val];
+            const gk  = String(h.gamePk||'');
+            const idx = h.atBatIndex ?? h.playIndex;
+            const bid = String(h.batterId||'');
+            if (idx != null) VIDEO_LINK_CACHE[`${gk}_${idx}`] = mp4;
+            if (bid)         VIDEO_LINK_CACHE[`${gk}_${bid}`] = mp4;
+            found++;
+            break;
+          }
+        }
       });
+
+      console.log(`[Video] game ${gamePk}: ${items.length} highlights, ${found} HR videos matched`);
       totalFound += found;
-      console.log(`[Video] game ${gamePk}: ${found}/${gameHRs.length} HR videos resolved`);
-    } catch(e) { console.warn(`[Video] game ${gamePk} failed:`, e.message); }
+    } catch(e) { console.warn(`[Video] game ${gamePk}:`, e.message); }
   }
   console.log(`[Video] Total: ${totalFound} HR video links built`);
 }
