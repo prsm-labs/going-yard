@@ -7259,19 +7259,23 @@ async function fetchVideoLinks(hrs) {
       const d = await r.json();
       const plays = d?.liveData?.plays?.allPlays || [];
 
+      let hrFound = 0;
       plays.forEach(play => {
         const evt = (play.result?.event || '').toLowerCase();
         if (evt !== 'home run') return;
         const uuid   = play.about?.playId;
         const idx    = play.about?.atBatIndex;
         const batId  = play.matchup?.batter?.id;
-        if (!uuid) return;
+        const name   = play.matchup?.batter?.fullName || '';
+        console.log(`[Video] HR play: batId=${batId} name=${name} idx=${idx} uuid=${uuid?.slice(0,8)}...`);
+        if (!uuid) { console.warn('[Video] No playId for HR play!', play.about); return; }
         const url = `https://bdata-producedclips.mlb.com/${uuid}.mp4`;
-        // Store by multiple keys so lookup always finds it
         if (idx != null) VIDEO_LINK_CACHE[`${gamePk}_${idx}`] = url;
         if (batId != null) VIDEO_LINK_CACHE[`${gamePk}_${batId}`] = url;
-        VIDEO_LINK_CACHE[uuid] = url; // also by raw UUID
+        VIDEO_LINK_CACHE[uuid] = url;
+        hrFound++;
       });
+      console.log(`[Video] game ${gamePk}: ${plays.length} plays, ${hrFound} HRs cached`);
     } catch(e) { /* silent */ }
   }
 }
@@ -7774,6 +7778,7 @@ function HRTrackerTab() {
                 <td style={{whiteSpace:"nowrap"}}><span style={{fontSize:10,fontWeight:500}}>{hr.pitcherName}</span></td>
                 <td><span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:"var(--muted)"}}>{hr.gameId}</span></td>
                 <td style={{textAlign:"center",width:32,minWidth:32,maxWidth:32}}>
+                  {(()=>{ const keys=[`${hr.gamePk}_${hr.atBatIndex}`,`${hr.gamePk}_${hr.batterId}`,hr.playId,hr.uuid]; if(hr===HR_DATA[0]) console.log('[Video] HR lookup keys:',keys,'cache size:',Object.keys(VIDEO_LINK_CACHE).length,'sample cache keys:',Object.keys(VIDEO_LINK_CACHE).slice(0,4)); return null;})()}
                   {(VIDEO_LINK_CACHE[`${hr.gamePk}_${hr.atBatIndex}`]
                     || VIDEO_LINK_CACHE[`${hr.gamePk}_${hr.batterId}`]
                     || VIDEO_LINK_CACHE[hr.playId]
