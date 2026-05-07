@@ -4272,24 +4272,92 @@ function GPanel({game, isLive, isFinal=false}) {
 
 function GCard({game}) {
   const [exp, setExp] = useState(false);
-  const isLive = game.status === "Live", isFin = game.status === "Final";
+  const isLive = game.status === "Live", isFin = game.status === "Final", isPre = !isLive && !isFin;
   const aw = game.away.score > game.home.score, hw = game.home.score > game.away.score;
+  const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
+  const statusColor = isLive ? '#ff4020' : isFin ? 'var(--muted)' : 'var(--green)';
+
   return <div className="gpw">
-    <div className={`gc ${exp?"exp":""}`} onClick={() => setExp(e => !e)}>
-      <div className="gh">
-        <div className={`gs ${isFin?"fin":!isLive?"pre":""}`}>
-        {isLive&&<span style={{marginRight:3}}>●</span>}
-        {isLive?"Live":isFin?"Final":
-          game.gameTime ? <span>{game.gameTime} ET</span> : "Upcoming"}
+    <div className={`gc ${exp?"exp":""}`} onClick={() => setExp(e => !e)}
+      style={{padding:0,overflow:'hidden'}}>
+
+      {/* Status bar */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',
+        padding:'5px 12px',borderBottom:'1px solid rgba(255,255,255,.05)',
+        background:'rgba(0,0,0,.2)'}}>
+        <div style={{display:'flex',alignItems:'center',gap:5}}>
+          {isLive && <span style={{width:6,height:6,borderRadius:'50%',background:'#ff4020',
+            display:'inline-block',animation:'pulse 1.2s ease-in-out infinite',flexShrink:0}}/>}
+          <span style={{fontFamily:mono,fontSize:9,fontWeight:600,color:statusColor,
+            textTransform:'uppercase',letterSpacing:.8}}>
+            {isLive ? (game.inning||'Live') : isFin ? 'Final' : (game.gameTime ? game.gameTime+' ET' : 'Upcoming')}
+          </span>
+        </div>
+        <span style={{fontFamily:mono,fontSize:10,color:'rgba(255,255,255,.25)'}}>
+          {exp ? '▴' : '▾'}
+        </span>
       </div>
-        <div style={{display:"flex",alignItems:"center",gap:6}}>{game.inning&&<div style={{fontSize:9,color:"var(--muted)",fontFamily:"DM Mono,monospace"}}>{game.inning}</div>}<span className={`cv2 ${exp?"op":""}`} style={{fontSize:11}}>▾</span></div>
+
+      {/* Main score row — horizontal like Image 2 */}
+      <div style={{display:'flex',alignItems:'center',padding:'10px 12px',gap:8}}>
+        {/* Away team */}
+        <div style={{flex:1,display:'flex',alignItems:'center',gap:8,minWidth:0}}>
+          <img src={`https://www.mlbstatic.com/team-logos/${game.away?.teamId||0}.svg`}
+            style={{width:28,height:28,flexShrink:0,objectFit:'contain'}}
+            onError={e=>{e.target.style.display='none';}}/>
+          <div style={{minWidth:0}}>
+            <div style={{fontFamily:osw,fontWeight:800,fontSize:16,
+              color:aw?'var(--text)':'var(--muted)',lineHeight:1}}>{game.away.abbr}</div>
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:1}}>
+              {game.away.record||''}
+            </div>
+          </div>
+          <div style={{fontFamily:osw,fontWeight:800,fontSize:26,
+            color:aw?'var(--text)':'var(--muted)',marginLeft:'auto',
+            minWidth:24,textAlign:'center'}}>
+            {(isLive||isFin) ? (game.away.score??'-') : '-'}
+          </div>
+        </div>
+
+        {/* Center divider */}
+        <div style={{display:'flex',flexDirection:'column',alignItems:'center',
+          gap:2,flexShrink:0,width:36}}>
+          {(isLive||isFin) && game.inning ? <>
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',letterSpacing:.5,
+              textAlign:'center',lineHeight:1}}>{game.inning}</div>
+            {game.outs != null && <div style={{fontFamily:mono,fontSize:7,
+              color:'rgba(255,255,255,.3)'}}>
+              {game.outs} out{game.outs!==1?'s':''}
+            </div>}
+          </> : <div style={{fontFamily:mono,fontSize:10,color:'rgba(255,255,255,.2)'}}>VS</div>}
+        </div>
+
+        {/* Home team */}
+        <div style={{flex:1,display:'flex',alignItems:'center',gap:8,
+          flexDirection:'row-reverse',minWidth:0}}>
+          <img src={`https://www.mlbstatic.com/team-logos/${game.home?.teamId||0}.svg`}
+            style={{width:28,height:28,flexShrink:0,objectFit:'contain'}}
+            onError={e=>{e.target.style.display='none';}}/>
+          <div style={{minWidth:0,textAlign:'right'}}>
+            <div style={{fontFamily:osw,fontWeight:800,fontSize:16,
+              color:hw?'var(--text)':'var(--muted)',lineHeight:1}}>{game.home.abbr}</div>
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:1}}>
+              {game.home.record||''}
+            </div>
+          </div>
+          <div style={{fontFamily:osw,fontWeight:800,fontSize:26,
+            color:hw?'var(--text)':'var(--muted)',marginRight:'auto',
+            minWidth:24,textAlign:'center'}}>
+            {(isLive||isFin) ? (game.home.score??'-') : '-'}
+          </div>
+        </div>
       </div>
-      <div className="gm">
-        <div className="gt"><div className="ta">{game.away.abbr}</div><div style={{fontSize:9,color:"var(--muted)",fontFamily:"DM Mono,monospace"}}>{game.away.record}</div><div className={`tsc ${aw?"win":""}`}>{game.away.score}</div></div>
-        <div className="gd">VS</div>
-        <div className="gt"><div className="ta">{game.home.abbr}</div><div style={{fontSize:9,color:"var(--muted)",fontFamily:"DM Mono,monospace"}}>{game.home.record}</div><div className={`tsc ${hw?"win":""}`}>{game.home.score}</div></div>
-      </div>
-      {!exp && <div className="gi" style={{color:isLive?"var(--fire2)":isFin?"var(--muted)":"var(--green)"}}>{isLive?"▾ Tap for live heat":isFin?"▾ Tap for final box score":"▾ Tap for 🚀 Liftoff list"}</div>}
+
+      {/* Tap hint */}
+      {!exp && <div style={{textAlign:'center',padding:'4px 12px 8px',
+        fontFamily:mono,fontSize:9,color:statusColor,opacity:.7}}>
+        {isLive ? '▾ tap for live heat' : isFin ? '▾ tap for box score' : '▾ tap for 🚀 liftoff list'}
+      </div>}
     </div>
   {exp && <>
     {(game.innings||[]).length > 0 && <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch",
