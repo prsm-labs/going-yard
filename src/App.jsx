@@ -9103,6 +9103,13 @@ function SimLabView({ data }) {
                         })() : <span style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:'rgba(255,255,255,.15)' }}>—</span>}
                       </td>
                       <td style={{textAlign:'center',padding:'3px 4px'}}>
+                        {(() => {
+                          const n = parseInt(b.recent_hr_count||0);
+                          const col = n>=3?'#ff4020':n>=1?'#f5a623':'rgba(255,255,255,.2)';
+                          return <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,color:col}}>{n>0?n:'—'}</span>;
+                        })()}
+                      </td>
+                      <td style={{textAlign:'center',padding:'3px 4px'}}>
                         <HROddsCell pid={parseInt(b.batter_id)||0}/>
                       </td>
                     </tr>
@@ -10291,6 +10298,11 @@ function BatterLeaderboard() {
     { key:'slg',  label:'SLG', render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{fmtStat(ws(p,'slg'))}</span> },
     { key:'ops',  label:'OPS', render: p => { const v=(ws(p,'slg')||0)+(ws(p,'obp')||0); return <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:700,color:opsCol(v)}}>{fmtStat(v||ws(p,'ops'))}</span>; }},
     { key:'hr',   label:'HR',  render: p => { const v=ws(p,'hr'); return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:v>=10?700:400,color:hrCol(v)}}>{v||0}</span>; }},
+    { key:'l7hr', label:'💥 L7', render: p => {
+        const n = parseInt(DAILY_PICKS_CACHE[String(p.pid||p.id||'')]?.recent_hr_count || p.windows?.last7?.hr || 0);
+        const col = n>=3?'#ff4020':n>=1?'#f5a623':'rgba(255,255,255,.2)';
+        return <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:col}}>{n>0?n:'—'}</span>;
+      }},
     { key:'hits', label:'H',   render: p => { const v=ws(p,'hits'); return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=30?'#27c97a':v>=20?'#f5a623':'var(--text)'}}>{v||0}</span>; }},
     { key:'xbh',  label:'XBH', render: p => { const v=ws(p,'xbh');  return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=12?'#ff8020':v>=7?'#f5a623':'var(--text)'}}>{v||0}</span>; }},
     { key:'kPct', label:'K%',  render: p => { const v=ws(p,'kPct'); return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=28?'var(--ice)':'var(--muted)'}}>{fmtPct(v)}</span>; }},
