@@ -9001,6 +9001,7 @@ function SimLabView({ data }) {
                     { label: 'XBH%',     key: 'proj_xbh_prob' },
                     { label: 'Sim TB',   key: 'sim_tb' },
                     { label: 'Score',    key: 'weighted_flag_score' },
+                    { label: 'L7💥',     key: 'recent_hr_count' },
                     { label: 'Grade',    key: null },
                     { label: '💣',       key: 'meatball_matchup_score' },
                     { label: 'HR Odds',  key: 'hr_odds_implied' },
@@ -9092,6 +9093,13 @@ function SimLabView({ data }) {
                           {parseFloat(b.weighted_flag_score) > 0 ? parseFloat(b.weighted_flag_score).toFixed(2) : '—'}
                         </span>
                       </td>
+                      <td style={{textAlign:'center',padding:'3px 4px'}}>
+                        {(() => {
+                          const n = parseInt(b.recent_hr_count||0);
+                          const col = n>=3?'#ff4020':n>=1?'#f5a623':'rgba(255,255,255,.2)';
+                          return <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,color:col}}>{n>0?n:'—'}</span>;
+                        })()}
+                      </td>
                       <td style={{ textAlign: 'right', padding:'3px 4px' }}>
                         {!INJURY_MAP[String(parseInt(b.batter_id)||0)] && <span style={{ padding:'1px 6px', borderRadius:4, fontSize:9, fontFamily:"'Oswald',sans-serif", fontWeight:800, background:gc.bg, color:gc.color, border:`1px solid ${gc.border}` }}>{b.grade}</span>}
                       </td>
@@ -9101,13 +9109,6 @@ function SimLabView({ data }) {
                           const col = ms >= 0.15 ? '#ff4020' : ms >= 0.08 ? '#f5a623' : '#27c97a';
                           return <span style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:col, fontWeight:700 }}>{(ms*100).toFixed(0)}</span>;
                         })() : <span style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:'rgba(255,255,255,.15)' }}>—</span>}
-                      </td>
-                      <td style={{textAlign:'center',padding:'3px 4px'}}>
-                        {(() => {
-                          const n = parseInt(b.recent_hr_count||0);
-                          const col = n>=3?'#ff4020':n>=1?'#f5a623':'rgba(255,255,255,.2)';
-                          return <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,color:col}}>{n>0?n:'—'}</span>;
-                        })()}
                       </td>
                       <td style={{textAlign:'center',padding:'3px 4px'}}>
                         <HROddsCell pid={parseInt(b.batter_id)||0}/>
