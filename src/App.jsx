@@ -7269,36 +7269,45 @@ async function fetchVideoLinks(hrs) {
       const d = await r.json();
       const items = d?.highlights?.highlights?.items || [];
 
-      let found = 0;
-      items.forEach(item => {
-        // Prefer broadcast clip (mlb-cuts-diamond) over Statcast viz (darkroom-clips)
-        // darkroom-clips.mlb.com = 3D Statcast trajectory animation (6 sec, no broadcast)
-        // mlb-cuts-diamond.mlb.com = actual HR broadcast clip
-        const playbacks = item.playbacks || [];
-        const broadcast = playbacks.find(p => (p.url||'').includes('mlb-cuts-diamond'))
-                       || playbacks.find(p => (p.url||'').includes('mediadownloads.mlb'))
-                       || playbacks.find(p => !(p.url||'').includes('darkroom-clips'));
-        const mp4 = broadcast?.url
-                 || playbacks.find(p => (p.url||'').endsWith('.mp4'))?.url
-                 || playbacks[0]?.url;
-        if (!mp4) return;
-
-        // Match to a batter via keyword player IDs
+      // Helper: match item keywords to a batter, return batter HR object or null
+      const matchBatter = (item) => {
         const keywords = item.keywordsAll || item.keywordsDisplay || [];
         for (const kw of keywords) {
           const val = String(kw.value || kw || '');
-          if (hrByBatter[val]) {
-            const h   = hrByBatter[val];
-            const gk  = String(h.gamePk||'');
-            const idx = h.atBatIndex ?? h.playIndex;
-            const bid = String(h.batterId||'');
-            if (idx != null) VIDEO_LINK_CACHE[`${gk}_${idx}`] = mp4;
-            if (bid)         VIDEO_LINK_CACHE[`${gk}_${bid}`] = mp4;
-            found++;
-            break;
-          }
+          if (hrByBatter[val]) return hrByBatter[val];
         }
+        return null;
+      };
+
+      // PASS 1: broadcast clips only (mlb-cuts-diamond = real HR video)
+      const matched = new Set();
+      items.forEach(item => {
+        const playbacks = item.playbacks || [];
+        const broadcastUrl = playbacks.find(p => (p.url||'').includes('mlb-cuts-diamond'))?.url
+                          || playbacks.find(p => (p.url||'').includes('mediadownloads.mlb'))?.url;
+        if (!broadcastUrl) return;
+        const h = matchBatter(item);
+        if (!h) return;
+        const gk = String(h.gamePk||''), idx = h.atBatIndex??h.playIndex, bid = String(h.batterId||'');
+        if (idx != null) VIDEO_LINK_CACHE[`${gk}_${idx}`] = broadcastUrl;
+        if (bid)         VIDEO_LINK_CACHE[`${gk}_${bid}`] = broadcastUrl;
+        matched.add(bid);
       });
+
+      // PASS 2: fallback to any clip (incl. Statcast viz) for unmatched batters
+      items.forEach(item => {
+        const playbacks = item.playbacks || [];
+        const anyUrl = playbacks.find(p => (p.url||'').endsWith('.mp4'))?.url || playbacks[0]?.url;
+        if (!anyUrl) return;
+        const h = matchBatter(item);
+        if (!h || matched.has(String(h.batterId||''))) return;
+        const gk = String(h.gamePk||''), idx = h.atBatIndex??h.playIndex, bid = String(h.batterId||'');
+        if (idx != null) VIDEO_LINK_CACHE[`${gk}_${idx}`] = anyUrl;
+        if (bid)         VIDEO_LINK_CACHE[`${gk}_${bid}`] = anyUrl;
+        matched.add(bid);
+      });
+
+      const found = matched.size;
 
       console.log(`[Video] game ${gamePk}: ${items.length} highlights, ${found} HR videos matched`);
       totalFound += found;
