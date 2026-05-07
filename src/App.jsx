@@ -7280,6 +7280,11 @@ async function fetchVideoLinks(hrs) {
         if (idx != null && uuid) idxToUUID[idx] = uuid;
       });
 
+      // DEBUG: show what we got vs what we need
+      const sampleIdxs = Object.keys(idxToUUID).slice(0,5);
+      const hrIdxs = gameHRs.map(h => h.atBatIndex ?? h.playIndex);
+      console.log(`[Video] game ${gamePk}: ${plays.length} plays, idxToUUID size=${Object.keys(idxToUUID).length}, sample idxs=${sampleIdxs}, HR atBatIdxs=${hrIdxs}`);
+
       // Match each HR by atBatIndex → get UUID → build Savant URL
       let found = 0;
       gameHRs.forEach(h => {
