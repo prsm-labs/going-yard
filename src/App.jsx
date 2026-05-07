@@ -7263,27 +7263,25 @@ async function fetchVideoLinks(hrs) {
   let totalFound = 0;
   for (const gamePk of games) {
     try {
+      // v1.1 live feed — the ONLY endpoint that includes play.about.playId (UUID)
+      // playByPlay confirmed via debug to have idxToUUID size=0 (no playId field)
       const r = await fetch(
-        `https://statsapi.mlb.com/api/v1/game/${gamePk}/playByPlay`,
-        { signal: AbortSignal.timeout(10000) }
+        `https://statsapi.mlb.com/api/v1.1/game/${gamePk}/feed/live`,
+        { signal: AbortSignal.timeout(12000) }
       );
       if (!r.ok) continue;
       const d = await r.json();
-      const plays = d?.allPlays || [];
+      const plays = d?.liveData?.plays?.allPlays || [];
       const gameHRs = hrByGame[gamePk] || [];
 
-      // Build atBatIndex → UUID map from every play in this game
+      // Build atBatIndex → UUID map
       const idxToUUID = {};
       plays.forEach(play => {
         const idx  = play.about?.atBatIndex;
         const uuid = play.about?.playId;
         if (idx != null && uuid) idxToUUID[idx] = uuid;
       });
-
-      // DEBUG: show what we got vs what we need
-      const sampleIdxs = Object.keys(idxToUUID).slice(0,5);
-      const hrIdxs = gameHRs.map(h => h.atBatIndex ?? h.playIndex);
-      console.log(`[Video] game ${gamePk}: ${plays.length} plays, idxToUUID size=${Object.keys(idxToUUID).length}, sample idxs=${sampleIdxs}, HR atBatIdxs=${hrIdxs}`);
+      console.log(`[Video] game ${gamePk}: ${plays.length} plays, ${Object.keys(idxToUUID).length} with playId`);
 
       // Match each HR by atBatIndex → get UUID → build Savant URL
       let found = 0;
