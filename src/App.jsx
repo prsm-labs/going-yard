@@ -330,9 +330,12 @@ function getCachedPlayer(pid) { return PLAYER_DATA_CACHE[String(pid)] || PLAYER_
 // Hot bat: 3+ HRs in last 7 days — works on player cache AND engine rows
 function isHotBatPlayer(p) {
   if (!p) return false;
+  const pid = String(p.pid || p.id || p.batter_id || '');
+  // Prefer daily_picks.csv recent_hr_count (pipeline-verified) over players.json last7.hr
+  const fromPicks = pid ? parseFloat(DAILY_PICKS_CACHE[pid]?.recent_hr_count ?? -1) : -1;
   const fromCache = parseFloat(p.windows?.last7?.hr ?? p.l7hr ?? -1);
   const fromRow   = parseFloat(p.recent_hr_count ?? -1);
-  const val = fromCache >= 0 ? fromCache : fromRow >= 0 ? fromRow : -1;
+  const val = fromPicks >= 0 ? fromPicks : fromRow >= 0 ? fromRow : fromCache >= 0 ? fromCache : -1;
   return val >= 3;
 }
 // Normalize team abbreviations — MLB API still returns legacy codes for relocated teams
@@ -8786,16 +8789,16 @@ function SimLabView({ data }) {
                 color: lineupOnly ? '#27c97a' : 'var(--muted)',
                 fontFamily: "'DM Mono',monospace", fontSize: 11, fontWeight: lineupOnly ? 700 : 400,
                 whiteSpace: 'nowrap' }}>
-              ✅ {lineupOnly ? 'Confirmed ✓' : 'Confirmed'}
+              ✅
             </button>
             <button onClick={() => setFilterGoneYardSim(v => !v)}
-              style={{ padding: '6px 12px', borderRadius: 7, cursor: 'pointer',
+              style={{ padding: '5px 8px', borderRadius: 7, cursor: 'pointer',
                 border: `1px solid ${filterGoneYardSim ? 'rgba(255,64,32,.5)' : 'var(--border)'}`,
                 background: filterGoneYardSim ? 'rgba(255,64,32,.15)' : 'var(--surface2)',
                 color: filterGoneYardSim ? 'var(--accent)' : 'var(--muted)',
                 fontFamily: "'DM Mono',monospace", fontSize: 11, fontWeight: filterGoneYardSim ? 700 : 400,
                 whiteSpace: 'nowrap' }}>
-              💥 {filterGoneYardSim ? 'Gone Yard ✓' : 'Gone Yard'}
+              💥
             </button>
             <button onClick={() => setFilterDueSim(v => !v)}
               style={{ padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
@@ -8803,7 +8806,7 @@ function SimLabView({ data }) {
                 color: filterDueSim ? 'var(--ice)' : 'var(--muted)',
                 border: `1px solid ${filterDueSim ? 'rgba(56,184,242,.5)' : 'var(--border)'}`,
                 fontFamily: "'DM Mono',monospace", fontWeight: filterDueSim ? 700 : 400, fontSize: 11 }}>
-              ⏳ {filterDueSim ? 'Due ✓' : 'Due'}
+              ⏳
             </button>
             <button onClick={()=>{setSimActiveOnly(s=>!s);if(!simActiveOnly)setSimInjuredOnly(false);}}
               style={{padding:'4px 10px',borderRadius:6,cursor:'pointer',
@@ -8812,7 +8815,7 @@ function SimLabView({ data }) {
                 color:simActiveOnly?'#34d399':'var(--muted)',
                 fontFamily:"'DM Mono',monospace",fontWeight:simActiveOnly?700:400,fontSize:11,
                 whiteSpace:'nowrap'}}>
-              ☑️ {simActiveOnly?'Active ✓':'Active'}
+              ☑️
             </button>
             <button onClick={()=>{setSimInjuredOnly(s=>!s);if(!simInjuredOnly)setSimActiveOnly(false);}}
               style={{padding:'4px 10px',borderRadius:6,cursor:'pointer',
@@ -8821,7 +8824,7 @@ function SimLabView({ data }) {
                 color:simInjuredOnly?'#fb923c':'var(--muted)',
                 fontFamily:"'DM Mono',monospace",fontWeight:simInjuredOnly?700:400,fontSize:11,
                 whiteSpace:'nowrap'}}>
-              🤕 {simInjuredOnly?'Injured ✓':'Injured'}
+              🤕
             </button>
             <button onClick={() => setSimHotOnly(s => !s)}
               style={{ padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
@@ -8830,7 +8833,7 @@ function SimLabView({ data }) {
                 color: simHotOnly?'#fb923c':'var(--muted)',
                 fontFamily: "'DM Mono',monospace", fontWeight: simHotOnly?700:400, fontSize: 11,
                 whiteSpace: 'nowrap' }}>
-              🔥 {simHotOnly?'Hot Bat ✓':'Hot Bat'}
+              🔥
             </button>
             <button onClick={() => setSimPicksOnly(s => !s)}
               style={{ padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
@@ -8839,7 +8842,7 @@ function SimLabView({ data }) {
                 color: simPicksOnly ? 'var(--accent2)' : 'var(--muted)',
                 fontFamily: "'DM Mono',monospace", fontWeight: simPicksOnly ? 700 : 400, fontSize: 11,
                 whiteSpace: 'nowrap' }}>
-              🎯 {simPicksOnly ? 'My Picks ✓' : 'My Picks'}
+              🎯
             </button>
             <button onClick={() => setFilterDiamondSim(v => !v)}
               style={{ padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
@@ -8848,7 +8851,7 @@ function SimLabView({ data }) {
                 border: `1px solid ${filterDiamondSim ? 'rgba(255,204,0,.5)' : 'var(--border)'}`,
                 fontFamily: "'DM Mono',monospace", fontWeight: filterDiamondSim ? 700 : 400, fontSize: 11 }}
               title="Tier 1 Locks: A+ grade + Sim TB≥2.0 + Hittable/Target pitcher">
-              💎 {filterDiamondSim ? 'Diamond ✓' : 'Diamond'}
+              💎
             </button>
             {/* Batter search */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginLeft: 'auto' }}>
@@ -8916,12 +8919,12 @@ function SimLabView({ data }) {
                   next.has(g) ? next.delete(g) : next.add(g);
                   return next;
                 })}
-                style={{ padding:'3px 10px', borderRadius:6, cursor:'pointer',
+                style={{ padding:'3px 8px', borderRadius:6, cursor:'pointer',
                   background: active ? 'rgba(255,255,255,.08)' : 'transparent',
                   color: active ? col : 'var(--muted)',
                   border: `1px solid ${active ? col : 'var(--border)'}`,
-                  fontFamily:"'DM Mono',monospace", fontWeight: active ? 700 : 400, fontSize: 10 }}>
-                {g}
+                  fontFamily:"'DM Mono',monospace", fontWeight: active ? 700 : 400, fontSize: 13 }}>
+                {g.split(' ')[0]}
               </button>;
             })}
           </div>
@@ -10436,7 +10439,7 @@ function BatterLeaderboard() {
             color:showPicksOnly?'var(--accent2)':'var(--muted)',
             fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:showPicksOnly?700:400,
             whiteSpace:'nowrap',transition:'all .15s'}}>
-          🎯 {showPicksOnly ? 'My Picks ✓' : 'My Picks'}
+          🎯
         </button>
         <button onClick={()=>{setActiveOnly(s=>!s);if(!activeOnly)setInjuredOnly(false);}}
           style={{padding:'6px 12px',borderRadius:7,cursor:'pointer',
@@ -10445,7 +10448,7 @@ function BatterLeaderboard() {
             color:activeOnly?'#34d399':'var(--muted)',
             fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:activeOnly?700:400,
             whiteSpace:'nowrap'}}>
-          ☑️ {activeOnly?'Active ✓':'Active'}
+          ☑️
         </button>
         <button onClick={()=>{setInjuredOnly(s=>!s);if(!injuredOnly)setActiveOnly(false);}}
           style={{padding:'6px 12px',borderRadius:7,cursor:'pointer',
@@ -10454,7 +10457,7 @@ function BatterLeaderboard() {
             color:injuredOnly?'#fb923c':'var(--muted)',
             fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:injuredOnly?700:400,
             whiteSpace:'nowrap'}}>
-          🤕 {injuredOnly?'Injured ✓':'Injured'}
+          🤕
         </button>
         <button onClick={()=>setHotBatOnly(s=>!s)}
           style={{padding:'6px 12px',borderRadius:7,cursor:'pointer',
@@ -10463,7 +10466,7 @@ function BatterLeaderboard() {
             color:hotBatOnly?'#fb923c':'var(--muted)',
             fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:hotBatOnly?700:400,
             whiteSpace:'nowrap'}}>
-          🔥 {hotBatOnly?'Hot Bat ✓':'Hot Bat'}
+          🔥
         </button>
         <button onClick={()=>setFilterGoneYard(s=>!s)}
           style={{padding:'6px 12px',borderRadius:7,cursor:'pointer',
@@ -10472,7 +10475,7 @@ function BatterLeaderboard() {
             color:filterGoneYard?'#ff4020':'var(--muted)',
             fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:filterGoneYard?700:400,
             whiteSpace:'nowrap',transition:'all .15s'}}>
-          💥 {filterGoneYard ? 'Gone Yard ✓' : 'Gone Yard'}
+          💥
         </button>
         <button onClick={()=>setFilterDue(v=>!v)}
           style={{padding:'4px 10px',borderRadius:6,cursor:'pointer',
@@ -10480,7 +10483,7 @@ function BatterLeaderboard() {
             color:filterDue?'var(--ice)':'var(--muted)',
             border:`1px solid ${filterDue?'rgba(56,184,242,.5)':'var(--border)'}`,
             fontFamily:"'DM Mono',monospace",fontWeight:filterDue?700:400,fontSize:11}}>
-          ⏳ {filterDue ? 'Due ✓' : 'Due'}
+          ⏳
         </button>
         <button onClick={()=>{
           const esc = v => `"${String(v??'').replace(/"/g,'""')}"`;
@@ -11686,7 +11689,7 @@ function MatchupEngineTab() {
           color:filterGoneYard?'#ff4020':'var(--muted)',
           border:`1px solid ${filterGoneYard?'rgba(255,20,0,.5)':'var(--border)'}`,
           fontFamily:"'DM Mono',monospace",fontWeight:filterGoneYard?700:400,fontSize:11}}>
-        💥 {filterGoneYard ? 'Gone Yard ✓' : 'Gone Yard'}
+        💥
       </button>
       <button onClick={()=>setFilterDue(v=>!v)}
         style={{padding:'3px 12px',borderRadius:6,cursor:'pointer',marginLeft:4,
@@ -11694,7 +11697,7 @@ function MatchupEngineTab() {
           color:filterDue?'var(--ice)':'var(--muted)',
           border:`1px solid ${filterDue?'rgba(56,184,242,.5)':'var(--border)'}`,
           fontFamily:"'DM Mono',monospace",fontWeight:filterDue?700:400,fontSize:11}}>
-        ⏳ {filterDue ? 'Due ✓' : 'Due'}
+        ⏳
       </button>
       <button onClick={()=>{setKmActiveOnly(s=>!s);if(!kmActiveOnly)setKmInjuredOnly(false);}}
         style={{padding:'3px 12px',borderRadius:6,cursor:'pointer',
@@ -11703,7 +11706,7 @@ function MatchupEngineTab() {
           color:kmActiveOnly?'#34d399':'var(--muted)',
           fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:kmActiveOnly?700:400,
           whiteSpace:'nowrap',marginLeft:4}}>
-        ☑️ {kmActiveOnly?'Active ✓':'Active'}
+        ☑️
       </button>
       <button onClick={()=>{setKmInjuredOnly(s=>!s);if(!kmInjuredOnly)setKmActiveOnly(false);}}
         style={{padding:'3px 12px',borderRadius:6,cursor:'pointer',
@@ -11712,7 +11715,7 @@ function MatchupEngineTab() {
           color:kmInjuredOnly?'#fb923c':'var(--muted)',
           fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:kmInjuredOnly?700:400,
           whiteSpace:'nowrap',marginLeft:4}}>
-        🤕 {kmInjuredOnly?'Injured ✓':'Injured'}
+        🤕
       </button>
       <button onClick={()=>setKmHotOnly(s=>!s)}
         style={{padding:'3px 12px',borderRadius:6,cursor:'pointer',
@@ -11721,7 +11724,7 @@ function MatchupEngineTab() {
           color:kmHotOnly?'#fb923c':'var(--muted)',
           fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:kmHotOnly?700:400,
           whiteSpace:'nowrap',marginLeft:4}}>
-        🔥 {kmHotOnly?'Hot Bat ✓':'Hot Bat'}
+        🔥
       </button>
       <button onClick={()=>setKmPicksOnly(s=>!s)}
         style={{padding:'3px 12px',borderRadius:6,cursor:'pointer',
