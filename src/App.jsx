@@ -7936,7 +7936,7 @@ function HRTrackerTab() {
         : <div className="tw"><table style={{width:"100%"}}>
             <colgroup>
               <col style={{width:24}}/>  {/* # */}
-              <col style={{width:68}}/>  {/* Time */}
+              <col style={{width:80}}/>  {/* Time */}
               <col style={{width:40}}/>  {/* Team */}
               <col style={{width:130}}/> {/* Batter */}
               <col style={{width:38}}/>  {/* HR# */}
@@ -7988,7 +7988,7 @@ function HRTrackerTab() {
                   || VIDEO_LINK_CACHE[hr.uuid];
                 return <tr key={i} style={{height:26}}>
                 <td style={{padding:"1px 3px"}}><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,color:i<3?"var(--accent)":"var(--muted)"}}>{sorted.length - i}</span></td>
-                <td style={{padding:"1px 3px"}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:"var(--text)"}}>{hr.timeET&&hr.timeET!==""?hr.timeET:`I${hr.inning}`}</span></td>
+                <td style={{padding:"1px 3px",whiteSpace:"nowrap"}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:"var(--text)",whiteSpace:"nowrap"}}>{hr.timeET&&hr.timeET!==""?hr.timeET:`I${hr.inning}`}</span></td>
                 <td style={{padding:"1px 3px"}}><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,color:"var(--text)"}}>{hr.batterTeam}</span></td>
                 <td style={{padding:"1px 3px",whiteSpace:"nowrap"}}><div style={{display:"flex",alignItems:"center",gap:3}}><PlayerAvatar pid={hr.batterId} name={hr.batterName} size={18}/><span className="pn" style={{fontSize:10,whiteSpace:"nowrap",...(isKeyMatchup(hr.batterId,hr.batterName)?{color:"#ff8020",fontWeight:700}:{})}}>{hr.batterName}</span><InjuryBadge pid={hr.batterId} name={hr.batterName}/></div></td>
                 <td style={{padding:"1px 3px"}}><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:10,color:"var(--accent)"}}>{seasonNum}</span></td>
