@@ -7999,7 +7999,7 @@ function HRTrackerTab() {
                 <td style={{padding:"1px 3px"}}><span className={`sv ${distC}`} style={{fontSize:9}}>{hr.distance!=null?`${hr.distance}ft`:"—"}</span></td>
                 <td style={{padding:"1px 3px"}}>{hr.pitchType?<span style={{fontSize:8,fontFamily:"'DM Mono',monospace",padding:"1px 4px",borderRadius:3,background:"var(--surface2)",border:"1px solid var(--border)",whiteSpace:"nowrap"}}>{hr.pitchType}</span>:"—"}</td>
                 <td style={{padding:"1px 3px",whiteSpace:"nowrap"}}><span style={{fontSize:9}}>{hr.pitcherName}</span></td>
-                <td style={{padding:"1px 3px"}}><span style={{fontSize:8,fontFamily:"'DM Mono',monospace",color:"var(--muted)"}}>{hr.gameId}</span></td>
+                <td style={{padding:"1px 3px",whiteSpace:"nowrap"}}><span style={{fontSize:8,fontFamily:"'DM Mono',monospace",color:"var(--muted)",whiteSpace:"nowrap"}}>{hr.awayAbbr&&hr.homeAbbr?`${hr.awayAbbr}@${hr.homeAbbr}`:hr.gameId}</span></td>
                 <td style={{textAlign:"center",padding:"1px 2px"}}>
                   {videoUrl ? <a href={videoUrl} target="_blank" rel="noopener noreferrer"
                     onClick={e=>e.stopPropagation()} title="Watch HR video"
