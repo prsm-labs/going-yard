@@ -7971,7 +7971,7 @@ function HRTrackerTab() {
                   || VIDEO_LINK_CACHE[`${hr.gamePk}_${hr.batterId}`]
                   || VIDEO_LINK_CACHE[hr.playId]
                   || VIDEO_LINK_CACHE[hr.uuid];
-                return <tr key={i} style={{height:26}}>
+                const row = (<tr key={i} style={{height:26}}>
                 <td style={{padding:"1px 3px"}}><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,color:i<3?"var(--accent)":"var(--muted)"}}>{sorted.length - i}</span></td>
                 <td style={{padding:"1px 3px"}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:"var(--text)"}}>{hr.timeET&&hr.timeET!==""?hr.timeET:`I${hr.inning}`}</span></td>
                 <td style={{padding:"1px 3px"}}><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,color:"var(--text)"}}>{hr.batterTeam}</span></td>
@@ -7990,7 +7990,7 @@ function HRTrackerTab() {
                     onClick={e=>e.stopPropagation()} title="Watch HR video"
                     style={{fontSize:12,textDecoration:"none",display:"block",textAlign:"center"}}>📹</a> : null}
                 </td>
-                </tr>;
+                </tr>); return row;
               })}
             </tbody>
           </table></div>
