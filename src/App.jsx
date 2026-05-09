@@ -8021,7 +8021,7 @@ function HotBatsTab() {
   const [loading, setLoading] = useState(true);
   const [expPid, setExpPid]  = useState(null);
   const [sort, setSort]      = useState('l7hr');
-  const [sortDir, setSortDir] = useState(-1); // -1 = desc, 1 = asc
+  const [sortDir, setSortDir] = useState(1); // 1 = desc (b-a), -1 = asc
   const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
 
   useEffect(() => {
@@ -8072,22 +8072,22 @@ function HotBatsTab() {
           <tbody>
             {sorted.map(p => [
               (<tr key={p.pid} onClick={()=>setExpPid(v=>v===p.pid?null:p.pid)}
-                style={{cursor:'pointer',borderBottom:'1px solid rgba(255,255,255,.04)',
+                style={{cursor:'pointer',height:28,borderBottom:'1px solid rgba(255,255,255,.04)',
                   background:expPid===p.pid?'rgba(255,255,255,.04)':'transparent'}}>
-                <td style={{padding:'6px 8px',fontFamily:osw,fontWeight:700,fontSize:10,color:'var(--accent2)'}}>{p.team}</td>
-                <td style={{padding:'6px 8px'}}>
-                  <div style={{display:'flex',alignItems:'center',gap:6}}>
-                    <PlayerAvatar pid={p.pid} name={p.name} size={20}/>
-                    <span style={{fontFamily:osw,fontWeight:700,fontSize:11,color:isKeyMatchup(p.pid,p.name)?'#ff8020':'var(--text)'}}>{p.name}</span>
-                    <span onClick={e=>e.stopPropagation()}><PickButton pid={p.pid} name={p.name} team={p.team}/></span>
+                <td style={{padding:'2px 6px',fontFamily:osw,fontWeight:700,fontSize:9,color:'var(--accent2)',whiteSpace:'nowrap'}}>{p.team}</td>
+                <td style={{padding:'2px 6px',maxWidth:160}}>
+                  <div style={{display:'flex',alignItems:'center',gap:4,overflow:'hidden'}}>
+                    <PlayerAvatar pid={p.pid} name={p.name} size={16}/>
+                    <span style={{fontFamily:osw,fontWeight:700,fontSize:10,color:isKeyMatchup(p.pid,p.name)?'#ff8020':'var(--text)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.name}</span>
+                    <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={p.pid} name={p.name} team={p.team}/></span>
                   </div>
                 </td>
-                <td style={{padding:'6px 8px',textAlign:'right'}}><span style={{fontFamily:osw,fontWeight:800,fontSize:13,color:p.l7hr>=3?'#ff4020':p.l7hr>=2?'#f5a623':'#27c97a'}}>{p.l7hr}</span></td>
-                <td style={{padding:'6px 8px',textAlign:'right',fontFamily:mono,fontSize:10}}>{p.seasonHR}</td>
-                <td style={{padding:'6px 8px',textAlign:'right',fontFamily:mono,fontSize:10,color:'var(--muted)'}}>{p.abhr||'—'}</td>
-                <td style={{padding:'6px 8px',textAlign:'right',fontFamily:mono,fontSize:10,color:p.abSince>20?'var(--ice)':p.abSince>10?'var(--muted)':'#27c97a'}}>{p.abSince}</td>
+                <td style={{padding:'2px 6px',textAlign:'right'}}><span style={{fontFamily:osw,fontWeight:800,fontSize:12,color:p.l7hr>=3?'#ff4020':p.l7hr>=2?'#f5a623':'#27c97a'}}>{p.l7hr}</span></td>
+                <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9}}>{p.seasonHR}</td>
+                <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{p.abhr||'—'}</td>
+                <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,color:p.abSince>20?'var(--ice)':p.abSince>10?'var(--muted)':'#27c97a'}}>{p.abSince}</td>
               </tr>),
-              expPid===p.pid && (<tr key={p.pid+'x'}><td colSpan={6} style={{padding:'0 12px 12px',background:'rgba(255,255,255,.02)'}}>
+              expPid===p.pid && (<tr key={p.pid+'x'}><td colSpan={6} style={{padding:'0 10px 10px',background:'rgba(255,255,255,.02)'}}>
                 <Last7HRChart batterId={p.pid}/>
                 <RecentGameLog batterId={p.pid}/>
               </td></tr>)
@@ -8104,8 +8104,8 @@ function HeatingUpTab() {
   const [rows, setRows]     = useState([]);
   const [loading, setLoading] = useState(true);
   const [expPid, setExpPid]  = useState(null);
-  const [sort, setSort]      = useState('heatScore');
-  const [sortDir, setSortDir] = useState(-1);
+  const [sort, setSort]      = useState('avgEV');
+  const [sortDir, setSortDir] = useState(1);
   const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
 
   useEffect(() => {
@@ -8157,26 +8157,26 @@ function HeatingUpTab() {
           <tbody>
             {sorted.map(p => [
               (<tr key={p.pid} onClick={()=>setExpPid(v=>v===p.pid?null:p.pid)}
-                style={{cursor:'pointer',borderBottom:'1px solid rgba(255,255,255,.04)',
+                style={{cursor:'pointer',height:28,borderBottom:'1px solid rgba(255,255,255,.04)',
                   background:expPid===p.pid?'rgba(255,255,255,.04)':'transparent'}}>
-                <td style={{padding:'5px 6px',fontFamily:osw,fontWeight:700,fontSize:10,color:'var(--accent2)'}}>{p.team}</td>
-                <td style={{padding:'5px 6px'}}>
-                  <div style={{display:'flex',alignItems:'center',gap:5}}>
-                    <PlayerAvatar pid={p.pid} name={p.name} size={18}/>
-                    <span style={{fontFamily:osw,fontWeight:700,fontSize:11,color:isKeyMatchup(p.pid,p.name)?'#ff8020':'var(--text)'}}>{p.name}</span>
-                    <span onClick={e=>e.stopPropagation()}><PickButton pid={p.pid} name={p.name} team={p.team}/></span>
+                <td style={{padding:'2px 5px',fontFamily:osw,fontWeight:700,fontSize:9,color:'var(--accent2)',whiteSpace:'nowrap'}}>{p.team}</td>
+                <td style={{padding:'2px 5px',maxWidth:150}}>
+                  <div style={{display:'flex',alignItems:'center',gap:4,overflow:'hidden'}}>
+                    <PlayerAvatar pid={p.pid} name={p.name} size={16}/>
+                    <span style={{fontFamily:osw,fontWeight:700,fontSize:10,color:isKeyMatchup(p.pid,p.name)?'#ff8020':'var(--text)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.name}</span>
+                    <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={p.pid} name={p.name} team={p.team}/></span>
                   </div>
                 </td>
-                <td style={{padding:'5px 6px',textAlign:'right',fontFamily:osw,fontWeight:700,fontSize:11,color:evCol(p.avgEV)}}>{p.avgEV.toFixed(1)}</td>
-                <td style={{padding:'5px 6px',textAlign:'right',fontFamily:mono,fontSize:10}}>{p.hh.toFixed(1)}%</td>
-                <td style={{padding:'5px 6px',textAlign:'right',fontFamily:mono,fontSize:10}}>{p.fb.toFixed(1)}%</td>
-                <td style={{padding:'5px 6px',textAlign:'right',fontFamily:mono,fontSize:10}}>{p.barrel.toFixed(1)}%</td>
-                <td style={{padding:'5px 6px',textAlign:'right'}}><span style={{fontFamily:osw,fontWeight:700,fontSize:11,color:p.l7hr>=3?'#ff4020':p.l7hr>=1?'#f5a623':'rgba(255,255,255,.2)'}}>{p.l7hr||'—'}</span></td>
-                <td style={{padding:'5px 6px',textAlign:'right',fontFamily:mono,fontSize:10}}>{p.seasonHR||'—'}</td>
-                <td style={{padding:'5px 6px',textAlign:'right',fontFamily:mono,fontSize:10,color:'var(--muted)'}}>{p.abhr||'—'}</td>
-                <td style={{padding:'5px 6px',textAlign:'right',fontFamily:mono,fontSize:10,color:p.abSince!=null?(p.abSince>20?'var(--ice)':p.abSince>10?'var(--muted)':'#27c97a'):'rgba(255,255,255,.2)'}}>{p.abSince!=null?p.abSince:'—'}</td>
+                <td style={{padding:'2px 5px',textAlign:'right',fontFamily:osw,fontWeight:700,fontSize:11,color:evCol(p.avgEV)}}>{p.avgEV.toFixed(1)}</td>
+                <td style={{padding:'2px 5px',textAlign:'right',fontFamily:mono,fontSize:9}}>{p.hh.toFixed(1)}%</td>
+                <td style={{padding:'2px 5px',textAlign:'right',fontFamily:mono,fontSize:9}}>{p.fb.toFixed(1)}%</td>
+                <td style={{padding:'2px 5px',textAlign:'right',fontFamily:mono,fontSize:9}}>{p.barrel.toFixed(1)}%</td>
+                <td style={{padding:'2px 5px',textAlign:'right'}}><span style={{fontFamily:osw,fontWeight:700,fontSize:11,color:p.l7hr>=3?'#ff4020':p.l7hr>=1?'#f5a623':'rgba(255,255,255,.2)'}}>{p.l7hr||'—'}</span></td>
+                <td style={{padding:'2px 5px',textAlign:'right',fontFamily:mono,fontSize:9}}>{p.seasonHR||'—'}</td>
+                <td style={{padding:'2px 5px',textAlign:'right',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{p.abhr||'—'}</td>
+                <td style={{padding:'2px 5px',textAlign:'right',fontFamily:mono,fontSize:9,color:p.abSince!=null?(p.abSince>20?'var(--ice)':p.abSince>10?'var(--muted)':'#27c97a'):'rgba(255,255,255,.2)'}}>{p.abSince!=null?p.abSince:'—'}</td>
               </tr>),
-              expPid===p.pid && (<tr key={p.pid+'x'}><td colSpan={10} style={{padding:'0 12px 12px',background:'rgba(255,255,255,.02)'}}>
+              expPid===p.pid && (<tr key={p.pid+'x'}><td colSpan={10} style={{padding:'0 10px 10px',background:'rgba(255,255,255,.02)'}}>
                 <Last7HRChart batterId={p.pid}/>
                 <RecentGameLog batterId={p.pid}/>
               </td></tr>)
@@ -8352,9 +8352,10 @@ function LiveBatterBox({ batterId, gamePk, onData }) {
     if (!gamePk || !batterId) { setStatus('error'); return; }
     (async () => {
       try {
-        const batters = await fetchLiveBatters(gamePk);
+        const result  = await fetchLiveBatters(gamePk);
+        const allBatters = Array.isArray(result) ? result : (result?.batters || []);
         const bid = parseInt(batterId);
-        const found = batters.find(b => b.id === bid || String(b.id) === String(batterId));
+        const found = allBatters.find(b => b.id === bid || String(b.id) === String(batterId));
         if (found) {
           setStats(found);
           setStatus('live');
