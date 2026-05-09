@@ -7848,7 +7848,8 @@ function HRTrackerTab() {
     </div>
     {hrTab === 'hotbats'   && <HotBatsTab/>}
     {hrTab === 'heatingup' && <HeatingUpTab/>}
-    {hrTab === 'tracker'   && <div>
+    {hrTab === 'tracker' && (
+    <div>
     <div className="hrow">
       <button onClick={exportHRCsv}
         style={{padding:"4px 12px",borderRadius:6,border:"1px solid var(--border)",
@@ -7993,7 +7994,8 @@ function HRTrackerTab() {
               })}
             </tbody>
           </table></div>
-    </div>}
+    </div>
+    )}
   </div>;
 }
 
