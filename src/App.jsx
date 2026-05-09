@@ -7893,29 +7893,36 @@ function HRTrackerTab() {
       <span style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{isToday?"🔴 Live":"📅 " + displayDate}</span>
     </div>
 
-    {/* Stats summary cards */}
-    <div className="cards" style={{marginBottom:14}}>
-      <div className="card"><div className="cl">💥 Total HRs</div><div className="cv" style={{color:"var(--accent)"}}>{totalHRs}</div><div className="cs">{isToday?"today":displayDate}</div></div>
-      <div className="card"><div className="cl">🎉 Grand Slams</div><div className="cv" style={{color:"var(--accent2)"}}>{slamCount}</div><div className="cs">{isToday?"today":displayDate}</div></div>
-      {avgDist && <div className="card"><div className="cl">📏 Avg Distance</div><div className="cv">{avgDist}</div><div className="cs">feet</div></div>}
-      {avgEV && <div className="card"><div className="cl">⚡ Avg Exit Velo</div><div className="cv">{avgEV}</div><div className="cs">mph</div></div>}
+    {/* Stats + top shots — compact single row */}
+    <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
+      {/* Stat mini-cards */}
+      {[
+        {icon:'💥',label:'HRs',  val:totalHRs,   sub:null,           col:'var(--accent)'},
+        {icon:'🎉',label:'Slams',val:slamCount,   sub:null,           col:'var(--accent2)'},
+        {icon:'📏',label:'Avg Dist',val:avgDist?`${avgDist}ft`:null,sub:null,col:'var(--text)'},
+        {icon:'⚡',label:'Avg EV', val:avgEV?`${avgEV}`:null,       sub:avgEV?'mph':null,col:'var(--text)'},
+      ].filter(c=>c.val!=null).map(c=>(
+        <div key={c.label} style={{flex:'0 0 auto',background:'var(--surface)',border:'1px solid var(--border)',
+          borderRadius:7,padding:'6px 10px',minWidth:64,textAlign:'center'}}>
+          <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:.8,whiteSpace:'nowrap'}}>{c.icon} {c.label}</div>
+          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:18,color:c.col,lineHeight:1.1}}>{c.val}</div>
+          {c.sub && <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>{c.sub}</div>}
+        </div>
+      ))}
+      {/* Longest + Hardest — compact */}
+      {topShot && <div style={{flex:1,minWidth:130,background:'var(--surface)',border:'1px solid rgba(232,65,26,.25)',borderRadius:7,padding:'6px 10px'}}>
+        <div style={{fontSize:7,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:.8,marginBottom:2}}>🚀 Longest</div>
+        <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,color:'var(--accent)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{topShot.batterName}</div>
+        <div style={{fontFamily:"'Oswald',sans-serif",fontSize:20,fontWeight:800,lineHeight:1}}>{topShot.distance}<span style={{fontSize:10,color:'var(--muted)',marginLeft:2}}>ft</span></div>
+        <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>{topShot.batterTeam} · {topShot.exitVelo}mph · {topShot.launchAngle}°</div>
+      </div>}
+      {hardest && <div style={{flex:1,minWidth:130,background:'var(--surface)',border:'1px solid rgba(245,166,35,.25)',borderRadius:7,padding:'6px 10px'}}>
+        <div style={{fontSize:7,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:.8,marginBottom:2}}>⚡ Hardest Hit</div>
+        <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,color:'var(--accent2)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{hardest.batterName}</div>
+        <div style={{fontFamily:"'Oswald',sans-serif",fontSize:20,fontWeight:800,lineHeight:1}}>{hardest.exitVelo}<span style={{fontSize:10,color:'var(--muted)',marginLeft:2}}>mph</span></div>
+        <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>{hardest.batterTeam} · {hardest.distance}ft · {hardest.launchAngle}°</div>
+      </div>}
     </div>
-
-    {/* Top shots */}
-    {(topShot || hardest) && <div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap"}}>
-      {topShot && <div style={{flex:1,minWidth:200,background:"var(--surface)",border:"1px solid rgba(232,65,26,.3)",borderRadius:8,padding:"10px 14px"}}>
-        <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>🚀 Longest Today</div>
-        <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:16,color:"var(--accent)"}}>{topShot.batterName}</div>
-        <div style={{fontFamily:"'Oswald',sans-serif",fontSize:28,color:"var(--text)",fontWeight:700,lineHeight:1}}>{topShot.distance}<span style={{fontSize:14,color:"var(--muted)",marginLeft:3}}>ft</span></div>
-        <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",marginTop:2}}>{topShot.batterTeam} · {topShot.exitVelo}mph · {topShot.launchAngle}°</div>
-      </div>}
-      {hardest && <div style={{flex:1,minWidth:200,background:"var(--surface)",border:"1px solid rgba(245,166,35,.3)",borderRadius:8,padding:"10px 14px"}}>
-        <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>⚡ Hardest Hit Today</div>
-        <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:16,color:"var(--accent2)"}}>{hardest.batterName}</div>
-        <div style={{fontFamily:"'Oswald',sans-serif",fontSize:28,color:"var(--text)",fontWeight:700,lineHeight:1}}>{hardest.exitVelo}<span style={{fontSize:14,color:"var(--muted)",marginLeft:3}}>mph</span></div>
-        <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",marginTop:2}}>{hardest.batterTeam} · {hardest.distance}ft · {hardest.launchAngle}°</div>
-      </div>}
-    </div>}
 
     {/* Search + Team filter */}
     <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:10,flexWrap:"wrap"}}>
