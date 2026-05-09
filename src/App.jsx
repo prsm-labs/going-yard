@@ -6240,6 +6240,7 @@ function GamedayTab() {
   const [plays,     setPlays]     = useState([]);
   const [playsLoad, setPlaysLoad] = useState(false);
   const [expandedPlayIdx, setExpandedPlayIdx] = useState(null);
+  const [expandedBatterId, setExpandedBatterId] = useState(null);
   const [notes,     setNotes]     = useState({});    // {away:[...], home:[...]} batting/baserunning info
   const pollRef  = useRef(null);
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
@@ -6800,8 +6801,12 @@ function GamedayTab() {
                         const isHot     = isHotBatPlayer(dp || getCachedPlayer(r.id));
                         const cp        = getCachedPlayer(r.id) || {};
                         const nameColor = r.id===curBatId ? 'var(--accent)' : gc?.color || (r.sub?'var(--muted)':undefined);
+                        const isBatExp = expandedBatterId === r.id;
                         return (
-                          <tr key={r.id} style={{background: r.id===curBatId ? 'rgba(232,65,26,.08)' : undefined}}>
+                          <React.Fragment key={r.id}>
+                          <tr onClick={(e)=>{if(e.target.tagName!=='SPAN'&&e.target.tagName!=='A')setExpandedBatterId(v=>v===r.id?null:r.id);}}
+                            style={{background: isBatExp?'rgba(255,255,255,.05)': r.id===curBatId ? 'rgba(232,65,26,.08)' : undefined,
+                              cursor:'pointer', borderLeft:isBatExp?'3px solid var(--accent)':'3px solid transparent'}}>
                             <td style={{...cell,textAlign:'left',minWidth:140}}>
                               <div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}>
                                 {/* Slot # */}
@@ -6841,6 +6846,14 @@ function GamedayTab() {
                                 color:j===2&&v>0?'#27c97a':j===3&&v>0?'var(--accent2)':undefined}}>{v}</td>
                             ))}
                           </tr>
+                          {isBatExp && (
+                            <tr><td colSpan={9} style={{padding:0,background:'rgba(232,65,26,.03)',borderBottom:'1px solid var(--border)'}}>
+                              <div style={{padding:'4px 12px 12px'}}>
+                                <LiveBatterBox batterId={r.id} gamePk={selGamePk}/>
+                              </div>
+                            </td></tr>
+                          )}
+                          </React.Fragment>
                         );
                       })
                       : rows.map(r => (
@@ -8065,6 +8078,7 @@ function HotBatsTab() {
                   <div style={{display:'flex',alignItems:'center',gap:6}}>
                     <PlayerAvatar pid={p.pid} name={p.name} size={20}/>
                     <span style={{fontFamily:osw,fontWeight:700,fontSize:11,color:isKeyMatchup(p.pid,p.name)?'#ff8020':'var(--text)'}}>{p.name}</span>
+                    <span onClick={e=>e.stopPropagation()}><PickButton pid={p.pid} name={p.name} team={p.team}/></span>
                   </div>
                 </td>
                 <td style={{padding:'6px 8px',textAlign:'right'}}><span style={{fontFamily:osw,fontWeight:800,fontSize:13,color:p.l7hr>=3?'#ff4020':p.l7hr>=2?'#f5a623':'#27c97a'}}>{p.l7hr}</span></td>
@@ -8148,6 +8162,7 @@ function HeatingUpTab() {
                   <div style={{display:'flex',alignItems:'center',gap:5}}>
                     <PlayerAvatar pid={p.pid} name={p.name} size={18}/>
                     <span style={{fontFamily:osw,fontWeight:700,fontSize:11,color:isKeyMatchup(p.pid,p.name)?'#ff8020':'var(--text)'}}>{p.name}</span>
+                    <span onClick={e=>e.stopPropagation()}><PickButton pid={p.pid} name={p.name} team={p.team}/></span>
                   </div>
                 </td>
                 <td style={{padding:'5px 6px',textAlign:'right',fontFamily:osw,fontWeight:700,fontSize:11,color:evCol(p.avgEV)}}>{p.avgEV.toFixed(1)}</td>
