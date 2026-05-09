@@ -7993,7 +7993,7 @@ function HRTrackerTab() {
               })}
             </tbody>
           </table></div>
-    </div>} {/* end tracker tab */}
+    </div>}
   </div>;
 }
 
