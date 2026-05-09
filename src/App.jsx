@@ -8055,17 +8055,17 @@ function HotBatsTab() {
     style={{padding:'5px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.8,
       color:sort===k?'var(--accent2)':'var(--muted)',cursor:'pointer',textAlign:'right',
       whiteSpace:wrap?'normal':'nowrap',lineHeight:1.3,maxWidth:wrap?36:undefined,
-      borderBottom:'1px solid var(--border)',background:'var(--surface2)',position:'sticky',top:0,zIndex:10}}>{l}{sort===k?(sortDir===-1?' ▼':' ▲'):''}</th>);
+      borderBottom:'1px solid var(--border)'}}>{l}{sort===k?(sortDir===-1?' ▼':' ▲'):''}</th>);
 
   if (loading) return (<div style={{display:'flex',alignItems:'center',gap:8,padding:20,color:'var(--muted)',fontFamily:mono,fontSize:11}}><div className="sp"/>Loading…</div>);
   return (
     <div>
       <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginBottom:10}}>{sorted.length} batters with HRs in last 7 games · tap row to expand</div>
-      <div style={{overflowX:'auto'}}>
-        <table style={{width:'100%',borderCollapse:'collapse',fontSize:10}}>
+      <div className="tw">
+        <table style={{width:'100%'}}>
           <thead><tr>
-            <th style={{padding:'5px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.8,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)',background:'var(--surface2)',position:'sticky',top:0,zIndex:10}}>TM</th>
-            <th style={{padding:'5px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.8,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)',background:'var(--surface2)',position:'sticky',top:0,zIndex:10}}>Batter</th>
+            <th style={{padding:'5px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.8,color:'var(--muted)',textAlign:'left'}}>TM</th>
+            <th style={{padding:'5px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.8,color:'var(--muted)',textAlign:'left'}}>Batter</th>
             <Th k="l7hr"     l="💥 L7"/>
             <Th k="seasonHR" l="Season"/>
             <Th k="abhr"     l="AB/HR"/>
@@ -8146,11 +8146,11 @@ function HeatingUpTab() {
   return (
     <div>
       <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginBottom:10}}>{sorted.length} batters · last 7 games contact quality · tap row to expand</div>
-      <div style={{overflowX:'auto'}}>
-        <table style={{width:'100%',borderCollapse:'collapse',fontSize:10}}>
+      <div className="tw">
+        <table style={{width:'100%'}}>
           <thead><tr>
-            <th style={{padding:'5px 6px',fontSize:7,fontFamily:mono,textTransform:'uppercase',letterSpacing:.6,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)',background:'var(--surface2)',position:'sticky',top:0,zIndex:10}}>TM</th>
-            <th style={{padding:'5px 6px',fontSize:7,fontFamily:mono,textTransform:'uppercase',letterSpacing:.6,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)',background:'var(--surface2)',position:'sticky',top:0,zIndex:10}}>Batter</th>
+            <th style={{padding:'5px 6px',fontSize:7,fontFamily:mono,textTransform:'uppercase',letterSpacing:.6,color:'var(--muted)',textAlign:'left'}}>TM</th>
+            <th style={{padding:'5px 6px',fontSize:7,fontFamily:mono,textTransform:'uppercase',letterSpacing:.6,color:'var(--muted)',textAlign:'left'}}>Batter</th>
             <Th k="avgEV"    l="Avg EV"/>
             <Th k="hh"       l="HH%"/>
             <Th k="fb"       l="FB%"/>
