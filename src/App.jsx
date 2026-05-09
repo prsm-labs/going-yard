@@ -7912,6 +7912,20 @@ function HRTrackerTab() {
       </div>}
     </div>
 
+    <HRTrackerTable
+      loading={loading} sorted={sorted} totalHRs={totalHRs}
+      isToday={isToday} displayDate={displayDate} hrRankMap={hrRankMap}
+      sortKey={sortKey} hs={hs} sortDir={sortDir}
+    />
+  </div>); return _body;
+}
+
+
+
+// ── HR Tracker Table — extracted to keep HRTrackerTab parse-friendly ─────────
+function HRTrackerTable({ loading, sorted, totalHRs, isToday, displayDate,
+    hrRankMap, sortKey, hs, sortDir }) {
+  return (
     {loading
       ? <div className="lw"><div className="sp"/><div className="lt">Loading today's home runs…</div></div>
       : sorted.length === 0
@@ -7994,10 +8008,8 @@ function HRTrackerTab() {
               })}
             </tbody>
           </table></div>
-  </div>); return _body;
+  );
 }
-
-
 // ── Hot Bats — batters with the most HRs in the last 7 games ────────────────
 function HotBatsTab() {
   const [players, setPlayers] = useState([]);
