@@ -7926,6 +7926,7 @@ function HRTrackerTab() {
 function HRTrackerTable({ loading, sorted, totalHRs, isToday, displayDate,
     hrRankMap, sortKey, hs, sortDir }) {
   return (
+    <>
     {loading
       ? <div className="lw"><div className="sp"/><div className="lt">Loading today's home runs…</div></div>
       : sorted.length === 0
@@ -8008,6 +8009,7 @@ function HRTrackerTable({ loading, sorted, totalHRs, isToday, displayDate,
               })}
             </tbody>
           </table></div>
+    </>
   );
 }
 // ── Hot Bats — batters with the most HRs in the last 7 games ────────────────
