@@ -4248,7 +4248,10 @@ function GPanel({game, isLive, isFinal=false}) {
                 </div>
               </div>,
               isE && <div key={`${b.id}-x`} style={{background:"rgba(232,65,26,.03)",
-                borderBottom:"1px solid rgba(30,45,58,.5)"}}><XRow b={b}/></div>
+                borderBottom:"1px solid rgba(30,45,58,.5)"}}>
+                {isLive && <LiveBatterBox batterId={b.id} gamePk={game.gamePk}/>}
+                <XRow b={b}/>
+              </div>
             ];
           })}
         </div>
@@ -7684,6 +7687,7 @@ function HRTicker({ onHRClick }) {
 
 
 function HRTrackerTab() {
+  const [hrTab, setHrTab] = useState('tracker');
   const [hrs, setHrs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sortKey, setSortKey] = useState("chronoIndex");
@@ -7830,7 +7834,24 @@ function HRTrackerTab() {
     a.click();
   };
 
+  const HRNav = () => (
+    <div style={{display:'flex',gap:6,marginBottom:14}}>
+      {[['tracker','💥 HR Tracker'],['hotbats','🔥 Hot Bats'],['heatingup','📈 Heating Up']].map(([key,label]) => (
+        <button key={key} onClick={() => setHrTab(key)}
+          style={{padding:'5px 12px',borderRadius:7,cursor:'pointer',
+            fontFamily:"'DM Mono',monospace",fontWeight:hrTab===key?700:400,fontSize:10,
+            border:`1px solid ${hrTab===key?'var(--accent)':'var(--border)'}`,
+            background:hrTab===key?'rgba(232,65,26,.15)':'var(--surface2)',
+            color:hrTab===key?'var(--accent)':'var(--muted)'}}>
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+  if (hrTab === 'hotbats')   return <div><HRNav/><HotBatsTab/></div>;
+  if (hrTab === 'heatingup') return <div><HRNav/><HeatingUpTab/></div>;
   return <div>
+    <HRNav/>
     <div className="hrow">
       <button onClick={exportHRCsv}
         style={{padding:"4px 12px",borderRadius:6,border:"1px solid var(--border)",
@@ -7979,6 +8000,176 @@ function HRTrackerTab() {
   </div>;
 }
 
+
+
+// ── Hot Bats Tab ─────────────────────────────────────────────────────────────
+function HotBatsTab() {
+  const [rows, setRows]     = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [expPid, setExpPid]  = useState(null);
+  const [sort, setSort]      = useState('l7hr');
+  const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
+
+  useEffect(() => {
+    const season = new Date().getFullYear();
+    fetch(`https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&season=${season}&sportId=1&limit=150`)
+      .then(r => r.json())
+      .then(async d => {
+        const leaders = d.leagueLeaders?.[0]?.leaders || [];
+        const out = await Promise.all(leaders.slice(0, 80).map(async l => {
+          const pid = l.person?.id; if (!pid) return null;
+          try {
+            const games = await fetchGameLog(pid);
+            const l7 = games.slice(-7);
+            const l7hr = l7.reduce((s,g) => s+(g.hrs||0), 0);
+            let abSince = 0;
+            for (let i=games.length-1;i>=0;i--) { if(games[i].hrs>0) break; abSince+=games[i].ab||0; }
+            const totAB = games.reduce((s,g)=>s+(g.ab||0),0);
+            const totHR = games.reduce((s,g)=>s+(g.hrs||0),0);
+            return { pid, name:l.person?.fullName||'', team:l.team?.abbreviation||'',
+              seasonHR:parseInt(l.value||0), l7hr, abhr:totHR>0?(totAB/totHR).toFixed(1):null, abSince };
+          } catch { return null; }
+        }));
+        setRows(out.filter(r => r && r.l7hr > 0));
+        setLoading(false);
+      }).catch(() => setLoading(false));
+  }, []);
+
+  const sorted = [...rows].sort((a,b) => (b[sort]||0)-(a[sort]||0));
+  const Th = ({k,l}) => (<th onClick={()=>setSort(k)}
+    style={{padding:'5px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.8,
+      color:sort===k?'var(--accent2)':'var(--muted)',cursor:'pointer',textAlign:'right',
+      whiteSpace:'nowrap',borderBottom:'1px solid var(--border)'}}>{l}{sort===k?' ▼':''}</th>);
+
+  if (loading) return (<div style={{display:'flex',alignItems:'center',gap:8,padding:20,color:'var(--muted)',fontFamily:mono,fontSize:11}}><div className="sp"/>Loading…</div>);
+  return (
+    <div>
+      <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginBottom:10}}>{sorted.length} batters with HRs in last 7 games · tap row to expand</div>
+      <div style={{overflowX:'auto'}}>
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:10}}>
+          <thead><tr>
+            <th style={{padding:'5px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.8,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)'}}>TM</th>
+            <th style={{padding:'5px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.8,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)'}}>Batter</th>
+            <Th k="l7hr"     l="💥 L7"/>
+            <Th k="seasonHR" l="Season"/>
+            <Th k="abhr"     l="AB/HR"/>
+            <Th k="abSince"  l="AB Since"/>
+          </tr></thead>
+          <tbody>
+            {sorted.map(p => [
+              (<tr key={p.pid} onClick={()=>setExpPid(v=>v===p.pid?null:p.pid)}
+                style={{cursor:'pointer',borderBottom:'1px solid rgba(255,255,255,.04)',
+                  background:expPid===p.pid?'rgba(255,255,255,.04)':'transparent'}}>
+                <td style={{padding:'6px 8px',fontFamily:osw,fontWeight:700,fontSize:10,color:'var(--accent2)'}}>{p.team}</td>
+                <td style={{padding:'6px 8px'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:6}}>
+                    <PlayerAvatar pid={p.pid} name={p.name} size={20}/>
+                    <span style={{fontFamily:osw,fontWeight:700,fontSize:11,color:isKeyMatchup(p.pid,p.name)?'#ff8020':'var(--text)'}}>{p.name}</span>
+                  </div>
+                </td>
+                <td style={{padding:'6px 8px',textAlign:'right'}}><span style={{fontFamily:osw,fontWeight:800,fontSize:13,color:p.l7hr>=3?'#ff4020':p.l7hr>=2?'#f5a623':'#27c97a'}}>{p.l7hr}</span></td>
+                <td style={{padding:'6px 8px',textAlign:'right',fontFamily:mono,fontSize:10}}>{p.seasonHR}</td>
+                <td style={{padding:'6px 8px',textAlign:'right',fontFamily:mono,fontSize:10,color:'var(--muted)'}}>{p.abhr||'—'}</td>
+                <td style={{padding:'6px 8px',textAlign:'right',fontFamily:mono,fontSize:10,color:p.abSince>20?'var(--ice)':p.abSince>10?'var(--muted)':'#27c97a'}}>{p.abSince}</td>
+              </tr>),
+              expPid===p.pid && (<tr key={p.pid+'x'}><td colSpan={6} style={{padding:'0 12px 12px',background:'rgba(255,255,255,.02)'}}>
+                <Last7HRChart batterId={p.pid}/>
+                <RecentGameLog batterId={p.pid}/>
+              </td></tr>)
+            ])}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ── Heating Up Tab ────────────────────────────────────────────────────────────
+function HeatingUpTab() {
+  const [rows, setRows]     = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [expPid, setExpPid]  = useState(null);
+  const [sort, setSort]      = useState('heatScore');
+  const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
+
+  useEffect(() => {
+    const all = Object.values(PLAYER_DATA_CACHE).filter(p => {
+      const w = p.windows?.last7;
+      return w && (w.pa||0) >= 10 && (w.avgEV||0) >= 85;
+    });
+    const built = all.map(p => {
+      const w = p.windows?.last7 || {};
+      const avgEV=w.avgEV||0, hh=w.hardHit||0, fb=w.flyBall||0, barrel=w.barrel||0, l7hr=w.hr||0;
+      const heatScore = avgEV*0.35 + hh*0.25 + fb*0.20 + barrel*0.20;
+      const seasonHR = p.windows?.season2026?.hr || 0;
+      const totAB = p.windows?.season2026?.ab || 0;
+      const abhr = seasonHR>0 ? (totAB/seasonHR).toFixed(1) : null;
+      const gl = GAME_LOG_CACHE[String(p.pid)];
+      let abSince = null;
+      if (gl) { abSince=0; for(let i=gl.length-1;i>=0;i--){if(gl[i].hrs>0)break;abSince+=gl[i].ab||0;} }
+      return { pid:p.pid, name:p.name, team:p.team||'', avgEV, hh, fb, barrel, l7hr, seasonHR, abhr, abSince, heatScore };
+    }).filter(r => r.avgEV >= 88);
+    setRows(built);
+    setLoading(false);
+  }, []);
+
+  const sorted = [...rows].sort((a,b) => (b[sort]||0)-(a[sort]||0));
+  const evCol = v => v>=103?'#ff4020':v>=98?'#ff8020':v>=95?'#f5a623':v>=90?'var(--text)':'var(--muted)';
+  const Th = ({k,l}) => (<th onClick={()=>setSort(k)}
+    style={{padding:'5px 6px',fontSize:7,fontFamily:mono,textTransform:'uppercase',letterSpacing:.6,
+      color:sort===k?'var(--accent2)':'var(--muted)',cursor:'pointer',textAlign:'right',
+      whiteSpace:'nowrap',borderBottom:'1px solid var(--border)'}}>{l}{sort===k?' ▼':''}</th>);
+
+  if (loading) return (<div style={{display:'flex',alignItems:'center',gap:8,padding:20,color:'var(--muted)',fontFamily:mono,fontSize:11}}><div className="sp"/>Computing…</div>);
+  return (
+    <div>
+      <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginBottom:10}}>{sorted.length} batters · last 7 games contact quality · tap row to expand</div>
+      <div style={{overflowX:'auto'}}>
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:10}}>
+          <thead><tr>
+            <th style={{padding:'5px 6px',fontSize:7,fontFamily:mono,textTransform:'uppercase',letterSpacing:.6,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)'}}>TM</th>
+            <th style={{padding:'5px 6px',fontSize:7,fontFamily:mono,textTransform:'uppercase',letterSpacing:.6,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)'}}>Batter</th>
+            <Th k="avgEV"    l="Avg EV"/>
+            <Th k="hh"       l="HH%"/>
+            <Th k="fb"       l="FB%"/>
+            <Th k="barrel"   l="Brl%"/>
+            <Th k="l7hr"     l="💥 L7"/>
+            <Th k="seasonHR" l="HR"/>
+            <Th k="abhr"     l="AB/HR"/>
+            <Th k="abSince"  l="AB Since"/>
+          </tr></thead>
+          <tbody>
+            {sorted.map(p => [
+              (<tr key={p.pid} onClick={()=>setExpPid(v=>v===p.pid?null:p.pid)}
+                style={{cursor:'pointer',borderBottom:'1px solid rgba(255,255,255,.04)',
+                  background:expPid===p.pid?'rgba(255,255,255,.04)':'transparent'}}>
+                <td style={{padding:'5px 6px',fontFamily:osw,fontWeight:700,fontSize:10,color:'var(--accent2)'}}>{p.team}</td>
+                <td style={{padding:'5px 6px'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:5}}>
+                    <PlayerAvatar pid={p.pid} name={p.name} size={18}/>
+                    <span style={{fontFamily:osw,fontWeight:700,fontSize:11,color:isKeyMatchup(p.pid,p.name)?'#ff8020':'var(--text)'}}>{p.name}</span>
+                  </div>
+                </td>
+                <td style={{padding:'5px 6px',textAlign:'right',fontFamily:osw,fontWeight:700,fontSize:11,color:evCol(p.avgEV)}}>{p.avgEV.toFixed(1)}</td>
+                <td style={{padding:'5px 6px',textAlign:'right',fontFamily:mono,fontSize:10}}>{p.hh.toFixed(1)}%</td>
+                <td style={{padding:'5px 6px',textAlign:'right',fontFamily:mono,fontSize:10}}>{p.fb.toFixed(1)}%</td>
+                <td style={{padding:'5px 6px',textAlign:'right',fontFamily:mono,fontSize:10}}>{p.barrel.toFixed(1)}%</td>
+                <td style={{padding:'5px 6px',textAlign:'right'}}><span style={{fontFamily:osw,fontWeight:700,fontSize:11,color:p.l7hr>=3?'#ff4020':p.l7hr>=1?'#f5a623':'rgba(255,255,255,.2)'}}>{p.l7hr||'—'}</span></td>
+                <td style={{padding:'5px 6px',textAlign:'right',fontFamily:mono,fontSize:10}}>{p.seasonHR||'—'}</td>
+                <td style={{padding:'5px 6px',textAlign:'right',fontFamily:mono,fontSize:10,color:'var(--muted)'}}>{p.abhr||'—'}</td>
+                <td style={{padding:'5px 6px',textAlign:'right',fontFamily:mono,fontSize:10,color:p.abSince!=null?(p.abSince>20?'var(--ice)':p.abSince>10?'var(--muted)':'#27c97a'):'rgba(255,255,255,.2)'}}>{p.abSince!=null?p.abSince:'—'}</td>
+              </tr>),
+              expPid===p.pid && (<tr key={p.pid+'x'}><td colSpan={10} style={{padding:'0 12px 12px',background:'rgba(255,255,255,.02)'}}>
+                <Last7HRChart batterId={p.pid}/>
+                <RecentGameLog batterId={p.pid}/>
+              </td></tr>)
+            ])}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 
 function MLBScoresTab() {
   return <div style={{margin:"-16px"}}>
