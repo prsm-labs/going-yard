@@ -7897,26 +7897,25 @@ function HRTrackerTab() {
     <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
       {/* Stat mini-cards */}
       {[
-        {icon:'💥',label:'HRs',  val:totalHRs,   sub:null,           col:'var(--accent)'},
-        {icon:'🎉',label:'Slams',val:slamCount,   sub:null,           col:'var(--accent2)'},
-        {icon:'📏',label:'Avg Dist',val:avgDist?`${avgDist}ft`:null,sub:null,col:'var(--text)'},
-        {icon:'⚡',label:'Avg EV', val:avgEV?`${avgEV}`:null,       sub:avgEV?'mph':null,col:'var(--text)'},
+        {icon:'💥',label:'HRs',        val:totalHRs,                  col:'var(--accent)'},
+        {icon:'🎉',label:'Grand Slams', val:slamCount,                 col:'var(--accent2)'},
+        {icon:'📏',label:'Avg Dist',    val:avgDist?`${avgDist}ft`:null,col:'var(--text)'},
+        {icon:'⚡',label:'Avg EV',      val:avgEV?`${avgEV}mph`:null,  col:'var(--text)'},
       ].filter(c=>c.val!=null).map(c=>(
         <div key={c.label} style={{flex:'0 0 auto',background:'var(--surface)',border:'1px solid var(--border)',
-          borderRadius:7,padding:'6px 10px',minWidth:64,textAlign:'center'}}>
-          <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:.8,whiteSpace:'nowrap'}}>{c.icon} {c.label}</div>
-          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:18,color:c.col,lineHeight:1.1}}>{c.val}</div>
-          {c.sub && <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>{c.sub}</div>}
+          borderRadius:7,padding:'5px 8px',textAlign:'center'}}>
+          <div style={{fontSize:7,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:.6,whiteSpace:'nowrap'}}>{c.icon} {c.label}</div>
+          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:16,color:c.col,lineHeight:1.1}}>{c.val}</div>
         </div>
       ))}
       {/* Longest + Hardest — compact */}
-      {topShot && <div style={{flex:1,minWidth:130,background:'var(--surface)',border:'1px solid rgba(232,65,26,.25)',borderRadius:7,padding:'6px 10px'}}>
+      {topShot && <div style={{flex:1,minWidth:120,background:'var(--surface)',border:'1px solid rgba(232,65,26,.25)',borderRadius:7,padding:'5px 8px'}}>
         <div style={{fontSize:7,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:.8,marginBottom:2}}>🚀 Longest</div>
         <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,color:'var(--accent)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{topShot.batterName}</div>
         <div style={{fontFamily:"'Oswald',sans-serif",fontSize:20,fontWeight:800,lineHeight:1}}>{topShot.distance}<span style={{fontSize:10,color:'var(--muted)',marginLeft:2}}>ft</span></div>
         <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>{topShot.batterTeam} · {topShot.exitVelo}mph · {topShot.launchAngle}°</div>
       </div>}
-      {hardest && <div style={{flex:1,minWidth:130,background:'var(--surface)',border:'1px solid rgba(245,166,35,.25)',borderRadius:7,padding:'6px 10px'}}>
+      {hardest && <div style={{flex:1,minWidth:120,background:'var(--surface)',border:'1px solid rgba(245,166,35,.25)',borderRadius:7,padding:'5px 8px'}}>
         <div style={{fontSize:7,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:.8,marginBottom:2}}>⚡ Hardest Hit</div>
         <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,color:'var(--accent2)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{hardest.batterName}</div>
         <div style={{fontFamily:"'Oswald',sans-serif",fontSize:20,fontWeight:800,lineHeight:1}}>{hardest.exitVelo}<span style={{fontSize:10,color:'var(--muted)',marginLeft:2}}>mph</span></div>
@@ -8028,7 +8027,8 @@ function HotBatsTab() {
   const [loading, setLoading] = useState(true);
   const [expPid, setExpPid]  = useState(null);
   const [sort, setSort]      = useState('l7hr');
-  const [sortDir, setSortDir] = useState(1); // 1 = desc (b-a), -1 = asc
+  const [sortDir, setSortDir] = useState(1);
+  const [teamFilter, setTeamFilter] = useState('ALL');
   const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
 
   useEffect(() => {
@@ -8057,7 +8057,8 @@ function HotBatsTab() {
       }).catch(() => setLoading(false));
   }, []);
 
-  const sorted = [...rows].sort((a,b) => sortDir * ((parseFloat(b[sort])||0)-(parseFloat(a[sort])||0)));
+  const teams_hb = ['ALL', ...Array.from(new Set(rows.map(p=>p.team).filter(Boolean))).sort()];
+  const sorted = [...rows].filter(p => teamFilter==='ALL' || p.team===teamFilter).sort((a,b) => sortDir * ((parseFloat(b[sort])||0)-(parseFloat(a[sort])||0)));
   const Th = ({k,l,wrap}) => (<th onClick={()=>{ if(sort===k) setSortDir(d=>-d); else { setSort(k); setSortDir(-1); } }}
     style={{padding:'5px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.8,
       color:sort===k?'var(--accent2)':'var(--muted)',cursor:'pointer',textAlign:'right',
@@ -8067,7 +8068,14 @@ function HotBatsTab() {
   if (loading) return (<div style={{display:'flex',alignItems:'center',gap:8,padding:20,color:'var(--muted)',fontFamily:mono,fontSize:11}}><div className="sp"/>Loading…</div>);
   return (
     <div>
-      <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginBottom:10}}>{sorted.length} batters with HRs in last 7 games · tap row to expand</div>
+      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10,flexWrap:'wrap'}}>
+        <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{sorted.length} batters · tap row to expand</div>
+        <select value={teamFilter} onChange={e=>setTeamFilter(e.target.value)}
+          style={{marginLeft:'auto',padding:'3px 8px',borderRadius:6,fontSize:10,fontFamily:mono,
+            border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',cursor:'pointer'}}>
+          {teams_hb.map(t=><option key={t} value={t}>{t==='ALL'?'All Teams':t}</option>)}
+        </select>
+      </div>
       <div className="tw">
         <table style={{width:'100%'}}>
           <thead><tr>
@@ -8115,6 +8123,7 @@ function HeatingUpTab() {
   const [expPid, setExpPid]  = useState(null);
   const [sort, setSort]      = useState('avgEV');
   const [sortDir, setSortDir] = useState(1);
+  const [teamFilter, setTeamFilter] = useState('ALL');
   const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
 
   useEffect(() => {
@@ -8142,7 +8151,8 @@ function HeatingUpTab() {
     setLoading(false);
   }, []);
 
-  const sorted = [...rows].sort((a,b) => sortDir * ((parseFloat(b[sort])||0)-(parseFloat(a[sort])||0)));
+  const teams_hu = ['ALL', ...Array.from(new Set(rows.map(p=>p.team).filter(Boolean))).sort()];
+  const sorted = [...rows].filter(p => teamFilter==='ALL' || p.team===teamFilter).sort((a,b) => sortDir * ((parseFloat(b[sort])||0)-(parseFloat(a[sort])||0)));
   const evCol = v => v>=103?'#ff4020':v>=98?'#ff8020':v>=95?'#f5a623':v>=90?'var(--text)':'var(--muted)';
   const Th = ({k,l}) => (<th onClick={()=>{ if(sort===k) setSortDir(d=>-d); else { setSort(k); setSortDir(-1); } }}
     style={{padding:'5px 6px',fontSize:7,fontFamily:mono,textTransform:'uppercase',letterSpacing:.6,
@@ -8152,7 +8162,14 @@ function HeatingUpTab() {
   if (loading) return (<div style={{display:'flex',alignItems:'center',gap:8,padding:20,color:'var(--muted)',fontFamily:mono,fontSize:11}}><div className="sp"/>Computing…</div>);
   return (
     <div>
-      <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginBottom:10}}>{sorted.length} batters · last 7 games contact quality · tap row to expand</div>
+      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10,flexWrap:'wrap'}}>
+        <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{sorted.length} batters · last 7 games · tap row to expand</div>
+        <select value={teamFilter} onChange={e=>setTeamFilter(e.target.value)}
+          style={{marginLeft:'auto',padding:'3px 8px',borderRadius:6,fontSize:10,fontFamily:mono,
+            border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',cursor:'pointer'}}>
+          {teams_hu.map(t=><option key={t} value={t}>{t==='ALL'?'All Teams':t}</option>)}
+        </select>
+      </div>
       <div className="tw">
         <table style={{width:'100%'}}>
           <thead><tr>
