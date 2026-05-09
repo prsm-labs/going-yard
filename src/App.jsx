@@ -7992,7 +7992,7 @@ function HRTrackerTab() {
                 <td style={{padding:"1px 3px"}}><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,color:"var(--text)"}}>{hr.batterTeam}</span></td>
                 <td style={{padding:"1px 3px",whiteSpace:"nowrap"}}><div style={{display:"flex",alignItems:"center",gap:3}}><PlayerAvatar pid={hr.batterId} name={hr.batterName} size={18}/><span className="pn" style={{fontSize:10,whiteSpace:"nowrap",...(isKeyMatchup(hr.batterId,hr.batterName)?{color:"#ff8020",fontWeight:700}:{})}}>{hr.batterName}</span><InjuryBadge pid={hr.batterId} name={hr.batterName}/></div></td>
                 <td style={{padding:"1px 3px"}}><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:10,color:"var(--accent)"}}>{seasonNum}</span></td>
-                <td style={{padding:"1px 3px"}}><span className={`hr-badge ${badgeCls}`} style={{fontSize:8,padding:"1px 4px"}}>{hr.hrType}</span></td>
+                <td style={{padding:"1px 3px",whiteSpace:"nowrap"}}><span className={`hr-badge ${badgeCls}`} style={{fontSize:8,padding:"1px 4px",whiteSpace:"nowrap"}}>{hr.hrType}</span></td>
                 <td style={{padding:"1px 3px"}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:9}}>{hr.halfInning==="top"?"▲":"▼"}{hr.inning}</span></td>
                 <td style={{padding:"1px 3px"}}><span className={`sv ${hr.launchAngle>=25&&hr.launchAngle<=35?"good":"avg"}`} style={{fontSize:9}}>{hr.launchAngle!=null?`${hr.launchAngle}°`:"—"}</span></td>
                 <td style={{padding:"1px 3px"}}><span className={`sv ${evC}`} style={{fontSize:9}}>{hr.exitVelo!=null?`${hr.exitVelo}`:"—"}</span></td>
@@ -8025,6 +8025,7 @@ function HotBatsTab() {
   const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
 
   useEffect(() => {
+    const ABBR={108:'LAA',109:'AZ',110:'BAL',111:'BOS',112:'CHC',113:'CIN',114:'CLE',115:'COL',116:'DET',117:'HOU',118:'KC',119:'LAD',120:'WSH',121:'NYM',133:'ATH',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',139:'TB',140:'TEX',141:'TOR',142:'MIN',143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL'};
     const season = new Date().getFullYear();
     fetch(`https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&season=${season}&sportId=1&limit=150`)
       .then(r => r.json())
@@ -8040,7 +8041,7 @@ function HotBatsTab() {
             for (let i=games.length-1;i>=0;i--) { if(games[i].hrs>0) break; abSince+=games[i].ab||0; }
             const totAB = games.reduce((s,g)=>s+(g.ab||0),0);
             const totHR = games.reduce((s,g)=>s+(g.hrs||0),0);
-            return { pid, name:l.person?.fullName||'', team:l.team?.abbreviation||'',
+            return { pid, name:l.person?.fullName||'', team:ABBR[l.team?.id]||l.team?.abbreviation||l.team?.name?.replace(/^.* /,'')||'',
               seasonHR:parseInt(l.value||0), l7hr, abhr:totHR>0?(totAB/totHR).toFixed(1):null, abSince };
           } catch { return null; }
         }));
