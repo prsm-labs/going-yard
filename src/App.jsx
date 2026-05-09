@@ -9857,7 +9857,7 @@ function BvPHistoryTab({ data }) {
   const filtered = useMemo(() => {
     let r = rows;
     if (bvpPicksOnly)  r = r.filter(x => picks[String(x.batterId)]);
-    if (bvpLineupOnly) r = r.filter(x => isConfirmed({batter_id: x.batterId, game_id: x.gameId}));
+    if (bvpLineupOnly) r = r.filter(x => parseInt(x.batterId||0) > 0 && LINEUP_STATUS[parseInt(x.batterId||0)]?.status === 'confirmed');
     if (bvpActiveOnly) r = r.filter(x => !INJURY_MAP[String(x.batterId)]);
     if (bvpInjuredOnly) r = r.filter(x => !!INJURY_MAP[String(x.batterId)]);
     if (minPA > 0) r = r.filter(x => (x.pa||0) >= minPA);
@@ -10216,7 +10216,7 @@ function BatterLeaderboard() {
     })
     .filter(p => !searchQ || p.name?.toLowerCase().includes(searchQ.toLowerCase()))
     .filter(p => !showPicksOnly || picks[String(p.pid)])
-    .filter(p => !battersLineupOnly || (()=>{ const pid=String(p.pid||p.id||''); const dp=DAILY_PICKS_CACHE[pid]; return dp && isConfirmed({batter_id:pid,game_id:dp.game_id}); })())
+    .filter(p => !battersLineupOnly || (parseInt(p.pid||p.id||0) > 0 && LINEUP_STATUS[parseInt(p.pid||p.id||0)]?.status === 'confirmed'))
     .filter(p => !activeOnly || !INJURY_MAP[String(p.pid||p.id)])
     .filter(p => !injuredOnly || !!INJURY_MAP[String(p.pid||p.id)])
     .filter(p => !hotBatOnly || isHotBatPlayer(p))
