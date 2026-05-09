@@ -8051,10 +8051,11 @@ function HotBatsTab() {
   }, []);
 
   const sorted = [...rows].sort((a,b) => sortDir * ((parseFloat(b[sort])||0)-(parseFloat(a[sort])||0)));
-  const Th = ({k,l}) => (<th onClick={()=>{ if(sort===k) setSortDir(d=>-d); else { setSort(k); setSortDir(-1); } }}
+  const Th = ({k,l,wrap}) => (<th onClick={()=>{ if(sort===k) setSortDir(d=>-d); else { setSort(k); setSortDir(-1); } }}
     style={{padding:'5px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.8,
       color:sort===k?'var(--accent2)':'var(--muted)',cursor:'pointer',textAlign:'right',
-      whiteSpace:'nowrap',borderBottom:'1px solid var(--border)'}}>{l}{sort===k?(sortDir===-1?' ▼':' ▲'):''}</th>);
+      whiteSpace:wrap?'normal':'nowrap',lineHeight:1.3,maxWidth:wrap?36:undefined,
+      borderBottom:'1px solid var(--border)'}}>{l}{sort===k?(sortDir===-1?' ▼':' ▲'):''}</th>);
 
   if (loading) return (<div style={{display:'flex',alignItems:'center',gap:8,padding:20,color:'var(--muted)',fontFamily:mono,fontSize:11}}><div className="sp"/>Loading…</div>);
   return (
@@ -8068,7 +8069,7 @@ function HotBatsTab() {
             <Th k="l7hr"     l="💥 L7"/>
             <Th k="seasonHR" l="Season"/>
             <Th k="abhr"     l="AB/HR"/>
-            <Th k="abSince"  l="AB Since"/>
+            <Th k="abSince" l="AB Since" wrap/>
           </tr></thead>
           <tbody>
             {sorted.map(p => [
@@ -8125,8 +8126,9 @@ function HeatingUpTab() {
       const totAB = p.windows?.season2026?.ab || 0;
       const abhr = seasonHR>0 ? (totAB/seasonHR).toFixed(1) : null;
       const gl = GAME_LOG_CACHE[String(p.pid)];
+      const glGames = gl?.games;
       let abSince = null;
-      if (gl) { abSince=0; for(let i=gl.length-1;i>=0;i--){if(gl[i].hrs>0)break;abSince+=gl[i].ab||0;} }
+      if (glGames) { abSince=0; for(let i=glGames.length-1;i>=0;i--){if(glGames[i].hrs>0)break;abSince+=glGames[i].ab||0;} }
       return { pid:p.pid, name:p.name, team:p.team||'', avgEV, hh, fb, barrel, l7hr, seasonHR, abhr, abSince, heatScore };
     }).filter(r => r.avgEV >= 88);
     setRows(built);
