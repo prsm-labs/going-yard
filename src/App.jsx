@@ -6804,7 +6804,7 @@ function GamedayTab() {
                         const isBatExp = expandedBatterId === r.id;
                         return (
                           <React.Fragment key={r.id}>
-                          <tr onClick={(e)=>{if(e.target.tagName!=='SPAN'&&e.target.tagName!=='A')setExpandedBatterId(v=>v===r.id?null:r.id);}}
+                          <tr onClick={(e)=>{if(!e.defaultPrevented)setExpandedBatterId(v=>v===r.id?null:r.id);}}
                             style={{background: isBatExp?'rgba(255,255,255,.05)': r.id===curBatId ? 'rgba(232,65,26,.08)' : undefined,
                               cursor:'pointer', borderLeft:isBatExp?'3px solid var(--accent)':'3px solid transparent'}}>
                             <td style={{...cell,textAlign:'left',minWidth:140}}>
@@ -6814,7 +6814,7 @@ function GamedayTab() {
                                 {/* Name — grade-colored, clickable opens AtBat slideout */}
                                 <span style={{fontFamily:osw,fontSize:11,fontWeight:r.id===curBatId?700:600,
                                   color:nameColor,cursor:'pointer',flex:1}}
-                                  onClick={e=>{e.stopPropagation();openAtBatSlide({pid:r.id,name:r.name,team:teamAbbr,
+                                  onClick={e=>{e.preventDefault();e.stopPropagation();openAtBatSlide({pid:r.id,name:r.name,team:teamAbbr,
                                     avgEV:cp.avgEV,barrel:cp.barrel,hardHit:cp.hardHit,flyBall:cp.flyBall,
                                     hr:cp.hr,avg:cp.avg,obp:cp.obp,slg:cp.slg,xwoba:cp.xwoba,
                                     kPct:cp.kPct,bbPct:cp.bbPct,launchAngle:cp.launchAngle});}}>
@@ -8021,6 +8021,7 @@ function HotBatsTab() {
   const [loading, setLoading] = useState(true);
   const [expPid, setExpPid]  = useState(null);
   const [sort, setSort]      = useState('l7hr');
+  const [sortDir, setSortDir] = useState(-1); // -1 = desc, 1 = asc
   const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
 
   useEffect(() => {
@@ -8048,11 +8049,11 @@ function HotBatsTab() {
       }).catch(() => setLoading(false));
   }, []);
 
-  const sorted = [...rows].sort((a,b) => (b[sort]||0)-(a[sort]||0));
-  const Th = ({k,l}) => (<th onClick={()=>setSort(k)}
+  const sorted = [...rows].sort((a,b) => sortDir * ((parseFloat(b[sort])||0)-(parseFloat(a[sort])||0)));
+  const Th = ({k,l}) => (<th onClick={()=>{ if(sort===k) setSortDir(d=>-d); else { setSort(k); setSortDir(-1); } }}
     style={{padding:'5px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.8,
       color:sort===k?'var(--accent2)':'var(--muted)',cursor:'pointer',textAlign:'right',
-      whiteSpace:'nowrap',borderBottom:'1px solid var(--border)'}}>{l}{sort===k?' ▼':''}</th>);
+      whiteSpace:'nowrap',borderBottom:'1px solid var(--border)'}}>{l}{sort===k?(sortDir===-1?' ▼':' ▲'):''}</th>);
 
   if (loading) return (<div style={{display:'flex',alignItems:'center',gap:8,padding:20,color:'var(--muted)',fontFamily:mono,fontSize:11}}><div className="sp"/>Loading…</div>);
   return (
@@ -8104,6 +8105,7 @@ function HeatingUpTab() {
   const [loading, setLoading] = useState(true);
   const [expPid, setExpPid]  = useState(null);
   const [sort, setSort]      = useState('heatScore');
+  const [sortDir, setSortDir] = useState(-1);
   const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
 
   useEffect(() => {
@@ -8127,12 +8129,12 @@ function HeatingUpTab() {
     setLoading(false);
   }, []);
 
-  const sorted = [...rows].sort((a,b) => (b[sort]||0)-(a[sort]||0));
+  const sorted = [...rows].sort((a,b) => sortDir * ((parseFloat(b[sort])||0)-(parseFloat(a[sort])||0)));
   const evCol = v => v>=103?'#ff4020':v>=98?'#ff8020':v>=95?'#f5a623':v>=90?'var(--text)':'var(--muted)';
-  const Th = ({k,l}) => (<th onClick={()=>setSort(k)}
+  const Th = ({k,l}) => (<th onClick={()=>{ if(sort===k) setSortDir(d=>-d); else { setSort(k); setSortDir(-1); } }}
     style={{padding:'5px 6px',fontSize:7,fontFamily:mono,textTransform:'uppercase',letterSpacing:.6,
       color:sort===k?'var(--accent2)':'var(--muted)',cursor:'pointer',textAlign:'right',
-      whiteSpace:'nowrap',borderBottom:'1px solid var(--border)'}}>{l}{sort===k?' ▼':''}</th>);
+      whiteSpace:'nowrap',borderBottom:'1px solid var(--border)'}}>{l}{sort===k?(sortDir===-1?' ▼':' ▲'):''}</th>);
 
   if (loading) return (<div style={{display:'flex',alignItems:'center',gap:8,padding:20,color:'var(--muted)',fontFamily:mono,fontSize:11}}><div className="sp"/>Computing…</div>);
   return (
