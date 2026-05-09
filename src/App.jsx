@@ -8695,72 +8695,50 @@ function SimLabView({ data }) {
       {/* ── SLATE RANKINGS ── */}
       {view === 'slate' && (
         <div>
-          {/* Controls */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-            {/* ── Matchup dropdown multi-select ── */}
+          {/* ── Row 1: Matchup dropdown + Search ── */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            {/* Matchup dropdown */}
             <div ref={matchupDropRef} style={{ position: 'relative' }}>
-              {/* Trigger button */}
-              <button
-                onClick={() => setShowMatchupDrop(v => !v)}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px',
-                  borderRadius: 7, cursor: 'pointer',
+              <button onClick={() => setShowMatchupDrop(v => !v)}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 7, cursor: 'pointer',
                   border: `1px solid ${selMatchups.size > 0 ? 'var(--accent)' : 'var(--border)'}`,
                   background: selMatchups.size > 0 ? 'rgba(232,65,26,.10)' : 'var(--surface2)',
                   color: selMatchups.size > 0 ? 'var(--accent)' : 'var(--muted)',
-                  fontFamily: "'DM Mono',monospace", fontSize: 11,
-                  fontWeight: selMatchups.size > 0 ? 700 : 400, whiteSpace: 'nowrap' }}>
-                🗓 {selMatchups.size === 0
-                  ? 'All Games'
-                  : `${selMatchups.size} Game${selMatchups.size > 1 ? 's' : ''} ✓`}
+                  fontFamily: "'DM Mono',monospace", fontSize: 11, fontWeight: selMatchups.size > 0 ? 700 : 400, whiteSpace: 'nowrap' }}>
+                🗓 {selMatchups.size === 0 ? 'All Games' : `${selMatchups.size} Game${selMatchups.size > 1 ? 's' : ''} ✓`}
                 <span style={{ fontSize: 9, opacity: .6, marginLeft: 2 }}>{showMatchupDrop ? '▲' : '▼'}</span>
               </button>
-
-              {/* Dropdown panel */}
               {showMatchupDrop && (
                 <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 200,
                   background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8,
                   padding: '8px 6px', minWidth: 220, boxShadow: '0 8px 24px rgba(0,0,0,.5)',
-                  display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {/* All option */}
+                  display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 260, overflowY: 'auto' }}>
                   <button onClick={() => { setSelMatchups(new Set()); setShowMatchupDrop(false); }}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px',
-                      borderRadius: 5, cursor: 'pointer', border: 'none', textAlign: 'left',
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 5, cursor: 'pointer', border: 'none', textAlign: 'left',
                       background: selMatchups.size === 0 ? 'rgba(232,65,26,.12)' : 'transparent',
                       color: selMatchups.size === 0 ? 'var(--accent)' : 'var(--muted)',
-                      fontFamily: "'DM Mono',monospace", fontSize: 11,
-                      fontWeight: selMatchups.size === 0 ? 700 : 400, width: '100%' }}>
+                      fontFamily: "'DM Mono',monospace", fontSize: 11, fontWeight: selMatchups.size === 0 ? 700 : 400, width: '100%' }}>
                     <span style={{ width: 12, height: 12, borderRadius: 3, flexShrink: 0,
                       border: `1.5px solid ${selMatchups.size === 0 ? 'var(--accent)' : 'var(--muted)'}`,
                       background: selMatchups.size === 0 ? 'var(--accent)' : 'transparent',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 8, color: 'white' }}>
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: 'white' }}>
                       {selMatchups.size === 0 ? '✓' : ''}
                     </span>
                     All Games
                   </button>
-                  {/* Divider */}
                   <div style={{ height: 1, background: 'var(--border)', margin: '3px 0' }}/>
-                  {/* One row per matchup */}
                   {matchupList.map(g => {
                     const isChecked = selMatchups.has(g.id);
-                    const toggle = () => setSelMatchups(prev => {
-                      const next = new Set(prev);
-                      isChecked ? next.delete(g.id) : next.add(g.id);
-                      return next;
-                    });
+                    const toggle = () => setSelMatchups(prev => { const next = new Set(prev); isChecked ? next.delete(g.id) : next.add(g.id); return next; });
                     return (
                       <button key={g.id} onClick={toggle}
-                        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px',
-                          borderRadius: 5, cursor: 'pointer', border: 'none', textAlign: 'left',
-                          background: isChecked ? 'rgba(232,65,26,.10)' : 'transparent',
-                          color: isChecked ? 'var(--accent)' : 'var(--text)',
-                          fontFamily: "'Oswald',sans-serif", fontSize: 12,
-                          fontWeight: isChecked ? 700 : 500, width: '100%', whiteSpace: 'nowrap' }}>
+                        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 5, cursor: 'pointer', border: 'none', textAlign: 'left',
+                          background: isChecked ? 'rgba(232,65,26,.10)' : 'transparent', color: isChecked ? 'var(--accent)' : 'var(--text)',
+                          fontFamily: "'Oswald',sans-serif", fontSize: 12, fontWeight: isChecked ? 700 : 500, width: '100%', whiteSpace: 'nowrap' }}>
                         <span style={{ width: 12, height: 12, borderRadius: 3, flexShrink: 0,
                           border: `1.5px solid ${isChecked ? 'var(--accent)' : 'var(--muted)'}`,
                           background: isChecked ? 'var(--accent)' : 'transparent',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: 8, color: 'white' }}>
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: 'white' }}>
                           {isChecked ? '✓' : ''}
                         </span>
                         <span style={{ flex: 1 }}>{g.away} @ {g.home}</span>
@@ -8768,164 +8746,84 @@ function SimLabView({ data }) {
                       </button>
                     );
                   })}
-                  {/* Clear link if anything selected */}
                   {selMatchups.size > 0 && (
-                    <div style={{ marginTop: 4, paddingTop: 4, borderTop: '1px solid var(--border)',
-                      textAlign: 'right' }}>
+                    <div style={{ marginTop: 4, paddingTop: 4, borderTop: '1px solid var(--border)', textAlign: 'right' }}>
                       <span onClick={() => { setSelMatchups(new Set()); setShowMatchupDrop(false); }}
-                        style={{ fontSize: 9, color: 'var(--accent)', fontFamily: "'DM Mono',monospace",
-                          cursor: 'pointer', textDecoration: 'underline' }}>
-                        clear all
-                      </span>
+                        style={{ fontSize: 9, color: 'var(--accent)', fontFamily: "'DM Mono',monospace", cursor: 'pointer', textDecoration: 'underline' }}>clear all</span>
                     </div>
                   )}
                 </div>
               )}
             </div>
-            <button onClick={() => setLineupOnly(v => !v)}
-              style={{ padding: '6px 12px', borderRadius: 7, cursor: 'pointer',
-                border: `1px solid ${lineupOnly ? 'rgba(39,201,122,.5)' : 'var(--border)'}`,
-                background: lineupOnly ? 'rgba(39,201,122,.12)' : 'var(--surface2)',
-                color: lineupOnly ? '#27c97a' : 'var(--muted)',
-                fontFamily: "'DM Mono',monospace", fontSize: 11, fontWeight: lineupOnly ? 700 : 400,
-                whiteSpace: 'nowrap' }}>
-              ✅
-            </button>
-            <button onClick={() => setFilterGoneYardSim(v => !v)}
-              style={{ padding: '5px 8px', borderRadius: 7, cursor: 'pointer',
-                border: `1px solid ${filterGoneYardSim ? 'rgba(255,64,32,.5)' : 'var(--border)'}`,
-                background: filterGoneYardSim ? 'rgba(255,64,32,.15)' : 'var(--surface2)',
-                color: filterGoneYardSim ? 'var(--accent)' : 'var(--muted)',
-                fontFamily: "'DM Mono',monospace", fontSize: 11, fontWeight: filterGoneYardSim ? 700 : 400,
-                whiteSpace: 'nowrap' }}>
-              💥
-            </button>
-            <button onClick={() => setFilterDueSim(v => !v)}
-              style={{ padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
-                background: filterDueSim ? 'rgba(56,184,242,.18)' : 'transparent',
-                color: filterDueSim ? 'var(--ice)' : 'var(--muted)',
-                border: `1px solid ${filterDueSim ? 'rgba(56,184,242,.5)' : 'var(--border)'}`,
-                fontFamily: "'DM Mono',monospace", fontWeight: filterDueSim ? 700 : 400, fontSize: 11 }}>
-              ⏳
-            </button>
-            <button onClick={()=>{setSimActiveOnly(s=>!s);if(!simActiveOnly)setSimInjuredOnly(false);}}
-              style={{padding:'4px 10px',borderRadius:6,cursor:'pointer',
-                border:`1px solid ${simActiveOnly?'#34d399':'var(--border)'}`,
-                background:simActiveOnly?'rgba(52,211,153,.12)':'transparent',
-                color:simActiveOnly?'#34d399':'var(--muted)',
-                fontFamily:"'DM Mono',monospace",fontWeight:simActiveOnly?700:400,fontSize:11,
-                whiteSpace:'nowrap'}}>
-              ☑️
-            </button>
-            <button onClick={()=>{setSimInjuredOnly(s=>!s);if(!simInjuredOnly)setSimActiveOnly(false);}}
-              style={{padding:'4px 10px',borderRadius:6,cursor:'pointer',
-                border:`1px solid ${simInjuredOnly?'#fb923c':'var(--border)'}`,
-                background:simInjuredOnly?'rgba(251,146,60,.12)':'transparent',
-                color:simInjuredOnly?'#fb923c':'var(--muted)',
-                fontFamily:"'DM Mono',monospace",fontWeight:simInjuredOnly?700:400,fontSize:11,
-                whiteSpace:'nowrap'}}>
-              🤕
-            </button>
-            <button onClick={() => setSimHotOnly(s => !s)}
-              style={{ padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
-                border: `1px solid ${simHotOnly?'#fb923c':'var(--border)'}`,
-                background: simHotOnly?'rgba(251,146,60,.12)':'transparent',
-                color: simHotOnly?'#fb923c':'var(--muted)',
-                fontFamily: "'DM Mono',monospace", fontWeight: simHotOnly?700:400, fontSize: 11,
-                whiteSpace: 'nowrap' }}>
-              🔥
-            </button>
-            <button onClick={() => setSimPicksOnly(s => !s)}
-              style={{ padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
-                border: `1px solid ${simPicksOnly ? 'var(--accent2)' : 'var(--border)'}}`,
-                background: simPicksOnly ? 'rgba(245,166,35,.12)' : 'transparent',
-                color: simPicksOnly ? 'var(--accent2)' : 'var(--muted)',
-                fontFamily: "'DM Mono',monospace", fontWeight: simPicksOnly ? 700 : 400, fontSize: 11,
-                whiteSpace: 'nowrap' }}>
-              🎯
-            </button>
-            <button onClick={() => setFilterDiamondSim(v => !v)}
-              style={{ padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
-                background: filterDiamondSim ? 'rgba(255,204,0,.18)' : 'transparent',
-                color: filterDiamondSim ? '#ffcc00' : 'var(--muted)',
-                border: `1px solid ${filterDiamondSim ? 'rgba(255,204,0,.5)' : 'var(--border)'}`,
-                fontFamily: "'DM Mono',monospace", fontWeight: filterDiamondSim ? 700 : 400, fontSize: 11 }}
-              title="Tier 1 Locks: A+ grade + Sim TB≥2.0 + Hittable/Target pitcher">
-              💎
-            </button>
-            {/* Batter search */}
+            {/* Search batter */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginLeft: 'auto' }}>
-              <input
-                type="text" value={simSearch} onChange={e => setSimSearch(e.target.value)}
-                placeholder="Search batter…"
-                style={{ padding: '4px 10px', borderRadius: 6, fontSize: 10,
-                  fontFamily: "'DM Mono',monospace",
+              <input type="text" value={simSearch} onChange={e => setSimSearch(e.target.value)} placeholder="Search batter…"
+                style={{ padding: '4px 10px', borderRadius: 6, fontSize: 10, fontFamily: "'DM Mono',monospace",
                   border: `1px solid ${simSearch ? 'var(--accent2)' : 'var(--border)'}`,
-                  background: 'var(--surface2)', color: 'var(--text)', width: 130,
-                  outline: 'none' }}/>
+                  background: 'var(--surface2)', color: 'var(--text)', width: 140, outline: 'none' }}/>
               {simSearch && <button onClick={() => setSimSearch('')}
-                style={{ background: 'none', border: 'none', color: 'var(--muted)',
-                  cursor: 'pointer', fontFamily: "'DM Mono',monospace", fontSize: 10, padding: '0 2px' }}>✕</button>}
+                style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontFamily: "'DM Mono',monospace", fontSize: 10, padding: '0 2px' }}>✕</button>}
             </div>
-            <span style={{ fontSize: 10, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>
-              {slate.length} batters · click column header to sort · click row to Deep Dive
+          </div>
+
+          {/* ── Row 2: Batter filter emoji stickers ── */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            {[
+              [() => setLineupOnly(v=>!v),        lineupOnly,        'rgba(39,201,122,.12)', '#27c97a',       '✅'],
+              [() => setFilterGoneYardSim(v=>!v), filterGoneYardSim, 'rgba(255,64,32,.15)',  'var(--accent)', '💥'],
+              [() => setFilterDueSim(v=>!v),      filterDueSim,      'rgba(56,184,242,.18)', 'var(--ice)',    '⏳'],
+              [()=>{setSimActiveOnly(s=>!s);if(!simActiveOnly)setSimInjuredOnly(false);}, simActiveOnly,  'rgba(52,211,153,.12)', '#34d399', '☑️'],
+              [()=>{setSimInjuredOnly(s=>!s);if(!simInjuredOnly)setSimActiveOnly(false);}, simInjuredOnly, 'rgba(251,146,60,.12)', '#fb923c', '🤕'],
+              [() => setSimHotOnly(s=>!s),        simHotOnly,        'rgba(251,146,60,.12)', '#fb923c',       '🔥'],
+              [() => setSimPicksOnly(s=>!s),       simPicksOnly,      'rgba(245,166,35,.12)', 'var(--accent2)','🎯'],
+              [() => setFilterDiamondSim(v=>!v),  filterDiamondSim,  'rgba(255,204,0,.18)',  '#ffcc00',       '💎'],
+            ].map(([fn, active, bg, col, emoji]) => (
+              <button key={emoji} onClick={fn}
+                style={{ padding: '4px 9px', borderRadius: 7, cursor: 'pointer', flexShrink: 0, fontSize: 14,
+                  border: `1px solid ${active ? col : 'var(--border)'}`,
+                  background: active ? bg : 'transparent', color: active ? col : 'var(--muted)' }}>
+                {emoji}
+              </button>
+            ))}
+            <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", marginLeft: 'auto', whiteSpace: 'nowrap' }}>
+              {slate.length} batters
             </span>
           </div>
 
-          {/* Pitcher grade filter — multi-select */}
-          <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-            {/* Batter grade filter */}
+          {/* ── Row 3: Batter grades ── */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", textTransform: 'uppercase', letterSpacing: 1 }}>Grade:</span>
             {['A+','A','B','C','D'].map(g => {
               const active = selBatterGradesSim.has(g);
-              const GCFG = { 'A+': '#f5a623', 'A': '#e8411a', 'B': '#38b8f2', 'C': 'var(--muted)', 'D': 'var(--muted)' };
-              const col = GCFG[g] || 'var(--muted)';
-              return (
-                <button key={g} onClick={() => setSelBatterGradesSim(prev => {
-                  const next = new Set(prev);
-                  active ? next.delete(g) : next.add(g);
-                  return next;
-                })}
-                  style={{ padding: '3px 10px', borderRadius: 5, cursor: 'pointer', fontWeight: active ? 800 : 500,
-                    border: `1px solid ${active ? col : 'var(--border)'}`,
-                    background: active ? `${col}20` : 'transparent',
-                    color: active ? col : 'var(--muted)',
-                    fontFamily: "'DM Mono',monospace", fontSize: 11 }}>
-                  {g}
-                </button>
-              );
+              const col = {'A+':'#f5a623','A':'#e8411a','B':'#38b8f2','C':'var(--muted)','D':'var(--muted)'}[g]||'var(--muted)';
+              return (<button key={g} onClick={() => setSelBatterGradesSim(prev => { const next=new Set(prev); active?next.delete(g):next.add(g); return next; })}
+                style={{ padding:'3px 10px', borderRadius:5, cursor:'pointer', fontWeight:active?800:500,
+                  border:`1px solid ${active?col:'var(--border)'}`, background:active?`${col}20`:'transparent',
+                  color:active?col:'var(--muted)', fontFamily:"'DM Mono',monospace", fontSize:11 }}>{g}</button>);
             })}
-            {selBatterGradesSim.size > 0 && (
-              <span onClick={() => setSelBatterGradesSim(new Set())}
-                style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace",
-                  cursor: 'pointer', textDecoration: 'underline' }}>clear</span>
-            )}
-            <span style={{ fontSize: 9, color: 'rgba(255,255,255,.15)', fontFamily: "'DM Mono',monospace" }}>|</span>
+            {selBatterGradesSim.size > 0 && <span onClick={() => setSelBatterGradesSim(new Set())}
+              style={{ fontSize:9, color:'var(--muted)', fontFamily:"'DM Mono',monospace", cursor:'pointer', textDecoration:'underline' }}>clear</span>}
+          </div>
+
+          {/* ── Row 4: Pitcher grades ── */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", textTransform: 'uppercase', letterSpacing: 1 }}>Pitcher:</span>
-            {/* All button — clears selection */}
             <button onClick={() => setSelPitcherGradesSim(new Set())}
-              style={{ padding:'3px 10px', borderRadius:6, cursor:'pointer',
-                background: selPitcherGradesSim.size===0 ? 'rgba(255,255,255,.08)' : 'transparent',
-                color: selPitcherGradesSim.size===0 ? 'var(--text)' : 'var(--muted)',
-                border: `1px solid ${selPitcherGradesSim.size===0 ? 'var(--text)' : 'var(--border)'}`,
-                fontFamily:"'DM Mono',monospace", fontWeight: selPitcherGradesSim.size===0 ? 700 : 400, fontSize: 10 }}>
-              All
-            </button>
-            {['‼️ Elite', '⚠️ Tough', '🤔 Average', '💥 Hittable', '🎯 Target'].map(g => {
+              style={{ padding:'3px 9px', borderRadius:6, cursor:'pointer',
+                background:selPitcherGradesSim.size===0?'rgba(255,255,255,.08)':'transparent',
+                color:selPitcherGradesSim.size===0?'var(--text)':'var(--muted)',
+                border:`1px solid ${selPitcherGradesSim.size===0?'var(--text)':'var(--border)'}`,
+                fontFamily:"'DM Mono',monospace", fontWeight:selPitcherGradesSim.size===0?700:400, fontSize:10 }}>All</button>
+            {['‼️ Elite','⚠️ Tough','🤔 Average','💥 Hittable','🎯 Target'].map(g => {
               const active = selPitcherGradesSim.has(g);
-              const col = g==='‼️ Elite'?'#ff4020':g==='⚠️ Tough'?'#ff8020':g==='🤔 Average'?'var(--muted)':g==='💥 Hittable'?'#27c97a':'#38b8f2';
-              return <button key={g} onClick={() => setSelPitcherGradesSim(prev => {
-                  const next = new Set(prev);
-                  next.has(g) ? next.delete(g) : next.add(g);
-                  return next;
-                })}
-                style={{ padding:'3px 8px', borderRadius:6, cursor:'pointer',
-                  background: active ? 'rgba(255,255,255,.08)' : 'transparent',
-                  color: active ? col : 'var(--muted)',
-                  border: `1px solid ${active ? col : 'var(--border)'}`,
-                  fontFamily:"'DM Mono',monospace", fontWeight: active ? 700 : 400, fontSize: 13 }}>
+              const col = {'‼️ Elite':'#ff4020','⚠️ Tough':'#ff8020','🤔 Average':'var(--muted)','💥 Hittable':'#27c97a','🎯 Target':'#38b8f2'}[g];
+              return (<button key={g} onClick={() => setSelPitcherGradesSim(prev => { const next=new Set(prev); next.has(g)?next.delete(g):next.add(g); return next; })}
+                style={{ padding:'3px 9px', borderRadius:6, cursor:'pointer',
+                  background:active?'rgba(255,255,255,.08)':'transparent', color:active?col:'var(--muted)',
+                  border:`1px solid ${active?col:'var(--border)'}`,
+                  fontFamily:"'DM Mono',monospace", fontWeight:active?700:400, fontSize:14 }}>
                 {g.split(' ')[0]}
-              </button>;
+              </button>);
             })}
           </div>
 
@@ -9886,6 +9784,7 @@ function BvPHistoryTab({ data }) {
   const [sortCol, setSortCol]     = useState('hr');
   const [sortDir, setSortDir]     = useState(1);  // 1 with (bn-an) = descending
   const [bvpPicksOnly, setBvpPicksOnly]     = useState(false);
+  const [bvpLineupOnly, setBvpLineupOnly]   = useState(false);
   const [bvpActiveOnly, setBvpActiveOnly]   = useState(false);
   const [bvpInjuredOnly, setBvpInjuredOnly] = useState(false);
   const [minPA, setMinPA]         = useState(1);
@@ -9957,7 +9856,8 @@ function BvPHistoryTab({ data }) {
 
   const filtered = useMemo(() => {
     let r = rows;
-    if (bvpPicksOnly) r = r.filter(x => picks[String(x.batterId)]);
+    if (bvpPicksOnly)  r = r.filter(x => picks[String(x.batterId)]);
+    if (bvpLineupOnly) r = r.filter(x => isConfirmed({batter_id: x.batterId, game_id: x.gameId}));
     if (bvpActiveOnly) r = r.filter(x => !INJURY_MAP[String(x.batterId)]);
     if (bvpInjuredOnly) r = r.filter(x => !!INJURY_MAP[String(x.batterId)]);
     if (minPA > 0) r = r.filter(x => (x.pa||0) >= minPA);
@@ -9972,7 +9872,7 @@ function BvPHistoryTab({ data }) {
       const bn = typeof bv === 'string' ? parseFloat(bv)||0 : bv;
       return sortDir * (bn - an);
     });
-  }, [rows, sortCol, sortDir, minPA, search, bvpPicksOnly, bvpActiveOnly, bvpInjuredOnly]);
+  }, [rows, sortCol, sortDir, minPA, search, bvpPicksOnly, bvpLineupOnly, bvpActiveOnly, bvpInjuredOnly]);
 
   const SortIcon = ({col}) => sortCol===col
     ? <span style={{marginLeft:3,fontSize:8}}>{sortDir===-1?'▼':'▲'}</span>
@@ -10048,6 +9948,14 @@ function BvPHistoryTab({ data }) {
             </button>
           ))}
         </div>
+        <button onClick={()=>setBvpLineupOnly(s=>!s)}
+          style={{padding:'3px 10px',borderRadius:6,cursor:'pointer',flexShrink:0,
+            border:`1px solid ${bvpLineupOnly?'#27c97a':'var(--border)'}`,
+            background:bvpLineupOnly?'rgba(39,201,122,.12)':'transparent',
+            color:bvpLineupOnly?'#27c97a':'var(--muted)',
+            fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:bvpLineupOnly?700:400}}>
+          ✅
+        </button>
         <button onClick={()=>{setBvpActiveOnly(s=>!s);if(!bvpActiveOnly)setBvpInjuredOnly(false);}}
           style={{padding:'3px 10px',borderRadius:6,cursor:'pointer',
             border:`1px solid ${bvpActiveOnly?'#34d399':'var(--border)'}`,
@@ -10055,7 +9963,7 @@ function BvPHistoryTab({ data }) {
             color:bvpActiveOnly?'#34d399':'var(--muted)',
             fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:bvpActiveOnly?700:400,
             whiteSpace:'nowrap',flexShrink:0}}>
-          ☑️ {bvpActiveOnly?'Active ✓':'Active'}
+          ☑️
         </button>
         <button onClick={()=>{setBvpInjuredOnly(s=>!s);if(!bvpInjuredOnly)setBvpActiveOnly(false);}}
           style={{padding:'3px 10px',borderRadius:6,cursor:'pointer',
@@ -10064,7 +9972,7 @@ function BvPHistoryTab({ data }) {
             color:bvpInjuredOnly?'#fb923c':'var(--muted)',
             fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:bvpInjuredOnly?700:400,
             whiteSpace:'nowrap',flexShrink:0}}>
-          🤕 {bvpInjuredOnly?'Injured ✓':'Injured'}
+          🤕
         </button>
 
         <button onClick={()=>setBvpPicksOnly(s=>!s)}
@@ -10165,6 +10073,7 @@ function BatterLeaderboard() {
   useInjuries();
   useHROdds();
   const [activeOnly, setActiveOnly]           = useState(false);
+  const [battersLineupOnly, setBattersLineupOnly] = useState(false);
   const [injuredOnly, setInjuredOnly]         = useState(false);
   const [hotBatOnly, setHotBatOnly]           = useState(false);
   const [slateFilter, setSlateFilter]     = useState('all');
@@ -10307,6 +10216,7 @@ function BatterLeaderboard() {
     })
     .filter(p => !searchQ || p.name?.toLowerCase().includes(searchQ.toLowerCase()))
     .filter(p => !showPicksOnly || picks[String(p.pid)])
+    .filter(p => !battersLineupOnly || (()=>{ const pid=String(p.pid||p.id||''); const dp=DAILY_PICKS_CACHE[pid]; return dp && isConfirmed({batter_id:pid,game_id:dp.game_id}); })())
     .filter(p => !activeOnly || !INJURY_MAP[String(p.pid||p.id)])
     .filter(p => !injuredOnly || !!INJURY_MAP[String(p.pid||p.id)])
     .filter(p => !hotBatOnly || isHotBatPlayer(p))
@@ -10432,6 +10342,15 @@ function BatterLeaderboard() {
               border:'1px solid var(--border)',borderRadius:7,color:'var(--text)',
               fontFamily:"'DM Mono',monospace",fontSize:11,outline:'none',textAlign:'center'}}/>
         </div>
+        <button onClick={()=>setBattersLineupOnly(s=>!s)}
+          style={{padding:'6px 12px',borderRadius:7,cursor:'pointer',
+            border:`1px solid ${battersLineupOnly?'#27c97a':'var(--border)'}`,
+            background:battersLineupOnly?'rgba(39,201,122,.12)':'var(--surface2)',
+            color:battersLineupOnly?'#27c97a':'var(--muted)',
+            fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:battersLineupOnly?700:400,
+            whiteSpace:'nowrap'}}>
+          ✅
+        </button>
         <button onClick={()=>setShowPicksOnly(s=>!s)}
           style={{padding:'6px 12px',borderRadius:7,cursor:'pointer',
             border:`1px solid ${showPicksOnly?'var(--accent2)':'var(--border)'}`,
@@ -10942,7 +10861,7 @@ function PitcherLeaderboard() {
                   color: active ? col : 'var(--muted)',
                   fontFamily:"'DM Mono',monospace",fontSize:10,
                   fontWeight: active ? 700 : 400}}>
-                {g === 'all' ? 'All Grades' : g}
+                {g === 'all' ? 'All' : g.split(' ')[0]}
               </button>
             );
           })}
@@ -11613,23 +11532,7 @@ function MatchupEngineTab() {
       );
     })()}
 
-    {/* Emoji legend */}
-    <div style={{display:'flex',gap:10,marginBottom:10,flexWrap:'wrap',padding:'6px 10px',
-      background:'var(--surface)',border:'1px solid var(--border)',borderRadius:7}}>
-      <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontWeight:700,
-        textTransform:'uppercase',letterSpacing:1,alignSelf:'center'}}>Key:</span>
-      {[
-        ['✅','Confirmed in lineup'],
-        ['💥','Hit a HR today'],
-        ['📉','Slump'],
-        ['💎','Diamond pick'],
-      ].map(([emoji, label]) => (
-        <span key={emoji} style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
-          display:'flex',alignItems:'center',gap:3}}>
-          <span style={{fontSize:11}}>{emoji}</span>{label}
-        </span>
-      ))}
-    </div>
+
 
 
 
@@ -11758,7 +11661,7 @@ function MatchupEngineTab() {
             color:active?col:'var(--muted)',
             border:`1px solid ${active?col:'var(--border)'}`,
             fontFamily:"'DM Mono',monospace",fontWeight:active?700:400,fontSize:11}}>
-          {g==='all'?'All':g}
+          {g==='all'?'All':g.split(' ')[0]}
         </button>;
       })}
     </div>}
