@@ -7830,9 +7830,26 @@ function HRTrackerTab() {
     a.click();
   };
 
+  const [hrTab, setHrTab] = useState('tracker');
+
   return <div>
+    {/* Sub-tab nav */}
+    <div style={{display:'flex',gap:6,marginBottom:14}}>
+      {[['tracker','💥 HR Tracker'],['hotbats','🔥 Hot Bats'],['heatingup','📈 Heating Up']].map(([key,label])=>(
+        <button key={key} onClick={()=>setHrTab(key)}
+          style={{padding:'5px 12px',borderRadius:7,cursor:'pointer',
+            fontFamily:"'DM Mono',monospace",fontWeight:hrTab===key?700:400,fontSize:10,
+            border:`1px solid ${hrTab===key?'var(--accent)':'var(--border)'}`,
+            background:hrTab===key?'rgba(232,65,26,.15)':'var(--surface2)',
+            color:hrTab===key?'var(--accent)':'var(--muted)'}}>
+          {label}
+        </button>
+      ))}
+    </div>
+    {hrTab === 'hotbats'   && <HotBatsTab/>}
+    {hrTab === 'heatingup' && <HeatingUpTab/>}
+    {hrTab === 'tracker'   && <div>
     <div className="hrow">
-      <button onClick={exportHRCsv}
         style={{padding:"4px 12px",borderRadius:6,border:"1px solid var(--border)",
           background:"var(--surface2)",color:"var(--muted)",cursor:"pointer",
           fontFamily:"'DM Mono',monospace",fontSize:11,display:"flex",alignItems:"center",gap:5}}>
@@ -7975,12 +7992,235 @@ function HRTrackerTab() {
               })}
             </tbody>
           </table></div>
-    }
+    </div>} {/* end tracker tab */}
   </div>;
 }
 
 
-function MLBScoresTab() {
+// ── Hot Bats — batters with the most HRs in the last 7 games ────────────────
+function HotBatsTab() {
+  const [players, setPlayers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [sortCol, setSortCol] = useState('l7hr');
+  const [sortDir, setSortDir] = useState(-1);
+  const [expandedPid, setExpandedPid] = useState(null);
+  const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
+
+  useEffect(() => {
+    const season = new Date().getFullYear();
+    fetch(`https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&season=${season}&sportId=1&limit=150&hydrate=person,currentTeam`)
+      .then(r => r.json())
+      .then(d => {
+        const leaders = d.leagueLeaders?.[0]?.leaders || [];
+        return Promise.all(leaders.slice(0,80).map(async l => {
+          const pid = l.person?.id;
+          if (!pid) return null;
+          try {
+            const games = await fetchGameLog(pid);
+            const last7 = games.slice(-7);
+            const l7hr = last7.reduce((s,g) => s+(g.hrs||0), 0);
+            const seasonHR = parseInt(l.value||0);
+            // AB since last HR
+            let abSince = 0;
+            for (let i=games.length-1;i>=0;i--) {
+              if (games[i].hrs>0) break;
+              abSince += games[i].ab||0;
+            }
+            // Average AB per HR
+            const totalAB = games.reduce((s,g)=>s+(g.ab||0),0);
+            const totalHR = games.reduce((s,g)=>s+(g.hrs||0),0);
+            const abhr = totalHR>0 ? (totalAB/totalHR).toFixed(1) : null;
+            return { pid, name:l.person?.fullName||'', team:l.team?.abbreviation||'',
+              teamId:l.team?.id||0, l7hr, seasonHR, abhr, abSince };
+          } catch { return null; }
+        }));
+      })
+      .then(rows => { setPlayers(rows.filter(Boolean).filter(r=>r.l7hr>0)); setLoading(false); })
+      .catch(()=>setLoading(false));
+  }, []);
+
+  const sorted = [...players].sort((a,b) => sortDir*((b[sortCol]||0)-(a[sortCol]||0)));
+  const Th = ({k,label}) => (
+    <th onClick={()=>{if(sortCol===k)setSortDir(d=>-d);else{setSortCol(k);setSortDir(-1);}}}
+      style={{padding:'5px 8px',fontFamily:mono,fontSize:8,textTransform:'uppercase',letterSpacing:.8,
+        color:sortCol===k?'var(--accent2)':'var(--muted)',cursor:'pointer',textAlign:'right',
+        whiteSpace:'nowrap',background:'var(--surface)',borderBottom:'1px solid var(--border)'}}>
+      {label}{sortCol===k?(sortDir===-1?' ▼':' ▲'):''}
+    </th>
+  );
+
+  if (loading) return <div style={{display:'flex',alignItems:'center',gap:8,padding:20,color:'var(--muted)',fontFamily:mono,fontSize:11}}><div className="sp"/>Loading hot bats from MLB Stats API…</div>;
+
+  return <div>
+    <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginBottom:10}}>
+      Batters with 1+ HRs in their last 7 games · sorted by L7 HRs · {sorted.length} batters
+    </div>
+    <div style={{overflowX:'auto'}}>
+      <table style={{width:'100%',borderCollapse:'collapse',fontSize:10}}>
+        <thead>
+          <tr>
+            <th style={{padding:'5px 8px',fontFamily:mono,fontSize:8,textTransform:'uppercase',letterSpacing:.8,color:'var(--muted)',textAlign:'left',background:'var(--surface)',borderBottom:'1px solid var(--border)'}}>Batter</th>
+            <th style={{padding:'5px 8px',fontFamily:mono,fontSize:8,textTransform:'uppercase',letterSpacing:.8,color:'var(--muted)',textAlign:'left',background:'var(--surface)',borderBottom:'1px solid var(--border)'}}>TM</th>
+            <Th k="l7hr" label="💥 L7"/>
+            <Th k="seasonHR" label="Season HRs"/>
+            <Th k="abhr" label="AB/HR"/>
+            <Th k="abSince" label="AB Since Last"/>
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map((p,i) => <>
+            <tr key={p.pid} onClick={()=>setExpandedPid(expandedPid===p.pid?null:p.pid)}
+              style={{cursor:'pointer',borderBottom:'1px solid rgba(255,255,255,.04)',
+                background:expandedPid===p.pid?'rgba(255,255,255,.04)':'transparent'}}
+              onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.03)'}
+              onMouseLeave={e=>e.currentTarget.style.background=expandedPid===p.pid?'rgba(255,255,255,.04)':'transparent'}>
+              <td style={{padding:'6px 8px',display:'flex',alignItems:'center',gap:6}}>
+                <PlayerAvatar pid={p.pid} name={p.name} size={20}/>
+                <span style={{fontFamily:osw,fontWeight:700,fontSize:11,
+                  color:isKeyMatchup(p.pid,p.name)?'#ff8020':'var(--text)'}}>{p.name}</span>
+              </td>
+              <td style={{padding:'6px 8px',fontFamily:osw,fontWeight:700,fontSize:10,color:'var(--accent2)'}}>{p.team}</td>
+              <td style={{padding:'6px 8px',textAlign:'right'}}>
+                <span style={{fontFamily:osw,fontWeight:800,fontSize:13,
+                  color:p.l7hr>=3?'#ff4020':p.l7hr>=2?'#f5a623':'#27c97a'}}>{p.l7hr}</span>
+              </td>
+              <td style={{padding:'6px 8px',textAlign:'right',fontFamily:mono,fontSize:10}}>{p.seasonHR}</td>
+              <td style={{padding:'6px 8px',textAlign:'right',fontFamily:mono,fontSize:10,color:'var(--muted)'}}>{p.abhr||'—'}</td>
+              <td style={{padding:'6px 8px',textAlign:'right',fontFamily:mono,fontSize:10,
+                color:p.abSince>20?'var(--ice)':p.abSince>10?'var(--muted)':'#27c97a'}}>{p.abSince}</td>
+            </tr>
+            {expandedPid===p.pid && (
+              <tr key={p.pid+'_exp'}><td colSpan={6} style={{padding:'0 12px 12px'}}>
+                <Last7HRChart batterId={p.pid}/>
+                <RecentGameLog batterId={p.pid}/>
+              </td></tr>
+            )}
+          </>)}
+        </tbody>
+      </table>
+    </div>
+  </div>;
+}
+
+// ── Heating Up — batters with strong recent contact metrics ──────────────────
+function HeatingUpTab() {
+  const [players, setPlayers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [sortCol, setSortCol] = useState('heatScore');
+  const [sortDir, setSortDir] = useState(-1);
+  const [expandedPid, setExpandedPid] = useState(null);
+  const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
+
+  useEffect(() => {
+    // Use PLAYER_DATA_CACHE (players.json) — already loaded, has all the metrics we need
+    const all = Object.values(PLAYER_DATA_CACHE).filter(p => {
+      const w = p.windows?.last7;
+      return w && (w.pa||0) >= 10 && (w.avgEV||0) > 0;
+    });
+    const rows = all.map(p => {
+      const w = p.windows?.last7 || {};
+      const avgEV = w.avgEV||0, hh = w.hardHit||0, fb = w.flyBall||0, barrel = w.barrel||0;
+      const l7hr = w.hr||0;
+      const totalHR = (p.windows?.season2026?.hr||0);
+      const totalAB = (p.windows?.season2026?.ab||0);
+      const abhr = totalHR>0?(totalAB/totalHR).toFixed(1):null;
+      // Heating up score — weighted contact quality
+      const heatScore = (avgEV*0.35) + (hh*0.25) + (fb*0.20) + (barrel*0.20);
+      // AB since last HR
+      const abSince = (() => {
+        let abs=0;
+        const gl = GAME_LOG_CACHE[String(p.pid)];
+        if (!gl) return null;
+        for (let i=gl.length-1;i>=0;i--) {
+          if (gl[i].hrs>0) break;
+          abs+=gl[i].ab||0;
+        }
+        return abs;
+      })();
+      return { pid:p.pid, name:p.name, team:p.team||'', teamId:p.teamId||0,
+        avgEV, hh, fb, barrel, l7hr, seasonHR:totalHR, abhr, abSince, heatScore };
+    }).filter(r => r.avgEV >= 88);  // min EV threshold
+
+    setPlayers(rows);
+    setLoading(false);
+  }, []);
+
+  const sorted = [...players].sort((a,b) => sortDir*((b[sortCol]||0)-(a[sortCol]||0)));
+  const Th = ({k,label}) => (
+    <th onClick={()=>{if(sortCol===k)setSortDir(d=>-d);else{setSortCol(k);setSortDir(-1);}}}
+      style={{padding:'5px 6px',fontFamily:mono,fontSize:7,textTransform:'uppercase',letterSpacing:.6,
+        color:sortCol===k?'var(--accent2)':'var(--muted)',cursor:'pointer',textAlign:'right',
+        whiteSpace:'nowrap',background:'var(--surface)',borderBottom:'1px solid var(--border)'}}>
+      {label}{sortCol===k?(sortDir===-1?' ▼':' ▲'):''}
+    </th>
+  );
+  const evCol = v => v>=103?'#ff4020':v>=98?'#ff8020':v>=95?'#f5a623':v>=90?'var(--text)':'var(--muted)';
+  const pctCol = v => v>=20?'#27c97a':v>=12?'var(--text)':'var(--muted)';
+
+  if (loading) return <div style={{display:'flex',alignItems:'center',gap:8,padding:20,color:'var(--muted)',fontFamily:mono,fontSize:11}}><div className="sp"/>Computing heating up scores…</div>;
+
+  return <div>
+    <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginBottom:10}}>
+      Last 7 games contact quality · min 10 PA · sorted by heat score · {sorted.length} batters
+    </div>
+    <div style={{overflowX:'auto'}}>
+      <table style={{width:'100%',borderCollapse:'collapse',fontSize:10}}>
+        <thead>
+          <tr>
+            <th style={{padding:'5px 8px',fontFamily:mono,fontSize:8,textTransform:'uppercase',letterSpacing:.8,color:'var(--muted)',textAlign:'left',background:'var(--surface)',borderBottom:'1px solid var(--border)'}}>Batter</th>
+            <th style={{padding:'5px 6px',fontFamily:mono,fontSize:7,textTransform:'uppercase',letterSpacing:.6,color:'var(--muted)',textAlign:'left',background:'var(--surface)',borderBottom:'1px solid var(--border)'}}>TM</th>
+            <Th k="avgEV" label="Avg EV"/>
+            <Th k="hh" label="HH%"/>
+            <Th k="fb" label="FB%"/>
+            <Th k="barrel" label="Brl%"/>
+            <Th k="l7hr" label="💥 L7"/>
+            <Th k="seasonHR" label="HR"/>
+            <Th k="abhr" label="AB/HR"/>
+            <Th k="abSince" label="AB Since"/>
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map((p,i) => <>
+            <tr key={p.pid} onClick={()=>setExpandedPid(expandedPid===p.pid?null:p.pid)}
+              style={{cursor:'pointer',borderBottom:'1px solid rgba(255,255,255,.04)',
+                background:expandedPid===p.pid?'rgba(255,255,255,.04)':'transparent'}}
+              onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.03)'}
+              onMouseLeave={e=>e.currentTarget.style.background=expandedPid===p.pid?'rgba(255,255,255,.04)':'transparent'}>
+              <td style={{padding:'5px 8px',display:'flex',alignItems:'center',gap:6}}>
+                <PlayerAvatar pid={p.pid} name={p.name} size={18}/>
+                <span style={{fontFamily:osw,fontWeight:700,fontSize:11,
+                  color:isKeyMatchup(p.pid,p.name)?'#ff8020':'var(--text)'}}>{p.name}</span>
+              </td>
+              <td style={{padding:'5px 6px',fontFamily:osw,fontWeight:700,fontSize:10,color:'var(--accent2)'}}>{p.team}</td>
+              <td style={{padding:'5px 6px',textAlign:'right',fontFamily:osw,fontWeight:700,fontSize:11,color:evCol(p.avgEV)}}>{p.avgEV.toFixed(1)}</td>
+              <td style={{padding:'5px 6px',textAlign:'right',fontFamily:mono,fontSize:10,color:pctCol(p.hh)}}>{p.hh.toFixed(1)}%</td>
+              <td style={{padding:'5px 6px',textAlign:'right',fontFamily:mono,fontSize:10,color:pctCol(p.fb)}}>{p.fb.toFixed(1)}%</td>
+              <td style={{padding:'5px 6px',textAlign:'right',fontFamily:mono,fontSize:10,color:pctCol(p.barrel)}}>{p.barrel.toFixed(1)}%</td>
+              <td style={{padding:'5px 6px',textAlign:'right'}}>
+                <span style={{fontFamily:osw,fontWeight:700,fontSize:11,
+                  color:p.l7hr>=3?'#ff4020':p.l7hr>=1?'#f5a623':'rgba(255,255,255,.2)'}}>{p.l7hr||'—'}</span>
+              </td>
+              <td style={{padding:'5px 6px',textAlign:'right',fontFamily:mono,fontSize:10}}>{p.seasonHR||'—'}</td>
+              <td style={{padding:'5px 6px',textAlign:'right',fontFamily:mono,fontSize:10,color:'var(--muted)'}}>{p.abhr||'—'}</td>
+              <td style={{padding:'5px 6px',textAlign:'right',fontFamily:mono,fontSize:10,
+                color:p.abSince!=null?(p.abSince>20?'var(--ice)':p.abSince>10?'var(--muted)':'#27c97a'):'rgba(255,255,255,.2)'}}>
+                {p.abSince!=null?p.abSince:'—'}
+              </td>
+            </tr>
+            {expandedPid===p.pid && (
+              <tr key={p.pid+'_exp'}><td colSpan={10} style={{padding:'0 12px 12px'}}>
+                <Last7HRChart batterId={p.pid}/>
+                <RecentGameLog batterId={p.pid}/>
+              </td></tr>
+            )}
+          </>)}
+        </tbody>
+      </table>
+    </div>
+  </div>;
+}
+
+
   return <div style={{margin:"-16px"}}>
     <iframe
       title="MLB Scores"
@@ -8695,72 +8935,49 @@ function SimLabView({ data }) {
       {/* ── SLATE RANKINGS ── */}
       {view === 'slate' && (
         <div>
-          {/* Controls */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-            {/* ── Matchup dropdown multi-select ── */}
+          {/* ── Row 1: Matchup dropdown + Search ── */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <div ref={matchupDropRef} style={{ position: 'relative' }}>
-              {/* Trigger button */}
-              <button
-                onClick={() => setShowMatchupDrop(v => !v)}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px',
-                  borderRadius: 7, cursor: 'pointer',
+              <button onClick={() => setShowMatchupDrop(v => !v)}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 7, cursor: 'pointer',
                   border: `1px solid ${selMatchups.size > 0 ? 'var(--accent)' : 'var(--border)'}`,
                   background: selMatchups.size > 0 ? 'rgba(232,65,26,.10)' : 'var(--surface2)',
                   color: selMatchups.size > 0 ? 'var(--accent)' : 'var(--muted)',
-                  fontFamily: "'DM Mono',monospace", fontSize: 11,
-                  fontWeight: selMatchups.size > 0 ? 700 : 400, whiteSpace: 'nowrap' }}>
-                🗓 {selMatchups.size === 0
-                  ? 'All Games'
-                  : `${selMatchups.size} Game${selMatchups.size > 1 ? 's' : ''} ✓`}
+                  fontFamily: "'DM Mono',monospace", fontSize: 11, fontWeight: selMatchups.size > 0 ? 700 : 400, whiteSpace: 'nowrap' }}>
+                🗓 {selMatchups.size === 0 ? 'All Games' : `${selMatchups.size} Game${selMatchups.size > 1 ? 's' : ''} ✓`}
                 <span style={{ fontSize: 9, opacity: .6, marginLeft: 2 }}>{showMatchupDrop ? '▲' : '▼'}</span>
               </button>
-
-              {/* Dropdown panel */}
               {showMatchupDrop && (
                 <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 200,
                   background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8,
                   padding: '8px 6px', minWidth: 220, boxShadow: '0 8px 24px rgba(0,0,0,.5)',
-                  display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {/* All option */}
+                  display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 260, overflowY: 'auto' }}>
                   <button onClick={() => { setSelMatchups(new Set()); setShowMatchupDrop(false); }}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px',
-                      borderRadius: 5, cursor: 'pointer', border: 'none', textAlign: 'left',
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 5, cursor: 'pointer', border: 'none', textAlign: 'left',
                       background: selMatchups.size === 0 ? 'rgba(232,65,26,.12)' : 'transparent',
                       color: selMatchups.size === 0 ? 'var(--accent)' : 'var(--muted)',
-                      fontFamily: "'DM Mono',monospace", fontSize: 11,
-                      fontWeight: selMatchups.size === 0 ? 700 : 400, width: '100%' }}>
+                      fontFamily: "'DM Mono',monospace", fontSize: 11, fontWeight: selMatchups.size === 0 ? 700 : 400, width: '100%' }}>
                     <span style={{ width: 12, height: 12, borderRadius: 3, flexShrink: 0,
                       border: `1.5px solid ${selMatchups.size === 0 ? 'var(--accent)' : 'var(--muted)'}`,
                       background: selMatchups.size === 0 ? 'var(--accent)' : 'transparent',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 8, color: 'white' }}>
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: 'white' }}>
                       {selMatchups.size === 0 ? '✓' : ''}
                     </span>
                     All Games
                   </button>
-                  {/* Divider */}
                   <div style={{ height: 1, background: 'var(--border)', margin: '3px 0' }}/>
-                  {/* One row per matchup */}
                   {matchupList.map(g => {
                     const isChecked = selMatchups.has(g.id);
-                    const toggle = () => setSelMatchups(prev => {
-                      const next = new Set(prev);
-                      isChecked ? next.delete(g.id) : next.add(g.id);
-                      return next;
-                    });
+                    const toggle = () => setSelMatchups(prev => { const next = new Set(prev); isChecked ? next.delete(g.id) : next.add(g.id); return next; });
                     return (
                       <button key={g.id} onClick={toggle}
-                        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px',
-                          borderRadius: 5, cursor: 'pointer', border: 'none', textAlign: 'left',
-                          background: isChecked ? 'rgba(232,65,26,.10)' : 'transparent',
-                          color: isChecked ? 'var(--accent)' : 'var(--text)',
-                          fontFamily: "'Oswald',sans-serif", fontSize: 12,
-                          fontWeight: isChecked ? 700 : 500, width: '100%', whiteSpace: 'nowrap' }}>
+                        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 5, cursor: 'pointer', border: 'none', textAlign: 'left',
+                          background: isChecked ? 'rgba(232,65,26,.10)' : 'transparent', color: isChecked ? 'var(--accent)' : 'var(--text)',
+                          fontFamily: "'Oswald',sans-serif", fontSize: 12, fontWeight: isChecked ? 700 : 500, width: '100%', whiteSpace: 'nowrap' }}>
                         <span style={{ width: 12, height: 12, borderRadius: 3, flexShrink: 0,
                           border: `1.5px solid ${isChecked ? 'var(--accent)' : 'var(--muted)'}`,
                           background: isChecked ? 'var(--accent)' : 'transparent',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: 8, color: 'white' }}>
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: 'white' }}>
                           {isChecked ? '✓' : ''}
                         </span>
                         <span style={{ flex: 1 }}>{g.away} @ {g.home}</span>
@@ -8768,167 +8985,86 @@ function SimLabView({ data }) {
                       </button>
                     );
                   })}
-                  {/* Clear link if anything selected */}
                   {selMatchups.size > 0 && (
-                    <div style={{ marginTop: 4, paddingTop: 4, borderTop: '1px solid var(--border)',
-                      textAlign: 'right' }}>
+                    <div style={{ marginTop: 4, paddingTop: 4, borderTop: '1px solid var(--border)', textAlign: 'right' }}>
                       <span onClick={() => { setSelMatchups(new Set()); setShowMatchupDrop(false); }}
-                        style={{ fontSize: 9, color: 'var(--accent)', fontFamily: "'DM Mono',monospace",
-                          cursor: 'pointer', textDecoration: 'underline' }}>
-                        clear all
-                      </span>
+                        style={{ fontSize: 9, color: 'var(--accent)', fontFamily: "'DM Mono',monospace", cursor: 'pointer', textDecoration: 'underline' }}>clear all</span>
                     </div>
                   )}
                 </div>
               )}
             </div>
-            <button onClick={() => setLineupOnly(v => !v)}
-              style={{ padding: '6px 12px', borderRadius: 7, cursor: 'pointer',
-                border: `1px solid ${lineupOnly ? 'rgba(39,201,122,.5)' : 'var(--border)'}`,
-                background: lineupOnly ? 'rgba(39,201,122,.12)' : 'var(--surface2)',
-                color: lineupOnly ? '#27c97a' : 'var(--muted)',
-                fontFamily: "'DM Mono',monospace", fontSize: 11, fontWeight: lineupOnly ? 700 : 400,
-                whiteSpace: 'nowrap' }}>
-              ✅
-            </button>
-            <button onClick={() => setFilterGoneYardSim(v => !v)}
-              style={{ padding: '5px 8px', borderRadius: 7, cursor: 'pointer',
-                border: `1px solid ${filterGoneYardSim ? 'rgba(255,64,32,.5)' : 'var(--border)'}`,
-                background: filterGoneYardSim ? 'rgba(255,64,32,.15)' : 'var(--surface2)',
-                color: filterGoneYardSim ? 'var(--accent)' : 'var(--muted)',
-                fontFamily: "'DM Mono',monospace", fontSize: 11, fontWeight: filterGoneYardSim ? 700 : 400,
-                whiteSpace: 'nowrap' }}>
-              💥
-            </button>
-            <button onClick={() => setFilterDueSim(v => !v)}
-              style={{ padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
-                background: filterDueSim ? 'rgba(56,184,242,.18)' : 'transparent',
-                color: filterDueSim ? 'var(--ice)' : 'var(--muted)',
-                border: `1px solid ${filterDueSim ? 'rgba(56,184,242,.5)' : 'var(--border)'}`,
-                fontFamily: "'DM Mono',monospace", fontWeight: filterDueSim ? 700 : 400, fontSize: 11 }}>
-              ⏳
-            </button>
-            <button onClick={()=>{setSimActiveOnly(s=>!s);if(!simActiveOnly)setSimInjuredOnly(false);}}
-              style={{padding:'4px 10px',borderRadius:6,cursor:'pointer',
-                border:`1px solid ${simActiveOnly?'#34d399':'var(--border)'}`,
-                background:simActiveOnly?'rgba(52,211,153,.12)':'transparent',
-                color:simActiveOnly?'#34d399':'var(--muted)',
-                fontFamily:"'DM Mono',monospace",fontWeight:simActiveOnly?700:400,fontSize:11,
-                whiteSpace:'nowrap'}}>
-              ☑️
-            </button>
-            <button onClick={()=>{setSimInjuredOnly(s=>!s);if(!simInjuredOnly)setSimActiveOnly(false);}}
-              style={{padding:'4px 10px',borderRadius:6,cursor:'pointer',
-                border:`1px solid ${simInjuredOnly?'#fb923c':'var(--border)'}`,
-                background:simInjuredOnly?'rgba(251,146,60,.12)':'transparent',
-                color:simInjuredOnly?'#fb923c':'var(--muted)',
-                fontFamily:"'DM Mono',monospace",fontWeight:simInjuredOnly?700:400,fontSize:11,
-                whiteSpace:'nowrap'}}>
-              🤕
-            </button>
-            <button onClick={() => setSimHotOnly(s => !s)}
-              style={{ padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
-                border: `1px solid ${simHotOnly?'#fb923c':'var(--border)'}`,
-                background: simHotOnly?'rgba(251,146,60,.12)':'transparent',
-                color: simHotOnly?'#fb923c':'var(--muted)',
-                fontFamily: "'DM Mono',monospace", fontWeight: simHotOnly?700:400, fontSize: 11,
-                whiteSpace: 'nowrap' }}>
-              🔥
-            </button>
-            <button onClick={() => setSimPicksOnly(s => !s)}
-              style={{ padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
-                border: `1px solid ${simPicksOnly ? 'var(--accent2)' : 'var(--border)'}}`,
-                background: simPicksOnly ? 'rgba(245,166,35,.12)' : 'transparent',
-                color: simPicksOnly ? 'var(--accent2)' : 'var(--muted)',
-                fontFamily: "'DM Mono',monospace", fontWeight: simPicksOnly ? 700 : 400, fontSize: 11,
-                whiteSpace: 'nowrap' }}>
-              🎯
-            </button>
-            <button onClick={() => setFilterDiamondSim(v => !v)}
-              style={{ padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
-                background: filterDiamondSim ? 'rgba(255,204,0,.18)' : 'transparent',
-                color: filterDiamondSim ? '#ffcc00' : 'var(--muted)',
-                border: `1px solid ${filterDiamondSim ? 'rgba(255,204,0,.5)' : 'var(--border)'}`,
-                fontFamily: "'DM Mono',monospace", fontWeight: filterDiamondSim ? 700 : 400, fontSize: 11 }}
-              title="Tier 1 Locks: A+ grade + Sim TB≥2.0 + Hittable/Target pitcher">
-              💎
-            </button>
-            {/* Batter search */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginLeft: 'auto' }}>
-              <input
-                type="text" value={simSearch} onChange={e => setSimSearch(e.target.value)}
-                placeholder="Search batter…"
-                style={{ padding: '4px 10px', borderRadius: 6, fontSize: 10,
-                  fontFamily: "'DM Mono',monospace",
+              <input type="text" value={simSearch} onChange={e => setSimSearch(e.target.value)} placeholder="Search batter…"
+                style={{ padding: '4px 10px', borderRadius: 6, fontSize: 10, fontFamily: "'DM Mono',monospace",
                   border: `1px solid ${simSearch ? 'var(--accent2)' : 'var(--border)'}`,
-                  background: 'var(--surface2)', color: 'var(--text)', width: 130,
-                  outline: 'none' }}/>
+                  background: 'var(--surface2)', color: 'var(--text)', width: 140, outline: 'none' }}/>
               {simSearch && <button onClick={() => setSimSearch('')}
-                style={{ background: 'none', border: 'none', color: 'var(--muted)',
-                  cursor: 'pointer', fontFamily: "'DM Mono',monospace", fontSize: 10, padding: '0 2px' }}>✕</button>}
+                style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontFamily: "'DM Mono',monospace", fontSize: 10, padding: '0 2px' }}>✕</button>}
             </div>
-            <span style={{ fontSize: 10, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>
-              {slate.length} batters · click column header to sort · click row to Deep Dive
+          </div>
+
+          {/* ── Row 2: Batter filter emoji buttons ── */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            {[
+              [() => setLineupOnly(v=>!v),        lineupOnly,        'rgba(39,201,122,.12)', '#27c97a',       '✅'],
+              [() => setFilterGoneYardSim(v=>!v), filterGoneYardSim, 'rgba(255,64,32,.15)',  'var(--accent)', '💥'],
+              [() => setFilterDueSim(v=>!v),      filterDueSim,      'rgba(56,184,242,.18)', 'var(--ice)',    '⏳'],
+              [()=>{setSimActiveOnly(s=>!s);if(!simActiveOnly)setSimInjuredOnly(false);}, simActiveOnly,  'rgba(52,211,153,.12)', '#34d399',       '☑️'],
+              [()=>{setSimInjuredOnly(s=>!s);if(!simInjuredOnly)setSimActiveOnly(false);}, simInjuredOnly, 'rgba(251,146,60,.12)', '#fb923c',       '🤕'],
+              [() => setSimHotOnly(s=>!s),        simHotOnly,        'rgba(251,146,60,.12)', '#fb923c',       '🔥'],
+              [() => setSimPicksOnly(s=>!s),       simPicksOnly,      'rgba(245,166,35,.12)', 'var(--accent2)','🎯'],
+              [() => setFilterDiamondSim(v=>!v),  filterDiamondSim,  'rgba(255,204,0,.18)',  '#ffcc00',       '💎'],
+            ].map(([fn, active, bg, col, emoji]) => (
+              <button key={emoji} onClick={fn}
+                style={{ padding: '4px 9px', borderRadius: 7, cursor: 'pointer', flexShrink: 0, fontSize: 14,
+                  border: `1px solid ${active ? col : 'var(--border)'}`,
+                  background: active ? bg : 'transparent',
+                  color: active ? col : 'var(--muted)' }}>
+                {emoji}
+              </button>
+            ))}
+            <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", marginLeft: 'auto', whiteSpace: 'nowrap' }}>
+              {slate.length} batters · sort by header · row = Deep Dive
             </span>
           </div>
 
-          {/* Pitcher grade filter — multi-select */}
-          <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-            {/* Batter grade filter */}
+          {/* ── Row 3: Batter grades ── */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", textTransform: 'uppercase', letterSpacing: 1 }}>Grade:</span>
             {['A+','A','B','C','D'].map(g => {
               const active = selBatterGradesSim.has(g);
-              const GCFG = { 'A+': '#f5a623', 'A': '#e8411a', 'B': '#38b8f2', 'C': 'var(--muted)', 'D': 'var(--muted)' };
-              const col = GCFG[g] || 'var(--muted)';
-              return (
-                <button key={g} onClick={() => setSelBatterGradesSim(prev => {
-                  const next = new Set(prev);
-                  active ? next.delete(g) : next.add(g);
-                  return next;
-                })}
-                  style={{ padding: '3px 10px', borderRadius: 5, cursor: 'pointer', fontWeight: active ? 800 : 500,
-                    border: `1px solid ${active ? col : 'var(--border)'}`,
-                    background: active ? `${col}20` : 'transparent',
-                    color: active ? col : 'var(--muted)',
-                    fontFamily: "'DM Mono',monospace", fontSize: 11 }}>
-                  {g}
-                </button>
-              );
+              const col = {'A+':'#f5a623','A':'#e8411a','B':'#38b8f2','C':'var(--muted)','D':'var(--muted)'}[g]||'var(--muted)';
+              return <button key={g} onClick={() => setSelBatterGradesSim(prev => { const next=new Set(prev); active?next.delete(g):next.add(g); return next; })}
+                style={{ padding:'3px 10px', borderRadius:5, cursor:'pointer', fontWeight:active?800:500,
+                  border:`1px solid ${active?col:'var(--border)'}`, background:active?`${col}20`:'transparent',
+                  color:active?col:'var(--muted)', fontFamily:"'DM Mono',monospace", fontSize:11 }}>{g}</button>;
             })}
-            {selBatterGradesSim.size > 0 && (
-              <span onClick={() => setSelBatterGradesSim(new Set())}
-                style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace",
-                  cursor: 'pointer', textDecoration: 'underline' }}>clear</span>
-            )}
-            <span style={{ fontSize: 9, color: 'rgba(255,255,255,.15)', fontFamily: "'DM Mono',monospace" }}>|</span>
+            {selBatterGradesSim.size > 0 && <span onClick={() => setSelBatterGradesSim(new Set())}
+              style={{ fontSize:9, color:'var(--muted)', fontFamily:"'DM Mono',monospace", cursor:'pointer', textDecoration:'underline' }}>clear</span>}
+          </div>
+
+          {/* ── Row 4: Pitcher grades ── */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", textTransform: 'uppercase', letterSpacing: 1 }}>Pitcher:</span>
-            {/* All button — clears selection */}
             <button onClick={() => setSelPitcherGradesSim(new Set())}
-              style={{ padding:'3px 10px', borderRadius:6, cursor:'pointer',
-                background: selPitcherGradesSim.size===0 ? 'rgba(255,255,255,.08)' : 'transparent',
-                color: selPitcherGradesSim.size===0 ? 'var(--text)' : 'var(--muted)',
-                border: `1px solid ${selPitcherGradesSim.size===0 ? 'var(--text)' : 'var(--border)'}`,
-                fontFamily:"'DM Mono',monospace", fontWeight: selPitcherGradesSim.size===0 ? 700 : 400, fontSize: 10 }}>
-              All
-            </button>
-            {['‼️ Elite', '⚠️ Tough', '🤔 Average', '💥 Hittable', '🎯 Target'].map(g => {
+              style={{ padding:'3px 9px', borderRadius:6, cursor:'pointer',
+                background:selPitcherGradesSim.size===0?'rgba(255,255,255,.08)':'transparent',
+                color:selPitcherGradesSim.size===0?'var(--text)':'var(--muted)',
+                border:`1px solid ${selPitcherGradesSim.size===0?'var(--text)':'var(--border)'}`,
+                fontFamily:"'DM Mono',monospace", fontWeight:selPitcherGradesSim.size===0?700:400, fontSize:10 }}>All</button>
+            {['‼️ Elite','⚠️ Tough','🤔 Average','💥 Hittable','🎯 Target'].map(g => {
               const active = selPitcherGradesSim.has(g);
-              const col = g==='‼️ Elite'?'#ff4020':g==='⚠️ Tough'?'#ff8020':g==='🤔 Average'?'var(--muted)':g==='💥 Hittable'?'#27c97a':'#38b8f2';
-              return <button key={g} onClick={() => setSelPitcherGradesSim(prev => {
-                  const next = new Set(prev);
-                  next.has(g) ? next.delete(g) : next.add(g);
-                  return next;
-                })}
+              const col = {'‼️ Elite':'#ff4020','⚠️ Tough':'#ff8020','🤔 Average':'var(--muted)','💥 Hittable':'#27c97a','🎯 Target':'#38b8f2'}[g];
+              return <button key={g} onClick={() => setSelPitcherGradesSim(prev => { const next=new Set(prev); next.has(g)?next.delete(g):next.add(g); return next; })}
                 style={{ padding:'3px 8px', borderRadius:6, cursor:'pointer',
-                  background: active ? 'rgba(255,255,255,.08)' : 'transparent',
-                  color: active ? col : 'var(--muted)',
-                  border: `1px solid ${active ? col : 'var(--border)'}`,
-                  fontFamily:"'DM Mono',monospace", fontWeight: active ? 700 : 400, fontSize: 13 }}>
+                  background:active?'rgba(255,255,255,.08)':'transparent', color:active?col:'var(--muted)',
+                  border:`1px solid ${active?col:'var(--border)'}`,
+                  fontFamily:"'DM Mono',monospace", fontWeight:active?700:400, fontSize:14 }}>
                 {g.split(' ')[0]}
               </button>;
             })}
           </div>
-
           {/* Hidden PitcherCard renders to populate simPitcherGrades cache */}
           <div style={{ display: 'none' }}>
             {[...new Set(data.map(r => r.pitcher_id).filter(Boolean))].map(pid => (
@@ -10942,7 +11078,7 @@ function PitcherLeaderboard() {
                   color: active ? col : 'var(--muted)',
                   fontFamily:"'DM Mono',monospace",fontSize:10,
                   fontWeight: active ? 700 : 400}}>
-                {g === 'all' ? 'All Grades' : g}
+                {g === 'all' ? 'All' : g.split(' ')[0]}
               </button>
             );
           })}
@@ -11613,23 +11749,7 @@ function MatchupEngineTab() {
       );
     })()}
 
-    {/* Emoji legend */}
-    <div style={{display:'flex',gap:10,marginBottom:10,flexWrap:'wrap',padding:'6px 10px',
-      background:'var(--surface)',border:'1px solid var(--border)',borderRadius:7}}>
-      <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontWeight:700,
-        textTransform:'uppercase',letterSpacing:1,alignSelf:'center'}}>Key:</span>
-      {[
-        ['✅','Confirmed in lineup'],
-        ['💥','Hit a HR today'],
-        ['📉','Slump'],
-        ['💎','Diamond pick'],
-      ].map(([emoji, label]) => (
-        <span key={emoji} style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
-          display:'flex',alignItems:'center',gap:3}}>
-          <span style={{fontSize:11}}>{emoji}</span>{label}
-        </span>
-      ))}
-    </div>
+
 
 
 
