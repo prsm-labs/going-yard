@@ -7850,6 +7850,7 @@ function HRTrackerTab() {
     {hrTab === 'heatingup' && <HeatingUpTab/>}
     {hrTab === 'tracker'   && <div>
     <div className="hrow">
+      <button onClick={exportHRCsv}
         style={{padding:"4px 12px",borderRadius:6,border:"1px solid var(--border)",
           background:"var(--surface2)",color:"var(--muted)",cursor:"pointer",
           fontFamily:"'DM Mono',monospace",fontSize:11,display:"flex",alignItems:"center",gap:5}}>
