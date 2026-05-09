@@ -7832,8 +7832,7 @@ function HRTrackerTab() {
 
   const [hrTab, setHrTab] = useState('tracker');
 
-  return <div>
-    {/* Sub-tab nav */}
+  const nav = (
     <div style={{display:'flex',gap:6,marginBottom:14}}>
       {[['tracker','💥 HR Tracker'],['hotbats','🔥 Hot Bats'],['heatingup','📈 Heating Up']].map(([key,label])=>(
         <button key={key} onClick={()=>setHrTab(key)}
@@ -7846,10 +7845,11 @@ function HRTrackerTab() {
         </button>
       ))}
     </div>
-    {hrTab === 'hotbats'   && <HotBatsTab/>}
-    {hrTab === 'heatingup' && <HeatingUpTab/>}
-    {hrTab === 'tracker' && (
-    <div>
+  );
+  if (hrTab === 'hotbats')   return <div>{nav}<HotBatsTab/></div>;
+  if (hrTab === 'heatingup') return <div>{nav}<HeatingUpTab/></div>;
+  return <div>
+  {nav}
     <div className="hrow">
       <button onClick={exportHRCsv}
         style={{padding:"4px 12px",borderRadius:6,border:"1px solid var(--border)",
@@ -7994,8 +7994,6 @@ function HRTrackerTab() {
               })}
             </tbody>
           </table></div>
-    </div>
-    )}
   </div>;
 }
 
