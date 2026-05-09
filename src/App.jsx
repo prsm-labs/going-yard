@@ -7848,7 +7848,7 @@ function HRTrackerTab() {
   );
   if (hrTab === 'hotbats')   return <div>{nav}<HotBatsTab/></div>;
   if (hrTab === 'heatingup') return <div>{nav}<HeatingUpTab/></div>;
-  return <div>
+  const _body = (<div>
   {nav}
     <div className="hrow">
       <button onClick={exportHRCsv}
@@ -7994,7 +7994,7 @@ function HRTrackerTab() {
               })}
             </tbody>
           </table></div>
-  </div>;
+  </div>); return _body;
 }
 
 
