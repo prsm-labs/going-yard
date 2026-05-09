@@ -8118,7 +8118,7 @@ function HeatingUpTab() {
       const w = p.windows?.last7 || {};
       const avgEV=w.avgEV||0, hh=w.hardHit||0, fb=w.flyBall||0, barrel=w.barrel||0;
       // Use GAME_LOG_CACHE for L7 HR — same source as HotBatsTab (players.json window is stale)
-      const gl7 = GAME_LOG_CACHE[String(p.pid)];
+      const gl7 = GAME_LOG_CACHE[String(p.pid)]?.games;
       const l7hr = gl7 ? gl7.slice(-7).reduce((s,g)=>s+(g.hrs||0),0) : (w.hr||0);
       const heatScore = avgEV*0.35 + hh*0.25 + fb*0.20 + barrel*0.20;
       const seasonHR = p.windows?.season2026?.hr || 0;
