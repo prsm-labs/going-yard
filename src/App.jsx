@@ -8750,7 +8750,10 @@ function LongShotView({ data }) {
   const [picksOnly,  setPicksOnly]    = useState(false);
   const [diamondOnly,setDiamondOnly]  = useState(false);
   const picks = usePicks();
-  const SOFT = ['🎯 Target','💥 Hittable']; // HH%>=33 = Target, HH%>=27.3 = Hittable
+  const pitcherGradeCache = useRef({});
+  const [cacheVersion, setCacheVersion] = useState(0);
+  const SOFT_GRADES = new Set(['🎯 Target','💥 Hittable','🤔 Average']);
+  const SOFT_LABEL_LIST = ['ALL','🤔 Average','💥 Hittable','🎯 Target'];
   const pgColor = pg => ({'💥 Hittable':'#27c97a','🎯 Target':'#38b8f2','🤔 Average':'var(--muted)'}[pg]||'var(--muted)');
   const tbColor = v => v>=2.0?'#27c97a':v>=1.5?'var(--accent2)':v>=1.0?'var(--text)':'var(--muted)';
 
@@ -8761,20 +8764,18 @@ function LongShotView({ data }) {
       if (!['C','D'].includes(grade)) continue;
       // Use pitcher_hh_pct_allowed (hard hit % allowed) as vulnerability proxy
       // Above median (27.3%) = soft/hittable pitcher — same logic as tracker "Target/Hittable"
-      const hh = parseFloat(b.pitcher_hh_pct_allowed)||0;
-      if (hh < 27.3) continue; // below median = tough/elite pitcher, skip
-      // Derive a display label from HH%
-      const pgLabel = hh>=33?'🎯 Target':hh>=27.3?'💥 Hittable':'🤔 Average';
+      const pid2 = String(parseInt(b.pitcher_id)||0);
+      const pgLabel = pitcherGradeCache.current[pid2] || '';
+      if (!pgLabel || !SOFT_GRADES.has(pgLabel)) continue;
       out.push({ ...b, _pgLabel:pgLabel,
         _simHR:parseFloat(b.sim_hr_adj)||0,
         _simTB:parseFloat(b.sim_tb)||0,
         _bvpFB:parseFloat(b.bvp_fb_pct)||0,
         _recEV:parseFloat(b.recent_avg_ev)||0,
-        _hrPct:parseFloat(b.proj_hr_adj)||parseFloat(b.sim_hr)||0,
-        _hh:hh });
+        _hrPct:parseFloat(b.proj_hr_adj)||parseFloat(b.sim_hr)||0 });
     }
     return out;
-  }, [data]);
+  }, [data, cacheVersion]);
 
   const teams = React.useMemo(() => ['ALL',...Array.from(new Set(rows.map(r=>r.batting_team||'').filter(Boolean))).sort()], [rows]);
 
@@ -8822,10 +8823,18 @@ function LongShotView({ data }) {
         </select>
         <select value={pgFilter} onChange={e=>setPgFilter(e.target.value)}
           style={{padding:'3px 8px',borderRadius:6,fontSize:10,fontFamily:mono,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',cursor:'pointer'}}>
-          {['ALL',...SOFT].map(g=><option key={g} value={g}>{g==='ALL'?'All Pitchers':g}</option>)}
+          {SOFT_LABEL_LIST.map(g=><option key={g} value={g}>{g==='ALL'?'All Pitchers':g}</option>)}
         </select>
         <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginLeft:'auto'}}>{filtered.length} long shots</span>
       </div>
+      {/* Hidden PitcherCards — populate grade cache with real ERA/K9/WHIP grades */}
+      <div style={{display:'none'}}>
+        {[...new Set((data||[]).map(r=>r.pitcher_id).filter(Boolean))].map(pid=>(
+          <PitcherCard key={pid} pitcherId={pid} pitcherName=""
+            onGrade={(id,g)=>{ pitcherGradeCache.current[id]=g; setCacheVersion(v=>v+1); }}/>
+        ))}
+      </div>
+
       {/* Sticker filters */}
       <div style={{display:'flex',gap:6,marginBottom:10,flexWrap:'wrap'}}>
         {[
