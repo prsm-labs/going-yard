@@ -7849,7 +7849,7 @@ function HRTrackerTab() {
 
   const HRNav = () => (
     <div style={{display:'flex',gap:6,marginBottom:14}}>
-      {[['tracker','💥 HR Tracker'],['hotbats','🔥 Hot Bats'],['heatingup','📈 Heating Up']].map(([key,label]) => (
+      {[['tracker','💥 HR Tracker'],['hotbats','🔥 Hot Bats'],['heatingup','📈 Heating Up'],['unlucky','😤 Robbed']].map(([key,label]) => (
         <button key={key} onClick={() => setHrTab(key)}
           style={{padding:'5px 12px',borderRadius:7,cursor:'pointer',
             fontFamily:"'DM Mono',monospace",fontWeight:hrTab===key?700:400,fontSize:10,
@@ -7863,6 +7863,7 @@ function HRTrackerTab() {
   );
   if (hrTab === 'hotbats')   return <div><HRNav/><HotBatsTab/></div>;
   if (hrTab === 'heatingup') return <div><HRNav/><HeatingUpTab/></div>;
+  if (hrTab === 'unlucky')   return <div><HRNav/><UnluckyTab/></div>;
   return <div>
     <HRNav/>
     <div className="hrow">
@@ -8020,6 +8021,156 @@ function HRTrackerTab() {
 }
 
 
+
+// ── Unlucky / Robbed Tab ─────────────────────────────────────────────────────
+// Batters who made HR-quality contact in last 7 days but got nothing for it
+function UnluckyTab() {
+  const [rows, setRows]       = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [expPid, setExpPid]   = useState(null);
+  const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
+
+  useEffect(() => {
+    (async () => {
+      try {
+        // Fetch last 7 days of games
+        const dates = [];
+        for (let i = 1; i <= 7; i++) {
+          const d = new Date(); d.setDate(d.getDate() - i);
+          dates.push(d.toISOString().slice(0,10));
+        }
+        // Get game PKs for those dates
+        const schedRes = await fetch(
+          `https://statsapi.mlb.com/api/v1/schedule?sportId=1&startDate=${dates[dates.length-1]}&endDate=${dates[0]}&gameType=R`
+        );
+        const schedData = await schedRes.json();
+        const gamePks = [];
+        for (const dateObj of (schedData.dates||[])) {
+          for (const g of (dateObj.games||[])) {
+            if (g.status?.abstractGameState === 'Final') gamePks.push(g.gamePk);
+          }
+        }
+
+        // Fetch play-by-play for each game, collect unlucky hits
+        const batterMap = {}; // pid → {name, team, pid, hits:[]}
+        const BATCH = 8;
+        for (let i = 0; i < gamePks.length; i += BATCH) {
+          const batch = gamePks.slice(i, i + BATCH);
+          await Promise.all(batch.map(async gk => {
+            try {
+              const r = await fetch(`https://statsapi.mlb.com/api/v1.1/game/${gk}/feed/live?fields=liveData,plays,allPlays,result,about,matchup,hitData,batter,fullName,currentTeam,abbreviation`);
+              const d = await r.json();
+              for (const play of (d.liveData?.plays?.allPlays||[])) {
+                const ev   = parseFloat(play.hitData?.launchSpeed||0);
+                const la   = parseFloat(play.hitData?.launchAngle||0);
+                const dist = parseFloat(play.hitData?.totalDistance||0);
+                const res  = play.result?.eventType||'';
+                const bbt  = play.hitData?.trajectory||'';
+                if (ev < 95 || res !== 'field_out') continue;
+                if (!(la >= 20 && la <= 35)) continue;
+                if (dist < 330) continue;
+                // Tier
+                let tier, tierScore;
+                const isBarrel = ev >= 98 && la >= 26 && la <= 30;
+                if (isBarrel && dist >= 370)       { tier='🚨 Barreled Out';     tierScore=3; }
+                else if (ev >= 98 && dist >= 370)  { tier='⚠️ Warning Track';    tierScore=2; }
+                else                               { tier='💥 Hard Hit Flyout';  tierScore=1; }
+                const pid  = play.matchup?.batter?.id;
+                const name = play.matchup?.batter?.fullName||'';
+                const team = play.matchup?.batSide?.code||'';
+                if (!pid) continue;
+                const key = String(pid);
+                if (!batterMap[key]) batterMap[key] = { pid, name, team:'', unluckyHits:[], topTier:0, totalScore:0 };
+                batterMap[key].unluckyHits.push({ ev, la, dist, tier, tierScore });
+                batterMap[key].totalScore += tierScore;
+                if (tierScore > batterMap[key].topTier) batterMap[key].topTier = tierScore;
+              }
+            } catch(e) {}
+          }));
+        }
+
+        // Enrich with team from PLAYER_DATA_CACHE
+        const result = Object.values(batterMap)
+          .filter(b => b.unluckyHits.length >= 1)
+          .map(b => {
+            const cp = getCachedPlayer(b.pid)||{};
+            return { ...b, team: cp.team||b.team||'',
+              count: b.unluckyHits.length,
+              topEV: Math.max(...b.unluckyHits.map(h=>h.ev)),
+              avgDist: Math.round(b.unluckyHits.reduce((s,h)=>s+h.dist,0)/b.unluckyHits.length),
+              tierLabel: b.topTier===3?'🚨 Barreled Out':b.topTier===2?'⚠️ Warning Track':'💥 Hard Flyout',
+            };
+          })
+          .sort((a,b) => b.totalScore - a.totalScore || b.count - a.count);
+
+        setRows(result);
+      } catch(e) { console.error('UnluckyTab error:', e); }
+      setLoading(false);
+    })();
+  }, []);
+
+  if (loading) return (<div style={{display:'flex',alignItems:'center',gap:8,padding:20,color:'var(--muted)',fontFamily:mono,fontSize:11}}><div className="sp"/>Scanning last 7 days for robbed hits…</div>);
+
+  return (
+    <div>
+      <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginBottom:6}}>
+        Batters who made HR-quality contact (EV≥95, LA 20-35°, 330ft+) but got nothing · last 7 games
+      </div>
+      <div style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.3)',marginBottom:10}}>
+        🚨 Barreled Out = true barrel caught · ⚠️ Warning Track = 370ft+ flyout · 💥 Hard Flyout = 330ft+ hard hit out
+      </div>
+      <div className="tw">
+        <table style={{width:'100%'}}>
+          <thead><tr>
+            <th style={{padding:'5px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.8,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)'}}>TM</th>
+            <th style={{padding:'5px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.8,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)'}}>Batter</th>
+            <th style={{padding:'5px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.8,color:'var(--muted)',textAlign:'center',borderBottom:'1px solid var(--border)'}}>Robbed</th>
+            <th style={{padding:'5px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.8,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)'}}>Top Tier</th>
+            <th style={{padding:'5px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.8,color:'var(--muted)',textAlign:'right',borderBottom:'1px solid var(--border)'}}>Peak EV</th>
+            <th style={{padding:'5px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.8,color:'var(--muted)',textAlign:'right',borderBottom:'1px solid var(--border)'}}>Avg Dist</th>
+          </tr></thead>
+          <tbody>
+            {rows.map(p => [
+              (<tr key={p.pid} onClick={()=>setExpPid(v=>v===p.pid?null:p.pid)}
+                style={{cursor:'pointer',height:28,borderBottom:'1px solid rgba(255,255,255,.04)',
+                  background:expPid===p.pid?'rgba(255,255,255,.04)':'transparent'}}>
+                <td style={{padding:'2px 8px',fontFamily:osw,fontWeight:700,fontSize:9,color:'var(--accent2)',whiteSpace:'nowrap'}}>{p.team}</td>
+                <td style={{padding:'2px 8px'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:5}}>
+                    <PlayerAvatar pid={p.pid} name={p.name} size={16}/>
+                    <span style={{fontFamily:osw,fontWeight:700,fontSize:10,color:isKeyMatchup(p.pid,p.name)?'#ff8020':'var(--text)',whiteSpace:'nowrap'}}>{p.name}</span>
+                    <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={p.pid} name={p.name} team={p.team}/></span>
+                  </div>
+                </td>
+                <td style={{padding:'2px 8px',textAlign:'center'}}>
+                  <span style={{fontFamily:osw,fontWeight:800,fontSize:14,
+                    color:p.count>=4?'#ff4020':p.count>=2?'#f5a623':'#27c97a'}}>{p.count}</span>
+                </td>
+                <td style={{padding:'2px 8px',fontFamily:mono,fontSize:9,color:p.topTier===3?'#ff4020':p.topTier===2?'#f5a623':'var(--muted)',whiteSpace:'nowrap'}}>{p.tierLabel}</td>
+                <td style={{padding:'2px 8px',textAlign:'right',fontFamily:osw,fontWeight:700,fontSize:11,
+                  color:p.topEV>=103?'#ff4020':p.topEV>=98?'#f5a623':'var(--text)'}}>{p.topEV.toFixed(1)}</td>
+                <td style={{padding:'2px 8px',textAlign:'right',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{p.avgDist}ft</td>
+              </tr>),
+              expPid===p.pid && (<tr key={p.pid+'x'}><td colSpan={6} style={{padding:'0 12px 12px',background:'rgba(255,255,255,.02)'}}>
+                <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',padding:'8px 0 4px'}}>Individual robbed hits:</div>
+                {p.unluckyHits.sort((a,b)=>b.tierScore-a.tierScore).map((h,i)=>(
+                  <div key={i} style={{display:'flex',gap:12,padding:'3px 0',borderBottom:'1px solid rgba(255,255,255,.04)',fontFamily:mono,fontSize:9}}>
+                    <span style={{color:h.tierScore===3?'#ff4020':h.tierScore===2?'#f5a623':'var(--muted)',width:130,flexShrink:0}}>{h.tier}</span>
+                    <span style={{color:h.ev>=103?'#ff4020':h.ev>=98?'#f5a623':'var(--text)'}}>{h.ev.toFixed(1)} mph</span>
+                    <span style={{color:'var(--muted)'}}>{h.la.toFixed(0)}°</span>
+                    <span style={{color:'var(--muted)'}}>{h.dist.toFixed(0)}ft</span>
+                  </div>
+                ))}
+                <div style={{marginTop:8}}><Last7HRChart batterId={p.pid}/></div>
+              </td></tr>)
+            ])}
+            {rows.length===0 && (<tr><td colSpan={6} style={{padding:'30px',textAlign:'center',fontFamily:mono,fontSize:10,color:'var(--muted)'}}>No robbed hits found in last 7 days.</td></tr>)}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 
 // ── Hot Bats Tab ─────────────────────────────────────────────────────────────
 function HotBatsTab() {
@@ -8734,6 +8885,8 @@ function PitcherCard({ pitcherId, pitcherName, onGrade }) {
 // ── SIM LAB ────────────────────────────────────────────────────
 // ── Long Shot View ────────────────────────────────────────────────────────────
 function LongShotView({ data }) {
+  const [lineupVer, setLineupVer] = useState(LINEUP_VERSION);
+  useEffect(() => { const unsub = subscribeLineup(v => setLineupVer(v)); return unsub; }, []);
   const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
   const [sort, setSort]       = useState('_sig');
   const [sortDir, setSortDir] = useState(1); // 1 = desc (bv-av = higher first)
@@ -8802,7 +8955,7 @@ function LongShotView({ data }) {
         _hrPct:parseFloat(b.proj_hr_adj)||parseFloat(b.sim_hr)||0 });
     }
     return out;
-  }, [data, cacheVersion]);
+  }, [data, cacheVersion, lineupVer]);
 
   const teams = React.useMemo(() => ['ALL',...Array.from(new Set(rows.map(r=>r.batting_team||'').filter(Boolean))).sort()], [rows]);
 
@@ -8982,6 +9135,8 @@ function LongShotView({ data }) {
 function SimLabView({ data }) {
   useHROdds();
   const picks = usePicks();
+  const [lineupVer, setLineupVer] = useState(LINEUP_VERSION);
+  useEffect(() => { const unsub = subscribeLineup(v => setLineupVer(v)); return unsub; }, []);
   const [view, setView]             = useState('slate');    // 'slate' | 'deepdive' | 'props'
   const [selBatter, setSelBatter]   = useState(null);
   const [sortBy, setSortBy]         = useState('proj_hr_adj');
@@ -9129,7 +9284,7 @@ function SimLabView({ data }) {
       }
       return mul * ((parseFloat(a[sortBy]) || 0) - (parseFloat(b[sortBy]) || 0));
     });
-  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, minHRScore, minHRPct, minMeatball, minHitPct, minSimTB, minOdds, simSearch]);
+  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, minHRScore, minHRPct, minMeatball, minHitPct, minSimTB, minOdds, simSearch, lineupVer]);
 
   // Auto-select top batter when data loads
   useEffect(() => {
