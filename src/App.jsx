@@ -8040,54 +8040,57 @@ function UnluckyTab() {
           dates.push(d.toISOString().slice(0,10));
         }
         // Get game PKs for those dates
+        // Get game PKs — accept any completed/in-progress state
         const schedRes = await fetch(
-          `https://statsapi.mlb.com/api/v1/schedule?sportId=1&startDate=${dates[dates.length-1]}&endDate=${dates[0]}&gameType=R`
+          `https://statsapi.mlb.com/api/v1/schedule?sportId=1&startDate=${dates[dates.length-1]}&endDate=${dates[0]}&sportId=1&gameType=R&hydrate=game(content(summary)),linescore`
         );
         const schedData = await schedRes.json();
         const gamePks = [];
         for (const dateObj of (schedData.dates||[])) {
           for (const g of (dateObj.games||[])) {
-            if (g.status?.abstractGameState === 'Final') gamePks.push(g.gamePk);
+            const state = (g.status?.abstractGameState||'').toLowerCase();
+            if (state === 'final' || state === 'live') gamePks.push(g.gamePk);
           }
         }
+        console.log('[Robbed] Found', gamePks.length, 'games to scan');
 
-        // Fetch play-by-play for each game, collect unlucky hits
-        const batterMap = {}; // pid → {name, team, pid, hits:[]}
-        const BATCH = 8;
+        // Fetch play-by-play — NO fields filter so we get full hitData
+        const batterMap = {};
+        const BATCH = 6;
         for (let i = 0; i < gamePks.length; i += BATCH) {
           const batch = gamePks.slice(i, i + BATCH);
           await Promise.all(batch.map(async gk => {
             try {
-              const r = await fetch(`https://statsapi.mlb.com/api/v1.1/game/${gk}/feed/live?fields=liveData,plays,allPlays,result,about,matchup,hitData,batter,fullName,currentTeam,abbreviation`);
+              const r = await fetch(`https://statsapi.mlb.com/api/v1.1/game/${gk}/feed/live`);
               const d = await r.json();
-              for (const play of (d.liveData?.plays?.allPlays||[])) {
-                const ev   = parseFloat(play.hitData?.launchSpeed||0);
-                const la   = parseFloat(play.hitData?.launchAngle||0);
-                const dist = parseFloat(play.hitData?.totalDistance||0);
-                const res  = play.result?.eventType||'';
-                const bbt  = play.hitData?.trajectory||'';
-                if (ev < 95 || res !== 'field_out') continue;
-                if (!(la >= 20 && la <= 35)) continue;
+              const plays = d.liveData?.plays?.allPlays || [];
+              for (const play of plays) {
+                const hd   = play.hitData || {};
+                const ev   = parseFloat(hd.launchSpeed  || hd.exitVelocity || 0);
+                const la   = parseFloat(hd.launchAngle  || 0);
+                const dist = parseFloat(hd.totalDistance || hd.hitDistance || 0);
+                const res  = (play.result?.eventType || play.result?.event || '').toLowerCase();
+                if (ev < 95) continue;
+                if (res !== 'field_out' && res !== 'fielded_out' && res !== 'flyout' && res !== 'lineout' && res !== 'pop_out') continue;
+                if (la < 20 || la > 35) continue;
                 if (dist < 330) continue;
-                // Tier
                 let tier, tierScore;
-                const isBarrel = ev >= 98 && la >= 26 && la <= 30;
-                if (isBarrel && dist >= 370)       { tier='🚨 Barreled Out';     tierScore=3; }
-                else if (ev >= 98 && dist >= 370)  { tier='⚠️ Warning Track';    tierScore=2; }
-                else                               { tier='💥 Hard Hit Flyout';  tierScore=1; }
+                if (ev >= 98 && dist >= 370)       { tier='🚨 Barreled Out';    tierScore=3; }
+                else if (ev >= 98 && dist >= 350)  { tier='⚠️ Warning Track';   tierScore=2; }
+                else                               { tier='💥 Hard Flyout';     tierScore=1; }
                 const pid  = play.matchup?.batter?.id;
-                const name = play.matchup?.batter?.fullName||'';
-                const team = play.matchup?.batSide?.code||'';
+                const name = play.matchup?.batter?.fullName || '';
                 if (!pid) continue;
                 const key = String(pid);
-                if (!batterMap[key]) batterMap[key] = { pid, name, team:'', unluckyHits:[], topTier:0, totalScore:0 };
+                if (!batterMap[key]) batterMap[key] = { pid, name, unluckyHits:[], topTier:0, totalScore:0 };
                 batterMap[key].unluckyHits.push({ ev, la, dist, tier, tierScore });
                 batterMap[key].totalScore += tierScore;
                 if (tierScore > batterMap[key].topTier) batterMap[key].topTier = tierScore;
               }
-            } catch(e) {}
+            } catch(e) { console.warn('[Robbed] game fetch error:', e); }
           }));
         }
+        console.log('[Robbed] Batters with unlucky hits:', Object.keys(batterMap).length);
 
         // Enrich with team from PLAYER_DATA_CACHE
         const result = Object.values(batterMap)
