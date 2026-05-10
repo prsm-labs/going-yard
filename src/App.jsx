@@ -8736,7 +8736,7 @@ function PitcherCard({ pitcherId, pitcherName, onGrade }) {
 function LongShotView({ data }) {
   const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
   const [sort, setSort]       = useState('_simTB');
-  const [sortDir, setSortDir] = useState(-1);
+  const [sortDir, setSortDir] = useState(1); // 1 = desc (bv-av = higher first)
   const [search, setSearch]   = useState('');
   const [teamFilter, setTeamFilter] = useState('ALL');
   const [pgFilter, setPgFilter]     = useState('ALL');
@@ -8784,7 +8784,7 @@ function LongShotView({ data }) {
     if (pgFilter!=='ALL')   r = r.filter(b=>b._pgLabel===pgFilter);
     if (search)      { const q=search.toLowerCase(); r=r.filter(b=>(b.batter||'').toLowerCase().includes(q)); }
     if (lineupOnly)  r = r.filter(b=>parseInt(b.batter_id||0)>0 && LINEUP_STATUS[parseInt(b.batter_id||0)]?.status==='confirmed');
-    if (goneYard)    r = r.filter(b=>parseInt(b.batter_id||0)>0 && HR_TODAY_SET?.has(parseInt(b.batter_id||0)));
+    if (goneYard)    r = r.filter(b=>{ const pid=parseInt(b.batter_id||0); const nm=(b.batter||'').toLowerCase(); return pid>0 && Array.isArray(HR_DATA) && HR_DATA.some(h=>h.batterId===pid||(h.batterName&&h.batterName.toLowerCase()===nm)); });
     if (dueOnly)     r = r.filter(b=>{ const dp=DAILY_PICKS_CACHE[String(b.batter_id||'')]; return dp&&isDue(dp); });
     if (activeOnly)  r = r.filter(b=>!INJURY_MAP[String(b.batter_id||'')]);
     if (injuredOnly) r = r.filter(b=>!!INJURY_MAP[String(b.batter_id||'')]);
@@ -8799,7 +8799,7 @@ function LongShotView({ data }) {
       style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,
         color:sort===k?'var(--accent2)':'var(--muted)',cursor:'pointer',textAlign:'right',
         whiteSpace:'nowrap',borderBottom:'1px solid var(--border)'}}>
-      {label}{sort===k?(sortDir===-1?' ▼':' ▲'):''}
+      {label}{sort===k?(sortDir===1?' ▼':' ▲'):''}
     </th>
   );
 
