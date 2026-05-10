@@ -8732,6 +8732,141 @@ function PitcherCard({ pitcherId, pitcherName, onGrade }) {
 
 // ── BATTER LEADERBOARD ─────────────────────────────────────────
 // ── SIM LAB ────────────────────────────────────────────────────
+// ── Long Shot View ────────────────────────────────────────────────────────────
+function LongShotView({ data }) {
+  const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
+  const [sort, setSort]       = useState('_simTB');
+  const [sortDir, setSortDir] = useState(-1);
+  const [search, setSearch]   = useState('');
+  const [teamFilter, setTeamFilter] = useState('ALL');
+  const [pgFilter, setPgFilter]     = useState('ALL');
+  const [expandedId, setExpandedId] = useState(null);
+  const picks = usePicks();
+  const SOFT = ['💥 Hittable','🎯 Target','🤔 Average'];
+  const pgColor = pg => ({'💥 Hittable':'#27c97a','🎯 Target':'#38b8f2','🤔 Average':'var(--muted)'}[pg]||'var(--muted)');
+  const tbColor = v => v>=2.0?'#27c97a':v>=1.5?'var(--accent2)':v>=1.0?'var(--text)':'var(--muted)';
+
+  const rows = React.useMemo(() => {
+    const out = [];
+    for (const b of (data||[])) {
+      const grade = (b.grade||'').trim();
+      if (!['C','D'].includes(grade)) continue;
+      const pbrl = parseFloat(b.pitcher_barrel_pct_allowed)||0;
+      const pgLabel = pbrl>=10?'💥 Hittable':pbrl>=7?'🎯 Target':pbrl<=2?'‼️ Elite':pbrl<=4?'⚠️ Tough':'🤔 Average';
+      if (!SOFT.includes(pgLabel)) continue;
+      out.push({ ...b, _pgLabel:pgLabel,
+        _simTB:parseFloat(b.sim_tb)||0, _bvpFB:parseFloat(b.bvp_fb_pct)||0,
+        _recEV:parseFloat(b.recent_avg_ev)||0, _hrPct:parseFloat(b.hr_pct)||0 });
+    }
+    return out;
+  }, [data]);
+
+  const teams = React.useMemo(() => ['ALL',...Array.from(new Set(rows.map(r=>r.team||'').filter(Boolean))).sort()], [rows]);
+
+  const filtered = React.useMemo(() => {
+    let r = rows;
+    if (teamFilter!=='ALL') r = r.filter(b=>b.team===teamFilter);
+    if (pgFilter!=='ALL')   r = r.filter(b=>b._pgLabel===pgFilter);
+    if (search) { const q=search.toLowerCase(); r=r.filter(b=>(b.batter_name||b.name||'').toLowerCase().includes(q)); }
+    return [...r].sort((a,b2)=>{ const av=a[sort]||0; const bv=b2[sort]||0; return sortDir*(bv-av); });
+  }, [rows,teamFilter,pgFilter,search,sort,sortDir]);
+
+  const Th = ({k,label}) => (
+    <th onClick={()=>{ if(sort===k) setSortDir(d=>-d); else{setSort(k);setSortDir(-1);} }}
+      style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,
+        color:sort===k?'var(--accent2)':'var(--muted)',cursor:'pointer',textAlign:'right',
+        whiteSpace:'nowrap',borderBottom:'1px solid var(--border)'}}>
+      {label}{sort===k?(sortDir===-1?' ▼':' ▲'):''}
+    </th>
+  );
+
+  return (
+    <div>
+      <div style={{background:'rgba(232,65,26,.06)',border:'1px solid rgba(232,65,26,.18)',borderRadius:8,padding:'8px 12px',marginBottom:12}}>
+        <div style={{fontFamily:osw,fontWeight:800,fontSize:13,color:'var(--accent)',marginBottom:2}}>🎲 Long Shot Board</div>
+        <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',lineHeight:1.5}}>
+          C/D grade batters vs Average · Hittable · Target pitchers only · sorted by Sim TB<br/>
+          <span style={{color:'#f5a623'}}>Best combos: Tue/Wed/Fri × Hittable/Target → 35–50% HR rate in tracker</span>
+        </div>
+      </div>
+      <div style={{display:'flex',gap:6,marginBottom:10,flexWrap:'wrap',alignItems:'center'}}>
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search batter…"
+          style={{padding:'4px 10px',borderRadius:6,fontSize:10,fontFamily:mono,width:130,outline:'none',
+            border:`1px solid ${search?'var(--accent2)':'var(--border)'}`,background:'var(--surface2)',color:'var(--text)'}}/>
+        <select value={teamFilter} onChange={e=>setTeamFilter(e.target.value)}
+          style={{padding:'3px 8px',borderRadius:6,fontSize:10,fontFamily:mono,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',cursor:'pointer'}}>
+          {teams.map(t=><option key={t} value={t}>{t==='ALL'?'All Teams':t}</option>)}
+        </select>
+        <select value={pgFilter} onChange={e=>setPgFilter(e.target.value)}
+          style={{padding:'3px 8px',borderRadius:6,fontSize:10,fontFamily:mono,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',cursor:'pointer'}}>
+          {['ALL',...SOFT].map(g=><option key={g} value={g}>{g==='ALL'?'All Pitchers':g}</option>)}
+        </select>
+        <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginLeft:'auto'}}>{filtered.length} long shots</span>
+      </div>
+      <div className="tw">
+        <table style={{width:'100%'}}>
+          <thead><tr>
+            <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)'}}>TM</th>
+            <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)'}}>Batter</th>
+            <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'center',borderBottom:'1px solid var(--border)'}}>Gr</th>
+            <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)'}}>Pitcher</th>
+            <Th k="_simTB"  label="Sim TB"/>
+            <Th k="_bvpFB"  label="BvP FB%"/>
+            <Th k="_recEV"  label="EV"/>
+            <Th k="_hrPct"  label="HR%"/>
+            <Th k="_pgLabel" label="P Grade"/>
+          </tr></thead>
+          <tbody>
+            {filtered.map(b => {
+              const pid  = parseInt(b.batter_id||b.player_id||0);
+              const name = b.batter_name||b.name||'';
+              const uid  = b.batter_id||b.player_id||name;
+              const isExp = expandedId === uid;
+              return (
+                <React.Fragment key={uid}>
+                  <tr onClick={()=>setExpandedId(v=>v===uid?null:uid)}
+                    style={{cursor:'pointer',height:26,borderBottom:'1px solid rgba(255,255,255,.04)',
+                      background:isExp?'rgba(255,255,255,.04)':'transparent',
+                      borderLeft:`2px solid ${isExp?'var(--accent)':'transparent'}`}}>
+                    <td style={{padding:'2px 6px',fontFamily:osw,fontWeight:700,fontSize:9,color:'var(--accent2)',whiteSpace:'nowrap'}}>{b.team||''}</td>
+                    <td style={{padding:'2px 6px',maxWidth:150}}>
+                      <div style={{display:'flex',alignItems:'center',gap:4}}>
+                        <PlayerAvatar pid={pid} name={name} size={16}/>
+                        <span style={{fontFamily:osw,fontWeight:700,fontSize:10,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',color:isKeyMatchup(pid,name)?'#ff8020':'var(--text)'}}>{name}</span>
+                        <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={pid} name={name} team={b.team||''}/></span>
+                      </div>
+                    </td>
+                    <td style={{padding:'2px 6px',textAlign:'center',fontFamily:osw,fontWeight:800,fontSize:10,color:b.grade==='C'?'var(--muted)':'rgba(232,65,26,.8)'}}>{b.grade}</td>
+                    <td style={{padding:'2px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',whiteSpace:'nowrap',maxWidth:100,overflow:'hidden',textOverflow:'ellipsis'}}>{b.pitcher_name||b.vs_pitcher||'—'}</td>
+                    <td style={{padding:'2px 6px',textAlign:'right'}}>
+                      <span style={{fontFamily:osw,fontWeight:800,fontSize:11,color:tbColor(b._simTB)}}>{b._simTB.toFixed(2)}</span>
+                    </td>
+                    <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,color:b._bvpFB>=20&&b._bvpFB<=36?'#27c97a':'var(--muted)'}}>{b._bvpFB>0?`${b._bvpFB.toFixed(0)}%`:'—'}</td>
+                    <td style={{padding:'2px 6px',textAlign:'right',fontFamily:osw,fontWeight:700,fontSize:10,color:b._recEV>=96?'#ff8020':b._recEV>=92?'var(--text)':'var(--muted)'}}>{b._recEV>0?b._recEV.toFixed(1):'—'}</td>
+                    <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,color:b._hrPct>=8?'#27c97a':'var(--muted)'}}>{b._hrPct>0?`${b._hrPct.toFixed(1)}%`:'—'}</td>
+                    <td style={{padding:'2px 6px',textAlign:'right'}}><span style={{fontFamily:mono,fontSize:9,color:pgColor(b._pgLabel),fontWeight:700}}>{b._pgLabel.split(' ')[0]}</span></td>
+                  </tr>
+                  {isExp && (
+                    <tr><td colSpan={9} style={{padding:'0 10px 10px',background:'rgba(255,255,255,.02)'}}>
+                      <Last7HRChart batterId={pid}/>
+                      <RecentGameLog batterId={pid}/>
+                    </td></tr>
+                  )}
+                </React.Fragment>
+              );
+            })}
+            {filtered.length===0 && (
+              <tr><td colSpan={9} style={{padding:'30px',textAlign:'center',fontFamily:mono,fontSize:10,color:'var(--muted)'}}>
+                No long shots match current filters.
+              </td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function SimLabView({ data }) {
   useHROdds();
   const picks = usePicks();
@@ -9889,7 +10024,7 @@ function CheatCodeButton() {
             </div>
             <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',
               marginTop:2,letterSpacing:.5}}>
-              Derived from 15-day HR tracker · 99 HRs · 756 played rows · base rate 13.1%
+              Derived from season HR tracker · 288 HRs · 1,689 played rows · base rate 17.1% ✱
             </div>
           </div>
           <button onClick={()=>setOpen(false)}
@@ -9913,7 +10048,7 @@ function CheatCodeButton() {
                 sub="A+ vs Target alone = 50% HR rate in tracker"/>
             </div>
             <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',
-              lineHeight:1.4}}>All three together → 46.7% HR rate vs 13.1% base. That's your lock.</div>
+              lineHeight:1.4}}>All three together → 46.7% HR rate vs 17.1% base. That's your lock. ✱</div>
           </Section>
 
           <Section emoji="🔥" title="Tier 2 — Any 2 = solid play" color="var(--accent2)">
@@ -9927,6 +10062,8 @@ function CheatCodeButton() {
               sub="Above 98 shows diminishing returns — sweet spot is 92-98"/>
             <Row label="Sim TB > 2.5" value="21.6% HR rate" color="var(--accent)"
               sub="Elite zone — filter to ≥2.5 for highest confidence plays"/>
+            <Row label="D/C Grade + 🎯 Target ✱" value="22.6% HR rate" color="#fb923c"
+              sub="New v2 finding: pitcher vulnerability overrides batter grade. Mid-week especially."/>
           </Section>
 
           <Section emoji="📐" title="The Narrowest Sweet Spots" color="var(--ice)">
@@ -9944,7 +10081,7 @@ function CheatCodeButton() {
             <Fade label="BvP EV 90–92 mph" sub="Worst BvP EV range in the data (-3.5% lift)."/>
             <Fade label="Temp below 65°F" sub="HR rate drops to 8.1-8.9%. Hard avoid."/>
             <Fade label="Grade B vs Target/Hittable" sub="9.3% HR rate — below base! Only trust pitcher targeting for A/A+."/>
-            <Fade label="Flags = 7" sub="Grade A concentration problem. Their Sim TB is high but they consistently underdeliver."/>
+            <Fade label="Flags = 7" sub="Grade A concentration problem. 10.5% HR rate ✱ — Sim TB looks high but consistently underdelivers."/>
           </Section>
 
           <Section emoji="🗺️" title="Daily Scan Order" color="#27c97a">
@@ -9954,6 +10091,7 @@ function CheatCodeButton() {
               <div><span style={{color:'var(--accent2)',fontWeight:700}}>3.</span> Check pitcher: Hittable or Target = green light</div>
               <div><span style={{color:'var(--accent2)',fontWeight:700}}>4.</span> Confirm HR% ≥ 8% and flags 4–6</div>
               <div><span style={{color:'var(--accent2)',fontWeight:700}}>5.</span> Weather tab: 70–75°F games get a bump</div>
+              <div><span style={{color:'var(--accent2)',fontWeight:700}}>✱</span> <span style={{color:'#f5a623'}}>Tue/Wed slate? Boost confidence on all A+ plays.</span></div>
               <div><span style={{color:'var(--accent2)',fontWeight:700}}>6.</span> Cross-check BvP FB% — is it 28–36%?</div>
             </div>
           </Section>
@@ -9975,13 +10113,13 @@ function CheatCodeButton() {
           <Section emoji="📅" title="Day of Week — Target Profiles" color="#f5a623">
             <div style={{display:'flex',flexDirection:'column',gap:4}}>
               {[
-                ['Thursday','✅ Best Day','14.3%','Getaway day — SimTB ≥ 2.0 = 27.3%. Even Elite pitchers get hit. A/A+ + SimTB is your lock.'],
-                ['Saturday','✅ Strong','12.9%','Hittable pitchers = 20.4%. A/A+ + Target/Hittable stack = 20%. Target No. 2 starters.'],
-                ['Monday','~ Solid','13.2%','Play normally. No specific unlock — standard Sauce filters apply.'],
-                ['Sunday','~ Neutral','11.6%','Target pitchers specifically = 22.2%. Only play if pitcher is Target.'],
-                ['Wednesday','~ Neutral','11.3%','Target pitchers = 21.7%. Otherwise nothing special.'],
-                ['Friday','⚠️ Trap','9.4%','Ace openers — Elite pitchers = 5.0%. FADE unless pitcher is Target/Hittable.'],
-                ['Tuesday','⚠️ Weakest','9.1%','Worst raw day. Target pitchers = 23.8% exception. Avoid everything else.'],
+                ['Tuesday','✅ Best Day ✱','25.8%','Biggest upgrade from v2. Stack A+ vs Target/Hittable. Boost confidence on all plays.'],
+                ['Wednesday','✅ Best Day ✱','25.8%','Tied with Tuesday — 2x the base rate. Best mid-week slate. Play your full card.'],
+                ['Friday','✅ Strong ✱','19.2%','Was flagged as a trap in v1. v2 flips it — above average. Standard filters apply.'],
+                ['Saturday','~ Solid ✱','15.9%','Slightly downgraded from v1. Hittable pitchers still = 20%+. A/A+ stack holds.'],
+                ['Sunday','~ Neutral','13.2%','Target pitchers = 22.2%. Otherwise play standard Sauce. No special unlock.'],
+                ['Monday','~ Neutral','13.1%','No specific signal. Standard Sauce filters apply. Nothing special either way.'],
+                ['Thursday','⚠️ Weakest ✱','12.5%','Was "Best Day" in v1 — now near-bottom. Big slate dilutes quality. Dampen confidence.'],
               ].map(([day, badge, rate, tip]) => {
                 const col = badge.includes('✅') ? '#27c97a' : badge.includes('⚠️') ? 'var(--accent)' : 'var(--muted)';
                 return (
@@ -10006,7 +10144,10 @@ function CheatCodeButton() {
           <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--muted)',
             textAlign:'center',marginTop:8,lineHeight:1.6,borderTop:'1px solid var(--border)',paddingTop:12}}>
             ⚠️ The Sauce is a living model — signals, thresholds and weights are updated<br/>
-            periodically as the season sample grows. Treat it as directional, not prescriptive.
+            periodically as the season sample grows. Treat it as directional, not prescriptive.<br/>
+            <span style={{color:'rgba(255,255,255,.25)',fontSize:7,marginTop:4,display:'block'}}>
+              ✱ Updated items reflect v2 analysis · 288 HRs · Last updated: May 9, 2026
+            </span>
           </div>
         </div>
       </div>
@@ -11605,15 +11746,16 @@ function MatchupEngineTab() {
       </div>
       {/* Row 2: data tabs */}
       <div style={{display:'flex',gap:4,flexWrap:'nowrap'}}>
-        <button style={stBtn('batters')}  onClick={()=>setSubTab('batters')}>🧢 Batters</button>
-        <button style={stBtn('pitchers')} onClick={()=>setSubTab('pitchers')}>⚾ Pitchers</button>
-        <button style={stBtn('history')}  onClick={()=>setSubTab('history')}>📜 BvP History</button>
+        <button style={stBtn('batters')}   onClick={()=>setSubTab('batters')}>🧢 Batters</button>
+        <button style={stBtn('pitchers')}  onClick={()=>setSubTab('pitchers')}>⚾ Pitchers</button>
+        <button style={stBtn('history')}   onClick={()=>setSubTab('history')}>📜 BvP History</button>
+        <button style={stBtn('longshot')}  onClick={()=>setSubTab('longshot')}>🎲 Long Shot</button>
         {/* <button style={stBtn('barrel')} onClick={()=>setSubTab('barrel')}>🛢 Daily Barrel</button> */}
       </div>
     </div>
 
     {/* Date slot toggle — only shown for matchups and simlab */}
-    {(subTab === 'matchups' || subTab === 'simlab' || subTab === 'allmatches') && (
+    {(subTab === 'matchups' || subTab === 'simlab' || subTab === 'allmatches' || subTab === 'longshot') && (
       <div style={{display:'flex',gap:6,marginBottom:14,alignItems:'center'}}>
         {[
           { slot: 'today',    label: todayLabel },
@@ -11649,6 +11791,11 @@ function MatchupEngineTab() {
       </div>
       <SimLabView key={`allmatches-${dateSlot}`} data={dateSlot==='tomorrow'&&allPicksTomorrowData.length>0 ? allPicksTomorrowData : allPicksData}/>
     </div>
+
+    {/* Long Shot — C/D grade batters with soft pitcher or good day conditions */}
+    {subTab === 'longshot' && (
+      <LongShotView data={dateSlot==='tomorrow'&&allPicksTomorrowData.length>0 ? allPicksTomorrowData : allPicksData}/>
+    )}
 
     {/* Sim Lab — display:none keeps component mounted so filters/sort persist across sub-tab switches */}
     <div style={{display: subTab==='simlab' ? 'block' : 'none'}}>
