@@ -8735,7 +8735,7 @@ function PitcherCard({ pitcherId, pitcherName, onGrade }) {
 // ── Long Shot View ────────────────────────────────────────────────────────────
 function LongShotView({ data }) {
   const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
-  const [sort, setSort]       = useState('_simTB');
+  const [sort, setSort]       = useState('_sig');
   const [sortDir, setSortDir] = useState(1); // 1 = desc (bv-av = higher first)
   const [search, setSearch]   = useState('');
   const [teamFilter, setTeamFilter] = useState('ALL');
@@ -8767,11 +8767,25 @@ function LongShotView({ data }) {
       const pid2 = String(parseInt(b.pitcher_id)||0);
       const pgLabel = pitcherGradeCache.current[pid2] || '';
       if (!pgLabel || !SOFT_GRADES.has(pgLabel)) continue;
-      out.push({ ...b, _pgLabel:pgLabel,
-        _simHR:parseFloat(b.sim_hr_adj)||0,
-        _simTB:parseFloat(b.sim_tb)||0,
-        _bvpFB:parseFloat(b.bvp_fb_pct)||0,
-        _recEV:parseFloat(b.recent_avg_ev)||0,
+      const _simHR = parseFloat(b.sim_hr_adj)||0;
+      const _simTB = parseFloat(b.sim_tb)||0;
+      const _bvpFB = parseFloat(b.bvp_fb_pct)||0;
+      const _recEV = parseFloat(b.recent_avg_ev)||0;
+      const _bvpEV = parseFloat(b.bvp_avg_ev)||0;
+      const _bvpLA = parseFloat(b.bvp_avg_la)||0;
+      const _flags = parseInt(b.total_flags)||0;
+      const _temp  = parseFloat(b.temp)||0;
+      // Tracker-validated signal stack score (max 11)
+      let _sig = 0;
+      if (_simTB >= 2.0)                 _sig += 2; else if (_simTB >= 1.5) _sig += 1;
+      if (_bvpFB >= 20 && _bvpFB <= 36) _sig += 2;
+      if (pgLabel === '🎯 Target')       _sig += 2; else if (pgLabel === '💥 Hittable') _sig += 1;
+      if (_temp  >= 65 && _temp  <= 78)  _sig += 1;
+      if (_bvpLA >= 20 && _bvpLA <= 28)  _sig += 1;
+      if (_bvpEV >= 92)                  _sig += 1;
+      if (_flags >= 2 && _flags <= 6)    _sig += 1;
+      out.push({ ...b, _pgLabel:pgLabel, _simHR, _simTB, _bvpFB, _recEV,
+        _bvpEV, _bvpLA, _flags, _temp, _sig,
         _hrPct:parseFloat(b.proj_hr_adj)||parseFloat(b.sim_hr)||0 });
     }
     return out;
@@ -8811,6 +8825,10 @@ function LongShotView({ data }) {
         <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',lineHeight:1.5}}>
           C/D grade batters vs pitchers allowing above-median hard contact (HH%≥27%) · sorted by HR Probability<br/>
           <span style={{color:'#f5a623'}}>Best combos: Tue/Wed/Fri × Hittable/Target → 35–50% HR rate in tracker</span>
+          <div style={{marginTop:3,fontSize:7,color:'rgba(255,255,255,.3)',lineHeight:1.6}}>
+            ⚡ Sig: <span style={{color:'#ff4020'}}>8+ elite lock</span> · <span style={{color:'#f5a623'}}>6-7 strong</span> · <span style={{color:'#27c97a'}}>4-5 solid</span> · &lt;4 monitor only &nbsp;|&nbsp;
+            SimTB≥2(+2) · BvP FB% 20-36%(+2) · 🎯Target(+2) · 💥Hit(+1) · 65-78°F(+1) · BvP LA 20-28°(+1) · BvP EV≥92(+1) · Flags 2-6(+1)
+          </div>
         </div>
       </div>
       <div style={{display:'flex',gap:6,marginBottom:10,flexWrap:'wrap',alignItems:'center'}}>
@@ -8825,7 +8843,21 @@ function LongShotView({ data }) {
           style={{padding:'3px 8px',borderRadius:6,fontSize:10,fontFamily:mono,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',cursor:'pointer'}}>
           {SOFT_LABEL_LIST.map(g=><option key={g} value={g}>{g==='ALL'?'All Pitchers':g}</option>)}
         </select>
-        <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginLeft:'auto'}}>{filtered.length} long shots</span>
+        <button onClick={()=>{
+          const hdr = ['Grade','Team','Batter','Pitcher','P.Grade','Sim TB','BvP FB%','BvP EV','HR%'];
+          const csvRows = [hdr, ...filtered.map(b=>[
+            b.grade||'', b.batting_team||'', b.batter||'', b.pitcher||'', b._pgLabel||'',
+            b._simTB.toFixed(2), b._bvpFB>0?b._bvpFB.toFixed(1):'', b._recEV>0?b._recEV.toFixed(1):'',
+            b._simHR>0?(b._simHR*100).toFixed(1):''
+          ])];
+          const csv = csvRows.map(r=>r.join(',')).join('\n');
+          const a = Object.assign(document.createElement('a'), {href:'data:text/csv;charset=utf-8,'+encodeURIComponent(csv), download:`LongShots-${new Date().toISOString().slice(0,10)}.csv`});
+          a.click();
+        }} style={{padding:'4px 10px',borderRadius:6,cursor:'pointer',fontSize:10,fontFamily:mono,
+          border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--muted)'}}>
+          ⬇ CSV
+        </button>
+        <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{filtered.length} long shots</span>
       </div>
       {/* Hidden PitcherCards — populate grade cache with real ERA/K9/WHIP grades */}
       <div style={{display:'none'}}>
@@ -8862,6 +8894,7 @@ function LongShotView({ data }) {
             <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)'}}>Batter</th>
             <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'center',borderBottom:'1px solid var(--border)'}}>Gr</th>
             <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)'}}>Pitcher</th>
+            <Th k="_sig"   label="⚡ Sig"/>
             <Th k="_simHR" label="HR%"/>
             <Th k="_simTB"  label="Sim TB"/>
             <Th k="_bvpFB"  label="BvP FB%"/>
@@ -8891,6 +8924,15 @@ function LongShotView({ data }) {
                     </td>
                     <td style={{padding:'2px 6px',textAlign:'center',fontFamily:osw,fontWeight:800,fontSize:10,color:b.grade==='C'?'var(--muted)':'rgba(232,65,26,.8)'}}>{b.grade}</td>
                     <td style={{padding:'2px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',whiteSpace:'nowrap',maxWidth:100,overflow:'hidden',textOverflow:'ellipsis'}}>{b.pitcher||'—'}</td>
+                    <td style={{padding:'2px 4px',textAlign:'right'}}>
+                      <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',
+                        width:20,height:17,borderRadius:4,fontFamily:osw,fontWeight:800,fontSize:11,
+                        background:b._sig>=8?'rgba(255,64,32,.25)':b._sig>=6?'rgba(245,166,35,.2)':b._sig>=4?'rgba(39,201,122,.15)':'rgba(255,255,255,.05)',
+                        color:b._sig>=8?'#ff4020':b._sig>=6?'#f5a623':b._sig>=4?'#27c97a':'var(--muted)',
+                        border:`1px solid ${b._sig>=8?'rgba(255,64,32,.4)':b._sig>=6?'rgba(245,166,35,.3)':b._sig>=4?'rgba(39,201,122,.25)':'var(--border)'}`}}>
+                        {b._sig}
+                      </span>
+                    </td>
                     <td style={{padding:'2px 6px',textAlign:'right'}}>
                       <span style={{fontFamily:osw,fontWeight:800,fontSize:11,
                         color:b._simHR>=0.15?'#ff4020':b._simHR>=0.10?'#f5a623':b._simHR>=0.06?'#27c97a':'var(--muted)'}}>{(b._simHR*100).toFixed(1)}%</span>
@@ -9373,6 +9415,7 @@ function SimLabView({ data }) {
                     { label: 'XBH%',     key: 'proj_xbh_prob' },
                     { label: 'Sim TB',   key: 'sim_tb' },
                     { label: 'Score',    key: 'weighted_flag_score' },
+                    { label: '⚡ Sig',   key: '_trackerSig' },
                     { label: 'L7💥',     key: 'recent_hr_count' },
                     { label: 'Grade',    key: null },
                     { label: '💣',       key: 'meatball_matchup_score' },
@@ -9403,6 +9446,41 @@ function SimLabView({ data }) {
                   const hrColor = hrP >= 12 ? '#ff4020' : hrP >= 8 ? '#ff8020' : hrP >= 5 ? '#f5a623' : 'var(--text)';
                   const hitColor = hitP >= 35 ? '#27c97a' : hitP >= 28 ? '#f5a623' : 'var(--text)';
                   const gc = GRADE_CFG[b.grade] || GRADE_CFG['D'];
+                  // ── Tracker Signal Score (A+/A/B calibrated) ──
+                  const _simTBv  = parseFloat(b.sim_tb)||0;
+                  const _bvpFBv  = parseFloat(b.bvp_fb_pct)||0;
+                  const _bvpEVv  = parseFloat(b.bvp_avg_ev)||0;
+                  const _bvpLAv  = parseFloat(b.bvp_avg_la)||0;
+                  const _recEVv  = parseFloat(b.recent_avg_ev)||0;
+                  const _barrelv = parseFloat(b.recent_barrel_pct)||0;
+                  const _tempv   = parseFloat(b.temp)||0;
+                  const _flagsv  = parseInt(b.total_flags)||0;
+                  const _pgLabelv= (() => { const pid=b.pitcher_id?String(parseInt(b.pitcher_id)||b.pitcher_id):null; return pid?simPitcherGrades.current[pid]||'':''; })();
+                  let _trackerSig = 0;
+                  // SimTB (2.0-2.5 best; 2.5-3.0 peak; 3.0+ reverses)
+                  if (_simTBv >= 2.5 && _simTBv < 3.0)  _trackerSig += 3;
+                  else if (_simTBv >= 2.0)               _trackerSig += 2;
+                  else if (_simTBv >= 1.5)               _trackerSig += 1;
+                  // Pitcher grade
+                  if (_pgLabelv === '🎯 Target')         _trackerSig += 2;
+                  else if (_pgLabelv === '💥 Hittable')  _trackerSig += 1;
+                  // Temp 70-75°F
+                  if (_tempv >= 70 && _tempv <= 75)      _trackerSig += 2;
+                  // Recent Barrel% (15%+ = massive signal; 3-6% = sweet spot)
+                  if (_barrelv >= 15)                    _trackerSig += 2;
+                  else if (_barrelv >= 3 && _barrelv <= 6) _trackerSig += 1;
+                  // Recent EV 96+
+                  if (_recEVv >= 100)                    _trackerSig += 2;
+                  else if (_recEVv >= 96)                _trackerSig += 1;
+                  // BvP EV 96-100
+                  if (_bvpEVv >= 96 && _bvpEVv < 100)   _trackerSig += 1;
+                  // BvP LA 20-24° (HR corridor)
+                  if (_bvpLAv >= 20 && _bvpLAv <= 24)   _trackerSig += 1;
+                  // BvP FB% 36-45% is dead zone for A+/A/B — deduct
+                  if (_bvpFBv >= 36 && _bvpFBv <= 45)   _trackerSig -= 1;
+                  // Flags=7 is confirmed dead zone
+                  if (_flagsv === 7)                     _trackerSig -= 2;
+                  b._trackerSig = Math.max(0, _trackerSig);
                   return (
                     <tr key={`${b.batter_id}-${i}`} className="dr"
                       onClick={() => { setSelBatter(b); setView('deepdive'); }}
@@ -9463,6 +9541,16 @@ function SimLabView({ data }) {
                       <td style={{ textAlign: 'right', padding:'3px 6px' }}>
                         <span style={{ fontFamily:"'Oswald',sans-serif", fontWeight:700, fontSize:11, color:'var(--text)' }}>
                           {parseFloat(b.weighted_flag_score) > 0 ? parseFloat(b.weighted_flag_score).toFixed(2) : '—'}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: 'center', padding:'3px 4px' }}>
+                        <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',
+                          width:20,height:17,borderRadius:4,
+                          fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:11,
+                          background:b._trackerSig>=8?'rgba(255,64,32,.25)':b._trackerSig>=6?'rgba(245,166,35,.2)':b._trackerSig>=4?'rgba(39,201,122,.15)':'rgba(255,255,255,.05)',
+                          color:b._trackerSig>=8?'#ff4020':b._trackerSig>=6?'#f5a623':b._trackerSig>=4?'#27c97a':'var(--muted)',
+                          border:`1px solid ${b._trackerSig>=8?'rgba(255,64,32,.4)':b._trackerSig>=6?'rgba(245,166,35,.3)':b._trackerSig>=4?'rgba(39,201,122,.25)':'var(--border)'}`}}>
+                          {b._trackerSig||'—'}
                         </span>
                       </td>
                       <td style={{textAlign:'center',padding:'3px 4px'}}>
