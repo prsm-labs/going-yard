@@ -8784,6 +8784,19 @@ function LongShotView({ data }) {
       if (_bvpLA >= 20 && _bvpLA <= 28)  _sig += 1;
       if (_bvpEV >= 92)                  _sig += 1;
       if (_flags >= 2 && _flags <= 6)    _sig += 1;
+      // Live lineup slot × platoon weak spot (updates every few mins via loadTodayLineups)
+      const _lsPid  = parseInt(b.batter_id)||0;
+      const _lsData = LINEUP_STATUS[_lsPid];
+      if (_lsData?.slot) {
+        const _slot = _lsData.slot;
+        const _ph   = (b.pitcher_hand||'').toLowerCase();
+        const _bh   = (b.batter_hand||'').toUpperCase();
+        const _hasPlatoon = (_ph.startsWith('r') && (_bh==='L'||_bh==='S')) ||
+                            (_ph.startsWith('l') && (_bh==='R'||_bh==='S'));
+        if (_hasPlatoon && _slot >= 2 && _slot <= 5)  _sig += 2; // platoon edge + heart of order
+        else if (_hasPlatoon)                          _sig += 1; // platoon edge, different slot
+        else if (_slot >= 3 && _slot <= 5)            _sig += 1; // prime slot, no platoon
+      }
       out.push({ ...b, _pgLabel:pgLabel, _simHR, _simTB, _bvpFB, _recEV,
         _bvpEV, _bvpLA, _flags, _temp, _sig,
         _hrPct:parseFloat(b.proj_hr_adj)||parseFloat(b.sim_hr)||0 });
