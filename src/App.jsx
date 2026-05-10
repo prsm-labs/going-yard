@@ -8023,7 +8023,7 @@ function HRTrackerTab() {
 
 
 // ── Unlucky / Robbed Tab ─────────────────────────────────────────────────────
-// Batters who made HR-quality contact in last 7 days but got nothing for it
+// Batters who made HR-quality contact in last 7 days but got nothing — reads from mlb_atbat_log_last7.csv
 function UnluckyTab() {
   const [rows, setRows]       = useState([]);
   const [loading, setLoading] = useState(true);
@@ -8033,78 +8033,51 @@ function UnluckyTab() {
   useEffect(() => {
     (async () => {
       try {
-        // Fetch last 7 days of games
-        const dates = [];
-        for (let i = 1; i <= 7; i++) {
-          const d = new Date(); d.setDate(d.getDate() - i);
-          dates.push(d.toISOString().slice(0,10));
-        }
-        // Get game PKs for those dates
-        // Get game PKs — accept any completed/in-progress state
-        const schedRes = await fetch(
-          `https://statsapi.mlb.com/api/v1/schedule?sportId=1&startDate=${dates[dates.length-1]}&endDate=${dates[0]}&sportId=1&gameType=R&hydrate=game(content(summary)),linescore`
-        );
-        const schedData = await schedRes.json();
-        const gamePks = [];
-        for (const dateObj of (schedData.dates||[])) {
-          for (const g of (dateObj.games||[])) {
-            const state = (g.status?.abstractGameState||'').toLowerCase();
-            if (state === 'final' || state === 'live') gamePks.push(g.gamePk);
-          }
-        }
-        console.log('[Robbed] Found', gamePks.length, 'games to scan');
+        const res  = await fetch('/data/mlb_atbat_log_last7.csv');
+        const text = await res.text();
+        const allRows = parseCSVText(text);
+        console.log('[Robbed] Loaded', allRows.length, 'at-bats from CSV');
 
-        // Fetch play-by-play — NO fields filter so we get full hitData
         const batterMap = {};
-        const BATCH = 6;
-        for (let i = 0; i < gamePks.length; i += BATCH) {
-          const batch = gamePks.slice(i, i + BATCH);
-          await Promise.all(batch.map(async gk => {
-            try {
-              const r = await fetch(`https://statsapi.mlb.com/api/v1.1/game/${gk}/feed/live`);
-              const d = await r.json();
-              const plays = d.liveData?.plays?.allPlays || [];
-              for (const play of plays) {
-                const hd   = play.hitData || {};
-                const ev   = parseFloat(hd.launchSpeed  || hd.exitVelocity || 0);
-                const la   = parseFloat(hd.launchAngle  || 0);
-                const dist = parseFloat(hd.totalDistance || hd.hitDistance || 0);
-                const res  = (play.result?.eventType || play.result?.event || '').toLowerCase();
-                if (ev < 95) continue;
-                if (res !== 'field_out' && res !== 'fielded_out' && res !== 'flyout' && res !== 'lineout' && res !== 'pop_out') continue;
-                if (la < 20 || la > 35) continue;
-                if (dist < 330) continue;
-                let tier, tierScore;
-                if (ev >= 98 && dist >= 370)       { tier='🚨 Barreled Out';    tierScore=3; }
-                else if (ev >= 98 && dist >= 350)  { tier='⚠️ Warning Track';   tierScore=2; }
-                else                               { tier='💥 Hard Flyout';     tierScore=1; }
-                const pid  = play.matchup?.batter?.id;
-                const name = play.matchup?.batter?.fullName || '';
-                if (!pid) continue;
-                const key = String(pid);
-                if (!batterMap[key]) batterMap[key] = { pid, name, unluckyHits:[], topTier:0, totalScore:0 };
-                batterMap[key].unluckyHits.push({ ev, la, dist, tier, tierScore });
-                batterMap[key].totalScore += tierScore;
-                if (tierScore > batterMap[key].topTier) batterMap[key].topTier = tierScore;
-              }
-            } catch(e) { console.warn('[Robbed] game fetch error:', e); }
-          }));
+        for (const row of allRows) {
+          const ev   = parseFloat(row['Exit Velocity']||0);
+          const la   = parseFloat(row['Launch Angle']||0);
+          const dist = parseFloat(row['Hit Distance']||0);
+          const res2 = (row['At-Bat Result']||'').toLowerCase();
+          const bbt  = (row['Batted Ball Type']||'').toLowerCase();
+          if (ev < 95) continue;
+          if (res2 !== 'field_out') continue;
+          if (la < 20 || la > 35) continue;
+          if (dist < 330) continue;
+          if (bbt === 'ground_ball' || bbt === 'popup') continue;
+          let tier, tierScore;
+          if (ev >= 98 && dist >= 370)      { tier = '🚨 Barreled Out';  tierScore = 3; }
+          else if (ev >= 98 && dist >= 350) { tier = '⚠️ Warning Track'; tierScore = 2; }
+          else                              { tier = '💥 Hard Flyout';   tierScore = 1; }
+          const pid  = parseInt(row['Batter']||0);
+          const team = row['Batter Team']||'';
+          if (!pid) continue;
+          const key = String(pid);
+          if (!batterMap[key]) {
+            const cp = getCachedPlayer(pid)||{};
+            batterMap[key] = { pid, name:cp.name||'', team:cp.team||team, unluckyHits:[], topTier:0, totalScore:0 };
+          }
+          batterMap[key].unluckyHits.push({ ev, la, dist, tier, tierScore, pitch:row['Pitch Type']||'', inning:row['Inning']||'' });
+          batterMap[key].totalScore += tierScore;
+          if (tierScore > batterMap[key].topTier) batterMap[key].topTier = tierScore;
         }
-        console.log('[Robbed] Batters with unlucky hits:', Object.keys(batterMap).length);
+        console.log('[Robbed] Batters found:', Object.keys(batterMap).length);
 
-        // Enrich with team from PLAYER_DATA_CACHE
         const result = Object.values(batterMap)
           .filter(b => b.unluckyHits.length >= 1)
-          .map(b => {
-            const cp = getCachedPlayer(b.pid)||{};
-            return { ...b, team: cp.team||b.team||'',
-              count: b.unluckyHits.length,
-              topEV: Math.max(...b.unluckyHits.map(h=>h.ev)),
-              avgDist: Math.round(b.unluckyHits.reduce((s,h)=>s+h.dist,0)/b.unluckyHits.length),
-              tierLabel: b.topTier===3?'🚨 Barreled Out':b.topTier===2?'⚠️ Warning Track':'💥 Hard Flyout',
-            };
-          })
-          .sort((a,b) => b.totalScore - a.totalScore || b.count - a.count);
+          .map(b => ({
+            ...b,
+            count:    b.unluckyHits.length,
+            topEV:    Math.max(...b.unluckyHits.map(h=>h.ev)),
+            avgDist:  Math.round(b.unluckyHits.reduce((s,h)=>s+h.dist,0)/b.unluckyHits.length),
+            tierLabel:b.topTier===3?'🚨 Barreled Out':b.topTier===2?'⚠️ Warning Track':'💥 Hard Flyout',
+          }))
+          .sort((a,b2) => b2.totalScore - a.totalScore || b2.count - a.count);
 
         setRows(result);
       } catch(e) { console.error('UnluckyTab error:', e); }
@@ -8117,7 +8090,7 @@ function UnluckyTab() {
   return (
     <div>
       <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginBottom:6}}>
-        Batters who made HR-quality contact (EV≥95, LA 20-35°, 330ft+) but got nothing · last 7 games
+        Batters who made HR-quality contact (EV≥95, LA 20-35°, 330ft+) but got nothing · last 7 days
       </div>
       <div style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.3)',marginBottom:10}}>
         🚨 Barreled Out = true barrel caught · ⚠️ Warning Track = 370ft+ flyout · 💥 Hard Flyout = 330ft+ hard hit out
