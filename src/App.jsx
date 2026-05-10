@@ -8768,13 +8768,13 @@ function LongShotView({ data }) {
     return out;
   }, [data]);
 
-  const teams = React.useMemo(() => ['ALL',...Array.from(new Set(rows.map(r=>r.team||'').filter(Boolean))).sort()], [rows]);
+  const teams = React.useMemo(() => ['ALL',...Array.from(new Set(rows.map(r=>r.batting_team||'').filter(Boolean))).sort()], [rows]);
 
   const filtered = React.useMemo(() => {
     let r = rows;
-    if (teamFilter!=='ALL') r = r.filter(b=>b.team===teamFilter);
+    if (teamFilter!=='ALL') r = r.filter(b=>b.batting_team===teamFilter);
     if (pgFilter!=='ALL')   r = r.filter(b=>b._pgLabel===pgFilter);
-    if (search) { const q=search.toLowerCase(); r=r.filter(b=>(b.batter_name||b.name||'').toLowerCase().includes(q)); }
+    if (search) { const q=search.toLowerCase(); r=r.filter(b=>(b.batter||'').toLowerCase().includes(q)); }
     return [...r].sort((a,b2)=>{ const av=a[sort]||0; const bv=b2[sort]||0; return sortDir*(bv-av); });
   }, [rows,teamFilter,pgFilter,search,sort,sortDir]);
 
@@ -8827,7 +8827,7 @@ function LongShotView({ data }) {
           <tbody>
             {filtered.map(b => {
               const pid  = parseInt(b.batter_id||b.player_id||0);
-              const name = b.batter_name||b.name||'';
+              const name = b.batter||'';
               const uid  = b.batter_id||b.player_id||name;
               const isExp = expandedId === uid;
               return (
@@ -8836,16 +8836,16 @@ function LongShotView({ data }) {
                     style={{cursor:'pointer',height:26,borderBottom:'1px solid rgba(255,255,255,.04)',
                       background:isExp?'rgba(255,255,255,.04)':'transparent',
                       borderLeft:`2px solid ${isExp?'var(--accent)':'transparent'}`}}>
-                    <td style={{padding:'2px 6px',fontFamily:osw,fontWeight:700,fontSize:9,color:'var(--accent2)',whiteSpace:'nowrap'}}>{b.team||''}</td>
+                    <td style={{padding:'2px 6px',fontFamily:osw,fontWeight:700,fontSize:9,color:'var(--accent2)',whiteSpace:'nowrap'}}>{b.batting_team||''}</td>
                     <td style={{padding:'2px 6px',maxWidth:150}}>
                       <div style={{display:'flex',alignItems:'center',gap:4}}>
                         <PlayerAvatar pid={pid} name={name} size={16}/>
                         <span style={{fontFamily:osw,fontWeight:700,fontSize:10,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',color:isKeyMatchup(pid,name)?'#ff8020':'var(--text)'}}>{name}</span>
-                        <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={pid} name={name} team={b.team||''}/></span>
+                        <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={pid} name={name} team={b.batting_team||''}/></span>
                       </div>
                     </td>
                     <td style={{padding:'2px 6px',textAlign:'center',fontFamily:osw,fontWeight:800,fontSize:10,color:b.grade==='C'?'var(--muted)':'rgba(232,65,26,.8)'}}>{b.grade}</td>
-                    <td style={{padding:'2px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',whiteSpace:'nowrap',maxWidth:100,overflow:'hidden',textOverflow:'ellipsis'}}>{b.pitcher_name||b.vs_pitcher||'—'}</td>
+                    <td style={{padding:'2px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',whiteSpace:'nowrap',maxWidth:100,overflow:'hidden',textOverflow:'ellipsis'}}>{b.pitcher||'—'}</td>
                     <td style={{padding:'2px 6px',textAlign:'right'}}>
                       <span style={{fontFamily:osw,fontWeight:800,fontSize:11,
                         color:b._simHR>=0.15?'#ff4020':b._simHR>=0.10?'#f5a623':b._simHR>=0.06?'#27c97a':'var(--muted)'}}>{(b._simHR*100).toFixed(1)}%</span>
