@@ -8735,14 +8735,14 @@ function PitcherCard({ pitcherId, pitcherName, onGrade }) {
 // ── Long Shot View ────────────────────────────────────────────────────────────
 function LongShotView({ data }) {
   const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
-  const [sort, setSort]       = useState('_simTB');
+  const [sort, setSort]       = useState('_simHR');
   const [sortDir, setSortDir] = useState(-1);
   const [search, setSearch]   = useState('');
   const [teamFilter, setTeamFilter] = useState('ALL');
   const [pgFilter, setPgFilter]     = useState('ALL');
   const [expandedId, setExpandedId] = useState(null);
   const picks = usePicks();
-  const SOFT = ['💥 Hittable','🎯 Target','🤔 Average'];
+  const SOFT = ['🎯 Target','💥 Hittable']; // HH%>=33 = Target, HH%>=27.3 = Hittable
   const pgColor = pg => ({'💥 Hittable':'#27c97a','🎯 Target':'#38b8f2','🤔 Average':'var(--muted)'}[pg]||'var(--muted)');
   const tbColor = v => v>=2.0?'#27c97a':v>=1.5?'var(--accent2)':v>=1.0?'var(--text)':'var(--muted)';
 
@@ -8751,12 +8751,19 @@ function LongShotView({ data }) {
     for (const b of (data||[])) {
       const grade = (b.grade||'').trim();
       if (!['C','D'].includes(grade)) continue;
-      const pbrl = parseFloat(b.pitcher_barrel_pct_allowed)||0;
-      const pgLabel = pbrl>=10?'💥 Hittable':pbrl>=7?'🎯 Target':pbrl<=2?'‼️ Elite':pbrl<=4?'⚠️ Tough':'🤔 Average';
-      if (!SOFT.includes(pgLabel)) continue;
+      // Use pitcher_hh_pct_allowed (hard hit % allowed) as vulnerability proxy
+      // Above median (27.3%) = soft/hittable pitcher — same logic as tracker "Target/Hittable"
+      const hh = parseFloat(b.pitcher_hh_pct_allowed)||0;
+      if (hh < 27.3) continue; // below median = tough/elite pitcher, skip
+      // Derive a display label from HH%
+      const pgLabel = hh>=33?'🎯 Target':hh>=27.3?'💥 Hittable':'🤔 Average';
       out.push({ ...b, _pgLabel:pgLabel,
-        _simTB:parseFloat(b.sim_tb)||0, _bvpFB:parseFloat(b.bvp_fb_pct)||0,
-        _recEV:parseFloat(b.recent_avg_ev)||0, _hrPct:parseFloat(b.hr_pct)||0 });
+        _simHR:parseFloat(b.sim_hr_adj)||0,
+        _simTB:parseFloat(b.sim_tb)||0,
+        _bvpFB:parseFloat(b.bvp_fb_pct)||0,
+        _recEV:parseFloat(b.recent_avg_ev)||0,
+        _hrPct:parseFloat(b.proj_hr_adj)||parseFloat(b.sim_hr)||0,
+        _hh:hh });
     }
     return out;
   }, [data]);
@@ -8785,7 +8792,7 @@ function LongShotView({ data }) {
       <div style={{background:'rgba(232,65,26,.06)',border:'1px solid rgba(232,65,26,.18)',borderRadius:8,padding:'8px 12px',marginBottom:12}}>
         <div style={{fontFamily:osw,fontWeight:800,fontSize:13,color:'var(--accent)',marginBottom:2}}>🎲 Long Shot Board</div>
         <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',lineHeight:1.5}}>
-          C/D grade batters vs Average · Hittable · Target pitchers only · sorted by Sim TB<br/>
+          C/D grade batters vs pitchers allowing above-median hard contact (HH%≥27%) · sorted by HR Probability<br/>
           <span style={{color:'#f5a623'}}>Best combos: Tue/Wed/Fri × Hittable/Target → 35–50% HR rate in tracker</span>
         </div>
       </div>
@@ -8810,6 +8817,7 @@ function LongShotView({ data }) {
             <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)'}}>Batter</th>
             <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'center',borderBottom:'1px solid var(--border)'}}>Gr</th>
             <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)'}}>Pitcher</th>
+            <Th k="_simHR" label="HR%"/>
             <Th k="_simTB"  label="Sim TB"/>
             <Th k="_bvpFB"  label="BvP FB%"/>
             <Th k="_recEV"  label="EV"/>
@@ -8839,6 +8847,10 @@ function LongShotView({ data }) {
                     <td style={{padding:'2px 6px',textAlign:'center',fontFamily:osw,fontWeight:800,fontSize:10,color:b.grade==='C'?'var(--muted)':'rgba(232,65,26,.8)'}}>{b.grade}</td>
                     <td style={{padding:'2px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',whiteSpace:'nowrap',maxWidth:100,overflow:'hidden',textOverflow:'ellipsis'}}>{b.pitcher_name||b.vs_pitcher||'—'}</td>
                     <td style={{padding:'2px 6px',textAlign:'right'}}>
+                      <span style={{fontFamily:osw,fontWeight:800,fontSize:11,
+                        color:b._simHR>=0.15?'#ff4020':b._simHR>=0.10?'#f5a623':b._simHR>=0.06?'#27c97a':'var(--muted)'}}>{(b._simHR*100).toFixed(1)}%</span>
+                    </td>
+                    <td style={{padding:'2px 6px',textAlign:'right'}}>
                       <span style={{fontFamily:osw,fontWeight:800,fontSize:11,color:tbColor(b._simTB)}}>{b._simTB.toFixed(2)}</span>
                     </td>
                     <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,color:b._bvpFB>=20&&b._bvpFB<=36?'#27c97a':'var(--muted)'}}>{b._bvpFB>0?`${b._bvpFB.toFixed(0)}%`:'—'}</td>
@@ -8847,7 +8859,7 @@ function LongShotView({ data }) {
                     <td style={{padding:'2px 6px',textAlign:'right'}}><span style={{fontFamily:mono,fontSize:9,color:pgColor(b._pgLabel),fontWeight:700}}>{b._pgLabel.split(' ')[0]}</span></td>
                   </tr>
                   {isExp && (
-                    <tr><td colSpan={9} style={{padding:'0 10px 10px',background:'rgba(255,255,255,.02)'}}>
+                    <tr><td colSpan={10} style={{padding:'0 10px 10px',background:'rgba(255,255,255,.02)'}}>
                       <Last7HRChart batterId={pid}/>
                       <RecentGameLog batterId={pid}/>
                     </td></tr>
@@ -8856,7 +8868,7 @@ function LongShotView({ data }) {
               );
             })}
             {filtered.length===0 && (
-              <tr><td colSpan={9} style={{padding:'30px',textAlign:'center',fontFamily:mono,fontSize:10,color:'var(--muted)'}}>
+              <tr><td colSpan={10} style={{padding:'30px',textAlign:'center',fontFamily:mono,fontSize:10,color:'var(--muted)'}}>
                 No long shots match current filters.
               </td></tr>
             )}
