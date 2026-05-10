@@ -8735,12 +8735,20 @@ function PitcherCard({ pitcherId, pitcherName, onGrade }) {
 // ── Long Shot View ────────────────────────────────────────────────────────────
 function LongShotView({ data }) {
   const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
-  const [sort, setSort]       = useState('_simHR');
+  const [sort, setSort]       = useState('_simTB');
   const [sortDir, setSortDir] = useState(-1);
   const [search, setSearch]   = useState('');
   const [teamFilter, setTeamFilter] = useState('ALL');
   const [pgFilter, setPgFilter]     = useState('ALL');
   const [expandedId, setExpandedId] = useState(null);
+  const [lineupOnly, setLineupOnly]   = useState(false);
+  const [goneYard,   setGoneYard]     = useState(false);
+  const [dueOnly,    setDueOnly]      = useState(false);
+  const [activeOnly, setActiveOnly]   = useState(false);
+  const [injuredOnly,setInjuredOnly]  = useState(false);
+  const [hotOnly,    setHotOnly]      = useState(false);
+  const [picksOnly,  setPicksOnly]    = useState(false);
+  const [diamondOnly,setDiamondOnly]  = useState(false);
   const picks = usePicks();
   const SOFT = ['🎯 Target','💥 Hittable']; // HH%>=33 = Target, HH%>=27.3 = Hittable
   const pgColor = pg => ({'💥 Hittable':'#27c97a','🎯 Target':'#38b8f2','🤔 Average':'var(--muted)'}[pg]||'var(--muted)');
@@ -8771,12 +8779,20 @@ function LongShotView({ data }) {
   const teams = React.useMemo(() => ['ALL',...Array.from(new Set(rows.map(r=>r.batting_team||'').filter(Boolean))).sort()], [rows]);
 
   const filtered = React.useMemo(() => {
-    let r = rows;
+    let r = rows.filter(b => b._simTB >= 0.01); // hide zero sim TB rows
     if (teamFilter!=='ALL') r = r.filter(b=>b.batting_team===teamFilter);
     if (pgFilter!=='ALL')   r = r.filter(b=>b._pgLabel===pgFilter);
-    if (search) { const q=search.toLowerCase(); r=r.filter(b=>(b.batter||'').toLowerCase().includes(q)); }
+    if (search)      { const q=search.toLowerCase(); r=r.filter(b=>(b.batter||'').toLowerCase().includes(q)); }
+    if (lineupOnly)  r = r.filter(b=>parseInt(b.batter_id||0)>0 && LINEUP_STATUS[parseInt(b.batter_id||0)]?.status==='confirmed');
+    if (goneYard)    r = r.filter(b=>parseInt(b.batter_id||0)>0 && HR_TODAY_SET?.has(parseInt(b.batter_id||0)));
+    if (dueOnly)     r = r.filter(b=>{ const dp=DAILY_PICKS_CACHE[String(b.batter_id||'')]; return dp&&isDue(dp); });
+    if (activeOnly)  r = r.filter(b=>!INJURY_MAP[String(b.batter_id||'')]);
+    if (injuredOnly) r = r.filter(b=>!!INJURY_MAP[String(b.batter_id||'')]);
+    if (hotOnly)     r = r.filter(b=>{ const dp=DAILY_PICKS_CACHE[String(b.batter_id||'')]; return dp&&isHotBatPlayer(dp); });
+    if (picksOnly)   r = r.filter(b=>picks[String(b.batter_id||'')]);
+    if (diamondOnly) r = r.filter(b=>{ const dp=DAILY_PICKS_CACHE[String(b.batter_id||'')]; return dp?.is_diamond==='1'||dp?.is_diamond===true; });
     return [...r].sort((a,b2)=>{ const av=a[sort]||0; const bv=b2[sort]||0; return sortDir*(bv-av); });
-  }, [rows,teamFilter,pgFilter,search,sort,sortDir]);
+  }, [rows,teamFilter,pgFilter,search,sort,sortDir,lineupOnly,goneYard,dueOnly,activeOnly,injuredOnly,hotOnly,picksOnly,diamondOnly]);
 
   const Th = ({k,label}) => (
     <th onClick={()=>{ if(sort===k) setSortDir(d=>-d); else{setSort(k);setSortDir(-1);} }}
@@ -8809,6 +8825,26 @@ function LongShotView({ data }) {
           {['ALL',...SOFT].map(g=><option key={g} value={g}>{g==='ALL'?'All Pitchers':g}</option>)}
         </select>
         <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginLeft:'auto'}}>{filtered.length} long shots</span>
+      </div>
+      {/* Sticker filters */}
+      <div style={{display:'flex',gap:6,marginBottom:10,flexWrap:'wrap'}}>
+        {[
+          [()=>setLineupOnly(v=>!v), lineupOnly,  'rgba(39,201,122,.12)', '#27c97a',        '✅'],
+          [()=>setGoneYard(v=>!v),   goneYard,    'rgba(255,64,32,.15)',  'var(--accent)',   '💥'],
+          [()=>setDueOnly(v=>!v),    dueOnly,     'rgba(56,184,242,.18)', 'var(--ice)',      '⏳'],
+          [()=>{setActiveOnly(v=>!v);if(!activeOnly)setInjuredOnly(false);}, activeOnly,  'rgba(52,211,153,.12)', '#34d399', '☑️'],
+          [()=>{setInjuredOnly(v=>!v);if(!injuredOnly)setActiveOnly(false);},injuredOnly,'rgba(251,146,60,.12)', '#fb923c', '🤕'],
+          [()=>setHotOnly(v=>!v),    hotOnly,     'rgba(251,146,60,.12)', '#fb923c',        '🔥'],
+          [()=>setPicksOnly(v=>!v),  picksOnly,   'rgba(245,166,35,.12)', 'var(--accent2)', '🎯'],
+          [()=>setDiamondOnly(v=>!v),diamondOnly, 'rgba(255,204,0,.18)',  '#ffcc00',        '💎'],
+        ].map(([fn,active,bg,col,emoji])=>(
+          <button key={emoji} onClick={fn}
+            style={{padding:'4px 9px',borderRadius:7,cursor:'pointer',flexShrink:0,fontSize:14,
+              border:`1px solid ${active?col:'var(--border)'}`,
+              background:active?bg:'transparent',color:active?col:'var(--muted)'}}>
+            {emoji}
+          </button>
+        ))}
       </div>
       <div className="tw">
         <table style={{width:'100%'}}>
