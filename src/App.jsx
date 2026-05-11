@@ -7849,7 +7849,7 @@ function HRTrackerTab() {
 
   const HRNav = () => (
     <div style={{display:'flex',gap:6,marginBottom:14}}>
-      {[['tracker','💥 HR Tracker'],['hotbats','🔥 Hot Bats'],['heatingup','📈 Heating Up'],['unlucky','😤 Robbed']].map(([key,label]) => (
+      {[['tracker','💥 HR Tracker'],['hotbats','🔥 Hot Bats'],['heatingup','📈 Heating Up']].map(([key,label]) => (
         <button key={key} onClick={() => setHrTab(key)}
           style={{padding:'5px 12px',borderRadius:7,cursor:'pointer',
             fontFamily:"'DM Mono',monospace",fontWeight:hrTab===key?700:400,fontSize:10,
@@ -7863,7 +7863,6 @@ function HRTrackerTab() {
   );
   if (hrTab === 'hotbats')   return <div><HRNav/><HotBatsTab/></div>;
   if (hrTab === 'heatingup') return <div><HRNav/><HeatingUpTab/></div>;
-  if (hrTab === 'unlucky')   return <div><HRNav/><UnluckyTab/></div>;
   return <div>
     <HRNav/>
     <div className="hrow">
@@ -8022,7 +8021,6 @@ function HRTrackerTab() {
 
 
 
-// ── Unlucky / Robbed Tab ─────────────────────────────────────────────────────
 // Batters who made HR-quality contact in last 7 days but got nothing — reads from mlb_atbat_log_last7.csv
 function HotBatsTab() {
   const [rows, setRows]     = useState([]);
