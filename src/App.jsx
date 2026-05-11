@@ -9375,7 +9375,7 @@ function SimLabView({ data }) {
                 'Recent FB%','Recent LA','BvP EV','BvP Barrel%','BvP FB%','BvP LA',
                 'Sim H','Sim 2B','Sim BB','Sim K','Sim TB','Sim RBI',
                 'Wind','Temp','Condition',
-                'AB','H','HR','R','TB','RBI','BB','K','Avg EV','Launch Angle'];
+                'AB','H','HR','R','TB','RBI','BB','K','Avg EV','Launch Angle','⚡ Sig'];
               const rows = slate.map(b => {
                 const bid = parseInt(b.batter_id) || 0;
                 const gy  = HR_DATA.some(h => h.batterId === bid ||
@@ -11852,6 +11852,7 @@ function MatchupEngineTab() {
         live?.totalBases??'', live?.rbi??'', live?.bb??'', live?.so??'',
         live?.avgEV>0?live.avgEV.toFixed(1):'',
         live?.launchAngle>0?live.launchAngle.toFixed(1):'',
+        b._trackerSig != null ? b._trackerSig : '',
       ].map(esc).join(',');
     });
     const csv = bom + headers.map(esc).join(',') + String.fromCharCode(10) + rows.join(String.fromCharCode(10));
