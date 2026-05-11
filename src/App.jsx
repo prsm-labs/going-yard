@@ -11841,7 +11841,7 @@ function MatchupEngineTab() {
         (b.batter && h.batterName && h.batterName.toLowerCase() === b.batter.toLowerCase()));
       const live = liveCache.current[String(bid)] || null;
       const pitchCleanId = b.pitcher_id ? String(parseInt(b.pitcher_id)||b.pitcher_id) : '';
-      const pitcherGrade = pitcherGradeCache.current[pitchCleanId] || '';
+      const pitcherGrade = simPitcherGrades.current[pitchCleanId] || '';
       return [b.grade, pitcherGrade, gy?'YES':'', b.batting_team, b.batter, b.batter_hand,
         b.pitcher, b.top_pitches, b.game_time, b.total_flags,
         b.recent_avg_ev, b.recent_barrel_pct, b.recent_fb_pct, b.recent_avg_la,
@@ -11862,7 +11862,7 @@ function MatchupEngineTab() {
           const _tmp = parseFloat(b.temp_f)||0;
           const _flg = parseInt(b.total_flags)||0;
           const _pid = b.pitcher_id?String(parseInt(b.pitcher_id)||b.pitcher_id):'';
-          const _pg  = pitcherGradeCache.current[_pid]||'';
+          const _pg  = simPitcherGrades.current[_pid]||'';
           let s = 0;
           if (_st>=2.5&&_st<3.0) s+=3; else if (_st>=2.0) s+=2; else if (_st>=1.5) s+=1;
           if (_pg==='🎯 Target') s+=2; else if (_pg==='💥 Hittable') s+=1; else if (_pg==='‼️ Elite') s-=2;
