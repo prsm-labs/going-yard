@@ -11852,7 +11852,29 @@ function MatchupEngineTab() {
         live?.totalBases??'', live?.rbi??'', live?.bb??'', live?.so??'',
         live?.avgEV>0?live.avgEV.toFixed(1):'',
         live?.launchAngle>0?live.launchAngle.toFixed(1):'',
-        b._trackerSig != null ? b._trackerSig : '',
+        (() => {
+          const _st  = parseFloat(b.sim_tb)||0;
+          const _br  = parseFloat(b.recent_barrel_pct)||0;
+          const _ev  = parseFloat(b.recent_avg_ev)||0;
+          const _bev = parseFloat(b.bvp_avg_ev)||0;
+          const _bla = parseFloat(b.bvp_avg_la)||0;
+          const _bfb = parseFloat(b.bvp_fb_pct)||0;
+          const _tmp = parseFloat(b.temp_f)||0;
+          const _flg = parseInt(b.total_flags)||0;
+          const _pid = b.pitcher_id?String(parseInt(b.pitcher_id)||b.pitcher_id):'';
+          const _pg  = pitcherGradeCache.current[_pid]||'';
+          let s = 0;
+          if (_st>=2.5&&_st<3.0) s+=3; else if (_st>=2.0) s+=2; else if (_st>=1.5) s+=1;
+          if (_pg==='🎯 Target') s+=2; else if (_pg==='💥 Hittable') s+=1; else if (_pg==='‼️ Elite') s-=2;
+          if (_tmp>=70&&_tmp<=75) s+=2;
+          if (_br>=15) s+=2; else if (_br>=3&&_br<=6) s+=1;
+          if (_ev>=100) s+=2; else if (_ev>=96) s+=1;
+          if (_bev>=96&&_bev<100) s+=1;
+          if (_bla>=20&&_bla<=24) s+=1;
+          if (_bfb>=36&&_bfb<=45) s-=1;
+          if (_flg===7) s-=2;
+          return Math.max(0,s);
+        })(),
       ].map(esc).join(',');
     });
     const csv = bom + headers.map(esc).join(',') + String.fromCharCode(10) + rows.join(String.fromCharCode(10));
