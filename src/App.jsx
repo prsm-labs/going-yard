@@ -8048,11 +8048,11 @@ function UnluckyTab() {
           if (ev < 95) continue;
           if (res2 !== 'field_out') continue;
           if (la < 20 || la > 35) continue;
-          if (dist < 330) continue;
+          if (dist < 350) continue;  // 350ft minimum — below this = typical flyout
           if (bbt === 'ground_ball' || bbt === 'popup') continue;
           let tier, tierScore;
-          if (ev >= 98 && dist >= 370)      { tier = '🚨 Barreled Out';  tierScore = 3; }
-          else if (ev >= 98 && dist >= 350) { tier = '⚠️ Warning Track'; tierScore = 2; }
+          if (ev >= 98 && dist >= 390)      { tier = '🚨 Barreled Out';  tierScore = 3; }
+          else if (ev >= 98 && dist >= 370) { tier = '⚠️ Warning Track'; tierScore = 2; }
           else                              { tier = '💥 Hard Flyout';   tierScore = 1; }
           const pid  = parseInt(row['Batter']||0);
           const team = row['Batter Team']||'';
@@ -8062,7 +8062,7 @@ function UnluckyTab() {
             const cp = getCachedPlayer(pid)||{};
             batterMap[key] = { pid, name:cp.name||'', team:cp.team||team, unluckyHits:[], topTier:0, totalScore:0 };
           }
-          batterMap[key].unluckyHits.push({ ev, la, dist, tier, tierScore, pitch:row['Pitch Type']||'', inning:row['Inning']||'' });
+          batterMap[key].unluckyHits.push({ ev, la, dist, tier, tierScore, pitch:row['Pitch Type']||'', inning:row['Inning']||'', date:row['Date']||'', pitcher:row['Pitcher']||'', pitcherTeam:row['Pitcher Team']||'' });
           batterMap[key].totalScore += tierScore;
           if (tierScore > batterMap[key].topTier) batterMap[key].topTier = tierScore;
         }
@@ -8072,12 +8072,15 @@ function UnluckyTab() {
           .filter(b => b.unluckyHits.length >= 1)
           .map(b => ({
             ...b,
-            count:    b.unluckyHits.length,
-            topEV:    Math.max(...b.unluckyHits.map(h=>h.ev)),
-            avgDist:  Math.round(b.unluckyHits.reduce((s,h)=>s+h.dist,0)/b.unluckyHits.length),
-            tierLabel:b.topTier===3?'🚨 Barreled Out':b.topTier===2?'⚠️ Warning Track':'💥 Hard Flyout',
+            count:     b.unluckyHits.length,
+            nBarrel:   b.unluckyHits.filter(h=>h.tierScore===3).length,
+            nWarning:  b.unluckyHits.filter(h=>h.tierScore===2).length,
+            nFlyout:   b.unluckyHits.filter(h=>h.tierScore===1).length,
+            topEV:     Math.max(...b.unluckyHits.map(h=>h.ev)),
+            avgDist:   Math.round(b.unluckyHits.reduce((s,h)=>s+h.dist,0)/b.unluckyHits.length),
+            tierLabel: b.topTier===3?'🚨 Barreled Out':b.topTier===2?'⚠️ Warning Track':'💥 Hard Flyout',
           }))
-          .sort((a,b2) => b2.totalScore - a.totalScore || b2.count - a.count);
+          .sort((a,b2) => b2.nBarrel - a.nBarrel || b2.nWarning - a.nWarning || b2.count - a.count);
 
         setRows(result);
       } catch(e) { console.error('UnluckyTab error:', e); }
@@ -8090,18 +8093,20 @@ function UnluckyTab() {
   return (
     <div>
       <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginBottom:6}}>
-        Batters who made HR-quality contact (EV≥95, LA 20-35°, 330ft+) but got nothing · last 7 days
+        Batters who made HR-quality contact (EV≥95, LA 20-35°, 350ft+) but got nothing · last 7 days · sorted by most robbed
       </div>
       <div style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.3)',marginBottom:10}}>
-        🚨 Barreled Out = true barrel caught · ⚠️ Warning Track = 370ft+ flyout · 💥 Hard Flyout = 330ft+ hard hit out
+        🚨 Barreled Out = 390ft+ flyout · ⚠️ Warning Track = 370-389ft · 💥 Hard Flyout = 350-369ft
       </div>
       <div className="tw">
         <table style={{width:'100%'}}>
           <thead><tr>
             <th style={{padding:'5px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.8,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)'}}>TM</th>
             <th style={{padding:'5px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.8,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)'}}>Batter</th>
-            <th style={{padding:'5px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.8,color:'var(--muted)',textAlign:'center',borderBottom:'1px solid var(--border)'}}>Robbed</th>
-            <th style={{padding:'5px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.8,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)'}}>Top Tier</th>
+            <th style={{padding:'5px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.8,color:'var(--muted)',textAlign:'center',borderBottom:'1px solid var(--border)'}}>Total</th>
+            <th style={{padding:'5px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.8,color:'#ff4020',textAlign:'center',borderBottom:'1px solid var(--border)'}}>🚨</th>
+            <th style={{padding:'5px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.8,color:'#f5a623',textAlign:'center',borderBottom:'1px solid var(--border)'}}>⚠️</th>
+            <th style={{padding:'5px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.8,color:'var(--muted)',textAlign:'center',borderBottom:'1px solid var(--border)'}}>💥</th>
             <th style={{padding:'5px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.8,color:'var(--muted)',textAlign:'right',borderBottom:'1px solid var(--border)'}}>Peak EV</th>
             <th style={{padding:'5px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.8,color:'var(--muted)',textAlign:'right',borderBottom:'1px solid var(--border)'}}>Avg Dist</th>
           </tr></thead>
@@ -8118,29 +8123,47 @@ function UnluckyTab() {
                     <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={p.pid} name={p.name} team={p.team}/></span>
                   </div>
                 </td>
-                <td style={{padding:'2px 8px',textAlign:'center'}}>
-                  <span style={{fontFamily:osw,fontWeight:800,fontSize:14,
+                <td style={{padding:'2px 6px',textAlign:'center'}}>
+                  <span style={{fontFamily:osw,fontWeight:800,fontSize:13,
                     color:p.count>=4?'#ff4020':p.count>=2?'#f5a623':'#27c97a'}}>{p.count}</span>
                 </td>
-                <td style={{padding:'2px 8px',fontFamily:mono,fontSize:9,color:p.topTier===3?'#ff4020':p.topTier===2?'#f5a623':'var(--muted)',whiteSpace:'nowrap'}}>{p.tierLabel}</td>
+                <td style={{padding:'2px 6px',textAlign:'center'}}>
+                  {p.nBarrel>0 ? <span style={{fontFamily:osw,fontWeight:800,fontSize:13,color:'#ff4020'}}>{p.nBarrel}</span>
+                              : <span style={{color:'rgba(255,255,255,.15)',fontSize:10}}>—</span>}
+                </td>
+                <td style={{padding:'2px 6px',textAlign:'center'}}>
+                  {p.nWarning>0 ? <span style={{fontFamily:osw,fontWeight:700,fontSize:12,color:'#f5a623'}}>{p.nWarning}</span>
+                               : <span style={{color:'rgba(255,255,255,.15)',fontSize:10}}>—</span>}
+                </td>
+                <td style={{padding:'2px 6px',textAlign:'center'}}>
+                  {p.nFlyout>0 ? <span style={{fontFamily:osw,fontWeight:600,fontSize:12,color:'var(--muted)'}}>{p.nFlyout}</span>
+                              : <span style={{color:'rgba(255,255,255,.15)',fontSize:10}}>—</span>}
+                </td>
                 <td style={{padding:'2px 8px',textAlign:'right',fontFamily:osw,fontWeight:700,fontSize:11,
                   color:p.topEV>=103?'#ff4020':p.topEV>=98?'#f5a623':'var(--text)'}}>{p.topEV.toFixed(1)}</td>
                 <td style={{padding:'2px 8px',textAlign:'right',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{p.avgDist}ft</td>
               </tr>),
-              expPid===p.pid && (<tr key={p.pid+'x'}><td colSpan={6} style={{padding:'0 12px 12px',background:'rgba(255,255,255,.02)'}}>
-                <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',padding:'8px 0 4px'}}>Individual robbed hits:</div>
-                {p.unluckyHits.sort((a,b)=>b.tierScore-a.tierScore).map((h,i)=>(
-                  <div key={i} style={{display:'flex',gap:12,padding:'3px 0',borderBottom:'1px solid rgba(255,255,255,.04)',fontFamily:mono,fontSize:9}}>
-                    <span style={{color:h.tierScore===3?'#ff4020':h.tierScore===2?'#f5a623':'var(--muted)',width:130,flexShrink:0}}>{h.tier}</span>
-                    <span style={{color:h.ev>=103?'#ff4020':h.ev>=98?'#f5a623':'var(--text)'}}>{h.ev.toFixed(1)} mph</span>
-                    <span style={{color:'var(--muted)'}}>{h.la.toFixed(0)}°</span>
-                    <span style={{color:'var(--muted)'}}>{h.dist.toFixed(0)}ft</span>
+              expPid===p.pid && (<tr key={p.pid+'x'}><td colSpan={8} style={{padding:'0 12px 12px',background:'rgba(255,255,255,.02)'}}>
+                <div style={{display:'grid',gridTemplateColumns:'90px 55px 70px 38px 38px 44px 1fr',gap:8,
+                  padding:'4px 0 2px',fontFamily:mono,fontSize:7,color:'rgba(255,255,255,.3)',textTransform:'uppercase',letterSpacing:.6}}>
+                  <span>Date</span><span>Tier</span><span>Pitcher</span><span>EV</span><span>LA</span><span>Dist</span><span>Details</span>
+                </div>
+                {p.unluckyHits.sort((a,b)=>b.dist-a.dist).map((h,i)=>(
+                  <div key={i} style={{display:'grid',gridTemplateColumns:'90px 55px 70px 38px 38px 44px 1fr',gap:8,
+                    padding:'4px 0',borderBottom:'1px solid rgba(255,255,255,.04)',fontFamily:mono,fontSize:9,alignItems:'center'}}>
+                    <span style={{color:'var(--muted)',fontSize:8}}>{h.date||'—'}</span>
+                    <span style={{color:h.tierScore===3?'#ff4020':h.tierScore===2?'#f5a623':'rgba(255,255,255,.4)',fontSize:8,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{h.tier.split(' ').slice(1).join(' ')}</span>
+                    <span style={{color:'var(--muted)',fontSize:8,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{h.pitcher||'—'}</span>
+                    <span style={{color:h.ev>=103?'#ff4020':h.ev>=98?'#f5a623':'var(--text)',fontWeight:700}}>{h.ev.toFixed(1)}</span>
+                    <span style={{color:'rgba(255,255,255,.4)'}}>{h.la.toFixed(0)}°</span>
+                    <span style={{color:h.dist>=390?'#ff4020':h.dist>=370?'#f5a623':'var(--text)',fontWeight:600}}>{h.dist.toFixed(0)}ft</span>
+                    <span style={{color:'rgba(255,255,255,.35)',fontSize:8}}>Inn.{h.inning} · {h.pitch}</span>
                   </div>
                 ))}
                 <div style={{marginTop:8}}><Last7HRChart batterId={p.pid}/></div>
               </td></tr>)
             ])}
-            {rows.length===0 && (<tr><td colSpan={6} style={{padding:'30px',textAlign:'center',fontFamily:mono,fontSize:10,color:'var(--muted)'}}>No robbed hits found in last 7 days.</td></tr>)}
+            {rows.length===0 && (<tr><td colSpan={8} style={{padding:'30px',textAlign:'center',fontFamily:mono,fontSize:10,color:'var(--muted)'}}>No robbed hits found in last 7 days.</td></tr>)}
           </tbody>
         </table>
       </div>
