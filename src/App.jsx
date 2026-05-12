@@ -8773,34 +8773,46 @@ function LongShotView({ data }) {
       const _simTB = parseFloat(b.sim_tb)||0;
       const _bvpFB = parseFloat(b.bvp_fb_pct)||0;
       const _recEV = parseFloat(b.recent_avg_ev)||0;
-      const _bvpEV = parseFloat(b.bvp_avg_ev)||0;
+      const _recLA = parseFloat(b.recent_avg_la)||0;
       const _bvpLA = parseFloat(b.bvp_avg_la)||0;
       const _flags = parseInt(b.total_flags)||0;
       const _temp  = parseFloat(b.temp)||0;
-      // Tracker-validated signal stack score (max 11)
+      // ⚡ Sig — v4 calibrated (1,231 HRs · 12,985 rows · 9.5% base rate)
       let _sig = 0;
-      if (_simTB >= 2.0)                 _sig += 2; else if (_simTB >= 1.5) _sig += 1;
-      if (_bvpFB >= 20 && _bvpFB <= 36) _sig += 2;
+      // SimTB: 2.5-3.0 peak; 3.0+ dead zone confirmed
+      if (_simTB >= 2.5 && _simTB < 3.0) _sig += 3;
+      else if (_simTB >= 2.0)            _sig += 2;
+      else if (_simTB >= 1.5)            _sig += 1;
+      if (_simTB >= 3.0)                 _sig -= 1;
+      // BvP FB%: 20-34% = sweet spot; 36+ = fade; 42+ = confirmed 0% HR dead zone
+      if (_bvpFB >= 20 && _bvpFB <= 34) _sig += 2;
+      if (_bvpFB >= 42)                  _sig -= 2;
+      else if (_bvpFB >= 36)             _sig -= 1;
+      // Pitcher grade
       if (pgLabel === '🎯 Target')       _sig += 2; else if (pgLabel === '💥 Hittable') _sig += 1;
-      if (_temp  >= 65 && _temp  <= 78)  _sig += 1;
-      if (_bvpLA >= 20 && _bvpLA <= 28)  _sig += 1;
-      if (_bvpEV >= 92)                  _sig += 1;
-      if (_flags >= 2 && _flags <= 6)    _sig += 1;
-      // Live lineup slot × platoon weak spot (updates every few mins via loadTodayLineups)
-      const _lsPid  = parseInt(b.batter_id)||0;
-      const _lsData = LINEUP_STATUS[_lsPid];
-      if (_lsData?.slot) {
-        const _slot = _lsData.slot;
-        const _ph   = (b.pitcher_hand||'').toLowerCase();
-        const _bh   = (b.batter_hand||'').toUpperCase();
+      // Temp: 70-75°F confirmed peak; wider temp range — only fade <50°F
+      if (_temp >= 70 && _temp <= 75)    _sig += 2;
+      // BvP LA 15-20°: v4 confirmed peak (18.7% HR rate, +9.2% vs base — upgraded to +2)
+      if (_bvpLA >= 15 && _bvpLA <= 20) _sig += 2;
+      // Recent LA 15-22°: HR corridor confirmed (peak 18-21°)
+      if (_recLA >= 15 && _recLA <= 22) _sig += 1;
+      // Flags: 5-6 peak; 7 dead zone; 1 = weakest real signal
+      if (_flags >= 5 && _flags <= 6)   _sig += 1;
+      else if (_flags === 7)             _sig -= 1;
+      else if (_flags === 1)             _sig -= 1;
+      // Live lineup slot × platoon (uses b.lineup_slot from engine data)
+      const _lsSlot = parseInt(b.lineup_slot)||0;
+      if (_lsSlot > 0) {
+        const _ph = (b.pitcher_hand||'').toLowerCase();
+        const _bh = (b.batter_hand||'').toUpperCase();
         const _hasPlatoon = (_ph.startsWith('r') && (_bh==='L'||_bh==='S')) ||
                             (_ph.startsWith('l') && (_bh==='R'||_bh==='S'));
-        if (_hasPlatoon && _slot >= 2 && _slot <= 5)  _sig += 2; // platoon edge + heart of order
-        else if (_hasPlatoon)                          _sig += 1; // platoon edge, different slot
-        else if (_slot >= 3 && _slot <= 5)            _sig += 1; // prime slot, no platoon
+        if (_hasPlatoon && _lsSlot >= 2 && _lsSlot <= 5) _sig += 2;
+        else if (_hasPlatoon)                              _sig += 1;
+        else if (_lsSlot >= 3 && _lsSlot <= 5)           _sig += 1;
       }
       out.push({ ...b, _pgLabel:pgLabel, _simHR, _simTB, _bvpFB, _recEV,
-        _bvpEV, _bvpLA, _flags, _temp, _sig,
+        _bvpLA, _recLA, _flags, _temp, _sig,
         _hrPct:parseFloat(b.proj_hr_adj)||parseFloat(b.sim_hr)||0 });
     }
     return out;
@@ -9466,37 +9478,39 @@ function SimLabView({ data }) {
                   // ── Tracker Signal Score (A+/A/B calibrated) ──
                   const _simTBv  = parseFloat(b.sim_tb)||0;
                   const _bvpFBv  = parseFloat(b.bvp_fb_pct)||0;
-                  const _bvpEVv  = parseFloat(b.bvp_avg_ev)||0;
                   const _bvpLAv  = parseFloat(b.bvp_avg_la)||0;
                   const _recEVv  = parseFloat(b.recent_avg_ev)||0;
+                  const _recLAv  = parseFloat(b.recent_avg_la)||0;
                   const _barrelv = parseFloat(b.recent_barrel_pct)||0;
                   const _tempv   = parseFloat(b.temp)||0;
                   const _flagsv  = parseInt(b.total_flags)||0;
                   const _pgLabelv= (() => { const pid=b.pitcher_id?String(parseInt(b.pitcher_id)||b.pitcher_id):null; return pid?simPitcherGrades.current[pid]||'':''; })();
                   let _trackerSig = 0;
-                  // SimTB (2.0-2.5 best; 2.5-3.0 peak; 3.0+ reverses)
+                  // SimTB: 2.5-3.0 peak; 3.0+ reverses (dead zone confirmed v4)
                   if (_simTBv >= 2.5 && _simTBv < 3.0)  _trackerSig += 3;
                   else if (_simTBv >= 2.0)               _trackerSig += 2;
                   else if (_simTBv >= 1.5)               _trackerSig += 1;
+                  if (_simTBv >= 3.0)                    _trackerSig -= 1; // 3.0+ dead zone
                   // Pitcher grade
                   if (_pgLabelv === '🎯 Target')         _trackerSig += 2;
                   else if (_pgLabelv === '💥 Hittable')  _trackerSig += 1;
                   // Temp 70-75°F
                   if (_tempv >= 70 && _tempv <= 75)      _trackerSig += 2;
-                  // Recent Barrel% (15%+ = massive signal; 3-6% = sweet spot)
-                  if (_barrelv >= 15)                    _trackerSig += 2;
-                  else if (_barrelv >= 3 && _barrelv <= 6) _trackerSig += 1;
-                  // Recent EV 96+
-                  if (_recEVv >= 100)                    _trackerSig += 2;
-                  else if (_recEVv >= 96)                _trackerSig += 1;
-                  // BvP EV 96-100
-                  if (_bvpEVv >= 96 && _bvpEVv < 100)   _trackerSig += 1;
-                  // BvP LA 20-24° (HR corridor)
-                  if (_bvpLAv >= 20 && _bvpLAv <= 24)   _trackerSig += 1;
-                  // BvP FB% 36-45% is dead zone for A+/A/B — deduct
-                  if (_bvpFBv >= 36 && _bvpFBv <= 45)   _trackerSig -= 1;
-                  // Flags=7 is confirmed dead zone
+                  // Recent Barrel% 3-6% sweet spot confirmed (15%+ fades to base — removed)
+                  if (_barrelv >= 3 && _barrelv <= 6)    _trackerSig += 1;
+                  // Recent EV: 95+ real signal; 102+ elite (v4 data, dip at 99-101 was noise)
+                  if (_recEVv >= 102)                    _trackerSig += 2;
+                  else if (_recEVv >= 95)                _trackerSig += 1;
+                  // Recent LA 15-22° HR corridor (v4 peak: 18-21°)
+                  if (_recLAv >= 15 && _recLAv <= 22)   _trackerSig += 1;
+                  // BvP LA 15-20° confirmed peak (18.7% HR rate, +9.2% vs base in v4)
+                  if (_bvpLAv >= 15 && _bvpLAv <= 20)   _trackerSig += 2;
+                  // BvP FB% tiered penalty: 42-50% = confirmed 0% HR dead zone
+                  if (_bvpFBv >= 42)                     _trackerSig -= 2;
+                  else if (_bvpFBv >= 36)                _trackerSig -= 1;
+                  // Flags=7 confirmed dead zone; Flags=1 weakest real signal
                   if (_flagsv === 7)                     _trackerSig -= 2;
+                  else if (_flagsv === 1)                _trackerSig -= 1;
                   b._trackerSig = Math.max(0, _trackerSig);
                   return (
                     <tr key={`${b.batter_id}-${i}`} className="dr"
@@ -10152,8 +10166,24 @@ function CheatCodeButton() {
     </div>
   );
 
+  const Verdict = ({emoji, label, rate, desc, rgb}) => (
+    <div style={{display:'flex',alignItems:'flex-start',gap:8,marginBottom:7,
+      padding:'7px 10px',borderRadius:7,
+      background:`rgba(${rgb},0.07)`,border:`1px solid rgba(${rgb},0.2)`}}>
+      <span style={{fontSize:15,lineHeight:1.4,flexShrink:0}}>{emoji}</span>
+      <div>
+        <div style={{display:'flex',alignItems:'center',gap:5,marginBottom:2,flexWrap:'wrap'}}>
+          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,
+            color:`rgb(${rgb})`,textTransform:'uppercase',letterSpacing:.5}}>{label}</span>
+          <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:700,
+            color:'var(--accent2)'}}>{rate}</span>
+        </div>
+        <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',lineHeight:1.4}}>{desc}</div>
+      </div>
+    </div>
+  );
+
   return <>
-    {/* Subtle trigger — looks like part of the UI */}
     <button onClick={()=>setOpen(true)}
       title="The Sauce"
       style={{marginLeft:'auto',background:'none',border:'none',cursor:'pointer',
@@ -10166,16 +10196,11 @@ function CheatCodeButton() {
     </button>
 
     {open && <>
-      {/* Backdrop */}
       <div onClick={()=>setOpen(false)} style={{position:'fixed',inset:0,
         background:'rgba(0,0,0,.6)',zIndex:900}}/>
-
-      {/* Panel */}
       <div style={{position:'fixed',right:0,top:0,bottom:0,width:'min(480px,100vw)',
         background:'var(--surface)',borderLeft:'2px solid var(--border)',
         zIndex:901,overflowY:'auto',display:'flex',flexDirection:'column'}}>
-
-        {/* Header */}
         <div style={{padding:'16px 20px 12px',borderBottom:'1px solid var(--border)',
           position:'sticky',top:0,background:'var(--surface)',zIndex:10,
           display:'flex',alignItems:'flex-start',justifyContent:'space-between'}}>
@@ -10186,7 +10211,7 @@ function CheatCodeButton() {
             </div>
             <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',
               marginTop:2,letterSpacing:.5}}>
-              Derived from season HR tracker · 288 HRs · 1,689 played rows · base rate 17.1% ✱
+              Derived from season HR tracker · 1,231 HRs · 12,985 rows · base rate 9.5% ✱
             </div>
           </div>
           <button onClick={()=>setOpen(false)}
@@ -10196,73 +10221,92 @@ function CheatCodeButton() {
             ✕
           </button>
         </div>
-
-        {/* Content */}
         <div style={{padding:'20px',flex:1}}>
 
-          <Section emoji="🔒" title="Tier 1 Lock — All 3 = strongest play" color="var(--accent)">
+          <Section emoji="🔒" title="Tier 1 Lock — The Real Signal Stack" color="var(--accent)">
             <div style={{background:'rgba(255,64,32,.06)',border:'1px solid rgba(255,64,32,.2)',
               borderRadius:8,padding:'10px 14px',marginBottom:8}}>
-              <Row label="Grade A+" value="46.7% HR rate when stacked" color="var(--accent)"/>
-              <Row label="Sim TB ≥ 2.0" value="+5.2% lift" color="#f5a623"
-                sub="→ Filter this in Sim Lab using the Sim TB box"/>
-              <Row label="Pitcher 💥 Hittable or 🎯 Target" value="+2.0% lift" color="#27c97a"
-                sub="A+ vs Target alone = 50% HR rate in tracker"/>
+              <Row label="🎯 Target pitcher + Sim TB ≥ 2.0" value="34.2% HR rate" color="var(--accent)"
+                sub="76 rows. The only combo in the dataset that cracks 30%. That's your lock."/>
+              <Row label="🎯 Target pitcher + RecEV ≥ 98" value="30.4% HR rate" color="#f5a623"
+                sub="When elite contact meets pitcher vulnerability, it shows."/>
+              <Row label="🎯 Target pitcher alone" value="18.7% HR rate" color="#27c97a"
+                sub="+9.2% vs base. Single strongest individual signal in the model."/>
             </div>
             <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',
-              lineHeight:1.4}}>All three together → 46.7% HR rate vs 17.1% base. That's your lock. ✱</div>
+              lineHeight:1.4}}>Pitcher grade is the engine. Sim TB and EV are the fuel. Stack all three → 3.6x base rate. ✱</div>
           </Section>
 
-          <Section emoji="🔥" title="Tier 2 — Any 2 = solid play" color="var(--accent2)">
-            <Row label="Recent EV > 98 mph" value="23.5% HR rate" color="var(--accent)"
-              sub="Hot bat signal — biggest non-grade individual predictor"/>
-            <Row label="Temp 70–75°F" value="22.3% HR rate" color="#f5a623"
-              sub="Strongest environmental signal in the dataset (+9.2% lift)"/>
-            <Row label="BvP FB% 28–36%" value="22.2% HR rate" color="#27c97a"
-              sub="Above 36% = popup territory, actually reverses below base"/>
-            <Row label="BvP EV 92–98 mph" value="16–17% HR rate" color="var(--accent2)"
-              sub="Above 98 shows diminishing returns — sweet spot is 92-98"/>
-            <Row label="Sim TB > 2.5" value="21.6% HR rate" color="var(--accent)"
-              sub="Elite zone — filter to ≥2.5 for highest confidence plays"/>
-            <Row label="D/C Grade + 🎯 Target ✱" value="22.6% HR rate" color="#fb923c"
-              sub="New v2 finding: pitcher vulnerability overrides batter grade. Mid-week especially."/>
+          <Section emoji="🔥" title="Tier 2 — Any 2 = Solid Play" color="var(--accent2)">
+            <Row label="Sim TB 2.5–3.0" value="21.4% HR rate" color="var(--accent)"
+              sub="Peak zone (+11.9% vs base). 3.0+ reverses hard — see Dead Zones."/>
+            <Row label="Temp 70–75°F" value="16.8% HR rate" color="#f5a623"
+              sub="Strongest environmental signal (+7.3% lift). Peak window confirmed."/>
+            <Row label="Grade A or A+ ✱" value="14.1–14.7% HR rate" color="#27c97a"
+              sub="A+ is +5.2%, A is +4.6% vs base. Stack with pitcher grade for lift."/>
+            <Row label="Sim TB 2.0–2.5" value="18.5% HR rate" color="var(--accent)"
+              sub="Reliable lift zone (+9.1%). Use Sim Lab ≥ 2.0 filter as your first cut."/>
+            <Row label="C/D Grade + 🎯 Target ✱" value="17.3% HR rate" color="#fb923c"
+              sub="Pitcher vulnerability overrides batter grade. Don't fade a C/D vs a Target arm."/>
+            <Row label="RecEV 95–98 mph" value="12.7% HR rate" color="var(--accent2)"
+              sub="Real lift at 95+. Elite tier is 102+ at 15.7%. Below 95 = base rate or worse."/>
           </Section>
 
           <Section emoji="📐" title="The Narrowest Sweet Spots" color="var(--ice)">
-            <Row label="BvP Launch Angle 20–24°" value="+4.1% lift" color="var(--ice)"
-              sub="HR corridor. Below 16° = groundball. Above 24° = popup."/>
-            <Row label="Recent Barrel% 3–6%" value="18.6% HR rate" color="var(--ice)"
-              sub="0-3% is the WORST zone (7.1%). Extreme barrel rates also fade."/>
-            <Row label="Signal Flags 4–6" value="14–15% HR rate" color="var(--ice)"
-              sub="Sweet spot. Flags 7 = 8.5% — looks great, underperforms."/>
+            <Row label="BvP Launch Angle 15–20° ✱" value="18.7% HR rate" color="var(--ice)"
+              sub="UPDATED: real peak shifted down. 15-18° is +9.2% vs base — not 20-24°."/>
+            <Row label="Recent Launch Angle 15–22° ✱" value="12.0–12.3% HR rate" color="var(--ice)"
+              sub="HR corridor confirmed. Peak at 18-21°. Above 24° drops below base rate."/>
+            <Row label="Recent Barrel% 3–6%" value="12.0% HR rate" color="var(--ice)"
+              sub="Sweet spot holds (+2.5% vs base). 0-3% = soft contact. 15%+ fades to base."/>
+            <Row label="Signal Flags 5–6" value="13.9–15.0% HR rate" color="var(--ice)"
+              sub="Confirmed peak. Flags 4 is softer (11.7%). Flags 7 = dead zone."/>
+            <Row label="BvP FB% 15–25%" value="13.4–13.9% HR rate" color="var(--ice)"
+              sub="Some fly ball intent vs this pitcher = good. Below 15% or above 36% = fade."/>
           </Section>
 
           <Section emoji="❌" title="Dead Zones — Fade These" color="var(--accent)">
-            <Fade label="Sim TB 1.6–2.0" sub="Worse than 1.3-1.6. The mystery dip — real, not noise."/>
-            <Fade label="Recent EV 92–94 mph" sub="Dead zone, -3% vs base. Skip this band entirely."/>
-            <Fade label="BvP EV 90–92 mph" sub="Worst BvP EV range in the data (-3.5% lift)."/>
-            <Fade label="Temp below 65°F" sub="HR rate drops to 8.1-8.9%. Hard avoid."/>
-            <Fade label="Grade B vs Target/Hittable" sub="9.3% HR rate — below base! Only trust pitcher targeting for A/A+."/>
-            <Fade label="Flags = 7" sub="Grade A concentration problem. 10.5% HR rate ✱ — Sim TB looks high but consistently underdelivers."/>
+            <Fade label="Sim TB 3.0+" sub="HR rate collapses to 9.7% — below base. Extreme projections = unreliable small BvP sample. Real peak caps at 2.5-3.0."/>
+            <Fade label="BvP FB% 42–50%" sub="0.0% HR rate across 26 rows. Complete dead zone — confirmed across every dataset version."/>
+            <Fade label="Flags = 1" sub="8.1% HR rate — weakest single-flag bucket. One signal with no confirmation is noise, not edge."/>
+            <Fade label="Flags = 7" sub="9.8% — barely above base. Looks maxed out, consistently underdelivers. Overcrowded signal problem."/>
+            <Fade label="Temp below 50°F" sub="Only sub-50°F is genuinely weak (8.5%). 55-65°F is fine — don't fade cold weather games blindly."/>
+            <Fade label="Recent LA above 28°" sub="HR rate falls after 24°. Above 28° = popup pattern, not power. 35°+ drops to 5.7%."/>
+            <Fade label="Grade B vs Target/Hittable" sub="Grade B batters see limited benefit from soft pitchers. Only A/A+ consistently stack with pitcher grade."/>
           </Section>
 
           <Section emoji="🗺️" title="Daily Scan Order" color="#27c97a">
-            <div style={{fontFamily:"'DM Mono',monospace",fontSize:10,lineHeight:1.8,color:'var(--text)'}}>
+            <div style={{fontFamily:"'DM Mono',monospace",fontSize:10,lineHeight:1.9,color:'var(--text)'}}>
               <div><span style={{color:'var(--accent2)',fontWeight:700}}>1.</span> Set Sim TB filter ≥ 1.5 in Sim Lab</div>
-              <div><span style={{color:'var(--accent2)',fontWeight:700}}>2.</span> Look for Grade A+ in that list first</div>
-              <div><span style={{color:'var(--accent2)',fontWeight:700}}>3.</span> Check pitcher: Hittable or Target = green light</div>
-              <div><span style={{color:'var(--accent2)',fontWeight:700}}>4.</span> Confirm HR% ≥ 8% and flags 4–6</div>
-              <div><span style={{color:'var(--accent2)',fontWeight:700}}>5.</span> Weather tab: 70–75°F games get a bump</div>
-              <div><span style={{color:'var(--accent2)',fontWeight:700}}>✱</span> <span style={{color:'#f5a623'}}>Tue/Wed slate? Boost confidence on all A+ plays.</span></div>
-              <div><span style={{color:'var(--accent2)',fontWeight:700}}>6.</span> Cross-check BvP FB% — is it 28–36%?</div>
+              <div><span style={{color:'var(--accent2)',fontWeight:700}}>2.</span> Pitcher grade first — 🎯 Target is the unlock</div>
+              <div><span style={{color:'var(--accent2)',fontWeight:700}}>3.</span> Grade A or A+ in that filtered list = stack it</div>
+              <div><span style={{color:'var(--accent2)',fontWeight:700}}>4.</span> Look for Flags 5–6 and Sim TB ≥ 2.0 together</div>
+              <div><span style={{color:'var(--accent2)',fontWeight:700}}>5.</span> Check BvP LA — is it 15–20°? Recent LA 15–22°?</div>
+              <div><span style={{color:'var(--accent2)',fontWeight:700}}>6.</span> Weather tab: 70–75°F = bump. Below 50°F only = slight fade.</div>
+              <div><span style={{color:'var(--accent2)',fontWeight:700}}>✱</span> <span style={{color:'#f5a623'}}>Thu/Wed slate? Highest KM pick hit rates. Fade Sat/Sun KM plays.</span></div>
             </div>
+          </Section>
+
+          <Section emoji="📡" title="Reading the Play" color="#38b8f2">
+            <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',
+              marginBottom:10,lineHeight:1.4}}>
+              What the signal stack is actually telling you about the likely outcome:
+            </div>
+            <Verdict emoji="💣" label="Going Yard" rate="34.2% HR rate" rgb="255,64,32"
+              desc="🎯 Target + Sim TB ≥ 2.0. Add RecEV ≥ 98 or BvP LA 15-20° for max conviction. Only combo in the data cracking 30%."/>
+            <Verdict emoji="🔥" label="Extra Bases" rate="19.8% HR rate" rgb="245,166,35"
+              desc="Sim TB 2.0-3.0 + Recent LA 15-24°. Power approach with elevation — gap shot territory. HR upside real, XBH is the floor."/>
+            <Verdict emoji="🎯" label="Hit On Deck" rate="~10-11% HR rate" rgb="39,201,122"
+              desc="Sim H ≥ 0.9 + EV 88-96 + LA below 15°. Contact hitter, flat approach. Good for hit/RBI props — limited power ceiling."/>
+            <Verdict emoji="⚠️" label="Monitor Only" rate="~9% HR rate" rgb="138,157,176"
+              desc="Flags = 1 or Sim TB below 1.0. One signal, nothing confirming it. At base rate — wait for a cleaner setup."/>
           </Section>
 
           <Section emoji="👤" title="Composite HR Hitter Profile" color="var(--muted)">
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px 12px'}}>
-              {[['Grade','A+ (highest rate)'],['Pitcher','💥 Hittable'],['Flags avg','4.7'],
-                ['Sim TB median','1.54'],['Recent EV','93.1 mph'],['BvP EV','92.8 mph'],
-                ['BvP FB%','23.4%'],['BvP LA','17.7°'],['Temp','70.9°F'],['Handedness','65% LHB']
+              {[['Grade','A or A+'],['Pitcher','🎯 Target'],['Flags avg','5.0'],
+                ['Sim TB avg','1.67 (KM HRs)'],['Recent EV','89.8 mph'],['BvP LA','16.9°'],
+                ['Recent LA','14.0°'],['BvP FB%','21.5%'],['Temp','70–75°F'],['Handedness','51% LHB']
               ].map(([k,v])=>(
                 <div key={k} style={{padding:'4px 0',borderBottom:'1px solid rgba(30,45,58,.3)'}}>
                   <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.6}}>{k}</div>
@@ -10270,29 +10314,40 @@ function CheatCodeButton() {
                 </div>
               ))}
             </div>
+            <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--muted)',
+              marginTop:8,lineHeight:1.5}}>
+              Avg EV of 89.8 and LA of 14.0° reflect the full MLB HR population — not just elite profiles. Signal stack narrows from here upward.
+            </div>
           </Section>
 
-          <Section emoji="📅" title="Day of Week — Target Profiles" color="#f5a623">
+          <Section emoji="📅" title="Day of Week — Key Matchup HR Rates" color="#f5a623">
+            <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--muted)',
+              marginBottom:8,lineHeight:1.4}}>
+              KM% = Key Matchup filtered rows (base 12.6%). All% = full slate. The split matters.
+            </div>
             <div style={{display:'flex',flexDirection:'column',gap:4}}>
               {[
-                ['Tuesday','✅ Best Day ✱','25.8%','Biggest upgrade from v2. Stack A+ vs Target/Hittable. Boost confidence on all plays.'],
-                ['Wednesday','✅ Best Day ✱','25.8%','Tied with Tuesday — 2x the base rate. Best mid-week slate. Play your full card.'],
-                ['Friday','✅ Strong ✱','19.2%','Was flagged as a trap in v1. v2 flips it — above average. Standard filters apply.'],
-                ['Saturday','~ Solid ✱','15.9%','Slightly downgraded from v1. Hittable pitchers still = 20%+. A/A+ stack holds.'],
-                ['Sunday','~ Neutral','13.2%','Target pitchers = 22.2%. Otherwise play standard Sauce. No special unlock.'],
-                ['Monday','~ Neutral','13.1%','No specific signal. Standard Sauce filters apply. Nothing special either way.'],
-                ['Thursday','⚠️ Weakest ✱','12.5%','Was "Best Day" in v1 — now near-bottom. Big slate dilutes quality. Dampen confidence.'],
-              ].map(([day, badge, rate, tip]) => {
-                const col = badge.includes('✅') ? '#27c97a' : badge.includes('⚠️') ? 'var(--accent)' : 'var(--muted)';
+                ['Thursday', '✅ Best KM Day ✱','14.8%','10.0%','Highest KM pick rate in the dataset (+2.3% above KM base). Was labeled weakest in old Sauce — completely flipped with real data. Stack your best plays on Thursdays.'],
+                ['Wednesday','✅ Strong KM ✱',  '13.6%','9.0%', 'Solid mid-week KM performance (+1.0% above KM base). Filtered plays hold up well. Standard Sauce applies.'],
+                ['Tuesday',  '✅ Solid KM ✱',   '13.3%','8.9%', "Good KM day (+0.7%). Raw HR rate slightly below base — the filter matters here. Don't play raw, play the picks."],
+                ['Friday',   '📊 Best Volume',  '12.8%','10.5%','Most HRs on Fridays (big slate). KM picks only break even vs KM base. Good day to play, not to boost confidence.'],
+                ['Monday',   '~ Neutral',        '12.6%','10.3%','KM picks at exactly base rate. No edge either way — standard filters only.'],
+                ['Saturday', '⚠️ Fade KM ✱',   '11.9%','8.9%', 'KM picks underperform KM base (-0.7%). Big weekend slate dilutes signal quality. Tighten filters.'],
+                ['Sunday',   '⚠️ Weakest KM ✱','10.8%','9.3%', 'Worst KM pick day (-1.8% below KM base). Avoid stacking. Only highest-conviction plays if at all.'],
+              ].map(([day, badge, kmRate, allRate, tip]) => {
+                const col = badge.includes('✅') ? '#27c97a' : badge.includes('⚠️') ? 'var(--accent)' : badge.includes('📊') ? 'var(--ice)' : 'var(--muted)';
                 return (
                   <div key={day} style={{display:'flex',alignItems:'flex-start',gap:8,
                     padding:'6px 8px',borderRadius:6,background:'rgba(255,255,255,.03)',
-                    border:`1px solid rgba(255,255,255,.06)`}}>
-                    <div style={{flexShrink:0,minWidth:80}}>
+                    border:'1px solid rgba(255,255,255,.06)'}}>
+                    <div style={{flexShrink:0,minWidth:86}}>
                       <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11}}>{day}</div>
                       <div style={{display:'flex',alignItems:'center',gap:4,marginTop:1}}>
-                        <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:col,fontWeight:700}}>{badge}</span>
-                        <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)'}}>{rate}</span>
+                        <span style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:col,fontWeight:700}}>{badge}</span>
+                      </div>
+                      <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--muted)',marginTop:1}}>
+                        KM: <span style={{color:'var(--text)',fontWeight:600}}>{kmRate}</span>
+                        <span style={{marginLeft:4}}>All: {allRate}</span>
                       </div>
                     </div>
                     <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',
@@ -10308,15 +10363,15 @@ function CheatCodeButton() {
             ⚠️ The Sauce is a living model — signals, thresholds and weights are updated<br/>
             periodically as the season sample grows. Treat it as directional, not prescriptive.<br/>
             <span style={{color:'rgba(255,255,255,.25)',fontSize:7,marginTop:4,display:'block'}}>
-              ✱ Updated items reflect v2 analysis · 288 HRs · Last updated: May 9, 2026
+              ✱ v3 analysis · 1,231 HRs · 12,985 rows · Last updated: May 12, 2026
             </span>
           </div>
+
         </div>
       </div>
     </>}
   </>;
 }
-
 function BvPHistoryTab({ data }) {
   useHROdds();
   const picks = usePicks();
@@ -11856,28 +11911,32 @@ function MatchupEngineTab() {
           const _st  = parseFloat(b.sim_tb)||0;
           const _br  = parseFloat(b.recent_barrel_pct)||0;
           const _ev  = parseFloat(b.recent_avg_ev)||0;
-          const _bev = parseFloat(b.bvp_avg_ev)||0;
+          const _rla = parseFloat(b.recent_avg_la)||0;
           const _bla = parseFloat(b.bvp_avg_la)||0;
           const _bfb = parseFloat(b.bvp_fb_pct)||0;
           const _tmp = parseFloat(b.temp_f)||0;
           const _flg = parseInt(b.total_flags)||0;
-          const _pid    = b.pitcher_id?String(parseInt(b.pitcher_id)||b.pitcher_id):'';
-          const _pgLive = simPitcherGrades.current[_pid]||'';
-          const _hhPct  = parseFloat(b.pitcher_hh_pct_allowed)||0;
-          // Use live grade if loaded, else derive from hh% so score always has a value
-          const _pg = _pgLive || (_hhPct>=33?'🎯 Target':_hhPct>=27?'💥 Hittable':_hhPct>0&&_hhPct<=18?'‼️ Elite':'🤔 Average');
+          const _pid = b.pitcher_id?String(parseInt(b.pitcher_id)||b.pitcher_id):'';
+          const _pg  = simPitcherGrades.current[_pid]||'';
           let s = 0;
+          // SimTB: 3.0+ dead zone penalty
           if (_st>=2.5&&_st<3.0) s+=3; else if (_st>=2.0) s+=2; else if (_st>=1.5) s+=1;
+          if (_st>=3.0) s-=1;
           if (_pg==='🎯 Target') s+=2; else if (_pg==='💥 Hittable') s+=1; else if (_pg==='‼️ Elite') s-=2;
           if (_tmp>=70&&_tmp<=75) s+=2;
-          if (_br>=15) s+=2; else if (_br>=3&&_br<=6) s+=1;
-          if (_ev>=100) s+=2; else if (_ev>=96) s+=1;
-          if (_bev>=96&&_bev<100) s+=1;
-          if (_bla>=20&&_bla<=24) s+=1;
-          if (_bfb>=36&&_bfb<=45) s-=1;
-          if (_flg===7) s-=2;
+          // Barrel 3-6% sweet spot (v4 confirmed); 15%+ removed (fades to base)
+          if (_br>=3&&_br<=6) s+=1;
+          // EV: 95+ real; 102+ elite (v4 data)
+          if (_ev>=102) s+=2; else if (_ev>=95) s+=1;
+          // Recent LA 15-22° (v4 peak: 18-21°)
+          if (_rla>=15&&_rla<=22) s+=1;
+          // BvP LA 15-20° confirmed peak in v4 (18.7% HR rate, upgraded to +2)
+          if (_bla>=15&&_bla<=20) s+=2;
+          // BvP FB% tiered penalty (42-50% = 0% HR confirmed dead zone)
+          if (_bfb>=42) s-=2; else if (_bfb>=36) s-=1;
+          // Flags=7 dead zone; Flags=1 weakest signal
+          if (_flg===7) s-=2; else if (_flg===1) s-=1;
           return Math.max(0,s);
-          return _pg ? Math.max(0,s) : '';
         })(),
       ].map(esc).join(',');
     });
