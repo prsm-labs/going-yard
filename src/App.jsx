@@ -11861,8 +11861,11 @@ function MatchupEngineTab() {
           const _bfb = parseFloat(b.bvp_fb_pct)||0;
           const _tmp = parseFloat(b.temp_f)||0;
           const _flg = parseInt(b.total_flags)||0;
-          const _pid = b.pitcher_id?String(parseInt(b.pitcher_id)||b.pitcher_id):'';
-          const _pg  = simPitcherGrades.current[_pid]||'';
+          const _pid    = b.pitcher_id?String(parseInt(b.pitcher_id)||b.pitcher_id):'';
+          const _pgLive = simPitcherGrades.current[_pid]||'';
+          const _hhPct  = parseFloat(b.pitcher_hh_pct_allowed)||0;
+          // Use live grade if loaded, else derive from hh% so score always has a value
+          const _pg = _pgLive || (_hhPct>=33?'🎯 Target':_hhPct>=27?'💥 Hittable':_hhPct>0&&_hhPct<=18?'‼️ Elite':'🤔 Average');
           let s = 0;
           if (_st>=2.5&&_st<3.0) s+=3; else if (_st>=2.0) s+=2; else if (_st>=1.5) s+=1;
           if (_pg==='🎯 Target') s+=2; else if (_pg==='💥 Hittable') s+=1; else if (_pg==='‼️ Elite') s-=2;
@@ -11874,6 +11877,7 @@ function MatchupEngineTab() {
           if (_bfb>=36&&_bfb<=45) s-=1;
           if (_flg===7) s-=2;
           return Math.max(0,s);
+          return _pg ? Math.max(0,s) : '';
         })(),
       ].map(esc).join(',');
     });
