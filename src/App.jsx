@@ -8029,237 +8029,257 @@ function HRLeaderboardTab() {
   const [rows,    setRows]    = useState([]);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState(null);
-  const [sort,    setSort]    = useState({ col:'hrs', dir:-1 });
+  const [sort,    setSortCol] = useState('hrs');
+  const [sortDir, setSortDir] = useState(1);   // 1=desc (most first), matches HotBats convention
   const [search,  setSearch]  = useState('');
   const [teamFilter, setTeamFilter] = useState('ALL');
+  const [expPid,  setExpPid]  = useState(null);
   const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
   const SEASON_START = '2026-03-25';
+  const ABBR = {108:'LAA',109:'AZ',110:'BAL',111:'BOS',112:'CHC',113:'CIN',114:'CLE',115:'COL',116:'DET',117:'HOU',118:'KC',119:'LAD',120:'WSH',121:'NYM',133:'ATH',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',139:'TB',140:'TEX',141:'TOR',142:'MIN',143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL'};
 
   useEffect(() => {
-    fetch('/data/mlb_atbat_log_full.csv')
+    const season = new Date().getFullYear();
+
+    // ── Step 1: MLB leaders API → real season HR counts + resolved names ───
+    const leadersPromise = fetch(
+      `https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&season=${season}&sportId=1&limit=200`
+    ).then(r => r.json()).then(d => {
+      const leaders = d.leagueLeaders?.[0]?.leaders || [];
+      const map = {};
+      leaders.forEach(l => {
+        const pid = l.person?.id;
+        if (!pid) return;
+        map[pid] = {
+          pid,
+          name: l.person?.fullName || '',
+          team: ABBR[l.team?.id] || l.team?.abbreviation || '',
+          hrs:  parseInt(l.value || 0),
+          laser105: 0, laser110: 0, hh105: 0, hh110: 0,
+        };
+      });
+      return map;
+    });
+
+    // ── Step 2: atbat log → laser / hard-hit counts keyed by batter ID ────
+    const logPromise = fetch('/data/mlb_atbat_log_full.csv')
       .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text(); })
       .then(text => {
-        const parsed = parseCSVText(text).filter(r => (r['Date']||'') >= SEASON_START);
-
-        // Build per-batter maps — one pass
-        const map = {};
+        const evMap = {};  // pid → { laser105, laser110, hh105, hh110 }
+        const parsed = parseCSVText(text);
         parsed.forEach(r => {
-          const bid  = r['Batter'] || '';
-          const name = r['Batter'] || bid;   // resolved below via getCachedPlayer
-          const team = r['Batter Team'] || '';
+          const dateStr = r['Date'] || '';
+          // Normalise MM/DD/YYYY → YYYY-MM-DD for comparison
+          let cmp = dateStr;
+          if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateStr)) {
+            const [m,d,y] = dateStr.split('/');
+            cmp = `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+          }
+          if (cmp < SEASON_START) return;
+          const pid = parseInt(r['Batter'] || 0);
+          if (!pid) return;
           const ev   = parseFloat(r['Exit Velocity']) || 0;
           const isHR = parseInt(r['Is Home Run'] || 0) === 1;
-          const isHH = parseInt(r['Is Hard Hit']  || 0) === 1;
-          if (!bid) return;
-          if (!map[bid]) map[bid] = {
-            bid, team,
-            hrs:0,
-            laser105:0, laser110:0,   // HR + EV threshold
-            hh105:0,    hh110:0,      // any batted ball + EV threshold
-          };
-          const m = map[bid];
-          if (isHR)        { m.hrs++;
+          if (!evMap[pid]) evMap[pid] = { laser105:0, laser110:0, hh105:0, hh110:0 };
+          const m = evMap[pid];
+          if (isHR) {
             if (ev >= 105) m.laser105++;
             if (ev >= 110) m.laser110++;
           }
-          if (ev > 0) {
-            if (ev >= 105) m.hh105++;
-            if (ev >= 110) m.hh110++;
-          }
+          if (ev >= 105) m.hh105++;
+          if (ev >= 110) m.hh110++;
         });
+        return evMap;
+      });
 
-        // Resolve names from player cache; rank by HR desc
-        const out = Object.values(map)
-          .filter(m => m.hrs >= 1)
-          .map(m => ({
-            ...m,
-            name: getCachedPlayer(parseInt(m.bid))?.name || `#${m.bid}`,
-          }))
+    Promise.all([leadersPromise, logPromise])
+      .then(([leaderMap, evMap]) => {
+        const out = Object.values(leaderMap)
+          .filter(r => r.hrs >= 1)
+          .map(r => {
+            const ev = evMap[r.pid] || {};
+            return { ...r, laser105: ev.laser105||0, laser110: ev.laser110||0,
+                           hh105:    ev.hh105||0,    hh110:    ev.hh110||0 };
+          })
           .sort((a,b) => b.hrs - a.hrs)
-          .map((m, i) => ({ ...m, rank: i + 1 }));
-
+          .map((r,i) => ({ ...r, rank: i+1 }));
         setRows(out);
         setLoading(false);
       })
       .catch(e => { setError(e.message); setLoading(false); });
   }, []);
 
+  const hs = (col) => {
+    if (sort === col) setSortDir(d => -d);
+    else { setSortCol(col); setSortDir(1); }
+  };
+
   const teams = ['ALL', ...Array.from(new Set(rows.map(r=>r.team).filter(Boolean))).sort()];
 
   const sorted = [...rows]
     .filter(r => {
       if (teamFilter !== 'ALL' && r.team !== teamFilter) return false;
-      if (search && !r.name.toLowerCase().includes(search.toLowerCase()) &&
-                    !r.team.toLowerCase().includes(search.toLowerCase())) return false;
+      if (search) {
+        const q = search.toLowerCase();
+        if (!r.name.toLowerCase().includes(q) && !r.team.toLowerCase().includes(q)) return false;
+      }
       return true;
     })
-    .sort((a,b) => sort.dir * ((b[sort.col]||0) - (a[sort.col]||0)));
+    .sort((a,b) => sortDir * ((b[sort]||0) - (a[sort]||0)));
 
-  const Th = ({ col, label, tip, right=true }) => (
-    <th title={tip}
-      onClick={() => setSort(s => ({ col, dir: s.col===col ? -s.dir : -1 }))}
-      style={{ padding:'6px 8px', fontSize:8, fontFamily:mono,
-        textTransform:'uppercase', letterSpacing:.8, whiteSpace:'nowrap',
-        color: sort.col===col ? 'var(--accent2)' : 'var(--muted)',
-        cursor:'pointer', textAlign: right?'right':'left',
-        borderBottom:'2px solid var(--border)',
-        background:'var(--surface)' }}>
-      {label}{sort.col===col ? (sort.dir===-1?' ▼':' ▲') : ''}
+  const Th = ({col, label, tip}) => (
+    <th title={tip} onClick={() => hs(col)}
+      style={{padding:'5px 6px', fontSize:7, fontFamily:mono, textTransform:'uppercase',
+        letterSpacing:.6, whiteSpace:'nowrap', cursor:'pointer', textAlign:'right',
+        color: sort===col ? 'var(--accent2)' : 'var(--muted)',
+        borderBottom:'1px solid var(--border)', background:'var(--surface2)',
+        position:'sticky', top:0, zIndex:10}}>
+      {label}{sort===col ? (sortDir===1?' ▼':' ▲') : ''}
     </th>
   );
 
-  const evBadge = (n, thresh) => {
-    if (n === 0) return <span style={{color:'var(--muted)',fontFamily:mono,fontSize:10}}>—</span>;
-    const color = thresh >= 110 ? '#ff3010' : '#ff8020';
-    return <span style={{fontFamily:osw,fontWeight:700,fontSize:11,color}}>{n}</span>;
-  };
-
   if (loading) return (
-    <div style={{display:'flex',alignItems:'center',gap:10,padding:24,color:'var(--muted)',fontFamily:mono,fontSize:11}}>
-      <div className="sp"/> Loading season HR data…
+    <div style={{display:'flex',alignItems:'center',gap:8,padding:20,
+      color:'var(--muted)',fontFamily:mono,fontSize:11}}>
+      <div className="sp"/> Loading season HR leaderboard…
     </div>
   );
   if (error) return (
     <div style={{padding:20,color:'var(--accent)',fontFamily:mono,fontSize:11}}>
-      ⚠ {error}<br/>
-      <span style={{fontSize:9,color:'var(--muted)'}}>Make sure mlb_atbat_log_full.csv is in public/data/</span>
+      ⚠ {error}
     </div>
   );
 
   return (
-    <div style={{padding:'0 0 24px'}}>
-
-      {/* ── Legend ─────────────────────────────────────────────────────────── */}
-      <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:12,
-        padding:'8px 12px',background:'rgba(255,255,255,.03)',
-        borderRadius:7,border:'1px solid var(--border)'}}>
-        {[
-          ['💣 Laser 105+','HR where exit velo ≥ 105 mph','#ff8020'],
-          ['🔥 Laser 110+','HR where exit velo ≥ 110 mph','#ff3010'],
-          ['💪 HH 105+','Any batted ball ≥ 105 mph (not just HRs)','#38b8f2'],
-          ['⚡ HH 110+','Any batted ball ≥ 110 mph','#27c97a'],
-        ].map(([badge, tip, color]) => (
-          <div key={badge} title={tip}
-            style={{display:'flex',alignItems:'center',gap:5,cursor:'default'}}>
-            <span style={{fontFamily:osw,fontWeight:700,fontSize:10,color}}>{badge}</span>
-            <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>{tip}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* ── Filters ────────────────────────────────────────────────────────── */}
-      <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
+    <div>
+      {/* ── Filters ──────────────────────────────────────────────────────── */}
+      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10,flexWrap:'wrap'}}>
         <input value={search} onChange={e=>setSearch(e.target.value)}
           placeholder="Search batter or team…"
-          style={{padding:'5px 10px',borderRadius:6,border:'1px solid var(--border)',
-            background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:11,
-            outline:'none',minWidth:180}}/>
+          style={{padding:'3px 10px',borderRadius:6,border:'1px solid var(--border)',
+            background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:10,
+            outline:'none',minWidth:160}}/>
         <select value={teamFilter} onChange={e=>setTeamFilter(e.target.value)}
-          style={{padding:'5px 8px',borderRadius:6,border:'1px solid var(--border)',
-            background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:11,cursor:'pointer'}}>
-          {teams.map(t=><option key={t} value={t}>{t}</option>)}
+          style={{padding:'3px 8px',borderRadius:6,border:'1px solid var(--border)',
+            background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:10,cursor:'pointer'}}>
+          {teams.map(t=><option key={t} value={t}>{t==='ALL'?'All Teams':t}</option>)}
         </select>
-        <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginLeft:'auto'}}>
-          {sorted.length} batter{sorted.length!==1?'s':''} · season 2026
-        </span>
+        <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginLeft:'auto'}}>
+          {sorted.length} batters · 2026 season · tap row to expand
+        </div>
       </div>
 
-      {/* ── Table ──────────────────────────────────────────────────────────── */}
-      <div style={{overflowX:'auto',borderRadius:8,border:'1px solid var(--border)'}}>
-        <table style={{width:'100%',borderCollapse:'collapse',fontSize:11}}>
-          <thead>
-            <tr>
-              <Th col="rank"     label="#"            tip="Season rank by HRs"             right={false}/>
-              <Th col="name"     label="Batter"       tip="Batter name"                    right={false}/>
-              <Th col="team"     label="Team"         tip="Team"                           right={false}/>
-              <Th col="hrs"      label="HR"           tip="Total HRs this season"/>
-              <Th col="laser105" label="💣 105+"      tip="HRs hit at 105+ mph exit velo"/>
-              <Th col="laser110" label="🔥 110+"      tip="HRs hit at 110+ mph exit velo"/>
-              <Th col="hh105"    label="💪 HH 105+"   tip="All batted balls 105+ mph (not just HRs)"/>
-              <Th col="hh110"    label="⚡ HH 110+"   tip="All batted balls 110+ mph (not just HRs)"/>
-            </tr>
-          </thead>
+      {/* ── Table ────────────────────────────────────────────────────────── */}
+      <div className="tw">
+        <table style={{width:'100%'}}>
+          <thead><tr>
+            <th onClick={()=>hs('rank')}
+              style={{padding:'5px 6px',fontSize:7,fontFamily:mono,textTransform:'uppercase',
+                letterSpacing:.6,color:sort==='rank'?'var(--accent2)':'var(--muted)',cursor:'pointer',
+                textAlign:'left',whiteSpace:'nowrap',borderBottom:'1px solid var(--border)',
+                background:'var(--surface2)',position:'sticky',top:0,zIndex:10}}>
+              #{sort==='rank'?(sortDir===1?' ▼':' ▲'):''}
+            </th>
+            <th style={{padding:'5px 6px',fontSize:7,fontFamily:mono,textTransform:'uppercase',
+              letterSpacing:.6,color:'var(--muted)',textAlign:'left',whiteSpace:'nowrap',
+              borderBottom:'1px solid var(--border)',background:'var(--surface2)',
+              position:'sticky',top:0,zIndex:10}}>Batter</th>
+            <Th col="hrs"      label="💥 HR"     tip="Total home runs this season"/>
+            <Th col="laser105" label="💣 105+"   tip="HRs hit at 105+ mph exit velocity"/>
+            <Th col="laser110" label="🔥 110+"   tip="HRs hit at 110+ mph exit velocity"/>
+            <Th col="hh105"    label="💪 HH 105" tip="All batted balls 105+ mph (not just HRs)"/>
+            <Th col="hh110"    label="⚡ HH 110" tip="All batted balls 110+ mph (not just HRs)"/>
+          </tr></thead>
           <tbody>
-            {sorted.map((r, i) => {
-              const isKM = isKeyMatchup(parseInt(r.bid), r.name);
-              const rowBg = i%2===0 ? 'var(--surface)' : 'var(--surface2)';
-              const laserPct105 = r.hrs > 0 ? Math.round(100*r.laser105/r.hrs) : 0;
-              const laserPct110 = r.hrs > 0 ? Math.round(100*r.laser110/r.hrs) : 0;
-              return (
-                <tr key={r.bid} style={{background: isKM ? 'rgba(255,130,32,.07)' : rowBg,
-                  borderBottom:'1px solid rgba(255,255,255,.04)'}}>
-                  {/* Rank */}
-                  <td style={{padding:'7px 10px',fontFamily:mono,fontSize:9,
-                    color: r.rank<=3?'var(--accent2)':'var(--muted)',fontWeight:r.rank<=3?700:400,
-                    textAlign:'left',whiteSpace:'nowrap'}}>
-                    {r.rank<=3 ? ['🥇','🥈','🥉'][r.rank-1] : r.rank}
-                  </td>
-                  {/* Name */}
-                  <td style={{padding:'7px 10px',whiteSpace:'nowrap'}}>
-                    <span style={{fontFamily:osw,fontWeight:700,fontSize:12,
-                      color: isKM?'#ff8020':'var(--text)'}}>
+            {sorted.map(r => [
+              (<tr key={r.pid}
+                onClick={() => setExpPid(v => v===r.pid ? null : r.pid)}
+                style={{cursor:'pointer', height:28,
+                  borderBottom:'1px solid rgba(255,255,255,.04)',
+                  background: expPid===r.pid
+                    ? 'rgba(255,255,255,.04)'
+                    : isKeyMatchup(r.pid,r.name)
+                      ? 'rgba(255,130,32,.05)'
+                      : 'transparent'}}>
+                {/* Rank */}
+                <td style={{padding:'2px 6px',fontFamily:osw,fontWeight:700,fontSize:10,
+                  color:r.rank<=3?'var(--accent2)':'var(--muted)',whiteSpace:'nowrap'}}>
+                  {r.rank<=3 ? ['🥇','🥈','🥉'][r.rank-1] : r.rank}
+                </td>
+                {/* Batter — avatar + name + pick button, no wrap */}
+                <td style={{padding:'2px 5px',maxWidth:170}}>
+                  <div style={{display:'flex',alignItems:'center',gap:4,overflow:'hidden'}}>
+                    <PlayerAvatar pid={r.pid} name={r.name} size={16}/>
+                    <span style={{fontFamily:mono,fontSize:8,fontWeight:700,
+                      color:'var(--accent2)',whiteSpace:'nowrap',flexShrink:0}}>
+                      {r.team}
+                    </span>
+                    <span style={{fontFamily:osw,fontWeight:700,fontSize:10,
+                      color:isKeyMatchup(r.pid,r.name)?'#ff8020':'var(--text)',
+                      whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
                       {r.name}
                     </span>
-                    {isKM && <span style={{marginLeft:5,fontSize:8,color:'#ff8020',
-                      fontFamily:mono}}>★KM</span>}
-                  </td>
-                  {/* Team */}
-                  <td style={{padding:'7px 10px',fontFamily:mono,fontSize:10,
-                    color:'var(--muted)',textAlign:'left'}}>{r.team}</td>
-                  {/* Total HRs */}
-                  <td style={{padding:'7px 10px',textAlign:'right'}}>
-                    <span style={{fontFamily:osw,fontWeight:800,fontSize:14,
-                      color: r.hrs>=20?'var(--accent)':r.hrs>=10?'#f5a623':'var(--text)'}}>
-                      {r.hrs}
+                    <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}>
+                      <PickButton pid={r.pid} name={r.name} team={r.team}/>
                     </span>
-                  </td>
-                  {/* Laser 105+ */}
-                  <td style={{padding:'7px 10px',textAlign:'right'}}>
-                    <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:1}}>
-                      {evBadge(r.laser105, 105)}
-                      {r.laser105 > 0 && <span style={{fontFamily:mono,fontSize:7,
-                        color:'var(--muted)'}}>{laserPct105}% of HRs</span>}
-                    </div>
-                  </td>
-                  {/* Laser 110+ */}
-                  <td style={{padding:'7px 10px',textAlign:'right'}}>
-                    {evBadge(r.laser110, 110)}
-                  </td>
-                  {/* HH 105+ */}
-                  <td style={{padding:'7px 10px',textAlign:'right'}}>
-                    <span style={{fontFamily:osw,fontWeight:700,fontSize:11,
-                      color: r.hh105>=50?'#38b8f2':r.hh105>=25?'#27c97a':'var(--text)'}}>
-                      {r.hh105||'—'}
-                    </span>
-                  </td>
-                  {/* HH 110+ */}
-                  <td style={{padding:'7px 10px',textAlign:'right'}}>
-                    <span style={{fontFamily:osw,fontWeight:700,fontSize:11,
-                      color: r.hh110>=10?'#27c97a':'var(--text)'}}>
-                      {r.hh110||'—'}
-                    </span>
+                  </div>
+                </td>
+                {/* HR total */}
+                <td style={{padding:'2px 6px',textAlign:'right'}}>
+                  <span style={{fontFamily:osw,fontWeight:800,fontSize:13,
+                    color:r.hrs>=20?'var(--accent)':r.hrs>=12?'#f5a623':'var(--text)'}}>
+                    {r.hrs}
+                  </span>
+                </td>
+                {/* Laser 105+ */}
+                <td style={{padding:'2px 6px',textAlign:'right'}}>
+                  <span style={{fontFamily:osw,fontWeight:700,fontSize:11,
+                    color:r.laser105>0?'#ff8020':'var(--muted)'}}>
+                    {r.laser105||'—'}
+                  </span>
+                </td>
+                {/* Laser 110+ */}
+                <td style={{padding:'2px 6px',textAlign:'right'}}>
+                  <span style={{fontFamily:osw,fontWeight:700,fontSize:11,
+                    color:r.laser110>0?'#ff3010':'var(--muted)'}}>
+                    {r.laser110||'—'}
+                  </span>
+                </td>
+                {/* HH 105+ */}
+                <td style={{padding:'2px 6px',textAlign:'right'}}>
+                  <span style={{fontFamily:osw,fontWeight:700,fontSize:11,
+                    color:r.hh105>=40?'#38b8f2':r.hh105>=20?'#27c97a':'var(--text)'}}>
+                    {r.hh105||'—'}
+                  </span>
+                </td>
+                {/* HH 110+ */}
+                <td style={{padding:'2px 6px',textAlign:'right'}}>
+                  <span style={{fontFamily:osw,fontWeight:700,fontSize:11,
+                    color:r.hh110>=8?'#27c97a':'var(--text)'}}>
+                    {r.hh110||'—'}
+                  </span>
+                </td>
+              </tr>),
+              expPid===r.pid && (
+                <tr key={r.pid+'x'}>
+                  <td colSpan={7} style={{padding:'0 10px 10px',
+                    background:'rgba(255,255,255,.02)'}}>
+                    <Last7HRChart batterId={r.pid}/>
+                    <RecentGameLog batterId={r.pid}/>
                   </td>
                 </tr>
-              );
-            })}
+              )
+            ])}
           </tbody>
         </table>
       </div>
 
-      {sorted.length === 0 && !loading && (
-        <div style={{padding:24,textAlign:'center',fontFamily:mono,fontSize:11,color:'var(--muted)'}}>
-          No batters match that filter.
-        </div>
-      )}
-
-      <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:10,lineHeight:1.6}}>
-        ✱ Data from mlb_atbat_log_full.csv · season from {SEASON_START} · ★KM = today's Key Matchup batter
-        <br/>Laser = HR with EV at or above threshold · HH = any batted ball at or above threshold
+      <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:8,lineHeight:1.6}}>
+        HR = MLB official season total · 💣🔥 Laser = HR at EV threshold · 💪⚡ HH = any batted ball at EV threshold · ★KM = today's key matchup
       </div>
     </div>
   );
 }
-
 function HotBatsTab() {
   const [rows, setRows]     = useState([]);
   const [loading, setLoading] = useState(true);
