@@ -7850,7 +7850,7 @@ function HRTrackerTab() {
 
   const HRNav = () => (
     <div style={{display:'flex',gap:6,marginBottom:14}}>
-      {[['tracker','💥 HR Tracker'],['hotbats','🔥 Hot Bats'],['heatingup','📈 Heating Up']].map(([key,label]) => (
+      {[['tracker','💥 HR Tracker'],['hotbats','🔥 Hot Bats'],['heatingup','📈 Heating Up'],['leaderboard','🏆 HR Leaders']].map(([key,label]) => (
         <button key={key} onClick={() => setHrTab(key)}
           style={{padding:'5px 12px',borderRadius:7,cursor:'pointer',
             fontFamily:"'DM Mono',monospace",fontWeight:hrTab===key?700:400,fontSize:10,
@@ -7862,8 +7862,9 @@ function HRTrackerTab() {
       ))}
     </div>
   );
-  if (hrTab === 'hotbats')   return <div><HRNav/><HotBatsTab/></div>;
-  if (hrTab === 'heatingup') return <div><HRNav/><HeatingUpTab/></div>;
+  if (hrTab === 'hotbats')     return <div><HRNav/><HotBatsTab/></div>;
+  if (hrTab === 'heatingup')   return <div><HRNav/><HeatingUpTab/></div>;
+  if (hrTab === 'leaderboard') return <div><HRNav/><HRLeaderboardTab/></div>;
   return <div>
     <HRNav/>
     <div className="hrow">
@@ -8023,6 +8024,242 @@ function HRTrackerTab() {
 
 
 // Batters who made HR-quality contact in last 7 days but got nothing — reads from mlb_atbat_log_last7.csv
+// ── HR Season Leaderboard ─────────────────────────────────────────────────────
+function HRLeaderboardTab() {
+  const [rows,    setRows]    = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState(null);
+  const [sort,    setSort]    = useState({ col:'hrs', dir:-1 });
+  const [search,  setSearch]  = useState('');
+  const [teamFilter, setTeamFilter] = useState('ALL');
+  const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
+  const SEASON_START = '2026-03-25';
+
+  useEffect(() => {
+    fetch('/data/mlb_atbat_log_full.csv')
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text(); })
+      .then(text => {
+        const parsed = parseCSVText(text).filter(r => (r['Date']||'') >= SEASON_START);
+
+        // Build per-batter maps — one pass
+        const map = {};
+        parsed.forEach(r => {
+          const bid  = r['Batter'] || '';
+          const name = r['Batter'] || bid;   // resolved below via getCachedPlayer
+          const team = r['Batter Team'] || '';
+          const ev   = parseFloat(r['Exit Velocity']) || 0;
+          const isHR = parseInt(r['Is Home Run'] || 0) === 1;
+          const isHH = parseInt(r['Is Hard Hit']  || 0) === 1;
+          if (!bid) return;
+          if (!map[bid]) map[bid] = {
+            bid, team,
+            hrs:0,
+            laser105:0, laser110:0,   // HR + EV threshold
+            hh105:0,    hh110:0,      // any batted ball + EV threshold
+          };
+          const m = map[bid];
+          if (isHR)        { m.hrs++;
+            if (ev >= 105) m.laser105++;
+            if (ev >= 110) m.laser110++;
+          }
+          if (ev > 0) {
+            if (ev >= 105) m.hh105++;
+            if (ev >= 110) m.hh110++;
+          }
+        });
+
+        // Resolve names from player cache; rank by HR desc
+        const out = Object.values(map)
+          .filter(m => m.hrs >= 1)
+          .map(m => ({
+            ...m,
+            name: getCachedPlayer(parseInt(m.bid))?.name || `#${m.bid}`,
+          }))
+          .sort((a,b) => b.hrs - a.hrs)
+          .map((m, i) => ({ ...m, rank: i + 1 }));
+
+        setRows(out);
+        setLoading(false);
+      })
+      .catch(e => { setError(e.message); setLoading(false); });
+  }, []);
+
+  const teams = ['ALL', ...Array.from(new Set(rows.map(r=>r.team).filter(Boolean))).sort()];
+
+  const sorted = [...rows]
+    .filter(r => {
+      if (teamFilter !== 'ALL' && r.team !== teamFilter) return false;
+      if (search && !r.name.toLowerCase().includes(search.toLowerCase()) &&
+                    !r.team.toLowerCase().includes(search.toLowerCase())) return false;
+      return true;
+    })
+    .sort((a,b) => sort.dir * ((b[sort.col]||0) - (a[sort.col]||0)));
+
+  const Th = ({ col, label, tip, right=true }) => (
+    <th title={tip}
+      onClick={() => setSort(s => ({ col, dir: s.col===col ? -s.dir : -1 }))}
+      style={{ padding:'6px 8px', fontSize:8, fontFamily:mono,
+        textTransform:'uppercase', letterSpacing:.8, whiteSpace:'nowrap',
+        color: sort.col===col ? 'var(--accent2)' : 'var(--muted)',
+        cursor:'pointer', textAlign: right?'right':'left',
+        borderBottom:'2px solid var(--border)',
+        background:'var(--surface)' }}>
+      {label}{sort.col===col ? (sort.dir===-1?' ▼':' ▲') : ''}
+    </th>
+  );
+
+  const evBadge = (n, thresh) => {
+    if (n === 0) return <span style={{color:'var(--muted)',fontFamily:mono,fontSize:10}}>—</span>;
+    const color = thresh >= 110 ? '#ff3010' : '#ff8020';
+    return <span style={{fontFamily:osw,fontWeight:700,fontSize:11,color}}>{n}</span>;
+  };
+
+  if (loading) return (
+    <div style={{display:'flex',alignItems:'center',gap:10,padding:24,color:'var(--muted)',fontFamily:mono,fontSize:11}}>
+      <div className="sp"/> Loading season HR data…
+    </div>
+  );
+  if (error) return (
+    <div style={{padding:20,color:'var(--accent)',fontFamily:mono,fontSize:11}}>
+      ⚠ {error}<br/>
+      <span style={{fontSize:9,color:'var(--muted)'}}>Make sure mlb_atbat_log_full.csv is in public/data/</span>
+    </div>
+  );
+
+  return (
+    <div style={{padding:'0 0 24px'}}>
+
+      {/* ── Legend ─────────────────────────────────────────────────────────── */}
+      <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:12,
+        padding:'8px 12px',background:'rgba(255,255,255,.03)',
+        borderRadius:7,border:'1px solid var(--border)'}}>
+        {[
+          ['💣 Laser 105+','HR where exit velo ≥ 105 mph','#ff8020'],
+          ['🔥 Laser 110+','HR where exit velo ≥ 110 mph','#ff3010'],
+          ['💪 HH 105+','Any batted ball ≥ 105 mph (not just HRs)','#38b8f2'],
+          ['⚡ HH 110+','Any batted ball ≥ 110 mph','#27c97a'],
+        ].map(([badge, tip, color]) => (
+          <div key={badge} title={tip}
+            style={{display:'flex',alignItems:'center',gap:5,cursor:'default'}}>
+            <span style={{fontFamily:osw,fontWeight:700,fontSize:10,color}}>{badge}</span>
+            <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>{tip}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Filters ────────────────────────────────────────────────────────── */}
+      <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
+        <input value={search} onChange={e=>setSearch(e.target.value)}
+          placeholder="Search batter or team…"
+          style={{padding:'5px 10px',borderRadius:6,border:'1px solid var(--border)',
+            background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:11,
+            outline:'none',minWidth:180}}/>
+        <select value={teamFilter} onChange={e=>setTeamFilter(e.target.value)}
+          style={{padding:'5px 8px',borderRadius:6,border:'1px solid var(--border)',
+            background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:11,cursor:'pointer'}}>
+          {teams.map(t=><option key={t} value={t}>{t}</option>)}
+        </select>
+        <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginLeft:'auto'}}>
+          {sorted.length} batter{sorted.length!==1?'s':''} · season 2026
+        </span>
+      </div>
+
+      {/* ── Table ──────────────────────────────────────────────────────────── */}
+      <div style={{overflowX:'auto',borderRadius:8,border:'1px solid var(--border)'}}>
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:11}}>
+          <thead>
+            <tr>
+              <Th col="rank"     label="#"            tip="Season rank by HRs"             right={false}/>
+              <Th col="name"     label="Batter"       tip="Batter name"                    right={false}/>
+              <Th col="team"     label="Team"         tip="Team"                           right={false}/>
+              <Th col="hrs"      label="HR"           tip="Total HRs this season"/>
+              <Th col="laser105" label="💣 105+"      tip="HRs hit at 105+ mph exit velo"/>
+              <Th col="laser110" label="🔥 110+"      tip="HRs hit at 110+ mph exit velo"/>
+              <Th col="hh105"    label="💪 HH 105+"   tip="All batted balls 105+ mph (not just HRs)"/>
+              <Th col="hh110"    label="⚡ HH 110+"   tip="All batted balls 110+ mph (not just HRs)"/>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((r, i) => {
+              const isKM = isKeyMatchup(parseInt(r.bid), r.name);
+              const rowBg = i%2===0 ? 'var(--surface)' : 'var(--surface2)';
+              const laserPct105 = r.hrs > 0 ? Math.round(100*r.laser105/r.hrs) : 0;
+              const laserPct110 = r.hrs > 0 ? Math.round(100*r.laser110/r.hrs) : 0;
+              return (
+                <tr key={r.bid} style={{background: isKM ? 'rgba(255,130,32,.07)' : rowBg,
+                  borderBottom:'1px solid rgba(255,255,255,.04)'}}>
+                  {/* Rank */}
+                  <td style={{padding:'7px 10px',fontFamily:mono,fontSize:9,
+                    color: r.rank<=3?'var(--accent2)':'var(--muted)',fontWeight:r.rank<=3?700:400,
+                    textAlign:'left',whiteSpace:'nowrap'}}>
+                    {r.rank<=3 ? ['🥇','🥈','🥉'][r.rank-1] : r.rank}
+                  </td>
+                  {/* Name */}
+                  <td style={{padding:'7px 10px',whiteSpace:'nowrap'}}>
+                    <span style={{fontFamily:osw,fontWeight:700,fontSize:12,
+                      color: isKM?'#ff8020':'var(--text)'}}>
+                      {r.name}
+                    </span>
+                    {isKM && <span style={{marginLeft:5,fontSize:8,color:'#ff8020',
+                      fontFamily:mono}}>★KM</span>}
+                  </td>
+                  {/* Team */}
+                  <td style={{padding:'7px 10px',fontFamily:mono,fontSize:10,
+                    color:'var(--muted)',textAlign:'left'}}>{r.team}</td>
+                  {/* Total HRs */}
+                  <td style={{padding:'7px 10px',textAlign:'right'}}>
+                    <span style={{fontFamily:osw,fontWeight:800,fontSize:14,
+                      color: r.hrs>=20?'var(--accent)':r.hrs>=10?'#f5a623':'var(--text)'}}>
+                      {r.hrs}
+                    </span>
+                  </td>
+                  {/* Laser 105+ */}
+                  <td style={{padding:'7px 10px',textAlign:'right'}}>
+                    <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:1}}>
+                      {evBadge(r.laser105, 105)}
+                      {r.laser105 > 0 && <span style={{fontFamily:mono,fontSize:7,
+                        color:'var(--muted)'}}>{laserPct105}% of HRs</span>}
+                    </div>
+                  </td>
+                  {/* Laser 110+ */}
+                  <td style={{padding:'7px 10px',textAlign:'right'}}>
+                    {evBadge(r.laser110, 110)}
+                  </td>
+                  {/* HH 105+ */}
+                  <td style={{padding:'7px 10px',textAlign:'right'}}>
+                    <span style={{fontFamily:osw,fontWeight:700,fontSize:11,
+                      color: r.hh105>=50?'#38b8f2':r.hh105>=25?'#27c97a':'var(--text)'}}>
+                      {r.hh105||'—'}
+                    </span>
+                  </td>
+                  {/* HH 110+ */}
+                  <td style={{padding:'7px 10px',textAlign:'right'}}>
+                    <span style={{fontFamily:osw,fontWeight:700,fontSize:11,
+                      color: r.hh110>=10?'#27c97a':'var(--text)'}}>
+                      {r.hh110||'—'}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {sorted.length === 0 && !loading && (
+        <div style={{padding:24,textAlign:'center',fontFamily:mono,fontSize:11,color:'var(--muted)'}}>
+          No batters match that filter.
+        </div>
+      )}
+
+      <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:10,lineHeight:1.6}}>
+        ✱ Data from mlb_atbat_log_full.csv · season from {SEASON_START} · ★KM = today's Key Matchup batter
+        <br/>Laser = HR with EV at or above threshold · HH = any batted ball at or above threshold
+      </div>
+    </div>
+  );
+}
+
 function HotBatsTab() {
   const [rows, setRows]     = useState([]);
   const [loading, setLoading] = useState(true);
