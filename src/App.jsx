@@ -7572,8 +7572,9 @@ let _notifyNew = null; // set by useNotifications
 let _notifLog  = [];   // all notification history
 let _setNotifLog = null;
 
-// Track multi-HR games for On Fire detection
-const GAME_HR_MAP = {}; // 'gamePk_batterId' → count
+// Track which batter-game combos have already fired an On Fire notification
+// Keyed 'gamePk_batterId' — fires when getLHL returns cls==='elite' (score ≥ 8)
+const LIVE_FIRE_SENT = new Set();
 
 // Track which teams have already fired lineup notifications
 const LINEUP_NOTIF_SENT = new Set();
@@ -14222,24 +14223,69 @@ function useHRNotifications() {
       sendLivePush(`💥 ${hrLabel} — ${notif.batterName}`,
         `${notif.batterTeam} · ${notif.exitVelo > 0 ? notif.exitVelo.toFixed(0)+'mph' : ''} ${notif.distance > 0 ? notif.distance+'ft' : ''}`.trim(),
         hrDedupKey);
-      // On Fire detection — same batter hits 2nd HR in same game
-      if (hr.gamePk && hr.batterId) {
-        const key = `${hr.gamePk}_${hr.batterId}`;
-        GAME_HR_MAP[key] = (GAME_HR_MAP[key] || 0) + 1;
-        if (GAME_HR_MAP[key] === 2 && _setQueue) {
-          const fireNotif = { id: Date.now()+Math.random(), notifType:'onFire',
-            batterName: hr.batterName||'Unknown', batterTeam: hr.batterTeam||'',
-            batterId: hr.batterId, subtitle: `${GAME_HR_MAP[key]} HRs this game!`,
-            time: notif.time };
-          _setQueue(q => [...q.slice(-2), fireNotif]);
-          _notifLog = [fireNotif, ..._notifLog].slice(0, 50);
-          if (_setNotifLog) _setNotifLog([..._notifLog]);
-          sendLivePush(`🔥 ON FIRE — ${hr.batterName}`,
-            `${GAME_HR_MAP[key]} home runs this game! ${hr.batterTeam}`);
-        }
-      }
     };
-    return () => { _setQueue = null; }; // keep _notifyNewHR alive — avoids missed HRs during remounts
+
+    // ── Live heat polling — On Fire when getLHL hits cls==='elite' ──────────
+    // Runs every 60s independently of the HR feed.
+    // Fires onFire notification the first time a batter reaches score ≥ 8
+    // (elite EV + good LA + multiple hard hits in this game), not on 2nd HR.
+    const checkLiveHeat = async () => {
+      try {
+        const etDate = new Date().toLocaleDateString('en-US',
+          {timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'});
+        const [m,d,y] = etDate.split('/');
+        const dateStr = `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+        const sched = await fetch(
+          `https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${dateStr}&hydrate=linescore`);
+        const schedData = await sched.json();
+        const liveGamePks = (schedData.dates?.[0]?.games || [])
+          .filter(g => g.status?.abstractGameState === 'Live')
+          .map(g => g.gamePk);
+        for (const gamePk of liveGamePks) {
+          const result = await fetchLiveBatters(gamePk).catch(() => null);
+          const batters = result?.batters || result || [];
+          batters.forEach(b => {
+            if (!b.id || !gamePk) return;
+            const fireKey = `${gamePk}_${b.id}`;
+            // Only fire once per batter per game, and only when heatLabel hits elite
+            if (b.heatLabel?.cls === 'elite' && !LIVE_FIRE_SENT.has(fireKey) && _setQueue) {
+              LIVE_FIRE_SENT.add(fireKey);
+              const evStr  = b.avgEV   > 0 ? `${b.avgEV.toFixed(0)}mph avg EV` : '';
+              const hhStr  = (b.hardHits||0) > 0
+                ? `${b.hardHits} hard hit${b.hardHits!==1?'s':''} today` : '';
+              const subtitle = [evStr, hhStr].filter(Boolean).join(' · ');
+              const fireNotif = {
+                id:         Date.now() + Math.random(),
+                notifType:  'onFire',
+                batterName: b.name  || 'Unknown',
+                batterTeam: b.team  || '',
+                batterId:   b.id,
+                subtitle,
+                time: new Date().toLocaleTimeString('en-US',
+                  {hour:'numeric',minute:'2-digit',timeZone:'America/New_York'}),
+              };
+              _setQueue(q => [...q.slice(-2), fireNotif]);
+              _notifLog = [fireNotif, ..._notifLog].slice(0, 50);
+              if (_setNotifLog) _setNotifLog([..._notifLog]);
+              sendLivePush(
+                `🔥 ON FIRE — ${b.name || 'Unknown'}`,
+                `${b.team || ''} · ${subtitle}`.replace(/^·\s*/,'').trim(),
+                `onfire-${gamePk}-${b.id}`  // dedup key — won't re-send same batter
+              );
+            }
+          });
+        }
+      } catch(e) { /* silent — polling, not critical */ }
+    };
+
+    // Start polling immediately then every 60s
+    checkLiveHeat();
+    const heatPoll = setInterval(checkLiveHeat, 60000);
+
+    return () => {
+      _setQueue = null;
+      clearInterval(heatPoll);
+    }; // keep _notifyNewHR alive across remounts
   }, []);
   const dismiss = (id) => setQueue(q => q.filter(n => n.id !== id));
   return { queue, dismiss };
