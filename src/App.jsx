@@ -9202,7 +9202,7 @@ function SimLabView({ data }) {
   useEffect(() => { const unsub = subscribeLineup(v => setLineupVer(v)); return unsub; }, []);
   const [view, setView]             = useState('slate');    // 'slate' | 'deepdive' | 'props'
   const [selBatter, setSelBatter]   = useState(null);
-  const [sortBy, setSortBy]         = useState('proj_hr_adj');
+  const [sortBy, setSortBy]         = useState('_trackerSig');
   const [sortDir, setSortDir]       = useState('desc');
   const [selMatchups, setSelMatchups] = useState(new Set()); // empty = all matchups
   const [showMatchupDrop, setShowMatchupDrop] = useState(false);
@@ -9217,7 +9217,7 @@ function SimLabView({ data }) {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [showMatchupDrop]);
-  const [sortProp, setSortProp]     = useState('proj_hit_prob');
+  const [sortProp, setSortProp]     = useState('_trackerSig');
   const [sortPropDir, setSortPropDir] = useState('desc');
   const [lineupOnly, setLineupOnly]   = useState(false);
   const [filterGoneYardSim, setFilterGoneYardSim] = useState(false);
@@ -10124,6 +10124,7 @@ function SimLabView({ data }) {
                     { label: 'Batter',    key: null,             align: 'left'   },
                     { label: 'Team',      key: null,             align: 'center' },
                     { label: 'vs',        key: null,             align: 'left'   },
+                    { label: '⚡ Sig',    key: '_trackerSig',    align: 'center' },
                     { label: 'HR >0.5',   key: 'proj_hr_adj',    align: 'center' },
                     { label: 'H >0.5',    key: 'proj_hit_prob',  align: 'center' },
                     { label: 'H >1.5',    key: 'proj_hit_prob',  align: 'center' },
@@ -10190,6 +10191,14 @@ function SimLabView({ data }) {
                         </td>
                         <td><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--accent2)', fontWeight: 700 }}>{b.batting_team}</span></td>
                         <td style={{ textAlign: 'left' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)' }}>{b.pitcher}</span></td>
+                        <td style={{textAlign:'center'}}>
+                          <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',
+                            width:22,height:18,borderRadius:4,fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:11,
+                            background:b._trackerSig>=10?'rgba(255,64,32,.25)':b._trackerSig>=7?'rgba(245,166,35,.2)':b._trackerSig>=4?'rgba(39,201,122,.15)':'rgba(255,255,255,.05)',
+                            color:b._trackerSig>=10?'#ff4020':b._trackerSig>=7?'#f5a623':b._trackerSig>=4?'#27c97a':'var(--muted)'}}>
+                            {b._trackerSig||'—'}
+                          </span>
+                        </td>
                         <Cell pass={hrP  >= 0.05}  val={`${(hrP*100).toFixed(1)}%`} />
                         <Cell pass={hitP >= 0.28}  val={`${(hitP*100).toFixed(1)}%`} />
                         <Cell pass={hitP >= 0.55}  val={`${(hitP*100).toFixed(1)}%`} />
@@ -14864,6 +14873,7 @@ export default function App() {
     {key:"weather",   label:"🌤️ Weather"},
     {key:"powerbi",   label:"📊 Data"},
     {key:"picks",     label:"🎯 My Picks"},
+    {key:"livesports",label:"📺 Live Sports",external:"https://thetvapp.to"},
     {key:"_sep3",     label:"|", sep:true},
     {key:"statcast",  label:"📡 Statcast"},
     {key:"mlbscores",  label:"⚾ MLB"},
@@ -14871,7 +14881,6 @@ export default function App() {
     {key:"doink",     label:"👾 DOINK"},
     {key:"_sep4",     label:"|", sep:true},
     {key:"linemate",  label:"📊 Linemate",  external:"https://linemate.io/mlb"},
-    {key:"livesports",label:"📺 Live Sports",external:"https://thetvapp.to"},
     {key:"gambly",    label:"🤖 Gambly Bot", external:"https://gambly.com"},
     {key:"_sep5",     label:"|", sep:true},
     {key:"getapp",    label:"📲 Get App"},
