@@ -8984,6 +8984,13 @@ function LongShotView({ data }) {
       if (_abSince > 30)                 _sig -= 1;
       // Sinker-heavy pitcher: lowest HR rate of any pitch type
       if (_topP.startsWith('SI'))        _sig -= 1;
+      // Barrel quality tier (EV-weighted, 430k data: 107+=96.4% HR, 103-107=75.9%, 98-103=37.5%)
+      const _brlQ = parseInt(b.barrel_quality_score)||0;
+      const _barrelv = parseFloat(b.recent_barrel_pct)||0;
+      if (_brlQ >= 3)                    _sig += 3;
+      else if (_brlQ >= 2)               _sig += 2;
+      else if (_brlQ >= 1)               _sig += 1;
+      else if (_barrelv >= 3 && _barrelv <= 6) _sig += 1; // fallback
       // Flags
       if (_flags === 7)                  _sig -= 2;
       else if (_flags === 1)             _sig -= 1;
@@ -9703,12 +9710,7 @@ function SimLabView({ data }) {
                   else if (_brlQv >= 2)                  _trackerSig += 2;  // 103-107 barrel — 76% HR
                   else if (_brlQv >= 1)                  _trackerSig += 1;  // 98-103 barrel — 37% HR
                   // Fallback: raw barrel 3-6% sweet spot if quality score unavailable
-      // Barrel quality tier (EV-weighted, 430k data)
-      const _brlQ = parseInt(b.barrel_quality_score)||0;
-      if (_brlQ >= 3)                       _sig += 3;
-      else if (_brlQ >= 2)                  _sig += 2;
-      else if (_brlQ >= 1)                  _sig += 1;
-      else if (_barrelv >= 3 && _barrelv <= 6) _sig += 1;
+                  else if (_barrelv >= 3 && _barrelv <= 6) _trackerSig += 1;
                   // Recent FB%: monotonic lift — 35%+ = +2, 25-35% = +1 (atbat log: 45%+ = 14.6%)
                   if (_recFBv >= 35)                     _trackerSig += 2;
                   else if (_recFBv >= 25)                _trackerSig += 1;
