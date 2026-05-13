@@ -7925,7 +7925,11 @@ function HRTrackerTab() {
     </div>
 
     {/* Search + Team filter */}
-    <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:10,flexWrap:"wrap"}}>
+    <div style={{display:"flex",gap:6,marginBottom:4,alignItems:"center"}}>
+        <HandFilter mode="batter" value={bvpBatterHand} onChange={setBvpBatterHand}/>
+        <HandFilter mode="pitcher" value={bvpPitcherHand} onChange={setBvpPitcherHand}/>
+      </div>
+      <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:10,flexWrap:"wrap"}}>
       <SearchBar value={hrSearch} onChange={setHrSearch} placeholder="Search batter or pitcher…"/>
       {teams.length > 0 && <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}>
         <span style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1}}>Team:</span>
@@ -8152,6 +8156,7 @@ function HRLeaderboardTab() {
                     <span style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'var(--accent2)',whiteSpace:'nowrap',flexShrink:0}}>{r.team}</span>
                     <span style={{fontFamily:osw,fontWeight:700,fontSize:10,color:isKeyMatchup(r.pid,r.name)?'#ff8020':'var(--text)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.name}</span>
                     <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={r.pid} name={r.name} team={r.team}/></span>
+                  <FormBadge formKey={r._formClass}/>
                   </div>
                 </td>
                 <td style={{padding:'2px 6px',textAlign:'right'}}>
@@ -8897,6 +8902,174 @@ function PitcherCard({ pitcherId, pitcherName, onGrade }) {
 // ── BATTER LEADERBOARD ─────────────────────────────────────────
 // ── SIM LAB ────────────────────────────────────────────────────
 // ── Long Shot View ────────────────────────────────────────────────────────────
+// ── Reusable handedness filter — batter or pitcher ───────────────────────────
+// mode: 'batter' | 'pitcher'
+// value: 'ALL' | 'R' | 'L' | 'S'  (S = switch; switch batters appear under both R and L)
+// Switch hitters (S) appear when R or L is selected (in addition to pure R/L batters)
+function HandFilter({ mode, value, onChange }) {
+  const mono = "'DM Mono',monospace";
+  const label = mode === 'batter' ? 'Batter' : 'Pitcher';
+  const opts = mode === 'batter'
+    ? [['ALL','All'],['R','RHB'],['L','LHB']]
+    : [['ALL','All'],['R','RHP'],['L','LHP']];
+  return (
+    <div style={{display:'flex',alignItems:'center',gap:4,flexShrink:0}}>
+      <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.6}}>{label}</span>
+      {opts.map(([key,lbl]) => (
+        <button key={key} onClick={()=>onChange(key)}
+          style={{padding:'2px 7px',borderRadius:5,border:`1px solid ${value===key?'var(--accent2)':'var(--border)'}`,
+            background:value===key?'rgba(56,184,242,.15)':'transparent',
+            color:value===key?'var(--accent2)':'var(--muted)',
+            fontFamily:mono,fontSize:9,fontWeight:value===key?700:400,cursor:'pointer',
+            transition:'all .15s'}}>
+          {lbl}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Helper: does a row match the handedness filter?
+// Switch hitters (hand==='S') match both R and L selections
+function matchesHandFilter(hand, filter) {
+  if (!filter || filter === 'ALL') return true;
+  if (!hand) return true;
+  const h = hand.toUpperCase();
+  if (h === 'S') return true; // switch → always include
+  return h === filter;
+}
+
+// ── Recent Form Class — automatic category tagging from L7 stats ─────────────
+// Priority order: Moonshot > Cold > Whiff > Worm > Gap > Contact > null
+// A batter gets exactly ONE class (highest priority trigger wins)
+const FORM_CLASSES = {
+  'moonshot': { label:'🌙 Moonshot Mafia', short:'🌙 Moonshot', color:'#ff8020', bg:'rgba(255,128,32,.15)', border:'rgba(255,128,32,.35)', desc:'Multiple HRs + elevated angle in L7' },
+  'cold':     { label:'🥶 Cold Bat',       short:'🥶 Cold',     color:'#38b8f2', bg:'rgba(56,184,242,.12)', border:'rgba(56,184,242,.3)',  desc:'Weak contact, low EV or bat speed in L7' },
+  'whiff':    { label:'💨 Whiff King',     short:'💨 Whiff',    color:'#f5a623', bg:'rgba(245,166,35,.12)', border:'rgba(245,166,35,.3)',  desc:'High strikeout rate in L7' },
+  'worm':     { label:'🪱 Worm Burner',    short:'🪱 Worm',     color:'#a78bfa', bg:'rgba(167,139,250,.12)',border:'rgba(167,139,250,.3)', desc:'Heavy ground-ball pattern in L7' },
+  'gap':      { label:'🎯 Gap Sniper',     short:'🎯 Gap',      color:'#27c97a', bg:'rgba(39,201,122,.12)', border:'rgba(39,201,122,.3)',  desc:'High XBH/doubles rate in L7' },
+  'contact':  { label:'🎩 Contact King',   short:'🎩 Contact',  color:'#e2e8f0', bg:'rgba(226,232,240,.08)',border:'rgba(226,232,240,.2)', desc:'High avg, low K%, solid hard contact in L7' },
+};
+
+function getFormClass(b) {
+  const hr    = parseInt(b.recent_hr_count)    || 0;
+  const la    = parseFloat(b.recent_avg_la)    || 0;
+  const ev    = parseFloat(b.recent_avg_ev)    || 0;
+  const hh    = parseFloat(b.recent_hh_pct)    || 0;
+  const bs    = parseFloat(b.recent_avg_bat_speed) || 0;
+  const gb    = parseFloat(b.recent_gb_pct)    || 0;
+  const fb    = parseFloat(b.recent_fb_pct)    || 0;
+  const kpct  = parseFloat(b.recent_k_pct)     || 0;
+  const xbh   = parseFloat(b.recent_xbh_rate)  || 0;
+  const brl   = parseFloat(b.recent_barrel_pct)|| 0;
+  const pbrl  = parseFloat(b.recent_pulled_barrel_pct) || 0;
+  const hit   = parseFloat(b.recent_hit_rate)  || 0;
+  const popup = parseFloat(b.recent_popup_pct) || 0;
+  const pa    = parseInt(b.recent_pa)          || 0;
+  if (pa < 5) return null; // not enough L7 data
+
+  // 1. Moonshot Mafia — hitting HRs with elevation
+  if (hr >= 2 && (la >= 18 || fb >= 30 || brl >= 5)) return 'moonshot';
+  // Single HR but elite angle + pull power
+  if (hr >= 1 && la >= 22 && ev >= 97 && pbrl >= 3) return 'moonshot';
+
+  // 2. Cold Bat — multiple weakness signals
+  const coldSignals = [ev > 0 && ev < 87, hh > 0 && hh < 27, bs > 0 && bs < 69].filter(Boolean).length;
+  if (coldSignals >= 2) return 'cold';
+  if (ev > 0 && ev < 84) return 'cold'; // extreme EV weakness alone
+
+  // 3. Whiff King — high strikeout rate
+  if (kpct >= 33) return 'whiff';
+  if (kpct >= 27 && hh < 32) return 'whiff'; // high K + weak contact
+
+  // 4. Worm Burner — heavy grounder pattern
+  if (gb >= 55) return 'worm';
+  if (gb >= 48 && la < 8) return 'worm'; // groundball + flat angle confirmation
+
+  // 5. Gap Sniper — extra-base hit machine without HR spike
+  if (xbh >= 0.08 && la >= 10 && la < 22) return 'gap'; // gap angle
+  if (xbh >= 0.10 && hr < 2) return 'gap'; // high XBH regardless
+
+  // 6. Contact King — quality contact, low K
+  if (kpct <= 14 && hh >= 36 && ev >= 92) return 'contact';
+  if (hit >= 0.32 && kpct <= 18 && gb < 45) return 'contact';
+
+  return null;
+}
+
+// Multi-select form class filter hook
+function FormClassFilter({ selected, onChange }) {
+  const mono = "'DM Mono',monospace";
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const fn = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', fn);
+    return () => document.removeEventListener('mousedown', fn);
+  }, [open]);
+
+  const toggle = key => {
+    const next = new Set(selected);
+    if (key === 'ALL') { onChange(new Set()); return; }
+    if (next.has(key)) next.delete(key); else next.add(key);
+    onChange(next);
+  };
+
+  const label = selected.size === 0 ? '🏷️ Form Class' : `🏷️ ${selected.size} selected`;
+  return (
+    <div ref={ref} style={{position:'relative',flexShrink:0}}>
+      <button onClick={()=>setOpen(o=>!o)}
+        style={{padding:'3px 9px',borderRadius:6,border:`1px solid ${selected.size>0?'var(--accent2)':'var(--border)'}`,
+          background:selected.size>0?'rgba(56,184,242,.12)':'var(--surface2)',
+          color:selected.size>0?'var(--accent2)':'var(--muted)',
+          fontFamily:mono,fontSize:9,cursor:'pointer',whiteSpace:'nowrap',
+          display:'flex',alignItems:'center',gap:4}}>
+        {label} <span style={{opacity:.6,fontSize:8}}>{open?'▲':'▼'}</span>
+      </button>
+      {open && (
+        <div style={{position:'absolute',top:'calc(100% + 4px)',left:0,zIndex:200,
+          background:'var(--surface)',border:'1px solid var(--border)',
+          borderRadius:8,padding:8,minWidth:190,boxShadow:'0 4px 16px rgba(0,0,0,.4)'}}>
+          <button onClick={()=>toggle('ALL')}
+            style={{width:'100%',textAlign:'left',padding:'4px 8px',borderRadius:5,
+              border:'none',background:selected.size===0?'rgba(56,184,242,.15)':'transparent',
+              color:selected.size===0?'var(--accent2)':'var(--muted)',
+              fontFamily:mono,fontSize:9,cursor:'pointer',marginBottom:4}}>
+            All batters
+          </button>
+          {Object.entries(FORM_CLASSES).map(([key, fc]) => (
+            <button key={key} onClick={()=>toggle(key)}
+              style={{width:'100%',textAlign:'left',padding:'4px 8px',borderRadius:5,
+                border:'none',background:selected.has(key)?fc.bg:'transparent',
+                color:selected.has(key)?fc.color:'var(--muted)',
+                fontFamily:mono,fontSize:9,cursor:'pointer',marginBottom:2,
+                display:'flex',alignItems:'center',gap:6}}>
+              <span style={{width:8,height:8,borderRadius:'50%',background:selected.has(key)?fc.color:'rgba(255,255,255,.15)',flexShrink:0}}/>
+              {fc.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Badge component for inline display
+function FormBadge({ formKey }) {
+  if (!formKey || !FORM_CLASSES[formKey]) return null;
+  const fc = FORM_CLASSES[formKey];
+  return (
+    <span title={fc.desc}
+      style={{display:'inline-block',padding:'1px 5px',borderRadius:4,
+        fontFamily:"'DM Mono',monospace",fontSize:7,fontWeight:700,letterSpacing:.3,
+        background:fc.bg,color:fc.color,border:`1px solid ${fc.border}`,
+        whiteSpace:'nowrap',cursor:'default',flexShrink:0}}>
+      {fc.short}
+    </span>
+  );
+}
+
 function LongShotView({ data }) {
   const [lineupVer, setLineupVer] = useState(LINEUP_VERSION);
   useEffect(() => { const unsub = subscribeLineup(v => setLineupVer(v)); return unsub; }, []);
@@ -8915,6 +9088,9 @@ function LongShotView({ data }) {
   const [hotOnly,    setHotOnly]      = useState(false);
   const [picksOnly,  setPicksOnly]    = useState(false);
   const [diamondOnly,setDiamondOnly]  = useState(false);
+  const [batterHand, setBatterHand]     = useState('ALL');
+  const [pitcherHand, setPitcherHand]   = useState('ALL');
+  const [formFilter, setFormFilter]     = useState(new Set());
   const picks = usePicks();
   const pitcherGradeCache = useRef({});
   const [cacheVersion, setCacheVersion] = useState(0);
@@ -9005,6 +9181,16 @@ function LongShotView({ data }) {
       // Lineup slot × platoon (uses b.lineup_slot from engine data)
       const _lsSlot = parseInt(b.lineup_slot)||0;
       if (_lsSlot > 0) {
+        // ── Pitcher handedness weakness vs this batter's hand ───────────
+        const _bhLS   = (b.batter_hand||'').toUpperCase();
+        const _pBrlLS = parseFloat(_bhLS==='L' ? b.pitcher_barrel_pct_vs_L : b.pitcher_barrel_pct_vs_R)||0;
+        const _pHHLS  = parseFloat(_bhLS==='L' ? b.pitcher_hh_pct_vs_L    : b.pitcher_hh_pct_vs_R)||0;
+        const _pFBLS  = parseFloat(_bhLS==='L' ? b.pitcher_fb_pct_vs_L    : b.pitcher_fb_pct_vs_R)||0;
+        const _pHRLS  = parseFloat(_bhLS==='L' ? b.pitcher_hr_pct_vs_L    : b.pitcher_hr_pct_vs_R)||0;
+        if (_pBrlLS >= 12)     _sig += 2; else if (_pBrlLS >= 8) _sig += 1;
+        if (_pHHLS >= 45)      _sig += 1;
+        if (_pFBLS >= 38)      _sig += 1;
+        if (_pHRLS >= 5)       _sig += 1;
         const _ph = (b.pitcher_hand||'').toLowerCase();
         const _bh = (b.batter_hand||'').toUpperCase();
         const _hasPlatoon = (_ph.startsWith('r') && (_bh==='L'||_bh==='S')) ||
@@ -9015,8 +9201,9 @@ function LongShotView({ data }) {
         else if (_lsSlot >= 3 && _lsSlot <= 5)           _sig += 1;
       }
       _sig = Math.min(14, Math.max(0, _sig)); // cap at 14
+      const _formClass = getFormClass(b);
       out.push({ ...b, _pgLabel:pgLabel, _simHR, _simTB, _bvpFB, _recEV,
-        _bvpLA, _recLA, _recFB, _flags, _temp, _sig,
+        _bvpLA, _recLA, _recFB, _flags, _temp, _sig, _formClass,
         _hrPct:parseFloat(b.proj_hr_adj)||parseFloat(b.sim_hr)||0 });
     }
     return out;
@@ -9025,7 +9212,10 @@ function LongShotView({ data }) {
   const teams = React.useMemo(() => ['ALL',...Array.from(new Set(rows.map(r=>r.batting_team||'').filter(Boolean))).sort()], [rows]);
 
   const filtered = React.useMemo(() => {
-    let r = rows.filter(b => b._simTB >= 0.01); // hide zero sim TB rows
+    let r = rows.filter(b => b._simTB >= 0.01)
+      .filter(b => matchesHandFilter(b.batter_hand, batterHand))
+      .filter(b => matchesHandFilter(b.pitcher_hand, pitcherHand))
+      .filter(b => formFilter.size === 0 || formFilter.has(b._formClass)); // hide zero sim TB rows
     if (teamFilter!=='ALL') r = r.filter(b=>b.batting_team===teamFilter);
     if (pgFilter!=='ALL')   r = r.filter(b=>b._pgLabel===pgFilter);
     if (search)      { const q=search.toLowerCase(); r=r.filter(b=>(b.batter||'').toLowerCase().includes(q)); }
@@ -9066,11 +9256,15 @@ function LongShotView({ data }) {
         <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search batter…"
           style={{padding:'4px 10px',borderRadius:6,fontSize:10,fontFamily:mono,width:130,outline:'none',
             border:`1px solid ${search?'var(--accent2)':'var(--border)'}`,background:'var(--surface2)',color:'var(--text)'}}/>
+      <HandFilter mode="batter" value={blBatterHand} onChange={setBlBatterHand}/>
         <select value={teamFilter} onChange={e=>setTeamFilter(e.target.value)}
           style={{padding:'3px 8px',borderRadius:6,fontSize:10,fontFamily:mono,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',cursor:'pointer'}}>
           {teams.map(t=><option key={t} value={t}>{t==='ALL'?'All Teams':t}</option>)}
         </select>
-        <select value={pgFilter} onChange={e=>setPgFilter(e.target.value)}
+        <HandFilter mode="batter" value={batterHand} onChange={setBatterHand}/>
+      <HandFilter mode="pitcher" value={pitcherHand} onChange={setPitcherHand}/>
+      <FormClassFilter selected={formFilter} onChange={setFormFilter}/>
+      <select value={pgFilter} onChange={e=>setPgFilter(e.target.value)}
           style={{padding:'3px 8px',borderRadius:6,fontSize:10,fontFamily:mono,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',cursor:'pointer'}}>
           {SOFT_LABEL_LIST.map(g=><option key={g} value={g}>{g==='ALL'?'All Pitchers':g}</option>)}
         </select>
@@ -9098,7 +9292,17 @@ function LongShotView({ data }) {
         ))}
       </div>
 
+      <div style={{display:"flex",gap:6,marginBottom:6,flexWrap:"wrap",alignItems:"center"}}>
+        <HandFilter mode="batter" value={kmBatterHand} onChange={setKmBatterHand}/>
+        <HandFilter mode="pitcher" value={kmPitcherHand} onChange={setKmPitcherHand}/>
+      </div>
+      <FormClassFilter selected={kmFormFilter} onChange={setKmFormFilter}/>
       {/* Sticker filters */}
+      <div style={{display:'flex',gap:6,marginBottom:6,flexWrap:'wrap',alignItems:'center'}}>
+        <HandFilter mode="batter" value={slBatterHand} onChange={setSlBatterHand}/>
+        <HandFilter mode="pitcher" value={slPitcherHand} onChange={setSlPitcherHand}/>
+        <FormClassFilter selected={slFormFilter} onChange={setSlFormFilter}/>
+      </div>
       <div style={{display:'flex',gap:6,marginBottom:10,flexWrap:'wrap'}}>
         {[
           [()=>setLineupOnly(v=>!v), lineupOnly,  'rgba(39,201,122,.12)', '#27c97a',        '✅'],
@@ -9150,6 +9354,7 @@ function LongShotView({ data }) {
                         <PlayerAvatar pid={pid} name={name} size={16}/>
                         <span style={{fontFamily:osw,fontWeight:700,fontSize:10,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',color:isKeyMatchup(pid,name)?'#ff8020':'var(--text)'}}>{name}</span>
                         <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={pid} name={name} team={b.batting_team||''}/></span>
+                      <FormBadge formKey={b._formClass}/>
                       </div>
                     </td>
                     <td style={{padding:'2px 6px',textAlign:'center',fontFamily:osw,fontWeight:800,fontSize:10,color:b.grade==='C'?'var(--muted)':'rgba(232,65,26,.8)'}}>{b.grade}</td>
@@ -9220,6 +9425,9 @@ function SimLabView({ data }) {
   const [sortProp, setSortProp]     = useState('_trackerSig');
   const [sortPropDir, setSortPropDir] = useState('desc');
   const [lineupOnly, setLineupOnly]   = useState(false);
+  const [slBatterHand, setSlBatterHand]   = useState('ALL');
+  const [slPitcherHand, setSlPitcherHand] = useState('ALL');
+  const [slFormFilter, setSlFormFilter]   = useState(new Set());
   const [filterGoneYardSim, setFilterGoneYardSim] = useState(false);
   const [filterDueSim, setFilterDueSim] = useState(false);
   const [filterDiamondSim, setFilterDiamondSim] = useState(false);
@@ -9311,6 +9519,9 @@ function SimLabView({ data }) {
 
   const slate = useMemo(() => {
     const filtered = data.filter(r => r.batter && r.batting_team)
+      .filter(r => matchesHandFilter(r.batter_hand, slBatterHand))
+      .filter(r => matchesHandFilter(r.pitcher_hand, slPitcherHand))
+      .filter(r => slFormFilter.size === 0 || slFormFilter.has(r._formClass))
       .filter(r => selMatchups.size === 0 || selMatchups.has(String(r.game_id)))
       .filter(r => selBatterGradesSim.size === 0 || selBatterGradesSim.has(r.grade))
       .filter(r => !lineupOnly || isConfirmed(r))
@@ -9746,14 +9957,36 @@ function SimLabView({ data }) {
                   // Flags: 7=dead zone, 1=noise (weakest single-signal bin)
                   if (_flagsv === 7)                      _trackerSig -= 2;
                   else if (_flagsv === 1)                 _trackerSig -= 1;
-                  // Platoon + lineup slot (capped at +1 — 430k data: 0.23% raw edge)
+                  // ── Pitcher handedness weakness vs this batter's hand
+          const _bhsl   = (b.batter_hand||'').toUpperCase();
+          const _pBrlSL = parseFloat(_bhsl==='R'||_bhsl==='S' ? b.pitcher_barrel_pct_vs_R : b.pitcher_barrel_pct_vs_L)||0;
+          const _pHHSL  = parseFloat(_bhsl==='R'||_bhsl==='S' ? b.pitcher_hh_pct_vs_R    : b.pitcher_hh_pct_vs_L)||0;
+          const _pFBSL  = parseFloat(_bhsl==='R'||_bhsl==='S' ? b.pitcher_fb_pct_vs_R    : b.pitcher_fb_pct_vs_L)||0;
+          const _pHRSL  = parseFloat(_bhsl==='R'||_bhsl==='S' ? b.pitcher_hr_pct_vs_R    : b.pitcher_hr_pct_vs_L)||0;
+          if (_pBrlSL>=12) s+=2; else if (_pBrlSL>=8) s+=1;
+          if (_pHHSL>=45)  s+=1;
+          if (_pFBSL>=38)  s+=1;
+          if (_pHRSL>=5)   s+=1;
+          // Platoon + lineup slot (capped at +1 — 430k data: 0.23% raw edge)
+                  // ── Pitcher handedness weakness vs this batter's hand ──────────
+                  const _bhv2    = (b.batter_hand||'').toUpperCase();
+                  const _pBrlVsH = parseFloat(_bhv2==='L' ? b.pitcher_barrel_pct_vs_L : b.pitcher_barrel_pct_vs_R)||0;
+                  const _pHHVsH  = parseFloat(_bhv2==='L' ? b.pitcher_hh_pct_vs_L    : b.pitcher_hh_pct_vs_R)||0;
+                  const _pFBVsH  = parseFloat(_bhv2==='L' ? b.pitcher_fb_pct_vs_L    : b.pitcher_fb_pct_vs_R)||0;
+                  const _pHRVsH  = parseFloat(_bhv2==='L' ? b.pitcher_hr_pct_vs_L    : b.pitcher_hr_pct_vs_R)||0;
+                  if (_pBrlVsH >= 12)      _trackerSig += 2;
+                  else if (_pBrlVsH >= 8)  _trackerSig += 1;
+                  if (_pHHVsH >= 45)       _trackerSig += 1;
+                  if (_pFBVsH >= 38)       _trackerSig += 1;
+                  if (_pHRVsH >= 5)        _trackerSig += 1;
                   const _slotv   = parseInt(b.lineup_slot)||0;
                   const _phv     = (b.pitcher_hand||'').toLowerCase();
                   const _bhv     = (b.batter_hand||'').toUpperCase();
                   const _platoonv= (_phv.startsWith('r')&&(_bhv==='L'||_bhv==='S'))||
                                    (_phv.startsWith('l')&&(_bhv==='R'||_bhv==='S'));
                   if (_platoonv || (_slotv >= 3 && _slotv <= 5)) _trackerSig += 1;
-                  b._trackerSig = Math.min(14, Math.max(0, _trackerSig)); // cap at 14 to prevent score inflation
+                  b._trackerSig = Math.min(14, Math.max(0, _trackerSig)); // cap at 14
+                  b._formClass   = getFormClass(b); to prevent score inflation
                   return (
                     <tr key={`${b.batter_id}-${i}`} className="dr"
                       onClick={() => { setSelBatter(b); setView('deepdive'); }}
@@ -10187,6 +10420,7 @@ function SimLabView({ data }) {
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                             <PlayerAvatar pid={parseInt(b.batter_id)||0} name={b.batter} size={24}/>
                             <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 12 }}>{b.batter}</span>
+                        <FormBadge formKey={getFormClass(b)}/>
                           </div>
                         </td>
                         <td><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--accent2)', fontWeight: 700 }}>{b.batting_team}</span></td>
@@ -10590,6 +10824,8 @@ function BvPHistoryTab({ data }) {
   const [sortCol, setSortCol]     = useState('hr');
   const [sortDir, setSortDir]     = useState(1);  // 1 with (bn-an) = descending
   const [bvpPicksOnly, setBvpPicksOnly]     = useState(false);
+  const [bvpBatterHand, setBvpBatterHand]   = useState('ALL');
+  const [bvpPitcherHand, setBvpPitcherHand] = useState('ALL');
   const [bvpLineupOnly, setBvpLineupOnly]   = useState(false);
   const [bvpActiveOnly, setBvpActiveOnly]   = useState(false);
   const [bvpInjuredOnly, setBvpInjuredOnly] = useState(false);
@@ -10662,6 +10898,8 @@ function BvPHistoryTab({ data }) {
 
   const filtered = useMemo(() => {
     let r = rows;
+    r = r.filter(x => matchesHandFilter(x.batter_hand||x.batterHand||'', bvpBatterHand));
+    r = r.filter(x => matchesHandFilter(x.pitcher_hand||x.pitcherHand||'', bvpPitcherHand));
     if (bvpPicksOnly)  r = r.filter(x => picks[String(x.batterId)]);
     if (bvpLineupOnly) r = r.filter(x => parseInt(x.batterId||0) > 0 && LINEUP_STATUS[parseInt(x.batterId||0)]?.status === 'confirmed');
     if (bvpActiveOnly) r = r.filter(x => !INJURY_MAP[String(x.batterId)]);
@@ -10678,7 +10916,7 @@ function BvPHistoryTab({ data }) {
       const bn = typeof bv === 'string' ? parseFloat(bv)||0 : bv;
       return sortDir * (bn - an);
     });
-  }, [rows, sortCol, sortDir, minPA, search, bvpPicksOnly, bvpLineupOnly, bvpActiveOnly, bvpInjuredOnly]);
+  }, [rows, sortCol, sortDir, minPA, search, bvpPicksOnly, bvpLineupOnly, bvpActiveOnly, bvpInjuredOnly, bvpBatterHand, bvpPitcherHand]);
 
   const SortIcon = ({col}) => sortCol===col
     ? <span style={{marginLeft:3,fontSize:8}}>{sortDir===-1?'▼':'▲'}</span>
@@ -10894,6 +11132,7 @@ function BatterLeaderboard() {
   const [showPicksOnly, setShowPicksOnly] = useState(false);
   const [filterGoneYard, setFilterGoneYard] = useState(false);
   const [filterDue, setFilterDue] = useState(false);
+  const [blBatterHand, setBlBatterHand] = useState('ALL');
   const picks = usePicks();
   const bprops = useBatterProps();
   // L7 HR fallback for batters not in daily_picks (not scheduled today)
@@ -11015,7 +11254,8 @@ function BatterLeaderboard() {
     })
     .filter(p => teamFilter === 'all' || p.team === teamFilter)
     .filter(p => {
-      if (slateFilter === 'all') return true;
+
+      if (!matchesHandFilter(p.batSide||p.hand||'', blBatterHand)) return false;      if (slateFilter === 'all') return true;
       if (slateFilter === 'today') return TODAY_TEAMS.has(p.team);
       if (slateFilter === 'tomorrow') return TOMORROW_TEAMS.has(p.team);
       return true;
@@ -11426,7 +11666,8 @@ function PitcherLeaderboard() {
   const [roleFilter, setRoleFilter] = useState('SP'); // all | SP | RP
   const [searchQ, setSearchQ]       = useState('');
   const [minIP, setMinIP]           = useState(5);
-  const [gradeFilter, setGradeFilter] = useState('all');
+  const [gradeFilter, setGradeFilter]     = useState('all');
+  const [plPitcherHand, setPlPitcherHand] = useState('ALL');
   // Static MLB team ID → abbreviation map (IDs are stable across seasons)
   const TEAM_ABBR = {
     133:'ATH',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',
@@ -11498,6 +11739,7 @@ function PitcherLeaderboard() {
 
   const filtered = withGrades
     .filter(p => p.ip >= minIP)
+    .filter(p => matchesHandFilter(p.hand||'', plPitcherHand))
     .filter(p => teamFilter === 'all' || p.team === teamFilter)
     .filter(p => roleFilter === 'all' || (roleFilter==='SP' ? p.gs > 0 : p.gs === 0))
     .filter(p => !searchQ || p.name.toLowerCase().includes(searchQ.toLowerCase()))
@@ -11582,6 +11824,7 @@ function PitcherLeaderboard() {
             style={{width:'100%',padding:'7px 28px 7px 28px',background:'var(--surface2)',
               border:'1px solid var(--border)',borderRadius:7,color:'var(--text)',
               fontFamily:"'DM Mono',monospace",fontSize:11,outline:'none',boxSizing:'border-box'}}/>
+      <HandFilter mode="pitcher" value={plPitcherHand} onChange={setPlPitcherHand}/>
           <span style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',color:'var(--muted)',pointerEvents:'none'}}>🔍</span>
           {searchQ && <button onClick={()=>setSearchQ('')}
             style={{position:'absolute',right:6,top:'50%',transform:'translateY(-50%)',
@@ -11935,6 +12178,9 @@ function MatchupEngineTab() {
   const [selPitcherGrade, setSelPitcherGrade] = useState('all');
   useInjuries();
   const [kmActiveOnly, setKmActiveOnly]         = useState(false);
+  const [kmBatterHand, setKmBatterHand]           = useState('ALL');
+  const [kmPitcherHand, setKmPitcherHand]         = useState('ALL');
+  const [kmFormFilter, setKmFormFilter]           = useState(new Set());
   const [kmInjuredOnly, setKmInjuredOnly]       = useState(false);
   const [kmHotOnly, setKmHotOnly]               = useState(false);
   const [filterGoneYard, setFilterGoneYard]   = useState(false);
@@ -12050,6 +12296,9 @@ function MatchupEngineTab() {
   (selGame === 'all' ? activeData : activeData.filter(r => String(r.game_id) === String(selGame)))
     .filter(r => selGrade === 'all' || r.grade === selGrade)
     .filter(r => !kmPicksOnly || picks[String(parseInt(r.batter_id)||0)])
+    .filter(r => matchesHandFilter(r.batter_hand, kmBatterHand))
+    .filter(r => matchesHandFilter(r.pitcher_hand, kmPitcherHand))
+    .filter(r => kmFormFilter.size === 0 || kmFormFilter.has(getFormClass(r)))
     .filter(r => !kmActiveOnly || !INJURY_MAP[String(parseInt(r.batter_id)||0)])
     .filter(r => !kmInjuredOnly || !!INJURY_MAP[String(parseInt(r.batter_id)||0)])
     .filter(r => !kmHotOnly || isHotBatPlayer(r))
