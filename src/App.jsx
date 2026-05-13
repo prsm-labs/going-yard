@@ -8958,7 +8958,7 @@ function LongShotView({ data }) {
       // Temp 70-75°F peak
       if (_temp >= 70 && _temp <= 75)    _sig += 2;
       // EV: corrected thresholds (103 = real cliff in data)
-      if (_recEV >= 103)                 _sig += 3;
+      if (_recEV >= 103)                 _sig += 2;  // recalibrated
       else if (_recEV >= 100)            _sig += 2;
       else if (_recEV >= 97)             _sig += 1;
       // Recent LA: real HR peak 25-30°, corridor 22-32° (atbat log N=241k)
@@ -8971,15 +8971,12 @@ function LongShotView({ data }) {
       if (_bvpFB >= 42)                  _sig -= 2;
       else if (_bvpFB >= 36)             _sig -= 1;
       // Recent FB%: monotonic — more elevation = more HRs
-      if (_recFB >= 35)                  _sig += 2;
-      else if (_recFB >= 25)             _sig += 1;
+      if (_recFB >= 35)                  _sig += 1;  // recalibrated
       else if (_recFB < 15)              _sig -= 1;
       // Bat speed (needs engine field; safe fallback = 0)
-      if (_bspd >= 77)                   _sig += 2;
-      else if (_bspd >= 74)             _sig += 1;
+      if (_bspd >= 77)                   _sig += 1;  // recalibrated
       // Consecutive HR momentum
-      if (_consHR >= 2)                  _sig += 2;
-      else if (_consHR === 1)            _sig += 1;
+      if (_consHR >= 2)                  _sig += 1;  // recalibrated
       // Due factor: more ABs since HR = colder, not hotter
       if (_abSince > 30)                 _sig -= 1;
       // Sinker-heavy pitcher: lowest HR rate of any pitch type
@@ -8987,24 +8984,21 @@ function LongShotView({ data }) {
       // Barrel quality tier (EV-weighted, 430k data: 107+=96.4% HR, 103-107=75.9%, 98-103=37.5%)
       const _brlQ = parseInt(b.barrel_quality_score)||0;
       const _barrelv = parseFloat(b.recent_barrel_pct)||0;
-      if (_brlQ >= 3)                    _sig += 3;
-      else if (_brlQ >= 2)               _sig += 2;
+      if (_brlQ >= 3)                    _sig += 2;  // recalibrated max
+      else if (_brlQ >= 2)               _sig += 1;
       else if (_brlQ >= 1)               _sig += 1;
-      else if (_barrelv >= 3 && _barrelv <= 6) _sig += 1; // fallback
+      else if (_barrelv >= 3 && _barrelv <= 6) _sig += 1;
       // ── Park HR Factor ─────────────────────────────────────────────────
       const _hf     = parseFloat(b.hr_factor)||1.0;
       const _hfNorm = _hf > 10 ? _hf/100 : _hf;
-      if (_hfNorm >= 1.20)      _sig += 2;
-      else if (_hfNorm >= 1.08) _sig += 1;
-      else if (_hfNorm <= 0.85) _sig -= 1;
+      if (_hfNorm >= 1.15)      _sig += 1;  // recalibrated
+      else if (_hfNorm <= 0.88) _sig -= 1;
       // ── Pulled Barrel Rate ───────────────────────────────────────────────
       const _pbrlPct = parseFloat(b.recent_pulled_barrel_pct)||0;
-      if (_pbrlPct >= 5.0)      _sig += 2;
-      else if (_pbrlPct >= 2.5) _sig += 1;
+      if (_pbrlPct >= 3.0)      _sig += 1;  // recalibrated
       // ── Batter-Ahead Count % ─────────────────────────────────────────────
       const _baAhead = parseFloat(b.recent_batter_ahead_pct)||0;
-      if (_baAhead >= 35)       _sig += 2;
-      else if (_baAhead >= 28)  _sig += 1;
+      if (_baAhead >= 32)       _sig += 1;  // recalibrated
       // Flags
       if (_flags === 7)                  _sig -= 2;
       else if (_flags === 1)             _sig -= 1;
@@ -9020,6 +9014,7 @@ function LongShotView({ data }) {
         else if (_hasPlatoon)                              _sig += 1;
         else if (_lsSlot >= 3 && _lsSlot <= 5)           _sig += 1;
       }
+      _sig = Math.min(14, Math.max(0, _sig)); // cap at 14
       out.push({ ...b, _pgLabel:pgLabel, _simHR, _simTB, _bvpFB, _recEV,
         _bvpLA, _recLA, _recFB, _flags, _temp, _sig,
         _hrPct:parseFloat(b.proj_hr_adj)||parseFloat(b.sim_hr)||0 });
@@ -9162,9 +9157,9 @@ function LongShotView({ data }) {
                     <td style={{padding:'2px 4px',textAlign:'right'}}>
                       <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',
                         width:20,height:17,borderRadius:4,fontFamily:osw,fontWeight:800,fontSize:11,
-                        background:b._sig>=8?'rgba(255,64,32,.25)':b._sig>=6?'rgba(245,166,35,.2)':b._sig>=4?'rgba(39,201,122,.15)':'rgba(255,255,255,.05)',
-                        color:b._sig>=8?'#ff4020':b._sig>=6?'#f5a623':b._sig>=4?'#27c97a':'var(--muted)',
-                        border:`1px solid ${b._sig>=8?'rgba(255,64,32,.4)':b._sig>=6?'rgba(245,166,35,.3)':b._sig>=4?'rgba(39,201,122,.25)':'var(--border)'}`}}>
+                        background:b._sig>=10?'rgba(255,64,32,.25)':b._sig>=7?'rgba(245,166,35,.2)':b._sig>=4?'rgba(39,201,122,.15)':'rgba(255,255,255,.05)',
+                        color:b._sig>=10?'#ff4020':b._sig>=7?'#f5a623':b._sig>=4?'#27c97a':'var(--muted)',
+                        border:`1px solid ${b._sig>=10?'rgba(255,64,32,.4)':b._sig>=7?'rgba(245,166,35,.3)':b._sig>=4?'rgba(39,201,122,.25)':'var(--border)'}`}}>
                         {b._sig}
                       </span>
                     </td>
@@ -9708,8 +9703,8 @@ function SimLabView({ data }) {
                   else if (_pgLabelv === '‼️ Elite')     _trackerSig -= 2;
                   // Temp: 70-75°F confirmed peak
                   if (_tempv >= 70 && _tempv <= 75)      _trackerSig += 2;
-                  // EV: real cliff at 103 (15.49% HR rate); 97+ real signal start
-                  if (_recEVv >= 103)                    _trackerSig += 3;
+                  // EV: real cliff at 103; 97+ real signal start
+                  if (_recEVv >= 103)                    _trackerSig += 2;  // was +3, recalibrated
                   else if (_recEVv >= 100)               _trackerSig += 2;
                   else if (_recEVv >= 97)                _trackerSig += 1;
                   // Recent LA: real HR peak 25-30°, full corridor 22-32° (atbat log confirmed)
@@ -9717,24 +9712,19 @@ function SimLabView({ data }) {
                   else if (_recLAv >= 18 && _recLAv < 22) _trackerSig += 1; // borderline credit
                   // BvP LA: confirm same approach angle corridor
                   if (_bvpLAv >= 22 && _bvpLAv <= 32)  _trackerSig += 1;
-                  // Barrel quality tier: EV-tiered conversion (430k: 107+ barrel = 96.4% HR!)
-                  // brl_quality: 0=none, 1=soft(98-103,37%), 2=elite(103-107,76%), 3=laser(107+,96%)
+                  // Barrel quality tier (recalibrated: max +2)
                   const _brlQv = parseInt(b.barrel_quality_score)||0;
-                  if (_brlQv >= 3)                       _trackerSig += 3;  // 107+ mph barrel — near-automatic
-                  else if (_brlQv >= 2)                  _trackerSig += 2;  // 103-107 barrel — 76% HR
-                  else if (_brlQv >= 1)                  _trackerSig += 1;  // 98-103 barrel — 37% HR
-                  // Fallback: raw barrel 3-6% sweet spot if quality score unavailable
-                  else if (_barrelv >= 3 && _barrelv <= 6) _trackerSig += 1;
-                  // Recent FB%: monotonic lift — 35%+ = +2, 25-35% = +1 (atbat log: 45%+ = 14.6%)
-                  if (_recFBv >= 35)                     _trackerSig += 2;
-                  else if (_recFBv >= 25)                _trackerSig += 1;
-                  else if (_recFBv < 15)                 _trackerSig -= 1; // groundball pattern
-                  // Bat speed: 77+ dramatically better HR rate (needs engine field)
-                  if (_bspdv >= 77)                      _trackerSig += 2;
-                  else if (_bspdv >= 74)                 _trackerSig += 1;
-                  // Momentum: consecutive HR games are predictive (18.88% after 3 straight)
-                  if (_consHRv >= 2)                     _trackerSig += 2;
-                  else if (_consHRv === 1)               _trackerSig += 1;
+                  if (_brlQv >= 3)                       _trackerSig += 2;  // 107+ barrel (96.4% HR)
+                  else if (_brlQv >= 2)                  _trackerSig += 1;  // 103-107 barrel (76% HR)
+                  else if (_brlQv >= 1)                  _trackerSig += 1;  // 98-103 barrel (37% HR)
+                  else if (_barrelv >= 3 && _barrelv <= 6) _trackerSig += 1; // fallback
+                  // Recent FB%: 35%+ meaningful lift; single tier to reduce inflation
+                  if (_recFBv >= 35)                     _trackerSig += 1;  // was +2
+                  else if (_recFBv < 15)                 _trackerSig -= 1;  // groundball penalty kept
+                  // Bat speed: 77+ = real edge; single tier
+                  if (_bspdv >= 77)                      _trackerSig += 1;  // was +2
+                  // Momentum: consecutive HR games; single tier
+                  if (_consHRv >= 2)                     _trackerSig += 1;  // was +2
                   // Due factor INVERTED: 51+ AB since HR = cold (7.76%), not hot
                   if (_abSince > 30)                     _trackerSig -= 1;
                   // BvP FB%: 42-50% = 0% HR dead zone; 36-42% = weak
@@ -9742,20 +9732,17 @@ function SimLabView({ data }) {
                   else if (_bvpFBv >= 36)                _trackerSig -= 1;
                   // Sinker-heavy pitcher: lowest HR pitch type (2.28%, avgLA 4.6°)
                   if (_topPitches.startsWith('SI'))      _trackerSig -= 1;
-                  // ── Park HR Factor (venue map hr_factor, 100=neutral) ────────────
+                  // ── Park HR Factor (single tier, recalibrated)
                   const _hfv = parseFloat(b.hr_factor)||1.0;
-                  const _hfNorm = _hfv > 10 ? _hfv/100 : _hfv; // handle integer percent storage
-                  if (_hfNorm >= 1.20)      _trackerSig += 2;   // big hitter's park (+20%+)
-                  else if (_hfNorm >= 1.08) _trackerSig += 1;   // moderate boost
-                  else if (_hfNorm <= 0.85) _trackerSig -= 1;   // pitcher's park penalty
-                  // ── Pulled Barrel Rate (power directed in play) ───────────────────
+                  const _hfNorm = _hfv > 10 ? _hfv/100 : _hfv;
+                  if (_hfNorm >= 1.15)      _trackerSig += 1;   // meaningful hitter's park (was +2 at 1.20)
+                  else if (_hfNorm <= 0.88) _trackerSig -= 1;   // pitcher's park penalty
+                  // ── Pulled Barrel Rate (single tier, recalibrated)
                   const _pbrlPctv = parseFloat(b.recent_pulled_barrel_pct)||0;
-                  if (_pbrlPctv >= 5.0)     _trackerSig += 2;   // 5%+ pulled barrel = elite pull power
-                  else if (_pbrlPctv >= 2.5) _trackerSig += 1;  // moderate pull rate
-                  // ── Batter-Ahead Count % (count tendencies) ──────────────────────
+                  if (_pbrlPctv >= 3.0)     _trackerSig += 1;   // any meaningful pulled barrel rate
+                  // ── Batter-Ahead Count % (single tier, recalibrated)
                   const _baAheadv = parseFloat(b.recent_batter_ahead_pct)||0;
-                  if (_baAheadv >= 35)      _trackerSig += 2;   // 35%+ batter-ahead = top 5.05% HR rate
-                  else if (_baAheadv >= 28) _trackerSig += 1;   // above average count discipline
+                  if (_baAheadv >= 32)      _trackerSig += 1;   // above-average count discipline
                   // Flags: 7=dead zone, 1=noise (weakest single-signal bin)
                   if (_flagsv === 7)                      _trackerSig -= 2;
                   else if (_flagsv === 1)                 _trackerSig -= 1;
@@ -9766,7 +9753,7 @@ function SimLabView({ data }) {
                   const _platoonv= (_phv.startsWith('r')&&(_bhv==='L'||_bhv==='S'))||
                                    (_phv.startsWith('l')&&(_bhv==='R'||_bhv==='S'));
                   if (_platoonv || (_slotv >= 3 && _slotv <= 5)) _trackerSig += 1;
-                  b._trackerSig = Math.max(0, _trackerSig);
+                  b._trackerSig = Math.min(14, Math.max(0, _trackerSig)); // cap at 14 to prevent score inflation
                   return (
                     <tr key={`${b.batter_id}-${i}`} className="dr"
                       onClick={() => { setSelBatter(b); setView('deepdive'); }}
@@ -9832,9 +9819,9 @@ function SimLabView({ data }) {
                         <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',
                           width:20,height:17,borderRadius:4,
                           fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:11,
-                          background:b._trackerSig>=8?'rgba(255,64,32,.25)':b._trackerSig>=6?'rgba(245,166,35,.2)':b._trackerSig>=4?'rgba(39,201,122,.15)':'rgba(255,255,255,.05)',
-                          color:b._trackerSig>=8?'#ff4020':b._trackerSig>=6?'#f5a623':b._trackerSig>=4?'#27c97a':'var(--muted)',
-                          border:`1px solid ${b._trackerSig>=8?'rgba(255,64,32,.4)':b._trackerSig>=6?'rgba(245,166,35,.3)':b._trackerSig>=4?'rgba(39,201,122,.25)':'var(--border)'}`}}>
+                          background:b._trackerSig>=10?'rgba(255,64,32,.25)':b._trackerSig>=7?'rgba(245,166,35,.2)':b._trackerSig>=4?'rgba(39,201,122,.15)':'rgba(255,255,255,.05)',
+                          color:b._trackerSig>=10?'#ff4020':b._trackerSig>=7?'#f5a623':b._trackerSig>=4?'#27c97a':'var(--muted)',
+                          border:`1px solid ${b._trackerSig>=10?'rgba(255,64,32,.4)':b._trackerSig>=7?'rgba(245,166,35,.3)':b._trackerSig>=4?'rgba(39,201,122,.25)':'var(--border)'}`}}>
                           {b._trackerSig||'—'}
                         </span>
                       </td>
@@ -12145,21 +12132,21 @@ function MatchupEngineTab() {
           // Temp
           if (_tmp>=70&&_tmp<=75) s+=2;
           // EV: corrected cliff at 103
-          if (_ev>=103) s+=3; else if (_ev>=100) s+=2; else if (_ev>=97) s+=1;
+          if (_ev>=103) s+=2; else if (_ev>=100) s+=2; else if (_ev>=97) s+=1; // recalibrated
           // Recent LA: 22-32° corridor (peak 25-30°)
           if (_rla>=22&&_rla<=32) s+=2; else if (_rla>=18&&_rla<22) s+=1;
           // BvP LA: same corridor
           if (_bla>=22&&_bla<=32) s+=1;
           // Barrel quality tier (EV-weighted, 430k data: 107+ = 96.4% HR)
           const _bq = parseInt(b.barrel_quality_score)||0;
-          if (_bq>=3) s+=3; else if (_bq>=2) s+=2; else if (_bq>=1) s+=1;
+          if (_bq>=3) s+=2; else if (_bq>=2) s+=1; else if (_bq>=1) s+=1; // recalibrated
           else if (_br>=3&&_br<=6) s+=1;  // fallback
           // Recent FB%
-          if (_rfb>=35) s+=2; else if (_rfb>=25) s+=1; else if (_rfb<15) s-=1;
+          if (_rfb>=35) s+=1; else if (_rfb<15) s-=1; // recalibrated
           // Bat speed
-          if (_bs>=77) s+=2; else if (_bs>=74) s+=1;
+          if (_bs>=77) s+=1; // recalibrated
           // Momentum
-          if (_chr>=2) s+=2; else if (_chr===1) s+=1;
+          if (_chr>=2) s+=1; // recalibrated
           // Due factor
           if (_abs>30) s-=1;
           // BvP FB%
@@ -12169,16 +12156,16 @@ function MatchupEngineTab() {
           // Park HR Factor
           const _hfc = parseFloat(b.hr_factor)||1.0;
           const _hfn = _hfc > 10 ? _hfc/100 : _hfc;
-          if (_hfn>=1.20) s+=2; else if (_hfn>=1.08) s+=1; else if (_hfn<=0.85) s-=1;
+          if (_hfn>=1.15) s+=1; else if (_hfn<=0.88) s-=1; // recalibrated
           // Pulled Barrel Rate
           const _pbc = parseFloat(b.recent_pulled_barrel_pct)||0;
-          if (_pbc>=5.0) s+=2; else if (_pbc>=2.5) s+=1;
+          if (_pbc>=3.0) s+=1; // recalibrated
           // Batter-Ahead Count %
           const _bac = parseFloat(b.recent_batter_ahead_pct)||0;
-          if (_bac>=35) s+=2; else if (_bac>=28) s+=1;
+          if (_bac>=32) s+=1; // recalibrated
           // Flags
           if (_flg===7) s-=2; else if (_flg===1) s-=1;
-          return Math.max(0,s);
+          return Math.min(14, Math.max(0,s)); // cap at 14
         })(),
       ].map(esc).join(',');
     });
