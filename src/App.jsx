@@ -8991,6 +8991,20 @@ function LongShotView({ data }) {
       else if (_brlQ >= 2)               _sig += 2;
       else if (_brlQ >= 1)               _sig += 1;
       else if (_barrelv >= 3 && _barrelv <= 6) _sig += 1; // fallback
+      // ── Park HR Factor ─────────────────────────────────────────────────
+      const _hf     = parseFloat(b.hr_factor)||1.0;
+      const _hfNorm = _hf > 10 ? _hf/100 : _hf;
+      if (_hfNorm >= 1.20)      _sig += 2;
+      else if (_hfNorm >= 1.08) _sig += 1;
+      else if (_hfNorm <= 0.85) _sig -= 1;
+      // ── Pulled Barrel Rate ───────────────────────────────────────────────
+      const _pbrlPct = parseFloat(b.recent_pulled_barrel_pct)||0;
+      if (_pbrlPct >= 5.0)      _sig += 2;
+      else if (_pbrlPct >= 2.5) _sig += 1;
+      // ── Batter-Ahead Count % ─────────────────────────────────────────────
+      const _baAhead = parseFloat(b.recent_batter_ahead_pct)||0;
+      if (_baAhead >= 35)       _sig += 2;
+      else if (_baAhead >= 28)  _sig += 1;
       // Flags
       if (_flags === 7)                  _sig -= 2;
       else if (_flags === 1)             _sig -= 1;
@@ -9728,6 +9742,20 @@ function SimLabView({ data }) {
                   else if (_bvpFBv >= 36)                _trackerSig -= 1;
                   // Sinker-heavy pitcher: lowest HR pitch type (2.28%, avgLA 4.6°)
                   if (_topPitches.startsWith('SI'))      _trackerSig -= 1;
+                  // ── Park HR Factor (venue map hr_factor, 100=neutral) ────────────
+                  const _hfv = parseFloat(b.hr_factor)||1.0;
+                  const _hfNorm = _hfv > 10 ? _hfv/100 : _hfv; // handle integer percent storage
+                  if (_hfNorm >= 1.20)      _trackerSig += 2;   // big hitter's park (+20%+)
+                  else if (_hfNorm >= 1.08) _trackerSig += 1;   // moderate boost
+                  else if (_hfNorm <= 0.85) _trackerSig -= 1;   // pitcher's park penalty
+                  // ── Pulled Barrel Rate (power directed in play) ───────────────────
+                  const _pbrlPctv = parseFloat(b.recent_pulled_barrel_pct)||0;
+                  if (_pbrlPctv >= 5.0)     _trackerSig += 2;   // 5%+ pulled barrel = elite pull power
+                  else if (_pbrlPctv >= 2.5) _trackerSig += 1;  // moderate pull rate
+                  // ── Batter-Ahead Count % (count tendencies) ──────────────────────
+                  const _baAheadv = parseFloat(b.recent_batter_ahead_pct)||0;
+                  if (_baAheadv >= 35)      _trackerSig += 2;   // 35%+ batter-ahead = top 5.05% HR rate
+                  else if (_baAheadv >= 28) _trackerSig += 1;   // above average count discipline
                   // Flags: 7=dead zone, 1=noise (weakest single-signal bin)
                   if (_flagsv === 7)                      _trackerSig -= 2;
                   else if (_flagsv === 1)                 _trackerSig -= 1;
@@ -12138,6 +12166,16 @@ function MatchupEngineTab() {
           if (_bfb>=42) s-=2; else if (_bfb>=36) s-=1;
           // Sinker penalty
           if (_tp.startsWith('SI')) s-=1;
+          // Park HR Factor
+          const _hfc = parseFloat(b.hr_factor)||1.0;
+          const _hfn = _hfc > 10 ? _hfc/100 : _hfc;
+          if (_hfn>=1.20) s+=2; else if (_hfn>=1.08) s+=1; else if (_hfn<=0.85) s-=1;
+          // Pulled Barrel Rate
+          const _pbc = parseFloat(b.recent_pulled_barrel_pct)||0;
+          if (_pbc>=5.0) s+=2; else if (_pbc>=2.5) s+=1;
+          // Batter-Ahead Count %
+          const _bac = parseFloat(b.recent_batter_ahead_pct)||0;
+          if (_bac>=35) s+=2; else if (_bac>=28) s+=1;
           // Flags
           if (_flg===7) s-=2; else if (_flg===1) s-=1;
           return Math.max(0,s);
