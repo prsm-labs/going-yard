@@ -8994,7 +8994,8 @@ function LongShotView({ data }) {
         const _bh = (b.batter_hand||'').toUpperCase();
         const _hasPlatoon = (_ph.startsWith('r') && (_bh==='L'||_bh==='S')) ||
                             (_ph.startsWith('l') && (_bh==='R'||_bh==='S'));
-        if (_hasPlatoon && _lsSlot >= 2 && _lsSlot <= 5) _sig += 2;
+        // Platoon cap at +1 (430k data: 0.23% raw edge)
+        if (_hasPlatoon && _lsSlot >= 2 && _lsSlot <= 5) _sig += 1;
         else if (_hasPlatoon)                              _sig += 1;
         else if (_lsSlot >= 3 && _lsSlot <= 5)           _sig += 1;
       }
@@ -9109,11 +9110,10 @@ function LongShotView({ data }) {
             <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'center',borderBottom:'1px solid var(--border)'}}>Gr</th>
             <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)'}}>Pitcher</th>
             <Th k="_sig"   label="⚡ Sig"/>
-            <Th k="_simHR" label="HR%"/>
+            <Th k="_simHR" label="Sim HR%"/>
             <Th k="_simTB"  label="Sim TB"/>
             <Th k="_bvpFB"  label="BvP FB%"/>
             <Th k="_recEV"  label="EV"/>
-            <Th k="_hrPct"  label="HR%"/>
             <Th k="_pgLabel" label="P Grade"/>
           </tr></thead>
           <tbody>
@@ -9154,10 +9154,9 @@ function LongShotView({ data }) {
                     <td style={{padding:'2px 6px',textAlign:'right'}}>
                       <span style={{fontFamily:osw,fontWeight:800,fontSize:11,color:tbColor(b._simTB)}}>{b._simTB.toFixed(2)}</span>
                     </td>
-                    <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,color:b._bvpFB>=20&&b._bvpFB<=36?'#27c97a':'var(--muted)'}}>{b._bvpFB>0?`${b._bvpFB.toFixed(0)}%`:'—'}</td>
-                    <td style={{padding:'2px 6px',textAlign:'right',fontFamily:osw,fontWeight:700,fontSize:10,color:b._recEV>=96?'#ff8020':b._recEV>=92?'var(--text)':'var(--muted)'}}>{b._recEV>0?b._recEV.toFixed(1):'—'}</td>
-                    <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,color:b._hrPct>=8?'#27c97a':'var(--muted)'}}>{b._hrPct>0?`${b._hrPct.toFixed(1)}%`:'—'}</td>
-                    <td style={{padding:'2px 6px',textAlign:'right'}}><span style={{fontFamily:mono,fontSize:9,color:pgColor(b._pgLabel),fontWeight:700}}>{b._pgLabel.split(' ')[0]}</span></td>
+                    <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,color:b._bvpFB>=20&&b._bvpFB<36?'#27c97a':b._bvpFB>=36&&b._bvpFB<42?'#f5a623':'var(--muted)'}}>{b._bvpFB>0?`${b._bvpFB.toFixed(0)}%`:'—'}</td>
+                    <td style={{padding:'2px 6px',textAlign:'right',fontFamily:osw,fontWeight:700,fontSize:10,color:b._recEV>=97?'#ff8020':b._recEV>=93?'var(--text)':'var(--muted)'}}>{b._recEV>0?b._recEV.toFixed(1):'—'}</td>
+                                        <td style={{padding:'2px 6px',textAlign:'right'}}><span style={{fontFamily:mono,fontSize:9,color:pgColor(b._pgLabel),fontWeight:700}}>{b._pgLabel.split(' ')[0]}</span></td>
                   </tr>
                   {isExp && (
                     <tr><td colSpan={10} style={{padding:'0 10px 10px',background:'rgba(255,255,255,.02)'}}>
@@ -9626,7 +9625,7 @@ function SimLabView({ data }) {
                     { label: 'Team',     key: null },
                     { label: 'vs Pitcher',key: null },
                     { label: 'P.Grade',  key: null },
-                    { label: 'HR%',      key: 'proj_hr_adj' },
+                    /* HR% (proj_hr_adj) removed — inflated by small BvP samples */
                     { label: 'Hit%',     key: 'proj_hit_prob' },
                     { label: 'XBH%',     key: 'proj_xbh_prob' },
                     { label: 'Sim TB',   key: 'sim_tb' },
@@ -9654,12 +9653,11 @@ function SimLabView({ data }) {
               </thead>
               <tbody>
                 {slate.map((b, i) => {
-                  const hrP = pctRaw(b.proj_hr_adj);
                   const hitP = pctRaw(b.proj_hit_prob);
                   const xbhP = pctRaw(b.proj_xbh_prob);
                   const tb = parseFloat(b.sim_tb) || 0;  // sim_tb = rate × proj PA (can exceed 1.5)
                   const rbi = parseFloat(b.proj_avg_rbi) || 0;
-                  const hrColor = hrP >= 12 ? '#ff4020' : hrP >= 8 ? '#ff8020' : hrP >= 5 ? '#f5a623' : 'var(--text)';
+
                   const hitColor = hitP >= 35 ? '#27c97a' : hitP >= 28 ? '#f5a623' : 'var(--text)';
                   const gc = GRADE_CFG[b.grade] || GRADE_CFG['D'];
                   // ── Tracker ⚡ Sig — v5 calibrated (241k PAs · 7,322 HRs) ──
@@ -9698,8 +9696,19 @@ function SimLabView({ data }) {
                   else if (_recLAv >= 18 && _recLAv < 22) _trackerSig += 1; // borderline credit
                   // BvP LA: confirm same approach angle corridor
                   if (_bvpLAv >= 22 && _bvpLAv <= 32)  _trackerSig += 1;
-                  // Barrel 3-6%: sweet spot confirmed; 15%+ removed (fades to base rate)
-                  if (_barrelv >= 3 && _barrelv <= 6)   _trackerSig += 1;
+                  // Barrel quality tier: EV-tiered conversion (430k: 107+ barrel = 96.4% HR!)
+                  // brl_quality: 0=none, 1=soft(98-103,37%), 2=elite(103-107,76%), 3=laser(107+,96%)
+                  const _brlQv = parseInt(b.barrel_quality_score)||0;
+                  if (_brlQv >= 3)                       _trackerSig += 3;  // 107+ mph barrel — near-automatic
+                  else if (_brlQv >= 2)                  _trackerSig += 2;  // 103-107 barrel — 76% HR
+                  else if (_brlQv >= 1)                  _trackerSig += 1;  // 98-103 barrel — 37% HR
+                  // Fallback: raw barrel 3-6% sweet spot if quality score unavailable
+      // Barrel quality tier (EV-weighted, 430k data)
+      const _brlQ = parseInt(b.barrel_quality_score)||0;
+      if (_brlQ >= 3)                       _sig += 3;
+      else if (_brlQ >= 2)                  _sig += 2;
+      else if (_brlQ >= 1)                  _sig += 1;
+      else if (_barrelv >= 3 && _barrelv <= 6) _sig += 1;
                   // Recent FB%: monotonic lift — 35%+ = +2, 25-35% = +1 (atbat log: 45%+ = 14.6%)
                   if (_recFBv >= 35)                     _trackerSig += 2;
                   else if (_recFBv >= 25)                _trackerSig += 1;
@@ -9720,6 +9729,13 @@ function SimLabView({ data }) {
                   // Flags: 7=dead zone, 1=noise (weakest single-signal bin)
                   if (_flagsv === 7)                      _trackerSig -= 2;
                   else if (_flagsv === 1)                 _trackerSig -= 1;
+                  // Platoon + lineup slot (capped at +1 — 430k data: 0.23% raw edge)
+                  const _slotv   = parseInt(b.lineup_slot)||0;
+                  const _phv     = (b.pitcher_hand||'').toLowerCase();
+                  const _bhv     = (b.batter_hand||'').toUpperCase();
+                  const _platoonv= (_phv.startsWith('r')&&(_bhv==='L'||_bhv==='S'))||
+                                   (_phv.startsWith('l')&&(_bhv==='R'||_bhv==='S'));
+                  if (_platoonv || (_slotv >= 3 && _slotv <= 5)) _trackerSig += 1;
                   b._trackerSig = Math.max(0, _trackerSig);
                   return (
                     <tr key={`${b.batter_id}-${i}`} className="dr"
@@ -9773,8 +9789,7 @@ function SimLabView({ data }) {
                           </span>;
                         })()}
                       </td>
-                      {/* HR% — shrunk font */}
-                      <td style={{ textAlign: 'right', padding:'3px 6px' }}><span style={{ fontFamily:"'Oswald',sans-serif", fontWeight:700, fontSize:11, color:hrColor }}>{hrP > 0 ? hrP.toFixed(1)+'%' : '—'}</span></td>
+                      
                       <td style={{ textAlign: 'right', padding:'3px 6px' }}><span style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:hitColor }}>{hitP > 0 ? hitP.toFixed(1)+'%' : '—'}</span></td>
                       <td style={{ textAlign: 'right', padding:'3px 6px' }}><span style={{ fontFamily:"'DM Mono',monospace", fontSize:10 }}>{xbhP > 0 ? xbhP.toFixed(1)+'%' : '—'}</span></td>
                       <td style={{ textAlign: 'right', padding:'3px 6px' }}><span style={{ fontFamily:"'Oswald',sans-serif", fontWeight:700, fontSize:11, color:tb>=1.5?'#ff8020':tb>=1.0?'#f5a623':'var(--text)' }}>{tb > 0 ? tb.toFixed(2) : '—'}</span></td>
@@ -10409,7 +10424,7 @@ function CheatCodeButton() {
             </div>
             <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',
               marginTop:2,letterSpacing:.5}}>
-              Derived from season HR tracker · 288 HRs · 1,689 played rows · base rate 17.1% ✱
+              Derived from 2024–26 at-bat log · 12,965 HRs · 430,587 PAs · base rate 3.0% ✱
             </div>
           </div>
           <button onClick={()=>setOpen(false)}
@@ -10531,7 +10546,7 @@ function CheatCodeButton() {
             ⚠️ The Sauce is a living model — signals, thresholds and weights are updated<br/>
             periodically as the season sample grows. Treat it as directional, not prescriptive.<br/>
             <span style={{color:'rgba(255,255,255,.25)',fontSize:7,marginTop:4,display:'block'}}>
-              ✱ Updated items reflect v2 analysis · 288 HRs · Last updated: May 9, 2026
+              ✱ v5 analysis · 12,965 HRs · 430,587 PAs · Last updated: May 13, 2026
             </span>
           </div>
         </div>
@@ -12105,8 +12120,10 @@ function MatchupEngineTab() {
           if (_rla>=22&&_rla<=32) s+=2; else if (_rla>=18&&_rla<22) s+=1;
           // BvP LA: same corridor
           if (_bla>=22&&_bla<=32) s+=1;
-          // Barrel 3-6%
-          if (_br>=3&&_br<=6) s+=1;
+          // Barrel quality tier (EV-weighted, 430k data: 107+ = 96.4% HR)
+          const _bq = parseInt(b.barrel_quality_score)||0;
+          if (_bq>=3) s+=3; else if (_bq>=2) s+=2; else if (_bq>=1) s+=1;
+          else if (_br>=3&&_br<=6) s+=1;  // fallback
           // Recent FB%
           if (_rfb>=35) s+=2; else if (_rfb>=25) s+=1; else if (_rfb<15) s-=1;
           // Bat speed
