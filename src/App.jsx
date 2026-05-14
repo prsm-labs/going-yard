@@ -9316,6 +9316,7 @@ function LongShotView({ data }) {
           <thead><tr>
             <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)'}}>TM</th>
             <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)'}}>Batter</th>
+            <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'center',borderBottom:'1px solid var(--border)'}}>Form</th>
             <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'center',borderBottom:'1px solid var(--border)'}}>Gr</th>
             <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)'}}>Pitcher</th>
             <Th k="_sig"   label="⚡ Sig"/>
@@ -9344,6 +9345,8 @@ function LongShotView({ data }) {
                         <span style={{fontFamily:osw,fontWeight:700,fontSize:10,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',color:isKeyMatchup(pid,name)?'#ff8020':'var(--text)'}}>{name}</span>
                         <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={pid} name={name} team={b.batting_team||''}/></span>
                       </div>
+                    </td>
+                    <td style={{padding:'2px 4px',textAlign:'center',verticalAlign:'middle'}}>
                       <FormBadge formKey={b._formClass}/>
                     </td>
                     <td style={{padding:'2px 6px',textAlign:'center',fontFamily:osw,fontWeight:800,fontSize:10,color:b.grade==='C'?'var(--muted)':'rgba(232,65,26,.8)'}}>{b.grade}</td>
@@ -9843,6 +9846,7 @@ function SimLabView({ data }) {
                   {[
                     { label: '+',        key: null },
                     { label: 'Batter',   key: null },
+                    { label: 'Form',     key: null },
                     { label: 'Team',     key: null },
                     { label: 'vs Pitcher',key: null },
                     { label: 'P.Grade',  key: null },
@@ -10033,7 +10037,9 @@ function SimLabView({ data }) {
                           </span>;
                         })()}
                       </td>
-                      
+                      <td style={{textAlign:'center',padding:'2px 4px',verticalAlign:'middle'}}>
+                        <FormBadge formKey={getFormClass(b)}/>
+                      </td>
                       <td style={{ textAlign: 'right', padding:'3px 6px' }}><span style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:hitColor }}>{hitP > 0 ? hitP.toFixed(1)+'%' : '—'}</span></td>
                       <td style={{ textAlign: 'right', padding:'3px 6px' }}><span style={{ fontFamily:"'DM Mono',monospace", fontSize:10 }}>{xbhP > 0 ? xbhP.toFixed(1)+'%' : '—'}</span></td>
                       <td style={{ textAlign: 'right', padding:'3px 6px' }}><span style={{ fontFamily:"'Oswald',sans-serif", fontWeight:700, fontSize:11, color:tb>=1.5?'#ff8020':tb>=1.0?'#f5a623':'var(--text)' }}>{tb > 0 ? tb.toFixed(2) : '—'}</span></td>
@@ -10414,7 +10420,6 @@ function SimLabView({ data }) {
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                             <PlayerAvatar pid={parseInt(b.batter_id)||0} name={b.batter} size={24}/>
                             <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 12 }}>{b.batter}</span>
-                        <FormBadge formKey={getFormClass(b)}/>
                           </div>
                         </td>
                         <td><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--accent2)', fontWeight: 700 }}>{b.batting_team}</span></td>
