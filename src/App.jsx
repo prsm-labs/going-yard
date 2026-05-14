@@ -9252,7 +9252,6 @@ function LongShotView({ data }) {
         <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search batter…"
           style={{padding:'4px 10px',borderRadius:6,fontSize:10,fontFamily:mono,width:130,outline:'none',
             border:`1px solid ${search?'var(--accent2)':'var(--border)'}`,background:'var(--surface2)',color:'var(--text)'}}/>
-      <HandFilter mode="batter" value={blBatterHand} onChange={setBlBatterHand}/>
         <select value={teamFilter} onChange={e=>setTeamFilter(e.target.value)}
           style={{padding:'3px 8px',borderRadius:6,fontSize:10,fontFamily:mono,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',cursor:'pointer'}}>
           {teams.map(t=><option key={t} value={t}>{t==='ALL'?'All Teams':t}</option>)}
@@ -9288,15 +9287,7 @@ function LongShotView({ data }) {
         ))}
       </div>
 
-      <div style={{display:"flex",gap:6,marginBottom:6,flexWrap:"wrap",alignItems:"center"}}>
-        <HandFilter mode="batter" value={kmBatterHand} onChange={setKmBatterHand}/>
-        <HandFilter mode="pitcher" value={kmPitcherHand} onChange={setKmPitcherHand}/>
-      </div>
-      <FormClassFilter selected={kmFormFilter} onChange={setKmFormFilter}/>
       {/* Sticker filters */}
-      <div style={{display:'flex',gap:6,marginBottom:6,flexWrap:'wrap',alignItems:'center'}}>
-
-      </div>
       <div style={{display:'flex',gap:6,marginBottom:10,flexWrap:'wrap'}}>
         {[
           [()=>setLineupOnly(v=>!v), lineupOnly,  'rgba(39,201,122,.12)', '#27c97a',        '✅'],
@@ -9676,6 +9667,11 @@ function SimLabView({ data }) {
           </div>
 
           {/* ── Row 2: Batter filter emoji stickers ── */}
+            <div style={{display:"flex",gap:6,marginBottom:4,flexWrap:"wrap",alignItems:"center"}}>
+              <HandFilter mode="batter" value={slBatterHand} onChange={setSlBatterHand}/>
+              <HandFilter mode="pitcher" value={slPitcherHand} onChange={setSlPitcherHand}/>
+              <FormClassFilter selected={slFormFilter} onChange={setSlFormFilter}/>
+            </div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             {[
               [() => setLineupOnly(v=>!v),        lineupOnly,        'rgba(39,201,122,.12)', '#27c97a',       '✅'],
@@ -10851,6 +10847,7 @@ function BvPHistoryTab({ data }) {
         opp:         pitcherTeam,
         pitcher:     r.pitcher     || '—',
         pitcherHand: r.pitcher_hand || '?',
+        batterHand:  r.batter_hand  || '',
         grade:       r.grade       || '—',
       });
     });
@@ -11354,6 +11351,7 @@ function BatterLeaderboard() {
             style={{width:'100%',padding:'7px 28px 7px 28px',background:'var(--surface2)',
               border:'1px solid var(--border)',borderRadius:7,color:'var(--text)',
               fontFamily:"'DM Mono',monospace",fontSize:11,outline:'none',boxSizing:'border-box'}}/>
+      <HandFilter mode="batter" value={blBatterHand} onChange={setBlBatterHand}/>
           <span style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',color:'var(--muted)',pointerEvents:'none'}}>🔍</span>
           {searchQ && <button onClick={()=>setSearchQ('')}
             style={{position:'absolute',right:6,top:'50%',transform:'translateY(-50%)',
@@ -12702,7 +12700,12 @@ function MatchupEngineTab() {
           {g}
         </button>;
       })}
-      {/* Gone Yard filter — show only batters who have already hit a HR today */}
+            <div style={{display:"flex",gap:6,marginBottom:6,flexWrap:"wrap",alignItems:"center"}}>
+        <HandFilter mode="batter" value={kmBatterHand} onChange={setKmBatterHand}/>
+        <HandFilter mode="pitcher" value={kmPitcherHand} onChange={setKmPitcherHand}/>
+        <FormClassFilter selected={kmFormFilter} onChange={setKmFormFilter}/>
+      </div>
+{/* Gone Yard filter — show only batters who have already hit a HR today */}
       <button onClick={()=>setFilterGoneYard(s=>!s)}
         style={{padding:'3px 12px',borderRadius:6,cursor:'pointer',marginLeft:4,
           background:filterGoneYard?'rgba(255,20,0,.18)':'transparent',
@@ -12947,6 +12950,7 @@ function MatchupEngineTab() {
                           title="🔥 Hot Bat — 3+ HRs in last 7 days">🔥</span>}
                         <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
                           marginLeft:2}}>{b.batter_hand}HB</span>
+                        <FormBadge formKey={getFormClass(b)}/>
                         <span style={{fontSize:10,color:'var(--muted)',opacity:.5}}>›</span>
                       </div>
 
@@ -15231,9 +15235,4 @@ export default function App() {
     <InjuryModal/>
   </>;
 
-      <div style={{display:"flex",gap:6,marginBottom:6,flexWrap:"wrap",alignItems:"center"}}>
-        <HandFilter mode="batter" value={slBatterHand} onChange={setSlBatterHand}/>
-        <HandFilter mode="pitcher" value={slPitcherHand} onChange={setSlPitcherHand}/>
-        <FormClassFilter selected={slFormFilter} onChange={setSlFormFilter}/>
-      </div>
 }
