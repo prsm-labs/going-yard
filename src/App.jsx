@@ -8962,7 +8962,7 @@ function getFormClass(b) {
   const hit   = parseFloat(b.recent_hit_rate)  || 0;
   const popup = parseFloat(b.recent_popup_pct) || 0;
   const pa    = parseInt(b.recent_pa)          || 0;
-  if (pa < 5) return null; // not enough L7 data
+  if (pa < 3) return null; // not enough L7 data
 
   // 1. Moonshot Mafia — hitting HRs with elevation
   if (hr >= 2 && (la >= 18 || fb >= 30 || brl >= 5)) return 'moonshot';
@@ -9224,7 +9224,7 @@ function LongShotView({ data }) {
     if (picksOnly)   r = r.filter(b=>picks[String(b.batter_id||'')]);
     if (diamondOnly) r = r.filter(b=>{ const dp=DAILY_PICKS_CACHE[String(b.batter_id||'')]; return dp?.is_diamond==='1'||dp?.is_diamond===true; });
     return [...r].sort((a,b2)=>{ const av=a[sort]||0; const bv=b2[sort]||0; return sortDir*(bv-av); });
-  }, [rows,teamFilter,pgFilter,search,sort,sortDir,lineupOnly,goneYard,dueOnly,activeOnly,injuredOnly,hotOnly,picksOnly,diamondOnly]);
+  }, [rows,teamFilter,pgFilter,search,sort,sortDir,lineupOnly,goneYard,dueOnly,activeOnly,injuredOnly,hotOnly,picksOnly,diamondOnly,batterHand,pitcherHand,formFilter]);
 
   const Th = ({k,label}) => (
     <th onClick={()=>{ if(sort===k) setSortDir(d=>-d); else{setSort(k);setSortDir(-1);} }}
@@ -9339,8 +9339,8 @@ function LongShotView({ data }) {
                         <PlayerAvatar pid={pid} name={name} size={16}/>
                         <span style={{fontFamily:osw,fontWeight:700,fontSize:10,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',color:isKeyMatchup(pid,name)?'#ff8020':'var(--text)'}}>{name}</span>
                         <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={pid} name={name} team={b.batting_team||''}/></span>
-                      <FormBadge formKey={b._formClass}/>
                       </div>
+                      <FormBadge formKey={b._formClass}/>
                     </td>
                     <td style={{padding:'2px 6px',textAlign:'center',fontFamily:osw,fontWeight:800,fontSize:10,color:b.grade==='C'?'var(--muted)':'rgba(232,65,26,.8)'}}>{b.grade}</td>
                     <td style={{padding:'2px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',whiteSpace:'nowrap',maxWidth:100,overflow:'hidden',textOverflow:'ellipsis'}}>{b.pitcher||'—'}</td>
@@ -9506,7 +9506,7 @@ function SimLabView({ data }) {
     const filtered = data.filter(r => r.batter && r.batting_team)
       .filter(r => matchesHandFilter(r.batter_hand, slBatterHand))
       .filter(r => matchesHandFilter(r.pitcher_hand, slPitcherHand))
-      .filter(r => slFormFilter.size === 0 || slFormFilter.has(r._formClass))
+      .filter(r => slFormFilter.size === 0 || slFormFilter.has(getFormClass(r)))
       .filter(r => selMatchups.size === 0 || selMatchups.has(String(r.game_id)))
       .filter(r => selBatterGradesSim.size === 0 || selBatterGradesSim.has(r.grade))
       .filter(r => !lineupOnly || isConfirmed(r))
@@ -9543,7 +9543,7 @@ function SimLabView({ data }) {
       }
       return mul * ((parseFloat(a[sortBy]) || 0) - (parseFloat(b[sortBy]) || 0));
     });
-  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, minHRScore, minHRPct, minMeatball, minHitPct, minSimTB, minOdds, simSearch, lineupVer]);
+  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, minHRScore, minHRPct, minMeatball, minHitPct, minSimTB, minOdds, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter]);
 
   // Auto-select top batter when data loads
   useEffect(() => {
@@ -12950,10 +12950,9 @@ function MatchupEngineTab() {
                           title="🔥 Hot Bat — 3+ HRs in last 7 days">🔥</span>}
                         <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
                           marginLeft:2}}>{b.batter_hand}HB</span>
-                        <FormBadge formKey={getFormClass(b)}/>
                         <span style={{fontSize:10,color:'var(--muted)',opacity:.5}}>›</span>
                       </div>
-
+                      <FormBadge formKey={getFormClass(b)}/>
                     {/* Flag pills */}
                     <div style={{display:'flex',gap:4,marginTop:3,flexWrap:'wrap'}}>
                       {flag(b.recent_ev_flag) &&
