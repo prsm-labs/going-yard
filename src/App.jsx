@@ -7849,7 +7849,7 @@ function HRTrackerTab() {
 
   const HRNav = () => (
     <div style={{display:'flex',gap:6,marginBottom:14}}>
-      {[['tracker','💥 HR Tracker'],['hotbats','🔥 Hot Bats'],['heatingup','📈 Heating Up'],['leaderboard','🏆 HR Leaders']].map(([key,label]) => (
+      {[['tracker','💥 HR Tracker'],['leaderboard','🏆 HR Leaders'],['hotbats','🔥 Hot Bats'],['heatingup','📈 Heating Up']].map(([key,label]) => (
         <button key={key} onClick={() => setHrTab(key)}
           style={{padding:'5px 12px',borderRadius:7,cursor:'pointer',
             fontFamily:"'DM Mono',monospace",fontWeight:hrTab===key?700:400,fontSize:10,
@@ -8033,6 +8033,7 @@ function HRLeaderboardTab() {
   const [search,  setSearch]  = React.useState('');
   const [teamFilter, setTeamFilter] = React.useState('ALL');
   const [expPid,  setExpPid]  = React.useState(null);
+  const [statCards, setStatCards] = React.useState({ total:0, longDist:null, longEV:null });
   const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
   const SEASON_START = '2026-03-25';
   const ABBR = {108:'LAA',109:'AZ',110:'BAL',111:'BOS',112:'CHC',113:'CIN',114:'CLE',115:'COL',116:'DET',117:'HOU',118:'KC',119:'LAD',120:'WSH',121:'NYM',133:'ATH',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',139:'TB',140:'TEX',141:'TOR',142:'MIN',143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL'};
@@ -8068,7 +8069,15 @@ function HRLeaderboardTab() {
           const isHR = parseInt(r['Is Home Run'] || 0) === 1;
           if (!evMap[pid]) evMap[pid] = { laser105:0, laser110:0, hh105:0, hh110:0 };
           const m = evMap[pid];
-          if (isHR) { if (ev>=105) m.laser105++; if (ev>=110) m.laser110++; }
+          if (isHR) {
+            if (ev>=105) m.laser105++; if (ev>=110) m.laser110++;
+            const dist = parseFloat(r['Hit Distance']) || 0;
+            const name = r['Batter'] ? String(r['Batter']) : '';
+            if (dist > 0 && (!evMap._longDist || dist > evMap._longDist.dist))
+              evMap._longDist = { pid, dist, ev };
+            if (ev > 0 && (!evMap._longEV || ev > evMap._longEV.ev))
+              evMap._longEV = { pid, ev, dist: parseFloat(r['Hit Distance'])||0 };
+          }
           if (ev>=105) m.hh105++; if (ev>=110) m.hh110++;
         });
         return evMap;
@@ -8078,6 +8087,17 @@ function HRLeaderboardTab() {
         const out = Object.values(leaderMap).filter(r => r.hrs >= 1)
           .map(r => { const ev = evMap[r.pid] || {}; return { ...r, laser105:ev.laser105||0, laser110:ev.laser110||0, hh105:ev.hh105||0, hh110:ev.hh110||0 }; })
           .sort((a,b) => b.hrs - a.hrs).map((r,i) => ({ ...r, rank: i+1 }));
+        // Stat cards
+        const total = out.reduce((s,r) => s+r.hrs, 0);
+        const longDistPid = evMap._longDist?.pid;
+        const longEVPid   = evMap._longEV?.pid;
+        const findName = pid => out.find(r=>r.pid===pid)?.name || `#${pid}`;
+        const findTeam = pid => out.find(r=>r.pid===pid)?.team || '';
+        setStatCards({
+          total,
+          longDist: evMap._longDist ? { name: findName(longDistPid), team: findTeam(longDistPid), dist: evMap._longDist.dist } : null,
+          longEV:   evMap._longEV   ? { name: findName(longEVPid),   team: findTeam(longEVPid),   ev:   evMap._longEV.ev   } : null,
+        });
         setRows(out); setLoading(false);
       }).catch(e => { setError(e.message); setLoading(false); });
   }, []);
@@ -8107,6 +8127,51 @@ function HRLeaderboardTab() {
 
   return (
     <div>
+      {/* ── Stat Cards ── */}
+      <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}>
+        {/* Total HRs */}
+        <div style={{flex:'1 1 100px',minWidth:100,background:'var(--surface2)',borderRadius:8,
+          border:'1px solid var(--border)',padding:'10px 14px',display:'flex',
+          flexDirection:'column',gap:2}}>
+          <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',
+            letterSpacing:.8}}>2026 Total HRs</div>
+          <div style={{fontFamily:osw,fontWeight:800,fontSize:28,color:'var(--accent)',
+            lineHeight:1}}>{statCards.total.toLocaleString()}</div>
+          <div style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.25)'}}>season to date</div>
+        </div>
+        {/* Longest Distance */}
+        <div style={{flex:'2 1 160px',minWidth:160,background:'var(--surface2)',borderRadius:8,
+          border:'1px solid var(--border)',padding:'10px 14px',display:'flex',
+          flexDirection:'column',gap:2}}>
+          <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',
+            letterSpacing:.8}}>📏 Longest HR</div>
+          {statCards.longDist ? <>
+            <div style={{fontFamily:osw,fontWeight:800,fontSize:22,color:'#f5a623',lineHeight:1}}>
+              {statCards.longDist.dist.toFixed(0)} ft
+            </div>
+            <div style={{fontFamily:mono,fontSize:9,color:'var(--text)',marginTop:1}}>
+              {statCards.longDist.name}
+              {statCards.longDist.team ? <span style={{color:'var(--muted)',marginLeft:4,fontSize:8}}>{statCards.longDist.team}</span> : null}
+            </div>
+          </> : <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)'}}>Loading…</div>}
+        </div>
+        {/* Highest EV */}
+        <div style={{flex:'2 1 160px',minWidth:160,background:'var(--surface2)',borderRadius:8,
+          border:'1px solid var(--border)',padding:'10px 14px',display:'flex',
+          flexDirection:'column',gap:2}}>
+          <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',
+            letterSpacing:.8}}>⚡ Hardest Hit HR</div>
+          {statCards.longEV ? <>
+            <div style={{fontFamily:osw,fontWeight:800,fontSize:22,color:'#ff4020',lineHeight:1}}>
+              {statCards.longEV.ev.toFixed(1)} mph
+            </div>
+            <div style={{fontFamily:mono,fontSize:9,color:'var(--text)',marginTop:1}}>
+              {statCards.longEV.name}
+              {statCards.longEV.team ? <span style={{color:'var(--muted)',marginLeft:4,fontSize:8}}>{statCards.longEV.team}</span> : null}
+            </div>
+          </> : <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)'}}>Loading…</div>}
+        </div>
+      </div>
       <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10,flexWrap:'wrap'}}>
         <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search batter or team…"
           style={{padding:'3px 10px',borderRadius:6,border:'1px solid var(--border)',background:'var(--surface2)',
@@ -15042,6 +15107,41 @@ function LegendButton() {
     { tab:'Pitcher Grades',   items:['🎯 Target — softest matchup, highest batter HR rate','💥 Hittable — green light','🤔 Average — play carefully','⚠️ Tough — fade unless A+ batter','‼️ Elite — avoid, especially on Fridays'] },
     { tab:'Weather',          items:['✅ Wind Out — boosts HR','⚠️ Wind In — suppresses HR','🌡️ 70–75°F = peak HR temp (+9.2% lift)','❄️ Below 65°F = hard fade','☀️ Sunny/Clear = favorable','🌧️ Rain Risk = watch for postponements'] },
     { tab:'Discipline',       items:['🟢 Disciplined: Chase K% < 8%, BB% > 8%','🟡 Watch: Chase K% 12–20% or behind in counts > 50%','🔴 Chase Risk: Chase K% > 20% — engine fades this batter −0.20','Score: 0–100, higher = more patient plate approach'] },
+    { tab:'🏷️ Form Class',    items:[
+      '🌙 Moonshot Mafia — 2+ HRs in L7 with elevation (FB%≥30, LA≥18°, or Barrel≥5%). Also fires on 1 HR + LA≥22° + EV≥97 + pull power. Best HR target.',
+      '🥶 Cold Bat — Weak contact pattern: 2+ of EV<87, HH%<27, bat speed<69. Or EV<84 alone. Fade regardless of Sig score.',
+      '💨 Whiff King — K%≥33%, or K%≥27 with weak hard-hit rate. High strikeout risk suppresses expected bases.',
+      '🪱 Worm Burner — GB%≥55%, or GB%≥48 with flat angle (LA<8°). Ball stays on the ground — not going yard.',
+      '🎯 Gap Sniper — XBH rate≥8% at gap angle (LA 10–22°), or XBH≥10% overall. Great for total bases, not HRs.',
+      '🎩 Contact King — K%≤14 + HH%≥36 + EV≥92, or hit rate≥.32 + low K + not groundball-heavy. Consistent contact, low HR ceiling.',
+      'No badge — insufficient L7 data (<3 PA) or no category triggered.',
+      'Visible as own column in: All Matchups · Sim Lab Slate · Long Shot tables.'
+    ] },
+    { tab:'⚡ Sig Score',      items:[
+      'Scale: 0–14 (hard cap). Red ≥10 = Elite · Orange ≥7 = Strong · Green ≥4 = Watch.',
+      '─── BOOSTS ───',
+      'Sim TB 2.5–3.0 → +3 · 2.0–2.5 → +2 · 1.5–2.0 → +1 (3.0+ dead zone → −1)',
+      'Pitcher: 🎯 Target → +2 · 💥 Hittable → +1 · ‼️ Elite → −2',
+      'Temp 70–75°F → +2 (peak HR carry window, 430k PA confirmed)',
+      'EV ≥103 → +2 · EV 97–103 → +2/+1 (103+ is the real carry cliff)',
+      'Recent LA 22–32° → +2 · 18–22° → +1 (HR peak corridor)',
+      'BvP LA 22–32° → +1 (confirms approach angle in this matchup)',
+      'BvP FB% 20–34% → +2 (dead zones: 42%+ → −2 · 36–42% → −1)',
+      'Barrel quality: 107+ EV barrel → +2 (96% HR rate!) · 103–107 → +1 · 98–103 → +1',
+      'Recent FB% ≥35% → +1',
+      'Bat speed ≥77 mph → +1',
+      'Consecutive HR games (2+) → +1',
+      'Park HR factor ≥1.15 → +1 (Coors etc.) · ≤0.88 → −1',
+      'Pulled barrel rate ≥3% → +1',
+      'Batter-ahead count ≥32% → +1',
+      'Pitcher hand weakness vs batter side: barrel ≥12% → +2 · ≥8% → +1 · HH≥45% → +1 · FB≥38% → +1 · HR≥5% → +1',
+      'Platoon advantage or lineup spot 3–5 → +1',
+      '─── FADES ───',
+      'Sinker-heavy pitcher (SI first) → −1 · ABs since HR >30 → −1',
+      'Flags = 7 (dead zone) → −2 · Flags = 1 (noise) → −1',
+      'Pitcher park ≤0.88 → −1 · Recent FB% <15% → −1',
+      'Data: 2024–26 at-bat log · 12,965 HRs · 430,587 PAs · base rate 3.0%'
+    ] },
   ];
   return <>
     <button onClick={()=>setOpen(true)}
@@ -15083,12 +15183,39 @@ function LegendButton() {
                 {tab}
               </div>
               <div style={{display:'flex',flexDirection:'column',gap:3}}>
-                {items.map((item,i) => (
-                  <div key={i} style={{fontFamily:"'DM Mono',monospace",fontSize:10,
-                    color:'var(--muted)',lineHeight:1.4,paddingLeft:4}}>
-                    {item}
-                  </div>
-                ))}
+                {items.map((item,i) => {
+                  const isSep = item.startsWith('───');
+                  const isScale = item.startsWith('Scale:');
+                  const isData = item.startsWith('Data:');
+                  const isVisible = item.startsWith('Visible');
+                  if (isSep) return (
+                    <div key={i} style={{fontFamily:"'DM Mono',monospace",fontSize:9,
+                      color:'var(--accent2)',letterSpacing:.8,marginTop:4,marginBottom:1,
+                      borderTop:'1px solid rgba(255,255,255,.06)',paddingTop:4}}>
+                      {item}
+                    </div>
+                  );
+                  if (isScale) return (
+                    <div key={i} style={{fontFamily:"'DM Mono',monospace",fontSize:10,
+                      color:'var(--text)',lineHeight:1.5,paddingLeft:4,fontWeight:700,
+                      marginBottom:2}}>
+                      {item}
+                    </div>
+                  );
+                  if (isData || isVisible) return (
+                    <div key={i} style={{fontFamily:"'DM Mono',monospace",fontSize:8,
+                      color:'rgba(255,255,255,.3)',lineHeight:1.4,paddingLeft:4,
+                      marginTop:4,fontStyle:'italic'}}>
+                      {item}
+                    </div>
+                  );
+                  return (
+                    <div key={i} style={{fontFamily:"'DM Mono',monospace",fontSize:10,
+                      color:'var(--muted)',lineHeight:1.4,paddingLeft:4}}>
+                      {item}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           ))}
