@@ -10014,6 +10014,9 @@ function SimLabView({ data }) {
                           </div>
                         </div>
                       </td>
+                      <td style={{textAlign:'center',padding:'2px 4px',verticalAlign:'middle'}}>
+                        <FormBadge formKey={getFormClass(b)}/>
+                      </td>
                       <td style={{ textAlign: 'right', padding:'3px 6px' }}><span style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:'var(--accent2)', fontWeight:700 }}>{b.batting_team}</span></td>
                       <td style={{ textAlign: 'right', padding:'3px 6px' }}>
                         <span style={{ fontFamily:"'DM Mono',monospace", fontSize:9, color:'var(--muted)', cursor:'pointer', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:90, display:'inline-block' }}
@@ -10036,9 +10039,6 @@ function SimLabView({ data }) {
                               border:'1px solid rgba(245,166,35,.3)',borderRadius:3,padding:'0 3px'}}>#{ws}</span>}
                           </span>;
                         })()}
-                      </td>
-                      <td style={{textAlign:'center',padding:'2px 4px',verticalAlign:'middle'}}>
-                        <FormBadge formKey={getFormClass(b)}/>
                       </td>
                       <td style={{ textAlign: 'right', padding:'3px 6px' }}><span style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:hitColor }}>{hitP > 0 ? hitP.toFixed(1)+'%' : '—'}</span></td>
                       <td style={{ textAlign: 'right', padding:'3px 6px' }}><span style={{ fontFamily:"'DM Mono',monospace", fontSize:10 }}>{xbhP > 0 ? xbhP.toFixed(1)+'%' : '—'}</span></td>
