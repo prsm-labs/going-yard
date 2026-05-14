@@ -8040,18 +8040,27 @@ function HRLeaderboardTab() {
 
   React.useEffect(() => {
     const season = new Date().getFullYear();
-    const leadersPromise = fetch(
-      `https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&season=${season}&sportId=1&limit=200`
-    ).then(r => r.json()).then(d => {
-      const leaders = d.leagueLeaders?.[0]?.leaders || [];
+    const today  = new Date().toISOString().slice(0,10);
+
+    // ── Paginated leaders — fetches ALL batters with ≥1 HR, no fixed cap ──────
+    // Pages of 500 until the last page returns fewer rows
+    const leadersPromise = (async () => {
       const map = {};
-      leaders.forEach(l => {
-        const pid = l.person?.id; if (!pid) return;
-        map[pid] = { pid, name: l.person?.fullName || '', team: ABBR[l.team?.id] || l.team?.abbreviation || '',
-          hrs: parseInt(l.value || 0), laser105:0, laser110:0, hh105:0, hh110:0 };
-      });
+      let offset = 0;
+      while (true) {
+        const url = `https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&season=${season}&sportId=1&startDate=${season}-03-25&endDate=${today}&limit=500&offset=${offset}`;
+        const d = await fetch(url).then(r=>r.json()).catch(()=>null);
+        const leaders = d?.leagueLeaders?.[0]?.leaders || [];
+        leaders.forEach(l => {
+          const pid = l.person?.id; if (!pid) return;
+          map[pid] = { pid, name: l.person?.fullName||'', team: ABBR[l.team?.id]||l.team?.abbreviation||'',
+            hrs: parseInt(l.value||0), laser105:0, laser110:0, hh105:0, hh110:0 };
+        });
+        if (leaders.length < 500) break;   // last page — done
+        offset += 500;
+      }
       return map;
-    });
+    })();
     const logPromise = fetch('/data/mlb_atbat_log_full.csv')
       .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text(); })
       .then(text => {
@@ -8072,7 +8081,6 @@ function HRLeaderboardTab() {
           if (isHR) {
             if (ev>=105) m.laser105++; if (ev>=110) m.laser110++;
             const dist = parseFloat(r['Hit Distance']) || 0;
-            const name = r['Batter'] ? String(r['Batter']) : '';
             if (dist > 0 && (!evMap._longDist || dist > evMap._longDist.dist))
               evMap._longDist = { pid, dist, ev };
             if (ev > 0 && (!evMap._longEV || ev > evMap._longEV.ev))
@@ -8088,7 +8096,7 @@ function HRLeaderboardTab() {
           .map(r => { const ev = evMap[r.pid] || {}; return { ...r, laser105:ev.laser105||0, laser110:ev.laser110||0, hh105:ev.hh105||0, hh110:ev.hh110||0 }; })
           .sort((a,b) => b.hrs - a.hrs).map((r,i) => ({ ...r, rank: i+1 }));
         // Stat cards
-        const total = out.reduce((s,r) => s+r.hrs, 0);
+        const total = out.reduce((s,r) => s+r.hrs, 0); // API sum — live, no limit now
         const longDistPid = evMap._longDist?.pid;
         const longEVPid   = evMap._longEV?.pid;
         const findName = pid => out.find(r=>r.pid===pid)?.name || `#${pid}`;
