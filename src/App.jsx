@@ -8930,8 +8930,12 @@ function HandFilter({ mode, value, onChange }) {
 function matchesHandFilter(hand, filter) {
   if (!filter || filter === 'ALL') return true;
   if (!hand) return true;
-  const h = hand.toUpperCase();
-  if (h === 'S') return true; // switch → always include
+  // Normalize 'Right'→'R', 'Left'→'L', 'Switch'→'S' (engine uses full words for pitcher_hand)
+  let h = hand.toUpperCase();
+  if (h === 'RIGHT') h = 'R';
+  else if (h === 'LEFT') h = 'L';
+  else if (h === 'SWITCH') h = 'S';
+  if (h === 'S') return true; // switch hitters appear under both
   return h === filter;
 }
 
@@ -12952,7 +12956,6 @@ function MatchupEngineTab() {
                           marginLeft:2}}>{b.batter_hand}HB</span>
                         <span style={{fontSize:10,color:'var(--muted)',opacity:.5}}>›</span>
                       </div>
-                      <FormBadge formKey={getFormClass(b)}/>
                     {/* Flag pills */}
                     <div style={{display:'flex',gap:4,marginTop:3,flexWrap:'wrap'}}>
                       {flag(b.recent_ev_flag) &&
