@@ -3230,6 +3230,9 @@ async function fetchGames(setL, setG, setE, silent=false) {
         },
       };
     });
+    // Update FINAL_GAME_IDS so all 4 tables can filter completed games
+    FINAL_GAME_IDS.clear();
+    games.forEach(g => { if (g.status === 'Final') FINAL_GAME_IDS.add(String(g.id)); });
     setG(games);
   } catch (e) {
     console.error("fetchGames error:", e.message);
@@ -7552,6 +7555,7 @@ const DUE_BADGE = (
 );
 const WEATHER_ALERT_GAME_IDS = new Set(); // game_ids with weather concerns at game time
 const DAILY_GAME_MAP    = {}; // keyed by normalized game_id → Set of batting_teams
+const FINAL_GAME_IDS    = new Set(); // game_ids whose status is "Final" — updated by fetchGames
 let _notifyNewHR = null; // callback set by useHRNotifications hook
 
 // Global navigation — lets notifications route to tabs/views without prop drilling
@@ -9169,6 +9173,7 @@ function LongShotView({ data }) {
   const [hotOnly,    setHotOnly]      = useState(false);
   const [picksOnly,  setPicksOnly]    = useState(false);
   const [diamondOnly,setDiamondOnly]  = useState(false);
+  const [hideFinal, setHideFinal]       = useState(false);
   const [batterHand, setBatterHand]     = useState('ALL');
   const [pitcherHand, setPitcherHand]   = useState('ALL');
   const [formFilter, setFormFilter]     = useState(new Set());
@@ -9296,7 +9301,8 @@ function LongShotView({ data }) {
     let r = rows.filter(b => b._simTB >= 0.01)
       .filter(b => matchesHandFilter(b.batter_hand, batterHand))
       .filter(b => matchesHandFilter(b.pitcher_hand, pitcherHand))
-      .filter(b => formFilter.size === 0 || formFilter.has(b._formClass)); // hide zero sim TB rows
+      .filter(b => formFilter.size === 0 || formFilter.has(b._formClass))
+      .filter(b => !hideFinal || !FINAL_GAME_IDS.has(String(b.game_id))); // hide zero sim TB rows
     if (teamFilter!=='ALL') r = r.filter(b=>b.batting_team===teamFilter);
     if (pgFilter!=='ALL')   r = r.filter(b=>b._pgLabel===pgFilter);
     if (search)      { const q=search.toLowerCase(); r=r.filter(b=>(b.batter||'').toLowerCase().includes(q)); }
@@ -9309,7 +9315,7 @@ function LongShotView({ data }) {
     if (picksOnly)   r = r.filter(b=>picks[String(b.batter_id||'')]);
     if (diamondOnly) r = r.filter(b=>{ const dp=DAILY_PICKS_CACHE[String(b.batter_id||'')]; return dp?.is_diamond==='1'||dp?.is_diamond===true; });
     return [...r].sort((a,b2)=>{ const av=a[sort]||0; const bv=b2[sort]||0; return sortDir*(bv-av); });
-  }, [rows,teamFilter,pgFilter,search,sort,sortDir,lineupOnly,goneYard,dueOnly,activeOnly,injuredOnly,hotOnly,picksOnly,diamondOnly,batterHand,pitcherHand,formFilter]);
+  }, [rows,teamFilter,pgFilter,search,sort,sortDir,lineupOnly,goneYard,dueOnly,activeOnly,injuredOnly,hotOnly,picksOnly,diamondOnly,batterHand,pitcherHand,formFilter,hideFinal]);
 
   const Th = ({k,label}) => (
     <th onClick={()=>{ if(sort===k) setSortDir(d=>-d); else{setSort(k);setSortDir(-1);} }}
@@ -9344,6 +9350,13 @@ function LongShotView({ data }) {
         <HandFilter mode="batter" value={batterHand} onChange={setBatterHand}/>
       <HandFilter mode="pitcher" value={pitcherHand} onChange={setPitcherHand}/>
       <FormClassFilter selected={formFilter} onChange={setFormFilter}/>
+      <button onClick={()=>setHideFinal(v=>!v)} style={{padding:'3px 9px',borderRadius:6,
+        border:`1px solid ${hideFinal?'#ff4020':'var(--border)'}`,
+        background:hideFinal?'rgba(255,64,32,.12)':'transparent',
+        color:hideFinal?'#ff4020':'var(--muted)',fontFamily:"'DM Mono',monospace",
+        fontSize:9,cursor:'pointer',whiteSpace:'nowrap'}}>
+        {hideFinal?'✓ Hiding Final':'Hide Final'}
+      </button>
       <select value={pgFilter} onChange={e=>setPgFilter(e.target.value)}
           style={{padding:'3px 8px',borderRadius:6,fontSize:10,fontFamily:mono,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',cursor:'pointer'}}>
           {SOFT_LABEL_LIST.map(g=><option key={g} value={g}>{g==='ALL'?'All Pitchers':g}</option>)}
@@ -9499,6 +9512,7 @@ function SimLabView({ data }) {
   const [sortPropDir, setSortPropDir] = useState('desc');
   const [lineupOnly, setLineupOnly]   = useState(false);
   const [slBatterHand, setSlBatterHand]   = useState('ALL');
+  const [slHideFinal, setSlHideFinal]     = useState(false);
   const [slPitcherHand, setSlPitcherHand] = useState('ALL');
   const [slFormFilter, setSlFormFilter]   = useState(new Set());
   const [filterGoneYardSim, setFilterGoneYardSim] = useState(false);
@@ -9595,6 +9609,7 @@ function SimLabView({ data }) {
       .filter(r => matchesHandFilter(r.batter_hand, slBatterHand))
       .filter(r => matchesHandFilter(r.pitcher_hand, slPitcherHand))
       .filter(r => slFormFilter.size === 0 || slFormFilter.has(getFormClass(r)))
+      .filter(r => !slHideFinal || !FINAL_GAME_IDS.has(String(r.game_id)))
       .filter(r => selMatchups.size === 0 || selMatchups.has(String(r.game_id)))
       .filter(r => selBatterGradesSim.size === 0 || selBatterGradesSim.has(r.grade))
       .filter(r => !lineupOnly || isConfirmed(r))
@@ -9631,7 +9646,7 @@ function SimLabView({ data }) {
       }
       return mul * ((parseFloat(a[sortBy]) || 0) - (parseFloat(b[sortBy]) || 0));
     });
-  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, minHRScore, minHRPct, minMeatball, minHitPct, minSimTB, minOdds, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter]);
+  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, minHRScore, minHRPct, minMeatball, minHitPct, minSimTB, minOdds, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal]);
 
   // Auto-select top batter when data loads
   useEffect(() => {
@@ -9759,6 +9774,13 @@ function SimLabView({ data }) {
               <HandFilter mode="batter" value={slBatterHand} onChange={setSlBatterHand}/>
               <HandFilter mode="pitcher" value={slPitcherHand} onChange={setSlPitcherHand}/>
               <FormClassFilter selected={slFormFilter} onChange={setSlFormFilter}/>
+              <button onClick={()=>setSlHideFinal(v=>!v)} style={{padding:'3px 9px',borderRadius:6,
+                border:`1px solid ${slHideFinal?'#ff4020':'var(--border)'}`,
+                background:slHideFinal?'rgba(255,64,32,.12)':'transparent',
+                color:slHideFinal?'#ff4020':'var(--muted)',fontFamily:"'DM Mono',monospace",
+                fontSize:9,cursor:'pointer',whiteSpace:'nowrap'}}>
+                {slHideFinal?'✓ Hiding Final':'Hide Final'}
+              </button>
             </div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             {[
@@ -12263,6 +12285,7 @@ function MatchupEngineTab() {
   useInjuries();
   const [kmActiveOnly, setKmActiveOnly]         = useState(false);
   const [kmBatterHand, setKmBatterHand]           = useState('ALL');
+  const [kmHideFinal, setKmHideFinal]             = useState(false);
   const [kmPitcherHand, setKmPitcherHand]         = useState('ALL');
   const [kmFormFilter, setKmFormFilter]           = useState(new Set());
   const [kmInjuredOnly, setKmInjuredOnly]       = useState(false);
@@ -12383,6 +12406,7 @@ function MatchupEngineTab() {
     .filter(r => matchesHandFilter(r.batter_hand, kmBatterHand))
     .filter(r => matchesHandFilter(r.pitcher_hand, kmPitcherHand))
     .filter(r => kmFormFilter.size === 0 || kmFormFilter.has(getFormClass(r)))
+    .filter(r => !kmHideFinal || !FINAL_GAME_IDS.has(String(r.game_id)))
     .filter(r => !kmActiveOnly || !INJURY_MAP[String(parseInt(r.batter_id)||0)])
     .filter(r => !kmInjuredOnly || !!INJURY_MAP[String(parseInt(r.batter_id)||0)])
     .filter(r => !kmHotOnly || isHotBatPlayer(r))
@@ -12794,6 +12818,13 @@ function MatchupEngineTab() {
         <HandFilter mode="batter" value={kmBatterHand} onChange={setKmBatterHand}/>
         <HandFilter mode="pitcher" value={kmPitcherHand} onChange={setKmPitcherHand}/>
         <FormClassFilter selected={kmFormFilter} onChange={setKmFormFilter}/>
+        <button onClick={()=>setKmHideFinal(v=>!v)} style={{padding:'3px 9px',borderRadius:6,
+          border:`1px solid ${kmHideFinal?'#ff4020':'var(--border)'}`,
+          background:kmHideFinal?'rgba(255,64,32,.12)':'transparent',
+          color:kmHideFinal?'#ff4020':'var(--muted)',fontFamily:"'DM Mono',monospace",
+          fontSize:9,cursor:'pointer',whiteSpace:'nowrap'}}>
+          {kmHideFinal?'✓ Hiding Final':'Hide Final'}
+        </button>
       </div>
 {/* Gone Yard filter — show only batters who have already hit a HR today */}
       <button onClick={()=>setFilterGoneYard(s=>!s)}
