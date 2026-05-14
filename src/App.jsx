@@ -8042,23 +8042,31 @@ function HRLeaderboardTab() {
     const season = new Date().getFullYear();
     const today  = new Date().toISOString().slice(0,10);
 
-    // ── Paginated leaders — fetches ALL batters with ≥1 HR, no fixed cap ──────
-    // Pages of 500 until the last page returns fewer rows
+    // ── ALL batters season hitting stats — paginated, no cap ────────────────
+    // Uses /api/v1/stats with playerPool=ALL which supports real offset pagination.
+    // Each page = 500 players. Stops when page returns fewer than 500.
+    // Filters to only batters with HR > 0 for the leaderboard rows,
+    // but sums ALL HRs across every batter for the true league total.
     const leadersPromise = (async () => {
       const map = {};
-      let offset = 0;
+      let offset = 0; let leagueTotalHRs = 0;
       while (true) {
-        const url = `https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&season=${season}&sportId=1&startDate=${season}-03-25&endDate=${today}&limit=500&offset=${offset}`;
+        const url = `https://statsapi.mlb.com/api/v1/stats?stats=season&group=hitting&gameType=R&season=${season}&sportId=1&playerPool=ALL&startDate=${season}-03-25&endDate=${today}&limit=500&offset=${offset}&hydrate=person,team`;
         const d = await fetch(url).then(r=>r.json()).catch(()=>null);
-        const leaders = d?.leagueLeaders?.[0]?.leaders || [];
-        leaders.forEach(l => {
-          const pid = l.person?.id; if (!pid) return;
-          map[pid] = { pid, name: l.person?.fullName||'', team: ABBR[l.team?.id]||l.team?.abbreviation||'',
-            hrs: parseInt(l.value||0), laser105:0, laser110:0, hh105:0, hh110:0 };
+        const splits = d?.stats?.[0]?.splits || [];
+        splits.forEach(s => {
+          const hrs = parseInt(s.stat?.homeRuns || 0);
+          leagueTotalHRs += hrs;
+          if (hrs < 1) return;   // skip 0-HR batters from leaderboard rows
+          const pid = s.player?.id; if (!pid) return;
+          const teamAbbr = ABBR[s.team?.id] || s.team?.abbreviation || '';
+          map[pid] = { pid, name: s.player?.fullName||'', team: teamAbbr,
+            hrs, laser105:0, laser110:0, hh105:0, hh110:0 };
         });
-        if (leaders.length < 500) break;   // last page — done
+        if (splits.length < 500) break;   // last page
         offset += 500;
       }
+      map._leagueTotalHRs = leagueTotalHRs;
       return map;
     })();
     const logPromise = fetch('/data/mlb_atbat_log_full.csv')
@@ -8096,7 +8104,7 @@ function HRLeaderboardTab() {
           .map(r => { const ev = evMap[r.pid] || {}; return { ...r, laser105:ev.laser105||0, laser110:ev.laser110||0, hh105:ev.hh105||0, hh110:ev.hh110||0 }; })
           .sort((a,b) => b.hrs - a.hrs).map((r,i) => ({ ...r, rank: i+1 }));
         // Stat cards
-        const total = out.reduce((s,r) => s+r.hrs, 0); // API sum — live, no limit now
+        const total = leaderMap._leagueTotalHRs || out.reduce((s,r)=>s+r.hrs,0);
         const longDistPid = evMap._longDist?.pid;
         const longEVPid   = evMap._longEV?.pid;
         const findName = pid => out.find(r=>r.pid===pid)?.name || `#${pid}`;
