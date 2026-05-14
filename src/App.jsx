@@ -9295,9 +9295,7 @@ function LongShotView({ data }) {
       <FormClassFilter selected={kmFormFilter} onChange={setKmFormFilter}/>
       {/* Sticker filters */}
       <div style={{display:'flex',gap:6,marginBottom:6,flexWrap:'wrap',alignItems:'center'}}>
-        <HandFilter mode="batter" value={slBatterHand} onChange={setSlBatterHand}/>
-        <HandFilter mode="pitcher" value={slPitcherHand} onChange={setSlPitcherHand}/>
-        <FormClassFilter selected={slFormFilter} onChange={setSlFormFilter}/>
+
       </div>
       <div style={{display:'flex',gap:6,marginBottom:10,flexWrap:'wrap'}}>
         {[
@@ -15233,4 +15231,9 @@ export default function App() {
     <InjuryModal/>
   </>;
 
+      <div style={{display:"flex",gap:6,marginBottom:6,flexWrap:"wrap",alignItems:"center"}}>
+        <HandFilter mode="batter" value={slBatterHand} onChange={setSlBatterHand}/>
+        <HandFilter mode="pitcher" value={slPitcherHand} onChange={setSlPitcherHand}/>
+        <FormClassFilter selected={slFormFilter} onChange={setSlFormFilter}/>
+      </div>
 }
