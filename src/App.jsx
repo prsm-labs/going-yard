@@ -7925,11 +7925,7 @@ function HRTrackerTab() {
     </div>
 
     {/* Search + Team filter */}
-    <div style={{display:"flex",gap:6,marginBottom:4,alignItems:"center"}}>
-        <HandFilter mode="batter" value={bvpBatterHand} onChange={setBvpBatterHand}/>
-        <HandFilter mode="pitcher" value={bvpPitcherHand} onChange={setBvpPitcherHand}/>
-      </div>
-      <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:10,flexWrap:"wrap"}}>
+    <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:10,flexWrap:"wrap"}}>
       <SearchBar value={hrSearch} onChange={setHrSearch} placeholder="Search batter or pitcher…"/>
       {teams.length > 0 && <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}>
         <span style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1}}>Team:</span>
@@ -10974,6 +10970,8 @@ function BvPHistoryTab({ data }) {
     <div>
       {/* Controls */}
       <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
+        <HandFilter mode="batter" value={bvpBatterHand} onChange={setBvpBatterHand}/>
+        <HandFilter mode="pitcher" value={bvpPitcherHand} onChange={setBvpPitcherHand}/>
         <input value={search} onChange={e=>setSearch(e.target.value)}
           placeholder="Search batter or pitcher…"
           style={{padding:'6px 11px',borderRadius:7,border:`1px solid ${search?'var(--accent2)':'var(--border)'}`,
