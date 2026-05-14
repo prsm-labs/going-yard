@@ -9986,7 +9986,7 @@ function SimLabView({ data }) {
                                    (_phv.startsWith('l')&&(_bhv==='R'||_bhv==='S'));
                   if (_platoonv || (_slotv >= 3 && _slotv <= 5)) _trackerSig += 1;
                   b._trackerSig = Math.min(14, Math.max(0, _trackerSig)); // cap at 14
-                  b._formClass   = getFormClass(b); to prevent score inflation
+                  b._formClass   = getFormClass(b); // cap at 14 to prevent score inflation
                   return (
                     <tr key={`${b.batter_id}-${i}`} className="dr"
                       onClick={() => { setSelBatter(b); setView('deepdive'); }}
