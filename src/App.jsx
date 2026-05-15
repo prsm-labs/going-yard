@@ -9961,7 +9961,7 @@ function SimLabView({ data }) {
               }));
               const bom = '\uFEFF';
               const esc = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
-              const headers = ['Grade','Pitcher Grade','Gone Yard','Is Key Matchup','Team','Batter','Hand','vs Pitcher',
+              const headers = ['Grade','Pitcher Grade','Gone Yard','Is Key Matchup','Team','Batter','Hand','P.Hand','vs Pitcher',
                 'Top Pitches','Game Time',
                 '⚡ Sig','💥 Boom','Form Class','gHR','ISO','Zone Fit',
                 'Flags','Recent EV','Recent Barrel%',
