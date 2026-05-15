@@ -9174,16 +9174,14 @@ function computeBoomScore(sig, zoneFit, iso, simTB, engineScore) {
 
 function BoomBadge({ score }) {
   if (!score || score < 10) return null;
-  const bg  = score>=70?'rgba(255,64,32,.22)':score>=50?'rgba(245,166,35,.18)':score>=30?'rgba(39,201,122,.14)':'rgba(255,255,255,.06)';
+  const bg  = score>=70?'rgba(255,64,32,.2)':score>=50?'rgba(245,166,35,.18)':score>=30?'rgba(39,201,122,.15)':'rgba(255,255,255,.06)';
   const col = score>=70?'#ff4020':score>=50?'#f5a623':score>=30?'#27c97a':'var(--muted)';
-  const bdr = score>=70?'rgba(255,64,32,.5)':score>=50?'rgba(245,166,35,.4)':score>=30?'rgba(39,201,122,.35)':'var(--border)';
-  const lbl = score>=80?'💥':score>=70?'🔥':score>=50?'⚡':'·';
   return (
-    <span title={`Boom Score: ${score} — combined Sig + ZoneFit + ISO + SimTB + Engine`}
-      style={{display:'inline-flex',alignItems:'center',gap:2,padding:'2px 6px',borderRadius:5,
-        fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:11,
-        background:bg,color:col,border:`1px solid ${bdr}`,whiteSpace:'nowrap',cursor:'default'}}>
-      {lbl} {score}
+    <span title={`Boom: ${score} — Sig + ZoneFit + ISO + SimTB + Engine`}
+      style={{display:'inline-block',padding:'1px 5px',borderRadius:4,
+        fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:10,
+        background:bg,color:col,whiteSpace:'nowrap',cursor:'default'}}>
+      {score}
     </span>
   );
 }
@@ -9664,6 +9662,7 @@ function SimLabView({ data }) {
       .filter(r => matchesHandFilter(r.pitcher_hand, slPitcherHand))
       .filter(r => slFormFilter.size === 0 || slFormFilter.has(getFormClass(r)))
       .filter(r => !slHideFinal || !FINAL_GAME_IDS.has(String(r.game_id)))
+      .map(r => ({ ...r, _boom: computeBoomScore(r._trackerSig, r.zone_fit, r.recent_iso, r.sim_tb, r.weighted_flag_score) }))
       .filter(r => selMatchups.size === 0 || selMatchups.has(String(r.game_id)))
       .filter(r => selBatterGradesSim.size === 0 || selBatterGradesSim.has(r.grade))
       .filter(r => !lineupOnly || isConfirmed(r))
@@ -10176,7 +10175,7 @@ function SimLabView({ data }) {
                         </div>
                       </td>
                       <td style={{textAlign:'center',padding:'2px 4px',verticalAlign:'middle'}}>
-                        <BoomBadge score={computeBoomScore(b._trackerSig, b.zone_fit, b.recent_iso, b.sim_tb, b.weighted_flag_score)}/>
+                        <BoomBadge score={b._boom}/>
                       </td>
                       <td style={{textAlign:'center',padding:'2px 4px',verticalAlign:'middle'}}>
                         <FormBadge formKey={getFormClass(b)}/>
@@ -10603,7 +10602,7 @@ function SimLabView({ data }) {
                         </td>
                         <td style={{ textAlign: 'left' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)' }}>{b.pitcher}</span></td>
                         <td style={{textAlign:'center',padding:'2px 4px'}}>
-                          <BoomBadge score={computeBoomScore(b._trackerSig, b.zone_fit, b.recent_iso, b.sim_tb, b.weighted_flag_score)}/>
+                          <BoomBadge score={b._boom}/>
                         </td>
                         <td style={{textAlign:'center'}}>
                           <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',
