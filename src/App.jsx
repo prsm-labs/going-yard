@@ -9564,7 +9564,8 @@ function SimLabView({ data }) {
   const [sortPropDir, setSortPropDir] = useState('desc');
   const [lineupOnly, setLineupOnly]   = useState(false);
   const [slBatterHand, setSlBatterHand]   = useState('ALL');
-  const sigCache = useRef({}); // caches _trackerSig per batter_id after first render
+  const sigCache  = useRef({}); // caches _trackerSig per batter_id after first render
+  const boomCache = useRef({}); // caches _boom per batter_id after first render
   const [slHideFinal, setSlHideFinal]     = useState(false);
   const [slPitcherHand, setSlPitcherHand] = useState('ALL');
   const [slFormFilter, setSlFormFilter]   = useState(new Set());
@@ -9693,9 +9694,8 @@ function SimLabView({ data }) {
     const mul = sortDir === 'desc' ? -1 : 1;
     const sorted = [...filtered].sort((a, b) => {
       if (sortBy === '_boom') {
-        // _trackerSig not on row yet at sort time — use weighted_flag_score as sig proxy
-        const aB = computeBoomScore((parseFloat(a.weighted_flag_score)||0)*4.6, a.zone_fit, a.recent_iso, a.sim_tb, a.weighted_flag_score);
-        const bB = computeBoomScore((parseFloat(b.weighted_flag_score)||0)*4.6, b.zone_fit, b.recent_iso, b.sim_tb, b.weighted_flag_score);
+        const aB = boomCache.current[String(a.batter_id)] ?? computeBoomScore((parseFloat(a.weighted_flag_score)||0)*4.6, a.zone_fit, a.recent_iso, a.sim_tb, a.weighted_flag_score);
+        const bB = boomCache.current[String(b.batter_id)] ?? computeBoomScore((parseFloat(b.weighted_flag_score)||0)*4.6, b.zone_fit, b.recent_iso, b.sim_tb, b.weighted_flag_score);
         return mul * (aB - bB);
       }
       if (sortBy === 'hr_odds_implied') {
@@ -10159,6 +10159,7 @@ function SimLabView({ data }) {
                   sigCache.current[String(b.batter_id)] = b._trackerSig; // persist for sort
                   b._formClass   = getFormClass(b);
                   b._boom        = computeBoomScore(b._trackerSig, b.zone_fit, b.recent_iso, b.sim_tb, b.weighted_flag_score);
+                  boomCache.current[String(b.batter_id)] = b._boom; // persist for sort
                   return (
                     <tr key={`${b.batter_id}-${i}`} className="dr"
                       onClick={() => { setSelBatter(b); setView('deepdive'); }}
