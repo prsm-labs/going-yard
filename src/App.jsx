@@ -9564,6 +9564,7 @@ function SimLabView({ data }) {
   const [sortPropDir, setSortPropDir] = useState('desc');
   const [lineupOnly, setLineupOnly]   = useState(false);
   const [slBatterHand, setSlBatterHand]   = useState('ALL');
+  const sigCache = useRef({}); // caches _trackerSig per batter_id after first render
   const [slHideFinal, setSlHideFinal]     = useState(false);
   const [slPitcherHand, setSlPitcherHand] = useState('ALL');
   const [slFormFilter, setSlFormFilter]   = useState(new Set());
@@ -9703,8 +9704,10 @@ function SimLabView({ data }) {
         return mul * (aO - bO);
       }
       if (sortBy === '_trackerSig') {
-        // _trackerSig computed in render loop; use weighted_flag_score×2 as sort proxy
-        return mul * ((parseFloat(a.weighted_flag_score)||0) - (parseFloat(b.weighted_flag_score)||0));
+        // Read from ref cache — populated after first render, accurate on all subsequent sorts
+        const aS = sigCache.current[String(a.batter_id)] ?? (parseFloat(a.weighted_flag_score)||0)*4.6;
+        const bS = sigCache.current[String(b.batter_id)] ?? (parseFloat(b.weighted_flag_score)||0)*4.6;
+        return mul * (aS - bS);
       }
       return mul * ((parseFloat(a[sortBy]) || 0) - (parseFloat(b[sortBy]) || 0));
     });
@@ -10153,6 +10156,7 @@ function SimLabView({ data }) {
                                    (_phv.startsWith('l')&&(_bhv==='R'||_bhv==='S'));
                   if (_platoonv || (_slotv >= 3 && _slotv <= 5)) _trackerSig += 1;
                   b._trackerSig = Math.min(14, Math.max(0, _trackerSig)); // cap at 14
+                  sigCache.current[String(b.batter_id)] = b._trackerSig; // persist for sort
                   b._formClass   = getFormClass(b);
                   b._boom        = computeBoomScore(b._trackerSig, b.zone_fit, b.recent_iso, b.sim_tb, b.weighted_flag_score);
                   return (
