@@ -9966,7 +9966,8 @@ function SimLabView({ data }) {
                 'Recent FB%','Recent LA','BvP EV','BvP Barrel%','BvP FB%','BvP LA',
                 'Sim H','Sim 2B','Sim BB','Sim K','Sim TB','Sim RBI',
                 'Wind','Temp','Condition',
-                'AB','H','HR','R','TB','RBI','BB','K','Avg EV','Launch Angle','⚡ Sig'];
+                'AB','H','HR','R','TB','RBI','BB','K','Avg EV','Launch Angle',
+                '⚡ Sig','💥 Boom','Form Class','gHR','ISO','Zone Fit'];
               const rows = slate.map(b => {
                 const bid = parseInt(b.batter_id) || 0;
                 const gy  = HR_DATA.some(h => h.batterId === bid ||
@@ -9985,6 +9986,13 @@ function SimLabView({ data }) {
                   lv?.totalBases??'', lv?.rbi??'', lv?.bb??'', lv?.so??'',
                   lv?.avgEV>0?lv.avgEV.toFixed(1):'',
                   lv?.launchAngle>0?lv.launchAngle.toFixed(1):'',
+                  // Computed columns from render cache
+                  sigCache.current[String(bid)] ?? '',
+                  boomCache.current[String(bid)] ?? '',
+                  (() => { const fc = getFormClass(b); return fc && FORM_CLASSES[fc] ? FORM_CLASSES[fc].short.replace(/[💥🥶💨🪱🎯🎩🌙]/gu,'').trim() : ''; })(),
+                  b.gHR ?? '',
+                  b.recent_iso ? parseFloat(b.recent_iso).toFixed(3) : '',
+                  b.zone_fit   ? parseFloat(b.zone_fit).toFixed(1)   : '',
                 ].map(esc).join(',');
               });
               const csv = bom + headers.map(esc).join(',') + '\n' + rows.join('\n');
