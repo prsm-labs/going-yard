@@ -9411,7 +9411,6 @@ function LongShotView({ data }) {
       <div className="tw">
         <table style={{width:'100%'}}>
           <thead><tr>
-            <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)'}}>TM</th>
             <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)'}}>Batter</th>
             <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'center',borderBottom:'1px solid var(--border)'}}>Form</th>
             <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'center',borderBottom:'1px solid var(--border)'}}>Gr</th>
@@ -9437,32 +9436,16 @@ function LongShotView({ data }) {
                     style={{cursor:'pointer',height:26,borderBottom:'1px solid rgba(255,255,255,.04)',
                       background:isExp?'rgba(255,255,255,.04)':'transparent',
                       borderLeft:`2px solid ${isExp?'var(--accent)':'transparent'}`}}>
-                    <td style={{padding:'2px 6px',fontFamily:osw,fontWeight:700,fontSize:9,color:'var(--accent2)',whiteSpace:'nowrap'}}>{b.batting_team||''}</td>
-                    <td style={{padding:'2px 6px',maxWidth:150}}>
-                      <div style={{display:'flex',alignItems:'center',gap:4}}>
+                    <td style={{padding:'2px 6px',maxWidth:170}}>
+                      <div style={{display:'flex',alignItems:'center',gap:4,overflow:'hidden'}}>
                         <PlayerAvatar pid={pid} name={name} size={16}/>
+                        <span style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'var(--accent2)',whiteSpace:'nowrap',flexShrink:0}}>{b.batting_team||''}</span>
                         <span style={{fontFamily:osw,fontWeight:700,fontSize:10,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',color:isKeyMatchup(pid,name)?'#ff8020':'var(--text)'}}>{name}</span>
                         <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={pid} name={name} team={b.batting_team||''}/></span>
                       </div>
                     </td>
                     <td style={{padding:'2px 4px',textAlign:'center',verticalAlign:'middle'}}>
                       <FormBadge formKey={b._formClass}/>
-                    </td>
-                    <td style={{padding:'2px 4px',textAlign:'center'}}>
-                      {(parseFloat(b.kHR)||0)>0 && <span style={{display:'inline-block',padding:'1px 4px',borderRadius:3,
-                        fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:9,
-                        background:(parseFloat(b.kHR)||0)>=70?'rgba(255,64,32,.2)':(parseFloat(b.kHR)||0)>=50?'rgba(245,166,35,.18)':(parseFloat(b.kHR)||0)>=30?'rgba(39,201,122,.15)':'rgba(255,255,255,.06)',
-                        color:(parseFloat(b.kHR)||0)>=70?'#ff4020':(parseFloat(b.kHR)||0)>=50?'#f5a623':(parseFloat(b.kHR)||0)>=30?'#27c97a':'var(--muted)'}}>
-                        {Math.round(parseFloat(b.kHR)||0)}
-                      </span>}
-                    </td>
-                    <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,
-                      color:(parseFloat(b.recent_iso)||0)>=0.25?'#ff8020':(parseFloat(b.recent_iso)||0)>=0.18?'#f5a623':'var(--muted)'}}>
-                      {(parseFloat(b.recent_iso)||0)>0?(parseFloat(b.recent_iso)||0).toFixed(3):'—'}
-                    </td>
-                    <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,
-                      color:(parseFloat(b.zone_fit)||0)>=8?'#ff4020':(parseFloat(b.zone_fit)||0)>=5?'#f5a623':(parseFloat(b.zone_fit)||0)>=2?'#27c97a':'var(--muted)'}}>
-                      {(parseFloat(b.zone_fit)||0)>0?((parseFloat(b.zone_fit)||0).toFixed(1)+'%'):'—'}
                     </td>
                     <td style={{padding:'2px 6px',textAlign:'center',fontFamily:osw,fontWeight:800,fontSize:10,color:b.grade==='C'?'var(--muted)':'rgba(232,65,26,.8)'}}>{b.grade}</td>
                     <td style={{padding:'2px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',whiteSpace:'nowrap',maxWidth:100,overflow:'hidden',textOverflow:'ellipsis'}}>{b.pitcher||'—'}</td>
@@ -9983,7 +9966,6 @@ function SimLabView({ data }) {
                     { label: '+',        key: null },
                     { label: 'Batter',   key: null },
                     { label: 'Form',     key: null },
-                    { label: 'Team',     key: null },
                     { label: 'vs Pitcher',key: null },
                     { label: 'P.Grade',  key: null },
                     /* HR% (proj_hr_adj) removed — inflated by small BvP samples */
@@ -10135,6 +10117,7 @@ function SimLabView({ data }) {
                       <td style={{ textAlign: 'left', maxWidth: 180 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 5, overflow: 'hidden' }}>
                           <PlayerAvatar pid={parseInt(b.batter_id)||0} name={b.batter} size={22}/>
+                          <span style={{fontFamily:"'DM Mono',monospace",fontSize:8,fontWeight:700,color:'var(--accent2)',whiteSpace:'nowrap',flexShrink:0}}>{b.batting_team}</span>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 3, overflow: 'hidden', cursor:'pointer', minWidth:0 }}
                             onClick={e=>{e.stopPropagation();const cp=getCachedPlayer(parseInt(b.batter_id)||0)||{};openAtBatSlide({pid:parseInt(b.batter_id)||0,name:b.batter,team:b.batting_team,avgEV:cp.avgEV,barrel:cp.barrel,hardHit:cp.hardHit,flyBall:cp.flyBall,hr:cp.hr,avg:cp.avg,obp:cp.obp,slg:cp.slg,xwoba:cp.xwoba,kPct:cp.kPct,bbPct:cp.bbPct,launchAngle:cp.launchAngle});}}>
                             <span style={{ fontFamily:"'Oswald',sans-serif", fontWeight:700, fontSize:11, whiteSpace:'nowrap',
@@ -10156,7 +10139,6 @@ function SimLabView({ data }) {
                       <td style={{textAlign:'center',padding:'2px 4px',verticalAlign:'middle'}}>
                         <FormBadge formKey={getFormClass(b)}/>
                       </td>
-                      <td style={{ textAlign: 'right', padding:'3px 6px' }}><span style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:'var(--accent2)', fontWeight:700 }}>{b.batting_team}</span></td>
                       <td style={{ textAlign: 'right', padding:'3px 6px' }}>
                         <span style={{ fontFamily:"'DM Mono',monospace", fontSize:9, color:'var(--muted)', cursor:'pointer', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:90, display:'inline-block' }}
                           onClick={e=>{e.stopPropagation();if(b.pitcher_id)openPitcherSlide({pid:parseInt(b.pitcher_id)||0,name:b.pitcher,team:'',hand:b.pitcher_hand,pitchMix:[]});}}>
@@ -10570,13 +10552,13 @@ function SimLabView({ data }) {
                         <td style={{ textAlign: 'center' }} onClick={e => e.stopPropagation()}>
                           <PickButton pid={parseInt(b.batter_id)||0} name={b.batter} team={b.batting_team}/>
                         </td>
-                        <td style={{ textAlign: 'left' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <td style={{ textAlign: 'left', maxWidth: 180 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 5, overflow: 'hidden' }}>
                             <PlayerAvatar pid={parseInt(b.batter_id)||0} name={b.batter} size={24}/>
-                            <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 12 }}>{b.batter}</span>
+                            <span style={{fontFamily:"'DM Mono',monospace",fontSize:8,fontWeight:700,color:'var(--accent2)',whiteSpace:'nowrap',flexShrink:0}}>{b.batting_team}</span>
+                            <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 12, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{b.batter}</span>
                           </div>
                         </td>
-                        <td><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--accent2)', fontWeight: 700 }}>{b.batting_team}</span></td>
                         <td style={{ textAlign: 'left' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)' }}>{b.pitcher}</span></td>
                         <td style={{textAlign:'center'}}>
                           <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',
