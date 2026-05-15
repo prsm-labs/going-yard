@@ -9155,6 +9155,39 @@ function FormBadge({ formKey }) {
   );
 }
 
+// ── Boom Score — final composite HR probability (0–99) ───────────────────────
+// Combines 5 independent signal axes. Each measures something different:
+//   Sig(0-14)    → calibrated HR signal stack (EV/LA/barrel/pitcher/park/etc)
+//   ZoneFit(%)   → spatial pitcher/batter zone overlap
+//   ISO(0-0.4+)  → raw isolated power profile
+//   SimTB(0-3.5) → full-game simulation output
+//   Score(0-3)   → 5-window flag-based engine grade
+// Higher = more signals aligned. 70+ = all systems go.
+function computeBoomScore(sig, zoneFit, iso, simTB, engineScore) {
+  const s  = Math.min(35, (parseFloat(sig)         || 0) / 14   * 35);
+  const zf = Math.min(20, (parseFloat(zoneFit)      || 0) / 20  * 20);
+  const is = Math.min(20, (parseFloat(iso)          || 0) / 0.40 * 20);
+  const tb = Math.min(15, (parseFloat(simTB)        || 0) / 3.5 * 15);
+  const es = Math.min(10, (parseFloat(engineScore)  || 0) / 3.0 * 10);
+  return Math.min(99, Math.round(s + zf + is + tb + es));
+}
+
+function BoomBadge({ score }) {
+  if (!score || score < 10) return null;
+  const bg  = score>=70?'rgba(255,64,32,.22)':score>=50?'rgba(245,166,35,.18)':score>=30?'rgba(39,201,122,.14)':'rgba(255,255,255,.06)';
+  const col = score>=70?'#ff4020':score>=50?'#f5a623':score>=30?'#27c97a':'var(--muted)';
+  const bdr = score>=70?'rgba(255,64,32,.5)':score>=50?'rgba(245,166,35,.4)':score>=30?'rgba(39,201,122,.35)':'var(--border)';
+  const lbl = score>=80?'💥':score>=70?'🔥':score>=50?'⚡':'·';
+  return (
+    <span title={`Boom Score: ${score} — combined Sig + ZoneFit + ISO + SimTB + Engine`}
+      style={{display:'inline-flex',alignItems:'center',gap:2,padding:'2px 6px',borderRadius:5,
+        fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:11,
+        background:bg,color:col,border:`1px solid ${bdr}`,whiteSpace:'nowrap',cursor:'default'}}>
+      {lbl} {score}
+    </span>
+  );
+}
+
 function LongShotView({ data }) {
   const [lineupVer, setLineupVer] = useState(LINEUP_VERSION);
   useEffect(() => { const unsub = subscribeLineup(v => setLineupVer(v)); return unsub; }, []);
@@ -9291,8 +9324,9 @@ function LongShotView({ data }) {
       const _kHR  = parseFloat(b.kHR)  || 0;
       const _iso  = parseFloat(b.recent_iso) || 0;
       const _zf   = parseFloat(b.zone_fit)   || 0;
+      const _boom = computeBoomScore(b._sig, b.zone_fit, b.recent_iso, b._simTB, b.weighted_flag_score);
       out.push({ ...b, _pgLabel:pgLabel, _simHR, _simTB, _bvpFB, _recEV,
-        _bvpLA, _recLA, _recFB, _flags, _temp, _sig, _formClass, _kHR, _iso, _zf,
+        _bvpLA, _recLA, _recFB, _flags, _temp, _sig, _formClass, _kHR, _iso, _zf, _boom,
         _hrPct:parseFloat(b.proj_hr_adj)||parseFloat(b.sim_hr)||0 });
     }
     return out;
@@ -9415,9 +9449,10 @@ function LongShotView({ data }) {
             <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'center',borderBottom:'1px solid var(--border)'}}>Form</th>
             <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'center',borderBottom:'1px solid var(--border)'}}>Gr</th>
             <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)'}}>Pitcher</th>
+            <Th k="_boom"  label="💥 Boom"/>
             <Th k="_sig"   label="⚡ Sig"/>
             <Th k="_simTB"  label="Sim TB"/>
-            <Th k="_kHR"    label="kHR"/>
+            <Th k="_kHR"    label="gHR"/>
             <Th k="_iso"    label="ISO"/>
             <Th k="_zf"     label="ZoneFit"/>
             <Th k="_bvpFB"  label="BvP FB%"/>
@@ -9449,6 +9484,9 @@ function LongShotView({ data }) {
                     </td>
                     <td style={{padding:'2px 6px',textAlign:'center',fontFamily:osw,fontWeight:800,fontSize:10,color:b.grade==='C'?'var(--muted)':'rgba(232,65,26,.8)'}}>{b.grade}</td>
                     <td style={{padding:'2px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',whiteSpace:'nowrap',maxWidth:100,overflow:'hidden',textOverflow:'ellipsis'}}>{b.pitcher||'—'}</td>
+                    <td style={{padding:'2px 4px',textAlign:'center'}}>
+                      <BoomBadge score={b._boom}/>
+                    </td>
                     <td style={{padding:'2px 4px',textAlign:'right'}}>
                       <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',
                         width:20,height:17,borderRadius:4,fontFamily:osw,fontWeight:800,fontSize:11,
@@ -9965,6 +10003,7 @@ function SimLabView({ data }) {
                   {[
                     { label: '+',        key: null },
                     { label: 'Batter',   key: null },
+                    { label: '💥 Boom', key: '_boom' },
                     { label: 'Form',     key: null },
                     { label: 'vs Pitcher',key: null },
                     { label: 'P.Grade',  key: null },
@@ -9974,7 +10013,7 @@ function SimLabView({ data }) {
                     { label: 'Sim TB',   key: 'sim_tb' },
                     { label: 'Score',    key: 'weighted_flag_score' },
                     { label: '⚡ Sig',   key: '_trackerSig' },
-                    { label: 'kHR',      key: 'kHR' },
+                    { label: 'gHR',      key: 'gHR' },
                     { label: 'ISO',      key: 'recent_iso' },
                     { label: 'ZoneFit',  key: 'zone_fit' },
                     { label: 'L7💥',     key: 'recent_hr_count' },
@@ -10135,6 +10174,9 @@ function SimLabView({ data }) {
                             {WEATHER_ALERT_GAME_IDS.has(String(b.game_id)) && <span style={{fontSize:9,flexShrink:0}} title="Weather alert">⚠️</span>}
                           </div>
                         </div>
+                      </td>
+                      <td style={{textAlign:'center',padding:'2px 4px',verticalAlign:'middle'}}>
+                        <BoomBadge score={computeBoomScore(b._trackerSig, b.zone_fit, b.recent_iso, b.sim_tb, b.weighted_flag_score)}/>
                       </td>
                       <td style={{textAlign:'center',padding:'2px 4px',verticalAlign:'middle'}}>
                         <FormBadge formKey={getFormClass(b)}/>
@@ -10491,8 +10533,8 @@ function SimLabView({ data }) {
                   {[
                     { label: '+',        key: null,             align: 'center' },
                     { label: 'Batter',    key: null,             align: 'left'   },
-                    { label: 'Team',      key: null,             align: 'center' },
                     { label: 'vs',        key: null,             align: 'left'   },
+                    { label: '💥 Boom',   key: '_boom',          align: 'center' },
                     { label: '⚡ Sig',    key: '_trackerSig',    align: 'center' },
                     { label: 'HR >0.5',   key: 'proj_hr_adj',    align: 'center' },
                     { label: 'H >0.5',    key: 'proj_hit_prob',  align: 'center' },
@@ -10560,6 +10602,9 @@ function SimLabView({ data }) {
                           </div>
                         </td>
                         <td style={{ textAlign: 'left' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)' }}>{b.pitcher}</span></td>
+                        <td style={{textAlign:'center',padding:'2px 4px'}}>
+                          <BoomBadge score={computeBoomScore(b._trackerSig, b.zone_fit, b.recent_iso, b.sim_tb, b.weighted_flag_score)}/>
+                        </td>
                         <td style={{textAlign:'center'}}>
                           <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',
                             width:22,height:18,borderRadius:4,fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:11,
