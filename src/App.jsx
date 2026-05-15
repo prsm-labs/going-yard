@@ -9288,8 +9288,11 @@ function LongShotView({ data }) {
       }
       _sig = Math.min(14, Math.max(0, _sig)); // cap at 14
       const _formClass = getFormClass(b);
+      const _kHR  = parseFloat(b.kHR)  || 0;
+      const _iso  = parseFloat(b.recent_iso) || 0;
+      const _zf   = parseFloat(b.zone_fit)   || 0;
       out.push({ ...b, _pgLabel:pgLabel, _simHR, _simTB, _bvpFB, _recEV,
-        _bvpLA, _recLA, _recFB, _flags, _temp, _sig, _formClass,
+        _bvpLA, _recLA, _recFB, _flags, _temp, _sig, _formClass, _kHR, _iso, _zf,
         _hrPct:parseFloat(b.proj_hr_adj)||parseFloat(b.sim_hr)||0 });
     }
     return out;
@@ -9414,8 +9417,10 @@ function LongShotView({ data }) {
             <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'center',borderBottom:'1px solid var(--border)'}}>Gr</th>
             <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)'}}>Pitcher</th>
             <Th k="_sig"   label="⚡ Sig"/>
-            <Th k="_simHR" label="Sim HR%"/>
             <Th k="_simTB"  label="Sim TB"/>
+            <Th k="_kHR"    label="kHR"/>
+            <Th k="_iso"    label="ISO"/>
+            <Th k="_zf"     label="ZoneFit"/>
             <Th k="_bvpFB"  label="BvP FB%"/>
             <Th k="_recEV"  label="EV"/>
             <Th k="_pgLabel" label="P Grade"/>
@@ -9443,6 +9448,22 @@ function LongShotView({ data }) {
                     <td style={{padding:'2px 4px',textAlign:'center',verticalAlign:'middle'}}>
                       <FormBadge formKey={b._formClass}/>
                     </td>
+                    <td style={{padding:'2px 4px',textAlign:'center'}}>
+                      {(parseFloat(b.kHR)||0)>0 && <span style={{display:'inline-block',padding:'1px 4px',borderRadius:3,
+                        fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:9,
+                        background:(parseFloat(b.kHR)||0)>=70?'rgba(255,64,32,.2)':(parseFloat(b.kHR)||0)>=50?'rgba(245,166,35,.18)':(parseFloat(b.kHR)||0)>=30?'rgba(39,201,122,.15)':'rgba(255,255,255,.06)',
+                        color:(parseFloat(b.kHR)||0)>=70?'#ff4020':(parseFloat(b.kHR)||0)>=50?'#f5a623':(parseFloat(b.kHR)||0)>=30?'#27c97a':'var(--muted)'}}>
+                        {Math.round(parseFloat(b.kHR)||0)}
+                      </span>}
+                    </td>
+                    <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,
+                      color:(parseFloat(b.recent_iso)||0)>=0.25?'#ff8020':(parseFloat(b.recent_iso)||0)>=0.18?'#f5a623':'var(--muted)'}}>
+                      {(parseFloat(b.recent_iso)||0)>0?(parseFloat(b.recent_iso)||0).toFixed(3):'—'}
+                    </td>
+                    <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,
+                      color:(parseFloat(b.zone_fit)||0)>=8?'#ff4020':(parseFloat(b.zone_fit)||0)>=5?'#f5a623':(parseFloat(b.zone_fit)||0)>=2?'#27c97a':'var(--muted)'}}>
+                      {(parseFloat(b.zone_fit)||0)>0?((parseFloat(b.zone_fit)||0).toFixed(1)+'%'):'—'}
+                    </td>
                     <td style={{padding:'2px 6px',textAlign:'center',fontFamily:osw,fontWeight:800,fontSize:10,color:b.grade==='C'?'var(--muted)':'rgba(232,65,26,.8)'}}>{b.grade}</td>
                     <td style={{padding:'2px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',whiteSpace:'nowrap',maxWidth:100,overflow:'hidden',textOverflow:'ellipsis'}}>{b.pitcher||'—'}</td>
                     <td style={{padding:'2px 4px',textAlign:'right'}}>
@@ -9455,11 +9476,23 @@ function LongShotView({ data }) {
                       </span>
                     </td>
                     <td style={{padding:'2px 6px',textAlign:'right'}}>
-                      <span style={{fontFamily:osw,fontWeight:800,fontSize:11,
-                        color:b._simHR>=0.15?'#ff4020':b._simHR>=0.10?'#f5a623':b._simHR>=0.06?'#27c97a':'var(--muted)'}}>{(b._simHR*100).toFixed(1)}%</span>
-                    </td>
-                    <td style={{padding:'2px 6px',textAlign:'right'}}>
                       <span style={{fontFamily:osw,fontWeight:800,fontSize:11,color:tbColor(b._simTB)}}>{b._simTB.toFixed(2)}</span>
+                    </td>
+                    <td style={{padding:'2px 4px',textAlign:'center'}}>
+                      {b._kHR>0 && <span style={{display:'inline-block',padding:'1px 5px',borderRadius:4,
+                        fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:10,
+                        background:b._kHR>=70?'rgba(255,64,32,.2)':b._kHR>=50?'rgba(245,166,35,.18)':b._kHR>=30?'rgba(39,201,122,.15)':'rgba(255,255,255,.06)',
+                        color:b._kHR>=70?'#ff4020':b._kHR>=50?'#f5a623':b._kHR>=30?'#27c97a':'var(--muted)'}}>
+                        {Math.round(b._kHR)}
+                      </span>}
+                    </td>
+                    <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,
+                      color:b._iso>=0.25?'#ff8020':b._iso>=0.18?'#f5a623':'var(--muted)'}}>
+                      {b._iso>0?b._iso.toFixed(3):'—'}
+                    </td>
+                    <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,
+                      color:b._zf>=8?'#ff4020':b._zf>=5?'#f5a623':b._zf>=2?'#27c97a':'var(--muted)'}}>
+                      {b._zf>0?b._zf.toFixed(1)+'%':'—'}
                     </td>
                     <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,color:b._bvpFB>=20&&b._bvpFB<36?'#27c97a':b._bvpFB>=36&&b._bvpFB<42?'#f5a623':'var(--muted)'}}>{b._bvpFB>0?`${b._bvpFB.toFixed(0)}%`:'—'}</td>
                     <td style={{padding:'2px 6px',textAlign:'right',fontFamily:osw,fontWeight:700,fontSize:10,color:b._recEV>=97?'#ff8020':b._recEV>=93?'var(--text)':'var(--muted)'}}>{b._recEV>0?b._recEV.toFixed(1):'—'}</td>
@@ -9959,6 +9992,9 @@ function SimLabView({ data }) {
                     { label: 'Sim TB',   key: 'sim_tb' },
                     { label: 'Score',    key: 'weighted_flag_score' },
                     { label: '⚡ Sig',   key: '_trackerSig' },
+                    { label: 'kHR',      key: 'kHR' },
+                    { label: 'ISO',      key: 'recent_iso' },
+                    { label: 'ZoneFit',  key: 'zone_fit' },
                     { label: 'L7💥',     key: 'recent_hr_count' },
                     { label: 'Grade',    key: null },
                     { label: '💣',       key: 'meatball_matchup_score' },
@@ -10160,6 +10196,21 @@ function SimLabView({ data }) {
                           border:`1px solid ${b._trackerSig>=10?'rgba(255,64,32,.4)':b._trackerSig>=7?'rgba(245,166,35,.3)':b._trackerSig>=4?'rgba(39,201,122,.25)':'var(--border)'}`}}>
                           {b._trackerSig||'—'}
                         </span>
+                      </td>
+                      <td style={{textAlign:'center',padding:'2px 4px'}}>
+                        {(()=>{ const kv=parseFloat(b.kHR)||0; if(!kv) return <span style={{color:'rgba(255,255,255,.15)',fontFamily:"'DM Mono',monospace",fontSize:10}}>—</span>;
+                          const bg=kv>=70?'rgba(255,64,32,.2)':kv>=50?'rgba(245,166,35,.18)':kv>=30?'rgba(39,201,122,.15)':'rgba(255,255,255,.06)';
+                          const col=kv>=70?'#ff4020':kv>=50?'#f5a623':kv>=30?'#27c97a':'var(--muted)';
+                          return <span style={{display:'inline-block',padding:'1px 6px',borderRadius:4,fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:10,background:bg,color:col}}>{Math.round(kv)}</span>;
+                        })()}
+                      </td>
+                      <td style={{textAlign:'right',padding:'3px 6px',fontFamily:"'DM Mono',monospace",fontSize:10,
+                        color:(parseFloat(b.recent_iso)||0)>=0.25?'#ff8020':(parseFloat(b.recent_iso)||0)>=0.18?'#f5a623':'var(--muted)'}}>
+                        {(parseFloat(b.recent_iso)||0)>0?(parseFloat(b.recent_iso)||0).toFixed(3):'—'}
+                      </td>
+                      <td style={{textAlign:'right',padding:'3px 6px',fontFamily:"'DM Mono',monospace",fontSize:10,
+                        color:(parseFloat(b.zone_fit)||0)>=8?'#ff4020':(parseFloat(b.zone_fit)||0)>=5?'#f5a623':(parseFloat(b.zone_fit)||0)>=2?'#27c97a':'var(--muted)'}}>
+                        {(parseFloat(b.zone_fit)||0)>0?((parseFloat(b.zone_fit)||0).toFixed(1)+'%'):'—'}
                       </td>
                       <td style={{textAlign:'center',padding:'3px 4px'}}>
                         {(() => {
