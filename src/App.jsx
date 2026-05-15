@@ -9190,7 +9190,7 @@ function LongShotView({ data }) {
   const [lineupVer, setLineupVer] = useState(LINEUP_VERSION);
   useEffect(() => { const unsub = subscribeLineup(v => setLineupVer(v)); return unsub; }, []);
   const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
-  const [sort, setSort]       = useState('_sig');
+  const [sort, setSort]       = useState('_boom');
   const [sortDir, setSortDir] = useState(1); // 1 = desc (bv-av = higher first)
   const [search, setSearch]   = useState('');
   const [teamFilter, setTeamFilter] = useState('ALL');
@@ -9545,7 +9545,7 @@ function SimLabView({ data }) {
   useEffect(() => { const unsub = subscribeLineup(v => setLineupVer(v)); return unsub; }, []);
   const [view, setView]             = useState('slate');    // 'slate' | 'deepdive' | 'props'
   const [selBatter, setSelBatter]   = useState(null);
-  const [sortBy, setSortBy]         = useState('_trackerSig');
+  const [sortBy, setSortBy]         = useState('_boom');
   const [sortDir, setSortDir]       = useState('desc');
   const [selMatchups, setSelMatchups] = useState(new Set()); // empty = all matchups
   const [showMatchupDrop, setShowMatchupDrop] = useState(false);
