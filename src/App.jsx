@@ -9319,7 +9319,7 @@ function LongShotView({ data }) {
       }
       _sig = Math.min(14, Math.max(0, _sig)); // cap at 14
       const _formClass = getFormClass(b);
-      const _kHR  = parseFloat(b.kHR)  || 0;
+      const _kHR  = parseFloat(b.gHR)  || 0;  // renamed kHR→gHR in engine
       const _iso  = parseFloat(b.recent_iso) || 0;
       const _zf   = parseFloat(b.zone_fit)   || 0;
       const _boom = computeBoomScore(b._sig, b.zone_fit, b.recent_iso, b._simTB, b.weighted_flag_score);
@@ -9662,7 +9662,6 @@ function SimLabView({ data }) {
       .filter(r => matchesHandFilter(r.pitcher_hand, slPitcherHand))
       .filter(r => slFormFilter.size === 0 || slFormFilter.has(getFormClass(r)))
       .filter(r => !slHideFinal || !FINAL_GAME_IDS.has(String(r.game_id)))
-      .map(r => ({ ...r, _boom: computeBoomScore(r._trackerSig, r.zone_fit, r.recent_iso, r.sim_tb, r.weighted_flag_score) }))
       .filter(r => selMatchups.size === 0 || selMatchups.has(String(r.game_id)))
       .filter(r => selBatterGradesSim.size === 0 || selBatterGradesSim.has(r.grade))
       .filter(r => !lineupOnly || isConfirmed(r))
@@ -9691,14 +9690,25 @@ function SimLabView({ data }) {
       .filter(r => !minOdds     || (() => { const d = HR_ODDS_MAP[String(parseInt(r.batter_id)||0)]; return d?.implied && (d.implied * 100) >= parseFloat(minOdds); })())
       .filter(r => !simSearch || (r.batter||'').toLowerCase().includes(simSearch.toLowerCase()));
     const mul = sortDir === 'desc' ? -1 : 1;
-    return [...filtered].sort((a, b) => {
+    const sorted = [...filtered].sort((a, b) => {
+      if (sortBy === '_boom') {
+        // _trackerSig not on row yet at sort time — use weighted_flag_score as sig proxy
+        const aB = computeBoomScore((parseFloat(a.weighted_flag_score)||0)*4.6, a.zone_fit, a.recent_iso, a.sim_tb, a.weighted_flag_score);
+        const bB = computeBoomScore((parseFloat(b.weighted_flag_score)||0)*4.6, b.zone_fit, b.recent_iso, b.sim_tb, b.weighted_flag_score);
+        return mul * (aB - bB);
+      }
       if (sortBy === 'hr_odds_implied') {
         const aO = HR_ODDS_MAP[String(parseInt(a.batter_id)||0)]?.implied || 0;
         const bO = HR_ODDS_MAP[String(parseInt(b.batter_id)||0)]?.implied || 0;
         return mul * (aO - bO);
       }
+      if (sortBy === '_trackerSig') {
+        // _trackerSig computed in render loop; use weighted_flag_score×2 as sort proxy
+        return mul * ((parseFloat(a.weighted_flag_score)||0) - (parseFloat(b.weighted_flag_score)||0));
+      }
       return mul * ((parseFloat(a[sortBy]) || 0) - (parseFloat(b[sortBy]) || 0));
     });
+    return sorted;
   }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, minHRScore, minHRPct, minMeatball, minHitPct, minSimTB, minOdds, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal]);
 
   // Auto-select top batter when data loads
@@ -10143,7 +10153,8 @@ function SimLabView({ data }) {
                                    (_phv.startsWith('l')&&(_bhv==='R'||_bhv==='S'));
                   if (_platoonv || (_slotv >= 3 && _slotv <= 5)) _trackerSig += 1;
                   b._trackerSig = Math.min(14, Math.max(0, _trackerSig)); // cap at 14
-                  b._formClass   = getFormClass(b); // cap at 14 to prevent score inflation
+                  b._formClass   = getFormClass(b);
+                  b._boom        = computeBoomScore(b._trackerSig, b.zone_fit, b.recent_iso, b.sim_tb, b.weighted_flag_score);
                   return (
                     <tr key={`${b.batter_id}-${i}`} className="dr"
                       onClick={() => { setSelBatter(b); setView('deepdive'); }}
@@ -10221,7 +10232,7 @@ function SimLabView({ data }) {
                         </span>
                       </td>
                       <td style={{textAlign:'center',padding:'2px 4px'}}>
-                        {(()=>{ const kv=parseFloat(b.kHR)||0; if(!kv) return <span style={{color:'rgba(255,255,255,.15)',fontFamily:"'DM Mono',monospace",fontSize:10}}>—</span>;
+                        {(()=>{ const kv=parseFloat(b.gHR)||0; if(!kv) return <span style={{color:'rgba(255,255,255,.15)',fontFamily:"'DM Mono',monospace",fontSize:10}}>—</span>;
                           const bg=kv>=70?'rgba(255,64,32,.2)':kv>=50?'rgba(245,166,35,.18)':kv>=30?'rgba(39,201,122,.15)':'rgba(255,255,255,.06)';
                           const col=kv>=70?'#ff4020':kv>=50?'#f5a623':kv>=30?'#27c97a':'var(--muted)';
                           return <span style={{display:'inline-block',padding:'1px 6px',borderRadius:4,fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:10,background:bg,color:col}}>{Math.round(kv)}</span>;
