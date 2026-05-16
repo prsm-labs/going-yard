@@ -9700,16 +9700,16 @@ function LongShotView({ data }) {
             <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'center',borderBottom:'1px solid var(--border)'}}>Form</th>
             <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'center',borderBottom:'1px solid var(--border)'}}>Gr</th>
             <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)'}}>Pitcher</th>
-            <Th k="_ps"    label="⚡️ PS"/>
             <Th k="_boom"  label="💥 Boom"/>
-            <Th k="_sig"   label="⚡ Sig"/>
-            <Th k="_simTB"  label="Sim TB"/>
+            <Th k="_pgLabel" label="P Grade"/>
             <Th k="_kHR"    label="gHR"/>
+            <Th k="_ps"     label="⚡️ PS"/>
+            <Th k="_sig"   label="⚡ Sig"/>
             <Th k="_iso"    label="ISO"/>
             <Th k="_zf"     label="ZoneFit"/>
             <Th k="_bvpFB"  label="BvP FB%"/>
             <Th k="_recEV"  label="EV"/>
-            <Th k="_pgLabel" label="P Grade"/>
+            <Th k="_simTB"  label="Sim TB"/>
           </tr></thead>
           <tbody>
             {filtered.map(b => {
@@ -9723,11 +9723,11 @@ function LongShotView({ data }) {
                     style={{cursor:'pointer',height:26,borderBottom:'1px solid rgba(255,255,255,.04)',
                       background:isExp?'rgba(255,255,255,.04)':'transparent',
                       borderLeft:`2px solid ${isExp?'var(--accent)':'transparent'}`}}>
-                    <td className="sticky-batter" style={{padding:'2px 6px',maxWidth:170}} title={_boom>=50&&b._ps>=40?'🔥 Convergence Zone — Boom+PS both signal':''}>
+                    <td className="sticky-batter" style={{padding:'2px 6px',maxWidth:170}} title={b._boom>=50&&b._ps>=40?'🔥 Convergence Zone — Boom+PS both signal':''}>
                       <div style={{display:'flex',alignItems:'center',gap:4,overflow:'hidden'}}>
                         <PlayerAvatar pid={pid} name={name} size={16}/>
                         <span style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'var(--accent2)',whiteSpace:'nowrap',flexShrink:0}}>{b.batting_team||''}</span>
-                        <span style={{fontFamily:osw,fontWeight:700,fontSize:10,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',color:isKeyMatchup(pid,name)?'#ff8020':(_boom>=50&&b._ps>=40)?'#a855f7':'var(--text)'}}>{name}</span>
+                        <span style={{fontFamily:osw,fontWeight:700,fontSize:10,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',color:isKeyMatchup(pid,name)?'#ff8020':(b._boom>=50&&b._ps>=40)?'#a855f7':'var(--text)'}}>{name}</span>
                         <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={pid} name={name} team={b.batting_team||''}/></span>
                       </div>
                     </td>
@@ -10291,23 +10291,23 @@ function SimLabView({ data }) {
                   {[
                     { label: '+',        key: null },
                     { label: 'Batter',   key: null },
-                    { label: '⚡️ PS',   key: 'ps_score' },
                     { label: '💥 Boom', key: '_boom' },
                     { label: 'Form',     key: null },
-                    { label: 'vs Pitcher',key: null },
                     { label: 'P.Grade',  key: null },
+                    { label: 'vs Pitcher',key: null },
+                    { label: 'gHR',      key: 'gHR' },
+                    { label: '⚡️ PS',   key: 'ps_score' },
+                    { label: '⚡ Sig',   key: '_trackerSig' },
                     /* HR% (proj_hr_adj) removed — inflated by small BvP samples */
                     { label: 'Hit%',     key: 'proj_hit_prob' },
                     { label: 'XBH%',     key: 'proj_xbh_prob' },
                     { label: 'Sim TB',   key: 'sim_tb' },
                     { label: 'Score',    key: 'weighted_flag_score' },
-                    { label: '⚡ Sig',   key: '_trackerSig' },
-                    { label: 'gHR',      key: 'gHR' },
                     { label: 'ISO',      key: 'recent_iso' },
-                    { label: 'ZoneFit',  key: 'zone_fit' },
                     { label: 'L7💥',     key: 'recent_hr_count' },
-                    { label: 'Grade',    key: null },
+                    { label: 'ZoneFit',  key: 'zone_fit' },
                     { label: '💣',       key: 'meatball_matchup_score' },
+                    { label: 'Grade',    key: null },
                     { label: 'HR Odds',  key: 'hr_odds_implied' },
                   ].map(col => (
                     <th key={col.label}
