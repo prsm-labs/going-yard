@@ -1773,6 +1773,7 @@ function MatchupCard({ dp }) {
       <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
         <div style={{display:'flex',gap:6,minWidth:'max-content',paddingBottom:4}}>
           {[
+            ['⚡️ PS', (parseFloat(dp.ps_score)||0)>=50?Math.round(parseFloat(dp.ps_score)):'—', (parseFloat(dp.ps_score)||0)>=90?'#a855f7':(parseFloat(dp.ps_score)||0)>=75?'#ff4020':(parseFloat(dp.ps_score)||0)>=60?'#f5a623':'var(--muted)'],
             ['💥 Boom', boom>0?Math.round(boom):'—', boomColor],
             ['⚡ Sig',  sig>0?sig:'—',               sigColor],
             ['P.Grade', pgLabel.split(' ')[0],        pgColor],
@@ -9386,6 +9387,20 @@ function computeBoomScore(sig, zoneFit, iso, simTB, engineScore) {
   return Math.min(99, Math.round(s + zf + is + tb + es));
 }
 
+
+function PSBadge({ score }) {
+  if (!score || score < 50) return null;
+  const bg  = score>=90?'rgba(147,51,234,.2)':score>=75?'rgba(255,64,32,.18)':score>=60?'rgba(245,166,35,.15)':'rgba(255,255,255,.06)';
+  const col = score>=90?'#a855f7':score>=75?'#ff4020':score>=60?'#f5a623':'var(--muted)';
+  return (
+    <span title={`PS: ${score} — Perfect Storm Score (90+=beyond reasonable doubt)`}
+      style={{display:'inline-block',padding:'1px 5px',borderRadius:4,
+        fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:10,
+        background:bg,color:col,whiteSpace:'nowrap',cursor:'default'}}>
+      {score}
+    </span>
+  );
+}
 function BoomBadge({ score }) {
   if (!score || score < 10) return null;
   const bg  = score>=70?'rgba(255,64,32,.2)':score>=50?'rgba(245,166,35,.18)':score>=30?'rgba(39,201,122,.15)':'rgba(255,255,255,.06)';
@@ -9541,6 +9556,20 @@ function LongShotView({ data }) {
       const _kHR  = parseFloat(b.gHR)  || 0;  // renamed kHR→gHR in engine
       const _iso  = parseFloat(b.recent_iso) || 0;
       const _zf   = parseFloat(b.zone_fit)   || 0;
+      // Live lineup slot — same pattern as Sig formula
+      const _lsStatusPS = LINEUP_STATUS[parseInt(b.batter_id)||0];
+      const _liveSlot   = (_lsStatusPS?.slot) || parseInt(b.lineup_slot)||0;
+      // Adjust PS gate for live confirmed slot (engine used static slot at run time)
+      let _ps = parseFloat(b.ps_score)||0;
+      if (_ps > 0 && _liveSlot > 0) {
+        // Reapply walk gate delta if slot changed since engine run
+        const engineSlot = parseInt(b.lineup_slot)||0;
+        if (_liveSlot !== engineSlot) {
+          const oldGate = engineSlot>=3&&engineSlot<=5?1.0:engineSlot===0?0.90:engineSlot===2||engineSlot===6?0.85:0.70;
+          const newGate = _liveSlot>=3&&_liveSlot<=5?1.0:_liveSlot===2||_liveSlot===6?0.85:0.70;
+          if (oldGate > 0) _ps = Math.min(99, Math.round(_ps / oldGate * newGate));
+        }
+      }
       const _boom = computeBoomScore(_sig, b.zone_fit, b.recent_iso, _simTB, b.weighted_flag_score);
       // Write to DAILY_PICKS_CACHE directly (b is a CSV copy, not the cache object)
       const _lsCache = DAILY_PICKS_CACHE[String(b.batter_id)];
@@ -9548,7 +9577,7 @@ function LongShotView({ data }) {
       if (_lsCache && !_lsCache._boom)       _lsCache._boom       = _boom;
       if (_lsCache && !_lsCache._pgLabel)    _lsCache._pgLabel    = pgLabel;
       out.push({ ...b, _pgLabel:pgLabel, _simHR, _simTB, _bvpFB, _recEV,
-        _bvpLA, _recLA, _recFB, _flags, _temp, _sig, _formClass, _kHR, _iso, _zf, _boom,
+        _bvpLA, _recLA, _recFB, _flags, _temp, _sig, _formClass, _kHR, _iso, _zf, _boom, _ps,
         _hrPct:parseFloat(b.proj_hr_adj)||parseFloat(b.sim_hr)||0 });
     }
     return out;
@@ -9671,6 +9700,7 @@ function LongShotView({ data }) {
             <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'center',borderBottom:'1px solid var(--border)'}}>Form</th>
             <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'center',borderBottom:'1px solid var(--border)'}}>Gr</th>
             <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)'}}>Pitcher</th>
+            <Th k="_ps"    label="⚡️ PS"/>
             <Th k="_boom"  label="💥 Boom"/>
             <Th k="_sig"   label="⚡ Sig"/>
             <Th k="_simTB"  label="Sim TB"/>
@@ -9706,6 +9736,9 @@ function LongShotView({ data }) {
                     </td>
                     <td style={{padding:'2px 6px',textAlign:'center',fontFamily:osw,fontWeight:800,fontSize:10,color:b.grade==='C'?'var(--muted)':'rgba(232,65,26,.8)'}}>{b.grade}</td>
                     <td style={{padding:'2px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',whiteSpace:'nowrap',maxWidth:100,overflow:'hidden',textOverflow:'ellipsis'}}>{b.pitcher||'—'}</td>
+                    <td style={{padding:'2px 4px',textAlign:'center'}}>
+                      <PSBadge score={b._ps}/>
+                    </td>
                     <td style={{padding:'2px 4px',textAlign:'center'}}>
                       <BoomBadge score={b._boom}/>
                     </td>
@@ -9924,6 +9957,9 @@ function SimLabView({ data }) {
         const aB = boomCache.current[String(a.batter_id)] ?? computeBoomScore((parseFloat(a.weighted_flag_score)||0)*4.6, a.zone_fit, a.recent_iso, a.sim_tb, a.weighted_flag_score);
         const bB = boomCache.current[String(b.batter_id)] ?? computeBoomScore((parseFloat(b.weighted_flag_score)||0)*4.6, b.zone_fit, b.recent_iso, b.sim_tb, b.weighted_flag_score);
         return mul * (aB - bB);
+      }
+      if (sortBy === 'ps_score') {
+        return mul * ((parseFloat(a.ps_score)||0) - (parseFloat(b.ps_score)||0));
       }
       if (sortBy === 'hr_odds_implied') {
         const aO = HR_ODDS_MAP[String(parseInt(a.batter_id)||0)]?.implied || 0;
@@ -10255,6 +10291,7 @@ function SimLabView({ data }) {
                   {[
                     { label: '+',        key: null },
                     { label: 'Batter',   key: null },
+                    { label: '⚡️ PS',   key: 'ps_score' },
                     { label: '💥 Boom', key: '_boom' },
                     { label: 'Form',     key: null },
                     { label: 'vs Pitcher',key: null },
@@ -10405,12 +10442,24 @@ function SimLabView({ data }) {
                   boomCache.current[String(b.batter_id)] = b._boom;
                   // Write to DAILY_PICKS_CACHE directly — allPicksData rows are CSV copies,
                   // not the same objects, so b.x = y never reaches the cache the slideout reads
+                  // Adjust PS Score live using confirmed lineup slot
+                  let _livePS = parseFloat(b.ps_score)||0;
+                  if (_livePS > 0 && _slotv > 0) {
+                    const _engSlot = parseInt(b.lineup_slot)||0;
+                    if (_slotv !== _engSlot && _engSlot > 0) {
+                      const _og = _engSlot>=3&&_engSlot<=5?1.0:_engSlot===2||_engSlot===6?0.85:0.70;
+                      const _ng = _slotv>=3&&_slotv<=5?1.0:_slotv===2||_slotv===6?0.85:0.70;
+                      if (_og > 0) _livePS = Math.min(99, Math.round(_livePS / _og * _ng));
+                    }
+                  }
+                  b._ps = _livePS;
                   const _cacheEntry = DAILY_PICKS_CACHE[String(b.batter_id)];
                   if (_cacheEntry) {
                     _cacheEntry._trackerSig = b._trackerSig;
                     _cacheEntry._pgLabel    = b._pgLabel;
                     _cacheEntry._boom       = b._boom;
                     _cacheEntry._formClass  = b._formClass;
+                    _cacheEntry._ps         = _livePS;
                   }
                   // On first render: if user hasn't sorted manually and we're sorting by boom,
                   // nudge sortDir to force useMemo re-run with now-populated cache
@@ -10447,6 +10496,9 @@ function SimLabView({ data }) {
                             {WEATHER_ALERT_GAME_IDS.has(String(b.game_id)) && <span style={{fontSize:9,flexShrink:0}} title="Weather alert">⚠️</span>}
                           </div>
                         </div>
+                      </td>
+                      <td style={{textAlign:'center',padding:'2px 4px',verticalAlign:'middle'}}>
+                        <PSBadge score={b._ps ?? (parseFloat(b.ps_score)||0)}/>
                       </td>
                       <td style={{textAlign:'center',padding:'2px 4px',verticalAlign:'middle'}}>
                         <BoomBadge score={b._boom}/>
@@ -10807,6 +10859,7 @@ function SimLabView({ data }) {
                     { label: '+',        key: null,             align: 'center' },
                     { label: 'Batter',    key: null,             align: 'left'   },
                     { label: 'vs',        key: null,             align: 'left'   },
+                    { label: '⚡️ PS',    key: 'ps_score',       align: 'center' },
                     { label: '💥 Boom',   key: '_boom',          align: 'center' },
                     { label: '⚡ Sig',    key: '_trackerSig',    align: 'center' },
                     { label: 'HR >0.5',   key: 'proj_hr_adj',    align: 'center' },
@@ -10875,6 +10928,9 @@ function SimLabView({ data }) {
                           </div>
                         </td>
                         <td style={{ textAlign: 'left' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)' }}>{b.pitcher}</span></td>
+                        <td style={{textAlign:'center',padding:'2px 4px'}}>
+                          <PSBadge score={b._ps ?? (parseFloat(b.ps_score)||0)}/>
+                        </td>
                         <td style={{textAlign:'center',padding:'2px 4px'}}>
                           <BoomBadge score={b._boom}/>
                         </td>
@@ -15522,6 +15578,13 @@ function LegendButton() {
       'ISO (Isolated Power) — (Total Bases − Hits) / AB. Season-long power profile from MLB Stats API. Red ≥.300 · Orange ≥.250 · Amber ≥.180.',
       'Zone Fit — pitcher meatball rate × batter HR rate in meatball zone. Measures spatial pitch-location matchup. Red ≥8% · Orange ≥5% · Green ≥2%.',
       'All five feed into 💥 Boom Score alongside Sig, Sim TB, and Engine Score.',
+    ] },
+    { tab:'🎯 Scores',          items:[
+      '⚡ Sig Score (0–14) — HR signal stack. Every flag adds points: exit velocity, launch angle, barrel quality, pitcher grade, park, weather, platoon, lineup slot. Most directly validated score — built from 430k PAs. Red ≥10 · Orange ≥7 · Green ≥4.',
+      '💥 Boom Score (0–99) — weighted composite of five independent axes: Sig + Zone Fit + ISO + Sim TB + Engine Score. No single axis dominates. Tells you when multiple systems agree. Red ≥70 · Orange ≥50 · Green ≥30.',
+      'gHR (0–99) — HR probability index. Combines Sig, Zone Fit, ISO, HR Intent, and xwOBA contact quality into a single number. xwOBA above .320 adds bonus points — rewards elite, luck-neutral contact. Red ≥70 · Orange ≥50.',
+      '⚡️ PS Score (0–99) — Perfect Storm Score. A gated multiplier system (not linear). Bad gates crush the whole score. Lineup slot gates apply first, then scores three independent phases: Batter Mechanics (25pts) + Pitcher Vulnerability (15pts) + Pitch Convergence (25pts, the core: does the pitcher's vulnerable pitch match this batter's damage zone?) + Environment (25pts) + Game Theory (5pts). Purple ≥90 (beyond reasonable doubt) · Red ≥75 · Orange ≥60.',
+      'Sig and Boom update live when lineups confirm. PS Score gate recalculates live using confirmed batting order slot.',
     ] },
     { tab:'⚡ Sig Score',      items:[
       'Scale: 0–14 (hard cap). Red ≥10 = Elite · Orange ≥7 = Strong · Green ≥4 = Watch.',
