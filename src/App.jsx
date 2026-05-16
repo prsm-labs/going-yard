@@ -1773,7 +1773,7 @@ function MatchupCard({ dp }) {
       <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
         <div style={{display:'flex',gap:6,minWidth:'max-content',paddingBottom:4}}>
           {[
-            ['⚡️ PS', (parseFloat(dp.ps_score)||0)>=30?Math.round(parseFloat(dp.ps_score)):'—', (parseFloat(dp.ps_score)||0)>=90?'#a855f7':(parseFloat(dp.ps_score)||0)>=75?'#ff4020':(parseFloat(dp.ps_score)||0)>=60?'#f5a623':'var(--muted)'],
+            ['⚡️ PS', (parseFloat(dp.ps_score)||0)>=1?Math.round(parseFloat(dp.ps_score)):'—', (parseFloat(dp.ps_score)||0)>=90?'#a855f7':(parseFloat(dp.ps_score)||0)>=75?'#ff4020':(parseFloat(dp.ps_score)||0)>=60?'#f5a623':'var(--muted)'],
             ['💥 Boom', boom>0?Math.round(boom):'—', boomColor],
             ['⚡ Sig',  sig>0?sig:'—',               sigColor],
             ['P.Grade', pgLabel.split(' ')[0],        pgColor],
@@ -9389,7 +9389,7 @@ function computeBoomScore(sig, zoneFit, iso, simTB, engineScore) {
 
 
 function PSBadge({ score }) {
-  if (!score || score < 30) return null;
+  if (!score || score < 1) return null;
   const bg  = score>=75?'rgba(147,51,234,.2)':score>=60?'rgba(255,64,32,.18)':score>=45?'rgba(245,166,35,.15)':'rgba(255,255,255,.06)';
   const col = score>=75?'#a855f7':score>=60?'#ff4020':score>=45?'#f5a623':'var(--muted)';
   return (
