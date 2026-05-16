@@ -8445,11 +8445,11 @@ function HRLeaderboardTab() {
                   color:r.rank<=3?'var(--accent2)':'var(--muted)',whiteSpace:'nowrap'}}>
                   {r.rank<=3?['🥇','🥈','🥉'][r.rank-1]:r.rank}
                 </td>
-                <td style={{padding:'2px 5px',maxWidth:170}}>
+                <td onClick={e=>{e.stopPropagation();openAtBatSlide({pid:r.pid,name:r.name,team:r.team});}} style={{padding:'2px 5px',maxWidth:170,cursor:'pointer'}}>
                   <div style={{display:'flex',alignItems:'center',gap:4,overflow:'hidden'}}>
                     <PlayerAvatar pid={r.pid} name={r.name} size={16}/>
                     <span style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'var(--accent2)',whiteSpace:'nowrap',flexShrink:0}}>{r.team}</span>
-                    <span onClick={e=>{e.stopPropagation();openAtBatSlide({pid:r.pid,name:r.name,team:r.team});}} style={{fontFamily:osw,fontWeight:700,fontSize:10,color:isKeyMatchup(r.pid,r.name)?'#ff8020':'var(--text)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',cursor:'pointer'}}>{r.name}</span>
+                    <span style={{fontFamily:osw,fontWeight:700,fontSize:10,color:isKeyMatchup(r.pid,r.name)?'#ff8020':'var(--text)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.name}</span>
                     <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={r.pid} name={r.name} team={r.team}/></span>
                   <FormBadge formKey={r._formClass}/>
                   </div>
@@ -8556,10 +8556,10 @@ function HotBatsTab() {
                 style={{cursor:'pointer',height:28,borderBottom:'1px solid rgba(255,255,255,.04)',
                   background:expPid===p.pid?'rgba(255,255,255,.04)':'transparent'}}>
                 <td style={{padding:'2px 6px',fontFamily:osw,fontWeight:700,fontSize:9,color:'var(--accent2)',whiteSpace:'nowrap'}}>{p.team}</td>
-                <td style={{padding:'2px 6px',maxWidth:160}}>
+                <td onClick={e=>{e.stopPropagation();openAtBatSlide({pid:p.pid,name:p.name,team:p.team});}} style={{padding:'2px 6px',maxWidth:160,cursor:'pointer'}}>
                   <div style={{display:'flex',alignItems:'center',gap:4,overflow:'hidden'}}>
                     <PlayerAvatar pid={p.pid} name={p.name} size={16}/>
-                    <span onClick={e=>{e.stopPropagation();openAtBatSlide({pid:p.pid,name:p.name,team:p.team});}} style={{fontFamily:osw,fontWeight:700,fontSize:10,color:isKeyMatchup(p.pid,p.name)?'#ff8020':'var(--text)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',cursor:'pointer'}}>{p.name}</span>
+                    <span style={{fontFamily:osw,fontWeight:700,fontSize:10,color:isKeyMatchup(p.pid,p.name)?'#ff8020':'var(--text)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.name}</span>
                     <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={p.pid} name={p.name} team={p.team}/></span>
                   </div>
                 </td>
@@ -8654,10 +8654,10 @@ function HeatingUpTab() {
                 style={{cursor:'pointer',height:28,borderBottom:'1px solid rgba(255,255,255,.04)',
                   background:expPid===p.pid?'rgba(255,255,255,.04)':'transparent'}}>
                 <td style={{padding:'2px 5px',fontFamily:osw,fontWeight:700,fontSize:9,color:'var(--accent2)',whiteSpace:'nowrap'}}>{p.team}</td>
-                <td style={{padding:'2px 5px',maxWidth:150}}>
+                <td onClick={e=>{e.stopPropagation();openAtBatSlide({pid:p.pid,name:p.name,team:p.team});}} style={{padding:'2px 5px',maxWidth:150,cursor:'pointer'}}>
                   <div style={{display:'flex',alignItems:'center',gap:4,overflow:'hidden'}}>
                     <PlayerAvatar pid={p.pid} name={p.name} size={16}/>
-                    <span onClick={e=>{e.stopPropagation();openAtBatSlide({pid:p.pid,name:p.name,team:p.team});}} style={{fontFamily:osw,fontWeight:700,fontSize:10,color:isKeyMatchup(p.pid,p.name)?'#ff8020':'var(--text)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',cursor:'pointer'}}>{p.name}</span>
+                    <span style={{fontFamily:osw,fontWeight:700,fontSize:10,color:isKeyMatchup(p.pid,p.name)?'#ff8020':'var(--text)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.name}</span>
                     <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={p.pid} name={p.name} team={p.team}/></span>
                   </div>
                 </td>
@@ -9542,10 +9542,11 @@ function LongShotView({ data }) {
       const _iso  = parseFloat(b.recent_iso) || 0;
       const _zf   = parseFloat(b.zone_fit)   || 0;
       const _boom = computeBoomScore(_sig, b.zone_fit, b.recent_iso, _simTB, b.weighted_flag_score);
-      // Write to DAILY_PICKS_CACHE for slideout — but DON'T overwrite if AM/SLSR
-      // already set a more accurate _trackerSig (AM uses fuller formula)
-      if (!b._trackerSig) b._trackerSig = _sig;
-      if (!b._boom)       b._boom       = _boom;
+      // Write to DAILY_PICKS_CACHE directly (b is a CSV copy, not the cache object)
+      const _lsCache = DAILY_PICKS_CACHE[String(b.batter_id)];
+      if (_lsCache && !_lsCache._trackerSig) _lsCache._trackerSig = _sig;
+      if (_lsCache && !_lsCache._boom)       _lsCache._boom       = _boom;
+      if (_lsCache && !_lsCache._pgLabel)    _lsCache._pgLabel    = pgLabel;
       out.push({ ...b, _pgLabel:pgLabel, _simHR, _simTB, _bvpFB, _recEV,
         _bvpLA, _recLA, _recFB, _flags, _temp, _sig, _formClass, _kHR, _iso, _zf, _boom,
         _hrPct:parseFloat(b.proj_hr_adj)||parseFloat(b.sim_hr)||0 });
@@ -10397,11 +10398,20 @@ function SimLabView({ data }) {
                                    (_phv.startsWith('l')&&(_bhv==='R'||_bhv==='S'));
                   if (_platoonv || (_slotv >= 3 && _slotv <= 5)) _trackerSig += 1;
                   b._trackerSig = Math.min(14, Math.max(0, _trackerSig)); // cap at 14
-                  b._pgLabel     = _pgLabelv; // write back so slideout can read it
-                  sigCache.current[String(b.batter_id)] = b._trackerSig; // persist for sort
+                  b._pgLabel     = _pgLabelv;
                   b._formClass   = getFormClass(b);
                   b._boom        = computeBoomScore(b._trackerSig, b.zone_fit, b.recent_iso, b.sim_tb, b.weighted_flag_score);
-                  boomCache.current[String(b.batter_id)] = b._boom; // persist for sort
+                  sigCache.current[String(b.batter_id)]  = b._trackerSig;
+                  boomCache.current[String(b.batter_id)] = b._boom;
+                  // Write to DAILY_PICKS_CACHE directly — allPicksData rows are CSV copies,
+                  // not the same objects, so b.x = y never reaches the cache the slideout reads
+                  const _cacheEntry = DAILY_PICKS_CACHE[String(b.batter_id)];
+                  if (_cacheEntry) {
+                    _cacheEntry._trackerSig = b._trackerSig;
+                    _cacheEntry._pgLabel    = b._pgLabel;
+                    _cacheEntry._boom       = b._boom;
+                    _cacheEntry._formClass  = b._formClass;
+                  }
                   // On first render: if user hasn't sorted manually and we're sorting by boom,
                   // nudge sortDir to force useMemo re-run with now-populated cache
                   if (!boomCacheReady.current && !userSorted.current && sortBy === '_boom') {
