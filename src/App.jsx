@@ -9835,12 +9835,15 @@ function SimLabView({ data }) {
   const [simActiveOnly, setSimActiveOnly]         = useState(false);
   const [simInjuredOnly, setSimInjuredOnly]       = useState(false);
   const [simHotOnly, setSimHotOnly]               = useState(false);
-  const [minHRScore, setMinHRScore]   = useState('');
-  const [minHRPct,   setMinHRPct]     = useState('');
-  const [minMeatball,setMinMeatball]  = useState('');
-  const [minHitPct,  setMinHitPct]    = useState('');
-  const [minSimTB,   setMinSimTB]     = useState('');
-  const [minOdds,    setMinOdds]      = useState('');
+  const [minBoom,    setMinBoom]     = useState('');
+  const [maxBoom,    setMaxBoom]     = useState('');
+  const [minGHR,     setMinGHR]      = useState('');
+  const [maxGHR,     setMaxGHR]      = useState('');
+  const [minSig,     setMinSig]      = useState('');
+  const [maxSig,     setMaxSig]      = useState('');
+  const [minPS,      setMinPS]       = useState('');
+  const [minSimTB,   setMinSimTB]    = useState('');
+  const [minOdds,    setMinOdds]     = useState('');
   const [simSearch,   setSimSearch]    = useState('');  // batter name search
   const [selPitcherGradesSim, setSelPitcherGradesSim] = useState(new Set()); // empty = All
   const [selBatterGradesSim,  setSelBatterGradesSim]  = useState(new Set()); // empty = All grades
@@ -9944,12 +9947,15 @@ function SimLabView({ data }) {
         const pid = r.pitcher_id ? String(parseInt(r.pitcher_id) || r.pitcher_id) : null;
         return pid && selPitcherGradesSim.has(simPitcherGrades.current[pid]);
       })
-      .filter(r => !minHRScore  || (parseFloat(r.weighted_flag_score)||0) >= parseFloat(minHRScore))
-      .filter(r => !minHRPct    || pctRaw(r.proj_hr_adj)               >= parseFloat(minHRPct))
-      .filter(r => !minMeatball || (parseFloat(r.meatball_matchup_score)||0)*100 >= parseFloat(minMeatball))
-      .filter(r => !minHitPct   || pctRaw(r.proj_hit_prob)              >= parseFloat(minHitPct))
-      .filter(r => !minSimTB    || (parseFloat(r.sim_tb)||0)             >= parseFloat(minSimTB))
-      .filter(r => !minOdds     || (() => { const d = HR_ODDS_MAP[String(parseInt(r.batter_id)||0)]; return d?.implied && (d.implied * 100) >= parseFloat(minOdds); })())
+      .filter(r => !minBoom   || (parseFloat(r._boom)||computeBoomScore(parseFloat(r.weighted_flag_score)*4.6, r.zone_fit, r.recent_iso, r.sim_tb, r.weighted_flag_score)) >= parseFloat(minBoom))
+      .filter(r => !maxBoom   || (parseFloat(r._boom)||computeBoomScore(parseFloat(r.weighted_flag_score)*4.6, r.zone_fit, r.recent_iso, r.sim_tb, r.weighted_flag_score)) <= parseFloat(maxBoom))
+      .filter(r => !minGHR    || (parseFloat(r.gHR)||0)  >= parseFloat(minGHR))
+      .filter(r => !maxGHR    || (parseFloat(r.gHR)||0)  <= parseFloat(maxGHR))
+      .filter(r => !minSig    || (parseFloat(r._trackerSig)||(parseFloat(r.weighted_flag_score)*4.6)) >= parseFloat(minSig))
+      .filter(r => !maxSig    || (parseFloat(r._trackerSig)||(parseFloat(r.weighted_flag_score)*4.6)) <= parseFloat(maxSig))
+      .filter(r => !minPS     || (parseFloat(r.ps_score)||0) >= parseFloat(minPS))
+      .filter(r => !minSimTB  || (parseFloat(r.sim_tb)||0)   >= parseFloat(minSimTB))
+      .filter(r => !minOdds   || (() => { const d = HR_ODDS_MAP[String(parseInt(r.batter_id)||0)]; return d?.implied && (d.implied * 100) >= parseFloat(minOdds); })())
       .filter(r => !simSearch || (r.batter||'').toLowerCase().includes(simSearch.toLowerCase()));
     const mul = sortDir === 'desc' ? -1 : 1;
     const sorted = [...filtered].sort((a, b) => {
@@ -9975,7 +9981,7 @@ function SimLabView({ data }) {
       return mul * ((parseFloat(a[sortBy]) || 0) - (parseFloat(b[sortBy]) || 0));
     });
     return sorted;
-  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, minHRScore, minHRPct, minMeatball, minHitPct, minSimTB, minOdds, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal]);
+  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, minBoom, maxBoom, minGHR, maxGHR, minSig, maxSig, minPS, minSimTB, minOdds, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal]);
 
   // Auto-select top batter when data loads
   useEffect(() => {
@@ -10180,30 +10186,40 @@ function SimLabView({ data }) {
           </div>
 
           {/* Min-value filter bar */}
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
-            <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", textTransform: 'uppercase', letterSpacing: 1, flexShrink: 0 }}>Min:</span>
+          <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center',marginBottom:8}}>
+            {/* Min+Max filters */}
             {[
-              { label: 'HR Score', val: minHRScore, set: setMinHRScore, placeholder: 'e.g. 2.0' },
-              { label: 'HR%',      val: minHRPct,   set: setMinHRPct,   placeholder: 'e.g. 5' },
-              { label: '💣',       val: minMeatball,set: setMinMeatball, placeholder: 'e.g. 10' },
-              { label: 'Hit%',     val: minHitPct,  set: setMinHitPct,  placeholder: 'e.g. 25' },
-              { label: 'Sim TB',   val: minSimTB,   set: setMinSimTB,   placeholder: 'e.g. 1.5' },
-              { label: 'Odds %',   val: minOdds,    set: setMinOdds,    placeholder: 'e.g. 8' },
-            ].map(({ label, val, set, placeholder }) => (
-              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", flexShrink: 0 }}>{label}</span>
-                <input type="number" value={val} onChange={e => set(e.target.value)}
-                  placeholder={placeholder}
-                  style={{ width: 60, padding: '3px 6px', borderRadius: 5, border: `1px solid ${val ? 'var(--accent2)' : 'var(--border)'}`,
-                    background: 'var(--surface2)', color: 'var(--text)',
-                    fontFamily: "'DM Mono',monospace", fontSize: 10 }}/>
+              { label:'💥 Boom', minV:minBoom, setMin:setMinBoom, maxV:maxBoom, setMax:setMaxBoom, hasMax:true,  ph:'30' },
+              { label:'gHR',     minV:minGHR,  setMin:setMinGHR,  maxV:maxGHR,  setMax:setMaxGHR,  hasMax:true,  ph:'40' },
+              { label:'⚡ Sig',  minV:minSig,  setMin:setMinSig,  maxV:maxSig,  setMax:setMaxSig,  hasMax:true,  ph:'4'  },
+              { label:'⚡️ PS',  minV:minPS,   setMin:setMinPS,   maxV:'',      setMax:null,        hasMax:false, ph:'40' },
+              { label:'Sim TB',  minV:minSimTB,setMin:setMinSimTB,maxV:'',      setMax:null,        hasMax:false, ph:'1.5'},
+              { label:'Odds %',  minV:minOdds, setMin:setMinOdds, maxV:'',      setMax:null,        hasMax:false, ph:'8'  },
+            ].map(({ label, minV, setMin, maxV, setMax, hasMax, ph }) => (
+              <div key={label} style={{display:'flex',alignItems:'center',gap:3,background:'var(--surface2)',
+                border:`1px solid ${minV||maxV?'var(--accent2)':'var(--border)'}`,
+                borderRadius:6,padding:'3px 7px'}}>
+                <span style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",flexShrink:0,marginRight:2}}>{label}</span>
+                <input type="number" value={minV} onChange={e=>setMin(e.target.value)} placeholder={ph}
+                  style={{width:42,padding:'1px 4px',borderRadius:4,
+                    border:`1px solid ${minV?'var(--accent2)':'var(--border)'}`,
+                    background:'var(--surface)',color:'var(--text)',
+                    fontFamily:"'DM Mono',monospace",fontSize:9}}/>
+                {hasMax && <>
+                  <span style={{fontSize:8,color:'rgba(255,255,255,.2)',margin:'0 1px'}}>–</span>
+                  <input type="number" value={maxV} onChange={e=>setMax(e.target.value)} placeholder="max"
+                    style={{width:42,padding:'1px 4px',borderRadius:4,
+                      border:`1px solid ${maxV?'var(--accent2)':'var(--border)'}`,
+                      background:'var(--surface)',color:'var(--text)',
+                      fontFamily:"'DM Mono',monospace",fontSize:9}}/>
+                </>}
               </div>
             ))}
-            {(minHRScore || minHRPct || minMeatball || minHitPct || minSimTB || minOdds) && (
-              <button onClick={() => { setMinHRScore(''); setMinHRPct(''); setMinMeatball(''); setMinHitPct(''); setMinSimTB(''); setMinOdds(''); }}
-                style={{ padding: '3px 9px', borderRadius: 5, border: '1px solid rgba(255,64,32,.3)',
-                  background: 'rgba(255,64,32,.08)', color: 'var(--accent)',
-                  fontFamily: "'DM Mono',monospace", fontSize: 9, cursor: 'pointer', fontWeight: 700 }}>
+            {(minBoom||maxBoom||minGHR||maxGHR||minSig||maxSig||minPS||minSimTB||minOdds) && (
+              <button onClick={()=>{setMinBoom('');setMaxBoom('');setMinGHR('');setMaxGHR('');setMinSig('');setMaxSig('');setMinPS('');setMinSimTB('');setMinOdds('');}}
+                style={{padding:'3px 9px',borderRadius:5,border:'1px solid rgba(255,64,32,.3)',
+                  background:'rgba(255,64,32,.08)',color:'var(--accent)',
+                  fontFamily:"'DM Mono',monospace",fontSize:9,cursor:'pointer',fontWeight:700}}>
                 ✕ Clear
               </button>
             )}
