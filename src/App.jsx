@@ -9701,7 +9701,7 @@ function LongShotView({ data }) {
             <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'center',borderBottom:'1px solid var(--border)'}}>Gr</th>
             <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)'}}>Pitcher</th>
             <Th k="_boom"  label="💥 Boom"/>
-            <Th k="_pgLabel" label="P Grade"/>
+            <Th k="_simTB"  label="Sim TB"/>
             <Th k="_kHR"    label="gHR"/>
             <Th k="_ps"     label="⚡️ PS"/>
             <Th k="_sig"   label="⚡ Sig"/>
@@ -9709,7 +9709,7 @@ function LongShotView({ data }) {
             <Th k="_zf"     label="ZoneFit"/>
             <Th k="_bvpFB"  label="BvP FB%"/>
             <Th k="_recEV"  label="EV"/>
-            <Th k="_simTB"  label="Sim TB"/>
+            <Th k="_pgLabel" label="P Grade"/>
           </tr></thead>
           <tbody>
             {filtered.map(b => {
@@ -9737,19 +9737,7 @@ function LongShotView({ data }) {
                     <td style={{padding:'2px 6px',textAlign:'center',fontFamily:osw,fontWeight:800,fontSize:10,color:b.grade==='C'?'var(--muted)':'rgba(232,65,26,.8)'}}>{b.grade}</td>
                     <td style={{padding:'2px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',whiteSpace:'nowrap',maxWidth:100,overflow:'hidden',textOverflow:'ellipsis'}}>{b.pitcher||'—'}</td>
                     <td style={{padding:'2px 4px',textAlign:'center'}}>
-                      <PSBadge score={b._ps}/>
-                    </td>
-                    <td style={{padding:'2px 4px',textAlign:'center'}}>
                       <BoomBadge score={b._boom}/>
-                    </td>
-                    <td style={{padding:'2px 4px',textAlign:'right'}}>
-                      <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',
-                        width:20,height:17,borderRadius:4,fontFamily:osw,fontWeight:800,fontSize:11,
-                        background:b._sig>=10?'rgba(255,64,32,.25)':b._sig>=7?'rgba(245,166,35,.2)':b._sig>=4?'rgba(39,201,122,.15)':'rgba(255,255,255,.05)',
-                        color:b._sig>=10?'#ff4020':b._sig>=7?'#f5a623':b._sig>=4?'#27c97a':'var(--muted)',
-                        border:`1px solid ${b._sig>=10?'rgba(255,64,32,.4)':b._sig>=7?'rgba(245,166,35,.3)':b._sig>=4?'rgba(39,201,122,.25)':'var(--border)'}`}}>
-                        {b._sig}
-                      </span>
                     </td>
                     <td style={{padding:'2px 6px',textAlign:'right'}}>
                       <span style={{fontFamily:osw,fontWeight:800,fontSize:11,color:tbColor(b._simTB)}}>{b._simTB.toFixed(2)}</span>
@@ -9761,6 +9749,18 @@ function LongShotView({ data }) {
                         color:b._kHR>=70?'#ff4020':b._kHR>=50?'#f5a623':b._kHR>=30?'#27c97a':'var(--muted)'}}>
                         {Math.round(b._kHR)}
                       </span>}
+                    </td>
+                    <td style={{padding:'2px 4px',textAlign:'center'}}>
+                      <PSBadge score={b._ps}/>
+                    </td>
+                    <td style={{padding:'2px 4px',textAlign:'right'}}>
+                      <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',
+                        width:20,height:17,borderRadius:4,fontFamily:osw,fontWeight:800,fontSize:11,
+                        background:b._sig>=10?'rgba(255,64,32,.25)':b._sig>=7?'rgba(245,166,35,.2)':b._sig>=4?'rgba(39,201,122,.15)':'rgba(255,255,255,.05)',
+                        color:b._sig>=10?'#ff4020':b._sig>=7?'#f5a623':b._sig>=4?'#27c97a':'var(--muted)',
+                        border:`1px solid ${b._sig>=10?'rgba(255,64,32,.4)':b._sig>=7?'rgba(245,166,35,.3)':b._sig>=4?'rgba(39,201,122,.25)':'var(--border)'}`}}>
+                        {b._sig}
+                      </span>
                     </td>
                     <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,
                       color:b._iso>=0.25?'#ff8020':b._iso>=0.18?'#f5a623':'var(--muted)'}}>
@@ -10498,19 +10498,10 @@ function SimLabView({ data }) {
                         </div>
                       </td>
                       <td style={{textAlign:'center',padding:'2px 4px',verticalAlign:'middle'}}>
-                        <PSBadge score={b._ps ?? (parseFloat(b.ps_score)||0)}/>
-                      </td>
-                      <td style={{textAlign:'center',padding:'2px 4px',verticalAlign:'middle'}}>
                         <BoomBadge score={b._boom}/>
                       </td>
                       <td style={{textAlign:'center',padding:'2px 4px',verticalAlign:'middle'}}>
                         <FormBadge formKey={getFormClass(b)}/>
-                      </td>
-                      <td style={{ textAlign: 'right', padding:'3px 6px' }}>
-                        <span style={{ fontFamily:"'DM Mono',monospace", fontSize:9, color:'var(--muted)', cursor:'pointer', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:90, display:'inline-block' }}
-                          onClick={e=>{e.stopPropagation();if(b.pitcher_id)openPitcherSlide({pid:parseInt(b.pitcher_id)||0,name:b.pitcher,team:'',hand:b.pitcher_hand,pitchMix:[]});}}>
-                          {b.pitcher}<span style={{fontSize:8,opacity:.4,marginLeft:1}}>›</span>
-                        </span>
                       </td>
                       {/* P.Grade + weak spot inline */}
                       <td style={{ textAlign: 'center', padding:'3px 4px' }}>
@@ -10527,6 +10518,12 @@ function SimLabView({ data }) {
                               border:'1px solid rgba(245,166,35,.3)',borderRadius:3,padding:'0 3px'}}>#{ws}</span>}
                           </span>;
                         })()}
+                      </td>
+                      <td style={{ textAlign: 'right', padding:'3px 6px' }}>
+                        <span style={{ fontFamily:"'DM Mono',monospace", fontSize:9, color:'var(--muted)', cursor:'pointer', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:90, display:'inline-block' }}
+                          onClick={e=>{e.stopPropagation();if(b.pitcher_id)openPitcherSlide({pid:parseInt(b.pitcher_id)||0,name:b.pitcher,team:'',hand:b.pitcher_hand,pitchMix:[]});}}>
+                          {b.pitcher}<span style={{fontSize:8,opacity:.4,marginLeft:1}}>›</span>
+                        </span>
                       </td>
                       <td style={{ textAlign: 'right', padding:'3px 6px' }}><span style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:hitColor }}>{hitP > 0 ? hitP.toFixed(1)+'%' : '—'}</span></td>
                       <td style={{ textAlign: 'right', padding:'3px 6px' }}><span style={{ fontFamily:"'DM Mono',monospace", fontSize:10 }}>{xbhP > 0 ? xbhP.toFixed(1)+'%' : '—'}</span></td>
