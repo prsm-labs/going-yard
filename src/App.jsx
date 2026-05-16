@@ -1709,8 +1709,8 @@ function MatchupCard({ dp }) {
   const [open, setOpen] = React.useState(false);
   const mono = "'DM Mono',monospace";
   const osw  = "'Oswald',sans-serif";
-  // _trackerSig/_boom are computed during AM/SLSR render — not in raw daily_picks.
-  // Use weighted_flag_score as sig proxy; compute boom from available engine fields.
+  // These are written back to DAILY_PICKS_CACHE during AM/SLSR render.
+  // Before first render: fall back to weighted_flag_score proxy.
   const sig  = parseFloat(dp._trackerSig) || Math.min(14, Math.round((parseFloat(dp.weighted_flag_score)||0) * 4.5));
   const boom = parseFloat(dp._boom) || computeBoomScore(sig, parseFloat(dp.zone_fit)||0, parseFloat(dp.recent_iso)||0, parseFloat(dp.sim_tb)||0, parseFloat(dp.weighted_flag_score)||0);
   const iso  = parseFloat(dp.recent_iso) || 0;
@@ -9490,6 +9490,10 @@ function LongShotView({ data }) {
       const _iso  = parseFloat(b.recent_iso) || 0;
       const _zf   = parseFloat(b.zone_fit)   || 0;
       const _boom = computeBoomScore(b._sig, b.zone_fit, b.recent_iso, b._simTB, b.weighted_flag_score);
+      // Write computed values back to DAILY_PICKS_CACHE so slideout reads real values
+      b._trackerSig = b._sig;
+      b._pgLabel    = pgLabel;
+      b._boom       = _boom;
       out.push({ ...b, _pgLabel:pgLabel, _simHR, _simTB, _bvpFB, _recEV,
         _bvpLA, _recLA, _recFB, _flags, _temp, _sig, _formClass, _kHR, _iso, _zf, _boom,
         _hrPct:parseFloat(b.proj_hr_adj)||parseFloat(b.sim_hr)||0 });
@@ -10341,6 +10345,7 @@ function SimLabView({ data }) {
                                    (_phv.startsWith('l')&&(_bhv==='R'||_bhv==='S'));
                   if (_platoonv || (_slotv >= 3 && _slotv <= 5)) _trackerSig += 1;
                   b._trackerSig = Math.min(14, Math.max(0, _trackerSig)); // cap at 14
+                  b._pgLabel     = _pgLabelv; // write back so slideout can read it
                   sigCache.current[String(b.batter_id)] = b._trackerSig; // persist for sort
                   b._formClass   = getFormClass(b);
                   b._boom        = computeBoomScore(b._trackerSig, b.zone_fit, b.recent_iso, b.sim_tb, b.weighted_flag_score);
