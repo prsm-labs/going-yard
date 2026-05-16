@@ -102,6 +102,9 @@ const styles = `
   .tw{overflow-x:auto;overflow-y:auto;max-height:72vh;border-radius:10px;border:1px solid var(--border);}
   .tw table{border-collapse:separate;border-spacing:0;}
   .tw th{position:sticky;top:0;z-index:10;background:var(--surface2);}
+  .tw th:first-child{position:sticky;top:0;left:0;z-index:20;background:var(--surface2);}
+  .tw td:first-child{position:sticky;left:0;z-index:5;background:var(--surface);}
+  .tw tr:hover td:first-child{background:var(--surface2);}
   .tw thead tr:first-child th{border-bottom:2px solid var(--border);}
   table{width:100%;border-collapse:collapse;}
   thead tr{background:var(--surface2);}
@@ -1908,6 +1911,161 @@ function AtBatSlideIn() {
         )}
       </div>
 
+
+      {/* ── Today's Matchup Card ────────────────────────────────────────── */}
+      {(() => {
+        const dp = DAILY_PICKS_CACHE[String(player.pid)];
+        if (!dp) return null;
+        const mono = "'DM Mono',monospace";
+        const osw  = "'Oswald',sans-serif";
+        const [open, setOpen] = React.useState(false);
+        const sig  = parseFloat(dp._trackerSig) || 0;
+        const boom = parseFloat(dp._boom) || 0;
+        const iso  = parseFloat(dp.recent_iso) || 0;
+        const zf   = parseFloat(dp.zone_fit) || 0;
+        const ghr  = parseFloat(dp.gHR) || 0;
+        const simTB= parseFloat(dp.sim_tb) || 0;
+        const ev   = parseFloat(dp.recent_avg_ev) || 0;
+        const brl  = parseFloat(dp.recent_barrel_pct) || 0;
+        const fb   = parseFloat(dp.recent_fb_pct) || 0;
+        const la   = parseFloat(dp.recent_avg_la) || 0;
+        const pgLabel = dp._pgLabel || dp.pitcher_grade || '—';
+        const pgColor = pgLabel.includes('Target')?'#27c97a':pgLabel.includes('Hittable')?'#60d360':pgLabel.includes('Average')?'#f5a623':pgLabel.includes('Tough')||pgLabel.includes('Elite')?'#ff4020':'var(--muted)';
+        const formKey = getFormClass(dp);
+        const fc = formKey && FORM_CLASSES[formKey];
+        const sigColor = sig>=10?'#ff4020':sig>=7?'#f5a623':sig>=4?'#27c97a':'var(--muted)';
+        const boomColor = boom>=70?'#ff4020':boom>=50?'#f5a623':boom>=30?'#27c97a':'var(--muted)';
+        return (
+          <div style={{padding:'12px 16px',borderBottom:'1px solid var(--border)'}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+              <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:1}}>
+                📊 Today's Matchup
+              </div>
+              <button onClick={()=>setOpen(o=>!o)}
+                style={{fontFamily:mono,fontSize:8,color:'var(--accent2)',background:'none',border:'none',cursor:'pointer',letterSpacing:.5}}>
+                {open?'▲ Less':'▼ Deep Dive'}
+              </button>
+            </div>
+
+            {/* Mini stats row — horizontally scrollable */}
+            <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
+              <div style={{display:'flex',gap:6,minWidth:'max-content',paddingBottom:4}}>
+                {[
+                  ['💥 Boom', boom>0?Math.round(boom):'—', boomColor],
+                  ['⚡ Sig',  sig>0?sig:'—',               sigColor],
+                  ['P.Grade', pgLabel.split(' ')[0],        pgColor],
+                  ['Form',    fc?fc.short:'—',              fc?fc.color:'var(--muted)'],
+                  ['Sim TB',  simTB>0?simTB.toFixed(2):'—','var(--text)'],
+                  ['gHR',     ghr>0?Math.round(ghr):'—',   ghr>=70?'#ff4020':ghr>=50?'#f5a623':'var(--muted)'],
+                  ['ISO',     iso>0?iso.toFixed(3):'—',     iso>=0.25?'#ff8020':iso>=0.18?'#f5a623':'var(--muted)'],
+                  ['ZoneFit', zf>0?(zf.toFixed(1)+'%'):'—',zf>=8?'#ff4020':zf>=5?'#f5a623':zf>=2?'#27c97a':'var(--muted)'],
+                  ['EV',      ev>0?ev.toFixed(1):'—',       ev>=103?'#ff4020':ev>=97?'#f5a623':'var(--muted)'],
+                  ['Barrel%', brl>0?(brl.toFixed(1)+'%'):'—',brl>=10?'#ff4020':brl>=6?'#f5a623':'var(--muted)'],
+                  ['FB%',     fb>0?(fb.toFixed(1)+'%'):'—', fb>=35?'#f5a623':'var(--muted)'],
+                  ['Avg LA',  la>0?(la.toFixed(1)+'°'):'—', la>=22?'#27c97a':'var(--muted)'],
+                  ['xwOBA',   (parseFloat(dp.season_xwoba)||0)>0?(parseFloat(dp.season_xwoba)).toFixed(3):'—', (parseFloat(dp.season_xwoba)||0)>=0.380?'#ff4020':(parseFloat(dp.season_xwoba)||0)>=0.320?'#f5a623':'var(--muted)'],
+                  ['wOBA',    (parseFloat(dp.season_woba)||0)>0?(parseFloat(dp.season_woba)).toFixed(3):'—',   (parseFloat(dp.season_woba)||0)>=0.370?'#ff4020':(parseFloat(dp.season_woba)||0)>=0.310?'#f5a623':'var(--muted)'],
+                  ['SwStr%',  (parseFloat(dp.season_swstr_pct)||0)>0?((parseFloat(dp.season_swstr_pct)).toFixed(1)+'%'):'—', (parseFloat(dp.season_swstr_pct)||0)>=20?'#ff4020':(parseFloat(dp.season_swstr_pct)||0)>=14?'#f5a623':'#27c97a'],
+                ].map(([lbl,val,col])=>(
+                  <div key={lbl} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,
+                    padding:'5px 8px',textAlign:'center',minWidth:52,flexShrink:0}}>
+                    <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.6,marginBottom:2}}>{lbl}</div>
+                    <div style={{fontFamily:osw,fontWeight:700,fontSize:12,color:col}}>{val}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ── Deep Dive dropdown ─────────────────────────────────────── */}
+            {open && (
+              <div style={{marginTop:10,display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                {/* Recent L7 */}
+                <div style={{background:'var(--surface2)',borderRadius:8,border:'1px solid var(--border)',padding:'10px 12px'}}>
+                  <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:8}}>📅 Recent (L7)</div>
+                  {[
+                    ['Avg EV',    dp.recent_avg_ev,      'mph', v=>parseFloat(v)>=103?'#ff4020':parseFloat(v)>=97?'#f5a623':'var(--text)'],
+                    ['Barrel%',   dp.recent_barrel_pct,  '%',   v=>parseFloat(v)>=10?'#ff4020':parseFloat(v)>=6?'#f5a623':'var(--muted)'],
+                    ['HH%',       dp.recent_hh_pct,      '%',   v=>parseFloat(v)>=45?'#ff8020':'var(--muted)'],
+                    ['FB%',       dp.recent_fb_pct,      '%',   v=>parseFloat(v)>=35?'#f5a623':'var(--muted)'],
+                    ['Avg LA',    dp.recent_avg_la,      '°',   v=>parseFloat(v)>=22?'#27c97a':'var(--muted)'],
+                    ['HR Count',  dp.recent_hr_count,    '',    v=>parseInt(v)>=2?'#ff4020':parseInt(v)>=1?'#f5a623':'var(--muted)'],
+                    ['ISO',       dp.recent_iso,         '',    v=>parseFloat(v)>=0.25?'#ff8020':parseFloat(v)>=0.18?'#f5a623':'var(--muted)'],
+                    ['xwOBA',     dp.season_xwoba,       '',    v=>parseFloat(v)>=0.380?'#ff4020':parseFloat(v)>=0.320?'#f5a623':'var(--muted)'],
+                    ['wOBA',      dp.season_woba,        '',    v=>parseFloat(v)>=0.370?'#ff4020':parseFloat(v)>=0.310?'#f5a623':'var(--muted)'],
+                    ['SwStr%',    dp.season_swstr_pct,   '%',   v=>parseFloat(v)>=20?'#ff4020':parseFloat(v)>=14?'#f5a623':'#27c97a'],
+                  ].map(([lbl,val,suf,col])=>{
+                    if (!val && val!==0) return null;
+                    const v = parseFloat(val);
+                    if (!v && v!==0) return null;
+                    return (
+                      <div key={lbl} style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:3}}>
+                        <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{lbl}</span>
+                        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:col(val)}}>
+                          {suf==='%'?(v.toFixed(1)+'%'):suf==='mph'?v.toFixed(1):suf==='°'?(v.toFixed(1)+'°'):val}
+                        </span>
+                      </div>
+                    );
+                  }).filter(Boolean)}
+                </div>
+
+                {/* BvP Quick */}
+                <div style={{background:'var(--surface2)',borderRadius:8,border:'1px solid var(--border)',padding:'10px 12px'}}>
+                  <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:8}}>⚔️ BvP Splits</div>
+                  {[
+                    ['Avg EV',   dp.bvp_avg_ev,      'mph', v=>parseFloat(v)>=103?'#ff4020':parseFloat(v)>=97?'#f5a623':'var(--text)'],
+                    ['Barrel%',  dp.bvp_barrel_pct,  '%',   ()=>'var(--muted)'],
+                    ['HH%',      dp.bvp_hh_pct,      '%',   v=>parseFloat(v)>=45?'#ff8020':'var(--muted)'],
+                    ['FB%',      dp.bvp_fb_pct,      '%',   ()=>'var(--muted)'],
+                    ['Avg LA',   dp.bvp_avg_la,      '°',   v=>parseFloat(v)>=22?'#27c97a':'var(--muted)'],
+                    ['PA',       dp.bvp_pa,          '',    ()=>'var(--text)'],
+                  ].map(([lbl,val,suf,col])=>{
+                    if (!val && val!==0) return null;
+                    const v = parseFloat(val);
+                    if (!v && v!==0) return null;
+                    return (
+                      <div key={lbl} style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:3}}>
+                        <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{lbl}</span>
+                        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:col(val)}}>
+                          {suf==='%'?(v.toFixed(1)+'%'):suf==='mph'?v.toFixed(1):suf==='°'?(v.toFixed(1)+'°'):val}
+                        </span>
+                      </div>
+                    );
+                  }).filter(Boolean)}
+                </div>
+
+                {/* Pitcher Vuln */}
+                <div style={{background:'var(--surface2)',borderRadius:8,border:'1px solid var(--border)',padding:'10px 12px',gridColumn:'1/-1'}}>
+                  <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:8}}>
+                    🎯 Pitcher Vuln — {dp.pitcher||'Today\'s Pitcher'}
+                  </div>
+                  <div style={{display:'flex',gap:12,flexWrap:'wrap'}}>
+                    {[
+                      ['HH Allowed',    dp.pitcher_hh_pct_allowed,    '%', v=>parseFloat(v)>=40?'#ff8020':'var(--muted)'],
+                      ['FB Allowed',    dp.pitcher_fb_pct_allowed,    '%', ()=>'var(--muted)'],
+                      ['Brl Allowed',   dp.pitcher_barrel_pct_allowed,'%', v=>parseFloat(v)>=8?'#ff4020':parseFloat(v)>=5?'#f5a623':'var(--muted)'],
+                      ['Meatball%',     dp.pitcher_meatball_pct,      '%', v=>parseFloat(v)>=55?'#ff8020':'var(--muted)'],
+                      ['Zone Fit',      dp.zone_fit,                   '%', v=>parseFloat(v)>=8?'#ff4020':parseFloat(v)>=5?'#f5a623':parseFloat(v)>=2?'#27c97a':'var(--muted)'],
+                    ].map(([lbl,val,suf,col])=>{
+                      if (!val && val!==0) return null;
+                      const v = parseFloat(val);
+                      if (!v && v!==0) return null;
+                      return (
+                        <div key={lbl} style={{textAlign:'center',minWidth:70}}>
+                          <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.5,marginBottom:2}}>{lbl}</div>
+                          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:col(val)}}>
+                            {v.toFixed(1)}{suf}
+                          </div>
+                        </div>
+                      );
+                    }).filter(Boolean)}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {/* BvP vs Today's Pitcher */}
       {(bvpData || bvpLoading) && (
         <div style={{padding:"14px 20px",borderBottom:"1px solid var(--border)"}}>
@@ -2564,9 +2722,12 @@ async function loadTodayLineups() {
         for (const side of ['away','home']) {
           const players = game.lineups?.[side==='away'?'awayPlayers':'homePlayers'] || [];
           const teamAbbr = game.teams?.[side]?.team?.abbreviation || '';
-          players.forEach(p => {
+          players.forEach((p, idx) => {
             if (p.id) {
-              LINEUP_STATUS[p.id] = { status: 'confirmed', team: teamAbbr };
+              // battingOrder from API is 100,200,...900 — divide by 100 for slot 1-9
+              // Fallback to array index+1 if battingOrder missing
+              const slot = p.battingOrder ? Math.round(p.battingOrder / 100) : (idx + 1);
+              LINEUP_STATUS[p.id] = { status: 'confirmed', team: teamAbbr, slot };
             }
           });
         }
@@ -9295,8 +9456,9 @@ function LongShotView({ data }) {
       // Flags
       if (_flags === 7)                  _sig -= 2;
       else if (_flags === 1)             _sig -= 1;
-      // Lineup slot × platoon (uses b.lineup_slot from engine data)
-      const _lsSlot = parseInt(b.lineup_slot)||0;
+      // Lineup slot: prefer live confirmed slot, fall back to engine data
+      const _lsStatus = LINEUP_STATUS[parseInt(b.batter_id)||0];
+      const _lsSlot = (_lsStatus?.slot) || parseInt(b.lineup_slot)||0;
       if (_lsSlot > 0) {
         // ── Pitcher handedness weakness vs this batter's hand ───────────
         const _bhLS   = (b.batter_hand||'').toUpperCase();
@@ -9564,8 +9726,10 @@ function SimLabView({ data }) {
   const [sortPropDir, setSortPropDir] = useState('desc');
   const [lineupOnly, setLineupOnly]   = useState(false);
   const [slBatterHand, setSlBatterHand]   = useState('ALL');
-  const sigCache  = useRef({}); // caches _trackerSig per batter_id after first render
-  const boomCache = useRef({}); // caches _boom per batter_id after first render
+  const sigCache       = useRef({}); // caches _trackerSig per batter_id after first render
+  const boomCache      = useRef({}); // caches _boom per batter_id after first render
+  const userSorted     = useRef(false); // true once user manually changes sort
+  const boomCacheReady = useRef(false); // true after first render populates boomCache
   const [slHideFinal, setSlHideFinal]     = useState(false);
   const [slPitcherHand, setSlPitcherHand] = useState('ALL');
   const [slFormFilter, setSlFormFilter]   = useState(new Set());
@@ -9600,6 +9764,7 @@ function SimLabView({ data }) {
   // Column sort handler: same column toggles direction, new column defaults to desc
   const handleSort = key => {
     if (!key) return;
+    userSorted.current = true; // user took control — don't auto-re-sort
     if (key === sortBy) setSortDir(d => d === 'desc' ? 'asc' : 'desc');
     else { setSortBy(key); setSortDir('desc'); }
   };
@@ -9963,7 +10128,7 @@ function SimLabView({ data }) {
               const esc = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
               const headers = ['Grade','Pitcher Grade','Gone Yard','Is Key Matchup','Team','Batter','Hand','P.Hand','vs Pitcher',
                 'Top Pitches','Game Time',
-                '⚡ Sig','💥 Boom','Form Class','gHR','ISO','Zone Fit',
+                '⚡ Sig','💥 Boom','Form Class','gHR','ISO','Zone Fit','xwOBA','wOBA','SwStr%',
                 'Flags','Recent EV','Recent Barrel%',
                 'Recent FB%','Recent LA','BvP EV','BvP Barrel%','BvP FB%','BvP LA',
                 'Sim H','Sim 2B','Sim BB','Sim K','Sim TB','Sim RBI',
@@ -9985,7 +10150,10 @@ function SimLabView({ data }) {
                   (() => { const fc = getFormClass(b); return fc && FORM_CLASSES[fc] ? FORM_CLASSES[fc].short.replace(/[💥🥶💨🪱🎯🎩🌙]/gu,'').trim() : ''; })(),
                   b.gHR ?? '',
                   b.recent_iso ? parseFloat(b.recent_iso).toFixed(3) : '',
-                  b.zone_fit   ? parseFloat(b.zone_fit).toFixed(1)   : '',
+                  b.zone_fit        ? parseFloat(b.zone_fit).toFixed(1)        : '',
+                  b.season_xwoba    ? parseFloat(b.season_xwoba).toFixed(3)    : '',
+                  b.season_woba     ? parseFloat(b.season_woba).toFixed(3)     : '',
+                  b.season_swstr_pct? parseFloat(b.season_swstr_pct).toFixed(1): '',
                   b.total_flags,
                   b.recent_avg_ev, b.recent_barrel_pct, b.recent_fb_pct, b.recent_avg_la,
                   b.bvp_avg_ev, b.bvp_barrel_pct, b.bvp_fb_pct, b.bvp_avg_la,
@@ -10159,7 +10327,9 @@ function SimLabView({ data }) {
                   if (_pHHVsH >= 45)       _trackerSig += 1;
                   if (_pFBVsH >= 38)       _trackerSig += 1;
                   if (_pHRVsH >= 5)        _trackerSig += 1;
-                  const _slotv   = parseInt(b.lineup_slot)||0;
+                  // Prefer live confirmed batting order slot over stale engine value
+                  const _liveStatus = LINEUP_STATUS[parseInt(b.batter_id)||0];
+                  const _slotv = (_liveStatus?.slot) || parseInt(b.lineup_slot)||0;
                   const _phv     = (b.pitcher_hand||'').toLowerCase();
                   const _bhv     = (b.batter_hand||'').toUpperCase();
                   const _platoonv= (_phv.startsWith('r')&&(_bhv==='L'||_bhv==='S'))||
@@ -10170,6 +10340,12 @@ function SimLabView({ data }) {
                   b._formClass   = getFormClass(b);
                   b._boom        = computeBoomScore(b._trackerSig, b.zone_fit, b.recent_iso, b.sim_tb, b.weighted_flag_score);
                   boomCache.current[String(b.batter_id)] = b._boom; // persist for sort
+                  // On first render: if user hasn't sorted manually and we're sorting by boom,
+                  // nudge sortDir to force useMemo re-run with now-populated cache
+                  if (!boomCacheReady.current && !userSorted.current && sortBy === '_boom') {
+                    boomCacheReady.current = true;
+                    setTimeout(() => setSortDir(d => { const v = d; return v; }), 0);
+                  }
                   return (
                     <tr key={`${b.batter_id}-${i}`} className="dr"
                       onClick={() => { setSelBatter(b); setView('deepdive'); }}
@@ -15267,6 +15443,14 @@ function LegendButton() {
       'No badge — insufficient L7 data (<3 PA) or no category triggered.',
       'Visible as own column in: All Matchups · Sim Lab Slate · Long Shot tables.'
     ] },
+    { tab:'📐 Contact Quality', items:[
+      'xwOBA (Expected Weighted On-Base Average) — luck-neutral contact quality. Built from our EV×LA matrix calibrated on 430k PAs. Red ≥.380 · Orange ≥.320.',
+      'wOBA — actual weighted on-base average using linear weights. Red ≥.370 · Orange ≥.310. Higher than xwOBA = getting lucky. Lower = getting unlucky.',
+      'SwStr% — swinging strike rate. Red ≥20% (fade, contact risk) · Orange 14–20% (watch) · Green <14% (disciplined hitter). Feeds the Whiff King Form Class.',
+      'ISO (Isolated Power) — (Total Bases − Hits) / AB. Season-long power profile from MLB Stats API. Red ≥.300 · Orange ≥.250 · Amber ≥.180.',
+      'Zone Fit — pitcher meatball rate × batter HR rate in meatball zone. Measures spatial pitch-location matchup. Red ≥8% · Orange ≥5% · Green ≥2%.',
+      'All five feed into 💥 Boom Score alongside Sig, Sim TB, and Engine Score.',
+    ] },
     { tab:'⚡ Sig Score',      items:[
       'Scale: 0–14 (hard cap). Red ≥10 = Elite · Orange ≥7 = Strong · Green ≥4 = Watch.',
       '─── BOOSTS ───',
@@ -15290,6 +15474,8 @@ function LegendButton() {
       'Sinker-heavy pitcher (SI first) → −1 · ABs since HR >30 → −1',
       'Flags = 7 (dead zone) → −2 · Flags = 1 (noise) → −1',
       'Pitcher park ≤0.88 → −1 · Recent FB% <15% → −1',
+      'xwOBA ≥.380 → +up to 8pts (EV×LA expected value, luck-neutral contact quality)',
+      'wOBA ≥.370 = elite actual production · SwStr% ≥20% = contact risk signal',
       'Data: 2024–26 at-bat log · 12,965 HRs · 430,587 PAs · base rate 3.0%'
     ] },
   ];
