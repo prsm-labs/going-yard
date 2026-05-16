@@ -9723,11 +9723,11 @@ function LongShotView({ data }) {
                     style={{cursor:'pointer',height:26,borderBottom:'1px solid rgba(255,255,255,.04)',
                       background:isExp?'rgba(255,255,255,.04)':'transparent',
                       borderLeft:`2px solid ${isExp?'var(--accent)':'transparent'}`}}>
-                    <td className="sticky-batter" style={{padding:'2px 6px',maxWidth:170}}>
+                    <td className="sticky-batter" style={{padding:'2px 6px',maxWidth:170}} title={_boom>=50&&b._ps>=40?'🔥 Convergence Zone — Boom+PS both signal':''}>
                       <div style={{display:'flex',alignItems:'center',gap:4,overflow:'hidden'}}>
                         <PlayerAvatar pid={pid} name={name} size={16}/>
                         <span style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'var(--accent2)',whiteSpace:'nowrap',flexShrink:0}}>{b.batting_team||''}</span>
-                        <span style={{fontFamily:osw,fontWeight:700,fontSize:10,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',color:isKeyMatchup(pid,name)?'#ff8020':'var(--text)'}}>{name}</span>
+                        <span style={{fontFamily:osw,fontWeight:700,fontSize:10,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',color:isKeyMatchup(pid,name)?'#ff8020':(_boom>=50&&b._ps>=40)?'#a855f7':'var(--text)'}}>{name}</span>
                         <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={pid} name={name} team={b.batting_team||''}/></span>
                       </div>
                     </td>
@@ -10483,7 +10483,7 @@ function SimLabView({ data }) {
                             onClick={e=>{e.stopPropagation();const cp=getCachedPlayer(parseInt(b.batter_id)||0)||{};openAtBatSlide({pid:parseInt(b.batter_id)||0,name:b.batter,team:b.batting_team,avgEV:cp.avgEV,barrel:cp.barrel,hardHit:cp.hardHit,flyBall:cp.flyBall,hr:cp.hr,avg:cp.avg,obp:cp.obp,slg:cp.slg,xwoba:cp.xwoba,kPct:cp.kPct,bbPct:cp.bbPct,launchAngle:cp.launchAngle});}}>
                             <span style={{ fontFamily:"'Oswald',sans-serif", fontWeight:700, fontSize:11, whiteSpace:'nowrap',
                               overflow:'hidden', textOverflow:'ellipsis',
-                              color: isKeyMatchup(parseInt(b.batter_id)||0, b.batter) ? '#ff8020' : 'var(--text)' }}>{b.batter}</span>
+                              color: isKeyMatchup(parseInt(b.batter_id)||0, b.batter) ? '#ff8020' : (b._boom>=50&&(parseFloat(b.ps_score)||0)>=40)?'#a855f7':'var(--text)' }}>{b.batter}</span>
                             <span style={{fontSize:9,color:'var(--muted)',opacity:.4,flexShrink:0}}>›</span>
                             {/* Stickers — inline, no wrap */}
                             <InjuryBadge pid={parseInt(b.batter_id)||0} name={b.batter}/>
@@ -15585,6 +15585,7 @@ function LegendButton() {
       'gHR (0–99) — HR probability index. Combines Sig, Zone Fit, ISO, HR Intent, and xwOBA contact quality into a single number. xwOBA above .320 adds bonus points — rewards elite, luck-neutral contact. Red ≥70 · Orange ≥50.',
       '⚡️ PS Score (0–99) — Perfect Storm Score. A gated multiplier system (not linear). Bad gates crush the whole score. Lineup slot gates apply first, then scores three independent phases: Batter Mechanics (25pts) + Pitcher Vulnerability (15pts) + Pitch Convergence (25pts, the core: does the pitcher\'s vulnerable pitch match this batter\'s damage zone?) + Environment (25pts) + Game Theory (5pts). Purple ≥90 (beyond reasonable doubt) · Red ≥75 · Orange ≥60.',
       'Sig and Boom update live when lineups confirm. PS Score gate recalculates live using confirmed batting order slot.',
+      '🔥 Convergence Zone: when Boom ≥50 AND PS ≥40 simultaneously, both scoring systems agree — the batter has a strong HR profile AND favorable situational factors. This overlap is rare and the highest-confidence signal in the app.',
     ] },
     { tab:'⚡ Sig Score',      items:[
       'Scale: 0–14 (hard cap). Red ≥10 = Elite · Orange ≥7 = Strong · Green ≥4 = Watch.',
