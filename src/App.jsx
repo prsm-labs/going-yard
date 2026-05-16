@@ -1709,9 +1709,40 @@ function MatchupCard({ dp }) {
   const [open, setOpen] = React.useState(false);
   const mono = "'DM Mono',monospace";
   const osw  = "'Oswald',sans-serif";
-  // These are written back to DAILY_PICKS_CACHE during AM/SLSR render.
-  // Before first render: fall back to weighted_flag_score proxy.
-  const sig  = parseFloat(dp._trackerSig) || Math.min(14, Math.round((parseFloat(dp.weighted_flag_score)||0) * 4.5));
+
+  // ── pgLabel FIRST — needed by sig formula below ──────────────────────────
+  // Uses AM/SLSR computed _pgLabel if available, else derives from engine vuln fields
+  const pgLabel = dp._pgLabel || (() => {
+    const brl = parseFloat(dp.pitcher_barrel_pct_allowed)||0;
+    const hh  = parseFloat(dp.pitcher_hh_pct_allowed)||0;
+    const mb  = parseFloat(dp.pitcher_meatball_pct)||0;
+    if (brl >= 9  || (hh >= 35 && mb >= 55)) return '🎯 Target';
+    if (brl >= 6  || hh >= 30)               return '💥 Hittable';
+    if (brl <= 2  && hh <= 22 && mb <= 45)   return '‼️ Elite';
+    if (brl <= 3  && hh <= 24)               return '⚠️ Tough';
+    return '🤔 Average';
+  })();
+
+  // ── Sig: use AM/SLSR computed value if available, else approximate ────────
+  const sig = (() => {
+    if (dp._trackerSig) return parseFloat(dp._trackerSig);
+    let s = 0;
+    const tb = parseFloat(dp.sim_tb)||0;
+    const ev = parseFloat(dp.recent_avg_ev)||0;
+    const brl= parseFloat(dp.recent_barrel_pct)||0;
+    const fb = parseFloat(dp.recent_fb_pct)||0;
+    const la = parseFloat(dp.recent_avg_la)||0;
+    if (tb>=2.5&&tb<3) s+=3; else if(tb>=2.0) s+=2; else if(tb>=1.5) s+=1;
+    if (tb>=3.0) s-=1;
+    if (pgLabel.includes('Target')) s+=2; else if(pgLabel.includes('Hittable')) s+=1;
+    else if(pgLabel.includes('Elite')) s-=2;
+    if (ev>=103) s+=2; else if(ev>=97) s+=1;
+    if (la>=22&&la<=32) s+=2; else if(la>=18) s+=1;
+    if (brl>=10) s+=2; else if(brl>=6) s+=1;
+    if (fb>=35) s+=1;
+    return Math.min(14, Math.max(0, s));
+  })();
+
   const boom = parseFloat(dp._boom) || computeBoomScore(sig, parseFloat(dp.zone_fit)||0, parseFloat(dp.recent_iso)||0, parseFloat(dp.sim_tb)||0, parseFloat(dp.weighted_flag_score)||0);
   const iso  = parseFloat(dp.recent_iso) || 0;
   const zf   = parseFloat(dp.zone_fit) || 0;
@@ -1721,7 +1752,6 @@ function MatchupCard({ dp }) {
   const brl  = parseFloat(dp.recent_barrel_pct) || 0;
   const fb   = parseFloat(dp.recent_fb_pct) || 0;
   const la   = parseFloat(dp.recent_avg_la) || 0;
-  const pgLabel = dp._pgLabel || dp.pitcher_grade || '';
   const pgColor = pgLabel.includes('Target')?'#27c97a':pgLabel.includes('Hittable')?'#60d360':pgLabel.includes('Average')?'#f5a623':pgLabel.includes('Tough')||pgLabel.includes('Elite')?'#ff4020':'var(--muted)';
   const formKey = getFormClass(dp);
   const fc = formKey && FORM_CLASSES[formKey];
@@ -1773,7 +1803,7 @@ function MatchupCard({ dp }) {
         <div style={{marginTop:10,display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
           {/* Recent L7 */}
           <div style={{background:'var(--surface2)',borderRadius:8,border:'1px solid var(--border)',padding:'10px 12px'}}>
-            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:8}}>📅 Recent (L7)</div>
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:8}}>📅 Recent Form (L7 At-Bats)</div>
             {[
               ['Avg EV',    dp.recent_avg_ev,      'mph', v=>parseFloat(v)>=103?'#ff4020':parseFloat(v)>=97?'#f5a623':'var(--text)'],
               ['Barrel%',   dp.recent_barrel_pct,  '%',   v=>parseFloat(v)>=10?'#ff4020':parseFloat(v)>=6?'#f5a623':'var(--muted)'],
@@ -1781,10 +1811,8 @@ function MatchupCard({ dp }) {
               ['FB%',       dp.recent_fb_pct,      '%',   v=>parseFloat(v)>=35?'#f5a623':'var(--muted)'],
               ['Avg LA',    dp.recent_avg_la,      '°',   v=>parseFloat(v)>=22?'#27c97a':'var(--muted)'],
               ['HR Count',  dp.recent_hr_count,    '',    v=>parseInt(v)>=2?'#ff4020':parseInt(v)>=1?'#f5a623':'var(--muted)'],
-              ['ISO',       dp.recent_iso,         '',    v=>parseFloat(v)>=0.25?'#ff8020':parseFloat(v)>=0.18?'#f5a623':'var(--muted)'],
-              ['xwOBA',     dp.season_xwoba,       '',    v=>parseFloat(v)>=0.380?'#ff4020':parseFloat(v)>=0.320?'#f5a623':'var(--muted)'],
-              ['wOBA',      dp.season_woba,        '',    v=>parseFloat(v)>=0.370?'#ff4020':parseFloat(v)>=0.310?'#f5a623':'var(--muted)'],
-              ['SwStr%',    dp.season_swstr_pct,   '%',   v=>parseFloat(v)>=20?'#ff4020':parseFloat(v)>=14?'#f5a623':'#27c97a'],
+
+
             ].map(([lbl,val,suf,col])=>{
               if (!val && val!==0) return null;
               const v = parseFloat(val);
@@ -1825,7 +1853,27 @@ function MatchupCard({ dp }) {
             }).filter(Boolean)}
           </div>
 
-          {/* Pitcher Vuln */}
+          {/* Season Contact Quality — full season stats, not L7 */}
+              {(dp.season_xwoba||dp.season_woba||dp.season_swstr_pct) && (
+                <div style={{background:'var(--surface2)',borderRadius:8,border:'1px solid var(--border)',padding:'10px 12px',gridColumn:'1/-1'}}>
+                  <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:8}}>📊 Season Contact Quality</div>
+                  <div style={{display:'flex',gap:20,flexWrap:'wrap'}}>
+                    {[
+                      ['xwOBA', dp.season_xwoba,     v=>parseFloat(v)>=0.380?'#ff4020':parseFloat(v)>=0.320?'#f5a623':'var(--muted)', v=>parseFloat(v).toFixed(3)],
+                      ['wOBA',  dp.season_woba,      v=>parseFloat(v)>=0.370?'#ff4020':parseFloat(v)>=0.310?'#f5a623':'var(--muted)', v=>parseFloat(v).toFixed(3)],
+                      ['SwStr%',dp.season_swstr_pct, v=>parseFloat(v)>=20?'#ff4020':parseFloat(v)>=14?'#f5a623':'#27c97a', v=>parseFloat(v).toFixed(1)+'%'],
+                      ['ISO',   dp.recent_iso,       v=>parseFloat(v)>=0.25?'#ff8020':parseFloat(v)>=0.18?'#f5a623':'var(--muted)', v=>parseFloat(v).toFixed(3)],
+                    ].map(([lbl,val,col,fmt])=>{
+                      if (!val||parseFloat(val)===0) return null;
+                      return (<div key={lbl} style={{textAlign:'center'}}>
+                        <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.5,marginBottom:2}}>{lbl}</div>
+                        <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:15,color:col(val)}}>{fmt(val)}</div>
+                      </div>);
+                    }).filter(Boolean)}
+                  </div>
+                </div>
+              )}
+              {/* Pitcher Vuln */}
           <div style={{background:'var(--surface2)',borderRadius:8,border:'1px solid var(--border)',padding:'10px 12px',gridColumn:'1/-1'}}>
             <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:8}}>
               🎯 Pitcher Vuln — {dp.pitcher||'Today\'s Pitcher'}
@@ -9391,16 +9439,10 @@ function LongShotView({ data }) {
       // Above median (27.3%) = soft/hittable pitcher — same logic as tracker "Target/Hittable"
       const pid2 = String(parseInt(b.pitcher_id)||0);
       // pitcherGradeCache populated by AM/SLSR render — fall back to engine grade field
-      const pgLabel = pitcherGradeCache.current[pid2] || b.pitcher_grade_label || (() => {
-        const raw = (b.weighted_flag_score||0);
-        // Derive rough grade from meatball/HH data when cache is cold
-        const hh = parseFloat(b.pitcher_hh_pct_allowed)||0;
-        const bb_pct = parseFloat(b.pitcher_barrel_pct_allowed)||0;
-        if (bb_pct >= 10 || hh >= 35) return '🎯 Target';
-        if (bb_pct >= 7  || hh >= 30) return '💥 Hittable';
-        if (bb_pct <= 3  && hh <= 20) return '‼️ Elite';
-        return '';
-      })();
+      const pgLabel = pitcherGradeCache.current[pid2] || '';
+      // Write pgLabel to DAILY_PICKS_CACHE for ALL batters (before soft filter)
+      // so the slideout always shows P.Grade regardless of pitcher grade
+      if (pgLabel) b._pgLabel = pgLabel;
       if (!pgLabel || !SOFT_GRADES.has(pgLabel)) continue;
       const _simHR = parseFloat(b.sim_hr_adj)||0;
       // ⚡ Sig — v5 calibrated (241k PAs · atbat log validated)
@@ -9500,10 +9542,10 @@ function LongShotView({ data }) {
       const _iso  = parseFloat(b.recent_iso) || 0;
       const _zf   = parseFloat(b.zone_fit)   || 0;
       const _boom = computeBoomScore(_sig, b.zone_fit, b.recent_iso, _simTB, b.weighted_flag_score);
-      // Write computed values back to DAILY_PICKS_CACHE so slideout reads real values
-      b._trackerSig = _sig;   // _sig is the local computed variable, not b._sig
-      b._pgLabel    = pgLabel;
-      b._boom       = _boom;
+      // Write to DAILY_PICKS_CACHE for slideout — but DON'T overwrite if AM/SLSR
+      // already set a more accurate _trackerSig (AM uses fuller formula)
+      if (!b._trackerSig) b._trackerSig = _sig;
+      if (!b._boom)       b._boom       = _boom;
       out.push({ ...b, _pgLabel:pgLabel, _simHR, _simTB, _bvpFB, _recEV,
         _bvpLA, _recLA, _recFB, _flags, _temp, _sig, _formClass, _kHR, _iso, _zf, _boom,
         _hrPct:parseFloat(b.proj_hr_adj)||parseFloat(b.sim_hr)||0 });
@@ -10597,7 +10639,7 @@ function SimLabView({ data }) {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: 10, marginBottom: 14 }}>
                   {/* Recent form */}
                   <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 12px' }}>
-                    <div style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>📅 Recent (L7)</div>
+                    <div style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>📅 Recent Form (L7)</div>
                     {[
                       ['Avg EV', b.recent_avg_ev, ' mph', parseFloat(b.recent_avg_ev) >= 95 ? '#ff4020' : parseFloat(b.recent_avg_ev) >= 90 ? '#f5a623' : 'var(--text)'],
                       ['Barrel%', b.recent_barrel_pct, '%', parseFloat(b.recent_barrel_pct) >= 10 ? '#ff4020' : parseFloat(b.recent_barrel_pct) >= 5 ? '#f5a623' : 'var(--text)'],
