@@ -8401,7 +8401,7 @@ function HRLeaderboardTab() {
                   <div style={{display:'flex',alignItems:'center',gap:4,overflow:'hidden'}}>
                     <PlayerAvatar pid={r.pid} name={r.name} size={16}/>
                     <span style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'var(--accent2)',whiteSpace:'nowrap',flexShrink:0}}>{r.team}</span>
-                    <span style={{fontFamily:osw,fontWeight:700,fontSize:10,color:isKeyMatchup(r.pid,r.name)?'#ff8020':'var(--text)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.name}</span>
+                    <span onClick={e=>{e.stopPropagation();openAtBatSlide({pid:r.pid,name:r.name,team:r.team});}} style={{fontFamily:osw,fontWeight:700,fontSize:10,color:isKeyMatchup(r.pid,r.name)?'#ff8020':'var(--text)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',cursor:'pointer'}}>{r.name}</span>
                     <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={r.pid} name={r.name} team={r.team}/></span>
                   <FormBadge formKey={r._formClass}/>
                   </div>
@@ -8511,7 +8511,7 @@ function HotBatsTab() {
                 <td style={{padding:'2px 6px',maxWidth:160}}>
                   <div style={{display:'flex',alignItems:'center',gap:4,overflow:'hidden'}}>
                     <PlayerAvatar pid={p.pid} name={p.name} size={16}/>
-                    <span style={{fontFamily:osw,fontWeight:700,fontSize:10,color:isKeyMatchup(p.pid,p.name)?'#ff8020':'var(--text)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.name}</span>
+                    <span onClick={e=>{e.stopPropagation();openAtBatSlide({pid:p.pid,name:p.name,team:p.team});}} style={{fontFamily:osw,fontWeight:700,fontSize:10,color:isKeyMatchup(p.pid,p.name)?'#ff8020':'var(--text)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',cursor:'pointer'}}>{p.name}</span>
                     <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={p.pid} name={p.name} team={p.team}/></span>
                   </div>
                 </td>
@@ -8609,7 +8609,7 @@ function HeatingUpTab() {
                 <td style={{padding:'2px 5px',maxWidth:150}}>
                   <div style={{display:'flex',alignItems:'center',gap:4,overflow:'hidden'}}>
                     <PlayerAvatar pid={p.pid} name={p.name} size={16}/>
-                    <span style={{fontFamily:osw,fontWeight:700,fontSize:10,color:isKeyMatchup(p.pid,p.name)?'#ff8020':'var(--text)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.name}</span>
+                    <span onClick={e=>{e.stopPropagation();openAtBatSlide({pid:p.pid,name:p.name,team:p.team});}} style={{fontFamily:osw,fontWeight:700,fontSize:10,color:isKeyMatchup(p.pid,p.name)?'#ff8020':'var(--text)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',cursor:'pointer'}}>{p.name}</span>
                     <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={p.pid} name={p.name} team={p.team}/></span>
                   </div>
                 </td>
@@ -9390,7 +9390,17 @@ function LongShotView({ data }) {
       // Use pitcher_hh_pct_allowed (hard hit % allowed) as vulnerability proxy
       // Above median (27.3%) = soft/hittable pitcher — same logic as tracker "Target/Hittable"
       const pid2 = String(parseInt(b.pitcher_id)||0);
-      const pgLabel = pitcherGradeCache.current[pid2] || '';
+      // pitcherGradeCache populated by AM/SLSR render — fall back to engine grade field
+      const pgLabel = pitcherGradeCache.current[pid2] || b.pitcher_grade_label || (() => {
+        const raw = (b.weighted_flag_score||0);
+        // Derive rough grade from meatball/HH data when cache is cold
+        const hh = parseFloat(b.pitcher_hh_pct_allowed)||0;
+        const bb_pct = parseFloat(b.pitcher_barrel_pct_allowed)||0;
+        if (bb_pct >= 10 || hh >= 35) return '🎯 Target';
+        if (bb_pct >= 7  || hh >= 30) return '💥 Hittable';
+        if (bb_pct <= 3  && hh <= 20) return '‼️ Elite';
+        return '';
+      })();
       if (!pgLabel || !SOFT_GRADES.has(pgLabel)) continue;
       const _simHR = parseFloat(b.sim_hr_adj)||0;
       // ⚡ Sig — v5 calibrated (241k PAs · atbat log validated)
@@ -9489,9 +9499,9 @@ function LongShotView({ data }) {
       const _kHR  = parseFloat(b.gHR)  || 0;  // renamed kHR→gHR in engine
       const _iso  = parseFloat(b.recent_iso) || 0;
       const _zf   = parseFloat(b.zone_fit)   || 0;
-      const _boom = computeBoomScore(b._sig, b.zone_fit, b.recent_iso, b._simTB, b.weighted_flag_score);
+      const _boom = computeBoomScore(_sig, b.zone_fit, b.recent_iso, _simTB, b.weighted_flag_score);
       // Write computed values back to DAILY_PICKS_CACHE so slideout reads real values
-      b._trackerSig = b._sig;
+      b._trackerSig = _sig;   // _sig is the local computed variable, not b._sig
       b._pgLabel    = pgLabel;
       b._boom       = _boom;
       out.push({ ...b, _pgLabel:pgLabel, _simHR, _simTB, _bvpFB, _recEV,
