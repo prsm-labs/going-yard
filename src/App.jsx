@@ -102,9 +102,9 @@ const styles = `
   .tw{overflow-x:auto;overflow-y:auto;max-height:72vh;border-radius:10px;border:1px solid var(--border);}
   .tw table{border-collapse:separate;border-spacing:0;}
   .tw th{position:sticky;top:0;z-index:10;background:var(--surface2);}
-  .tw th:first-child{position:sticky;top:0;left:0;z-index:20;background:var(--surface2);}
-  .tw td:first-child{position:sticky;left:0;z-index:5;background:var(--surface);}
-  .tw tr:hover td:first-child{background:var(--surface2);}
+  .tw th.sticky-batter{position:sticky;top:0;left:0;z-index:20;background:var(--surface2);}
+  .tw td.sticky-batter{position:sticky;left:0;z-index:5;background:var(--surface);}
+  .tw tr:hover td.sticky-batter{background:var(--surface2);}
   .tw thead tr:first-child th{border-bottom:2px solid var(--border);}
   table{width:100%;border-collapse:collapse;}
   thead tr{background:var(--surface2);}
@@ -1709,8 +1709,10 @@ function MatchupCard({ dp }) {
   const [open, setOpen] = React.useState(false);
   const mono = "'DM Mono',monospace";
   const osw  = "'Oswald',sans-serif";
-  const sig  = parseFloat(dp._trackerSig) || 0;
-  const boom = parseFloat(dp._boom) || 0;
+  // _trackerSig/_boom are computed during AM/SLSR render — not in raw daily_picks.
+  // Use weighted_flag_score as sig proxy; compute boom from available engine fields.
+  const sig  = parseFloat(dp._trackerSig) || Math.min(14, Math.round((parseFloat(dp.weighted_flag_score)||0) * 4.5));
+  const boom = parseFloat(dp._boom) || computeBoomScore(sig, parseFloat(dp.zone_fit)||0, parseFloat(dp.recent_iso)||0, parseFloat(dp.sim_tb)||0, parseFloat(dp.weighted_flag_score)||0);
   const iso  = parseFloat(dp.recent_iso) || 0;
   const zf   = parseFloat(dp.zone_fit) || 0;
   const ghr  = parseFloat(dp.gHR) || 0;
@@ -1719,7 +1721,7 @@ function MatchupCard({ dp }) {
   const brl  = parseFloat(dp.recent_barrel_pct) || 0;
   const fb   = parseFloat(dp.recent_fb_pct) || 0;
   const la   = parseFloat(dp.recent_avg_la) || 0;
-  const pgLabel = dp._pgLabel || dp.pitcher_grade || '—';
+  const pgLabel = dp._pgLabel || dp.pitcher_grade || '';
   const pgColor = pgLabel.includes('Target')?'#27c97a':pgLabel.includes('Hittable')?'#60d360':pgLabel.includes('Average')?'#f5a623':pgLabel.includes('Tough')||pgLabel.includes('Elite')?'#ff4020':'var(--muted)';
   const formKey = getFormClass(dp);
   const fc = formKey && FORM_CLASSES[formKey];
@@ -9608,7 +9610,7 @@ function LongShotView({ data }) {
       <div className="tw">
         <table style={{width:'100%'}}>
           <thead><tr>
-            <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)'}}>Batter</th>
+            <th className="sticky-batter" style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)'}}>Batter</th>
             <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'center',borderBottom:'1px solid var(--border)'}}>Form</th>
             <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'center',borderBottom:'1px solid var(--border)'}}>Gr</th>
             <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)'}}>Pitcher</th>
@@ -9634,7 +9636,7 @@ function LongShotView({ data }) {
                     style={{cursor:'pointer',height:26,borderBottom:'1px solid rgba(255,255,255,.04)',
                       background:isExp?'rgba(255,255,255,.04)':'transparent',
                       borderLeft:`2px solid ${isExp?'var(--accent)':'transparent'}`}}>
-                    <td style={{padding:'2px 6px',maxWidth:170}}>
+                    <td className="sticky-batter" style={{padding:'2px 6px',maxWidth:170}}>
                       <div style={{display:'flex',alignItems:'center',gap:4,overflow:'hidden'}}>
                         <PlayerAvatar pid={pid} name={name} size={16}/>
                         <span style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'var(--accent2)',whiteSpace:'nowrap',flexShrink:0}}>{b.batting_team||''}</span>
@@ -10357,7 +10359,7 @@ function SimLabView({ data }) {
                         <PickButton pid={parseInt(b.batter_id)||0} name={b.batter} team={b.batting_team}/>
                       </td>
                       {/* ── Batter name — single-line, no wrap ── */}
-                      <td style={{ textAlign: 'left', maxWidth: 180 }}>
+                      <td className="sticky-batter" style={{ textAlign: 'left', maxWidth: 180 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 5, overflow: 'hidden' }}>
                           <PlayerAvatar pid={parseInt(b.batter_id)||0} name={b.batter} size={22}/>
                           <span style={{fontFamily:"'DM Mono',monospace",fontSize:8,fontWeight:700,color:'var(--accent2)',whiteSpace:'nowrap',flexShrink:0}}>{b.batting_team}</span>
@@ -10798,7 +10800,7 @@ function SimLabView({ data }) {
                         <td style={{ textAlign: 'center' }} onClick={e => e.stopPropagation()}>
                           <PickButton pid={parseInt(b.batter_id)||0} name={b.batter} team={b.batting_team}/>
                         </td>
-                        <td style={{ textAlign: 'left', maxWidth: 180 }}>
+                        <td className="sticky-batter" style={{ textAlign: 'left', maxWidth: 180 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 5, overflow: 'hidden' }}>
                             <PlayerAvatar pid={parseInt(b.batter_id)||0} name={b.batter} size={24}/>
                             <span style={{fontFamily:"'DM Mono',monospace",fontSize:8,fontWeight:700,color:'var(--accent2)',whiteSpace:'nowrap',flexShrink:0}}>{b.batting_team}</span>
