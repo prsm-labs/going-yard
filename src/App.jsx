@@ -10525,13 +10525,15 @@ function SimLabView({ data }) {
                           {b.pitcher}<span style={{fontSize:8,opacity:.4,marginLeft:1}}>›</span>
                         </span>
                       </td>
-                      <td style={{ textAlign: 'right', padding:'3px 6px' }}><span style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:hitColor }}>{hitP > 0 ? hitP.toFixed(1)+'%' : '—'}</span></td>
-                      <td style={{ textAlign: 'right', padding:'3px 6px' }}><span style={{ fontFamily:"'DM Mono',monospace", fontSize:10 }}>{xbhP > 0 ? xbhP.toFixed(1)+'%' : '—'}</span></td>
-                      <td style={{ textAlign: 'right', padding:'3px 6px' }}><span style={{ fontFamily:"'Oswald',sans-serif", fontWeight:700, fontSize:11, color:tb>=1.5?'#ff8020':tb>=1.0?'#f5a623':'var(--text)' }}>{tb > 0 ? tb.toFixed(2) : '—'}</span></td>
-                      <td style={{ textAlign: 'right', padding:'3px 6px' }}>
-                        <span style={{ fontFamily:"'Oswald',sans-serif", fontWeight:700, fontSize:11, color:'var(--text)' }}>
-                          {parseFloat(b.weighted_flag_score) > 0 ? parseFloat(b.weighted_flag_score).toFixed(2) : '—'}
-                        </span>
+                      <td style={{textAlign:'center',padding:'2px 4px'}}>
+                        {(()=>{ const kv=parseFloat(b.gHR)||0; if(!kv) return <span style={{color:'rgba(255,255,255,.15)',fontFamily:"'DM Mono',monospace",fontSize:10}}>—</span>;
+                          const bg=kv>=70?'rgba(255,64,32,.2)':kv>=50?'rgba(245,166,35,.18)':kv>=30?'rgba(39,201,122,.15)':'rgba(255,255,255,.06)';
+                          const col=kv>=70?'#ff4020':kv>=50?'#f5a623':kv>=30?'#27c97a':'var(--muted)';
+                          return <span style={{display:'inline-block',padding:'1px 6px',borderRadius:4,fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:10,background:bg,color:col}}>{Math.round(kv)}</span>;
+                        })()}
+                      </td>
+                      <td style={{textAlign:'center',padding:'2px 4px'}}>
+                        <PSBadge score={b._ps ?? (parseFloat(b.ps_score)||0)}/>
                       </td>
                       <td style={{ textAlign: 'center', padding:'3px 4px' }}>
                         <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',
@@ -10543,20 +10545,17 @@ function SimLabView({ data }) {
                           {b._trackerSig||'—'}
                         </span>
                       </td>
-                      <td style={{textAlign:'center',padding:'2px 4px'}}>
-                        {(()=>{ const kv=parseFloat(b.gHR)||0; if(!kv) return <span style={{color:'rgba(255,255,255,.15)',fontFamily:"'DM Mono',monospace",fontSize:10}}>—</span>;
-                          const bg=kv>=70?'rgba(255,64,32,.2)':kv>=50?'rgba(245,166,35,.18)':kv>=30?'rgba(39,201,122,.15)':'rgba(255,255,255,.06)';
-                          const col=kv>=70?'#ff4020':kv>=50?'#f5a623':kv>=30?'#27c97a':'var(--muted)';
-                          return <span style={{display:'inline-block',padding:'1px 6px',borderRadius:4,fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:10,background:bg,color:col}}>{Math.round(kv)}</span>;
-                        })()}
+                      <td style={{ textAlign: 'right', padding:'3px 6px' }}><span style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:hitColor }}>{hitP > 0 ? hitP.toFixed(1)+'%' : '—'}</span></td>
+                      <td style={{ textAlign: 'right', padding:'3px 6px' }}><span style={{ fontFamily:"'DM Mono',monospace", fontSize:10 }}>{xbhP > 0 ? xbhP.toFixed(1)+'%' : '—'}</span></td>
+                      <td style={{ textAlign: 'right', padding:'3px 6px' }}><span style={{ fontFamily:"'Oswald',sans-serif", fontWeight:700, fontSize:11, color:tb>=1.5?'#ff8020':tb>=1.0?'#f5a623':'var(--text)' }}>{tb > 0 ? tb.toFixed(2) : '—'}</span></td>
+                      <td style={{ textAlign: 'right', padding:'3px 6px' }}>
+                        <span style={{ fontFamily:"'Oswald',sans-serif", fontWeight:700, fontSize:11, color:'var(--text)' }}>
+                          {parseFloat(b.weighted_flag_score) > 0 ? parseFloat(b.weighted_flag_score).toFixed(2) : '—'}
+                        </span>
                       </td>
                       <td style={{textAlign:'right',padding:'3px 6px',fontFamily:"'DM Mono',monospace",fontSize:10,
                         color:(parseFloat(b.recent_iso)||0)>=0.25?'#ff8020':(parseFloat(b.recent_iso)||0)>=0.18?'#f5a623':'var(--muted)'}}>
                         {(parseFloat(b.recent_iso)||0)>0?(parseFloat(b.recent_iso)||0).toFixed(3):'—'}
-                      </td>
-                      <td style={{textAlign:'right',padding:'3px 6px',fontFamily:"'DM Mono',monospace",fontSize:10,
-                        color:(parseFloat(b.zone_fit)||0)>=8?'#ff4020':(parseFloat(b.zone_fit)||0)>=5?'#f5a623':(parseFloat(b.zone_fit)||0)>=2?'#27c97a':'var(--muted)'}}>
-                        {(parseFloat(b.zone_fit)||0)>0?((parseFloat(b.zone_fit)||0).toFixed(1)+'%'):'—'}
                       </td>
                       <td style={{textAlign:'center',padding:'3px 4px'}}>
                         {(() => {
@@ -10565,15 +10564,19 @@ function SimLabView({ data }) {
                           return <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,color:col}}>{n>0?n:'—'}</span>;
                         })()}
                       </td>
-                      <td style={{ textAlign: 'right', padding:'3px 4px' }}>
-                        {!INJURY_MAP[String(parseInt(b.batter_id)||0)] && <span style={{ padding:'1px 6px', borderRadius:4, fontSize:9, fontFamily:"'Oswald',sans-serif", fontWeight:800, background:gc.bg, color:gc.color, border:`1px solid ${gc.border}` }}>{b.grade}</span>}
+                      <td style={{textAlign:'right',padding:'3px 6px',fontFamily:"'DM Mono',monospace",fontSize:10,
+                        color:(parseFloat(b.zone_fit)||0)>=8?'#ff4020':(parseFloat(b.zone_fit)||0)>=5?'#f5a623':(parseFloat(b.zone_fit)||0)>=2?'#27c97a':'var(--muted)'}}>
+                        {(parseFloat(b.zone_fit)||0)>0?((parseFloat(b.zone_fit)||0).toFixed(1)+'%'):'—'}
                       </td>
                       <td style={{ textAlign: 'right', padding:'3px 6px' }}>
                         {parseFloat(b.meatball_matchup_score) > 0 ? (() => {
                           const ms = parseFloat(b.meatball_matchup_score);
                           const col = ms >= 0.15 ? '#ff4020' : ms >= 0.08 ? '#f5a623' : '#27c97a';
-                          return <span style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:col, fontWeight:700 }}>{(ms*100).toFixed(0)}</span>;
-                        })() : <span style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:'rgba(255,255,255,.15)' }}>—</span>}
+                          return <span style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:col, fontWeight:700 }}>{(ms*100).toFixed(1)}%</span>;
+                        })() : <span style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:'rgba(255,255,255,.2)' }}>—</span>}
+                      </td>
+                      <td style={{ textAlign: 'right', padding:'3px 4px' }}>
+                        {!INJURY_MAP[String(parseInt(b.batter_id)||0)] && <span style={{ padding:'1px 6px', borderRadius:4, fontFamily:"'DM Mono',monospace", fontSize:9, color:'rgba(255,255,255,.25)', border:'1px solid rgba(255,255,255,.1)' }}>{b.grade||'—'}</span>}
                       </td>
                       <td style={{textAlign:'center',padding:'3px 4px'}}>
                         <HROddsCell pid={parseInt(b.batter_id)||0}/>
