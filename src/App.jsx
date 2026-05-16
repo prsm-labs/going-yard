@@ -1704,6 +1704,158 @@ function openAtBatSlide(player) {
   if (AB_SLIDE_LISTENER) AB_SLIDE_LISTENER(player);
 }
 
+
+function MatchupCard({ dp }) {
+  const [open, setOpen] = React.useState(false);
+  const mono = "'DM Mono',monospace";
+  const osw  = "'Oswald',sans-serif";
+  const sig  = parseFloat(dp._trackerSig) || 0;
+  const boom = parseFloat(dp._boom) || 0;
+  const iso  = parseFloat(dp.recent_iso) || 0;
+  const zf   = parseFloat(dp.zone_fit) || 0;
+  const ghr  = parseFloat(dp.gHR) || 0;
+  const simTB= parseFloat(dp.sim_tb) || 0;
+  const ev   = parseFloat(dp.recent_avg_ev) || 0;
+  const brl  = parseFloat(dp.recent_barrel_pct) || 0;
+  const fb   = parseFloat(dp.recent_fb_pct) || 0;
+  const la   = parseFloat(dp.recent_avg_la) || 0;
+  const pgLabel = dp._pgLabel || dp.pitcher_grade || '—';
+  const pgColor = pgLabel.includes('Target')?'#27c97a':pgLabel.includes('Hittable')?'#60d360':pgLabel.includes('Average')?'#f5a623':pgLabel.includes('Tough')||pgLabel.includes('Elite')?'#ff4020':'var(--muted)';
+  const formKey = getFormClass(dp);
+  const fc = formKey && FORM_CLASSES[formKey];
+  const sigColor = sig>=10?'#ff4020':sig>=7?'#f5a623':sig>=4?'#27c97a':'var(--muted)';
+  const boomColor = boom>=70?'#ff4020':boom>=50?'#f5a623':boom>=30?'#27c97a':'var(--muted)';
+  return (
+    <div style={{padding:'12px 16px',borderBottom:'1px solid var(--border)'}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+        <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:1}}>
+          📊 Today's Matchup
+        </div>
+        <button onClick={()=>setOpen(o=>!o)}
+          style={{fontFamily:mono,fontSize:8,color:'var(--accent2)',background:'none',border:'none',cursor:'pointer',letterSpacing:.5}}>
+          {open?'▲ Less':'▼ Deep Dive'}
+        </button>
+      </div>
+
+      {/* Mini stats row — horizontally scrollable */}
+      <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
+        <div style={{display:'flex',gap:6,minWidth:'max-content',paddingBottom:4}}>
+          {[
+            ['💥 Boom', boom>0?Math.round(boom):'—', boomColor],
+            ['⚡ Sig',  sig>0?sig:'—',               sigColor],
+            ['P.Grade', pgLabel.split(' ')[0],        pgColor],
+            ['Form',    fc?fc.short:'—',              fc?fc.color:'var(--muted)'],
+            ['Sim TB',  simTB>0?simTB.toFixed(2):'—','var(--text)'],
+            ['gHR',     ghr>0?Math.round(ghr):'—',   ghr>=70?'#ff4020':ghr>=50?'#f5a623':'var(--muted)'],
+            ['ISO',     iso>0?iso.toFixed(3):'—',     iso>=0.25?'#ff8020':iso>=0.18?'#f5a623':'var(--muted)'],
+            ['ZoneFit', zf>0?(zf.toFixed(1)+'%'):'—',zf>=8?'#ff4020':zf>=5?'#f5a623':zf>=2?'#27c97a':'var(--muted)'],
+            ['EV',      ev>0?ev.toFixed(1):'—',       ev>=103?'#ff4020':ev>=97?'#f5a623':'var(--muted)'],
+            ['Barrel%', brl>0?(brl.toFixed(1)+'%'):'—',brl>=10?'#ff4020':brl>=6?'#f5a623':'var(--muted)'],
+            ['FB%',     fb>0?(fb.toFixed(1)+'%'):'—', fb>=35?'#f5a623':'var(--muted)'],
+            ['Avg LA',  la>0?(la.toFixed(1)+'°'):'—', la>=22?'#27c97a':'var(--muted)'],
+            ['xwOBA',   (parseFloat(dp.season_xwoba)||0)>0?(parseFloat(dp.season_xwoba)).toFixed(3):'—', (parseFloat(dp.season_xwoba)||0)>=0.380?'#ff4020':(parseFloat(dp.season_xwoba)||0)>=0.320?'#f5a623':'var(--muted)'],
+            ['wOBA',    (parseFloat(dp.season_woba)||0)>0?(parseFloat(dp.season_woba)).toFixed(3):'—',   (parseFloat(dp.season_woba)||0)>=0.370?'#ff4020':(parseFloat(dp.season_woba)||0)>=0.310?'#f5a623':'var(--muted)'],
+            ['SwStr%',  (parseFloat(dp.season_swstr_pct)||0)>0?((parseFloat(dp.season_swstr_pct)).toFixed(1)+'%'):'—', (parseFloat(dp.season_swstr_pct)||0)>=20?'#ff4020':(parseFloat(dp.season_swstr_pct)||0)>=14?'#f5a623':'#27c97a'],
+          ].map(([lbl,val,col])=>(
+            <div key={lbl} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,
+              padding:'5px 8px',textAlign:'center',minWidth:52,flexShrink:0}}>
+              <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.6,marginBottom:2}}>{lbl}</div>
+              <div style={{fontFamily:osw,fontWeight:700,fontSize:12,color:col}}>{val}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Deep Dive dropdown ─────────────────────────────────────── */}
+      {open && (
+        <div style={{marginTop:10,display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+          {/* Recent L7 */}
+          <div style={{background:'var(--surface2)',borderRadius:8,border:'1px solid var(--border)',padding:'10px 12px'}}>
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:8}}>📅 Recent (L7)</div>
+            {[
+              ['Avg EV',    dp.recent_avg_ev,      'mph', v=>parseFloat(v)>=103?'#ff4020':parseFloat(v)>=97?'#f5a623':'var(--text)'],
+              ['Barrel%',   dp.recent_barrel_pct,  '%',   v=>parseFloat(v)>=10?'#ff4020':parseFloat(v)>=6?'#f5a623':'var(--muted)'],
+              ['HH%',       dp.recent_hh_pct,      '%',   v=>parseFloat(v)>=45?'#ff8020':'var(--muted)'],
+              ['FB%',       dp.recent_fb_pct,      '%',   v=>parseFloat(v)>=35?'#f5a623':'var(--muted)'],
+              ['Avg LA',    dp.recent_avg_la,      '°',   v=>parseFloat(v)>=22?'#27c97a':'var(--muted)'],
+              ['HR Count',  dp.recent_hr_count,    '',    v=>parseInt(v)>=2?'#ff4020':parseInt(v)>=1?'#f5a623':'var(--muted)'],
+              ['ISO',       dp.recent_iso,         '',    v=>parseFloat(v)>=0.25?'#ff8020':parseFloat(v)>=0.18?'#f5a623':'var(--muted)'],
+              ['xwOBA',     dp.season_xwoba,       '',    v=>parseFloat(v)>=0.380?'#ff4020':parseFloat(v)>=0.320?'#f5a623':'var(--muted)'],
+              ['wOBA',      dp.season_woba,        '',    v=>parseFloat(v)>=0.370?'#ff4020':parseFloat(v)>=0.310?'#f5a623':'var(--muted)'],
+              ['SwStr%',    dp.season_swstr_pct,   '%',   v=>parseFloat(v)>=20?'#ff4020':parseFloat(v)>=14?'#f5a623':'#27c97a'],
+            ].map(([lbl,val,suf,col])=>{
+              if (!val && val!==0) return null;
+              const v = parseFloat(val);
+              if (!v && v!==0) return null;
+              return (
+                <div key={lbl} style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:3}}>
+                  <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{lbl}</span>
+                  <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:col(val)}}>
+                    {suf==='%'?(v.toFixed(1)+'%'):suf==='mph'?v.toFixed(1):suf==='°'?(v.toFixed(1)+'°'):val}
+                  </span>
+                </div>
+              );
+            }).filter(Boolean)}
+          </div>
+
+          {/* BvP Quick */}
+          <div style={{background:'var(--surface2)',borderRadius:8,border:'1px solid var(--border)',padding:'10px 12px'}}>
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:8}}>⚔️ BvP Splits</div>
+            {[
+              ['Avg EV',   dp.bvp_avg_ev,      'mph', v=>parseFloat(v)>=103?'#ff4020':parseFloat(v)>=97?'#f5a623':'var(--text)'],
+              ['Barrel%',  dp.bvp_barrel_pct,  '%',   ()=>'var(--muted)'],
+              ['HH%',      dp.bvp_hh_pct,      '%',   v=>parseFloat(v)>=45?'#ff8020':'var(--muted)'],
+              ['FB%',      dp.bvp_fb_pct,      '%',   ()=>'var(--muted)'],
+              ['Avg LA',   dp.bvp_avg_la,      '°',   v=>parseFloat(v)>=22?'#27c97a':'var(--muted)'],
+              ['PA',       dp.bvp_pa,          '',    ()=>'var(--text)'],
+            ].map(([lbl,val,suf,col])=>{
+              if (!val && val!==0) return null;
+              const v = parseFloat(val);
+              if (!v && v!==0) return null;
+              return (
+                <div key={lbl} style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:3}}>
+                  <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{lbl}</span>
+                  <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:col(val)}}>
+                    {suf==='%'?(v.toFixed(1)+'%'):suf==='mph'?v.toFixed(1):suf==='°'?(v.toFixed(1)+'°'):val}
+                  </span>
+                </div>
+              );
+            }).filter(Boolean)}
+          </div>
+
+          {/* Pitcher Vuln */}
+          <div style={{background:'var(--surface2)',borderRadius:8,border:'1px solid var(--border)',padding:'10px 12px',gridColumn:'1/-1'}}>
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:8}}>
+              🎯 Pitcher Vuln — {dp.pitcher||'Today\'s Pitcher'}
+            </div>
+            <div style={{display:'flex',gap:12,flexWrap:'wrap'}}>
+              {[
+                ['HH Allowed',    dp.pitcher_hh_pct_allowed,    '%', v=>parseFloat(v)>=40?'#ff8020':'var(--muted)'],
+                ['FB Allowed',    dp.pitcher_fb_pct_allowed,    '%', ()=>'var(--muted)'],
+                ['Brl Allowed',   dp.pitcher_barrel_pct_allowed,'%', v=>parseFloat(v)>=8?'#ff4020':parseFloat(v)>=5?'#f5a623':'var(--muted)'],
+                ['Meatball%',     dp.pitcher_meatball_pct,      '%', v=>parseFloat(v)>=55?'#ff8020':'var(--muted)'],
+                ['Zone Fit',      dp.zone_fit,                   '%', v=>parseFloat(v)>=8?'#ff4020':parseFloat(v)>=5?'#f5a623':parseFloat(v)>=2?'#27c97a':'var(--muted)'],
+              ].map(([lbl,val,suf,col])=>{
+                if (!val && val!==0) return null;
+                const v = parseFloat(val);
+                if (!v && v!==0) return null;
+                return (
+                  <div key={lbl} style={{textAlign:'center',minWidth:70}}>
+                    <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.5,marginBottom:2}}>{lbl}</div>
+                    <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:col(val)}}>
+                      {v.toFixed(1)}{suf}
+                    </div>
+                  </div>
+                );
+              }).filter(Boolean)}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AtBatSlideIn() {
   const [player, setPlayer] = useState(null);
   const [atBats, setAtBats] = useState([]);
@@ -1913,158 +2065,9 @@ function AtBatSlideIn() {
 
 
       {/* ── Today's Matchup Card ────────────────────────────────────────── */}
-      {(() => {
-        const dp = DAILY_PICKS_CACHE[String(player.pid)];
-        if (!dp) return null;
-        const mono = "'DM Mono',monospace";
-        const osw  = "'Oswald',sans-serif";
-        const [open, setOpen] = React.useState(false);
-        const sig  = parseFloat(dp._trackerSig) || 0;
-        const boom = parseFloat(dp._boom) || 0;
-        const iso  = parseFloat(dp.recent_iso) || 0;
-        const zf   = parseFloat(dp.zone_fit) || 0;
-        const ghr  = parseFloat(dp.gHR) || 0;
-        const simTB= parseFloat(dp.sim_tb) || 0;
-        const ev   = parseFloat(dp.recent_avg_ev) || 0;
-        const brl  = parseFloat(dp.recent_barrel_pct) || 0;
-        const fb   = parseFloat(dp.recent_fb_pct) || 0;
-        const la   = parseFloat(dp.recent_avg_la) || 0;
-        const pgLabel = dp._pgLabel || dp.pitcher_grade || '—';
-        const pgColor = pgLabel.includes('Target')?'#27c97a':pgLabel.includes('Hittable')?'#60d360':pgLabel.includes('Average')?'#f5a623':pgLabel.includes('Tough')||pgLabel.includes('Elite')?'#ff4020':'var(--muted)';
-        const formKey = getFormClass(dp);
-        const fc = formKey && FORM_CLASSES[formKey];
-        const sigColor = sig>=10?'#ff4020':sig>=7?'#f5a623':sig>=4?'#27c97a':'var(--muted)';
-        const boomColor = boom>=70?'#ff4020':boom>=50?'#f5a623':boom>=30?'#27c97a':'var(--muted)';
-        return (
-          <div style={{padding:'12px 16px',borderBottom:'1px solid var(--border)'}}>
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
-              <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:1}}>
-                📊 Today's Matchup
-              </div>
-              <button onClick={()=>setOpen(o=>!o)}
-                style={{fontFamily:mono,fontSize:8,color:'var(--accent2)',background:'none',border:'none',cursor:'pointer',letterSpacing:.5}}>
-                {open?'▲ Less':'▼ Deep Dive'}
-              </button>
-            </div>
-
-            {/* Mini stats row — horizontally scrollable */}
-            <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
-              <div style={{display:'flex',gap:6,minWidth:'max-content',paddingBottom:4}}>
-                {[
-                  ['💥 Boom', boom>0?Math.round(boom):'—', boomColor],
-                  ['⚡ Sig',  sig>0?sig:'—',               sigColor],
-                  ['P.Grade', pgLabel.split(' ')[0],        pgColor],
-                  ['Form',    fc?fc.short:'—',              fc?fc.color:'var(--muted)'],
-                  ['Sim TB',  simTB>0?simTB.toFixed(2):'—','var(--text)'],
-                  ['gHR',     ghr>0?Math.round(ghr):'—',   ghr>=70?'#ff4020':ghr>=50?'#f5a623':'var(--muted)'],
-                  ['ISO',     iso>0?iso.toFixed(3):'—',     iso>=0.25?'#ff8020':iso>=0.18?'#f5a623':'var(--muted)'],
-                  ['ZoneFit', zf>0?(zf.toFixed(1)+'%'):'—',zf>=8?'#ff4020':zf>=5?'#f5a623':zf>=2?'#27c97a':'var(--muted)'],
-                  ['EV',      ev>0?ev.toFixed(1):'—',       ev>=103?'#ff4020':ev>=97?'#f5a623':'var(--muted)'],
-                  ['Barrel%', brl>0?(brl.toFixed(1)+'%'):'—',brl>=10?'#ff4020':brl>=6?'#f5a623':'var(--muted)'],
-                  ['FB%',     fb>0?(fb.toFixed(1)+'%'):'—', fb>=35?'#f5a623':'var(--muted)'],
-                  ['Avg LA',  la>0?(la.toFixed(1)+'°'):'—', la>=22?'#27c97a':'var(--muted)'],
-                  ['xwOBA',   (parseFloat(dp.season_xwoba)||0)>0?(parseFloat(dp.season_xwoba)).toFixed(3):'—', (parseFloat(dp.season_xwoba)||0)>=0.380?'#ff4020':(parseFloat(dp.season_xwoba)||0)>=0.320?'#f5a623':'var(--muted)'],
-                  ['wOBA',    (parseFloat(dp.season_woba)||0)>0?(parseFloat(dp.season_woba)).toFixed(3):'—',   (parseFloat(dp.season_woba)||0)>=0.370?'#ff4020':(parseFloat(dp.season_woba)||0)>=0.310?'#f5a623':'var(--muted)'],
-                  ['SwStr%',  (parseFloat(dp.season_swstr_pct)||0)>0?((parseFloat(dp.season_swstr_pct)).toFixed(1)+'%'):'—', (parseFloat(dp.season_swstr_pct)||0)>=20?'#ff4020':(parseFloat(dp.season_swstr_pct)||0)>=14?'#f5a623':'#27c97a'],
-                ].map(([lbl,val,col])=>(
-                  <div key={lbl} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,
-                    padding:'5px 8px',textAlign:'center',minWidth:52,flexShrink:0}}>
-                    <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.6,marginBottom:2}}>{lbl}</div>
-                    <div style={{fontFamily:osw,fontWeight:700,fontSize:12,color:col}}>{val}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* ── Deep Dive dropdown ─────────────────────────────────────── */}
-            {open && (
-              <div style={{marginTop:10,display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-                {/* Recent L7 */}
-                <div style={{background:'var(--surface2)',borderRadius:8,border:'1px solid var(--border)',padding:'10px 12px'}}>
-                  <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:8}}>📅 Recent (L7)</div>
-                  {[
-                    ['Avg EV',    dp.recent_avg_ev,      'mph', v=>parseFloat(v)>=103?'#ff4020':parseFloat(v)>=97?'#f5a623':'var(--text)'],
-                    ['Barrel%',   dp.recent_barrel_pct,  '%',   v=>parseFloat(v)>=10?'#ff4020':parseFloat(v)>=6?'#f5a623':'var(--muted)'],
-                    ['HH%',       dp.recent_hh_pct,      '%',   v=>parseFloat(v)>=45?'#ff8020':'var(--muted)'],
-                    ['FB%',       dp.recent_fb_pct,      '%',   v=>parseFloat(v)>=35?'#f5a623':'var(--muted)'],
-                    ['Avg LA',    dp.recent_avg_la,      '°',   v=>parseFloat(v)>=22?'#27c97a':'var(--muted)'],
-                    ['HR Count',  dp.recent_hr_count,    '',    v=>parseInt(v)>=2?'#ff4020':parseInt(v)>=1?'#f5a623':'var(--muted)'],
-                    ['ISO',       dp.recent_iso,         '',    v=>parseFloat(v)>=0.25?'#ff8020':parseFloat(v)>=0.18?'#f5a623':'var(--muted)'],
-                    ['xwOBA',     dp.season_xwoba,       '',    v=>parseFloat(v)>=0.380?'#ff4020':parseFloat(v)>=0.320?'#f5a623':'var(--muted)'],
-                    ['wOBA',      dp.season_woba,        '',    v=>parseFloat(v)>=0.370?'#ff4020':parseFloat(v)>=0.310?'#f5a623':'var(--muted)'],
-                    ['SwStr%',    dp.season_swstr_pct,   '%',   v=>parseFloat(v)>=20?'#ff4020':parseFloat(v)>=14?'#f5a623':'#27c97a'],
-                  ].map(([lbl,val,suf,col])=>{
-                    if (!val && val!==0) return null;
-                    const v = parseFloat(val);
-                    if (!v && v!==0) return null;
-                    return (
-                      <div key={lbl} style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:3}}>
-                        <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{lbl}</span>
-                        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:col(val)}}>
-                          {suf==='%'?(v.toFixed(1)+'%'):suf==='mph'?v.toFixed(1):suf==='°'?(v.toFixed(1)+'°'):val}
-                        </span>
-                      </div>
-                    );
-                  }).filter(Boolean)}
-                </div>
-
-                {/* BvP Quick */}
-                <div style={{background:'var(--surface2)',borderRadius:8,border:'1px solid var(--border)',padding:'10px 12px'}}>
-                  <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:8}}>⚔️ BvP Splits</div>
-                  {[
-                    ['Avg EV',   dp.bvp_avg_ev,      'mph', v=>parseFloat(v)>=103?'#ff4020':parseFloat(v)>=97?'#f5a623':'var(--text)'],
-                    ['Barrel%',  dp.bvp_barrel_pct,  '%',   ()=>'var(--muted)'],
-                    ['HH%',      dp.bvp_hh_pct,      '%',   v=>parseFloat(v)>=45?'#ff8020':'var(--muted)'],
-                    ['FB%',      dp.bvp_fb_pct,      '%',   ()=>'var(--muted)'],
-                    ['Avg LA',   dp.bvp_avg_la,      '°',   v=>parseFloat(v)>=22?'#27c97a':'var(--muted)'],
-                    ['PA',       dp.bvp_pa,          '',    ()=>'var(--text)'],
-                  ].map(([lbl,val,suf,col])=>{
-                    if (!val && val!==0) return null;
-                    const v = parseFloat(val);
-                    if (!v && v!==0) return null;
-                    return (
-                      <div key={lbl} style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:3}}>
-                        <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{lbl}</span>
-                        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:col(val)}}>
-                          {suf==='%'?(v.toFixed(1)+'%'):suf==='mph'?v.toFixed(1):suf==='°'?(v.toFixed(1)+'°'):val}
-                        </span>
-                      </div>
-                    );
-                  }).filter(Boolean)}
-                </div>
-
-                {/* Pitcher Vuln */}
-                <div style={{background:'var(--surface2)',borderRadius:8,border:'1px solid var(--border)',padding:'10px 12px',gridColumn:'1/-1'}}>
-                  <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:8}}>
-                    🎯 Pitcher Vuln — {dp.pitcher||'Today\'s Pitcher'}
-                  </div>
-                  <div style={{display:'flex',gap:12,flexWrap:'wrap'}}>
-                    {[
-                      ['HH Allowed',    dp.pitcher_hh_pct_allowed,    '%', v=>parseFloat(v)>=40?'#ff8020':'var(--muted)'],
-                      ['FB Allowed',    dp.pitcher_fb_pct_allowed,    '%', ()=>'var(--muted)'],
-                      ['Brl Allowed',   dp.pitcher_barrel_pct_allowed,'%', v=>parseFloat(v)>=8?'#ff4020':parseFloat(v)>=5?'#f5a623':'var(--muted)'],
-                      ['Meatball%',     dp.pitcher_meatball_pct,      '%', v=>parseFloat(v)>=55?'#ff8020':'var(--muted)'],
-                      ['Zone Fit',      dp.zone_fit,                   '%', v=>parseFloat(v)>=8?'#ff4020':parseFloat(v)>=5?'#f5a623':parseFloat(v)>=2?'#27c97a':'var(--muted)'],
-                    ].map(([lbl,val,suf,col])=>{
-                      if (!val && val!==0) return null;
-                      const v = parseFloat(val);
-                      if (!v && v!==0) return null;
-                      return (
-                        <div key={lbl} style={{textAlign:'center',minWidth:70}}>
-                          <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.5,marginBottom:2}}>{lbl}</div>
-                          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:col(val)}}>
-                            {v.toFixed(1)}{suf}
-                          </div>
-                        </div>
-                      );
-                    }).filter(Boolean)}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      })()}
+      {player?.pid && DAILY_PICKS_CACHE[String(player.pid)] && (
+        <MatchupCard dp={DAILY_PICKS_CACHE[String(player.pid)]}/>
+      )}
 
       {/* BvP vs Today's Pitcher */}
       {(bvpData || bvpLoading) && (
