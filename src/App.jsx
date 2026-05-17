@@ -9402,8 +9402,8 @@ function computeYardScore(sig, ghr, boom, ps) {
 
 function YardBadge({ score }) {
   if (!score || score < 1) return null;
-  const bg  = score>=75?'rgba(255,215,0,.22)':score>=60?'rgba(255,64,32,.18)':score>=45?'rgba(245,166,35,.15)':'rgba(255,255,255,.06)';
-  const col = score>=75?'#ffd700':score>=60?'#ff4020':score>=45?'#f5a623':'var(--muted)';
+  const bg  = score>=75?'rgba(255,215,0,.22)':score>=60?'rgba(255,64,32,.18)':score>=45?'rgba(245,166,35,.15)':score>=20?'rgba(210,180,140,.15)':'rgba(255,255,255,.04)';
+  const col = score>=75?'#ffd700':score>=60?'#ff4020':score>=45?'#f5a623':score>=20?'#c4a882':'var(--muted)';
   return (
     <span title={`Yard Score: ${score} — Boom(35%) + PS(30%) + gHR(25%) + Sig(10%)`}
       style={{display:'inline-block',padding:'1px 5px',borderRadius:4,
@@ -9729,7 +9729,7 @@ function LongShotView({ data }) {
             <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'center',borderBottom:'1px solid var(--border)'}}>Form</th>
             <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'center',borderBottom:'1px solid var(--border)'}}>Gr</th>
             <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)'}}>Pitcher</th>
-            <Th k="_kHR"    label="gHR"/>
+            <Th k="_simTB"  label="Sim TB"/>
             <Th k="_iso"    label="ISO"/>
             <Th k="_zf"     label="ZoneFit"/>
             <Th k="_bvpFB"  label="BvP FB%"/>
@@ -9842,11 +9842,7 @@ function SimLabView({ data }) {
   const [simHotOnly, setSimHotOnly]               = useState(false);
   const [minBoom,    setMinBoom]     = useState('');
   const [maxBoom,    setMaxBoom]     = useState('');
-  const [minGHR,     setMinGHR]      = useState('');
-  const [maxGHR,     setMaxGHR]      = useState('');
-  const [minSig,     setMinSig]      = useState('');
-  const [maxSig,     setMaxSig]      = useState('');
-  const [minPS,      setMinPS]       = useState('');
+
   const [minSimTB,   setMinSimTB]    = useState('');
   const [minOdds,    setMinOdds]     = useState('');
   const [simSearch,   setSimSearch]    = useState('');  // batter name search
@@ -9954,11 +9950,7 @@ function SimLabView({ data }) {
       })
       .filter(r => !minBoom   || (parseFloat(r._boom)||computeBoomScore(parseFloat(r.weighted_flag_score)*4.6, r.zone_fit, r.recent_iso, r.sim_tb, r.weighted_flag_score)) >= parseFloat(minBoom))
       .filter(r => !maxBoom   || (parseFloat(r._boom)||computeBoomScore(parseFloat(r.weighted_flag_score)*4.6, r.zone_fit, r.recent_iso, r.sim_tb, r.weighted_flag_score)) <= parseFloat(maxBoom))
-      .filter(r => !minGHR    || (parseFloat(r.gHR)||0)  >= parseFloat(minGHR))
-      .filter(r => !maxGHR    || (parseFloat(r.gHR)||0)  <= parseFloat(maxGHR))
-      .filter(r => !minSig    || (parseFloat(r._trackerSig)||(parseFloat(r.weighted_flag_score)*4.6)) >= parseFloat(minSig))
-      .filter(r => !maxSig    || (parseFloat(r._trackerSig)||(parseFloat(r.weighted_flag_score)*4.6)) <= parseFloat(maxSig))
-      .filter(r => !minPS     || (parseFloat(r.ps_score)||0) >= parseFloat(minPS))
+
       .filter(r => !minSimTB  || (parseFloat(r.sim_tb)||0)   >= parseFloat(minSimTB))
       .filter(r => !minOdds   || (() => { const d = HR_ODDS_MAP[String(parseInt(r.batter_id)||0)]; return d?.implied && (d.implied * 100) >= parseFloat(minOdds); })())
       .filter(r => !simSearch || (r.batter||'').toLowerCase().includes(simSearch.toLowerCase()));
@@ -9986,7 +9978,7 @@ function SimLabView({ data }) {
       return mul * ((parseFloat(a[sortBy]) || 0) - (parseFloat(b[sortBy]) || 0));
     });
     return sorted;
-  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, minBoom, maxBoom, minGHR, maxGHR, minSig, maxSig, minPS, minSimTB, minOdds, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal]);
+  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, minBoom, maxBoom, minSimTB, minOdds, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal]);
 
   // Auto-select top batter when data loads
   useEffect(() => {
@@ -10195,9 +10187,7 @@ function SimLabView({ data }) {
             {/* Min+Max filters */}
             {[
               { label:'💥 Boom', minV:minBoom, setMin:setMinBoom, maxV:maxBoom, setMax:setMaxBoom, hasMax:true,  ph:'30' },
-              { label:'gHR',     minV:minGHR,  setMin:setMinGHR,  maxV:maxGHR,  setMax:setMaxGHR,  hasMax:true,  ph:'40' },
-              { label:'⚡ Sig',  minV:minSig,  setMin:setMinSig,  maxV:maxSig,  setMax:setMaxSig,  hasMax:true,  ph:'4'  },
-              { label:'⚡️ PS',  minV:minPS,   setMin:setMinPS,   maxV:'',      setMax:null,        hasMax:false, ph:'40' },
+
               { label:'Sim TB',  minV:minSimTB,setMin:setMinSimTB,maxV:'',      setMax:null,        hasMax:false, ph:'1.5'},
               { label:'Odds %',  minV:minOdds, setMin:setMinOdds, maxV:'',      setMax:null,        hasMax:false, ph:'8'  },
             ].map(({ label, minV, setMin, maxV, setMax, hasMax, ph }) => (
@@ -10220,8 +10210,8 @@ function SimLabView({ data }) {
                 </>}
               </div>
             ))}
-            {(minBoom||maxBoom||minGHR||maxGHR||minSig||maxSig||minPS||minSimTB||minOdds) && (
-              <button onClick={()=>{setMinBoom('');setMaxBoom('');setMinGHR('');setMaxGHR('');setMinSig('');setMaxSig('');setMinPS('');setMinSimTB('');setMinOdds('');}}
+            {(minBoom||maxBoom||minSimTB||minOdds) && (
+              <button onClick={()=>{setMinBoom('');setMaxBoom('');setMinSimTB('');setMinOdds('');}}
                 style={{padding:'3px 9px',borderRadius:5,border:'1px solid rgba(255,64,32,.3)',
                   background:'rgba(255,64,32,.08)',color:'var(--accent)',
                   fontFamily:"'DM Mono',monospace",fontSize:9,cursor:'pointer',fontWeight:700}}>
@@ -10321,7 +10311,10 @@ function SimLabView({ data }) {
                     { label: 'Hit%',     key: 'proj_hit_prob' },
                     { label: 'XBH%',     key: 'proj_xbh_prob' },
                     { label: 'Sim TB',   key: 'sim_tb' },
-                    { label: 'Score',    key: 'weighted_flag_score' },
+                    { label: 'L7 EV',    key: 'recent_avg_ev' },
+                    { label: 'HH%',      key: 'recent_hh_pct' },
+                    { label: 'FB%',      key: 'recent_fb_pct' },
+
                     { label: 'ISO',      key: 'recent_iso' },
                     { label: 'L7💥',     key: 'recent_hr_count' },
                     { label: 'ZoneFit',  key: 'zone_fit' },
@@ -10550,10 +10543,17 @@ function SimLabView({ data }) {
                       <td style={{ textAlign: 'right', padding:'3px 6px' }}><span style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:hitColor }}>{hitP > 0 ? hitP.toFixed(1)+'%' : '—'}</span></td>
                       <td style={{ textAlign: 'right', padding:'3px 6px' }}><span style={{ fontFamily:"'DM Mono',monospace", fontSize:10 }}>{xbhP > 0 ? xbhP.toFixed(1)+'%' : '—'}</span></td>
                       <td style={{ textAlign: 'right', padding:'3px 6px' }}><span style={{ fontFamily:"'Oswald',sans-serif", fontWeight:700, fontSize:11, color:tb>=1.5?'#ff8020':tb>=1.0?'#f5a623':'var(--text)' }}>{tb > 0 ? tb.toFixed(2) : '—'}</span></td>
-                      <td style={{ textAlign: 'right', padding:'3px 6px' }}>
-                        <span style={{ fontFamily:"'Oswald',sans-serif", fontWeight:700, fontSize:11, color:'var(--text)' }}>
-                          {parseFloat(b.weighted_flag_score) > 0 ? parseFloat(b.weighted_flag_score).toFixed(2) : '—'}
-                        </span>
+                      <td style={{textAlign:'right',padding:'3px 6px',fontFamily:"'DM Mono',monospace",fontSize:10,
+                        color:(parseFloat(b.recent_avg_ev)||0)>=103?'#ff4020':(parseFloat(b.recent_avg_ev)||0)>=97?'#f5a623':'var(--muted)'}}>
+                        {(parseFloat(b.recent_avg_ev)||0)>0?(parseFloat(b.recent_avg_ev)||0).toFixed(1):'—'}
+                      </td>
+                      <td style={{textAlign:'right',padding:'3px 6px',fontFamily:"'DM Mono',monospace",fontSize:10,
+                        color:(parseFloat(b.recent_hh_pct)||0)>=40?'#ff4020':(parseFloat(b.recent_hh_pct)||0)>=30?'#f5a623':'var(--muted)'}}>
+                        {(parseFloat(b.recent_hh_pct)||0)>0?((parseFloat(b.recent_hh_pct)||0).toFixed(1)+'%'):'—'}
+                      </td>
+                      <td style={{textAlign:'right',padding:'3px 6px',fontFamily:"'DM Mono',monospace",fontSize:10,
+                        color:(parseFloat(b.recent_fb_pct)||0)>=35?'#27c97a':'var(--muted)'}}>
+                        {(parseFloat(b.recent_fb_pct)||0)>0?((parseFloat(b.recent_fb_pct)||0).toFixed(1)+'%'):'—'}
                       </td>
                       <td style={{textAlign:'right',padding:'3px 6px',fontFamily:"'DM Mono',monospace",fontSize:10,
                         color:(parseFloat(b.recent_iso)||0)>=0.25?'#ff8020':(parseFloat(b.recent_iso)||0)>=0.18?'#f5a623':'var(--muted)'}}>
