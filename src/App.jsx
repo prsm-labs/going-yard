@@ -9851,8 +9851,8 @@ function SimLabView({ data }) {
   const [simActiveOnly, setSimActiveOnly]         = useState(false);
   const [simInjuredOnly, setSimInjuredOnly]       = useState(false);
   const [simHotOnly, setSimHotOnly]               = useState(false);
-  const [minBoom,    setMinBoom]     = useState('');
-  const [maxBoom,    setMaxBoom]     = useState('');
+  const [minYard,    setMinYard]     = useState('');
+  const [maxYard,    setMaxYard]     = useState('');
 
   const [minSimTB,   setMinSimTB]    = useState('');
   const [minOdds,    setMinOdds]     = useState('');
@@ -9959,8 +9959,8 @@ function SimLabView({ data }) {
         const pid = r.pitcher_id ? String(parseInt(r.pitcher_id) || r.pitcher_id) : null;
         return pid && selPitcherGradesSim.has(simPitcherGrades.current[pid]);
       })
-      .filter(r => !minBoom   || (parseFloat(r._boom)||computeBoomScore(parseFloat(r.weighted_flag_score)*4.6, r.zone_fit, r.recent_iso, r.sim_tb, r.weighted_flag_score)) >= parseFloat(minBoom))
-      .filter(r => !maxBoom   || (parseFloat(r._boom)||computeBoomScore(parseFloat(r.weighted_flag_score)*4.6, r.zone_fit, r.recent_iso, r.sim_tb, r.weighted_flag_score)) <= parseFloat(maxBoom))
+      .filter(r => !minYard   || (parseFloat(r._yard)||computeYardScore(parseFloat(r.weighted_flag_score)*4.6, parseFloat(r.gHR)||0, parseFloat(r._boom)||0, parseFloat(r.ps_score)||0)) >= parseFloat(minYard))
+      .filter(r => !maxYard   || (parseFloat(r._yard)||computeYardScore(parseFloat(r.weighted_flag_score)*4.6, parseFloat(r.gHR)||0, parseFloat(r._boom)||0, parseFloat(r.ps_score)||0)) <= parseFloat(maxYard))
 
       .filter(r => !minSimTB  || (parseFloat(r.sim_tb)||0)   >= parseFloat(minSimTB))
       .filter(r => !minOdds   || (() => { const d = HR_ODDS_MAP[String(parseInt(r.batter_id)||0)]; return d?.implied && (d.implied * 100) >= parseFloat(minOdds); })())
@@ -9989,7 +9989,7 @@ function SimLabView({ data }) {
       return mul * ((parseFloat(a[sortBy]) || 0) - (parseFloat(b[sortBy]) || 0));
     });
     return sorted;
-  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, minBoom, maxBoom, minSimTB, minOdds, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal]);
+  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, minYard, maxYard, minSimTB, minOdds, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal]);
 
   // Auto-select top batter when data loads
   useEffect(() => {
@@ -10197,7 +10197,7 @@ function SimLabView({ data }) {
           <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center',marginBottom:8}}>
             {/* Min+Max filters */}
             {[
-              { label:'💥 Boom', minV:minBoom, setMin:setMinBoom, maxV:maxBoom, setMax:setMaxBoom, hasMax:true,  ph:'30' },
+              { label:'🎯 Yard', minV:minYard, setMin:setMinYard, maxV:maxYard, setMax:setMaxYard, hasMax:true,  ph:'30' },
 
               { label:'Sim TB',  minV:minSimTB,setMin:setMinSimTB,maxV:'',      setMax:null,        hasMax:false, ph:'1.5'},
               { label:'Odds %',  minV:minOdds, setMin:setMinOdds, maxV:'',      setMax:null,        hasMax:false, ph:'8'  },
@@ -10221,8 +10221,8 @@ function SimLabView({ data }) {
                 </>}
               </div>
             ))}
-            {(minBoom||maxBoom||minSimTB||minOdds) && (
-              <button onClick={()=>{setMinBoom('');setMaxBoom('');setMinSimTB('');setMinOdds('');}}
+            {(minYard||maxYard||minSimTB||minOdds) && (
+              <button onClick={()=>{setMinYard('');setMaxYard('');setMinSimTB('');setMinOdds('');}}
                 style={{padding:'3px 9px',borderRadius:5,border:'1px solid rgba(255,64,32,.3)',
                   background:'rgba(255,64,32,.08)',color:'var(--accent)',
                   fontFamily:"'DM Mono',monospace",fontSize:9,cursor:'pointer',fontWeight:700}}>
