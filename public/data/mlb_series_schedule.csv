@@ -1,6 +1,6 @@
 Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitcher ID (Away),Game ID,Day of Week,Day Abbr,Series Game #,Games in Series,Series Position,Day Context
 2026-05-17,12:15 PM,TB,MIA,656876.0,691587.0,822982,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-05-17,01:35 PM,WSH,BAL,571945.0,687064.0,822738,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
+2026-05-17,01:35 PM,WSH,BAL,663992.0,687064.0,822738,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
 2026-05-17,01:35 PM,PIT,PHI,694973.0,554430.0,823381,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
 2026-05-17,01:35 PM,ATL,BOS,656550.0,678394.0,824923,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
 2026-05-17,01:40 PM,CLE,CIN,668909.0,663903.0,824436,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
@@ -14,15 +14,15 @@ Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitc
 2026-05-17,04:05 PM,ATH,SF,605488.0,605288.0,825006,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
 2026-05-17,04:07 PM,LAA,LAD,680570.0,808963.0,824034,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
 2026-05-17,07:20 PM,SEA,SD,669923.0,608337.0,823138,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-05-18,06:40 PM,DET,CLE,,677944.0,824277,Monday,Mon,1,4,Opener,~ Solid
-2026-05-18,06:40 PM,TB,BAL,,,822980,Monday,Mon,1,3,Opener,~ Solid
+2026-05-18,06:40 PM,DET,CLE,664285.0,677944.0,824277,Monday,Mon,1,4,Opener,~ Solid
+2026-05-18,06:40 PM,TB,BAL,663556.0,669432.0,822980,Monday,Mon,1,3,Opener,~ Solid
 2026-05-18,06:40 PM,PHI,CIN,,666157.0,823465,Monday,Mon,1,3,Opener,~ Solid
-2026-05-18,06:40 PM,MIA,ATL,676974.0,,823867,Monday,Mon,1,4,Opener,~ Solid
+2026-05-18,06:40 PM,MIA,ATL,676974.0,702275.0,823867,Monday,Mon,1,4,Opener,~ Solid
 2026-05-18,06:45 PM,WSH,NYM,,681035.0,822734,Monday,Mon,1,4,Opener,~ Solid
 2026-05-18,07:05 PM,NYY,TOR,677960.0,,823549,Monday,Mon,1,4,Opener,~ Solid
 2026-05-18,07:40 PM,KC,BOS,,,824114,Monday,Mon,1,3,Opener,~ Solid
 2026-05-18,07:40 PM,MIN,HOU,,,823705,Monday,Mon,1,3,Opener,~ Solid
-2026-05-18,07:40 PM,CHC,MIL,,,824680,Monday,Mon,1,3,Opener,~ Solid
+2026-05-18,07:40 PM,CHC,MIL,,687075.0,824680,Monday,Mon,1,3,Opener,~ Solid
 2026-05-18,08:40 PM,COL,TEX,,,824357,Monday,Mon,1,3,Opener,~ Solid
 2026-05-18,09:38 PM,LAA,ATH,,,824035,Monday,Mon,1,4,Opener,~ Solid
 2026-05-18,09:40 PM,SD,LAD,,,823301,Monday,Mon,1,3,Opener,~ Solid
