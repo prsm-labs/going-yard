@@ -1773,8 +1773,9 @@ function MatchupCard({ dp }) {
       <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
         <div style={{display:'flex',gap:6,minWidth:'max-content',paddingBottom:4}}>
           {[
-            ['⚡️ PS', (parseFloat(dp.ps_score)||0)>=1?Math.round(parseFloat(dp.ps_score)):'—', (parseFloat(dp.ps_score)||0)>=90?'#a855f7':(parseFloat(dp.ps_score)||0)>=75?'#ff4020':(parseFloat(dp.ps_score)||0)>=60?'#f5a623':'var(--muted)'],
+            ['🎯 Yard', sig>0||boom>0?(()=>{const ys=computeYardScore(sig,parseFloat(dp.gHR)||0,boom,parseFloat(dp.ps_score)||0);return ys>0?ys:'—';})():'—', (()=>{const ys=computeYardScore(sig,parseFloat(dp.gHR)||0,boom,parseFloat(dp.ps_score)||0);return ys>=75?'#ffd700':ys>=60?'#ff4020':ys>=45?'#f5a623':'var(--muted)';})()],
             ['💥 Boom', boom>0?Math.round(boom):'—', boomColor],
+            ['⚡️ PS', (parseFloat(dp.ps_score)||0)>=1?Math.round(parseFloat(dp.ps_score)):'—', (parseFloat(dp.ps_score)||0)>=75?'#a855f7':(parseFloat(dp.ps_score)||0)>=60?'#ff4020':'var(--muted)'],
             ['⚡ Sig',  sig>0?sig:'—',               sigColor],
             ['P.Grade', pgLabel.split(' ')[0],        pgColor],
             ['Form',    fc?fc.short:'—',              fc?fc.color:'var(--muted)'],
@@ -9388,6 +9389,31 @@ function computeBoomScore(sig, zoneFit, iso, simTB, engineScore) {
 }
 
 
+function computeYardScore(sig, ghr, boom, ps) {
+  // Yard Score: weighted composite of all four scoring systems (0-99)
+  // Boom 35% | PS 30% | gHR 25% | Sig 10% (Sig normalized to 0-100)
+  const sigN = (Math.min(14, Math.max(0, parseFloat(sig)||0)) / 14) * 100;
+  const raw  = (parseFloat(boom)||0) * 0.35
+             + (parseFloat(ps)  ||0) * 0.30
+             + (parseFloat(ghr) ||0) * 0.25
+             + sigN                  * 0.10;
+  return Math.min(99, Math.max(0, Math.round(raw)));
+}
+
+function YardBadge({ score }) {
+  if (!score || score < 1) return null;
+  const bg  = score>=75?'rgba(255,215,0,.22)':score>=60?'rgba(255,64,32,.18)':score>=45?'rgba(245,166,35,.15)':'rgba(255,255,255,.06)';
+  const col = score>=75?'#ffd700':score>=60?'#ff4020':score>=45?'#f5a623':'var(--muted)';
+  return (
+    <span title={`Yard Score: ${score} — Boom(35%) + PS(30%) + gHR(25%) + Sig(10%)`}
+      style={{display:'inline-block',padding:'1px 5px',borderRadius:4,
+        fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:10,
+        background:bg,color:col,whiteSpace:'nowrap',cursor:'default'}}>
+      {score}
+    </span>
+  );
+}
+
 function PSBadge({ score }) {
   if (!score || score < 1) return null;
   const bg  = score>=75?'rgba(147,51,234,.2)':score>=60?'rgba(255,64,32,.18)':score>=45?'rgba(245,166,35,.15)':'rgba(255,255,255,.06)';
@@ -9419,7 +9445,7 @@ function LongShotView({ data }) {
   const [lineupVer, setLineupVer] = useState(LINEUP_VERSION);
   useEffect(() => { const unsub = subscribeLineup(v => setLineupVer(v)); return unsub; }, []);
   const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
-  const [sort, setSort]       = useState('_boom');
+  const [sort, setSort]       = useState('_yard');
   const [sortDir, setSortDir] = useState(1); // 1 = desc (bv-av = higher first)
   const [search, setSearch]   = useState('');
   const [teamFilter, setTeamFilter] = useState('ALL');
@@ -9570,14 +9596,16 @@ function LongShotView({ data }) {
           if (oldGate > 0) _ps = Math.min(99, Math.round(_ps / oldGate * newGate));
         }
       }
-      const _boom = computeBoomScore(_sig, b.zone_fit, b.recent_iso, _simTB, b.weighted_flag_score);
+      const _boom  = computeBoomScore(_sig, b.zone_fit, b.recent_iso, _simTB, b.weighted_flag_score);
+      const _ps_v  = b._ps ?? (parseFloat(b.ps_score)||0);
+      const _yard  = computeYardScore(_sig, b._kHR||parseFloat(b.gHR)||0, _boom, _ps_v);
       // Write to DAILY_PICKS_CACHE directly (b is a CSV copy, not the cache object)
       const _lsCache = DAILY_PICKS_CACHE[String(b.batter_id)];
       if (_lsCache && !_lsCache._trackerSig) _lsCache._trackerSig = _sig;
       if (_lsCache && !_lsCache._boom)       _lsCache._boom       = _boom;
       if (_lsCache && !_lsCache._pgLabel)    _lsCache._pgLabel    = pgLabel;
       out.push({ ...b, _pgLabel:pgLabel, _simHR, _simTB, _bvpFB, _recEV,
-        _bvpLA, _recLA, _recFB, _flags, _temp, _sig, _formClass, _kHR, _iso, _zf, _boom, _ps,
+        _bvpLA, _recLA, _recFB, _flags, _temp, _sig, _formClass, _kHR, _iso, _zf, _boom, _ps, _yard,
         _hrPct:parseFloat(b.proj_hr_adj)||parseFloat(b.sim_hr)||0 });
     }
     return out;
@@ -9697,14 +9725,11 @@ function LongShotView({ data }) {
         <table style={{width:'100%'}}>
           <thead><tr>
             <th className="sticky-batter" style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)'}}>Batter</th>
+            <Th k="_yard"   label={<img src="/icon-192.png" alt="Yard" style={{width:14,height:14,borderRadius:2,objectFit:'cover',verticalAlign:'middle'}}/>}/>
             <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'center',borderBottom:'1px solid var(--border)'}}>Form</th>
             <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'center',borderBottom:'1px solid var(--border)'}}>Gr</th>
             <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)'}}>Pitcher</th>
-            <Th k="_boom"  label="💥 Boom"/>
-            <Th k="_simTB"  label="Sim TB"/>
             <Th k="_kHR"    label="gHR"/>
-            <Th k="_ps"     label="⚡️ PS"/>
-            <Th k="_sig"   label="⚡ Sig"/>
             <Th k="_iso"    label="ISO"/>
             <Th k="_zf"     label="ZoneFit"/>
             <Th k="_bvpFB"  label="BvP FB%"/>
@@ -9731,36 +9756,16 @@ function LongShotView({ data }) {
                         <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={pid} name={name} team={b.batting_team||''}/></span>
                       </div>
                     </td>
+                    <td style={{padding:'2px 4px',textAlign:'center'}}>
+                      <YardBadge score={b._yard}/>
+                    </td>
                     <td style={{padding:'2px 4px',textAlign:'center',verticalAlign:'middle'}}>
                       <FormBadge formKey={b._formClass}/>
                     </td>
                     <td style={{padding:'2px 6px',textAlign:'center',fontFamily:osw,fontWeight:800,fontSize:10,color:b.grade==='C'?'var(--muted)':'rgba(232,65,26,.8)'}}>{b.grade}</td>
                     <td style={{padding:'2px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',whiteSpace:'nowrap',maxWidth:100,overflow:'hidden',textOverflow:'ellipsis'}}>{b.pitcher||'—'}</td>
-                    <td style={{padding:'2px 4px',textAlign:'center'}}>
-                      <BoomBadge score={b._boom}/>
-                    </td>
                     <td style={{padding:'2px 6px',textAlign:'right'}}>
                       <span style={{fontFamily:osw,fontWeight:800,fontSize:11,color:tbColor(b._simTB)}}>{b._simTB.toFixed(2)}</span>
-                    </td>
-                    <td style={{padding:'2px 4px',textAlign:'center'}}>
-                      {b._kHR>0 && <span style={{display:'inline-block',padding:'1px 5px',borderRadius:4,
-                        fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:10,
-                        background:b._kHR>=70?'rgba(255,64,32,.2)':b._kHR>=50?'rgba(245,166,35,.18)':b._kHR>=30?'rgba(39,201,122,.15)':'rgba(255,255,255,.06)',
-                        color:b._kHR>=70?'#ff4020':b._kHR>=50?'#f5a623':b._kHR>=30?'#27c97a':'var(--muted)'}}>
-                        {Math.round(b._kHR)}
-                      </span>}
-                    </td>
-                    <td style={{padding:'2px 4px',textAlign:'center'}}>
-                      <PSBadge score={b._ps}/>
-                    </td>
-                    <td style={{padding:'2px 4px',textAlign:'right'}}>
-                      <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',
-                        width:20,height:17,borderRadius:4,fontFamily:osw,fontWeight:800,fontSize:11,
-                        background:b._sig>=10?'rgba(255,64,32,.25)':b._sig>=7?'rgba(245,166,35,.2)':b._sig>=4?'rgba(39,201,122,.15)':'rgba(255,255,255,.05)',
-                        color:b._sig>=10?'#ff4020':b._sig>=7?'#f5a623':b._sig>=4?'#27c97a':'var(--muted)',
-                        border:`1px solid ${b._sig>=10?'rgba(255,64,32,.4)':b._sig>=7?'rgba(245,166,35,.3)':b._sig>=4?'rgba(39,201,122,.25)':'var(--border)'}`}}>
-                        {b._sig}
-                      </span>
                     </td>
                     <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,
                       color:b._iso>=0.25?'#ff8020':b._iso>=0.18?'#f5a623':'var(--muted)'}}>
@@ -9802,7 +9807,7 @@ function SimLabView({ data }) {
   useEffect(() => { const unsub = subscribeLineup(v => setLineupVer(v)); return unsub; }, []);
   const [view, setView]             = useState('slate');    // 'slate' | 'deepdive' | 'props'
   const [selBatter, setSelBatter]   = useState(null);
-  const [sortBy, setSortBy]         = useState('_boom');
+  const [sortBy, setSortBy]         = useState('_yard');
   const [sortDir, setSortDir]       = useState('desc');
   const [selMatchups, setSelMatchups] = useState(new Set()); // empty = all matchups
   const [showMatchupDrop, setShowMatchupDrop] = useState(false);
@@ -10242,7 +10247,7 @@ function SimLabView({ data }) {
               const esc = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
               const headers = ['Grade','Pitcher Grade','Gone Yard','Is Key Matchup','Team','Batter','Hand','P.Hand','vs Pitcher',
                 'Top Pitches','Game Time',
-                '⚡ Sig','💥 Boom','Form Class','gHR','ISO','Zone Fit','xwOBA','wOBA','SwStr%',
+                'Yard Score','⚡ Sig','💥 Boom','Form Class','gHR','ISO','Zone Fit','xwOBA','wOBA','SwStr%',
                 'Flags','Recent EV','Recent Barrel%',
                 'Recent FB%','Recent LA','BvP EV','BvP Barrel%','BvP FB%','BvP LA',
                 'Sim H','Sim 2B','Sim BB','Sim K','Sim TB','Sim RBI',
@@ -10259,6 +10264,7 @@ function SimLabView({ data }) {
                 return [b.grade, pitcherGrade, gy?'YES':'', isKM, b.batting_team, b.batter, b.batter_hand,
                   b.pitcher_hand||'', b.pitcher, b.top_pitches, b.game_time,
                   // Computed columns — between Game Time and Flags
+                  (b._yard ?? computeYardScore(sigCache.current[String(bid)]||0, parseFloat(b.gHR)||0, boomCache.current[String(bid)]||0, b._ps||(parseFloat(b.ps_score)||0))),
                   sigCache.current[String(bid)] ?? '',
                   boomCache.current[String(bid)] ?? '',
                   (() => { const fc = getFormClass(b); return fc && FORM_CLASSES[fc] ? FORM_CLASSES[fc].short.replace(/[💥🥶💨🪱🎯🎩🌙]/gu,'').trim() : ''; })(),
@@ -10307,13 +10313,10 @@ function SimLabView({ data }) {
                   {[
                     { label: '+',        key: null },
                     { label: 'Batter',   key: null },
-                    { label: '💥 Boom', key: '_boom' },
+                    { label: (<img src="/icon-192.png" alt="Yard" style={{width:15,height:15,borderRadius:2,objectFit:'cover',verticalAlign:'middle',display:'inline-block'}}/>), key: '_yard', colKey: '_yard' },
                     { label: 'Form',     key: null },
                     { label: 'P.Grade',  key: null },
                     { label: 'vs Pitcher',key: null },
-                    { label: 'gHR',      key: 'gHR' },
-                    { label: '⚡️ PS',   key: 'ps_score' },
-                    { label: '⚡ Sig',   key: '_trackerSig' },
                     /* HR% (proj_hr_adj) removed — inflated by small BvP samples */
                     { label: 'Hit%',     key: 'proj_hit_prob' },
                     { label: 'XBH%',     key: 'proj_xbh_prob' },
@@ -10326,10 +10329,10 @@ function SimLabView({ data }) {
                     { label: 'Grade',    key: null },
                     { label: 'HR Odds',  key: 'hr_odds_implied' },
                   ].map(col => (
-                    <th key={col.label}
+                    <th key={col.colKey||col.key||String(col.label)}
                       onClick={() => handleSort(col.key)}
                       style={{
-                        textAlign: col.label === 'Batter' || col.label === 'vs Pitcher' ? 'left' : 'center',
+                        textAlign: col.colKey==='_yard'?'center': col.label === 'Batter' || col.label === 'vs Pitcher' ? 'left' : 'center',
                         whiteSpace: 'normal', wordBreak: 'break-word',
                         fontSize: 9, lineHeight: 1.2, padding: '5px 5px', verticalAlign: 'bottom',
                         cursor: col.key ? 'pointer' : 'default',
@@ -10468,7 +10471,8 @@ function SimLabView({ data }) {
                       if (_og > 0) _livePS = Math.min(99, Math.round(_livePS / _og * _ng));
                     }
                   }
-                  b._ps = _livePS;
+                  b._ps  = _livePS;
+                  b._yard = computeYardScore(b._trackerSig||0, parseFloat(b.gHR)||0, b._boom||0, b._ps);
                   const _cacheEntry = DAILY_PICKS_CACHE[String(b.batter_id)];
                   if (_cacheEntry) {
                     _cacheEntry._trackerSig = b._trackerSig;
@@ -10476,6 +10480,7 @@ function SimLabView({ data }) {
                     _cacheEntry._boom       = b._boom;
                     _cacheEntry._formClass  = b._formClass;
                     _cacheEntry._ps         = _livePS;
+                    _cacheEntry._yard       = b._yard;
                   }
                   // On first render: if user hasn't sorted manually and we're sorting by boom,
                   // nudge sortDir to force useMemo re-run with now-populated cache
@@ -10514,7 +10519,7 @@ function SimLabView({ data }) {
                         </div>
                       </td>
                       <td style={{textAlign:'center',padding:'2px 4px',verticalAlign:'middle'}}>
-                        <BoomBadge score={b._boom}/>
+                        <YardBadge score={b._yard ?? computeYardScore(b._trackerSig||0, parseFloat(b.gHR)||0, b._boom||0, b._ps||(parseFloat(b.ps_score)||0))}/>
                       </td>
                       <td style={{textAlign:'center',padding:'2px 4px',verticalAlign:'middle'}}>
                         <FormBadge formKey={getFormClass(b)}/>
@@ -10541,26 +10546,7 @@ function SimLabView({ data }) {
                           {b.pitcher}<span style={{fontSize:8,opacity:.4,marginLeft:1}}>›</span>
                         </span>
                       </td>
-                      <td style={{textAlign:'center',padding:'2px 4px'}}>
-                        {(()=>{ const kv=parseFloat(b.gHR)||0; if(!kv) return <span style={{color:'rgba(255,255,255,.15)',fontFamily:"'DM Mono',monospace",fontSize:10}}>—</span>;
-                          const bg=kv>=70?'rgba(255,64,32,.2)':kv>=50?'rgba(245,166,35,.18)':kv>=30?'rgba(39,201,122,.15)':'rgba(255,255,255,.06)';
-                          const col=kv>=70?'#ff4020':kv>=50?'#f5a623':kv>=30?'#27c97a':'var(--muted)';
-                          return <span style={{display:'inline-block',padding:'1px 6px',borderRadius:4,fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:10,background:bg,color:col}}>{Math.round(kv)}</span>;
-                        })()}
-                      </td>
-                      <td style={{textAlign:'center',padding:'2px 4px'}}>
-                        <PSBadge score={b._ps ?? (parseFloat(b.ps_score)||0)}/>
-                      </td>
-                      <td style={{ textAlign: 'center', padding:'3px 4px' }}>
-                        <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',
-                          width:20,height:17,borderRadius:4,
-                          fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:11,
-                          background:b._trackerSig>=10?'rgba(255,64,32,.25)':b._trackerSig>=7?'rgba(245,166,35,.2)':b._trackerSig>=4?'rgba(39,201,122,.15)':'rgba(255,255,255,.05)',
-                          color:b._trackerSig>=10?'#ff4020':b._trackerSig>=7?'#f5a623':b._trackerSig>=4?'#27c97a':'var(--muted)',
-                          border:`1px solid ${b._trackerSig>=10?'rgba(255,64,32,.4)':b._trackerSig>=7?'rgba(245,166,35,.3)':b._trackerSig>=4?'rgba(39,201,122,.25)':'var(--border)'}`}}>
-                          {b._trackerSig||'—'}
-                        </span>
-                      </td>
+
                       <td style={{ textAlign: 'right', padding:'3px 6px' }}><span style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:hitColor }}>{hitP > 0 ? hitP.toFixed(1)+'%' : '—'}</span></td>
                       <td style={{ textAlign: 'right', padding:'3px 6px' }}><span style={{ fontFamily:"'DM Mono',monospace", fontSize:10 }}>{xbhP > 0 ? xbhP.toFixed(1)+'%' : '—'}</span></td>
                       <td style={{ textAlign: 'right', padding:'3px 6px' }}><span style={{ fontFamily:"'Oswald',sans-serif", fontWeight:700, fontSize:11, color:tb>=1.5?'#ff8020':tb>=1.0?'#f5a623':'var(--text)' }}>{tb > 0 ? tb.toFixed(2) : '—'}</span></td>
