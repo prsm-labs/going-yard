@@ -5369,9 +5369,9 @@ function LineupsView({ date }) {
                   </span>
                 </div>
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1px 1fr',gap:0,padding:'12px 0'}}>
-                  <div style={{padding:'0 12px'}}><TeamLineup side={game.away} gamePk={game.gamePk} onBatterClick={setSelBatterInfo}/></div>
+                  <div style={{padding:'0 12px'}}><TeamLineup side={game.away} gamePk={game.gamePk} onBatterClick={({player,teamAbbr})=>openAtBatSlide({pid:player.id||0,name:player.fullName||'',team:teamAbbr})}/></div>
                   <div style={{background:'var(--border)'}}/>
-                  <div style={{padding:'0 12px'}}><TeamLineup side={game.home} gamePk={game.gamePk} onBatterClick={setSelBatterInfo}/></div>
+                  <div style={{padding:'0 12px'}}><TeamLineup side={game.home} gamePk={game.gamePk} onBatterClick={({player,teamAbbr})=>openAtBatSlide({pid:player.id||0,name:player.fullName||'',team:teamAbbr})}/></div>
                 </div>
               </div>
             );
@@ -9606,6 +9606,7 @@ function LongShotView({ data }) {
       if (_lsCache && !_lsCache._pgLabel)    _lsCache._pgLabel    = pgLabel;
       out.push({ ...b, _pgLabel:pgLabel, _simHR, _simTB, _bvpFB, _recEV,
         _bvpLA, _recLA, _recFB, _flags, _temp, _sig, _formClass, _kHR, _iso, _zf, _boom, _ps, _yard,
+        _bsD: parseFloat(b.bat_speed_vs_baseline)||null,
         _hrPct:parseFloat(b.proj_hr_adj)||parseFloat(b.sim_hr)||0 });
     }
     return out;
@@ -9734,6 +9735,7 @@ function LongShotView({ data }) {
             <Th k="_zf"     label="ZoneFit"/>
             <Th k="_bvpFB"  label="BvP FB%"/>
             <Th k="_recEV"  label="EV"/>
+            <Th k="_bsD"    label="BS Δ"/>
             <Th k="_pgLabel" label="P Grade"/>
           </tr></thead>
           <tbody>
@@ -9777,6 +9779,15 @@ function LongShotView({ data }) {
                     </td>
                     <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,color:b._bvpFB>=20&&b._bvpFB<36?'#27c97a':b._bvpFB>=36&&b._bvpFB<42?'#f5a623':'var(--muted)'}}>{b._bvpFB>0?`${b._bvpFB.toFixed(0)}%`:'—'}</td>
                     <td style={{padding:'2px 6px',textAlign:'right',fontFamily:osw,fontWeight:700,fontSize:10,color:b._recEV>=97?'#ff8020':b._recEV>=93?'var(--text)':'var(--muted)'}}>{b._recEV>0?b._recEV.toFixed(1):'—'}</td>
+                    <td style={{padding:'2px 5px',textAlign:'right',fontFamily:mono,fontSize:9}}>
+                      {(()=>{
+                        const d=b._bsD;
+                        if(d==null||isNaN(d)) return <span style={{color:'var(--muted)'}}>—</span>;
+                        const arrow=d>=0.5?'↑':d<=-0.5?'↓':'→';
+                        const col=d>=1.5?'#27c97a':d>=0.5?'#a8d8a8':d<=-1.5?'#ff4020':d<=-0.5?'#f5a623':'var(--muted)';
+                        return <span style={{color:col,fontWeight:700}}>{arrow}{d>=0?'+':''}{d.toFixed(1)}</span>;
+                      })()}
+                    </td>
                                         <td style={{padding:'2px 6px',textAlign:'right'}}><span style={{fontFamily:mono,fontSize:9,color:pgColor(b._pgLabel),fontWeight:700}}>{b._pgLabel.split(' ')[0]}</span></td>
                   </tr>
                   {isExp && (
@@ -10312,6 +10323,7 @@ function SimLabView({ data }) {
                     { label: 'XBH%',     key: 'proj_xbh_prob' },
                     { label: 'Sim TB',   key: 'sim_tb' },
                     { label: 'L7 EV',    key: 'recent_avg_ev' },
+                    { label: 'BS Δ',     key: 'bat_speed_vs_baseline' },
                     { label: 'HH%',      key: 'recent_hh_pct' },
                     { label: 'FB%',      key: 'recent_fb_pct' },
 
@@ -10546,6 +10558,15 @@ function SimLabView({ data }) {
                       <td style={{textAlign:'right',padding:'3px 6px',fontFamily:"'DM Mono',monospace",fontSize:10,
                         color:(parseFloat(b.recent_avg_ev)||0)>=103?'#ff4020':(parseFloat(b.recent_avg_ev)||0)>=97?'#f5a623':'var(--muted)'}}>
                         {(parseFloat(b.recent_avg_ev)||0)>0?(parseFloat(b.recent_avg_ev)||0).toFixed(1):'—'}
+                      </td>
+                      <td style={{textAlign:'right',padding:'3px 6px',fontFamily:"'DM Mono',monospace",fontSize:10}}>
+                        {(()=>{
+                          const d=parseFloat(b.bat_speed_vs_baseline);
+                          if(isNaN(d)||b.bat_speed_vs_baseline===''||b.bat_speed_vs_baseline==null) return <span style={{color:'var(--muted)'}}>—</span>;
+                          const arrow=d>=0.5?'↑':d<=-0.5?'↓':'→';
+                          const col=d>=1.5?'#27c97a':d>=0.5?'#a8d8a8':d<=-1.5?'#ff4020':d<=-0.5?'#f5a623':'var(--muted)';
+                          return <span style={{color:col,fontWeight:700}}>{arrow}{d>=0?'+':''}{d.toFixed(1)}</span>;
+                        })()}
                       </td>
                       <td style={{textAlign:'right',padding:'3px 6px',fontFamily:"'DM Mono',monospace",fontSize:10,
                         color:(parseFloat(b.recent_hh_pct)||0)>=40?'#ff4020':(parseFloat(b.recent_hh_pct)||0)>=30?'#f5a623':'var(--muted)'}}>
