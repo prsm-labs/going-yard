@@ -13221,7 +13221,7 @@ function BvPDeepDiveTab() {
     fetch('/data/bvp_matrix.json')
       .then(r => r.ok ? r.json() : null)
       .then(d => {
-        if (d?.matrix) { BVP_MATRIX_CACHE.data = d.matrix; setMatrix(d.matrix); }
+        if (d?.matrix && typeof d.matrix === 'object') { BVP_MATRIX_CACHE.data = d.matrix; setMatrix(d.matrix); }
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -13230,11 +13230,7 @@ function BvPDeepDiveTab() {
 
 
 
-  // ── Pitcher list ───────────────────────────────────────────────────────────
-  const pitchers = Object.entries(matrix).map(([pid, p]) => ({ pid, ...p }))
-    .sort((a,b) => (a.name||'').localeCompare(b.name||''));
 
-  const pitcher = selPitcher ? matrix[selPitcher] : null;
 
   // ── Toggle pitch selection ─────────────────────────────────────────────────
   const togglePitch = pt => {
@@ -13377,6 +13373,12 @@ function BvPDeepDiveTab() {
       {loading ? 'Loading BvP matrix…' : '⚠ bvp_matrix.json not found. Run mlbdata_aggregate.py to generate it.'}
     </div>
   );
+
+  // ── Pitcher list (after guard — matrix is guaranteed non-null here) ────────
+  const pitchers = Object.entries(matrix).map(([pid, p]) => ({ pid, ...p }))
+    .sort((a,b) => (a.name||'').localeCompare(b.name||''));
+
+  const pitcher = selPitcher ? matrix[selPitcher] : null;
 
   return (
     <div style={{padding:'0 4px'}}>
