@@ -13783,38 +13783,6 @@ function BvPDeepDiveTab() {
   );
 }
 
-          </table>
-        </div>
-
-        {/* ── Selected batter zone overlay ──────────────────────────────────── */}
-        {selBatter && selZoneGrid && (
-          <div style={{marginTop:12,background:'var(--surface2)',borderRadius:8,
-            border:'1px solid var(--border)',padding:'12px 14px'}}>
-            <div style={{fontSize:9,color:'var(--muted)',fontFamily:mono,textTransform:'uppercase',
-              letterSpacing:.7,marginBottom:8}}>
-              {pitcher.vs_batter?.[selBatter]?.name} — Contact Zone vs {[...selPitches].join('+')||'All Pitches'}
-            </div>
-            <div style={{display:'flex',gap:20,alignItems:'flex-start'}}>
-              <ZoneGrid grid={selZoneGrid} title="Batter Contact Zones" color="green"/>
-              {selPitches.size===1 && (
-                <ZoneGrid
-                  grid={pitcher.zone_by_pitch?.[[...selPitches][0]]?.[`${dateWin}_${dayNight}_${location==='A'?'A':location==='H'?'H':'A_loc'}`]}
-                  title="Pitcher Location" color="red"/>
-              )}
-              <div style={{fontSize:9,fontFamily:mono,color:'var(--muted)',lineHeight:1.8}}>
-                <div>Green = batter contact frequency</div>
-                <div>Red = where pitcher leaves the {[...selPitches][0]||'pitch'}</div>
-                <div style={{marginTop:8,color:'var(--text)'}}>Overlap = damage zone</div>
-              </div>
-            </div>
-          </div>
-        )}
-
-      </>)}
-    </div>
-  );
-}
-
 function MatchupEngineTab() {
   const [subTab, setSubTab]        = useState('matchups');
   const [data, setData]           = useState([]);
