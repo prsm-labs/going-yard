@@ -9709,7 +9709,7 @@ function LongShotView({ data }) {
       .filter(b => matchesHandFilter(b.pitcher_hand, pitcherHand))
       .filter(b => formFilter.size === 0 || formFilter.has(b._formClass))
       .filter(b => !hideFinal   || !FINAL_GAME_IDS.has(String(b.game_id)))
-      .filter(b => !hideYestHR || !parseInt(b.hr_yesterday||0)); // hide batters who went yard yesterday
+      .filter(b => !hideYestHR || !(b._hrYest||parseInt(b.hr_yesterday||0))); // hide batters who went yard yesterday
     if (teamFilter!=='ALL') r = r.filter(b=>b.batting_team===teamFilter);
     if (pgFilter!=='ALL')   r = r.filter(b=>b._pgLabel===pgFilter);
     if (search)      { const q=search.toLowerCase(); r=r.filter(b=>(b.batter||'').toLowerCase().includes(q)); }
@@ -10693,7 +10693,7 @@ function SimLabView({ data }) {
                         })()}
                       </td>
                       <td style={{textAlign:'center',padding:'3px 4px'}}>
-                        {parseInt(b.hr_yesterday||0) > 0 && (
+                        {(b._hrYest||parseInt(b.hr_yesterday||0)) > 0 && (
                           <span title="Went yard yesterday" style={{fontSize:12}}>🔁</span>
                         )}
                       </td>
@@ -13665,25 +13665,31 @@ function BvPDeepDiveTab() {
                   textTransform:'uppercase',letterSpacing:.6,color:'var(--muted)',textAlign:'left',
                   borderBottom:'1px solid var(--border)',background:'var(--surface2)',
                   position:'sticky',left:0,top:0,zIndex:20,whiteSpace:'nowrap'}}>
-                  Batter {pitcher && <span style={{fontSize:7,opacity:.5,fontWeight:400}}>· ✓ platoon · ⚡ PS pitch match</span>}
+                  Batter {pitcher && <span style={{fontSize:7,opacity:.5,fontWeight:400}}>✓ = platoon · ⚡ = PS pitch match</span>}
                 </th>
-                {/* Season/form columns — always populated */}
-                <TH col="yard"     label="🎯"     title="Yard Score"/>
+                <TH col="yard"     label="🎯"     title="Yard Score (daily)"/>
                 <TH col="grade"    label="Gr"     title="Matchup Grade"/>
-                <TH col="sim_tb"   label="SimTB"  title="Simulated Total Bases"/>
-                <TH col="rec_ev"   label="EV"     title="Recent Avg Exit Velocity"/>
-                <TH col="bat_speed_delta" label="BSΔ" title="Bat Speed vs Baseline"/>
-                <TH col="rec_hh"   label="HH%"    title="Recent Hard Hit Rate"/>
-                <TH col="rec_fb"   label="FB%"    title="Recent Fly Ball Rate"/>
-                <TH col="rec_iso"  label="ISO"    title="Recent Isolated Power"/>
-                <TH col="la_mean"  label="LA°"    title="Launch Angle Mean (L15)"/>
-                <TH col="zone_fit" label="ZFit"   title="Zone Fit vs Pitcher"/>
-                {/* Direct BvP — populated when batter has faced this pitcher */}
-                <TH col="bvp_ev"   label="BvP EV"  title="Exit Velocity vs THIS pitcher"/>
-                <TH col="bvp_hh"   label="BvP HH%" title="Hard Hit Rate vs THIS pitcher"/>
-                <TH col="bvp_fb"   label="BvP FB%" title="Fly Ball Rate vs THIS pitcher"/>
-                <TH col="bvp_brl"  label="BvP Brl" title="Barrel Rate vs THIS pitcher"/>
-                <TH col="bvp_iso"  label="BvP ISO" title="ISO vs THIS pitcher"/>
+                <TH col="ps_score" label="PS"     title="PS Score (always available)"/>
+                <TH col="la_mean"  label="LA°"    title="Launch Angle Mean L15 (44% of batters)"/>
+                <TH col="sim_tb"   label="SimTB"  title="Simulated Total Bases (key matchup batters only)"/>
+                <TH col="rec_ev"   label="EV"     title="Recent Exit Velocity (key matchup batters)"/>
+                <TH col="rec_hh"   label="HH%"    title="Recent Hard Hit Rate (key matchup batters)"/>
+                <TH col="rec_iso"  label="ISO"    title="Recent ISO (key matchup batters)"/>
+                {/* BvP: populated only when batter has prior history vs this pitcher */}
+                <th style={{padding:'4px 8px',fontSize:7,fontFamily:mono,color:'rgba(255,215,0,.6)',
+                  background:'rgba(255,215,0,.04)',borderBottom:'1px solid var(--border)',
+                  borderLeft:'1px solid rgba(255,215,0,.15)',textAlign:'center',whiteSpace:'nowrap'}}
+                  colSpan={4}>
+                  ↓ vs {pitcher?.name?.split(' ').pop()||'pitcher'} (direct history)
+                </th>
+              </tr>
+              <tr>
+                <th className="sticky-batter" style={{background:'var(--surface2)',position:'sticky',left:0,zIndex:20,borderBottom:'1px solid var(--border)'}}/>
+                <th colSpan={8} style={{borderBottom:'1px solid var(--border)',background:'var(--surface2)'}}/>
+                <TH col="bvp_ev"  label="EV"   title="Exit Velocity vs this pitcher specifically"/>
+                <TH col="bvp_hh"  label="HH%"  title="Hard Hit Rate vs this pitcher"/>
+                <TH col="bvp_iso" label="ISO"  title="ISO vs this pitcher"/>
+                <TH col="bvp_fb"  label="FB%"  title="Fly Ball Rate vs this pitcher"/>
               </tr>
             </thead>
             <tbody>
@@ -14112,7 +14118,7 @@ function MatchupEngineTab() {
       <div style={{display:'flex',gap:4,flexWrap:'wrap',justifyContent:'center'}}>
         <button style={stBtn('batters')}   onClick={()=>setSubTab('batters')}>🧢 Batters</button>
         <button style={stBtn('pitchers')}  onClick={()=>setSubTab('pitchers')}>⚾ Pitchers</button>
-        <button style={stBtn('bvp')}       onClick={()=>setSubTab('bvp')}>🆚 BvP Deep Dive</button>
+        {/* 🆚 BvP Deep Dive — hidden until data pipeline rebuilt */}
         <button style={stBtn('history')}   onClick={()=>setSubTab('history')}>📜 BvP History</button>
         <button style={stBtn('pairs')}     onClick={()=>setSubTab('pairs')}>🔗 Pairs</button>
       </div>
