@@ -136,11 +136,8 @@ const styles = `
   align-items:center;justify-content:center;z-index:99999;transition:opacity .6s ease,visibility .6s ease;}
 .splash-overlay.fade-out{opacity:0;visibility:hidden;}
 @keyframes spin-ball{
-  0%   { transform: rotate(0deg) rotateY(0deg) scale(1); }
-  25%  { transform: rotate(90deg) rotateY(45deg) scale(1.06); }
-  50%  { transform: rotate(180deg) rotateY(0deg) scale(1); }
-  75%  { transform: rotate(270deg) rotateY(-45deg) scale(1.06); }
-  100% { transform: rotate(360deg) rotateY(0deg) scale(1); }
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 @keyframes arc-float{
   0%,100% { transform: translateY(0px); }
@@ -158,9 +155,10 @@ const styles = `
   animation: arc-float 1.6s ease-in-out infinite;
 }
 .splash-ball{
-  width:110px;height:110px;border-radius:50%;object-fit:cover;
-  animation: spin-ball .85s linear infinite;
-  filter: drop-shadow(0 0 28px rgba(232,65,26,.55)) drop-shadow(0 0 8px rgba(255,160,50,.35));
+  width:130px;height:130px;object-fit:contain;
+  animation: spin-ball 1.2s linear infinite;
+  filter: drop-shadow(0 0 24px rgba(232,65,26,.5)) drop-shadow(0 0 8px rgba(255,160,50,.3));
+  transform-origin: 38% 42%;
 }
 .splash-logo-wrap{
   animation: splash-fade-in .5s ease both;
@@ -12907,10 +12905,17 @@ function PairsTab({ data }) {
 
   // ── Apply global gates ─────────────────────────────────────────────────────
   const eligible = React.useMemo(() => batters.filter(b => {
+    // Gate 0: must be on today's slate (has a game_id)
+    if (!b.game_id) return false;
+    // Gate 0b: must have recent data (recent_avg_ev or bat_speed populated)
+    const hasRecent = parseFloat(b.recent_avg_ev||0) > 0 || parseFloat(b.recent_hh_pct||0) > 0 || parseFloat(b.recent_iso||0) > 0;
+    if (!hasRecent) return false;
+    // Gate 1: Yard Score ≥20
     const yard = parseFloat(b._yard||0);
-    if (yard < 20) return false;                          // Gate 1: Yard Score ≥20
+    if (yard < 20) return false;
+    // Gate 2: no Elite/Tough pitchers
     const tier = pitcherTier(b);
-    if (tier === 'elite' || tier === 'tough') return false; // Gate 2: no Elite/Tough
+    if (tier === 'elite' || tier === 'tough') return false;
     return true;
   }), [batters]);
 
@@ -13245,6 +13250,7 @@ function BvPDeepDiveTab() {
   // ── Build batter rows from selected pitcher + pitches + day/night ──────────
   const batterRows = React.useMemo(() => {
     if (!pitcher) return [];
+    try {
     const pitchKeys = selPitches.size > 0 ? [...selPitches] : Object.keys(pitcher.pitch_mix||{});
     return Object.entries(pitcher.vs_batter||{}).map(([bid, bdata]) => {
       if (batterHand !== 'ALL' && bdata.hand !== batterHand) return null;
@@ -13314,6 +13320,10 @@ function BvPDeepDiveTab() {
           : bdata.overall?.[`${dateWin}_${dayNight}_${location}`]?.zone_grid,
       };
     }).filter(Boolean);
+    } catch(e) {
+      console.error('BvP batterRows error:', e);
+      return [];
+    }
   }, [pitcher, selPitches, dateWin, dayNight, batterHand, location]);
 
   // ── Sort batter rows ───────────────────────────────────────────────────────
@@ -13410,7 +13420,7 @@ function BvPDeepDiveTab() {
                     {p.is_starter && <span style={{marginRight:3,fontSize:7,opacity:.7}}>★</span>}
                     {p.name}
                     {p.hand && <span style={{marginLeft:4,fontSize:7,opacity:.6}}>{p.hand==='R'||p.hand==='Right'?'R':'L'}</span>}
-                    {p.grade && !p.is_starter && <span style={{marginLeft:4,fontSize:7,color:pgCol(p.grade)}}>{p.grade.split(' ')[0]}</span>}
+                    {p.grade && !p.is_starter && <span style={{marginLeft:4,fontSize:7,color:pgCol(p.grade)}}>{(p.grade||'').split(' ')[0]}</span>}
                   </button>
                 ))}
               </div>
