@@ -9547,7 +9547,7 @@ function LongShotView({ data }) {
   const [picksOnly,  setPicksOnly]    = useState(false);
   const [diamondOnly,setDiamondOnly]  = useState(false);
   const [hideFinal, setHideFinal]       = useState(false);
-  const [hideYestHR, setHideYestHR]   = useState(false);
+  
   const [batterHand, setBatterHand]     = useState('ALL');
   const [pitcherHand, setPitcherHand]   = useState('ALL');
   const [formFilter, setFormFilter]     = useState(new Set());
@@ -9695,7 +9695,6 @@ function LongShotView({ data }) {
       out.push({ ...b, _pgLabel:pgLabel, _simHR, _simTB, _bvpFB, _recEV,
         _bvpLA, _recLA, _recFB, _flags, _temp, _sig, _formClass, _kHR, _iso, _zf, _boom, _ps, _yard,
         _bsD: parseFloat(b.bat_speed_vs_baseline)||null,
-        _hrYest: parseInt(b.hr_yesterday||0),
         _hrPct:parseFloat(b.proj_hr_adj)||parseFloat(b.sim_hr)||0 });
     }
     return out;
@@ -9709,8 +9708,7 @@ function LongShotView({ data }) {
       .filter(b => matchesHandFilter(b.pitcher_hand, pitcherHand))
       .filter(b => formFilter.size === 0 || formFilter.has(b._formClass))
       .filter(b => !hideFinal   || !FINAL_GAME_IDS.has(String(b.game_id)))
-      .filter(b => !hideYestHR || !(b._hrYest||parseInt(b.hr_yesterday||0))); // hide batters who went yard yesterday
-    if (teamFilter!=='ALL') r = r.filter(b=>b.batting_team===teamFilter);
+      .filter(b =>     if (teamFilter!=='ALL') r = r.filter(b=>b.batting_team===teamFilter);
     if (pgFilter!=='ALL')   r = r.filter(b=>b._pgLabel===pgFilter);
     if (search)      { const q=search.toLowerCase(); r=r.filter(b=>(b.batter||'').toLowerCase().includes(q)); }
     if (lineupOnly)  r = r.filter(b=>parseInt(b.batter_id||0)>0 && LINEUP_STATUS[parseInt(b.batter_id||0)]?.status==='confirmed');
@@ -9722,7 +9720,7 @@ function LongShotView({ data }) {
     if (picksOnly)   r = r.filter(b=>picks[String(b.batter_id||'')]);
     if (diamondOnly) r = r.filter(b=>{ const dp=DAILY_PICKS_CACHE[String(b.batter_id||'')]; return dp?.is_diamond==='1'||dp?.is_diamond===true; });
     return [...r].sort((a,b2)=>{ const av=a[sort]||0; const bv=b2[sort]||0; return sortDir*(bv-av); });
-  }, [rows,teamFilter,pgFilter,search,sort,sortDir,lineupOnly,goneYard,dueOnly,activeOnly,injuredOnly,hotOnly,picksOnly,diamondOnly,batterHand,pitcherHand,formFilter,hideFinal,hideYestHR]);
+  }, [rows,teamFilter,pgFilter,search,sort,sortDir,lineupOnly,goneYard,dueOnly,activeOnly,injuredOnly,hotOnly,picksOnly,diamondOnly,batterHand,pitcherHand,formFilter,hideFinal,]);
 
   const Th = ({k,label}) => (
     <th onClick={()=>{ if(sort===k) setSortDir(d=>-d); else{setSort(k);setSortDir(-1);} }}
@@ -9757,13 +9755,7 @@ function LongShotView({ data }) {
         <HandFilter mode="batter" value={batterHand} onChange={setBatterHand}/>
       <HandFilter mode="pitcher" value={pitcherHand} onChange={setPitcherHand}/>
       <FormClassFilter selected={formFilter} onChange={setFormFilter}/>
-      <button onClick={()=>setHideYestHR(v=>!v)}
-              style={{padding:'3px 8px',borderRadius:5,fontSize:9,fontFamily:mono,cursor:'pointer',
-                border:`1px solid ${hideYestHR?'#fbbf24':'var(--border)'}`,
-                background:hideYestHR?'rgba(251,191,36,.12)':'transparent',
-                color:hideYestHR?'#fbbf24':'var(--muted)',fontWeight:700}}>
-              🔁 Hide Yesterday
-            </button>
+      
             <button onClick={()=>setHideFinal(v=>!v)} style={{padding:'3px 9px',borderRadius:6,
         border:`1px solid ${hideFinal?'#ff4020':'var(--border)'}`,
         background:hideFinal?'rgba(255,64,32,.12)':'transparent',
@@ -9833,8 +9825,7 @@ function LongShotView({ data }) {
             <Th k="_bvpFB"  label="BvP FB%"/>
             <Th k="_recEV"  label="EV"/>
             <Th k="_bsD"    label="BS Δ"/>
-            <Th k="_hrYest" label="HR-1"/>
-            <Th k="_pgLabel" label="P Grade"/>
+                        <Th k="_pgLabel" label="P Grade"/>
           </tr></thead>
           <tbody>
             {filtered.map(b => {
@@ -9885,12 +9876,6 @@ function LongShotView({ data }) {
                         const col=d>=1.5?'#27c97a':d>=0.5?'#a8d8a8':d<=-1.5?'#ff4020':d<=-0.5?'#f5a623':'var(--muted)';
                         return <span style={{color:col,fontWeight:700}}>{arrow}{d>=0?'+':''}{d.toFixed(1)}</span>;
                       })()}
-                    </td>
-                    <td style={{textAlign:'center',padding:'2px 4px'}}>
-                      {b._hrYest>0 && <span title={`Hit ${b._hrYest} HR yesterday`} style={{
-                        color:'#fbbf24',background:'rgba(251,191,36,.15)',
-                        padding:'1px 5px',borderRadius:4,fontFamily:osw,fontWeight:800,fontSize:10
-                      }}>{b._hrYest}</span>}
                     </td>
                                         <td style={{padding:'2px 6px',textAlign:'right'}}><span style={{fontFamily:mono,fontSize:9,color:pgColor(b._pgLabel),fontWeight:700}}>{b._pgLabel.split(' ')[0]}</span></td>
                   </tr>
@@ -10433,7 +10418,6 @@ function SimLabView({ data }) {
 
                     { label: 'ISO',      key: 'recent_iso' },
                     { label: 'L7💥',     key: 'recent_hr_count' },
-                    { label: '🔁',        key: 'hr_yesterday' },
                     { label: 'ZoneFit',  key: 'zone_fit' },
                     { label: 'Grade',    key: null },
                     { label: '💣',       key: 'meatball_matchup_score' },
@@ -10692,11 +10676,7 @@ function SimLabView({ data }) {
                           return <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,color:col}}>{n>0?n:'—'}</span>;
                         })()}
                       </td>
-                      <td style={{textAlign:'center',padding:'3px 4px'}}>
-                        {(b._hrYest||parseInt(b.hr_yesterday||0)) > 0 && (
-                          <span title="Went yard yesterday" style={{fontSize:12}}>🔁</span>
-                        )}
-                      </td>
+
                       <td style={{textAlign:'right',padding:'3px 6px',fontFamily:"'DM Mono',monospace",fontSize:10,
                         color:(parseFloat(b.zone_fit)||0)>=8?'#ff4020':(parseFloat(b.zone_fit)||0)>=5?'#f5a623':(parseFloat(b.zone_fit)||0)>=2?'#27c97a':'var(--muted)'}}>
                         {(parseFloat(b.zone_fit)||0)>0?((parseFloat(b.zone_fit)||0).toFixed(1)+'%'):'—'}
