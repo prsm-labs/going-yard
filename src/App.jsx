@@ -13243,6 +13243,9 @@ function BvPDeepDiveTab() {
   };
 
   // ── Build batter rows from selected pitcher + pitches + day/night ──────────
+  // pitcher must be declared before useMemo (can't be after guard)
+  const pitcher = (matrix && selPitcher) ? (matrix[selPitcher] || null) : null;
+
   const batterRows = React.useMemo(() => {
     if (!pitcher) return [];
     try {
@@ -13377,8 +13380,6 @@ function BvPDeepDiveTab() {
   // ── Pitcher list (after guard — matrix is guaranteed non-null here) ────────
   const pitchers = Object.entries(matrix).map(([pid, p]) => ({ pid, ...p }))
     .sort((a,b) => (a.name||'').localeCompare(b.name||''));
-
-  const pitcher = selPitcher ? matrix[selPitcher] : null;
 
   return (
     <div style={{padding:'0 4px'}}>
