@@ -13227,12 +13227,8 @@ function BvPDeepDiveTab() {
       .catch(() => setLoading(false));
   }, []);
 
-  if (loading) return <div style={{padding:40,color:'var(--muted)',fontFamily:mono,fontSize:11,textAlign:'center'}}>
-    Loading BvP matrix…
-  </div>;
-  if (!matrix) return <div style={{padding:40,color:'var(--accent)',fontFamily:mono,fontSize:11}}>
-    ⚠ bvp_matrix.json not found. Run mlbdata_aggregate.py to generate it.
-  </div>;
+
+
 
   // ── Pitcher list ───────────────────────────────────────────────────────────
   const pitchers = Object.entries(matrix).map(([pid, p]) => ({ pid, ...p }))
@@ -13373,6 +13369,14 @@ function BvPDeepDiveTab() {
         ? selBatterData.by_pitch?.[_selPitchArr[0]]?.[dayNight]?.zone_grid
         : selBatterData.overall?.[dayNight]?.zone_grid)
     : null;
+
+  // Guard after all hooks — no early returns before hooks (fixes React #310)
+  if (loading || !matrix) return (
+    <div style={{padding:40,color:loading?'var(--muted)':'var(--accent)',
+      fontFamily:"'DM Mono',monospace",fontSize:11,textAlign:'center'}}>
+      {loading ? 'Loading BvP matrix…' : '⚠ bvp_matrix.json not found. Run mlbdata_aggregate.py to generate it.'}
+    </div>
+  );
 
   return (
     <div style={{padding:'0 4px'}}>
