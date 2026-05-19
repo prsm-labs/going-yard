@@ -10688,6 +10688,7 @@ function SimLabView({ data }) {
                       <td style={{textAlign:'right',padding:'3px 6px',fontFamily:"'DM Mono',monospace",fontSize:10,
                         color:(parseFloat(b.recent_iso)||0)>=0.25?'#ff8020':(parseFloat(b.recent_iso)||0)>=0.18?'#f5a623':'var(--muted)'}}>
                         {(parseFloat(b.recent_iso)||0)>0?(parseFloat(b.recent_iso)||0).toFixed(3):'—'}
+                      </td>
                       <td style={{textAlign:'center',padding:'3px 4px'}}>
                         {(() => {
                           const n = parseInt(b.recent_hr_count||0);
@@ -10718,7 +10719,6 @@ function SimLabView({ data }) {
                         <HROddsCell pid={parseInt(b.batter_id)||0}/>
                       </td>
                     </tr>
-                  );
                   );
                 })}
               </tbody>
