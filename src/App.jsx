@@ -13494,7 +13494,9 @@ function BvPDeepDiveTab() {
         {selPitches.size === 1 && pitcher.zone_by_pitch?.[[...selPitches][0]] && (
           <div style={{display:'flex',gap:20,marginBottom:14,alignItems:'flex-start',flexWrap:'wrap'}}>
             {['D','N'].map(dn => {
-              const zg = pitcher.zone_by_pitch?.[[...selPitches][0]]?.[];
+              const _pt0 = [...selPitches][0];
+              const _locK = location==='A'?'A':location==='H'?'H':'A_loc';
+              const zg = pitcher.zone_by_pitch?.[_pt0]?.[`${dateWin}_${dn}_${_locK}`];
               if (!zg) return null;
               return <ZoneGrid key={dn} grid={zg} title={`${dn==='D'?'Day':'Night'} — Pitcher Locations`} color="red"/>;
             })}
