@@ -13250,88 +13250,130 @@ function BvPDeepDiveTab() {
   const batterRows = React.useMemo(() => {
     if (!pitcher) return [];
     try {
-    const pitchKeys = selPitches.size > 0 ? [...selPitches] : Object.keys(pitcher.pitch_mix||{});
-    return Object.entries(pitcher.vs_batter||{}).map(([bid, bdata]) => {
-      if (batterHand !== 'ALL' && bdata.hand !== batterHand) return null;
+      // ── Correct architecture: show TODAY's OPPOSING lineup batters ──────────
+      // Not historical opponents — today's confirmed/projected batters vs this pitcher
+      const matchup  = pitcher.matchup || '';
+      const parts    = matchup.split(' @ ');
+      const awayTeam = parts[0]?.trim() || '';
+      const homeTeam = parts[1]?.trim() || '';
+      // Opposing team bats against this pitcher
+      const opposingTeam = pitcher.team === homeTeam ? awayTeam
+                         : pitcher.team === awayTeam ? homeTeam
+                         : '';
 
-      // Aggregate metrics across selected pitch types + day/night
-      let pa=0, ab=0, h=0, hr=0, bb=0, k=0;
-      let ev_sum=0, ev_n=0, hh_sum=0, brl_sum=0, pbrl_sum=0;
-      let pfb_sum=0, fb_sum=0, gb_sum=0;
-      let iso_sum=0, woba_sum=0, xwoba_sum=0, metric_n=0;
+      // Collect today's opposing lineup from DAILY_PICKS_CACHE
+      const seen = new Set();
+      const todayBatters = Object.values(DAILY_PICKS_CACHE).filter(b => {
+        const bid  = String(b.batter_id||'').split('.')[0];
+        const team = b.batting_team || b.team || '';
+        if (!bid || seen.has(bid)) return false;
+        if (opposingTeam && team !== opposingTeam) return false;
+        const ls = LINEUP_STATUS[parseInt(bid)||0];
+        if (!ls) return false;  // must be in today's lineup
+        seen.add(bid);
+        return true;
+      });
 
-      const addMetrics = m => {
-        if (!m) return;
-        pa   += m.pa||0; ab   += m.ab||0; h    += m.h||0;
-        hr   += m.hr||0; bb   += m.bb||0; k    += m.k||0;
-        if (m.avg_ev)  { ev_sum  += m.avg_ev  * (m.pa||1); ev_n  += (m.pa||1); }
-        if (m.hh_pct)  hh_sum  += m.hh_pct  * (m.pa||1);
-        if (m.brl_pct) brl_sum += m.brl_pct * (m.pa||1);
-        if (m.pbrl_pct)pbrl_sum+= m.pbrl_pct* (m.pa||1);
-        if (m.pfb_pct) pfb_sum += m.pfb_pct * (m.pa||1);
-        if (m.fb_pct)  fb_sum  += m.fb_pct  * (m.pa||1);
-        if (m.gb_pct)  gb_sum  += m.gb_pct  * (m.pa||1);
-        if (m.iso)  { iso_sum  += m.iso  * (m.pa||1); metric_n += (m.pa||1); }
-        if (m.woba) { woba_sum += m.woba * (m.pa||1); }
-        if (m.xwoba){ xwoba_sum+= m.xwoba* (m.pa||1); }
-      };
-
-      // Helper: look up a key, trying D+N fallback if A doesn't exist
+      // Helper: look up a split key, falling back D→N when A doesn't exist
       const getMetrics = (obj, key) => {
         if (!obj) return null;
         if (obj[key]) return obj[key];
-        // A=all not in JSON — try D and N separately
-        const [w,,l] = key.split('_');
+        // A daynight key doesn't exist in JSON — try D then N
+        const segs = key.split('_');
+        const w = segs[0], l = segs[segs.length-1];
         return obj[`${w}_D_${l}`] || obj[`${w}_N_${l}`] || null;
       };
-      if (selPitches.size > 0) {
-        pitchKeys.forEach(pt => {
-          const dn_data = getMetrics(bdata.by_pitch?.[pt], `${dateWin}_${dayNight}_${location}`);
-          if (dn_data) addMetrics(dn_data);
-        });
-      } else {
-        addMetrics(getMetrics(bdata.overall, `${dateWin}_${dayNight}_${location}`));
-      }
 
-      if (pa === 0) return null;
+      return todayBatters.map(dp => {
+        const bid  = String(dp.batter_id||'').split('.')[0];
+        // Hand filter
+        const hand = (dp.batter_hand || dp.hand || '').charAt(0).toUpperCase();
+        if (batterHand !== 'ALL' && hand && hand !== batterHand.charAt(0)) return null;
 
-      const w = pa;
-      const dp_row = DAILY_PICKS_CACHE[bid];
+        // Look up this batter in the pitcher's historical vs_batter data (may not exist)
+        const bdata = pitcher.vs_batter?.[bid] || null;
+        const splitKey = `${dateWin}_${dayNight}_${location}`;
 
-      return {
-        bid, name: bdata.name, hand: bdata.hand,
-        pa, ab, h, hr, bb, k,
-        avg:   ab>0?+(h/ab).toFixed(3):null,
-        avg_ev: ev_n>0?+(ev_sum/ev_n).toFixed(1):null,
-        hh_pct: pa>0?+(hh_sum/pa).toFixed(1):null,
-        brl_pct:pa>0?+(brl_sum/pa).toFixed(1):null,
-        pbrl_pct:pa>0?+(pbrl_sum/pa).toFixed(1):null,
-        pfb_pct: pa>0?+(pfb_sum/pa).toFixed(1):null,
-        fb_pct:  pa>0?+(fb_sum/pa).toFixed(1):null,
-        gb_pct:  pa>0?+(gb_sum/pa).toFixed(1):null,
-        iso:     metric_n>0?+(iso_sum/metric_n).toFixed(3):null,
-        woba:    metric_n>0?+(woba_sum/metric_n).toFixed(3):null,
-        xwoba:   metric_n>0?+(xwoba_sum/metric_n).toFixed(3):null,
-        // Static daily scores — unchanged by filter, follow the batter
-        yard:    dp_row?._yard ?? null,
-        boom:    dp_row?._boom ?? null,
-        sig:     dp_row?._trackerSig ?? null,
-        ghr:     parseFloat(dp_row?.gHR)||null,
-        ps:      parseFloat(dp_row?.ps_score)||null,
-        grade:   dp_row?.grade || null,
-        team:    dp_row?.batting_team || null,
-        form:    dp_row?._formClass || null,
-        // zone grid for selected pitch
-        zone_grid: selPitches.size === 1
-          ? bdata.by_pitch?.[[...selPitches][0]]?.[`${dateWin}_${dayNight}_${location}`]?.zone_grid
-          : bdata.overall?.[`${dateWin}_${dayNight}_${location}`]?.zone_grid,
-      };
-    }).filter(Boolean);
+        // Aggregate BvP metrics across selected pitch types
+        let pa=0,ab=0,h=0,hr=0,bb=0,k=0;
+        let ev_sum=0,ev_n=0,hh_sum=0,brl_sum=0,pbrl_sum=0,pfb_sum=0,fb_sum=0,gb_sum=0;
+        let iso_sum=0,woba_sum=0,xwoba_sum=0,metric_n=0;
+
+        const addMetrics = m => {
+          if (!m) return;
+          pa   += m.pa||0;  ab   += m.ab||0;  h    += m.h||0;
+          hr   += m.hr||0;  bb   += m.bb||0;  k    += m.k||0;
+          if (m.avg_ev)  { ev_sum  += m.avg_ev  * (m.pa||1); ev_n     += (m.pa||1); }
+          if (m.hh_pct)  hh_sum  += m.hh_pct  * (m.pa||1);
+          if (m.brl_pct) brl_sum += m.brl_pct * (m.pa||1);
+          if (m.pbrl_pct)pbrl_sum+= m.pbrl_pct* (m.pa||1);
+          if (m.pfb_pct) pfb_sum += m.pfb_pct * (m.pa||1);
+          if (m.fb_pct)  fb_sum  += m.fb_pct  * (m.pa||1);
+          if (m.gb_pct)  gb_sum  += m.gb_pct  * (m.pa||1);
+          if (m.iso)  { iso_sum   += m.iso  * (m.pa||1); metric_n += (m.pa||1); }
+          if (m.woba) { woba_sum  += m.woba * (m.pa||1); }
+          if (m.xwoba){ xwoba_sum += m.xwoba* (m.pa||1); }
+        };
+
+        if (bdata) {
+          if (selPitches.size > 0) {
+            [...selPitches].forEach(pt => addMetrics(getMetrics(bdata.by_pitch?.[pt], splitKey)));
+          } else {
+            addMetrics(getMetrics(bdata.overall, splitKey));
+          }
+        }
+
+        const w        = Math.max(pa, 1);
+        const avg_ev   = ev_n > 0      ? ev_sum   / ev_n      : 0;
+        const hh_pct   = pa  > 0      ? hh_sum   / pa        : 0;
+        const brl_pct  = pa  > 0      ? brl_sum  / pa        : 0;
+        const pbrl_pct = pa  > 0      ? pbrl_sum / pa        : 0;
+        const pfb_pct  = pa  > 0      ? pfb_sum  / pa        : 0;
+        const fb_pct   = pa  > 0      ? fb_sum   / pa        : 0;
+        const gb_pct   = pa  > 0      ? gb_sum   / pa        : 0;
+        const iso      = metric_n > 0  ? iso_sum  / metric_n  : parseFloat(dp.recent_iso||0);
+        const woba     = metric_n > 0  ? woba_sum / metric_n  : 0;
+        const xwoba    = metric_n > 0  ? xwoba_sum/ metric_n  : 0;
+        const ba       = ab > 0        ? h / ab               : 0;
+
+        // Zone grid for overlay
+        const zone_grid = bdata ? (
+          selPitches.size === 1
+            ? getMetrics(bdata.by_pitch?.[[...selPitches][0]], splitKey)?.zone_grid
+            : getMetrics(bdata.overall, splitKey)?.zone_grid
+        ) : null;
+
+        const ls = LINEUP_STATUS[parseInt(bid)||0];
+
+        return {
+          bid, name: dp.batter || bdata?.name || bid,
+          hand, team: dp.batting_team || '',
+          // BvP stats (may be 0 if never faced)
+          pa, hr, h, ab, bb, k,
+          avg_ev, hh_pct, brl_pct, pbrl_pct, pfb_pct,
+          fb_pct, gb_pct, iso, woba, xwoba, ba,
+          hasBvP: pa > 0,  // flag: do we have actual matchup data?
+          zone_grid,
+          // From daily picks (always present)
+          _yard:                  parseFloat(dp._yard||0),
+          ps_score:               parseFloat(dp.ps_score||0),
+          bat_speed_vs_baseline:  parseFloat(dp.bat_speed_vs_baseline||0),
+          recent_avg_ev:          parseFloat(dp.recent_avg_ev||0),
+          recent_hh_pct:          parseFloat(dp.recent_hh_pct||0),
+          recent_fb_pct:          parseFloat(dp.recent_fb_pct||0),
+          recent_iso:             parseFloat(dp.recent_iso||0),
+          sim_tb:                 parseFloat(dp.sim_tb||0),
+          zone_fit:               parseFloat(dp.zone_fit||0),
+          grade:                  dp.grade || '',
+          lineup_slot:            ls?.slot || ls?.lineup_slot || 9,
+        };
+      }).filter(Boolean).sort((a,b) => (a.lineup_slot||9) - (b.lineup_slot||9));
     } catch(e) {
       console.error('BvP batterRows error:', e);
       return [];
     }
   }, [pitcher, selPitches, dateWin, dayNight, batterHand, location]);
+
 
   // ── Sort batter rows ───────────────────────────────────────────────────────
   const sortedRows = React.useMemo(() => {
@@ -13389,6 +13431,15 @@ function BvPDeepDiveTab() {
   // ── Pitcher list (after guard — matrix is guaranteed non-null here) ────────
   const pitchers = Object.entries(matrix).map(([pid, p]) => ({ pid, ...p }))
     .sort((a,b) => (a.name||'').localeCompare(b.name||''));
+
+  // Opposing team for the selected pitcher
+  const opposingTeam = (() => {
+    if (!pitcher) return '';
+    const parts = (pitcher.matchup||'').split(' @ ');
+    return pitcher.team === parts[1]?.trim() ? parts[0]?.trim()
+         : pitcher.team === parts[0]?.trim() ? parts[1]?.trim()
+         : '';
+  })();
 
   return (
     <div style={{padding:'0 4px'}}>
@@ -13643,7 +13694,7 @@ function BvPDeepDiveTab() {
             </button>
           ))}
           <div style={{marginLeft:'auto',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>
-            {sortedRows.length} batters · {selPitches.size>0?[...selPitches].join('+'):'All pitches'} · {dateWin==='A'?'Full Season':`Last ${dateWin} days`} · {dayNight==='A'?'All':dayNight==='D'?'Day':'Night'} · {location==='A'?'All venues':location==='H'?'Home':'Away'}
+            {sortedRows.length} {opposingTeam||'opposing'} batters in lineup · {selPitches.size>0?[...selPitches].join('+'):'All pitches'} · {dateWin==='A'?'Full Season':`Last ${dateWin} days`} · {dayNight==='D'?'Day':'Night'} · {location==='A'?'All venues':location==='H'?'Home':'Away'}
           </div>
         </div>
 
@@ -13714,9 +13765,9 @@ function BvPDeepDiveTab() {
                         </span>
                       </div>
                     </td>
-                    {/* Yard Score — static, follows batter */}
+                    {/* Yard Score — static from daily picks */}
                     <td style={{textAlign:'right',padding:'2px 6px'}}>
-                      {r.yard != null && <YardBadge score={r.yard}/>}
+                      {r._yard > 0 && <YardBadge score={r._yard}/>}
                     </td>
                     {/* Grade */}
                     <td style={{textAlign:'center',padding:'2px 4px',fontFamily:mono,fontSize:9,
