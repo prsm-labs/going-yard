@@ -13207,7 +13207,8 @@ function BvPDeepDiveTab() {
   const [selPitches,  setSelPitches]   = useState(new Set()); // multi-select pitch types
   const [dateWin,     setDateWin]      = useState('A');    // A=season 30/15/7=last N days
   const [location,    setLocation]     = useState('A');    // A=all H=home Away=away
-  const [dayNight,    setDayNight]     = useState('A');    // A=All D=Day N=Night
+  const [selGame,     setSelGame]      = useState(null);
+  const [dayNight,    setDayNight]     = useState('D');    // D/N only — aggregate has no A key
   const [batterHand,  setBatterHand]   = useState('ALL');
   const [pitcherHand, setPitcherHand]  = useState('ALL'); // RHP / LHP / ALL
   const [sortBy,      setSortBy]       = useState('avg_ev');
@@ -13275,13 +13276,21 @@ function BvPDeepDiveTab() {
         if (m.xwoba){ xwoba_sum+= m.xwoba* (m.pa||1); }
       };
 
+      // Helper: look up a key, trying D+N fallback if A doesn't exist
+      const getMetrics = (obj, key) => {
+        if (!obj) return null;
+        if (obj[key]) return obj[key];
+        // A=all not in JSON — try D and N separately
+        const [w,,l] = key.split('_');
+        return obj[`${w}_D_${l}`] || obj[`${w}_N_${l}`] || null;
+      };
       if (selPitches.size > 0) {
         pitchKeys.forEach(pt => {
-          const dn_data = bdata.by_pitch?.[pt]?.[`${dateWin}_${dayNight}_${location}`];
+          const dn_data = getMetrics(bdata.by_pitch?.[pt], `${dateWin}_${dayNight}_${location}`);
           if (dn_data) addMetrics(dn_data);
         });
       } else {
-        addMetrics(bdata.overall?.[`${dateWin}_${dayNight}_${location}`]);
+        addMetrics(getMetrics(bdata.overall, `${dateWin}_${dayNight}_${location}`));
       }
 
       if (pa === 0) return null;
@@ -13384,6 +13393,65 @@ function BvPDeepDiveTab() {
   return (
     <div style={{padding:'0 4px'}}>
 
+      {/* ── Game selector strip ─────────────────────────────────────────── */}
+      {(()=>{
+        // Build unique games from pitchers, sorted by game time
+        const games = [];
+        const seen = new Set();
+        pitchers.forEach(p => {
+          const key = p.matchup || p.team || '';
+          if (key && !seen.has(key)) {
+            seen.add(key);
+            // Find game time from SCHEDULE_CACHE or daily_picks via matchup string
+            const dp = Object.values(DAILY_PICKS_CACHE).find(b =>
+              b.batting_team && p.matchup && p.matchup.includes(b.batting_team)
+            );
+            games.push({ key, label: key, time: dp?.game_time || '' });
+          }
+        });
+        // Sort by time
+        games.sort((a,b) => (a.time||'').localeCompare(b.time||''));
+        if (!games.length) return null;
+        return (
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:8,color:'var(--muted)',fontFamily:mono,textTransform:'uppercase',
+              letterSpacing:.7,marginBottom:6}}>Select Matchup</div>
+            <div style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:4,
+              WebkitOverflowScrolling:'touch',scrollbarWidth:'none'}}>
+              <button onClick={()=>{setSelGame(null);setSelPitcher(null);setSelBatter(null);}}
+                style={{flexShrink:0,padding:'6px 10px',borderRadius:8,fontSize:9,fontFamily:mono,
+                  cursor:'pointer',border:`1px solid ${selGame===null?'var(--accent2)':'var(--border)'}`,
+                  background:selGame===null?'rgba(232,65,26,.12)':'var(--surface2)',
+                  color:selGame===null?'var(--accent2)':'var(--muted)',whiteSpace:'nowrap'}}>
+                All Games
+              </button>
+              {games.map(g => {
+                const active = selGame === g.key;
+                // Parse teams from matchup string "AWAY @ HOME"
+                const [away='', home=''] = g.key.split(' @ ');
+                return (
+                  <button key={g.key}
+                    onClick={()=>{setSelGame(g.key);setSelPitcher(null);setSelBatter(null);}}
+                    style={{flexShrink:0,padding:'6px 10px',borderRadius:8,cursor:'pointer',
+                      border:`1px solid ${active?'var(--accent2)':'var(--border)'}`,
+                      background:active?'rgba(232,65,26,.08)':'var(--surface2)',
+                      display:'flex',flexDirection:'column',alignItems:'center',gap:2}}>
+                    <div style={{display:'flex',alignItems:'center',gap:5}}>
+                      <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,
+                        color:active?'var(--text)':'var(--muted)'}}>{away}</span>
+                      <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>@</span>
+                      <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,
+                        color:active?'var(--text)':'var(--muted)'}}>{home}</span>
+                    </div>
+                    {g.time && <div style={{fontFamily:mono,fontSize:7,color:active?'var(--accent2)':'var(--muted)'}}>{g.time}</div>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ── Pitcher selector — grouped by game, filtered by hand ────────── */}
       <div style={{marginBottom:12}}>
         <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,flexWrap:'wrap'}}>
@@ -13404,7 +13472,8 @@ function BvPDeepDiveTab() {
         {/* Group pitchers by matchup */}
         {(()=>{
           const filtered = pitchers.filter(p =>
-            pitcherHand==='ALL' || p.hand===pitcherHand || p.hand===(pitcherHand==='R'?'Right':'Left')
+            (!selGame || p.matchup === selGame) &&
+            (pitcherHand==='ALL' || p.hand===pitcherHand || p.hand===(pitcherHand==='R'?'Right':'Left'))
           );
           const byGame = {};
           filtered.forEach(p => {
