@@ -13659,171 +13659,6 @@ function BvPDeepDiveTab() {
         {/* ── Batter table ─────────────────────────────────────────────────── */}
         <div style={{overflowX:'auto'}}>
           <table className="tw" style={{width:'100%',borderCollapse:'collapse',fontSize:10}}>
-            <thead>
-              <tr>
-                {/* Sticky batter column */}
-                <th className="sticky-batter" style={{padding:'5px 8px',fontSize:8,fontFamily:mono,
-                  textTransform:'uppercase',letterSpacing:.6,color:'var(--muted)',textAlign:'left',
-                  borderBottom:'1px solid var(--border)',background:'var(--surface2)',
-                  position:'sticky',left:0,top:0,zIndex:20,whiteSpace:'nowrap'}}>
-                  Batter {pitcher && <span style={{fontSize:7,opacity:.5,fontWeight:400}}>· ✓ = platoon adv</span>}
-                </th>
-                <TH col="yard"    label="Yard"  title="Yard Score (static — daily)"/>
-                <TH col="grade"   label="Gr"    title="Matchup Grade"/>
-                <TH col="pa"      label="PA"    title="Plate Appearances vs this pitcher/pitch"/>
-                <TH col="avg"     label="AVG"   title="Batting Average"/>
-                <TH col="hr"      label="HR"    title="Home Runs"/>
-                <TH col="bb"      label="BB"    title="Walks"/>
-                <TH col="k"       label="K"     title="Strikeouts"/>
-                <TH col="avg_ev"  label="EV"    title="Avg Exit Velocity"/>
-                <TH col="hh_pct"  label="HH%"   title="Hard Hit Rate"/>
-                <TH col="brl_pct" label="Brl%"  title="Barrel Rate"/>
-                <TH col="pbrl_pct"label="PBrl%" title="Pulled Barrel Rate"/>
-                <TH col="fb_pct"  label="FB%"   title="Fly Ball Rate"/>
-                <TH col="gb_pct"  label="GB%"   title="Ground Ball Rate"/>
-                <TH col="pfb_pct" label="PFB%"  title="Pulled Fly Ball Rate"/>
-                <TH col="iso"     label="ISO"   title="Isolated Power"/>
-                <TH col="woba"    label="wOBA"  title="Weighted On-Base Average"/>
-                <TH col="xwoba"   label="xwOBA" title="Expected wOBA (luck-neutral)"/>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedRows.map(r => {
-                const isSelected = selBatter === r.bid;
-                return (
-                  <tr key={r.bid}
-                    onClick={()=>setSelBatter(isSelected?null:r.bid)}
-                    style={{cursor:'pointer',borderBottom:'1px solid rgba(255,255,255,.04)',
-                      background:isSelected?'rgba(232,65,26,.08)':'transparent',
-                      height:28}}>
-                    {/* Sticky batter cell */}
-                    <td className="sticky-batter" style={{padding:'2px 8px',
-                      background:isSelected?'rgba(232,65,26,.08)':'var(--surface)',
-                      position:'sticky',left:0,zIndex:5,whiteSpace:'nowrap',minWidth:160}}>
-                      <div style={{display:'flex',alignItems:'center',gap:4}}>
-                        <span style={{fontFamily:mono,fontSize:7,color:'var(--muted)',minWidth:10}}>{r.lineup_slot||''}</span>
-                        <PlayerAvatar pid={parseInt(r.bid)||0} name={r.name} size={16}/>
-                        <span style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'var(--accent2)',flexShrink:0}}>{r.team||''}</span>
-                        <span onClick={e=>{e.stopPropagation();openAtBatSlide({pid:parseInt(r.bid)||0,name:r.name,team:r.team||''});}}
-                          style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,
-                            color:isKeyMatchup(parseInt(r.bid)||0,r.name)?'#ff8020':'var(--text)',
-                            cursor:'pointer',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                          {r.name}
-                        </span>
-                        {r.platoon && <span title="Platoon advantage" style={{fontSize:9,color:'#27c97a',flexShrink:0}}>✓</span>}
-                        {r.pitchMatch && <span title={`PS convergence on ${r.convPitch}`} style={{fontSize:9,color:'#f5a623',flexShrink:0}}>⚡</span>}
-                        <PickButton pid={parseInt(r.bid)||0} name={r.name} team={r.team||''}/>
-                      </div>
-                    </td>
-                    {/* Yard Score */}
-                    <td style={{textAlign:'right',padding:'2px 6px'}}>
-                      {r._yard > 0 && <YardBadge score={r._yard}/>}
-                    </td>
-                    {/* Grade */}
-                    <td style={{textAlign:'center',padding:'2px 4px',fontFamily:mono,fontSize:9,fontWeight:700,
-                      color:r.grade==='A+'?'#ffd700':r.grade==='A'?'#27c97a':r.grade==='B'?'#f5a623':'var(--muted)'}}>
-                      {r.grade||'—'}
-                    </td>
-                    {/* Sim TB */}
-                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,
-                      color:r.sim_tb>=1.4?'#ff4020':r.sim_tb>=1.1?'#f5a623':'var(--muted)'}}>
-                      {r.sim_tb>0?r.sim_tb.toFixed(2):'—'}
-                    </td>
-                    {/* Recent EV */}
-                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,
-                      color:r.rec_ev>=95?'#ff4020':r.rec_ev>=90?'#f5a623':r.rec_ev>=85?'#27c97a':'var(--muted)'}}>
-                      {r.rec_ev>0?r.rec_ev.toFixed(1):'—'}
-                    </td>
-                    {/* BS Delta */}
-                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,
-                      color:r.bat_speed_delta>=1.5?'#27c97a':r.bat_speed_delta<=-1?'#f5a623':'var(--muted)'}}>
-                      {r.bat_speed_delta!==0?(r.bat_speed_delta>0?'+':'')+r.bat_speed_delta.toFixed(1):'—'}
-                    </td>
-                    {/* Recent HH% */}
-                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,
-                      color:r.rec_hh>=40?'#ff4020':r.rec_hh>=30?'#f5a623':'var(--muted)'}}>
-                      {r.rec_hh>0?r.rec_hh.toFixed(1)+'%':'—'}
-                    </td>
-                    {/* Recent FB% */}
-                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,
-                      color:r.rec_fb>=35?'#27c97a':'var(--muted)'}}>
-                      {r.rec_fb>0?r.rec_fb.toFixed(1)+'%':'—'}
-                    </td>
-                    {/* Recent ISO */}
-                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,
-                      color:r.rec_iso>=0.250?'#ff8020':r.rec_iso>=0.180?'#f5a623':'var(--muted)'}}>
-                      {r.rec_iso>0?r.rec_iso.toFixed(3):'—'}
-                    </td>
-                    {/* Launch Angle mean */}
-                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,
-                      color:(r.la_mean>=18&&r.la_mean<=30)?'#27c97a':'var(--muted)'}}>
-                      {r.la_mean>0?r.la_mean.toFixed(0)+'°':'—'}
-                    </td>
-                    {/* Zone Fit */}
-                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,
-                      color:r.zone_fit>=8?'#ff4020':r.zone_fit>=5?'#f5a623':r.zone_fit>=2?'#27c97a':'var(--muted)'}}>
-                      {r.zone_fit>0?r.zone_fit.toFixed(1)+'%':'—'}
-                    </td>
-                    {/* BvP EV — only when batter has faced this pitcher */}
-                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,
-                      color:r.bvp_ev>=95?'#ff4020':r.bvp_ev>=90?'#f5a623':r.bvp_ev>=85?'#27c97a':'rgba(255,255,255,.2)'}}>
-                      {r.bvp_ev>0?r.bvp_ev.toFixed(1):<span style={{color:'rgba(255,255,255,.15)',fontSize:8}}>—</span>}
-                    </td>
-                    {/* BvP HH% */}
-                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,
-                      color:r.bvp_hh>=40?'#ff4020':r.bvp_hh>=30?'#f5a623':'rgba(255,255,255,.2)'}}>
-                      {r.bvp_hh>0?r.bvp_hh.toFixed(1)+'%':<span style={{color:'rgba(255,255,255,.15)',fontSize:8}}>—</span>}
-                    </td>
-                    {/* BvP FB% */}
-                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,
-                      color:r.bvp_fb>=35?'#27c97a':'rgba(255,255,255,.2)'}}>
-                      {r.bvp_fb>0?r.bvp_fb.toFixed(1)+'%':<span style={{color:'rgba(255,255,255,.15)',fontSize:8}}>—</span>}
-                    </td>
-                    {/* BvP Barrel% */}
-                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,
-                      color:r.bvp_brl>=8?'#ff4020':r.bvp_brl>=5?'#f5a623':'rgba(255,255,255,.2)'}}>
-                      {r.bvp_brl>0?r.bvp_brl.toFixed(1)+'%':<span style={{color:'rgba(255,255,255,.15)',fontSize:8}}>—</span>}
-                    </td>
-                    {/* BvP ISO */}
-                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,
-                      color:r.bvp_iso>=0.250?'#ff8020':r.bvp_iso>=0.180?'#f5a623':'rgba(255,255,255,.2)'}}>
-                      {r.bvp_iso>0?r.bvp_iso.toFixed(3):<span style={{color:'rgba(255,255,255,.15)',fontSize:8}}>—</span>}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        {/* ── Selected batter zone overlay ──────────────────────────────────── */}
-        {selBatter && selZoneGrid && (
-          <div style={{marginTop:12,background:'var(--surface2)',borderRadius:8,
-            border:'1px solid var(--border)',padding:'12px 14px'}}>
-            <div style={{fontSize:9,color:'var(--muted)',fontFamily:mono,textTransform:'uppercase',
-              letterSpacing:.7,marginBottom:8}}>
-              {pitcher.vs_batter?.[selBatter]?.name} — Contact Zone vs {[...selPitches].join('+')||'All Pitches'}
-            </div>
-            <div style={{display:'flex',gap:20,alignItems:'flex-start'}}>
-              <ZoneGrid grid={selZoneGrid} title="Batter Contact Zones" color="green"/>
-              {selPitches.size===1 && (
-                <ZoneGrid
-                  grid={pitcher.zone_by_pitch?.[[...selPitches][0]]?.[`${dateWin}_${dayNight}_${location==='A'?'A':location==='H'?'H':'A_loc'}`]}
-                  title="Pitcher Location" color="red"/>
-              )}
-              <div style={{fontSize:9,fontFamily:mono,color:'var(--muted)',lineHeight:1.8}}>
-                <div>Green = batter contact frequency</div>
-                <div>Red = where pitcher leaves the {[...selPitches][0]||'pitch'}</div>
-                <div style={{marginTop:8,color:'var(--text)'}}>Overlap = damage zone</div>
-              </div>
-            </div>
-          </div>
-        )}
-
-      </>)}
-    </div>
-  );
-}
               <thead>
               <tr>
                 <th className="sticky-batter" style={{padding:'5px 8px',fontSize:8,fontFamily:mono,
@@ -13916,6 +13751,38 @@ function BvPDeepDiveTab() {
                 );
               })}
             </tbody>
+          </table>
+        </div>
+
+        {/* ── Selected batter zone overlay ──────────────────────────────────── */}
+        {selBatter && selZoneGrid && (
+          <div style={{marginTop:12,background:'var(--surface2)',borderRadius:8,
+            border:'1px solid var(--border)',padding:'12px 14px'}}>
+            <div style={{fontSize:9,color:'var(--muted)',fontFamily:mono,textTransform:'uppercase',
+              letterSpacing:.7,marginBottom:8}}>
+              {pitcher.vs_batter?.[selBatter]?.name} — Contact Zone vs {[...selPitches].join('+')||'All Pitches'}
+            </div>
+            <div style={{display:'flex',gap:20,alignItems:'flex-start'}}>
+              <ZoneGrid grid={selZoneGrid} title="Batter Contact Zones" color="green"/>
+              {selPitches.size===1 && (
+                <ZoneGrid
+                  grid={pitcher.zone_by_pitch?.[[...selPitches][0]]?.[`${dateWin}_${dayNight}_${location==='A'?'A':location==='H'?'H':'A_loc'}`]}
+                  title="Pitcher Location" color="red"/>
+              )}
+              <div style={{fontSize:9,fontFamily:mono,color:'var(--muted)',lineHeight:1.8}}>
+                <div>Green = batter contact frequency</div>
+                <div>Red = where pitcher leaves the {[...selPitches][0]||'pitch'}</div>
+                <div style={{marginTop:8,color:'var(--text)'}}>Overlap = damage zone</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </>)}
+    </div>
+  );
+}
+
           </table>
         </div>
 
