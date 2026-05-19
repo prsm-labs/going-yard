@@ -9708,7 +9708,7 @@ function LongShotView({ data }) {
       .filter(b => matchesHandFilter(b.pitcher_hand, pitcherHand))
       .filter(b => formFilter.size === 0 || formFilter.has(b._formClass))
       .filter(b => !hideFinal   || !FINAL_GAME_IDS.has(String(b.game_id)))
-      .filter(b =>     if (teamFilter!=='ALL') r = r.filter(b=>b.batting_team===teamFilter);
+    if (teamFilter!=='ALL') r = r.filter(b=>b.batting_team===teamFilter);
     if (pgFilter!=='ALL')   r = r.filter(b=>b._pgLabel===pgFilter);
     if (search)      { const q=search.toLowerCase(); r=r.filter(b=>(b.batter||'').toLowerCase().includes(q)); }
     if (lineupOnly)  r = r.filter(b=>parseInt(b.batter_id||0)>0 && LINEUP_STATUS[parseInt(b.batter_id||0)]?.status==='confirmed');
