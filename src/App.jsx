@@ -13354,9 +13354,10 @@ function BvPDeepDiveTab() {
   );
 
   const selBatterData = selBatter ? pitcher?.vs_batter?.[selBatter] : null;
+  const _selPitchArr  = [...selPitches];
   const selZoneGrid   = selBatterData
     ? (selPitches.size===1
-        ? selBatterData.by_pitch?.[...selPitches][0]?.[dayNight]?.zone_grid
+        ? selBatterData.by_pitch?.[_selPitchArr[0]]?.[dayNight]?.zone_grid
         : selBatterData.overall?.[dayNight]?.zone_grid)
     : null;
 
@@ -13490,10 +13491,10 @@ function BvPDeepDiveTab() {
         </div>
 
         {/* ── Zone grid for selected pitch ─────────────────────────────────── */}
-        {selPitches.size === 1 && pitcher.zone_by_pitch?.[...selPitches][0] && (
+        {selPitches.size === 1 && pitcher.zone_by_pitch?.[[...selPitches][0]] && (
           <div style={{display:'flex',gap:20,marginBottom:14,alignItems:'flex-start',flexWrap:'wrap'}}>
             {['D','N'].map(dn => {
-              const zg = pitcher.zone_by_pitch?.[...selPitches][0]?.[];
+              const zg = pitcher.zone_by_pitch?.[[...selPitches][0]]?.[];
               if (!zg) return null;
               return <ZoneGrid key={dn} grid={zg} title={`${dn==='D'?'Day':'Night'} — Pitcher Locations`} color="red"/>;
             })}
@@ -13666,7 +13667,7 @@ function BvPDeepDiveTab() {
               <ZoneGrid grid={selZoneGrid} title="Batter Contact Zones" color="green"/>
               {selPitches.size===1 && (
                 <ZoneGrid
-                  grid={pitcher.zone_by_pitch?.[...selPitches][0]?.[`${dateWin}_${dayNight}_${location==='A'?'A':location==='H'?'H':'A_loc'}`]}
+                  grid={pitcher.zone_by_pitch?.[[...selPitches][0]]?.[`${dateWin}_${dayNight}_${location==='A'?'A':location==='H'?'H':'A_loc'}`]}
                   title="Pitcher Location" color="red"/>
               )}
               <div style={{fontSize:9,fontFamily:mono,color:'var(--muted)',lineHeight:1.8}}>
