@@ -135,13 +135,13 @@ const styles = `
   .splash-overlay{position:fixed;inset:0;background:#0d0d0f;display:flex;flex-direction:column;
   align-items:center;justify-content:center;z-index:99999;transition:opacity .6s ease,visibility .6s ease;}
 .splash-overlay.fade-out{opacity:0;visibility:hidden;}
-@keyframes spin-ball{
-  0%   { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+@keyframes ball-pulse{
+  0%,100% { filter: drop-shadow(0 0 18px rgba(232,65,26,.6)) drop-shadow(0 0 6px rgba(255,160,50,.4)); transform: scale(1); }
+  50%      { filter: drop-shadow(0 0 38px rgba(232,65,26,.9)) drop-shadow(0 0 16px rgba(255,200,50,.7)); transform: scale(1.07); }
 }
 @keyframes arc-float{
   0%,100% { transform: translateY(0px); }
-  50%      { transform: translateY(-18px); }
+  50%      { transform: translateY(-12px); }
 }
 @keyframes splash-fade-in{
   from { opacity:0; transform:scale(.85); }
@@ -156,9 +156,7 @@ const styles = `
 }
 .splash-ball{
   width:130px;height:130px;object-fit:contain;
-  animation: spin-ball 1.2s linear infinite;
-  filter: drop-shadow(0 0 24px rgba(232,65,26,.5)) drop-shadow(0 0 8px rgba(255,160,50,.3));
-  transform-origin: 38% 42%;
+  animation: ball-pulse 1.6s ease-in-out infinite;
 }
 .splash-logo-wrap{
   animation: splash-fade-in .5s ease both;
@@ -12899,7 +12897,12 @@ function PairsTab({ data }) {
       const key = String(b.batter_id||b.batter||'');
       if (!key || seen.has(key) || !b.batter || !b.game_id) return false;
       seen.add(key);
-      return true;
+      // Must be in confirmed or projected lineup today
+      const bid = parseInt(b.batter_id||0);
+      const ls  = bid ? LINEUP_STATUS[bid] : null;
+      if (!ls || (ls.status !== 'confirmed' && ls.status !== 'projected')) return false;
+      // Must have recent contact/sim data (not inactive)
+      return parseFloat(b.recent_avg_ev||0) > 0 || parseFloat(b.sim_tb||0) > 0;
     });
   }, []);
 
@@ -13418,9 +13421,9 @@ function BvPDeepDiveTab() {
                       color:selPitcher===p.pid?'var(--accent2)':p.is_starter?'var(--text)':'var(--muted)',
                       fontWeight:selPitcher===p.pid?700:p.is_starter?600:400}}>
                     {p.is_starter && <span style={{marginRight:3,fontSize:7,opacity:.7}}>★</span>}
-                    {p.name}
+                    {p.name||'Unknown'}
                     {p.hand && <span style={{marginLeft:4,fontSize:7,opacity:.6}}>{p.hand==='R'||p.hand==='Right'?'R':'L'}</span>}
-                    {p.grade && !p.is_starter && <span style={{marginLeft:4,fontSize:7,color:pgCol(p.grade)}}>{(p.grade||'').split(' ')[0]}</span>}
+                    {p.grade && !p.is_starter && <span style={{marginLeft:4,fontSize:7,color:pgCol(p.grade||'')}}>{(p.grade||'').split(' ')[0]}</span>}
                   </button>
                 ))}
               </div>
@@ -13445,7 +13448,7 @@ function BvPDeepDiveTab() {
             const hKey = batterHand==='ALL'?'A':batterHand.charAt(0);
             const pLocKey = location==='A'?'A':location==='H'?'H':'A_loc';
             const splitKey = `${dateWin}_${dayNight}_${hKey}_${pLocKey}`;
-            const split = pitcher.stats_by_split?.[splitKey] || pitcher.stats_by_split?.['A_A_A'] || {};
+            const split = (pitcher.stats_by_split||{})[splitKey] || (pitcher.stats_by_split||{})['A_A_A'] || {};
             const pa  = split.pa  ?? pitcher.pa;
             const hh  = split.hh_pct  ?? pitcher.hh_pct_allowed;
             const brl = split.brl_pct ?? pitcher.brl_pct_allowed;
@@ -13501,7 +13504,7 @@ function BvPDeepDiveTab() {
         </div>
 
         {/* ── Zone grid for selected pitch ─────────────────────────────────── */}
-        {selPitches.size === 1 && pitcher.zone_by_pitch?.[[...selPitches][0]] && (
+        {selPitches.size === 1 && pitcher.zone_by_pitch && [...selPitches][0] && pitcher.zone_by_pitch[[...selPitches][0]] && (
           <div style={{display:'flex',gap:20,marginBottom:14,alignItems:'flex-start',flexWrap:'wrap'}}>
             {['D','N'].map(dn => {
               const _pt0 = [...selPitches][0];
