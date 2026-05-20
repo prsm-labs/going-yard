@@ -1788,11 +1788,20 @@ function MatchupCard({ dp }) {
     if (tb>=2.5&&tb<3) s+=3; else if(tb>=2.0) s+=2; else if(tb>=1.5) s+=1;
     if (tb>=3.0) s-=1;
     if (pgLabel.includes('Target')) s+=2; else if(pgLabel.includes('Hittable')) s+=1;
-    else if(pgLabel.includes('Elite')) s-=1;  // softened: was -2, pitcher difficulty shouldn't dominate
+    else if(pgLabel.includes('Elite')) s-=1;
     if (ev>=103) s+=2; else if(ev>=97) s+=1;
     if (la>=22&&la<=32) s+=2; else if(la>=18) s+=1;
     if (brl>=10) s+=2; else if(brl>=6) s+=1;
     if (fb>=35) s+=1;
+    // Pulled barrel — 3-4x more important than pulled FB
+    const pbrl = parseFloat(dp.recent_pulled_barrel_pct||0);
+    const pfb  = parseFloat(dp.recent_pulled_fb_pct||0);
+    if (pbrl>=12) s+=3; else if(pbrl>=8) s+=2; else if(pbrl>=5) s+=1;
+    // Pulled FB — directional signal, smaller weight
+    if (pfb>=40) s+=1;
+    // Surprise power: HR production outrunning barrel/LA profile
+    const hrRate = parseFloat(dp.recent_hr_rate||0);
+    if (hrRate>=0.05 && pbrl<8 && (parseFloat(dp.recent_iso||0))<0.200) s+=1;
     return Math.min(14, Math.max(0, s));
   })();
 
@@ -12809,7 +12818,15 @@ function SoCloseTab({ data }) {
         const bid = String(b.batter_id||'').split('.')[0];
         if (!bid || seen.has(bid)) return false;
         seen.add(bid);
-        return parseInt(b.so_close_count||0) > 0 && b.batter && b.game_id;
+        if (!b.batter || !b.game_id) return false;
+        const closeCount = parseInt(b.so_close_count||0);
+        const wentYard   = (b._hrYest||parseInt(b.hr_yesterday||0)) > 0;
+        // Rule 1: must have ≥2 close calls
+        if (closeCount < 2) return false;
+        // Rule 2: exclude batters who went yard yesterday...
+        // ...UNLESS they had 3+ close calls BEYOND the HR (on a tear)
+        if (wentYard && closeCount < 3) return false;
+        return true;
       })
       .map(b => ({
         bid:       String(b.batter_id||'').split('.')[0],
@@ -12819,6 +12836,7 @@ function SoCloseTab({ data }) {
         grade:     b.grade || '',
         _yard:     parseFloat(b._yard||0),
         count:     parseInt(b.so_close_count||0),
+        on_tear:   (b._hrYest||parseInt(b.hr_yesterday||0)) > 0 && parseInt(b.so_close_count||0) >= 3,
         max_dist:  parseFloat(b.so_close_max_dist||0),
         max_ev:    parseFloat(b.so_close_max_ev||0),
         reasons:   b.so_close_reasons || '',
@@ -12863,7 +12881,7 @@ function SoCloseTab({ data }) {
       <div style={{marginBottom:12,background:'var(--surface2)',borderRadius:8,
         border:'1px solid var(--border)',padding:'10px 14px'}}>
         <div style={{fontFamily:osw,fontWeight:800,fontSize:13,color:'var(--text)',marginBottom:4}}>
-          🤏 So Close
+          🤏 Close Calls
         </div>
         <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',lineHeight:1.7}}>
           Batters with near-HR events yesterday — deep fly outs, hard XBH, rockets that didn't leave the yard.
@@ -12890,7 +12908,7 @@ function SoCloseTab({ data }) {
       {/* ── Table ─────────────────────────────────────────────────────────── */}
       {rows.length === 0 ? (
         <div style={{textAlign:'center',padding:40,color:'var(--muted)',fontFamily:mono,fontSize:11}}>
-          No so-close data yet — run the engine to populate yesterday's near-HR events
+          No Close Calls data yet — run the engine with yesterday's at-bat log
         </div>
       ) : (
         <div style={{overflowX:'auto'}}>
@@ -12920,6 +12938,7 @@ function SoCloseTab({ data }) {
                         style={{fontFamily:osw,fontWeight:700,fontSize:11,color:'var(--text)',cursor:'pointer'}}>
                         {r.name}
                       </span>
+                      {r.on_tear && <span title="On a tear — went yard AND 3+ close calls yesterday" style={{fontSize:11,marginLeft:2}}>🔥</span>}
                       <PickButton pid={parseInt(r.bid)||0} name={r.name} team={r.team}/>
                     </div>
                     <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',marginTop:1,paddingLeft:23}}>
@@ -12968,7 +12987,7 @@ function SoCloseTab({ data }) {
       )}
 
       <div style={{textAlign:'center',fontFamily:mono,fontSize:7,color:'var(--muted)',marginTop:10}}>
-        Criteria: fly ball / line drive ≥330ft at 88mph+ EV · XBH · Rockets (EV 100+ mph line drive)
+        Criteria: ≥2 events · fly ball/line drive ≥330ft at 88mph+ EV · XBH · Rockets (EV 100+ mph) · 🔥 = went yard + 3+ close calls
       </div>
     </div>
   );
@@ -14290,7 +14309,7 @@ function MatchupEngineTab() {
         <button style={stBtn('pitchers')}  onClick={()=>setSubTab('pitchers')}>⚾ Pitchers</button>
         {/* 🆚 BvP Deep Dive — hidden until data pipeline rebuilt */}
         <button style={stBtn('history')}   onClick={()=>setSubTab('history')}>📜 BvP History</button>
-        <button style={stBtn('soclose')}   onClick={()=>setSubTab('soclose')}>🤏 So Close</button>
+        <button style={stBtn('soclose')}   onClick={()=>setSubTab('soclose')}>🤏 Close Calls</button>
         <button style={stBtn('pairs')}     onClick={()=>setSubTab('pairs')}>🔗 Pairs</button>
       </div>
     </div>
