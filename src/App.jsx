@@ -13234,14 +13234,22 @@ const PAIR_TYPES = [
 ];
 
 function pitcherTier(b) {
-  const hh = parseFloat(b.pitcher_hh_pct_allowed||0);
-  const mb = parseFloat(b.pitcher_meatball_pct||0);
-  if (!hh && !mb) return 'unknown';
-  if (hh < 28 && mb < 50) return 'elite';
-  if (hh < 32 && mb < 55) return 'tough';
-  if (hh < 36)            return 'average';
-  if (hh < 40)            return 'hittable';
-  return 'target';
+  // Use _pgLabel (same grade shown in UI) so pairs and app are in sync
+  const label = b._pgLabel || (() => {
+    const brl = parseFloat(b.pitcher_barrel_pct_allowed||0);
+    const hh  = parseFloat(b.pitcher_hh_pct_allowed||0);
+    const mb  = parseFloat(b.pitcher_meatball_pct||0);
+    if (brl >= 9  || (hh >= 35 && mb >= 55)) return '🎯 Target';
+    if (brl >= 6  || hh >= 30)               return '💥 Hittable';
+    if (brl <= 2  && hh <= 22 && mb <= 45)   return '‼️ Elite';
+    if (brl <= 3  && hh <= 24)               return '⚠️ Tough';
+    return '🤔 Average';
+  })();
+  if (label.includes('Elite')) return 'elite';
+  if (label.includes('Tough')) return 'tough';
+  if (label.includes('Target'))   return 'target';
+  if (label.includes('Hittable')) return 'hittable';
+  return 'average';
 }
 
 function pairScore(a, b) {
@@ -13296,9 +13304,18 @@ function PairsTab({ data }) {
     // Gate 1: Yard Score ≥20
     const yard = parseFloat(b._yard||0);
     if (yard < 20) return false;
-    // Gate 2: no Elite/Tough pitchers
+    // Gate 2: no Elite pitchers. Tough allowed but batter must clear a higher bar.
     const tier = pitcherTier(b);
-    if (tier === 'elite' || tier === 'tough') return false;
+    if (tier === 'elite') return false;
+    if (tier === 'tough') {
+      // Tough pitcher — only include batters with genuine power evidence
+      const yard   = parseFloat(b._yard||0);
+      const iso    = parseFloat(b.l7_iso||b.recent_iso||0);
+      const pbrl   = parseFloat(b.recent_pulled_barrel_pct||0);
+      const sc     = parseInt(b.so_close_count||0);
+      // Must meet at least one elevated threshold
+      return yard >= 45 || iso >= 0.220 || pbrl >= 7 || sc >= 2;
+    }
     return true;
   }), [batters]);
 
