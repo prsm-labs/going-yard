@@ -12846,7 +12846,6 @@ function SoCloseTab({ data }) {
           projected: ls.status === 'projected',
           isDiamond: b.is_diamond === 'True' || b.is_diamond === true,
           isDue:     (parseFloat(b.ab_since_hr||0) >= 15 && parseFloat(b.recent_iso||0) >= 0.180),
-          isHot:     parseInt(b.recent_hr_count||0) >= 2,
           on_tear:   wentYard && closeCount >= 3,
           wentYard:  wentYard,
           count:     closeCount,
@@ -12994,12 +12993,15 @@ function SoCloseTab({ data }) {
                         <PlayerAvatar pid={r.pid} name={r.name} size={20}/>
                         {/* Sticker badges */}
                         {r.confirmed && <span title="Confirmed in lineup" style={{fontSize:9,flexShrink:0}}>✅</span>}
-                        {r.projected  && <span title="Projected in lineup" style={{fontSize:9,flexShrink:0,opacity:.7}}>📋</span>}
                         {r.isDiamond  && <span style={{padding:'1px 4px',borderRadius:3,fontSize:8,fontWeight:700,
                           background:'rgba(255,204,0,.15)',color:'#ffcc00',border:'1px solid rgba(255,204,0,.3)',flexShrink:0}}>💎</span>}
-                        {r.on_tear    && <span title="On a tear — went yard + 3+ close calls" style={{fontSize:10,flexShrink:0}}>🔥</span>}
-                        {r.isHot      && !r.on_tear && <span title="Hot bat" style={{fontSize:10,flexShrink:0}}>🌶️</span>}
-                        {r.wentYard   && !r.on_tear && <span title="Went yard yesterday" style={{fontSize:7,padding:'1px 4px',borderRadius:3,background:'rgba(255,20,0,.25)',border:'1px solid rgba(255,20,0,.5)',color:'#fff',fontFamily:"'DM Mono',monospace",fontWeight:800,flexShrink:0}}>GY</span>}
+                        {hrDataIsToday && HR_DATA.some(h=>h.batterId===r.pid||(h.batterName&&r.name&&h.batterName.toLowerCase()===r.name.toLowerCase())) && (
+                          <span title="💥 Gone Yard Today" style={{fontSize:10,flexShrink:0}}>💥</span>
+                        )}
+                        {isHotBatPlayer(getCachedPlayer(r.pid)||{recent_hr_count:r.count}) && (
+                          <span title="🔥 Hot Bat — 3+ HRs in last 7 days" style={{fontSize:10,flexShrink:0,lineHeight:1}}>🔥</span>
+                        )}
+                        {r.on_tear && <span title="💣 On a tear — went yard yesterday + 3+ close calls" style={{fontSize:10,flexShrink:0}}>💣</span>}
                         {/* Name */}
                         <span onClick={e=>{e.stopPropagation();const cp=getCachedPlayer(r.pid)||{};
                           openAtBatSlide({pid:r.pid,name:r.name,team:r.team,
@@ -13268,8 +13270,12 @@ function PairsTab({ data }) {
             <div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}>
               {(()=>{const bid=parseInt(b.batter_id)||0;const ls=LINEUP_STATUS[bid];return ls?.status==='confirmed'&&<span style={{fontSize:9}}>✅</span>;})()}
               {(b.is_diamond==='True'||b.is_diamond===true)&&<span style={{padding:'1px 4px',borderRadius:3,fontSize:8,fontWeight:700,background:'rgba(255,204,0,.15)',color:'#ffcc00',border:'1px solid rgba(255,204,0,.3)'}}>💎</span>}
-              {parseInt(b._hrYest||b.hr_yesterday||0)>0&&<span style={{fontSize:7,padding:'1px 4px',borderRadius:3,background:'rgba(255,20,0,.25)',border:'1px solid rgba(255,20,0,.5)',color:'#fff',fontFamily:"'DM Mono',monospace",fontWeight:800}}>GY</span>}
-              {parseInt(b.recent_hr_count||0)>=2&&<span style={{fontSize:9}} title="Hot bat">🔥</span>}
+              {hrDataIsToday&&HR_DATA.some(h=>h.batterId===(parseInt(b.batter_id)||0)||(h.batterName&&b.batter&&h.batterName.toLowerCase()===b.batter.toLowerCase()))&&(
+                <span title="💥 Gone Yard Today" style={{fontSize:10,lineHeight:1}}>💥</span>
+              )}
+              {isHotBatPlayer(getCachedPlayer(parseInt(b.batter_id)||0)||b)&&(
+                <span title="🔥 Hot Bat — 3+ HRs in last 7 days" style={{fontSize:10,lineHeight:1}}>🔥</span>
+              )}
               <span
                 onClick={()=>openAtBatSlide({pid:parseInt(b.batter_id)||0,name:b.batter,team:b.batting_team||''})}
                 style={{fontFamily:osw,fontWeight:800,fontSize:12,color:'var(--text)',
