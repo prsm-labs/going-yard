@@ -2315,6 +2315,139 @@ function AtBatSlideIn() {
 
 
 // ── PITCHER SLIDE-OUT ──────────────────────────────────────────────────────────
+// ── Pitcher game log cache (pitching group) ───────────────────────────────────
+const PITCHER_LOG_CACHE = {};
+
+async function fetchPitcherGameLog(pid) {
+  if (!pid) return [];
+  const key = String(pid);
+  const cached = PITCHER_LOG_CACHE[key];
+  if (cached && Date.now() - cached.ts < 3600000) return cached.games;
+  try {
+    const season = new Date().getFullYear();
+    const r = await fetch(
+      `https://statsapi.mlb.com/api/v1/people/${pid}/stats?stats=gameLog&group=pitching&season=${season}`,
+      { signal: AbortSignal.timeout(6000) }
+    );
+    if (!r.ok) return [];
+    const d = await r.json();
+    const splits = d?.stats?.[0]?.splits || [];
+    const ABBR = {133:'ATH',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',139:'TB',140:'TEX',141:'TOR',142:'MIN',143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL',108:'LAA',109:'ARI',110:'BAL',111:'BOS',112:'CHC',113:'CIN',114:'CLE',115:'COL',116:'DET',117:'HOU',118:'KC',119:'LAD',120:'WSH',121:'NYM'};
+    const games = splits.map(s => ({
+      date: s.date || '',
+      opp:  ABBR[s.opponent?.id] || s.opponent?.abbreviation || s.opponent?.name?.replace(/^.* /,'') || '?',
+      loc:  s.isHome ? 'home' : 'away',
+      hra:  parseInt(s.stat?.homeRuns ?? 0),      // HR allowed
+      ip:   parseFloat(s.stat?.inningsPitched ?? 0),
+      er:   parseInt(s.stat?.earnedRuns ?? 0),
+      k:    parseInt(s.stat?.strikeOuts ?? 0),
+    })).sort((a,b) => a.date > b.date ? 1 : -1);
+    PITCHER_LOG_CACHE[key] = { games, ts: Date.now() };
+    return games;
+  } catch { return []; }
+}
+
+function Last7HRAllowedChart({ pitcherId }) {
+  const [games, setGames] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!pitcherId) return;
+    setLoading(true);
+    fetchPitcherGameLog(pitcherId).then(g => {
+      setGames(g.slice(-7));
+      setLoading(false);
+    });
+  }, [pitcherId]);
+
+  if (loading) return (
+    <div style={{padding:'12px 0',textAlign:'center',fontFamily:"'DM Mono',monospace",
+      fontSize:9,color:'var(--muted)'}}>Loading game log…</div>
+  );
+  if (games.length === 0) return null;
+
+  const allowedGames = games.filter(g => g.hra > 0).length;
+  const pct     = Math.round((allowedGames / games.length) * 100);
+  const maxHRA  = Math.max(1, ...games.map(g => g.hra));
+  const BAR_H   = 100;
+  // For pitchers: lower % is BETTER — invert the color logic
+  const pctColor = pct <= 14 ? '#27c97a' : pct <= 42 ? '#ffc840' : '#ff4020';
+  const label   = games.length < 7 ? `LAST ${games.length}` : 'LAST 7';
+
+  return (
+    <div style={{background:'var(--surface)',border:'1px solid var(--border)',
+      borderRadius:12,padding:'14px 16px',marginTop:12}}>
+      {/* Header */}
+      <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',marginBottom:12}}>
+        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:12,
+          letterSpacing:.5,color:'var(--text)'}}>🚀 HR Allowed</span>
+        <div style={{display:'flex',alignItems:'baseline',gap:8}}>
+          <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--muted)'}}>
+            {allowedGames} of {games.length} starts
+          </span>
+          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:22,
+            color:pctColor}}>{pct}%</span>
+        </div>
+      </div>
+
+      {/* Bars */}
+      <div style={{display:'flex',alignItems:'flex-end',gap:4,height:BAR_H,
+        position:'relative',paddingLeft:14,paddingRight:14}}>
+        <span style={{position:'absolute',left:0,top:0,fontFamily:"'DM Mono',monospace",
+          fontSize:8,color:'var(--muted)',lineHeight:1}}>1</span>
+        <span style={{position:'absolute',left:0,bottom:0,fontFamily:"'DM Mono',monospace",
+          fontSize:8,color:'var(--muted)',lineHeight:1}}>0</span>
+        <div style={{position:'absolute',left:10,right:10,top:BAR_H/2,
+          borderTop:'1px solid rgba(255,255,255,.12)',zIndex:0,pointerEvents:'none'}}/>
+        {games.map((g, i) => {
+          const isHRA = g.hra > 0;
+          const barH  = isHRA
+            ? Math.max(Math.round(BAR_H * (g.hra / maxHRA)), Math.round(BAR_H * 0.5))
+            : 0;
+          return (
+            <div key={i} style={{flex:1,display:'flex',flexDirection:'column',
+              alignItems:'center',justifyContent:'flex-end',height:'100%',gap:2,zIndex:1}}>
+              <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,
+                lineHeight:1,color:isHRA?'#ff4020':'#27c97a'}}>{g.hra}</span>
+              <div style={{width:'100%',borderRadius:'4px 4px 0 0',
+                height:isHRA ? barH : 2,
+                background:isHRA?'linear-gradient(180deg,#ff4020,#c02010)':'rgba(39,201,122,.2)',
+                minHeight:2}}/>
+              {/* IP label at bottom */}
+              <div style={{fontFamily:"'DM Mono',monospace",fontSize:7,color:'rgba(255,255,255,.3)',
+                marginTop:2}}>{g.ip>0?g.ip.toFixed(1):''}</div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Date + opp labels */}
+      <div style={{display:'flex',gap:4,marginTop:4,paddingLeft:14,paddingRight:14}}>
+        {games.map((g,i) => (
+          <div key={i} style={{flex:1,textAlign:'center'}}>
+            <div style={{fontFamily:"'DM Mono',monospace",fontSize:7.5,
+              color:'var(--muted)',lineHeight:1.4}}>
+              {(g.date||'').slice(5).replace('-','/')}
+            </div>
+            <div style={{fontFamily:"'DM Mono',monospace",fontSize:7.5,
+              color:'var(--muted)',lineHeight:1.3,opacity:.6}}>
+              {(g.loc==='away'?'@':'vs')} {g.opp}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Summary strip */}
+      <div style={{display:'flex',gap:12,marginTop:10,justifyContent:'center',
+        fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--muted)'}}>
+        <span>K: {games.reduce((s,g)=>s+g.k,0)} L7</span>
+        <span>ER: {games.reduce((s,g)=>s+g.er,0)} L7</span>
+        <span>{pct===0?'✅ No HR allowed':'⚠️ Allowed in '+allowedGames+' of '+games.length}</span>
+      </div>
+    </div>
+  );
+}
+
 function PitcherSlideIn() {
   const [pitcher, setPitcher] = useState(null);
   const [stats, setStats]     = useState(null);
@@ -2485,6 +2618,11 @@ function PitcherSlideIn() {
           </div>
         </div>
       )}
+
+      {/* HR Allowed Chart */}
+      <div style={{padding:'0 20px'}}>
+        <Last7HRAllowedChart pitcherId={pitcher?.pid}/>
+      </div>
 
       {/* Game Log */}
       <div style={{padding:'14px 20px',flex:1}}>
@@ -13271,10 +13409,15 @@ function PairsTab({ data }) {
   const mono = "'DM Mono',monospace";
   const osw  = "'Oswald',sans-serif";
   const [activeType, setActiveType] = useState('all');
-  const [expanded,   setExpanded]   = useState(null);
+  const [expanded,     setExpanded]     = useState(null);
+  const [showExpired,  setShowExpired]  = useState(false);
   const [hrVer,      setHrVer]      = useState(0);
+  const [finalVer,   setFinalVer]   = useState(0);
   useEffect(() => {
-    const id = setInterval(() => { if (_HR_VER !== hrVer) setHrVer(_HR_VER); }, 5000);
+    const id = setInterval(() => {
+      if (_HR_VER !== hrVer) setHrVer(_HR_VER);
+      setFinalVer(FINAL_GAME_IDS.size); // re-render when games go Final
+    }, 15000); // check every 15s
     return () => clearInterval(id);
   }, [hrVer]);
 
@@ -13343,7 +13486,17 @@ function PairsTab({ data }) {
       if (!seen.has(key) || seen.get(key).score < p.score) seen.set(key, p);
     }
     return [...seen.values()].sort((x,y) => y.score - x.score).slice(0, 50);
-  }, [eligible, activeType]);
+  }, [eligible, activeType, finalVer]);
+
+  // ── Split into active vs expired based on FINAL_GAME_IDS ──────────────────
+  const activePairs  = pairs.filter(p =>
+    !FINAL_GAME_IDS.has(String(p.a.game_id)) &&
+    !FINAL_GAME_IDS.has(String(p.b.game_id))
+  );
+  const expiredPairs = pairs.filter(p =>
+    FINAL_GAME_IDS.has(String(p.a.game_id)) ||
+    FINAL_GAME_IDS.has(String(p.b.game_id))
+  );
 
   const ydCol = v => !v?'var(--muted)':v>=75?'#ffd700':v>=60?'#ff4020':v>=45?'#f5a623':v>=20?'#c4a882':'var(--muted)';
 
@@ -13463,6 +13616,18 @@ function PairsTab({ data }) {
 
       {/* ── Export ────────────────────────────────────────────────────────── */}
       <div style={{display:'flex',justifyContent:'flex-end',marginBottom:6}}>
+        <button onClick={()=>setShowExpired(v=>!v)}
+          style={{padding:'4px 10px',borderRadius:6,cursor:'pointer',fontSize:11,
+            border:`1px solid ${showExpired?'#94a3b8':'var(--border)'}`,
+            background:showExpired?'rgba(148,163,184,.12)':'transparent',
+            color:showExpired?'#94a3b8':'var(--muted)',fontFamily:mono,fontSize:9,
+            display:'flex',alignItems:'center',gap:4}}>
+          ⏰ {showExpired?'Expired':'Active'}
+          {expiredPairs.length>0&&!showExpired&&<span style={{background:'rgba(148,163,184,.25)',
+            borderRadius:8,padding:'0 5px',fontSize:8,color:'#94a3b8'}}>
+            {expiredPairs.length}
+          </span>}
+        </button>
         <button onClick={()=>{
           const lines = ['Type,BatterA,TeamA,YardA,BatterB,TeamB,YardB,SameGame'];
           pairs.forEach(p=>{lines.push([p.type.label,p.a.batter,p.a.batting_team,parseFloat(p.a._yard||0).toFixed(0),p.b.batter,p.b.batting_team,parseFloat(p.b._yard||0).toFixed(0),p.sameGame?'Yes':'No'].join(','));});
@@ -13500,7 +13665,18 @@ function PairsTab({ data }) {
         </div>
       ) : (
         <div style={{display:'flex',flexDirection:'column',gap:10}}>
-          {pairs.map((pair, idx) => {
+          {showExpired && expiredPairs.length === 0 && (
+            <div style={{textAlign:'center',padding:24,fontFamily:mono,fontSize:10,color:'var(--muted)'}}>
+              No expired pairs yet today
+            </div>
+          )}
+          {showExpired && expiredPairs.length > 0 && (
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textAlign:'center',
+              padding:'4px 0 8px',letterSpacing:.5}}>
+              ⏰ {expiredPairs.length} expired pair{expiredPairs.length!==1?'s':''} — game{expiredPairs.length!==1?'s':''} finished today
+            </div>
+          )}
+          {(showExpired ? expiredPairs : activePairs).map((pair, idx) => {
             const isExp = expanded === idx;
             const pt    = pair.type;
             return (
@@ -13515,7 +13691,8 @@ function PairsTab({ data }) {
                                    isGoneYardToday(parseInt(pair.b.batter_id)||0,pair.b.batter);
                   return (
                 <div style={{padding:'8px 14px',display:'flex',alignItems:'center',gap:8,
-                  background:isExp?pt.bg:bothYard?'rgba(255,64,32,.06)':'transparent'}}>
+                  background:isExp?pt.bg:bothYard?'rgba(255,64,32,.06)':showExpired?'rgba(148,163,184,.04)':'transparent',
+                  opacity:showExpired?0.7:1}}>
                   {/* Type badge */}
                   <span style={{padding:'2px 8px',borderRadius:12,fontSize:8,fontFamily:mono,
                     fontWeight:700,color:pt.color,background:pt.bg,border:`1px solid ${pt.border}`,
