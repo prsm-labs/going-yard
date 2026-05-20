@@ -1788,7 +1788,7 @@ function MatchupCard({ dp }) {
     if (tb>=2.5&&tb<3) s+=3; else if(tb>=2.0) s+=2; else if(tb>=1.5) s+=1;
     if (tb>=3.0) s-=1;
     if (pgLabel.includes('Target')) s+=2; else if(pgLabel.includes('Hittable')) s+=1;
-    else if(pgLabel.includes('Elite')) s-=2;
+    else if(pgLabel.includes('Elite')) s-=1;  // softened: was -2, pitcher difficulty shouldn't dominate
     if (ev>=103) s+=2; else if(ev>=97) s+=1;
     if (la>=22&&la<=32) s+=2; else if(la>=18) s+=1;
     if (brl>=10) s+=2; else if(brl>=6) s+=1;
@@ -9449,12 +9449,14 @@ function computeBoomScore(sig, zoneFit, iso, simTB, engineScore) {
 
 
 function computeYardScore(sig, ghr, boom, ps) {
-  // Yard Score: weighted composite of all four scoring systems (0-99)
-  // Boom 35% | PS 30% | gHR 25% | Sig 10% (Sig normalized to 0-100)
+  // Yard Score: weighted composite — batter-centric rebalance
+  // gHR 30% | PS 30% | Boom 30% | Sig 10%
+  // gHR raised (pure batter quality, pitcher-independent)
+  // Boom lowered (was double-counting pitcher penalty via Sig feed)
   const sigN = (Math.min(14, Math.max(0, parseFloat(sig)||0)) / 14) * 100;
-  const raw  = (parseFloat(boom)||0) * 0.35
+  const raw  = (parseFloat(boom)||0) * 0.30
              + (parseFloat(ps)  ||0) * 0.30
-             + (parseFloat(ghr) ||0) * 0.25
+             + (parseFloat(ghr) ||0) * 0.30
              + sigN                  * 0.10;
   return Math.min(99, Math.max(0, Math.round(raw)));
 }
@@ -12785,6 +12787,194 @@ function RecentGameLog({ batterId }) {
 
 
 
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SO CLOSE TAB
+// Batters who had near-HR events yesterday:
+// deep fly outs (330ft+), hard XBH, rockets that didn't leave the yard.
+// All data from daily_picks.csv so_close_* fields — computed from yesterday's log.
+// ══════════════════════════════════════════════════════════════════════════════
+
+function SoCloseTab({ data }) {
+  const mono = "'DM Mono',monospace";
+  const osw  = "'Oswald',sans-serif";
+  const [sortBy,  setSortBy]  = useState('so_close_max_dist');
+  const [teamFilter, setTeamFilter] = useState('ALL');
+
+  // ── Pull batters with so_close events from DAILY_PICKS_CACHE ──────────────
+  const rows = React.useMemo(() => {
+    const seen = new Set();
+    return Object.values(DAILY_PICKS_CACHE)
+      .filter(b => {
+        const bid = String(b.batter_id||'').split('.')[0];
+        if (!bid || seen.has(bid)) return false;
+        seen.add(bid);
+        return parseInt(b.so_close_count||0) > 0 && b.batter && b.game_id;
+      })
+      .map(b => ({
+        bid:       String(b.batter_id||'').split('.')[0],
+        name:      b.batter || '',
+        team:      b.batting_team || '',
+        pitcher:   b.pitcher || '',
+        grade:     b.grade || '',
+        _yard:     parseFloat(b._yard||0),
+        count:     parseInt(b.so_close_count||0),
+        max_dist:  parseFloat(b.so_close_max_dist||0),
+        max_ev:    parseFloat(b.so_close_max_ev||0),
+        reasons:   b.so_close_reasons || '',
+        rec_iso:   parseFloat(b.recent_iso||0),
+        rec_fb:    parseFloat(b.recent_fb_pct||0),
+        sim_tb:    parseFloat(b.sim_tb||0),
+        ps_score:  parseFloat(b.ps_score||0),
+      }))
+      .filter(r => teamFilter === 'ALL' || r.team === teamFilter)
+      .sort((a, b) => {
+        if (sortBy === 'so_close_max_dist') return b.max_dist - a.max_dist;
+        if (sortBy === 'max_ev')            return b.max_ev   - a.max_ev;
+        if (sortBy === 'count')             return b.count    - a.count;
+        if (sortBy === '_yard')             return b._yard    - a._yard;
+        return 0;
+      });
+  }, [sortBy, teamFilter]);
+
+  // ── Teams on today's slate ─────────────────────────────────────────────────
+  const teams = React.useMemo(() => {
+    const t = new Set(Object.values(DAILY_PICKS_CACHE).map(b => b.batting_team||'').filter(Boolean));
+    return ['ALL', ...Array.from(t).sort()];
+  }, []);
+
+  const distCol = d => d >= 390?'#ff4020':d >= 370?'#f5a623':d >= 350?'#fbbf24':'var(--muted)';
+  const evCol   = e => e >= 105?'#ff4020':e >= 100?'#f5a623':e >= 95?'#27c97a':'var(--muted)';
+
+  const SortBtn = ({col, label}) => (
+    <button onClick={()=>setSortBy(col)}
+      style={{padding:'3px 8px',borderRadius:4,fontSize:8,fontFamily:mono,cursor:'pointer',
+        border:`1px solid ${sortBy===col?'var(--accent2)':'var(--border)'}`,
+        background:sortBy===col?'rgba(232,65,26,.1)':'transparent',
+        color:sortBy===col?'var(--accent2)':'var(--muted)',fontWeight:sortBy===col?700:400}}>
+      {label}
+    </button>
+  );
+
+  return (
+    <div style={{padding:'0 4px'}}>
+
+      {/* ── Header ────────────────────────────────────────────────────────── */}
+      <div style={{marginBottom:12,background:'var(--surface2)',borderRadius:8,
+        border:'1px solid var(--border)',padding:'10px 14px'}}>
+        <div style={{fontFamily:osw,fontWeight:800,fontSize:13,color:'var(--text)',marginBottom:4}}>
+          🤏 So Close
+        </div>
+        <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',lineHeight:1.7}}>
+          Batters with near-HR events yesterday — deep fly outs, hard XBH, rockets that didn't leave the yard.
+          {' '}<span style={{color:'var(--text)'}}>{rows.length} batters</span> on today's slate had close calls.
+        </div>
+      </div>
+
+      {/* ── Controls ──────────────────────────────────────────────────────── */}
+      <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center',marginBottom:12}}>
+        <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>Sort:</span>
+        <SortBtn col="so_close_max_dist" label="Deepest"/>
+        <SortBtn col="max_ev"            label="Hardest Hit"/>
+        <SortBtn col="count"             label="Most Events"/>
+        <SortBtn col="_yard"             label="Yard Score"/>
+        <div style={{width:1,height:14,background:'var(--border)',margin:'0 4px'}}/>
+        <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>Team:</span>
+        <select value={teamFilter} onChange={e=>setTeamFilter(e.target.value)}
+          style={{fontFamily:mono,fontSize:8,background:'var(--surface2)',color:'var(--text)',
+            border:'1px solid var(--border)',borderRadius:4,padding:'2px 6px',cursor:'pointer'}}>
+          {teams.map(t=><option key={t} value={t}>{t}</option>)}
+        </select>
+      </div>
+
+      {/* ── Table ─────────────────────────────────────────────────────────── */}
+      {rows.length === 0 ? (
+        <div style={{textAlign:'center',padding:40,color:'var(--muted)',fontFamily:mono,fontSize:11}}>
+          No so-close data yet — run the engine to populate yesterday's near-HR events
+        </div>
+      ) : (
+        <div style={{overflowX:'auto'}}>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:10}}>
+            <thead>
+              <tr>
+                {[['Batter','left'],['Gr','center'],['🎯','center'],['Events','center'],
+                  ['Max Dist','right'],['Max EV','right'],['Sim TB','right'],
+                  ['Yesterday Near-Misses','left']].map(([h,a])=>(
+                  <th key={h} style={{padding:'5px 8px',fontSize:8,fontFamily:mono,
+                    textTransform:'uppercase',letterSpacing:.6,color:'var(--muted)',
+                    textAlign:a,borderBottom:'1px solid var(--border)',
+                    background:'var(--surface2)',whiteSpace:'nowrap'}}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(r => (
+                <tr key={r.bid} style={{borderBottom:'1px solid rgba(255,255,255,.04)',
+                  background:'transparent',height:30}}>
+                  {/* Batter */}
+                  <td style={{padding:'2px 8px',minWidth:160,whiteSpace:'nowrap'}}>
+                    <div style={{display:'flex',alignItems:'center',gap:5}}>
+                      <PlayerAvatar pid={parseInt(r.bid)||0} name={r.name} size={18}/>
+                      <span style={{fontFamily:mono,fontSize:8,color:'var(--accent2)',fontWeight:700}}>{r.team}</span>
+                      <span onClick={()=>openAtBatSlide({pid:parseInt(r.bid)||0,name:r.name,team:r.team})}
+                        style={{fontFamily:osw,fontWeight:700,fontSize:11,color:'var(--text)',cursor:'pointer'}}>
+                        {r.name}
+                      </span>
+                      <PickButton pid={parseInt(r.bid)||0} name={r.name} team={r.team}/>
+                    </div>
+                    <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',marginTop:1,paddingLeft:23}}>
+                      vs {r.pitcher}
+                    </div>
+                  </td>
+                  {/* Grade */}
+                  <td style={{textAlign:'center',padding:'2px 4px',fontFamily:mono,fontSize:9,fontWeight:700,
+                    color:r.grade==='A+'?'#ffd700':r.grade==='A'?'#27c97a':r.grade==='B'?'#f5a623':'var(--muted)'}}>
+                    {r.grade||'—'}
+                  </td>
+                  {/* Yard Score */}
+                  <td style={{textAlign:'center',padding:'2px 4px'}}>
+                    {r._yard > 0 && <YardBadge score={r._yard}/>}
+                  </td>
+                  {/* Event count */}
+                  <td style={{textAlign:'center',padding:'2px 8px',fontFamily:osw,fontWeight:800,
+                    fontSize:13,color:r.count>=3?'#ff4020':r.count>=2?'#f5a623':'#fbbf24'}}>
+                    {r.count}
+                  </td>
+                  {/* Max Distance */}
+                  <td style={{textAlign:'right',padding:'2px 8px',fontFamily:mono,fontSize:10,
+                    fontWeight:700,color:distCol(r.max_dist)}}>
+                    {r.max_dist > 0 ? `${r.max_dist.toFixed(0)}ft` : '—'}
+                  </td>
+                  {/* Max EV */}
+                  <td style={{textAlign:'right',padding:'2px 8px',fontFamily:mono,fontSize:10,
+                    color:evCol(r.max_ev)}}>
+                    {r.max_ev > 0 ? `${r.max_ev.toFixed(1)}` : '—'}
+                  </td>
+                  {/* Sim TB */}
+                  <td style={{textAlign:'right',padding:'2px 8px',fontFamily:mono,fontSize:9,
+                    color:r.sim_tb>=1.4?'#ff4020':r.sim_tb>=1.1?'#f5a623':'var(--muted)'}}>
+                    {r.sim_tb > 0 ? r.sim_tb.toFixed(2) : '—'}
+                  </td>
+                  {/* Reasons */}
+                  <td style={{padding:'2px 10px',fontFamily:mono,fontSize:8,color:'var(--muted)',
+                    maxWidth:280,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                    {r.reasons || '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div style={{textAlign:'center',fontFamily:mono,fontSize:7,color:'var(--muted)',marginTop:10}}>
+        Criteria: fly ball / line drive ≥330ft at 88mph+ EV · XBH · Rockets (EV 100+ mph line drive)
+      </div>
+    </div>
+  );
+}
+
+
 // ══════════════════════════════════════════════════════════════════════════════
 // PAIRS TAB
 // Surfaces correlated batter pairs from shared underlying conditions.
@@ -14100,6 +14290,7 @@ function MatchupEngineTab() {
         <button style={stBtn('pitchers')}  onClick={()=>setSubTab('pitchers')}>⚾ Pitchers</button>
         {/* 🆚 BvP Deep Dive — hidden until data pipeline rebuilt */}
         <button style={stBtn('history')}   onClick={()=>setSubTab('history')}>📜 BvP History</button>
+        <button style={stBtn('soclose')}   onClick={()=>setSubTab('soclose')}>🤏 So Close</button>
         <button style={stBtn('pairs')}     onClick={()=>setSubTab('pairs')}>🔗 Pairs</button>
       </div>
     </div>
@@ -14145,6 +14336,7 @@ function MatchupEngineTab() {
     {/* Long Shot — C/D grade batters with soft pitcher or good day conditions */}
     {subTab === 'bvp'      && <BvPDeepDiveTab/>}
     {subTab === 'pairs'    && <PairsTab data={data}/>}
+    {subTab === 'soclose'  && <SoCloseTab data={data}/>}
     {subTab === 'longshot' && (
       <LongShotView data={dateSlot==='tomorrow'&&allPicksTomorrowData.length>0 ? allPicksTomorrowData : allPicksData}/>
     )}
