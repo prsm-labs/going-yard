@@ -10250,7 +10250,6 @@ function SimLabView({ data }) {
               [() => setFilterGoneYardSim(v=>!v), filterGoneYardSim, 'rgba(255,64,32,.15)',  'var(--accent)', '💥'],
               [() => setFilterDueSim(v=>!v),      filterDueSim,      'rgba(56,184,242,.18)', 'var(--ice)',    '⏳'],
               [()=>{setSimActiveOnly(s=>!s);if(!simActiveOnly)setSimInjuredOnly(false);}, simActiveOnly,  'rgba(52,211,153,.12)', '#34d399', '☑️'],
-              [()=>{setSimInjuredOnly(s=>!s);if(!simInjuredOnly)setSimActiveOnly(false);}, simInjuredOnly, 'rgba(251,146,60,.12)', '#fb923c', '🤕'],
               [() => setSimHotOnly(s=>!s),        simHotOnly,        'rgba(251,146,60,.12)', '#fb923c',       '🔥'],
               [() => setSimPicksOnly(s=>!s),       simPicksOnly,      'rgba(245,166,35,.12)', 'var(--accent2)','🎯'],
               [() => setFilterDiamondSim(v=>!v),  filterDiamondSim,  'rgba(255,204,0,.18)',  '#ffcc00',       '💎'],
@@ -10263,9 +10262,6 @@ function SimLabView({ data }) {
                 {emoji}
               </button>
             ))}
-            <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", marginLeft: 'auto', whiteSpace: 'nowrap' }}>
-              {slate.length} batters
-            </span>
           </div>
 
           {/* ── Row 3: Batter grades ── */}
@@ -13442,14 +13438,19 @@ function PairsTab({ data }) {
                   overflow:'hidden',cursor:'pointer',
                   transition:'border-color .15s'}}>
                 {/* Pair header */}
+                {(()=>{
+                  const bothYard = isGoneYardToday(parseInt(pair.a.batter_id)||0,pair.a.batter) &&
+                                   isGoneYardToday(parseInt(pair.b.batter_id)||0,pair.b.batter);
+                  return (
                 <div style={{padding:'8px 14px',display:'flex',alignItems:'center',gap:8,
-                  background:isExp?pt.bg:'transparent'}}>
+                  background:isExp?pt.bg:bothYard?'rgba(255,64,32,.06)':'transparent'}}>
                   {/* Type badge */}
                   <span style={{padding:'2px 8px',borderRadius:12,fontSize:8,fontFamily:mono,
                     fontWeight:700,color:pt.color,background:pt.bg,border:`1px solid ${pt.border}`,
                     flexShrink:0,whiteSpace:'nowrap'}}>
                     {pt.label}
                   </span>
+                  {bothYard && <span title="Both went yard today!" style={{fontSize:14,flexShrink:0}}>💥</span>}
                   {pair.sameGame && (
                     <span style={{padding:'2px 6px',borderRadius:4,fontSize:7,fontFamily:mono,
                       color:'var(--muted)',border:'1px solid var(--border)',flexShrink:0}}>
@@ -13475,6 +13476,8 @@ function PairsTab({ data }) {
                   </div>
                   <span style={{color:'var(--muted)',fontSize:10,flexShrink:0}}>{isExp?'▲':'▼'}</span>
                 </div>
+                  );
+                })()}
                 {/* Expanded detail */}
                 {isExp && (
                   <div style={{padding:'10px 14px',borderTop:`1px solid ${pt.border}`}}>
