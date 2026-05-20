@@ -56,7 +56,7 @@ async function getPushState() {
 const BUILD_TIMESTAMP = "2026-05-03 11:09 PM ET";
 
 const styles = `
-  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&family=Barlow+Condensed:wght@400;500;600;700&display=swap');
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
   :root{
     --bg:#080c10;--surface:#0d1318;--surface2:#131b22;--border:#1e2d3a;
@@ -168,7 +168,7 @@ const styles = `
   animation: text-rise .55s ease .25s both;
 }
 .splash-sub{
-  font-family:'DM Mono',monospace;font-size:11px;letter-spacing:2px;
+  font-family:'Barlow Condensed',sans-serif;font-weight:500;font-size:12px;letter-spacing:3px;
   color:rgba(255,255,255,.35);text-transform:uppercase;
   animation: text-rise .55s ease .4s both;
 }
@@ -12976,7 +12976,7 @@ function SoCloseTab({ data }) {
   // ── Sortable column header ─────────────────────────────────────────────────
   const Th = ({col, label, title, align='right'}) => (
     <th onClick={()=>{ if(sortBy===col) setSortDir(d=>d*-1); else{setSortBy(col);setSortDir(-1);} }}
-      style={{padding:'5px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',
+      style={{padding:'4px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',
         letterSpacing:.6,whiteSpace:'nowrap',cursor:'pointer',textAlign:align,
         borderBottom:'1px solid var(--border)',background:'var(--surface2)',
         color:sortBy===col?'var(--accent2)':'var(--muted)'}}
@@ -13111,11 +13111,11 @@ function SoCloseTab({ data }) {
                       color:r.pgLabel?.includes('Target')?'#27c97a':r.pgLabel?.includes('Hittable')?'#60d360':r.pgLabel?.includes('Elite')?'#ff4020':r.pgLabel?.includes('Tough')?'#f5a623':'var(--muted)'}}>
                       {r.pgLabel?r.pgLabel.split(' ').slice(-1)[0]:'—'}
                     </td>
-                    <td style={{textAlign:'center',padding:'2px 6px',fontFamily:osw,fontWeight:800,fontSize:12,
+                    <td style={{textAlign:'center',padding:'2px 4px',fontFamily:osw,fontWeight:800,fontSize:11,
                       color:r.count>=4?'#ff4020':r.count>=3?'#f5a623':'#fbbf24'}}>
                       {r.count}
                     </td>
-                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,fontWeight:700,
+                    <td style={{textAlign:'right',padding:'2px 4px',fontFamily:mono,fontSize:9,fontWeight:700,
                       color:r.max_dist>=390?'#ff4020':r.max_dist>=370?'#f5a623':r.max_dist>=350?'#fbbf24':'var(--muted)'}}>
                       {r.max_dist>0?r.max_dist.toFixed(0)+'ft':'—'}
                     </td>
@@ -13135,7 +13135,8 @@ function SoCloseTab({ data }) {
                       color:r.iso>=0.250?'#ff8020':r.iso>=0.180?'#f5a623':'var(--muted)'}}>
                       {r.iso>0?r.iso.toFixed(3):'—'}
                     </td>
-                    <td style={{padding:'2px 8px',fontFamily:mono,fontSize:8,color:'var(--muted)',
+                    <td style={{padding:'2px 8px',fontFamily:"'Barlow Condensed',sans-serif",
+                      fontSize:11,fontWeight:500,color:'var(--muted)',letterSpacing:.2,
                       maxWidth:240,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
                       {r.reasons||'—'}
                     </td>
