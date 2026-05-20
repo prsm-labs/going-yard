@@ -12811,6 +12811,7 @@ function SoCloseTab({ data }) {
   const [search,  setSearch]  = useState('');
   const [teamFilter, setTeamFilter] = useState('ALL');
   const [expandedBid, setExpandedBid] = useState(null);
+  const [confirmedOnly, setConfirmedOnly] = useState(false);
 
   // ── Pull batters with so_close events from DAILY_PICKS_CACHE ──────────────
   const rows = React.useMemo(() => {
@@ -12847,6 +12848,7 @@ function SoCloseTab({ data }) {
           isDue:     (parseFloat(b.ab_since_hr||0) >= 15 && parseFloat(b.recent_iso||0) >= 0.180),
           isHot:     parseInt(b.recent_hr_count||0) >= 2,
           on_tear:   wentYard && closeCount >= 3,
+          wentYard:  wentYard,
           count:     closeCount,
           max_dist:  parseFloat(b.so_close_max_dist||0),
           max_ev:    parseFloat(b.so_close_max_ev||0),
@@ -12859,6 +12861,7 @@ function SoCloseTab({ data }) {
       })
       .filter(r => {
         if (teamFilter !== 'ALL' && r.team !== teamFilter) return false;
+        if (confirmedOnly && !r.confirmed) return false;
         if (search && !r.name.toLowerCase().includes(search.toLowerCase()) && !r.team.toLowerCase().includes(search.toLowerCase())) return false;
         return true;
       })
@@ -12866,7 +12869,7 @@ function SoCloseTab({ data }) {
         const av = a[sortBy] ?? -999, bv = b[sortBy] ?? -999;
         return sortDir * (typeof av === 'string' ? av.localeCompare(bv) : bv - av) * -1;
       });
-  }, [sortBy, sortDir, teamFilter, search]);
+  }, [sortBy, sortDir, teamFilter, search, confirmedOnly]);
 
   // ── Teams on today's slate ─────────────────────────────────────────────────
   const teams = React.useMemo(() => {
@@ -12921,6 +12924,13 @@ function SoCloseTab({ data }) {
             border:'1px solid var(--border)',borderRadius:4,padding:'5px 8px',cursor:'pointer'}}>
           {teams.map(t=><option key={t} value={t}>{t==='ALL'?'All Teams':t}</option>)}
         </select>
+        <button onClick={()=>setConfirmedOnly(v=>!v)}
+          title={confirmedOnly?'Showing confirmed only':'Filter to confirmed lineup'}
+          style={{padding:'5px 10px',borderRadius:6,cursor:'pointer',fontSize:14,
+            border:`1px solid ${confirmedOnly?'#27c97a':'var(--border)'}`,
+            background:confirmedOnly?'rgba(39,201,122,.12)':'transparent'}}>
+          ✅
+        </button>
         <button onClick={handleExport}
           style={{padding:'5px 10px',borderRadius:6,background:'rgba(56,184,242,.1)',
             border:'1px solid rgba(56,184,242,.3)',color:'var(--ice)',cursor:'pointer',
@@ -12989,6 +12999,7 @@ function SoCloseTab({ data }) {
                           background:'rgba(255,204,0,.15)',color:'#ffcc00',border:'1px solid rgba(255,204,0,.3)',flexShrink:0}}>💎</span>}
                         {r.on_tear    && <span title="On a tear — went yard + 3+ close calls" style={{fontSize:10,flexShrink:0}}>🔥</span>}
                         {r.isHot      && !r.on_tear && <span title="Hot bat" style={{fontSize:10,flexShrink:0}}>🌶️</span>}
+                        {r.wentYard   && !r.on_tear && <span title="Went yard yesterday" style={{fontSize:7,padding:'1px 4px',borderRadius:3,background:'rgba(255,20,0,.25)',border:'1px solid rgba(255,20,0,.5)',color:'#fff',fontFamily:"'DM Mono',monospace",fontWeight:800,flexShrink:0}}>GY</span>}
                         {/* Name */}
                         <span onClick={e=>{e.stopPropagation();const cp=getCachedPlayer(r.pid)||{};
                           openAtBatSlide({pid:r.pid,name:r.name,team:r.team,
@@ -13254,7 +13265,11 @@ function PairsTab({ data }) {
         <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:8}}>
           <PlayerAvatar pid={parseInt(b.batter_id)||0} name={b.batter} size={22}/>
           <div style={{minWidth:0}}>
-            <div style={{display:'flex',alignItems:'center',gap:5}}>
+            <div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}>
+              {(()=>{const bid=parseInt(b.batter_id)||0;const ls=LINEUP_STATUS[bid];return ls?.status==='confirmed'&&<span style={{fontSize:9}}>✅</span>;})()}
+              {(b.is_diamond==='True'||b.is_diamond===true)&&<span style={{padding:'1px 4px',borderRadius:3,fontSize:8,fontWeight:700,background:'rgba(255,204,0,.15)',color:'#ffcc00',border:'1px solid rgba(255,204,0,.3)'}}>💎</span>}
+              {parseInt(b._hrYest||b.hr_yesterday||0)>0&&<span style={{fontSize:7,padding:'1px 4px',borderRadius:3,background:'rgba(255,20,0,.25)',border:'1px solid rgba(255,20,0,.5)',color:'#fff',fontFamily:"'DM Mono',monospace",fontWeight:800}}>GY</span>}
+              {parseInt(b.recent_hr_count||0)>=2&&<span style={{fontSize:9}} title="Hot bat">🔥</span>}
               <span
                 onClick={()=>openAtBatSlide({pid:parseInt(b.batter_id)||0,name:b.batter,team:b.batting_team||''})}
                 style={{fontFamily:osw,fontWeight:800,fontSize:12,color:'var(--text)',
@@ -13342,6 +13357,18 @@ function PairsTab({ data }) {
         </div>
       </div>
 
+      {/* ── Export ────────────────────────────────────────────────────────── */}
+      <div style={{display:'flex',justifyContent:'flex-end',marginBottom:6}}>
+        <button onClick={()=>{
+          const lines = ['Type,BatterA,TeamA,YardA,BatterB,TeamB,YardB,SameGame'];
+          pairs.forEach(p=>{lines.push([p.type.label,p.a.batter,p.a.batting_team,parseFloat(p.a._yard||0).toFixed(0),p.b.batter,p.b.batting_team,parseFloat(p.b._yard||0).toFixed(0),p.sameGame?'Yes':'No'].join(','));});
+          const blob=new Blob([lines.join('\n')],{type:'text/csv'});
+          const url=URL.createObjectURL(blob);const a=document.createElement('a');
+          a.href=url;a.download='pairs.csv';a.click();URL.revokeObjectURL(url);
+        }} style={{padding:'4px 10px',borderRadius:6,background:'rgba(56,184,242,.1)',
+          border:'1px solid rgba(56,184,242,.3)',color:'var(--ice)',cursor:'pointer',
+          fontFamily:mono,fontSize:9}}>⬇ Export CSV</button>
+      </div>
       {/* ── Pair type filter ──────────────────────────────────────────────── */}
       <div style={{display:'flex',gap:5,flexWrap:'wrap',marginBottom:14,justifyContent:'center'}}>
         <button onClick={()=>setActiveType('all')}
