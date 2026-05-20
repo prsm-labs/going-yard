@@ -6501,6 +6501,14 @@ function PitchBuilderTab() {
 // ── HR TICKER + TRACKER ──────────────────────────────────────
 // Global HR data — shared between ticker and tracker tab
 let HR_DATA = [];
+let HR_DATA_DATE = '';
+// Global gone yard check — works anywhere in the app
+const isGoneYardToday = (pid, name) => {
+  if (!HR_DATA_DATE || !HR_DATA.length) return false;
+  const etNow = new Date().toLocaleDateString('en-US',{timeZone:'America/New_York',month:'2-digit',day:'2-digit',year:'numeric'});
+  if (HR_DATA_DATE !== etNow) return false;
+  return HR_DATA.some(h => h.batterId === pid || (h.batterName && name && h.batterName.toLowerCase() === name.toLowerCase()));
+};
 const VIDEO_LINK_CACHE = {}; // gamePk_atBatIndex → savant video URL
 
 
@@ -7765,7 +7773,6 @@ async function fetchVideoLinks(hrs) {
   console.log(`[Video] Total: ${totalFound} HR video links built`);
 }
 
-let HR_DATA_DATE = '';
 let HR_LAST_FETCH = 0;
 const SEEN_HR_IDS = new Set();
 const DAILY_PICKS_CACHE = {}; // keyed by batter_id string
@@ -12995,7 +13002,7 @@ function SoCloseTab({ data }) {
                         {r.confirmed && <span title="Confirmed in lineup" style={{fontSize:9,flexShrink:0}}>✅</span>}
                         {r.isDiamond  && <span style={{padding:'1px 4px',borderRadius:3,fontSize:8,fontWeight:700,
                           background:'rgba(255,204,0,.15)',color:'#ffcc00',border:'1px solid rgba(255,204,0,.3)',flexShrink:0}}>💎</span>}
-                        {hrDataIsToday && HR_DATA.some(h=>h.batterId===r.pid||(h.batterName&&r.name&&h.batterName.toLowerCase()===r.name.toLowerCase())) && (
+                        {isGoneYardToday(r.pid, r.name) && (
                           <span title="💥 Gone Yard Today" style={{fontSize:10,flexShrink:0}}>💥</span>
                         )}
                         {isHotBatPlayer(getCachedPlayer(r.pid)||{recent_hr_count:r.count}) && (
@@ -13270,7 +13277,7 @@ function PairsTab({ data }) {
             <div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}>
               {(()=>{const bid=parseInt(b.batter_id)||0;const ls=LINEUP_STATUS[bid];return ls?.status==='confirmed'&&<span style={{fontSize:9}}>✅</span>;})()}
               {(b.is_diamond==='True'||b.is_diamond===true)&&<span style={{padding:'1px 4px',borderRadius:3,fontSize:8,fontWeight:700,background:'rgba(255,204,0,.15)',color:'#ffcc00',border:'1px solid rgba(255,204,0,.3)'}}>💎</span>}
-              {hrDataIsToday&&HR_DATA.some(h=>h.batterId===(parseInt(b.batter_id)||0)||(h.batterName&&b.batter&&h.batterName.toLowerCase()===b.batter.toLowerCase()))&&(
+              {isGoneYardToday(parseInt(b.batter_id)||0, b.batter)&&(
                 <span title="💥 Gone Yard Today" style={{fontSize:10,lineHeight:1}}>💥</span>
               )}
               {isHotBatPlayer(getCachedPlayer(parseInt(b.batter_id)||0)||b)&&(
