@@ -12894,9 +12894,7 @@ function SoCloseTab({ data }) {
       r.max_dist, r.max_ev, r.rec_ev, r.sim_tb, r.iso,
       r.on_tear?'YES':'', `"${r.reasons}"`
     ].join(','));
-    const blob = new Blob([headers.join(',')+'
-'+csvRows.join('
-')], {type:'text/csv'});
+    const blob = new Blob([headers.join(',')+'\n'+csvRows.join('\n')], {type:'text/csv'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href=url; a.download='close-calls.csv'; a.click();
     URL.revokeObjectURL(url);
