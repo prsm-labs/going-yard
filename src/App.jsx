@@ -9952,6 +9952,7 @@ function SimLabView({ data }) {
   const [slPitcherHand, setSlPitcherHand] = useState('ALL');
   const [slFormFilter, setSlFormFilter]   = useState(new Set());
   const [filterGoneYardSim, setFilterGoneYardSim] = useState(false);
+  const [filterKeyMatchup,  setFilterKeyMatchup]  = useState(false);
   const [filterDueSim, setFilterDueSim] = useState(false);
   const [filterDiamondSim, setFilterDiamondSim] = useState(false);
   const [simPicksOnly, setSimPicksOnly]           = useState(false);
@@ -10050,6 +10051,7 @@ function SimLabView({ data }) {
       .filter(r => selBatterGradesSim.size === 0 || selBatterGradesSim.has(r.grade))
       .filter(r => !lineupOnly || isConfirmed(r))
       .filter(r => !filterGoneYardSim || isGoneYardSim(r))
+      .filter(r => !filterKeyMatchup  || isKeyMatchup(parseInt(r.batter_id)||0, r.batter))
       .filter(r => !filterDueSim || isDueFromRow(r, parseInt(r.batter_id)||0))
       .filter(r => !simPicksOnly || picks[String(parseInt(r.batter_id)||0)])
       .filter(r => !simActiveOnly || !INJURY_MAP[String(parseInt(r.batter_id)||0)])
@@ -10096,7 +10098,7 @@ function SimLabView({ data }) {
       return mul * ((parseFloat(a[sortBy]) || 0) - (parseFloat(b[sortBy]) || 0));
     });
     return sorted;
-  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, minYard, maxYard, minSimTB, minOdds, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal]);
+  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, filterKeyMatchup, minYard, maxYard, minSimTB, minOdds, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal]);
 
   // Auto-select top batter when data loads
   useEffect(() => {
@@ -10242,6 +10244,7 @@ function SimLabView({ data }) {
               [() => setSimHotOnly(s=>!s),        simHotOnly,        'rgba(251,146,60,.12)', '#fb923c',       '🔥'],
               [() => setSimPicksOnly(s=>!s),       simPicksOnly,      'rgba(245,166,35,.12)', 'var(--accent2)','🎯'],
               [() => setFilterDiamondSim(v=>!v),  filterDiamondSim,  'rgba(255,204,0,.18)',  '#ffcc00',       '💎'],
+              [() => setFilterKeyMatchup(v=>!v),  filterKeyMatchup,  'rgba(255,215,0,.18)',  '#ffd700',       '🔑'],
             ].map(([fn, active, bg, col, emoji]) => (
               <button key={emoji} onClick={fn}
                 style={{ padding: '4px 9px', borderRadius: 7, cursor: 'pointer', flexShrink: 0, fontSize: 14,
@@ -14436,9 +14439,9 @@ function MatchupEngineTab() {
       {/* Row 1 */}
       <div style={{display:'flex',gap:4,flexWrap:'wrap',justifyContent:'center'}}>
         <button style={stBtn('matchups')}   onClick={()=>setSubTab('matchups')}>⚡ Matchups</button>
-        <button style={stBtn('simlab')}     onClick={()=>setSubTab('simlab')}>🧠 Sim Lab</button>
         <button style={stBtn('allmatches')} onClick={()=>setSubTab('allmatches')}>📋 All Matchups</button>
         <button style={stBtn('longshot')}   onClick={()=>setSubTab('longshot')}>🎲 Long Shot</button>
+        <button style={stBtn('pairs')}      onClick={()=>setSubTab('pairs')}>🔗 Pairs</button>
       </div>
       {/* Row 2 */}
       <div style={{display:'flex',gap:4,flexWrap:'wrap',justifyContent:'center'}}>
@@ -14447,7 +14450,7 @@ function MatchupEngineTab() {
         {/* 🆚 BvP Deep Dive — hidden until data pipeline rebuilt */}
         <button style={stBtn('history')}   onClick={()=>setSubTab('history')}>📜 BvP History</button>
         <button style={stBtn('soclose')}   onClick={()=>setSubTab('soclose')}>🤏 Close Calls</button>
-        <button style={stBtn('pairs')}     onClick={()=>setSubTab('pairs')}>🔗 Pairs</button>
+        {/* 🧠 Sim Lab hidden — key matchup batters via 🔑 filter in All Matchups */}
       </div>
     </div>
 
