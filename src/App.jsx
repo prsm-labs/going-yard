@@ -6502,12 +6502,22 @@ function PitchBuilderTab() {
 // Global HR data — shared between ticker and tracker tab
 let HR_DATA = [];
 let HR_DATA_DATE = '';
+let _HR_VER = 0; // incremented when HR_DATA updates — triggers re-renders in tabs
 // Global gone yard check — works anywhere in the app
+// HR_DATA_DATE is YYYY-MM-DD format (set from API response)
+const _etTodayYMD = () => {
+  const s = new Date().toLocaleDateString('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'});
+  const [m,d,y] = s.split('/');
+  return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+};
 const isGoneYardToday = (pid, name) => {
-  if (!HR_DATA_DATE || !HR_DATA.length) return false;
-  const etNow = new Date().toLocaleDateString('en-US',{timeZone:'America/New_York',month:'2-digit',day:'2-digit',year:'numeric'});
-  if (HR_DATA_DATE !== etNow) return false;
-  return HR_DATA.some(h => h.batterId === pid || (h.batterName && name && h.batterName.toLowerCase() === name.toLowerCase()));
+  if (!HR_DATA.length) return false;
+  // Allow if HR_DATA_DATE matches today OR is empty (live data just loaded)
+  if (HR_DATA_DATE && HR_DATA_DATE !== _etTodayYMD()) return false;
+  return HR_DATA.some(h =>
+    h.batterId === pid ||
+    (h.batterName && name && h.batterName.toLowerCase() === name.toLowerCase())
+  );
 };
 const VIDEO_LINK_CACHE = {}; // gamePk_atBatIndex → savant video URL
 
@@ -7901,7 +7911,7 @@ async function fetchHRs(force=false) {
     // Keep yesterday's HRs in ticker until today's games produce at least 3 HRs
     // This way the ticker stays alive past midnight until next day's games start
     if (newHRs.length > 0) {
-      HR_DATA = newHRs; HR_DATA_DATE = data.date || '';
+      HR_DATA = newHRs; HR_DATA_DATE = data.date || ''; _HR_VER = (_HR_VER||0) + 1;
       // Seed on first load; fire banners on subsequent fetches only
       const isFirst = HR_LAST_FETCH === 0;
       newHRs.forEach(h => {
@@ -12820,8 +12830,13 @@ function SoCloseTab({ data }) {
   const [sortDir, setSortDir] = useState(-1);  // -1=desc 1=asc
   const [search,  setSearch]  = useState('');
   const [teamFilter, setTeamFilter] = useState('ALL');
-  const [expandedBid, setExpandedBid] = useState(null);
+  const [expandedBid,   setExpandedBid]   = useState(null);
   const [confirmedOnly, setConfirmedOnly] = useState(false);
+  const [hrVer,         setHrVer]         = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => { if (_HR_VER !== hrVer) setHrVer(_HR_VER); }, 5000);
+    return () => clearInterval(id);
+  }, [hrVer]);
 
   // ── Pull batters with so_close events from DAILY_PICKS_CACHE ──────────────
   const rows = React.useMemo(() => {
@@ -13197,7 +13212,12 @@ function PairsTab({ data }) {
   const mono = "'DM Mono',monospace";
   const osw  = "'Oswald',sans-serif";
   const [activeType, setActiveType] = useState('all');
-  const [expanded, setExpanded]     = useState(null);
+  const [expanded,   setExpanded]   = useState(null);
+  const [hrVer,      setHrVer]      = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => { if (_HR_VER !== hrVer) setHrVer(_HR_VER); }, 5000);
+    return () => clearInterval(id);
+  }, [hrVer]);
 
   // ── Build deduplicated batter list from DAILY_PICKS_CACHE ─────────────────
   const batters = React.useMemo(() => {
