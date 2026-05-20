@@ -382,9 +382,14 @@ const styles = `
   background:rgba(12,12,18,.97);color:#dde;
   font-family:'DM Mono',monospace;font-size:10px;line-height:1.45;
   padding:5px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.13);
-  width:max-content;max-width:200px;white-space:normal;text-align:center;
-  pointer-events:none;opacity:0;transition:opacity .15s ease;z-index:9999;
+  width:max-content;max-width:180px;white-space:normal;text-align:center;
+  pointer-events:none;opacity:0;transition:opacity .15s ease;z-index:99999;
   box-shadow:0 4px 18px rgba(0,0,0,.55);
+}
+[data-tip]:hover::after{opacity:1;}
+/* Flip tooltip below when element is near top of viewport */
+[data-tip]:hover::after{
+  --tip-offset: calc(100% + 6px);
 }
 [data-tip]:hover::after{opacity:1;}
 `;
@@ -1647,15 +1652,10 @@ function MyPicksTab() {
   const bprops = useBatterProps();
   const [selPlayer,setSelPlayer] = useState(null);
   const pickList = Object.values(picks).sort((a,b)=>a.type.localeCompare(b.type));
-  const grouped = {
-    favorite:  pickList.filter(p=>p.type==="favorite"),
-    darkhorse: pickList.filter(p=>p.type==="darkhorse"),
-    longshot:  pickList.filter(p=>p.type==="longshot"),
-    daylate:   pickList.filter(p=>p.type==="daylate"),
-    due:       pickList.filter(p=>p.type==="due"),
-    tailed:    pickList.filter(p=>p.type==="tailed"),
-    hotbat:    pickList.filter(p=>p.type==="hotbat"),
-  };
+  // Dynamically build grouped from PICK_TYPES so new categories auto-appear
+  const grouped = Object.fromEntries(
+    Object.keys(PICK_TYPES).map(type => [type, pickList.filter(p => p.type === type)])
+  );
 
   return <div>
 
@@ -1733,6 +1733,16 @@ function MyPicksTab() {
           <span style={{fontSize:13}}>🔥</span>
           <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'#fb923c',minWidth:78}}>Hot Bat</span>
           <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',lineHeight:1.4}}>On a tear — riding the hot hand</span>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:5,minWidth:200,marginBottom:2}}>
+          <span style={{fontSize:13}}>🗒️</span>
+          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'#94a3b8',minWidth:78}}>Listed</span>
+          <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',lineHeight:1.4}}>On the radar — watching this one</span>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:5,minWidth:200,marginBottom:2}}>
+          <span style={{fontSize:13}}>🔁</span>
+          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'#fbbf24',minWidth:78}}>Back to Back</span>
+          <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',lineHeight:1.4}}>Went yard yesterday — riding the momentum</span>
         </div>
       </div>
     </div>
@@ -1939,13 +1949,13 @@ function MatchupCard({ dp }) {
           {/* Season Contact Quality — full season stats, not L7 */}
               {(dp.season_xwoba||dp.season_woba||dp.season_swstr_pct) && (
                 <div style={{background:'var(--surface2)',borderRadius:8,border:'1px solid var(--border)',padding:'10px 12px',gridColumn:'1/-1'}}>
-                  <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:8}}>📊 Season Contact Quality</div>
+                  <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:8}}>📊 Season Contact Quality (via Statcast API)</div>
                   <div style={{display:'flex',gap:20,flexWrap:'wrap'}}>
                     {[
                       ['xwOBA', dp.season_xwoba,     v=>parseFloat(v)>=0.380?'#ff4020':parseFloat(v)>=0.320?'#f5a623':'var(--muted)', v=>parseFloat(v).toFixed(3)],
                       ['wOBA',  dp.season_woba,      v=>parseFloat(v)>=0.370?'#ff4020':parseFloat(v)>=0.310?'#f5a623':'var(--muted)', v=>parseFloat(v).toFixed(3)],
                       ['SwStr%',dp.season_swstr_pct, v=>parseFloat(v)>=20?'#ff4020':parseFloat(v)>=14?'#f5a623':'#27c97a', v=>parseFloat(v).toFixed(1)+'%'],
-                      ['ISO',   dp.recent_iso,       v=>parseFloat(v)>=0.25?'#ff8020':parseFloat(v)>=0.18?'#f5a623':'var(--muted)', v=>parseFloat(v).toFixed(3)],
+                      ['ISO',   dp.season_iso||dp.recent_iso, v=>parseFloat(v)>=0.25?'#ff8020':parseFloat(v)>=0.18?'#f5a623':'var(--muted)', v=>parseFloat(v).toFixed(3)],
                     ].map(([lbl,val,col,fmt])=>{
                       if (!val||parseFloat(val)===0) return null;
                       return (<div key={lbl} style={{textAlign:'center'}}>
@@ -9819,17 +9829,7 @@ function LongShotView({ data }) {
 
   return (
     <div>
-      <div style={{background:'rgba(232,65,26,.06)',border:'1px solid rgba(232,65,26,.18)',borderRadius:8,padding:'8px 12px',marginBottom:12}}>
-        <div style={{fontFamily:osw,fontWeight:800,fontSize:13,color:'var(--accent)',marginBottom:2}}>🎲 Long Shot Board</div>
-        <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',lineHeight:1.5}}>
-          C/D grade batters vs pitchers allowing above-median hard contact (HH%≥27%) · sorted by HR Probability<br/>
-          <span style={{color:'#f5a623'}}>Best combos: Tue/Wed/Fri × Hittable/Target → 35–50% HR rate in tracker</span>
-          <div style={{marginTop:3,fontSize:7,color:'rgba(255,255,255,.3)',lineHeight:1.6}}>
-            ⚡ Sig: <span style={{color:'#ff4020'}}>8+ elite lock</span> · <span style={{color:'#f5a623'}}>6-7 strong</span> · <span style={{color:'#27c97a'}}>4-5 solid</span> · &lt;4 monitor only &nbsp;|&nbsp;
-            SimTB≥2(+2) · BvP FB% 20-36%(+2) · 🎯Target(+2) · 💥Hit(+1) · 65-78°F(+1) · BvP LA 20-28°(+1) · BvP EV≥92(+1) · Flags 2-6(+1)
-          </div>
-        </div>
-      </div>
+
       <div style={{display:'flex',gap:6,marginBottom:10,flexWrap:'wrap',alignItems:'center'}}>
         <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search batter…"
           style={{padding:'4px 10px',borderRadius:6,fontSize:10,fontFamily:mono,width:130,outline:'none',
