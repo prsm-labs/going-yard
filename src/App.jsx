@@ -373,6 +373,20 @@ const styles = `
     '    .gc{overflow:visible;}'
     .tw{overflow-x:auto;overflow-y:auto;max-height:72vh;-webkit-overflow-scrolling:touch;}
     }
+
+/* ── Emoji / header tooltips ────────────────────────────────────────────── */
+[data-tip]{position:relative;cursor:default;}
+[data-tip]::after{
+  content:attr(data-tip);
+  position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);
+  background:rgba(12,12,18,.97);color:#dde;
+  font-family:'DM Mono',monospace;font-size:10px;line-height:1.45;
+  padding:5px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.13);
+  width:max-content;max-width:200px;white-space:normal;text-align:center;
+  pointer-events:none;opacity:0;transition:opacity .15s ease;z-index:9999;
+  box-shadow:0 4px 18px rgba(0,0,0,.55);
+}
+[data-tip]:hover::after{opacity:1;}
 `;
 
 // THRESHOLDS
@@ -4241,7 +4255,7 @@ function LRow({b, rank}) {
             {b.grade}
           </span>}
           {LINEUP_STATUS[b.id]?.status === 'confirmed' && (
-            <span style={{fontSize:10,flexShrink:0}} title="Confirmed in lineup">✅</span>
+            <span style={{fontSize:10,flexShrink:0}} title="Confirmed in lineup" data-tip="✅ Confirmed in today's lineup">✅</span>
           )}
           {b.due && DUE_BADGE}
           {b.isDiamond && <span style={{padding:'1px 4px',borderRadius:4,fontSize:9,fontWeight:700,
@@ -6433,7 +6447,7 @@ function PitchBuilderTab() {
           const handCol=m.cls==="pos"?"var(--green)":m.cls==="neg"?"var(--ice)":"var(--muted)";
           return <button key={p.id} onClick={()=>toggleBatter(p.id)}
             style={{padding:"4px 10px",borderRadius:6,fontFamily:"'Oswald',sans-serif",fontWeight:500,fontSize:11,cursor:"pointer",border:`1px solid ${isSel?"var(--accent)":"var(--border)"}`,background:isSel?"rgba(232,65,26,.1)":"var(--surface2)",color:isSel?p.injured?"rgba(232,65,26,.5)":"var(--accent)":p.injured?"var(--muted)":"var(--muted)",transition:"all .15s",display:"flex",alignItems:"center",gap:5,opacity:p.injured?0.5:1}}>
-            {p.injured && <span title="On Injured List">🤕</span>}
+            {p.injured && <span title="On Injured List" data-tip="🤕 On the Injured List — reduced projection">🤕</span>}
             {p.name}
             <span style={{fontSize:8,color:handCol,fontFamily:"'DM Mono',monospace",fontWeight:700}}>{p.hand}</span>
           </button>;
@@ -7852,7 +7866,7 @@ const DUE_BADGE = (
   <span style={{padding:'2px 6px',borderRadius:4,fontSize:9,fontWeight:700,
     background:'rgba(56,184,242,.15)',border:'1px solid rgba(56,184,242,.35)',
     color:'var(--ice)',fontFamily:"'DM Mono',monospace",letterSpacing:.3,flexShrink:0}}
-    title="Due — AB since last HR exceeds their normal AB/HR rate">⏳ Due</span>
+    title="Due — AB since last HR exceeds their normal AB/HR rate" data-tip="⏳ Overdue for a HR based on historical AB/HR rate">⏳ Due</span>
 );
 const WEATHER_ALERT_GAME_IDS = new Set(); // game_ids with weather concerns at game time
 const DAILY_GAME_MAP    = {}; // keyed by normalized game_id → Set of batting_teams
@@ -9848,12 +9862,12 @@ function LongShotView({ data }) {
             <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'center',borderBottom:'1px solid var(--border)'}}>Gr</th>
             <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)'}}>Pitcher</th>
             <Th k="_simTB"  label="Sim TB"/>
-            <Th k="_iso"    label="ISO"/>
-            <Th k="_zf"     label="ZoneFit"/>
+            <Th k="_iso"    label="ISO" title="Isolated Power — raw power metric (SLG − AVG)" data-tip="Isolated Power — raw power metric (SLG − AVG)"/>
+            <Th k="_zf"     label="ZoneFit" title="Zone Fit — contact zone overlap with pitcher tendencies" data-tip="Zone Fit — contact zone overlap with pitcher tendencies"/>
             <Th k="_bvpFB"  label="BvP FB%"/>
             <Th k="_recEV"  label="EV"/>
-            <Th k="_bsD"    label="BS Δ"/>
-                        <Th k="_pgLabel" label="P Grade"/>
+            <Th k="_bsD"    label="BS Δ" title="Bat Speed Δ vs season baseline (mph) — green = trending up" data-tip="Bat Speed Δ vs season baseline (mph) — green = trending up"/>
+                        <Th k="_pgLabel" label="P Grade" title="Pitcher Grade: 🎯Target / 💥Hittable / Average / ⚠️Tough / ‼️Elite" data-tip="Pitcher Grade: 🎯Target / 💥Hittable / Average / ⚠️Tough / ‼️Elite"/>
           </tr></thead>
           <tbody>
             {filtered.map(b => {
@@ -10254,14 +10268,26 @@ function SimLabView({ data }) {
               [() => setSimPicksOnly(s=>!s),       simPicksOnly,      'rgba(245,166,35,.12)', 'var(--accent2)','🎯'],
               [() => setFilterDiamondSim(v=>!v),  filterDiamondSim,  'rgba(255,204,0,.18)',  '#ffcc00',       '💎'],
               [() => setFilterKeyMatchup(v=>!v),  filterKeyMatchup,  'rgba(255,215,0,.18)',  '#ffd700',       '🔑'],
-            ].map(([fn, active, bg, col, emoji]) => (
+            ].map(([fn, active, bg, col, emoji]) => {
+              const EMOJI_TIPS = {
+                '✅': 'Show confirmed lineup batters only',
+                '💥': 'Show batters who went yard today (live)',
+                '⏳': 'Show batters who are "due" — overdue for a HR by AB count',
+                '☑️': 'Show active (non-injured) batters only',
+                '🔥': 'Show hot bat batters — 3+ HRs in last 7 days',
+                '🎯': 'Show only batters in My Picks list',
+                '💎': 'Show Diamond tier picks only',
+                '🔑': 'Show Key Matchup batters only',
+              };
+              return (
               <button key={emoji} onClick={fn}
+                data-tip={EMOJI_TIPS[emoji] || emoji}
                 style={{ padding: '4px 9px', borderRadius: 7, cursor: 'pointer', flexShrink: 0, fontSize: 14,
                   border: `1px solid ${active ? col : 'var(--border)'}`,
                   background: active ? bg : 'transparent', color: active ? col : 'var(--muted)' }}>
                 {emoji}
               </button>
-            ))}
+            );})}
           </div>
 
           {/* ── Row 3: Batter grades ── */}
@@ -10629,12 +10655,12 @@ function SimLabView({ data }) {
                             <span style={{fontSize:9,color:'var(--muted)',opacity:.4,flexShrink:0}}>›</span>
                             {/* Stickers — inline, no wrap */}
                             <InjuryBadge pid={parseInt(b.batter_id)||0} name={b.batter}/>
-                            {isHotBatPlayer(b)     && <span style={{fontSize:9,flexShrink:0}} title="🔥 Hot Bat">🔥</span>}
+                            {isHotBatPlayer(b)     && <span style={{fontSize:9,flexShrink:0}} title="🔥 Hot Bat" data-tip="🔥 Hot Bat — 3 or more HRs in the last 7 days">🔥</span>}
                             {isConfirmed(b)         && <span style={{fontSize:9,flexShrink:0,color:'#27c97a'}}>✅</span>}
                             {isGoneYardSim(b)       && <span style={{fontSize:9,flexShrink:0}}>💥</span>}
-                            {isDueFromRow(b,parseInt(b.batter_id)||0) && <span style={{fontSize:9,flexShrink:0}} title="Due">⏳</span>}
+                            {isDueFromRow(b,parseInt(b.batter_id)||0) && <span style={{fontSize:9,flexShrink:0}} title="Due" data-tip="⏳ Overdue — AB count since last HR exceeds normal rate">⏳</span>}
                             {(b.is_diamond==='True'||b.is_diamond===true) && <span style={{fontSize:9,flexShrink:0}}>💎</span>}
-                            {(b.in_slump==='True'||b.in_slump===true) && <span style={{fontSize:9,flexShrink:0}} title="Slump">📉</span>}
+                            {(b.in_slump==='True'||b.in_slump===true) && <span style={{fontSize:9,flexShrink:0}} title="Slump" data-tip="📉 In a slump — multiple negative contact indicators">📉</span>}
                             {WEATHER_ALERT_GAME_IDS.has(String(b.game_id)) && <span style={{fontSize:9,flexShrink:0}} title="Weather alert">⚠️</span>}
                           </div>
                         </div>
@@ -12904,7 +12930,7 @@ function SoCloseTab({ data }) {
         letterSpacing:.6,whiteSpace:'nowrap',cursor:'pointer',textAlign:align,
         borderBottom:'1px solid var(--border)',background:'var(--surface2)',
         color:sortBy===col?'var(--accent2)':'var(--muted)'}}
-      title={title}>
+      title={title} data-tip={title}>
       {label}{sortBy===col?(sortDir===1?' ▲':' ▼'):''}
     </th>
   );
@@ -13013,16 +13039,16 @@ function SoCloseTab({ data }) {
                       <div style={{display:'flex',alignItems:'center',gap:5}}>
                         <PlayerAvatar pid={r.pid} name={r.name} size={20}/>
                         {/* Sticker badges */}
-                        {r.confirmed && <span title="Confirmed in lineup" style={{fontSize:9,flexShrink:0}}>✅</span>}
+                        {r.confirmed && <span title="Confirmed in lineup" data-tip="✅ Confirmed in today's lineup" style={{fontSize:9,flexShrink:0}}>✅</span>}
                         {r.isDiamond  && <span style={{padding:'1px 4px',borderRadius:3,fontSize:8,fontWeight:700,
                           background:'rgba(255,204,0,.15)',color:'#ffcc00',border:'1px solid rgba(255,204,0,.3)',flexShrink:0}}>💎</span>}
                         {isGoneYardToday(r.pid, r.name) && (
-                          <span title="💥 Gone Yard Today" style={{fontSize:10,flexShrink:0}}>💥</span>
+                          <span title="💥 Gone Yard Today" data-tip="💥 Hit a HR in today's live games" style={{fontSize:10,flexShrink:0}}>💥</span>
                         )}
                         {isHotBatPlayer(getCachedPlayer(r.pid)||{recent_hr_count:r.count}) && (
-                          <span title="🔥 Hot Bat — 3+ HRs in last 7 days" style={{fontSize:10,flexShrink:0,lineHeight:1}}>🔥</span>
+                          <span title="🔥 Hot Bat — 3+ HRs in last 7 days" data-tip="🔥 Hot Bat — 3 or more HRs in the last 7 days" style={{fontSize:10,flexShrink:0,lineHeight:1}}>🔥</span>
                         )}
-                        {r.on_tear && <span title="💣 On a tear — went yard yesterday + 3+ close calls" style={{fontSize:10,flexShrink:0}}>💣</span>}
+                        {r.on_tear && <span title="💣 On a tear — went yard yesterday + 3+ close calls" data-tip="💣 On a tear — went yard yesterday AND had 3+ close calls" style={{fontSize:10,flexShrink:0}}>💣</span>}
                         {/* Name */}
                         <span onClick={e=>{e.stopPropagation();const cp=getCachedPlayer(r.pid)||{};
                           openAtBatSlide({pid:r.pid,name:r.name,team:r.team,
@@ -13297,10 +13323,10 @@ function PairsTab({ data }) {
               {(()=>{const bid=parseInt(b.batter_id)||0;const ls=LINEUP_STATUS[bid];return ls?.status==='confirmed'&&<span style={{fontSize:9}}>✅</span>;})()}
               {(b.is_diamond==='True'||b.is_diamond===true)&&<span style={{padding:'1px 4px',borderRadius:3,fontSize:8,fontWeight:700,background:'rgba(255,204,0,.15)',color:'#ffcc00',border:'1px solid rgba(255,204,0,.3)'}}>💎</span>}
               {isGoneYardToday(parseInt(b.batter_id)||0, b.batter)&&(
-                <span title="💥 Gone Yard Today" style={{fontSize:10,lineHeight:1}}>💥</span>
+                <span title="💥 Gone Yard Today" data-tip="💥 Hit a HR in today's live games" style={{fontSize:10,lineHeight:1}}>💥</span>
               )}
               {isHotBatPlayer(getCachedPlayer(parseInt(b.batter_id)||0)||b)&&(
-                <span title="🔥 Hot Bat — 3+ HRs in last 7 days" style={{fontSize:10,lineHeight:1}}>🔥</span>
+                <span title="🔥 Hot Bat — 3+ HRs in last 7 days" data-tip="🔥 Hot Bat — 3 or more HRs in the last 7 days" style={{fontSize:10,lineHeight:1}}>🔥</span>
               )}
               <span
                 onClick={()=>openAtBatSlide({pid:parseInt(b.batter_id)||0,name:b.batter,team:b.batting_team||''})}
@@ -13450,7 +13476,7 @@ function PairsTab({ data }) {
                     flexShrink:0,whiteSpace:'nowrap'}}>
                     {pt.label}
                   </span>
-                  {bothYard && <span title="Both went yard today!" style={{fontSize:14,flexShrink:0}}>💥</span>}
+                  {bothYard && <span title="Both went yard today!" data-tip="💥💥 Both batters in this pair went yard today" style={{fontSize:14,flexShrink:0}}>💥</span>}
                   {pair.sameGame && (
                     <span style={{padding:'2px 6px',borderRadius:4,fontSize:7,fontFamily:mono,
                       color:'var(--muted)',border:'1px solid var(--border)',flexShrink:0}}>
@@ -14019,7 +14045,7 @@ function BvPDeepDiveTab() {
                   position:'sticky',left:0,top:0,zIndex:20,whiteSpace:'nowrap'}}>
                   Batter {pitcher && <span style={{fontSize:7,opacity:.5,fontWeight:400}}>✓ = platoon · ⚡ = PS pitch match</span>}
                 </th>
-                <TH col="yard"     label="🎯"     title="Yard Score (daily)"/>
+                <TH col="yard"     label="🎯" title="Yard Score — composite HR probability 0-99"/>
                 <TH col="grade"    label="Gr"     title="Matchup Grade"/>
                 <TH col="ps_score" label="PS"     title="PS Score (always available)"/>
                 <TH col="la_mean"  label="LA°"    title="Launch Angle Mean L15 (44% of batters)"/>
@@ -14073,7 +14099,7 @@ function BvPDeepDiveTab() {
                           const ph = pitcher?.hand?.charAt(0).toUpperCase();
                           const bh = r.hand?.charAt(0).toUpperCase();
                           const platoon = (ph==='R'&&(bh==='L'||bh==='S'))||(ph==='L'&&bh==='R');
-                          return platoon ? <span title="Platoon advantage" style={{fontSize:9,color:'#27c97a',marginLeft:2,flexShrink:0}}>✓</span> : null;
+                          return platoon ? <span title="Platoon advantage" data-tip="✓ Natural platoon advantage vs pitcher's hand" style={{fontSize:9,color:'#27c97a',marginLeft:2,flexShrink:0}}>✓</span> : null;
                         })()}
                         <span style={{flexShrink:0}}>
                           <PickButton pid={parseInt(r.bid)||0} name={r.name} team={r.team||''}/>
@@ -14463,8 +14489,8 @@ function MatchupEngineTab() {
       <div style={{display:'flex',gap:4,flexWrap:'wrap',justifyContent:'center'}}>
         <button style={stBtn('matchups')}   onClick={()=>setSubTab('matchups')}>⚡ Matchups</button>
         <button style={stBtn('allmatches')} onClick={()=>setSubTab('allmatches')}>📋 All Matchups</button>
-        <button style={stBtn('longshot')}   onClick={()=>setSubTab('longshot')}>🎲 Long Shot</button>
-        <button style={stBtn('pairs')}      onClick={()=>setSubTab('pairs')}>🔗 Pairs</button>
+        <button style={stBtn('longshot')}   data-tip="🎲 Long Shot — high-odds batters with elite pitcher matchup metrics" onClick={()=>setSubTab('longshot')}>🎲 Long Shot</button>
+        <button style={stBtn('pairs')}      data-tip="🔗 Pairs — correlated batter pairs sharing underlying conditions" onClick={()=>setSubTab('pairs')}>🔗 Pairs</button>
       </div>
       {/* Row 2 */}
       <div style={{display:'flex',gap:4,flexWrap:'wrap',justifyContent:'center'}}>
@@ -14472,7 +14498,7 @@ function MatchupEngineTab() {
         <button style={stBtn('pitchers')}  onClick={()=>setSubTab('pitchers')}>⚾ Pitchers</button>
         {/* 🆚 BvP Deep Dive — hidden until data pipeline rebuilt */}
         <button style={stBtn('history')}   onClick={()=>setSubTab('history')}>📜 BvP History</button>
-        <button style={stBtn('soclose')}   onClick={()=>setSubTab('soclose')}>🤏 Close Calls</button>
+        <button style={stBtn('soclose')}   data-tip="🤏 Close Calls — batters who nearly went yard yesterday" onClick={()=>setSubTab('soclose')}>🤏 Close Calls</button>
         {/* 🧠 Sim Lab hidden — key matchup batters via 🔑 filter in All Matchups */}
       </div>
     </div>
@@ -14951,7 +14977,7 @@ function MatchupEngineTab() {
                         </span>
                         <InjuryBadge pid={pid} name={b.batter}/>
                         {isHotBatPlayer(b) && <span style={{fontSize:10,flexShrink:0,lineHeight:1}}
-                          title="🔥 Hot Bat — 3+ HRs in last 7 days">🔥</span>}
+                          title="🔥 Hot Bat — 3+ HRs in last 7 days" data-tip="🔥 Hot Bat — 3 or more HRs in the last 7 days">🔥</span>}
                         <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
                           marginLeft:2}}>{b.batter_hand}HB</span>
                         <span style={{fontSize:10,color:'var(--muted)',opacity:.5}}>›</span>
