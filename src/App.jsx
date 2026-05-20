@@ -1819,8 +1819,13 @@ function MatchupCard({ dp }) {
     return Math.min(14, Math.max(0, s));
   })();
 
-  const boom = parseFloat(dp._boom) || computeBoomScore(sig, parseFloat(dp.zone_fit)||0, parseFloat(dp.recent_iso)||0, parseFloat(dp.sim_tb)||0, parseFloat(dp.weighted_flag_score)||0);
-  const iso  = parseFloat(dp.recent_iso) || 0;
+  const boom   = parseFloat(dp._boom) || computeBoomScore(sig, parseFloat(dp.zone_fit)||0, parseFloat(dp.recent_iso)||0, parseFloat(dp.sim_tb)||0, parseFloat(dp.weighted_flag_score)||0);
+  const iso    = parseFloat(dp.l7_iso||dp.recent_iso) || 0;  // L7 blended ISO
+  const l7iso   = parseFloat(dp.l7_iso)    || parseFloat(dp.recent_iso)  || 0;
+  const l7woba  = parseFloat(dp.l7_woba)   || parseFloat(dp.season_woba) || 0;
+  const l7xwoba = parseFloat(dp.l7_xwoba)  || parseFloat(dp.season_xwoba)|| 0;
+  const sWoba   = parseFloat(dp.season_woba)  || 0;
+  const sXwoba  = parseFloat(dp.season_xwoba) || 0;
   const zf   = parseFloat(dp.zone_fit) || 0;
   const ghr  = parseFloat(dp.gHR) || 0;
   const simTB= parseFloat(dp.sim_tb) || 0;
@@ -1857,14 +1862,14 @@ function MatchupCard({ dp }) {
             ['Form',    fc?fc.short:'—',              fc?fc.color:'var(--muted)'],
             ['Sim TB',  simTB>0?simTB.toFixed(2):'—','var(--text)'],
             ['gHR',     ghr>0?Math.round(ghr):'—',   ghr>=70?'#ff4020':ghr>=50?'#f5a623':'var(--muted)'],
-            ['ISO',     iso>0?iso.toFixed(3):'—',     iso>=0.25?'#ff8020':iso>=0.18?'#f5a623':'var(--muted)'],
+            ['L7 ISO',  iso>0?iso.toFixed(3):'—',     iso>=0.25?'#ff8020':iso>=0.18?'#f5a623':'var(--muted)'],
             ['ZoneFit', zf>0?(zf.toFixed(1)+'%'):'—',zf>=8?'#ff4020':zf>=5?'#f5a623':zf>=2?'#27c97a':'var(--muted)'],
             ['EV',      ev>0?ev.toFixed(1):'—',       ev>=103?'#ff4020':ev>=97?'#f5a623':'var(--muted)'],
             ['Barrel%', brl>0?(brl.toFixed(1)+'%'):'—',brl>=10?'#ff4020':brl>=6?'#f5a623':'var(--muted)'],
             ['FB%',     fb>0?(fb.toFixed(1)+'%'):'—', fb>=35?'#f5a623':'var(--muted)'],
             ['Avg LA',  la>0?(la.toFixed(1)+'°'):'—', la>=22?'#27c97a':'var(--muted)'],
-            ['xwOBA',   (parseFloat(dp.season_xwoba)||0)>0?(parseFloat(dp.season_xwoba)).toFixed(3):'—', (parseFloat(dp.season_xwoba)||0)>=0.380?'#ff4020':(parseFloat(dp.season_xwoba)||0)>=0.320?'#f5a623':'var(--muted)'],
-            ['wOBA',    (parseFloat(dp.season_woba)||0)>0?(parseFloat(dp.season_woba)).toFixed(3):'—',   (parseFloat(dp.season_woba)||0)>=0.370?'#ff4020':(parseFloat(dp.season_woba)||0)>=0.310?'#f5a623':'var(--muted)'],
+            ['L7 xwOBA',   (l7xwoba||0)>0?(l7xwoba).toFixed(3):'—', (l7xwoba||0)>=0.380?'#ff4020':(l7xwoba||0)>=0.320?'#f5a623':'var(--muted)'],
+            ['L7 wOBA',    l7woba>0?l7woba.toFixed(3):'—',   l7woba>=0.370?'#ff4020':l7woba>=0.310?'#f5a623':'var(--muted)'],
             ['SwStr%',  (parseFloat(dp.season_swstr_pct)||0)>0?((parseFloat(dp.season_swstr_pct)).toFixed(1)+'%'):'—', (parseFloat(dp.season_swstr_pct)||0)>=20?'#ff4020':(parseFloat(dp.season_swstr_pct)||0)>=14?'#f5a623':'#27c97a'],
           ].map(([lbl,val,col])=>(
             <div key={lbl} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,
@@ -3021,7 +3026,9 @@ function getTeam(pid, fallback) {
 }
 
 // Real days since last HR from MLB game log API
-const DAYS_SINCE_HR_CACHE = {}; // pid → {days, ts}
+const DAYS_SINCE_HR_CACHE = {}; // pid → {days, ts, l7, l15}
+// L7/L15 stat structure: {iso, avg, slg, obp, hr, pa, woba_proxy}
+// woba_proxy = (0.7*BB + 0.9*1B + 1.25*2B + 1.6*3B + 2.0*HR) / PA
 async function fetchDaysSinceHR(pid) {
   if (!pid) return null;
   const cached = DAYS_SINCE_HR_CACHE[pid];
@@ -3040,15 +3047,52 @@ async function fetchDaysSinceHR(pid) {
         const gameDate = new Date(g.date + 'T12:00:00');
         const diffDays = Math.floor((today - gameDate) / (1000 * 60 * 60 * 24));
         daysSince = Math.min(daysSince, diffDays);
-        break; // game log is sorted newest first
+        break;
       }
     }
     const result = daysSince === 999 ? null : daysSince;
-    DAYS_SINCE_HR_CACHE[pid] = { days: result, ts: Date.now() };
+
+    // ── Compute L7 / L15 stats from game log ─────────────────────────────────
+    const calcWindow = (gameList) => {
+      let ab=0,h=0,tb=0,hr=0,bb=0,pa=0,sf=0;
+      gameList.forEach(g => {
+        const s = g.stat || {};
+        ab += parseInt(s.atBats||0);
+        h  += parseInt(s.hits||0);
+        tb += parseInt(s.totalBases||0);
+        hr += parseInt(s.homeRuns||0);
+        bb += parseInt(s.baseOnBalls||0);
+        pa += parseInt(s.plateAppearances||0);
+        sf += parseInt(s.sacFlies||0);
+      });
+      if (pa < 1) return null;
+      const avg  = ab>0 ? h/ab  : 0;
+      const slg  = ab>0 ? tb/ab : 0;
+      const obp  = (ab+bb+sf)>0 ? (h+bb)/(ab+bb+sf) : 0;
+      const iso  = slg - avg;
+      // wOBA proxy using linear weights (simplified, no HBP)
+      const singles = h - (tb - h - hr*2 - Math.max(0,tb-h-hr*3));  // rough 1B estimate
+      const woba_num = 0.69*bb + 0.89*(h-hr) + 1.27*hr*0.3 + 2.0*hr*0.7; // simplified
+      const woba = pa>0 ? Math.min(0.600, woba_num/pa) : 0;
+      return { iso:+iso.toFixed(3), avg:+avg.toFixed(3), slg:+slg.toFixed(3),
+               obp:+obp.toFixed(3), hr, pa, woba:+woba.toFixed(3) };
+    };
+    // games are newest-first from API
+    const l7  = calcWindow(games.slice(0, 7));
+    const l15 = calcWindow(games.slice(0, 15));
+
+    DAYS_SINCE_HR_CACHE[pid] = { days: result, l7, l15, ts: Date.now() };
     return result;
   } catch(e) { return null; }
 }
 
+
+// Get cached L7/L15 stats — returns immediately if cached, null if not yet loaded
+function getCachedL7L15(pid) {
+  const c = DAYS_SINCE_HR_CACHE[pid];
+  if (!c) return null;
+  return { l7: c.l7 || null, l15: c.l15 || null };
+}
 
 // Load daily_picks.csv → DAILY_PICKS_CACHE keyed by batter_id
 async function loadDailyPicks() {
@@ -10469,7 +10513,7 @@ function SimLabView({ data }) {
                     { label: 'HH%',      key: 'recent_hh_pct' },
                     { label: 'FB%',      key: 'recent_fb_pct' },
 
-                    { label: 'ISO',      key: 'recent_iso' },
+                    { label: 'L7 ISO',   key: 'l7_iso' },
                     { label: 'L7💥',     key: 'recent_hr_count' },
                     { label: 'ZoneFit',  key: 'zone_fit' },
                     { label: 'Grade',    key: null },
@@ -10720,7 +10764,12 @@ function SimLabView({ data }) {
                       </td>
                       <td style={{textAlign:'right',padding:'3px 6px',fontFamily:"'DM Mono',monospace",fontSize:10,
                         color:(parseFloat(b.recent_iso)||0)>=0.25?'#ff8020':(parseFloat(b.recent_iso)||0)>=0.18?'#f5a623':'var(--muted)'}}>
-                        {(parseFloat(b.recent_iso)||0)>0?(parseFloat(b.recent_iso)||0).toFixed(3):'—'}
+                        {(()=>{
+                          const li=parseFloat(b.l7_iso)||parseFloat(b.recent_iso)||0;
+                          const si=parseFloat(b.season_iso||b.recent_iso)||0;
+                          const trending=li>si*1.15?'↑':li<si*0.85?'↓':'';
+                          return li>0?<>{li.toFixed(3)}{trending&&<span style={{fontSize:8,marginLeft:1,color:trending==='↑'?'#27c97a':'#f5a623'}}>{trending}</span>}</>:'—';
+                        })()}
                       </td>
                       <td style={{textAlign:'center',padding:'3px 4px'}}>
                         {(() => {
@@ -13184,30 +13233,27 @@ const PAIR_TYPES = [
     sameGame: true,
   },
   {
-    id: 'ps_duo',
-    label: '🌩️ PS Duo',
-    color: '#a855f7', bg: 'rgba(168,85,247,.08)', border: 'rgba(168,85,247,.25)',
-    desc: 'Both PS Score ≥35 — mechanical and situational factors independently aligned for each',
-    qualify: b => parseFloat(b.ps_score||0) >= 35,
+    id: 'barrel_bros',
+    label: '🛢️ Barrel Bros',
+    color: '#ff4020', bg: 'rgba(255,64,32,.08)', border: 'rgba(255,64,32,.25)',
+    desc: 'Both with pulled barrel% ≥6% — optimal exit angle + pull-side contact, the highest HR predictor',
+    qualify: b => parseFloat(b.recent_pulled_barrel_pct||0) >= 6,
     sameGame: false,
   },
   {
-    id: 'moonshot_tandem',
-    label: '🌙 Moonshot Tandem',
-    color: '#38b8f2', bg: 'rgba(56,184,242,.08)', border: 'rgba(56,184,242,.25)',
-    desc: 'Same game, FB% ≥30% + ISO ≥.160 — matching power profiles in identical park and weather',
-    qualify: b => parseFloat(b.recent_fb_pct||0) >= 30 && parseFloat(b.recent_iso||0) >= 0.160,
-    sameGame: true,
+    id: 'close_call_combo',
+    label: '🤏 Close Call Combo',
+    color: '#fbbf24', bg: 'rgba(251,191,36,.08)', border: 'rgba(251,191,36,.25)',
+    desc: 'Both had 2+ near-HR events yesterday — deep fly outs, hard XBH, rockets that nearly left the yard',
+    qualify: b => parseInt(b.so_close_count||0) >= 2,
+    sameGame: false,
   },
   {
-    id: 'la_locked',
-    label: '📐 LA Locked',
-    color: '#ffd700', bg: 'rgba(255,215,0,.08)', border: 'rgba(255,215,0,.25)',
-    desc: 'Launch angle mean 18-30° + stddev <14° — swing plane consistently in the HR corridor',
-    qualify: b => {
-      const m = parseFloat(b.la_mean_l15||0), s = parseFloat(b.la_stddev||99);
-      return m >= 18 && m <= 30 && s > 0 && s < 14;
-    },
+    id: 'iso_surge',
+    label: '💰 ISO Surge',
+    color: '#a78bfa', bg: 'rgba(167,139,250,.08)', border: 'rgba(167,139,250,.25)',
+    desc: 'Both with L7 ISO ≥.220 — genuine power surge in the last 7 days, not a season mirage',
+    qualify: b => parseFloat(b.l7_iso||b.recent_iso||0) >= 0.220,
     sameGame: false,
   },
 ];
@@ -13224,10 +13270,18 @@ function pitcherTier(b) {
 }
 
 function pairScore(a, b) {
-  const yA = parseFloat(a._yard||0), yB = parseFloat(b._yard||0);
+  const yA = parseFloat(a._yard||0),    yB = parseFloat(b._yard||0);
   const psA = parseFloat(a.ps_score||0), psB = parseFloat(b.ps_score||0);
   const bsA = parseFloat(a.bat_speed_vs_baseline||0), bsB = parseFloat(b.bat_speed_vs_baseline||0);
-  return (yA + yB) * 0.5 + (psA + psB) * 0.25 + Math.max(bsA,0) * 3 + Math.max(bsB,0) * 3;
+  const pbA = parseFloat(a.recent_pulled_barrel_pct||0), pbB = parseFloat(b.recent_pulled_barrel_pct||0);
+  const scA = parseInt(a.so_close_count||0), scB = parseInt(b.so_close_count||0);
+  const isoA = parseFloat(a.l7_iso||a.recent_iso||0), isoB = parseFloat(b.l7_iso||b.recent_iso||0);
+  return (yA + yB) * 0.5
+       + (psA + psB) * 0.20
+       + Math.max(bsA,0) * 3 + Math.max(bsB,0) * 3
+       + (pbA + pbB) * 1.5    // pulled barrel bonus
+       + (scA + scB) * 2      // close calls yesterday bonus
+       + (isoA + isoB) * 8;   // L7 ISO bonus
 }
 
 function PairsTab({ data }) {
