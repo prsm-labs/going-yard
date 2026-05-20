@@ -9790,6 +9790,7 @@ function LongShotView({ data }) {
       if (_lsCache && !_lsCache._pgLabel)    _lsCache._pgLabel    = pgLabel;
       out.push({ ...b, _pgLabel:pgLabel, _simHR, _simTB, _bvpFB, _recEV,
         _bvpLA, _recLA, _recFB, _flags, _temp, _sig, _formClass, _kHR, _iso, _zf, _boom, _ps, _yard,
+        _hrYest: parseInt(b.hr_yesterday||0),
         _bsD: parseFloat(b.bat_speed_vs_baseline)||null,
         _hrPct:parseFloat(b.proj_hr_adj)||parseFloat(b.sim_hr)||0 });
     }
@@ -12897,7 +12898,7 @@ function RecentGameLog({ batterId }) {
 function SoCloseTab({ data }) {
   const mono = "'DM Mono',monospace";
   const osw  = "'Oswald',sans-serif";
-  const [sortBy,  setSortBy]  = useState('so_close_max_dist');
+  const [sortBy,  setSortBy]  = useState('count');
   const [sortDir, setSortDir] = useState(-1);  // -1=desc 1=asc
   const [search,  setSearch]  = useState('');
   const [teamFilter, setTeamFilter] = useState('ALL');
@@ -13078,114 +13079,87 @@ function SoCloseTab({ data }) {
                   <tr key={r.bid}
                     onClick={()=>setExpandedBid(isExp?null:r.bid)}
                     style={{cursor:'pointer',borderBottom:'1px solid rgba(255,255,255,.04)',
-                      background:isExp?'rgba(56,184,242,.06)':'transparent',
-                      outline:isExp?'1px solid rgba(56,184,242,.2)':'none'}}>
+                      background:isExp?'rgba(56,184,242,.06)':'transparent',height:28}}>
 
                     {/* Batter cell — sticky */}
-                    <td style={{padding:'4px 8px',position:'sticky',left:0,zIndex:4,
+                    <td style={{padding:'2px 6px',position:'sticky',left:0,zIndex:4,
                       background:isExp?'rgba(56,184,242,.06)':'var(--surface)',
-                      minWidth:200,whiteSpace:'nowrap'}}>
-                      <div style={{display:'flex',alignItems:'center',gap:5}}>
-                        <PlayerAvatar pid={r.pid} name={r.name} size={20}/>
-                        {/* Sticker badges */}
-                        {r.confirmed && <span title="Confirmed in lineup" data-tip="✅ Confirmed in today's lineup" style={{fontSize:9,flexShrink:0}}>✅</span>}
-                        {r.isDiamond  && <span style={{padding:'1px 4px',borderRadius:3,fontSize:8,fontWeight:700,
-                          background:'rgba(255,204,0,.15)',color:'#ffcc00',border:'1px solid rgba(255,204,0,.3)',flexShrink:0}}>💎</span>}
-                        {isGoneYardToday(r.pid, r.name) && (
-                          <span title="💥 Gone Yard Today" data-tip="💥 Hit a HR in today's live games" style={{fontSize:10,flexShrink:0}}>💥</span>
-                        )}
-                        {isHotBatPlayer(getCachedPlayer(r.pid)||{recent_hr_count:r.count}) && (
-                          <span title="🔥 Hot Bat — 3+ HRs in last 7 days" data-tip="🔥 Hot Bat — 3 or more HRs in the last 7 days" style={{fontSize:10,flexShrink:0,lineHeight:1}}>🔥</span>
-                        )}
-                        {r.on_tear && <span title="💣 On a tear — went yard yesterday + 3+ close calls" data-tip="💣 On a tear — went yard yesterday AND had 3+ close calls" style={{fontSize:10,flexShrink:0}}>💣</span>}
-                        {/* Name */}
-                        <span onClick={e=>{e.stopPropagation();const cp=getCachedPlayer(r.pid)||{};
-                          openAtBatSlide({pid:r.pid,name:r.name,team:r.team,
-                            avgEV:cp.avgEV,barrel:cp.barrel,hardHit:cp.hardHit,flyBall:cp.flyBall,
-                            hr:cp.hr,avg:cp.avg,obp:cp.obp,slg:cp.slg,xwoba:cp.xwoba,
-                            kPct:cp.kPct,bbPct:cp.bbPct,launchAngle:cp.launchAngle});}}
-                          style={{fontFamily:osw,fontWeight:700,fontSize:11,color:'var(--text)',
-                            cursor:'pointer',overflow:'hidden',textOverflow:'ellipsis'}}>
+                      minWidth:170,whiteSpace:'nowrap'}}>
+                      <div style={{display:'flex',alignItems:'center',gap:3}}>
+                        <PlayerAvatar pid={r.pid} name={r.name} size={16}/>
+                        {r.confirmed && <span title="Confirmed in lineup" data-tip="✅ Confirmed in today's lineup" style={{fontSize:8,flexShrink:0}}>✅</span>}
+                        {r.isDiamond  && <span style={{padding:'1px 3px',borderRadius:3,fontSize:7,fontWeight:700,background:'rgba(255,204,0,.15)',color:'#ffcc00',border:'1px solid rgba(255,204,0,.3)',flexShrink:0}}>💎</span>}
+                        {isGoneYardToday(r.pid,r.name) && <span title="💥 Gone Yard Today" style={{fontSize:9,flexShrink:0}}>💥</span>}
+                        {isHotBatPlayer(getCachedPlayer(r.pid)||{recent_hr_count:r.count}) && <span title="🔥 3+ HRs L7" style={{fontSize:9,flexShrink:0}}>🔥</span>}
+                        {r.on_tear && <span title="💣 On a tear" style={{fontSize:9,flexShrink:0}}>💣</span>}
+                        <span onClick={e=>{e.stopPropagation();openAtBatSlide({pid:r.pid,name:r.name,team:r.team});}}
+                          style={{fontFamily:osw,fontWeight:700,fontSize:10,color:'var(--text)',cursor:'pointer'}}>
                           {r.name}
                         </span>
-                        <span style={{fontFamily:mono,fontSize:7,color:'var(--muted)',fontWeight:700}}>{r.team}</span>
+                        <span style={{fontFamily:mono,fontSize:7,color:'var(--accent2)',fontWeight:700}}>{r.team}</span>
                         <PickButton pid={r.pid} name={r.name} team={r.team}/>
                       </div>
                     </td>
-
-                    {/* Yard Score */}
-                    <td style={{textAlign:'center',padding:'3px 6px'}}>
-                      {r._yard > 0 && <YardBadge score={r._yard}/>}
+                    <td style={{textAlign:'center',padding:'2px 4px'}}>
+                      {r._yard>0&&<YardBadge score={r._yard}/>}
                     </td>
-                    {/* Grade */}
-                    <td style={{textAlign:'center',padding:'3px 4px',fontFamily:mono,fontSize:9,fontWeight:700,
+                    <td style={{textAlign:'center',padding:'2px 4px',fontFamily:mono,fontSize:9,fontWeight:700,
                       color:r.grade==='A+'?'#ffd700':r.grade==='A'?'#27c97a':r.grade==='B'?'#f5a623':'var(--muted)'}}>
                       {r.grade||'—'}
                     </td>
-                    {/* Pitcher Grade */}
-                    <td style={{textAlign:'center',padding:'3px 6px',fontFamily:mono,fontSize:8,
-                      fontWeight:700,color:pgCol(r.pgLabel)}}>
-                      {r.pgLabel?r.pgLabel.split(' ')[0]:'—'}
+                    <td style={{textAlign:'center',padding:'2px 4px',fontFamily:mono,fontSize:8,fontWeight:700,
+                      color:r.pgLabel?.includes('Target')?'#27c97a':r.pgLabel?.includes('Hittable')?'#60d360':r.pgLabel?.includes('Elite')?'#ff4020':r.pgLabel?.includes('Tough')?'#f5a623':'var(--muted)'}}>
+                      {r.pgLabel?r.pgLabel.split(' ').slice(-1)[0]:'—'}
                     </td>
-                    {/* Close Call count */}
-                    <td style={{textAlign:'center',padding:'3px 8px',fontFamily:osw,fontWeight:800,
-                      fontSize:14,color:r.count>=4?'#ff4020':r.count>=3?'#f5a623':'#fbbf24'}}>
+                    <td style={{textAlign:'center',padding:'2px 6px',fontFamily:osw,fontWeight:800,fontSize:12,
+                      color:r.count>=4?'#ff4020':r.count>=3?'#f5a623':'#fbbf24'}}>
                       {r.count}
                     </td>
-                    {/* Max Distance */}
-                    <td style={{textAlign:'right',padding:'3px 8px',fontFamily:mono,fontSize:10,
-                      fontWeight:700,color:distCol(r.max_dist)}}>
-                      {r.max_dist>0?`${r.max_dist.toFixed(0)}ft`:'—'}
+                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,fontWeight:700,
+                      color:r.max_dist>=390?'#ff4020':r.max_dist>=370?'#f5a623':r.max_dist>=350?'#fbbf24':'var(--muted)'}}>
+                      {r.max_dist>0?r.max_dist.toFixed(0)+'ft':'—'}
                     </td>
-                    {/* Max EV */}
-                    <td style={{textAlign:'right',padding:'3px 8px',fontFamily:mono,fontSize:10,
-                      color:evCol(r.max_ev)}}>
+                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,
+                      color:r.max_ev>=105?'#ff4020':r.max_ev>=100?'#f5a623':r.max_ev>=95?'#27c97a':'var(--muted)'}}>
                       {r.max_ev>0?r.max_ev.toFixed(1):'—'}
                     </td>
-                    {/* L7 EV */}
-                    <td style={{textAlign:'right',padding:'3px 8px',fontFamily:mono,fontSize:9,
+                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,
                       color:r.rec_ev>=95?'#ff4020':r.rec_ev>=90?'#f5a623':r.rec_ev>=85?'#27c97a':'var(--muted)'}}>
                       {r.rec_ev>0?r.rec_ev.toFixed(1):'—'}
                     </td>
-                    {/* Sim TB */}
-                    <td style={{textAlign:'right',padding:'3px 8px',fontFamily:mono,fontSize:9,
+                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,
                       color:r.sim_tb>=1.4?'#ff4020':r.sim_tb>=1.1?'#f5a623':'var(--muted)'}}>
                       {r.sim_tb>0?r.sim_tb.toFixed(2):'—'}
                     </td>
-                    {/* ISO */}
-                    <td style={{textAlign:'right',padding:'3px 8px',fontFamily:mono,fontSize:9,
+                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,
                       color:r.iso>=0.250?'#ff8020':r.iso>=0.180?'#f5a623':'var(--muted)'}}>
                       {r.iso>0?r.iso.toFixed(3):'—'}
                     </td>
-                    {/* Reasons */}
-                    <td style={{padding:'3px 10px',fontFamily:mono,fontSize:8,color:'var(--muted)',
-                      maxWidth:260,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                    <td style={{padding:'2px 8px',fontFamily:mono,fontSize:8,color:'var(--muted)',
+                      maxWidth:240,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
                       {r.reasons||'—'}
                     </td>
                   </tr>
                 );
-
                 const expandRow = isExp ? (
                   <tr key={r.bid+'_exp'}>
-                    <td colSpan={11}
-                      style={{padding:'0 12px 14px',background:'rgba(56,184,242,.04)',
-                        borderBottom:'2px solid rgba(56,184,242,.2)'}}>
-                      <div style={{display:'flex',alignItems:'center',gap:8,
-                        padding:'8px 0 6px',borderBottom:'1px solid var(--border)',marginBottom:6}}>
-                        <PlayerAvatar pid={r.pid} name={r.name} size={26}/>
-                        <span style={{fontFamily:osw,fontWeight:700,fontSize:13}}>{r.name}</span>
-                        <span style={{fontFamily:mono,fontSize:10,color:'var(--accent2)'}}>{r.team}</span>
-                        <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginLeft:'auto'}}>
-                          Recent At-Bats · {r.count} close call{r.count!==1?'s':''} yesterday
+                    <td colSpan={11} style={{padding:'0 12px 12px',background:'rgba(56,184,242,.04)',
+                      borderBottom:'2px solid rgba(56,184,242,.2)'}}>
+                      <div style={{display:'flex',alignItems:'center',gap:8,padding:'6px 0 4px',
+                        borderBottom:'1px solid var(--border)',marginBottom:4}}>
+                        <PlayerAvatar pid={r.pid} name={r.name} size={22}/>
+                        <span style={{fontFamily:osw,fontWeight:700,fontSize:12}}>{r.name}</span>
+                        <span style={{fontFamily:mono,fontSize:9,color:'var(--accent2)'}}>{r.team}</span>
+                        <span style={{fontFamily:mono,fontSize:7,color:'var(--muted)',marginLeft:'auto'}}>
+                          {r.count} close call{r.count!==1?'s':''} yesterday
                         </span>
                       </div>
-                      <InjuryBanner pid={r.pid} style={{margin:'6px 0 4px'}}/>
+                      <InjuryBanner pid={r.pid} style={{margin:'4px 0'}}/>
                       <Last7HRChart batterId={r.pid}/>
                       <RecentGameLog batterId={r.pid}/>
                     </td>
                   </tr>
                 ) : null;
-
                 return [mainRow, expandRow].filter(Boolean);
               })}
             </tbody>
