@@ -12798,17 +12798,19 @@ function RecentGameLog({ batterId }) {
 
 
 // ══════════════════════════════════════════════════════════════════════════════
-// SO CLOSE TAB
-// Batters who had near-HR events yesterday:
-// deep fly outs (330ft+), hard XBH, rockets that didn't leave the yard.
-// All data from daily_picks.csv so_close_* fields — computed from yesterday's log.
+// CLOSE CALLS TAB
+// Batters with ≥2 near-HR events yesterday (deep fly outs, hard XBH, rockets)
+// Excludes batters who went yard (unless 3+ close calls = on a tear)
 // ══════════════════════════════════════════════════════════════════════════════
 
 function SoCloseTab({ data }) {
   const mono = "'DM Mono',monospace";
   const osw  = "'Oswald',sans-serif";
   const [sortBy,  setSortBy]  = useState('so_close_max_dist');
+  const [sortDir, setSortDir] = useState(-1);  // -1=desc 1=asc
+  const [search,  setSearch]  = useState('');
   const [teamFilter, setTeamFilter] = useState('ALL');
+  const [expandedBid, setExpandedBid] = useState(null);
 
   // ── Pull batters with so_close events from DAILY_PICKS_CACHE ──────────────
   const rows = React.useMemo(() => {
@@ -12816,44 +12818,55 @@ function SoCloseTab({ data }) {
     return Object.values(DAILY_PICKS_CACHE)
       .filter(b => {
         const bid = String(b.batter_id||'').split('.')[0];
-        if (!bid || seen.has(bid)) return false;
+        if (!bid || seen.has(bid) || !b.batter || !b.game_id) return false;
         seen.add(bid);
-        if (!b.batter || !b.game_id) return false;
         const closeCount = parseInt(b.so_close_count||0);
-        const wentYard   = (b._hrYest||parseInt(b.hr_yesterday||0)) > 0;
-        // Rule 1: must have ≥2 close calls
+        const wentYard   = parseInt(b._hrYest||b.hr_yesterday||0) > 0;
         if (closeCount < 2) return false;
-        // Rule 2: exclude batters who went yard yesterday...
-        // ...UNLESS they had 3+ close calls BEYOND the HR (on a tear)
         if (wentYard && closeCount < 3) return false;
         return true;
       })
-      .map(b => ({
-        bid:       String(b.batter_id||'').split('.')[0],
-        name:      b.batter || '',
-        team:      b.batting_team || '',
-        pitcher:   b.pitcher || '',
-        grade:     b.grade || '',
-        _yard:     parseFloat(b._yard||0),
-        count:     parseInt(b.so_close_count||0),
-        on_tear:   (b._hrYest||parseInt(b.hr_yesterday||0)) > 0 && parseInt(b.so_close_count||0) >= 3,
-        max_dist:  parseFloat(b.so_close_max_dist||0),
-        max_ev:    parseFloat(b.so_close_max_ev||0),
-        reasons:   b.so_close_reasons || '',
-        rec_iso:   parseFloat(b.recent_iso||0),
-        rec_fb:    parseFloat(b.recent_fb_pct||0),
-        sim_tb:    parseFloat(b.sim_tb||0),
-        ps_score:  parseFloat(b.ps_score||0),
-      }))
-      .filter(r => teamFilter === 'ALL' || r.team === teamFilter)
+      .map(b => {
+        const bid = String(b.batter_id||'').split('.')[0];
+        const pid = parseInt(bid)||0;
+        const ls  = LINEUP_STATUS[pid] || {};
+        const dp  = DAILY_PICKS_CACHE[bid] || b;
+        const wentYard = parseInt(b._hrYest||b.hr_yesterday||0) > 0;
+        const closeCount = parseInt(b.so_close_count||0);
+        return {
+          bid, pid,
+          name:      b.batter || '',
+          team:      b.batting_team || '',
+          pitcher:   b.pitcher || '',
+          grade:     b.grade || '',
+          pgLabel:   dp._pgLabel || '',
+          _yard:     parseFloat(b._yard||0),
+          confirmed: ls.status === 'confirmed',
+          projected: ls.status === 'projected',
+          isDiamond: b.is_diamond === 'True' || b.is_diamond === true,
+          isDue:     isDueFromCache ? isDueFromCache(bid) : false,
+          isHot:     isHotBatPlayer ? isHotBatPlayer({pid,windows:b.windows}) : false,
+          on_tear:   wentYard && closeCount >= 3,
+          count:     closeCount,
+          max_dist:  parseFloat(b.so_close_max_dist||0),
+          max_ev:    parseFloat(b.so_close_max_ev||0),
+          reasons:   b.so_close_reasons || '',
+          rec_ev:    parseFloat(b.recent_avg_ev||0),
+          sim_tb:    parseFloat(b.sim_tb||0),
+          ps_score:  parseFloat(b.ps_score||0),
+          iso:       parseFloat(b.recent_iso||0),
+        };
+      })
+      .filter(r => {
+        if (teamFilter !== 'ALL' && r.team !== teamFilter) return false;
+        if (search && !r.name.toLowerCase().includes(search.toLowerCase()) && !r.team.toLowerCase().includes(search.toLowerCase())) return false;
+        return true;
+      })
       .sort((a, b) => {
-        if (sortBy === 'so_close_max_dist') return b.max_dist - a.max_dist;
-        if (sortBy === 'max_ev')            return b.max_ev   - a.max_ev;
-        if (sortBy === 'count')             return b.count    - a.count;
-        if (sortBy === '_yard')             return b._yard    - a._yard;
-        return 0;
+        const av = a[sortBy] ?? -999, bv = b[sortBy] ?? -999;
+        return sortDir * (typeof av === 'string' ? av.localeCompare(bv) : bv - av) * -1;
       });
-  }, [sortBy, teamFilter]);
+  }, [sortBy, sortDir, teamFilter, search]);
 
   // ── Teams on today's slate ─────────────────────────────────────────────────
   const teams = React.useMemo(() => {
@@ -12861,48 +12874,70 @@ function SoCloseTab({ data }) {
     return ['ALL', ...Array.from(t).sort()];
   }, []);
 
-  const distCol = d => d >= 390?'#ff4020':d >= 370?'#f5a623':d >= 350?'#fbbf24':'var(--muted)';
-  const evCol   = e => e >= 105?'#ff4020':e >= 100?'#f5a623':e >= 95?'#27c97a':'var(--muted)';
-
-  const SortBtn = ({col, label}) => (
-    <button onClick={()=>setSortBy(col)}
-      style={{padding:'3px 8px',borderRadius:4,fontSize:8,fontFamily:mono,cursor:'pointer',
-        border:`1px solid ${sortBy===col?'var(--accent2)':'var(--border)'}`,
-        background:sortBy===col?'rgba(232,65,26,.1)':'transparent',
-        color:sortBy===col?'var(--accent2)':'var(--muted)',fontWeight:sortBy===col?700:400}}>
-      {label}
-    </button>
+  // ── Sortable column header ─────────────────────────────────────────────────
+  const Th = ({col, label, title, align='right'}) => (
+    <th onClick={()=>{ if(sortBy===col) setSortDir(d=>d*-1); else{setSortBy(col);setSortDir(-1);} }}
+      style={{padding:'5px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',
+        letterSpacing:.6,whiteSpace:'nowrap',cursor:'pointer',textAlign:align,
+        borderBottom:'1px solid var(--border)',background:'var(--surface2)',
+        color:sortBy===col?'var(--accent2)':'var(--muted)'}}
+      title={title}>
+      {label}{sortBy===col?(sortDir===1?' ▲':' ▼'):''}
+    </th>
   );
+
+  // ── Export ─────────────────────────────────────────────────────────────────
+  const handleExport = () => {
+    const headers = ['Batter','Team','Pitcher','P.Grade','Yard','Close Calls','Max Dist(ft)','Max EV','L7 EV','Sim TB','ISO','On Tear','Near-Misses'];
+    const csvRows = rows.map(r => [
+      r.name, r.team, r.pitcher, r.pgLabel, r._yard, r.count,
+      r.max_dist, r.max_ev, r.rec_ev, r.sim_tb, r.iso,
+      r.on_tear?'YES':'', `"${r.reasons}"`
+    ].join(','));
+    const blob = new Blob([headers.join(',')+'
+'+csvRows.join('
+')], {type:'text/csv'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href=url; a.download='close-calls.csv'; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const distCol = d => d>=390?'#ff4020':d>=370?'#f5a623':d>=350?'#fbbf24':'var(--muted)';
+  const evCol   = e => e>=105?'#ff4020':e>=100?'#f5a623':e>=95?'#27c97a':'var(--muted)';
+  const pgCol   = g => !g?'var(--muted)':g.includes('Target')?'#27c97a':g.includes('Hittable')?'#60d360':g.includes('Elite')?'#ff4020':g.includes('Tough')?'#f5a623':'var(--muted)';
 
   return (
     <div style={{padding:'0 4px'}}>
 
-      {/* ── Header ────────────────────────────────────────────────────────── */}
-      <div style={{marginBottom:12,background:'var(--surface2)',borderRadius:8,
-        border:'1px solid var(--border)',padding:'10px 14px'}}>
-        <div style={{fontFamily:osw,fontWeight:800,fontSize:13,color:'var(--text)',marginBottom:4}}>
-          🤏 Close Calls
+      {/* ── Header + controls ────────────────────────────────────────────── */}
+      <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',marginBottom:10}}>
+        <div style={{flex:1,minWidth:160}}>
+          <input value={search} onChange={e=>setSearch(e.target.value)}
+            placeholder="Search batter or team..."
+            style={{width:'100%',padding:'5px 10px',borderRadius:6,border:'1px solid var(--border)',
+              background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:9,
+              outline:'none',boxSizing:'border-box'}}/>
         </div>
-        <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',lineHeight:1.7}}>
-          Batters with near-HR events yesterday — deep fly outs, hard XBH, rockets that didn't leave the yard.
-          {' '}<span style={{color:'var(--text)'}}>{rows.length} batters</span> on today's slate had close calls.
-        </div>
-      </div>
-
-      {/* ── Controls ──────────────────────────────────────────────────────── */}
-      <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center',marginBottom:12}}>
-        <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>Sort:</span>
-        <SortBtn col="so_close_max_dist" label="Deepest"/>
-        <SortBtn col="max_ev"            label="Hardest Hit"/>
-        <SortBtn col="count"             label="Most Events"/>
-        <SortBtn col="_yard"             label="Yard Score"/>
-        <div style={{width:1,height:14,background:'var(--border)',margin:'0 4px'}}/>
-        <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>Team:</span>
         <select value={teamFilter} onChange={e=>setTeamFilter(e.target.value)}
           style={{fontFamily:mono,fontSize:8,background:'var(--surface2)',color:'var(--text)',
-            border:'1px solid var(--border)',borderRadius:4,padding:'2px 6px',cursor:'pointer'}}>
-          {teams.map(t=><option key={t} value={t}>{t}</option>)}
+            border:'1px solid var(--border)',borderRadius:4,padding:'5px 8px',cursor:'pointer'}}>
+          {teams.map(t=><option key={t} value={t}>{t==='ALL'?'All Teams':t}</option>)}
         </select>
+        <button onClick={handleExport}
+          style={{padding:'5px 10px',borderRadius:6,background:'rgba(56,184,242,.1)',
+            border:'1px solid rgba(56,184,242,.3)',color:'var(--ice)',cursor:'pointer',
+            fontFamily:mono,fontSize:9,whiteSpace:'nowrap'}}>
+          ⬇ Export CSV
+        </button>
+      </div>
+
+      {/* ── Info bar ─────────────────────────────────────────────────────── */}
+      <div style={{marginBottom:10,background:'rgba(251,191,36,.06)',borderRadius:6,
+        border:'1px solid rgba(251,191,36,.2)',padding:'7px 12px',
+        fontFamily:mono,fontSize:8,color:'var(--muted)',lineHeight:1.7}}>
+        <span style={{color:'#fbbf24',fontWeight:700}}>{rows.length} batters</span> had ≥2 near-HR events yesterday and are playing today ·
+        Excludes yesterday HRs unless 3+ close calls (<span style={{color:'#ff8020'}}>🔥 on a tear</span>) ·
+        Click any row to expand recent ABs
       </div>
 
       {/* ── Table ─────────────────────────────────────────────────────────── */}
@@ -12915,84 +12950,148 @@ function SoCloseTab({ data }) {
           <table style={{width:'100%',borderCollapse:'collapse',fontSize:10}}>
             <thead>
               <tr>
-                {[['Batter','left'],['Gr','center'],['🎯','center'],['Events','center'],
-                  ['Max Dist','right'],['Max EV','right'],['Sim TB','right'],
-                  ['Yesterday Near-Misses','left']].map(([h,a])=>(
-                  <th key={h} style={{padding:'5px 8px',fontSize:8,fontFamily:mono,
-                    textTransform:'uppercase',letterSpacing:.6,color:'var(--muted)',
-                    textAlign:a,borderBottom:'1px solid var(--border)',
-                    background:'var(--surface2)',whiteSpace:'nowrap'}}>{h}</th>
-                ))}
+                <th style={{padding:'5px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',
+                  letterSpacing:.6,color:'var(--muted)',textAlign:'left',position:'sticky',left:0,
+                  borderBottom:'1px solid var(--border)',background:'var(--surface2)',zIndex:5,
+                  whiteSpace:'nowrap'}}>Batter</th>
+                <Th col="_yard"           label="🎯"         title="Yard Score"             align="center"/>
+                <Th col="grade"           label="Gr"         title="Matchup Grade"          align="center"/>
+                <Th col="pgLabel"         label="P.Grade"    title="Pitcher Grade"          align="center"/>
+                <Th col="count"           label="Calls"      title="Close Call event count" align="center"/>
+                <Th col="max_dist"        label="Max Dist"   title="Deepest near-miss (ft)" align="right"/>
+                <Th col="max_ev"          label="Max EV"     title="Hardest hit EV (mph)"   align="right"/>
+                <Th col="rec_ev"          label="L7 EV"      title="L7 avg exit velocity"   align="right"/>
+                <Th col="sim_tb"          label="Sim TB"     title="Simulated total bases"  align="right"/>
+                <Th col="iso"             label="ISO"        title="Recent isolated power"  align="right"/>
+                <th style={{padding:'5px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',
+                  letterSpacing:.6,color:'var(--muted)',borderBottom:'1px solid var(--border)',
+                  background:'var(--surface2)',whiteSpace:'nowrap'}}>Near-Misses</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map(r => (
-                <tr key={r.bid} style={{borderBottom:'1px solid rgba(255,255,255,.04)',
-                  background:'transparent',height:30}}>
-                  {/* Batter */}
-                  <td style={{padding:'2px 8px',minWidth:160,whiteSpace:'nowrap'}}>
-                    <div style={{display:'flex',alignItems:'center',gap:5}}>
-                      <PlayerAvatar pid={parseInt(r.bid)||0} name={r.name} size={18}/>
-                      <span style={{fontFamily:mono,fontSize:8,color:'var(--accent2)',fontWeight:700}}>{r.team}</span>
-                      <span onClick={()=>openAtBatSlide({pid:parseInt(r.bid)||0,name:r.name,team:r.team})}
-                        style={{fontFamily:osw,fontWeight:700,fontSize:11,color:'var(--text)',cursor:'pointer'}}>
-                        {r.name}
-                      </span>
-                      {r.on_tear && <span title="On a tear — went yard AND 3+ close calls yesterday" style={{fontSize:11,marginLeft:2}}>🔥</span>}
-                      <PickButton pid={parseInt(r.bid)||0} name={r.name} team={r.team}/>
-                    </div>
-                    <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',marginTop:1,paddingLeft:23}}>
-                      vs {r.pitcher}
-                    </div>
-                  </td>
-                  {/* Grade */}
-                  <td style={{textAlign:'center',padding:'2px 4px',fontFamily:mono,fontSize:9,fontWeight:700,
-                    color:r.grade==='A+'?'#ffd700':r.grade==='A'?'#27c97a':r.grade==='B'?'#f5a623':'var(--muted)'}}>
-                    {r.grade||'—'}
-                  </td>
-                  {/* Yard Score */}
-                  <td style={{textAlign:'center',padding:'2px 4px'}}>
-                    {r._yard > 0 && <YardBadge score={r._yard}/>}
-                  </td>
-                  {/* Event count */}
-                  <td style={{textAlign:'center',padding:'2px 8px',fontFamily:osw,fontWeight:800,
-                    fontSize:13,color:r.count>=3?'#ff4020':r.count>=2?'#f5a623':'#fbbf24'}}>
-                    {r.count}
-                  </td>
-                  {/* Max Distance */}
-                  <td style={{textAlign:'right',padding:'2px 8px',fontFamily:mono,fontSize:10,
-                    fontWeight:700,color:distCol(r.max_dist)}}>
-                    {r.max_dist > 0 ? `${r.max_dist.toFixed(0)}ft` : '—'}
-                  </td>
-                  {/* Max EV */}
-                  <td style={{textAlign:'right',padding:'2px 8px',fontFamily:mono,fontSize:10,
-                    color:evCol(r.max_ev)}}>
-                    {r.max_ev > 0 ? `${r.max_ev.toFixed(1)}` : '—'}
-                  </td>
-                  {/* Sim TB */}
-                  <td style={{textAlign:'right',padding:'2px 8px',fontFamily:mono,fontSize:9,
-                    color:r.sim_tb>=1.4?'#ff4020':r.sim_tb>=1.1?'#f5a623':'var(--muted)'}}>
-                    {r.sim_tb > 0 ? r.sim_tb.toFixed(2) : '—'}
-                  </td>
-                  {/* Reasons */}
-                  <td style={{padding:'2px 10px',fontFamily:mono,fontSize:8,color:'var(--muted)',
-                    maxWidth:280,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                    {r.reasons || '—'}
-                  </td>
-                </tr>
-              ))}
+              {rows.flatMap(r => {
+                const isExp = expandedBid === r.bid;
+                const mainRow = (
+                  <tr key={r.bid}
+                    onClick={()=>setExpandedBid(isExp?null:r.bid)}
+                    style={{cursor:'pointer',borderBottom:'1px solid rgba(255,255,255,.04)',
+                      background:isExp?'rgba(56,184,242,.06)':'transparent',
+                      outline:isExp?'1px solid rgba(56,184,242,.2)':'none'}}>
+
+                    {/* Batter cell — sticky */}
+                    <td style={{padding:'4px 8px',position:'sticky',left:0,zIndex:4,
+                      background:isExp?'rgba(56,184,242,.06)':'var(--surface)',
+                      minWidth:200,whiteSpace:'nowrap'}}>
+                      <div style={{display:'flex',alignItems:'center',gap:5}}>
+                        <PlayerAvatar pid={r.pid} name={r.name} size={20}/>
+                        {/* Sticker badges */}
+                        {r.confirmed && <span title="Confirmed in lineup" style={{fontSize:9,flexShrink:0}}>✅</span>}
+                        {r.projected  && <span title="Projected in lineup" style={{fontSize:9,flexShrink:0,opacity:.7}}>📋</span>}
+                        {r.isDiamond  && <span style={{padding:'1px 4px',borderRadius:3,fontSize:8,fontWeight:700,
+                          background:'rgba(255,204,0,.15)',color:'#ffcc00',border:'1px solid rgba(255,204,0,.3)',flexShrink:0}}>💎</span>}
+                        {r.on_tear    && <span title="On a tear — went yard + 3+ close calls" style={{fontSize:10,flexShrink:0}}>🔥</span>}
+                        {r.isHot      && !r.on_tear && <span title="Hot bat" style={{fontSize:10,flexShrink:0}}>🌶️</span>}
+                        {/* Name */}
+                        <span onClick={e=>{e.stopPropagation();const cp=getCachedPlayer(r.pid)||{};
+                          openAtBatSlide({pid:r.pid,name:r.name,team:r.team,
+                            avgEV:cp.avgEV,barrel:cp.barrel,hardHit:cp.hardHit,flyBall:cp.flyBall,
+                            hr:cp.hr,avg:cp.avg,obp:cp.obp,slg:cp.slg,xwoba:cp.xwoba,
+                            kPct:cp.kPct,bbPct:cp.bbPct,launchAngle:cp.launchAngle});}}
+                          style={{fontFamily:osw,fontWeight:700,fontSize:11,color:'var(--text)',
+                            cursor:'pointer',overflow:'hidden',textOverflow:'ellipsis'}}>
+                          {r.name}
+                        </span>
+                        <span style={{fontFamily:mono,fontSize:7,color:'var(--muted)',fontWeight:700}}>{r.team}</span>
+                        <PickButton pid={r.pid} name={r.name} team={r.team}/>
+                      </div>
+                    </td>
+
+                    {/* Yard Score */}
+                    <td style={{textAlign:'center',padding:'3px 6px'}}>
+                      {r._yard > 0 && <YardBadge score={r._yard}/>}
+                    </td>
+                    {/* Grade */}
+                    <td style={{textAlign:'center',padding:'3px 4px',fontFamily:mono,fontSize:9,fontWeight:700,
+                      color:r.grade==='A+'?'#ffd700':r.grade==='A'?'#27c97a':r.grade==='B'?'#f5a623':'var(--muted)'}}>
+                      {r.grade||'—'}
+                    </td>
+                    {/* Pitcher Grade */}
+                    <td style={{textAlign:'center',padding:'3px 6px',fontFamily:mono,fontSize:8,
+                      fontWeight:700,color:pgCol(r.pgLabel)}}>
+                      {r.pgLabel?r.pgLabel.split(' ')[0]:'—'}
+                    </td>
+                    {/* Close Call count */}
+                    <td style={{textAlign:'center',padding:'3px 8px',fontFamily:osw,fontWeight:800,
+                      fontSize:14,color:r.count>=4?'#ff4020':r.count>=3?'#f5a623':'#fbbf24'}}>
+                      {r.count}
+                    </td>
+                    {/* Max Distance */}
+                    <td style={{textAlign:'right',padding:'3px 8px',fontFamily:mono,fontSize:10,
+                      fontWeight:700,color:distCol(r.max_dist)}}>
+                      {r.max_dist>0?`${r.max_dist.toFixed(0)}ft`:'—'}
+                    </td>
+                    {/* Max EV */}
+                    <td style={{textAlign:'right',padding:'3px 8px',fontFamily:mono,fontSize:10,
+                      color:evCol(r.max_ev)}}>
+                      {r.max_ev>0?r.max_ev.toFixed(1):'—'}
+                    </td>
+                    {/* L7 EV */}
+                    <td style={{textAlign:'right',padding:'3px 8px',fontFamily:mono,fontSize:9,
+                      color:r.rec_ev>=95?'#ff4020':r.rec_ev>=90?'#f5a623':r.rec_ev>=85?'#27c97a':'var(--muted)'}}>
+                      {r.rec_ev>0?r.rec_ev.toFixed(1):'—'}
+                    </td>
+                    {/* Sim TB */}
+                    <td style={{textAlign:'right',padding:'3px 8px',fontFamily:mono,fontSize:9,
+                      color:r.sim_tb>=1.4?'#ff4020':r.sim_tb>=1.1?'#f5a623':'var(--muted)'}}>
+                      {r.sim_tb>0?r.sim_tb.toFixed(2):'—'}
+                    </td>
+                    {/* ISO */}
+                    <td style={{textAlign:'right',padding:'3px 8px',fontFamily:mono,fontSize:9,
+                      color:r.iso>=0.250?'#ff8020':r.iso>=0.180?'#f5a623':'var(--muted)'}}>
+                      {r.iso>0?r.iso.toFixed(3):'—'}
+                    </td>
+                    {/* Reasons */}
+                    <td style={{padding:'3px 10px',fontFamily:mono,fontSize:8,color:'var(--muted)',
+                      maxWidth:260,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                      {r.reasons||'—'}
+                    </td>
+                  </tr>
+                );
+
+                const expandRow = isExp ? (
+                  <tr key={r.bid+'_exp'}>
+                    <td colSpan={11}
+                      style={{padding:'0 12px 14px',background:'rgba(56,184,242,.04)',
+                        borderBottom:'2px solid rgba(56,184,242,.2)'}}>
+                      <div style={{display:'flex',alignItems:'center',gap:8,
+                        padding:'8px 0 6px',borderBottom:'1px solid var(--border)',marginBottom:6}}>
+                        <PlayerAvatar pid={r.pid} name={r.name} size={26}/>
+                        <span style={{fontFamily:osw,fontWeight:700,fontSize:13}}>{r.name}</span>
+                        <span style={{fontFamily:mono,fontSize:10,color:'var(--accent2)'}}>{r.team}</span>
+                        <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginLeft:'auto'}}>
+                          Recent At-Bats · {r.count} close call{r.count!==1?'s':''} yesterday
+                        </span>
+                      </div>
+                      <InjuryBanner pid={r.pid} style={{margin:'6px 0 4px'}}/>
+                      <Last7HRChart batterId={r.pid}/>
+                      <RecentGameLog batterId={r.pid}/>
+                    </td>
+                  </tr>
+                ) : null;
+
+                return [mainRow, expandRow].filter(Boolean);
+              })}
             </tbody>
           </table>
         </div>
       )}
 
       <div style={{textAlign:'center',fontFamily:mono,fontSize:7,color:'var(--muted)',marginTop:10}}>
-        Criteria: ≥2 events · fly ball/line drive ≥330ft at 88mph+ EV · XBH · Rockets (EV 100+ mph) · 🔥 = went yard + 3+ close calls
+        Criteria: ≥2 events · fly ball/line drive ≥330ft at 88mph+ EV · XBH · Rockets (EV 100+mph) · 🔥 = went yard + 3+ close calls
       </div>
     </div>
   );
 }
-
 
 // ══════════════════════════════════════════════════════════════════════════════
 // PAIRS TAB
