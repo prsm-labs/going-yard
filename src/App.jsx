@@ -13450,7 +13450,8 @@ function StatsTab() {
               <tbody>
                 {pRows.length===0
                   ? <tr><td colSpan={15} style={{textAlign:'center',padding:24,fontFamily:mono,fontSize:10,color:'var(--muted)'}}>No pitcher data — run build_splits.py then mlbdata_aggregate.py</td></tr>
-                  : pRows.map(r=>(
+                  : pRows.flatMap(r=>{
+                  const mainP = (
                   <tr key={r.id}
                     onClick={()=>setExpandedP(e=>e===r.id?null:r.id)}
                     style={{borderBottom:'1px solid rgba(255,255,255,.04)',height:26,cursor:'pointer',
@@ -13493,7 +13494,8 @@ function StatsTab() {
                       })()}
                     </td>
                   </tr>
-                  {expandedP===r.id && (
+                  );
+                  const expP = expandedP===r.id ? (
                     <tr key={r.id+'_exp'}>
                       <td colSpan={15} style={{padding:'0 12px 12px',background:'rgba(56,184,242,.04)',borderBottom:'2px solid rgba(56,184,242,.18)'}}>
                         <div style={{display:'flex',alignItems:'center',gap:8,padding:'6px 0 4px',borderBottom:'1px solid var(--border)',marginBottom:6}}>
@@ -13506,8 +13508,9 @@ function StatsTab() {
                         <Last7HRAllowedChart pitcherId={parseInt(r.id)||0}/>
                       </td>
                     </tr>
-                  )}
-                ))}
+                  ) : null;
+                  return [mainP, expP].filter(Boolean);
+                })}
               </tbody>
             </table>
           </div>
@@ -13609,7 +13612,8 @@ function StatsTab() {
               <tbody>
                 {bRows.length===0
                   ? <tr><td colSpan={17} style={{textAlign:'center',padding:24,fontFamily:mono,fontSize:10,color:'var(--muted)'}}>No batter data — run build_splits.py then mlbdata_aggregate.py</td></tr>
-                  : bRows.map(r=>(
+                  : bRows.flatMap(r=>{
+                  const mainB = (
                   <tr key={r.id}
                     onClick={()=>setExpandedB(e=>e===r.id?null:r.id)}
                     style={{borderBottom:'1px solid rgba(255,255,255,.04)',height:26,cursor:'pointer',
@@ -13659,8 +13663,8 @@ function StatsTab() {
                       })()}
                     </td>
                   </tr>
-                ))}
-                  {expandedB===r.id && (
+                  );
+                  const expB = expandedB===r.id ? (
                     <tr key={r.id+'_exp'}>
                       <td colSpan={17} style={{padding:'0 12px 12px',background:'rgba(232,65,26,.04)',borderBottom:'2px solid rgba(232,65,26,.18)'}}>
                         <div style={{display:'flex',alignItems:'center',gap:8,padding:'6px 0 4px',borderBottom:'1px solid var(--border)',marginBottom:6}}>
@@ -13674,7 +13678,9 @@ function StatsTab() {
                         <RecentGameLog batterId={parseInt(r.id)||0}/>
                       </td>
                     </tr>
-                  )}
+                  ) : null;
+                  return [mainB, expB].filter(Boolean);
+                })}
               </tbody>
             </table>
           </div>
