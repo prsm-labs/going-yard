@@ -13119,7 +13119,10 @@ function StatsTab() {
 
   // ── Pitcher-only state ────────────────────────────────────────────────────────
   const [pHandFilter, setPHandFilter] = useState('');
-  const [pRoleFilter, setPRoleFilter] = useState('');
+  const [pRoleFilter,    setPRoleFilter]    = useState('');
+  const [pScheduledOnly, setPScheduledOnly] = useState(false);
+  const [pitcherCollapsed, setPitcherCollapsed] = useState(false);
+  const [batterCollapsed,  setBatterCollapsed]  = useState(false);
   const [pSortBy,     setPSortBy]     = useState('hr_per9');
   const [pSortDir,    setPSortDir]    = useState(-1);
   const [pSearch,     setPSearch]     = useState('');
@@ -13281,6 +13284,7 @@ function StatsTab() {
         if ((r.bf||0) < pMinBF) return false;
         if (sharedPHand && r.hand !== sharedPHand) return false;
         if (pRoleFilter && r.role !== pRoleFilter) return false;
+        if (pScheduledOnly && !probablePitcherIds.has(r.id) && LINEUP_STATUS[parseInt(r.id)||0]?.status !== 'confirmed') return false;
         if (pPgFilter.length > 0) {
           if (!pPgFilter.some(g => (r._pgLabel||'').includes(g))) return false;
         }
@@ -13292,7 +13296,7 @@ function StatsTab() {
         return pSortDir * (av - bv);
       })
       .slice(0, 300);
-  }, [data, window, pSplitKey, pSortBy, pSortDir, pSearch, pTeam, pMinBF, pRoleFilter, pPgFilter, matchupTeams, sharedPHand, lineupVer]);
+  }, [data, window, pSplitKey, pSortBy, pSortDir, pSearch, pTeam, pMinBF, pRoleFilter, pPgFilter, matchupTeams, sharedPHand, lineupVer, pScheduledOnly]);
 
   // ── Shared helpers ────────────────────────────────────────────────────────────
   const fmtAvg = v => v>0 ? '.'+String(Math.round(v*1000)).padStart(3,'0') : '—';
@@ -13381,11 +13385,17 @@ function StatsTab() {
 
       {/* ══ PITCHERS ══════════════════════════════════════════════════════════ */}
       <div style={{marginBottom:20}}>
-        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+        <div onClick={()=>setPitcherCollapsed(v=>!v)}
+          style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,cursor:'pointer',
+            userSelect:'none',padding:'4px 0'}}>
           <span style={{fontFamily:osw,fontWeight:800,fontSize:13,color:'var(--text)'}}>⚾ Pitchers</span>
           <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>{pRows.length} shown</span>
+          <span style={{marginLeft:'auto',fontFamily:mono,fontSize:10,color:'var(--muted)'}}>
+            {pitcherCollapsed ? '▶' : '▼'}
+          </span>
         </div>
 
+        {!pitcherCollapsed && <>
         {/* Pitcher filters */}
         <div style={{display:'flex',gap:5,flexWrap:'nowrap',alignItems:'center',marginBottom:6,overflowX:'auto',WebkitOverflowScrolling:'touch',paddingBottom:2}}>
           {/* Shared: pitcher hand = batter vsLHP/vsRHP split */}
@@ -13394,6 +13404,13 @@ function StatsTab() {
           {/* Shared tandem: location + day/night */}
           <PillRow items={[['','All'],['home','Home'],['away','Away']]} active={sharedLoc} onSelect={setSharedLoc} color='rgba(39,201,122,.2)' activeColor='#27c97a'/>
           <PillRow items={[['','All'],['day','Day'],['night','Night']]} active={sharedDN} onSelect={setSharedDN} color='rgba(245,166,35,.2)' activeColor='#f5a623'/>
+          {/* Scheduled starters only */}
+          <button onClick={()=>setPScheduledOnly(v=>!v)} data-tip="Scheduled starting pitchers only"
+            style={{padding:'3px 8px',borderRadius:5,fontSize:12,cursor:'pointer',flexShrink:0,
+              border:`1px solid ${pScheduledOnly?'#f5a623':'var(--border)'}`,
+              background:pScheduledOnly?'rgba(245,166,35,.15)':'transparent'}}>
+            ⚾
+          </button>
           <div style={{display:'flex',gap:2}}>
             {gradeEmojis.map(([key,emoji])=>(
               <button key={key} onClick={()=>setPPgFilter(f=>f.includes(key)?f.filter(x=>x!==key):[...f,key])}
@@ -13517,6 +13534,7 @@ function StatsTab() {
         </div>
       </div>
 
+        </>}
       {/* ══ Separator ════════════════════════════════════════════════════════ */}
       <div style={{display:'flex',alignItems:'center',gap:10,margin:'4px 0 18px'}}>
         <div style={{flex:1,height:1,background:'var(--border)'}}/>
@@ -13526,11 +13544,17 @@ function StatsTab() {
 
       {/* ══ BATTERS ═══════════════════════════════════════════════════════════ */}
       <div>
-        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+        <div onClick={()=>setBatterCollapsed(v=>!v)}
+          style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,cursor:'pointer',
+            userSelect:'none',padding:'4px 0'}}>
           <span style={{fontFamily:osw,fontWeight:800,fontSize:13,color:'var(--text)'}}>🧢 Batters</span>
           <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>{bRows.length} shown</span>
+          <span style={{marginLeft:'auto',fontFamily:mono,fontSize:10,color:'var(--muted)'}}>
+            {batterCollapsed ? '▶' : '▼'}
+          </span>
         </div>
 
+        {!batterCollapsed && <>
         {/* Batter filters — row 1: shared tandem filters */}
         <div style={{display:'flex',gap:5,flexWrap:'nowrap',alignItems:'center',marginBottom:4,overflowX:'auto',WebkitOverflowScrolling:'touch',paddingBottom:2}}>
           {/* Shared: batter hand = pitcher vsLHB/vsRHB split */}
@@ -13685,6 +13709,7 @@ function StatsTab() {
             </table>
           </div>
         </div>
+      </>}
       </div>
     </div>
   );
