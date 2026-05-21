@@ -13154,9 +13154,16 @@ function StatsTab() {
         if (statsPage==='batters'  && (r.pa||0)  < minPA) return false;
         if (statsPage==='pitchers' && (r.bf||0)  < minBF) return false;
         if (roleFilter && statsPage==='pitchers' && r.role !== roleFilter) return false;
-        if (pgFilter.length > 0 && statsPage==='pitchers') {
-          const grade = r._pgLabel || '';
-          if (!pgFilter.some(g => grade.includes(g))) return false;
+        if (pgFilter.length > 0) {
+          // Pitchers: filter by their own grade. Batters: filter by today's opposing pitcher grade
+          if (statsPage==='pitchers') {
+            const grade = r._pgLabel || '';
+            if (!pgFilter.some(g => grade.includes(g))) return false;
+          } else {
+            const dp = DAILY_PICKS_CACHE[r.id] || Object.values(DAILY_PICKS_CACHE).find(b=>String(b.batter_id||'').split('.')[0]===r.id);
+            const pg = dp?._pgLabel || '';
+            if (!pgFilter.some(g => pg.includes(g))) return false;
+          }
         }
         if (search && !( (r.name||r.id).toLowerCase().includes(search.toLowerCase()) ||
                          (r.team||'').toLowerCase().includes(search.toLowerCase()))) return false;
@@ -13164,7 +13171,7 @@ function StatsTab() {
       })
       .sort((a,b) => {
         const av = a[sortBy] ?? -999, bv = b[sortBy] ?? -999;
-        return sortDir * (bv - av);
+        return sortDir * (av - bv);  // sortDir=-1 → desc (highest first)
       })
       .slice(0, 200); // cap at 200 for performance
   }, [data, statsPage, window, splitKey, sortBy, sortDir, search, teamFilter, minPA, minBF, pgFilter, roleFilter]);
@@ -13318,23 +13325,23 @@ function StatsTab() {
           </button>}
         </div>
       )}
-      {/* ── Pitch group filter (batters only) ─────────────────────────────── */}
+{/* 🔥 Pitch group filter hidden — session 8 */}
+      {/* ── Info bar ──────────────────────────────────────────────────────── */}
+      {/* ── Today's Pitcher grade filter (batters page) ─────────────────────── */}
       {statsPage==='batters' && (
-        <div style={{display:'flex',gap:4,flexWrap:'wrap',alignItems:'center',marginBottom:8}}>
-          <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>Pitch:</span>
-          {[['','All'],['fastball','🔥 Fastball'],['breaking','🌀 Breaking'],['offspeed','💨 Offspeed']].map(([val,lbl])=>(
-            <button key={val} onClick={()=>setPitchGroup(p=>p===val&&val?'':val)}
-              style={{padding:'3px 8px',borderRadius:5,fontSize:8,fontFamily:mono,cursor:'pointer',
-                border:`1px solid ${pitchGroup===val&&val?'var(--accent)':!val&&!pitchGroup?'var(--accent)':'var(--border)'}`,
-                background:pitchGroup===val&&val?'rgba(232,65,26,.2)':!val&&!pitchGroup?'rgba(232,65,26,.08)':'transparent',
-                color:pitchGroup===val||(!val&&!pitchGroup)?'var(--accent)':'var(--muted)',
-                fontWeight:pitchGroup===val||(!val&&!pitchGroup)?700:400}}>
-              {lbl}
+        <div style={{display:'flex',gap:3,alignItems:'center',marginBottom:6}}>
+          <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>Opp:</span>
+          {[['','All'],['Target','🎯'],['Hittable','💥'],['Average','🤔'],['Tough','⚠️'],['Elite','‼️']].map(([key,emoji])=>(
+            <button key={key} onClick={()=>setPgFilter(f=>key?f.includes(key)?f.filter(x=>x!==key):[...f,key]:[])}
+              data-tip={key?key+' pitcher':'Show all pitchers'}
+              style={{padding:'3px 6px',borderRadius:5,fontSize:11,cursor:'pointer',
+                border:`1px solid ${(!key&&!pgFilter.length)||pgFilter.includes(key)?'var(--accent)':'var(--border)'}`,
+                background:(!key&&!pgFilter.length)||pgFilter.includes(key)?'rgba(232,65,26,.1)':'transparent'}}>
+              {emoji||'All'}
             </button>
           ))}
         </div>
       )}
-      {/* ── Info bar ──────────────────────────────────────────────────────── */}
       <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginBottom:8}}>
         <span style={{color:'var(--text)'}}>{rows.length}</span> {statsPage} ·{' '}
         <span style={{color:'var(--ice)'}}>{WIN_LABELS[window]}</span> ·{' '}
@@ -13414,15 +13421,17 @@ function StatsTab() {
                   <td style={{padding:'2px 8px',minWidth:140,whiteSpace:'nowrap'}}>
                     {(()=>{
                       const dp = DAILY_PICKS_CACHE[r.id] || Object.values(DAILY_PICKS_CACHE).find(b=>String(b.batter_id||'').split('.')[0]===r.id);
-                      if (!dp?.pitcher) return <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>—</span>;
-                      return <div>
+                      if (!dp?.pitcher) return <span style={{fontFamily:mono,fontSize:7,color:'var(--muted)'}}>—</span>;
+                      const pgL = dp._pgLabel||'';
+                      const pgEmoji = pgL.includes('Target')?'🎯':pgL.includes('Hittable')?'💥':pgL.includes('Elite')?'‼️':pgL.includes('Tough')?'⚠️':'';
+                      const hand = dp.pitcher_hand==='L'?'LHP':dp.pitcher_hand==='R'?'RHP':'';
+                      return <div style={{display:'flex',alignItems:'center',gap:3,flexWrap:'nowrap'}}>
                         <span onClick={()=>openPitcherSlide({pid:parseInt(dp.pitcher_id||0),name:dp.pitcher,team:dp.pitcher_team||'',hand:dp.pitcher_hand||'',pitchMix:[]})}
-                          style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,color:'var(--text)',cursor:'pointer'}}>
+                          style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:9,color:'var(--text)',cursor:'pointer',whiteSpace:'nowrap'}}>
                           {dp.pitcher}
                         </span>
-                        <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)'}}>
-                          {dp.pitcher_team||''} · {dp.pitcher_hand==='L'?'LHP':dp.pitcher_hand==='R'?'RHP':''}
-                        </div>
+                        {pgEmoji&&<span style={{fontSize:9,flexShrink:0}}>{pgEmoji}</span>}
+                        <span style={{fontFamily:mono,fontSize:7,color:'var(--muted)',flexShrink:0}}>{hand}</span>
                       </div>;
                     })()}
                   </td>
