@@ -8457,8 +8457,7 @@ function HRTrackerTab() {
             <colgroup>
               <col style={{width:24}}/>  {/* # */}
               <col style={{width:80}}/>  {/* Time */}
-              <col style={{width:40}}/>  {/* Team */}
-              <col style={{width:130}}/> {/* Batter */}
+              <col style={{width:170}}/> {/* Batter */}
               <col style={{width:38}}/>  {/* HR# */}
               <col style={{width:90}}/>  {/* Type/RBI */}
               <col style={{width:50}}/>  {/* Inning */}
@@ -8474,7 +8473,6 @@ function HRTrackerTab() {
               <th style={{width:24,cursor:"default",background:"var(--surface2)"}}>#</th>
               {[
                 {key:"chronoIndex",label:"Time"},
-                {key:"batterTeam", label:"Tm"},
                 {key:"batterName", label:"Batter"},
                 {key:"seasonHRs",  label:"HR#"},
                 {key:"rbi",        label:"Type"},
@@ -8509,8 +8507,7 @@ function HRTrackerTab() {
                 return <tr key={i} style={{height:26}}>
                 <td style={{padding:"1px 3px"}}><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,color:i<3?"var(--accent)":"var(--muted)"}}>{sorted.length - i}</span></td>
                 <td style={{padding:"1px 3px",whiteSpace:"nowrap"}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:"var(--text)",whiteSpace:"nowrap"}}>{hr.timeET&&hr.timeET!==""?hr.timeET:`I${hr.inning}`}</span></td>
-                <td style={{padding:"1px 3px"}}><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,color:"var(--text)"}}>{hr.batterTeam}</span></td>
-                <td style={{padding:"1px 3px",whiteSpace:"nowrap"}}><div style={{display:"flex",alignItems:"center",gap:3}}><PlayerAvatar pid={hr.batterId} name={hr.batterName} size={18}/><span className="pn" style={{fontSize:10,whiteSpace:"nowrap",...(isKeyMatchup(hr.batterId,hr.batterName)?{color:"#ff8020",fontWeight:700}:{})}}>{hr.batterName}</span><InjuryBadge pid={hr.batterId} name={hr.batterName}/></div></td>
+                <td style={{padding:"1px 3px",whiteSpace:"nowrap"}}><div style={{display:"flex",alignItems:"center",gap:4}}><PlayerAvatar pid={hr.batterId} name={hr.batterName} size={18}/><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:9,color:"var(--accent2)",minWidth:28}}>{hr.batterTeam}</span><span className="pn" style={{fontSize:10,whiteSpace:"nowrap",...(isKeyMatchup(hr.batterId,hr.batterName)?{color:"#ff8020",fontWeight:700}:{})}}>{hr.batterName}</span><InjuryBadge pid={hr.batterId} name={hr.batterName}/></div></td>
                 <td style={{padding:"1px 3px"}}><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:10,color:"var(--accent)"}}>{seasonNum}</span></td>
                 <td style={{padding:"1px 3px",whiteSpace:"nowrap"}}><span className={`hr-badge ${badgeCls}`} style={{fontSize:8,padding:"1px 4px",whiteSpace:"nowrap"}}>{hr.hrType}</span></td>
                 <td style={{padding:"1px 3px"}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:9}}>{hr.halfInning==="top"?"▲":"▼"}{hr.inning}</span></td>
@@ -13030,6 +13027,306 @@ function RecentGameLog({ batterId }) {
 
 
 // ══════════════════════════════════════════════════════════════════════════════
+// STATS TAB — Batter & Pitcher Splits
+// Data: batter_splits.json + pitcher_splits.json (from build_splits.py)
+// Hybrid: at-bat log splits (pre-aggregated) + Stats API on player tap
+// ══════════════════════════════════════════════════════════════════════════════
+
+const SPLITS_CACHE = { batters: null, pitchers: null, ts: 0 };
+
+async function loadSplitsData() {
+  if (SPLITS_CACHE.batters && Date.now() - SPLITS_CACHE.ts < 3600000)
+    return SPLITS_CACHE;
+  try {
+    const [b, p] = await Promise.all([
+      fetch('/data/batter_splits.json').then(r => r.ok ? r.json() : {}),
+      fetch('/data/pitcher_splits.json').then(r => r.ok ? r.json() : {}),
+    ]);
+    SPLITS_CACHE.batters  = b;
+    SPLITS_CACHE.pitchers = p;
+    SPLITS_CACHE.ts       = Date.now();
+  } catch(e) { console.warn('Splits load failed:', e); }
+  return SPLITS_CACHE;
+}
+
+function StatsTab() {
+  const mono = "'DM Mono',monospace";
+  const osw  = "'Oswald',sans-serif";
+  const [statsPage,   setStatsPage]   = useState('batters'); // 'batters' | 'pitchers'
+  const [window,      setWindow]      = useState('L30');
+  const [split,       setSplit]       = useState('overall');
+  const [sortBy,      setSortBy]      = useState('woba');
+  const [sortDir,     setSortDir]     = useState(-1);
+  const [search,      setSearch]      = useState('');
+  const [teamFilter,  setTeamFilter]  = useState('ALL');
+  const [data,        setData]        = useState({batters:{}, pitchers:{}});
+  const [loading,     setLoading]     = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    loadSplitsData().then(d => {
+      setData({ batters: d.batters||{}, pitchers: d.pitchers||{} });
+      setLoading(false);
+    });
+  }, []);
+
+  const WINDOWS = ['L7','L15','L30','season'];
+  const BATTER_SPLITS  = ['overall','vsLHP','vsRHP','home','away','day','night'];
+  const PITCHER_SPLITS = ['overall','vsLHB','vsRHB','home','away','day','night'];
+  const SPLIT_LABELS   = { overall:'All', vsLHP:'vs LHP', vsRHP:'vs RHP', vsLHB:'vs LHB', vsRHB:'vs RHB', home:'Home', away:'Away', day:'Day', night:'Night' };
+  const WIN_LABELS     = { L7:'Last 7', L15:'Last 15', L30:'Last 30', season:'2026 Season' };
+
+  // ── Build rows ─────────────────────────────────────────────────────────────
+  const rows = React.useMemo(() => {
+    const src = statsPage === 'batters' ? data.batters : data.pitchers;
+    if (!src) return [];
+    return Object.entries(src)
+      .map(([id, player]) => {
+        const sp = player.splits?.[window]?.[split];
+        if (!sp) return null;
+        return { id, ...player, ...sp };
+      })
+      .filter(r => {
+        if (!r) return false;
+        if (teamFilter !== 'ALL' && r.team !== teamFilter) return false;
+        if (search && !( (r.name||r.id).toLowerCase().includes(search.toLowerCase()) ||
+                         (r.team||'').toLowerCase().includes(search.toLowerCase()))) return false;
+        return true;
+      })
+      .sort((a,b) => {
+        const av = a[sortBy] ?? -999, bv = b[sortBy] ?? -999;
+        return sortDir * (bv - av);
+      })
+      .slice(0, 200); // cap at 200 for performance
+  }, [data, statsPage, window, split, sortBy, sortDir, search, teamFilter]);
+
+  const teams = React.useMemo(() => {
+    const src = statsPage === 'batters' ? data.batters : data.pitchers;
+    return ['ALL', ...new Set(Object.values(src||{}).map(p=>p.team||'').filter(Boolean)).values()].sort();
+  }, [data, statsPage]);
+
+  const Th = ({col, label, title}) => (
+    <th onClick={()=>{ if(sortBy===col) setSortDir(d=>d*-1); else{setSortBy(col);setSortDir(-1);} }}
+      style={{padding:'4px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',
+        letterSpacing:.5,whiteSpace:'nowrap',cursor:'pointer',textAlign:'right',
+        borderBottom:'1px solid var(--border)',background:'var(--surface2)',
+        color:sortBy===col?'var(--accent2)':'var(--muted)'}}
+      title={title}>
+      {label}{sortBy===col?(sortDir===1?' ▲':' ▼'):''}
+    </th>
+  );
+
+  const fmtAvg = v => v > 0 ? '.'+String(Math.round(v*1000)).padStart(3,'0') : '—';
+  const fmtPct = v => v > 0 ? v.toFixed(1)+'%' : '—';
+  const fmtDec = v => v > 0 ? v.toFixed(3) : '—';
+  const fmtN   = v => v > 0 ? String(Math.round(v)) : '—';
+
+  const evColor  = v => v>=103?'#ff4020':v>=97?'#f5a623':v>=93?'#27c97a':'var(--muted)';
+  const wobaColor= v => v>=0.380?'#ff4020':v>=0.340?'#f5a623':v>=0.310?'var(--text)':'var(--muted)';
+  const isoColor = v => v>=0.250?'#ff8020':v>=0.180?'#f5a623':'var(--muted)';
+  const hhColor  = v => v>=42?'#ff4020':v>=35?'#f5a623':'var(--muted)';
+
+  return (
+    <div style={{padding:'0 4px'}}>
+
+      {/* ── Sub-page toggle ───────────────────────────────────────────────── */}
+      <div style={{display:'flex',gap:6,marginBottom:12}}>
+        {[['batters','🧢 Batters'],['pitchers','⚾ Pitchers']].map(([key,label])=>(
+          <button key={key} onClick={()=>{setStatsPage(key);setSortBy(key==='batters'?'woba':'woba_allowed');}}
+            style={{padding:'6px 14px',borderRadius:8,cursor:'pointer',fontSize:10,fontFamily:osw,
+              fontWeight:700,letterSpacing:.5,border:`1px solid ${statsPage===key?'var(--accent)':'var(--border)'}`,
+              background:statsPage===key?'rgba(232,65,26,.12)':'var(--surface2)',
+              color:statsPage===key?'var(--accent)':'var(--muted)'}}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Controls ──────────────────────────────────────────────────────── */}
+      <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center',marginBottom:10}}>
+        {/* Window */}
+        <div style={{display:'flex',gap:3,background:'var(--surface2)',borderRadius:7,padding:3,border:'1px solid var(--border)'}}>
+          {WINDOWS.map(w=>(
+            <button key={w} onClick={()=>setWindow(w)}
+              style={{padding:'3px 8px',borderRadius:5,fontSize:8,fontFamily:mono,cursor:'pointer',
+                border:'none',background:window===w?'var(--accent)':'transparent',
+                color:window===w?'#fff':'var(--muted)',fontWeight:window===w?700:400}}>
+              {w==='season'?'Szn':w}
+            </button>
+          ))}
+        </div>
+        {/* Split */}
+        <div style={{display:'flex',gap:3,background:'var(--surface2)',borderRadius:7,padding:3,border:'1px solid var(--border)'}}>
+          {(statsPage==='batters'?BATTER_SPLITS:PITCHER_SPLITS).map(s=>(
+            <button key={s} onClick={()=>setSplit(s)}
+              style={{padding:'3px 8px',borderRadius:5,fontSize:8,fontFamily:mono,cursor:'pointer',
+                border:'none',background:split===s?'rgba(56,184,242,.25)':'transparent',
+                color:split===s?'var(--ice)':'var(--muted)',fontWeight:split===s?700:400}}>
+              {SPLIT_LABELS[s]}
+            </button>
+          ))}
+        </div>
+        {/* Search */}
+        <input value={search} onChange={e=>setSearch(e.target.value)}
+          placeholder="Search player or team..."
+          style={{flex:1,minWidth:130,padding:'5px 9px',borderRadius:6,
+            border:'1px solid var(--border)',background:'var(--surface2)',
+            color:'var(--text)',fontFamily:mono,fontSize:9,outline:'none'}}/>
+        {/* Team */}
+        <select value={teamFilter} onChange={e=>setTeamFilter(e.target.value)}
+          style={{fontFamily:mono,fontSize:8,background:'var(--surface2)',color:'var(--text)',
+            border:'1px solid var(--border)',borderRadius:5,padding:'4px 7px',cursor:'pointer'}}>
+          {teams.map(t=><option key={t} value={t}>{t==='ALL'?'All Teams':t}</option>)}
+        </select>
+      </div>
+
+      {/* ── Info bar ──────────────────────────────────────────────────────── */}
+      <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginBottom:8}}>
+        <span style={{color:'var(--text)'}}>{rows.length}</span> {statsPage} ·{' '}
+        <span style={{color:'var(--ice)'}}>{WIN_LABELS[window]}</span> ·{' '}
+        <span style={{color:'#f5a623'}}>{SPLIT_LABELS[split]}</span> ·{' '}
+        from at-bat log · min {statsPage==='batters'?'5':'5'} PA
+      </div>
+
+      {loading ? (
+        <div style={{textAlign:'center',padding:40,fontFamily:mono,fontSize:11,color:'var(--muted)'}}>
+          Loading splits data…
+        </div>
+      ) : rows.length === 0 ? (
+        <div style={{textAlign:'center',padding:40,fontFamily:mono,fontSize:11,color:'var(--muted)'}}>
+          No data — run build_splits.py then mlbdata_aggregate.py
+        </div>
+      ) : statsPage === 'batters' ? (
+
+        /* ── BATTER TABLE ──────────────────────────────────────────────── */
+        <div style={{overflowX:'auto'}}>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:10}}>
+            <thead><tr>
+              <th style={{padding:'4px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',
+                letterSpacing:.5,color:'var(--muted)',textAlign:'left',
+                borderBottom:'1px solid var(--border)',background:'var(--surface2)',
+                position:'sticky',left:0,zIndex:5,whiteSpace:'nowrap'}}>Batter</th>
+              <Th col="pa"       label="PA"     title="Plate appearances"/>
+              <Th col="avg"      label="AVG"    title="Batting average"/>
+              <Th col="obp"      label="OBP"    title="On-base percentage"/>
+              <Th col="slg"      label="SLG"    title="Slugging percentage"/>
+              <Th col="iso"      label="ISO"    title="Isolated power (SLG−AVG)"/>
+              <Th col="woba"     label="wOBA"   title="Weighted on-base average (linear weights)"/>
+              <Th col="hr"       label="HR"     title="Home runs"/>
+              <Th col="hr_rate"  label="HR%"    title="HR per plate appearance %"/>
+              <Th col="k_pct"    label="K%"     title="Strikeout rate"/>
+              <Th col="bb_pct"   label="BB%"    title="Walk rate"/>
+              <Th col="ev"       label="EV"     title="Average exit velocity (mph)"/>
+              <Th col="hh_pct"   label="HH%"    title="Hard hit rate (EV ≥95mph)"/>
+              <Th col="brl_pct"  label="Brl%"   title="Barrel rate"/>
+              <Th col="pbrl_pct" label="PBrl%"  title="Pulled barrel rate"/>
+              <Th col="fb_pct"   label="FB%"    title="Fly ball rate"/>
+              <Th col="la_mean"  label="LA°"    title="Average launch angle"/>
+            </tr></thead>
+            <tbody>
+              {rows.map(r => (
+                <tr key={r.id} style={{borderBottom:'1px solid rgba(255,255,255,.04)',height:26}}>
+                  <td style={{padding:'2px 8px',position:'sticky',left:0,
+                    background:'var(--surface)',zIndex:3,whiteSpace:'nowrap',minWidth:180}}>
+                    <div style={{display:'flex',alignItems:'center',gap:4}}>
+                      <PlayerAvatar pid={parseInt(r.id)||0} name={r.name||r.id} size={16}/>
+                      <span style={{fontFamily:osw,fontWeight:700,fontSize:9,
+                        color:'var(--accent2)',minWidth:26}}>{r.team||''}</span>
+                      <span onClick={()=>openAtBatSlide({pid:parseInt(r.id)||0,name:r.name||r.id,team:r.team||''})}
+                        style={{fontFamily:osw,fontWeight:700,fontSize:10,color:'var(--text)',cursor:'pointer'}}>
+                        {r.name||r.id}
+                      </span>
+                    </div>
+                  </td>
+                  <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{fmtN(r.pa)}</td>
+                  <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.avg||0)>=0.280?'#27c97a':'var(--muted)'}}>{fmtAvg(r.avg)}</td>
+                  <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.obp||0)>=0.360?'#27c97a':'var(--muted)'}}>{fmtAvg(r.obp)}</td>
+                  <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.slg||0)>=0.480?'#ff8020':(r.slg||0)>=0.400?'#f5a623':'var(--muted)'}}>{fmtAvg(r.slg)}</td>
+                  <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:isoColor(r.iso||0)}}>{fmtDec(r.iso)}</td>
+                  <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,fontWeight:700,color:wobaColor(r.woba||0)}}>{fmtDec(r.woba)}</td>
+                  <td style={{textAlign:'right',padding:'2px 5px',fontFamily:osw,fontWeight:800,fontSize:11,color:(r.hr||0)>=5?'#ff4020':(r.hr||0)>=2?'#f5a623':'var(--muted)'}}>{r.hr||0}</td>
+                  <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.hr_rate||0)>=8?'#ff4020':(r.hr_rate||0)>=4?'#f5a623':'var(--muted)'}}>{fmtPct(r.hr_rate)}</td>
+                  <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.k_pct||0)>=28?'#ff4020':(r.k_pct||0)>=22?'#f5a623':'var(--muted)'}}>{fmtPct(r.k_pct)}</td>
+                  <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.bb_pct||0)>=12?'#27c97a':'var(--muted)'}}>{fmtPct(r.bb_pct)}</td>
+                  <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:evColor(r.ev||0)}}>{r.ev?r.ev.toFixed(1):'—'}</td>
+                  <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:hhColor(r.hh_pct||0)}}>{fmtPct(r.hh_pct)}</td>
+                  <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.brl_pct||0)>=10?'#ff4020':(r.brl_pct||0)>=6?'#f5a623':'var(--muted)'}}>{fmtPct(r.brl_pct)}</td>
+                  <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.pbrl_pct||0)>=8?'#ff4020':'var(--muted)'}}>{fmtPct(r.pbrl_pct)}</td>
+                  <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.fb_pct||0)>=38?'#27c97a':'var(--muted)'}}>{fmtPct(r.fb_pct)}</td>
+                  <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.la_mean||0)>=18&&(r.la_mean||0)<=30?'#27c97a':'var(--muted)'}}>{r.la_mean?r.la_mean.toFixed(1)+'°':'—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+      ) : (
+
+        /* ── PITCHER TABLE ─────────────────────────────────────────────── */
+        <div style={{overflowX:'auto'}}>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:10}}>
+            <thead><tr>
+              <th style={{padding:'4px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',
+                letterSpacing:.5,color:'var(--muted)',textAlign:'left',
+                borderBottom:'1px solid var(--border)',background:'var(--surface2)',
+                position:'sticky',left:0,zIndex:5,whiteSpace:'nowrap'}}>Pitcher</th>
+              <Th col="bf"              label="BF"     title="Batters faced"/>
+              <Th col="woba_allowed"    label="wOBA"   title="wOBA allowed"/>
+              <Th col="hr_allowed"      label="HR"     title="Home runs allowed"/>
+              <Th col="hr_rate"         label="HR%"    title="HR allowed per BF %"/>
+              <Th col="k_pct"           label="K%"     title="Strikeout rate"/>
+              <Th col="bb_pct"          label="BB%"    title="Walk rate"/>
+              <Th col="ev_allowed"      label="EV"     title="Average exit velocity allowed"/>
+              <Th col="hh_pct_allowed"  label="HH%"    title="Hard hit rate allowed"/>
+              <Th col="brl_pct_allowed" label="Brl%"   title="Barrel rate allowed"/>
+              <Th col="fb_pct_allowed"  label="FB%"    title="Fly ball rate allowed"/>
+              <Th col="meatball_pct"    label="MB%"    title="Meatball rate (hittable zone in hitter-friendly counts)"/>
+            </tr></thead>
+            <tbody>
+              {rows.map(r => (
+                <tr key={r.id} style={{borderBottom:'1px solid rgba(255,255,255,.04)',height:26}}>
+                  <td style={{padding:'2px 8px',position:'sticky',left:0,
+                    background:'var(--surface)',zIndex:3,whiteSpace:'nowrap',minWidth:180}}>
+                    <div style={{display:'flex',alignItems:'center',gap:4}}>
+                      <PlayerAvatar pid={parseInt(r.id)||0} name={r.name||r.id} size={16}/>
+                      <span style={{fontFamily:osw,fontWeight:700,fontSize:9,color:'var(--accent2)',minWidth:26}}>{r.team||''}</span>
+                      <span style={{fontFamily:osw,fontWeight:700,fontSize:10,color:'var(--text)'}}>{r.name||r.id}</span>
+                      <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginLeft:2}}>{r.hand||''}</span>
+                    </div>
+                  </td>
+                  <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{fmtN(r.bf)}</td>
+                  <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,fontWeight:700,
+                    color:(r.woba_allowed||0)>=0.360?'#ff4020':(r.woba_allowed||0)>=0.320?'#f5a623':'#27c97a'}}>{fmtDec(r.woba_allowed)}</td>
+                  <td style={{textAlign:'right',padding:'2px 5px',fontFamily:osw,fontWeight:800,fontSize:11,
+                    color:(r.hr_allowed||0)>=8?'#ff4020':(r.hr_allowed||0)>=4?'#f5a623':'var(--muted)'}}>{r.hr_allowed||0}</td>
+                  <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
+                    color:(r.hr_rate||0)>=6?'#ff4020':(r.hr_rate||0)>=3?'#f5a623':'var(--muted)'}}>{fmtPct(r.hr_rate)}</td>
+                  <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
+                    color:(r.k_pct||0)>=28?'#27c97a':(r.k_pct||0)>=22?'#f5a623':'var(--muted)'}}>{fmtPct(r.k_pct)}</td>
+                  <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
+                    color:(r.bb_pct||0)>=10?'#ff4020':'var(--muted)'}}>{fmtPct(r.bb_pct)}</td>
+                  <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
+                    color:evColor(r.ev_allowed||0)}}>{r.ev_allowed?r.ev_allowed.toFixed(1):'—'}</td>
+                  <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
+                    color:hhColor(r.hh_pct_allowed||0)}}>{fmtPct(r.hh_pct_allowed)}</td>
+                  <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
+                    color:(r.brl_pct_allowed||0)>=10?'#ff4020':(r.brl_pct_allowed||0)>=6?'#f5a623':'var(--muted)'}}>{fmtPct(r.brl_pct_allowed)}</td>
+                  <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
+                    color:(r.fb_pct_allowed||0)>=40?'#ff4020':(r.fb_pct_allowed||0)>=35?'#f5a623':'var(--muted)'}}>{fmtPct(r.fb_pct_allowed)}</td>
+                  <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
+                    color:(r.meatball_pct||0)>=60?'#ff4020':(r.meatball_pct||0)>=50?'#f5a623':'var(--muted)'}}>{fmtPct(r.meatball_pct)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════════
 // CLOSE CALLS TAB
 // Batters with ≥2 near-HR events yesterday (deep fly outs, hard XBH, rockets)
 // Excludes batters who went yard (unless 3+ close calls = on a tear)
@@ -14770,6 +15067,7 @@ function MatchupEngineTab() {
     {subTab === 'bvp'      && <BvPDeepDiveTab/>}
     {subTab === 'pairs'    && <PairsTab data={data}/>}
     {subTab === 'soclose'  && <SoCloseTab data={data}/>}
+    {subTab === 'stats'    && <StatsTab/>}
     {subTab === 'longshot' && (
       <LongShotView data={dateSlot==='tomorrow'&&allPicksTomorrowData.length>0 ? allPicksTomorrowData : allPicksData}/>
     )}
@@ -16630,6 +16928,7 @@ function WeatherTab() {
       </div>
 
       <div style={{display:'flex',gap:6,marginBottom:16,padding:'4px',background:'var(--surface)',borderRadius:9,border:'1px solid var(--border)',width:'fit-content'}}>
+        <button style={stBtn('stats')}   onClick={()=>setSubTab('stats')}>📊 Stats</button>
         <button style={stBtn('weather')} onClick={()=>setSubTab('weather')}>🌤️ Game Day</button>
         <button style={stBtn('parks')}   onClick={()=>setSubTab('parks')}>🏟️ Park Factors</button>
       </div>
