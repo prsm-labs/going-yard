@@ -13069,7 +13069,18 @@ function StatsTab() {
 
   // ── Shared state ────────────────────────────────────────────────────────────
   const [window,      setWindow]      = useState('L30');
-  const [selMatchup,  setSelMatchup]  = useState('');   // 'awayTeam@homeTeam' or ''
+  const [selMatchup,  setSelMatchup]  = useState('');
+  const [lineupVer,   setLineupVer]   = useState(0);
+  useEffect(() => {
+    // Poll until DAILY_PICKS_CACHE is populated (handles display:none mount timing)
+    const id = setInterval(() => {
+      if (Object.keys(DAILY_PICKS_CACHE).length > 0) {
+        setLineupVer(v => v + 1);
+        clearInterval(id);
+      }
+    }, 500);
+    return () => clearInterval(id);
+  }, []);
 
   // ── Batter-only state ─────────────────────────────────────────────────────────
   const [bHandSplit,  setBHandSplit]  = useState('');
@@ -13112,15 +13123,18 @@ function StatsTab() {
     const seen = new Set();
     const list = [];
     Object.values(DAILY_PICKS_CACHE).forEach(r => {
-      if (!r.game_id || !r.home_team || !r.away_team) return;
-      const key = `${r.away_team}@${r.home_team}`;
+      // daily_picks.csv fields: home_team, away_team (from schedule join)
+      const home = r.home_team || ''; 
+      const away = r.away_team || r.batting_team || '';
+      if (!r.game_id || !home || !away || home === away) return;
+      const key = `${away}@${home}`;
       if (!seen.has(key)) {
         seen.add(key);
-        list.push({ key, away: r.away_team, home: r.home_team, time: r.game_time||'' });
+        list.push({ key, away, home, time: r.game_time||'' });
       }
     });
     return list.sort((a,b) => a.time.localeCompare(b.time));
-  }, []);
+  }, [lineupVer]);
 
   // Teams allowed by matchup selection
   const matchupTeams = React.useMemo(() => {
@@ -13159,7 +13173,7 @@ function StatsTab() {
       })
       .filter(r => {
         if (!r) return false;
-        if (matchupTeams && !matchupTeams.has(r.team)) return false;
+        if (matchupTeams && !matchupTeams.has(r.team) && !matchupTeams.has(r.pitcher_team)) return false;
         if (!matchupTeams && bTeam !== 'ALL' && r.team !== bTeam) return false;
         if ((r.pa||0) < bMinPA) return false;
         if (bHandFilter && r.hand !== bHandFilter) return false;
@@ -13400,7 +13414,7 @@ function StatsTab() {
                     <td style={{padding:'2px 8px',whiteSpace:'nowrap'}}>
                       {(()=>{
                         // Match on pitcher_team — works for SP, RP, everyone
-                        const game = matchupList.find(m => m.home===r.team || m.away===r.team);
+                        const game = matchupList.find(m => m.home===r.team || m.away===r.team || m.home===r.pitcher_team || m.away===r.pitcher_team);
                         if (!game) return <span style={{fontFamily:mono,fontSize:7,color:'var(--muted)'}}>—</span>;
                         const opp = game.home===r.team ? game.away : game.home;
                         return <span style={{fontFamily:osw,fontWeight:700,fontSize:10,color:'var(--text)'}}>{opp}</span>;
