@@ -13067,8 +13067,9 @@ function StatsTab() {
   const mono = "'DM Mono',monospace";
   const osw  = "'Oswald',sans-serif";
 
-  // ── Shared window ────────────────────────────────────────────────────────────
+  // ── Shared state ────────────────────────────────────────────────────────────
   const [window,      setWindow]      = useState('L30');
+  const [selMatchup,  setSelMatchup]  = useState('');   // 'awayTeam@homeTeam' or ''
 
   // ── Batter-only state ─────────────────────────────────────────────────────────
   const [bHandSplit,  setBHandSplit]  = useState('');
@@ -13106,12 +13107,34 @@ function StatsTab() {
 
   const WIN_LABELS = { L7:'Last 7', L15:'Last 15', L30:'Last 30', season:'2026 Season' };
 
+  // ── Build matchup list from DAILY_PICKS_CACHE ─────────────────────────────
+  const matchupList = React.useMemo(() => {
+    const seen = new Set();
+    const list = [];
+    Object.values(DAILY_PICKS_CACHE).forEach(r => {
+      if (!r.game_id || !r.home_team || !r.away_team) return;
+      const key = `${r.away_team}@${r.home_team}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        list.push({ key, away: r.away_team, home: r.home_team, time: r.game_time||'' });
+      }
+    });
+    return list.sort((a,b) => a.time.localeCompare(b.time));
+  }, []);
+
+  // Teams allowed by matchup selection
+  const matchupTeams = React.useMemo(() => {
+    if (!selMatchup) return null;  // null = no restriction
+    const m = matchupList.find(m => m.key === selMatchup);
+    return m ? new Set([m.away, m.home]) : null;
+  }, [selMatchup, matchupList]);
+
   // ── Batter split key ──────────────────────────────────────────────────────────
   const bSplitKey = [bHandSplit, bLocSplit, bDnSplit].filter(Boolean).join('_') || 'overall';
 
   // ── Teams ──────────────────────────────────────────────────────────────────────
-  const bTeams = React.useMemo(() => ['ALL',...new Set(Object.values(data.batters||{}).map(p=>p.team||'').filter(Boolean))].sort(), [data.batters]);
-  const pTeams = React.useMemo(() => ['ALL',...new Set(Object.values(data.pitchers||{}).map(p=>p.team||'').filter(Boolean))].sort(), [data.pitchers]);
+  const bTeams = React.useMemo(() => { const all=['ALL',...new Set(Object.values(data.batters||{}).map(p=>p.team||'').filter(Boolean))].sort(); return matchupTeams?['ALL',...all.filter(t=>t!=='ALL'&&matchupTeams.has(t))]:all; }, [data.batters, matchupTeams]);
+  const pTeams = React.useMemo(() => { const all=['ALL',...new Set(Object.values(data.pitchers||{}).map(p=>p.team||'').filter(Boolean))].sort(); return matchupTeams?['ALL',...all.filter(t=>t!=='ALL'&&matchupTeams.has(t))]:all; }, [data.pitchers, matchupTeams]);
 
   // ── Batter rows ───────────────────────────────────────────────────────────────
   const bRows = React.useMemo(() => {
@@ -13136,7 +13159,8 @@ function StatsTab() {
       })
       .filter(r => {
         if (!r) return false;
-        if (bTeam !== 'ALL' && r.team !== bTeam) return false;
+        if (matchupTeams && !matchupTeams.has(r.team)) return false;
+        if (!matchupTeams && bTeam !== 'ALL' && r.team !== bTeam) return false;
         if ((r.pa||0) < bMinPA) return false;
         if (bHandFilter && r.hand !== bHandFilter) return false;
         if (bPgFilter.length > 0) {
@@ -13152,7 +13176,7 @@ function StatsTab() {
         return bSortDir * (av - bv);
       })
       .slice(0, 300);
-  }, [data, window, bSplitKey, bSortBy, bSortDir, bSearch, bTeam, bMinPA, bHandFilter, bPgFilter]);
+  }, [data, window, bSplitKey, bSortBy, bSortDir, bSearch, bTeam, bMinPA, bHandFilter, bPgFilter, matchupTeams]);
 
   // ── Pitcher rows ──────────────────────────────────────────────────────────────
   const pRows = React.useMemo(() => {
@@ -13178,7 +13202,8 @@ function StatsTab() {
       })
       .filter(r => {
         if (!r) return false;
-        if (pTeam !== 'ALL' && r.team !== pTeam) return false;
+        if (matchupTeams && !matchupTeams.has(r.team)) return false;
+        if (!matchupTeams && pTeam !== 'ALL' && r.team !== pTeam) return false;
         if ((r.bf||0) < pMinBF) return false;
         if (pHandFilter && r.hand !== pHandFilter) return false;
         if (pRoleFilter && r.role !== pRoleFilter) return false;
@@ -13193,7 +13218,7 @@ function StatsTab() {
         return pSortDir * (av - bv);
       })
       .slice(0, 300);
-  }, [data, window, pSortBy, pSortDir, pSearch, pTeam, pMinBF, pHandFilter, pRoleFilter, pPgFilter]);
+  }, [data, window, pSortBy, pSortDir, pSearch, pTeam, pMinBF, pHandFilter, pRoleFilter, pPgFilter, matchupTeams]);
 
   // ── Shared helpers ────────────────────────────────────────────────────────────
   const fmtAvg = v => v>0 ? '.'+String(Math.round(v*1000)).padStart(3,'0') : '—';
@@ -13260,6 +13285,21 @@ function StatsTab() {
             </button>
           ))}
         </div>
+        {/* Matchup selector */}
+        <select value={selMatchup} onChange={e=>{setSelMatchup(e.target.value);setBTeam('ALL');setPTeam('ALL');}}
+          style={{fontFamily:mono,fontSize:9,background:'var(--surface2)',color:selMatchup?'var(--text)':'var(--muted)',
+            border:`1px solid ${selMatchup?'var(--accent)':'var(--border)'}`,borderRadius:6,
+            padding:'4px 10px',cursor:'pointer',fontWeight:selMatchup?700:400}}>
+          <option value=''>All Matchups</option>
+          {matchupList.map(m=>(
+            <option key={m.key} value={m.key}>{m.away} @ {m.home}{m.time?' · '+m.time:''}</option>
+          ))}
+        </select>
+        {selMatchup&&<button onClick={()=>{setSelMatchup('');setBTeam('ALL');setPTeam('ALL');}}
+          style={{padding:'4px 8px',borderRadius:6,fontSize:9,fontFamily:mono,cursor:'pointer',
+            border:'1px solid var(--border)',color:'var(--muted)',background:'transparent'}}>
+          ✕
+        </button>}
         <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginLeft:4}}>
           {WIN_LABELS[window]}  ·  {bRows.length} batters  ·  {pRows.length} pitchers
         </span>
@@ -13359,9 +13399,11 @@ function StatsTab() {
                     <td style={{textAlign:'center',padding:'2px 5px',fontFamily:mono,fontSize:8,fontWeight:700,color:pgCol(r._pgLabel)}}>{r._pgLabel?.split(' ')[0]||'—'}</td>
                     <td style={{padding:'2px 8px',whiteSpace:'nowrap'}}>
                       {(()=>{
-                        const schedRow = Object.values(DAILY_PICKS_CACHE).find(b=>String(b.pitcher_id||'').split('.')[0]===r.id||(b.pitcher&&r.name&&b.pitcher.toLowerCase()===r.name.toLowerCase()));
-                        if (!schedRow) return <span style={{fontFamily:mono,fontSize:7,color:'var(--muted)'}}>—</span>;
-                        return <span style={{fontFamily:osw,fontWeight:700,fontSize:10,color:'var(--text)'}}>{schedRow.batting_team||'—'}</span>;
+                        // Match on pitcher_team — works for SP, RP, everyone
+                        const game = matchupList.find(m => m.home===r.team || m.away===r.team);
+                        if (!game) return <span style={{fontFamily:mono,fontSize:7,color:'var(--muted)'}}>—</span>;
+                        const opp = game.home===r.team ? game.away : game.home;
+                        return <span style={{fontFamily:osw,fontWeight:700,fontSize:10,color:'var(--text)'}}>{opp}</span>;
                       })()}
                     </td>
                   </tr>
