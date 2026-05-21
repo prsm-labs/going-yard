@@ -13174,7 +13174,7 @@ function StatsTab() {
       .filter(r => {
         if (!r) return false;
         if (matchupTeams && !matchupTeams.has(r.team) && !matchupTeams.has(r.pitcher_team)) return false;
-        if (!matchupTeams && bTeam !== 'ALL' && r.team !== bTeam) return false;
+        if (bTeam !== 'ALL' && r.team !== bTeam) return false;
         if ((r.pa||0) < bMinPA) return false;
         if (bHandFilter && r.hand !== bHandFilter) return false;
         if (bPgFilter.length > 0) {
@@ -13217,7 +13217,7 @@ function StatsTab() {
       .filter(r => {
         if (!r) return false;
         if (matchupTeams && !matchupTeams.has(r.team)) return false;
-        if (!matchupTeams && pTeam !== 'ALL' && r.team !== pTeam) return false;
+        if (pTeam !== 'ALL' && r.team !== pTeam) return false;
         if ((r.bf||0) < pMinBF) return false;
         if (pHandFilter && r.hand !== pHandFilter) return false;
         if (pRoleFilter && r.role !== pRoleFilter) return false;
