@@ -13531,10 +13531,10 @@ function StatsTab() {
               </tbody>
             </table>
           </div>
+        </>}
         </div>
       </div>
 
-        </>}
       {/* ══ Separator ════════════════════════════════════════════════════════ */}
       <div style={{display:'flex',alignItems:'center',gap:10,margin:'4px 0 18px'}}>
         <div style={{flex:1,height:1,background:'var(--border)'}}/>
@@ -13708,8 +13708,8 @@ function StatsTab() {
               </tbody>
             </table>
           </div>
+        </>}
         </div>
-      </>}
       </div>
     </div>
   );
