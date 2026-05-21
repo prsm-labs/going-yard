@@ -6920,6 +6920,8 @@ function GamedayTab() {
     if (!team) return [];
     return (team.batters || []).map(bid => {
       const p = team.players?.[`ID${bid}`]; if (!p) return null;
+      const posAbbr = p.position?.abbreviation || p.position?.code || '';
+      if (posAbbr === 'P' || posAbbr === '1') return null;  // exclude pitchers from batter box
       const bo = p.battingOrder; const s = p.stats?.batting || {};
       return { id:bid, name:p.person?.fullName||'—', pos:p.position?.abbreviation||'',
         slot: bo && bo%100===0 ? Math.floor(bo/100) : null, sub: bo && bo%100!==0,
@@ -16956,10 +16958,16 @@ function useHRNotifications() {
       playHRSound();
       // Send live push — dedup key = gamePk+batterId+atBatIndex, unique per HR event
       const hrDedupKey = `hr-${hr.gamePk}-${hr.batterId}-${hr.atBatIndex}`;
-      const hrLabel = notif.type === 'Grand Slam' ? 'GRAND SLAM' : notif.type + ' HR';
-      sendLivePush(`💥 ${hrLabel} — ${notif.batterName}`,
-        `${notif.batterTeam} · ${notif.exitVelo > 0 ? notif.exitVelo.toFixed(0)+'mph' : ''} ${notif.distance > 0 ? notif.distance+'ft' : ''}`.trim(),
-        hrDedupKey);
+      const hrLabel = notif.type === 'Grand Slam' ? 'GRAND SLAM 💥' : notif.type === 'Grand Slam' ? 'grand slam' : notif.type?.toLowerCase() || 'solo';
+      const distStr  = notif.distance > 0 ? `${notif.distance}'` : '';
+      const evoStr   = notif.exitVelo > 0 ? `${notif.exitVelo.toFixed(0)}mph` : '';
+      const inningStr= notif.inning ? `${notif.halfInning === 'top' ? 'Top' : 'Bot'} ${notif.inning}` : '';
+      const matchup  = (hr.awayAbbr && hr.homeAbbr) ? `${hr.awayAbbr} @ ${hr.homeAbbr}` : notif.batterTeam;
+      // Title: "J. Soto solo 416' dinger 📈"
+      const pushTitle = `${notif.batterName} ${hrLabel} ${distStr} dinger 📈`.replace(/\s+/g,' ').trim();
+      // Body: "NYM @ PHI · Top 3 · 103mph"
+      const pushBody  = [matchup, inningStr, evoStr].filter(Boolean).join(' · ');
+      sendLivePush(pushTitle, pushBody, hrDedupKey);
       // On Fire detection — same batter hits 2nd HR in same game
       if (hr.gamePk && hr.batterId) {
         const key = `${hr.gamePk}_${hr.batterId}`;
