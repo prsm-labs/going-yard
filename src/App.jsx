@@ -13639,8 +13639,8 @@ function StatsTab() {
                   <BTh col="pbrl_pct" label="PBrl%" title="Pulled barrel rate"/>
                   <BTh col="fb_pct"   label="FB%"   title="Fly ball rate"/>
                   <BTh col="la_mean"  label="LA°"   title="Average launch angle"/>
-                  <th style={{padding:'4px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',<BTh col="_yard" label="⚡Score" title="Today's Yard Score"/>
-              letterSpacing:.5,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)',background:'var(--surface2)',whiteSpace:'nowrap'}}>Today's Pitcher</th>
+                  <BTh col="_yard" label="⚡Score" title="Today's Yard Score"/>
+                  <th style={{padding:'4px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.5,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)',background:'var(--surface2)',whiteSpace:'nowrap'}}>Today's Pitcher</th>
                 </tr>
               </thead>
               <tbody>
