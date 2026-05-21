@@ -13068,11 +13068,24 @@ function StatsTab() {
   const osw  = "'Oswald',sans-serif";
   const [statsPage,   setStatsPage]   = useState('batters'); // 'batters' | 'pitchers'
   const [window,      setWindow]      = useState('L30');
-  const [handSplit,   setHandSplit]   = useState('');       // '' | 'vsLHP' | 'vsRHP'
-  const [locSplit,    setLocSplit]    = useState('');       // '' | 'home'  | 'away'
-  const [dnSplit,     setDnSplit]     = useState('');       // '' | 'day'   | 'night'
+  // Separate filter state per page so batter/pitcher filters don't bleed
+  const [bHandSplit,  setBHandSplit]  = useState('');
+  const [bLocSplit,   setBLocSplit]   = useState('');
+  const [bDnSplit,    setBDnSplit]    = useState('');
+  const [pHandSplit,  setPHandSplit]  = useState('');
+  const [pLocSplit,   setPLocSplit]   = useState('');
+  const [pDnSplit,    setPDnSplit]    = useState('');
+  const handSplit = statsPage==='batters' ? bHandSplit : pHandSplit;
+  const locSplit  = statsPage==='batters' ? bLocSplit  : pLocSplit;
+  const dnSplit   = statsPage==='batters' ? bDnSplit   : pDnSplit;
+  const setHandSplit = statsPage==='batters' ? setBHandSplit : setPHandSplit;
+  const setLocSplit  = statsPage==='batters' ? setBLocSplit  : setPLocSplit;
+  const setDnSplit   = statsPage==='batters' ? setBDnSplit   : setPDnSplit;
   const [sortBy,      setSortBy]      = useState('woba');
   const [sortDir,     setSortDir]     = useState(-1);
+  const [minPA,       setMinPA]       = useState(10);
+  const [minBF,       setMinBF]       = useState(10);
+  const [pgFilter,    setPgFilter]    = useState([]);  // pitcher grade filter
   const [search,      setSearch]      = useState('');
   const [teamFilter,  setTeamFilter]  = useState('ALL');
   const [data,        setData]        = useState({batters:{}, pitchers:{}});
@@ -13094,16 +13107,51 @@ function StatsTab() {
   // ── Build rows ─────────────────────────────────────────────────────────────
   const rows = React.useMemo(() => {
     const src = statsPage === 'batters' ? data.batters : data.pitchers;
-    if (!src) return [];
+    if (!src || Object.keys(src).length === 0) return [];
+    // Try exact splitKey first, fall back to overall
+    const getSplit = (player) => {
+      const wins = player.splits?.[window];
+      if (!wins) return null;
+      if (wins[splitKey]) return wins[splitKey];           // exact match
+      // Partial fallback: try without one dimension
+      const parts = splitKey.split('_');
+      for (let i = parts.length - 1; i >= 1; i--) {
+        const partial = parts.slice(0, i).join('_');
+        if (wins[partial]) return wins[partial];
+      }
+      return wins['overall'] || null;                     // last resort
+    };
     return Object.entries(src)
       .map(([id, player]) => {
-        const sp = player.splits?.[window]?.[splitKey];
+        const sp = getSplit(player);
         if (!sp) return null;
-        return { id, ...player, ...sp };
+        // Add computed pitcher rate stats
+        const sp2 = {...sp};
+        if (statsPage === 'pitchers') {
+          const ip = (sp.bf||0) * 0.27; // rough IP proxy (BF * 0.27 ≈ IP)
+          sp2.hr_per9  = ip > 0 ? +((sp.hr_allowed||0) / ip * 9).toFixed(2) : 0;
+          sp2.k_per9   = ip > 0 ? +((sp.k||0)          / ip * 9).toFixed(1) : 0;
+          sp2.era      = ip > 0 ? +((sp.h_allowed||0)*0.5 / ip * 9).toFixed(2) : 0; // proxy via hits
+          sp2._pgLabel = (() => {
+            const hh=sp.hh_pct_allowed||0, brl=sp.brl_pct_allowed||0, mb=sp.meatball_pct||0;
+            if (brl >= 9  || (hh >= 35 && mb >= 55)) return '🎯 Target';
+            if (brl >= 6  || hh >= 30)               return '💥 Hittable';
+            if (brl <= 2  && hh <= 22 && mb <= 45)   return '‼️ Elite';
+            if (brl <= 3  && hh <= 24)               return '⚠️ Tough';
+            return '🤔 Average';
+          })();
+        }
+        return { id, ...player, ...sp2 };
       })
       .filter(r => {
         if (!r) return false;
         if (teamFilter !== 'ALL' && r.team !== teamFilter) return false;
+        if (statsPage==='batters'  && (r.pa||0)  < minPA) return false;
+        if (statsPage==='pitchers' && (r.bf||0)  < minBF) return false;
+        if (pgFilter.length > 0 && statsPage==='pitchers') {
+          const grade = r._pgLabel || '';
+          if (!pgFilter.some(g => grade.includes(g))) return false;
+        }
         if (search && !( (r.name||r.id).toLowerCase().includes(search.toLowerCase()) ||
                          (r.team||'').toLowerCase().includes(search.toLowerCase()))) return false;
         return true;
@@ -13113,7 +13161,7 @@ function StatsTab() {
         return sortDir * (bv - av);
       })
       .slice(0, 200); // cap at 200 for performance
-  }, [data, statsPage, window, splitKey, sortBy, sortDir, search, teamFilter]);
+  }, [data, statsPage, window, splitKey, sortBy, sortDir, search, teamFilter, minPA, minBF, pgFilter]);
 
   const teams = React.useMemo(() => {
     const src = statsPage === 'batters' ? data.batters : data.pitchers;
@@ -13147,7 +13195,7 @@ function StatsTab() {
       {/* ── Sub-page toggle ───────────────────────────────────────────────── */}
       <div style={{display:'flex',gap:6,marginBottom:12}}>
         {[['batters','🧢 Batters'],['pitchers','⚾ Pitchers']].map(([key,label])=>(
-          <button key={key} onClick={()=>{setStatsPage(key);setSortBy(key==='batters'?'woba':'woba_allowed');}}
+          <button key={key} onClick={()=>{setStatsPage(key);setSortBy(key==='batters'?'woba':'hr_per9');setSortDir(-1);setPgFilter([]);}}
             style={{padding:'6px 14px',borderRadius:8,cursor:'pointer',fontSize:10,fontFamily:osw,
               fontWeight:700,letterSpacing:.5,border:`1px solid ${statsPage===key?'var(--accent)':'var(--border)'}`,
               background:statsPage===key?'rgba(232,65,26,.12)':'var(--surface2)',
@@ -13203,6 +13251,18 @@ function StatsTab() {
             </button>
           ))}
         </div>
+        {/* Min PA/BF */}
+        <div style={{display:'flex',alignItems:'center',gap:4}}>
+          <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',whiteSpace:'nowrap'}}>
+            {statsPage==='batters'?'Min PA:':'Min BF:'}
+          </span>
+          <input type="number" min={1} max={500}
+            value={statsPage==='batters'?minPA:minBF}
+            onChange={e=>statsPage==='batters'?setMinPA(+e.target.value||1):setMinBF(+e.target.value||1)}
+            style={{width:44,padding:'4px 6px',borderRadius:5,border:'1px solid var(--border)',
+              background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:9,
+              textAlign:'center',outline:'none'}}/>
+        </div>
         {/* Search */}
         <input value={search} onChange={e=>setSearch(e.target.value)}
           placeholder="Search player or team..."
@@ -13217,6 +13277,27 @@ function StatsTab() {
         </select>
       </div>
 
+      {/* ── Pitcher grade filter (pitchers only) ──────────────────────────── */}
+      {statsPage==='pitchers' && (
+        <div style={{display:'flex',gap:4,flexWrap:'wrap',alignItems:'center',marginBottom:8}}>
+          <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>P.Grade:</span>
+          {[['Target','🎯 Target','#27c97a'],['Hittable','💥 Hittable','#60d360'],
+            ['Average','🤔 Average','#94a3b8'],['Tough','⚠️ Tough','#f5a623'],['Elite','‼️ Elite','#ff4020']].map(([key,label,col])=>(
+            <button key={key} onClick={()=>setPgFilter(f=>f.includes(key)?f.filter(x=>x!==key):[...f,key])}
+              style={{padding:'3px 8px',borderRadius:5,fontSize:8,fontFamily:mono,cursor:'pointer',
+                border:`1px solid ${pgFilter.includes(key)?col:'var(--border)'}`,
+                background:pgFilter.includes(key)?col+'22':'transparent',
+                color:pgFilter.includes(key)?col:'var(--muted)',fontWeight:pgFilter.includes(key)?700:400}}>
+              {label}
+            </button>
+          ))}
+          {pgFilter.length>0 && <button onClick={()=>setPgFilter([])}
+            style={{padding:'3px 6px',borderRadius:5,fontSize:8,fontFamily:mono,
+              cursor:'pointer',border:'1px solid var(--border)',color:'var(--muted)',background:'transparent'}}>
+            ✕ Clear
+          </button>}
+        </div>
+      )}
       {/* ── Info bar ──────────────────────────────────────────────────────── */}
       <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginBottom:8}}>
         <span style={{color:'var(--text)'}}>{rows.length}</span> {statsPage} ·{' '}
@@ -13255,7 +13336,6 @@ function StatsTab() {
               <Th col="bb_pct"   label="BB%"    title="Walk rate"/>
               <Th col="ev"       label="EV"     title="Average exit velocity (mph)"/>
               <Th col="hh_pct"   label="HH%"    title="Hard hit rate (EV ≥95mph)"/>
-              <Th col="brl_pct"  label="Brl%"   title="Barrel rate"/>
               <Th col="pbrl_pct" label="PBrl%"  title="Pulled barrel rate"/>
               <Th col="fb_pct"   label="FB%"    title="Fly ball rate"/>
               <Th col="la_mean"  label="LA°"    title="Average launch angle"/>
@@ -13287,7 +13367,6 @@ function StatsTab() {
                   <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.bb_pct||0)>=12?'#27c97a':'var(--muted)'}}>{fmtPct(r.bb_pct)}</td>
                   <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:evColor(r.ev||0)}}>{r.ev?r.ev.toFixed(1):'—'}</td>
                   <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:hhColor(r.hh_pct||0)}}>{fmtPct(r.hh_pct)}</td>
-                  <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.brl_pct||0)>=10?'#ff4020':(r.brl_pct||0)>=6?'#f5a623':'var(--muted)'}}>{fmtPct(r.brl_pct)}</td>
                   <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.pbrl_pct||0)>=8?'#ff4020':'var(--muted)'}}>{fmtPct(r.pbrl_pct)}</td>
                   <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.fb_pct||0)>=38?'#27c97a':'var(--muted)'}}>{fmtPct(r.fb_pct)}</td>
                   <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.la_mean||0)>=18&&(r.la_mean||0)<=30?'#27c97a':'var(--muted)'}}>{r.la_mean?r.la_mean.toFixed(1)+'°':'—'}</td>
@@ -13317,7 +13396,10 @@ function StatsTab() {
               <Th col="hh_pct_allowed"  label="HH%"    title="Hard hit rate allowed"/>
               <Th col="brl_pct_allowed" label="Brl%"   title="Barrel rate allowed"/>
               <Th col="fb_pct_allowed"  label="FB%"    title="Fly ball rate allowed"/>
+              <Th col="hr_per9"         label="HR/9"   title="Home runs allowed per 9 innings (estimated)"/>
+              <Th col="k_per9"          label="K/9"    title="Strikeouts per 9 innings (estimated)"/>
               <Th col="meatball_pct"    label="MB%"    title="Meatball rate (hittable zone in hitter-friendly counts)"/>
+              <Th col="_pgLabel"        label="Grade"  title="Pitcher grade: Target/Hittable/Average/Tough/Elite" align="center"/>
             </tr></thead>
             <tbody>
               {rows.map(r => (
@@ -13327,7 +13409,10 @@ function StatsTab() {
                     <div style={{display:'flex',alignItems:'center',gap:4}}>
                       <PlayerAvatar pid={parseInt(r.id)||0} name={r.name||r.id} size={16}/>
                       <span style={{fontFamily:osw,fontWeight:700,fontSize:9,color:'var(--accent2)',minWidth:26}}>{r.team||''}</span>
-                      <span style={{fontFamily:osw,fontWeight:700,fontSize:10,color:'var(--text)'}}>{r.name||r.id}</span>
+                      <span onClick={()=>openPitcherSlide({pid:parseInt(r.id)||0,name:r.name||r.id,team:r.team||'',hand:r.hand||'',pitchMix:[]})}
+                        style={{fontFamily:osw,fontWeight:700,fontSize:10,color:'var(--text)',cursor:'pointer'}}>
+                        {r.name||r.id}
+                      </span>
                       <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginLeft:2}}>{r.hand||''}</span>
                     </div>
                   </td>
@@ -13350,8 +13435,16 @@ function StatsTab() {
                     color:(r.brl_pct_allowed||0)>=10?'#ff4020':(r.brl_pct_allowed||0)>=6?'#f5a623':'var(--muted)'}}>{fmtPct(r.brl_pct_allowed)}</td>
                   <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
                     color:(r.fb_pct_allowed||0)>=40?'#ff4020':(r.fb_pct_allowed||0)>=35?'#f5a623':'var(--muted)'}}>{fmtPct(r.fb_pct_allowed)}</td>
+                  <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,fontWeight:700,
+                    color:(r.hr_per9||0)>=1.5?'#ff4020':(r.hr_per9||0)>=1.0?'#f5a623':(r.hr_per9||0)>=0.5?'#fbbf24':'#27c97a'}}>{r.hr_per9>0?r.hr_per9.toFixed(2):'—'}</td>
+                  <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
+                    color:(r.k_per9||0)>=10?'#27c97a':(r.k_per9||0)>=8?'#f5a623':'var(--muted)'}}>{r.k_per9>0?r.k_per9.toFixed(1):'—'}</td>
                   <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
                     color:(r.meatball_pct||0)>=60?'#ff4020':(r.meatball_pct||0)>=50?'#f5a623':'var(--muted)'}}>{fmtPct(r.meatball_pct)}</td>
+                  <td style={{textAlign:'center',padding:'2px 5px',fontFamily:mono,fontSize:8,fontWeight:700,
+                    color:r._pgLabel?.includes('Target')?'#27c97a':r._pgLabel?.includes('Hittable')?'#60d360':r._pgLabel?.includes('Elite')?'#ff4020':r._pgLabel?.includes('Tough')?'#f5a623':'var(--muted)'}}>
+                    {r._pgLabel?.split(' ')[0]||'—'}
+                  </td>
                 </tr>
               ))}
             </tbody>
