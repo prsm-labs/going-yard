@@ -13104,6 +13104,7 @@ function StatsTab() {
 
   // ── Batter-only state ─────────────────────────────────────────────────────────
   const [bHandFilter, setBHandFilter] = useState('');
+  const [bPicksOnly,  setBPicksOnly]  = useState(false);
   const [bConfirmed,  setBConfirmed]  = useState(false);
   const [bHotOnly,    setBHotOnly]    = useState(false);
   const [bGYOnly,     setBGYOnly]     = useState(false);
@@ -13242,6 +13243,7 @@ function StatsTab() {
         if (sharedBHand && r.hand !== sharedBHand && !(sharedBHand==='S'&&r.hand==='S')) return false;
         if (bHandFilter && r.hand !== bHandFilter) return false;
         const bpid = parseInt(r.id)||0;
+        if (bPicksOnly) { const picks = loadPicks(); if (!picks[bpid] && !picks[r.name]) return false; }
         const bls  = LINEUP_STATUS[bpid];
         if (bConfirmed && bls?.status !== 'confirmed') return false;
         if (bGYOnly    && !isGoneYardToday(bpid, r.name)) return false;
@@ -13260,7 +13262,7 @@ function StatsTab() {
         return bSortDir * (av - bv);
       })
       .slice(0, 300);
-  }, [data, window, bSplitKey, bSortBy, bSortDir, bSearch, bTeam, bMinPA, bHandFilter, bPgFilter, matchupTeams, sharedBHand, bConfirmed, bHotOnly, bGYOnly, bHideInj, lineupVer]);
+  }, [data, window, bSplitKey, bSortBy, bSortDir, bSearch, bTeam, bMinPA, bHandFilter, bPgFilter, matchupTeams, sharedBHand, bConfirmed, bHotOnly, bGYOnly, bHideInj, bPicksOnly, lineupVer]);
 
   // ── Pitcher rows ──────────────────────────────────────────────────────────────
   const pRows = React.useMemo(() => {
@@ -13579,6 +13581,7 @@ function StatsTab() {
         <div style={{display:'flex',gap:5,flexWrap:'nowrap',alignItems:'center',marginBottom:6,overflowX:'auto',WebkitOverflowScrolling:'touch',paddingBottom:2}}>
           {/* Sticker filters */}
           {[
+            [bPicksOnly, setBPicksOnly, '🎯', 'My Picks only'],
             [bConfirmed, setBConfirmed, '✅', 'Confirmed lineup only'],
             [bHotOnly,   setBHotOnly,   '🔥', '3+ HRs in last 7 days'],
             [bGYOnly,    setBGYOnly,    '💥', 'Gone yard today'],
@@ -13625,6 +13628,7 @@ function StatsTab() {
                 <tr>
                   <th style={{padding:'4px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.5,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)',background:'var(--surface2)',position:'sticky',left:0,zIndex:5,whiteSpace:'nowrap'}}>Batter</th>
                   <BTh col="pa"       label="PA"    title="Plate appearances"/>
+                  <BTh col="_yard"    label={<img src="/icon-192.png" alt="Yard" style={{width:14,height:14,borderRadius:2,objectFit:'cover',verticalAlign:'middle'}}/>} title="Today's Yard Score" align="center"/>
                   <BTh col="avg"      label="AVG"   title="Batting average"/>
                   <BTh col="obp"      label="OBP"   title="On-base percentage"/>
                   <BTh col="slg"      label="SLG"   title="Slugging percentage"/>
@@ -13639,7 +13643,6 @@ function StatsTab() {
                   <BTh col="pbrl_pct" label="PBrl%" title="Pulled barrel rate"/>
                   <BTh col="fb_pct"   label="FB%"   title="Fly ball rate"/>
                   <BTh col="la_mean"  label="LA°"   title="Average launch angle"/>
-                  <BTh col="_yard" label="⚡Score" title="Today's Yard Score"/>
                   <th style={{padding:'4px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.5,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)',background:'var(--surface2)',whiteSpace:'nowrap'}}>Today's Pitcher</th>
                 </tr>
               </thead>
@@ -13667,6 +13670,9 @@ function StatsTab() {
                       </div>
                     </td>
                     <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{fmtN(r.pa)}</td>
+                    <td style={{textAlign:'center',padding:'2px 4px'}}>
+                      {r._yard>0 ? <YardBadge score={parseFloat(r._yard)}/> : <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>—</span>}
+                    </td>
                     <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.avg||0)>=0.280?'#27c97a':'var(--muted)'}}>{fmtAvg(r.avg)}</td>
                     <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.obp||0)>=0.360?'#27c97a':'var(--muted)'}}>{fmtAvg(r.obp)}</td>
                     <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.slg||0)>=0.480?'#ff8020':(r.slg||0)>=0.400?'#f5a623':'var(--muted)'}}>{fmtAvg(r.slg)}</td>
@@ -13681,15 +13687,7 @@ function StatsTab() {
                     <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.pbrl_pct||0)>=8?'#ff4020':'var(--muted)'}}>{fmtPct(r.pbrl_pct)}</td>
                     <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.fb_pct||0)>=38?'#27c97a':'var(--muted)'}}>{fmtPct(r.fb_pct)}</td>
                     <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.la_mean||0)>=18&&(r.la_mean||0)<=30?'#27c97a':'var(--muted)'}}>{r.la_mean?r.la_mean.toFixed(1)+'°':'—'}</td>
-                    <td style={{textAlign:'right',padding:'2px 5px'}}>
-                      {(()=>{
-                        const dp2 = DAILY_PICKS_CACHE[r.id]||Object.values(DAILY_PICKS_CACHE).find(b=>String(b.batter_id||'').split('.')[0]===r.id);
-                        if (!dp2?._yard) return <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>—</span>;
-                        const yv = parseFloat(dp2._yard)||0;
-                        const col = yv>=55?'#ff4020':yv>=45?'#f5a623':yv>=35?'#27c97a':'var(--muted)';
-                        return <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:11,color:col}}>{yv.toFixed(0)}</span>;
-                      })()}
-                    </td>
+
                     <td style={{padding:'2px 8px',whiteSpace:'nowrap'}}>
                       {(()=>{
                         const dp = DAILY_PICKS_CACHE[r.id]||Object.values(DAILY_PICKS_CACHE).find(b=>String(b.batter_id||'').split('.')[0]===r.id);
