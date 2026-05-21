@@ -13071,8 +13071,8 @@ function StatsTab() {
   const [window,      setWindow]      = useState('L30');
   const [selMatchup,  setSelMatchup]  = useState('');
   const [lineupVer,   setLineupVer]   = useState(0);
+  const autoLinkRef = React.useRef(false); // prevent circular team auto-link
   useEffect(() => {
-    // Poll until DAILY_PICKS_CACHE is populated (handles display:none mount timing)
     const id = setInterval(() => {
       if (Object.keys(DAILY_PICKS_CACHE).length > 0) {
         setLineupVer(v => v + 1);
@@ -13082,17 +13082,40 @@ function StatsTab() {
     return () => clearInterval(id);
   }, []);
 
+  // Auto-link: when pitcher team changes, set batter team to opponent (and vice versa)
+  const onPTeamChange = (team) => {
+    setPTeam(team);
+    if (team === 'ALL' || autoLinkRef.current) return;
+    const game = matchupList.find(m => m.home===team || m.away===team);
+    if (game) { autoLinkRef.current=true; setBTeam(game.home===team?game.away:game.home); setTimeout(()=>autoLinkRef.current=false,50); }
+  };
+  const onBTeamChange = (team) => {
+    setBTeam(team);
+    if (team === 'ALL' || autoLinkRef.current) return;
+    const game = matchupList.find(m => m.home===team || m.away===team);
+    if (game) { autoLinkRef.current=true; setPTeam(game.home===team?game.away:game.home); setTimeout(()=>autoLinkRef.current=false,50); }
+  };
+
+  // ── Shared tandem filters (affect both tables + splits) ─────────────────────
+  const [sharedPHand, setSharedPHand] = useState('');  // '' | 'L' | 'R' — pitcher hand → batter vsLHP/vsRHP split
+  const [sharedBHand, setSharedBHand] = useState('');  // '' | 'L' | 'R' | 'S' — batter hand → pitcher vsLHB/vsRHB split
+  const [sharedLoc,   setSharedLoc]   = useState('');  // '' | 'home' | 'away'
+  const [sharedDN,    setSharedDN]    = useState('');  // '' | 'day' | 'night'
+
   // ── Batter-only state ─────────────────────────────────────────────────────────
-  const [bHandSplit,  setBHandSplit]  = useState('');
-  const [bLocSplit,   setBLocSplit]   = useState('');
-  const [bDnSplit,    setBDnSplit]    = useState('');
   const [bHandFilter, setBHandFilter] = useState('');
+  const [bConfirmed,  setBConfirmed]  = useState(false);
+  const [bHotOnly,    setBHotOnly]    = useState(false);
+  const [bGYOnly,     setBGYOnly]     = useState(false);
+  const [bHideInj,    setBHideInj]    = useState(false);
   const [bSortBy,     setBSortBy]     = useState('iso');
   const [bSortDir,    setBSortDir]    = useState(-1);
   const [bSearch,     setBSearch]     = useState('');
   const [bTeam,       setBTeam]       = useState('ALL');
   const [bMinPA,      setBMinPA]      = useState(10);
   const [bPgFilter,   setBPgFilter]   = useState([]);
+  const [expandedB,   setExpandedB]   = useState(null); // expanded batter row id
+  const [expandedP,   setExpandedP]   = useState(null); // expanded pitcher row id
 
   // ── Pitcher-only state ────────────────────────────────────────────────────────
   const [pHandFilter, setPHandFilter] = useState('');
@@ -13117,6 +13140,16 @@ function StatsTab() {
   }, []);
 
   const WIN_LABELS = { L7:'Last 7', L15:'Last 15', L30:'Last 30', season:'2026 Season' };
+
+  // Probable pitcher IDs (from daily_picks.csv schedule join)
+  const probablePitcherIds = React.useMemo(() => {
+    const ids = new Set();
+    Object.values(DAILY_PICKS_CACHE).forEach(r => {
+      const pid = String(r.pitcher_id||'').split('.')[0];
+      if (pid && pid !== '0') ids.add(pid);
+    });
+    return ids;
+  }, [lineupVer]);
 
   // ── Build matchup list from DAILY_PICKS_CACHE ─────────────────────────────
   const matchupList = React.useMemo(() => {
@@ -13144,7 +13177,25 @@ function StatsTab() {
   }, [selMatchup, matchupList]);
 
   // ── Batter split key ──────────────────────────────────────────────────────────
-  const bSplitKey = [bHandSplit, bLocSplit, bDnSplit].filter(Boolean).join('_') || 'overall';
+  // Batter split key: pitcher hand sets vs-hand, shared loc/dn set location/daynight
+  const bSplitKey = React.useMemo(() => {
+    const parts = [];
+    if (sharedPHand === 'L') parts.push('vsLHP');
+    if (sharedPHand === 'R') parts.push('vsRHP');
+    if (sharedLoc)           parts.push(sharedLoc);
+    if (sharedDN)            parts.push(sharedDN);
+    return parts.join('_') || 'overall';
+  }, [sharedPHand, sharedLoc, sharedDN]);
+
+  // Pitcher split key: batter hand sets vs-hand
+  const pSplitKey = React.useMemo(() => {
+    const parts = [];
+    if (sharedBHand === 'L') parts.push('vsLHB');
+    if (sharedBHand === 'R') parts.push('vsRHB');
+    if (sharedLoc)           parts.push(sharedLoc);
+    if (sharedDN)            parts.push(sharedDN);
+    return parts.join('_') || 'overall';
+  }, [sharedBHand, sharedLoc, sharedDN]);
 
   // ── Teams ──────────────────────────────────────────────────────────────────────
   const bTeams = React.useMemo(() => { const all=['ALL',...new Set(Object.values(data.batters||{}).map(p=>p.team||'').filter(Boolean))].sort(); return matchupTeams?['ALL',...all.filter(t=>t!=='ALL'&&matchupTeams.has(t))]:all; }, [data.batters, matchupTeams]);
@@ -13176,7 +13227,14 @@ function StatsTab() {
         if (matchupTeams && !matchupTeams.has(r.team) && !matchupTeams.has(r.pitcher_team)) return false;
         if (bTeam !== 'ALL' && r.team !== bTeam) return false;
         if ((r.pa||0) < bMinPA) return false;
+        if (sharedBHand && r.hand !== sharedBHand && !(sharedBHand==='S'&&r.hand==='S')) return false;
         if (bHandFilter && r.hand !== bHandFilter) return false;
+        const bpid = parseInt(r.id)||0;
+        const bls  = LINEUP_STATUS[bpid];
+        if (bConfirmed && bls?.status !== 'confirmed') return false;
+        if (bGYOnly    && !isGoneYardToday(bpid, r.name)) return false;
+        if (bHotOnly   && !(parseInt(r.recent_hr_count||0)>=3||(getCachedPlayer(bpid)?.recentHR||0)>=3)) return false;
+        if (bHideInj   && INJURY_MAP?.[bpid]) return false;
         if (bPgFilter.length > 0) {
           const dp = DAILY_PICKS_CACHE[r.id] || Object.values(DAILY_PICKS_CACHE).find(b=>String(b.batter_id||'').split('.')[0]===r.id);
           const pg = dp?._pgLabel || '';
@@ -13190,7 +13248,7 @@ function StatsTab() {
         return bSortDir * (av - bv);
       })
       .slice(0, 300);
-  }, [data, window, bSplitKey, bSortBy, bSortDir, bSearch, bTeam, bMinPA, bHandFilter, bPgFilter, matchupTeams]);
+  }, [data, window, bSplitKey, bSortBy, bSortDir, bSearch, bTeam, bMinPA, bHandFilter, bPgFilter, matchupTeams, sharedBHand, bConfirmed, bHotOnly, bGYOnly, bHideInj, lineupVer]);
 
   // ── Pitcher rows ──────────────────────────────────────────────────────────────
   const pRows = React.useMemo(() => {
@@ -13198,7 +13256,9 @@ function StatsTab() {
     if (!Object.keys(src).length) return [];
     return Object.entries(src)
       .map(([id, player]) => {
-        const sp = player.splits?.[window]?.['overall'];
+        const psk = pSplitKey || 'overall';
+        const wins = player.splits?.[window];
+        const sp = wins?.[psk] || wins?.['overall'];
         if (!sp) return null;
         const ip = (sp.bf||0) * 0.27;
         const _pgLabel = (() => {
@@ -13219,7 +13279,7 @@ function StatsTab() {
         if (matchupTeams && !matchupTeams.has(r.team)) return false;
         if (pTeam !== 'ALL' && r.team !== pTeam) return false;
         if ((r.bf||0) < pMinBF) return false;
-        if (pHandFilter && r.hand !== pHandFilter) return false;
+        if (sharedPHand && r.hand !== sharedPHand) return false;
         if (pRoleFilter && r.role !== pRoleFilter) return false;
         if (pPgFilter.length > 0) {
           if (!pPgFilter.some(g => (r._pgLabel||'').includes(g))) return false;
@@ -13232,7 +13292,7 @@ function StatsTab() {
         return pSortDir * (av - bv);
       })
       .slice(0, 300);
-  }, [data, window, pSortBy, pSortDir, pSearch, pTeam, pMinBF, pHandFilter, pRoleFilter, pPgFilter, matchupTeams]);
+  }, [data, window, pSplitKey, pSortBy, pSortDir, pSearch, pTeam, pMinBF, pRoleFilter, pPgFilter, matchupTeams, sharedPHand, lineupVer]);
 
   // ── Shared helpers ────────────────────────────────────────────────────────────
   const fmtAvg = v => v>0 ? '.'+String(Math.round(v*1000)).padStart(3,'0') : '—';
@@ -13267,7 +13327,7 @@ function StatsTab() {
     <div style={{display:'flex',gap:2,background:'var(--surface2)',borderRadius:7,padding:2,border:'1px solid var(--border)'}}>
       {items.map(([val,lbl])=>(
         <button key={val} onClick={()=>onSelect(v=>v===val&&val?'':val)}
-          style={{padding:'3px 7px',borderRadius:5,fontSize:8,fontFamily:mono,cursor:'pointer',border:'none',
+          style={{padding:'3px 7px',borderRadius:5,fontSize:8,fontFamily:mono,cursor:'pointer',border:'none',flexShrink:0,
             background:active===val&&val?color:!val&&!active?color.replace('.2','.08'):'transparent',
             color:active===val||(!val&&!active)?activeColor:'var(--muted)',
             fontWeight:active===val||(!val&&!active)?700:400}}>
@@ -13327,9 +13387,13 @@ function StatsTab() {
         </div>
 
         {/* Pitcher filters */}
-        <div style={{display:'flex',gap:5,flexWrap:'wrap',alignItems:'center',marginBottom:6}}>
-          <PillRow items={[['','All'],['L','LHP'],['R','RHP']]} active={pHandFilter} onSelect={setPHandFilter}/>
+        <div style={{display:'flex',gap:5,flexWrap:'nowrap',alignItems:'center',marginBottom:6,overflowX:'auto',WebkitOverflowScrolling:'touch',paddingBottom:2}}>
+          {/* Shared: pitcher hand = batter vsLHP/vsRHP split */}
+          <PillRow items={[['','All'],['L','LHP'],['R','RHP']]} active={sharedPHand} onSelect={setSharedPHand}/>
           <PillRow items={[['','All'],['SP','SP'],['RP','RP']]} active={pRoleFilter} onSelect={setPRoleFilter} color='rgba(251,191,36,.2)' activeColor='#fbbf24'/>
+          {/* Shared tandem: location + day/night */}
+          <PillRow items={[['','All'],['home','Home'],['away','Away']]} active={sharedLoc} onSelect={setSharedLoc} color='rgba(39,201,122,.2)' activeColor='#27c97a'/>
+          <PillRow items={[['','All'],['day','Day'],['night','Night']]} active={sharedDN} onSelect={setSharedDN} color='rgba(245,166,35,.2)' activeColor='#f5a623'/>
           <div style={{display:'flex',gap:2}}>
             {gradeEmojis.map(([key,emoji])=>(
               <button key={key} onClick={()=>setPPgFilter(f=>f.includes(key)?f.filter(x=>x!==key):[...f,key])}
@@ -13343,17 +13407,17 @@ function StatsTab() {
             {pPgFilter.length>0&&<button onClick={()=>setPPgFilter([])} style={{padding:'2px 5px',borderRadius:5,fontSize:8,fontFamily:mono,cursor:'pointer',border:'1px solid var(--border)',color:'var(--muted)',background:'transparent'}}>✕</button>}
           </div>
           <div style={{display:'flex',alignItems:'center',gap:4}}>
-            <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>Min BF:</span>
+            <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0}}>Min BF:</span>
             <input type="number" min={1} max={500} value={pMinBF}
               onChange={e=>setPMinBF(+e.target.value||1)}
               style={{width:44,padding:'4px 6px',borderRadius:5,border:'1px solid var(--border)',
                 background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:9,textAlign:'center',outline:'none'}}/>
           </div>
           <input value={pSearch} onChange={e=>setPSearch(e.target.value)}
-            placeholder="Search pitcher or team…"
-            style={{flex:1,minWidth:130,padding:'5px 9px',borderRadius:6,border:'1px solid var(--border)',
+            placeholder="Search…"
+            style={{flex:'0 0 120px',minWidth:80,padding:'5px 9px',borderRadius:6,border:'1px solid var(--border)',
               background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:9,outline:'none'}}/>
-          <select value={pTeam} onChange={e=>setPTeam(e.target.value)}
+          <select value={pTeam} onChange={e=>onPTeamChange(e.target.value)}
             style={{fontFamily:mono,fontSize:8,background:'var(--surface2)',color:'var(--text)',
               border:'1px solid var(--border)',borderRadius:5,padding:'4px 7px',cursor:'pointer'}}>
             {pTeams.map(t=><option key={t} value={t}>{t==='ALL'?'All Teams':t}</option>)}
@@ -13387,13 +13451,21 @@ function StatsTab() {
                 {pRows.length===0
                   ? <tr><td colSpan={15} style={{textAlign:'center',padding:24,fontFamily:mono,fontSize:10,color:'var(--muted)'}}>No pitcher data — run build_splits.py then mlbdata_aggregate.py</td></tr>
                   : pRows.map(r=>(
-                  <tr key={r.id} style={{borderBottom:'1px solid rgba(255,255,255,.04)',height:26}}>
+                  <tr key={r.id}
+                    onClick={()=>setExpandedP(e=>e===r.id?null:r.id)}
+                    style={{borderBottom:'1px solid rgba(255,255,255,.04)',height:26,cursor:'pointer',
+                      background:expandedP===r.id?'rgba(56,184,242,.06)':'transparent'}}>
                     <td style={{padding:'2px 8px',position:'sticky',left:0,background:'var(--surface)',zIndex:3,whiteSpace:'nowrap',minWidth:170}}>
                       <div style={{display:'flex',alignItems:'center',gap:4}}>
                         <PlayerAvatar pid={parseInt(r.id)||0} name={r.name||r.id} size={16}/>
                         <span style={{fontFamily:osw,fontWeight:700,fontSize:9,color:'var(--accent2)',minWidth:26}}>{r.team||''}</span>
                         <span onClick={()=>openPitcherSlide({pid:parseInt(r.id)||0,name:r.name||r.id,team:r.team||'',hand:r.hand||'',pitchMix:[]})}
                           style={{fontFamily:osw,fontWeight:700,fontSize:10,color:'var(--text)',cursor:'pointer'}}>{r.name||r.id}</span>
+                        {LINEUP_STATUS[parseInt(r.id)||0]?.status==='confirmed'
+                          ? <span title="Confirmed SP" style={{fontSize:10,flexShrink:0}}>🟢</span>
+                          : probablePitcherIds.has(r.id)
+                            ? <span title="Probable SP" style={{fontSize:10,flexShrink:0}}>🟡</span>
+                            : null}
                         <span style={{fontFamily:mono,fontSize:7,color:'var(--muted)'}}>{r.hand==='L'?'LHP':r.hand==='R'?'RHP':''}</span>
                         {r.role&&<span style={{padding:'1px 3px',borderRadius:3,fontSize:7,fontWeight:700,background:r.role==='SP'?'rgba(56,184,242,.15)':'rgba(251,191,36,.15)',color:r.role==='SP'?'var(--ice)':'#fbbf24',border:`1px solid ${r.role==='SP'?'rgba(56,184,242,.3)':'rgba(251,191,36,.3)'}`}}>{r.role}</span>}
                       </div>
@@ -13421,6 +13493,20 @@ function StatsTab() {
                       })()}
                     </td>
                   </tr>
+                  {expandedP===r.id && (
+                    <tr key={r.id+'_exp'}>
+                      <td colSpan={15} style={{padding:'0 12px 12px',background:'rgba(56,184,242,.04)',borderBottom:'2px solid rgba(56,184,242,.18)'}}>
+                        <div style={{display:'flex',alignItems:'center',gap:8,padding:'6px 0 4px',borderBottom:'1px solid var(--border)',marginBottom:6}}>
+                          <PlayerAvatar pid={parseInt(r.id)||0} name={r.name||r.id} size={20}/>
+                          <span style={{fontFamily:osw,fontWeight:700,fontSize:12}}>{r.name||r.id}</span>
+                          <span style={{fontFamily:mono,fontSize:8,color:'var(--accent2)'}}>{r.team}</span>
+                          <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>{r.hand==='L'?'LHP':'RHP'} · {r.role||''}</span>
+                          <span style={{fontFamily:mono,fontSize:8,color:pgCol(r._pgLabel),marginLeft:'auto'}}>{r._pgLabel||''}</span>
+                        </div>
+                        <Last7HRAllowedChart pitcherId={parseInt(r.id)||0}/>
+                      </td>
+                    </tr>
+                  )}
                 ))}
               </tbody>
             </table>
@@ -13442,17 +13528,35 @@ function StatsTab() {
           <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>{bRows.length} shown</span>
         </div>
 
-        {/* Batter filters — row 1: splits */}
-        <div style={{display:'flex',gap:5,flexWrap:'wrap',alignItems:'center',marginBottom:4}}>
-          <PillRow items={[['','All'],['vsLHP','vs LHP'],['vsRHP','vs RHP']]} active={bHandSplit} onSelect={setBHandSplit}/>
-          <PillRow items={[['','All'],['home','Home'],['away','Away']]} active={bLocSplit} onSelect={setBLocSplit} color='rgba(39,201,122,.2)' activeColor='#27c97a'/>
-          <PillRow items={[['','All'],['day','Day'],['night','Night']]} active={bDnSplit} onSelect={setBDnSplit} color='rgba(245,166,35,.2)' activeColor='#f5a623'/>
-          <PillRow items={[['','All'],['L','LHB'],['R','RHB'],['S','SWB']]} active={bHandFilter} onSelect={setBHandFilter}/>
+        {/* Batter filters — row 1: shared tandem filters */}
+        <div style={{display:'flex',gap:5,flexWrap:'nowrap',alignItems:'center',marginBottom:4,overflowX:'auto',WebkitOverflowScrolling:'touch',paddingBottom:2}}>
+          {/* Shared: batter hand = pitcher vsLHB/vsRHB split */}
+          <PillRow items={[['','All'],['L','LHB'],['R','RHB'],['S','SWB']]} active={sharedBHand} onSelect={setSharedBHand}/>
+          {/* Shared: location + day/night affect both splits */}
+          <PillRow items={[['','All'],['home','Home'],['away','Away']]} active={sharedLoc} onSelect={setSharedLoc} color='rgba(39,201,122,.2)' activeColor='#27c97a'/>
+          <PillRow items={[['','All'],['day','Day'],['night','Night']]} active={sharedDN} onSelect={setSharedDN} color='rgba(245,166,35,.2)' activeColor='#f5a623'/>
+          {/* Batter-only: additional hand filter on top of split */}
+          <PillRow items={[['','All'],['L','L only'],['R','R only'],['S','S only']]} active={bHandFilter} onSelect={setBHandFilter}/>
         </div>
 
-        {/* Batter filters — row 2: opp grade + controls */}
-        <div style={{display:'flex',gap:5,flexWrap:'wrap',alignItems:'center',marginBottom:6}}>
-          <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>Opp:</span>
+        {/* Batter filters — row 2: stickers + opp grade + controls */}
+        <div style={{display:'flex',gap:5,flexWrap:'nowrap',alignItems:'center',marginBottom:6,overflowX:'auto',WebkitOverflowScrolling:'touch',paddingBottom:2}}>
+          {/* Sticker filters */}
+          {[
+            [bConfirmed, setBConfirmed, '✅', 'Confirmed lineup only'],
+            [bHotOnly,   setBHotOnly,   '🔥', '3+ HRs in last 7 days'],
+            [bGYOnly,    setBGYOnly,    '💥', 'Gone yard today'],
+            [bHideInj,   setBHideInj,   '🤕', 'Hide injured'],
+          ].map(([active, setFn, emoji, tip]) => (
+            <button key={emoji} onClick={()=>setFn(v=>!v)} data-tip={tip}
+              style={{padding:'3px 7px',borderRadius:5,fontSize:12,cursor:'pointer',flexShrink:0,
+                border:`1px solid ${active?'var(--accent)':'var(--border)'}`,
+                background:active?'rgba(232,65,26,.15)':'transparent'}}>
+              {emoji}
+            </button>
+          ))}
+          <div style={{width:1,height:14,background:'var(--border)',flexShrink:0}}/>
+          <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0}}>Opp:</span>
           {gradeEmojis.map(([key,emoji])=>(
             <button key={key} onClick={()=>setBPgFilter(f=>f.includes(key)?f.filter(x=>x!==key):[...f,key])}
               data-tip={key+' opposing pitcher'}
@@ -13464,14 +13568,14 @@ function StatsTab() {
           ))}
           {bPgFilter.length>0&&<button onClick={()=>setBPgFilter([])} style={{padding:'2px 5px',borderRadius:5,fontSize:8,fontFamily:mono,cursor:'pointer',border:'1px solid var(--border)',color:'var(--muted)',background:'transparent'}}>✕</button>}
           <div style={{display:'flex',alignItems:'center',gap:4,marginLeft:4}}>
-            <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>Min PA:</span>
+            <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0}}>Min PA:</span>
             <input type="number" min={1} max={500} value={bMinPA} onChange={e=>setBMinPA(+e.target.value||1)}
               style={{width:44,padding:'4px 6px',borderRadius:5,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:9,textAlign:'center',outline:'none'}}/>
           </div>
           <input value={bSearch} onChange={e=>setBSearch(e.target.value)}
-            placeholder="Search batter or team…"
-            style={{flex:1,minWidth:130,padding:'5px 9px',borderRadius:6,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:9,outline:'none'}}/>
-          <select value={bTeam} onChange={e=>setBTeam(e.target.value)}
+            placeholder="Search…"
+            style={{flex:'0 0 120px',minWidth:80,padding:'5px 9px',borderRadius:6,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:9,outline:'none'}}/>
+          <select value={bTeam} onChange={e=>onBTeamChange(e.target.value)}
             style={{fontFamily:mono,fontSize:8,background:'var(--surface2)',color:'var(--text)',border:'1px solid var(--border)',borderRadius:5,padding:'4px 7px',cursor:'pointer'}}>
             {bTeams.map(t=><option key={t} value={t}>{t==='ALL'?'All Teams':t}</option>)}
           </select>
@@ -13506,7 +13610,10 @@ function StatsTab() {
                 {bRows.length===0
                   ? <tr><td colSpan={17} style={{textAlign:'center',padding:24,fontFamily:mono,fontSize:10,color:'var(--muted)'}}>No batter data — run build_splits.py then mlbdata_aggregate.py</td></tr>
                   : bRows.map(r=>(
-                  <tr key={r.id} style={{borderBottom:'1px solid rgba(255,255,255,.04)',height:26}}>
+                  <tr key={r.id}
+                    onClick={()=>setExpandedB(e=>e===r.id?null:r.id)}
+                    style={{borderBottom:'1px solid rgba(255,255,255,.04)',height:26,cursor:'pointer',
+                      background:expandedB===r.id?'rgba(232,65,26,.06)':'transparent'}}>
                     <td style={{padding:'2px 8px',position:'sticky',left:0,background:'var(--surface)',zIndex:3,whiteSpace:'nowrap',minWidth:190}}>
                       <div style={{display:'flex',alignItems:'center',gap:4}}>
                         <PlayerAvatar pid={parseInt(r.id)||0} name={r.name||r.id} size={16}/>
@@ -13514,6 +13621,10 @@ function StatsTab() {
                         <span onClick={()=>openAtBatSlide({pid:parseInt(r.id)||0,name:r.name||r.id,team:r.team||''})}
                           style={{fontFamily:osw,fontWeight:700,fontSize:10,color:'var(--text)',cursor:'pointer'}}>{r.name||r.id}</span>
                         {r.hand&&<span style={{fontFamily:mono,fontSize:7,color:'var(--muted)'}}>{r.hand}</span>}
+                        {LINEUP_STATUS[parseInt(r.id)||0]?.status==='confirmed'&&<span title="Confirmed in lineup" style={{fontSize:9,flexShrink:0}}>✅</span>}
+                        {isGoneYardToday(parseInt(r.id)||0,r.name)&&<span title="Gone yard today" style={{fontSize:9,flexShrink:0}}>💥</span>}
+                        {isHotBatPlayer(getCachedPlayer(parseInt(r.id)||0)||{})&&<span title="Hot bat 3+ HR L7" style={{fontSize:9,flexShrink:0}}>🔥</span>}
+                        {INJURY_MAP?.[parseInt(r.id)||0]&&<span title={INJURY_MAP[parseInt(r.id)||0]?.label||'Injured'} style={{fontSize:9,flexShrink:0}}>🤕</span>}
                         <PickButton pid={parseInt(r.id)||0} name={r.name||r.id} team={r.team||''}/>
                       </div>
                     </td>
@@ -13549,6 +13660,21 @@ function StatsTab() {
                     </td>
                   </tr>
                 ))}
+                  {expandedB===r.id && (
+                    <tr key={r.id+'_exp'}>
+                      <td colSpan={17} style={{padding:'0 12px 12px',background:'rgba(232,65,26,.04)',borderBottom:'2px solid rgba(232,65,26,.18)'}}>
+                        <div style={{display:'flex',alignItems:'center',gap:8,padding:'6px 0 4px',borderBottom:'1px solid var(--border)',marginBottom:6}}>
+                          <PlayerAvatar pid={parseInt(r.id)||0} name={r.name||r.id} size={20}/>
+                          <span style={{fontFamily:osw,fontWeight:700,fontSize:12}}>{r.name||r.id}</span>
+                          <span style={{fontFamily:mono,fontSize:8,color:'var(--accent2)'}}>{r.team}</span>
+                          <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>{r.hand||''}</span>
+                        </div>
+                        <InjuryBanner pid={parseInt(r.id)||0} style={{margin:'4px 0'}}/>
+                        <Last7HRChart batterId={parseInt(r.id)||0}/>
+                        <RecentGameLog batterId={parseInt(r.id)||0}/>
+                      </td>
+                    </tr>
+                  )}
               </tbody>
             </table>
           </div>
