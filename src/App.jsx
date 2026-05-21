@@ -15067,7 +15067,6 @@ function MatchupEngineTab() {
     {subTab === 'bvp'      && <BvPDeepDiveTab/>}
     {subTab === 'pairs'    && <PairsTab data={data}/>}
     {subTab === 'soclose'  && <SoCloseTab data={data}/>}
-    {subTab === 'stats'    && <StatsTab/>}
     {subTab === 'longshot' && (
       <LongShotView data={dateSlot==='tomorrow'&&allPicksTomorrowData.length>0 ? allPicksTomorrowData : allPicksData}/>
     )}
@@ -16928,7 +16927,6 @@ function WeatherTab() {
       </div>
 
       <div style={{display:'flex',gap:6,marginBottom:16,padding:'4px',background:'var(--surface)',borderRadius:9,border:'1px solid var(--border)',width:'fit-content'}}>
-        <button style={stBtn('stats')}   onClick={()=>setSubTab('stats')}>📊 Stats</button>
         <button style={stBtn('weather')} onClick={()=>setSubTab('weather')}>🌤️ Game Day</button>
         <button style={stBtn('parks')}   onClick={()=>setSubTab('parks')}>🏟️ Park Factors</button>
       </div>
@@ -17757,6 +17755,7 @@ export default function App() {
     {key:"_sep1",     label:"|", sep:true},
     {key:"live",      label:"📡 Live"},
     {key:"matchup",   label:"⚡ Key Matchups"},
+    {key:"stats",     label:"📊 Stats"},
     {key:"_sep2",     label:"|", sep:true},
     {key:"weather",   label:"🌤️ Weather"},
     {key:"powerbi",   label:"📊 Data"},
@@ -17829,6 +17828,7 @@ export default function App() {
       </nav>
       <main className="content">
         <div style={{display:tab==="weather"?"block":"none"}}><WeatherTab/></div>
+        <div style={{display:tab==="stats"?"block":"none"}}><StatsTab/></div>
         {tab==="live"     && <LiveTab/>}
         {tab==="picks"    && <MyPicksTab/>}
         <div style={{display:tab==="powerbi"?"block":"none"}}><PowerBITab/></div>
