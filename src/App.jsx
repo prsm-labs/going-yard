@@ -13068,7 +13068,7 @@ function StatsTab() {
   const osw  = "'Oswald',sans-serif";
 
   // ── Shared state ────────────────────────────────────────────────────────────
-  const [window,      setWindow]      = useState('L30');
+  const [window,      setWindow]      = useState('L15');
   const [selMatchup,  setSelMatchup]  = useState('');
   const [lineupVer,   setLineupVer]   = useState(0);
   const autoLinkRef = React.useRef(false); // prevent circular team auto-link
@@ -13120,7 +13120,7 @@ function StatsTab() {
   // ── Pitcher-only state ────────────────────────────────────────────────────────
   const [pHandFilter, setPHandFilter] = useState('');
   const [pRoleFilter,    setPRoleFilter]    = useState('');
-  const [pScheduledOnly, setPScheduledOnly] = useState(false);
+  const [pScheduledOnly, setPScheduledOnly] = useState(true); // default: show scheduled SPs
   const [pitcherCollapsed, setPitcherCollapsed] = useState(false);
   const [batterCollapsed,  setBatterCollapsed]  = useState(false);
   const [pSortBy,     setPSortBy]     = useState('hr_per9');
@@ -13171,6 +13171,13 @@ function StatsTab() {
     });
     return list.sort((a,b) => a.time.localeCompare(b.time));
   }, [lineupVer]);
+
+  // Auto-select first matchup when cache loads
+  React.useEffect(() => {
+    if (matchupList.length > 0 && !selMatchup) {
+      setSelMatchup(matchupList[0].key);
+    }
+  }, [matchupList]);
 
   // Teams allowed by matchup selection
   const matchupTeams = React.useMemo(() => {
@@ -13223,7 +13230,9 @@ function StatsTab() {
       .map(([id, player]) => {
         const sp = getSplit(player);
         if (!sp) return null;
-        return { id, ...player, ...sp };
+        // Merge today's yard score from DAILY_PICKS_CACHE
+        const dpRow = DAILY_PICKS_CACHE[id] || Object.values(DAILY_PICKS_CACHE).find(b=>String(b.batter_id||'').split('.')[0]===id);
+        return { id, ...player, ...sp, _yard: dpRow?._yard || null };
       })
       .filter(r => {
         if (!r) return false;
@@ -13630,7 +13639,8 @@ function StatsTab() {
                   <BTh col="pbrl_pct" label="PBrl%" title="Pulled barrel rate"/>
                   <BTh col="fb_pct"   label="FB%"   title="Fly ball rate"/>
                   <BTh col="la_mean"  label="LA°"   title="Average launch angle"/>
-                  <th style={{padding:'4px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.5,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)',background:'var(--surface2)',whiteSpace:'nowrap'}}>Today's Pitcher</th>
+                  <th style={{padding:'4px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',<BTh col="_yard" label="⚡Score" title="Today's Yard Score"/>
+              letterSpacing:.5,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)',background:'var(--surface2)',whiteSpace:'nowrap'}}>Today's Pitcher</th>
                 </tr>
               </thead>
               <tbody>
@@ -13671,6 +13681,15 @@ function StatsTab() {
                     <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.pbrl_pct||0)>=8?'#ff4020':'var(--muted)'}}>{fmtPct(r.pbrl_pct)}</td>
                     <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.fb_pct||0)>=38?'#27c97a':'var(--muted)'}}>{fmtPct(r.fb_pct)}</td>
                     <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.la_mean||0)>=18&&(r.la_mean||0)<=30?'#27c97a':'var(--muted)'}}>{r.la_mean?r.la_mean.toFixed(1)+'°':'—'}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px'}}>
+                      {(()=>{
+                        const dp2 = DAILY_PICKS_CACHE[r.id]||Object.values(DAILY_PICKS_CACHE).find(b=>String(b.batter_id||'').split('.')[0]===r.id);
+                        if (!dp2?._yard) return <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>—</span>;
+                        const yv = parseFloat(dp2._yard)||0;
+                        const col = yv>=55?'#ff4020':yv>=45?'#f5a623':yv>=35?'#27c97a':'var(--muted)';
+                        return <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:11,color:col}}>{yv.toFixed(0)}</span>;
+                      })()}
+                    </td>
                     <td style={{padding:'2px 8px',whiteSpace:'nowrap'}}>
                       {(()=>{
                         const dp = DAILY_PICKS_CACHE[r.id]||Object.values(DAILY_PICKS_CACHE).find(b=>String(b.batter_id||'').split('.')[0]===r.id);
