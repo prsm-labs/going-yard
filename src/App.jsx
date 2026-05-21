@@ -13395,7 +13395,7 @@ function StatsTab() {
           </span>
         </div>
 
-        {!pitcherCollapsed && <>
+        <div style={{display:pitcherCollapsed?'none':'block'}}>
         {/* Pitcher filters */}
         <div style={{display:'flex',gap:5,flexWrap:'nowrap',alignItems:'center',marginBottom:6,overflowX:'auto',WebkitOverflowScrolling:'touch',paddingBottom:2}}>
           {/* Shared: pitcher hand = batter vsLHP/vsRHP split */}
@@ -13531,7 +13531,7 @@ function StatsTab() {
               </tbody>
             </table>
           </div>
-        </>}
+        </div>
         </div>
       </div>
 
@@ -13554,7 +13554,7 @@ function StatsTab() {
           </span>
         </div>
 
-        {!batterCollapsed && <>
+        <div style={{display:batterCollapsed?'none':'block'}}>
         {/* Batter filters — row 1: shared tandem filters */}
         <div style={{display:'flex',gap:5,flexWrap:'nowrap',alignItems:'center',marginBottom:4,overflowX:'auto',WebkitOverflowScrolling:'touch',paddingBottom:2}}>
           {/* Shared: batter hand = pitcher vsLHB/vsRHB split */}
@@ -13708,7 +13708,7 @@ function StatsTab() {
               </tbody>
             </table>
           </div>
-        </>}
+        </div>
         </div>
       </div>
     </div>
