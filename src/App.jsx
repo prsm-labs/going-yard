@@ -13081,11 +13081,13 @@ function StatsTab() {
   const setHandSplit = statsPage==='batters' ? setBHandSplit : setPHandSplit;
   const setLocSplit  = statsPage==='batters' ? setBLocSplit  : setPLocSplit;
   const setDnSplit   = statsPage==='batters' ? setBDnSplit   : setPDnSplit;
-  const [sortBy,      setSortBy]      = useState('woba');
+  const [sortBy,      setSortBy]      = useState('iso');   // batters: highest ISO
   const [sortDir,     setSortDir]     = useState(-1);
   const [minPA,       setMinPA]       = useState(10);
   const [minBF,       setMinBF]       = useState(10);
   const [pgFilter,    setPgFilter]    = useState([]);  // pitcher grade filter
+  const [pitchGroup,  setPitchGroup]  = useState('');  // '' | 'fastball' | 'breaking' | 'offspeed'
+  const [roleFilter,  setRoleFilter]  = useState('');  // '' | 'SP' | 'RP'
   const [search,      setSearch]      = useState('');
   const [teamFilter,  setTeamFilter]  = useState('ALL');
   const [data,        setData]        = useState({batters:{}, pitchers:{}});
@@ -13101,7 +13103,10 @@ function StatsTab() {
 
   const WINDOWS = ['L7','L15','L30','season'];
   // Build combined split key from 3 independent selectors
-  const splitKey = [handSplit, locSplit, dnSplit].filter(Boolean).join('_') || 'overall';
+  // For batters: pitch group overrides the split key entirely (mutually exclusive with hand/loc/dn combos)
+  const splitKey = pitchGroup
+    ? pitchGroup
+    : ([handSplit, locSplit, dnSplit].filter(Boolean).join('_') || 'overall');
   const WIN_LABELS = { L7:'Last 7', L15:'Last 15', L30:'Last 30', season:'2026 Season' };
 
   // ── Build rows ─────────────────────────────────────────────────────────────
@@ -13148,6 +13153,7 @@ function StatsTab() {
         if (teamFilter !== 'ALL' && r.team !== teamFilter) return false;
         if (statsPage==='batters'  && (r.pa||0)  < minPA) return false;
         if (statsPage==='pitchers' && (r.bf||0)  < minBF) return false;
+        if (roleFilter && statsPage==='pitchers' && r.role !== roleFilter) return false;
         if (pgFilter.length > 0 && statsPage==='pitchers') {
           const grade = r._pgLabel || '';
           if (!pgFilter.some(g => grade.includes(g))) return false;
@@ -13161,7 +13167,7 @@ function StatsTab() {
         return sortDir * (bv - av);
       })
       .slice(0, 200); // cap at 200 for performance
-  }, [data, statsPage, window, splitKey, sortBy, sortDir, search, teamFilter, minPA, minBF, pgFilter]);
+  }, [data, statsPage, window, splitKey, sortBy, sortDir, search, teamFilter, minPA, minBF, pgFilter, roleFilter]);
 
   const teams = React.useMemo(() => {
     const src = statsPage === 'batters' ? data.batters : data.pitchers;
@@ -13195,7 +13201,7 @@ function StatsTab() {
       {/* ── Sub-page toggle ───────────────────────────────────────────────── */}
       <div style={{display:'flex',gap:6,marginBottom:12}}>
         {[['batters','🧢 Batters'],['pitchers','⚾ Pitchers']].map(([key,label])=>(
-          <button key={key} onClick={()=>{setStatsPage(key);setSortBy(key==='batters'?'woba':'hr_per9');setSortDir(-1);setPgFilter([]);}}
+          <button key={key} onClick={()=>{setStatsPage(key);setSortBy(key==='batters'?'iso':'hr_per9');setSortDir(-1);setPgFilter([]);}}
             style={{padding:'6px 14px',borderRadius:8,cursor:'pointer',fontSize:10,fontFamily:osw,
               fontWeight:700,letterSpacing:.5,border:`1px solid ${statsPage===key?'var(--accent)':'var(--border)'}`,
               background:statsPage===key?'rgba(232,65,26,.12)':'var(--surface2)',
@@ -13279,6 +13285,20 @@ function StatsTab() {
 
       {/* ── Pitcher grade filter (pitchers only) ──────────────────────────── */}
       {statsPage==='pitchers' && (
+        <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center',marginBottom:8}}>
+          <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>Role:</span>
+          {[['','All'],['SP','SP'],['RP','RP']].map(([val,lbl])=>(
+            <button key={val} onClick={()=>setRoleFilter(r=>r===val&&val?'':val)}
+              style={{padding:'3px 8px',borderRadius:5,fontSize:8,fontFamily:mono,cursor:'pointer',
+                border:`1px solid ${roleFilter===val&&val?'var(--accent2)':'var(--border)'}`,
+                background:roleFilter===val&&val?'rgba(56,184,242,.15)':'transparent',
+                color:roleFilter===val&&val?'var(--ice)':'var(--muted)',fontWeight:roleFilter===val&&val?700:400}}>
+              {lbl}
+            </button>
+          ))}
+        </div>
+      )}
+      {statsPage==='pitchers' && (
         <div style={{display:'flex',gap:4,flexWrap:'wrap',alignItems:'center',marginBottom:8}}>
           <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>P.Grade:</span>
           {[['Target','🎯 Target','#27c97a'],['Hittable','💥 Hittable','#60d360'],
@@ -13296,6 +13316,22 @@ function StatsTab() {
               cursor:'pointer',border:'1px solid var(--border)',color:'var(--muted)',background:'transparent'}}>
             ✕ Clear
           </button>}
+        </div>
+      )}
+      {/* ── Pitch group filter (batters only) ─────────────────────────────── */}
+      {statsPage==='batters' && (
+        <div style={{display:'flex',gap:4,flexWrap:'wrap',alignItems:'center',marginBottom:8}}>
+          <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>Pitch:</span>
+          {[['','All'],['fastball','🔥 Fastball'],['breaking','🌀 Breaking'],['offspeed','💨 Offspeed']].map(([val,lbl])=>(
+            <button key={val} onClick={()=>setPitchGroup(p=>p===val&&val?'':val)}
+              style={{padding:'3px 8px',borderRadius:5,fontSize:8,fontFamily:mono,cursor:'pointer',
+                border:`1px solid ${pitchGroup===val&&val?'var(--accent)':!val&&!pitchGroup?'var(--accent)':'var(--border)'}`,
+                background:pitchGroup===val&&val?'rgba(232,65,26,.2)':!val&&!pitchGroup?'rgba(232,65,26,.08)':'transparent',
+                color:pitchGroup===val||(!val&&!pitchGroup)?'var(--accent)':'var(--muted)',
+                fontWeight:pitchGroup===val||(!val&&!pitchGroup)?700:400}}>
+              {lbl}
+            </button>
+          ))}
         </div>
       )}
       {/* ── Info bar ──────────────────────────────────────────────────────── */}
@@ -13339,6 +13375,11 @@ function StatsTab() {
               <Th col="pbrl_pct" label="PBrl%"  title="Pulled barrel rate"/>
               <Th col="fb_pct"   label="FB%"    title="Fly ball rate"/>
               <Th col="la_mean"  label="LA°"    title="Average launch angle"/>
+              <th style={{padding:'4px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',
+                letterSpacing:.5,color:'var(--muted)',textAlign:'left',
+                borderBottom:'1px solid var(--border)',background:'var(--surface2)',whiteSpace:'nowrap'}}>
+                Today's Pitcher
+              </th>
             </tr></thead>
             <tbody>
               {rows.map(r => (
@@ -13370,6 +13411,21 @@ function StatsTab() {
                   <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.pbrl_pct||0)>=8?'#ff4020':'var(--muted)'}}>{fmtPct(r.pbrl_pct)}</td>
                   <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.fb_pct||0)>=38?'#27c97a':'var(--muted)'}}>{fmtPct(r.fb_pct)}</td>
                   <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.la_mean||0)>=18&&(r.la_mean||0)<=30?'#27c97a':'var(--muted)'}}>{r.la_mean?r.la_mean.toFixed(1)+'°':'—'}</td>
+                  <td style={{padding:'2px 8px',minWidth:140,whiteSpace:'nowrap'}}>
+                    {(()=>{
+                      const dp = DAILY_PICKS_CACHE[r.id] || Object.values(DAILY_PICKS_CACHE).find(b=>String(b.batter_id||'').split('.')[0]===r.id);
+                      if (!dp?.pitcher) return <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>—</span>;
+                      return <div>
+                        <span onClick={()=>openPitcherSlide({pid:parseInt(dp.pitcher_id||0),name:dp.pitcher,team:dp.pitcher_team||'',hand:dp.pitcher_hand||'',pitchMix:[]})}
+                          style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,color:'var(--text)',cursor:'pointer'}}>
+                          {dp.pitcher}
+                        </span>
+                        <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)'}}>
+                          {dp.pitcher_team||''} · {dp.pitcher_hand==='L'?'LHP':dp.pitcher_hand==='R'?'RHP':''}
+                        </div>
+                      </div>;
+                    })()}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -13414,6 +13470,11 @@ function StatsTab() {
                         {r.name||r.id}
                       </span>
                       <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginLeft:2}}>{r.hand||''}</span>
+                      {r.role && <span style={{marginLeft:4,padding:'1px 4px',borderRadius:3,fontSize:7,fontWeight:700,
+                        background:r.role==='SP'?'rgba(56,184,242,.15)':'rgba(251,191,36,.15)',
+                        color:r.role==='SP'?'var(--ice)':'#fbbf24',border:`1px solid ${r.role==='SP'?'rgba(56,184,242,.3)':'rgba(251,191,36,.3)'}`}}>
+                        {r.role}
+                      </span>}
                     </div>
                   </td>
                   <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{fmtN(r.bf)}</td>
