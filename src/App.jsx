@@ -13038,14 +13038,28 @@ async function loadSplitsData() {
   if (SPLITS_CACHE.batters && Date.now() - SPLITS_CACHE.ts < 3600000)
     return SPLITS_CACHE;
   try {
+    const fetchJson = async (url) => {
+      const r = await fetch(url);
+      if (!r.ok) { console.error(`[Splits] ${url} → HTTP ${r.status}`); return null; }
+      const text = await r.text();
+      if (!text || text.trim().length < 10) { console.error(`[Splits] ${url} → empty response`); return null; }
+      try { return JSON.parse(text); }
+      catch(e) { console.error(`[Splits] ${url} → JSON parse error:`, e.message, text.slice(0,100)); return null; }
+    };
     const [b, p] = await Promise.all([
-      fetch('/data/batter_splits.json').then(r => r.ok ? r.json() : {}),
-      fetch('/data/pitcher_splits.json').then(r => r.ok ? r.json() : {}),
+      fetchJson('/data/batter_splits.json'),
+      fetchJson('/data/pitcher_splits.json'),
     ]);
-    SPLITS_CACHE.batters  = b;
-    SPLITS_CACHE.pitchers = p;
-    SPLITS_CACHE.ts       = Date.now();
-  } catch(e) { console.warn('Splits load failed:', e); }
+    if (b && Object.keys(b).length > 0) {
+      SPLITS_CACHE.batters = b;
+      console.log(`[Splits] batters loaded: ${Object.keys(b).length} players`);
+    } else { console.error('[Splits] batter_splits.json empty or null'); }
+    if (p && Object.keys(p).length > 0) {
+      SPLITS_CACHE.pitchers = p;
+      console.log(`[Splits] pitchers loaded: ${Object.keys(p).length} players`);
+    } else { console.error('[Splits] pitcher_splits.json empty or null'); }
+    SPLITS_CACHE.ts = Date.now();
+  } catch(e) { console.error('[Splits] load failed:', e); }
   return SPLITS_CACHE;
 }
 
@@ -13054,7 +13068,9 @@ function StatsTab() {
   const osw  = "'Oswald',sans-serif";
   const [statsPage,   setStatsPage]   = useState('batters'); // 'batters' | 'pitchers'
   const [window,      setWindow]      = useState('L30');
-  const [split,       setSplit]       = useState('overall');
+  const [handSplit,   setHandSplit]   = useState('');       // '' | 'vsLHP' | 'vsRHP'
+  const [locSplit,    setLocSplit]    = useState('');       // '' | 'home'  | 'away'
+  const [dnSplit,     setDnSplit]     = useState('');       // '' | 'day'   | 'night'
   const [sortBy,      setSortBy]      = useState('woba');
   const [sortDir,     setSortDir]     = useState(-1);
   const [search,      setSearch]      = useState('');
@@ -13071,10 +13087,9 @@ function StatsTab() {
   }, []);
 
   const WINDOWS = ['L7','L15','L30','season'];
-  const BATTER_SPLITS  = ['overall','vsLHP','vsRHP','home','away','day','night'];
-  const PITCHER_SPLITS = ['overall','vsLHB','vsRHB','home','away','day','night'];
-  const SPLIT_LABELS   = { overall:'All', vsLHP:'vs LHP', vsRHP:'vs RHP', vsLHB:'vs LHB', vsRHB:'vs RHB', home:'Home', away:'Away', day:'Day', night:'Night' };
-  const WIN_LABELS     = { L7:'Last 7', L15:'Last 15', L30:'Last 30', season:'2026 Season' };
+  // Build combined split key from 3 independent selectors
+  const splitKey = [handSplit, locSplit, dnSplit].filter(Boolean).join('_') || 'overall';
+  const WIN_LABELS = { L7:'Last 7', L15:'Last 15', L30:'Last 30', season:'2026 Season' };
 
   // ── Build rows ─────────────────────────────────────────────────────────────
   const rows = React.useMemo(() => {
@@ -13082,7 +13097,7 @@ function StatsTab() {
     if (!src) return [];
     return Object.entries(src)
       .map(([id, player]) => {
-        const sp = player.splits?.[window]?.[split];
+        const sp = player.splits?.[window]?.[splitKey];
         if (!sp) return null;
         return { id, ...player, ...sp };
       })
@@ -13098,7 +13113,7 @@ function StatsTab() {
         return sortDir * (bv - av);
       })
       .slice(0, 200); // cap at 200 for performance
-  }, [data, statsPage, window, split, sortBy, sortDir, search, teamFilter]);
+  }, [data, statsPage, window, splitKey, sortBy, sortDir, search, teamFilter]);
 
   const teams = React.useMemo(() => {
     const src = statsPage === 'batters' ? data.batters : data.pitchers;
@@ -13155,14 +13170,36 @@ function StatsTab() {
             </button>
           ))}
         </div>
-        {/* Split */}
-        <div style={{display:'flex',gap:3,background:'var(--surface2)',borderRadius:7,padding:3,border:'1px solid var(--border)'}}>
-          {(statsPage==='batters'?BATTER_SPLITS:PITCHER_SPLITS).map(s=>(
-            <button key={s} onClick={()=>setSplit(s)}
-              style={{padding:'3px 8px',borderRadius:5,fontSize:8,fontFamily:mono,cursor:'pointer',
-                border:'none',background:split===s?'rgba(56,184,242,.25)':'transparent',
-                color:split===s?'var(--ice)':'var(--muted)',fontWeight:split===s?700:400}}>
-              {SPLIT_LABELS[s]}
+        {/* Hand split */}
+        <div style={{display:'flex',gap:2,background:'var(--surface2)',borderRadius:7,padding:2,border:'1px solid var(--border)'}}>
+          {[['','All'],statsPage==='batters'?['vsLHP','vs LHP']:['vsLHB','vs LHB'],statsPage==='batters'?['vsRHP','vs RHP']:['vsRHB','vs RHB']].map(([val,lbl])=>(
+            <button key={val} onClick={()=>setHandSplit(h=>h===val&&val?'':val)}
+              style={{padding:'3px 7px',borderRadius:5,fontSize:8,fontFamily:mono,cursor:'pointer',border:'none',
+                background:handSplit===val&&val?'rgba(56,184,242,.25)':!val&&!handSplit?'rgba(56,184,242,.1)':'transparent',
+                color:handSplit===val||(!val&&!handSplit)?'var(--ice)':'var(--muted)',fontWeight:handSplit===val||(!val&&!handSplit)?700:400}}>
+              {lbl}
+            </button>
+          ))}
+        </div>
+        {/* Location split */}
+        <div style={{display:'flex',gap:2,background:'var(--surface2)',borderRadius:7,padding:2,border:'1px solid var(--border)'}}>
+          {[['','All'],['home','Home'],['away','Away']].map(([val,lbl])=>(
+            <button key={val} onClick={()=>setLocSplit(l=>l===val&&val?'':val)}
+              style={{padding:'3px 7px',borderRadius:5,fontSize:8,fontFamily:mono,cursor:'pointer',border:'none',
+                background:locSplit===val&&val?'rgba(39,201,122,.2)':!val&&!locSplit?'rgba(39,201,122,.08)':'transparent',
+                color:locSplit===val||(!val&&!locSplit)?'#27c97a':'var(--muted)',fontWeight:locSplit===val||(!val&&!locSplit)?700:400}}>
+              {lbl}
+            </button>
+          ))}
+        </div>
+        {/* Day/Night split */}
+        <div style={{display:'flex',gap:2,background:'var(--surface2)',borderRadius:7,padding:2,border:'1px solid var(--border)'}}>
+          {[['','All'],['day','Day'],['night','Night']].map(([val,lbl])=>(
+            <button key={val} onClick={()=>setDnSplit(d=>d===val&&val?'':val)}
+              style={{padding:'3px 7px',borderRadius:5,fontSize:8,fontFamily:mono,cursor:'pointer',border:'none',
+                background:dnSplit===val&&val?'rgba(245,166,35,.2)':!val&&!dnSplit?'rgba(245,166,35,.08)':'transparent',
+                color:dnSplit===val||(!val&&!dnSplit)?'#f5a623':'var(--muted)',fontWeight:dnSplit===val||(!val&&!dnSplit)?700:400}}>
+              {lbl}
             </button>
           ))}
         </div>
@@ -13184,7 +13221,7 @@ function StatsTab() {
       <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginBottom:8}}>
         <span style={{color:'var(--text)'}}>{rows.length}</span> {statsPage} ·{' '}
         <span style={{color:'var(--ice)'}}>{WIN_LABELS[window]}</span> ·{' '}
-        <span style={{color:'#f5a623'}}>{SPLIT_LABELS[split]}</span> ·{' '}
+        <span style={{color:'#f5a623'}}>{splitKey==='overall'?'All splits':splitKey.replace(/_/g,' + ')}</span> ·{' '}
         from at-bat log · min {statsPage==='batters'?'5':'5'} PA
       </div>
 
