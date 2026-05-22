@@ -13441,6 +13441,7 @@ function StatsTab() {
   );
 
   return (
+    <>
     <div style={{padding:'0 4px'}}>
 
       {/* ── Shared window selector ───────────────────────────────────────────── */}
@@ -13851,8 +13852,6 @@ function StatsTab() {
         </div>
       </div>
     </div>
-  );
-}
       {/* Help slideout */}
       {showHelp && <div style={{position:'fixed',top:0,right:0,bottom:0,width:320,zIndex:9999,background:'var(--surface)',borderLeft:'1px solid var(--border)',display:'flex',flexDirection:'column',boxShadow:'-4px 0 24px rgba(0,0,0,.5)'}}>
         <div style={{display:'flex',alignItems:'center',gap:10,padding:'14px 16px',borderBottom:'1px solid var(--border)',background:'var(--surface2)'}}>
@@ -13867,6 +13866,7 @@ function StatsTab() {
       </div>}
       {showHelp && <div onClick={()=>setShowHelp(false)} style={{position:'fixed',inset:0,zIndex:9998,background:'rgba(0,0,0,.4)'}}/>}
     </div>
+    </>
   );
 }
 
