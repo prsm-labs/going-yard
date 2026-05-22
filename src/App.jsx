@@ -13860,12 +13860,11 @@ function StatsTab() {
         </div>
         <div style={{overflowY:'auto',padding:16,fontFamily:"'DM Mono',monospace",fontSize:10,lineHeight:1.8,color:'var(--muted)'}}>
           {[['Data Source','Pre-aggregated from your at-bat log (250k+ PAs). Updates daily when build_splits.py runs.'],['Windows','L7/L15/L30 are rolling from the last date in the log. Season = full 2026. Both tables update together.'],['Tandem Filters','Pitcher LHP/RHP sets the batter split to vsLHP/vsRHP simultaneously. Batter LHB/RHB sets pitcher split to vsLHB/vsRHB.'],['Pitch Groups','Fastball/Breaking/Offspeed filters both tables. Stacks with handedness and window only -- not location or day/night.'],['Yard Score',"Today HR model score. Only shows for batters with a game today."],['SP Filter',"Filters pitchers to scheduled starters only (yellow probable or green confirmed)."],['Matchup Filter','Selecting a game filters both tables to those two teams.'],['Min PA / BF','Raise for more reliable splits, lower to see everyone.']].map(([t,d])=>(
-            <div key={t} style={{marginBottom:14}}><div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'var(--text)',marginBottom:3}}>{t}</div><div>{d}</div></div>
+            <div key={t} style={{marginBottom:14}}><div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'var(--text)',marginBottom:3}}>{t}</div><div>{d}</div></div></div>
           ))}
         </div>
       </div>}
       {showHelp && <div onClick={()=>setShowHelp(false)} style={{position:'fixed',inset:0,zIndex:9998,background:'rgba(0,0,0,.4)'}}/>}
-    </div>
     </>
   );
 }
