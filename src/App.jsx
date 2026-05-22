@@ -13498,13 +13498,18 @@ function StatsTab() {
           return '🤔 Average';
         })();
         // If name is missing/numeric, check cached player data
-        // Name fallback: splits JSON → DAILY_PICKS_CACHE (pitcher field) → live player cache → ID
+        // Name + team fallback: splits JSON → DAILY_PICKS_CACHE → live player cache
+        const _cacheMatch = Object.values(DAILY_PICKS_CACHE).find(r=>String(r.pitcher_id||'').split('.')[0]===id);
         const pName = (player.name && !/^\d+$/.test(player.name))
           ? player.name
-          : Object.values(DAILY_PICKS_CACHE).find(r=>String(r.pitcher_id||'').split('.')[0]===id)?.pitcher
+          : _cacheMatch?.pitcher
             || getCachedPlayer(parseInt(id)||0)?.name
             || player.name;
-        return { id, ...player, name: pName, ...sp,
+        // Team: prefer today's schedule data over stale splits JSON
+        const pTeamResolved = _cacheMatch?.pitcher_team
+          || getCachedPlayer(parseInt(id)||0)?.team
+          || player.team || '';
+        return { id, ...player, name: pName, team: pTeamResolved, ...sp,
           hr_per9: ip>0 ? +((sp.hr_allowed||0)/ip*9).toFixed(2) : 0,
           k_per9:  ip>0 ? +((sp.k||0)/ip*9).toFixed(1) : 0,
           _pgLabel, fb_pct_p, br_pct_p, os_pct_p };
