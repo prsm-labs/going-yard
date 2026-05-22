@@ -13425,13 +13425,9 @@ function StatsTab() {
     const getSplit = (player) => {
       const wins = player.splits?.[window];
       if (!wins) return null;
-      if (wins[bSplitKey]) return wins[bSplitKey];
-      const parts = bSplitKey.split('_');
-      for (let i = parts.length-1; i >= 1; i--) {
-        const partial = parts.slice(0,i).join('_');
-        if (wins[partial]) return wins[partial];
-      }
-      return wins['overall'] || null;
+      // Exact match only — no fallback to overall
+      // If batter has no data for this split+window combo, exclude them
+      return wins[bSplitKey] || null;
     };
     return Object.entries(src)
       .map(([id, player]) => {
