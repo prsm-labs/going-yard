@@ -18476,6 +18476,109 @@ function LegendButton() {
   </>;
 }
 
+function LinksTab() {
+  const mono = "'DM Mono',monospace";
+  const osw  = "'Oswald',sans-serif";
+
+  const links = [
+    {
+      name: 'OnlyHomers',
+      url:  'https://onlyhomers.com',
+      emoji: '💥',
+      color: '#ff4020',
+      summary: 'Daily MLB home run tracker and season HR leaderboard. Every dinger logged with stats, video, and player pages.',
+    },
+    {
+      name: 'PropFinder',
+      url:  'https://propfinder.app',
+      emoji: '🎯',
+      color: '#f5a623',
+      summary: 'MLB prop bet finder and odds comparison. Quickly surface the best HR, hits, and strikeout props across sportsbooks.',
+    },
+    {
+      name: 'Blast Report',
+      url:  'https://blast-report.com',
+      emoji: '💣',
+      color: '#27c97a',
+      summary: 'Bat speed and attack angle data from Blast Motion sensors. Detailed swing metrics for hitter analysis.',
+    },
+    {
+      name: 'Doink Sports',
+      url:  'https://doinksports.com',
+      emoji: '👾',
+      color: '#60d360',
+      summary: 'MLB weather and park factor tools for prop bettors. Wind, temp, and game conditions in one clean dashboard.',
+    },
+    {
+      name: 'Gambly',
+      url:  'https://gambly.com',
+      emoji: '🤖',
+      color: '#a855f7',
+      summary: 'AI-powered sports betting tools and prop analysis. Automated line monitoring and value alert system.',
+    },
+  ];
+
+  return (
+    <div style={{padding:'16px 12px',maxWidth:680,margin:'0 auto'}}>
+      <div style={{marginBottom:20}}>
+        <div style={{fontFamily:osw,fontWeight:800,fontSize:18,color:'var(--text)',marginBottom:4}}>
+          🔗 Links
+        </div>
+        <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>
+          Tools and sites we use and recommend · more coming soon
+        </div>
+      </div>
+
+      <div style={{display:'flex',flexDirection:'column',gap:10}}>
+        {links.map(link => (
+          <a key={link.name} href={link.url} target="_blank" rel="noopener noreferrer"
+            style={{textDecoration:'none',display:'block'}}>
+            <div style={{
+              background:'var(--surface)',
+              border:`1px solid var(--border)`,
+              borderLeft:`3px solid ${link.color}`,
+              borderRadius:10,
+              padding:'14px 16px',
+              display:'flex',
+              alignItems:'center',
+              gap:14,
+              transition:'background .15s',
+              cursor:'pointer',
+            }}
+            onMouseEnter={e=>e.currentTarget.style.background='var(--surface2)'}
+            onMouseLeave={e=>e.currentTarget.style.background='var(--surface)'}
+            >
+              <span style={{fontSize:28,flexShrink:0}}>{link.emoji}</span>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
+                  <span style={{fontFamily:osw,fontWeight:800,fontSize:14,color:'var(--text)'}}>
+                    {link.name}
+                  </span>
+                  <span style={{fontFamily:mono,fontSize:8,color:link.color,
+                    background:`${link.color}18`,border:`1px solid ${link.color}30`,
+                    borderRadius:4,padding:'1px 6px'}}>
+                    {link.url.replace('https://','').replace('www.','')}
+                  </span>
+                </div>
+                <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',lineHeight:1.5}}>
+                  {link.summary}
+                </div>
+              </div>
+              <span style={{fontFamily:mono,fontSize:14,color:'var(--muted)',flexShrink:0}}>↗</span>
+            </div>
+          </a>
+        ))}
+      </div>
+
+      <div style={{marginTop:20,padding:'12px 16px',background:'var(--surface)',
+        border:'1px solid var(--border)',borderRadius:8,
+        fontFamily:mono,fontSize:8,color:'var(--muted)',textAlign:'center'}}>
+        Want to be listed here? Reach out — more links coming soon.
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [tab, setTab] = useState("homeruns");
@@ -18497,24 +18600,17 @@ export default function App() {
 
   const NAV = [
     {key:"homeruns",  label:"💥 HR Tracker"},
-    {key:"_sep1",     label:"|", sep:true},
     {key:"live",      label:"📡 Live"},
-    {key:"matchup",   label:"⚡ Key Matchups"},
     {key:"stats",     label:"📊 Splits"},
-    {key:"_sep2",     label:"|", sep:true},
-    {key:"weather",   label:"🌤️ Weather"},
+    {key:"matchup",   label:"⚡ Key Matchups"},
     {key:"powerbi",   label:"📊 Data"},
+    {key:"weather",   label:"🌤️ Weather"},
     {key:"picks",     label:"🎯 My Picks"},
-    {key:"livesports",label:"📺 Live Sports",external:"https://thetvapp.to"},
-    {key:"_sep3",     label:"|", sep:true},
+    {key:"_sep1",     label:"|", sep:true},
     {key:"statcast",  label:"📡 Statcast"},
-    {key:"mlbscores",  label:"⚾ MLB"},
-    {key:"onlyhomers",label:"⚾ Only Homers"},
-    {key:"doink",     label:"👾 DOINK"},
-    {key:"_sep4",     label:"|", sep:true},
-    {key:"linemate",  label:"📊 Linemate",  external:"https://linemate.io/mlb"},
-    {key:"gambly",    label:"🤖 Gambly Bot", external:"https://gambly.com"},
-    {key:"_sep5",     label:"|", sep:true},
+    {key:"livesports",label:"📺 Live Sports ↗",external:"https://thetvapp.to"},
+    {key:"mlbscores", label:"⚾ MLB"},
+    {key:"links",     label:"🔗 Links"},
     {key:"getapp",    label:"📲 Get App"},
   ];
 
@@ -18576,6 +18672,7 @@ export default function App() {
         <div style={{display:tab==="stats"?"block":"none"}}><StatsTab/></div>
         {tab==="live"     && <LiveTab/>}
         {tab==="picks"    && <MyPicksTab/>}
+        {tab==="links"    && <LinksTab/>}
         <div style={{display:tab==="powerbi"?"block":"none"}}><PowerBITab/></div>
         <div style={{display:tab==="statcast"?"block":"none"}}><StatcastTab/></div>
         <div style={{display:tab==="homeruns"?"block":"none"}}><HRTrackerTab/></div>
