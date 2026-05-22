@@ -5766,6 +5766,7 @@ function LiveTab() {
     return () => { if (_GLOBAL_NAV) _GLOBAL_NAV.setLiveView = null; };
   }, [setLiveView]);
   const [liveGameFilter, setLiveGameFilter] = useState('all');
+  const [showLiveHelp, setShowLiveHelp] = useState(false);
   const todayET2 = new Date().toLocaleDateString("en-US",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"});
   const [lm2,ld2,ly2] = todayET2.split("/");
   const liveTodayStr = `${ly2}-${lm2}-${ld2}`;
@@ -5840,7 +5841,15 @@ function LiveTab() {
     </div>
 
     {/* Sub-view toggle */}
-    <div style={{display:'flex',gap:5,marginBottom:12,padding:'3px',background:'var(--surface)',borderRadius:8,border:'1px solid var(--border)',width:'fit-content'}}>
+    {showLiveHelp && <HelpSlideout title="📺 Live Tab Guide" items={[
+      ['📺 Gameday', "In-game box scores for every game happening right now. Tap a game card to expand it and see live batter stats, pitch-by-pitch data, and base runners."],
+      ['🎮 Live Games', "Score ticker for all today's games with live updates. Use the date picker to browse past game scores."],
+      ['📋 Lineups', "Today's confirmed and projected batting orders for every team. Tap a game to expand or collapse it. Green = confirmed lineup, yellow = projected."],
+      ['🔴 Live indicator', "A red dot next to a game means it's currently in progress. Scores update automatically."],
+      ['Player tap', "Tap any batter name to open their stat card with recent performance data and HR history."],
+    ]} onClose={()=>setShowLiveHelp(false)}/>}
+    <div style={{display:'flex',gap:5,marginBottom:12,alignItems:'center'}}>
+      <div style={{display:'flex',gap:5,padding:'3px',background:'var(--surface)',borderRadius:8,border:'1px solid var(--border)',width:'fit-content'}}>
       {[['gameday','📺 Gameday'],['games','🎮 Live Games'],['lineups','📋 Lineups']].map(([key,label])=>(
         <button key={key} onClick={()=>setLiveView(key)}
           style={{padding:'6px 14px',borderRadius:6,cursor:'pointer',border:'none',
@@ -5851,6 +5860,8 @@ function LiveTab() {
           {label}
         </button>
       ))}
+      </div>
+      <HelpBtn onClick={()=>setShowLiveHelp(v=>!v)}/>
     </div>
 
   {liveView==='lineups' && <LineupsView date={liveDate}/>}
@@ -8265,6 +8276,45 @@ function HRTicker({ onHRClick }) {
 }
 
 
+// ── Reusable help slideout component ─────────────────────────────────────────
+function HelpSlideout({ title, items, onClose }) {
+  const mono = "'DM Mono',monospace";
+  const osw  = "'Oswald',sans-serif";
+  return <>
+    <div style={{position:'fixed',top:0,right:0,bottom:0,width:300,zIndex:9999,
+      background:'var(--surface)',borderLeft:'1px solid var(--border)',
+      display:'flex',flexDirection:'column',boxShadow:'-4px 0 24px rgba(0,0,0,.5)'}}>
+      <div style={{display:'flex',alignItems:'center',gap:10,padding:'14px 16px',
+        borderBottom:'1px solid var(--border)',background:'var(--surface2)',flexShrink:0}}>
+        <span style={{fontFamily:osw,fontWeight:800,fontSize:13,color:'var(--text)'}}>{title}</span>
+        <button onClick={onClose}
+          style={{marginLeft:'auto',background:'transparent',border:'none',
+            color:'var(--muted)',fontSize:18,cursor:'pointer',padding:'0 4px',lineHeight:1}}>✕</button>
+      </div>
+      <div style={{overflowY:'auto',padding:'14px 16px',fontFamily:mono,fontSize:10,
+        lineHeight:1.7,color:'var(--muted)'}}>
+        {items.map(([t,d])=>(
+          <div key={t} style={{marginBottom:14}}>
+            <div style={{fontFamily:osw,fontWeight:700,fontSize:11,color:'var(--text)',marginBottom:3}}>{t}</div>
+            <div>{d}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+    <div onClick={onClose} style={{position:'fixed',inset:0,zIndex:9998,background:'rgba(0,0,0,.4)'}}/>
+  </>;
+}
+
+function HelpBtn({ onClick }) {
+  return (
+    <button onClick={onClick} data-tip="How to use this page"
+      style={{padding:'3px 8px',borderRadius:6,fontSize:10,cursor:'pointer',
+        border:'1px solid var(--border)',color:'var(--muted)',background:'transparent',
+        flexShrink:0,fontWeight:700,lineHeight:1}}>?</button>
+  );
+}
+
+
 function HRTrackerTab() {
   const [hrTab, setHrTab] = useState('tracker');
   const [hrs, setHrs] = useState([]);
@@ -8274,6 +8324,7 @@ function HRTrackerTab() {
   const [filterTeam, setFilterTeam] = useState("all");
   const [refreshing, setRefreshing] = useState(false);
   const [hrSearch, setHrSearch] = useState("");
+  const [showHRHelp, setShowHRHelp] = useState(false);
 
   // Date picker — defaults to today, min = season start
   const todayET = new Date().toLocaleDateString("en-US",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"});
@@ -8413,8 +8464,17 @@ function HRTrackerTab() {
     a.click();
   };
 
-  const HRNav = () => (
-    <div style={{display:'flex',gap:6,marginBottom:14}}>
+  const HR_HELP = [
+    ['💥 HR Tracker', 'Every home run hit today, live. Shows who hit it, how far, exit velocity, inning, and pitch thrown. Tap any row for a short video clip.'],
+    ['🏆 HR Leaders', 'Season home run leaderboard. See who leads the league and how your picks stack up.'],
+    ['🔥 Hot Bats', 'Batters on a home run streak or heating up over the last 7 days — players to watch closely.'],
+    ['📈 Heating Up', 'Batters showing rising exit velocity and hard contact trends — surging before the HR comes.'],
+    ['Filters', 'Use the team filter to focus on a specific team, or the search bar to find a player. Sort any column by clicking the header.'],
+    ['⬇ CSV', 'Export the current view as a spreadsheet.'],
+  ];
+  const HRNav = () => (<>
+    {showHRHelp && <HelpSlideout title="📊 HR Tracker Guide" items={HR_HELP} onClose={()=>setShowHRHelp(false)}/>}
+    <div style={{display:'flex',gap:6,marginBottom:14,alignItems:'center'}}>
       {[['tracker','💥 HR Tracker'],['leaderboard','🏆 HR Leaders'],['hotbats','🔥 Hot Bats'],['heatingup','📈 Heating Up']].map(([key,label]) => (
         <button key={key} onClick={() => setHrTab(key)}
           style={{padding:'5px 12px',borderRadius:7,cursor:'pointer',
@@ -8425,8 +8485,9 @@ function HRTrackerTab() {
           {label}
         </button>
       ))}
+      <HelpBtn onClick={()=>setShowHRHelp(v=>!v)}/>
     </div>
-  );
+  </>);
   if (hrTab === 'hotbats')     return <div><HRNav/><HotBatsTab/></div>;
   if (hrTab === 'heatingup')   return <div><HRNav/><HeatingUpTab/></div>;
   if (hrTab === 'leaderboard') return <div><HRNav/><HRLeaderboardTab/></div>;
@@ -15256,6 +15317,7 @@ function BvPDeepDiveTab() {
 
 function MatchupEngineTab() {
   const [subTab, setSubTab]        = useState('matchups');
+  const [showKMHelp, setShowKMHelp] = useState(false);
   const [data, setData]           = useState([]);
   const [tomorrowData, setTomorrowData] = useState([]);
   // Full engine output (all batters) for the All Matchups tab
@@ -15571,6 +15633,18 @@ function MatchupEngineTab() {
     )}
 
     {/* Sub-tab navigation */}
+    {showKMHelp && <HelpSlideout title="⚡ Key Matchups Guide" items={[
+      ['⚡ Matchups', "Today's top batter vs pitcher matchups ranked by HR probability. Each card shows the Yard Score, pitcher grade, and key stats. Use filters to narrow by grade or team."],
+      ['📋 All Matchups', "Full list of every scheduled batter with stats, grades, and filters. Sort by any column, filter by pitcher grade, confirmed lineup, and more."],
+      ['🎲 Long Shot', "Higher-odds plays — batters with lower grades facing hittable pitchers. Good for prop diversification."],
+      ['🔗 Pairs', "Two-batter combos sharing favorable conditions like the same pitcher, park, or trend. Both need to deliver for the pair to hit."],
+      ['🧢 Batters / ⚾ Pitchers', "Stat tables for today's scheduled batters and pitchers. Filter by grade, handedness, confirmed status, and more."],
+      ['📜 BvP History', "Head-to-head at-bat history between a batter and pitcher. See past results, pitch types, and trends."],
+      ['🤏 Close Calls', "Batters who nearly hit a home run in their last game — high exit velo, deep fly balls that just missed. Prime bounce-back candidates."],
+      ['Yard Score 🎯', "Our HR probability score (0–99). Higher = more favorable conditions. A+ batters vs Target pitchers are the top tier."],
+      ['Pitcher Grades', "🎯 Target = easiest to homer off. 💥 Hittable = solid. 🤔 Average = neutral. ⚠️ Tough = difficult. ‼️ Elite = avoid."],
+      ['Legend', "A+ = 6–8 flags (highest HR rate) · A = 4–5 · B = 2–3 · C = 1 · D = 0 flags. Flags are positive indicators like high barrel rate, favorable park, recent form, and pitcher vulnerability."],
+    ]} onClose={()=>setShowKMHelp(false)}/>}
     <div style={{display:'flex',flexDirection:'column',gap:4,marginBottom:14}}>
       {/* Row 1 */}
       <div style={{display:'flex',gap:4,flexWrap:'wrap',justifyContent:'center'}}>
@@ -15587,6 +15661,7 @@ function MatchupEngineTab() {
         <button style={stBtn('history')}   onClick={()=>setSubTab('history')}>📜 BvP History</button>
         <button style={stBtn('soclose')}   data-tip="🤏 Close Calls — batters who nearly went yard yesterday" onClick={()=>setSubTab('soclose')}>🤏 Close Calls</button>
         {/* 🧠 Sim Lab hidden — key matchup batters via 🔑 filter in All Matchups */}
+        <HelpBtn onClick={()=>setShowKMHelp(v=>!v)}/>
       </div>
     </div>
 
