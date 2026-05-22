@@ -13585,8 +13585,8 @@ function StatsTab() {
     <div style={{padding:'0 4px'}}>
 
       {/* ── Shared window selector ───────────────────────────────────────────── */}
-      <div style={{display:'flex',gap:6,alignItems:'center',marginBottom:14}}>
-        <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>Window:</span>
+      <div style={{display:'flex',flexWrap:'wrap',gap:6,alignItems:'center',marginBottom:8}}>
+        <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0}}>Window:</span>
         <div style={{display:'flex',gap:3,background:'var(--surface2)',borderRadius:7,padding:3,border:'1px solid var(--border)'}}>
           {['L7','L15','L30','season'].map(w=>(
             <button key={w} onClick={()=>setWindow(w)}
@@ -13602,7 +13602,8 @@ function StatsTab() {
         <select value={selMatchup} onChange={e=>{setSelMatchup(e.target.value);setBTeam('ALL');setPTeam('ALL');}}
           style={{fontFamily:mono,fontSize:9,background:'var(--surface2)',color:selMatchup?'var(--text)':'var(--muted)',
             border:`1px solid ${selMatchup?'var(--accent)':'var(--border)'}`,borderRadius:6,
-            padding:'4px 10px',cursor:'pointer',fontWeight:selMatchup?700:400}}>
+            padding:'4px 10px',cursor:'pointer',fontWeight:selMatchup?700:400,
+            maxWidth:180,minWidth:0,flex:'1 1 120px'}}>
           <option value=''>All Matchups</option>
           {matchupList.map(m=>(
             <option key={m.key} value={m.key}>{m.away} @ {m.home}{m.time?' · '+m.time:''}</option>
@@ -13613,8 +13614,8 @@ function StatsTab() {
             border:'1px solid var(--border)',color:'var(--muted)',background:'transparent'}}>
           ✕
         </button>}
-        <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginLeft:4}}>
-          {WIN_LABELS[window]}  ·  {bRows.length} batters  ·  {pRows.length} pitchers
+        <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',whiteSpace:'nowrap',flex:'1 1 auto',textAlign:'right',minWidth:0,overflow:'hidden',textOverflow:'ellipsis'}}>
+          {WIN_LABELS[window]} · {bRows.length}b · {pRows.length}p
         </span>
         <button onClick={()=>{
           // Reset all filters to defaults
@@ -13854,9 +13855,14 @@ function StatsTab() {
         {/* Batter filters — row 1b: pitch group filter */}
         <div style={{display:'flex',gap:4,flexWrap:'nowrap',alignItems:'center',marginBottom:4,overflowX:'auto',WebkitOverflowScrolling:'touch',paddingBottom:2}}>
           <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0}}>Pitch:</span>
-          {[['','All'],['fastball','🔥 Fastball'],['breaking','🌀 Breaking'],['offspeed','💨 Offspeed']].map(([val,lbl])=>(
+          {[
+            ['','All','All pitch types — no pitch filter active'],
+            ['fastball','🔥 Fastball','4-Seam (FF), Sinker (SI), Cutter (FC), 2-Seam (FT) · Hard velocity, 88-100+ mph'],
+            ['breaking','🌀 Breaking','Slider (SL), Curveball (CU), Sweeper (SV/ST), Knuckle-curve (KC) · Lateral/downward movement, 72-90 mph'],
+            ['offspeed','💨 Offspeed','Changeup (CH), Splitter (FS), Forkball (FO) · Deceptive speed, disrupts timing, 78-88 mph'],
+          ].map(([val,lbl,tip])=>(
             <button key={val} onClick={()=>setPitchGroup(p=>p===val&&val?'':val)}
-              data-tip={val?`vs ${lbl.split(' ')[1]} pitches`:'All pitch types'}
+              data-tip={tip}
               style={{padding:'3px 8px',borderRadius:5,fontSize:8,fontFamily:mono,cursor:'pointer',flexShrink:0,
                 border:`1px solid ${pitchGroup===val&&val?'var(--accent)':!val&&!pitchGroup?'var(--accent)':'var(--border)'}`,
                 background:pitchGroup===val&&val?'rgba(232,65,26,.2)':!val&&!pitchGroup?'rgba(232,65,26,.08)':'transparent',
@@ -14036,7 +14042,7 @@ function StatsTab() {
             ['⚾ LHP / RHP', 'Filter pitchers by throwing hand. Selecting LHP also updates the batter table to show how batters perform against lefties.'],
             ['🏠 Home / Away', 'Show stats from home games only or away games only. Affects both tables.'],
             ['🌙 Day / Night', 'Filter to day games or night games. Affects both tables.'],
-            ['🔥 Pitch Groups', 'See how batters do against fastballs, breaking balls, or offspeed pitches — and sort pitchers by how often they throw that pitch type.'],
+            ['🔥 Pitch Groups', '🔥 Fastball = 4-seam, sinker, cutter, 2-seam (88-100+ mph). 🌀 Breaking = slider, curveball, sweeper, knuckle-curve (72-90 mph). 💨 Offspeed = changeup, splitter, forkball (78-88 mph). Select a group to see batter stats vs those pitches and auto-sort pitchers by how often they throw it. Stacks with handedness and window.'],
             ['🎯 Matchup', 'Pick a game from the dropdown to instantly focus both tables on just those two teams.'],
             ['👕 Team Dropdown', 'After picking a matchup, use the team dropdown to narrow down to one side — e.g. just the away team batters.'],
             ['⚾ SP Button', "Show only today's scheduled starting pitchers."],
