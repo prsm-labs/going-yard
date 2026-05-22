@@ -2149,6 +2149,7 @@ function AtBatSlideIn() {
           </div>
           <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>
             {player.team}
+            {(()=>{const h=(player.batSide||player.hand||getCachedPlayer(player.pid)?.batSide||getCachedPlayer(player.pid)?.hand||'');return h?<span style={{color:'var(--accent2)',fontWeight:700}}> · {h==='L'?'LHB':h==='R'?'RHB':h==='S'?'SWB':h}</span>:null;})()}
             {player.avgEV > 0 && <span> · EV {player.avgEV.toFixed(1)}</span>}
             {(apiHr != null ? apiHr : player.hr) > 0 && <span style={{color:'var(--accent)',fontWeight:700}}> · {apiHr != null ? apiHr : player.hr} HR</span>}
             {player.avg > 0 && <span> · {'.'+String(Math.round(player.avg*1000)).padStart(3,'0')} AVG</span>}
@@ -3011,7 +3012,8 @@ async function loadTodayLineups() {
               // battingOrder from API is 100,200,...900 — divide by 100 for slot 1-9
               // Fallback to array index+1 if battingOrder missing
               const slot = p.battingOrder ? Math.round(p.battingOrder / 100) : (idx + 1);
-              LINEUP_STATUS[p.id] = { status: 'confirmed', team: teamAbbr, slot };
+              const pos = p.position?.abbreviation || p.positionType || '';
+              LINEUP_STATUS[p.id] = { status: 'confirmed', team: teamAbbr, slot, pos };
             }
           });
         }
@@ -13276,8 +13278,11 @@ function StatsTab() {
   const [bMinPA,      setBMinPA]      = useState(10);
   const [bPgFilter,   setBPgFilter]   = useState([]);
   const [pitchGroup,  setPitchGroup]  = useState('');   // '' | 'fastball' | 'breaking' | 'offspeed'
-  const [expandedB,   setExpandedB]   = useState(null); // expanded batter row id
-  const [expandedP,   setExpandedP]   = useState(null); // expanded pitcher row id
+  const [expandedB,   setExpandedB]   = useState(null);
+  const [expandedP,   setExpandedP]   = useState(null);
+  const [teamsCollapsed, setTeamsCollapsed] = useState(false);
+  const [tSortBy,     setTSortBy]     = useState('woba');
+  const [tSortDir,    setTSortDir]    = useState(-1);
 
   // ── Pitcher-only state ────────────────────────────────────────────────────────
   const [pHandFilter, setPHandFilter] = useState('');
@@ -13306,12 +13311,16 @@ function StatsTab() {
 
   const WIN_LABELS = { L7:'Last 7', L15:'Last 15', L30:'Last 30', season:'2026 Season' };
 
-  // Probable pitcher IDs (from daily_picks.csv schedule join)
+  // Probable pitcher IDs — exclude anyone confirmed as batter-only today
   const probablePitcherIds = React.useMemo(() => {
     const ids = new Set();
     Object.values(DAILY_PICKS_CACHE||{}).forEach(r => {
       const pid = String(r.pitcher_id||'').split('.')[0];
-      if (pid && pid !== '0') ids.add(pid);
+      if (!pid || pid === '0') return;
+      // If confirmed in lineup as a non-pitcher position today, skip
+      const ls = LINEUP_STATUS[parseInt(pid)||0];
+      if (ls?.status === 'confirmed' && ls.pos && ls.pos !== 'P' && ls.pos !== 'SP' && ls.pos !== 'TWP') return;
+      ids.add(pid);
     });
     return ids;
   }, [lineupVer]);
@@ -13338,7 +13347,10 @@ function StatsTab() {
   const exportCSV = (rows, filename, type) => {
     const fv = v => (v===null||v===undefined||v==='') ? '' : v;
     let headers, rowFn;
-    if (type === 'batters') {
+    if (type === 'teams') {
+      headers = ['Team','Players','PA','AVG','OBP','SLG','ISO','wOBA','HR','HR%','K%','BB%','EV','HH%','PBrl%','FB%','LA'];
+      rowFn = r=>[r.team,r.players,Math.round(r.pa),r.avg?.toFixed(3)||'',r.obp?.toFixed(3)||'',r.slg?.toFixed(3)||'',r.iso?.toFixed(3)||'',r.woba?.toFixed(3)||'',r.hr||0,r.hr_rate?.toFixed(1)||'',r.k_pct?.toFixed(1)||'',r.bb_pct?.toFixed(1)||'',r.ev?.toFixed(1)||'',r.hh_pct?.toFixed(1)||'',r.pbrl_pct?.toFixed(1)||'',r.fb_pct?.toFixed(1)||'',r.la_mean?.toFixed(1)||''];
+    } else if (type === 'batters') {
       headers = ['ID','Name','Team','Hand','PA','Yard Score','AVG','OBP','SLG','ISO','wOBA','HR','HR%','K%','BB%','EV','HH%','PBrl%','FB%','LA'];
       rowFn = r => [r.id, r.name||r.id, r.team||'', r.hand||'', fv(r.pa),
         r._yard?parseFloat(r._yard).toFixed(0):'',
@@ -13530,6 +13542,50 @@ function StatsTab() {
       })
       .slice(0, 300);
   }, [data, window, pSplitKey, pSortBy, pSortDir, pSearch, pTeam, pMinBF, pRoleFilter, pPgFilter, matchupTeams, sharedPHand, lineupVer, pScheduledOnly]);
+
+  // ── Team rows — aggregate bRows by team ───────────────────────────────────
+  const teamRows = React.useMemo(() => {
+    const map = {};
+    bRows.forEach(r => {
+      const t = r.team || '?';
+      if (!map[t]) map[t] = { team:t, players:0, pa:0, hr:0, _hrSum:0, _avgN:0, _avgD:0,
+        _obpN:0, _slgN:0, _isoN:0, _wobaN:0, _evSum:0, _evN:0,
+        _hhSum:0, _kSum:0, _bbSum:0, _fbSum:0, _laSum:0, _laN:0, _pbrlSum:0 };
+      const m = map[t];
+      const pa = r.pa||0; if (!pa) return;
+      m.players++;
+      m.pa    += pa;
+      m.hr    += r.hr||0;
+      m._avgN += (r.avg||0)*pa;  m._avgD += pa;
+      m._obpN += (r.obp||0)*pa;
+      m._slgN += (r.slg||0)*pa;
+      m._isoN += (r.iso||0)*pa;
+      m._wobaN+= (r.woba||0)*pa;
+      if (r.ev>0){ m._evSum+=(r.ev||0)*pa; m._evN+=pa; }
+      m._hhSum+= (r.hh_pct||0)*pa;
+      m._kSum += (r.k_pct||0)*pa;
+      m._bbSum+= (r.bb_pct||0)*pa;
+      m._fbSum+= (r.fb_pct||0)*pa;
+      if (r.la_mean){ m._laSum+=(r.la_mean||0)*pa; m._laN+=pa; }
+      m._pbrlSum+=(r.pbrl_pct||0)*pa;
+    });
+    return Object.values(map).map(m => ({
+      team:m.team, players:m.players, pa:m.pa, hr:m.hr,
+      avg:  m._avgD?m._avgN/m._avgD:0,
+      obp:  m._avgD?m._obpN/m._avgD:0,
+      slg:  m._avgD?m._slgN/m._avgD:0,
+      iso:  m._avgD?m._isoN/m._avgD:0,
+      woba: m._avgD?m._wobaN/m._avgD:0,
+      ev:   m._evN?m._evSum/m._evN:0,
+      hh_pct: m._avgD?m._hhSum/m._avgD:0,
+      k_pct:  m._avgD?m._kSum/m._avgD:0,
+      bb_pct: m._avgD?m._bbSum/m._avgD:0,
+      fb_pct: m._avgD?m._fbSum/m._avgD:0,
+      la_mean:m._laN?m._laSum/m._laN:0,
+      pbrl_pct:m._avgD?m._pbrlSum/m._avgD:0,
+      hr_rate: m.pa?m.hr/m.pa*100:0,
+    })).sort((a,b) => tSortDir*(( a[tSortBy]??-999)-(b[tSortBy]??-999)));
+  }, [bRows, tSortBy, tSortDir]);
 
   // ── Shared helpers ────────────────────────────────────────────────────────────
   const fmtAvg = v => v>0 ? '.'+String(Math.round(v*1000)).padStart(3,'0') : '—';
@@ -13748,11 +13804,17 @@ function StatsTab() {
                         <span style={{fontFamily:osw,fontWeight:700,fontSize:9,color:'var(--accent2)',minWidth:26}}>{r.team||''}</span>
                         <span onClick={()=>openPitcherSlide({pid:parseInt(r.id)||0,name:r.name||r.id,team:r.team||'',hand:r.hand||'',pitchMix:[]})}
                           style={{fontFamily:osw,fontWeight:700,fontSize:10,color:'var(--text)',cursor:'pointer'}}>{r.name||r.id}</span>
-                        {LINEUP_STATUS[parseInt(r.id)||0]?.status==='confirmed'
-                          ? <span title="Confirmed SP" style={{fontSize:10,flexShrink:0}}>🟢</span>
-                          : probablePitcherIds.has(r.id)
-                            ? <span title="Probable SP" style={{fontSize:10,flexShrink:0}}>🟡</span>
-                            : null}
+                        {(()=>{
+                          const ls = LINEUP_STATUS[parseInt(r.id)||0];
+                          // If confirmed in lineup as a non-pitcher today → no sticker, not pitching
+                          const confirmedBatterOnly = ls?.status==='confirmed' && ls.pos && ls.pos!=='P' && ls.pos!=='SP' && ls.pos!=='TWP';
+                          if (confirmedBatterOnly) return null;
+                          // Confirmed as starting pitcher
+                          if (ls?.status==='confirmed' && (ls.pos==='P'||ls.pos==='SP'||ls.pos==='TWP')) return <span title="Confirmed SP" style={{fontSize:10,flexShrink:0}}>🟢</span>;
+                          // Probable (not yet confirmed either way)
+                          if (probablePitcherIds.has(r.id)) return <span title="Probable SP" style={{fontSize:10,flexShrink:0}}>🟡</span>;
+                          return null;
+                        })()}
                         <span style={{fontFamily:mono,fontSize:7,color:'var(--muted)'}}>{r.hand==='L'?'LHP':r.hand==='R'?'RHP':''}</span>
                         {r.role&&<span style={{padding:'1px 3px',borderRadius:3,fontSize:7,fontWeight:700,background:r.role==='SP'?'rgba(56,184,242,.15)':'rgba(251,191,36,.15)',color:r.role==='SP'?'var(--ice)':'#fbbf24',border:`1px solid ${r.role==='SP'?'rgba(56,184,242,.3)':'rgba(251,191,36,.3)'}`}}>{r.role}</span>}
                       </div>
@@ -13928,6 +13990,7 @@ function StatsTab() {
               <thead style={{position:'sticky',top:0,zIndex:4}}>
                 <tr>
                   <th style={{padding:'4px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.5,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)',background:'var(--surface2)',position:'sticky',left:0,zIndex:5,whiteSpace:'nowrap'}}>Batter</th>
+                  <th style={{padding:'4px 5px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.5,color:'var(--muted)',textAlign:'center',borderBottom:'1px solid var(--border)',background:'var(--surface2)',whiteSpace:'nowrap'}} title="Batting order slot (confirmed lineups only)">#</th>
                   <BTh col="pa"       label="PA"    title="Plate appearances"/>
                   <BTh col="_yard"    label={<img src="/icon-192.png" alt="Yard" style={{width:14,height:14,borderRadius:2,objectFit:'cover',verticalAlign:'middle'}}/>} title="Today's Yard Score" align="center"/>
                   <BTh col="avg"      label="AVG"   title="Batting average"/>
@@ -13970,6 +14033,7 @@ function StatsTab() {
                         <PickButton pid={parseInt(r.id)||0} name={r.name||r.id} team={r.team||''}/>
                       </div>
                     </td>
+                    {(()=>{const ls=LINEUP_STATUS[parseInt(r.id)||0];const slot=(ls?.status==='confirmed'&&ls?.pos!=='P'&&ls?.slot>=1&&ls?.slot<=9)?ls.slot:null;return <td style={{textAlign:'center',padding:'2px 4px',fontFamily:mono,fontSize:9,fontWeight:700,color:slot?'#27c97a':'transparent',minWidth:18}}>{slot||'·'}</td>;})()}
                     <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{fmtN(r.pa)}</td>
                     <td style={{textAlign:'center',padding:'2px 4px'}}>
                       {r._yard>0 ? <YardBadge score={parseFloat(r._yard)}/> : <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>—</span>}
@@ -14029,7 +14093,82 @@ function StatsTab() {
         </div>
         </div>
       </div>
+
+      {/* ══ Team Separator ══════════════════════════════════════════════════ */}
+      <div style={{display:'flex',alignItems:'center',gap:10,margin:'4px 0 18px'}}>
+        <div style={{flex:1,height:1,background:'var(--border)'}}/>
+        <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',letterSpacing:1,textTransform:'uppercase'}}>Teams</span>
+        <div style={{flex:1,height:1,background:'var(--border)'}}/>
+      </div>
+
+      {/* ══ TEAMS ════════════════════════════════════════════════════════════ */}
+      <div style={{marginBottom:20}}>
+        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+          <div onClick={()=>setTeamsCollapsed(v=>!v)}
+            style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',userSelect:'none',padding:'4px 0',flex:1}}>
+            <span style={{fontFamily:osw,fontWeight:800,fontSize:13,color:'var(--text)'}}>👕 Teams</span>
+            <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>{teamRows.length} teams</span>
+            <span data-tip={teamsCollapsed?'Expand':'Collapse'}
+              style={{marginLeft:'auto',fontFamily:mono,fontSize:10,color:'var(--muted)'}}>
+              {teamsCollapsed?'▶':'▼'}
+            </span>
+          </div>
+          <button onClick={()=>exportCSV(teamRows,`team-splits-${window}.csv`,'teams')}
+            data-tip="Export team table to CSV"
+            style={{padding:'3px 8px',borderRadius:6,fontSize:9,cursor:'pointer',
+              border:'1px solid var(--border)',color:'var(--muted)',background:'transparent',fontFamily:mono,flexShrink:0}}>
+            ⬇ CSV
+          </button>
+        </div>
+        <div style={{display:teamsCollapsed?'none':'block'}}>
+          <div style={{overflowX:'auto'}}>
+            <div style={{maxHeight:280,overflowY:'auto',borderRadius:8,border:'1px solid var(--border)'}}>
+              <table style={{width:'100%',borderCollapse:'collapse',fontSize:10}}>
+                <thead style={{position:'sticky',top:0,zIndex:4}}>
+                  <tr>
+                    {(()=>{const TTh=({col,label,title,align='right'})=>(<th onClick={()=>{if(tSortBy===col)setTSortDir(d=>d*-1);else{setTSortBy(col);setTSortDir(-1);}}} style={{padding:'4px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.5,whiteSpace:'nowrap',cursor:'pointer',textAlign:align,borderBottom:'1px solid var(--border)',background:'var(--surface2)',color:tSortBy===col?'var(--accent2)':'var(--muted)'}}>{label}{tSortBy===col?(tSortDir===1?' ▲':' ▼'):''}</th>);
+                    return <><th style={{padding:'4px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.5,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)',background:'var(--surface2)',position:'sticky',left:0,zIndex:5}}>Team</th>
+                    <TTh col="players" label="Plyrs" title="Players in sample"/><TTh col="pa" label="PA" title="Plate appearances"/><TTh col="avg" label="AVG" title="Batting average"/><TTh col="obp" label="OBP" title="On-base %"/><TTh col="slg" label="SLG" title="Slugging %"/><TTh col="iso" label="ISO" title="Isolated power"/><TTh col="woba" label="wOBA" title="Weighted on-base avg"/><TTh col="hr" label="HR" title="Home runs"/><TTh col="hr_rate" label="HR%" title="HR per PA"/><TTh col="k_pct" label="K%" title="Strikeout rate"/><TTh col="bb_pct" label="BB%" title="Walk rate"/><TTh col="ev" label="EV" title="Exit velocity"/><TTh col="hh_pct" label="HH%" title="Hard hit rate"/><TTh col="pbrl_pct" label="PBrl%" title="Pulled barrel rate"/><TTh col="fb_pct" label="FB%" title="Fly ball rate"/><TTh col="la_mean" label="LA°" title="Launch angle"/></>;})()}
+                  </tr>
+                </thead>
+                <tbody>
+                  {teamRows.length===0
+                    ?<tr><td colSpan={17} style={{textAlign:'center',padding:24,fontFamily:mono,fontSize:10,color:'var(--muted)'}}>No data for this split</td></tr>
+                    :teamRows.map(r=>(
+                    <tr key={r.team} style={{borderBottom:'1px solid rgba(255,255,255,.04)',height:26,background:bTeam===r.team?'rgba(56,184,242,.06)':'transparent'}}>
+                      <td style={{padding:'2px 8px',position:'sticky',left:0,background:bTeam===r.team?'rgba(56,184,242,.08)':'var(--surface)',zIndex:3,whiteSpace:'nowrap'}}>
+                        <span style={{fontFamily:osw,fontWeight:800,fontSize:12,color:bTeam===r.team?'var(--accent)':'var(--text)',cursor:'pointer'}}
+                          onClick={()=>onBTeamChange(bTeam===r.team?'ALL':r.team)}>
+                          {r.team}
+                        </span>
+                        <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginLeft:5}}>({r.players}p)</span>
+                      </td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{r.players}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{Math.round(r.pa)}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.avg||0)>=.270?'#27c97a':'var(--muted)'}}>{r.avg>0?'.'+String(Math.round(r.avg*1000)).padStart(3,'0'):'—'}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.obp||0)>=.340?'#27c97a':'var(--muted)'}}>{r.obp>0?'.'+String(Math.round(r.obp*1000)).padStart(3,'0'):'—'}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.slg||0)>=.450?'#ff8020':(r.slg||0)>=.380?'#f5a623':'var(--muted)'}}>{r.slg>0?'.'+String(Math.round(r.slg*1000)).padStart(3,'0'):'—'}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,fontWeight:700,color:(r.iso||0)>=.200?'#ff8020':(r.iso||0)>=.160?'#f5a623':'var(--muted)'}}>{r.iso>0?r.iso.toFixed(3):'—'}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,fontWeight:700,color:(r.woba||0)>=.340?'#ff4020':(r.woba||0)>=.310?'#f5a623':'var(--muted)'}}>{r.woba>0?r.woba.toFixed(3):'—'}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:osw,fontWeight:800,fontSize:11,color:(r.hr||0)>=15?'#ff4020':(r.hr||0)>=8?'#f5a623':'var(--muted)'}}>{r.hr||0}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.hr_rate||0)>=5?'#ff4020':(r.hr_rate||0)>=3?'#f5a623':'var(--muted)'}}>{r.hr_rate>0?r.hr_rate.toFixed(1)+'%':'—'}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.k_pct||0)>=26?'#ff4020':'var(--muted)'}}>{r.k_pct>0?r.k_pct.toFixed(1)+'%':'—'}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.bb_pct||0)>=11?'#27c97a':'var(--muted)'}}>{r.bb_pct>0?r.bb_pct.toFixed(1)+'%':'—'}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.ev||0)>=103?'#ff4020':(r.ev||0)>=98?'#f5a623':'var(--muted)'}}>{r.ev>0?r.ev.toFixed(1):'—'}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.hh_pct||0)>=42?'#ff4020':(r.hh_pct||0)>=36?'#f5a623':'var(--muted)'}}>{r.hh_pct>0?r.hh_pct.toFixed(1)+'%':'—'}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.pbrl_pct||0)>=8?'#ff4020':'var(--muted)'}}>{r.pbrl_pct>0?r.pbrl_pct.toFixed(1)+'%':'—'}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.fb_pct||0)>=38?'#27c97a':'var(--muted)'}}>{r.fb_pct>0?r.fb_pct.toFixed(1)+'%':'—'}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.la_mean||0)>=18&&(r.la_mean||0)<=30?'#27c97a':'var(--muted)'}}>{r.la_mean>0?r.la_mean.toFixed(1)+'°':'—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
+
       {/* Help slideout */}
       {showHelp && <div style={{position:'fixed',top:0,right:0,bottom:0,width:320,zIndex:9999,background:'var(--surface)',borderLeft:'1px solid var(--border)',display:'flex',flexDirection:'column',boxShadow:'-4px 0 24px rgba(0,0,0,.5)'}}>
         <div style={{display:'flex',alignItems:'center',gap:10,padding:'14px 16px',borderBottom:'1px solid var(--border)',background:'var(--surface2)'}}>
@@ -18484,21 +18623,21 @@ function LinksTab() {
     {
       name: 'OnlyHomers',
       url:  'https://onlyhomers.com',
-      emoji: '💥',
-      color: '#ff4020',
+      logo: '/images/logo-onlyhomers.jpg',
+      color: '#e05c1a',
       summary: 'Daily MLB home run tracker and season HR leaderboard. Every dinger logged with stats, video, and player pages.',
     },
     {
       name: 'PropFinder',
       url:  'https://propfinder.app',
-      emoji: '🎯',
-      color: '#f5a623',
+      logo: '/images/logo-propfinder.webp',
+      color: '#aaaaaa',
       summary: 'MLB prop bet finder and odds comparison. Quickly surface the best HR, hits, and strikeout props across sportsbooks.',
     },
     {
       name: 'Blast Report',
       url:  'https://blast-report.com',
-      emoji: '💣',
+      logo: '/images/logo-blast.jpg',
       color: '#27c97a',
       summary: 'Bat speed and attack angle data from Blast Motion sensors. Detailed swing metrics for hitter analysis.',
     },
@@ -18512,8 +18651,8 @@ function LinksTab() {
     {
       name: 'Gambly',
       url:  'https://gambly.com',
-      emoji: '🤖',
-      color: '#a855f7',
+      logo: '/images/logo-gambly.jpg',
+      color: '#27c930',
       summary: 'AI-powered sports betting tools and prop analysis. Automated line monitoring and value alert system.',
     },
   ];
@@ -18548,7 +18687,12 @@ function LinksTab() {
             onMouseEnter={e=>e.currentTarget.style.background='var(--surface2)'}
             onMouseLeave={e=>e.currentTarget.style.background='var(--surface)'}
             >
-              <span style={{fontSize:28,flexShrink:0}}>{link.emoji}</span>
+              {link.logo
+                ? <img src={link.logo} alt={link.name}
+                    style={{width:44,height:44,borderRadius:8,objectFit:'contain',
+                      background:'#fff',flexShrink:0,padding:2}}/>
+                : <span style={{fontSize:28,flexShrink:0}}>{link.emoji}</span>
+              }
               <div style={{flex:1,minWidth:0}}>
                 <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
                   <span style={{fontFamily:osw,fontWeight:800,fontSize:14,color:'var(--text)'}}>
