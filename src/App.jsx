@@ -7960,6 +7960,17 @@ async function fetchInjuries() {
       }
     } catch(e2) { /* pipeline CSV not available — skip cross-check */ }
 
+    // ── Final pass: clear anyone confirmed in today's lineup ──────────────────
+    // Lineup confirmation is ground truth — overrides any stale injury data
+    let confirmedCleared = 0;
+    Object.keys(INJURY_MAP).forEach(pid => {
+      if (LINEUP_STATUS[pid]?.status === 'confirmed') {
+        delete INJURY_MAP[pid];
+        confirmedCleared++;
+      }
+    });
+    if (confirmedCleared > 0) console.log(`[Injuries] ${confirmedCleared} cleared — confirmed in today lineup`);
+
     INJURY_LOADED = Date.now();
     notifyInjuryListeners();
     console.log(`[Injuries] ${ilCount} IL players (${Object.keys(placements).length} placed, ${Object.keys(activations).length} activated)`);
@@ -11494,6 +11505,8 @@ async function fetchBvP(batterId, pitcherId) {
 function InjuryBadge({ pid, name }) {
   const inj = INJURY_MAP[String(pid || '')];
   if (!inj) return null;
+  // If confirmed in today's lineup they're healthy — stale injury data, suppress sticker
+  if (LINEUP_STATUS[String(pid || '')]?.status === 'confirmed') return null;
   const tip = `${inj.label}${inj.shortDesc ? ' · '+inj.shortDesc : ''}`;
   return (
     <span title={tip} aria-label={tip}
@@ -13445,7 +13458,7 @@ function StatsTab() {
         if (bConfirmed && bls?.status !== 'confirmed') return false;
         if (bGYOnly    && !isGoneYardToday(bpid, r.name)) return false;
         if (bHotOnly   && !(parseInt(r.recent_hr_count||0)>=3||(getCachedPlayer(bpid)?.recentHR||0)>=3)) return false;
-        if (bHideInj   && INJURY_MAP?.[bpid]) return false;
+        if (bHideInj   && INJURY_MAP?.[bpid] && !LINEUP_STATUS?.[bpid]) return false;
         if (bPgFilter.length > 0) {
           const dp = DAILY_PICKS_CACHE[r.id] || Object.values(DAILY_PICKS_CACHE).find(b=>String(b.batter_id||'').split('.')[0]===r.id);
           const pg = dp?._pgLabel || '';
@@ -13946,7 +13959,7 @@ function StatsTab() {
                         {LINEUP_STATUS[parseInt(r.id)||0]?.status==='confirmed'&&<span title="Confirmed in lineup" style={{fontSize:9,flexShrink:0}}>✅</span>}
                         {isGoneYardToday(parseInt(r.id)||0,r.name)&&<span title="Gone yard today" style={{fontSize:9,flexShrink:0}}>💥</span>}
                         {isHotBatPlayer(getCachedPlayer(parseInt(r.id)||0)||{})&&<span title="Hot bat 3+ HR L7" style={{fontSize:9,flexShrink:0}}>🔥</span>}
-                        {INJURY_MAP?.[parseInt(r.id)||0]&&<span title={INJURY_MAP[parseInt(r.id)||0]?.label||'Injured'} style={{fontSize:9,flexShrink:0}}>🤕</span>}
+                        {INJURY_MAP?.[parseInt(r.id)||0]&&!LINEUP_STATUS?.[parseInt(r.id)||0]&&<span title={INJURY_MAP[parseInt(r.id)||0]?.label||'Injured'} style={{fontSize:9,flexShrink:0}}>🤕</span>}
                         <PickButton pid={parseInt(r.id)||0} name={r.name||r.id} team={r.team||''}/>
                       </div>
                     </td>
