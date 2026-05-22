@@ -13476,8 +13476,23 @@ function StatsTab() {
         <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginLeft:4}}>
           {WIN_LABELS[window]}  ·  {bRows.length} batters  ·  {pRows.length} pitchers
         </span>
+        <button onClick={()=>{
+          // Reset all filters to defaults
+          setWindow('L15'); setSelMatchup(matchupList[0]?.key||''); setSharedPHand(''); setSharedBHand('');
+          setSharedLoc(''); setSharedDN(''); setPitchGroup('');
+          setBHandFilter(''); setBTeam('ALL'); setBMinPA(10); setBPgFilter([]);
+          setBConfirmed(false); setBHotOnly(false); setBGYOnly(false); setBHideInj(false); setBPicksOnly(false);
+          setPHandFilter && setPHandFilter(''); setPTeam('ALL'); setPMinBF(10); setPPgFilter([]);
+          setPRoleFilter(''); setPScheduledOnly(true);
+          setBatterCollapsed(false); setPitcherCollapsed(false);
+          setBSearch(''); setPSearch('');
+        }} data-tip="Reset all filters to default"
+          style={{padding:'3px 8px',borderRadius:6,fontSize:9,cursor:'pointer',fontFamily:"'DM Mono',monospace",
+            border:'1px solid var(--border)',color:'var(--muted)',background:'transparent',flexShrink:0}}>
+          ↺ Reset
+        </button>
         <button onClick={()=>setShowHelp(v=>!v)} data-tip="How Splits works"
-          style={{marginLeft:'auto',padding:'3px 8px',borderRadius:6,fontSize:10,cursor:'pointer',
+          style={{padding:'3px 8px',borderRadius:6,fontSize:10,cursor:'pointer',
             border:'1px solid var(--border)',color:'var(--muted)',background:'transparent',flexShrink:0}}>
           ?
         </button>
@@ -13855,11 +13870,23 @@ function StatsTab() {
       {/* Help slideout */}
       {showHelp && <div style={{position:'fixed',top:0,right:0,bottom:0,width:320,zIndex:9999,background:'var(--surface)',borderLeft:'1px solid var(--border)',display:'flex',flexDirection:'column',boxShadow:'-4px 0 24px rgba(0,0,0,.5)'}}>
         <div style={{display:'flex',alignItems:'center',gap:10,padding:'14px 16px',borderBottom:'1px solid var(--border)',background:'var(--surface2)'}}>
-          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:14}}>How Splits Works</span>
+          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:14}}>📊 How to Use the Splits Page</span>
           <button onClick={()=>setShowHelp(false)} style={{marginLeft:'auto',background:'transparent',border:'none',color:'var(--muted)',fontSize:18,cursor:'pointer'}}>x</button>
         </div>
         <div style={{overflowY:'auto',padding:16,fontFamily:"'DM Mono',monospace",fontSize:10,lineHeight:1.8,color:'var(--muted)'}}>
-          {[['Data Source','Pre-aggregated from your at-bat log (250k+ PAs). Updates daily when build_splits.py runs.'],['Windows','L7/L15/L30 are rolling from the last date in the log. Season = full 2026. Both tables update together.'],['Tandem Filters','Pitcher LHP/RHP sets the batter split to vsLHP/vsRHP simultaneously. Batter LHB/RHB sets pitcher split to vsLHB/vsRHB.'],['Pitch Groups','Fastball/Breaking/Offspeed filters both tables. Stacks with handedness and window only -- not location or day/night.'],['Yard Score',"Today HR model score. Only shows for batters with a game today."],['SP Filter',"Filters pitchers to scheduled starters only (yellow probable or green confirmed)."],['Matchup Filter','Selecting a game filters both tables to those two teams.'],['Min PA / BF','Raise for more reliable splits, lower to see everyone.']].map(([t,d])=>(
+          {[
+            ['⏱ Time Window (L7 / L15 / L30 / Szn)', 'How far back to look. L7 = last 7 days, L30 = last 30 days, Szn = full season. Applies to both tables at once.'],
+            ['🧢 LHB / RHB / SWB', 'Filter batters by which side they hit from. Selecting LHB also updates the pitcher table to show how pitchers do against left-handed hitters.'],
+            ['⚾ LHP / RHP', 'Filter pitchers by throwing hand. Selecting LHP also updates the batter table to show how batters perform against lefties.'],
+            ['🏠 Home / Away', 'Show stats from home games only or away games only. Affects both tables.'],
+            ['🌙 Day / Night', 'Filter to day games or night games. Affects both tables.'],
+            ['🔥 Pitch Groups', 'See how batters do against fastballs, breaking balls, or offspeed pitches — and sort pitchers by how often they throw that pitch type.'],
+            ['🎯 Matchup', 'Pick a game from the dropdown to instantly focus both tables on just those two teams.'],
+            ['👕 Team Dropdown', 'After picking a matchup, use the team dropdown to narrow down to one side — e.g. just the away team batters.'],
+            ['⚾ SP Button', 'Show only today's scheduled starting pitchers.'],
+            ['✅ 🔥 💥 🤕 Stickers', 'Filter batters by status: confirmed in lineup, hot bat, gone yard today, or hide injured players.'],
+            ['Min PA / Min BF', 'Minimum plate appearances or batters faced. Raise it to see only players with enough data to be meaningful.'],
+          ].map(([t,d])=>(
             <div key={t} style={{marginBottom:14}}><div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'var(--text)',marginBottom:3}}>{t}</div><div>{d}</div></div>
           ))}
         </div>
