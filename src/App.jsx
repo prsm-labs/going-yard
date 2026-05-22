@@ -13122,12 +13122,13 @@ function StatsTab() {
 
   // ── Shared state ────────────────────────────────────────────────────────────
   const [window,      setWindow]      = useState('L15');
+  const [showHelp,    setShowHelp]    = useState(false);
   const [selMatchup,  setSelMatchup]  = useState('');
   const [lineupVer,   setLineupVer]   = useState(0);
   const autoLinkRef = React.useRef(false); // prevent circular team auto-link
   useEffect(() => {
     const id = setInterval(() => {
-      if (Object.keys(DAILY_PICKS_CACHE).length > 0) {
+      if (DAILY_PICKS_CACHE && Object.keys(DAILY_PICKS_CACHE).length > 0) {
         setLineupVer(v => v + 1);
         clearInterval(id);
       }
@@ -13169,7 +13170,6 @@ function StatsTab() {
   const [bMinPA,      setBMinPA]      = useState(10);
   const [bPgFilter,   setBPgFilter]   = useState([]);
   const [pitchGroup,  setPitchGroup]  = useState('');   // '' | 'fastball' | 'breaking' | 'offspeed'
-  const [showHelp,    setShowHelp]    = useState(false);
   const [expandedB,   setExpandedB]   = useState(null); // expanded batter row id
   const [expandedP,   setExpandedP]   = useState(null); // expanded pitcher row id
 
@@ -13203,7 +13203,7 @@ function StatsTab() {
   // Probable pitcher IDs (from daily_picks.csv schedule join)
   const probablePitcherIds = React.useMemo(() => {
     const ids = new Set();
-    Object.values(DAILY_PICKS_CACHE).forEach(r => {
+    Object.values(DAILY_PICKS_CACHE||{}).forEach(r => {
       const pid = String(r.pitcher_id||'').split('.')[0];
       if (pid && pid !== '0') ids.add(pid);
     });
@@ -13214,7 +13214,7 @@ function StatsTab() {
   const matchupList = React.useMemo(() => {
     const seen = new Set();
     const list = [];
-    Object.values(DAILY_PICKS_CACHE).forEach(r => {
+    Object.values(DAILY_PICKS_CACHE||{}).forEach(r => {
       // daily_picks.csv fields: home_team, away_team (from schedule join)
       const home = r.home_team || ''; 
       const away = r.away_team || r.batting_team || '';
@@ -13284,7 +13284,7 @@ function StatsTab() {
   // ── Batter rows ───────────────────────────────────────────────────────────────
   const bRows = React.useMemo(() => {
     const src = data.batters || {};
-    if (!Object.keys(src).length) return [];
+    if (!src || !Object.keys(src).length) return [];
     const getSplit = (player) => {
       const wins = player.splits?.[window];
       if (!wins) return null;
@@ -13340,7 +13340,7 @@ function StatsTab() {
   // ── Pitcher rows ──────────────────────────────────────────────────────────────
   const pRows = React.useMemo(() => {
     const src = data.pitchers || {};
-    if (!Object.keys(src).length) return [];
+    if (!src || !Object.keys(src).length) return [];
     return Object.entries(src)
       .map(([id, player]) => {
         const psk = pSplitKey || 'overall';
