@@ -13451,7 +13451,8 @@ function StatsTab() {
         const resolvedName = (player.name && !/^\d+$/.test(player.name))
           ? player.name
           : dpRow?.batter || getCachedPlayer(parseInt(id)||0)?.name || player.name;
-        return { id, ...player, name: resolvedName, ...sp, _yard: dpRow?._yard || null };
+        const _slot = (()=>{ const ls=LINEUP_STATUS[parseInt(id)||0]; return (ls?.status==='confirmed'&&ls.pos!=='P'&&ls.slot>=1&&ls.slot<=9)?ls.slot:99; })();
+        return { id, ...player, name: resolvedName, ...sp, _yard: dpRow?._yard || null, _slot };
       })
       .filter(r => {
         if (!r) return false;
@@ -13990,7 +13991,7 @@ function StatsTab() {
               <thead style={{position:'sticky',top:0,zIndex:4}}>
                 <tr>
                   <th style={{padding:'4px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.5,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)',background:'var(--surface2)',position:'sticky',left:0,zIndex:5,whiteSpace:'nowrap'}}>Batter</th>
-                  <th style={{padding:'4px 5px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.5,color:'var(--muted)',textAlign:'center',borderBottom:'1px solid var(--border)',background:'var(--surface2)',whiteSpace:'nowrap'}} title="Batting order slot (confirmed lineups only)">#</th>
+                  <BTh col="_slot" label="#" title="Batting order slot — confirmed lineups only" align="center"/>
                   <BTh col="pa"       label="PA"    title="Plate appearances"/>
                   <BTh col="_yard"    label={<img src="/icon-192.png" alt="Yard" style={{width:14,height:14,borderRadius:2,objectFit:'cover',verticalAlign:'middle'}}/>} title="Today's Yard Score" align="center"/>
                   <BTh col="avg"      label="AVG"   title="Batting average"/>
@@ -14033,7 +14034,7 @@ function StatsTab() {
                         <PickButton pid={parseInt(r.id)||0} name={r.name||r.id} team={r.team||''}/>
                       </div>
                     </td>
-                    {(()=>{const ls=LINEUP_STATUS[parseInt(r.id)||0];const slot=(ls?.status==='confirmed'&&ls?.pos!=='P'&&ls?.slot>=1&&ls?.slot<=9)?ls.slot:null;return <td style={{textAlign:'center',padding:'2px 4px',fontFamily:mono,fontSize:9,fontWeight:700,color:slot?'#27c97a':'transparent',minWidth:18}}>{slot||'·'}</td>;})()}
+                    <td style={{textAlign:'center',padding:'2px 4px',fontFamily:mono,fontSize:9,fontWeight:700,color:r._slot<99?'#27c97a':'transparent',minWidth:18}}>{r._slot<99?r._slot:'·'}</td>
                     <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{fmtN(r.pa)}</td>
                     <td style={{textAlign:'center',padding:'2px 4px'}}>
                       {r._yard>0 ? <YardBadge score={parseFloat(r._yard)}/> : <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>—</span>}
@@ -14128,7 +14129,7 @@ function StatsTab() {
                   <tr>
                     {(()=>{const TTh=({col,label,title,align='right'})=>(<th onClick={()=>{if(tSortBy===col)setTSortDir(d=>d*-1);else{setTSortBy(col);setTSortDir(-1);}}} style={{padding:'4px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.5,whiteSpace:'nowrap',cursor:'pointer',textAlign:align,borderBottom:'1px solid var(--border)',background:'var(--surface2)',color:tSortBy===col?'var(--accent2)':'var(--muted)'}}>{label}{tSortBy===col?(tSortDir===1?' ▲':' ▼'):''}</th>);
                     return <><th style={{padding:'4px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.5,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)',background:'var(--surface2)',position:'sticky',left:0,zIndex:5}}>Team</th>
-                    <TTh col="players" label="Plyrs" title="Players in sample"/><TTh col="pa" label="PA" title="Plate appearances"/><TTh col="avg" label="AVG" title="Batting average"/><TTh col="obp" label="OBP" title="On-base %"/><TTh col="slg" label="SLG" title="Slugging %"/><TTh col="iso" label="ISO" title="Isolated power"/><TTh col="woba" label="wOBA" title="Weighted on-base avg"/><TTh col="hr" label="HR" title="Home runs"/><TTh col="hr_rate" label="HR%" title="HR per PA"/><TTh col="k_pct" label="K%" title="Strikeout rate"/><TTh col="bb_pct" label="BB%" title="Walk rate"/><TTh col="ev" label="EV" title="Exit velocity"/><TTh col="hh_pct" label="HH%" title="Hard hit rate"/><TTh col="pbrl_pct" label="PBrl%" title="Pulled barrel rate"/><TTh col="fb_pct" label="FB%" title="Fly ball rate"/><TTh col="la_mean" label="LA°" title="Launch angle"/></>;})()}
+                    <TTh col="players" label="Batters" title="Batters in sample"/><TTh col="pa" label="PA" title="Plate appearances"/><TTh col="avg" label="AVG" title="Batting average"/><TTh col="obp" label="OBP" title="On-base %"/><TTh col="slg" label="SLG" title="Slugging %"/><TTh col="iso" label="ISO" title="Isolated power"/><TTh col="woba" label="wOBA" title="Weighted on-base avg"/><TTh col="hr" label="HR" title="Home runs"/><TTh col="hr_rate" label="HR%" title="HR per PA"/><TTh col="k_pct" label="K%" title="Strikeout rate"/><TTh col="bb_pct" label="BB%" title="Walk rate"/><TTh col="ev" label="EV" title="Exit velocity"/><TTh col="hh_pct" label="HH%" title="Hard hit rate"/><TTh col="pbrl_pct" label="PBrl%" title="Pulled barrel rate"/><TTh col="fb_pct" label="FB%" title="Fly ball rate"/><TTh col="la_mean" label="LA°" title="Launch angle"/></>;})()}
                   </tr>
                 </thead>
                 <tbody>
@@ -14141,7 +14142,7 @@ function StatsTab() {
                           onClick={()=>onBTeamChange(bTeam===r.team?'ALL':r.team)}>
                           {r.team}
                         </span>
-                        <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginLeft:5}}>({r.players}p)</span>
+                        
                       </td>
                       <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{r.players}</td>
                       <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{Math.round(r.pa)}</td>
@@ -18637,7 +18638,7 @@ function LinksTab() {
     {
       name: 'Blast Report',
       url:  'https://blast-report.com',
-      logo: '/images/logo-blast.jpg',
+      emoji: '💣',
       color: '#27c97a',
       summary: 'Bat speed and attack angle data from Blast Motion sensors. Detailed swing metrics for hitter analysis.',
     },
@@ -18689,6 +18690,7 @@ function LinksTab() {
             >
               {link.logo
                 ? <img src={link.logo} alt={link.name}
+                    onError={e=>{e.target.style.display='none';e.target.nextSibling&&(e.target.nextSibling.style.display='block');}}
                     style={{width:44,height:44,borderRadius:8,objectFit:'contain',
                       background:'#fff',flexShrink:0,padding:2}}/>
                 : <span style={{fontSize:28,flexShrink:0}}>{link.emoji}</span>
