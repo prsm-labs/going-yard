@@ -7824,7 +7824,7 @@ function extractInjuryDetail(desc) {
 }
 
 async function fetchInjuries() {
-  const INJURY_TTL = 4 * 60 * 60 * 1000;
+  const INJURY_TTL = 60 * 60 * 1000; // 1hr — DTD status changes throughout the day
   if (INJURY_LOADED && Date.now() - INJURY_LOADED < INJURY_TTL) return;
   Object.keys(INJURY_MAP).forEach(k => delete INJURY_MAP[k]);
 
@@ -7899,9 +7899,42 @@ async function fetchInjuries() {
       }
     });
 
+    // ── Supplement: /api/v1/injuries for day-to-day + any IL gaps ──────────────
+    // This endpoint captures DTD players that never appear in transactions
+    try {
+      const season = new Date().getFullYear();
+      const ir = await fetch(
+        `https://statsapi.mlb.com/api/v1/injuries?sportId=1&season=${season}`,
+        { signal: AbortSignal.timeout(8000) }
+      );
+      if (ir.ok) {
+        const id = await ir.json();
+        let dtdAdded = 0;
+        for (const inj of (id.injuries || [])) {
+          const pid  = String(inj.player?.id || '');
+          const stat = (inj.status || '').toLowerCase();
+          if (!pid) continue;
+          // Add DTD players not caught by transactions, or update existing entries
+          const isDTD = stat.includes('day-to-day') || stat.includes('dtd');
+          const isIL  = stat.includes('injured list') || stat.includes(' il') || stat.includes('10-day') || stat.includes('15-day') || stat.includes('60-day');
+          if ((isDTD || isIL) && !INJURY_MAP[pid]) {
+            const notes = inj.notes || inj.injuryType || '';
+            INJURY_MAP[pid] = {
+              date:      inj.date || new Date().toISOString().slice(0,10),
+              emoji:     isDTD ? '🤕' : stat.includes('60') ? '🚫' : '🤕',
+              label:     isDTD ? 'Day-To-Day' : stat.includes('60') ? '60-Day IL' : stat.includes('15') ? '15-Day IL' : '10-Day IL',
+              fullDesc:  `${inj.status || ''}${notes ? ' — ' + notes : ''}`,
+              shortDesc: notes,
+              team:      inj.team?.abbreviation || '',
+            };
+            dtdAdded++;
+          }
+        }
+        if (dtdAdded > 0) console.log(`[Injuries] +${dtdAdded} DTD/supplemental players from /api/v1/injuries`);
+      }
+    } catch(e3) { console.warn('[Injuries] supplemental endpoint failed:', e3.message); }
+
     // ── Cross-check against mlb_injury_report.csv from the pipeline ────────────
-    // This file is generated nightly and is the most accurate status source.
-    // If a player is listed as 'Active' there but still in our INJURY_MAP, remove them.
     try {
       const cr = await fetch('/data/mlb_injury_report.csv');
       if (cr.ok) {
@@ -7917,7 +7950,6 @@ async function fetchInjuries() {
             const cols = line.split(',').map(c => c.replace(/^"|"$/g, '').trim());
             const bid  = cols[bidIdx];
             const desc = (cols[descIdx] || '').toLowerCase();
-            // If pipeline says Active but we have them as injured → remove
             if (bid && desc === 'active' && INJURY_MAP[bid]) {
               delete INJURY_MAP[bid];
               cleared++;
@@ -17967,8 +17999,11 @@ function useHRNotifications() {
           _setQueue(q => [...q.slice(-2), fireNotif]);
           _notifLog = [fireNotif, ..._notifLog].slice(0, 50);
           if (_setNotifLog) _setNotifLog([..._notifLog]);
+          // Skip push if batter is injured
+        if (!INJURY_MAP[String(hr.batterId||'')]) {
           sendLivePush(`🔥 ON FIRE — ${hr.batterName}`,
             `${GAME_HR_MAP[key]} home runs this game! ${hr.batterTeam}`);
+        }
         }
       }
     };
