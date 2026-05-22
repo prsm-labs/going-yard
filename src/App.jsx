@@ -13866,7 +13866,10 @@ function StatsTab() {
         </div>
       </div>}
       {showHelp && <div onClick={()=>setShowHelp(false)} style={{position:'fixed',inset:0,zIndex:9998,background:'rgba(0,0,0,.4)'}}/>}
-      
+    </div>
+  );
+}
+
 
 function SoCloseTab({ data }) {
   const mono = "'DM Mono',monospace";
