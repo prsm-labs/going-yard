@@ -13289,6 +13289,37 @@ function StatsTab() {
     return list.sort((a,b) => a.time.localeCompare(b.time));
   }, [lineupVer]);
 
+  // ── CSV export helper ────────────────────────────────────────────────────
+  const exportCSV = (rows, filename, type) => {
+    const fv = v => (v===null||v===undefined||v==='') ? '' : v;
+    let headers, rowFn;
+    if (type === 'batters') {
+      headers = ['ID','Name','Team','Hand','PA','Yard Score','AVG','OBP','SLG','ISO','wOBA','HR','HR%','K%','BB%','EV','HH%','PBrl%','FB%','LA'];
+      rowFn = r => [r.id, r.name||r.id, r.team||'', r.hand||'', fv(r.pa),
+        r._yard?parseFloat(r._yard).toFixed(0):'',
+        r.avg?.toFixed(3)||'', r.obp?.toFixed(3)||'', r.slg?.toFixed(3)||'',
+        r.iso?.toFixed(3)||'', r.woba?.toFixed(3)||'', fv(r.hr),
+        r.hr_rate?.toFixed(1)||'', r.k_pct?.toFixed(1)||'', r.bb_pct?.toFixed(1)||'',
+        r.ev?.toFixed(1)||'', r.hh_pct?.toFixed(1)||'', r.pbrl_pct?.toFixed(1)||'',
+        r.fb_pct?.toFixed(1)||'', r.la_mean?.toFixed(1)||''];
+    } else {
+      headers = ['ID','Name','Team','Hand','Role','BF','HR/9','wOBA Allowed','HR','K/9','K%','BB%','EV Allowed','HH%','Brl%','FB%','MB%','FB Use%','BK Use%','OS Use%','Grade'];
+      rowFn = r => [r.id, r.name||r.id, r.team||'', r.hand||'', r.role||'', fv(r.bf),
+        r.hr_per9?.toFixed(2)||'', r.woba_allowed?.toFixed(3)||'', fv(r.hr_allowed),
+        r.k_per9?.toFixed(1)||'', r.k_pct?.toFixed(1)||'', r.bb_pct?.toFixed(1)||'',
+        r.ev_allowed?.toFixed(1)||'', r.hh_pct_allowed?.toFixed(1)||'',
+        r.brl_pct_allowed?.toFixed(1)||'', r.fb_pct_allowed?.toFixed(1)||'',
+        r.meatball_pct?.toFixed(1)||'', r.fb_pct_p?.toFixed(1)||'',
+        r.br_pct_p?.toFixed(1)||'', r.os_pct_p?.toFixed(1)||'', r._pgLabel||''];
+    }
+    const csv = [headers.join(','), ...rows.map(r=>rowFn(r).map(v=>
+      String(fv(v)).includes(',')?`"${v}"`:v
+    ).join(','))].join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+    a.download = filename; a.click();
+  };
+
   // Auto-sort pitcher table when pitch group changes
   React.useEffect(() => {
     if (pitchGroup === 'fastball')  { setPSortBy('fb_pct_p'); setPSortDir(-1); }
@@ -13422,9 +13453,12 @@ function StatsTab() {
           return '🤔 Average';
         })();
         // If name is missing/numeric, check cached player data
+        // Name fallback: splits JSON → DAILY_PICKS_CACHE (pitcher field) → live player cache → ID
         const pName = (player.name && !/^\d+$/.test(player.name))
           ? player.name
-          : getCachedPlayer(parseInt(id)||0)?.name || player.name;
+          : Object.values(DAILY_PICKS_CACHE).find(r=>String(r.pitcher_id||'').split('.')[0]===id)?.pitcher
+            || getCachedPlayer(parseInt(id)||0)?.name
+            || player.name;
         return { id, ...player, name: pName, ...sp,
           hr_per9: ip>0 ? +((sp.hr_allowed||0)/ip*9).toFixed(2) : 0,
           k_per9:  ip>0 ? +((sp.k||0)/ip*9).toFixed(1) : 0,
@@ -13561,15 +13595,23 @@ function StatsTab() {
 
       {/* ══ PITCHERS ══════════════════════════════════════════════════════════ */}
       <div style={{marginBottom:20}}>
-        <div onClick={()=>setPitcherCollapsed(v=>!v)}
-          style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,cursor:'pointer',
-            userSelect:'none',padding:'4px 0'}}>
-          <span style={{fontFamily:osw,fontWeight:800,fontSize:13,color:'var(--text)'}}>⚾ Pitchers</span>
-          <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>{pRows.length} shown</span>
-          <span data-tip={pitcherCollapsed?'Expand pitcher table':'Collapse pitcher table'}
-            style={{marginLeft:'auto',fontFamily:mono,fontSize:10,color:'var(--muted)'}}>
-            {pitcherCollapsed ? '▶' : '▼'}
-          </span>
+        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+          <div onClick={()=>setPitcherCollapsed(v=>!v)}
+            style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',userSelect:'none',padding:'4px 0',flex:1}}>
+            <span style={{fontFamily:osw,fontWeight:800,fontSize:13,color:'var(--text)'}}>⚾ Pitchers</span>
+            <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>{pRows.length} shown</span>
+            <span data-tip={pitcherCollapsed?'Expand pitcher table':'Collapse pitcher table'}
+              style={{marginLeft:'auto',fontFamily:mono,fontSize:10,color:'var(--muted)'}}>
+              {pitcherCollapsed ? '▶' : '▼'}
+            </span>
+          </div>
+          <button onClick={()=>exportCSV(pRows, `pitcher-splits-${window}.csv`, 'pitchers')}
+            data-tip="Export pitcher table to CSV"
+            style={{padding:'3px 8px',borderRadius:6,fontSize:9,cursor:'pointer',
+              border:'1px solid var(--border)',color:'var(--muted)',background:'transparent',
+              fontFamily:mono,flexShrink:0}}>
+            ⬇ CSV
+          </button>
         </div>
 
         <div style={{display:pitcherCollapsed?'none':'block'}}>
@@ -13733,15 +13775,23 @@ function StatsTab() {
 
       {/* ══ BATTERS ═══════════════════════════════════════════════════════════ */}
       <div>
-        <div onClick={()=>setBatterCollapsed(v=>!v)}
-          style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,cursor:'pointer',
-            userSelect:'none',padding:'4px 0'}}>
-          <span style={{fontFamily:osw,fontWeight:800,fontSize:13,color:'var(--text)'}}>🧢 Batters</span>
-          <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>{bRows.length} shown</span>
-          <span data-tip={batterCollapsed?'Expand batter table':'Collapse batter table'}
-            style={{marginLeft:'auto',fontFamily:mono,fontSize:10,color:'var(--muted)'}}>
-            {batterCollapsed ? '▶' : '▼'}
-          </span>
+        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+          <div onClick={()=>setBatterCollapsed(v=>!v)}
+            style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',userSelect:'none',padding:'4px 0',flex:1}}>
+            <span style={{fontFamily:osw,fontWeight:800,fontSize:13,color:'var(--text)'}}>🧢 Batters</span>
+            <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>{bRows.length} shown</span>
+            <span data-tip={batterCollapsed?'Expand batter table':'Collapse batter table'}
+              style={{marginLeft:'auto',fontFamily:mono,fontSize:10,color:'var(--muted)'}}>
+              {batterCollapsed ? '▶' : '▼'}
+            </span>
+          </div>
+          <button onClick={()=>exportCSV(bRows, `batter-splits-${window}.csv`, 'batters')}
+            data-tip="Export batter table to CSV"
+            style={{padding:'3px 8px',borderRadius:6,fontSize:9,cursor:'pointer',
+              border:'1px solid var(--border)',color:'var(--muted)',background:'transparent',
+              fontFamily:mono,flexShrink:0}}>
+            ⬇ CSV
+          </button>
         </div>
 
         <div style={{display:batterCollapsed?'none':'block'}}>
