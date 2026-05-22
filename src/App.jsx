@@ -13883,7 +13883,7 @@ function StatsTab() {
             ['🔥 Pitch Groups', 'See how batters do against fastballs, breaking balls, or offspeed pitches — and sort pitchers by how often they throw that pitch type.'],
             ['🎯 Matchup', 'Pick a game from the dropdown to instantly focus both tables on just those two teams.'],
             ['👕 Team Dropdown', 'After picking a matchup, use the team dropdown to narrow down to one side — e.g. just the away team batters.'],
-            ['⚾ SP Button', 'Show only today's scheduled starting pitchers.'],
+            ['⚾ SP Button', "Show only today's scheduled starting pitchers."],
             ['✅ 🔥 💥 🤕 Stickers', 'Filter batters by status: confirmed in lineup, hot bat, gone yard today, or hide injured players.'],
             ['Min PA / Min BF', 'Minimum plate appearances or batters faced. Raise it to see only players with enough data to be meaningful.'],
           ].map(([t,d])=>(
