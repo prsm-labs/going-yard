@@ -19896,10 +19896,10 @@ function CheatSheetTab({ data }) {
     return Object.values(DAILY_PICKS_CACHE||{})
       .filter(r => {
         const bid = String(r.batter_id||'').split('.')[0];
-        if (!bid||seen.has(bid)||!r.batter||!r.game_id) return false;
+        if (!bid||seen.has(bid)||!r.batter) return false;
         seen.add(bid);
-        const ev = parseFloat(r.avgEV||r.avg_ev||0);
-        if (ev < 85) return false;
+        const ev = parseFloat(r.avgEV||r.avg_ev||r.recentAvgEV||r.l7_ev||0);
+        if (ev < 82) return false;
         if (INJURY_MAP?.[parseInt(bid)||0] && !LINEUP_STATUS?.[parseInt(bid)||0]) return false;
         return true;
       })
@@ -19907,7 +19907,7 @@ function CheatSheetTab({ data }) {
         id: String(r.batter_id||'').split('.')[0],
         name: r.batter||'',
         team: r.batting_team||'',
-        ev: parseFloat(r.avgEV||r.avg_ev||0),
+        ev: parseFloat(r.avgEV||r.avg_ev||r.recentAvgEV||r.l7_ev||0),
         hh: parseFloat(r.recentHardHit||r.hardHit||0),
         pitcher: r.pitcher||'',
         pgLabel: r._pgLabel||'',
@@ -20015,7 +20015,7 @@ function CheatSheetTab({ data }) {
 
         <Section emoji="🚀" title="Avg Exit Velo" color="#a855f7">
           {top5EV.length===0
-            ?<div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',padding:12}}>No game split data yet</div>
+            ?<div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',padding:12}}>No EV data yet</div>
             :top5EV.map((r,i)=>(
             <Card key={r.id} rank={i+1} pid={r.id}
               name={r.name} team={r.team}
