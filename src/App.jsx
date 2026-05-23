@@ -19892,20 +19892,29 @@ function CheatSheetTab({ data }) {
   }, []);
 
   const top5EV = React.useMemo(() => {
-    const todayIds = new Set(Object.values(DAILY_PICKS_CACHE||{}).map(r=>String(r.batter_id||'').split('.')[0]));
-    return Object.entries(gData.batters||{})
-      .filter(([id]) => todayIds.has(id))
-      .map(([id, p]) => {
-        const sp = p.splits?.L7?.overall;
-        if (!sp||!sp.ev||sp.games<3) return null;
-        if (INJURY_MAP?.[parseInt(id)||0] && !LINEUP_STATUS?.[parseInt(id)||0]) return null;
-        const dp = Object.values(DAILY_PICKS_CACHE).find(r=>String(r.batter_id||'').split('.')[0]===id);
-        return { id, name:p.name||id, team:p.team||'', ev:sp.ev, hh_pct:sp.hh_pct||0, games:sp.games, pitcher:dp?.pitcher||'', pgLabel:dp?._pgLabel||'' };
+    const seen = new Set();
+    return Object.values(DAILY_PICKS_CACHE||{})
+      .filter(r => {
+        const bid = String(r.batter_id||'').split('.')[0];
+        if (!bid||seen.has(bid)||!r.batter||!r.game_id) return false;
+        seen.add(bid);
+        const ev = parseFloat(r.avgEV||r.avg_ev||0);
+        if (ev < 85) return false;
+        if (INJURY_MAP?.[parseInt(bid)||0] && !LINEUP_STATUS?.[parseInt(bid)||0]) return false;
+        return true;
       })
-      .filter(Boolean)
-      .sort((a,b)=>b.ev-a.ev)
-      .slice(0,5);
-  }, [gData]);
+      .map(r => ({
+        id: String(r.batter_id||'').split('.')[0],
+        name: r.batter||'',
+        team: r.batting_team||'',
+        ev: parseFloat(r.avgEV||r.avg_ev||0),
+        hh: parseFloat(r.recentHardHit||r.hardHit||0),
+        pitcher: r.pitcher||'',
+        pgLabel: r._pgLabel||'',
+      }))
+      .sort((a,b) => b.ev - a.ev)
+      .slice(0, 5);
+  }, []);
 
   const pgEmoji = l => l?.includes('Target')?'🎯':l?.includes('Hittable')?'💥':l?.includes('Elite')?'‼️':l?.includes('Tough')?'⚠️':'🤔';
 
@@ -20012,7 +20021,7 @@ function CheatSheetTab({ data }) {
               name={r.name} team={r.team}
               stat={`${r.ev.toFixed(1)}`}
               statLabel="avg EV (L7)"
-              sub={`${r.hh_pct?.toFixed(1)}% HH · ${r.games}g`}
+              sub={r.hh>0?`${r.hh} HH`:''}
               pitcher={r.pitcher} pgLabel={r.pgLabel}/>
           ))}
         </Section>
