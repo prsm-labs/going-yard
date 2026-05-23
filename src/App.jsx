@@ -19848,13 +19848,13 @@ function CheatSheetTab({ data }) {
       .filter(([id]) => todayIds.has(id))
       .map(([id, p]) => {
         const sp = p.splits?.L7?.overall;
-        if (!sp||!sp.g2tb_pct||sp.games<3) return null;
+        if (!sp||!sp.g2tb_pct||sp.games<4) return null;  // min 4 games for meaningful sample
         if (INJURY_MAP?.[parseInt(id)||0] && !LINEUP_STATUS?.[parseInt(id)||0]) return null;
         const dp = Object.values(DAILY_PICKS_CACHE).find(r=>String(r.batter_id||'').split('.')[0]===id);
         return { id, name:p.name||id, team:p.team||'', g2tb:sp.g2tb, g2tb_pct:sp.g2tb_pct, games:sp.games, pitcher:dp?.pitcher||'', pgLabel:dp?._pgLabel||'' };
       })
       .filter(Boolean)
-      .sort((a,b)=>b.g2tb_pct-a.g2tb_pct)
+      .sort((a,b) => b.g2tb!==a.g2tb ? b.g2tb-a.g2tb : b.g2tb_pct-a.g2tb_pct) // count first, then pct
       .slice(0,5);
   }, [gData]);
 
@@ -19865,13 +19865,13 @@ function CheatSheetTab({ data }) {
       .filter(([id]) => todayIds.has(id))
       .map(([id, p]) => {
         const sp = p.splits?.L7?.overall;
-        if (!sp||!sp.h_game_pct||sp.games<3) return null;
+        if (!sp||!sp.h_game_pct||sp.games<4) return null;
         if (INJURY_MAP?.[parseInt(id)||0] && !LINEUP_STATUS?.[parseInt(id)||0]) return null;
         const dp = Object.values(DAILY_PICKS_CACHE).find(r=>String(r.batter_id||'').split('.')[0]===id);
         return { id, name:p.name||id, team:p.team||'', h_game:sp.h_game, h_game_pct:sp.h_game_pct, avg:sp.avg, games:sp.games, pitcher:dp?.pitcher||'', pgLabel:dp?._pgLabel||'' };
       })
       .filter(Boolean)
-      .sort((a,b)=>b.h_game_pct-a.h_game_pct)
+      .sort((a,b) => b.h_game!==a.h_game ? b.h_game-a.h_game : b.h_game_pct-a.h_game_pct)
       .slice(0,5);
   }, [gData]);
 
@@ -19909,7 +19909,7 @@ function CheatSheetTab({ data }) {
         seen.add(bid);
         if (INJURY_MAP?.[parseInt(bid)||0] && !LINEUP_STATUS?.[parseInt(bid)||0]) return false;
         const w7 = getCachedPlayer(parseInt(bid)||0)?.windows?.last7;
-        return (w7?.avgEV||0) >= 82;
+        return (w7?.avgEV||0) >= 82 && (w7?.pa||0) >= 20; // min 20 PA in L7 for meaningful sample
       })
       .map(r => {
         const bid = String(r.batter_id||'').split('.')[0];
