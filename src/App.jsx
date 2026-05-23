@@ -19867,6 +19867,46 @@ function CheatSheetTab({ data }) {
       .slice(0,5);
   }, [gData]);
 
+  // ── Top 5 Close Calls: highest so_close_count with a game today ─────────────
+  const top5Close = React.useMemo(() => {
+    const seen = new Set();
+    return Object.values(DAILY_PICKS_CACHE||{})
+      .filter(b => {
+        const bid = String(b.batter_id||'').split('.')[0];
+        if (!bid||seen.has(bid)||!b.batter||!b.game_id) return false;
+        seen.add(bid);
+        if (parseInt(b.so_close_count||0) < 2) return false;
+        if (INJURY_MAP?.[parseInt(bid)||0] && !LINEUP_STATUS?.[parseInt(bid)||0]) return false;
+        return true;
+      })
+      .map(b => ({
+        pid: String(b.batter_id||'').split('.')[0],
+        name: b.batter||'',
+        team: b.batting_team||'',
+        count: parseInt(b.so_close_count||0),
+        pitcher: b.pitcher||'',
+        pgLabel: b._pgLabel||'',
+      }))
+      .sort((a,b) => b.count - a.count)
+      .slice(0, 5);
+  }, []);
+
+  const top5EV = React.useMemo(() => {
+    const todayIds = new Set(Object.values(DAILY_PICKS_CACHE||{}).map(r=>String(r.batter_id||'').split('.')[0]));
+    return Object.entries(gData.batters||{})
+      .filter(([id]) => todayIds.has(id))
+      .map(([id, p]) => {
+        const sp = p.splits?.L7?.overall;
+        if (!sp||!sp.ev||sp.games<3) return null;
+        if (INJURY_MAP?.[parseInt(id)||0] && !LINEUP_STATUS?.[parseInt(id)||0]) return null;
+        const dp = Object.values(DAILY_PICKS_CACHE).find(r=>String(r.batter_id||'').split('.')[0]===id);
+        return { id, name:p.name||id, team:p.team||'', ev:sp.ev, hh_pct:sp.hh_pct||0, games:sp.games, pitcher:dp?.pitcher||'', pgLabel:dp?._pgLabel||'' };
+      })
+      .filter(Boolean)
+      .sort((a,b)=>b.ev-a.ev)
+      .slice(0,5);
+  }, [gData]);
+
   const pgEmoji = l => l?.includes('Target')?'🎯':l?.includes('Hittable')?'💥':l?.includes('Elite')?'‼️':l?.includes('Tough')?'⚠️':'🤔';
 
   const Card = ({rank, pid, name, team, stat, statLabel, sub, pitcher, pgLabel}) => (
@@ -19947,6 +19987,32 @@ function CheatSheetTab({ data }) {
               stat={`${r.h_game_pct}%`}
               statLabel="Hit rate"
               sub={`${r.h_game}/${r.games} games · ${r.avg?.toFixed?r.avg.toFixed(3):r.avg} AVG`}
+              pitcher={r.pitcher} pgLabel={r.pgLabel}/>
+          ))}
+        </Section>
+
+        <Section emoji="🤏" title="Close Calls" color="#60d360">
+          {top5Close.length===0
+            ?<div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',padding:12}}>No close calls found</div>
+            :top5Close.map((r,i)=>(
+            <Card key={r.pid} rank={i+1} pid={r.pid}
+              name={r.name} team={r.team}
+              stat={r.count}
+              statLabel="near-misses"
+              sub="yesterday"
+              pitcher={r.pitcher} pgLabel={r.pgLabel}/>
+          ))}
+        </Section>
+
+        <Section emoji="🚀" title="Avg Exit Velo" color="#a855f7">
+          {top5EV.length===0
+            ?<div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',padding:12}}>No game split data yet</div>
+            :top5EV.map((r,i)=>(
+            <Card key={r.id} rank={i+1} pid={r.id}
+              name={r.name} team={r.team}
+              stat={`${r.ev.toFixed(1)}`}
+              statLabel="avg EV (L7)"
+              sub={`${r.hh_pct?.toFixed(1)}% HH · ${r.games}g`}
               pitcher={r.pitcher} pgLabel={r.pgLabel}/>
           ))}
         </Section>
