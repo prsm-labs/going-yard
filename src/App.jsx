@@ -19892,26 +19892,34 @@ function CheatSheetTab({ data }) {
   }, []);
 
   const top5EV = React.useMemo(() => {
+    // Use PLAYER_DATA_CACHE (Statcast/Baseball Savant) — same source as Batters KM tab
     const seen = new Set();
+    const todayBatterIds = new Set(
+      Object.values(DAILY_PICKS_CACHE||{}).map(r=>String(r.batter_id||'').split('.')[0]).filter(Boolean)
+    );
     return Object.values(DAILY_PICKS_CACHE||{})
       .filter(r => {
         const bid = String(r.batter_id||'').split('.')[0];
         if (!bid||seen.has(bid)||!r.batter) return false;
         seen.add(bid);
-        const ev = parseFloat(r.avgEV||r.avg_ev||r.recentAvgEV||r.l7_ev||0);
-        if (ev < 82) return false;
         if (INJURY_MAP?.[parseInt(bid)||0] && !LINEUP_STATUS?.[parseInt(bid)||0]) return false;
-        return true;
+        const player = getCachedPlayer(parseInt(bid)||0);
+        const ev = parseFloat(player?.avgEV||0);
+        return ev >= 82;
       })
-      .map(r => ({
-        id: String(r.batter_id||'').split('.')[0],
-        name: r.batter||'',
-        team: r.batting_team||'',
-        ev: parseFloat(r.avgEV||r.avg_ev||r.recentAvgEV||r.l7_ev||0),
-        hh: parseFloat(r.recentHardHit||r.hardHit||0),
-        pitcher: r.pitcher||'',
-        pgLabel: r._pgLabel||'',
-      }))
+      .map(r => {
+        const bid = String(r.batter_id||'').split('.')[0];
+        const player = getCachedPlayer(parseInt(bid)||0);
+        return {
+          id: bid,
+          name: r.batter||player?.name||bid,
+          team: r.batting_team||player?.team||'',
+          ev: parseFloat(player?.avgEV||0),
+          hh: parseFloat(player?.hardHitPct||player?.recentHardHit||0),
+          pitcher: r.pitcher||'',
+          pgLabel: r._pgLabel||'',
+        };
+      })
       .sort((a,b) => b.ev - a.ev)
       .slice(0, 5);
   }, []);
