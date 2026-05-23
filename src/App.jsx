@@ -19909,7 +19909,7 @@ function CheatSheetTab({ data }) {
         seen.add(bid);
         if (INJURY_MAP?.[parseInt(bid)||0] && !LINEUP_STATUS?.[parseInt(bid)||0]) return false;
         const w7 = getCachedPlayer(parseInt(bid)||0)?.windows?.last7;
-        return (w7?.avgEV||0) >= 82 && (w7?.pa||0) >= 20; // min 20 PA in L7 for meaningful sample
+        return (w7?.avgEV||0) >= 82 && (w7?.pa||0) >= 10;
       })
       .map(r => {
         const bid = String(r.batter_id||'').split('.')[0];
