@@ -19803,10 +19803,18 @@ function GameSplitsTab() {
 function CheatSheetTab({ data }) {
   const mono = "'DM Mono',monospace";
   const osw  = "'Oswald',sans-serif";
-  const [gData, setGData] = useState({batters:{},pitchers:{}});
+  const [gData,    setGData]    = useState({batters:{},pitchers:{}});
+  const [cacheVer, setCacheVer] = useState(0);
 
   useEffect(() => {
     loadGameSplitsData().then(d => setGData(d));
+    const id = setInterval(() => {
+      if (Object.keys(PLAYER_DATA_CACHE).length > 50 && Object.keys(DAILY_PICKS_CACHE||{}).length > 0) {
+        setCacheVer(v => v + 1);
+        clearInterval(id);
+      }
+    }, 500);
+    return () => clearInterval(id);
   }, []);
 
   // ── Top 5 HR: high yard score + hittable/target pitcher + high ISO ──────────
@@ -19892,37 +19900,34 @@ function CheatSheetTab({ data }) {
   }, []);
 
   const top5EV = React.useMemo(() => {
-    // Use PLAYER_DATA_CACHE (Statcast/Baseball Savant) — same source as Batters KM tab
+    // windows.last7.avgEV — exact same source as Heating Up tab
     const seen = new Set();
-    const todayBatterIds = new Set(
-      Object.values(DAILY_PICKS_CACHE||{}).map(r=>String(r.batter_id||'').split('.')[0]).filter(Boolean)
-    );
     return Object.values(DAILY_PICKS_CACHE||{})
       .filter(r => {
         const bid = String(r.batter_id||'').split('.')[0];
         if (!bid||seen.has(bid)||!r.batter) return false;
         seen.add(bid);
         if (INJURY_MAP?.[parseInt(bid)||0] && !LINEUP_STATUS?.[parseInt(bid)||0]) return false;
-        const player = getCachedPlayer(parseInt(bid)||0);
-        const ev = parseFloat(player?.avgEV||0);
-        return ev >= 82;
+        const w7 = getCachedPlayer(parseInt(bid)||0)?.windows?.last7;
+        return (w7?.avgEV||0) >= 82;
       })
       .map(r => {
         const bid = String(r.batter_id||'').split('.')[0];
         const player = getCachedPlayer(parseInt(bid)||0);
+        const w7 = player?.windows?.last7 || {};
         return {
           id: bid,
           name: r.batter||player?.name||bid,
           team: r.batting_team||player?.team||'',
-          ev: parseFloat(player?.avgEV||0),
-          hh: parseFloat(player?.hardHitPct||player?.recentHardHit||0),
+          ev: parseFloat(w7.avgEV||0),
+          hh: parseFloat(w7.hardHit||0),
           pitcher: r.pitcher||'',
           pgLabel: r._pgLabel||'',
         };
       })
       .sort((a,b) => b.ev - a.ev)
       .slice(0, 5);
-  }, []);
+  }, [cacheVer]);
 
   const pgEmoji = l => l?.includes('Target')?'🎯':l?.includes('Hittable')?'💥':l?.includes('Elite')?'‼️':l?.includes('Tough')?'⚠️':'🤔';
 
