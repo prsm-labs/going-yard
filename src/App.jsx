@@ -19815,7 +19815,10 @@ function CheatSheetTab({ data }) {
       .filter(r => {
         if (!r._yard || parseFloat(r._yard||0) < 30) return false;
         const label = r._pgLabel||'';
-        return label.includes('Target') || label.includes('Hittable');
+        if (!label.includes('Target') && !label.includes('Hittable')) return false;
+        const pid = String(r.batter_id||'').split('.')[0];
+        if (INJURY_MAP?.[parseInt(pid)||0] && !LINEUP_STATUS?.[parseInt(pid)||0]) return false;
+        return true;
       })
       .map(r => {
         const pid = String(r.batter_id||'').split('.')[0];
@@ -19838,6 +19841,7 @@ function CheatSheetTab({ data }) {
       .map(([id, p]) => {
         const sp = p.splits?.L7?.overall;
         if (!sp||!sp.g2tb_pct||sp.games<3) return null;
+        if (INJURY_MAP?.[parseInt(id)||0] && !LINEUP_STATUS?.[parseInt(id)||0]) return null;
         const dp = Object.values(DAILY_PICKS_CACHE).find(r=>String(r.batter_id||'').split('.')[0]===id);
         return { id, name:p.name||id, team:p.team||'', g2tb:sp.g2tb, g2tb_pct:sp.g2tb_pct, games:sp.games, pitcher:dp?.pitcher||'', pgLabel:dp?._pgLabel||'' };
       })
@@ -19854,6 +19858,7 @@ function CheatSheetTab({ data }) {
       .map(([id, p]) => {
         const sp = p.splits?.L7?.overall;
         if (!sp||!sp.h_game_pct||sp.games<3) return null;
+        if (INJURY_MAP?.[parseInt(id)||0] && !LINEUP_STATUS?.[parseInt(id)||0]) return null;
         const dp = Object.values(DAILY_PICKS_CACHE).find(r=>String(r.batter_id||'').split('.')[0]===id);
         return { id, name:p.name||id, team:p.team||'', h_game:sp.h_game, h_game_pct:sp.h_game_pct, avg:sp.avg, games:sp.games, pitcher:dp?.pitcher||'', pgLabel:dp?._pgLabel||'' };
       })
@@ -19872,7 +19877,8 @@ function CheatSheetTab({ data }) {
       <PlayerAvatar pid={parseInt(pid)||0} name={name} size={28}/>
       <div style={{flex:1,minWidth:0}}>
         <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:2}}>
-          <span style={{fontFamily:osw,fontWeight:800,fontSize:11,color:'var(--text)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{name}</span>
+          <span onClick={()=>openAtBatSlide({pid:parseInt(pid)||0,name,team})}
+            style={{fontFamily:osw,fontWeight:800,fontSize:11,color:'var(--text)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',cursor:'pointer'}}>{name}</span>
           <span style={{fontFamily:mono,fontSize:8,color:'var(--accent2)',flexShrink:0}}>{team}</span>
         </div>
         <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
