@@ -14428,27 +14428,34 @@ function StatsTab() {
                     </td>
                   </tr>
                   );
-                  const expB = expandedB===r.id ? (
-                    <tr key={r.id+'_exp'}>
-                      <td colSpan={17} style={{padding:'0 12px 12px',background:'rgba(232,65,26,.04)',borderBottom:'2px solid rgba(232,65,26,.18)'}}>
-                        <div style={{display:'flex',alignItems:'center',gap:8,padding:'6px 0 4px',borderBottom:'1px solid var(--border)',marginBottom:6}}>
-                          <PlayerAvatar pid={parseInt(r.id)||0} name={r.name||r.id} size={20}/>
-                          <span style={{fontFamily:osw,fontWeight:700,fontSize:12}}>{r.name||r.id}</span>
-                          <span style={{fontFamily:mono,fontSize:8,color:'var(--accent2)'}}>{r.team}</span>
-                          <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>{r.hand||''}</span>
-                        </div>
-                        <InjuryBanner pid={parseInt(r.id)||0} style={{margin:'4px 0'}}/>
-                        <Last7HRChart batterId={parseInt(r.id)||0}/>
-                        <RecentGameLog batterId={parseInt(r.id)||0}/>
-                      </td>
-                    </tr>
-                  ) : null;
-                  return [mainB, expB].filter(Boolean);
+                  return [mainB];
                 })}
               </tbody>
             </table>
           </div>
         </div>
+        {/* Full-width batter expand panel — outside scroll container */}
+        {expandedB && bRows.find(r=>r.id===expandedB) && (()=>{
+          const r = bRows.find(r=>r.id===expandedB);
+          return (
+            <div style={{margin:'4px 0 8px',borderRadius:8,border:'2px solid rgba(232,65,26,.25)',
+              background:'rgba(232,65,26,.04)',padding:'12px 16px'}}>
+              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,
+                paddingBottom:8,borderBottom:'1px solid var(--border)'}}>
+                <PlayerAvatar pid={parseInt(r.id)||0} name={r.name||r.id} size={22}/>
+                <span style={{fontFamily:osw,fontWeight:800,fontSize:13,color:'var(--text)'}}>{r.name||r.id}</span>
+                <span style={{fontFamily:mono,fontSize:9,color:'var(--accent2)'}}>{r.team}</span>
+                <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>{r.hand||''}</span>
+                <button onClick={()=>setExpandedB(null)}
+                  style={{marginLeft:'auto',background:'transparent',border:'none',
+                    color:'var(--muted)',fontSize:16,cursor:'pointer'}}>✕</button>
+              </div>
+              <InjuryBanner pid={parseInt(r.id)||0} style={{marginBottom:8}}/>
+              <Last7HRChart batterId={parseInt(r.id)||0}/>
+              <RecentGameLog batterId={parseInt(r.id)||0}/>
+            </div>
+          );
+        })()}
         </div>
       </div>
 
@@ -18510,7 +18517,23 @@ function useHRNotifications() {
         if (parts.length < 2) return name;
         return parts[0][0] + '. ' + parts.slice(1).join(' ');
       })(notif.batterName);
-      const pushTitle = `${shortName} ${hrLabel} ${distStr} dinger 📈`.replace(/\s+/g,' ').trim();
+      // Dynamic descriptor: moonshot (420ft+) > laser (105mph+) > random from pool
+      const dist = notif.distance || 0;
+      const ev   = notif.exitVelo || 0;
+      let descriptor, emoji;
+      if (dist >= 420) {
+        descriptor = 'moonshot'; emoji = '🌕';
+      } else if (ev >= 105) {
+        descriptor = 'laser';    emoji = '🔫';
+      } else {
+        // Random from remaining pool
+        const pool = [
+          ['dinger','💥'], ['bomb','💣'], ['dinger','💥'],
+          ['bomb','💣'],   ['dinger','💥'], ['shot','🚀'],
+        ];
+        [descriptor, emoji] = pool[Math.floor(Math.random() * pool.length)];
+      }
+      const pushTitle = `${shortName} ${hrLabel} ${distStr} ${descriptor} ${emoji}`.replace(/\s+/g,' ').trim();
       // Body: "NYM @ PHI · Top 3 · 103mph"
       const pushBody  = [matchup, inningStr, evoStr].filter(Boolean).join(' · ');
       sendLivePush(pushTitle, pushBody, hrDedupKey);
@@ -19720,8 +19743,7 @@ function GameSplitsTab() {
                       <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.k_pct||0)>=28?'#ff4020':'var(--muted)'}}>{fmtPct(r.k_pct)}</td>
                       <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.bb_pct||0)>=12?'#27c97a':'var(--muted)'}}>{fmtPct(r.bb_pct)}</td>
                     </tr>);
-                    const expB=expandedB===r.id?(<tr key={r.id+'_exp'}><td colSpan={21} style={{padding:'0 12px 12px',background:'rgba(232,65,26,.04)',borderBottom:'2px solid rgba(232,65,26,.18)'}}><InjuryBanner pid={parseInt(r.id)||0} style={{margin:'4px 0'}}/><Last7HRChart batterId={parseInt(r.id)||0}/><RecentGameLog batterId={parseInt(r.id)||0}/></td></tr>):null;
-                    return [mainB,expB].filter(Boolean);
+                    return [mainB];
                   })}
                 </tbody>
               </table>
@@ -19729,6 +19751,28 @@ function GameSplitsTab() {
           </div>
         </div>
       </div>
+
+      {/* Full-width batter expand panel for Game Splits */}
+      {expandedB && bRows.find(r=>r.id===expandedB) && (()=>{
+        const r = bRows.find(r=>r.id===expandedB);
+        return (
+          <div style={{margin:'0 0 12px',borderRadius:8,border:'2px solid rgba(232,65,26,.25)',
+            background:'rgba(232,65,26,.04)',padding:'12px 16px'}}>
+            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,
+              paddingBottom:8,borderBottom:'1px solid var(--border)'}}>
+              <PlayerAvatar pid={parseInt(r.id)||0} name={r.name||r.id} size={22}/>
+              <span style={{fontFamily:osw,fontWeight:800,fontSize:13,color:'var(--text)'}}>{r.name||r.id}</span>
+              <span style={{fontFamily:mono,fontSize:9,color:'var(--accent2)'}}>{r.team}</span>
+              <button onClick={()=>setExpandedB(null)}
+                style={{marginLeft:'auto',background:'transparent',border:'none',
+                  color:'var(--muted)',fontSize:16,cursor:'pointer'}}>✕</button>
+            </div>
+            <InjuryBanner pid={parseInt(r.id)||0} style={{marginBottom:8}}/>
+            <Last7HRChart batterId={parseInt(r.id)||0}/>
+            <RecentGameLog batterId={parseInt(r.id)||0}/>
+          </div>
+        );
+      })()}
 
       {/* ══ Team separator */}
       <div style={{display:'flex',alignItems:'center',gap:10,margin:'4px 0 18px'}}>
