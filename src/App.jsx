@@ -2395,7 +2395,7 @@ function Last7HRAllowedChart({ pitcherId }) {
       <div style={{display:'flex',alignItems:'flex-end',gap:4,height:BAR_H,
         position:'relative',paddingLeft:14,paddingRight:14}}>
         <span style={{position:'absolute',left:0,top:0,fontFamily:"'DM Mono',monospace",
-          fontSize:8,color:'var(--muted)',lineHeight:1}}>1</span>
+          fontSize:8,color:'var(--muted)',lineHeight:1}}>{maxVal}</span>
         <span style={{position:'absolute',left:0,bottom:0,fontFamily:"'DM Mono',monospace",
           fontSize:8,color:'var(--muted)',lineHeight:1}}>0</span>
         <div style={{position:'absolute',left:10,right:10,top:BAR_H/2,
@@ -13014,12 +13014,18 @@ async function fetchGameLog(pid) {
     const splits = d?.stats?.[0]?.splits || [];
     const ABBR = {133:'ATH',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',139:'TB',140:'TEX',141:'TOR',142:'MIN',143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL',108:'LAA',109:'ARI',110:'BAL',111:'BOS',112:'CHC',113:'CIN',114:'CLE',115:'COL',116:'DET',117:'HOU',118:'KC',119:'LAD',120:'WSH',121:'NYM'};
     const games = splits.map(s => ({
-      date: s.date || '',
-      opp:  ABBR[s.opponent?.id] || s.opponent?.abbreviation || s.opponent?.name?.replace(/^.* /,'') || '?',
-      loc:  s.isHome ? 'home' : 'away',
-      hrs:  parseInt(s.stat?.homeRuns ?? 0),
-      ab:   parseInt(s.stat?.atBats   ?? 0),
-      h:    parseInt(s.stat?.hits     ?? 0),
+      date:       s.date || '',
+      opp:        ABBR[s.opponent?.id] || s.opponent?.abbreviation || s.opponent?.name?.replace(/^.* /,'') || '?',
+      loc:        s.isHome ? 'home' : 'away',
+      hrs:        parseInt(s.stat?.homeRuns   ?? 0),
+      ab:         parseInt(s.stat?.atBats     ?? 0),
+      h:          parseInt(s.stat?.hits       ?? 0),
+      totalBases: parseInt(s.stat?.totalBases ?? 0),
+      doubles:    parseInt(s.stat?.doubles    ?? 0),
+      triples:    parseInt(s.stat?.triples    ?? 0),
+      rbi:        parseInt(s.stat?.rbi        ?? 0),
+      bb:         parseInt(s.stat?.baseOnBalls?? 0),
+      k:          parseInt(s.stat?.strikeOuts ?? 0),
     })).sort((a,b) => a.date > b.date ? 1 : -1);
     GAME_LOG_CACHE[key] = { games, ts: Date.now() };
     return games;
@@ -13029,6 +13035,7 @@ async function fetchGameLog(pid) {
 function Last7HRChart({ batterId }) {
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [view, setView] = useState('hr'); // 'hr' | '2tb'
 
   useEffect(() => {
     if (!batterId) return;
@@ -13045,20 +13052,34 @@ function Last7HRChart({ batterId }) {
   );
   if (games.length === 0) return null;
 
-  const hitGames = games.filter(g => g.hrs > 0).length;
-  const pct      = Math.round((hitGames / games.length) * 100);
-  const maxHR    = Math.max(1, ...games.map(g => g.hrs));
-  const BAR_H    = 120;
-  const pctColor = pct >= 57 ? '#27c97a' : pct >= 43 ? '#ffc840' : 'var(--muted)';
-  const label    = games.length < 7 ? `LAST ${games.length}` : 'LAST 7';
+  // Compute for both views — react to pill selection
+  const getValue  = g => view === '2tb' ? (g.totalBases||0) : g.hrs;
+  const threshold = view === '2tb' ? 2 : 1;
+  const hitGames  = games.filter(g => getValue(g) >= threshold).length;
+  const pct       = Math.round((hitGames / games.length) * 100);
+  const maxVal    = Math.max(view==='2tb'?2:1, ...games.map(g => getValue(g)));
+  const BAR_H     = 120;
+  const barColor  = view==='2tb' ? '#27c97a' : '#27c97a';
+  const noColor   = view==='2tb' ? 'rgba(255,255,255,.08)' : 'rgba(255,64,32,.15)';
+  const pctColor  = pct >= 57 ? '#27c97a' : pct >= 43 ? '#ffc840' : 'var(--muted)';
+  const label     = games.length < 7 ? `LAST ${games.length}` : 'LAST 7';
 
   return (
     <div style={{background:'var(--surface)',border:'1px solid var(--border)',
       borderRadius:12,padding:'14px 16px',marginTop:12}}>
-      {/* Header */}
-      <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',marginBottom:12}}>
-        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:12,
-          letterSpacing:.5,color:'var(--text)'}}>💥 Gone Yard</span>
+      {/* Header with pill toggle */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+        <div style={{display:'flex',gap:3,background:'var(--surface2)',borderRadius:6,padding:2,border:'1px solid var(--border)'}}>
+          {[['hr','💥 HR'],['2tb','🎯 2TB+']].map(([k,lbl])=>(
+            <button key={k} onClick={()=>setView(k)}
+              style={{padding:'3px 9px',borderRadius:4,fontSize:8,fontFamily:"'DM Mono',monospace",
+                cursor:'pointer',border:'none',fontWeight:view===k?700:400,
+                background:view===k?'var(--accent)':'transparent',
+                color:view===k?'#fff':'var(--muted)'}}>
+              {lbl}
+            </button>
+          ))}
+        </div>
         <div style={{display:'flex',alignItems:'baseline',gap:8}}>
           <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--muted)'}}>
             {hitGames} of {games.length}
@@ -13080,18 +13101,19 @@ function Last7HRChart({ batterId }) {
         <span style={{position:'absolute',right:0,top:BAR_H/2-12,fontFamily:"'DM Mono',monospace",
           fontSize:8,color:'rgba(255,255,255,.3)'}}>0.5</span>
         {games.map((g, i) => {
-          const isHR = g.hrs > 0;
-          const barH = isHR
-            ? Math.max(Math.round(BAR_H * (g.hrs / maxHR)), Math.round(BAR_H * 0.5))
+          const val  = getValue(g);
+          const isHit= val >= threshold;
+          const barH = isHit
+            ? Math.max(Math.round(BAR_H * (val / maxVal)), Math.round(BAR_H * 0.25))
             : 0;
           return (
             <div key={i} style={{flex:1,display:'flex',flexDirection:'column',
               alignItems:'center',justifyContent:'flex-end',height:'100%',gap:2,zIndex:1}}>
               <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,
-                lineHeight:1,color:isHR?'#27c97a':'#ff4020'}}>{g.hrs}</span>
+                lineHeight:1,color:isHit?barColor:'#ff4020'}}>{val}</span>
               <div style={{width:'100%',borderRadius:'4px 4px 0 0',
-                height:isHR ? barH : 2,
-                background:isHR?'linear-gradient(180deg,#27c97a,#1aa862)':'rgba(255,64,32,.15)',
+                height:isHit ? barH : 2,
+                background:isHit?`linear-gradient(180deg,${barColor},#1aa862)`:noColor,
                 minHeight:2}}/>
             </div>
           );
@@ -20149,10 +20171,12 @@ function CheatSheetTab({ data }) {
 function ContactSlideout({ onClose }) {
   const mono = "'DM Mono',monospace";
   const osw  = "'Oswald',sans-serif";
+  const [from_,   setFrom]       = useState('');
   const [subject, setSubject]   = useState('');
   const [message, setMessage]   = useState('');
   const [files,   setFiles]     = useState([]);
   const [sent,    setSent]      = useState(false);
+  const [sending, setSending]   = useState(false);
   const fileRef = React.useRef();
 
   const handleFiles = (e) => {
@@ -20197,11 +20221,14 @@ function ContactSlideout({ onClose }) {
       {/* Form */}
       {sent ? (
         <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',
-          justifyContent:'center',gap:12,padding:24}}>
-          <span style={{fontSize:40}}>🚀</span>
-          <div style={{fontFamily:osw,fontWeight:800,fontSize:16,color:'var(--text)'}}>Opening your email…</div>
-          <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',textAlign:'center'}}>
-            Your email client should open with the message prefilled.
+          justifyContent:'center',gap:14,padding:24,textAlign:'center'}}>
+          <span style={{fontSize:48}}>🙏</span>
+          <div style={{fontFamily:osw,fontWeight:800,fontSize:18,color:'var(--text)'}}>Thanks for reaching out!</div>
+          <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)',lineHeight:1.7,maxWidth:240}}>
+            Your message is on its way to the Going Yard team. We read every message and appreciate the feedback.
+          </div>
+          <div style={{fontFamily:mono,fontSize:9,color:'var(--accent2)',marginTop:4}}>
+            ⚾ Keep swinging for the fences
           </div>
         </div>
       ) : (
@@ -20214,6 +20241,24 @@ function ContactSlideout({ onClose }) {
               background:'rgba(255,255,255,.04)',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>
               Going Yard &lt;hello@goingyard.app&gt;
             </div>
+          </div>
+
+          {/* From field — required */}
+          <div>
+            <label style={{fontFamily:mono,fontSize:8,color:'var(--muted)',display:'block',marginBottom:4}}>
+              FROM <span style={{color:'#ff4020'}}>*</span>
+            </label>
+            <input value={from_} onChange={e=>setFrom(e.target.value)}
+              placeholder="your@email.com"
+              type="email"
+              required
+              style={{width:'100%',padding:'8px 10px',borderRadius:6,
+                border:`1px solid ${from_&&!/^[^@]+@[^@]+\.[^@]+$/.test(from_)?'#ff4020':'var(--border)'}`,
+                background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:9,
+                outline:'none',boxSizing:'border-box'}}/>
+            {from_&&!/^[^@]+@[^@]+\.[^@]+$/.test(from_)&&(
+              <div style={{fontFamily:mono,fontSize:7,color:'#ff4020',marginTop:3}}>Please enter a valid email</div>
+            )}
           </div>
 
           {/* Subject */}
@@ -20286,15 +20331,43 @@ function ContactSlideout({ onClose }) {
             </div>
           </div>
 
-          {/* Send button */}
+          {/* Send Message button — submits via Formspree */}
+          <button onClick={async()=>{
+            if (!message.trim()||!from_||!/^[^@]+@[^@]+\.[^@]+$/.test(from_)) return;
+            setSending(true);
+            try {
+              await fetch('https://formspree.io/f/xpwrvrqy', {
+                method:'POST',
+                headers:{'Content-Type':'application/json','Accept':'application/json'},
+                body: JSON.stringify({
+                  _replyto: from_,
+                  subject: subject||'Going Yard Feedback',
+                  message,
+                  _subject: subject||'Going Yard Feedback',
+                }),
+              });
+            } catch(e) { /* fallback gracefully */ }
+            setSending(false);
+            setSent(true);
+          }}
+            disabled={!message.trim()||!from_||!/^[^@]+@[^@]+\.[^@]+$/.test(from_)||sending}
+            style={{padding:'12px',borderRadius:8,fontSize:12,
+              cursor:(message.trim()&&from_&&/^[^@]+@[^@]+\.[^@]+$/.test(from_))?'pointer':'not-allowed',
+              fontFamily:osw,fontWeight:800,letterSpacing:.5,
+              background:(message.trim()&&from_)?'var(--accent)':'var(--surface2)',
+              color:(message.trim()&&from_)?'#fff':'var(--muted)',border:'none',
+              opacity:(message.trim()&&from_)?1:.6}}>
+            {sending?'Sending…':'📨 Send Message'}
+          </button>
+
+          {/* Open in email app — secondary option */}
           <button onClick={handleSend}
             disabled={!message.trim()}
-            style={{padding:'12px',borderRadius:8,fontSize:12,cursor:message.trim()?'pointer':'not-allowed',
-              fontFamily:osw,fontWeight:800,letterSpacing:.5,
-              background:message.trim()?'var(--accent)':'var(--surface2)',
-              color:message.trim()?'#fff':'var(--muted)',border:'none',
-              opacity:message.trim()?1:.6}}>
-            ✉️ Open in Email App
+            style={{padding:'10px',borderRadius:8,fontSize:11,cursor:message.trim()?'pointer':'not-allowed',
+              fontFamily:mono,fontWeight:400,
+              background:'transparent',border:'1px solid var(--border)',
+              color:'var(--muted)',opacity:message.trim()?1:.5}}>
+            ✉️ Open in Email App instead
           </button>
         </div>
       )}
