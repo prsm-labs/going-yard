@@ -8335,6 +8335,7 @@ function HelpSlideout({ title, items, onClose }) {
         <button onClick={onClose}
           style={{marginLeft:'auto',background:'transparent',border:'none',
             color:'var(--muted)',fontSize:18,cursor:'pointer',padding:'0 4px',lineHeight:1}}>✕</button>
+        <ContactBtn style={{marginLeft:4}}/>
       </div>
       <div style={{overflowY:'auto',padding:'14px 16px',fontFamily:mono,fontSize:10,
         lineHeight:1.7,color:'var(--muted)'}}>
@@ -13989,7 +13990,7 @@ function StatsTab() {
         ))}
       </div>
 
-      {splitsSubTab==='gamelog' && <GameSplitsTab/>}
+      <div style={{display:splitsSubTab==='gamelog'?'block':'none'}}><GameSplitsTab/></div>
       <div style={{display:splitsSubTab==='splits'?'block':'none'}}>
 
       {/* ── Shared window selector ───────────────────────────────────────────── */}
@@ -18502,8 +18503,14 @@ function useHRNotifications() {
       const evoStr   = notif.exitVelo > 0 ? `${notif.exitVelo.toFixed(0)}mph` : '';
       const inningStr= notif.inning ? `${notif.halfInning === 'top' ? 'Top' : 'Bot'} ${notif.inning}` : '';
       const matchup  = (hr.awayAbbr && hr.homeAbbr) ? `${hr.awayAbbr} @ ${hr.homeAbbr}` : notif.batterTeam;
-      // Title: "J. Soto solo 416' dinger 📈"
-      const pushTitle = `${notif.batterName} ${hrLabel} ${distStr} dinger 📈`.replace(/\s+/g,' ').trim();
+      // Title: "E. De La Cruz solo 387' dinger 📈" — first initial + last name(s)
+      const shortName = (name => {
+        if (!name) return name;
+        const parts = name.trim().split(' ');
+        if (parts.length < 2) return name;
+        return parts[0][0] + '. ' + parts.slice(1).join(' ');
+      })(notif.batterName);
+      const pushTitle = `${shortName} ${hrLabel} ${distStr} dinger 📈`.replace(/\s+/g,' ').trim();
       // Body: "NYM @ PHI · Top 3 · 103mph"
       const pushBody  = [matchup, inningStr, evoStr].filter(Boolean).join(' · ');
       sendLivePush(pushTitle, pushBody, hrDedupKey);
@@ -18521,7 +18528,8 @@ function useHRNotifications() {
           if (_setNotifLog) _setNotifLog([..._notifLog]);
           // Skip push if batter is injured
         if (!INJURY_MAP[String(hr.batterId||'')]) {
-          sendLivePush(`🔥 ON FIRE — ${hr.batterName}`,
+          const fireShort = (name => { if(!name)return name; const p=name.trim().split(' '); return p.length<2?name:p[0][0]+'. '+p.slice(1).join(' '); })(hr.batterName);
+          sendLivePush(`🔥 ON FIRE — ${fireShort}`,
             `${GAME_HR_MAP[key]} home runs this game! ${hr.batterTeam}`);
         }
         }
@@ -19080,6 +19088,10 @@ function LinksTab() {
         border:'1px solid var(--border)',borderRadius:8,
         fontFamily:mono,fontSize:8,color:'var(--muted)',textAlign:'center'}}>
         Want to be listed here? Reach out — more links coming soon.
+      </div>
+      <div style={{marginTop:8,display:'flex',justifyContent:'center'}}>
+        <ContactBtn style={{fontSize:11,padding:'8px 20px',borderRadius:8,border:'1px solid var(--border)',color:'var(--text)',background:'var(--surface)'}}/>
+        <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',marginLeft:10,alignSelf:'center'}}>hello@goingyard.app</span>
       </div>
     </div>
   );
@@ -19968,8 +19980,22 @@ function CheatSheetTab({ data }) {
 
   return (
     <div style={{padding:'8px 4px'}}>
-      <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginBottom:12}}>
-        Top 5 batters per category · today's games only · L7 game log data
+      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:12}}>
+        <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>Top 5 batters per category · today only · L7 data</span>
+        <button onClick={()=>{
+          const rows = [
+            ['Category','Rank','Name','Team','Stat','Stat Label','Pitcher','Pitcher Grade'],
+            ...top5HR.map((r,i)=>[  'HR Candidate', i+1, r.batter||r.name, r.batting_team||r.team, parseFloat(r._yard||0).toFixed(0), 'Yard Score', r.pitcher||'', r._pgLabel||'']),
+            ...top52TB.map((r,i)=>['2+ Bases',      i+1, r.name, r.team, r.g2tb_pct+'%', '2TB+ rate '+r.g2tb+'/'+r.games+' g', r.pitcher, r.pgLabel]),
+            ...top5Hit.map((r,i)=>['Hit Rate',      i+1, r.name, r.team, r.h_game_pct+'%', 'Hit rate '+r.h_game+'/'+r.games+' g', r.pitcher, r.pgLabel]),
+            ...top5Close.map((r,i)=>['Close Calls',  i+1, r.name, r.team, r.count, 'near-misses', r.pitcher, r.pgLabel]),
+            ...top5EV.map((r,i)=>[ 'Avg Exit Velo', i+1, r.name, r.team, r.ev.toFixed(1), 'avg EV (L7)', r.pitcher, r.pgLabel]),
+          ];
+          const csv = rows.map(r=>r.map(v=>String(v||'').includes(',')?`"${v}"`:v).join(',')).join('\n');
+          const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='cheat-sheet.csv'; a.click();
+        }} style={{padding:'3px 8px',borderRadius:6,fontSize:9,cursor:'pointer',border:'1px solid var(--border)',color:'var(--muted)',background:'transparent',fontFamily:mono,flexShrink:0}}>
+          ⬇ CSV
+        </button>
       </div>
       <div style={{display:'flex',gap:16,flexWrap:'wrap',alignItems:'flex-start'}}>
 
@@ -20044,6 +20070,180 @@ function CheatSheetTab({ data }) {
   );
 }
 
+
+// ── Contact Form Slideout ─────────────────────────────────────────────────────
+function ContactSlideout({ onClose }) {
+  const mono = "'DM Mono',monospace";
+  const osw  = "'Oswald',sans-serif";
+  const [subject, setSubject]   = useState('');
+  const [message, setMessage]   = useState('');
+  const [files,   setFiles]     = useState([]);
+  const [sent,    setSent]      = useState(false);
+  const fileRef = React.useRef();
+
+  const handleFiles = (e) => {
+    const picked = Array.from(e.target.files||[]).slice(0,3); // max 3 attachments
+    setFiles(prev => [...prev, ...picked].slice(0,3));
+  };
+
+  const handleSend = () => {
+    // Build mailto link — browser opens email client with prefilled fields
+    const to      = 'hello@goingyard.app';
+    const sub     = encodeURIComponent(subject || 'Going Yard Feedback');
+    const body    = encodeURIComponent(
+      message +
+      (files.length > 0 ? '\n\n[' + files.map(f=>f.name).join(', ') + ' attached — please add manually if needed]' : '')
+    );
+    window.open(`mailto:${to}?subject=${sub}&body=${body}`, '_self');
+    setSent(true);
+    setTimeout(onClose, 1800);
+  };
+
+  const removeFile = (i) => setFiles(prev => prev.filter((_,idx)=>idx!==i));
+
+  return <>
+    <div style={{position:'fixed',top:0,right:0,bottom:0,width:340,zIndex:9999,
+      background:'var(--surface)',borderLeft:'1px solid var(--border)',
+      display:'flex',flexDirection:'column',
+      boxShadow:'-6px 0 32px rgba(0,0,0,.6)'}}>
+
+      {/* Header */}
+      <div style={{display:'flex',alignItems:'center',gap:10,padding:'14px 16px',
+        borderBottom:'1px solid var(--border)',background:'var(--surface2)',flexShrink:0}}>
+        <span style={{fontSize:18}}>✉️</span>
+        <div>
+          <div style={{fontFamily:osw,fontWeight:800,fontSize:14,color:'var(--text)'}}>Contact Going Yard</div>
+          <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>hello@goingyard.app</div>
+        </div>
+        <button onClick={onClose}
+          style={{marginLeft:'auto',background:'transparent',border:'none',
+            color:'var(--muted)',fontSize:20,cursor:'pointer',lineHeight:1,padding:'0 4px'}}>✕</button>
+      </div>
+
+      {/* Form */}
+      {sent ? (
+        <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',
+          justifyContent:'center',gap:12,padding:24}}>
+          <span style={{fontSize:40}}>🚀</span>
+          <div style={{fontFamily:osw,fontWeight:800,fontSize:16,color:'var(--text)'}}>Opening your email…</div>
+          <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',textAlign:'center'}}>
+            Your email client should open with the message prefilled.
+          </div>
+        </div>
+      ) : (
+        <div style={{flex:1,overflowY:'auto',padding:16,display:'flex',flexDirection:'column',gap:12}}>
+
+          {/* To field — read only */}
+          <div>
+            <label style={{fontFamily:mono,fontSize:8,color:'var(--muted)',display:'block',marginBottom:4}}>TO</label>
+            <div style={{padding:'8px 10px',borderRadius:6,border:'1px solid var(--border)',
+              background:'rgba(255,255,255,.04)',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>
+              Going Yard &lt;hello@goingyard.app&gt;
+            </div>
+          </div>
+
+          {/* Subject */}
+          <div>
+            <label style={{fontFamily:mono,fontSize:8,color:'var(--muted)',display:'block',marginBottom:4}}>SUBJECT</label>
+            <input value={subject} onChange={e=>setSubject(e.target.value)}
+              placeholder="Feedback, idea, bug report…"
+              style={{width:'100%',padding:'8px 10px',borderRadius:6,
+                border:'1px solid var(--border)',background:'var(--surface2)',
+                color:'var(--text)',fontFamily:mono,fontSize:9,outline:'none',
+                boxSizing:'border-box'}}/>
+          </div>
+
+          {/* Message */}
+          <div style={{flex:1}}>
+            <label style={{fontFamily:mono,fontSize:8,color:'var(--muted)',display:'block',marginBottom:4}}>MESSAGE</label>
+            <textarea value={message} onChange={e=>setMessage(e.target.value)}
+              placeholder={"Share your ideas, bugs, or feature requests\nWe read every message — this app is built with your feedback"}
+              rows={8}
+              style={{width:'100%',padding:'8px 10px',borderRadius:6,
+                border:'1px solid var(--border)',background:'var(--surface2)',
+                color:'var(--text)',fontFamily:mono,fontSize:9,outline:'none',
+                resize:'vertical',boxSizing:'border-box',lineHeight:1.6}}/>
+          </div>
+
+          {/* Attachments */}
+          <div>
+            <label style={{fontFamily:mono,fontSize:8,color:'var(--muted)',display:'block',marginBottom:6}}>
+              ATTACHMENTS <span style={{color:'rgba(255,255,255,.3)'}}>· screenshots, images (max 3)</span>
+            </label>
+            <input ref={fileRef} type="file" multiple accept="image/*,.png,.jpg,.jpeg,.webp,.gif"
+              onChange={handleFiles} style={{display:'none'}}/>
+            {files.length < 3 && (
+              <button onClick={()=>fileRef.current?.click()}
+                style={{padding:'7px 12px',borderRadius:6,fontSize:9,cursor:'pointer',fontFamily:mono,
+                  border:'1px dashed var(--border)',color:'var(--muted)',background:'transparent',
+                  width:'100%',textAlign:'center'}}>
+                + Add screenshot or image
+              </button>
+            )}
+            {files.length > 0 && (
+              <div style={{marginTop:6,display:'flex',flexDirection:'column',gap:4}}>
+                {files.map((f,i)=>(
+                  <div key={i} style={{display:'flex',alignItems:'center',gap:8,
+                    padding:'5px 8px',borderRadius:5,background:'var(--surface2)',
+                    border:'1px solid var(--border)'}}>
+                    <span style={{fontSize:10}}>📎</span>
+                    <span style={{fontFamily:mono,fontSize:8,color:'var(--text)',flex:1,
+                      overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{f.name}</span>
+                    <button onClick={()=>removeFile(i)}
+                      style={{background:'transparent',border:'none',color:'var(--muted)',
+                        cursor:'pointer',fontSize:12,padding:'0 2px'}}>✕</button>
+                  </div>
+                ))}
+                {files.length > 0 && (
+                  <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',marginTop:2}}>
+                    Note: your email client will open — attach files there if needed
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Beta note */}
+          <div style={{padding:'10px 12px',borderRadius:6,
+            background:'rgba(56,184,242,.08)',border:'1px solid rgba(56,184,242,.2)'}}>
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--ice)',lineHeight:1.6}}>
+              🧪 <strong>Beta feedback welcome</strong> — ideas, bugs, data issues, UX suggestions.
+              Every message gets read. Help us build the best MLB HR tool out there.
+            </div>
+          </div>
+
+          {/* Send button */}
+          <button onClick={handleSend}
+            disabled={!message.trim()}
+            style={{padding:'12px',borderRadius:8,fontSize:12,cursor:message.trim()?'pointer':'not-allowed',
+              fontFamily:osw,fontWeight:800,letterSpacing:.5,
+              background:message.trim()?'var(--accent)':'var(--surface2)',
+              color:message.trim()?'#fff':'var(--muted)',border:'none',
+              opacity:message.trim()?1:.6}}>
+            ✉️ Open in Email App
+          </button>
+        </div>
+      )}
+    </div>
+    <div onClick={onClose}
+      style={{position:'fixed',inset:0,zIndex:9998,background:'rgba(0,0,0,.5)'}}/>
+  </>;
+}
+
+// ── Global contact button trigger ─────────────────────────────────────────────
+function ContactBtn({ style={} }) {
+  const [open, setOpen] = useState(false);
+  return <>
+    <button onClick={()=>setOpen(true)}
+      data-tip="Contact Going Yard"
+      style={{padding:'3px 8px',borderRadius:6,fontSize:10,cursor:'pointer',
+        border:'1px solid var(--border)',color:'var(--muted)',background:'transparent',
+        flexShrink:0,...style}}>
+      ✉️
+    </button>
+    {open && <ContactSlideout onClose={()=>setOpen(false)}/>}
+  </>;
+}
 export default function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [tab, setTab] = useState("homeruns");
@@ -20104,6 +20304,7 @@ export default function App() {
               display:"flex",alignItems:"center",gap:3,flexShrink:0,whiteSpace:'nowrap'}}>
             🎯 Picks
           </button>
+          <ContactBtn/>
             </div>
       </header>
       <HRTicker onHRClick={()=>setTab("homeruns")}/>
