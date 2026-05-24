@@ -19577,7 +19577,8 @@ function GameSplitsTab() {
                         <div style={{display:'flex',alignItems:'center',gap:4}}>
                           <PlayerAvatar pid={parseInt(r.id)||0} name={r.name||r.id} size={16}/>
                           <span style={{fontFamily:osw,fontWeight:700,fontSize:9,color:'var(--accent2)',minWidth:26}}>{r.team||''}</span>
-                          <span style={{fontFamily:osw,fontWeight:700,fontSize:10,color:'var(--text)'}}>{r.name||r.id}</span>
+                          <span onClick={e=>{e.stopPropagation();openPitcherSlide({pid:parseInt(r.id)||0,name:r.name||r.id,team:r.team||'',hand:r.hand||'',pitchMix:[]});}}
+                            style={{fontFamily:osw,fontWeight:700,fontSize:10,color:'var(--text)',cursor:'pointer'}}>{r.name||r.id}</span>
                           <span style={{fontFamily:mono,fontSize:7,color:'var(--muted)'}}>{r.hand==='L'?'LHP':r.hand==='R'?'RHP':''}</span>
                           {r.role&&<span style={{padding:'1px 3px',borderRadius:3,fontSize:7,fontWeight:700,background:r.role==='SP'?'rgba(56,184,242,.15)':'rgba(251,191,36,.15)',color:r.role==='SP'?'var(--ice)':'#fbbf24'}}>{r.role}</span>}
                           {!confirmedBatterOnly&&(confirmedSP?<span title="Confirmed SP" style={{fontSize:9}}>🟢</span>:probablePitcherIds.has(r.id)?<span title="Probable SP" style={{fontSize:9}}>🟡</span>:null)}
@@ -19691,7 +19692,8 @@ function GameSplitsTab() {
                         <div style={{display:'flex',alignItems:'center',gap:4}}>
                           <PlayerAvatar pid={parseInt(r.id)||0} name={r.name||r.id} size={16}/>
                           <span style={{fontFamily:osw,fontWeight:700,fontSize:9,color:'var(--accent2)',minWidth:26}}>{r.team||''}</span>
-                          <span style={{fontFamily:osw,fontWeight:700,fontSize:10,color:'var(--text)'}}>{r.name||r.id}</span>
+                          <span onClick={e=>{e.stopPropagation();openAtBatSlide({pid:parseInt(r.id)||0,name:r.name||r.id,team:r.team||''});}}
+                            style={{fontFamily:osw,fontWeight:700,fontSize:10,color:'var(--text)',cursor:'pointer'}}>{r.name||r.id}</span>
                           {LINEUP_STATUS[parseInt(r.id)||0]?.status==='confirmed'&&<span style={{fontSize:9}}>✅</span>}
                           {INJURY_MAP?.[parseInt(r.id)||0]&&!LINEUP_STATUS?.[parseInt(r.id)||0]&&<span style={{fontSize:9}}>🤕</span>}
                           <PickButton pid={parseInt(r.id)||0} name={r.name||r.id} team={r.team||''}/>
