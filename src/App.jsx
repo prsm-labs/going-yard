@@ -2338,10 +2338,12 @@ async function fetchPitcherGameLog(pid) {
       date: s.date || '',
       opp:  ABBR[s.opponent?.id] || s.opponent?.abbreviation || s.opponent?.name?.replace(/^.* /,'') || '?',
       loc:  s.isHome ? 'home' : 'away',
-      hra:  parseInt(s.stat?.homeRuns ?? 0),      // HR allowed
+      hra:  parseInt(s.stat?.homeRuns      ?? 0),
+      ha:   parseInt(s.stat?.hits          ?? 0),
       ip:   parseFloat(s.stat?.inningsPitched ?? 0),
-      er:   parseInt(s.stat?.earnedRuns ?? 0),
-      k:    parseInt(s.stat?.strikeOuts ?? 0),
+      er:   parseInt(s.stat?.earnedRuns    ?? 0),
+      k:    parseInt(s.stat?.strikeOuts    ?? 0),
+      bb:   parseInt(s.stat?.baseOnBalls   ?? 0),
     })).sort((a,b) => a.date > b.date ? 1 : -1);
     PITCHER_LOG_CACHE[key] = { games, ts: Date.now() };
     return games;
@@ -2349,8 +2351,9 @@ async function fetchPitcherGameLog(pid) {
 }
 
 function Last7HRAllowedChart({ pitcherId }) {
-  const [games, setGames] = useState([]);
+  const [games,   setGames]   = useState([]);
   const [loading, setLoading] = useState(true);
+  const [view,    setView]    = useState('hr'); // 'hr' | 'h' | 'k'
 
   useEffect(() => {
     if (!pitcherId) return;
@@ -2367,24 +2370,44 @@ function Last7HRAllowedChart({ pitcherId }) {
   );
   if (games.length === 0) return null;
 
-  const allowedGames = games.filter(g => g.hra > 0).length;
+  const getVal   = g => view==='h'?(g.ha||0):view==='k'?(g.k||0):(g.hra||0);
+  const hitLabel = view==='h'?'Hits Allowed':view==='k'?'Strikeouts':'HR Allowed';
+  const hitEmoji = view==='h'?'🎯':view==='k'?'🌀':'🚀';
+  // Good = low for HR/H, high for K
+  const goodFn   = v => view==='k' ? v>=6 : v===0;
+  const badFn    = v => view==='k' ? v<=2 : v>0;
+  const allowedGames = games.filter(g => badFn(getVal(g))).length;
   const pct     = Math.round((allowedGames / games.length) * 100);
-  const maxHRA  = Math.max(1, ...games.map(g => g.hra));
+  const maxHRA  = Math.max(view==='k'?5:1, ...games.map(g => getVal(g)));
   const BAR_H   = 100;
-  // For pitchers: lower % is BETTER — invert the color logic
-  const pctColor = pct <= 14 ? '#27c97a' : pct <= 42 ? '#ffc840' : '#ff4020';
+  const barGood = view==='k'?'#27c97a':'rgba(39,201,122,.2)';
+  const barBad  = view==='k'?'rgba(255,64,32,.2)':'linear-gradient(180deg,#ff4020,#c02010)';
+  const numGood = view==='k'?'#27c97a':'#27c97a';
+  const numBad  = view==='k'?'#ff4020':'#ff4020';
+  const pctColor = view==='k'
+    ? (pct <= 14 ? '#ff4020' : pct <= 42 ? '#ffc840' : '#27c97a')
+    : (pct <= 14 ? '#27c97a' : pct <= 42 ? '#ffc840' : '#ff4020');
   const label   = games.length < 7 ? `LAST ${games.length}` : 'LAST 7';
 
   return (
     <div style={{background:'var(--surface)',border:'1px solid var(--border)',
       borderRadius:12,padding:'14px 16px',marginTop:12}}>
-      {/* Header */}
-      <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',marginBottom:12}}>
-        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:12,
-          letterSpacing:.5,color:'var(--text)'}}>🚀 HR Allowed</span>
+      {/* Header with pill toggle */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12,flexWrap:'wrap',gap:8}}>
+        <div style={{display:'flex',gap:3,background:'var(--surface2)',borderRadius:6,padding:2,border:'1px solid var(--border)'}}>
+          {[['hr','🚀 HR'],['h','🎯 Hits'],['k','🌀 K']].map(([k,lbl])=>(
+            <button key={k} onClick={()=>setView(k)}
+              style={{padding:'3px 9px',borderRadius:4,fontSize:8,fontFamily:"'DM Mono',monospace",
+                cursor:'pointer',border:'none',fontWeight:view===k?700:400,
+                background:view===k?'var(--accent)':'transparent',
+                color:view===k?'#fff':'var(--muted)'}}>
+              {lbl}
+            </button>
+          ))}
+        </div>
         <div style={{display:'flex',alignItems:'baseline',gap:8}}>
           <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--muted)'}}>
-            {allowedGames} of {games.length} starts
+            {allowedGames} of {games.length}
           </span>
           <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:22,
             color:pctColor}}>{pct}%</span>
@@ -2395,26 +2418,27 @@ function Last7HRAllowedChart({ pitcherId }) {
       <div style={{display:'flex',alignItems:'flex-end',gap:4,height:BAR_H,
         position:'relative',paddingLeft:14,paddingRight:14}}>
         <span style={{position:'absolute',left:0,top:0,fontFamily:"'DM Mono',monospace",
-          fontSize:8,color:'var(--muted)',lineHeight:1}}>{maxVal}</span>
+          fontSize:8,color:'var(--muted)',lineHeight:1}}>{maxHRA}</span>
         <span style={{position:'absolute',left:0,bottom:0,fontFamily:"'DM Mono',monospace",
           fontSize:8,color:'var(--muted)',lineHeight:1}}>0</span>
         <div style={{position:'absolute',left:10,right:10,top:BAR_H/2,
           borderTop:'1px solid rgba(255,255,255,.12)',zIndex:0,pointerEvents:'none'}}/>
         {games.map((g, i) => {
-          const isHRA = g.hra > 0;
-          const barH  = isHRA
-            ? Math.max(Math.round(BAR_H * (g.hra / maxHRA)), Math.round(BAR_H * 0.5))
+          const val  = getVal(g);
+          const isGd = goodFn(val);
+          const isBd = badFn(val);
+          const barH = val > 0
+            ? Math.max(Math.round(BAR_H * (val / maxHRA)), Math.round(BAR_H * 0.15))
             : 0;
           return (
             <div key={i} style={{flex:1,display:'flex',flexDirection:'column',
               alignItems:'center',justifyContent:'flex-end',height:'100%',gap:2,zIndex:1}}>
               <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,
-                lineHeight:1,color:isHRA?'#ff4020':'#27c97a'}}>{g.hra}</span>
+                lineHeight:1,color:isGd?numGood:isBd?numBad:'var(--muted)'}}>{val}</span>
               <div style={{width:'100%',borderRadius:'4px 4px 0 0',
-                height:isHRA ? barH : 2,
-                background:isHRA?'linear-gradient(180deg,#ff4020,#c02010)':'rgba(39,201,122,.2)',
+                height:val > 0 ? barH : 2,
+                background:isGd?barGood:isBd?barBad:'rgba(255,255,255,.08)',
                 minHeight:2}}/>
-              {/* IP label at bottom */}
               <div style={{fontFamily:"'DM Mono',monospace",fontSize:7,color:'rgba(255,255,255,.3)',
                 marginTop:2}}>{g.ip>0?g.ip.toFixed(1):''}</div>
             </div>
