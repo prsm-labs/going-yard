@@ -13035,7 +13035,7 @@ async function fetchGameLog(pid) {
 function Last7HRChart({ batterId }) {
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState('hr'); // 'hr' | '2tb'
+  const [view, setView] = useState('hr'); // 'hr' | '2tb' | '2b'
 
   useEffect(() => {
     if (!batterId) return;
@@ -13053,11 +13053,11 @@ function Last7HRChart({ batterId }) {
   if (games.length === 0) return null;
 
   // Compute for both views — react to pill selection
-  const getValue  = g => view === '2tb' ? (g.totalBases||0) : g.hrs;
-  const threshold = view === '2tb' ? 2 : 1;
+  const getValue  = g => view==='2tb'?(g.totalBases||0):view==='2b'?(g.doubles||0):g.hrs;
+  const threshold = view==='2tb'?2:view==='2b'?1:1;
   const hitGames  = games.filter(g => getValue(g) >= threshold).length;
   const pct       = Math.round((hitGames / games.length) * 100);
-  const maxVal    = Math.max(view==='2tb'?2:1, ...games.map(g => getValue(g)));
+  const maxVal    = Math.max(view==='2tb'?2:view==='2b'?1:1, ...games.map(g => getValue(g)));
   const BAR_H     = 120;
   const barColor  = view==='2tb' ? '#27c97a' : '#27c97a';
   const noColor   = view==='2tb' ? 'rgba(255,255,255,.08)' : 'rgba(255,64,32,.15)';
@@ -13070,7 +13070,7 @@ function Last7HRChart({ batterId }) {
       {/* Header with pill toggle */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
         <div style={{display:'flex',gap:3,background:'var(--surface2)',borderRadius:6,padding:2,border:'1px solid var(--border)'}}>
-          {[['hr','💥 HR'],['2tb','🎯 2TB+']].map(([k,lbl])=>(
+          {[['hr','💥 HR'],['2tb','🎯 2TB+'],['2b','⚡ 2B']].map(([k,lbl])=>(
             <button key={k} onClick={()=>setView(k)}
               style={{padding:'3px 9px',borderRadius:4,fontSize:8,fontFamily:"'DM Mono',monospace",
                 cursor:'pointer',border:'none',fontWeight:view===k?700:400,
@@ -16269,6 +16269,7 @@ function MatchupEngineTab() {
         <button style={stBtn('longshot')}   data-tip="🎲 Long Shot — high-odds batters with elite pitcher matchup metrics" onClick={()=>setSubTab('longshot')}>🎲 Long Shot</button>
         <button style={stBtn('pairs')}      data-tip="🔗 Pairs — correlated batter pairs sharing underlying conditions" onClick={()=>setSubTab('pairs')}>🔗 Pairs</button>
         <button style={stBtn('cheatsheet')} data-tip="🃏 Cheat Sheet — Top 5 HR, 2+Base, and Hit candidates for today" onClick={()=>setSubTab('cheatsheet')}>🃏 Cheat Sheet</button>
+        <button style={stBtn('streaks')}    data-tip="🔥 Streaks — active hitting, HR, 2TB and 2B streaks for today's batters" onClick={()=>setSubTab('streaks')}>🔥 Streaks</button>
       </div>
       {/* Row 2 */}
       <div style={{display:'flex',gap:4,flexWrap:'wrap',justifyContent:'center'}}>
@@ -16324,6 +16325,7 @@ function MatchupEngineTab() {
     {subTab === 'bvp'      && <BvPDeepDiveTab/>}
     {subTab === 'pairs'    && <PairsTab data={data}/>}
     {subTab === 'cheatsheet' && <CheatSheetTab data={data}/>}
+    {subTab === 'streaks'    && <StreaksTab/>}
     {subTab === 'soclose'  && <SoCloseTab data={data}/>}
     {subTab === 'longshot' && (
       <LongShotView data={dateSlot==='tomorrow'&&allPicksTomorrowData.length>0 ? allPicksTomorrowData : allPicksData}/>
@@ -20336,7 +20338,7 @@ function ContactSlideout({ onClose }) {
             if (!message.trim()||!from_||!/^[^@]+@[^@]+\.[^@]+$/.test(from_)) return;
             setSending(true);
             try {
-              await fetch('https://formspree.io/f/xpwrvrqy', {
+              await fetch('https://formspree.io/f/meedllry', {
                 method:'POST',
                 headers:{'Content-Type':'application/json','Accept':'application/json'},
                 body: JSON.stringify({
@@ -20391,6 +20393,227 @@ function ContactBtn({ style={} }) {
     {open && <ContactSlideout onClose={()=>setOpen(false)}/>}
   </>;
 }
+function StreaksTab() {
+  const mono = "'DM Mono',monospace";
+  const osw  = "'Oswald',sans-serif";
+  const [category, setCategory] = useState('hit');
+  const [breaksAllowed, setBreaksAllowed] = useState(1);
+  const [players, setPlayers]   = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [teamFilter, setTeamFilter] = useState('ALL');
+
+  const CATS = [
+    { key:'hr',   label:'1+ HR',      emoji:'💥', test: g => (g.hrs||0) >= 1 },
+    { key:'hit',  label:'1+ Hit',     emoji:'⚾', test: g => (g.h||0)   >= 1 },
+    { key:'2tb',  label:'2+ Bases',   emoji:'🎯', test: g => (g.totalBases||0) >= 2 },
+    { key:'2b',   label:'2B',         emoji:'⚡', test: g => (g.doubles||0) >= 1 },
+  ];
+
+  const cat = CATS.find(c => c.key === category);
+
+  // Load game logs for all today's batters
+  useEffect(() => {
+    setLoading(true);
+    setPlayers([]);
+
+    const todayBatters = [];
+    const seen = new Set();
+    Object.values(DAILY_PICKS_CACHE||{}).forEach(r => {
+      const bid = String(r.batter_id||'').split('.')[0];
+      if (!bid || seen.has(bid) || !r.batter || !r.game_id) return;
+      seen.add(bid);
+      if (INJURY_MAP?.[parseInt(bid)||0] && !LINEUP_STATUS?.[parseInt(bid)||0]) return;
+      todayBatters.push({ id: bid, name: r.batter, team: r.batting_team||'' });
+    });
+
+    // Batch fetch game logs — 5 at a time to avoid rate limits
+    let results = [];
+    const batchSize = 5;
+
+    const fetchBatch = async (batch) => {
+      const logs = await Promise.all(
+        batch.map(b => fetchGameLog(parseInt(b.id)||0).then(games => ({ ...b, games })))
+      );
+      results = [...results, ...logs];
+      setPlayers([...results]);
+    };
+
+    const runAll = async () => {
+      for (let i = 0; i < todayBatters.length; i += batchSize) {
+        await fetchBatch(todayBatters.slice(i, i + batchSize));
+        await new Promise(r => setTimeout(r, 120)); // small delay between batches
+      }
+      setLoading(false);
+    };
+
+    runAll();
+  }, []);
+
+  // Compute streak for each player given category and breaks allowed
+  const computeStreak = (games, testFn, maxBreaks) => {
+    if (!games || games.length === 0) return { streak: 0, boxes: [] };
+    // Work backwards from most recent game
+    let streak = 0, breaks = 0;
+    const recent = [...games].reverse(); // most recent first
+    const boxes  = [];
+    for (const g of recent) {
+      const success = testFn(g);
+      if (success) {
+        streak++;
+        boxes.unshift({ success: true, date: g.date, opp: g.opp });
+      } else {
+        if (breaks < maxBreaks) {
+          breaks++;
+          boxes.unshift({ success: false, date: g.date, opp: g.opp });
+        } else {
+          break;
+        }
+      }
+    }
+    // Actual streak = consecutive successes from the end (ignoring breaks up to maxBreaks)
+    // Re-count: streak is the count of successes in the sequence
+    const successCount = boxes.filter(b => b.success).length;
+    return { streak: successCount, boxes };
+  };
+
+  // Sorted player list for current category
+  const sorted = React.useMemo(() => {
+    return players
+      .filter(p => teamFilter === 'ALL' || p.team === teamFilter)
+      .map(p => {
+        const { streak, boxes } = computeStreak(p.games || [], cat.test, breaksAllowed);
+        return { ...p, streak, boxes };
+      })
+      .filter(p => p.streak >= 2)
+      .sort((a, b) => b.streak - a.streak)
+      .slice(0, 20);
+  }, [players, category, breaksAllowed, teamFilter]);
+
+  const teams = React.useMemo(() => {
+    const all = [...new Set(players.map(p=>p.team).filter(Boolean))].sort();
+    return ['ALL', ...all];
+  }, [players]);
+
+  const loadedCount = players.length;
+  const totalCount  = Object.values(DAILY_PICKS_CACHE||{}).filter((r,_,arr) => {
+    const bid = String(r.batter_id||'').split('.')[0];
+    return bid && r.batter && r.game_id;
+  }).length;
+
+  return (
+    <div style={{padding:'0 4px'}}>
+      {/* Header */}
+      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:12,flexWrap:'wrap'}}>
+        <span style={{fontFamily:osw,fontWeight:800,fontSize:16,color:'var(--text)'}}>🔥 Streaks</span>
+        {loading && (
+          <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>
+            Loading {loadedCount}/{totalCount || '?'} batters…
+          </span>
+        )}
+        {!loading && (
+          <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>
+            {sorted.length} active streaks · today's batters
+          </span>
+        )}
+        <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:8}}>
+          <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>Breaks:</span>
+          {[0,1,2,3].map(n => (
+            <button key={n} onClick={()=>setBreaksAllowed(n)}
+              style={{width:26,height:26,borderRadius:'50%',border:'none',cursor:'pointer',
+                fontFamily:mono,fontWeight:700,fontSize:10,
+                background:breaksAllowed===n?'var(--text)':'var(--surface2)',
+                color:breaksAllowed===n?'var(--surface)':'var(--muted)'}}>
+              {n}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Category pills */}
+      <div style={{display:'flex',gap:6,marginBottom:10,flexWrap:'wrap'}}>
+        {CATS.map(c => (
+          <button key={c.key} onClick={()=>setCategory(c.key)}
+            style={{padding:'6px 14px',borderRadius:20,fontSize:10,cursor:'pointer',fontFamily:mono,
+              border:`1px solid ${category===c.key?'var(--accent)':'var(--border)'}`,
+              background:category===c.key?'var(--accent)':'var(--surface2)',
+              color:category===c.key?'#fff':'var(--muted)',fontWeight:category===c.key?700:400}}>
+            {c.emoji} {c.label}
+          </button>
+        ))}
+        <select value={teamFilter} onChange={e=>setTeamFilter(e.target.value)}
+          style={{marginLeft:'auto',fontFamily:mono,fontSize:8,background:'var(--surface2)',
+            color:'var(--text)',border:'1px solid var(--border)',borderRadius:6,
+            padding:'4px 8px',cursor:'pointer'}}>
+          {teams.map(t=><option key={t} value={t}>{t==='ALL'?'All Teams':t}</option>)}
+        </select>
+      </div>
+
+      {/* Legend */}
+      <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginBottom:10,display:'flex',gap:12,alignItems:'center'}}>
+        <span>Each box = 1 game · most recent on right</span>
+        <span style={{display:'flex',alignItems:'center',gap:4}}>
+          <span style={{width:12,height:12,borderRadius:2,background:'#27c97a',display:'inline-block'}}/>✅ success
+        </span>
+        <span style={{display:'flex',alignItems:'center',gap:4}}>
+          <span style={{width:12,height:12,borderRadius:2,background:'#ff4020',display:'inline-block'}}/>❌ break
+        </span>
+      </div>
+
+      {/* Player cards — 2 column grid */}
+      {sorted.length === 0 && !loading && (
+        <div style={{textAlign:'center',padding:40,fontFamily:mono,fontSize:10,color:'var(--muted)'}}>
+          No streaks of 2+ found for {cat.label} with {breaksAllowed} break{breaksAllowed!==1?'s':''} allowed
+        </div>
+      )}
+
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:8}}>
+        {sorted.map(p => (
+          <div key={p.id}
+            style={{background:'var(--surface)',border:'1px solid var(--border)',
+              borderRadius:10,padding:'10px 12px',display:'flex',alignItems:'center',gap:10}}>
+            <PlayerAvatar pid={parseInt(p.id)||0} name={p.name} size={36}/>
+            {/* Streak number */}
+            <div style={{width:38,height:38,borderRadius:8,flexShrink:0,
+              background:'linear-gradient(135deg,#f5a623,#e8941a)',
+              display:'flex',alignItems:'center',justifyContent:'center'}}>
+              <span style={{fontFamily:osw,fontWeight:800,fontSize:20,color:'#fff',lineHeight:1}}>
+                {p.streak}
+              </span>
+            </div>
+            {/* Name + boxes */}
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:5}}>
+                <span onClick={()=>openAtBatSlide({pid:parseInt(p.id)||0,name:p.name,team:p.team})}
+                  style={{fontFamily:osw,fontWeight:700,fontSize:11,color:'var(--text)',
+                    cursor:'pointer',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                  {p.name}
+                </span>
+                <span style={{fontFamily:mono,fontSize:8,color:'var(--accent2)',flexShrink:0}}>{p.team}</span>
+              </div>
+              {/* Game boxes */}
+              <div style={{display:'flex',gap:2,flexWrap:'nowrap',overflowX:'auto'}}>
+                {p.boxes.map((b,i) => (
+                  <div key={i}
+                    data-tip={`${b.date||''} vs ${b.opp||''} — ${b.success?cat.label:'no '+cat.label}`}
+                    style={{width:14,height:14,borderRadius:2,flexShrink:0,
+                      background:b.success?'#27c97a':'#ff4020',
+                      opacity:b.success?1:0.7}}/>
+                ))}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {loading && sorted.length === 0 && (
+        <div style={{textAlign:'center',padding:30,fontFamily:mono,fontSize:9,color:'var(--muted)'}}>
+          Fetching game logs… {loadedCount} of {totalCount || '?'} batters loaded
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [tab, setTab] = useState("homeruns");
