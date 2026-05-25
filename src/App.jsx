@@ -19258,6 +19258,27 @@ function LinksTab() {
       color: '#27c930',
       summary: 'AI-powered sports betting tools and prop analysis. Automated line monitoring and value alert system.',
     },
+    {
+      name: 'Gameday Insights',
+      url:  'https://new.gameday-insights.com/',
+      emoji: '📊',
+      color: '#38b8f2',
+      summary: 'Real-time MLB game intelligence and daily matchup breakdowns. Pitcher and batter insights to sharpen your pre-game research.',
+    },
+    {
+      name: 'Degenelytics',
+      url:  'https://www.degenelytics.net/',
+      emoji: '🎲',
+      color: '#a855f7',
+      summary: 'Data-driven sports analytics and betting tools. Sharp research and model-based breakdowns for the serious bettor.',
+    },
+    {
+      name: 'BallparkPal',
+      url:  'https://www.ballparkpal.com',
+      emoji: '🏟️',
+      color: '#f5a623',
+      summary: 'Park factor and weather data for every MLB ballpark. Understand how venue and conditions affect HR potential before you pick.',
+    },
   ];
 
   return (
