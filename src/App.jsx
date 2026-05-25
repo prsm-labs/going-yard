@@ -20466,6 +20466,7 @@ function StreaksTab() {
     { key:'hit',  label:'1+ Hit',     emoji:'⚾', test: g => (g.h||0)   >= 1 },
     { key:'2tb',  label:'2+ Bases',   emoji:'🎯', test: g => (g.totalBases||0) >= 2 },
     { key:'2b',   label:'2B',         emoji:'⚡', test: g => (g.doubles||0) >= 1 },
+    { key:'rbi',  label:'1+ RBI',     emoji:'🏃', test: g => (g.rbi||0) >= 1 },
   ];
 
   const cat = CATS.find(c => c.key === category);
