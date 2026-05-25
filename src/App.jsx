@@ -20229,30 +20229,18 @@ function ContactSlideout({ onClose }) {
   const [from_,   setFrom]       = useState('');
   const [subject, setSubject]   = useState('');
   const [message, setMessage]   = useState('');
-  const [files,   setFiles]     = useState([]);
   const [sent,    setSent]      = useState(false);
   const [sending, setSending]   = useState(false);
-  const fileRef = React.useRef();
-
-  const handleFiles = (e) => {
-    const picked = Array.from(e.target.files||[]).slice(0,3); // max 3 attachments
-    setFiles(prev => [...prev, ...picked].slice(0,3));
-  };
 
   const handleSend = () => {
     // Build mailto link — browser opens email client with prefilled fields
     const to      = 'hello@goingyard.app';
     const sub     = encodeURIComponent(subject || 'Going Yard Feedback');
-    const body    = encodeURIComponent(
-      message +
-      (files.length > 0 ? '\n\n[' + files.map(f=>f.name).join(', ') + ' attached — please add manually if needed]' : '')
-    );
+    const body    = encodeURIComponent(message);
     window.open(`mailto:${to}?subject=${sub}&body=${body}`, '_self');
     setSent(true);
     setTimeout(onClose, 1800);
   };
-
-  const removeFile = (i) => setFiles(prev => prev.filter((_,idx)=>idx!==i));
 
   return <>
     <div style={{position:'fixed',top:0,right:0,bottom:0,width:340,zIndex:9999,
@@ -20339,42 +20327,18 @@ function ContactSlideout({ onClose }) {
                 resize:'vertical',boxSizing:'border-box',lineHeight:1.6}}/>
           </div>
 
-          {/* Attachments */}
-          <div>
-            <label style={{fontFamily:mono,fontSize:8,color:'var(--muted)',display:'block',marginBottom:6}}>
-              ATTACHMENTS <span style={{color:'rgba(255,255,255,.3)'}}>· screenshots, images (max 3)</span>
-            </label>
-            <input ref={fileRef} type="file" multiple accept="image/*,.png,.jpg,.jpeg,.webp,.gif"
-              onChange={handleFiles} style={{display:'none'}}/>
-            {files.length < 3 && (
-              <button onClick={()=>fileRef.current?.click()}
-                style={{padding:'7px 12px',borderRadius:6,fontSize:9,cursor:'pointer',fontFamily:mono,
-                  border:'1px dashed var(--border)',color:'var(--muted)',background:'transparent',
-                  width:'100%',textAlign:'center'}}>
-                + Add screenshot or image
-              </button>
-            )}
-            {files.length > 0 && (
-              <div style={{marginTop:6,display:'flex',flexDirection:'column',gap:4}}>
-                {files.map((f,i)=>(
-                  <div key={i} style={{display:'flex',alignItems:'center',gap:8,
-                    padding:'5px 8px',borderRadius:5,background:'var(--surface2)',
-                    border:'1px solid var(--border)'}}>
-                    <span style={{fontSize:10}}>📎</span>
-                    <span style={{fontFamily:mono,fontSize:8,color:'var(--text)',flex:1,
-                      overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{f.name}</span>
-                    <button onClick={()=>removeFile(i)}
-                      style={{background:'transparent',border:'none',color:'var(--muted)',
-                        cursor:'pointer',fontSize:12,padding:'0 2px'}}>✕</button>
-                  </div>
-                ))}
-                {files.length > 0 && (
-                  <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',marginTop:2}}>
-                    Note: your email client will open — attach files there if needed
-                  </div>
-                )}
-              </div>
-            )}
+          {/* Screenshot tip */}
+          <div style={{padding:'8px 12px',borderRadius:6,
+            background:'var(--surface2)',border:'1px solid var(--border)'}}>
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',lineHeight:1.7}}>
+              📎 <strong style={{color:'var(--text)'}}>Want to include a screenshot?</strong>
+              {' '}Email it directly to{' '}
+              <a href="mailto:hello@goingyard.app"
+                style={{color:'var(--accent)',textDecoration:'none',fontWeight:700}}>
+                hello@goingyard.app
+              </a>
+              {' '}and we'll match it to your message.
+            </div>
           </div>
 
           {/* Beta note */}
