@@ -16319,23 +16319,23 @@ function MatchupEngineTab() {
       <div style={{display:'flex',gap:4,flexWrap:'wrap',justifyContent:'center'}}>
         <button style={stBtn('matchups')}   onClick={()=>setSubTab('matchups')}>⚡ Matchups</button>
         <button style={stBtn('allmatches')} onClick={()=>setSubTab('allmatches')}>📋 All Matchups</button>
-        <button style={stBtn('longshot')}   data-tip="🎲 Long Shot — high-odds batters with elite pitcher matchup metrics" onClick={()=>setSubTab('longshot')}>🎲 Long Shot</button>
-        <button style={stBtn('pairs')}      data-tip="🔗 Pairs — correlated batter pairs sharing underlying conditions" onClick={()=>setSubTab('pairs')}>🔗 Pairs</button>
-        <button style={stBtn('cheatsheet')} data-tip="🃏 Cheat Sheet — Top 5 HR, 2+Base, and Hit candidates for today" onClick={()=>setSubTab('cheatsheet')}>🃏 Cheat Sheet</button>
-        <button style={stBtn('streaks')}    data-tip="🔥 Streaks — active hitting, HR, 2TB and 2B streaks for today's batters" onClick={()=>setSubTab('streaks')}>🔥 Streaks</button>
+        <button style={stBtn('longshot')}   data-tip="🎲 Long Shot" onClick={()=>setSubTab('longshot')}>🎲 Long Shot</button>
+        <button style={stBtn('history')}    onClick={()=>setSubTab('history')}>📜 BvP History</button>
       </div>
       {/* Row 2 */}
       <div style={{display:'flex',gap:4,flexWrap:'wrap',justifyContent:'center'}}>
+        <button style={stBtn('cheatsheet')} data-tip="🃏 Cheat Sheet" onClick={()=>setSubTab('cheatsheet')}>🃏 Cheat Sheet</button>
+        <button style={stBtn('streaks')}    data-tip="🔥 Streaks" onClick={()=>setSubTab('streaks')}>🔥 Streaks</button>
+        <button style={stBtn('soclose')}    data-tip="🤏 Close Calls" onClick={()=>setSubTab('soclose')}>🤏 Close Calls</button>
+        <button style={stBtn('pairs')}      data-tip="🔗 Pairs" onClick={()=>setSubTab('pairs')}>🔗 Pairs</button>
+      </div>
+      {/* Row 3 */}
+      <div style={{display:'flex',gap:4,flexWrap:'wrap',justifyContent:'center'}}>
         <button style={stBtn('batters')}   onClick={()=>setSubTab('batters')}>🧢 Batters</button>
         <button style={stBtn('pitchers')}  onClick={()=>setSubTab('pitchers')}>⚾ Pitchers</button>
-        {/* 🆚 BvP Deep Dive — hidden until data pipeline rebuilt */}
-        <button style={stBtn('history')}   onClick={()=>setSubTab('history')}>📜 BvP History</button>
-        <button style={stBtn('soclose')}   data-tip="🤏 Close Calls — batters who nearly went yard yesterday" onClick={()=>setSubTab('soclose')}>🤏 Close Calls</button>
-        {/* 🧠 Sim Lab hidden — key matchup batters via 🔑 filter in All Matchups */}
         <HelpBtn onClick={()=>setShowKMHelp(v=>!v)}/>
       </div>
     </div>
-
     {/* Date slot toggle — only shown for matchups and simlab */}
     {(subTab === 'matchups' || subTab === 'simlab' || subTab === 'allmatches' || subTab === 'longshot') && (
       <div style={{display:'flex',gap:6,marginBottom:14,alignItems:'center'}}>
@@ -17705,9 +17705,8 @@ function DataStatusBadge() {
   }[status] || {dot:"#5a7080",text:"—",tip:""};
 
   return (
-    <div title={cfg.tip + (lastOk ? ` · ${lastOk}` : "")} style={{display:"flex",alignItems:"center",gap:4,padding:"2px 7px",borderRadius:20,background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.08)",cursor:"default"}}>
-      <div style={{width:6,height:6,borderRadius:"50%",background:cfg.dot,boxShadow:status==="live"?`0 0 6px ${cfg.dot}`:"none",animation:status==="live"?"pulse 1.5s ease-in-out infinite":"none"}}/>
-      <span style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:cfg.dot,letterSpacing:.3,textTransform:"uppercase"}}>{cfg.text}</span>
+    <div title={cfg.tip + (lastOk ? ` · ${lastOk}` : "")} style={{display:"flex",alignItems:"center",cursor:"default"}}>
+      <div style={{width:8,height:8,borderRadius:'50%',background:cfg.dot,boxShadow:status==="live"?`0 0 6px ${cfg.dot}`:"none",animation:status==="live"?"pulse 1.5s ease-in-out infinite":"none"}}/>
     </div>
   );
 }
@@ -19907,7 +19906,7 @@ function GameSplitsTab() {
                   <tr>
                     <th style={{padding:'4px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.5,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)',background:'var(--surface2)',position:'sticky',left:0,zIndex:5}}>Team</th>
                     <TTh col="players"      label="Batters"  title="Batters in sample"/>
-                    <TTh col="games"        label="G"        title="Total games"/>
+                    {/* G col hidden - sums player games not team games */}
                     <TTh col="avg"          label="AVG"      title="Team batting average"/>
                     <TTh col="obp"          label="OBP"      title="Team on-base %"/>
                     <TTh col="slg"          label="SLG"      title="Team slugging %"/>
@@ -19935,7 +19934,7 @@ function GameSplitsTab() {
                           onClick={()=>onBTeamChange(bTeam===r.team?'ALL':r.team)}>{r.team}</span>
                       </td>
                       <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{r.players}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{r.games}</td>
+                      {/* games td hidden */}
                       <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.avg||0)>=.270?'#27c97a':'var(--muted)'}}>{r.avg>0?fmtAvg(r.avg):'—'}</td>
                       <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.obp||0)>=.340?'#27c97a':'var(--muted)'}}>{r.obp>0?fmtAvg(r.obp):'—'}</td>
                       <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.slg||0)>=.450?'#ff8020':'var(--muted)'}}>{r.slg>0?fmtAvg(r.slg):'—'}</td>
@@ -20014,7 +20013,8 @@ function CheatSheetTab({ data }) {
         if (!sp||!sp.g2tb_pct||sp.games<4) return null;  // min 4 games for meaningful sample
         if (INJURY_MAP?.[parseInt(id)||0] && !LINEUP_STATUS?.[parseInt(id)||0]) return null;
         const dp = Object.values(DAILY_PICKS_CACHE).find(r=>String(r.batter_id||'').split('.')[0]===id);
-        return { id, name:p.name||id, team:p.team||'', g2tb:sp.g2tb, g2tb_pct:sp.g2tb_pct, games:sp.games, pitcher:dp?.pitcher||'', pgLabel:dp?._pgLabel||'' };
+        const n2tb=(p.name&&!/^\d+$/.test(p.name))?p.name:getCachedPlayer(parseInt(id)||0)?.name||dp?.batter||p.name;
+        return { id, name:n2tb, team:p.team||dp?.batting_team||'', g2tb:sp.g2tb, g2tb_pct:sp.g2tb_pct, games:sp.games, pitcher:dp?.pitcher||'', pgLabel:dp?._pgLabel||'' };
       })
       .filter(Boolean)
       .sort((a,b) => b.g2tb!==a.g2tb ? b.g2tb-a.g2tb : b.g2tb_pct-a.g2tb_pct) // count first, then pct
@@ -20031,7 +20031,8 @@ function CheatSheetTab({ data }) {
         if (!sp||!sp.h_game_pct||sp.games<4) return null;
         if (INJURY_MAP?.[parseInt(id)||0] && !LINEUP_STATUS?.[parseInt(id)||0]) return null;
         const dp = Object.values(DAILY_PICKS_CACHE).find(r=>String(r.batter_id||'').split('.')[0]===id);
-        return { id, name:p.name||id, team:p.team||'', h_game:sp.h_game, h_game_pct:sp.h_game_pct, avg:sp.avg, games:sp.games, pitcher:dp?.pitcher||'', pgLabel:dp?._pgLabel||'' };
+        const nhit=(p.name&&!/^\d+$/.test(p.name))?p.name:getCachedPlayer(parseInt(id)||0)?.name||dp?.batter||p.name;
+        return { id, name:nhit, team:p.team||dp?.batting_team||'', h_game:sp.h_game, h_game_pct:sp.h_game_pct, avg:sp.avg, games:sp.games, pitcher:dp?.pitcher||'', pgLabel:dp?._pgLabel||'' };
       })
       .filter(Boolean)
       .sort((a,b) => b.h_game!==a.h_game ? b.h_game-a.h_game : b.h_game_pct-a.h_game_pct)
@@ -20381,11 +20382,10 @@ function ContactSlideout({ onClose }) {
 
           {/* Open in email app — secondary option */}
           <button onClick={handleSend}
-            disabled={!message.trim()}
-            style={{padding:'10px',borderRadius:8,fontSize:11,cursor:message.trim()?'pointer':'not-allowed',
+            style={{padding:'10px',borderRadius:8,fontSize:11,cursor:'pointer',
               fontFamily:mono,fontWeight:400,
               background:'transparent',border:'1px solid var(--border)',
-              color:'var(--muted)',opacity:message.trim()?1:.5}}>
+              color:'var(--muted)'}}>
             ✉️ Open in Email App instead
           </button>
         </div>
@@ -20675,7 +20675,7 @@ export default function App() {
       <header className="header">
         <div style={{display:"flex",flexDirection:"column",gap:0}}>
           <div style={{display:'flex',alignItems:'center',gap:8}}>
-            <div className="logo" style={{fontSize:14}}><div className="logo-dot"/><img src="/icon-192.png" alt="Going Yard" style={{width:16,height:16,borderRadius:3,objectFit:"cover",flexShrink:0,verticalAlign:"middle"}}/> <span>GOING</span> YARD</div>
+            <div className="logo" style={{fontSize:14}}><img src="/icon-192.png" alt="Going Yard" style={{width:16,height:16,borderRadius:3,objectFit:"cover",flexShrink:0,verticalAlign:"middle"}}/> <span>GOING</span> YARD</div>
             <NotifyBell/>
           </div>
           <div className="landscape-hint" style={{fontSize:8,color:"var(--muted)",fontFamily:"'DM Mono',monospace",letterSpacing:.3,paddingLeft:2,lineHeight:1}}>📱↔️ Rotate to landscape</div>
