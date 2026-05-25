@@ -1794,7 +1794,7 @@ function MatchupCard({ dp }) {
     const hh  = parseFloat(dp.pitcher_hh_pct_allowed)||0;
     const mb  = parseFloat(dp.pitcher_meatball_pct)||0;
     if (brl >= 9  || (hh >= 35 && mb >= 55)) return '🎯 Target';
-    if (brl >= 6  || hh >= 30)               return '💥 Hittable';
+    if (brl >= 5.5|| hh >= 28)               return '💥 Hittable'; // was 6%/30% — tightened (Average anomaly: borderline pitchers pulled into Hittable)
     if (brl <= 2  && hh <= 22 && mb <= 45)   return '‼️ Elite';
     if (brl <= 3  && hh <= 24)               return '⚠️ Tough';
     return '🤔 Average';
@@ -1864,7 +1864,7 @@ function MatchupCard({ dp }) {
       <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
         <div style={{display:'flex',gap:6,minWidth:'max-content',paddingBottom:4}}>
           {[
-            ['🎯 Yard', sig>0||boom>0?(()=>{const ys=computeYardScore(sig,parseFloat(dp.gHR)||0,boom,parseFloat(dp.ps_score)||0);return ys>0?ys:'—';})():'—', (()=>{const ys=computeYardScore(sig,parseFloat(dp.gHR)||0,boom,parseFloat(dp.ps_score)||0);return ys>=75?'#ffd700':ys>=60?'#ff4020':ys>=45?'#f5a623':'var(--muted)';})()],
+            ['🎯 Yard', sig>0||boom>0?(()=>{const ys=computeYardScore(sig,parseFloat(dp.gHR)||0,boom,parseFloat(dp.ps_score)||0);return ys>0?ys:'—';})():'—', (()=>{const ys=computeYardScore(sig,parseFloat(dp.gHR)||0,boom,parseFloat(dp.ps_score)||0);return ys>=32?'#ffd700':ys>=24?'#ff4020':ys>=18?'#f5a623':'var(--muted)';})()],
             ['💥 Boom', boom>0?Math.round(boom):'—', boomColor],
             ['⚡️ PS', (parseFloat(dp.ps_score)||0)>=1?Math.round(parseFloat(dp.ps_score)):'—', (parseFloat(dp.ps_score)||0)>=75?'#a855f7':(parseFloat(dp.ps_score)||0)>=60?'#ff4020':'var(--muted)'],
             ['⚡ Sig',  sig>0?sig:'—',               sigColor],
@@ -4517,11 +4517,25 @@ function LRow({b, rank}) {
       <PlayerAvatar pid={b.id} name={b.name} size={30} border={"1.5px solid "+vc+"60"}/>
       <div className="li">
         <div style={{display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>
-          {b.grade && isKeyMatchup(b.id) && <span style={{padding:'1px 6px',borderRadius:4,fontSize:9,fontWeight:800,
-            fontFamily:"'Oswald',sans-serif",letterSpacing:.5,
-            background:vc+'18',border:'1px solid '+vc+'40',color:vc,flexShrink:0}}>
-            {b.grade}
-          </span>}
+          {b.grade && isKeyMatchup(b.id) && (() => {
+            const dp = DAILY_PICKS_CACHE[String(b.id)];
+            const effGrade = computeEffectiveGrade(b.grade, dp?._pgLabel || '');
+            const gc = GRADE_CFG[effGrade] || GRADE_CFG['D'];
+            const isHighVar = (b.formClass==='Worm'||b.formClass==='Whiff'||dp?._formClass==='Worm'||dp?._formClass==='Whiff') && (parseFloat(dp?.gHR)||0) < 15;
+            return <>
+              <span title={`Effective Grade: ${effGrade} (Batter: ${b.grade} × Pitcher context)`}
+                style={{padding:'1px 6px',borderRadius:4,fontSize:9,fontWeight:800,
+                fontFamily:"'Oswald',sans-serif",letterSpacing:.5,
+                background:gc.bg,border:`1px solid ${gc.border}`,color:gc.color,flexShrink:0}}>
+                {effGrade}
+              </span>
+              {isHighVar && <span title="⚡ High Variance — limited MLB track record, score less reliable"
+                style={{padding:'1px 4px',borderRadius:4,fontSize:9,fontWeight:700,
+                background:'rgba(168,85,247,.15)',color:'#a855f7',border:'1px solid rgba(168,85,247,.3)',flexShrink:0}}>
+                ⚡HV
+              </span>}
+            </>;
+          })()}
           {LINEUP_STATUS[b.id]?.status === 'confirmed' && (
             <span style={{fontSize:10,flexShrink:0}} title="Confirmed in lineup" data-tip="✅ Confirmed in today's lineup">✅</span>
           )}
@@ -8199,8 +8213,18 @@ function hrYesterday(bid) {
 const isKeyMatchup = (pid, name) => {
   // Only valid for today — stale data from a previous day is ignored
   if (KEY_MATCHUP_DATE !== getETDateStr()) return false;
+  // Primary: engine-designated (daily_summary.csv)
   if (pid && KEY_MATCHUP_BATTER_IDS.has(String(parseInt(pid)||pid))) return true;
   if (name && KEY_MATCHUP_BATTER_NAMES.has(String(name).toLowerCase().trim())) return true;
+  // Secondary expansion: Sig ≥ 4 is a standalone qualifier (data: Sig≥4 → 8.5-8.9% HR rate)
+  // and Yard Score ≥ 20 (lowered from prior threshold — 20-25 bucket = 9.8% HR rate)
+  const cache = pid ? DAILY_PICKS_CACHE[String(parseInt(pid)||pid)] : null;
+  if (cache) {
+    const sig  = parseFloat(cache._trackerSig || cache.weighted_flag_score * 4.6) || 0;
+    const yard = parseFloat(cache._yard) || 0;
+    if (sig >= 4)   return true;
+    if (yard >= 20) return true;
+  }
   return false;
 };
 const KEY_MATCHUP_STYLE = {color:'#ff8020',fontWeight:700}; // orange like "Heating Up"
@@ -9897,41 +9921,111 @@ function FormBadge({ formKey }) {
 
 // ── Boom Score — final composite HR probability (0–99) ───────────────────────
 // Combines 5 independent signal axes. Each measures something different:
+// ── HPE Helper: gHR Taper ────────────────────────────────────────────────────
+// Data shows HR rate peaks at gHR 25-30 then declines. Raw gHR over-credits
+// elite power profiles. Apply diminishing returns above 20 so a gHR=60 batter
+// doesn't score 3× better than gHR=20 when actual HR rates are only ~1.5× apart.
+function taperGHR(ghr) {
+  const g = parseFloat(ghr) || 0;
+  if (g <= 20) return g;                          // linear up to 20
+  if (g <= 30) return 20 + (g - 20) * 0.70;      // mild taper 20–30
+  return 27 + Math.sqrt(Math.max(0, g - 30)) * 2.5; // strong taper above 30
+  // gHR=20→20  gHR=25→23.5  gHR=30→27  gHR=40→32.9  gHR=50→37.1  gHR=60→40.6
+}
+
+// ── HPE Helper: Zone Fit Non-Linear ─────────────────────────────────────────
+// zone_fit is a continuous 0–15+ float from the engine (pitcher_mb_rate × batter_mb_hr_rate × 100).
+// Correct bucketed HR rates from 3,375 scored matchups:
+//   ZF=0:    2.4%  | ZF 0-1:  5.1%  | ZF 1-3:  6.7%
+//   ZF 3-5:  9.0%  | ZF 4-5: 11.2%  | ZF 5-6: 14.8% ← PEAK
+//   ZF 6-8:  7.4%  | ZF 8+:   2.8%  ← cliff
+// Shape: bell curve peaking 4-6, not linear. Clips at both ends.
+function zoneFitScore(zf) {
+  const z = parseFloat(zf) || 0;
+  if (z <= 0)   return 0;                            // no overlap → 2.4% rate → 0 pts
+  if (z <= 1)   return Math.round(z * 25);           // 0-1: ramp to 25
+  if (z <= 3)   return Math.round(25 + (z-1) * 15); // 1-3: ramp 25→55
+  if (z <= 5)   return Math.round(55 + (z-3) * 20); // 3-5: ramp 55→95 (peak zone)
+  if (z <= 6)   return 100;                          // 5-6: peak — 14.8% HR rate
+  if (z <= 8)   return Math.round(100 - (z-6) * 25);// 6-8: taper 100→50
+  return Math.max(0, Math.round(50 - (z-8) * 10));  // 8+: strong taper, hits 0 at ~13
+}
+
+// ── HPE Helper: Effective Matchup Grade ─────────────────────────────────────
+// Fixes the Grade Paradox: Grade A vs an Elite pitcher is NOT a good matchup.
+// Cross-references batter grade × pitcher grade → context-aware effective grade.
+// Data: Grade A/A+ alone produces only 6.2% HR rate; C produces 7.7%.
+// The paradox disappears when pitcher context is applied.
+function computeEffectiveGrade(batterGrade, pgLabel) {
+  const bg = (batterGrade || 'D').trim();
+  const pg = (pgLabel || '').toLowerCase();
+  const isElite    = pg.includes('elite');
+  const isTough    = pg.includes('tough');
+  const isAverage  = pg.includes('average');
+  const isHittable = pg.includes('hittable');
+  const isTarget   = pg.includes('target');
+  // Matrix: rows = batter grade, cols = pitcher grade
+  const matrix = {
+    'A+': { elite:'C', tough:'B', average:'A', hittable:'A+', target:'A+', other:'A' },
+    'A':  { elite:'C', tough:'C', average:'B', hittable:'A',  target:'A',  other:'B' },
+    'B':  { elite:'D', tough:'D', average:'C', hittable:'B',  target:'B',  other:'C' },
+    'C':  { elite:'D', tough:'D', average:'C', hittable:'C',  target:'B',  other:'C' },
+    'D':  { elite:'D', tough:'D', average:'D', hittable:'D',  target:'C',  other:'D' },
+  };
+  const row = matrix[bg] || matrix['D'];
+  if (isElite)    return row.elite;
+  if (isTough)    return row.tough;
+  if (isAverage)  return row.average;
+  if (isHittable) return row.hittable;
+  if (isTarget)   return row.target;
+  return row.other;
+}
+
+// ── Boom Score ───────────────────────────────────────────────────────────────
 //   Sig(0-14)    → calibrated HR signal stack (EV/LA/barrel/pitcher/park/etc)
-//   ZoneFit(%)   → spatial pitcher/batter zone overlap
+//   ZoneFit      → spatial pitcher/batter zone overlap (non-linear, data-verified)
 //   ISO(0-0.4+)  → raw isolated power profile
 //   SimTB(0-3.5) → full-game simulation output
 //   Score(0-3)   → 5-window flag-based engine grade
-// Higher = more signals aligned. 70+ = all systems go.
+// Rebalanced: Zone Fit elevated (30%, non-linear) | Sig(30%) | SimTB(20%) | ISO(15%) | Engine(5%)
+// Zone Fit is now primary — ZF≥3 predicts 10-30% HR rates vs 2.4% at ZF=0.
 function computeBoomScore(sig, zoneFit, iso, simTB, engineScore) {
-  const s  = Math.min(35, (parseFloat(sig)         || 0) / 14   * 35);
-  const zf = Math.min(20, (parseFloat(zoneFit)      || 0) / 20  * 20);
-  const is = Math.min(20, (parseFloat(iso)          || 0) / 0.40 * 20);
-  const tb = Math.min(15, (parseFloat(simTB)        || 0) / 3.5 * 15);
-  const es = Math.min(10, (parseFloat(engineScore)  || 0) / 3.0 * 10);
-  return Math.min(99, Math.round(s + zf + is + tb + es));
+  const zfRaw = zoneFitScore(parseFloat(zoneFit) || 0);   // non-linear 0–100
+  const zf = zfRaw * 0.30;                                 // 30% weight, max contrib 30
+  const s  = Math.min(30, (parseFloat(sig)        || 0) / 14  * 30);   // 30%
+  const tb = Math.min(20, (parseFloat(simTB)      || 0) / 3.5 * 20);   // 20%
+  const is = Math.min(15, (parseFloat(iso)        || 0) / 0.40 * 15);  // 15%
+  const es = Math.min(5,  (parseFloat(engineScore)|| 0) / 3.0 * 5);    //  5%
+  return Math.min(99, Math.round(zf + s + tb + is + es));
 }
 
-
+// ── Yard Score ───────────────────────────────────────────────────────────────
+// Rebalanced weights (data-driven, May 2026):
+//   Boom(35%) + PS(25%) + Sig direct(20%) + gHR tapered(20%)
+// Key changes vs prior formula:
+//   • Sig weight doubled (10%→20%): cleanest linear predictor in the dataset
+//   • gHR now tapered: diminishing returns above 25-30 match actual HR rate curve
+//   • Boom elevated: now contains Zone Fit non-linear, a stronger situational signal
+//   • PS trimmed slightly: BvP deltas are real but modest (+1.7 EV, +0.3 barrel)
+// Sweet spot target: 20–34 range should produce 9-11% HR rates consistently.
 function computeYardScore(sig, ghr, boom, ps) {
-  // Yard Score: weighted composite — batter-centric rebalance
-  // gHR 30% | PS 30% | Boom 30% | Sig 10%
-  // gHR raised (pure batter quality, pitcher-independent)
-  // Boom lowered (was double-counting pitcher penalty via Sig feed)
-  const sigN = (Math.min(14, Math.max(0, parseFloat(sig)||0)) / 14) * 100;
-  const raw  = (parseFloat(boom)||0) * 0.30
-             + (parseFloat(ps)  ||0) * 0.30
-             + (parseFloat(ghr) ||0) * 0.30
-             + sigN                  * 0.10;
+  const sigN   = (Math.min(14, Math.max(0, parseFloat(sig) || 0)) / 14) * 100;
+  const ghrT   = taperGHR(parseFloat(ghr) || 0);   // tapered gHR, not raw
+  const raw    = (parseFloat(boom) || 0) * 0.35
+               + (parseFloat(ps)   || 0) * 0.25
+               + sigN                    * 0.20
+               + ghrT                    * 0.20;
   return Math.min(99, Math.max(0, Math.round(raw)));
 }
 
 function YardBadge({ score }) {
   if (!score || score < 1) return null;
-  const bg  = score>=75?'rgba(255,215,0,.22)':score>=60?'rgba(255,64,32,.18)':score>=45?'rgba(245,166,35,.15)':score>=20?'rgba(210,180,140,.15)':'rgba(255,255,255,.04)';
-  const col = score>=75?'#ffd700':score>=60?'#ff4020':score>=45?'#f5a623':score>=20?'#c4a882':'var(--muted)';
+  // Thresholds recalibrated to new sweet spot (data: 20-34 = 9-11% HR rate)
+  // 32+ = Elite tier (target ~12-15%), 24+ = High, 18+ = Mid, 13+ = Watch, <13 = Noise
+  const bg  = score>=32?'rgba(255,215,0,.22)':score>=24?'rgba(255,64,32,.18)':score>=18?'rgba(245,166,35,.15)':score>=13?'rgba(210,180,140,.15)':'rgba(255,255,255,.04)';
+  const col = score>=32?'#ffd700':score>=24?'#ff4020':score>=18?'#f5a623':score>=13?'#c4a882':'var(--muted)';
   return (
-    <span title={`Yard Score: ${score} — Boom(35%) + PS(30%) + gHR(25%) + Sig(10%)`}
+    <span title={`Yard Score: ${score} — Boom(35%) + PS(25%) + Sig(20%) + gHR tapered(20%) · Sweet spot: 20–34`}
       style={{display:'inline-block',padding:'1px 5px',borderRadius:4,
         fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:10,
         background:bg,color:col,whiteSpace:'nowrap',cursor:'default'}}>
@@ -10311,7 +10405,17 @@ function LongShotView({ data }) {
                     <td style={{padding:'2px 4px',textAlign:'center',verticalAlign:'middle'}}>
                       <FormBadge formKey={b._formClass}/>
                     </td>
-                    <td style={{padding:'2px 6px',textAlign:'center',fontFamily:osw,fontWeight:800,fontSize:10,color:b.grade==='C'?'var(--muted)':'rgba(232,65,26,.8)'}}>{b.grade}</td>
+                    <td style={{padding:'2px 6px',textAlign:'center',fontFamily:osw,fontWeight:800,fontSize:10}}>
+                      {(() => {
+                        const effG = computeEffectiveGrade(b.grade, b._pgLabel || '');
+                        const gc   = GRADE_CFG[effG] || GRADE_CFG['D'];
+                        const isHV = (b._formClass==='Worm'||b._formClass==='Whiff') && (parseFloat(b.gHR)||0) < 15;
+                        return <span title={`Effective Grade: ${effG} (Batter: ${b.grade||'?'} × ${b._pgLabel||'No pitcher grade'})`}
+                          style={{color:gc.color,cursor:'default'}}>
+                          {effG}{isHV?' ⚡':''}
+                        </span>;
+                      })()}
+                    </td>
                     <td style={{padding:'2px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',whiteSpace:'nowrap',maxWidth:100,overflow:'hidden',textOverflow:'ellipsis'}}>{b.pitcher||'—'}</td>
                     <td style={{padding:'2px 6px',textAlign:'right'}}>
                       <span style={{fontFamily:osw,fontWeight:800,fontSize:11,color:tbColor(b._simTB)}}>{b._simTB.toFixed(2)}</span>
@@ -10915,7 +11019,8 @@ function SimLabView({ data }) {
                   const rbi = parseFloat(b.proj_avg_rbi) || 0;
 
                   const hitColor = hitP >= 35 ? '#27c97a' : hitP >= 28 ? '#f5a623' : 'var(--text)';
-                  const gc = GRADE_CFG[b.grade] || GRADE_CFG['D'];
+                  const _effGradeKM = computeEffectiveGrade(b.grade, b._pgLabel || '');
+                  const gc = GRADE_CFG[_effGradeKM] || GRADE_CFG['D'];
                   // ── Tracker ⚡ Sig — v5 calibrated (241k PAs · 7,322 HRs) ──
                   const _simTBv  = parseFloat(b.sim_tb)||0;
                   const _bvpFBv  = parseFloat(b.bvp_fb_pct)||0;
@@ -11204,7 +11309,8 @@ function SimLabView({ data }) {
             const hitP = pctRaw(b.proj_hit_prob);
             const xbhP = pctRaw(b.proj_xbh_prob);
             const tb = parseFloat(b.sim_tb) || 0;
-            const gc = GRADE_CFG[b.grade] || GRADE_CFG['D'];
+            const gc = GRADE_CFG[computeEffectiveGrade(b.grade, b._pgLabel || '')] || GRADE_CFG['D'];
+            const _effGradeSimLab = computeEffectiveGrade(b.grade, b._pgLabel || '');
             const inSlump = b.in_slump === 'True' || b.in_slump === true;
             const isDiamond = b.is_diamond === 'True' || b.is_diamond === true;
             const hf = parseFloat(b.hr_factor) || 1.0;
@@ -11219,7 +11325,7 @@ function SimLabView({ data }) {
                         <PlayerAvatar pid={parseInt(b.batter_id)||0} name={b.batter} size={40}/>
                         <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 22, color: 'var(--text)' }}>{b.batter}</span>
                         <SavantLink pid={parseInt(b.batter_id)||0} type="batter"/>
-                        {!INJURY_MAP[String(parseInt(b.batter_id)||0)] && <span style={{ padding: '3px 9px', borderRadius: 6, fontSize: 11, fontFamily: "'Oswald',sans-serif", fontWeight: 800, background: gc.bg, color: gc.color, border: `1px solid ${gc.border}` }}>{b.grade}</span>}
+                        {!INJURY_MAP[String(parseInt(b.batter_id)||0)] && <span title={`Effective Grade: ${_effGradeSimLab} (Batter: ${b.grade||'?'} × Pitcher context)`} style={{ padding: '3px 9px', borderRadius: 6, fontSize: 11, fontFamily: "'Oswald',sans-serif", fontWeight: 800, background: gc.bg, color: gc.color, border: `1px solid ${gc.border}` }}>{_effGradeSimLab}</span>}
                         <InjuryBadge pid={parseInt(b.batter_id)||0} name={b.batter}/>
                         <PickButton pid={parseInt(b.batter_id)||0} name={b.batter} team={b.batting_team}/>
                         {isDiamond && <span style={{ padding: '2px 8px', borderRadius: 5, fontSize: 10, fontWeight: 700, background: 'rgba(255,204,0,.15)', color: '#ffcc00', border: '1px solid rgba(255,204,0,.35)' }}>💎 Diamond Pick</span>}
@@ -11485,7 +11591,8 @@ function SimLabView({ data }) {
                     const hrP  = toDecimal(b.proj_hr_adj);
                     const hitP = toDecimal(b.proj_hit_prob);
                     const tb   = parseFloat(b.proj_avg_tb) || 0;
-                    const gc   = GRADE_CFG[b.grade] || GRADE_CFG['D'];
+                    const _effGradeSL = computeEffectiveGrade(b.grade, b._pgLabel || '');
+                    const gc   = GRADE_CFG[_effGradeSL] || GRADE_CFG['D'];
 
                     const Cell = ({ pass, val }) => {
                       const col = pass ? '#27c97a' : '#38b8f2';
@@ -11536,7 +11643,7 @@ function SimLabView({ data }) {
                         <Cell pass={tb >= 1.0}    val={tb.toFixed(2)} />
                         <Cell pass={tb >= 1.5}    val={tb.toFixed(2)} />
                         <td style={{ textAlign: 'center' }}>
-                          <span style={{ padding: '2px 7px', borderRadius: 5, fontSize: 10, fontFamily: "'Oswald',sans-serif", fontWeight: 800, background: gc.bg, color: gc.color, border: `1px solid ${gc.border}` }}>{b.grade}</span>
+                          <span title={`Effective Grade: ${_effGradeSL} (Batter: ${b.grade||'?'} × Pitcher context)`} style={{ padding: '2px 7px', borderRadius: 5, fontSize: 10, fontFamily: "'Oswald',sans-serif", fontWeight: 800, background: gc.bg, color: gc.color, border: `1px solid ${gc.border}` }}>{_effGradeSL}</span>
                         </td>
                       </tr>
                     );
@@ -15013,7 +15120,7 @@ function pitcherTier(b) {
     const hh  = parseFloat(b.pitcher_hh_pct_allowed||0);
     const mb  = parseFloat(b.pitcher_meatball_pct||0);
     if (brl >= 9  || (hh >= 35 && mb >= 55)) return '🎯 Target';
-    if (brl >= 6  || hh >= 30)               return '💥 Hittable';
+    if (brl >= 5.5|| hh >= 28)               return '💥 Hittable'; // was 6%/30% — tightened (Average anomaly: borderline pitchers pulled into Hittable)
     if (brl <= 2  && hh <= 22 && mb <= 45)   return '‼️ Elite';
     if (brl <= 3  && hh <= 24)               return '⚠️ Tough';
     return '🤔 Average';
