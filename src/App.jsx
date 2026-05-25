@@ -2406,11 +2406,19 @@ function Last7HRAllowedChart({ pitcherId }) {
           ))}
         </div>
         <div style={{display:'flex',alignItems:'baseline',gap:8}}>
-          <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--muted)'}}>
-            {allowedGames} of {games.length}
-          </span>
-          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:22,
-            color:pctColor}}>{pct}%</span>
+          {view==='hr' ? <>
+            <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--muted)'}}>
+              {allowedGames} of {games.length}
+            </span>
+            <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:22,
+              color:pctColor}}>{pct}%</span>
+          </> : <>
+            <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)'}}>avg / start</span>
+            <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:22,
+              color:pctColor}}>
+              {(games.reduce((s,g)=>s+getVal(g),0)/Math.max(1,games.length)).toFixed(1)}
+            </span>
+          </>}
         </div>
       </div>
 
@@ -14257,6 +14265,27 @@ function StatsTab() {
           </div>
         </div>
         </div>
+        {/* Full-width pitcher expand panel — StatsTab */}
+        {expandedP && pRows.find(r=>r.id===expandedP) && (()=>{
+          const r = pRows.find(r=>r.id===expandedP);
+          return (
+            <div style={{margin:'4px 0 8px',borderRadius:8,border:'2px solid rgba(56,184,242,.25)',
+              background:'rgba(56,184,242,.04)',padding:'12px 16px'}}>
+              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,
+                paddingBottom:8,borderBottom:'1px solid var(--border)'}}>
+                <PlayerAvatar pid={parseInt(r.id)||0} name={r.name||r.id} size={22}/>
+                <span style={{fontFamily:osw,fontWeight:800,fontSize:13,color:'var(--text)'}}>{r.name||r.id}</span>
+                <span style={{fontFamily:mono,fontSize:9,color:'var(--accent2)'}}>{r.team}</span>
+                <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>{r.hand==='L'?'LHP':'RHP'}{r.role?' · '+r.role:''}</span>
+                <span style={{fontFamily:mono,fontSize:8,color:pgCol(r._pgLabel),marginLeft:8}}>{r._pgLabel||''}</span>
+                <button onClick={()=>setExpandedP(null)}
+                  style={{marginLeft:'auto',background:'transparent',border:'none',
+                    color:'var(--muted)',fontSize:16,cursor:'pointer'}}>✕</button>
+              </div>
+              <Last7HRAllowedChart pitcherId={parseInt(r.id)||0}/>
+            </div>
+          );
+        })()}
       </div>
 
       {/* ══ Separator ════════════════════════════════════════════════════════ */}
