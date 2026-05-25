@@ -2003,7 +2003,8 @@ function AtBatSlideIn() {
   const [player, setPlayer] = useState(null);
   const [atBats, setAtBats] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [apiHr, setApiHr] = useState(null); // correct HR count from MLB Stats API
+  const [apiHr,  setApiHr]  = useState(null);
+  const [risp,   setRisp]   = useState(null); // {avg, obp, slg, ops, pa} // correct HR count from MLB Stats API
   const [bvpData, setBvpData] = useState(null);  // BvP vs today's pitcher
   const [bvpLoading, setBvpLoading] = useState(false);
 
@@ -2085,6 +2086,21 @@ function AtBatSlideIn() {
       })
       .catch(() => {});
 
+    // Fetch RISP splits from statSplits
+    fetch(`https://statsapi.mlb.com/api/v1/people/${player.pid}/stats?stats=statSplits&group=hitting&season=${new Date().getFullYear()}`)
+      .then(r => r.json())
+      .then(d => {
+        const splits = d?.stats?.[0]?.splits || [];
+        const rs = splits.find(s => s.split?.code === 'RISP' || (s.split?.description||'').includes('Scoring Position'));
+        if (rs?.stat) setRisp({
+          avg: rs.stat.avg||'.---', obp: rs.stat.obp||'.---',
+          slg: rs.stat.slg||'.---', ops: rs.stat.ops||'.---',
+          pa:  rs.stat.plateAppearances||0, h: rs.stat.hits||0,
+        });
+      })
+      .catch(() => {});
+
+
     // Fetch real at-bat log from Baseball Savant statcast search
     const today = new Date().toLocaleDateString("en-US",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"}).split("/");
     const dateStr = `${today[2]}-${today[0]}-${today[1]}`;
@@ -2157,6 +2173,32 @@ function AtBatSlideIn() {
           </div>
         </div>
         <PickButton pid={player.pid} name={player.name} team={player.team}/>
+        {/* RISP Stats */}
+        {risp && (
+          <div style={{margin:'8px 0 4px',padding:'8px 12px',borderRadius:7,
+            background:'rgba(245,166,35,.08)',border:'1px solid rgba(245,166,35,.2)'}}>
+            <div style={{fontFamily:mono,fontSize:7,color:'#f5a623',letterSpacing:1,
+              textTransform:'uppercase',marginBottom:5}}>
+              🏃 Runners in Scoring Position · {risp.pa} PA
+            </div>
+            <div style={{display:'flex',gap:14,flexWrap:'wrap'}}>
+              {[['AVG',risp.avg],['OBP',risp.obp],['SLG',risp.slg],['OPS',risp.ops]].map(([lbl,val])=>(
+                <div key={lbl} style={{textAlign:'center'}}>
+                  <div style={{fontFamily:osw,fontWeight:800,fontSize:14,
+                    color:parseFloat(val)>=.300?'#27c97a':parseFloat(val)>=.250?'#f5a623':'var(--text)',
+                    lineHeight:1}}>{val||'.---'}</div>
+                  <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',marginTop:2}}>{lbl}</div>
+                </div>
+              ))}
+              <div style={{textAlign:'center'}}>
+                <div style={{fontFamily:osw,fontWeight:800,fontSize:14,color:'var(--text)',lineHeight:1}}>
+                  {risp.h}
+                </div>
+                <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',marginTop:2}}>H</div>
+              </div>
+            </div>
+          </div>
+        )}
         <button onClick={()=>setPlayer(null)} style={{background:"none",border:"1px solid var(--border)",borderRadius:6,color:"var(--muted)",cursor:"pointer",padding:"5px 10px",fontFamily:"'DM Mono',monospace",fontSize:11}}>✕ Close</button>
       </div>
 
@@ -13067,7 +13109,7 @@ async function fetchGameLog(pid) {
 function Last7HRChart({ batterId }) {
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState('hr'); // 'hr' | '2tb' | '2b'
+  const [view, setView] = useState('hr'); // 'hr' | '2tb' | '2b' | 'rbi'
 
   useEffect(() => {
     if (!batterId) return;
@@ -13085,11 +13127,11 @@ function Last7HRChart({ batterId }) {
   if (games.length === 0) return null;
 
   // Compute for both views — react to pill selection
-  const getValue  = g => view==='2tb'?(g.totalBases||0):view==='2b'?(g.doubles||0):g.hrs;
-  const threshold = view==='2tb'?2:view==='2b'?1:1;
+  const getValue  = g => view==='2tb'?(g.totalBases||0):view==='2b'?(g.doubles||0):view==='rbi'?(g.rbi||0):g.hrs;
+  const threshold = view==='2tb'?2:view==='rbi'?1:view==='2b'?1:1;
   const hitGames  = games.filter(g => getValue(g) >= threshold).length;
   const pct       = Math.round((hitGames / games.length) * 100);
-  const maxVal    = Math.max(view==='2tb'?2:view==='2b'?1:1, ...games.map(g => getValue(g)));
+  const maxVal    = Math.max(view==='2tb'?2:view==='rbi'?1:view==='2b'?1:1, ...games.map(g => getValue(g)));
   const BAR_H     = 120;
   const barColor  = view==='2tb' ? '#27c97a' : '#27c97a';
   const noColor   = view==='2tb' ? 'rgba(255,255,255,.08)' : 'rgba(255,64,32,.15)';
@@ -13102,7 +13144,7 @@ function Last7HRChart({ batterId }) {
       {/* Header with pill toggle */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
         <div style={{display:'flex',gap:3,background:'var(--surface2)',borderRadius:6,padding:2,border:'1px solid var(--border)'}}>
-          {[['hr','💥 HR'],['2tb','🎯 2TB+'],['2b','⚡ 2B']].map(([k,lbl])=>(
+          {[['hr','💥 HR'],['2tb','🎯 2TB+'],['2b','⚡ 2B'],['rbi','🏃 RBI']].map(([k,lbl])=>(
             <button key={k} onClick={()=>setView(k)}
               style={{padding:'3px 9px',borderRadius:4,fontSize:8,fontFamily:"'DM Mono',monospace",
                 cursor:'pointer',border:'none',fontWeight:view===k?700:400,
