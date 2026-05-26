@@ -19520,7 +19520,7 @@ function CrystalBallTab() {
     if (pick.closeCall >= 1)  reasons.push(`${pick.closeCall} close call${pick.closeCall>1?'s':''}`);
     if (pick.bsDelta >= 0.5)  reasons.push(`bat speed +${pick.bsDelta.toFixed(1)}`);
     if (pick.la >= 20 && pick.la <= 34) reasons.push(`${pick.la.toFixed(0)}° LA`);
-    if (pick.zf >= 3)         reasons.push(`zone fit ${pick.zf.toFixed(1)}`);
+    if (pick.zf >= 5)         reasons.push(`zone fit ${pick.zf.toFixed(1)} 🔥`);
     if (pick.pg.includes('Target'))   reasons.push('🎯 Target pitcher');
     if (pick.pg.includes('Hittable')) reasons.push('💥 Hittable pitcher');
     if (!reasons.length)      reasons.push(`yard score ${pick.yard}`);
