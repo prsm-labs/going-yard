@@ -19650,20 +19650,26 @@ function CrystalBallTab() {
                 </div>
                 {/* Player avatar */}
                 <PlayerAvatar pid={parseInt(p.id)||0} size={32}/>
-                {/* Name + team */}
-                <div style={{flex:1,minWidth:0}}>
+                {/* Name + team — clickable to open slideout */}
+                <div style={{flex:1,minWidth:0,cursor:'pointer'}}
+                  onClick={()=>{const cp=getCachedPlayer(parseInt(p.id)||0)||{};openAtBatSlide({pid:parseInt(p.id)||0,name:p.name,team:p.team,avgEV:cp.avgEV,barrel:cp.barrel,hardHit:cp.hardHit,flyBall:cp.flyBall,hr:cp.hr,avg:cp.avg,obp:cp.obp,slg:cp.slg,xwoba:cp.xwoba,kPct:cp.kPct,bbPct:cp.bbPct,launchAngle:cp.launchAngle});}}>
                   <div style={{fontFamily:osw,fontSize:15,fontWeight:800,
                     color:'var(--text)',letterSpacing:.5,
-                    whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                    whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',
+                    textDecoration:'underline',textDecorationColor:'rgba(168,85,247,0.4)',
+                    textUnderlineOffset:3}}>
                     {p.name}
                   </div>
                   <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>
                     {p.team}{p.hand?` · ${p.hand}HB`:''}{p.pitcher?` · vs ${p.pitcher}`:''}
                   </div>
                 </div>
-                {/* Scores */}
-                <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:2,flexShrink:0}}>
-                  <YardBadge score={p.yard}/>
+                {/* Scores + pick button */}
+                <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:3,flexShrink:0}}>
+                  <div style={{display:'flex',alignItems:'center',gap:4}}>
+                    <YardBadge score={p.yard}/>
+                    <PickButton pid={parseInt(p.id)||0} name={p.name} team={p.team}/>
+                  </div>
                   {p.effGrade && p.effGrade !== 'D' && (
                     <span style={{fontFamily:osw,fontSize:9,fontWeight:800,
                       color:gradeColor(p.effGrade)}}>
