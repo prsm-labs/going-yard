@@ -13771,18 +13771,9 @@ function StatsTab() {
   const [showHelp,    setShowHelp]    = useState(false);
   const [selMatchup,  setSelMatchup]  = useState('');
   const [lineupVer,   setLineupVer]   = useState(0);
+  // ── Shared cross-tab filters: pTeam/bTeam/window/selMatchup are the single
+  // source of truth for both Splits and Game sub-pages (passed as props to GameSplitsTab)
   const autoLinkRef = React.useRef(false); // prevent circular team auto-link
-  useEffect(() => {
-    const id = setInterval(() => {
-      if (DAILY_PICKS_CACHE && Object.keys(DAILY_PICKS_CACHE).length > 0) {
-        setLineupVer(v => v + 1);
-        clearInterval(id);
-      }
-    }, 500);
-    return () => clearInterval(id);
-  }, []);
-
-  // Auto-link: when pitcher team changes, set batter team to opponent (and vice versa)
   const onPTeamChange = (team) => {
     setPTeam(team);
     if (team === 'ALL' || autoLinkRef.current) return;
@@ -14193,7 +14184,15 @@ function StatsTab() {
         ))}
       </div>
 
-      <div style={{display:splitsSubTab==='gamelog'?'block':'none'}}><GameSplitsTab/></div>
+      <div style={{display:splitsSubTab==='gamelog'?'block':'none'}}>
+        <GameSplitsTab
+          window={window}           setWindow={setWindow}
+          selMatchup={selMatchup}   setSelMatchup={setSelMatchup}
+          pTeam={pTeam}             onPTeamChange={onPTeamChange}
+          bTeam={bTeam}             onBTeamChange={onBTeamChange}
+          matchupList={matchupList}
+        />
+      </div>
       <div style={{display:splitsSubTab==='splits'?'block':'none'}}>
 
       {/* ── Shared window selector ───────────────────────────────────────────── */}
@@ -19371,13 +19370,14 @@ async function loadGameSplitsData() {
   return { batters: BATTER_GAME_SPLITS, pitchers: PITCHER_GAME_SPLITS };
 }
 
-function GameSplitsTab() {
+function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, onPTeamChange, bTeam, onBTeamChange, matchupList }) {
   const mono = "'DM Mono',monospace";
   const osw  = "'Oswald',sans-serif";
 
   // ── Shared state (mirrors StatsTab) ──────────────────────────────────────
-  const [window,         setWindow]         = useState('L15');
-  const [selMatchup,     setSelMatchup]     = useState('');
+  // window, selMatchup, pTeam, bTeam, matchupList, onPTeamChange, onBTeamChange
+  // are all passed as props from StatsTab — they are the single source of truth
+  // shared between the Splits and Game sub-pages.
   const [sharedPHand,    setSharedPHand]    = useState('');
   const [sharedBHand,    setSharedBHand]    = useState('');
   const [sharedLoc,      setSharedLoc]      = useState('');
@@ -19389,7 +19389,7 @@ function GameSplitsTab() {
   const [pSortBy,        setPSortBy]        = useState('hr_per9');
   const [pSortDir,       setPSortDir]       = useState(-1);
   const [pSearch,        setPSearch]        = useState('');
-  const [pTeam,          setPTeam]          = useState('ALL');
+  // pTeam comes from props (shared with Splits page)
   const [pMinBF,         setPMinBF]         = useState(2);
   const [pRoleFilter,    setPRoleFilter]    = useState('');
   const [pPgFilter,      setPPgFilter]      = useState([]);
@@ -19401,7 +19401,7 @@ function GameSplitsTab() {
   const [bSortBy,        setBSortBy]        = useState('g2tb_pct');
   const [bSortDir,       setBSortDir]       = useState(-1);
   const [bSearch,        setBSearch]        = useState('');
-  const [bTeam,          setBTeam]          = useState('ALL');
+  // bTeam comes from props (shared with Splits page)
   const [bMinGames,      setBMinGames]      = useState(2);
   const [bHandFilter,    setBHandFilter]    = useState('');
   const [bPgFilter,      setBPgFilter]      = useState([]);
@@ -19433,22 +19433,10 @@ function GameSplitsTab() {
 
   const WIN_LABELS = { L7:'Last 7', L15:'Last 15', L30:'Last 30', season:'2026 Season' };
 
-  // ── Matchup list ──────────────────────────────────────────────────────────
-  const matchupList = React.useMemo(() => {
-    const seen = new Set(), list = [];
-    Object.values(DAILY_PICKS_CACHE||{}).forEach(r => {
-      const home = r.home_team||'', away = r.away_team||r.batting_team||'';
-      if (!r.game_id||!home||!away||home===away) return;
-      const key = `${away}@${home}`;
-      if (!seen.has(key)) { seen.add(key); list.push({key,away,home,time:r.game_time||''}); }
-    });
-    return list.sort((a,b)=>a.time.localeCompare(b.time));
-  }, [lineupVer]);
+  // matchupList, selMatchup, window, pTeam, bTeam, onPTeamChange, onBTeamChange
+  // all come from props — no local duplicates needed.
 
-  React.useEffect(() => {
-    if (matchupList.length > 0 && !selMatchup) setSelMatchup(matchupList[0]?.key||'');
-  }, [matchupList]);
-
+  // ── matchupTeams: derived from prop selMatchup + prop matchupList ─────────
   const matchupTeams = React.useMemo(() => {
     if (!selMatchup) return null;
     const m = matchupList.find(m=>m.key===selMatchup);
@@ -19491,21 +19479,6 @@ function GameSplitsTab() {
     if (sharedDN)  parts.push(sharedDN);
     return parts.join('_')||'overall';
   }, [sharedBHand, sharedLoc, sharedDN]);
-
-  // ── Team auto-link ────────────────────────────────────────────────────────
-  const autoLinkRef = React.useRef(false);
-  const onPTeamChange = (team) => {
-    setPTeam(team);
-    if (team==='ALL'||autoLinkRef.current) return;
-    const game = matchupList.find(m=>m.home===team||m.away===team);
-    if (game) { autoLinkRef.current=true; setBTeam(game.home===team?game.away:game.home); setTimeout(()=>autoLinkRef.current=false,50); }
-  };
-  const onBTeamChange = (team) => {
-    setBTeam(team);
-    if (team==='ALL'||autoLinkRef.current) return;
-    const game = matchupList.find(m=>m.home===team||m.away===team);
-    if (game) { autoLinkRef.current=true; setPTeam(game.home===team?game.away:game.home); setTimeout(()=>autoLinkRef.current=false,50); }
-  };
 
   // ── Auto-sort pitchers on pitch group change ──────────────────────────────
   React.useEffect(() => {
@@ -19733,20 +19706,20 @@ function GameSplitsTab() {
             </button>
           ))}
         </div>
-        <select value={selMatchup} onChange={e=>{setSelMatchup(e.target.value);setBTeam('ALL');setPTeam('ALL');}}
+        <select value={selMatchup} onChange={e=>{setSelMatchup(e.target.value);onBTeamChange('ALL');onPTeamChange('ALL');}}
           style={{fontFamily:mono,fontSize:9,background:'var(--surface2)',color:selMatchup?'var(--text)':'var(--muted)',
             border:`1px solid ${selMatchup?'var(--accent)':'var(--border)'}`,borderRadius:6,
             padding:'4px 10px',cursor:'pointer',fontWeight:selMatchup?700:400,maxWidth:180,minWidth:0,flex:'1 1 120px'}}>
           <option value=''>All Matchups</option>
           {matchupList.map(m=><option key={m.key} value={m.key}>{m.away} @ {m.home}{m.time?' · '+m.time:''}</option>)}
         </select>
-        {selMatchup&&<button onClick={()=>{setSelMatchup('');setBTeam('ALL');setPTeam('ALL');}}
+        {selMatchup&&<button onClick={()=>{setSelMatchup('');onBTeamChange('ALL');onPTeamChange('ALL');}}
           style={{padding:'4px 8px',borderRadius:6,fontSize:9,fontFamily:mono,cursor:'pointer',
             border:'1px solid var(--border)',color:'var(--muted)',background:'transparent'}}>✕</button>}
         <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',whiteSpace:'nowrap',flex:'1 1 auto',textAlign:'right',minWidth:0}}>
           {WIN_LABELS[window]} · {bRows.length}b · {pRows.length}p
         </span>
-        <button onClick={()=>{setWindow('L15');setSelMatchup(matchupList[0]?.key||'');setSharedPHand('');setSharedBHand('');setSharedLoc('');setSharedDN('');setPitchGroup('');setBHandFilter('');setBTeam('ALL');setPTeam('ALL');setBMinGames(2);setPMinBF(2);setPScheduledOnly(true);setBConfirmed(false);setBPicksOnly(false);setBHideInj(false);setBatterCollapsed(false);setPitcherCollapsed(false);setBSearch('');setPSearch('');}}
+        <button onClick={()=>{setWindow('L15');setSelMatchup(matchupList[0]?.key||'');setSharedPHand('');setSharedBHand('');setSharedLoc('');setSharedDN('');setPitchGroup('');setBHandFilter('');onBTeamChange('ALL');onPTeamChange('ALL');setBMinGames(2);setPMinBF(2);setPScheduledOnly(true);setBConfirmed(false);setBPicksOnly(false);setBHideInj(false);setBatterCollapsed(false);setPitcherCollapsed(false);setBSearch('');setPSearch('');}}
           data-tip="Reset all filters to default"
           style={{padding:'3px 8px',borderRadius:6,fontSize:9,cursor:'pointer',fontFamily:mono,border:'1px solid var(--border)',color:'var(--muted)',background:'transparent',flexShrink:0}}>
           ↺ Reset
