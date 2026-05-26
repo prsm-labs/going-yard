@@ -3796,6 +3796,18 @@ async function fetchGames(setL, setG, setE, silent=false) {
     // Update FINAL_GAME_IDS so all 4 tables can filter completed games
     FINAL_GAME_IDS.clear();
     games.forEach(g => { if (g.status === 'Final') FINAL_GAME_IDS.add(String(g.id)); });
+    // Populate PROBABLE_PITCHER_MAP so BvPHistoryTab can fill missing pitcher_ids
+    // keyed by team abbreviation (both sides of each game)
+    games.forEach(g => {
+      if (g.away?.probablePitcherId) {
+        // Away pitcher faces home team batters
+        PROBABLE_PITCHER_MAP[g.home?.abbr] = { id: g.away.probablePitcherId, name: g.away.probablePitcher||'', hand: g.away.pitcherHand||'R', gamePk: g.gamePk };
+      }
+      if (g.home?.probablePitcherId) {
+        // Home pitcher faces away team batters
+        PROBABLE_PITCHER_MAP[g.away?.abbr] = { id: g.home.probablePitcherId, name: g.home.probablePitcher||'', hand: g.home.pitcherHand||'R', gamePk: g.gamePk };
+      }
+    });
     setG(games);
   } catch (e) {
     console.error("fetchGames error:", e.message);
@@ -8215,18 +8227,9 @@ function hrYesterday(bid) {
 const isKeyMatchup = (pid, name) => {
   // Only valid for today — stale data from a previous day is ignored
   if (KEY_MATCHUP_DATE !== getETDateStr()) return false;
-  // Primary: engine-designated (daily_summary.csv)
+  // Primary: engine-designated (daily_summary.csv) — only source of truth
   if (pid && KEY_MATCHUP_BATTER_IDS.has(String(parseInt(pid)||pid))) return true;
   if (name && KEY_MATCHUP_BATTER_NAMES.has(String(name).toLowerCase().trim())) return true;
-  // Secondary expansion: Sig ≥ 4 is a standalone qualifier (data: Sig≥4 → 8.5-8.9% HR rate)
-  // and Yard Score ≥ 20 (lowered from prior threshold — 20-25 bucket = 9.8% HR rate)
-  const cache = pid ? DAILY_PICKS_CACHE[String(parseInt(pid)||pid)] : null;
-  if (cache) {
-    const sig  = parseFloat(cache._trackerSig || cache.weighted_flag_score * 4.6) || 0;
-    const yard = parseFloat(cache._yard) || 0;
-    if (sig >= 4)   return true;
-    if (yard >= 20) return true;
-  }
   return false;
 };
 const KEY_MATCHUP_STYLE = {color:'#ff8020',fontWeight:700}; // orange like "Heating Up"
@@ -8274,6 +8277,9 @@ const DUE_BADGE = (
 const WEATHER_ALERT_GAME_IDS = new Set(); // game_ids with weather concerns at game time
 const DAILY_GAME_MAP    = {}; // keyed by normalized game_id → Set of batting_teams
 const FINAL_GAME_IDS    = new Set(); // game_ids whose status is "Final" — updated by fetchGames
+// Probable pitcher map — populated by fetchGames, used by BvPHistoryTab to fill missing pitcher_ids
+// keyed by team abbreviation → { id, name, hand, gamePk }
+const PROBABLE_PITCHER_MAP = {};
 let _notifyNewHR = null; // callback set by useHRNotifications hook
 
 // Global navigation — lets notifications route to tabs/views without prop drilling
@@ -8806,7 +8812,7 @@ function HRLeaderboardTab() {
   const [statCards, setStatCards] = React.useState({ total:0, longDist:null, longEV:null });
   const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
   const SEASON_START = '2026-03-25';
-  const ABBR = {108:'LAA',109:'AZ',110:'BAL',111:'BOS',112:'CHC',113:'CIN',114:'CLE',115:'COL',116:'DET',117:'HOU',118:'KC',119:'LAD',120:'WSH',121:'NYM',133:'ATH',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',139:'TB',140:'TEX',141:'TOR',142:'MIN',143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL'};
+  const ABBR = {108:'LAA',109:'ARI',110:'BAL',111:'BOS',112:'CHC',113:'CIN',114:'CLE',115:'COL',116:'DET',117:'HOU',118:'KC',119:'LAD',120:'WSH',121:'NYM',133:'ATH',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',139:'TB',140:'TEX',141:'TOR',142:'MIN',143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL'};
 
   React.useEffect(() => {
     const season = new Date().getFullYear();
@@ -9048,7 +9054,7 @@ function HotBatsTab() {
   const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
 
   useEffect(() => {
-    const ABBR={108:'LAA',109:'AZ',110:'BAL',111:'BOS',112:'CHC',113:'CIN',114:'CLE',115:'COL',116:'DET',117:'HOU',118:'KC',119:'LAD',120:'WSH',121:'NYM',133:'ATH',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',139:'TB',140:'TEX',141:'TOR',142:'MIN',143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL'};
+    const ABBR={108:'LAA',109:'ARI',110:'BAL',111:'BOS',112:'CHC',113:'CIN',114:'CLE',115:'COL',116:'DET',117:'HOU',118:'KC',119:'LAD',120:'WSH',121:'NYM',133:'ATH',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',139:'TB',140:'TEX',141:'TOR',142:'MIN',143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL'};
     const season = new Date().getFullYear();
     fetch(`https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&season=${season}&sportId=1&limit=150`)
       .then(r => r.json())
@@ -12027,7 +12033,6 @@ function BvPHistoryTab({ data }) {
   const picks = usePicks();
   const [rows, setRows]           = useState([]); // [{...batter, ...bvpStats}]
   const [loading, setLoading]     = useState(false);
-  const [loaded, setLoaded]       = useState(false);
   const [sortCol, setSortCol]     = useState('hr');
   const [sortDir, setSortDir]     = useState(1);  // 1 with (bn-an) = descending
   const [bvpPicksOnly, setBvpPicksOnly]     = useState(false);
@@ -12039,6 +12044,18 @@ function BvPHistoryTab({ data }) {
   const [minPA, setMinPA]         = useState(1);
   const [search, setSearch]       = useState('');
 
+  // Re-check PROBABLE_PITCHER_MAP after live games load (it populates async after fetchGames)
+  const [ppMapVer, setPPMapVer] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (Object.keys(PROBABLE_PITCHER_MAP).length > 0) {
+        setPPMapVer(v => v + 1);
+        clearInterval(id);
+      }
+    }, 800);
+    return () => clearInterval(id);
+  }, []);
+
   // Build unique batter+pitcher pairs from engine data
   const pairs = useMemo(() => {
     if (!data?.length) return [];
@@ -12046,7 +12063,19 @@ function BvPHistoryTab({ data }) {
     const out = [];
     data.forEach(r => {
       const bid = parseInt(r.batter_id)||0;
-      const pid = parseInt(r.pitcher_id)||0;
+      // Primary: pitcher_id from daily_picks.csv (pipeline)
+      // Fallback: PROBABLE_PITCHER_MAP keyed by batter's team (live API data)
+      let pid = parseInt(r.pitcher_id)||0;
+      let pitcherName = r.pitcher || '—';
+      let pitcherHand = r.pitcher_hand || '?';
+      if (!pid && r.batting_team) {
+        const pp = PROBABLE_PITCHER_MAP[String(r.batting_team).trim()];
+        if (pp?.id) {
+          pid = parseInt(pp.id)||0;
+          pitcherName = pp.name || pitcherName;
+          pitcherHand = pp.hand || pitcherHand;
+        }
+      }
       if (!bid || !pid) return;
       const k = `${bid}_${pid}`;
       if (seen.has(k)) return;
@@ -12062,20 +12091,23 @@ function BvPHistoryTab({ data }) {
         batter:      r.batter      || '—',
         team:        battingTeam,
         opp:         pitcherTeam,
-        pitcher:     r.pitcher     || '—',
-        pitcherHand: r.pitcher_hand || '?',
+        pitcher:     pitcherName,
+        pitcherHand: pitcherHand,
         batterHand:  r.batter_hand  || '',
         grade:       r.grade       || '—',
+        _fromFallback: !r.pitcher_id && !!PROBABLE_PITCHER_MAP[battingTeam], // flag API-sourced pairs
       });
     });
     return out;
-  }, [data]);
+  }, [data, ppMapVer]);
 
-  // Load BvP data when tab first shown
+  // Load BvP data whenever pairs change — uses a ref to avoid double-fetch on strict mode
+  const fetchingRef = React.useRef(false);
   useEffect(() => {
-    if (loaded || !pairs.length) return;
+    if (!pairs.length || fetchingRef.current) return;
+    fetchingRef.current = true;
     setLoading(true);
-    setLoaded(true);
+    setRows([]);
 
     // Fetch in batches of 8 to avoid hammering the API
     // NOTE: rows only set AFTER all batches complete to avoid partial display bug
@@ -12095,9 +12127,10 @@ function BvPHistoryTab({ data }) {
       }
       setRows([...results]); // set ALL at once — no partial display
       setLoading(false);
+      fetchingRef.current = false;
     };
     fetchAll();
-  }, [pairs, loaded]);
+  }, [pairs]);
 
   const handleSort = (col) => {
     if (sortCol === col) setSortDir(d => -d);
@@ -19749,6 +19782,13 @@ function CrystalBallTab() {
                           <span title="✅ Confirmed in today's lineup"
                             style={{fontSize:11,flexShrink:0,lineHeight:1}}>✅</span>
                         )}
+                        {Array.isArray(HR_DATA) && HR_DATA.some(h =>
+                          h.batterId === parseInt(p.id)||0 ||
+                          (h.batterName && h.batterName.toLowerCase() === p.name.toLowerCase())
+                        ) && (
+                          <span title="💥 Gone Yard today"
+                            style={{fontSize:11,flexShrink:0,lineHeight:1}}>💥</span>
+                        )}
                       </div>}
                     </div>
 
@@ -21181,6 +21221,25 @@ function StreaksTab() {
   const [players, setPlayers]   = useState([]);
   const [loading, setLoading]   = useState(true);
   const [teamFilter, setTeamFilter] = useState('ALL');
+  const [selMatchup, setSelMatchup] = useState('');
+
+  // Matchup list from daily picks
+  const matchupList = React.useMemo(() => {
+    const seen = new Set(), list = [];
+    Object.values(DAILY_PICKS_CACHE||{}).forEach(r => {
+      const home = r.home_team||'', away = r.away_team||r.batting_team||'';
+      if (!r.game_id||!home||!away||home===away) return;
+      const key = `${away}@${home}`;
+      if (!seen.has(key)) { seen.add(key); list.push({key,away,home,time:r.game_time||''}); }
+    });
+    return list.sort((a,b)=>a.time.localeCompare(b.time));
+  }, [players]);
+
+  const matchupTeams = React.useMemo(() => {
+    if (!selMatchup) return null;
+    const m = matchupList.find(m => m.key === selMatchup);
+    return m ? new Set([m.away, m.home]) : null;
+  }, [selMatchup, matchupList]);
 
   const CATS = [
     { key:'hr',   label:'1+ HR',      emoji:'💥', test: g => (g.hrs||0) >= 1 },
@@ -21261,6 +21320,7 @@ function StreaksTab() {
   const sorted = React.useMemo(() => {
     return players
       .filter(p => teamFilter === 'ALL' || p.team === teamFilter)
+      .filter(p => !matchupTeams || matchupTeams.has(p.team))
       .map(p => {
         const { streak, boxes } = computeStreak(p.games || [], cat.test, breaksAllowed);
         return { ...p, streak, boxes };
@@ -21268,7 +21328,7 @@ function StreaksTab() {
       .filter(p => p.streak >= 2)
       .sort((a, b) => b.streak - a.streak)
       .slice(0, 20);
-  }, [players, category, breaksAllowed, teamFilter]);
+  }, [players, category, breaksAllowed, teamFilter, matchupTeams]);
 
   const teams = React.useMemo(() => {
     const all = [...new Set(players.map(p=>p.team).filter(Boolean))].sort();
@@ -21327,6 +21387,19 @@ function StreaksTab() {
             padding:'4px 8px',cursor:'pointer'}}>
           {teams.map(t=><option key={t} value={t}>{t==='ALL'?'All Teams':t}</option>)}
         </select>
+        <select value={selMatchup} onChange={e=>{setSelMatchup(e.target.value);setTeamFilter('ALL');}}
+          style={{fontFamily:mono,fontSize:8,background:'var(--surface2)',
+            color:selMatchup?'var(--text)':'var(--muted)',
+            border:`1px solid ${selMatchup?'var(--accent)':'var(--border)'}`,
+            borderRadius:6,padding:'4px 8px',cursor:'pointer',
+            fontWeight:selMatchup?700:400,maxWidth:170}}>
+          <option value=''>All Matchups</option>
+          {matchupList.map(m=><option key={m.key} value={m.key}>{m.away} @ {m.home}{m.time?` · ${m.time}`:''}</option>)}
+        </select>
+        {selMatchup && <button onClick={()=>{setSelMatchup('');setTeamFilter('ALL');}}
+          style={{padding:'3px 7px',borderRadius:6,fontSize:9,cursor:'pointer',
+            border:'1px solid var(--border)',color:'var(--muted)',background:'transparent',
+            fontFamily:mono}}>✕</button>}
       </div>
 
       {/* Legend */}
