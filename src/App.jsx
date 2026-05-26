@@ -13802,11 +13802,21 @@ function StatsTab() {
     const game = matchupList.find(m => m.home===team || m.away===team);
     if (game) { autoLinkRef.current=true; setPTeam(game.home===team?game.away:game.home); setTimeout(()=>autoLinkRef.current=false,50); }
   };
+  // When pitcher selects Home → batters are Away, and vice versa
+  const onPLocChange = (loc) => {
+    setSharedPLoc(loc);
+    setSharedBLoc(loc === 'home' ? 'away' : loc === 'away' ? 'home' : '');
+  };
+  const onBLocChange = (loc) => {
+    setSharedBLoc(loc);
+    setSharedPLoc(loc === 'home' ? 'away' : loc === 'away' ? 'home' : '');
+  };
 
   // ── Shared tandem filters (affect both tables + splits) ─────────────────────
   const [sharedPHand, setSharedPHand] = useState('');  // '' | 'L' | 'R' — pitcher hand → batter vsLHP/vsRHP split
   const [sharedBHand, setSharedBHand] = useState('');  // '' | 'L' | 'R' | 'S' — batter hand → pitcher vsLHB/vsRHB split
-  const [sharedLoc,   setSharedLoc]   = useState('');  // '' | 'home' | 'away'
+  const [sharedPLoc,  setSharedPLoc]  = useState('');  // pitcher location: '' | 'home' | 'away'
+  const [sharedBLoc,  setSharedBLoc]  = useState('');  // batter location: opposite of pitcher
   const [sharedDN,    setSharedDN]    = useState('');  // '' | 'day' | 'night'
 
   // ── Batter-only state ─────────────────────────────────────────────────────────
@@ -13956,20 +13966,20 @@ function StatsTab() {
     const parts = [];
     if (sharedPHand === 'L') parts.push('vsLHP');
     if (sharedPHand === 'R') parts.push('vsRHP');
-    if (sharedLoc)           parts.push(sharedLoc);
+    if (sharedBLoc)          parts.push(sharedBLoc);
     if (sharedDN)            parts.push(sharedDN);
     return parts.join('_') || 'overall';
-  }, [sharedPHand, sharedLoc, sharedDN, pitchGroup]);
+  }, [sharedPHand, sharedBLoc, sharedDN, pitchGroup]);
 
   // Pitcher split key: batter hand sets vs-hand
   const pSplitKey = React.useMemo(() => {
     const parts = [];
     if (sharedBHand === 'L') parts.push('vsLHB');
     if (sharedBHand === 'R') parts.push('vsRHB');
-    if (sharedLoc)           parts.push(sharedLoc);
+    if (sharedPLoc)          parts.push(sharedPLoc);
     if (sharedDN)            parts.push(sharedDN);
     return parts.join('_') || 'overall';
-  }, [sharedBHand, sharedLoc, sharedDN]);
+  }, [sharedBHand, sharedPLoc, sharedDN]);
 
   // ── Teams ──────────────────────────────────────────────────────────────────────
   const bTeams = React.useMemo(() => { const all=['ALL',...new Set(Object.values(data.batters||{}).map(p=>p.team||'').filter(Boolean))].sort(); return matchupTeams?['ALL',...all.filter(t=>t!=='ALL'&&matchupTeams.has(t))]:all; }, [data.batters, matchupTeams]);
@@ -14247,7 +14257,7 @@ function StatsTab() {
         <button onClick={()=>{
           // Reset all filters to defaults
           setWindow('L15'); setSelMatchup(matchupList[0]?.key||''); setSharedPHand(''); setSharedBHand('');
-          setSharedLoc(''); setSharedDN(''); setPitchGroup('');
+          setSharedPLoc(''); setSharedBLoc(''); setSharedDN(''); setPitchGroup('');
           setBHandFilter(''); setBTeam('ALL'); setBMinPA(10); setBPgFilter([]);
           setBConfirmed(false); setBHotOnly(false); setBGYOnly(false); setBHideInj(false); setBPicksOnly(false);
           setPHandFilter && setPHandFilter(''); setPTeam('ALL'); setPMinBF(10); setPPgFilter([]);
@@ -14294,7 +14304,7 @@ function StatsTab() {
           <PillRow items={[['','All'],['L','LHP'],['R','RHP']]} active={sharedPHand} onSelect={setSharedPHand}/>
           <PillRow items={[['','All'],['SP','SP'],['RP','RP']]} active={pRoleFilter} onSelect={setPRoleFilter} color='rgba(251,191,36,.2)' activeColor='#fbbf24'/>
           {/* Shared tandem: location + day/night */}
-          <PillRow items={[['','All'],['home','Home'],['away','Away']]} active={sharedLoc} onSelect={setSharedLoc} color='rgba(39,201,122,.2)' activeColor='#27c97a'/>
+          <PillRow items={[['','All'],['home','Home'],['away','Away']]} active={sharedPLoc} onSelect={onPLocChange} color='rgba(39,201,122,.2)' activeColor='#27c97a'/>
           <PillRow items={[['','All'],['day','Day'],['night','Night']]} active={sharedDN} onSelect={setSharedDN} color='rgba(245,166,35,.2)' activeColor='#f5a623'/>
           {/* Scheduled starters only */}
           <button onClick={()=>setPScheduledOnly(v=>!v)} data-tip="Scheduled starting pitchers only"
@@ -14486,7 +14496,7 @@ function StatsTab() {
           {/* Shared: batter hand = pitcher vsLHB/vsRHB split */}
           <PillRow items={[['','All'],['L','LHB'],['R','RHB'],['S','SWB']]} active={sharedBHand} onSelect={setSharedBHand}/>
           {/* Shared: location + day/night affect both splits */}
-          <PillRow items={[['','All'],['home','Home'],['away','Away']]} active={sharedLoc} onSelect={setSharedLoc} color='rgba(39,201,122,.2)' activeColor='#27c97a'/>
+          <PillRow items={[['','All'],['home','Home'],['away','Away']]} active={sharedBLoc} onSelect={onBLocChange} color='rgba(39,201,122,.2)' activeColor='#27c97a'/>
           <PillRow items={[['','All'],['day','Day'],['night','Night']]} active={sharedDN} onSelect={setSharedDN} color='rgba(245,166,35,.2)' activeColor='#f5a623'/>
           {/* Batter-only: additional hand filter on top of split */}
           <PillRow items={[['','All'],['L','L only'],['R','R only'],['S','S only']]} active={bHandFilter} onSelect={setBHandFilter}/>
@@ -19396,7 +19406,8 @@ function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, on
   // shared between the Splits and Game sub-pages.
   const [sharedPHand,    setSharedPHand]    = useState('');
   const [sharedBHand,    setSharedBHand]    = useState('');
-  const [sharedLoc,      setSharedLoc]      = useState('');
+  const [sharedPLoc,     setSharedPLoc]     = useState('');  // pitcher location
+  const [sharedBLoc,     setSharedBLoc]     = useState('');  // batter location (opposite)
   const [sharedDN,       setSharedDN]       = useState('');
   const [pitchGroup,     setPitchGroup]     = useState('');
   const [showHelp,       setShowHelp]       = useState(false);
@@ -19482,19 +19493,19 @@ function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, on
     const parts=[];
     if (sharedPHand==='L') parts.push('vsLHP');
     if (sharedPHand==='R') parts.push('vsRHP');
-    if (sharedLoc) parts.push(sharedLoc);
-    if (sharedDN)  parts.push(sharedDN);
+    if (sharedBLoc) parts.push(sharedBLoc);
+    if (sharedDN)   parts.push(sharedDN);
     return parts.join('_')||'overall';
-  }, [sharedPHand, sharedLoc, sharedDN, pitchGroup]);
+  }, [sharedPHand, sharedBLoc, sharedDN, pitchGroup]);
 
   const pSplitKey = React.useMemo(() => {
     const parts=[];
     if (sharedBHand==='L') parts.push('vsLHB');
     if (sharedBHand==='R') parts.push('vsRHB');
-    if (sharedLoc) parts.push(sharedLoc);
-    if (sharedDN)  parts.push(sharedDN);
+    if (sharedPLoc) parts.push(sharedPLoc);
+    if (sharedDN)   parts.push(sharedDN);
     return parts.join('_')||'overall';
-  }, [sharedBHand, sharedLoc, sharedDN]);
+  }, [sharedBHand, sharedPLoc, sharedDN]);
 
   // ── Auto-sort pitchers on pitch group change ──────────────────────────────
   React.useEffect(() => {
@@ -19735,7 +19746,7 @@ function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, on
         <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',whiteSpace:'nowrap',flex:'1 1 auto',textAlign:'right',minWidth:0}}>
           {WIN_LABELS[window]} · {bRows.length}b · {pRows.length}p
         </span>
-        <button onClick={()=>{setWindow('L15');setSelMatchup(matchupList[0]?.key||'');setSharedPHand('');setSharedBHand('');setSharedLoc('');setSharedDN('');setPitchGroup('');setBHandFilter('');onBTeamChange('ALL');onPTeamChange('ALL');setBMinGames(2);setPMinBF(2);setPScheduledOnly(true);setBConfirmed(false);setBPicksOnly(false);setBHideInj(false);setBatterCollapsed(false);setPitcherCollapsed(false);setBSearch('');setPSearch('');}}
+        <button onClick={()=>{setWindow('L15');setSelMatchup(matchupList[0]?.key||'');setSharedPHand('');setSharedBHand('');setSharedPLoc('');setSharedBLoc('');setSharedDN('');setPitchGroup('');setBHandFilter('');onBTeamChange('ALL');onPTeamChange('ALL');setBMinGames(2);setPMinBF(2);setPScheduledOnly(true);setBConfirmed(false);setBPicksOnly(false);setBHideInj(false);setBatterCollapsed(false);setPitcherCollapsed(false);setBSearch('');setPSearch('');}}
           data-tip="Reset all filters to default"
           style={{padding:'3px 8px',borderRadius:6,fontSize:9,cursor:'pointer',fontFamily:mono,border:'1px solid var(--border)',color:'var(--muted)',background:'transparent',flexShrink:0}}>
           ↺ Reset
@@ -19748,7 +19759,7 @@ function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, on
       <div style={{display:'flex',gap:5,flexWrap:'nowrap',alignItems:'center',marginBottom:10,overflowX:'auto',WebkitOverflowScrolling:'touch',paddingBottom:2}}>
         <PillRow items={[['','All','All hands'],['L','LHP','LHP → batters see vsLHP split'],['R','RHP','RHP → batters see vsRHP split']]} active={sharedPHand} onSelect={setSharedPHand}/>
         <PillRow items={[['','All','All batters'],['L','LHB','LHB → pitchers see vsLHB split'],['R','RHB','RHB → pitchers see vsRHB split'],['S','SWB','Switch hitters']]} active={sharedBHand} onSelect={setSharedBHand}/>
-        <PillRow items={[['','All'],['home','Home'],['away','Away']]} active={sharedLoc} onSelect={setSharedLoc} color='rgba(39,201,122,.2)' activeColor='#27c97a'/>
+        <PillRow items={[['','All'],['home','Home'],['away','Away']]} active={sharedPLoc} onSelect={onPLocChange} color='rgba(39,201,122,.2)' activeColor='#27c97a'/>
         <PillRow items={[['','All'],['day','Day'],['night','Night']]} active={sharedDN} onSelect={setSharedDN} color='rgba(245,166,35,.2)' activeColor='#f5a623'/>
       </div>
 
@@ -20252,7 +20263,69 @@ function CheatSheetTab({ data }) {
       .slice(0, 5);
   }, [cacheVer]);
 
-  const pgEmoji = l => l?.includes('Target')?'🎯':l?.includes('Hittable')?'💥':l?.includes('Elite')?'‼️':l?.includes('Tough')?'⚠️':'🤔';
+  // ── Top 5 Due: EV uptrend ≥95 + elevated bat speed + solid LA + close call(s)
+  //    + recent HR pattern (not cold) + favorable pitcher only
+  //    Explicitly NOT "hasn't hit in a while" — abSinceHR gate keeps cold streaks OUT
+  const top5Due = React.useMemo(() => {
+    const seen = new Set();
+    return Object.values(DAILY_PICKS_CACHE||{})
+      .filter(r => {
+        const bid = String(r.batter_id||'').split('.')[0];
+        if (!bid || seen.has(bid) || !r.batter || !r.game_id) return false;
+        seen.add(bid);
+        if (INJURY_MAP?.[parseInt(bid)||0] && !LINEUP_STATUS?.[parseInt(bid)||0]) return false;
+        // Pitcher gate: Target, Hittable, Average only — not Elite or Tough
+        const pg = r._pgLabel||'';
+        if (pg.includes('Elite') || pg.includes('Tough')) return false;
+        // EV uptrend ≥ 95mph recent
+        const ev = parseFloat(r.recent_avg_ev||0);
+        if (ev < 95) return false;
+        // Bat speed elevated above baseline
+        const bsDelta = parseFloat(r.bat_speed_vs_baseline||0);
+        if (bsDelta < 0.5) return false;
+        // Solid launch angle (sweet spot range 20–35°)
+        const la = parseFloat(r.recent_avg_la||0);
+        if (la < 18 || la > 38) return false;
+        // At least 1 close call — "on the doorstep" signal
+        const closeCall = parseInt(r.so_close_count||0);
+        if (closeCall < 1) return false;
+        // Recent HR pattern — NOT a cold streak: abSinceHR ≤ 20
+        // This is the key gate that prevents "he hasn't hit in 3 weeks" false positives
+        const player = getCachedPlayer(parseInt(bid)||0);
+        const abSinceHR = player?.windows?.last7?.abSinceHR ?? player?.abSinceHR ?? 99;
+        if (abSinceHR > 20) return false;
+        return true;
+      })
+      .map(r => {
+        const bid = String(r.batter_id||'').split('.')[0];
+        const player = getCachedPlayer(parseInt(bid)||0);
+        const ev      = parseFloat(r.recent_avg_ev||0);
+        const la      = parseFloat(r.recent_avg_la||0);
+        const bsDelta = parseFloat(r.bat_speed_vs_baseline||0);
+        const closeCall = parseInt(r.so_close_count||0);
+        const abSinceHR = player?.windows?.last7?.abSinceHR ?? player?.abSinceHR ?? 0;
+        // Due Score: composite rank signal — higher = more aligned
+        const dueScore = (ev - 95) * 2          // EV above 95 threshold
+                       + bsDelta * 4            // bat speed delta
+                       + (la >= 22 ? (la-18)*0.5 : 0) // LA sweet spot bonus
+                       + closeCall * 3          // each close call = meaningful signal
+                       + Math.max(0, (20-abSinceHR)*0.5); // more recent HR = higher
+        const name = (r.batter&&!/^\d+$/.test(r.batter))
+          ? r.batter
+          : getCachedPlayer(parseInt(bid)||0)?.name || r.batter || bid;
+        return {
+          id: bid,
+          name,
+          team: r.batting_team || player?.team || '',
+          ev, la, bsDelta, closeCall, abSinceHR, dueScore,
+          pitcher: r.pitcher||'',
+          pgLabel: r._pgLabel||'',
+        };
+      })
+      .sort((a,b) => b.dueScore - a.dueScore)
+      .filter((r,i,arr) => arr.findIndex(x=>x.id===r.id)===i) // dedup
+      .slice(0, 5);
+  }, [cacheVer]);
 
   const Card = ({rank, pid, name, team, stat, statLabel, sub, pitcher, pgLabel}) => (
     <div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 10px',
@@ -20301,6 +20374,7 @@ function CheatSheetTab({ data }) {
             ...top5Hit.map((r,i)=>['Hit Rate',      i+1, r.name, r.team, r.h_game_pct+'%', 'Hit rate '+r.h_game+'/'+r.games+' g', r.pitcher, r.pgLabel]),
             ...top5Close.map((r,i)=>['Close Calls',  i+1, r.name, r.team, r.count, 'near-misses', r.pitcher, r.pgLabel]),
             ...top5EV.map((r,i)=>[ 'Avg Exit Velo', i+1, r.name, r.team, r.ev.toFixed(1), 'avg EV (L7)', r.pitcher, r.pgLabel]),
+            ...top5Due.map((r,i)=>['Due',           i+1, r.name, r.team, r.ev.toFixed(1)+'ev / '+r.la.toFixed(0)+'°', `BS+${r.bsDelta.toFixed(1)} · ${r.closeCall}CC · ${r.abSinceHR}AB`, r.pitcher, r.pgLabel]),
           ];
           const csv = rows.map(r=>r.map(v=>String(v||'').includes(',')?`"${v}"`:v).join(',')).join('\n');
           const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='cheat-sheet.csv'; a.click();
@@ -20372,6 +20446,22 @@ function CheatSheetTab({ data }) {
               stat={`${r.ev.toFixed(1)}`}
               statLabel="avg EV (L7)"
               sub={r.hh>0?`${r.hh} HH`:''}
+              pitcher={r.pitcher} pgLabel={r.pgLabel}/>
+          ))}
+        </Section>
+
+        <Section emoji="⏳" title="Due" color="#f5a623">
+          {top5Due.length===0
+            ?<div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',padding:12}}>
+                No "due" batters found today — needs EV≥95, elevated bat speed,<br/>
+                solid LA, 1+ close calls, recent HR (≤20 AB), vs Avg/Hittable/Target
+              </div>
+            :top5Due.map((r,i)=>(
+            <Card key={r.id} rank={i+1} pid={r.id}
+              name={r.name} team={r.team}
+              stat={`${r.ev.toFixed(1)}`}
+              statLabel={`${r.la.toFixed(0)}° LA · BS+${r.bsDelta.toFixed(1)}`}
+              sub={`${r.closeCall} close call${r.closeCall!==1?'s':''} · ${r.abSinceHR} AB ago`}
               pitcher={r.pitcher} pgLabel={r.pgLabel}/>
           ))}
         </Section>
