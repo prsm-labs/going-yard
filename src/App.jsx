@@ -2496,7 +2496,7 @@ function Last7HRAllowedChart({ pitcherId }) {
         })}
       </div>
 
-      {/* Date + opp labels */}
+      {/* Date + opp + IP labels */}
       <div style={{display:'flex',gap:4,marginTop:4,paddingLeft:14,paddingRight:14}}>
         {games.map((g,i) => (
           <div key={i} style={{flex:1,textAlign:'center'}}>
@@ -2507,6 +2507,10 @@ function Last7HRAllowedChart({ pitcherId }) {
             <div style={{fontFamily:"'DM Mono',monospace",fontSize:7.5,
               color:'var(--muted)',lineHeight:1.3,opacity:.6}}>
               {(g.loc==='away'?'@':'vs')} {g.opp}
+            </div>
+            <div style={{fontFamily:"'DM Mono',monospace",fontSize:7,
+              color:'var(--muted)',lineHeight:1.3,marginTop:1,opacity:.7}}>
+              {g.ip!=null&&g.ip>0?g.ip.toFixed(1)+'IP':'—'}
             </div>
           </div>
         ))}
@@ -2782,18 +2786,20 @@ function PicksSlideout({onClose}) {
                     <span style={{color:"var(--accent2)",fontWeight:700}}>{getTeam(p.pid, p.team)}</span>
                   </div>
                 </div>
-                {/* Category switcher */}
-                <div style={{display:"flex",gap:4}}>
+                {/* Category switcher — compact dropdown */}
+                <select value={p.type} onChange={e=>setPick(p.pid,p.name,p.team,e.target.value)}
+                  title={PICK_TYPES[p.type]?.label}
+                  style={{
+                    padding:'3px 6px',borderRadius:6,cursor:'pointer',outline:'none',flexShrink:0,
+                    border:`1px solid ${PICK_TYPES[p.type]?.color||'var(--border)'}`,
+                    background:`${PICK_TYPES[p.type]?.color||'transparent'}18`,
+                    color:PICK_TYPES[p.type]?.color||'var(--muted)',
+                    fontFamily:"'DM Mono',monospace",fontSize:13,fontWeight:700,
+                  }}>
                   {Object.entries(PICK_TYPES).map(([type,c])=>(
-                    <button key={type} onClick={()=>setPick(p.pid,p.name,p.team,type)}
-                      title={c.label}
-                      style={{width:26,height:26,borderRadius:5,cursor:"pointer",fontSize:13,
-                        border:`1px solid ${p.type===type?c.color:"var(--border)"}`,
-                        background:p.type===type?`${c.color}20`:"var(--surface2)"}}>
-                      {c.label.split(" ")[0]}
-                    </button>
+                    <option key={type} value={type}>{c.label.split(' ')[0]}</option>
                   ))}
-                </div>
+                </select>
                 <button onClick={()=>setPick(p.pid,p.name,p.team,p.type)}
                   style={{background:"none",border:"1px solid var(--border)",borderRadius:5,color:"var(--muted)",cursor:"pointer",padding:"2px 7px",fontSize:10,flexShrink:0}}>✕</button>
               </div>;
@@ -13216,7 +13222,7 @@ async function fetchGameLog(pid) {
 function Last7HRChart({ batterId }) {
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState('hr'); // 'hr' | '2tb' | '2b' | 'rbi'
+  const [view, setView] = useState('hr'); // 'hr' | 'h' | '2tb' | '2b' | 'rbi'
 
   useEffect(() => {
     if (!batterId) return;
@@ -13234,8 +13240,8 @@ function Last7HRChart({ batterId }) {
   if (games.length === 0) return null;
 
   // Compute for both views — react to pill selection
-  const getValue  = g => view==='2tb'?(g.totalBases||0):view==='2b'?(g.doubles||0):view==='rbi'?(g.rbi||0):g.hrs;
-  const threshold = view==='2tb'?2:view==='rbi'?1:view==='2b'?1:1;
+  const getValue  = g => view==='2tb'?(g.totalBases||0):view==='2b'?(g.doubles||0):view==='rbi'?(g.rbi||0):view==='h'?(g.h||0):g.hrs;
+  const threshold = view==='2tb'?2:view==='rbi'?1:view==='2b'?1:view==='h'?1:1;
   const hitGames  = games.filter(g => getValue(g) >= threshold).length;
   const pct       = Math.round((hitGames / games.length) * 100);
   const maxVal    = Math.max(view==='2tb'?2:view==='rbi'?1:view==='2b'?1:1, ...games.map(g => getValue(g)));
@@ -13251,9 +13257,9 @@ function Last7HRChart({ batterId }) {
       {/* Header with pill toggle */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
         <div style={{display:'flex',gap:3,background:'var(--surface2)',borderRadius:6,padding:2,border:'1px solid var(--border)'}}>
-          {[['hr','💥 HR'],['2tb','🎯 2TB+'],['2b','⚡ 2B'],['rbi','🏃 RBI']].map(([k,lbl])=>(
+          {[['hr','💥 HR'],['h','🎯 Hits'],['2tb','🎯 2TB+'],['2b','⚡ 2B'],['rbi','🏃 RBI']].map(([k,lbl])=>(
             <button key={k} onClick={()=>setView(k)}
-              style={{padding:'3px 9px',borderRadius:4,fontSize:8,fontFamily:"'DM Mono',monospace",
+              style={{padding:'3px 6px',borderRadius:4,fontSize:8,fontFamily:"'DM Mono',monospace",
                 cursor:'pointer',border:'none',fontWeight:view===k?700:400,
                 background:view===k?'var(--accent)':'transparent',
                 color:view===k?'#fff':'var(--muted)'}}>
@@ -13262,10 +13268,10 @@ function Last7HRChart({ batterId }) {
           ))}
         </div>
         <div style={{display:'flex',alignItems:'baseline',gap:8}}>
-          <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--muted)'}}>
+          <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)'}}>
             {hitGames} of {games.length}
           </span>
-          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:22,
+          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:18,
             color:pctColor}}>{pct}%</span>
         </div>
       </div>
@@ -13313,6 +13319,8 @@ function Last7HRChart({ batterId }) {
               color:'var(--muted)',lineHeight:1.3,opacity:.6}}>
               {(g.loc==='away'?'@':'vs')} {g.opp}
             </div>
+            <div style={{fontFamily:"'DM Mono',monospace",fontSize:7,color:'var(--muted)',lineHeight:1.3,marginTop:1,opacity:.7}}>{g.ab!=null?g.ab+'AB':'—'}</div>
+            <div style={{fontFamily:"'DM Mono',monospace",fontSize:7,lineHeight:1.2,color:(g.h||0)>0?'#27c97a':'var(--muted)',opacity:.85}}>{g.h!=null?g.h+'H':'—'}</div>
           </div>
         ))}
       </div>
