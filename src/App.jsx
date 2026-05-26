@@ -13803,11 +13803,14 @@ function StatsTab() {
     if (game) { autoLinkRef.current=true; setPTeam(game.home===team?game.away:game.home); setTimeout(()=>autoLinkRef.current=false,50); }
   };
   // When pitcher selects Home → batters are Away, and vice versa
-  const onPLocChange = (loc) => {
+  // PillRow passes an updater fn (v=>...) not a plain string, so resolve it first
+  const onPLocChange = (locOrFn) => {
+    const loc = typeof locOrFn === 'function' ? locOrFn(sharedPLoc) : locOrFn;
     setSharedPLoc(loc);
     setSharedBLoc(loc === 'home' ? 'away' : loc === 'away' ? 'home' : '');
   };
-  const onBLocChange = (loc) => {
+  const onBLocChange = (locOrFn) => {
+    const loc = typeof locOrFn === 'function' ? locOrFn(sharedBLoc) : locOrFn;
     setSharedBLoc(loc);
     setSharedPLoc(loc === 'home' ? 'away' : loc === 'away' ? 'home' : '');
   };
