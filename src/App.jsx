@@ -13771,6 +13771,19 @@ function StatsTab() {
   const [showHelp,    setShowHelp]    = useState(false);
   const [selMatchup,  setSelMatchup]  = useState('');
   const [lineupVer,   setLineupVer]   = useState(0);
+
+  // Poll until DAILY_PICKS_CACHE is populated, then bump lineupVer to trigger
+  // matchupList rebuild and auto-select first matchup
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (DAILY_PICKS_CACHE && Object.keys(DAILY_PICKS_CACHE).length > 0) {
+        setLineupVer(v => v + 1);
+        clearInterval(id);
+      }
+    }, 500);
+    return () => clearInterval(id);
+  }, []);
+
   // ── Shared cross-tab filters: pTeam/bTeam/window/selMatchup are the single
   // source of truth for both Splits and Game sub-pages (passed as props to GameSplitsTab)
   const autoLinkRef = React.useRef(false); // prevent circular team auto-link
