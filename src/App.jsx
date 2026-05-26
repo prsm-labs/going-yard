@@ -20327,6 +20327,8 @@ function CheatSheetTab({ data }) {
       .slice(0, 5);
   }, [cacheVer]);
 
+  const pgEmoji = l => l?.includes('Target')?'🎯':l?.includes('Hittable')?'💥':l?.includes('Elite')?'‼️':l?.includes('Tough')?'⚠️':'🤔';
+
   const Card = ({rank, pid, name, team, stat, statLabel, sub, pitcher, pgLabel}) => (
     <div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 10px',
       background:'var(--surface)',border:'1px solid var(--border)',borderRadius:8,
