@@ -19654,21 +19654,20 @@ function CrystalBallTab() {
 
       {/* 3 cards — show when picks are ready */}
       {(phase === 'cards' || phase === 'done') && picks.length === 3 && (
-        <div style={{width:'100%',display:'flex',gap:'clamp(6px,2vw,12px)',
-          justifyContent:'center',flexWrap:'nowrap',marginBottom:24}}>
+        <div style={{width:'100%',display:'flex',gap:12,
+          justifyContent:'flex-start',flexWrap:'nowrap',overflowX:'auto',
+          WebkitOverflowScrolling:'touch',paddingBottom:8,marginBottom:16,
+          scrollSnapType:'x mandatory'}}>
           {picks.map((pick, i) => {
             const tier = CB_TIERS[i];
             const isFlipped = flipped[i];
             const p = pick;
-            // Card fills 1/3 of available width minus gaps, capped at 195px
-            // min 95px so content stays readable on the smallest phones
-            const cardW = 'clamp(95px, calc(33.3vw - 14px), 195px)';
-            const cardH = 'clamp(133px, calc(46.6vw - 20px), 273px)';
             return (
               <div key={i}
                 onClick={() => !isFlipped && flipCard(i)}
                 style={{
-                  width:cardW, height:cardH, flexShrink:0,
+                  width:195, height:273, flexShrink:0,
+                  scrollSnapAlign:'start',
                   perspective:1000,cursor:isFlipped?'default':'pointer',
                   position:'relative',
                 }}>
@@ -19704,16 +19703,16 @@ function CrystalBallTab() {
                     ))}
                     {/* GY logo */}
                     <img src="/icon-192.png" alt="Going Yard"
-                      style={{width:'clamp(36px,9vw,64px)',height:'clamp(36px,9vw,64px)',borderRadius:10,
+                      style={{width:64,height:64,borderRadius:12,
                         filter:'drop-shadow(0 0 12px rgba(168,85,247,0.6))',
                         opacity:.92}}/>
-                    <div style={{fontFamily:osw,fontSize:'clamp(8px,2.2vw,13px)',fontWeight:900,
-                      letterSpacing:'clamp(1px,0.5vw,3px)',color:'rgba(200,170,255,0.7)',textTransform:'uppercase'}}>
+                    <div style={{fontFamily:osw,fontSize:13,fontWeight:900,
+                      letterSpacing:3,color:'rgba(200,170,255,0.7)',textTransform:'uppercase'}}>
                       GOING YARD
                     </div>
                     {/* Tier hint */}
-                    <div style={{fontFamily:mono,fontSize:'clamp(6px,1.6vw,8px)',
-                      color:`rgba(${tier.accentRgb},0.55)`,letterSpacing:'clamp(0.5px,0.4vw,1.5px)',
+                    <div style={{fontFamily:mono,fontSize:8,
+                      color:`rgba(${tier.accentRgb},0.55)`,letterSpacing:1.5,
                       textTransform:'uppercase'}}>
                       {tier.emoji} {tier.name}
                     </div>
@@ -19734,7 +19733,7 @@ function CrystalBallTab() {
                     background:tier.bg,
                     border:`2px solid ${tier.border}`,
                     boxShadow:`0 8px 32px rgba(0,0,0,0.6),0 0 20px ${tier.glow}`,
-                    display:'flex',flexDirection:'column',padding:'clamp(7px,2vw,12px) clamp(6px,1.8vw,11px)',gap:'clamp(4px,1vw,8px)',
+                    display:'flex',flexDirection:'column',padding:'12px 11px',gap:8,
                   }}>
                     {/* Tier badge */}
                     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
@@ -19750,14 +19749,14 @@ function CrystalBallTab() {
                     {/* Player avatar + name */}
                     {p && <>
                       <div style={{display:'flex',alignItems:'center',gap:8}}>
-                        <PlayerAvatar pid={parseInt(p.id)||0} size={28}/>
+                        <PlayerAvatar pid={parseInt(p.id)||0} size={36}/>
                         <div style={{flex:1,minWidth:0,cursor:'pointer'}}
                           onClick={e=>{e.stopPropagation();const cp=getCachedPlayer(parseInt(p.id)||0)||{};
                             openAtBatSlide({pid:parseInt(p.id)||0,name:p.name,team:p.team,
                               avgEV:cp.avgEV,barrel:cp.barrel,hardHit:cp.hardHit,flyBall:cp.flyBall,
                               hr:cp.hr,avg:cp.avg,obp:cp.obp,slg:cp.slg,xwoba:cp.xwoba,
                               kPct:cp.kPct,bbPct:cp.bbPct,launchAngle:cp.launchAngle});}}>
-                          <div style={{fontFamily:osw,fontSize:'clamp(10px,2.8vw,13px)',fontWeight:900,
+                          <div style={{fontFamily:osw,fontSize:13,fontWeight:900,
                             color:'var(--text)',lineHeight:1.2,
                             whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',
                             textDecoration:'underline',
@@ -19791,8 +19790,8 @@ function CrystalBallTab() {
                       {/* Reason tags */}
                       <div style={{display:'flex',flexWrap:'wrap',gap:3,flex:1,alignContent:'flex-start'}}>
                         {p.reasons.map((r,ri)=>(
-                          <span key={ri} style={{fontFamily:mono,fontSize:'clamp(5.5px,1.4vw,7px)',
-                            padding:'clamp(1px,0.4vw,2px) clamp(3px,1vw,5px)',borderRadius:3,
+                          <span key={ri} style={{fontFamily:mono,fontSize:7,
+                            padding:'2px 5px',borderRadius:3,
                             background:tier.tagBg,color:tier.tagColor,
                             border:`1px solid ${tier.tagBorder}`}}>
                             {r}
