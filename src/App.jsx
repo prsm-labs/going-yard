@@ -2508,10 +2508,6 @@ function Last7HRAllowedChart({ pitcherId }) {
               color:'var(--muted)',lineHeight:1.3,opacity:.6}}>
               {(g.loc==='away'?'@':'vs')} {g.opp}
             </div>
-            <div style={{fontFamily:"'DM Mono',monospace",fontSize:7,
-              color:'var(--muted)',lineHeight:1.3,marginTop:1,opacity:.7}}>
-              {g.ip!=null&&g.ip>0?g.ip.toFixed(1)+'IP':'—'}
-            </div>
           </div>
         ))}
       </div>
@@ -13320,7 +13316,6 @@ function Last7HRChart({ batterId }) {
               {(g.loc==='away'?'@':'vs')} {g.opp}
             </div>
             <div style={{fontFamily:"'DM Mono',monospace",fontSize:7,color:'var(--muted)',lineHeight:1.3,marginTop:1,opacity:.7}}>{g.ab!=null?g.ab+'AB':'—'}</div>
-            <div style={{fontFamily:"'DM Mono',monospace",fontSize:7,lineHeight:1.2,color:(g.h||0)>0?'#27c97a':'var(--muted)',opacity:.85}}>{g.h!=null?g.h+'H':'—'}</div>
           </div>
         ))}
       </div>
