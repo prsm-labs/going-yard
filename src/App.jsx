@@ -19390,368 +19390,465 @@ let GAME_SPLITS_LOADED = false;
 // ═══════════════════════════════════════════════════════════════════════════
 // 🔮  CRYSTAL BALL TAB
 // ═══════════════════════════════════════════════════════════════════════════
+// ── Crystal Ball tier configs ────────────────────────────────────────────────
+const CB_TIERS = [
+  {
+    id:'chosen', name:'The Chosen', sub:'All signals firing',
+    emoji:'👑', accentRgb:'255,215,0',
+    border:'rgba(255,215,0,0.5)', glow:'rgba(255,215,0,0.3)',
+    bg:'linear-gradient(160deg,rgba(255,215,0,0.12)0%,rgba(20,10,0,0.7)100%)',
+    tagBg:'rgba(255,215,0,0.1)', tagColor:'rgba(255,215,0,0.9)', tagBorder:'rgba(255,215,0,0.25)',
+    filter: b => b.yard >= 32 && b.ev >= 92,
+    score:  b => {
+      let s = b.yard * 1.2;
+      if (b.sig >= 3)  s += b.sig * 3;
+      if (b.ev >= 95)  s += (b.ev-95) * 2;
+      if (b.la >= 18 && b.la <= 35) s += 10;
+      if (b.bsDelta >= 1) s += b.bsDelta * 5;
+      if (b.closeCall >= 1) s += b.closeCall * 6;
+      if (b.zf >= 3)  s += b.zf * 4;
+      if (b.pg.includes('Target'))   s += 14;
+      if (b.pg.includes('Hittable')) s += 9;
+      s += ({'A+':12,'A':9,'B':6,'C':3,'D':0}[b.effGrade]||0);
+      return s;
+    },
+  },
+  {
+    id:'darkhorse', name:'Dark Horse', sub:'Yard 20–31 · Under radar',
+    emoji:'🐎', accentRgb:'255,90,30',
+    border:'rgba(255,90,30,0.5)', glow:'rgba(255,90,30,0.25)',
+    bg:'linear-gradient(160deg,rgba(255,90,30,0.12)0%,rgba(20,5,0,0.7)100%)',
+    tagBg:'rgba(255,90,30,0.1)', tagColor:'rgba(255,140,80,0.9)', tagBorder:'rgba(255,90,30,0.25)',
+    filter: b => b.yard >= 20 && b.yard <= 31 && b.ev >= 88,
+    score:  b => {
+      let s = b.yard;
+      if (b.sig >= 2)  s += b.sig * 3.5;
+      if (b.closeCall >= 1) s += b.closeCall * 7;
+      if (b.bsDelta >= 0.5) s += b.bsDelta * 5;
+      if (b.zf >= 2)   s += b.zf * 4;
+      if (b.ev >= 93)  s += (b.ev-93) * 1.5;
+      if (b.la >= 18 && b.la <= 35) s += 8;
+      if (b.pg.includes('Target'))   s += 12;
+      if (b.pg.includes('Hittable')) s += 8;
+      if (b.pg.includes('Average'))  s += 4;
+      return s;
+    },
+  },
+  {
+    id:'wildcard', name:'Wild Card', sub:'Spike signals · Surprise',
+    emoji:'🃏', accentRgb:'0,210,170',
+    border:'rgba(0,210,170,0.45)', glow:'rgba(0,210,170,0.22)',
+    bg:'linear-gradient(160deg,rgba(0,210,170,0.1)0%,rgba(0,14,12,0.7)100%)',
+    tagBg:'rgba(0,210,170,0.08)', tagColor:'rgba(0,210,170,0.85)', tagBorder:'rgba(0,210,170,0.22)',
+    filter: b => b.yard >= 13 && b.yard < 32 && (
+      b.bsDelta >= 1.5 || b.closeCall >= 2 || b.zf >= 4 || (b.ev >= 96 && b.la >= 20)
+    ),
+    score:  b => {
+      let s = b.yard * 0.8;
+      if (b.bsDelta >= 1.5) s += b.bsDelta * 8;
+      if (b.closeCall >= 2) s += b.closeCall * 9;
+      if (b.zf >= 4)  s += b.zf * 6;
+      if (b.ev >= 96)  s += (b.ev-96) * 3;
+      if (b.sig >= 3)  s += b.sig * 2.5;
+      if (b.la >= 20 && b.la <= 34) s += 7;
+      if (b.pg.includes('Target'))   s += 10;
+      if (b.pg.includes('Hittable')) s += 7;
+      if (b.pg.includes('Average'))  s += 5;
+      s += Math.random() * 8; // a touch of chaos
+      return s;
+    },
+  },
+];
+
 function CrystalBallTab() {
   const mono = "'DM Mono',monospace";
   const osw  = "'Oswald',sans-serif";
 
-  const [phase,    setPhase]    = useState('idle');   // idle | gazing | reveal
-  const [picks,    setPicks]    = useState([]);
-  const [revealed, setRevealed] = useState([]);       // indexes revealed so far
-  const [orbPulse, setOrbPulse] = useState(false);
+  const [phase,    setPhase]    = useState('idle');    // idle | gazing | cards | done
+  const [picks,    setPicks]    = useState([]);         // 3 picks, one per tier
+  const [flipped,  setFlipped]  = useState([false, false, false]);
   const [showHelp, setShowHelp] = useState(false);
+  const [orbPulse, setOrbPulse] = useState(false);
 
-  // ── Scoring: pull the top HPE candidates and pick 3 ─────────────────────
-  const generatePicks = () => {
-    const candidates = [];
-    const seen = new Set();
-
-    Object.values(DAILY_PICKS_CACHE || {}).forEach(r => {
-      const bid = String(r.batter_id || '').split('.')[0];
-      if (!bid || seen.has(bid) || !r.batter || !r.game_id) return;
+  const buildBatters = () => {
+    const out = [], seen = new Set();
+    Object.values(DAILY_PICKS_CACHE||{}).forEach(r => {
+      const bid = String(r.batter_id||'').split('.')[0];
+      if (!bid||seen.has(bid)||!r.batter||!r.game_id) return;
       seen.add(bid);
-      if (INJURY_MAP?.[parseInt(bid) || 0] && !LINEUP_STATUS?.[parseInt(bid) || 0]) return;
-
-      const pg = r._pgLabel || '';
-      if (pg.includes('Elite') || pg.includes('Tough')) return;
-
-      const sig      = parseFloat(r._trackerSig || r.weighted_flag_score * 4.6 || 0);
-      const ghr      = parseFloat(r.gHR || r.kHR || 0);
-      const ps       = parseFloat(r.ps_score || 0);
-      const boom     = computeBoomScore(sig, parseFloat(r.zone_fit||0), parseFloat(r.iso||0), parseFloat(r.sim_tb||0), parseFloat(r.weighted_flag_score||0));
-      const yard     = computeYardScore(sig, ghr, boom, ps);
-      const ev       = parseFloat(r.recent_avg_ev || 0);
-      const la       = parseFloat(r.recent_avg_la || 0);
-      const bsDelta  = parseFloat(r.bat_speed_vs_baseline || 0);
-      const closeCall= parseInt(r.so_close_count || 0);
-      const flags    = parseInt(r.flag_count || sig || 0);
-      const zf       = parseFloat(r.zone_fit || 0);
-
-      // Must have real data
-      if (yard < 10 || ev < 85) return;
-
-      // Crystal score: weighted HPE composite with some bonus criteria
-      let crystal = yard * 1.0;
-      if (sig >= 3)        crystal += sig * 2.5;
-      if (ev >= 95)        crystal += (ev - 95) * 1.5;
-      if (la >= 18 && la <= 35) crystal += 8;
-      if (bsDelta >= 1)    crystal += bsDelta * 4;
-      if (closeCall >= 1)  crystal += closeCall * 5;
-      if (zf >= 3)         crystal += zf * 3;
-      if (pg.includes('Target'))   crystal += 12;
-      if (pg.includes('Hittable')) crystal += 8;
-
-      const effGrade = computeEffectiveGrade(r.grade || 'D', pg);
-      const gradeBonus = {A:10, B:7, C:4, D:0}[effGrade] || 0;
-      crystal += gradeBonus;
-
-      // Build reason strings
-      const reasons = [];
-      if (sig >= 4)        reasons.push(`${sig} live signals firing`);
-      if (ev >= 95)        reasons.push(`${ev.toFixed(1)} mph avg EV`);
-      if (closeCall >= 1)  reasons.push(`${closeCall} close call${closeCall>1?'s':''}`);
-      if (bsDelta >= 1)    reasons.push(`bat speed +${bsDelta.toFixed(1)} above baseline`);
-      if (la >= 20 && la <= 34) reasons.push(`${la.toFixed(0)}° launch angle`);
-      if (zf >= 3)         reasons.push(`zone fit ${zf.toFixed(1)}`);
-      if (pg.includes('Target'))   reasons.push('facing a 🎯 Target pitcher');
-      if (pg.includes('Hittable')) reasons.push('facing a 💥 Hittable pitcher');
-      if (effGrade === 'A' || effGrade === 'A+') reasons.push(`effective grade ${effGrade}`);
-      if (reasons.length === 0)  reasons.push(`yard score ${yard}`);
-
-      const name = (r.batter && !/^\d+$/.test(r.batter))
-        ? r.batter
-        : getCachedPlayer(parseInt(bid) || 0)?.name || r.batter || bid;
-
-      candidates.push({
-        id: bid, name, team: r.batting_team || '',
-        crystal, yard, sig, ev, la, bsDelta, closeCall, zf,
-        effGrade, pgLabel: pg,
-        pitcher: r.pitcher || '',
-        reasons: reasons.slice(0, 3),
-        hand: r.batter_hand || '',
-      });
+      if (INJURY_MAP?.[parseInt(bid)||0] && !LINEUP_STATUS?.[parseInt(bid)||0]) return;
+      const pg = r._pgLabel||'';
+      if (pg.includes('Elite')||pg.includes('Tough')) return;
+      const sig  = parseFloat(r._trackerSig||r.weighted_flag_score*4.6||0);
+      const ghr  = parseFloat(r.gHR||r.kHR||0);
+      const ps   = parseFloat(r.ps_score||0);
+      const boom = computeBoomScore(sig, parseFloat(r.zone_fit||0), parseFloat(r.iso||0), parseFloat(r.sim_tb||0), parseFloat(r.weighted_flag_score||0));
+      const yard = computeYardScore(sig, ghr, boom, ps);
+      const ev   = parseFloat(r.recent_avg_ev||0);
+      const la   = parseFloat(r.recent_avg_la||0);
+      const bsDelta   = parseFloat(r.bat_speed_vs_baseline||0);
+      const closeCall = parseInt(r.so_close_count||0);
+      const zf   = parseFloat(r.zone_fit||0);
+      if (yard < 10 || ev < 82) return;
+      const effGrade = computeEffectiveGrade(r.grade||'D', pg);
+      const name = (r.batter&&!/^\d+$/.test(r.batter))
+        ? r.batter : getCachedPlayer(parseInt(bid)||0)?.name||r.batter||bid;
+      out.push({id:bid, name, team:r.batting_team||'', yard, sig, ev, la,
+        bsDelta, closeCall, zf, effGrade, pg, pitcher:r.pitcher||'', hand:r.batter_hand||''});
     });
+    return out;
+  };
 
-    // Sort by crystal score, add small random shuffle in top 15 so it feels alive
-    candidates.sort((a, b) => b.crystal - a.crystal);
-    const pool = candidates.slice(0, 15);
-    // Fisher-Yates on pool so the same 3 don't always show
-    for (let i = pool.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [pool[i], pool[j]] = [pool[j], pool[i]];
-    }
-    // Weighted random draw from top 15 — higher crystal score = more likely
-    // but not guaranteed, so strong candidates float up without locking in forever.
-    // Uses a roulette-wheel selection so standards are never lowered.
-    const chosen = [];
+  const drawOne = (batters, tier) => {
+    const pool = batters
+      .filter(tier.filter)
+      .map(b => ({...b, crystal:tier.score(b)}))
+      .sort((a,b) => b.crystal - a.crystal)
+      .slice(0, 15);
+    if (!pool.length) return null;
     const remaining = [...pool];
-    while (chosen.length < 3 && remaining.length > 0) {
-      const totalWeight = remaining.reduce((sum, r) => sum + Math.max(1, r.crystal), 0);
-      let rand = Math.random() * totalWeight;
-      let idx = 0;
-      for (let j = 0; j < remaining.length; j++) {
-        rand -= Math.max(1, remaining[j].crystal);
-        if (rand <= 0) { idx = j; break; }
-      }
-      chosen.push(remaining.splice(idx, 1)[0]);
+    const total = remaining.reduce((s,r)=>s+Math.max(1,r.crystal),0);
+    let rand = Math.random() * total;
+    let pick = remaining[0];
+    for (let j=0; j<remaining.length; j++) {
+      rand -= Math.max(1, remaining[j].crystal);
+      if (rand <= 0) { pick = remaining[j]; break; }
     }
-    return chosen;
+    const reasons = [];
+    if (pick.sig >= 4)        reasons.push(`${pick.sig} signals firing`);
+    if (pick.ev >= 95)        reasons.push(`${pick.ev.toFixed(1)} mph EV`);
+    if (pick.closeCall >= 1)  reasons.push(`${pick.closeCall} close call${pick.closeCall>1?'s':''}`);
+    if (pick.bsDelta >= 0.5)  reasons.push(`bat speed +${pick.bsDelta.toFixed(1)}`);
+    if (pick.la >= 20 && pick.la <= 34) reasons.push(`${pick.la.toFixed(0)}° LA`);
+    if (pick.zf >= 3)         reasons.push(`zone fit ${pick.zf.toFixed(1)}`);
+    if (pick.pg.includes('Target'))   reasons.push('🎯 Target pitcher');
+    if (pick.pg.includes('Hittable')) reasons.push('💥 Hittable pitcher');
+    if (!reasons.length)      reasons.push(`yard score ${pick.yard}`);
+    return {...pick, reasons: reasons.slice(0,3)};
   };
 
   const startGazing = () => {
     setPhase('gazing');
-    setRevealed([]);
-    setPicks([]);
     setOrbPulse(true);
-
-    // After 3.2s of "gazing", compute and reveal
+    setFlipped([false,false,false]);
+    setPicks([]);
     setTimeout(() => {
-      const chosen = generatePicks();
-      setPicks(chosen);
-      setPhase('reveal');
+      const batters = buildBatters();
+      const drawn = CB_TIERS.map(t => drawOne(batters, t));
+      setPicks(drawn);
       setOrbPulse(false);
-      // Staggered card reveals
-      setTimeout(() => setRevealed([0]),       200);
-      setTimeout(() => setRevealed([0, 1]),    700);
-      setTimeout(() => setRevealed([0, 1, 2]), 1200);
-    }, 3200);
+      setPhase('cards');
+    }, 3000);
+  };
+
+  const flipCard = (i) => {
+    if (phase !== 'cards' && phase !== 'done') return;
+    setFlipped(f => {
+      const next = [...f];
+      next[i] = true;
+      return next;
+    });
+    if (flipped.filter(Boolean).length === 2) {
+      setTimeout(() => setPhase('done'), 600);
+    }
   };
 
   const reset = () => {
     setPhase('idle');
     setPicks([]);
-    setRevealed([]);
+    setFlipped([false,false,false]);
     setOrbPulse(false);
   };
 
-  // Grade color
-  const gradeColor = g => g==='A+'?'#ffd700':g==='A'?'#ff9f1c':g==='B'?'#38b8f2':g==='C'?'var(--muted)':'var(--muted)';
+  const gradeColor = g => g==='A+'?'#ffd700':g==='A'?'#ff9f1c':g==='B'?'#38b8f2':'var(--muted)';
+  const allFlipped = flipped.every(Boolean);
 
   return (
-    <div style={{maxWidth:680,margin:'0 auto',padding:'24px 16px',minHeight:'80vh',
+    <div style={{maxWidth:720,margin:'0 auto',padding:'24px 16px',
       display:'flex',flexDirection:'column',alignItems:'center'}}>
 
-      {/* ── Header ── */}
-      <div style={{textAlign:'center',marginBottom:28,width:'100%',position:'relative'}}>
-        <div style={{fontFamily:osw,fontSize:28,fontWeight:900,letterSpacing:2,
+      {/* Header */}
+      <div style={{textAlign:'center',marginBottom:24,width:'100%',position:'relative'}}>
+        <div style={{fontFamily:osw,fontSize:26,fontWeight:900,letterSpacing:2,
           color:'var(--text)',textTransform:'uppercase',marginBottom:4}}>
           🔮 Crystal Ball
         </div>
-        <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)',letterSpacing:1,marginBottom:10}}>
-          HPE-POWERED · DATA-BACKED · EERILY ACCURATE
+        <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',letterSpacing:1,marginBottom:8}}>
+          THREE TIERS · ONE CARD EACH · CLICK TO REVEAL
         </div>
-        {/* Disclaimer */}
         <div style={{display:'inline-flex',alignItems:'center',gap:6,
-          background:'rgba(245,166,35,0.08)',border:'1px solid rgba(245,166,35,0.2)',
-          borderRadius:6,padding:'5px 10px',marginBottom:4}}>
-          <span style={{fontSize:11}}>🎱</span>
-          <span style={{fontFamily:mono,fontSize:8,color:'rgba(245,166,35,0.8)',letterSpacing:.5}}>
+          background:'rgba(245,166,35,0.07)',border:'1px solid rgba(245,166,35,0.18)',
+          borderRadius:6,padding:'4px 10px'}}>
+          <span>🎱</span>
+          <span style={{fontFamily:mono,fontSize:7.5,color:'rgba(245,166,35,0.75)'}}>
             Just for fun — but it just might come true
           </span>
         </div>
-        {/* Help button — top right */}
         <div style={{position:'absolute',top:0,right:0}}>
           <HelpBtn onClick={()=>setShowHelp(true)}/>
         </div>
       </div>
 
-      {/* ── Orb ── */}
-      <div style={{position:'relative',width:180,height:180,marginBottom:32,cursor:phase==='idle'?'pointer':'default'}}
-        onClick={phase==='idle' ? startGazing : undefined}>
-        {/* Outer glow ring */}
-        <div style={{
-          position:'absolute',inset:-12,borderRadius:'50%',
-          background: orbPulse
-            ? 'radial-gradient(circle, rgba(168,85,247,0.35) 0%, rgba(56,184,242,0.15) 60%, transparent 80%)'
-            : 'radial-gradient(circle, rgba(168,85,247,0.12) 0%, transparent 70%)',
-          transition:'background 0.6s ease',
-          animation: orbPulse ? 'orbBreath 1.1s ease-in-out infinite' : 'none',
-        }}/>
-        {/* Orb body */}
-        <div style={{
-          position:'absolute',inset:0,borderRadius:'50%',
-          background:'radial-gradient(circle at 38% 35%, rgba(220,200,255,0.18) 0%, rgba(100,60,180,0.55) 40%, rgba(20,10,50,0.92) 100%)',
-          border:'1.5px solid rgba(168,85,247,0.4)',
-          boxShadow: orbPulse
-            ? '0 0 40px rgba(168,85,247,0.6), 0 0 80px rgba(56,184,242,0.25), inset 0 0 30px rgba(100,60,200,0.3)'
-            : '0 0 20px rgba(168,85,247,0.3), inset 0 0 20px rgba(80,40,160,0.2)',
-          transition:'box-shadow 0.4s ease',
-          display:'flex',alignItems:'center',justifyContent:'center',
-          flexDirection:'column',gap:6,
-          overflow:'hidden',
-        }}>
-          {/* Inner shimmer */}
-          <div style={{
-            position:'absolute',inset:0,borderRadius:'50%',
-            background:'radial-gradient(ellipse at 30% 25%, rgba(255,255,255,0.08) 0%, transparent 55%)',
-            pointerEvents:'none',
-          }}/>
-
-          {phase === 'idle' && <>
-            <div style={{fontSize:36,lineHeight:1,filter:'drop-shadow(0 0 8px rgba(200,150,255,0.8))'}}>🔮</div>
-            <div style={{fontFamily:mono,fontSize:8,color:'rgba(200,170,255,0.7)',letterSpacing:1,textAlign:'center',lineHeight:1.5,padding:'0 16px'}}>
-              TAP TO<br/>REVEAL
-            </div>
-          </>}
-
-          {phase === 'gazing' && <>
-            <div style={{fontSize:28,animation:'orbSpin 1.4s linear infinite',lineHeight:1}}>✨</div>
-            <div style={{fontFamily:mono,fontSize:8,color:'rgba(180,140,255,0.8)',letterSpacing:1,textAlign:'center',lineHeight:1.8}}>
-              GAZING INTO<br/>THE DATA…
-            </div>
-          </>}
-
-          {phase === 'reveal' && <>
-            <div style={{fontSize:32,lineHeight:1,filter:'drop-shadow(0 0 10px rgba(255,215,0,0.9))'}}>⚡</div>
-            <div style={{fontFamily:osw,fontSize:11,color:'#ffd700',letterSpacing:2,fontWeight:800}}>
-              DESTINY FOUND
-            </div>
-          </>}
+      {/* Orb — shown during idle and gazing */}
+      {(phase === 'idle' || phase === 'gazing') && (
+        <div style={{position:'relative',width:150,height:150,marginBottom:28,
+          cursor:phase==='idle'?'pointer':'default'}}
+          onClick={phase==='idle'?startGazing:undefined}>
+          <div style={{position:'absolute',inset:-14,borderRadius:'50%',
+            background:orbPulse?'radial-gradient(circle,rgba(168,85,247,0.3)0%,transparent 75%)':'none',
+            animation:orbPulse?'orbBreath 1.1s ease-in-out infinite':'none'}}/>
+          <div style={{position:'absolute',inset:0,borderRadius:'50%',
+            background:'radial-gradient(circle at 38% 32%,rgba(210,180,255,0.18)0%,rgba(100,55,185,0.55)40%,rgba(15,8,40,0.93)100%)',
+            border:'1.5px solid rgba(168,85,247,0.4)',
+            boxShadow:orbPulse
+              ?'0 0 36px rgba(168,85,247,0.55),inset 0 0 24px rgba(100,50,200,0.25)'
+              :'0 0 16px rgba(168,85,247,0.25)',
+            transition:'box-shadow 0.4s',display:'flex',alignItems:'center',
+            justifyContent:'center',flexDirection:'column',gap:5}}>
+            <div style={{position:'absolute',inset:0,borderRadius:'50%',
+              background:'radial-gradient(ellipse at 30% 25%,rgba(255,255,255,0.07)0%,transparent 55%)',
+              pointerEvents:'none'}}/>
+            {phase==='idle' && <>
+              <div style={{fontSize:30,filter:'drop-shadow(0 0 8px rgba(200,150,255,0.8))'}}>🔮</div>
+              <div style={{fontFamily:mono,fontSize:7.5,color:'rgba(200,170,255,0.7)',
+                letterSpacing:1,textAlign:'center',lineHeight:1.6}}>TAP TO<br/>BEGIN</div>
+            </>}
+            {phase==='gazing' && <>
+              <div style={{fontSize:24,animation:'orbSpin 1.3s linear infinite'}}>✨</div>
+              <div style={{fontFamily:mono,fontSize:7.5,color:'rgba(180,140,255,0.8)',
+                letterSpacing:1,textAlign:'center',lineHeight:1.7}}>READING<br/>THE DATA…</div>
+            </>}
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* ── Idle CTA ── */}
+      {/* Idle description */}
       {phase === 'idle' && (
-        <div style={{textAlign:'center',marginBottom:24,animation:'fadeUp 0.5s ease'}}>
-          <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)',lineHeight:1.8,maxWidth:340,marginBottom:16}}>
-            The orb consults exit velocity, bat speed, zone fit,<br/>
-            close calls, signals, and matchup fate.<br/>
-            Three names. One destiny.
+        <div style={{textAlign:'center',marginBottom:20,animation:'fadeUp 0.5s ease'}}>
+          <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)',lineHeight:1.9,
+            maxWidth:360,marginBottom:16}}>
+            The orb draws one batter from each tier.<br/>
+            Three cards appear face-down.<br/>
+            <span style={{color:'rgba(255,215,0,0.6)'}}>👑 Chosen</span>{' · '}
+            <span style={{color:'rgba(255,90,30,0.7)'}}>🐎 Dark Horse</span>{' · '}
+            <span style={{color:'rgba(0,210,170,0.6)'}}>🃏 Wild Card</span>
           </div>
           <button onClick={startGazing}
-            style={{padding:'10px 28px',borderRadius:8,cursor:'pointer',
+            style={{padding:'10px 30px',borderRadius:8,cursor:'pointer',
               fontFamily:osw,fontSize:14,fontWeight:800,letterSpacing:2,
-              border:'1px solid rgba(168,85,247,0.5)',
-              background:'rgba(168,85,247,0.15)',color:'#c084fc',
-              boxShadow:'0 0 20px rgba(168,85,247,0.2)',
-              textTransform:'uppercase',
-              transition:'all 0.2s ease'}}>
-            🔮 Start the Engine
+              border:'1px solid rgba(168,85,247,0.45)',
+              background:'rgba(168,85,247,0.12)',color:'#c084fc',
+              boxShadow:'0 0 20px rgba(168,85,247,0.18)',textTransform:'uppercase'}}>
+            🔮 Begin Grand Reveal
           </button>
         </div>
       )}
 
-      {/* ── Gazing state ── */}
+      {/* Gazing status */}
       {phase === 'gazing' && (
-        <div style={{fontFamily:mono,fontSize:9,color:'rgba(168,85,247,0.7)',
-          letterSpacing:2,textAlign:'center',animation:'orbBreath 1.1s ease-in-out infinite'}}>
+        <div style={{fontFamily:mono,fontSize:9,letterSpacing:2,color:'rgba(168,85,247,0.7)',
+          animation:'orbBreath 1.1s ease-in-out infinite',textAlign:'center'}}>
           CONSULTING THE DATA SPIRITS…
         </div>
       )}
 
-      {/* ── Reveal cards ── */}
-      {phase === 'reveal' && picks.length > 0 && (
-        <div style={{width:'100%',display:'flex',flexDirection:'column',gap:12,marginBottom:24}}>
-          {picks.map((p, i) => (
-            <div key={p.id}
-              style={{
-                opacity: revealed.includes(i) ? 1 : 0,
-                transform: revealed.includes(i) ? 'translateY(0) scale(1)' : 'translateY(20px) scale(0.97)',
-                transition:'all 0.5s cubic-bezier(0.34,1.56,0.64,1)',
-                background:'linear-gradient(135deg, rgba(168,85,247,0.08) 0%, rgba(20,10,50,0.6) 100%)',
-                border:'1px solid rgba(168,85,247,0.25)',
-                borderRadius:12,padding:'14px 16px',
-                boxShadow: revealed.includes(i) ? '0 4px 24px rgba(168,85,247,0.12)' : 'none',
-              }}>
-              <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}>
-                {/* Rank orb */}
-                <div style={{width:28,height:28,borderRadius:'50%',flexShrink:0,
-                  background:'rgba(168,85,247,0.2)',border:'1px solid rgba(168,85,247,0.4)',
-                  display:'flex',alignItems:'center',justifyContent:'center',
-                  fontFamily:osw,fontSize:13,fontWeight:900,color:'#c084fc'}}>
-                  {i+1}
-                </div>
-                {/* Player avatar */}
-                <PlayerAvatar pid={parseInt(p.id)||0} size={32}/>
-                {/* Name + team — clickable to open slideout */}
-                <div style={{flex:1,minWidth:0,cursor:'pointer'}}
-                  onClick={()=>{const cp=getCachedPlayer(parseInt(p.id)||0)||{};openAtBatSlide({pid:parseInt(p.id)||0,name:p.name,team:p.team,avgEV:cp.avgEV,barrel:cp.barrel,hardHit:cp.hardHit,flyBall:cp.flyBall,hr:cp.hr,avg:cp.avg,obp:cp.obp,slg:cp.slg,xwoba:cp.xwoba,kPct:cp.kPct,bbPct:cp.bbPct,launchAngle:cp.launchAngle});}}>
-                  <div style={{fontFamily:osw,fontSize:15,fontWeight:800,
-                    color:'var(--text)',letterSpacing:.5,
-                    whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',
-                    textDecoration:'underline',textDecorationColor:'rgba(168,85,247,0.4)',
-                    textUnderlineOffset:3}}>
-                    {p.name}
-                  </div>
-                  <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>
-                    {p.team}{p.hand?` · ${p.hand}HB`:''}{p.pitcher?` · vs ${p.pitcher}`:''}
-                  </div>
-                </div>
-                {/* Scores + pick button */}
-                <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:3,flexShrink:0}}>
-                  <div style={{display:'flex',alignItems:'center',gap:4}}>
-                    <YardBadge score={p.yard}/>
-                    <PickButton pid={parseInt(p.id)||0} name={p.name} team={p.team}/>
-                  </div>
-                  {p.effGrade && p.effGrade !== 'D' && (
-                    <span style={{fontFamily:osw,fontSize:9,fontWeight:800,
-                      color:gradeColor(p.effGrade)}}>
-                      {p.effGrade}
-                    </span>
-                  )}
-                </div>
-              </div>
+      {/* 3 cards — show when picks are ready */}
+      {(phase === 'cards' || phase === 'done') && picks.length === 3 && (
+        <div style={{width:'100%',display:'flex',gap:12,justifyContent:'center',
+          flexWrap:'wrap',marginBottom:24}}>
+          {picks.map((pick, i) => {
+            const tier = CB_TIERS[i];
+            const isFlipped = flipped[i];
+            const p = pick;
+            return (
+              <div key={i}
+                onClick={() => !isFlipped && flipCard(i)}
+                style={{
+                  // Baseball card proportions: 2.5" × 3.5" = ~0.714
+                  width:195, height:273, flexShrink:0,
+                  perspective:1000,cursor:isFlipped?'default':'pointer',
+                  position:'relative',
+                }}>
+                {/* Card wrapper — rotates on flip */}
+                <div style={{
+                  position:'absolute',inset:0,
+                  transformStyle:'preserve-3d',
+                  transition:'transform 0.65s cubic-bezier(0.4,0.2,0.2,1)',
+                  transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+                }}>
 
-              {/* Pitcher grade badge */}
-              {p.pgLabel && (
-                <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',
-                  marginBottom:6,paddingLeft:38}}>
-                  {p.pgLabel}
-                </div>
-              )}
-
-              {/* Reasons */}
-              <div style={{paddingLeft:38,display:'flex',flexWrap:'wrap',gap:4}}>
-                {p.reasons.map((r,ri) => (
-                  <span key={ri} style={{
-                    fontFamily:mono,fontSize:8,padding:'2px 7px',borderRadius:4,
-                    background:'rgba(168,85,247,0.12)',color:'rgba(200,170,255,0.85)',
-                    border:'1px solid rgba(168,85,247,0.2)',
+                  {/* ── CARD BACK (face-down = Going Yard logo) ── */}
+                  <div style={{
+                    position:'absolute',inset:0,backfaceVisibility:'hidden',
+                    borderRadius:12,overflow:'hidden',
+                    background:'linear-gradient(160deg,#0d1318 0%,#1a0a2e 50%,#0a1020 100%)',
+                    border:'2px solid rgba(168,85,247,0.35)',
+                    boxShadow:'0 8px 32px rgba(0,0,0,0.6),inset 0 1px 0 rgba(255,255,255,0.05)',
+                    display:'flex',flexDirection:'column',
+                    alignItems:'center',justifyContent:'center',gap:12,
                   }}>
-                    {r}
-                  </span>
-                ))}
-              </div>
-            </div>
-          ))}
+                    {/* Decorative border inset */}
+                    <div style={{position:'absolute',inset:8,borderRadius:8,
+                      border:'1px solid rgba(168,85,247,0.18)',pointerEvents:'none'}}/>
+                    {/* Corner diamonds */}
+                    {[[8,8],[8,'auto'],[8,'auto'],['auto',8]].map((_,ci)=>(
+                      <div key={ci} style={{position:'absolute',
+                        top:ci<2?14:'auto',bottom:ci>=2?14:'auto',
+                        left:ci%2===0?14:'auto',right:ci%2===1?14:'auto',
+                        width:6,height:6,borderRadius:1,
+                        background:'rgba(168,85,247,0.4)',
+                        transform:'rotate(45deg)'}}/>
+                    ))}
+                    {/* GY logo */}
+                    <img src="/icon-192.png" alt="Going Yard"
+                      style={{width:64,height:64,borderRadius:12,
+                        filter:'drop-shadow(0 0 12px rgba(168,85,247,0.6))',
+                        opacity:.92}}/>
+                    <div style={{fontFamily:osw,fontSize:13,fontWeight:900,
+                      letterSpacing:3,color:'rgba(200,170,255,0.7)',textTransform:'uppercase'}}>
+                      GOING YARD
+                    </div>
+                    {/* Tier hint */}
+                    <div style={{fontFamily:mono,fontSize:8,
+                      color:`rgba(${tier.accentRgb},0.55)`,letterSpacing:1.5,
+                      textTransform:'uppercase'}}>
+                      {tier.emoji} {tier.name}
+                    </div>
+                    {/* Tap hint */}
+                    {!isFlipped && (
+                      <div style={{position:'absolute',bottom:16,fontFamily:mono,
+                        fontSize:7,color:'rgba(255,255,255,0.2)',letterSpacing:1.5}}>
+                        TAP TO REVEAL
+                      </div>
+                    )}
+                  </div>
 
-          {/* Footer */}
-          {revealed.length === 3 && (
-            <div style={{
-              opacity:1,animation:'fadeUp 0.6s ease 0.4s both',
-              textAlign:'center',padding:'8px 0',
-            }}>
-              <div style={{fontFamily:mono,fontSize:8,color:'rgba(168,85,247,0.5)',
-                letterSpacing:1,marginBottom:12}}>
-                ⚠ NOT FINANCIAL ADVICE. THE ORBS HAVE SPOKEN.
+                  {/* ── CARD FRONT (face-up = player reveal) ── */}
+                  <div style={{
+                    position:'absolute',inset:0,backfaceVisibility:'hidden',
+                    transform:'rotateY(180deg)',
+                    borderRadius:12,overflow:'hidden',
+                    background:tier.bg,
+                    border:`2px solid ${tier.border}`,
+                    boxShadow:`0 8px 32px rgba(0,0,0,0.6),0 0 20px ${tier.glow}`,
+                    display:'flex',flexDirection:'column',padding:'12px 11px',gap:8,
+                  }}>
+                    {/* Tier badge */}
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                      <div style={{display:'flex',alignItems:'center',gap:5}}>
+                        <span style={{fontSize:13}}>{tier.emoji}</span>
+                        <span style={{fontFamily:osw,fontSize:9,fontWeight:800,
+                          color:`rgba(${tier.accentRgb},0.9)`,letterSpacing:1,
+                          textTransform:'uppercase'}}>{tier.name}</span>
+                      </div>
+                      {p && <YardBadge score={p.yard}/>}
+                    </div>
+
+                    {/* Player avatar + name */}
+                    {p && <>
+                      <div style={{display:'flex',alignItems:'center',gap:8}}>
+                        <PlayerAvatar pid={parseInt(p.id)||0} size={36}/>
+                        <div style={{flex:1,minWidth:0,cursor:'pointer'}}
+                          onClick={e=>{e.stopPropagation();const cp=getCachedPlayer(parseInt(p.id)||0)||{};
+                            openAtBatSlide({pid:parseInt(p.id)||0,name:p.name,team:p.team,
+                              avgEV:cp.avgEV,barrel:cp.barrel,hardHit:cp.hardHit,flyBall:cp.flyBall,
+                              hr:cp.hr,avg:cp.avg,obp:cp.obp,slg:cp.slg,xwoba:cp.xwoba,
+                              kPct:cp.kPct,bbPct:cp.bbPct,launchAngle:cp.launchAngle});}}>
+                          <div style={{fontFamily:osw,fontSize:13,fontWeight:900,
+                            color:'var(--text)',lineHeight:1.2,
+                            whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',
+                            textDecoration:'underline',
+                            textDecorationColor:`rgba(${tier.accentRgb},0.4)`,
+                            textUnderlineOffset:2}}>
+                            {p.name}
+                          </div>
+                          <div style={{fontFamily:mono,fontSize:7.5,color:'var(--muted)',
+                            whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                            {p.team}{p.hand?` · ${p.hand}HB`:''}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Pitcher */}
+                      {p.pgLabel && <div style={{fontFamily:mono,fontSize:7.5,
+                        color:'var(--muted)',lineHeight:1.3}}>
+                        {p.pgLabel}{p.pitcher?` · vs ${p.pitcher}`:''}
+                      </div>}
+
+                      {/* Effective grade */}
+                      {p.effGrade && p.effGrade !== 'D' && (
+                        <div style={{display:'flex',alignItems:'center',gap:4}}>
+                          <span style={{fontFamily:osw,fontSize:8,fontWeight:800,
+                            color:gradeColor(p.effGrade)}}>
+                            Grade {p.effGrade}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Reason tags */}
+                      <div style={{display:'flex',flexWrap:'wrap',gap:3,flex:1,alignContent:'flex-start'}}>
+                        {p.reasons.map((r,ri)=>(
+                          <span key={ri} style={{fontFamily:mono,fontSize:7,
+                            padding:'2px 5px',borderRadius:3,
+                            background:tier.tagBg,color:tier.tagColor,
+                            border:`1px solid ${tier.tagBorder}`}}>
+                            {r}
+                          </span>
+                        ))}
+                      </div>
+
+                      {/* Pick button at bottom */}
+                      <div style={{display:'flex',justifyContent:'center',marginTop:'auto'}}>
+                        <PickButton pid={parseInt(p.id)||0} name={p.name} team={p.team}/>
+                      </div>
+                    </>}
+
+                    {/* No pick found */}
+                    {!p && (
+                      <div style={{flex:1,display:'flex',alignItems:'center',
+                        justifyContent:'center',fontFamily:mono,fontSize:8,
+                        color:'var(--muted)',textAlign:'center',lineHeight:1.7}}>
+                        No qualifying<br/>batter found<br/>for this tier today
+                      </div>
+                    )}
+                  </div>
+
+                </div>
               </div>
-              <button onClick={startGazing}
-                style={{padding:'7px 20px',borderRadius:7,cursor:'pointer',marginRight:8,
-                  fontFamily:mono,fontSize:9,fontWeight:700,letterSpacing:1,
-                  border:'1px solid rgba(168,85,247,0.3)',
-                  background:'rgba(168,85,247,0.1)',color:'#c084fc'}}>
-                🔮 Ask Again
-              </button>
-              <button onClick={reset}
-                style={{padding:'7px 20px',borderRadius:7,cursor:'pointer',
-                  fontFamily:mono,fontSize:9,fontWeight:700,letterSpacing:1,
-                  border:'1px solid var(--border)',
-                  background:'transparent',color:'var(--muted)'}}>
-                ↺ Reset
-              </button>
-            </div>
-          )}
+            );
+          })}
         </div>
       )}
 
-      {/* ── No data state ── */}
-      {phase === 'reveal' && picks.length === 0 && (
-        <div style={{textAlign:'center',fontFamily:mono,fontSize:10,color:'var(--muted)',marginBottom:20}}>
-          The orb sees no worthy candidates yet — load today's data first.
-          <br/><br/>
+      {/* Flip hint */}
+      {phase === 'cards' && !allFlipped && (
+        <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',
+          letterSpacing:1,textAlign:'center',marginBottom:16,
+          animation:'fadeUp 0.4s ease'}}>
+          {flipped.filter(Boolean).length === 0
+            ? '👆 Click any card to reveal'
+            : `${3 - flipped.filter(Boolean).length} card${3-flipped.filter(Boolean).length!==1?'s':''} remaining`}
+        </div>
+      )}
+
+      {/* Footer when all revealed */}
+      {(phase === 'done' || (phase === 'cards' && allFlipped)) && (
+        <div style={{textAlign:'center',padding:'8px 0 16px',animation:'fadeUp 0.5s ease'}}>
+          <div style={{fontFamily:mono,fontSize:8,color:'rgba(168,85,247,0.4)',
+            letterSpacing:1,marginBottom:12}}>
+            ⚠ NOT FINANCIAL ADVICE. THE ORBS HAVE SPOKEN.
+          </div>
+          <button onClick={startGazing}
+            style={{padding:'7px 20px',borderRadius:7,cursor:'pointer',marginRight:8,
+              fontFamily:mono,fontSize:9,fontWeight:700,letterSpacing:1,
+              border:'1px solid rgba(168,85,247,0.3)',
+              background:'rgba(168,85,247,0.1)',color:'#c084fc'}}>
+            🔮 Ask Again
+          </button>
           <button onClick={reset}
-            style={{padding:'7px 18px',borderRadius:7,cursor:'pointer',
-              fontFamily:mono,fontSize:9,border:'1px solid var(--border)',
-              background:'transparent',color:'var(--muted)'}}>
+            style={{padding:'7px 20px',borderRadius:7,cursor:'pointer',
+              fontFamily:mono,fontSize:9,fontWeight:700,letterSpacing:1,
+              border:'1px solid var(--border)',background:'transparent',color:'var(--muted)'}}>
             ↺ Reset
           </button>
         </div>
@@ -19759,39 +19856,36 @@ function CrystalBallTab() {
 
       <style>{`
         @keyframes orbBreath {
-          0%,100% { opacity:.7; transform:scale(1); }
-          50%      { opacity:1;  transform:scale(1.04); }
+          0%,100%{opacity:.7;transform:scale(1);}
+          50%{opacity:1;transform:scale(1.05);}
         }
         @keyframes orbSpin {
-          from { transform:rotate(0deg); }
-          to   { transform:rotate(360deg); }
+          from{transform:rotate(0deg);}
+          to{transform:rotate(360deg);}
         }
         @keyframes fadeUp {
-          from { opacity:0; transform:translateY(12px); }
-          to   { opacity:1; transform:translateY(0); }
+          from{opacity:0;transform:translateY(10px);}
+          to{opacity:1;transform:translateY(0);}
         }
       `}</style>
 
-      {/* ── Bottom disclaimer ── */}
-      <div style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,0.15)',
-        textAlign:'center',padding:'12px 0 4px',letterSpacing:.5,lineHeight:1.8}}>
-        Crystal Ball predictions are generated for entertainment purposes only.<br/>
-        Past data patterns do not guarantee future outcomes. Not financial advice.
+      <div style={{fontFamily:mono,fontSize:7.5,color:'rgba(255,255,255,0.1)',
+        textAlign:'center',padding:'8px 0',letterSpacing:.4,lineHeight:1.8}}>
+        For entertainment only. Past patterns do not guarantee future outcomes.
       </div>
 
-      {/* ── Help Slideout ── */}
       {showHelp && <HelpSlideout title="🔮 Crystal Ball Guide" onClose={()=>setShowHelp(false)} items={[
-        ['What is this?',          'A fun but data-backed HR prediction engine. The orb consults today\'s full HPE scoring stack — exit velocity, bat speed, zone fit, signal flags, close calls, and matchup grade — then reveals 3 batters it considers "destined" to go yard today.'],
-        ['How are the 3 picked?',  'Every batter in today\'s data gets a Crystal Score built from: Yard Score (base) + Sig bonus + EV above 95mph + launch angle sweet spot + bat speed above baseline + close calls + zone fit + pitcher grade bonus. The top 15 qualify, then a light shuffle pulls 3 so the same trio doesn\'t always appear.'],
-        ['Why does it vary?',      'Intentionally. The pool is the top 15 qualifiers, not just the top 3. A small randomization means the orb can surface different strong candidates each time — because in reality, any of the top 15 could go yard.'],
-        ['Pitcher filter',         'Elite and Tough pitchers are automatically excluded. Only batters facing Average, Hittable, or Target pitchers qualify — the same logic used in the HPE\'s "Due" category.'],
-        ['The disclaimer',         'This is for entertainment. The data behind it is real and the logic is sound, but baseball is beautifully random. A 15% HR probability still means it doesn\'t happen 85% of the time. Enjoy the eerie hits when they land.'],
-        ['"Ask Again"',            'Reshuffles the top 15 pool and draws a new trio. Use it if you want a second opinion from the orb, or to see who else is in contention today.'],
+        ['How it works',     'Press Begin Grand Reveal. The orb gazes into today\'s HPE data and draws one batter from each of three tiers. Three face-down cards appear — click each to flip and reveal your pick.'],
+        ['👑 The Chosen',    'Yard Score 32+ with EV 92+. The most fully-aligned candidates the HPE can find today — live signals, strong matchup, elevated power profile. Highest single-game HR probability tier.'],
+        ['🐎 Dark Horse',    'Yard Score 20–31 — the proven sweet spot in the data (9–10% HR rate). Flying under the radar, not being managed around. Close calls and bat speed spikes are weighted heavily here.'],
+        ['🃏 Wild Card',     'Any Yard Score 13+ with at least one spike signal: bat speed surge ≥1.5 above baseline, 2+ close calls, zone fit ≥4, or EV 96+ with solid launch angle. Includes a small chaos factor — the one nobody sees coming.'],
+        ['Clicking the card','Click any card to flip and reveal the batter. Tap their name to open the full stats slideout. Use the [+] button to add them to My Picks.'],
+        ['Ask Again',        'Draws a fresh pick from each tier\'s top-15 pool using weighted randomness. Higher crystal scores are more likely but not guaranteed — you\'ll see variety across reshuffles.'],
+        ['The disclaimer',   'Just for fun — but the data is real. Enjoy the hits when they land.'],
       ]}/>}
     </div>
   );
 }
-
 
 async function loadGameSplitsData() {
   if (GAME_SPLITS_LOADED) return { batters: BATTER_GAME_SPLITS, pitchers: PITCHER_GAME_SPLITS };
