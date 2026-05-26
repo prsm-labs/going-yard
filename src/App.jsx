@@ -19479,10 +19479,22 @@ function CrystalBallTab() {
       const j = Math.floor(Math.random() * (i + 1));
       [pool[i], pool[j]] = [pool[j], pool[i]];
     }
-    // But still weight toward top: take the best 3 from shuffled top-15
-    return pool
-      .sort((a, b) => b.crystal - a.crystal)
-      .slice(0, 3);
+    // Weighted random draw from top 15 — higher crystal score = more likely
+    // but not guaranteed, so strong candidates float up without locking in forever.
+    // Uses a roulette-wheel selection so standards are never lowered.
+    const chosen = [];
+    const remaining = [...pool];
+    while (chosen.length < 3 && remaining.length > 0) {
+      const totalWeight = remaining.reduce((sum, r) => sum + Math.max(1, r.crystal), 0);
+      let rand = Math.random() * totalWeight;
+      let idx = 0;
+      for (let j = 0; j < remaining.length; j++) {
+        rand -= Math.max(1, remaining[j].crystal);
+        if (rand <= 0) { idx = j; break; }
+      }
+      chosen.push(remaining.splice(idx, 1)[0]);
+    }
+    return chosen;
   };
 
   const startGazing = () => {
