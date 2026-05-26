@@ -14216,6 +14216,8 @@ function StatsTab() {
           selMatchup={selMatchup}   setSelMatchup={setSelMatchup}
           pTeam={pTeam}             onPTeamChange={onPTeamChange}
           bTeam={bTeam}             onBTeamChange={onBTeamChange}
+          sharedPLoc={sharedPLoc}   onPLocChange={onPLocChange}
+          sharedBLoc={sharedBLoc}   onBLocChange={onBLocChange}
           matchupList={matchupList}
         />
       </div>
@@ -19396,7 +19398,7 @@ async function loadGameSplitsData() {
   return { batters: BATTER_GAME_SPLITS, pitchers: PITCHER_GAME_SPLITS };
 }
 
-function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, onPTeamChange, bTeam, onBTeamChange, matchupList }) {
+function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, onPTeamChange, bTeam, onBTeamChange, sharedPLoc, onPLocChange, sharedBLoc, onBLocChange, matchupList }) {
   const mono = "'DM Mono',monospace";
   const osw  = "'Oswald',sans-serif";
 
@@ -19406,8 +19408,7 @@ function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, on
   // shared between the Splits and Game sub-pages.
   const [sharedPHand,    setSharedPHand]    = useState('');
   const [sharedBHand,    setSharedBHand]    = useState('');
-  const [sharedPLoc,     setSharedPLoc]     = useState('');  // pitcher location
-  const [sharedBLoc,     setSharedBLoc]     = useState('');  // batter location (opposite)
+  // sharedPLoc, sharedBLoc, onPLocChange, onBLocChange come from props
   const [sharedDN,       setSharedDN]       = useState('');
   const [pitchGroup,     setPitchGroup]     = useState('');
   const [showHelp,       setShowHelp]       = useState(false);
