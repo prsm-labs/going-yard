@@ -19775,6 +19775,7 @@ function CrystalBallTab() {
 }
 
 
+async function loadGameSplitsData() {
   if (GAME_SPLITS_LOADED) return { batters: BATTER_GAME_SPLITS, pitchers: PITCHER_GAME_SPLITS };
   try {
     const [br, pr] = await Promise.all([
