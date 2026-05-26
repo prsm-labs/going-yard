@@ -19743,7 +19743,13 @@ function CrystalBallTab() {
                           color:`rgba(${tier.accentRgb},0.9)`,letterSpacing:1,
                           textTransform:'uppercase'}}>{tier.name}</span>
                       </div>
-                      {p && <YardBadge score={p.yard}/>}
+                      {p && <div style={{display:'flex',alignItems:'center',gap:4}}>
+                        <YardBadge score={p.yard}/>
+                        {LINEUP_STATUS[parseInt(p.id)||0]?.status === 'confirmed' && (
+                          <span title="✅ Confirmed in today's lineup"
+                            style={{fontSize:11,flexShrink:0,lineHeight:1}}>✅</span>
+                        )}
+                      </div>}
                     </div>
 
                     {/* Player avatar + name */}
