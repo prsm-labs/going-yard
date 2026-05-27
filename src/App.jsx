@@ -13606,11 +13606,6 @@ function RecentGameLog({ batterId }) {
         await Promise.all(splits.slice(0, 5).map(async (split) => {
           const gamePk = split?.game?.gamePk;
           if (!gamePk) return;
-          const oppAbbr = split?.opponent?.abbreviation ||
-                          split?.opponent?.teamCode?.toUpperCase() ||
-                          split?.opponent?.teamTriCode ||
-                          split?.team?.abbreviation ||
-                          '';
           const date    = split?.date || '';
           try {
             const gRes = await fetch(
@@ -13621,25 +13616,39 @@ function RecentGameLog({ batterId }) {
             const gData = await gRes.json();
             const plays = gData?.liveData?.plays?.allPlays || [];
 
+            // Derive opponent from game feed — works for home AND away batters
+            const gameTeams = gData?.gameData?.teams || {};
+            const awayAbbr  = gameTeams?.away?.abbreviation || gameTeams?.away?.teamCode?.toUpperCase() || '';
+            const homeAbbr  = gameTeams?.home?.abbreviation || gameTeams?.home?.teamCode?.toUpperCase() || '';
+            // Find which side the batter is on by checking the first play involving pid
+            const firstBatterPlay = plays.find(p => parseInt(p?.matchup?.batter?.id) === pid);
+            const batterSide = firstBatterPlay?.about?.halfInning; // 'top' = away, 'bottom' = home
+            const oppAbbr = batterSide === 'top' ? homeAbbr
+                          : batterSide === 'bottom' ? awayAbbr
+                          : (homeAbbr || awayAbbr || '');
+
             plays.forEach(play => {
               if (parseInt(play?.matchup?.batter?.id) !== pid) return;
               const result    = (play?.result?.eventType || play?.result?.event || '').toLowerCase().replace(/ /g,'_');
               const events    = play?.playEvents || [];
               const lastPitch = events.filter(e => e?.isPitch).pop();
               const pitchCode = lastPitch?.details?.type?.code || '';
-              // Statcast lives on hitData at play level OR on the last pitch event
               const hitData   = play?.hitData || lastPitch?.hitData || {};
               const ev        = hitData?.launchSpeed   ?? null;
               const la        = hitData?.launchAngle   ?? null;
               const dist      = hitData?.totalDistance ?? null;
+              const inning    = play?.about?.inning    ?? 0;
+              const atBatIdx  = play?.about?.atBatIndex ?? 0;
               allAbs.push({
-                date:   date,
-                opp:    oppAbbr,
-                result: result,
-                ev:     ev   != null ? Math.round(ev   * 10) / 10 : null,
-                la:     la   != null ? Math.round(la   * 10) / 10 : null,
-                dist:   dist != null ? Math.round(dist)            : null,
-                pitch:  pitchCode,
+                date:      date,
+                opp:       oppAbbr,
+                result:    result,
+                ev:        ev   != null ? Math.round(ev   * 10) / 10 : null,
+                la:        la   != null ? Math.round(la   * 10) / 10 : null,
+                dist:      dist != null ? Math.round(dist)            : null,
+                pitch:     pitchCode,
+                _inning:   inning,    // hidden — used for sort only
+                _atBatIdx: atBatIdx,  // hidden — used for sort only
               });
             });
           } catch(_) {}
@@ -13647,7 +13656,12 @@ function RecentGameLog({ batterId }) {
 
         if (!allAbs.length) throw new Error('no abs parsed');
 
-        const sorted = allAbs.sort((a,b) => b.date.localeCompare(a.date)).slice(0,15);
+        // Sort: most recent date first, then highest inning first, then highest atBatIndex first
+        const sorted = allAbs.sort((a, b) => {
+          if (b.date !== a.date) return b.date.localeCompare(a.date);
+          if (b._inning !== a._inning) return b._inning - a._inning;
+          return b._atBatIdx - a._atBatIdx;
+        }).slice(0, 15);
 
         if (!RecentGameLog._cache) RecentGameLog._cache = {};
         RecentGameLog._cache[cacheKey] = { data: sorted, ts: Date.now() };
