@@ -13558,6 +13558,8 @@ function RecentGameLog({ batterId }) {
     if (!batterId || parseInt(batterId) <= 0) return;
     const pid      = parseInt(batterId);
     const cacheKey = `rglog_${pid}`;
+    // Clear any stale cache entries so fixes take effect
+    if (RecentGameLog._cache?.[cacheKey]) delete RecentGameLog._cache[cacheKey];
 
     // Show pipeline data immediately while live fetch runs
     const pipelineData = getCachedPlayer(pid)?.recentAtBats || [];
@@ -13593,7 +13595,9 @@ function RecentGameLog({ batterId }) {
           s?.type?.code === 'gameLog' ||
           (s?.splits?.length > 0 && s.splits[0]?.game?.gamePk)
         );
-        const splits = gameLogStat?.splits || [];
+        const splits = (gameLogStat?.splits || [])
+          .sort((a, b) => (b?.date || '').localeCompare(a?.date || ''))  // most recent first
+          .slice(0, 5);
 
         if (!splits.length) throw new Error('no splits');
 
@@ -13603,7 +13607,10 @@ function RecentGameLog({ batterId }) {
           const gamePk = split?.game?.gamePk;
           if (!gamePk) return;
           const oppAbbr = split?.opponent?.abbreviation ||
-                          split?.opponent?.teamCode?.toUpperCase() || '';
+                          split?.opponent?.teamCode?.toUpperCase() ||
+                          split?.opponent?.teamTriCode ||
+                          split?.team?.abbreviation ||
+                          '';
           const date    = split?.date || '';
           try {
             const gRes = await fetch(
@@ -13617,13 +13624,14 @@ function RecentGameLog({ batterId }) {
             plays.forEach(play => {
               if (parseInt(play?.matchup?.batter?.id) !== pid) return;
               const result    = (play?.result?.eventType || play?.result?.event || '').toLowerCase().replace(/ /g,'_');
-              const ev        = play?.hitData?.launchSpeed   ?? null;
-              const la        = play?.hitData?.launchAngle   ?? null;
-              const dist      = play?.hitData?.totalDistance ?? null;
-              // Last pitch of the PA
               const events    = play?.playEvents || [];
               const lastPitch = events.filter(e => e?.isPitch).pop();
               const pitchCode = lastPitch?.details?.type?.code || '';
+              // Statcast lives on hitData at play level OR on the last pitch event
+              const hitData   = play?.hitData || lastPitch?.hitData || {};
+              const ev        = hitData?.launchSpeed   ?? null;
+              const la        = hitData?.launchAngle   ?? null;
+              const dist      = hitData?.totalDistance ?? null;
               allAbs.push({
                 date:   date,
                 opp:    oppAbbr,
