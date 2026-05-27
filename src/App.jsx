@@ -1999,6 +1999,92 @@ function MatchupCard({ dp }) {
   );
 }
 
+// ── Slideout matchup line helper ─────────────────────────────────────────────
+// Finds today's game for a given team abbreviation from LIVE_GAMES_CACHE
+function getGameForTeam(teamAbbr) {
+  if (!teamAbbr) return null;
+  const abbr = String(teamAbbr).trim().toUpperCase();
+  return LIVE_GAMES_CACHE.find(g =>
+    g.away?.abbr?.toUpperCase() === abbr ||
+    g.home?.abbr?.toUpperCase() === abbr
+  ) || null;
+}
+
+function SlideoutMatchupLine({ team }) {
+  const mono = "'DM Mono',monospace";
+  const g = getGameForTeam(team);
+  if (!g) return null;
+
+  const away = g.away?.abbr || '???';
+  const home = g.home?.abbr || '???';
+  const matchup = `${away} @ ${home}`;
+
+  // Time — format game_time or startTime
+  let timeStr = '';
+  if (g.time) {
+    timeStr = g.time; // already formatted like "7:05 PM ET"
+  } else if (g.startTime) {
+    try {
+      const d = new Date(g.startTime);
+      timeStr = d.toLocaleTimeString('en-US', {
+        timeZone:'America/New_York', hour:'numeric', minute:'2-digit',
+        hour12:true
+      }) + ' ET';
+    } catch(_) {}
+  }
+
+  // Game status
+  const status = g.status || '';
+  const isLive     = status === 'Live' || status === 'In Progress';
+  const isFinal    = status === 'Final' || status === 'Game Over';
+  const isWarmup   = status === 'Warmup' || status === 'Pre-Game';
+  const isPostponed= status === 'Postponed' || status === 'Suspended';
+  const isSched    = !isLive && !isFinal && !isWarmup && !isPostponed;
+
+  let statusLabel = '';
+  let statusColor = 'var(--muted)';
+
+  if (isLive) {
+    const inn = g.inning ? ` · ${g.inningHalf || ''} ${g.inning}` : '';
+    const score = (g.away?.score != null && g.home?.score != null)
+      ? ` · ${g.away.abbr} ${g.away.score} – ${g.home.score} ${g.home.abbr}` : '';
+    statusLabel = `🔴 LIVE${inn}${score}`;
+    statusColor = '#ff4444';
+  } else if (isFinal) {
+    const score = (g.away?.score != null && g.home?.score != null)
+      ? ` · ${g.away.abbr} ${g.away.score} – ${g.home.score} ${g.home.abbr}` : '';
+    statusLabel = `Final${score}`;
+    statusColor = 'var(--muted)';
+  } else if (isWarmup) {
+    statusLabel = '⚾ Warmup';
+    statusColor = '#f5a623';
+  } else if (isPostponed) {
+    statusLabel = '🌧 Postponed';
+    statusColor = '#6b7280';
+  } else {
+    statusLabel = timeStr || 'Scheduled';
+    statusColor = 'var(--muted)';
+  }
+
+  return (
+    <div style={{
+      marginTop:5,
+      display:'flex',alignItems:'center',gap:8,
+      fontFamily:mono,fontSize:9,flexWrap:'wrap',
+    }}>
+      <span style={{color:'var(--text)',fontWeight:600,letterSpacing:.3}}>
+        {matchup}
+      </span>
+      {timeStr && !isLive && !isFinal && (
+        <span style={{color:'var(--muted)'}}>· {timeStr}</span>
+      )}
+      <span style={{color:statusColor,fontWeight:isLive?700:400}}>
+        · {statusLabel}
+      </span>
+    </div>
+  );
+}
+
 function AtBatSlideIn() {
   const [player, setPlayer] = useState(null);
   const [atBats, setAtBats] = useState([]);
@@ -2171,6 +2257,7 @@ function AtBatSlideIn() {
             {player.avg > 0 && <span> · {'.'+String(Math.round(player.avg*1000)).padStart(3,'0')} AVG</span>}
             {player.grade?.grade && <span> · {player.grade.grade} Grade</span>}
           </div>
+          <SlideoutMatchupLine team={player.team}/>
         </div>
         <PickButton pid={player.pid} name={player.name} team={player.team}/>
         {/* RISP Stats */}
@@ -2612,6 +2699,7 @@ function PitcherSlideIn() {
             {stats?.era && stats.era !== '—' && <span style={{marginLeft:6}}>· ERA {stats.era}</span>}
             {stats?.whip && stats.whip !== '—' && <span style={{marginLeft:6}}>· WHIP {stats.whip}</span>}
           </div>
+          <SlideoutMatchupLine team={pitcher.team}/>
         </div>
         <button onClick={()=>setPitcher(null)} style={{background:'none',border:'1px solid var(--border)',
           borderRadius:6,color:'var(--muted)',cursor:'pointer',padding:'5px 10px',
@@ -3809,6 +3897,9 @@ async function fetchGames(setL, setG, setE, silent=false) {
       }
     });
     setG(games);
+    // Populate module-level cache so slideouts can look up game status by team
+    LIVE_GAMES_CACHE.length = 0;
+    LIVE_GAMES_CACHE.push(...games);
   } catch (e) {
     console.error("fetchGames error:", e.message);
     setE(e.message);
@@ -8280,6 +8371,8 @@ const FINAL_GAME_IDS    = new Set(); // game_ids whose status is "Final" — upd
 // Probable pitcher map — populated by fetchGames, used by BvPHistoryTab to fill missing pitcher_ids
 // keyed by team abbreviation → { id, name, hand, gamePk }
 const PROBABLE_PITCHER_MAP = {};
+// Live game cache — populated by fetchGames so any component can look up game status by team abbr
+const LIVE_GAMES_CACHE = [];
 let _notifyNewHR = null; // callback set by useHRNotifications hook
 
 // Global navigation — lets notifications route to tabs/views without prop drilling
