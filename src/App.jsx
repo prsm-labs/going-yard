@@ -2101,6 +2101,32 @@ function AtBatSlideIn() {
     return () => { AB_SLIDE_LISTENER = null; };
   }, []);
 
+  // Fetch live at-bat status when slideout opens — populates LIVE_AB_STATUS_CACHE
+  // so the matchup line can show ⚡/👀/⛳ without requiring the Live tab to be open
+  useEffect(() => {
+    if (!player?.pid || !player?.team) return;
+    const g = getGameForTeam(player.team);
+    if (!g?.gamePk) return;
+    const status = g.status || '';
+    const isLive = status === 'Live' || status === 'In Progress';
+    if (!isLive) return;
+    fetch(`https://statsapi.mlb.com/api/v1/game/${g.gamePk}/linescore`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (!d) return;
+        const off = d.offense || {};
+        const cur  = off.batter?.id;
+        const deck = off.onDeck?.id;
+        const hole = off.inHole?.id;
+        if (cur)  LIVE_AB_STATUS_CACHE[cur]  = 'atbat';
+        if (deck) LIVE_AB_STATUS_CACHE[deck] = 'ondeck';
+        if (hole) LIVE_AB_STATUS_CACHE[hole] = 'inhole';
+        // Force re-render so the badge appears
+        setPlayer(p => p ? {...p} : p);
+      })
+      .catch(() => {});
+  }, [player?.pid, player?.team]);
+
   useEffect(() => {
     if (!player?.pid) return;
 
