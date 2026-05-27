@@ -18359,6 +18359,12 @@ function WeatherGameCard({ g, wd }) {
               <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",lineHeight:1.6}}>
                 from {display.windDirRaw} ({display.windDeg}°)<br/>
                 <span style={{opacity:.6}}>CF faces {wd.cfDir}°</span>
+                {display.metarSource && (
+                  <span style={{marginLeft:6,color:'#27c97a',fontWeight:700,opacity:.8}}
+                    title={`Live observed wind from ${display.metarSource} METAR station`}>
+                    · METAR
+                  </span>
+                )}
               </div>
             </div>
           </div>
