@@ -4482,7 +4482,6 @@ function MLBNewsLink({ pid }) {
     </a>
   );
 }
-}
 
 function SRing({score, color}) {
   const r = 16, ci = 2 * Math.PI * r, fill = (score / 100) * ci;
