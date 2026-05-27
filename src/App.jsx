@@ -4081,7 +4081,7 @@ async function fetchLiftoffBatters(game) {
     // Collect engine rows for this game's batting teams
     const engineRows = Object.values(DAILY_PICKS_CACHE).filter(r => {
       const rGid = String(r._gid || r.game_id || '').replace(/\.0$/,'');
-      return rGid === gameId;
+      return rGid === gameId && isActiveBatter(r);
     });
 
     if (engineRows.length > 0) {
@@ -8302,6 +8302,22 @@ async function fetchVideoLinks(hrs) {
 let HR_LAST_FETCH = 0;
 const SEEN_HR_IDS = new Set();
 const DAILY_PICKS_CACHE = {}; // keyed by batter_id string
+
+// ── Active batter gate ────────────────────────────────────────────────────────
+// Hides batters with zero recent plate appearances who are NOT confirmed in today's
+// lineup. This prevents injured, demoted, or long-absent players from polluting
+// Streaks, Cheat Sheet, Key Matchups, Crystal Ball, and All Matchups.
+// If a batter IS confirmed in lineup, always show them regardless of recent_pa.
+function isActiveBatter(r) {
+  const pid = parseInt(String(r?.batter_id||r?.id||0).split('.')[0]) || 0;
+  if (LINEUP_STATUS[pid]?.status === 'confirmed') return true; // confirmed → always show
+  const recentPA   = parseFloat(r?.recent_pa || r?.recent_7day_pa || 0);
+  const seasonPA   = parseFloat(r?.season_pa || 0);
+  // Must have at least 1 PA in recent window OR 10+ season PA and in today's game
+  if (recentPA > 0) return true;
+  if (seasonPA >= 10 && r?.game_id) return true; // in today's slate, give benefit of doubt
+  return false;
+}
 // Key matchup batter IDs for today — orange highlight across all tabs
 // Keyed to ET date so it auto-resets each day
 const KEY_MATCHUP_BATTER_IDS   = new Set();
@@ -15788,6 +15804,7 @@ function BvPDeepDiveTab() {
         if (opposingTeam && team !== opposingTeam) return false;
         const ls = LINEUP_STATUS[parseInt(bid)||0];
         if (!ls) return false;
+        if (!isActiveBatter(b)) return false; // hide stale/inactive batters
         seen.add(bid);
         // Hand filter: does batter hand match selected filter?
         if (batterHand !== 'ALL') {
@@ -19636,6 +19653,7 @@ function CrystalBallTab() {
       if (!bid||seen.has(bid)||!r.batter||!r.game_id) return;
       seen.add(bid);
       if (INJURY_MAP?.[parseInt(bid)||0] && !LINEUP_STATUS?.[parseInt(bid)||0]) return;
+      if (!isActiveBatter(r)) return ; // hide stale/inactive batters
       const pg = r._pgLabel||'';
       if (pg.includes('Elite')||pg.includes('Tough')) return;
       const sig  = parseFloat(r._trackerSig||r.weighted_flag_score*4.6||0);
@@ -20836,6 +20854,7 @@ function CheatSheetTab({ data }) {
         if (!label.includes('Target') && !label.includes('Hittable')) return false;
         const pid = String(r.batter_id||'').split('.')[0];
         if (INJURY_MAP?.[parseInt(pid)||0] && !LINEUP_STATUS?.[parseInt(pid)||0]) return false;
+        if (!isActiveBatter(r)) return false;
         return true;
       })
       .map(r => {
@@ -20861,6 +20880,7 @@ function CheatSheetTab({ data }) {
         if (!sp||!sp.g2tb_pct||sp.games<4) return null;  // min 4 games for meaningful sample
         if (INJURY_MAP?.[parseInt(id)||0] && !LINEUP_STATUS?.[parseInt(id)||0]) return null;
         const dp = Object.values(DAILY_PICKS_CACHE).find(r=>String(r.batter_id||'').split('.')[0]===id);
+        if (dp && !isActiveBatter(dp)) return null;
         const n2tb=(p.name&&!/^\d+$/.test(p.name))?p.name:getCachedPlayer(parseInt(id)||0)?.name||dp?.batter||p.name;
         return { id, name:n2tb, team:p.team||dp?.batting_team||'', g2tb:sp.g2tb, g2tb_pct:sp.g2tb_pct, games:sp.games, pitcher:dp?.pitcher||'', pgLabel:dp?._pgLabel||'' };
       })
@@ -20879,6 +20899,7 @@ function CheatSheetTab({ data }) {
         if (!sp||!sp.h_game_pct||sp.games<4) return null;
         if (INJURY_MAP?.[parseInt(id)||0] && !LINEUP_STATUS?.[parseInt(id)||0]) return null;
         const dp = Object.values(DAILY_PICKS_CACHE).find(r=>String(r.batter_id||'').split('.')[0]===id);
+        if (dp && !isActiveBatter(dp)) return null;
         const nhit=(p.name&&!/^\d+$/.test(p.name))?p.name:getCachedPlayer(parseInt(id)||0)?.name||dp?.batter||p.name;
         return { id, name:nhit, team:p.team||dp?.batting_team||'', h_game:sp.h_game, h_game_pct:sp.h_game_pct, avg:sp.avg, games:sp.games, pitcher:dp?.pitcher||'', pgLabel:dp?._pgLabel||'' };
       })
@@ -20897,6 +20918,7 @@ function CheatSheetTab({ data }) {
         seen.add(bid);
         if (parseInt(b.so_close_count||0) < 2) return false;
         if (INJURY_MAP?.[parseInt(bid)||0] && !LINEUP_STATUS?.[parseInt(bid)||0]) return false;
+        if (!isActiveBatter(r)) return false; // hide stale/inactive batters
         return true;
       })
       .map(b => ({
@@ -20920,6 +20942,7 @@ function CheatSheetTab({ data }) {
         if (!bid||seen.has(bid)||!r.batter) return false;
         seen.add(bid);
         if (INJURY_MAP?.[parseInt(bid)||0] && !LINEUP_STATUS?.[parseInt(bid)||0]) return false;
+        if (!isActiveBatter(r)) return false; // hide stale/inactive batters
         const w7 = getCachedPlayer(parseInt(bid)||0)?.windows?.last7;
         return (w7?.avgEV||0) >= 82 && (w7?.pa||0) >= 10;
       })
@@ -20952,6 +20975,7 @@ function CheatSheetTab({ data }) {
         if (!bid || seen.has(bid) || !r.batter || !r.game_id) return false;
         seen.add(bid);
         if (INJURY_MAP?.[parseInt(bid)||0] && !LINEUP_STATUS?.[parseInt(bid)||0]) return false;
+        if (!isActiveBatter(r)) return false; // hide stale/inactive batters
         // Pitcher gate: Target, Hittable, Average only — not Elite or Tough
         const pg = r._pgLabel||'';
         if (pg.includes('Elite') || pg.includes('Tough')) return false;
@@ -21389,6 +21413,7 @@ function StreaksTab() {
       if (!bid || seen.has(bid) || !r.batter || !r.game_id) return;
       seen.add(bid);
       if (INJURY_MAP?.[parseInt(bid)||0] && !LINEUP_STATUS?.[parseInt(bid)||0]) return;
+      if (!isActiveBatter(r)) return ; // hide stale/inactive batters
       todayBatters.push({ id: bid, name: r.batter, team: r.batting_team||'' });
     });
 
