@@ -8874,7 +8874,25 @@ function HRTrackerTab() {
                 <td style={{padding:"1px 3px"}}><span className={`sv ${evC}`} style={{fontSize:9}}>{hr.exitVelo!=null?`${hr.exitVelo}`:"—"}</span></td>
                 <td style={{padding:"1px 3px"}}><span className={`sv ${distC}`} style={{fontSize:9}}>{hr.distance!=null?`${hr.distance}ft`:"—"}</span></td>
                 <td style={{padding:"1px 3px"}}>{hr.pitchType?<span style={{fontSize:8,fontFamily:"'DM Mono',monospace",padding:"1px 4px",borderRadius:3,background:"var(--surface2)",border:"1px solid var(--border)",whiteSpace:"nowrap"}}>{hr.pitchType}</span>:"—"}</td>
-                <td style={{padding:"1px 3px",whiteSpace:"nowrap"}}><span style={{fontSize:9,cursor:"pointer",textDecoration:"underline",textDecorationStyle:"dotted"}} onClick={e=>{e.stopPropagation();openPitcherSlide({pid:hr.pitcherId,name:hr.pitcherName,team:hr.pitcherTeam||'',hand:hr.pitcherHand||'R'});}}>{hr.pitcherName}</span></td>
+                <td style={{padding:"1px 3px",whiteSpace:"nowrap"}}><span style={{fontSize:9,cursor:"pointer",textDecoration:"underline",textDecorationStyle:"dotted"}} onClick={async e=>{
+                  e.stopPropagation();
+                  let pid  = hr.pitcherId || 0;
+                  let hand = hr.pitcherHand || 'R';
+                  let team = hr.pitcherTeam || '';
+                  // pitcherId is not in the HR payload — resolve via MLB Stats API person search
+                  if (!pid && hr.pitcherName) {
+                    try {
+                      const res = await fetch(`https://statsapi.mlb.com/api/v1/people/search?names=${encodeURIComponent(hr.pitcherName)}&sportId=1&activeStatus=ACTIVE`);
+                      const d   = await res.json();
+                      const p   = d.people?.[0];
+                      if (p?.id) {
+                        pid  = p.id;
+                        hand = p.pitchHand?.code || hand;
+                      }
+                    } catch(_) {}
+                  }
+                  openPitcherSlide({pid, name:hr.pitcherName, team, hand, pitchMix:[]});
+                }}>{hr.pitcherName}</span></td>
                 <td style={{padding:"1px 3px",whiteSpace:"nowrap"}}><span style={{fontSize:8,fontFamily:"'DM Mono',monospace",color:"var(--muted)",whiteSpace:"nowrap"}}>{hr.awayAbbr&&hr.homeAbbr?`${hr.awayAbbr}@${hr.homeAbbr}`:hr.gameId}</span></td>
                 <td style={{textAlign:"center",padding:"1px 2px"}}>
                   {videoUrl ? <a href={videoUrl} target="_blank" rel="noopener noreferrer"
