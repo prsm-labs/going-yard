@@ -2068,7 +2068,7 @@ function SlideoutMatchupLine({ team }) {
       <span style={{color:'var(--text)',fontWeight:600,letterSpacing:.3}}>
         {matchup}
       </span>
-      {timeStr && !isLive && !isFinal && (
+      {timeStr && !isLive && !isFinal && !isSched && (
         <span style={{color:'var(--muted)'}}>· {timeStr}</span>
       )}
       <span style={{color:statusColor,fontWeight:isLive?700:400}}>
@@ -2252,7 +2252,13 @@ function AtBatSlideIn() {
           </div>
           <SlideoutMatchupLine team={player.team}/>
         </div>
-        <PickButton pid={player.pid} name={player.name} team={player.team}/>
+        <div style={{display:'flex',alignItems:'center',gap:6,flexShrink:0}}>
+          {LINEUP_STATUS[player.pid]?.status === 'confirmed' && (
+            <span title="✅ Confirmed in today's lineup"
+              style={{fontSize:13,lineHeight:1}}>✅</span>
+          )}
+          <PickButton pid={player.pid} name={player.name} team={player.team}/>
+        </div>
         {/* RISP Stats */}
         {risp && (
           <div style={{margin:'8px 0 4px',padding:'8px 12px',borderRadius:7,
@@ -18175,40 +18181,43 @@ function envScore(s) {
 // windDeg = meteorological FROM direction
 function StadiumWindDiagram({ cfDir, windDeg, windDir, size=72 }) {
   const cx=size/2, cy=size/2;
-
-  // Field shape: rotate entire field so CF points in cfDir direction
-  const fieldRot = cfDir - 90; // rotate so "up" = cfDir
   const toRad = d => (d-90)*Math.PI/180;
 
-  // Outfield arc (CF = up in local coords, then rotated)
+  // Field is ALWAYS oriented with CF at top and home plate at bottom —
+  // consistent across all stadiums so cards all look the same at a glance.
+  // Wind arrow rotates independently to show true wind direction relative to field.
   const arcR = size*0.42;
-  const lfAngle = fieldRot - 45;
-  const rfAngle = fieldRot + 45;
+  const lfAngle = -45; // LF always upper-left
+  const rfAngle = +45; // RF always upper-right
   const lf = {x: cx+arcR*Math.cos(toRad(lfAngle)), y: cy+arcR*Math.sin(toRad(lfAngle))};
   const rf = {x: cx+arcR*Math.cos(toRad(rfAngle)), y: cy+arcR*Math.sin(toRad(rfAngle))};
-  const cf = {x: cx+arcR*Math.cos(toRad(fieldRot)), y: cy+arcR*Math.sin(toRad(fieldRot))};
+  const cf = {x: cx+arcR*Math.cos(toRad(0)),       y: cy+arcR*Math.sin(toRad(0))};
 
-  // Home plate (opposite of CF)
+  // Home plate always at bottom
   const hpR = size*0.3;
-  const hp = {x: cx+hpR*Math.cos(toRad(fieldRot+180)), y: cy+hpR*Math.sin(toRad(fieldRot+180))};
+  const hp  = {x: cx, y: cy+hpR};
 
   // Diamond points
-  const dR = size*0.18;
-  const d1b = {x: cx+dR*Math.cos(toRad(fieldRot+135)), y: cy+dR*Math.sin(toRad(fieldRot+135))};
-  const d3b = {x: cx+dR*Math.cos(toRad(fieldRot+225)), y: cy+dR*Math.sin(toRad(fieldRot+225))};
-  const d2b = {x: cx+dR*Math.cos(toRad(fieldRot)),     y: cy+dR*Math.sin(toRad(fieldRot))};
+  const dR  = size*0.18;
+  const d1b = {x: cx+dR*Math.cos(toRad(+135)), y: cy+dR*Math.sin(toRad(+135))};
+  const d3b = {x: cx+dR*Math.cos(toRad(-135)), y: cy+dR*Math.sin(toRad(-135))};
+  const d2b = {x: cx,                           y: cy-dR};
 
-  // Wind arrow (FROM direction = where wind comes from, arrow shows where it goes TO)
-  const windToward = (windDeg + 180) % 360;
-  const wRad = toRad(windToward);
-  const wLen = size*0.34;
-  const wx2 = cx + wLen*Math.cos(wRad);
-  const wy2 = cy + wLen*Math.sin(wRad);
-  const wx1 = cx - wLen*0.5*Math.cos(wRad);
-  const wy1 = cy - wLen*0.5*Math.sin(wRad);
+  // Wind arrow: windDeg is "comes from" (met convention) → arrow points TOWARD
+  // We need to rotate wind direction relative to the field orientation.
+  // Field CF faces cfDir compass degrees. Our diagram CF always faces 0° (up).
+  // So rotate wind: windRelative = windDeg - cfDir (field-relative bearing)
+  const windRelField  = ((windDeg - cfDir) + 360) % 360;
+  const windToward    = (windRelField + 180) % 360;
+  const wRad  = toRad(windToward);
+  const wLen  = size*0.34;
+  const wx2   = cx + wLen*Math.cos(wRad);
+  const wy2   = cy + wLen*Math.sin(wRad);
+  const wx1   = cx - wLen*0.5*Math.cos(wRad);
+  const wy1   = cy - wLen*0.5*Math.sin(wRad);
 
   const wCol = {'out-strong':'#ff4020','out':'#ff8020','in-strong':'#38b8f2','in':'#60a0d0','cross':'#f5a623','calm':'#888'}[windDir]||'#888';
-  const uid = `wd${Math.abs(windDeg)}`;
+  const uid  = `wd${Math.abs(windDeg)}${Math.abs(cfDir)}`;
 
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}
