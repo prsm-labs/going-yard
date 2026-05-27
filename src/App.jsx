@@ -2010,7 +2010,7 @@ function getGameForTeam(teamAbbr) {
   ) || null;
 }
 
-function SlideoutMatchupLine({ team }) {
+function SlideoutMatchupLine({ team, pid }) {
   const mono = "'DM Mono',monospace";
   const g = getGameForTeam(team);
   if (!g) return null;
@@ -2019,26 +2019,21 @@ function SlideoutMatchupLine({ team }) {
   const home = g.home?.abbr || '???';
   const matchup = `${away} @ ${home}`;
 
-  // Time — format game_time or startTime
   let timeStr = '';
-  // g.gameTime is already a formatted string like "7:05 PM" built in fetchGames
-  if (g.gameTime) {
-    timeStr = g.gameTime + ' ET';
-  }
+  if (g.gameTime) timeStr = g.gameTime + ' ET';
 
-  // Game status
-  const status = g.status || '';
-  const isLive     = status === 'Live' || status === 'In Progress';
-  const isFinal    = status === 'Final' || status === 'Game Over';
-  const isWarmup   = status === 'Warmup' || status === 'Pre-Game';
-  const isPostponed= status === 'Postponed' || status === 'Suspended';
-  const isSched    = !isLive && !isFinal && !isWarmup && !isPostponed;
+  const status      = g.status || '';
+  const isLive      = status === 'Live' || status === 'In Progress';
+  const isFinal     = status === 'Final' || status === 'Game Over';
+  const isWarmup    = status === 'Warmup' || status === 'Pre-Game';
+  const isPostponed = status === 'Postponed' || status === 'Suspended';
+  const isSched     = !isLive && !isFinal && !isWarmup && !isPostponed;
 
   let statusLabel = '';
   let statusColor = 'var(--muted)';
 
   if (isLive) {
-    const inn = g.inning ? ` · ${g.inningHalf || ''} ${g.inning}` : '';
+    const inn   = g.inning ? ` · ${g.inningHalf || ''} ${g.inning}` : '';
     const score = (g.away?.score != null && g.home?.score != null)
       ? ` · ${g.away.abbr} ${g.away.score} – ${g.home.score} ${g.home.abbr}` : '';
     statusLabel = `🔴 LIVE${inn}${score}`;
@@ -2059,21 +2054,35 @@ function SlideoutMatchupLine({ team }) {
     statusColor = 'var(--muted)';
   }
 
+  // At-bat status — only show when game is live and pid is known
+  const abStatus = pid && isLive ? LIVE_AB_STATUS_CACHE[parseInt(pid)] : null;
+  const abBadge  = abStatus === 'atbat'  ? { icon:'⚡', label:'At Bat',      color:'#ffd700' }
+                 : abStatus === 'ondeck' ? { icon:'👀', label:'On Deck',     color:'#f5a623' }
+                 : abStatus === 'inhole' ? { icon:'⛳', label:'In the Hole', color:'var(--muted)' }
+                 : null;
+
   return (
     <div style={{
-      marginTop:5,
-      display:'flex',alignItems:'center',gap:8,
-      fontFamily:mono,fontSize:9,flexWrap:'wrap',
+      marginTop:4,
+      display:'flex',alignItems:'center',gap:6,flexWrap:'nowrap',
+      fontFamily:mono,fontSize:9,color:'var(--muted)',lineHeight:1,
     }}>
-      <span style={{color:'var(--text)',fontWeight:600,letterSpacing:.3}}>
+      <span style={{color:'var(--text)',fontWeight:600,letterSpacing:.3,flexShrink:0}}>
         {matchup}
       </span>
       {timeStr && !isLive && !isFinal && !isSched && (
-        <span style={{color:'var(--muted)'}}>· {timeStr}</span>
+        <span style={{flexShrink:0}}>· {timeStr}</span>
       )}
-      <span style={{color:statusColor,fontWeight:isLive?700:400}}>
+      <span style={{color:statusColor,fontWeight:isLive?700:400,flexShrink:0}}>
         · {statusLabel}
       </span>
+      {abBadge && (
+        <span title={abBadge.label}
+          style={{flexShrink:0,fontSize:12,lineHeight:1,cursor:'default',
+            filter:`drop-shadow(0 0 3px ${abBadge.color}88)`}}>
+          {abBadge.icon}
+        </span>
+      )}
     </div>
   );
 }
@@ -2251,7 +2260,7 @@ function AtBatSlideIn() {
             {player.avg > 0 && <span> · {'.'+String(Math.round(player.avg*1000)).padStart(3,'0')} AVG</span>}
             {player.grade?.grade && <span> · {player.grade.grade} Grade</span>}
           </div>
-          <SlideoutMatchupLine team={player.team}/>
+          <SlideoutMatchupLine team={player.team} pid={player.pid}/>
         </div>
         <div style={{display:'flex',alignItems:'center',gap:6,flexShrink:0}}>
           {LINEUP_STATUS[player.pid]?.status === 'confirmed' && (
@@ -2707,7 +2716,7 @@ function PitcherSlideIn() {
             {stats?.era && stats.era !== '—' && <span style={{marginLeft:6}}>· ERA {stats.era}</span>}
             {stats?.whip && stats.whip !== '—' && <span style={{marginLeft:6}}>· WHIP {stats.whip}</span>}
           </div>
-          <SlideoutMatchupLine team={pitcher.team}/>
+          <SlideoutMatchupLine team={pitcher.team} pid={pitcher.pid}/>
         </div>
         <button onClick={()=>setPitcher(null)} style={{background:'none',border:'1px solid var(--border)',
           borderRadius:6,color:'var(--muted)',cursor:'pointer',padding:'5px 10px',
@@ -3929,6 +3938,10 @@ async function fetchLiveBatters(gamePk) {
   const currentBatterId = data.currentBatterId  || null;
   const onDeckId        = data.onDeckId         || null;
   const inTheHoleId     = data.inTheHoleId      || null;
+  // Populate global AB status cache so slideouts can show ⚡/👀/⛳
+  if (currentBatterId) LIVE_AB_STATUS_CACHE[parseInt(currentBatterId)] = 'atbat';
+  if (onDeckId)        LIVE_AB_STATUS_CACHE[parseInt(onDeckId)]        = 'ondeck';
+  if (inTheHoleId)     LIVE_AB_STATUS_CACHE[parseInt(inTheHoleId)]     = 'inhole';
   // Base runners — read from liveLinescore (renamed to avoid collision with boxscore's own linescore key)
   const offense         = data.liveLinescore?.offense || data.linescore?.offense || {};
   const linescoreData   = data.liveLinescore || data.linescore || {};
@@ -8413,6 +8426,8 @@ const FINAL_GAME_IDS    = new Set(); // game_ids whose status is "Final" — upd
 const PROBABLE_PITCHER_MAP = {};
 // Live game cache — populated by fetchGames so any component can look up game status by team abbr
 const LIVE_GAMES_CACHE = [];
+// Maps playerId (number) → 'atbat' | 'ondeck' | 'inhole' — updated by fetchLiveBatters
+const LIVE_AB_STATUS_CACHE = {};
 let _notifyNewHR = null; // callback set by useHRNotifications hook
 
 // Global navigation — lets notifications route to tabs/views without prop drilling
