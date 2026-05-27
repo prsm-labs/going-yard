@@ -2241,6 +2241,7 @@ function AtBatSlideIn() {
           <div style={{display:'flex',alignItems:'center',gap:6}}>
             <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:18,letterSpacing:1}}>{player.name}</span>
             <SavantLink pid={player?.pid} type="batter"/>
+            <MLBNewsLink pid={player?.pid}/>
           </div>
           <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>
             {player.team}
@@ -2698,6 +2699,7 @@ function PitcherSlideIn() {
           <div style={{display:'flex',alignItems:'center',gap:6}}>
             <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:18,letterSpacing:1}}>{pitcher.name}</span>
             <SavantLink pid={pitcher.pid} type="pitcher"/>
+            <MLBNewsLink pid={pitcher.pid}/>
           </div>
           <div style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
             {pitcher.team && <span style={{color:'var(--accent2)',fontWeight:700}}>{pitcher.team}</span>}
@@ -4460,9 +4462,26 @@ function SavantLink({ pid, type='batter', size=9 }) {
         opacity:.5,transition:'opacity .12s'}}
       onMouseEnter={e=>e.currentTarget.style.opacity='1'}
       onMouseLeave={e=>e.currentTarget.style.opacity='.5'}>
+      📊
+    </a>
+  );
+}
+
+function MLBNewsLink({ pid }) {
+  if (!pid || parseInt(pid) <= 0) return null;
+  return (
+    <a href={`https://www.mlb.com/player/${pid}`} target="_blank" rel="noopener noreferrer"
+      onClick={e => e.stopPropagation()}
+      title="News, injuries & transactions on MLB.com"
+      style={{display:'inline-flex',alignItems:'center',
+        fontSize:10,textDecoration:'none',flexShrink:0,
+        opacity:.5,transition:'opacity .12s'}}
+      onMouseEnter={e=>e.currentTarget.style.opacity='1'}
+      onMouseLeave={e=>e.currentTarget.style.opacity='.5'}>
       🔗
     </a>
   );
+}
 }
 
 function SRing({score, color}) {
