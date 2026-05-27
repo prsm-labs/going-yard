@@ -1,19 +1,4 @@
 Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitcher ID (Away),Game ID,Day of Week,Day Abbr,Series Game #,Games in Series,Series Position,Day Context
-2026-05-26,06:10 PM,CLE,WSH,676282.0,676917.0,824434,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
-2026-05-26,06:35 PM,BAL,TB,669358.0,643377.0,824837,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
-2026-05-26,06:40 PM,DET,LAA,672456.0,686799.0,824275,Tuesday,Tue,1,3,Opener,⚠️ Weakest Day
-2026-05-26,06:40 PM,PIT,CHC,677952.0,696136.0,823379,Tuesday,Tue,2,4,Middle,⚠️ Weakest Day
-2026-05-26,06:45 PM,BOS,ATL,624133.0,675911.0,824758,Tuesday,Tue,1,3,Opener,⚠️ Weakest Day
-2026-05-26,07:07 PM,TOR,MIA,680755.0,645261.0,822811,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
-2026-05-26,07:10 PM,NYM,CIN,656849.0,695505.0,823624,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
-2026-05-26,07:40 PM,CWS,MIN,680732.0,657746.0,824597,Tuesday,Tue,2,4,Middle,⚠️ Weakest Day
-2026-05-26,07:40 PM,KC,NYY,663559.0,693645.0,824106,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
-2026-05-26,07:40 PM,MIL,STL,690986.0,700241.0,823785,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
-2026-05-26,08:05 PM,TEX,HOU,683004.0,669920.0,822898,Tuesday,Tue,2,4,Middle,⚠️ Weakest Day
-2026-05-26,09:40 PM,ATH,SEA,695611.0,676106.0,825004,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
-2026-05-26,09:40 PM,SD,PHI,681190.0,605400.0,823294,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
-2026-05-26,09:45 PM,SF,AZ,641816.0,593958.0,823216,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
-2026-05-26,10:10 PM,LAD,COL,641778.0,607536.0,823949,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
 2026-05-27,01:07 PM,TOR,MIA,592332.0,691587.0,822809,Wednesday,Wed,3,3,Finale,~ Neutral
 2026-05-27,01:10 PM,CLE,WSH,668909.0,571945.0,824432,Wednesday,Wed,3,3,Finale,~ Neutral
 2026-05-27,01:40 PM,MIL,STL,,669160.0,823783,Wednesday,Wed,3,3,Finale,~ Neutral
@@ -24,8 +9,14 @@ Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitc
 2026-05-27,06:40 PM,DET,LAA,663554.0,667755.0,824270,Wednesday,Wed,2,3,Middle,~ Neutral
 2026-05-27,06:40 PM,PIT,CHC,696149.0,592791.0,823376,Wednesday,Wed,3,4,Middle,~ Neutral
 2026-05-27,06:45 PM,BOS,ATL,813349.0,693821.0,824756,Wednesday,Wed,2,3,Middle,~ Neutral
-2026-05-27,07:10 PM,NYM,CIN,,671096.0,823626,Wednesday,Wed,3,3,Finale,~ Neutral
+2026-05-27,07:10 PM,NYM,CIN,623211.0,671096.0,823626,Wednesday,Wed,3,3,Finale,~ Neutral
 2026-05-27,07:40 PM,CWS,MIN,663436.0,687570.0,824596,Wednesday,Wed,3,4,Middle,~ Neutral
 2026-05-27,07:40 PM,KC,NYY,702070.0,543037.0,824104,Wednesday,Wed,3,3,Finale,~ Neutral
 2026-05-27,08:05 PM,TEX,HOU,594798.0,681347.0,822897,Wednesday,Wed,3,4,Middle,~ Neutral
-2026-05-27,10:10 PM,LAD,COL,660271.0,,823947,Wednesday,Wed,3,3,Finale,~ Neutral
+2026-05-27,10:10 PM,LAD,COL,660271.0,608372.0,823947,Wednesday,Wed,3,3,Finale,~ Neutral
+2026-05-28,01:10 PM,DET,LAA,656427.0,680570.0,824272,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
+2026-05-28,02:10 PM,CWS,MIN,607200.0,671737.0,824595,Thursday,Thu,4,4,Finale,✅ Best Day (getaway)
+2026-05-28,04:10 PM,BOS,ATL,,519242.0,824757,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
+2026-05-28,06:35 PM,BAL,TOR,,,824834,Thursday,Thu,1,4,Opener,✅ Best Day (getaway)
+2026-05-28,06:40 PM,PIT,CHC,694973.0,607067.0,823378,Thursday,Thu,4,4,Finale,✅ Best Day (getaway)
+2026-05-28,08:05 PM,TEX,HOU,543135.0,681293.0,822896,Thursday,Thu,4,4,Finale,✅ Best Day (getaway)
