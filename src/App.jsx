@@ -18107,6 +18107,34 @@ function GetAppTab() {
       <Step n="3" text={<>Click <strong>Install</strong> — pinned to taskbar and Start menu</>}/>
     </Card>
 
+    {/* Notifications callout */}
+    <div style={{
+      margin:'0 0 20px',padding:'14px 16px',
+      borderRadius:10,
+      background:'rgba(232,65,26,.07)',
+      border:'1px solid rgba(232,65,26,.25)',
+      display:'flex',alignItems:'flex-start',gap:12,
+    }}>
+      <span style={{fontSize:22,flexShrink:0,lineHeight:1,marginTop:1}}>🔔</span>
+      <div>
+        <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,
+          color:'var(--accent)',letterSpacing:.5,marginBottom:4}}>
+          Enable Notifications
+        </div>
+        <div style={{fontFamily:"'DM Mono',monospace",fontSize:10,
+          color:'var(--muted)',lineHeight:1.7}}>
+          After installing the app, tap the{' '}
+          <strong style={{color:'var(--text)'}}>🔔 bell icon</strong>{' '}
+          in the top left corner to enable push notifications.
+          You'll get alerted when a{' '}
+          <strong style={{color:'var(--accent)'}}>💥 home run</strong>{' '}
+          is hit and when{' '}
+          <strong style={{color:'#27c97a'}}>✅ lineups are confirmed</strong>{' '}
+          for today's games.
+        </div>
+      </div>
+    </div>
+
     {/* Direct link */}
     <div style={{textAlign:"center",marginBottom:24}}>
       <a href={url} target="_blank" rel="noopener noreferrer"
