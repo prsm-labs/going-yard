@@ -13549,8 +13549,108 @@ function Last7HRChart({ batterId }) {
 }
 
 function RecentGameLog({ batterId }) {
-  const abs = getCachedPlayer(batterId)?.recentAtBats;
-  if (!abs || abs.length === 0) return null;
+  const [abs,      setAbs]      = React.useState(null);  // null=loading, []=no data
+  const [loading,  setLoading]  = React.useState(false);
+  const [error,    setError]    = React.useState(null);
+  const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+  React.useEffect(() => {
+    if (!batterId || parseInt(batterId) <= 0) return;
+    const pid     = parseInt(batterId);
+    const cacheKey = `rglog_${pid}`;
+
+    // Check in-memory cache first
+    const cached = RecentGameLog._cache?.[cacheKey];
+    if (cached && Date.now() - cached.ts < CACHE_TTL) {
+      setAbs(cached.data);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    const fetchAtBats = async () => {
+      try {
+        // Step 1: get last 5 games for this batter
+        const glRes = await fetch(
+          `https://statsapi.mlb.com/api/v1/people/${pid}/stats?stats=gameLog&group=hitting&season=2026&limit=5&sportId=1`
+        );
+        const glData = await glRes.json();
+        const games  = glData?.stats?.[0]?.splits || [];
+        if (!games.length) { setAbs([]); setLoading(false); return; }
+
+        // Step 2: for each game fetch play-by-play and filter batter's PAs
+        const allAbs = [];
+        const gameDate = (split) => split.date || '';
+
+        await Promise.all(games.slice(0,5).map(async (split) => {
+          const gamePk = split.game?.gamePk;
+          if (!gamePk) return;
+          try {
+            const gameRes = await fetch(
+              `https://statsapi.mlb.com/api/v1.1/game/${gamePk}/feed/live?fields=liveData,plays,allPlays,matchup,batter,result,type,description,hitData,launchSpeed,launchAngle,totalDistance,pitchIndex,pitches,details,code,type`
+            );
+            const gameData = await gameRes.json();
+            const plays = gameData?.liveData?.plays?.allPlays || [];
+
+            plays.forEach(play => {
+              if (play.matchup?.batter?.id !== pid) return;
+              const result  = play.result?.eventType || play.result?.event || '';
+              const pitches = play.pitchIndex || [];
+              // Get last pitch of the PA
+              const lastPitchIdx = pitches[pitches.length - 1];
+              const pitchPlay   = lastPitchIdx != null ? play.playEvents?.[lastPitchIdx] : null;
+              const pitchCode   = pitchPlay?.details?.type?.code || '';
+              const ev    = play.hitData?.launchSpeed   ?? null;
+              const la    = play.hitData?.launchAngle   ?? null;
+              const dist  = play.hitData?.totalDistance ?? null;
+              const oppTeam = split.opponent?.abbreviation || split.opponent?.teamName?.slice(0,3) || '';
+              allAbs.push({
+                date:   gameDate(split),
+                opp:    oppTeam,
+                result: result.toLowerCase().replace(/ /g,'_'),
+                ev:     ev   != null ? Math.round(ev * 10) / 10 : null,
+                la:     la   != null ? Math.round(la * 10) / 10 : null,
+                dist:   dist != null ? Math.round(dist)          : null,
+                pitch:  pitchCode,
+              });
+            });
+          } catch(_) {}
+        }));
+
+        // Sort most recent first, take 15
+        const sorted = allAbs
+          .sort((a,b) => b.date.localeCompare(a.date))
+          .slice(0, 15);
+
+        // Cache result
+        if (!RecentGameLog._cache) RecentGameLog._cache = {};
+        RecentGameLog._cache[cacheKey] = { data: sorted, ts: Date.now() };
+
+        setAbs(sorted);
+        setLoading(false);
+
+      } catch(e) {
+        // Fall back to pipeline data if API fails
+        const fallback = getCachedPlayer(pid)?.recentAtBats || [];
+        setAbs(fallback);
+        setError('live');
+        setLoading(false);
+      }
+    };
+
+    fetchAtBats();
+
+    // Refresh every 5 minutes while component is mounted
+    const interval = setInterval(() => {
+      if (RecentGameLog._cache?.[cacheKey]) {
+        delete RecentGameLog._cache[cacheKey];
+      }
+      fetchAtBats();
+    }, CACHE_TTL);
+
+    return () => clearInterval(interval);
+  }, [batterId]);
 
   const RESULT_LABEL = {
     home_run:'💥 HR', single:'1B', double:'2B', triple:'3B',
@@ -13568,49 +13668,84 @@ function RecentGameLog({ batterId }) {
     return 'var(--muted)';
   };
 
+  const mono = "'DM Mono',monospace";
+
+  // Loading state
+  if (loading && !abs) return (
+    <div style={{marginTop:10,fontFamily:mono,fontSize:8,color:'var(--muted)',
+      textTransform:'uppercase',letterSpacing:1}}>
+      📋 Loading at-bats…
+    </div>
+  );
+
+  if (!abs || abs.length === 0) return null;
+
   return (
     <div style={{marginTop:10}}>
-      <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
-        textTransform:'uppercase',letterSpacing:1,marginBottom:5}}>
+      <div style={{fontSize:8,color:'var(--muted)',fontFamily:mono,
+        textTransform:'uppercase',letterSpacing:1,marginBottom:5,
+        display:'flex',alignItems:'center',gap:6}}>
         📋 Recent At-Bats
+        {error === 'live' && (
+          <span style={{fontSize:7,color:'#f5a623',opacity:.7}}>(pipeline data)</span>
+        )}
+        {!error && abs.length > 0 && (
+          <span style={{fontSize:7,color:'#27c97a',opacity:.7}}>· live · updates every 5min</span>
+        )}
       </div>
       <div style={{border:'1px solid var(--border)',borderRadius:7,overflow:'hidden'}}>
+        {/* Sticky header */}
         <table style={{width:'100%',borderCollapse:'collapse'}}>
           <thead>
             <tr style={{background:'var(--surface2)'}}>
               {['Date','Opp','Result','EV','LA','Dist','Pitch'].map(h => (
                 <th key={h} style={{padding:'4px 7px',
                   textAlign:h==='Result'?'left':'center',
-                  fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+                  fontSize:8,color:'var(--muted)',fontFamily:mono,
                   textTransform:'uppercase',letterSpacing:.5,whiteSpace:'nowrap',
                   borderBottom:'1px solid var(--border)'}}>{h}</th>
               ))}
             </tr>
           </thead>
-          <tbody>
-            {abs.map((a, i) => (
-              <tr key={i} style={{
-                borderBottom:i<abs.length-1?'1px solid rgba(255,255,255,.04)':'none',
-                background:i%2===0?'rgba(255,255,255,.01)':'transparent'}}>
-                <td style={{padding:'4px 7px',color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:9,whiteSpace:'nowrap'}}>{a.date?.slice(5)||'—'}</td>
-                <td style={{padding:'4px 7px',textAlign:'center',fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'var(--accent2)'}}>{a.opp||'—'}</td>
-                <td style={{padding:'4px 7px',fontFamily:"'DM Mono',monospace",fontSize:9,whiteSpace:'nowrap',
-                  color:resultColor(a.result),fontWeight:['home_run','single','double','triple'].includes(a.result)?700:400}}>
-                  {RESULT_LABEL[a.result] || a.result || '—'}</td>
-                <td style={{padding:'4px 7px',textAlign:'center',fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,
-                  color:a.ev>=103?'#ff4020':a.ev>=95?'#ff8020':a.ev>=90?'#ffc840':a.ev>0?'var(--text)':'var(--muted)'}}>
-                  {a.ev != null ? a.ev.toFixed(1) : '—'}</td>
-                <td style={{padding:'4px 7px',textAlign:'center',fontFamily:"'DM Mono',monospace",fontSize:9,
-                  color:a.la!=null&&a.la>=20&&a.la<=35?'#27c97a':'var(--muted)'}}>
-                  {a.la != null ? a.la.toFixed(0)+'°' : '—'}</td>
-                <td style={{padding:'4px 7px',textAlign:'center',fontFamily:"'DM Mono',monospace",fontSize:9,
-                  color:a.dist>=400?'#ff4020':a.dist>=350?'#ff8020':a.dist>0?'var(--text)':'var(--muted)'}}>
-                  {a.dist > 0 ? a.dist+'ft' : '—'}</td>
-                <td style={{padding:'4px 7px',textAlign:'center',fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)'}}>{a.pitch||'—'}</td>
-              </tr>
-            ))}
-          </tbody>
         </table>
+        {/* Scrollable body — ~5 rows visible, up to 15 total */}
+        <div style={{maxHeight:165,overflowY:'auto',WebkitOverflowScrolling:'touch'}}>
+          <table style={{width:'100%',borderCollapse:'collapse'}}>
+            <tbody>
+              {abs.map((a, i) => (
+                <tr key={i} style={{
+                  borderBottom:i<abs.length-1?'1px solid rgba(255,255,255,.04)':'none',
+                  background:i%2===0?'rgba(255,255,255,.01)':'transparent'}}>
+                  <td style={{padding:'4px 7px',color:'var(--muted)',fontFamily:mono,fontSize:9,whiteSpace:'nowrap'}}>
+                    {(a.date||'').slice(5).replace('-','-')||'—'}
+                  </td>
+                  <td style={{padding:'4px 7px',textAlign:'center',fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'var(--accent2)'}}>
+                    {a.opp||'—'}
+                  </td>
+                  <td style={{padding:'4px 7px',fontFamily:mono,fontSize:9,whiteSpace:'nowrap',
+                    color:resultColor(a.result),fontWeight:['home_run','single','double','triple'].includes(a.result)?700:400}}>
+                    {RESULT_LABEL[a.result] || a.result || '—'}
+                  </td>
+                  <td style={{padding:'4px 7px',textAlign:'center',fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,
+                    color:a.ev>=103?'#ff4020':a.ev>=95?'#ff8020':a.ev>=90?'#ffc840':a.ev>0?'var(--text)':'var(--muted)'}}>
+                    {a.ev != null ? a.ev.toFixed(1) : '—'}
+                  </td>
+                  <td style={{padding:'4px 7px',textAlign:'center',fontFamily:mono,fontSize:9,
+                    color:a.la!=null&&a.la>=20&&a.la<=35?'#27c97a':'var(--muted)'}}>
+                    {a.la != null ? a.la.toFixed(0)+'°' : '—'}
+                  </td>
+                  <td style={{padding:'4px 7px',textAlign:'center',fontFamily:mono,fontSize:9,
+                    color:a.dist>=400?'#ff4020':a.dist>=350?'#ff8020':a.dist>0?'var(--text)':'var(--muted)'}}>
+                    {a.dist > 0 ? a.dist+'ft' : '—'}
+                  </td>
+                  <td style={{padding:'4px 7px',textAlign:'center',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>
+                    {a.pitch||'—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
