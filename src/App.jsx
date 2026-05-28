@@ -8485,7 +8485,16 @@ function loadAtBatLog() {
     fetch('/data/mlb_atbat_log_full.csv')
       .then(r => r.ok ? r.text() : Promise.reject(r.status))
       .then(text => {
-        ATBAT_LOG_CACHE = parseCSVText(text).filter(r=>(r['Date']||'')>='2026-03-20'); // hardcoded — SEASON_START_DB is not in module scope
+        const parsed = parseCSVText(text);
+        ATBAT_LOG_CACHE = parsed.filter(r => {
+          let d = r['Date'] || '';
+          // Normalize MM/DD/YYYY → YYYY-MM-DD for comparison
+          if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(d)) {
+            const [m, dy, y] = d.split('/');
+            d = `${y}-${m.padStart(2,'0')}-${dy.padStart(2,'0')}`;
+          }
+          return d >= '2026-03-20';
+        });
         ATBAT_LOG_LOADING = false;
         ATBAT_LOG_CALLBACKS.forEach(cb => cb(ATBAT_LOG_CACHE));
         ATBAT_LOG_CALLBACKS = [];
@@ -9089,40 +9098,50 @@ function HRLeaderboardTab() {
       return { map, leagueTotalHRs };
     })();
 
-    // ── Laser HR stats — shared module-level cache (loaded once, reused across tabs)
-    const logPromise = loadAtBatLog().then(rows => {
-          const evMap = {}; let longDist = null, longEV = null;
-          rows.forEach(r => {
-            const pid = parseInt(r['Batter'] || 0); if (!pid) return;
-            const ev   = parseFloat(r['Exit Velocity']) || 0;
-            const isHR = parseInt(r['Is Home Run'] || 0) === 1;
-            if (!evMap[pid]) evMap[pid] = { laser105:0, laser110:0, hh105:0, hh110:0 };
-            const m = evMap[pid];
-            if (isHR) {
-              if (ev>=105) m.laser105++; if (ev>=110) m.laser110++;
-              const dist = parseFloat(r['Hit Distance']) || 0;
-              if (dist > 0 && (!longDist || dist > longDist.dist)) longDist = { pid, dist, ev };
-              if (ev > 0  && (!longEV   || ev > longEV.ev))        longEV   = { pid, ev, dist: parseFloat(r['Hit Distance'])||0 };
-            }
-            if (ev>=105) m.hh105++; if (ev>=110) m.hh110++;
-          });
-          return { evMap, longDist, longEV };
-        }).catch(() => ({ evMap:{}, longDist:null, longEV:null }));
+    // ── Laser HR stats — loaded AFTER API calls finish to avoid concurrent memory pressure
+    // Running both simultaneously crashes iOS Safari; sequential is safer
+    leadersPromise.then(({ map }) => {
+      if (!Object.keys(map).length) return; // no data, skip
+      loadAtBatLog().then(rows => {
+        const evMap = {}; let longDist = null, longEV = null;
+        rows.forEach(r => {
+          const pid = parseInt(r['Batter'] || 0); if (!pid) return;
+          const ev   = parseFloat(r['Exit Velocity']) || 0;
+          const isHR = parseInt(r['Is Home Run'] || 0) === 1;
+          if (!evMap[pid]) evMap[pid] = { laser105:0, laser110:0, hh105:0, hh110:0 };
+          const m = evMap[pid];
+          if (isHR) {
+            if (ev>=105) m.laser105++; if (ev>=110) m.laser110++;
+            const dist = parseFloat(r['Hit Distance']) || 0;
+            if (dist > 0 && (!longDist || dist > longDist.dist)) longDist = { pid, dist, ev };
+            if (ev > 0  && (!longEV   || ev > longEV.ev))        longEV   = { pid, ev, dist: parseFloat(r['Hit Distance'])||0 };
+          }
+          if (ev>=105) m.hh105++; if (ev>=110) m.hh110++;
+        });
+        // Merge laser data into existing rows
+        setRows(prev => prev.map(r => {
+          const ev = evMap[r.pid] || {};
+          return { ...r, laser105:ev.laser105||0, laser110:ev.laser110||0, hh105:ev.hh105||0, hh110:ev.hh110||0 };
+        }));
+        const findName = pid => { const f = rows.find ? undefined : undefined; return map[pid]?.name || `#${pid}`; };
+        const findTeam = pid => map[pid]?.team || '';
+        setStatCards(prev => ({
+          ...prev,
+          longDist: longDist ? { name:map[longDist.pid]?.name||`#${longDist.pid}`, team:map[longDist.pid]?.team||'', dist:longDist.dist } : null,
+          longEV:   longEV   ? { name:map[longEV.pid]?.name  ||`#${longEV.pid}`,   team:map[longEV.pid]?.team  ||'', ev:longEV.ev       } : null,
+        }));
+      }).catch(() => {});
+    });
 
-    Promise.all([leadersPromise, logPromise])
-      .then(([{ map, leagueTotalHRs }, { evMap, longDist, longEV }]) => {
+    // Run API calls — leaderboard rows load immediately, laser data updates after
+    leadersPromise
+      .then(({ map, leagueTotalHRs }) => {
         const out = Object.values(map)
           .filter(r => r.pid && typeof r.pid === 'number' && r.hrs >= 1)
-          .map(r => { const ev = evMap[r.pid] || {}; return { ...r, laser105:ev.laser105||0, laser110:ev.laser110||0, hh105:ev.hh105||0, hh110:ev.hh110||0 }; })
+          .map(r => ({ ...r, laser105:0, laser110:0, hh105:0, hh110:0 }))
           .sort((a,b) => b.hrs - a.hrs).map((r,i) => ({ ...r, rank: i+1 }));
         const total = leagueTotalHRs || out.reduce((s,r)=>s+r.hrs,0);
-        const findName = pid => out.find(r=>r.pid===pid)?.name || `#${pid}`;
-        const findTeam = pid => out.find(r=>r.pid===pid)?.team || '';
-        setStatCards({
-          total,
-          longDist: longDist ? { name:findName(longDist.pid), team:findTeam(longDist.pid), dist:longDist.dist } : null,
-          longEV:   longEV   ? { name:findName(longEV.pid),   team:findTeam(longEV.pid),   ev:longEV.ev       } : null,
-        });
+        setStatCards({ total, longDist:null, longEV:null }); // laser stat cards populated after CSV loads
         setRows(out); setLoading(false);
       }).catch(e => { setError(e.message); setLoading(false); });
   }, []);
