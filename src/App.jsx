@@ -8360,7 +8360,24 @@ let HR_LAST_FETCH = 0;
 const SEEN_HR_IDS = new Set();
 const DAILY_PICKS_CACHE = {}; // keyed by batter_id string
 
-// ── Active batter gate ────────────────────────────────────────────────────────
+// ── Pitcher name resolver ─────────────────────────────────────────────────────
+// daily_picks.csv sometimes has "Unknown (694346...)" when the engine couldn't
+// resolve the pitcher name. Falls back through PROBABLE_PITCHER_MAP → player cache.
+function resolvePitcherName(raw, battingTeam, pitcherId) {
+  if (raw && raw !== '—' && !raw.startsWith('Unknown') && !/^\d+$/.test(raw.trim())) return raw;
+  // Probable pitcher map keyed by batting team
+  const pp = battingTeam ? PROBABLE_PITCHER_MAP[String(battingTeam).trim()] : null;
+  if (pp?.name) return pp.name;
+  // Extract numeric ID from "Unknown (694346...)" or use pitcherId directly
+  const rawId = parseInt((String(raw||'').match(/\d+/)||[])[0] || pitcherId || 0);
+  if (rawId) {
+    const cp = getCachedPlayer(rawId);
+    if (cp?.name) return cp.name;
+  }
+  return raw || '—';
+}
+
+
 // Hides batters with zero recent plate appearances who are NOT confirmed in today's
 // lineup. This prevents injured, demoted, or long-absent players from polluting
 // Streaks, Cheat Sheet, Key Matchups, Crystal Ball, and All Matchups.
@@ -9010,37 +9027,47 @@ function HRLeaderboardTab() {
     const season = new Date().getFullYear();
     const today  = new Date().toISOString().slice(0,10);
 
-    // ── ALL batters season hitting stats — paginated, no cap ────────────────
-    // Uses /api/v1/stats with playerPool=ALL which supports real offset pagination.
-    // Each page = 500 players. Stops when page returns fewer than 500.
-    // Filters to only batters with HR > 0 for the leaderboard rows,
-    // but sums ALL HRs across every batter for the true league total.
+    // ── ALL batters season hitting stats — paginated, max 10 pages ──────────
     const leadersPromise = (async () => {
-      const map = {};
-      let offset = 0; let leagueTotalHRs = 0;
-      while (true) {
-        const url = `https://statsapi.mlb.com/api/v1/stats?stats=season&group=hitting&gameType=R&season=${season}&sportId=1&playerPool=ALL&startDate=${season}-03-25&endDate=${today}&limit=500&offset=${offset}&hydrate=person,team`;
-        const d = await fetch(url).then(r=>r.json()).catch(()=>null);
+      const map = {}; let offset = 0; let leagueTotalHRs = 0;
+      const MAX_PAGES = 10; let page = 0;
+      while (page < MAX_PAGES) {
+        page++;
+        let d = null;
+        try {
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), 12000);
+          const res = await fetch(
+            `https://statsapi.mlb.com/api/v1/stats?stats=season&group=hitting&gameType=R&season=${season}&sportId=1&playerPool=ALL&startDate=${season}-03-25&endDate=${today}&limit=500&offset=${offset}&hydrate=person,team`,
+            { signal: ctrl.signal }
+          );
+          clearTimeout(timer);
+          d = await res.json();
+        } catch(e) {
+          console.warn(`[Leaderboard] page ${page} failed:`, e.message);
+          break;
+        }
         const splits = d?.stats?.[0]?.splits || [];
         splits.forEach(s => {
           const hrs = parseInt(s.stat?.homeRuns || 0);
           leagueTotalHRs += hrs;
-          if (hrs < 1) return;   // skip 0-HR batters from leaderboard rows
+          if (hrs < 1) return;
           const pid = s.player?.id; if (!pid) return;
           const teamAbbr = ABBR[s.team?.id] || s.team?.abbreviation || '';
           map[pid] = { pid, name: s.player?.fullName||'', team: teamAbbr,
             hrs, laser105:0, laser110:0, hh105:0, hh110:0 };
         });
-        if (splits.length < 500) break;   // last page
+        if (splits.length < 500) break;
         offset += 500;
       }
-      map._leagueTotalHRs = leagueTotalHRs;
-      return map;
+      return { map, leagueTotalHRs };
     })();
+
+    // ── At-bat log for laser/EV stats — non-fatal if missing ───────────────
     const logPromise = fetch('/data/mlb_atbat_log_full.csv')
-      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text(); })
+      .then(r => { if (!r.ok) throw new Error(`CSV ${r.status}`); return r.text(); })
       .then(text => {
-        const evMap = {};
+        const evMap = {}; let longDist = null, longEV = null;
         const parsed = parseCSVText(text);
         parsed.forEach(r => {
           let cmp = r['Date'] || '';
@@ -9057,30 +9084,31 @@ function HRLeaderboardTab() {
           if (isHR) {
             if (ev>=105) m.laser105++; if (ev>=110) m.laser110++;
             const dist = parseFloat(r['Hit Distance']) || 0;
-            if (dist > 0 && (!evMap._longDist || dist > evMap._longDist.dist))
-              evMap._longDist = { pid, dist, ev };
-            if (ev > 0 && (!evMap._longEV || ev > evMap._longEV.ev))
-              evMap._longEV = { pid, ev, dist: parseFloat(r['Hit Distance'])||0 };
+            if (dist > 0 && (!longDist || dist > longDist.dist)) longDist = { pid, dist, ev };
+            if (ev > 0  && (!longEV   || ev   > longEV.ev))     longEV   = { pid, ev, dist: parseFloat(r['Hit Distance'])||0 };
           }
           if (ev>=105) m.hh105++; if (ev>=110) m.hh110++;
         });
-        return evMap;
+        return { evMap, longDist, longEV };
+      })
+      .catch(e => {
+        console.warn('[Leaderboard] CSV failed:', e.message);
+        return { evMap:{}, longDist:null, longEV:null }; // non-fatal
       });
+
     Promise.all([leadersPromise, logPromise])
-      .then(([leaderMap, evMap]) => {
-        const out = Object.values(leaderMap).filter(r => r.hrs >= 1)
+      .then(([{ map, leagueTotalHRs }, { evMap, longDist, longEV }]) => {
+        const out = Object.values(map)
+          .filter(r => r.pid && typeof r.pid === 'number' && r.hrs >= 1)
           .map(r => { const ev = evMap[r.pid] || {}; return { ...r, laser105:ev.laser105||0, laser110:ev.laser110||0, hh105:ev.hh105||0, hh110:ev.hh110||0 }; })
           .sort((a,b) => b.hrs - a.hrs).map((r,i) => ({ ...r, rank: i+1 }));
-        // Stat cards
-        const total = leaderMap._leagueTotalHRs || out.reduce((s,r)=>s+r.hrs,0);
-        const longDistPid = evMap._longDist?.pid;
-        const longEVPid   = evMap._longEV?.pid;
+        const total = leagueTotalHRs || out.reduce((s,r)=>s+r.hrs,0);
         const findName = pid => out.find(r=>r.pid===pid)?.name || `#${pid}`;
         const findTeam = pid => out.find(r=>r.pid===pid)?.team || '';
         setStatCards({
           total,
-          longDist: evMap._longDist ? { name: findName(longDistPid), team: findTeam(longDistPid), dist: evMap._longDist.dist } : null,
-          longEV:   evMap._longEV   ? { name: findName(longEVPid),   team: findTeam(longEVPid),   ev:   evMap._longEV.ev   } : null,
+          longDist: longDist ? { name:findName(longDist.pid), team:findTeam(longDist.pid), dist:longDist.dist } : null,
+          longEV:   longEV   ? { name:findName(longEV.pid),   team:findTeam(longEV.pid),   ev:longEV.ev       } : null,
         });
         setRows(out); setLoading(false);
       }).catch(e => { setError(e.message); setLoading(false); });
@@ -9201,7 +9229,7 @@ function HRLeaderboardTab() {
                     <span style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'var(--accent2)',whiteSpace:'nowrap',flexShrink:0}}>{r.team}</span>
                     <span style={{fontFamily:osw,fontWeight:700,fontSize:10,color:isKeyMatchup(r.pid,r.name)?'#ff8020':'var(--text)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.name}</span>
                     <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={r.pid} name={r.name} team={r.team}/></span>
-                  <FormBadge formKey={r._formClass}/>
+                    <FormBadge formKey={r._formClass}/>
                   </div>
                 </td>
                 <td style={{padding:'2px 6px',textAlign:'right'}}>
@@ -9220,7 +9248,7 @@ function HRLeaderboardTab() {
                   <span style={{fontFamily:osw,fontWeight:700,fontSize:11,color:r.hh110>=8?'#27c97a':'var(--text)'}}>{r.hh110||'—'}</span>
                 </td>
               </tr>),
-              expPid===r.pid && (
+              expPid===r.pid && !loading && (
                 <tr key={r.pid+'x'}><td colSpan={7} style={{padding:'0 10px 10px',background:'rgba(255,255,255,.02)'}}>
                   <Last7HRChart batterId={r.pid}/><RecentGameLog batterId={r.pid}/>
                 </td></tr>
@@ -10616,7 +10644,7 @@ function LongShotView({ data }) {
                         </span>;
                       })()}
                     </td>
-                    <td style={{padding:'2px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',whiteSpace:'nowrap',maxWidth:100,overflow:'hidden',textOverflow:'ellipsis'}}>{b.pitcher||'—'}</td>
+                    <td style={{padding:'2px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',whiteSpace:'nowrap',maxWidth:100,overflow:'hidden',textOverflow:'ellipsis'}}>{resolvePitcherName(b.pitcher, b.batting_team, b.pitcher_id)}</td>
                     <td style={{padding:'2px 6px',textAlign:'right'}}>
                       <span style={{fontFamily:osw,fontWeight:800,fontSize:11,color:tbColor(b._simTB)}}>{b._simTB.toFixed(2)}</span>
                     </td>
@@ -11411,7 +11439,7 @@ function SimLabView({ data }) {
                       <td style={{ textAlign: 'right', padding:'3px 6px' }}>
                         <span style={{ fontFamily:"'DM Mono',monospace", fontSize:9, color:'var(--muted)', cursor:'pointer', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:90, display:'inline-block' }}
                           onClick={e=>{e.stopPropagation();if(b.pitcher_id)openPitcherSlide({pid:parseInt(b.pitcher_id)||0,name:b.pitcher,team:'',hand:b.pitcher_hand,pitchMix:[]});}}>
-                          {b.pitcher}<span style={{fontSize:8,opacity:.4,marginLeft:1}}>›</span>
+                          {resolvePitcherName(b.pitcher, b.batting_team, b.pitcher_id)}<span style={{fontSize:8,opacity:.4,marginLeft:1}}>›</span>
                         </span>
                       </td>
 
@@ -11718,7 +11746,7 @@ function SimLabView({ data }) {
                     <div style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>⚾ Pitcher Grade</div>
                     <div style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', marginBottom:4 }}
                       onClick={e=>{ e.stopPropagation(); openPitcherSlide({pid:parseInt(b.pitcher_id)||0, name:b.pitcher, team:b.pitcher_team||'', hand:b.pitcher_hand, pitchMix:[]}); }}>
-                      <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 13, color: 'var(--text)' }}>{b.pitcher}</span>
+                      <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 13, color: 'var(--text)' }}>{resolvePitcherName(b.pitcher, b.batting_team, b.pitcher_id)}</span>
                       <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", fontWeight: 400 }}>{b.pitcher_hand}HP</span>
                       <span style={{ fontSize: 11, color: 'var(--ice)', fontFamily:"'DM Mono',monospace", fontWeight:700, marginLeft:'auto' }}>› Stats</span>
                     </div>
@@ -11821,7 +11849,7 @@ function SimLabView({ data }) {
                             <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 12, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{b.batter}</span>
                           </div>
                         </td>
-                        <td style={{ textAlign: 'left' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)' }}>{b.pitcher}</span></td>
+                        <td style={{ textAlign: 'left' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)' }}>{resolvePitcherName(b.pitcher, b.batting_team, b.pitcher_id)}</span></td>
                         <td style={{textAlign:'center',padding:'2px 4px'}}>
                           <PSBadge score={b._ps ?? (parseFloat(b.ps_score)||0)}/>
                         </td>
@@ -12378,7 +12406,7 @@ function BvPHistoryTab({ data }) {
     {key:'pitcher', label:'Pitcher', align:'left',  render:r=>(
       <div style={{cursor:'pointer',display:'flex',alignItems:'center',gap:4}}
         onClick={()=>openPitcherSlide({pid:r.pitcherId,name:r.pitcher,team:r.opp,hand:r.pitcherHand,pitchMix:[]})}>
-        <span style={{fontFamily:"'DM Mono',monospace",fontSize:10}}>{r.pitcher}</span>
+        <span style={{fontFamily:"'DM Mono',monospace",fontSize:10}}>{resolvePitcherName(r.pitcher, r.batting_team, r.pitcher_id)}</span>
           <InjuryBadge pid={r.pitcherId} name={r.pitcher}/>
         <span style={{fontSize:8,color:'var(--muted)',opacity:.4}}>({r.pitcherHand}HP)</span>
         <span style={{fontSize:9,opacity:.4}}>›</span>
@@ -21162,7 +21190,7 @@ function CheatSheetTab({ data }) {
         seen.add(bid);
         if (parseInt(b.so_close_count||0) < 2) return false;
         if (INJURY_MAP?.[parseInt(bid)||0] && !LINEUP_STATUS?.[parseInt(bid)||0]) return false;
-        if (!isActiveBatter(r)) return false; // hide stale/inactive batters
+        if (!isActiveBatter(b)) return false; // hide stale/inactive batters
         return true;
       })
       .map(b => ({
