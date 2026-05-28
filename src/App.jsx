@@ -371,7 +371,7 @@ const styles = `
     @media(orientation:landscape){.landscape-hint{display:none!important;}}
     .tab{white-space:nowrap;flex-shrink:0;padding:10px 9px;font-size:10px;}
     '    .gc{overflow:visible;}'
-    .tw{overflow-x:auto;overflow-y:auto;max-height:72vh;}
+    .tw{overflow-x:auto;overflow-y:auto;max-height:45vh;} /* shorter on mobile = fewer composited rows = no portrait crash */
     }
 
 /* ── Emoji / header tooltips ────────────────────────────────────────────── */
@@ -8485,7 +8485,7 @@ function loadAtBatLog() {
     fetch('/data/mlb_atbat_log_full.csv')
       .then(r => r.ok ? r.text() : Promise.reject(r.status))
       .then(text => {
-        ATBAT_LOG_CACHE = parseCSVText(text).filter(r=>(r['Date']||'')>=SEASON_START_DB);
+        ATBAT_LOG_CACHE = parseCSVText(text).filter(r=>(r['Date']||'')>='2026-03-20'); // hardcoded — SEASON_START_DB is not in module scope
         ATBAT_LOG_LOADING = false;
         ATBAT_LOG_CALLBACKS.forEach(cb => cb(ATBAT_LOG_CACHE));
         ATBAT_LOG_CALLBACKS = [];
