@@ -371,7 +371,7 @@ const styles = `
     @media(orientation:landscape){.landscape-hint{display:none!important;}}
     .tab{white-space:nowrap;flex-shrink:0;padding:10px 9px;font-size:10px;}
     '    .gc{overflow:visible;}'
-    .tw{overflow-x:auto;overflow-y:auto;max-height:72vh;-webkit-overflow-scrolling:touch;}
+    .tw{overflow-x:auto;overflow-y:auto;max-height:72vh;}
     }
 
 /* ── Emoji / header tooltips ────────────────────────────────────────────── */
@@ -8471,6 +8471,32 @@ const PROBABLE_PITCHER_MAP = {};
 const LIVE_GAMES_CACHE = [];
 // Maps playerId (number) → 'atbat' | 'ondeck' | 'inhole' — updated by fetchLiveBatters
 const LIVE_AB_STATUS_CACHE = {};
+// Module-level cache for parsed at-bat log — loaded once, shared across tabs
+// Avoids reloading the large CSV multiple times and prevents mobile OOM on leaderboard
+let ATBAT_LOG_CACHE = null;
+let ATBAT_LOG_LOADING = false;
+let ATBAT_LOG_CALLBACKS = [];
+function loadAtBatLog() {
+  return new Promise((resolve) => {
+    if (ATBAT_LOG_CACHE) { resolve(ATBAT_LOG_CACHE); return; }
+    ATBAT_LOG_CALLBACKS.push(resolve);
+    if (ATBAT_LOG_LOADING) return; // already in flight
+    ATBAT_LOG_LOADING = true;
+    fetch('/data/mlb_atbat_log_full.csv')
+      .then(r => r.ok ? r.text() : Promise.reject(r.status))
+      .then(text => {
+        ATBAT_LOG_CACHE = parseCSVText(text).filter(r=>(r['Date']||'')>=SEASON_START_DB);
+        ATBAT_LOG_LOADING = false;
+        ATBAT_LOG_CALLBACKS.forEach(cb => cb(ATBAT_LOG_CACHE));
+        ATBAT_LOG_CALLBACKS = [];
+      })
+      .catch(() => {
+        ATBAT_LOG_LOADING = false;
+        ATBAT_LOG_CALLBACKS.forEach(cb => cb([]));
+        ATBAT_LOG_CALLBACKS = [];
+      });
+  });
+}
 let _notifyNewHR = null; // callback set by useHRNotifications hook
 
 // Global navigation — lets notifications route to tabs/views without prop drilling
@@ -9063,38 +9089,25 @@ function HRLeaderboardTab() {
       return { map, leagueTotalHRs };
     })();
 
-    // ── At-bat log for laser/EV stats — non-fatal if missing ───────────────
-    const logPromise = fetch('/data/mlb_atbat_log_full.csv')
-      .then(r => { if (!r.ok) throw new Error(`CSV ${r.status}`); return r.text(); })
-      .then(text => {
-        const evMap = {}; let longDist = null, longEV = null;
-        const parsed = parseCSVText(text);
-        parsed.forEach(r => {
-          let cmp = r['Date'] || '';
-          if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(cmp)) {
-            const [m,d,y] = cmp.split('/');
-            cmp = `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
-          }
-          if (cmp < SEASON_START) return;
-          const pid = parseInt(r['Batter'] || 0); if (!pid) return;
-          const ev   = parseFloat(r['Exit Velocity']) || 0;
-          const isHR = parseInt(r['Is Home Run'] || 0) === 1;
-          if (!evMap[pid]) evMap[pid] = { laser105:0, laser110:0, hh105:0, hh110:0 };
-          const m = evMap[pid];
-          if (isHR) {
-            if (ev>=105) m.laser105++; if (ev>=110) m.laser110++;
-            const dist = parseFloat(r['Hit Distance']) || 0;
-            if (dist > 0 && (!longDist || dist > longDist.dist)) longDist = { pid, dist, ev };
-            if (ev > 0  && (!longEV   || ev   > longEV.ev))     longEV   = { pid, ev, dist: parseFloat(r['Hit Distance'])||0 };
-          }
-          if (ev>=105) m.hh105++; if (ev>=110) m.hh110++;
-        });
-        return { evMap, longDist, longEV };
-      })
-      .catch(e => {
-        console.warn('[Leaderboard] CSV failed:', e.message);
-        return { evMap:{}, longDist:null, longEV:null }; // non-fatal
-      });
+    // ── Laser HR stats — shared module-level cache (loaded once, reused across tabs)
+    const logPromise = loadAtBatLog().then(rows => {
+          const evMap = {}; let longDist = null, longEV = null;
+          rows.forEach(r => {
+            const pid = parseInt(r['Batter'] || 0); if (!pid) return;
+            const ev   = parseFloat(r['Exit Velocity']) || 0;
+            const isHR = parseInt(r['Is Home Run'] || 0) === 1;
+            if (!evMap[pid]) evMap[pid] = { laser105:0, laser110:0, hh105:0, hh110:0 };
+            const m = evMap[pid];
+            if (isHR) {
+              if (ev>=105) m.laser105++; if (ev>=110) m.laser110++;
+              const dist = parseFloat(r['Hit Distance']) || 0;
+              if (dist > 0 && (!longDist || dist > longDist.dist)) longDist = { pid, dist, ev };
+              if (ev > 0  && (!longEV   || ev > longEV.ev))        longEV   = { pid, ev, dist: parseFloat(r['Hit Distance'])||0 };
+            }
+            if (ev>=105) m.hh105++; if (ev>=110) m.hh110++;
+          });
+          return { evMap, longDist, longEV };
+        }).catch(() => ({ evMap:{}, longDist:null, longEV:null }));
 
     Promise.all([leadersPromise, logPromise])
       .then(([{ map, leagueTotalHRs }, { evMap, longDist, longEV }]) => {
