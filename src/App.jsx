@@ -10766,6 +10766,7 @@ function SimLabView({ data }) {
   const [minYard,    setMinYard]     = useState('');
   const [maxYard,    setMaxYard]     = useState('');
 
+  const [minSig,     setMinSig]      = useState('');
   const [minSimTB,   setMinSimTB]    = useState('');
   const [minOdds,    setMinOdds]     = useState('');
   const [simSearch,   setSimSearch]    = useState('');  // batter name search
@@ -10875,6 +10876,7 @@ function SimLabView({ data }) {
       .filter(r => !minYard   || (parseFloat(r._yard)||computeYardScore(parseFloat(r.weighted_flag_score)*4.6, parseFloat(r.gHR)||0, parseFloat(r._boom)||0, parseFloat(r.ps_score)||0)) >= parseFloat(minYard))
       .filter(r => !maxYard   || (parseFloat(r._yard)||computeYardScore(parseFloat(r.weighted_flag_score)*4.6, parseFloat(r.gHR)||0, parseFloat(r._boom)||0, parseFloat(r.ps_score)||0)) <= parseFloat(maxYard))
 
+      .filter(r => !minSig    || (parseFloat(r.weighted_flag_score)*4.6||0) >= parseFloat(minSig))
       .filter(r => !minSimTB  || (parseFloat(r.sim_tb)||0)   >= parseFloat(minSimTB))
       .filter(r => !minOdds   || (() => { const d = HR_ODDS_MAP[String(parseInt(r.batter_id)||0)]; return d?.implied && (d.implied * 100) >= parseFloat(minOdds); })())
       .filter(r => !simSearch || (r.batter||'').toLowerCase().includes(simSearch.toLowerCase()));
@@ -10902,7 +10904,7 @@ function SimLabView({ data }) {
       return mul * ((parseFloat(a[sortBy]) || 0) - (parseFloat(b[sortBy]) || 0));
     });
     return sorted;
-  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, filterKeyMatchup, minYard, maxYard, minSimTB, minOdds, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal]);
+  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, filterKeyMatchup, minYard, maxYard, minSig, minSimTB, minOdds, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal]);
 
   // Auto-select top batter when data loads
   useEffect(() => {
@@ -11069,6 +11071,8 @@ function SimLabView({ data }) {
               </button>
             );})}
           </div>
+          {/* ⚡ The Sauce — faintly hidden cheat sheet, visible in All Matchups */}
+          <div style={{display:'flex',alignItems:'center',marginBottom:4}}><CheatCodeButton/></div>
 
           {/* ── Row 3: Batter grades ── */}
           <div style={{ display: 'flex', gap: 6, marginBottom: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -11121,6 +11125,7 @@ function SimLabView({ data }) {
             {[
               { label:'🎯 Yard', minV:minYard, setMin:setMinYard, maxV:maxYard, setMax:setMaxYard, hasMax:true,  ph:'30' },
 
+              { label:'⚡ Sig',   minV:minSig,  setMin:setMinSig,  maxV:'',      setMax:null,        hasMax:false, ph:'4'  },
               { label:'Sim TB',  minV:minSimTB,setMin:setMinSimTB,maxV:'',      setMax:null,        hasMax:false, ph:'1.5'},
               { label:'Odds %',  minV:minOdds, setMin:setMinOdds, maxV:'',      setMax:null,        hasMax:false, ph:'8'  },
             ].map(({ label, minV, setMin, maxV, setMax, hasMax, ph }) => (
@@ -11143,8 +11148,8 @@ function SimLabView({ data }) {
                 </>}
               </div>
             ))}
-            {(minYard||maxYard||minSimTB||minOdds) && (
-              <button onClick={()=>{setMinYard('');setMaxYard('');setMinSimTB('');setMinOdds('');}}
+            {(minYard||maxYard||minSig||minSimTB||minOdds) && (
+              <button onClick={()=>{setMinYard('');setMaxYard('');setMinSig('');setMinSimTB('');setMinOdds('');}}
                 style={{padding:'3px 9px',borderRadius:5,border:'1px solid rgba(255,64,32,.3)',
                   background:'rgba(255,64,32,.08)',color:'var(--accent)',
                   fontFamily:"'DM Mono',monospace",fontSize:9,cursor:'pointer',fontWeight:700}}>
@@ -11237,6 +11242,7 @@ function SimLabView({ data }) {
                     { label: '+',        key: null },
                     { label: 'Batter',   key: null },
                     { label: (<img src="/icon-192.png" alt="Yard" style={{width:15,height:15,borderRadius:2,objectFit:'cover',verticalAlign:'middle',display:'inline-block'}}/>), key: '_yard', colKey: '_yard' },
+                    { label: '⚡',       key: '_sig', colKey:'_sig' },
                     { label: 'Form',     key: null },
                     { label: 'P.Grade',  key: null },
                     { label: 'vs Pitcher',key: null },
@@ -11448,6 +11454,14 @@ function SimLabView({ data }) {
                       </td>
                       <td style={{textAlign:'center',padding:'2px 4px',verticalAlign:'middle'}}>
                         <YardBadge score={b._yard ?? computeYardScore(b._trackerSig||0, parseFloat(b.gHR)||0, b._boom||0, b._ps||(parseFloat(b.ps_score)||0))}/>
+                      </td>
+                      <td style={{textAlign:'center',padding:'2px 4px',verticalAlign:'middle'}}>
+                        {(() => {
+                          const sig = Math.round(parseFloat(b._sig ?? b._trackerSig ?? (b.weighted_flag_score ? parseFloat(b.weighted_flag_score)*4.6 : 0)) || 0);
+                          if (!sig) return <span style={{color:'var(--muted)',fontSize:8}}>—</span>;
+                          const col = sig>=7?'#ffd700':sig>=5?'#f5a623':sig>=3?'var(--text)':'var(--muted)';
+                          return <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:11,color:col}}>{sig}</span>;
+                        })()}
                       </td>
                       <td style={{textAlign:'center',padding:'2px 4px',verticalAlign:'middle'}}>
                         <FormBadge formKey={getFormClass(b)}/>
@@ -12078,202 +12092,315 @@ function NotifyBell() {
 
 function CheatCodeButton() {
   const [open, setOpen] = useState(false);
+  const mono = "'DM Mono',monospace";
+  const osw  = "'Oswald',sans-serif";
 
   const Section = ({emoji, title, color, children}) => (
     <div style={{marginBottom:20}}>
       <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:8,
         borderBottom:'1px solid var(--border)',paddingBottom:6}}>
         <span style={{fontSize:13}}>{emoji}</span>
-        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,
-          letterSpacing:.8,color:color||'var(--text)',textTransform:'uppercase'}}>{title}</span>
+        <span style={{fontFamily:osw,fontWeight:700,fontSize:13,letterSpacing:.8,
+          color:color||'var(--text)',textTransform:'uppercase'}}>{title}</span>
       </div>
       {children}
     </div>
   );
 
-  const Row = ({label, value, color, sub}) => (
-    <div style={{display:'flex',alignItems:'baseline',gap:6,marginBottom:5}}>
-      <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--muted)',
-        flexShrink:0,width:14}}>›</span>
-      <div>
-        <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--text)'}}>{label}</span>
-        {value && <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,
-          color:color||'var(--accent2)',marginLeft:6}}>{value}</span>}
-        {sub && <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',
-          marginTop:1,lineHeight:1.3}}>{sub}</div>}
+  const Row = ({label, value, color, sub, col}) => (
+    <div style={{display:'flex',alignItems:'baseline',gap:6,marginBottom:6}}>
+      <span style={{fontFamily:mono,fontSize:10,color:'var(--muted)',flexShrink:0,width:14}}>›</span>
+      <div style={{flex:1}}>
+        <div style={{display:'flex',alignItems:'baseline',gap:6,flexWrap:'wrap'}}>
+          <span style={{fontFamily:mono,fontSize:10,color:'var(--text)'}}>{label}</span>
+          {col && <span style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.3)',
+            background:'rgba(255,255,255,.05)',padding:'1px 5px',borderRadius:3,
+            letterSpacing:.5}}>COL: {col}</span>}
+          {value && <span style={{fontFamily:osw,fontWeight:700,fontSize:11,
+            color:color||'var(--accent2)'}}>{value}</span>}
+        </div>
+        {sub && <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',
+          marginTop:2,lineHeight:1.4}}>{sub}</div>}
       </div>
     </div>
   );
 
   const Fade = ({label, sub}) => (
-    <div style={{display:'flex',alignItems:'baseline',gap:6,marginBottom:5}}>
-      <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--accent)',flexShrink:0}}>✕</span>
+    <div style={{display:'flex',alignItems:'baseline',gap:6,marginBottom:6}}>
+      <span style={{fontFamily:mono,fontSize:10,color:'var(--accent)',flexShrink:0}}>✕</span>
       <div>
-        <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--text)'}}>{label}</span>
-        {sub && <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',marginTop:1,lineHeight:1.3}}>{sub}</div>}
+        <span style={{fontFamily:mono,fontSize:10,color:'var(--text)'}}>{label}</span>
+        {sub && <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',
+          marginTop:2,lineHeight:1.4}}>{sub}</div>}
+      </div>
+    </div>
+  );
+
+  const Stat = ({label, val, sub}) => (
+    <div style={{padding:'5px 0',borderBottom:'1px solid rgba(255,255,255,.04)',
+      display:'flex',alignItems:'baseline',gap:8}}>
+      <span style={{fontFamily:osw,fontWeight:800,fontSize:13,color:'var(--accent)',
+        flexShrink:0,width:52}}>{val}</span>
+      <div>
+        <div style={{fontFamily:mono,fontSize:10,color:'var(--text)'}}>{label}</div>
+        {sub && <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:1}}>{sub}</div>}
       </div>
     </div>
   );
 
   return <>
-    {/* Subtle trigger — looks like part of the UI */}
     <button onClick={()=>setOpen(true)}
-      title="The Sauce"
-      style={{marginLeft:'auto',background:'none',border:'none',cursor:'pointer',
-        padding:'2px 6px',borderRadius:4,opacity:.35,
-        fontSize:11,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+      title="The Sauce — how to read this table"
+      style={{background:'none',border:'none',cursor:'pointer',
+        padding:'2px 6px',borderRadius:4,opacity:.3,
+        fontSize:11,color:'var(--muted)',fontFamily:mono,
         transition:'opacity .2s'}}
-      onMouseEnter={e=>e.currentTarget.style.opacity='.9'}
-      onMouseLeave={e=>e.currentTarget.style.opacity='.35'}>
+      onMouseEnter={e=>e.currentTarget.style.opacity='.85'}
+      onMouseLeave={e=>e.currentTarget.style.opacity='.3'}>
       ⚡
     </button>
 
     {open && <>
-      {/* Backdrop */}
       <div onClick={()=>setOpen(false)} style={{position:'fixed',inset:0,
         background:'rgba(0,0,0,.6)',zIndex:900}}/>
-
-      {/* Panel */}
-      <div style={{position:'fixed',right:0,top:0,bottom:0,width:'min(480px,100vw)',
+      <div style={{position:'fixed',right:0,top:0,bottom:0,width:'min(500px,100vw)',
         background:'var(--surface)',borderLeft:'2px solid var(--border)',
         zIndex:901,overflowY:'auto',display:'flex',flexDirection:'column'}}>
 
-        {/* Header */}
         <div style={{padding:'16px 20px 12px',borderBottom:'1px solid var(--border)',
           position:'sticky',top:0,background:'var(--surface)',zIndex:10,
           display:'flex',alignItems:'flex-start',justifyContent:'space-between'}}>
           <div>
-            <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:20,
+            <div style={{fontFamily:osw,fontWeight:800,fontSize:20,
               letterSpacing:1.5,color:'var(--accent)',textTransform:'uppercase'}}>
-              The Sauce
+              The Sauce ⚡
             </div>
-            <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',
+            <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',
               marginTop:2,letterSpacing:.5}}>
-              Derived from 2024–26 at-bat log · 12,965 HRs · 430,587 PAs · base rate 3.0% ✱
+              18,207 matchups · 1,572 HRs · 8.63% base rate · 2024–26
             </div>
           </div>
           <button onClick={()=>setOpen(false)}
             style={{background:'none',border:'1px solid var(--border)',borderRadius:6,
               color:'var(--muted)',cursor:'pointer',padding:'4px 10px',
-              fontFamily:"'DM Mono',monospace",fontSize:10,marginLeft:12,flexShrink:0}}>
-            ✕
-          </button>
+              fontFamily:mono,fontSize:10,marginLeft:12,flexShrink:0}}>✕</button>
         </div>
 
-        {/* Content */}
         <div style={{padding:'20px',flex:1}}>
 
-          <Section emoji="🔒" title="Tier 1 Lock — All 3 = strongest play" color="var(--accent)">
-            <div style={{background:'rgba(255,64,32,.06)',border:'1px solid rgba(255,64,32,.2)',
+          {/* #1 misconception */}
+          <div style={{background:'rgba(255,64,32,.07)',border:'1px solid rgba(255,64,32,.25)',
+            borderRadius:8,padding:'12px 14px',marginBottom:20}}>
+            <div style={{fontFamily:osw,fontWeight:700,fontSize:13,color:'var(--accent)',
+              letterSpacing:.8,marginBottom:6}}>YARD SCORE ≠ BEST PICK</div>
+            <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',lineHeight:1.7}}>
+              The highest Yard Score is not automatically the best play.
+              A Yard 48 batter facing a Tough pitcher is often a worse bet than
+              a Yard 26 with a Target pitcher, confirmed in lineup, and a hot EV
+              reading. The signal is how many independent factors stack at once —
+              not the raw number.
+            </div>
+          </div>
+
+          {/* Proven numbers */}
+          <Section emoji="📊" title="What the Data Actually Shows" color="var(--accent2)">
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',
+              marginBottom:8,letterSpacing:.5,textTransform:'uppercase'}}>
+              From 18,207 tracked matchups — 2024/25/26 seasons
+            </div>
+            <Stat val="30.0%" label="A+ Grade + 🎯 Target pitcher"
+              sub="30 matchups, 9 HRs. The single best confirmed combo in the dataset."/>
+            <Stat val="14.8%" label="Sim TB ≥ 2.0"
+              sub="Meaningfully above base (8.63%). The 2.0 threshold is real."/>
+            <Stat val="15.1%" label="Recent EV 102+ mph"
+              sub="Batter is genuinely elite-hot. EV 95–98 still solid at 11.5%."/>
+            <Stat val="12.5%" label="Zone Fit 4–6"
+              sub="The sweet spot. Below 4 = weak. Above 8 = overcorrects, drops back to 4%."/>
+            <Stat val="~10%+" label="Sig Score 4+"
+              sub="Sig 4 = 9.3%, Sig 6 = 10.5%, Sig 7 = 11.3%. Real signal, not linear — 4+ doubles the base rate."/>
+            <Stat val="3.6%" label="A+ Grade + ⚠️ Tough pitcher"
+              sub="Below base rate. Grade doesn't overcome a genuinely tough arm."/>
+          </Section>
+
+          {/* Grade reality */}
+          <Section emoji="🎖️" title="Grade — What It Actually Means" color="#f5a623">
+            <div style={{background:'rgba(245,166,35,.06)',border:'1px solid rgba(245,166,35,.2)',
               borderRadius:8,padding:'10px 14px',marginBottom:8}}>
-              <Row label="Grade A+" value="46.7% HR rate when stacked" color="var(--accent)"/>
-              <Row label="Sim TB ≥ 2.0" value="+5.2% lift" color="#f5a623"
-                sub="→ Filter this in Sim Lab using the Sim TB box"/>
-              <Row label="Pitcher 💥 Hittable or 🎯 Target" value="+2.0% lift" color="#27c97a"
-                sub="A+ vs Target alone = 50% HR rate in tracker"/>
+              {[['A+','14.4%','201 matchups'],['A','14.0%','1,055'],
+                ['B','10.9%','3,374'],['C','8.6%','5,963'],['D','6.7%','7,614']
+              ].map(([g,r,n]) => (
+                <div key={g} style={{display:'flex',alignItems:'center',
+                  gap:8,padding:'3px 0',borderBottom:'1px solid rgba(255,255,255,.04)'}}>
+                  <span style={{fontFamily:osw,fontWeight:800,fontSize:13,
+                    color:{'A+':'#f5a623','A':'#e8411a','B':'#38b8f2','C':'var(--muted)','D':'var(--muted)'}[g],
+                    width:24}}>{g}</span>
+                  <span style={{fontFamily:osw,fontWeight:700,fontSize:13,
+                    color:'var(--text)',width:48}}>{r}</span>
+                  <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{n} matchups</span>
+                </div>
+              ))}
             </div>
-            <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',
-              lineHeight:1.4}}>All three together → 46.7% HR rate vs 17.1% base. That's your lock. ✱</div>
-          </Section>
-
-          <Section emoji="🔥" title="Tier 2 — Any 2 = solid play" color="var(--accent2)">
-            <Row label="Recent EV > 98 mph" value="23.5% HR rate" color="var(--accent)"
-              sub="Hot bat signal — biggest non-grade individual predictor"/>
-            <Row label="Temp 70–75°F" value="22.3% HR rate" color="#f5a623"
-              sub="Strongest environmental signal in the dataset (+9.2% lift)"/>
-            <Row label="BvP FB% 28–36%" value="22.2% HR rate" color="#27c97a"
-              sub="Above 36% = popup territory, actually reverses below base"/>
-            <Row label="BvP EV 92–98 mph" value="16–17% HR rate" color="var(--accent2)"
-              sub="Above 98 shows diminishing returns — sweet spot is 92-98"/>
-            <Row label="Sim TB > 2.5" value="21.6% HR rate" color="var(--accent)"
-              sub="Elite zone — filter to ≥2.5 for highest confidence plays"/>
-            <Row label="D/C Grade + 🎯 Target ✱" value="22.6% HR rate" color="#fb923c"
-              sub="New v2 finding: pitcher vulnerability overrides batter grade. Mid-week especially."/>
-          </Section>
-
-          <Section emoji="📐" title="The Narrowest Sweet Spots" color="var(--ice)">
-            <Row label="BvP Launch Angle 20–24°" value="+4.1% lift" color="var(--ice)"
-              sub="HR corridor. Below 16° = groundball. Above 24° = popup."/>
-            <Row label="Recent Barrel% 3–6%" value="18.6% HR rate" color="var(--ice)"
-              sub="0-3% is the WORST zone (7.1%). Extreme barrel rates also fade."/>
-            <Row label="Signal Flags 4–6" value="14–15% HR rate" color="var(--ice)"
-              sub="Sweet spot. Flags 7 = 8.5% — looks great, underperforms."/>
-          </Section>
-
-          <Section emoji="❌" title="Dead Zones — Fade These" color="var(--accent)">
-            <Fade label="Sim TB 1.6–2.0" sub="Worse than 1.3-1.6. The mystery dip — real, not noise."/>
-            <Fade label="Recent EV 92–94 mph" sub="Dead zone, -3% vs base. Skip this band entirely."/>
-            <Fade label="BvP EV 90–92 mph" sub="Worst BvP EV range in the data (-3.5% lift)."/>
-            <Fade label="Temp below 65°F" sub="HR rate drops to 8.1-8.9%. Hard avoid."/>
-            <Fade label="Grade B vs Target/Hittable" sub="9.3% HR rate — below base! Only trust pitcher targeting for A/A+."/>
-            <Fade label="Flags = 7" sub="Grade A concentration problem. 10.5% HR rate ✱ — Sim TB looks high but consistently underdelivers."/>
-          </Section>
-
-          <Section emoji="🗺️" title="Daily Scan Order" color="#27c97a">
-            <div style={{fontFamily:"'DM Mono',monospace",fontSize:10,lineHeight:1.8,color:'var(--text)'}}>
-              <div><span style={{color:'var(--accent2)',fontWeight:700}}>1.</span> Set Sim TB filter ≥ 1.5 in Sim Lab</div>
-              <div><span style={{color:'var(--accent2)',fontWeight:700}}>2.</span> Look for Grade A+ in that list first</div>
-              <div><span style={{color:'var(--accent2)',fontWeight:700}}>3.</span> Check pitcher: Hittable or Target = green light</div>
-              <div><span style={{color:'var(--accent2)',fontWeight:700}}>4.</span> Confirm HR% ≥ 8% and flags 4–6</div>
-              <div><span style={{color:'var(--accent2)',fontWeight:700}}>5.</span> Weather tab: 70–75°F games get a bump</div>
-              <div><span style={{color:'var(--accent2)',fontWeight:700}}>✱</span> <span style={{color:'#f5a623'}}>Tue/Wed slate? Boost confidence on all A+ plays.</span></div>
-              <div><span style={{color:'var(--accent2)',fontWeight:700}}>6.</span> Cross-check BvP FB% — is it 28–36%?</div>
+            <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',lineHeight:1.5}}>
+              Grades are clean and monotonic across 18k rows. A+ and A are
+              genuinely distinct from the field. But pitcher grade still matters —
+              an A+ vs Tough pitcher (3.6%) is worse than a B vs Target (14.0%).
             </div>
           </Section>
 
-          <Section emoji="👤" title="Composite HR Hitter Profile" color="var(--muted)">
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px 12px'}}>
-              {[['Grade','A+ (highest rate)'],['Pitcher','💥 Hittable'],['Flags avg','4.7'],
-                ['Sim TB median','1.54'],['Recent EV','93.1 mph'],['BvP EV','92.8 mph'],
-                ['BvP FB%','23.4%'],['BvP LA','17.7°'],['Temp','70.9°F'],['Handedness','65% LHB']
-              ].map(([k,v])=>(
-                <div key={k} style={{padding:'4px 0',borderBottom:'1px solid rgba(30,45,58,.3)'}}>
-                  <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.6}}>{k}</div>
-                  <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'var(--text)'}}>{v}</div>
+          {/* Sim TB reality */}
+          <Section emoji="📐" title="Sim TB — The Real Thresholds" color="var(--ice)">
+            <Row label="Sim TB ≥ 2.0" value="14.8% HR rate" color="var(--ice)" col="SIM TB"
+              sub="Filter here for high-ceiling plays. This is where it gets meaningfully better."/>
+            <Row label="Sim TB 1.3–2.0" value="~10.6% HR rate" color="var(--muted)" col="SIM TB"
+              sub="Above base, roughly flat across this whole band. Solid, not elite."/>
+            <Row label="Sim TB < 1.0" value="5.2% HR rate" color="var(--accent)" col="SIM TB"
+              sub="Below base — fade."/>
+            <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginTop:6,
+              padding:'6px 8px',background:'rgba(255,255,255,.03)',borderRadius:5}}>
+              There is no mystery dip. The 1.3–2.0 range performs consistently.
+              The big jump is at 2.0 — that's the real filter threshold.
+            </div>
+          </Section>
+
+          {/* Sig reality */}
+          <Section emoji="⚡" title="Sig Score — The Real Story" color="#ffd700">
+            <Row label="Sig 0" value="3.7%" color="var(--muted)" col="⚡ SIG"
+              sub="Below base — no meaningful signals firing"/>
+            <Row label="Sig 1–3" value="5.7–8.2%" color="var(--muted)" col="⚡ SIG"
+              sub="Approaching base rate. Not strong enough alone."/>
+            <Row label="Sig 4–5" value="9.3–9.4%" color="#f5a623" col="⚡ SIG"
+              sub="Doubles the base rate. This is the real floor for actionable plays."/>
+            <Row label="Sig 6–7" value="10.5–11.3%" color="#ffd700" col="⚡ SIG"
+              sub="Strong signal. Use the ⚡ Sig filter box — set minimum to 4."/>
+            <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginTop:6,
+              padding:'6px 8px',background:'rgba(255,215,0,.06)',borderRadius:5,
+              border:'1px solid rgba(255,215,0,.15)'}}>
+              Sig is not "higher = always better." It's roughly flat from 4–9.
+              The value is the 4+ threshold doubling the base rate — not chasing
+              the highest number.
+            </div>
+          </Section>
+
+          {/* Zone Fit */}
+          <Section emoji="🎯" title="Zone Fit — The Sweet Spot" color="var(--ice)">
+            <Row label="Zone Fit 4–6" value="12.5% HR rate" color="var(--ice)" col="ZONEFIT"
+              sub="The confirmed sweet spot across 18k rows."/>
+            <Row label="Zone Fit < 2" value="4.4% HR rate" color="var(--accent)"
+              sub="Below base — pitcher doesn't throw to this batter's damage zone."/>
+            <Row label="Zone Fit > 8" value="4.1% HR rate" color="var(--accent)"
+              sub="Overcorrects — extreme zone fit actually drops back below base. Don't chase the highest number."/>
+          </Section>
+
+          {/* Handedness */}
+          <Section emoji="🤝" title="Handedness — New in v6" color="#a78bfa">
+            <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',
+              lineHeight:1.6,marginBottom:8}}>
+              Now scored explicitly. The engine reads pitcher splits vs each
+              batter's hand and boosts Sig when the compound matches: platoon
+              advantage + pitcher weak vs this hand + batter strong vs that hand.
+              You'll see it reflected in elevated Sig scores — no separate column needed.
+            </div>
+            <div style={{background:'rgba(167,139,250,.07)',border:'1px solid rgba(167,139,250,.2)',
+              borderRadius:6,padding:'8px 10px'}}>
+              <div style={{fontFamily:mono,fontSize:9,color:'#a78bfa',lineHeight:1.6}}>
+                💡 For deeper handedness research, go to the{' '}
+                <strong style={{color:'var(--text)'}}>Splits page</strong> — filter by
+                pitcher hand (LHP/RHP) to see exactly how any batter performs vs
+                each arm. That's where you find the .320 vs LHP batters before
+                the engine does.
+              </div>
+            </div>
+          </Section>
+
+          {/* Daily scan */}
+          <Section emoji="🗺️" title="Daily Scan — 5 Steps" color="#27c97a">
+            <div style={{fontFamily:mono,fontSize:10,lineHeight:2.0,color:'var(--text)'}}>
+              {[
+                ['1','Filter Sim TB ≥ 1.5 — cuts low-ceiling noise immediately'],
+                ['2','Filter P.Grade to 🎯 Target + 💥 Hittable'],
+                ['3','Look for Grade A or A+ in what remains'],
+                ['4','Confirm ✅ lineup + check Sig ≥ 4 with the ⚡ Sig filter'],
+                ['5','Check FORM — Moonshot and Gap over Cold and Worm'],
+                ['✱','A+ vs Target (30% HR rate) is the single best combo in the data'],
+              ].map(([n,txt]) => (
+                <div key={n} style={{display:'flex',gap:8,alignItems:'baseline'}}>
+                  <span style={{color:'var(--accent2)',fontWeight:700,
+                    flexShrink:0,width:14}}>{n}.</span>
+                  <span>{txt}</span>
                 </div>
               ))}
             </div>
           </Section>
 
-          <Section emoji="📅" title="Day of Week — Target Profiles" color="#f5a623">
-            <div style={{display:'flex',flexDirection:'column',gap:4}}>
-              {[
-                ['Tuesday','✅ Best Day ✱','25.8%','Biggest upgrade from v2. Stack A+ vs Target/Hittable. Boost confidence on all plays.'],
-                ['Wednesday','✅ Best Day ✱','25.8%','Tied with Tuesday — 2x the base rate. Best mid-week slate. Play your full card.'],
-                ['Friday','✅ Strong ✱','19.2%','Was flagged as a trap in v1. v2 flips it — above average. Standard filters apply.'],
-                ['Saturday','~ Solid ✱','15.9%','Slightly downgraded from v1. Hittable pitchers still = 20%+. A/A+ stack holds.'],
-                ['Sunday','~ Neutral','13.2%','Target pitchers = 22.2%. Otherwise play standard Sauce. No special unlock.'],
-                ['Monday','~ Neutral','13.1%','No specific signal. Standard Sauce filters apply. Nothing special either way.'],
-                ['Thursday','⚠️ Weakest ✱','12.5%','Was "Best Day" in v1 — now near-bottom. Big slate dilutes quality. Dampen confidence.'],
-              ].map(([day, badge, rate, tip]) => {
-                const col = badge.includes('✅') ? '#27c97a' : badge.includes('⚠️') ? 'var(--accent)' : 'var(--muted)';
-                return (
-                  <div key={day} style={{display:'flex',alignItems:'flex-start',gap:8,
-                    padding:'6px 8px',borderRadius:6,background:'rgba(255,255,255,.03)',
-                    border:`1px solid rgba(255,255,255,.06)`}}>
-                    <div style={{flexShrink:0,minWidth:80}}>
-                      <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11}}>{day}</div>
-                      <div style={{display:'flex',alignItems:'center',gap:4,marginTop:1}}>
-                        <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:col,fontWeight:700}}>{badge}</span>
-                        <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)'}}>{rate}</span>
-                      </div>
-                    </div>
-                    <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',
-                      lineHeight:1.4,flex:1}}>{tip}</div>
-                  </div>
-                );
-              })}
-            </div>
+          {/* Fade */}
+          <Section emoji="❌" title="Fade These" color="var(--accent)">
+            <Fade label="A+ vs ⚠️ Tough or ‼️ Elite pitcher"
+              sub="A+ + Tough = 3.6% — below base rate. Grade doesn't overcome a tough arm."/>
+            <Fade label="Sim TB below 1.0"
+              sub="5.2% HR rate. Half the base rate. Cut with the Sim TB filter."/>
+            <Fade label="Zone Fit above 8"
+              sub="Overcorrects — drops back to 4.1%. The sweet spot is 4–6, not highest."/>
+            <Fade label="Recent EV below 88 mph"
+              sub="6.75% — below base. Batter is cold. Combine with Cold form = double fade."/>
+            <Fade label="Cold form + no confirmed lineup"
+              sub="Two independent negatives before you even look at anything else."/>
           </Section>
 
-          <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--muted)',
-            textAlign:'center',marginTop:8,lineHeight:1.6,borderTop:'1px solid var(--border)',paddingTop:12}}>
-            ⚠️ The Sauce is a living model — signals, thresholds and weights are updated<br/>
-            periodically as the season sample grows. Treat it as directional, not prescriptive.<br/>
-            <span style={{color:'rgba(255,255,255,.25)',fontSize:7,marginTop:4,display:'block'}}>
-              ✱ v5 analysis · 12,965 HRs · 430,587 PAs · Last updated: May 13, 2026
+          {/* Form */}
+          <Section emoji="🔥" title="Form Class — What Each Means" color="var(--accent2)">
+            {[
+              ['Moonshot','9.8%','High launch angle + EV profile. Barely above base — context matters more than label alone.'],
+              ['Contact', '9.2%','Consistent hard contact. Reliable but not a power signal on its own.'],
+              ['Gap',     '7.8%','Hard contact, XBH-oriented. Solid. Pairs well with a Target pitcher.'],
+              ['Whiff',   '6.3%','K-prone. Below base — avoid unless Sig is stacked.'],
+              ['Worm',    '5.0%','Ground ball tendency. Lowest power profile. Fade.'],
+              ['Cold',    '4.1%','No recent heat. Well below base. Hard avoid.'],
+            ].map(([fc,rate,desc]) => (
+              <div key={fc} style={{display:'flex',gap:8,padding:'5px 0',
+                borderBottom:'1px solid rgba(255,255,255,.04)'}}>
+                <div style={{flexShrink:0,width:68}}>
+                  <div style={{fontFamily:osw,fontWeight:700,fontSize:11}}>{fc}</div>
+                  <div style={{fontFamily:mono,fontSize:9,
+                    color:parseFloat(rate)>=9?'#27c97a':parseFloat(rate)<=5?'var(--accent)':'var(--muted)'}}>{rate}</div>
+                </div>
+                <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',
+                  lineHeight:1.4,flex:1}}>{desc}</div>
+              </div>
+            ))}
+          </Section>
+
+          {/* Column guide */}
+          <Section emoji="📋" title="Column Guide" color="var(--muted)">
+            {[
+              ['YARD',    'Composite score. Starting point only — stack the signals.'],
+              ['⚡ SIG',  'Stacked signal count. Filter ≥ 4. Doubles the base HR rate.'],
+              ['FORM',    'Swing profile. Moonshot/Gap = power. Cold/Worm = fade.'],
+              ['P.GRADE', '🎯 Target = exploit. 💥 Hittable = good. ⚠️ Tough/‼️ Elite = fade unless grade A+.'],
+              ['SIM TB',  'Simulated total bases. Filter ≥ 1.5 to start, ≥ 2.0 for elite plays.'],
+              ['ZONEFIT', 'Pitch zone alignment. Sweet spot 4–6. Ignore if > 8 or < 2.'],
+              ['L7 EV',   'Last 7 days exit velocity. ≥ 95 = hot. ≥ 102 = elite hot.'],
+              ['BS Δ',    'Bat speed vs season baseline. Positive = accelerating. Key Sig input.'],
+              ['DIST',    'Recent near-miss distances. Balls near the wall = HR intent is there.'],
+            ].map(([col,desc]) => (
+              <div key={col} style={{display:'flex',gap:8,padding:'5px 0',
+                borderBottom:'1px solid rgba(255,255,255,.04)'}}>
+                <span style={{fontFamily:mono,fontSize:9,color:'var(--accent2)',
+                  fontWeight:700,flexShrink:0,width:56,letterSpacing:.3}}>{col}</span>
+                <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)',
+                  lineHeight:1.4}}>{desc}</span>
+              </div>
+            ))}
+          </Section>
+
+          <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',
+            textAlign:'center',marginTop:8,lineHeight:1.6,
+            borderTop:'1px solid var(--border)',paddingTop:12}}>
+            ⚡ The Sauce is a living model — updated as the season sample grows.<br/>
+            <span style={{color:'rgba(255,255,255,.2)',fontSize:7,marginTop:4,display:'block'}}>
+              v6 · 18,207 matchups · 1,572 HRs · 8.63% base rate · 2024–26
             </span>
           </div>
+
         </div>
       </div>
     </>}
@@ -17010,7 +17137,6 @@ function MatchupEngineTab() {
     <div style={{display: subTab==='simlab' ? 'block' : 'none'}}>
       <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:10}}>
         <span style={{fontSize:10,color:'var(--accent)',fontFamily:"'DM Mono',monospace",fontWeight:700,opacity:.6}}>🧠</span>
-        <CheatCodeButton/>
       </div>
       <SimLabView data={activeData}/>
     </div>
