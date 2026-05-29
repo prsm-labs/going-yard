@@ -10767,6 +10767,7 @@ function SimLabView({ data }) {
   const [maxYard,    setMaxYard]     = useState('');
 
   const [minSig,     setMinSig]      = useState('');
+  const [maxSig,     setMaxSig]      = useState('');
   const [minSimTB,   setMinSimTB]    = useState('');
   const [minOdds,    setMinOdds]     = useState('');
   const [simSearch,   setSimSearch]    = useState('');  // batter name search
@@ -10876,7 +10877,7 @@ function SimLabView({ data }) {
       .filter(r => !minYard   || (parseFloat(r._yard)||computeYardScore(parseFloat(r.weighted_flag_score)*4.6, parseFloat(r.gHR)||0, parseFloat(r._boom)||0, parseFloat(r.ps_score)||0)) >= parseFloat(minYard))
       .filter(r => !maxYard   || (parseFloat(r._yard)||computeYardScore(parseFloat(r.weighted_flag_score)*4.6, parseFloat(r.gHR)||0, parseFloat(r._boom)||0, parseFloat(r.ps_score)||0)) <= parseFloat(maxYard))
 
-      .filter(r => !minSig    || (parseFloat(r.weighted_flag_score)*4.6||0) >= parseFloat(minSig))
+      .filter(r => { const _s = Math.round(sigCache.current[String(r.batter_id)] ?? (parseFloat(r.weighted_flag_score)||0)*4.6); return (!minSig || _s >= parseFloat(minSig)) && (!maxSig || _s <= parseFloat(maxSig)); })
       .filter(r => !minSimTB  || (parseFloat(r.sim_tb)||0)   >= parseFloat(minSimTB))
       .filter(r => !minOdds   || (() => { const d = HR_ODDS_MAP[String(parseInt(r.batter_id)||0)]; return d?.implied && (d.implied * 100) >= parseFloat(minOdds); })())
       .filter(r => !simSearch || (r.batter||'').toLowerCase().includes(simSearch.toLowerCase()));
@@ -10904,7 +10905,7 @@ function SimLabView({ data }) {
       return mul * ((parseFloat(a[sortBy]) || 0) - (parseFloat(b[sortBy]) || 0));
     });
     return sorted;
-  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, filterKeyMatchup, minYard, maxYard, minSig, minSimTB, minOdds, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal]);
+  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, filterKeyMatchup, minYard, maxYard, minSig, maxSig, minSimTB, minOdds, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal]);
 
   // Auto-select top batter when data loads
   useEffect(() => {
@@ -11125,7 +11126,7 @@ function SimLabView({ data }) {
             {[
               { label:'🎯 Yard', minV:minYard, setMin:setMinYard, maxV:maxYard, setMax:setMaxYard, hasMax:true,  ph:'30' },
 
-              { label:'⚡ Sig',   minV:minSig,  setMin:setMinSig,  maxV:'',      setMax:null,        hasMax:false, ph:'4'  },
+              { label:'⚡ Sig',   minV:minSig,  setMin:setMinSig,  maxV:maxSig,  setMax:setMaxSig,   hasMax:true,  ph:'4'  },
               { label:'Sim TB',  minV:minSimTB,setMin:setMinSimTB,maxV:'',      setMax:null,        hasMax:false, ph:'1.5'},
               { label:'Odds %',  minV:minOdds, setMin:setMinOdds, maxV:'',      setMax:null,        hasMax:false, ph:'8'  },
             ].map(({ label, minV, setMin, maxV, setMax, hasMax, ph }) => (
@@ -11148,8 +11149,8 @@ function SimLabView({ data }) {
                 </>}
               </div>
             ))}
-            {(minYard||maxYard||minSig||minSimTB||minOdds) && (
-              <button onClick={()=>{setMinYard('');setMaxYard('');setMinSig('');setMinSimTB('');setMinOdds('');}}
+            {(minYard||maxYard||minSig||maxSig||minSimTB||minOdds) && (
+              <button onClick={()=>{setMinYard('');setMaxYard('');setMinSig('');setMaxSig('');setMinSimTB('');setMinOdds('');}}
                 style={{padding:'3px 9px',borderRadius:5,border:'1px solid rgba(255,64,32,.3)',
                   background:'rgba(255,64,32,.08)',color:'var(--accent)',
                   fontFamily:"'DM Mono',monospace",fontSize:9,cursor:'pointer',fontWeight:700}}>
