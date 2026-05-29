@@ -10895,7 +10895,7 @@ function SimLabView({ data }) {
         const bO = HR_ODDS_MAP[String(parseInt(b.batter_id)||0)]?.implied || 0;
         return mul * (aO - bO);
       }
-      if (sortBy === '_trackerSig') {
+      if (sortBy === '_trackerSig' || sortBy === '_sig') {
         // Read from ref cache — populated after first render, accurate on all subsequent sorts
         const aS = sigCache.current[String(a.batter_id)] ?? (parseFloat(a.weighted_flag_score)||0)*4.6;
         const bS = sigCache.current[String(b.batter_id)] ?? (parseFloat(b.weighted_flag_score)||0)*4.6;
