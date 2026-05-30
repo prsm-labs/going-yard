@@ -6098,6 +6098,23 @@ function LiveTab() {
       </div>
     </div>
 
+    {/* ── Shared date bar — applies to all sub-views ─────────────────── */}
+    <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10,flexWrap:'wrap'}}>
+      <button onClick={()=>{const d=new Date(liveDate+'T12:00:00');d.setDate(d.getDate()-1);const s=d.toISOString().slice(0,10);setLiveDate(s);load(false,s);}}
+        disabled={liveDate<=LIVE_SEASON_START}
+        style={{padding:'3px 10px',borderRadius:6,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--muted)',cursor:'pointer',fontFamily:"'DM Mono',monospace",fontSize:12}}>←</button>
+      <input type="date" value={liveDate} min={LIVE_SEASON_START}
+        onChange={e=>{setLiveDate(e.target.value);load(false,e.target.value);}}
+        style={{padding:'3px 10px',borderRadius:6,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontFamily:"'DM Mono',monospace",fontSize:11,cursor:'pointer'}}/>
+      <button onClick={()=>{const d=new Date(liveDate+'T12:00:00');d.setDate(d.getDate()+1);const s=d.toISOString().slice(0,10);setLiveDate(s);load(false,s);}}
+        style={{padding:'3px 10px',borderRadius:6,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--muted)',cursor:'pointer',fontFamily:"'DM Mono',monospace",fontSize:12}}>→</button>
+      {liveDate!==liveTodayStr&&<button onClick={()=>{setLiveDate(liveTodayStr);load(false,liveTodayStr);}}
+        style={{padding:'3px 10px',borderRadius:6,border:'1px solid var(--accent)',background:'rgba(232,65,26,.1)',color:'var(--accent)',cursor:'pointer',fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:700}}>Today</button>}
+      <span style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
+        {liveDate===liveTodayStr?'🔴 Live':'📅 '+new Date(liveDate+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}
+      </span>
+    </div>
+
     {/* Sub-view toggle */}
     {showLiveHelp && <HelpSlideout title="📺 Live Tab Guide" items={[
       ['📺 Gameday', "In-game box scores for every game happening right now. Tap a game card to expand it and see live batter stats, pitch-by-pitch data, and base runners."],
@@ -6122,28 +6139,11 @@ function LiveTab() {
       <HelpBtn onClick={()=>setShowLiveHelp(v=>!v)}/>
     </div>
 
-  {liveView==='battracking' && <BatTrackingTab games={games}/>}
+  {liveView==='battracking' && <BatTrackingTab games={games} date={liveDate} isToday={liveDate===liveTodayStr}/>}
   {liveView==='lineups' && <LineupsView date={liveDate}/>}
-  {liveView==='gameday' && <GamedayTab/>}
+  {liveView==='gameday' && <GamedayTab date={liveDate}/>}
 
   {liveView==='games' && <>
-  {/* Date picker */}
-  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,flexWrap:"wrap"}}>
-    <span style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1}}>Date</span>
-    <button onClick={()=>{const d=new Date(liveDate+"T12:00:00");d.setDate(d.getDate()-1);const s=d.toISOString().slice(0,10);setLiveDate(s);load(false,s);}}
-      disabled={liveDate<=LIVE_SEASON_START}
-      style={{padding:"3px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--surface2)",color:"var(--muted)",cursor:"pointer",fontFamily:"'DM Mono',monospace",fontSize:12}}>←</button>
-    <input type="date" value={liveDate} min={LIVE_SEASON_START}
-      onChange={e=>{setLiveDate(e.target.value);load(false,e.target.value);}}
-      style={{padding:"3px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--surface2)",color:"var(--text)",fontFamily:"'DM Mono',monospace",fontSize:11,cursor:"pointer"}}/>
-    <button onClick={()=>{const d=new Date(liveDate+"T12:00:00");d.setDate(d.getDate()+1);const s=d.toISOString().slice(0,10);setLiveDate(s);load(false,s);}}
-      style={{padding:"3px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--surface2)",color:"var(--muted)",cursor:"pointer",fontFamily:"'DM Mono',monospace",fontSize:12}}>→</button>
-    {liveDate!==liveTodayStr&&<button onClick={()=>{setLiveDate(liveTodayStr);load(false,liveTodayStr);}}
-      style={{padding:"3px 10px",borderRadius:6,border:"1px solid var(--accent)",background:"rgba(232,65,26,.1)",color:"var(--accent)",cursor:"pointer",fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:700}}>Today</button>}
-    <span style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>
-      {liveDate===liveTodayStr?"🔴 Live":"📅 "+new Date(liveDate+"T12:00:00").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"})}
-    </span>
-  </div>
 
     <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 12px",
         borderRadius:8,background:"rgba(245,166,35,.06)",border:"1px solid rgba(245,166,35,.15)",
@@ -7052,7 +7052,7 @@ const VIDEO_LINK_CACHE = {}; // gamePk_atBatIndex → savant video URL
 
 
 // ── GAMEDAY TAB ──────────────────────────────────────────────────────────────
-function BatTrackingTab({ games }) {
+function BatTrackingTab({ games, date, isToday }) {
   const mono  = "'DM Mono',monospace";
   const osw   = "'Oswald',sans-serif";
   const POLL  = 90000; // 90 seconds — generous for Stats API
@@ -7291,7 +7291,7 @@ function BatTrackingTab({ games }) {
           <option value="all">All Games</option>
           {liveAndFinal.map(g=>(
             <option key={g.gamePk} value={String(g.gamePk)}>
-              {g.status==='Live' ? `🔴 LIVE · ` : `✓ Final · `}{g.away?.abbr} @ {g.home?.abbr}
+              {g.status==='Live' ? '🔴 LIVE · ' : isToday===false ? '📅 ' : '✓ Final · '}{g.away?.abbr} @ {g.home?.abbr}
               {g.inning ? ` (${g.inning})` : ''}
             </option>
           ))}
