@@ -7067,6 +7067,7 @@ function BatTrackingTab({ games }) {
   const [sortDir,   setSortDir]   = React.useState(-1);   // -1=desc 1=asc
   const [selPlay,   setSelPlay]   = React.useState(null);  // expanded play for pitch detail
   const pollRef = React.useRef(null);
+  const [fetchDebug, setFetchDebug] = React.useState(null);
 
   // ── Game options ────────────────────────────────────────────────────────
   const liveAndFinal = React.useMemo(() =>
@@ -7102,11 +7103,18 @@ function BatTrackingTab({ games }) {
         const savant = savantRes.status === 'fulfilled' ? savantRes.value : {};
         const batSpeedMap = savant.bat_speeds || {};
         const plays = d?.allPlays || [];
-        console.log('[BatTracking] game', g.gamePk,
-          '| pbp plays:', plays.length,
-          '| complete:', plays.filter(p=>p.about?.isComplete).length,
-          '| hasResult:', plays.filter(p=>p.result?.event).length,
-          '| savant bat speeds:', Object.keys(batSpeedMap).length);
+        const _dbg = {
+          gamePk: g.gamePk,
+          url: `https://statsapi.mlb.com/api/v1/game/${g.gamePk}/playByPlay`,
+          pbpStatus: pbpRes.status,
+          totalPlays: plays.length,
+          complete: plays.filter(p=>p.about?.isComplete).length,
+          hasResult: plays.filter(p=>p.result?.event).length,
+          savantBatSpeeds: Object.keys(batSpeedMap).length,
+          rawKeys: Object.keys(pbpRes.status === 'fulfilled' ? (pbpRes.value||{}) : {}),
+        };
+        console.log('[BatTracking]', _dbg);
+        setFetchDebug(_dbg);
         const awayAbbr = g.away?.abbr || '???';
         const homeAbbr = g.home?.abbr || '???';
         plays.forEach(play => {
@@ -7356,7 +7364,18 @@ function BatTrackingTab({ games }) {
               {filtered.length === 0 && (
                 <tr><td colSpan={10} style={{padding:20,textAlign:'center',
                   fontFamily:mono,fontSize:10,color:'var(--muted)'}}>
-                  No plate appearances found
+                  {loading ? 'Loading…' : fetchDebug ? (
+                    <div style={{textAlign:'left',padding:'0 12px'}}>
+                      <div style={{color:'var(--accent)',marginBottom:6}}>No plate appearances found — debug info:</div>
+                      <div>GamePk: <span style={{color:'var(--text)'}}>{fetchDebug.gamePk ?? 'MISSING'}</span></div>
+                      <div>PBP fetch: <span style={{color:fetchDebug.pbpStatus==='fulfilled'?'#27c97a':'var(--accent)'}}>{fetchDebug.pbpStatus}</span></div>
+                      <div>Total plays returned: <span style={{color:'var(--text)'}}>{fetchDebug.totalPlays}</span></div>
+                      <div>Complete: {fetchDebug.complete} / HasResult: {fetchDebug.hasResult}</div>
+                      <div>Savant bat speeds: {fetchDebug.savantBatSpeeds}</div>
+                      <div style={{fontSize:8,color:'var(--muted)',marginTop:4,wordBreak:'break-all'}}>URL: {fetchDebug.url}</div>
+                      {fetchDebug.rawKeys?.length > 0 && <div style={{fontSize:8,color:'var(--muted)'}}>Response keys: {fetchDebug.rawKeys.join(', ')}</div>}
+                    </div>
+                  ) : 'No plate appearances found'}
                 </td></tr>
               )}
               {filtered.map((r,i) => {
