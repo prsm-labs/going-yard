@@ -6108,7 +6108,7 @@ function LiveTab() {
     ]} onClose={()=>setShowLiveHelp(false)}/>}
     <div style={{display:'flex',gap:5,marginBottom:12,alignItems:'center'}}>
       <div style={{display:'flex',gap:5,padding:'3px',background:'var(--surface)',borderRadius:8,border:'1px solid var(--border)',width:'fit-content'}}>
-      {[['gameday','📺 Gameday'],['games','🎮 Live Games'],['lineups','📋 Lineups']].map(([key,label])=>(
+      {[['gameday','📺 Gameday'],['battracking','🥎 Bat Tracking'],['games','🎮 Live Games'],['lineups','📋 Lineups']].map(([key,label])=>(
         <button key={key} onClick={()=>setLiveView(key)}
           style={{padding:'6px 14px',borderRadius:6,cursor:'pointer',border:'none',
             fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,letterSpacing:.8,
@@ -6122,6 +6122,7 @@ function LiveTab() {
       <HelpBtn onClick={()=>setShowLiveHelp(v=>!v)}/>
     </div>
 
+  {liveView==='battracking' && <BatTrackingTab games={games}/>}
   {liveView==='lineups' && <LineupsView date={liveDate}/>}
   {liveView==='gameday' && <GamedayTab/>}
 
@@ -7051,6 +7052,337 @@ const VIDEO_LINK_CACHE = {}; // gamePk_atBatIndex → savant video URL
 
 
 // ── GAMEDAY TAB ──────────────────────────────────────────────────────────────
+function BatTrackingTab({ games }) {
+  const mono  = "'DM Mono',monospace";
+  const osw   = "'Oswald',sans-serif";
+  const POLL  = 90000; // 90 seconds — generous for Stats API
+
+  // ── State ──────────────────────────────────────────────────────────────
+  const [plays,     setPlays]     = React.useState([]);   // all parsed PAs
+  const [loading,   setLoading]   = React.useState(true);
+  const [lastUpd,   setLastUpd]   = React.useState(null);
+  const [selGame,   setSelGame]   = React.useState('all'); // gamePk | 'all'
+  const [search,    setSearch]    = React.useState('');
+  const [sortCol,   setSortCol]   = React.useState('inning');
+  const [sortDir,   setSortDir]   = React.useState(-1);   // -1=desc 1=asc
+  const pollRef = React.useRef(null);
+
+  // ── Game options ────────────────────────────────────────────────────────
+  const liveAndFinal = React.useMemo(() =>
+    (games||[]).filter(g => g.status==='Live' || g.status==='Final')
+      .sort((a,b) => (a.status==='Live'?0:1)-(b.status==='Live'?0:1))
+  , [games]);
+
+  // Default to earliest live game (or first final if none live)
+  React.useEffect(() => {
+    const firstLive = liveAndFinal.find(g => g.status==='Live');
+    if (firstLive) setSelGame(String(firstLive.gamePk));
+    else if (liveAndFinal.length) setSelGame(String(liveAndFinal[0].gamePk));
+    else setSelGame('all');
+  }, [liveAndFinal.length]);
+
+  // ── Fetch play-by-play ──────────────────────────────────────────────────
+  const fetchPlays = React.useCallback(async (silent=false) => {
+    if (!silent) setLoading(true);
+    const targets = selGame === 'all'
+      ? liveAndFinal
+      : liveAndFinal.filter(g => String(g.gamePk) === selGame);
+
+    const allPAs = [];
+    await Promise.allSettled(targets.map(async g => {
+      try {
+        const r = await fetch(`https://statsapi.mlb.com/api/v1/game/${g.gamePk}/playByPlay`);
+        const d = await r.json();
+        const plays = d.allPlays || [];
+        const awayAbbr = g.away?.abbr || '???';
+        const homeAbbr = g.home?.abbr || '???';
+        plays.forEach(play => {
+          if (!play.about?.isComplete) return;
+          const batter    = play.matchup?.batter;
+          const side      = play.about?.halfInning; // 'top'=away 'bottom'=home
+          const team      = side === 'top' ? awayAbbr : homeAbbr;
+          const events    = play.playEvents || [];
+          const lastPitch = [...events].reverse().find(e => e.isPitch);
+          const hitData   = play.hitData || lastPitch?.hitData || {};
+          const batSpd    = events.find(e => e.batSpeed != null)?.batSpeed ?? null;
+          const pitchVelo = lastPitch?.pitchData?.startSpeed ?? null;
+          const xba       = play.expectedStatistics?.xba ?? null;
+          const result    = (play.result?.event || '').toLowerCase().replace(/ /g,'_');
+          allPAs.push({
+            pa:       play.about?.atBatIndex ?? 0,
+            inning:   play.about?.inning ?? 0,
+            half:     side,
+            gamePk:   g.gamePk,
+            matchup:  `${awayAbbr} @ ${homeAbbr}`,
+            batterId: batter?.id,
+            batter:   batter?.fullName || '—',
+            team,
+            result,
+            ev:     hitData.launchSpeed   != null ? Math.round(hitData.launchSpeed*10)/10 : null,
+            la:     hitData.launchAngle   != null ? Math.round(hitData.launchAngle*10)/10 : null,
+            dist:   hitData.totalDistance != null ? Math.round(hitData.totalDistance) : null,
+            batSpd: batSpd != null ? Math.round(batSpd*10)/10 : null,
+            pitchV: pitchVelo != null ? Math.round(pitchVelo*10)/10 : null,
+            xba:    xba != null ? parseFloat(xba).toFixed(3) : null,
+            pitchCode: lastPitch?.details?.type?.code || null,
+            isHR: result === 'home_run',
+          });
+        });
+      } catch(_) {}
+    }));
+
+    // Sort: live games first, then by most recent PA (inning desc → pa desc)
+    allPAs.sort((a,b) => {
+      // Live games before final
+      const aLive = liveAndFinal.find(g=>g.gamePk===a.gamePk)?.status==='Live' ? 0 : 1;
+      const bLive = liveAndFinal.find(g=>g.gamePk===b.gamePk)?.status==='Live' ? 0 : 1;
+      if (aLive !== bLive) return aLive - bLive;
+      // Within same game: most recent inning desc, then PA desc
+      if (a.gamePk === b.gamePk) {
+        if (b.inning !== a.inning) return b.inning - a.inning;
+        return b.pa - a.pa;
+      }
+      // Different games: sort by highest inning reached
+      return b.inning - a.inning || b.pa - a.pa;
+    });
+    setPlays(allPAs);
+    setLastUpd(new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}));
+    if (!silent) setLoading(false);
+  }, [selGame, liveAndFinal]);
+
+  React.useEffect(() => {
+    setLoading(true);
+    setPlays([]);
+    fetchPlays(false);
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(() => fetchPlays(true), POLL);
+    return () => clearInterval(pollRef.current);
+  }, [fetchPlays]);
+
+  // ── Filter + sort ───────────────────────────────────────────────────────
+  const RESULT_LABEL = {
+    home_run:'💥 HR', single:'1B', double:'2B', triple:'3B',
+    strikeout:'K', walk:'BB', field_out:'Out', force_out:'FO',
+    grounded_into_double_play:'DP', double_play:'DP', sac_fly:'SF',
+    hit_by_pitch:'HBP', intent_walk:'IBB', fielders_choice:'FC',
+    strikeout_double_play:'KDP', field_error:'E', catcher_interf:'CI',
+  };
+  const resultColor = r => {
+    if (r==='home_run') return 'var(--accent)';
+    if (['single','double','triple'].includes(r)) return '#27c97a';
+    if (r==='walk'||r==='intent_walk'||r==='hit_by_pitch') return '#38b8f2';
+    if (r==='strikeout'||r==='strikeout_double_play') return 'var(--ice)';
+    return 'var(--muted)';
+  };
+
+  const filtered = React.useMemo(() => {
+    let rows = plays;
+    const q = search.trim().toLowerCase();
+    if (q) rows = rows.filter(r =>
+      r.batter.toLowerCase().includes(q) ||
+      r.team.toLowerCase().includes(q) ||
+      r.matchup.toLowerCase().includes(q)
+    );
+    const mul = sortDir;
+    return [...rows].sort((a,b) => {
+      const av = a[sortCol] ?? -999;
+      const bv = b[sortCol] ?? -999;
+      return typeof av === 'string'
+        ? mul * av.localeCompare(bv)
+        : mul * (Number(av) - Number(bv));
+    });
+  }, [plays, search, sortCol, sortDir]);
+
+  const handleSort = col => {
+    if (sortCol === col) setSortDir(d => -d);
+    else { setSortCol(col); setSortDir(-1); }
+  };
+  const SortArrow = ({col}) => sortCol===col
+    ? <span style={{marginLeft:2,fontSize:8,opacity:.7}}>{sortDir===-1?'▼':'▲'}</span>
+    : null;
+
+  const Th = ({col, label, title, align='center', w}) => (
+    <th onClick={()=>handleSort(col)} title={title}
+      style={{padding:'4px 6px',textAlign:align,whiteSpace:'nowrap',cursor:'pointer',
+        fontSize:8,color:'var(--muted)',fontFamily:mono,textTransform:'uppercase',
+        letterSpacing:.5,background:'var(--surface2)',borderBottom:'1px solid var(--border)',
+        userSelect:'none',width:w||'auto'}}>
+      {label}<SortArrow col={col}/>
+    </th>
+  );
+
+  // ── Render ──────────────────────────────────────────────────────────────
+  if (!liveAndFinal.length) return (
+    <div style={{padding:40,textAlign:'center',fontFamily:mono,fontSize:10,color:'var(--muted)'}}>
+      No active games right now
+    </div>
+  );
+
+  return (
+    <div>
+      {/* Controls */}
+      <div style={{display:'flex',flexWrap:'wrap',gap:8,alignItems:'center',marginBottom:10}}>
+        {/* Game picker */}
+        <select value={selGame} onChange={e=>setSelGame(e.target.value)}
+          style={{padding:'5px 10px',borderRadius:6,border:'1px solid var(--border)',
+            background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:10,
+            cursor:'pointer',maxWidth:200}}>
+          <option value="all">All Games</option>
+          {liveAndFinal.map(g=>(
+            <option key={g.gamePk} value={String(g.gamePk)}>
+              {g.status==='Live'?'🔴 ':'⚫ '}{g.away?.abbr} @ {g.home?.abbr}
+            </option>
+          ))}
+        </select>
+
+        {/* Search */}
+        <input value={search} onChange={e=>setSearch(e.target.value)}
+          placeholder="Search batter or team…"
+          style={{padding:'5px 10px',borderRadius:6,border:'1px solid var(--border)',
+            background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:10,
+            width:160,outline:'none'}}/>
+
+        {/* Last update */}
+        {lastUpd && (
+          <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginLeft:'auto'}}>
+            Updated {lastUpd} · refreshes every 90s
+          </span>
+        )}
+      </div>
+
+      {/* Stats bar */}
+      <div style={{display:'flex',gap:8,marginBottom:10,flexWrap:'wrap'}}>
+        {[
+          ['PAs', filtered.length],
+          ['HRs 💥', filtered.filter(r=>r.isHR).length],
+          ['Hard Hit (102+)', filtered.filter(r=>(r.ev||0)>=102).length],
+          ['Ks', filtered.filter(r=>r.result==='strikeout'||r.result==='strikeout_double_play').length],
+          ['BBs', filtered.filter(r=>r.result==='walk'||r.result==='intent_walk').length],
+        ].map(([label, val]) => (
+          <div key={label} style={{padding:'4px 10px',borderRadius:6,
+            background:'var(--surface2)',border:'1px solid var(--border)'}}>
+            <div style={{fontFamily:osw,fontWeight:800,fontSize:13,color:'var(--text)'}}>{val}</div>
+            <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',marginTop:1,
+              textTransform:'uppercase',letterSpacing:.5}}>{label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Table */}
+      {loading ? (
+        <div style={{padding:30,textAlign:'center',fontFamily:mono,fontSize:10,color:'var(--muted)'}}>
+          Loading play-by-play…
+        </div>
+      ) : (
+        <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch',
+          border:'1px solid var(--border)',borderRadius:8,maxHeight:'62vh',overflowY:'auto'}}>
+          <table style={{width:'100%',borderCollapse:'collapse',minWidth:700}}>
+            <thead style={{position:'sticky',top:0,zIndex:5}}>
+              <tr>
+                <Th col="pa"      label="PA"         title="Plate appearance #" align="center" w={36}/>
+                <Th col="inning"  label="In."        title="Inning" align="center" w={36}/>
+                <Th col="batter"  label="Batter"     title="Batter name" align="left"/>
+                <Th col="team"    label="Team"       title="Batting team" align="center" w={48}/>
+                <Th col="result"  label="Result"     title="At-bat result" align="left"/>
+                <Th col="ev"      label="Exit Velo"  title="Exit velocity (mph)" align="right" w={72}/>
+                <Th col="la"      label="LA"         title="Launch angle (°)" align="right" w={44}/>
+                <Th col="dist"    label="Hit Dist"   title="Hit distance (ft)" align="right" w={64}/>
+                <Th col="batSpd"  label="Bat Speed"  title="Bat speed (mph)" align="right" w={72}/>
+                <Th col="pitchV"  label="Pitch Velo" title="Pitch velocity (mph)" align="right" w={72}/>
+                <Th col="xba"     label="xBA"        title="Expected batting average" align="right" w={52}/>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0 && (
+                <tr><td colSpan={11} style={{padding:20,textAlign:'center',
+                  fontFamily:mono,fontSize:10,color:'var(--muted)'}}>
+                  No plate appearances found
+                </td></tr>
+              )}
+              {filtered.map((r,i) => {
+                const evColor = r.ev==null?'var(--muted)':r.ev>=103?'#ff4020':r.ev>=95?'#ff8020':r.ev>=90?'#ffc840':'var(--text)';
+                const laGood  = r.la!=null && r.la>=18 && r.la<=35;
+                const isRecent = i < 5;
+                return (
+                  <tr key={`${r.gamePk}-${r.pa}`}
+                    onClick={() => {
+                      if (r.batterId) {
+                        const cp = getCachedPlayer(r.batterId) || {};
+                        openAtBatSlide({ pid:r.batterId, name:r.batter, team:r.team,
+                          avgEV:cp.avgEV, barrel:cp.barrel, hardHit:cp.hardHit,
+                          flyBall:cp.flyBall, hr:cp.hr, avg:cp.avg, obp:cp.obp,
+                          slg:cp.slg, xwoba:cp.xwoba, kPct:cp.kPct, bbPct:cp.bbPct });
+                      }
+                    }}
+                    style={{cursor:r.batterId?'pointer':'default',
+                      borderBottom:'1px solid rgba(255,255,255,.04)',
+                      background: r.isHR ? 'rgba(232,65,26,.06)'
+                        : isRecent ? 'rgba(255,255,255,.015)' : 'transparent',
+                      transition:'background .1s'}}
+                    onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.05)'}
+                    onMouseLeave={e=>e.currentTarget.style.background=
+                      r.isHR?'rgba(232,65,26,.06)':isRecent?'rgba(255,255,255,.015)':'transparent'}>
+                    <td style={{padding:'3px 6px',textAlign:'center',fontFamily:mono,
+                      fontSize:9,color:'var(--muted)'}}>{r.pa}</td>
+                    <td style={{padding:'3px 6px',textAlign:'center',fontFamily:mono,
+                      fontSize:9,color:'var(--muted)'}}>
+                      {r.half==='top'?'▲':'▼'}{r.inning}
+                    </td>
+                    <td style={{padding:'3px 6px',fontFamily:osw,fontWeight:700,fontSize:11,
+                      color:r.isHR?'var(--accent)':'var(--text)',whiteSpace:'nowrap',
+                      maxWidth:140,overflow:'hidden',textOverflow:'ellipsis'}}>
+                      {r.batter}
+                      {r.isHR && <span style={{marginLeft:4,fontSize:10}}>💥</span>}
+                    </td>
+                    <td style={{padding:'3px 6px',textAlign:'center',fontFamily:osw,
+                      fontWeight:700,fontSize:10,color:'var(--accent2)'}}>{r.team}</td>
+                    <td style={{padding:'3px 6px',fontFamily:mono,fontSize:9,
+                      color:resultColor(r.result),fontWeight:r.isHR?700:400,whiteSpace:'nowrap'}}>
+                      {RESULT_LABEL[r.result] || r.result || '—'}
+                    </td>
+                    <td style={{padding:'3px 6px',textAlign:'right',fontFamily:osw,
+                      fontWeight:700,fontSize:11,color:evColor}}>
+                      {r.ev != null ? r.ev.toFixed(1) : '—'}
+                    </td>
+                    <td style={{padding:'3px 6px',textAlign:'right',fontFamily:mono,
+                      fontSize:9,color:laGood?'#27c97a':'var(--muted)'}}>
+                      {r.la != null ? r.la.toFixed(0)+'°' : '—'}
+                    </td>
+                    <td style={{padding:'3px 6px',textAlign:'right',fontFamily:mono,
+                      fontSize:9,color:r.dist>=400?'#ff4020':r.dist>=350?'#ff8020':
+                        r.dist>0?'var(--text)':'var(--muted)'}}>
+                      {r.dist != null && r.dist > 0 ? r.dist+'ft' : '—'}
+                    </td>
+                    <td style={{padding:'3px 6px',textAlign:'right',fontFamily:osw,
+                      fontWeight:r.batSpd>=75?700:400,fontSize:11,
+                      color:r.batSpd>=78?'#ffd700':r.batSpd>=74?'#f5a623':
+                        r.batSpd!=null?'var(--muted)':'var(--muted)'}}>
+                      {r.batSpd != null ? r.batSpd.toFixed(1) : '—'}
+                    </td>
+                    <td style={{padding:'3px 6px',textAlign:'right',fontFamily:mono,
+                      fontSize:9,color:'var(--muted)'}}>
+                      {r.pitchV != null ? r.pitchV.toFixed(1) : '—'}
+                    </td>
+                    <td style={{padding:'3px 6px',textAlign:'right',fontFamily:mono,
+                      fontSize:9,color:r.xba>=.300?'#27c97a':r.xba>=.250?'#f5a623':
+                        r.xba!=null?'var(--muted)':'var(--muted)'}}>
+                      {r.xba || '—'}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.2)',
+        marginTop:6,textAlign:'right'}}>
+        {filtered.length} plate appearances · tap batter to open stat card
+      </div>
+    </div>
+  );
+}
+
 function GamedayTab() {
   const etToday = () => {
     const s = new Date().toLocaleDateString('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'});
