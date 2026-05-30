@@ -7065,6 +7065,7 @@ function BatTrackingTab({ games }) {
   const [search,    setSearch]    = React.useState('');
   const [sortCol,   setSortCol]   = React.useState('inning');
   const [sortDir,   setSortDir]   = React.useState(-1);   // -1=desc 1=asc
+  const [selPlay,   setSelPlay]   = React.useState(null);  // expanded play for pitch detail
   const pollRef = React.useRef(null);
 
   // ── Game options ────────────────────────────────────────────────────────
@@ -7104,9 +7105,18 @@ function BatTrackingTab({ games }) {
           const events    = play.playEvents || [];
           const lastPitch = [...events].reverse().find(e => e.isPitch);
           const hitData   = play.hitData || lastPitch?.hitData || {};
-          const batSpd    = events.find(e => e.batSpeed != null)?.batSpeed ?? null;
+          // batSpeed is on the result event (last event), not pitch events
+          const batSpd = (() => {
+            for (let ei = events.length - 1; ei >= 0; ei--) {
+              if (events[ei].batSpeed != null) return events[ei].batSpeed;
+            }
+            return null;
+          })();
           const pitchVelo = lastPitch?.pitchData?.startSpeed ?? null;
-          const xba       = play.expectedStatistics?.xba ?? null;
+          // xBA can come back as "-.---" when not available
+          const xbaRaw = play.expectedStatistics?.xba;
+          const xba = xbaRaw && xbaRaw !== '-.---' && !isNaN(parseFloat(xbaRaw))
+            ? parseFloat(xbaRaw).toFixed(3) : null;
           const result    = (play.result?.event || '').toLowerCase().replace(/ /g,'_');
           allPAs.push({
             pa:       play.about?.atBatIndex ?? 0,
@@ -7123,9 +7133,21 @@ function BatTrackingTab({ games }) {
             dist:   hitData.totalDistance != null ? Math.round(hitData.totalDistance) : null,
             batSpd: batSpd != null ? Math.round(batSpd*10)/10 : null,
             pitchV: pitchVelo != null ? Math.round(pitchVelo*10)/10 : null,
-            xba:    xba != null ? parseFloat(xba).toFixed(3) : null,
+            xba,
             pitchCode: lastPitch?.details?.type?.code || null,
             isHR: result === 'home_run',
+            // Store pitch sequence for the zone detail panel
+            pitches: events.filter(e => e.isPitch).map((e, pi) => ({
+              num:   pi + 1,
+              code:  e.details?.type?.code || '?',
+              desc:  e.details?.type?.description || e.details?.description || '',
+              velo:  e.pitchData?.startSpeed ?? null,
+              pX:    e.pitchData?.coordinates?.pX ?? null,
+              pZ:    e.pitchData?.coordinates?.pZ ?? null,
+              szTop: e.pitchData?.strikeZoneTop ?? 3.5,
+              szBot: e.pitchData?.strikeZoneBottom ?? 1.5,
+              result: e.details?.description || '',
+            })),
           });
         });
       } catch(_) {}
@@ -7303,72 +7325,184 @@ function BatTrackingTab({ games }) {
                 const evColor = r.ev==null?'var(--muted)':r.ev>=103?'#ff4020':r.ev>=95?'#ff8020':r.ev>=90?'#ffc840':'var(--text)';
                 const laGood  = r.la!=null && r.la>=18 && r.la<=35;
                 const isRecent = i < 5;
+                const isSel   = selPlay && selPlay.gamePk===r.gamePk && selPlay.pa===r.pa;
+                const pitchC  = code => ({
+                  'FF':'#E84040','SI':'#E87040','FC':'#E8B040',
+                  'SL':'#40B8E8','CU':'#4060E8','KC':'#4080E8',
+                  'CH':'#40E880','FS':'#80E840','EP':'#C040E8',
+                }[code] || '#8899a6');
                 return (
-                  <tr key={`${r.gamePk}-${r.pa}`}
-                    onClick={() => {
-                      if (r.batterId) {
-                        const cp = getCachedPlayer(r.batterId) || {};
-                        openAtBatSlide({ pid:r.batterId, name:r.batter, team:r.team,
-                          avgEV:cp.avgEV, barrel:cp.barrel, hardHit:cp.hardHit,
-                          flyBall:cp.flyBall, hr:cp.hr, avg:cp.avg, obp:cp.obp,
-                          slg:cp.slg, xwoba:cp.xwoba, kPct:cp.kPct, bbPct:cp.bbPct });
-                      }
-                    }}
-                    style={{cursor:r.batterId?'pointer':'default',
-                      borderBottom:'1px solid rgba(255,255,255,.04)',
-                      background: r.isHR ? 'rgba(232,65,26,.06)'
-                        : isRecent ? 'rgba(255,255,255,.015)' : 'transparent',
-                      transition:'background .1s'}}
-                    onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.05)'}
-                    onMouseLeave={e=>e.currentTarget.style.background=
-                      r.isHR?'rgba(232,65,26,.06)':isRecent?'rgba(255,255,255,.015)':'transparent'}>
-                    <td style={{padding:'3px 6px',textAlign:'center',fontFamily:mono,
-                      fontSize:9,color:'var(--muted)'}}>{r.pa}</td>
-                    <td style={{padding:'3px 6px',textAlign:'center',fontFamily:mono,
-                      fontSize:9,color:'var(--muted)'}}>
-                      {r.half==='top'?'▲':'▼'}{r.inning}
-                    </td>
-                    <td style={{padding:'3px 6px',fontFamily:osw,fontWeight:700,fontSize:11,
-                      color:r.isHR?'var(--accent)':'var(--text)',whiteSpace:'nowrap',
-                      maxWidth:140,overflow:'hidden',textOverflow:'ellipsis'}}>
-                      {r.batter}
-                      {r.isHR && <span style={{marginLeft:4,fontSize:10}}>💥</span>}
-                    </td>
-                    <td style={{padding:'3px 6px',textAlign:'center',fontFamily:osw,
-                      fontWeight:700,fontSize:10,color:'var(--accent2)'}}>{r.team}</td>
-                    <td style={{padding:'3px 6px',fontFamily:mono,fontSize:9,
-                      color:resultColor(r.result),fontWeight:r.isHR?700:400,whiteSpace:'nowrap'}}>
-                      {RESULT_LABEL[r.result] || r.result || '—'}
-                    </td>
-                    <td style={{padding:'3px 6px',textAlign:'right',fontFamily:osw,
-                      fontWeight:700,fontSize:11,color:evColor}}>
-                      {r.ev != null ? r.ev.toFixed(1) : '—'}
-                    </td>
-                    <td style={{padding:'3px 6px',textAlign:'right',fontFamily:mono,
-                      fontSize:9,color:laGood?'#27c97a':'var(--muted)'}}>
-                      {r.la != null ? r.la.toFixed(0)+'°' : '—'}
-                    </td>
-                    <td style={{padding:'3px 6px',textAlign:'right',fontFamily:mono,
-                      fontSize:9,color:r.dist>=400?'#ff4020':r.dist>=350?'#ff8020':
-                        r.dist>0?'var(--text)':'var(--muted)'}}>
-                      {r.dist != null && r.dist > 0 ? r.dist+'ft' : '—'}
-                    </td>
-                    <td style={{padding:'3px 6px',textAlign:'right',fontFamily:osw,
-                      fontWeight:r.batSpd>=75?700:400,fontSize:11,
-                      color:r.batSpd>=78?'#ffd700':r.batSpd>=74?'#f5a623':
-                        r.batSpd!=null?'var(--muted)':'var(--muted)'}}>
-                      {r.batSpd != null ? r.batSpd.toFixed(1) : '—'}
-                    </td>
-                    <td style={{padding:'3px 6px',textAlign:'right',fontFamily:mono,
-                      fontSize:9,color:'var(--muted)'}}>
-                      {r.pitchV != null ? r.pitchV.toFixed(1) : '—'}
-                    </td>
-                    <td style={{padding:'3px 6px',textAlign:'right',fontFamily:mono,
-                      fontSize:9,color:r.xba>=.300?'#27c97a':r.xba>=.250?'#f5a623':
-                        r.xba!=null?'var(--muted)':'var(--muted)'}}>
-                      {r.xba || '—'}
-                    </td>
-                  </tr>
+                  <React.Fragment key={`${r.gamePk}-${r.pa}`}>
+                    <tr
+                      onClick={() => setSelPlay(isSel ? null : r)}
+                      style={{cursor:'pointer',
+                        borderBottom: isSel ? 'none' : '1px solid rgba(255,255,255,.04)',
+                        background: isSel ? 'rgba(255,255,255,.06)'
+                          : r.isHR ? 'rgba(232,65,26,.06)'
+                          : isRecent ? 'rgba(255,255,255,.015)' : 'transparent',
+                        transition:'background .1s'}}
+                      onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.05)'}
+                      onMouseLeave={e=>e.currentTarget.style.background=
+                        isSel?'rgba(255,255,255,.06)':r.isHR?'rgba(232,65,26,.06)':isRecent?'rgba(255,255,255,.015)':'transparent'}>
+                      <td style={{padding:'3px 6px',textAlign:'center',fontFamily:mono,
+                        fontSize:9,color:'var(--muted)'}}>{r.pa}</td>
+                      <td style={{padding:'3px 6px',textAlign:'center',fontFamily:mono,
+                        fontSize:9,color:'var(--muted)'}}>
+                        {r.half==='top'?'▲':'▼'}{r.inning}
+                      </td>
+                      <td style={{padding:'3px 6px',fontFamily:osw,fontWeight:700,fontSize:11,
+                        whiteSpace:'nowrap',maxWidth:140,overflow:'hidden',textOverflow:'ellipsis'}}>
+                        {/* Batter name — separate click for slideout */}
+                        <span
+                          onClick={e => {
+                            e.stopPropagation();
+                            if (r.batterId) {
+                              const cp = getCachedPlayer(r.batterId) || {};
+                              openAtBatSlide({ pid:r.batterId, name:r.batter, team:r.team,
+                                avgEV:cp.avgEV, barrel:cp.barrel, hardHit:cp.hardHit,
+                                flyBall:cp.flyBall, hr:cp.hr, avg:cp.avg, obp:cp.obp,
+                                slg:cp.slg, xwoba:cp.xwoba, kPct:cp.kPct, bbPct:cp.bbPct });
+                            }
+                          }}
+                          style={{color:r.isHR?'var(--accent)':'var(--text)',
+                            textDecoration:'underline',textDecorationStyle:'dotted',
+                            cursor:'pointer'}}
+                          title="Open batter stats">
+                          {r.batter}
+                        </span>
+                        {r.isHR && <span style={{marginLeft:4,fontSize:10}}>💥</span>}
+                      </td>
+                      <td style={{padding:'3px 6px',textAlign:'center',fontFamily:osw,
+                        fontWeight:700,fontSize:10,color:'var(--accent2)'}}>{r.team}</td>
+                      <td style={{padding:'3px 6px',fontFamily:mono,fontSize:9,
+                        color:resultColor(r.result),fontWeight:r.isHR?700:400,whiteSpace:'nowrap'}}>
+                        {RESULT_LABEL[r.result] || r.result || '—'}
+                      </td>
+                      <td style={{padding:'3px 6px',textAlign:'right',fontFamily:osw,
+                        fontWeight:700,fontSize:11,color:evColor}}>
+                        {r.ev != null ? r.ev.toFixed(1) : '—'}
+                      </td>
+                      <td style={{padding:'3px 6px',textAlign:'right',fontFamily:mono,
+                        fontSize:9,color:laGood?'#27c97a':'var(--muted)'}}>
+                        {r.la != null ? r.la.toFixed(0)+'°' : '—'}
+                      </td>
+                      <td style={{padding:'3px 6px',textAlign:'right',fontFamily:mono,
+                        fontSize:9,color:r.dist>=400?'#ff4020':r.dist>=350?'#ff8020':
+                          r.dist>0?'var(--text)':'var(--muted)'}}>
+                        {r.dist != null && r.dist > 0 ? r.dist+'ft' : '—'}
+                      </td>
+                      <td style={{padding:'3px 6px',textAlign:'right',fontFamily:osw,
+                        fontWeight:r.batSpd>=75?700:400,fontSize:11,
+                        color:r.batSpd>=78?'#ffd700':r.batSpd>=74?'#f5a623':
+                          r.batSpd!=null?'var(--muted)':'var(--muted)'}}>
+                        {r.batSpd != null ? r.batSpd.toFixed(1) : '—'}
+                      </td>
+                      <td style={{padding:'3px 6px',textAlign:'right',fontFamily:mono,
+                        fontSize:9,color:'var(--muted)'}}>
+                        {r.pitchV != null ? r.pitchV.toFixed(1) : '—'}
+                      </td>
+                      <td style={{padding:'3px 6px',textAlign:'right',fontFamily:mono,
+                        fontSize:9,color:r.xba>=.300?'#27c97a':r.xba>=.250?'#f5a623':
+                          r.xba!=null?'var(--muted)':'var(--muted)'}}>
+                        {r.xba || '—'}
+                      </td>
+                    </tr>
+                    {/* ── Expanded pitch zone detail ── */}
+                    {isSel && (
+                      <tr style={{background:'rgba(255,255,255,.04)'}}>
+                        <td colSpan={11} style={{padding:'12px 16px',
+                          borderBottom:'1px solid var(--border)'}}>
+                          <div style={{display:'flex',gap:16,alignItems:'flex-start',flexWrap:'wrap'}}>
+                            {/* Pitch zone SVG */}
+                            {r.pitches.length > 0 && (() => {
+                              const sz = { top: r.pitches[0]?.szTop||3.5, bot: r.pitches[0]?.szBot||1.5 };
+                              const W=120, H=140, pad=16;
+                              const toX = px => pad + (px + 1.0) / 2.0 * (W - pad*2);
+                              const toY = pz => pad + (1 - (pz - sz.bot) / (sz.top - sz.bot)) * (H - pad*2);
+                              return (
+                                <svg width={W} height={H} style={{flexShrink:0,
+                                  background:'rgba(0,0,0,.3)',borderRadius:6,
+                                  border:'1px solid var(--border)'}}>
+                                  {/* Strike zone */}
+                                  <rect x={pad} y={toY(sz.top)}
+                                    width={W-pad*2} height={toY(sz.bot)-toY(sz.top)}
+                                    fill="none" stroke="rgba(255,255,255,.25)" strokeWidth="1"/>
+                                  {/* Pitches */}
+                                  {r.pitches.map((p,pi) => p.pX!=null && p.pZ!=null && (
+                                    <g key={pi}>
+                                      <circle cx={toX(p.pX)} cy={toY(p.pZ)} r="9"
+                                        fill={pitchC(p.code)} opacity=".85"/>
+                                      <text x={toX(p.pX)} y={toY(p.pZ)+4}
+                                        textAnchor="middle" fontSize="8"
+                                        fontWeight="700" fill="white"
+                                        fontFamily="monospace">{p.num}</text>
+                                    </g>
+                                  ))}
+                                  {/* Home plate */}
+                                  <polygon points={`${W/2-6},${H-6} ${W/2+6},${H-6} ${W/2+8},${H-2} ${W/2-8},${H-2}`}
+                                    fill="rgba(255,255,255,.3)"/>
+                                </svg>
+                              );
+                            })()}
+                            {/* Pitch sequence */}
+                            <div style={{flex:1,minWidth:140}}>
+                              <div style={{fontFamily:osw,fontWeight:700,fontSize:12,
+                                marginBottom:6,color:'var(--text)'}}>
+                                {r.batter}
+                                <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)',
+                                  marginLeft:8,fontWeight:400}}>
+                                  vs {r.pitches.length > 0 ? r.pitchCode || '—' : '—'}
+                                  {' · '}{r.pitches.length} pitch{r.pitches.length!==1?'es':''}
+                                </span>
+                              </div>
+                              <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                                {[...r.pitches].reverse().map((p,pi) => (
+                                  <div key={pi} style={{display:'flex',alignItems:'center',gap:8}}>
+                                    <div style={{width:20,height:20,borderRadius:'50%',
+                                      background:pitchC(p.code),flexShrink:0,
+                                      display:'flex',alignItems:'center',justifyContent:'center',
+                                      fontSize:9,fontWeight:700,fontFamily:mono,color:'white'}}>
+                                      {p.num}
+                                    </div>
+                                    <div>
+                                      <div style={{fontFamily:osw,fontSize:11,fontWeight:600,color:'var(--text)'}}>
+                                        {p.desc || p.code}
+                                      </div>
+                                      <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>
+                                        {p.result}{p.velo ? ` · ${p.velo.toFixed(1)} mph` : ''}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                              {/* Hit data if available */}
+                              {(r.ev || r.la || r.dist) && (
+                                <div style={{display:'flex',gap:12,marginTop:8,
+                                  paddingTop:8,borderTop:'1px solid rgba(255,255,255,.06)'}}>
+                                  {r.ev && <div>
+                                    <div style={{fontFamily:osw,fontWeight:800,fontSize:13,color:evColor}}>{r.ev.toFixed(1)}</div>
+                                    <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)'}}>EV mph</div>
+                                  </div>}
+                                  {r.la!=null && <div>
+                                    <div style={{fontFamily:osw,fontWeight:800,fontSize:13}}>{r.la.toFixed(0)}°</div>
+                                    <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)'}}>LA</div>
+                                  </div>}
+                                  {r.dist>0 && <div>
+                                    <div style={{fontFamily:osw,fontWeight:800,fontSize:13}}>{r.dist}ft</div>
+                                    <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)'}}>Dist</div>
+                                  </div>}
+                                  {r.batSpd && <div>
+                                    <div style={{fontFamily:osw,fontWeight:800,fontSize:13,color:'#ffd700'}}>{r.batSpd.toFixed(1)}</div>
+                                    <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)'}}>Bat Spd</div>
+                                  </div>}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 );
               })}
             </tbody>
@@ -7377,7 +7511,7 @@ function BatTrackingTab({ games }) {
       )}
       <div style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.2)',
         marginTop:6,textAlign:'right'}}>
-        {filtered.length} plate appearances · tap batter to open stat card
+        {filtered.length} plate appearances · tap row for pitch zone · tap batter name for stats
       </div>
     </div>
   );
