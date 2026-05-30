@@ -7101,20 +7101,18 @@ function BatTrackingTab({ games }) {
         const d = pbpRes.status === 'fulfilled' ? pbpRes.value : {};
         const savant = savantRes.status === 'fulfilled' ? savantRes.value : {};
         const batSpeedMap = savant.bat_speeds || {};
-        console.log('[BatTracking] game', g.gamePk,
-          '| savant status:', savantRes.status,
-          '| bat_speeds count:', savant.count ?? 0,
-          '| sample keys:', Object.keys(batSpeedMap).slice(0,3),
-          '| sample values:', Object.values(batSpeedMap).slice(0,2));
-        // Log first play's ID to check format matching
-        if (plays[0]) console.log('[BatTracking] first play atBatIndex:',
-          plays[0].about?.atBatIndex, '→ playId would be:', `${g.gamePk}_${plays[0].about?.atBatIndex}`);
-
         const plays = d?.allPlays || [];
+        console.log('[BatTracking] game', g.gamePk,
+          '| pbp plays:', plays.length,
+          '| complete:', plays.filter(p=>p.about?.isComplete).length,
+          '| hasResult:', plays.filter(p=>p.result?.event).length,
+          '| savant bat speeds:', Object.keys(batSpeedMap).length);
         const awayAbbr = g.away?.abbr || '???';
         const homeAbbr = g.home?.abbr || '???';
         plays.forEach(play => {
-          if (!play.about?.isComplete) return;
+          // Accept completed plays OR plays that have a result event (handles live edge cases)
+          const hasResult = play.result?.event && play.result.event.trim() !== '';
+          if (!play.about?.isComplete && !hasResult) return;
           const batter    = play.matchup?.batter;
           const side      = play.about?.halfInning; // 'top'=away 'bottom'=home
           const team      = side === 'top' ? awayAbbr : homeAbbr;
