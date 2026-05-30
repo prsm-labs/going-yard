@@ -7304,6 +7304,17 @@ function BatTrackingTab({ games, date, isToday }) {
             background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:10,
             width:160,outline:'none'}}/>
 
+        {/* Sort reset — only shows when not on default sort */}
+        {(sortCol !== 'inning' || sortDir !== -1) && (
+          <button onClick={()=>{setSortCol('inning');setSortDir(-1);}}
+            title="Reset sort to default (most recent inning)"
+            style={{padding:'4px 10px',borderRadius:6,border:'1px solid var(--border)',
+              background:'var(--surface2)',color:'var(--muted)',cursor:'pointer',
+              fontFamily:mono,fontSize:9,letterSpacing:.3}}>
+            ↺ Reset Sort
+          </button>
+        )}
+
         {/* Last update */}
         {lastUpd && (
           <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginLeft:'auto'}}>
