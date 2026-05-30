@@ -1,10 +1,12 @@
 // api/savant.js — Vercel serverless proxy for Baseball Savant gf endpoint
+// Savant gf response uses: team_home[] and team_away[] arrays
+// Each item has: play_id, batSpeed, ab_number, launch_speed, launch_angle etc.
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const { game_pk, debug } = req.query;
+  const { game_pk } = req.query;
   if (!game_pk || !/^\d+$/.test(game_pk)) {
     return res.status(400).json({ error: 'Invalid game_pk' });
   }
@@ -27,78 +29,37 @@ export default async function handler(req, res) {
 
     const data = await r.json();
 
-    // Debug mode — return raw structure info
-    if (debug === '1') {
-      const topKeys = Object.keys(data);
-      const preview = {};
-      for (const k of topKeys) {
-        const v = data[k];
-        if (Array.isArray(v)) {
-          preview[k] = { type: 'array', length: v.length, firstItemKeys: v[0] ? Object.keys(v[0]) : [] };
-        } else if (typeof v === 'object' && v !== null) {
-          preview[k] = { type: 'object', keys: Object.keys(v).slice(0, 20) };
-        } else {
-          preview[k] = { type: typeof v, value: String(v).slice(0, 100) };
-        }
-      }
-      return res.status(200).json({ topKeys, preview });
-    }
-
-    // Extract bat speeds — try every known structure
+    // Savant gf uses team_home[] and team_away[] — each pitch/play has batSpeed
+    // play_id format matches our {gamePk}_{atBatNumber} key
     const batSpeeds = {};
 
     const processPlay = (play) => {
       if (!play) return;
-      // Savant gf uses sv_id or play_id as the key
-      const pid = play.play_id || play.sv_id || play.ab_id;
+      const pid = play.play_id;
       if (!pid) return;
-      
-      // bat_speed field names Savant uses
-      const bs = play.bat_speed ?? play.batSpeed ?? play.bat_spd ?? 
-                 play.swing_speed ?? play.swingSpeed ?? null;
+      // batSpeed is camelCase in Savant gf response
+      const bs = play.batSpeed ?? play.bat_speed ?? null;
       if (bs != null && Number(bs) > 0) {
         batSpeeds[pid] = {
           bat_speed:    Number(bs),
-          swing_length: play.swing_length ?? play.swingLength ?? null,
-          attack_angle: play.attack_angle ?? play.attackAngle ?? null,
+          swing_length: play.swing_length ?? null,
+          attack_angle: play.attack_angle ?? null,
+          hit_speed:    play.hit_speed_round ?? null,
         };
       }
     };
 
-    // Savant gf response structures we've seen:
-    // 1. data.team_home / data.team_away (arrays of plays)
-    // 2. data.home_team_data / data.away_team_data
-    // 3. data.plays (flat array)
-    // 4. data[teamAbbr] (keyed by team)
-    // 5. Nested: data.scoreboard.currentPlay etc.
-
-    const arrayKeys = Object.keys(data).filter(k => Array.isArray(data[k]) && data[k].length > 0);
-    
-    for (const k of arrayKeys) {
-      data[k].forEach(processPlay);
-    }
-
-    // Also check nested objects
-    for (const [k, v] of Object.entries(data)) {
-      if (v && typeof v === 'object' && !Array.isArray(v)) {
-        // Try sub-arrays
-        for (const [sk, sv] of Object.entries(v)) {
-          if (Array.isArray(sv)) sv.forEach(processPlay);
-        }
-      }
-    }
+    // The two main pitch arrays
+    if (Array.isArray(data.team_home)) data.team_home.forEach(processPlay);
+    if (Array.isArray(data.team_away)) data.team_away.forEach(processPlay);
+    // Fallback — also check exit_velocity array (another pitch array)
+    if (Array.isArray(data.exit_velocity)) data.exit_velocity.forEach(processPlay);
 
     res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=60');
-    res.status(200).json({ 
-      game_pk, 
-      bat_speeds: batSpeeds, 
+    res.status(200).json({
+      game_pk,
+      bat_speeds: batSpeeds,
       count: Object.keys(batSpeeds).length,
-      // Include structure hint when count is 0
-      ...(Object.keys(batSpeeds).length === 0 ? {
-        _debug_keys: Object.keys(data),
-        _debug_array_keys: arrayKeys,
-        _debug_first_item: arrayKeys[0] ? Object.keys(data[arrayKeys[0]][0] || {}) : []
-      } : {})
     });
 
   } catch (err) {
