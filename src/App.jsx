@@ -7092,9 +7092,9 @@ function BatTrackingTab({ games }) {
     const allPAs = [];
     await Promise.allSettled(targets.map(async g => {
       try {
-        const r = await fetch(`https://statsapi.mlb.com/api/v1/game/${g.gamePk}/playByPlay`);
+        const r = await fetch(`https://statsapi.mlb.com/api/v1.1/game/${g.gamePk}/feed/live`);
         const d = await r.json();
-        const plays = d.allPlays || [];
+        const plays = d?.liveData?.plays?.allPlays || [];
         const awayAbbr = g.away?.abbr || '???';
         const homeAbbr = g.home?.abbr || '???';
         plays.forEach(play => {
@@ -7105,17 +7105,22 @@ function BatTrackingTab({ games }) {
           const events    = play.playEvents || [];
           const lastPitch = [...events].reverse().find(e => e.isPitch);
           const hitData   = play.hitData || lastPitch?.hitData || {};
-          // batSpeed is on the result event (last event), not pitch events
+          // batSpeed: in feed/live it's on the last pitch event or hitData
           const batSpd = (() => {
             for (let ei = events.length - 1; ei >= 0; ei--) {
-              if (events[ei].batSpeed != null) return events[ei].batSpeed;
+              const e = events[ei];
+              if (e.batSpeed != null) return e.batSpeed;
+              if (e.hitData?.batSpeed != null) return e.hitData.batSpeed;
+              if (e.playEvents?.batSpeed != null) return e.playEvents.batSpeed;
             }
+            // fallback: check play-level hitData
+            if (play.hitData?.batSpeed != null) return play.hitData.batSpeed;
             return null;
           })();
           const pitchVelo = lastPitch?.pitchData?.startSpeed ?? null;
-          // xBA can come back as "-.---" when not available
-          const xbaRaw = play.expectedStatistics?.xba;
-          const xba = xbaRaw && xbaRaw !== '-.---' && !isNaN(parseFloat(xbaRaw))
+          // xBA: in feed/live lives on expectedStatistics or result
+          const xbaRaw = play.expectedStatistics?.xba ?? play.about?.xba;
+          const xba = xbaRaw && String(xbaRaw) !== '-.---' && !isNaN(parseFloat(xbaRaw))
             ? parseFloat(xbaRaw).toFixed(3) : null;
           const result    = (play.result?.event || '').toLowerCase().replace(/ /g,'_');
           allPAs.push({
@@ -7301,17 +7306,17 @@ function BatTrackingTab({ games }) {
           <table style={{width:'100%',borderCollapse:'collapse',minWidth:700}}>
             <thead style={{position:'sticky',top:0,zIndex:5}}>
               <tr>
-                <Th col="pa"      label="PA"         title="Plate appearance #" align="center" w={36}/>
-                <Th col="inning"  label="In."        title="Inning" align="center" w={36}/>
+                <Th col="pa"      label="PA"         title="Plate appearance #" align="center" w={32}/>
+                <Th col="inning"  label="In."        title="Inning" align="center" w={38}/>
                 <Th col="batter"  label="Batter"     title="Batter name" align="left"/>
-                <Th col="team"    label="Team"       title="Batting team" align="center" w={48}/>
-                <Th col="result"  label="Result"     title="At-bat result" align="left"/>
-                <Th col="ev"      label="Exit Velo"  title="Exit velocity (mph)" align="right" w={72}/>
-                <Th col="la"      label="LA"         title="Launch angle (°)" align="right" w={44}/>
-                <Th col="dist"    label="Hit Dist"   title="Hit distance (ft)" align="right" w={64}/>
-                <Th col="batSpd"  label="Bat Speed"  title="Bat speed (mph)" align="right" w={72}/>
-                <Th col="pitchV"  label="Pitch Velo" title="Pitch velocity (mph)" align="right" w={72}/>
-                <Th col="xba"     label="xBA"        title="Expected batting average" align="right" w={52}/>
+                <Th col="team"    label="Team"       title="Batting team" align="center" w={42}/>
+                <Th col="result"  label="Result"     title="At-bat result" align="left" w={70}/>
+                <Th col="ev"      label="Exit Velo"  title="Exit velocity (mph)" align="right" w={68}/>
+                <Th col="la"      label="LA"         title="Launch angle (°)" align="right" w={40}/>
+                <Th col="dist"    label="Dist"       title="Hit distance (ft)" align="right" w={56}/>
+                <Th col="batSpd"  label="Bat Spd"    title="Bat speed (mph)" align="right" w={60}/>
+                <Th col="pitchV"  label="Pitch V"    title="Pitch velocity (mph)" align="right" w={60}/>
+                <Th col="xba"     label="xBA"        title="Expected batting average" align="right" w={48}/>
               </tr>
             </thead>
             <tbody>
@@ -7413,34 +7418,55 @@ function BatTrackingTab({ games }) {
                         <td colSpan={11} style={{padding:'12px 16px',
                           borderBottom:'1px solid var(--border)'}}>
                           <div style={{display:'flex',gap:16,alignItems:'flex-start',flexWrap:'wrap'}}>
-                            {/* Pitch zone SVG */}
+                            {/* Pitch zone SVG — 9-box strike zone grid */}
                             {r.pitches.length > 0 && (() => {
                               const sz = { top: r.pitches[0]?.szTop||3.5, bot: r.pitches[0]?.szBot||1.5 };
-                              const W=120, H=140, pad=16;
-                              const toX = px => pad + (px + 1.0) / 2.0 * (W - pad*2);
-                              const toY = pz => pad + (1 - (pz - sz.bot) / (sz.top - sz.bot)) * (H - pad*2);
+                              const W=140, H=160, padL=20, padR=14, padT=14, padB=28;
+                              const zoneW = W - padL - padR;
+                              const zoneH = H - padT - padB;
+                              // Map pitch coords — clamp so dots stay inside SVG
+                              const toX = px => Math.max(4, Math.min(W-4, padL + (Math.max(-1.5,Math.min(1.5,px??0)) + 1.5) / 3.0 * zoneW));
+                              const toY = pz => Math.max(4, Math.min(H-4, padT + (1 - (Math.max(sz.bot-0.5, Math.min(sz.top+0.5, pz??sz.bot)) - sz.bot) / (sz.top - sz.bot)) * zoneH));
+                              // Strike zone box corners
+                              const szX = padL, szY = padT, szW = zoneW, szH = zoneH;
+                              // 9-box grid cell size
+                              const cellW = szW / 3, cellH = szH / 3;
                               return (
                                 <svg width={W} height={H} style={{flexShrink:0,
-                                  background:'rgba(0,0,0,.3)',borderRadius:6,
+                                  background:'rgba(0,0,0,.4)',borderRadius:6,
                                   border:'1px solid var(--border)'}}>
-                                  {/* Strike zone */}
-                                  <rect x={pad} y={toY(sz.top)}
-                                    width={W-pad*2} height={toY(sz.bot)-toY(sz.top)}
-                                    fill="none" stroke="rgba(255,255,255,.25)" strokeWidth="1"/>
-                                  {/* Pitches */}
-                                  {r.pitches.map((p,pi) => p.pX!=null && p.pZ!=null && (
-                                    <g key={pi}>
-                                      <circle cx={toX(p.pX)} cy={toY(p.pZ)} r="9"
-                                        fill={pitchC(p.code)} opacity=".85"/>
-                                      <text x={toX(p.pX)} y={toY(p.pZ)+4}
-                                        textAnchor="middle" fontSize="8"
-                                        fontWeight="700" fill="white"
-                                        fontFamily="monospace">{p.num}</text>
-                                    </g>
+                                  {/* Outer strike zone */}
+                                  <rect x={szX} y={szY} width={szW} height={szH}
+                                    fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.25)" strokeWidth="1.5"/>
+                                  {/* 9-box internal grid lines */}
+                                  {[1,2].map(i => (
+                                    <React.Fragment key={i}>
+                                      <line x1={szX+cellW*i} y1={szY} x2={szX+cellW*i} y2={szY+szH}
+                                        stroke="rgba(255,255,255,.12)" strokeWidth="0.75"/>
+                                      <line x1={szX} y1={szY+cellH*i} x2={szX+szW} y2={szY+cellH*i}
+                                        stroke="rgba(255,255,255,.12)" strokeWidth="0.75"/>
+                                    </React.Fragment>
                                   ))}
                                   {/* Home plate */}
-                                  <polygon points={`${W/2-6},${H-6} ${W/2+6},${H-6} ${W/2+8},${H-2} ${W/2-8},${H-2}`}
-                                    fill="rgba(255,255,255,.3)"/>
+                                  <polygon points={`${padL+zoneW/2-8},${H-padB+6} ${padL+zoneW/2+8},${H-padB+6} ${padL+zoneW/2+10},${H-padB+12} ${padL+zoneW/2},${H-padB+16} ${padL+zoneW/2-10},${H-padB+12}`}
+                                    fill="rgba(255,255,255,.2)" stroke="rgba(255,255,255,.4)" strokeWidth="0.5"/>
+                                  {/* Pitches — drawn in order so last is on top */}
+                                  {r.pitches.map((p, pi) => {
+                                    const x = toX(p.pX);
+                                    const y = toY(p.pZ);
+                                    const col = pitchC(p.code);
+                                    const isLast = pi === r.pitches.length - 1;
+                                    return (
+                                      <g key={pi}>
+                                        <circle cx={x} cy={y} r={isLast?10:9}
+                                          fill={col} stroke="rgba(0,0,0,.4)" strokeWidth="1"
+                                          opacity={isLast?1:0.8}/>
+                                        <text x={x} y={y+4} textAnchor="middle"
+                                          fontSize="8" fontWeight="800"
+                                          fill="white" fontFamily="monospace">{p.num}</text>
+                                      </g>
+                                    );
+                                  })}
                                 </svg>
                               );
                             })()}
