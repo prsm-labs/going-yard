@@ -7127,13 +7127,16 @@ function BatTrackingTab({ games }) {
           const events    = play.playEvents || [];
           const lastPitch = [...events].reverse().find(e => e.isPitch);
           const hitData   = play.hitData || lastPitch?.hitData || {};
-          // batSpeed: Savant bat_speeds keyed by UUID play_id from playEvents
+          const pitcher   = play.matchup?.pitcher;
+          // savantPlayId MUST be declared before savantData uses it
+          const savantPlayId = (() => {
+            for (let ei = events.length - 1; ei >= 0; ei--) {
+              const pid = events[ei].playId ?? events[ei].details?.playId ?? events[ei].details?.event_uuid;
+              if (pid) return pid;
+            }
+            return null;
+          })();
           const savantData = savantPlayId ? batSpeedMap[savantPlayId] : null;
-          // Debug first 3 plays
-          if ((play.about?.atBatIndex ?? 0) < 3) {
-            console.log('[BatTracking] play', playId, '| savantData:', savantData,
-              '| events batSpeed scan:', events.map(e=>e.batSpeed).filter(Boolean));
-          }
           const batSpd = savantData?.bat_speed != null
             ? Number(savantData.bat_speed)
             : (() => {
@@ -7145,17 +7148,7 @@ function BatTrackingTab({ games }) {
                 return play.hitData?.batSpeed ?? null;
               })();
           const pitchVelo = lastPitch?.pitchData?.startSpeed ?? null;
-
           const result    = (play.result?.event || '').toLowerCase().replace(/ /g,'_');
-          const pitcher = play.matchup?.pitcher;
-          // Savant bat_speeds are keyed by UUID play_id (from last pitch event)
-          const savantPlayId = (() => {
-            for (let ei = events.length - 1; ei >= 0; ei--) {
-              const pid = events[ei].playId ?? events[ei].details?.playId ?? events[ei].details?.event_uuid;
-              if (pid) return pid;
-            }
-            return null;
-          })();
           allPAs.push({
             pa:       play.about?.atBatIndex ?? 0,
             inning:   play.about?.inning ?? 0,
