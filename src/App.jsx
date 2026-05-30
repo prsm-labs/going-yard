@@ -7101,6 +7101,14 @@ function BatTrackingTab({ games }) {
         const d = pbpRes.status === 'fulfilled' ? pbpRes.value : {};
         const savant = savantRes.status === 'fulfilled' ? savantRes.value : {};
         const batSpeedMap = savant.bat_speeds || {};
+        console.log('[BatTracking] game', g.gamePk,
+          '| savant status:', savantRes.status,
+          '| bat_speeds count:', savant.count ?? 0,
+          '| sample keys:', Object.keys(batSpeedMap).slice(0,3),
+          '| sample values:', Object.values(batSpeedMap).slice(0,2));
+        // Log first play's ID to check format matching
+        if (plays[0]) console.log('[BatTracking] first play atBatIndex:',
+          plays[0].about?.atBatIndex, '→ playId would be:', `${g.gamePk}_${plays[0].about?.atBatIndex}`);
 
         const plays = d?.allPlays || [];
         const awayAbbr = g.away?.abbr || '???';
@@ -7113,9 +7121,13 @@ function BatTrackingTab({ games }) {
           const events    = play.playEvents || [];
           const lastPitch = [...events].reverse().find(e => e.isPitch);
           const hitData   = play.hitData || lastPitch?.hitData || {};
-          // batSpeed: try Savant proxy first (most reliable), fall back to playByPlay
-          const playId = `${g.gamePk}_${play.about?.atBatIndex ?? 0}`;
-          const savantData = batSpeedMap[playId];
+          // batSpeed: Savant bat_speeds keyed by UUID play_id from playEvents
+          const savantData = savantPlayId ? batSpeedMap[savantPlayId] : null;
+          // Debug first 3 plays
+          if ((play.about?.atBatIndex ?? 0) < 3) {
+            console.log('[BatTracking] play', playId, '| savantData:', savantData,
+              '| events batSpeed scan:', events.map(e=>e.batSpeed).filter(Boolean));
+          }
           const batSpd = savantData?.bat_speed != null
             ? Number(savantData.bat_speed)
             : (() => {
@@ -7130,6 +7142,14 @@ function BatTrackingTab({ games }) {
 
           const result    = (play.result?.event || '').toLowerCase().replace(/ /g,'_');
           const pitcher = play.matchup?.pitcher;
+          // Savant bat_speeds are keyed by UUID play_id (from last pitch event)
+          const savantPlayId = (() => {
+            for (let ei = events.length - 1; ei >= 0; ei--) {
+              const pid = events[ei].playId ?? events[ei].details?.playId ?? events[ei].details?.event_uuid;
+              if (pid) return pid;
+            }
+            return null;
+          })();
           allPAs.push({
             pa:       play.about?.atBatIndex ?? 0,
             inning:   play.about?.inning ?? 0,
