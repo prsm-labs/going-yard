@@ -6098,8 +6098,8 @@ function LiveTab() {
       </div>
     </div>
 
-    {/* ── Shared date bar — applies to all sub-views ─────────────────── */}
-    <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10,flexWrap:'wrap'}}>
+    {/* ── Shared date bar — applies to Bat Tracking, Live Games, Lineups ── */}
+    {liveView !== 'gameday' && <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10,flexWrap:'wrap'}}>
       <button onClick={()=>{const d=new Date(liveDate+'T12:00:00');d.setDate(d.getDate()-1);const s=d.toISOString().slice(0,10);setLiveDate(s);load(false,s);}}
         disabled={liveDate<=LIVE_SEASON_START}
         style={{padding:'3px 10px',borderRadius:6,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--muted)',cursor:'pointer',fontFamily:"'DM Mono',monospace",fontSize:12}}>←</button>
@@ -6113,7 +6113,7 @@ function LiveTab() {
       <span style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
         {liveDate===liveTodayStr?'🔴 Live':'📅 '+new Date(liveDate+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}
       </span>
-    </div>
+    </div>}
 
     {/* Sub-view toggle */}
     {showLiveHelp && <HelpSlideout title="📺 Live Tab Guide" items={[
