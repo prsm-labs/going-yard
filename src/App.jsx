@@ -7092,8 +7092,16 @@ function BatTrackingTab({ games }) {
     const allPAs = [];
     await Promise.allSettled(targets.map(async g => {
       try {
-        const r = await fetch(`https://statsapi.mlb.com/api/v1/game/${g.gamePk}/playByPlay`);
-        const d = await r.json();
+        // Fetch play-by-play + Savant bat speed in parallel
+        const [pbpRes, savantRes] = await Promise.allSettled([
+          fetch(`https://statsapi.mlb.com/api/v1/game/${g.gamePk}/playByPlay`).then(r=>r.json()),
+          fetch(`/api/savant?game_pk=${g.gamePk}`).then(r=>r.json()).catch(()=>({bat_speeds:{}})),
+        ]);
+
+        const d = pbpRes.status === 'fulfilled' ? pbpRes.value : {};
+        const savant = savantRes.status === 'fulfilled' ? savantRes.value : {};
+        const batSpeedMap = savant.bat_speeds || {};
+
         const plays = d?.allPlays || [];
         const awayAbbr = g.away?.abbr || '???';
         const homeAbbr = g.home?.abbr || '???';
@@ -7105,20 +7113,19 @@ function BatTrackingTab({ games }) {
           const events    = play.playEvents || [];
           const lastPitch = [...events].reverse().find(e => e.isPitch);
           const hitData   = play.hitData || lastPitch?.hitData || {};
-          // batSpeed: lives on the swing/contact event which is type='action' NOT isPitch
-          // Must scan ALL events, not just pitch events
-          const batSpd = (() => {
-            for (let ei = 0; ei < events.length; ei++) {
-              const e = events[ei];
-              // Check every possible field name and location
-              const bs = e.batSpeed
-                ?? e.swingData?.batSpeed
-                ?? e.hitData?.batSpeed
-                ?? e.details?.batSpeed;
-              if (bs != null && Number(bs) > 0) return Number(bs);
-            }
-            return play.hitData?.batSpeed ?? null;
-          })();
+          // batSpeed: try Savant proxy first (most reliable), fall back to playByPlay
+          const playId = `${g.gamePk}_${play.about?.atBatIndex ?? 0}`;
+          const savantData = batSpeedMap[playId];
+          const batSpd = savantData?.bat_speed != null
+            ? Number(savantData.bat_speed)
+            : (() => {
+                for (let ei = 0; ei < events.length; ei++) {
+                  const e = events[ei];
+                  const bs = e.batSpeed ?? e.swingData?.batSpeed ?? e.hitData?.batSpeed ?? e.details?.batSpeed;
+                  if (bs != null && Number(bs) > 0) return Number(bs);
+                }
+                return play.hitData?.batSpeed ?? null;
+              })();
           const pitchVelo = lastPitch?.pitchData?.startSpeed ?? null;
 
           const result    = (play.result?.event || '').toLowerCase().replace(/ /g,'_');
@@ -7159,18 +7166,17 @@ function BatTrackingTab({ games }) {
       } catch(_) {}
     }));
 
-    // Sort: live games first, then by most recent PA (inning desc → pa desc)
+    // Sort: live game plays first, then by most recent inning/PA desc
     allPAs.sort((a,b) => {
-      // Live games before final
       const aLive = liveAndFinal.find(g=>g.gamePk===a.gamePk)?.status==='Live' ? 0 : 1;
       const bLive = liveAndFinal.find(g=>g.gamePk===b.gamePk)?.status==='Live' ? 0 : 1;
-      if (aLive !== bLive) return aLive - bLive;
-      // Within same game: most recent inning desc, then PA desc
+      if (aLive !== bLive) return aLive - bLive; // live first
+      // Within same status: most recent inning desc, then PA desc
       if (a.gamePk === b.gamePk) {
         if (b.inning !== a.inning) return b.inning - a.inning;
         return b.pa - a.pa;
       }
-      // Different games: sort by highest inning reached
+      // Across different games of same status: highest inning first
       return b.inning - a.inning || b.pa - a.pa;
     });
     setPlays(allPAs);
@@ -7266,7 +7272,8 @@ function BatTrackingTab({ games }) {
           <option value="all">All Games</option>
           {liveAndFinal.map(g=>(
             <option key={g.gamePk} value={String(g.gamePk)}>
-              {g.status==='Live'?'🔴 ':'⚫ '}{g.away?.abbr} @ {g.home?.abbr}
+              {g.status==='Live' ? `🔴 LIVE · ` : `✓ Final · `}{g.away?.abbr} @ {g.home?.abbr}
+              {g.inning ? ` (${g.inning})` : ''}
             </option>
           ))}
         </select>
