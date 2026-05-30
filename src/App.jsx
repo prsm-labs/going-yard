@@ -2327,7 +2327,7 @@ function AtBatSlideIn() {
       {/* Injury banner — visible on mobile */}
       {player?.pid && INJURY_MAP[String(player.pid)] && (
         <div style={{padding:'0 20px'}}>
-          <InjuryBanner pid={player.pid}/>
+          <InjuryBanner pid={player.pid} playerName={player.name}/>
         </div>
       )}
       {/* Last 7 Games HR Chart */}
@@ -8610,6 +8610,7 @@ function HROddsCell({ pid }) {
 
 // ── Injury Report — MLB Stats API SC transactions ────────────────────────────
 const INJURY_MAP = {};  // pid → { emoji, label, shortDesc, fullDesc, date, team }
+const ROTO_NEWS_BY_NAME = {}; // lowercase name → injury entry (for players not yet in INJURY_MAP)
 const INJURY_LISTENERS = new Set();
 let   INJURY_LOADED = 0; // timestamp — refreshes every 4hrs (DTD status changes during day)
 let   INJURY_MODAL_CB = null; // set by InjuryModal component
@@ -8734,6 +8735,61 @@ async function fetchInjuries() {
         if (dtdAdded > 0) console.log(`[Injuries] +${dtdAdded} DTD/supplemental players from /api/v1/injuries`);
       }
     } catch(e3) { console.warn('[Injuries] supplemental endpoint failed:', e3.message); }
+
+    // ── RotoWire RSS — catches DTD / breaking injuries not yet on IL ──────────
+    // Free public RSS, proxied via /api/rotowire to bypass CORS.
+    // Matches by player name → enriches INJURY_MAP or adds new entries.
+    try {
+      const rwRes = await fetch('/api/rotowire', { signal: AbortSignal.timeout(6000) });
+      if (rwRes.ok) {
+        const rw = await rwRes.json();
+        let rwAdded = 0, rwUpdated = 0;
+
+        // Build a name→pid reverse lookup from players we already know
+        const nameToPid = {};
+        Object.entries(INJURY_MAP).forEach(([pid, info]) => {
+          if (info.playerName) nameToPid[info.playerName.toLowerCase()] = pid;
+        });
+        // Also build from PLAYER_CACHE if available
+        if (window._playerCache) {
+          Object.entries(window._playerCache).forEach(([pid, p]) => {
+            if (p.fullName) nameToPid[p.fullName.toLowerCase()] = pid;
+          });
+        }
+
+        for (const item of (rw.items || [])) {
+          if (!item.playerName || !item.emoji) continue;
+          if (item.isReturn) continue; // player is back — don't add injury
+
+          const nameLower = item.playerName.toLowerCase();
+          const pid = nameToPid[nameLower];
+
+          const entry = {
+            emoji:     item.emoji,
+            label:     item.isDTD ? 'Day-to-Day' : item.isInjury ? 'Injured' : 'News',
+            shortDesc: item.title.replace(/^[^:]+:\s*/, '').slice(0, 80),
+            fullDesc:  item.title,
+            rotoDesc:  item.desc?.slice(0, 200),
+            rotoLink:  item.link,
+            rotoDate:  item.pubDate,
+            fromRoto:  true,
+          };
+
+          if (pid) {
+            // Only upgrade/update if RotoWire is more severe or INJURY_MAP is empty
+            if (!INJURY_MAP[pid] || item.isDTD) {
+              INJURY_MAP[pid] = { ...INJURY_MAP[pid], ...entry };
+              rwUpdated++;
+            }
+          } else {
+            // Store by name for later matching when batter slideout opens
+            ROTO_NEWS_BY_NAME[nameLower] = entry;
+            if (item.isInjury || item.isDTD) rwAdded++;
+          }
+        }
+        console.log(`[Injuries] RotoWire: +${rwAdded} new name-matches, ${rwUpdated} INJURY_MAP updates`);
+      }
+    } catch(e4) { console.warn('[Injuries] RotoWire RSS failed:', e4.message); }
 
     // ── Cross-check against mlb_injury_report.csv from the pipeline ────────────
     try {
@@ -12521,10 +12577,11 @@ function InjuryBadge({ pid, name }) {
 }
 
 // Inline injury banner — used inside slideouts/dropdowns for mobile
-function InjuryBanner({ pid, style = {} }) {
-  const inj = INJURY_MAP[String(pid || '')];
+function InjuryBanner({ pid, playerName, style = {} }) {
+  const inj = INJURY_MAP[String(pid || '')]
+    || (playerName ? ROTO_NEWS_BY_NAME[playerName.toLowerCase()] : null);
   if (!inj) return null;
-  const col = inj.emoji==='🚫'?'#ff4020':inj.emoji==='🤕'?'#ff8020':'#38b8f2';
+  const col = inj.emoji==='🚫'?'#ff4020':inj.emoji==='⚠️'?'#f5a623':inj.emoji==='🤕'?'#ff8020':'#38b8f2';
   return (
     <div style={{
       display:'flex',alignItems:'flex-start',gap:10,
@@ -12533,22 +12590,42 @@ function InjuryBanner({ pid, style = {} }) {
       ...style
     }}>
       <span style={{fontSize:18,lineHeight:1,flexShrink:0}}>{inj.emoji}</span>
-      <div style={{minWidth:0}}>
-        <div style={{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:700,
-          color:col,marginBottom:2}}>{inj.label}</div>
+      <div style={{minWidth:0,flex:1}}>
+        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:2,flexWrap:'wrap'}}>
+          <div style={{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:700,
+            color:col}}>{inj.label}</div>
+          {inj.fromRoto && (
+            <span style={{fontFamily:"'DM Mono',monospace",fontSize:8,
+              color:'var(--muted)',letterSpacing:.3}}>via RotoWire</span>
+          )}
+        </div>
         {inj.shortDesc && (
           <div style={{fontFamily:"'DM Mono',monospace",fontSize:11,
             color:'var(--text)',lineHeight:1.5}}>{inj.shortDesc}</div>
         )}
-        {inj.date && (
+        {inj.rotoDesc && (
           <div style={{fontFamily:"'DM Mono',monospace",fontSize:10,
-            color:'var(--muted)',marginTop:3}}>Since {inj.date}</div>
+            color:'var(--muted)',lineHeight:1.5,marginTop:5,
+            borderTop:'1px solid rgba(255,255,255,.06)',paddingTop:5}}>
+            {inj.rotoDesc}
+            {inj.rotoLink && (
+              <a href={inj.rotoLink} target="_blank" rel="noopener noreferrer"
+                style={{color:col,marginLeft:6,textDecoration:'none'}}>
+                ↗ Full report
+              </a>
+            )}
+          </div>
+        )}
+        {(inj.date || inj.rotoDate) && (
+          <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,
+            color:'var(--muted)',marginTop:4,opacity:.7}}>
+            {inj.date ? `IL since ${inj.date}` : `Reported ${new Date(inj.rotoDate).toLocaleDateString('en-US',{month:'short',day:'numeric'})}`}
+          </div>
         )}
       </div>
     </div>
   );
 }
-
 function InjuryModal() {
   const [data, setData] = useState(null);
   useEffect(() => { INJURY_MODAL_CB = setData; return () => { INJURY_MODAL_CB = null; }; }, []);
