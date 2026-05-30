@@ -7092,9 +7092,9 @@ function BatTrackingTab({ games }) {
     const allPAs = [];
     await Promise.allSettled(targets.map(async g => {
       try {
-        const r = await fetch(`https://statsapi.mlb.com/api/v1.1/game/${g.gamePk}/feed/live`);
+        const r = await fetch(`https://statsapi.mlb.com/api/v1/game/${g.gamePk}/playByPlay`);
         const d = await r.json();
-        const plays = d?.liveData?.plays?.allPlays || [];
+        const plays = d?.allPlays || [];
         const awayAbbr = g.away?.abbr || '???';
         const homeAbbr = g.home?.abbr || '???';
         plays.forEach(play => {
@@ -7105,24 +7105,24 @@ function BatTrackingTab({ games }) {
           const events    = play.playEvents || [];
           const lastPitch = [...events].reverse().find(e => e.isPitch);
           const hitData   = play.hitData || lastPitch?.hitData || {};
-          // batSpeed: in feed/live it's on the last pitch event or hitData
+          // batSpeed: lives on the swing/contact event which is type='action' NOT isPitch
+          // Must scan ALL events, not just pitch events
           const batSpd = (() => {
-            for (let ei = events.length - 1; ei >= 0; ei--) {
+            for (let ei = 0; ei < events.length; ei++) {
               const e = events[ei];
-              if (e.batSpeed != null) return e.batSpeed;
-              if (e.hitData?.batSpeed != null) return e.hitData.batSpeed;
-              if (e.playEvents?.batSpeed != null) return e.playEvents.batSpeed;
+              // Check every possible field name and location
+              const bs = e.batSpeed
+                ?? e.swingData?.batSpeed
+                ?? e.hitData?.batSpeed
+                ?? e.details?.batSpeed;
+              if (bs != null && Number(bs) > 0) return Number(bs);
             }
-            // fallback: check play-level hitData
-            if (play.hitData?.batSpeed != null) return play.hitData.batSpeed;
-            return null;
+            return play.hitData?.batSpeed ?? null;
           })();
           const pitchVelo = lastPitch?.pitchData?.startSpeed ?? null;
-          // xBA: in feed/live lives on expectedStatistics or result
-          const xbaRaw = play.expectedStatistics?.xba ?? play.about?.xba;
-          const xba = xbaRaw && String(xbaRaw) !== '-.---' && !isNaN(parseFloat(xbaRaw))
-            ? parseFloat(xbaRaw).toFixed(3) : null;
+
           const result    = (play.result?.event || '').toLowerCase().replace(/ /g,'_');
+          const pitcher = play.matchup?.pitcher;
           allPAs.push({
             pa:       play.about?.atBatIndex ?? 0,
             inning:   play.about?.inning ?? 0,
@@ -7131,6 +7131,8 @@ function BatTrackingTab({ games }) {
             matchup:  `${awayAbbr} @ ${homeAbbr}`,
             batterId: batter?.id,
             batter:   batter?.fullName || '—',
+            pitcherId: pitcher?.id || null,
+            pitcherName: pitcher?.fullName || null,
             team,
             result,
             ev:     hitData.launchSpeed   != null ? Math.round(hitData.launchSpeed*10)/10 : null,
@@ -7138,7 +7140,6 @@ function BatTrackingTab({ games }) {
             dist:   hitData.totalDistance != null ? Math.round(hitData.totalDistance) : null,
             batSpd: batSpd != null ? Math.round(batSpd*10)/10 : null,
             pitchV: pitchVelo != null ? Math.round(pitchVelo*10)/10 : null,
-            xba,
             pitchCode: lastPitch?.details?.type?.code || null,
             isHR: result === 'home_run',
             // Store pitch sequence for the zone detail panel
@@ -7228,14 +7229,22 @@ function BatTrackingTab({ games }) {
     ? <span style={{marginLeft:2,fontSize:8,opacity:.7}}>{sortDir===-1?'▼':'▲'}</span>
     : null;
 
-  const Th = ({col, label, title, align='center', w}) => (
+  const Th = ({col, label, title, align='center', w, sticky=false, left=0}) => (
     <th onClick={()=>handleSort(col)} title={title}
       style={{padding:'4px 6px',textAlign:align,whiteSpace:'nowrap',cursor:'pointer',
         fontSize:8,color:'var(--muted)',fontFamily:mono,textTransform:'uppercase',
         letterSpacing:.5,background:'var(--surface2)',borderBottom:'1px solid var(--border)',
-        userSelect:'none',width:w||'auto'}}>
+        userSelect:'none',width:w||'auto',
+        ...(sticky ? {position:'sticky',left,zIndex:4,boxShadow:'2px 0 4px rgba(0,0,0,.3)'} : {})}}>
       {label}<SortArrow col={col}/>
     </th>
+  );
+  const Td = ({children, style={}, sticky=false, left=0}) => (
+    <td style={{...style,
+      ...(sticky ? {position:'sticky',left,background:'var(--surface)',
+        zIndex:3,boxShadow:'2px 0 4px rgba(0,0,0,.3)'} : {})}}>
+      {children}
+    </td>
   );
 
   // ── Render ──────────────────────────────────────────────────────────────
@@ -7306,22 +7315,21 @@ function BatTrackingTab({ games }) {
           <table style={{width:'100%',borderCollapse:'collapse',minWidth:700}}>
             <thead style={{position:'sticky',top:0,zIndex:5}}>
               <tr>
-                <Th col="pa"      label="PA"         title="Plate appearance #" align="center" w={32}/>
-                <Th col="inning"  label="In."        title="Inning" align="center" w={38}/>
-                <Th col="batter"  label="Batter"     title="Batter name" align="left"/>
-                <Th col="team"    label="Team"       title="Batting team" align="center" w={42}/>
-                <Th col="result"  label="Result"     title="At-bat result" align="left" w={70}/>
-                <Th col="ev"      label="Exit Velo"  title="Exit velocity (mph)" align="right" w={68}/>
-                <Th col="la"      label="LA"         title="Launch angle (°)" align="right" w={40}/>
-                <Th col="dist"    label="Dist"       title="Hit distance (ft)" align="right" w={56}/>
-                <Th col="batSpd"  label="Bat Spd"    title="Bat speed (mph)" align="right" w={60}/>
-                <Th col="pitchV"  label="Pitch V"    title="Pitch velocity (mph)" align="right" w={60}/>
-                <Th col="xba"     label="xBA"        title="Expected batting average" align="right" w={48}/>
+                <Th col="pa"      label="PA"      title="Plate appearance #" align="center" w={32} sticky left={0}/>
+                <Th col="inning"  label="In."     title="Inning" align="center" w={38} sticky left={32}/>
+                <Th col="batter"  label="Batter"  title="Batter name" align="left" w={140} sticky left={70}/>
+                <Th col="team"    label="Team"    title="Batting team" align="center" w={42}/>
+                <Th col="result"  label="Result"  title="At-bat result" align="left" w={70}/>
+                <Th col="ev"      label="Exit Velo" title="Exit velocity (mph)" align="right" w={68}/>
+                <Th col="la"      label="LA"      title="Launch angle (°)" align="right" w={40}/>
+                <Th col="dist"    label="Dist"    title="Hit distance (ft)" align="right" w={56}/>
+                <Th col="batSpd"  label="Bat Spd" title="Bat speed (mph)" align="right" w={60}/>
+                <Th col="pitchV"  label="Pitch V" title="Pitch velocity (mph)" align="right" w={60}/>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 && (
-                <tr><td colSpan={11} style={{padding:20,textAlign:'center',
+                <tr><td colSpan={10} style={{padding:20,textAlign:'center',
                   fontFamily:mono,fontSize:10,color:'var(--muted)'}}>
                   No plate appearances found
                 </td></tr>
@@ -7349,15 +7357,14 @@ function BatTrackingTab({ games }) {
                       onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.05)'}
                       onMouseLeave={e=>e.currentTarget.style.background=
                         isSel?'rgba(255,255,255,.06)':r.isHR?'rgba(232,65,26,.06)':isRecent?'rgba(255,255,255,.015)':'transparent'}>
-                      <td style={{padding:'3px 6px',textAlign:'center',fontFamily:mono,
-                        fontSize:9,color:'var(--muted)'}}>{r.pa}</td>
-                      <td style={{padding:'3px 6px',textAlign:'center',fontFamily:mono,
+                      <Td sticky left={0} style={{padding:'3px 6px',textAlign:'center',fontFamily:mono,
+                        fontSize:9,color:'var(--muted)'}}>{r.pa}</Td>
+                      <Td sticky left={32} style={{padding:'3px 6px',textAlign:'center',fontFamily:mono,
                         fontSize:9,color:'var(--muted)'}}>
                         {r.half==='top'?'▲':'▼'}{r.inning}
-                      </td>
-                      <td style={{padding:'3px 6px',fontFamily:osw,fontWeight:700,fontSize:11,
-                        whiteSpace:'nowrap',maxWidth:140,overflow:'hidden',textOverflow:'ellipsis'}}>
-                        {/* Batter name — separate click for slideout */}
+                      </Td>
+                      <Td sticky left={70} style={{padding:'3px 6px',fontFamily:osw,fontWeight:700,fontSize:11,
+                        whiteSpace:'nowrap',width:140,maxWidth:140,overflow:'hidden',textOverflow:'ellipsis'}}>
                         <span
                           onClick={e => {
                             e.stopPropagation();
@@ -7376,7 +7383,7 @@ function BatTrackingTab({ games }) {
                           {r.batter}
                         </span>
                         {r.isHR && <span style={{marginLeft:4,fontSize:10}}>💥</span>}
-                      </td>
+                      </Td>
                       <td style={{padding:'3px 6px',textAlign:'center',fontFamily:osw,
                         fontWeight:700,fontSize:10,color:'var(--accent2)'}}>{r.team}</td>
                       <td style={{padding:'3px 6px',fontFamily:mono,fontSize:9,
@@ -7406,16 +7413,12 @@ function BatTrackingTab({ games }) {
                         fontSize:9,color:'var(--muted)'}}>
                         {r.pitchV != null ? r.pitchV.toFixed(1) : '—'}
                       </td>
-                      <td style={{padding:'3px 6px',textAlign:'right',fontFamily:mono,
-                        fontSize:9,color:r.xba>=.300?'#27c97a':r.xba>=.250?'#f5a623':
-                          r.xba!=null?'var(--muted)':'var(--muted)'}}>
-                        {r.xba || '—'}
-                      </td>
+
                     </tr>
                     {/* ── Expanded pitch zone detail ── */}
                     {isSel && (
                       <tr style={{background:'rgba(255,255,255,.04)'}}>
-                        <td colSpan={11} style={{padding:'12px 16px',
+                        <td colSpan={10} style={{padding:'12px 16px',
                           borderBottom:'1px solid var(--border)'}}>
                           <div style={{display:'flex',gap:16,alignItems:'flex-start',flexWrap:'wrap'}}>
                             {/* Pitch zone SVG — 9-box strike zone grid */}
@@ -7477,7 +7480,7 @@ function BatTrackingTab({ games }) {
                                 {r.batter}
                                 <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)',
                                   marginLeft:8,fontWeight:400}}>
-                                  vs {r.pitches.length > 0 ? r.pitchCode || '—' : '—'}
+                                  vs {r.pitcherName || r.pitchCode || '—'}
                                   {' · '}{r.pitches.length} pitch{r.pitches.length!==1?'es':''}
                                 </span>
                               </div>
