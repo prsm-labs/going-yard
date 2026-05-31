@@ -21343,6 +21343,8 @@ function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, on
   const [sharedBHand,    setSharedBHand]    = useState('');
   // sharedPLoc, sharedBLoc, onPLocChange, onBLocChange come from props
   const [sharedDN,       setSharedDN]       = useState('');
+  const [selDOW,         setSelDOW]          = useState(''); // '' = all days, or 'mon'/'tue'/...
+  const [selDOW,         setSelDOW]          = useState('');  // Mon/Tue/Wed/Thu/Fri/Sat/Sun or '' = all
   const [pitchGroup,     setPitchGroup]     = useState('');
   const [showHelp,       setShowHelp]       = useState(false);
 
@@ -21419,6 +21421,7 @@ function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, on
 
   // ── Split keys ────────────────────────────────────────────────────────────
   const bSplitKey = React.useMemo(() => {
+    if (selDOW) return selDOW; // DOW overrides other splits when selected
     if (pitchGroup) {
       if (sharedPHand==='L') return pitchGroup+'_vsLHP';
       if (sharedPHand==='R') return pitchGroup+'_vsRHP';
@@ -21430,16 +21433,17 @@ function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, on
     if (sharedBLoc) parts.push(sharedBLoc);
     if (sharedDN)   parts.push(sharedDN);
     return parts.join('_')||'overall';
-  }, [sharedPHand, sharedBLoc, sharedDN, pitchGroup]);
+  }, [sharedPHand, sharedBLoc, sharedDN, pitchGroup, selDOW]);
 
   const pSplitKey = React.useMemo(() => {
+    if (selDOW) return selDOW; // DOW overrides other splits when selected
     const parts=[];
     if (sharedBHand==='L') parts.push('vsLHB');
     if (sharedBHand==='R') parts.push('vsRHB');
     if (sharedPLoc) parts.push(sharedPLoc);
     if (sharedDN)   parts.push(sharedDN);
     return parts.join('_')||'overall';
-  }, [sharedBHand, sharedPLoc, sharedDN]);
+  }, [sharedBHand, sharedPLoc, sharedDN, selDOW]);
 
   // ── Auto-sort pitchers on pitch group change ──────────────────────────────
   React.useEffect(() => {
@@ -21694,7 +21698,24 @@ function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, on
         <PillRow items={[['','All','All hands'],['L','LHP','LHP → batters see vsLHP split'],['R','RHP','RHP → batters see vsRHP split']]} active={sharedPHand} onSelect={setSharedPHand}/>
         <PillRow items={[['','All','All batters'],['L','LHB','LHB → pitchers see vsLHB split'],['R','RHB','RHB → pitchers see vsRHB split'],['S','SWB','Switch hitters']]} active={sharedBHand} onSelect={setSharedBHand}/>
         <PillRow items={[['','All'],['home','Home'],['away','Away']]} active={sharedPLoc} onSelect={onPLocChange} color='rgba(39,201,122,.2)' activeColor='#27c97a'/>
-        <PillRow items={[['','All'],['day','Day'],['night','Night']]} active={sharedDN} onSelect={setSharedDN} color='rgba(245,166,35,.2)' activeColor='#f5a623'/>
+        <PillRow items={[['','All'],['day','Day'],['night','Night']]} active={sharedDN} onSelect={v=>{setSharedDN(v);setSelDOW('');}} color='rgba(245,166,35,.2)' activeColor='#f5a623'/>
+        {/* ── Day of Week filter ─────────────────────────────────────────── */}
+        <div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}>
+          <span style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--muted)',
+            textTransform:'uppercase',letterSpacing:.5,flexShrink:0}}>DOW</span>
+          {[['','All'],['mon','Mon'],['tue','Tue'],['wed','Wed'],['thu','Thu'],
+            ['fri','Fri'],['sat','Sat'],['sun','Sun']].map(([v,l])=>(
+            <button key={v} onClick={()=>{setSelDOW(v);if(v)setSharedDN('');}}
+              style={{padding:'3px 8px',borderRadius:5,fontSize:9,cursor:'pointer',
+                fontFamily:"'DM Mono',monospace",userSelect:'none',
+                border:`1px solid ${selDOW===v&&v?'#a78bfa':'var(--border)'}`,
+                background:selDOW===v&&v?'rgba(167,139,250,.15)':'transparent',
+                color:selDOW===v&&v?'#a78bfa':'var(--muted)',
+                fontWeight:selDOW===v&&v?700:400}}>
+              {l}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* ══ PITCHERS ══════════════════════════════════════════════════════════ */}
