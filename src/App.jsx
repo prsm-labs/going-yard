@@ -7718,7 +7718,7 @@ function GamedayTab() {
   const loadAllLive = useCallback(async (gameList) => {
     const liveGames = (gameList || []).filter(g => g.status?.abstractGameState === 'Live');
     if (!liveGames.length) return;
-    await Promise.allSettled(liveGames.map(async g => {
+    await Promise.allSettled(todayGames.map(async g => {
       try {
         const r = await fetch(`/api/boxscore?gamePk=${g.gamePk}`);
         const d = await r.json();
@@ -8680,10 +8680,14 @@ const LIVE_CC_MAP = {};
 // Uses LIVE_GAMES_CACHE (populated by fetchGames at app startup) to know which games are live
 async function pollLiveCloseCalls() {
   try {
-    const liveGames = (LIVE_GAMES_CACHE || []).filter(g => g.status === 'Live');
-    if (!liveGames.length) return;
+    // Poll ALL today's games — Live AND Final — so close calls accumulate throughout the day
+    // PlayByPlay for Final games is cached/static, minimal extra load
+    const todayGames = (LIVE_GAMES_CACHE || []).filter(g =>
+      g.status === 'Live' || g.status === 'Final' || g.status === 'Preview'
+    );
+    if (!todayGames.length) return;
 
-    await Promise.allSettled(liveGames.map(async g => {
+    await Promise.allSettled(todayGames.map(async g => {
       try {
         const r = await fetch(`https://statsapi.mlb.com/api/v1/game/${g.gamePk}/playByPlay`);
         const d = await r.json();
@@ -11871,11 +11875,38 @@ function SimLabView({ data }) {
               // Fetch live box scores for all games in current slate
               const slateGameIds = [...new Set(slate.map(r => r.game_id).filter(Boolean))];
               const slateLiveCache = {};
+              // Build live CC cache at export time — same approach as box scores
+              const slateCCCache = {}; // batter_id → { count, maxEV, maxDist }
               await Promise.all(slateGameIds.map(async gid => {
                 try {
                   const result = await fetchLiveBatters(gid);
                   const batters = result?.batters || result || [];
                   batters.forEach(bt => { if (bt.id) slateLiveCache[String(bt.id)] = bt; });
+                } catch(e) {}
+                // Fetch playByPlay for CC data — same games, same moment
+                try {
+                  const pbp = await fetch(`https://statsapi.mlb.com/api/v1/game/${gid}/playByPlay`).then(r=>r.json());
+                  (pbp?.allPlays || []).forEach(play => {
+                    const hd = play.hitData || {};
+                    const ev = hd.launchSpeed || 0, la = hd.launchAngle || 0, dist = hd.totalDistance || 0;
+                    const isHR = (play.result?.event||'').toLowerCase() === 'home_run';
+                    const bid = String(play.matchup?.batter?.id || '');
+                    if (!bid) return;
+                    if (ev >= 98 && la >= 18 && la <= 35 && dist >= 350 && !isHR) {
+                      if (!slateCCCache[bid]) slateCCCache[bid] = { count:0, maxEV:0, maxDist:0 };
+                      slateCCCache[bid].count++;
+                      slateCCCache[bid].maxEV   = Math.max(slateCCCache[bid].maxEV,   ev);
+                      slateCCCache[bid].maxDist = Math.max(slateCCCache[bid].maxDist, dist);
+                      // Also update the global LIVE_CC_MAP while we're at it
+                      const key = bid;
+                      if (!LIVE_CC_MAP[key]) LIVE_CC_MAP[key] = { count:0, plays:[] };
+                      const pa = play.about?.atBatIndex ?? 0;
+                      if (!LIVE_CC_MAP[key].plays.some(p=>p.pa===pa&&p.gamePk===gid)) {
+                        LIVE_CC_MAP[key].count++;
+                        LIVE_CC_MAP[key].plays.push({pa,gamePk:gid,ev,la,dist});
+                      }
+                    }
+                  });
                 } catch(e) {}
               }));
               const bom = '\uFEFF';
@@ -11919,10 +11950,10 @@ function SimLabView({ data }) {
                   lv?.totalBases??'', lv?.rbi??'', lv?.bb??'', lv?.so??'',
                   lv?.avgEV>0?lv.avgEV.toFixed(1):'',
                   lv?.launchAngle>0?lv.launchAngle.toFixed(1):'',
-                  // Live close calls — today only, not visible in table
-                  (() => { const lcc = LIVE_CC_MAP[String(bid)]; return lcc?.count||''; })(),
-                  (() => { const lcc = LIVE_CC_MAP[String(bid)]; return lcc?.plays?.length ? Math.max(...lcc.plays.map(p=>p.ev||0)).toFixed(1) : ''; })(),
-                  (() => { const lcc = LIVE_CC_MAP[String(bid)]; return lcc?.plays?.length ? Math.max(...lcc.plays.map(p=>p.dist||0)) : ''; })(),
+                  // Live close calls — fetched fresh at export time, same as box scores
+                  slateCCCache[String(bid)]?.count || '',
+                  slateCCCache[String(bid)]?.maxEV  ? slateCCCache[String(bid)].maxEV.toFixed(1)  : '',
+                  slateCCCache[String(bid)]?.maxDist ? slateCCCache[String(bid)].maxDist : '',
                 ].map(esc).join(',');
               });
               const csv = bom + headers.map(esc).join(',') + '\n' + rows.join('\n');
