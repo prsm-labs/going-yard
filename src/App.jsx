@@ -21344,7 +21344,6 @@ function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, on
   // sharedPLoc, sharedBLoc, onPLocChange, onBLocChange come from props
   const [sharedDN,       setSharedDN]       = useState('');
   const [selDOW,         setSelDOW]          = useState(''); // '' = all days, or 'mon'/'tue'/...
-  const [selDOW,         setSelDOW]          = useState('');  // Mon/Tue/Wed/Thu/Fri/Sat/Sun or '' = all
   const [pitchGroup,     setPitchGroup]     = useState('');
   const [showHelp,       setShowHelp]       = useState(false);
 
