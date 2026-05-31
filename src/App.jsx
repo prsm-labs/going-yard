@@ -2233,7 +2233,7 @@ function AtBatSlideIn() {
         // MLB Stats API returns oldest→newest — reverse for most recent first
         const sorted = [...games].reverse();
         // ID → abbreviation map so opponent shows NYM not MET, DET not TIG, etc.
-        const OPP_ABBR = {133:'ATH',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',139:'TB',140:'TEX',141:'TOR',142:'MIN',143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL',108:'LAA',109:'ARI',110:'BAL',111:'BOS',112:'CHC',113:'CIN',114:'CLE',115:'COL',116:'DET',117:'HOU',118:'KC',119:'LAD',120:'WSH',121:'NYM'};
+        const OPP_ABBR = {133:'ATH',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',139:'TB',140:'TEX',141:'TOR',142:'MIN',143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL',108:'LAA',109:'AZ',110:'BAL',111:'BOS',112:'CHC',113:'CIN',114:'CLE',115:'COL',116:'DET',117:'HOU',118:'KC',119:'LAD',120:'WSH',121:'NYM'};
         const rows = sorted.slice(0,20).map(g => ({
           date: g.date?.slice(5) || "—",
           opp:  OPP_ABBR[g.opponent?.id] ||
@@ -2504,7 +2504,7 @@ async function fetchPitcherGameLog(pid) {
     if (!r.ok) return [];
     const d = await r.json();
     const splits = d?.stats?.[0]?.splits || [];
-    const ABBR = {133:'ATH',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',139:'TB',140:'TEX',141:'TOR',142:'MIN',143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL',108:'LAA',109:'ARI',110:'BAL',111:'BOS',112:'CHC',113:'CIN',114:'CLE',115:'COL',116:'DET',117:'HOU',118:'KC',119:'LAD',120:'WSH',121:'NYM'};
+    const ABBR = {133:'ATH',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',139:'TB',140:'TEX',141:'TOR',142:'MIN',143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL',108:'LAA',109:'AZ',110:'BAL',111:'BOS',112:'CHC',113:'CIN',114:'CLE',115:'COL',116:'DET',117:'HOU',118:'KC',119:'LAD',120:'WSH',121:'NYM'};
     const games = splits.map(s => ({
       date: s.date || '',
       opp:  ABBR[s.opponent?.id] || s.opponent?.abbreviation || s.opponent?.name?.replace(/^.* /,'') || '?',
@@ -2690,7 +2690,7 @@ function PitcherSlideIn() {
         if (!pid) return;
         const r = await fetch(`https://statsapi.mlb.com/api/v1/people/${pid}/stats?stats=gameLog&group=pitching&season=2026&sportId=1&limit=20`);
         const d = await r.json();
-        const OPP_ABBR = {133:'ATH',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',139:'TB',140:'TEX',141:'TOR',142:'MIN',143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL',108:'LAA',109:'ARI',110:'BAL',111:'BOS',112:'CHC',113:'CIN',114:'CLE',115:'COL',116:'DET',117:'HOU',118:'KC',119:'LAD',120:'WSH',121:'NYM'};
+        const OPP_ABBR = {133:'ATH',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',139:'TB',140:'TEX',141:'TOR',142:'MIN',143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL',108:'LAA',109:'AZ',110:'BAL',111:'BOS',112:'CHC',113:'CIN',114:'CLE',115:'COL',116:'DET',117:'HOU',118:'KC',119:'LAD',120:'WSH',121:'NYM'};
         const rows = (d.stats?.[0]?.splits||[]).reverse().slice(0,20).map(g=>({
           date: g.date?.slice(5)||'—',
           opp:  OPP_ABBR[g.opponent?.id]||g.opponent?.abbreviation||'—',
@@ -3328,7 +3328,7 @@ async function loadGlobalPlayerMap() {
           const ex = GLOBAL_PLAYER_TEAM_MAP[pid] || {};
           // Roster endpoint gives us the team from the URL — use TEAM_ABBR map
           const ABBR_MAP = {
-            108:'LAA',109:'ARI',110:'BAL',111:'BOS',112:'CHC',113:'CIN',
+            108:'LAA',109:'AZ',110:'BAL',111:'BOS',112:'CHC',113:'CIN',
             114:'CLE',115:'COL',116:'DET',117:'HOU',118:'KC', 119:'LAD',
             120:'WSH',121:'NYM',133:'ATH',134:'PIT',135:'SD', 136:'SEA',
             137:'SF', 138:'STL',139:'TB', 140:'TEX',141:'TOR',142:'MIN',
@@ -3849,7 +3849,7 @@ async function fetchGames(setL, setG, setE, silent=false) {
       // Team abbreviation — try every possible path
       const awTeam = aw?.team || {};
       const hmTeam = hm?.team || {};
-      const _tAbbr = id => ({133:'ATH',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',139:'TB',140:'TEX',141:'TOR',142:'MIN',143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL',108:'LAA',109:'ARI',110:'BAL',111:'BOS',112:'CHC',113:'CIN',114:'CLE',115:'COL',116:'DET',117:'HOU',118:'KC',119:'LAD',120:'WSH',121:'NYM'})[id] || '???';
+      const _tAbbr = id => ({133:'ATH',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',139:'TB',140:'TEX',141:'TOR',142:'MIN',143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL',108:'LAA',109:'AZ',110:'BAL',111:'BOS',112:'CHC',113:'CIN',114:'CLE',115:'COL',116:'DET',117:'HOU',118:'KC',119:'LAD',120:'WSH',121:'NYM'})[id] || '???';
       const awAbbr = awTeam.abbreviation || awTeam.teamCode?.toUpperCase() ||
                      (awTeam.teamName ? awTeam.teamName.slice(0,3).toUpperCase() : null) ||
                      _tAbbr(awTeam.id);
@@ -4331,7 +4331,7 @@ async function fetchRealPitcher(game, side) {
   const base = { name: name || `${ta} Starter`, hand: hand==="L"?"LHP":"RHP", team:ta, era:"—", whip:"—", fbVelo:0, pitchMix:[], loading:false };
   if (!name) return base;
   try {
-    const _TIDS = {ARI:109,ATL:144,BAL:110,BOS:111,CHC:112,CWS:145,CIN:113,CLE:114,COL:115,DET:116,HOU:117,KC:118,LAA:108,LAD:119,MIA:146,MIL:158,MIN:142,NYM:121,NYY:147,OAK:133,PHI:143,PIT:134,SD:135,SEA:136,SF:137,STL:138,TB:139,TEX:140,TOR:141,WSH:120};
+    const _TIDS = {AZ:109,ATL:144,BAL:110,BOS:111,CHC:112,CWS:145,CIN:113,CLE:114,COL:115,DET:116,HOU:117,KC:118,LAA:108,LAD:119,MIA:146,MIL:158,MIN:142,NYM:121,NYY:147,OAK:133,PHI:143,PIT:134,SD:135,SEA:136,SF:137,STL:138,TB:139,TEX:140,TOR:141,WSH:120};
     const teamId = _TIDS[ta];
     if (!teamId) return base;
     const rRes = await fetch(`https://statsapi.mlb.com/api/v1/teams/${teamId}/roster?rosterType=active&season=2026`);
@@ -7066,6 +7066,8 @@ function BatTrackingTab({ games, date, isToday }) {
   const [sortCol,   setSortCol]   = React.useState('inning');
   const [sortDir,   setSortDir]   = React.useState(-1);   // -1=desc 1=asc
   const [selPlay,   setSelPlay]   = React.useState(null);  // expanded play for pitch detail
+  const [filterCC,  setFilterCC]  = React.useState(false); // 🤏 show close calls only
+  const [filterHR,  setFilterHR]  = React.useState(false); // 💥 show HRs only
   const pollRef = React.useRef(null);
   const [fetchDebug, setFetchDebug] = React.useState(null);
 
@@ -7185,6 +7187,22 @@ function BatTrackingTab({ games, date, isToday }) {
       } catch(_) {}
     }));
 
+    // Populate LIVE_CC_MAP — close calls from today's live at-bats
+    allPAs.forEach(pa => {
+      if (!pa.batterId) return;
+      const ev = pa.ev||0, la = pa.la||0, dist = pa.dist||0;
+      if (ev >= 98 && la >= 18 && la <= 35 && dist >= 350 && !pa.isHR) {
+        const key = String(pa.batterId);
+        if (!LIVE_CC_MAP[key]) LIVE_CC_MAP[key] = { count:0, plays:[] };
+        const already = LIVE_CC_MAP[key].plays.some(p => p.pa===pa.pa && p.gamePk===pa.gamePk);
+        if (!already) {
+          LIVE_CC_MAP[key].count++;
+          LIVE_CC_MAP[key].plays.push({pa:pa.pa,gamePk:pa.gamePk,ev,la,dist,
+            inning:pa.inning,half:pa.half,result:pa.result});
+        }
+      }
+    });
+
     // Sort: live game plays first, then by most recent inning/PA desc
     allPAs.sort((a,b) => {
       const aLive = liveAndFinal.find(g=>g.gamePk===a.gamePk)?.status==='Live' ? 0 : 1;
@@ -7228,6 +7246,8 @@ function BatTrackingTab({ games, date, isToday }) {
     return 'var(--muted)';
   };
 
+  const isCloseCall = r => (r.ev||0) >= 98 && (r.la||0) >= 18 && (r.la||0) <= 35 && (r.dist||0) >= 350 && !r.isHR;
+
   const filtered = React.useMemo(() => {
     let rows = plays;
     const q = search.trim().toLowerCase();
@@ -7236,6 +7256,8 @@ function BatTrackingTab({ games, date, isToday }) {
       r.team.toLowerCase().includes(q) ||
       r.matchup.toLowerCase().includes(q)
     );
+    if (filterCC) rows = rows.filter(isCloseCall);
+    if (filterHR) rows = rows.filter(r => r.isHR);
     const mul = sortDir;
     return [...rows].sort((a,b) => {
       const av = a[sortCol] ?? -999;
@@ -7244,7 +7266,7 @@ function BatTrackingTab({ games, date, isToday }) {
         ? mul * av.localeCompare(bv)
         : mul * (Number(av) - Number(bv));
     });
-  }, [plays, search, sortCol, sortDir]);
+  }, [plays, search, sortCol, sortDir, filterCC, filterHR]);
 
   const handleSort = col => {
     if (sortCol === col) setSortDir(d => -d);
@@ -7323,14 +7345,13 @@ function BatTrackingTab({ games, date, isToday }) {
         )}
       </div>
 
-      {/* Stats bar */}
-      <div style={{display:'flex',gap:8,marginBottom:10,flexWrap:'wrap'}}>
+      {/* Stats bar + filter buttons */}
+      <div style={{display:'flex',gap:8,marginBottom:10,flexWrap:'wrap',alignItems:'center'}}>
         {[
-          ['PAs', filtered.length],
-          ['HRs 💥', filtered.filter(r=>r.isHR).length],
-          ['Hard Hit (102+)', filtered.filter(r=>(r.ev||0)>=102).length],
-          ['Ks', filtered.filter(r=>r.result==='strikeout'||r.result==='strikeout_double_play').length],
-          ['BBs', filtered.filter(r=>r.result==='walk'||r.result==='intent_walk').length],
+          ['PAs', plays.length],
+          ['Hard Hit (102+)', plays.filter(r=>(r.ev||0)>=102).length],
+          ['Ks', plays.filter(r=>r.result==='strikeout'||r.result==='strikeout_double_play').length],
+          ['BBs', plays.filter(r=>r.result==='walk'||r.result==='intent_walk').length],
         ].map(([label, val]) => (
           <div key={label} style={{padding:'4px 10px',borderRadius:6,
             background:'var(--surface2)',border:'1px solid var(--border)'}}>
@@ -7339,6 +7360,44 @@ function BatTrackingTab({ games, date, isToday }) {
               textTransform:'uppercase',letterSpacing:.5}}>{label}</div>
           </div>
         ))}
+        {/* 💥 HRs — clickable filter card */}
+        {(()=>{
+          const count = plays.filter(r=>r.isHR).length;
+          return (
+            <div onClick={()=>{setFilterHR(v=>!v);setFilterCC(false);}}
+              style={{padding:'4px 10px',borderRadius:6,cursor:'pointer',userSelect:'none',
+                background:filterHR?'rgba(232,65,26,.18)':'var(--surface2)',
+                border:filterHR?'1px solid var(--accent)':'1px solid var(--border)',
+                transition:'all .15s'}}>
+              <div style={{fontFamily:osw,fontWeight:800,fontSize:13,
+                color:filterHR?'var(--accent)':'var(--text)'}}>{count}</div>
+              <div style={{fontFamily:mono,fontSize:7,marginTop:1,
+                textTransform:'uppercase',letterSpacing:.5,
+                color:filterHR?'var(--accent)':'var(--muted)'}}>
+                💥 HRs{filterHR?' ✓':''}
+              </div>
+            </div>
+          );
+        })()}
+        {/* 🤏 Close Calls — clickable filter card */}
+        {(()=>{
+          const count = plays.filter(isCloseCall).length;
+          return (
+            <div onClick={()=>{setFilterCC(v=>!v);setFilterHR(false);}}
+              style={{padding:'4px 10px',borderRadius:6,cursor:'pointer',userSelect:'none',
+                background:filterCC?'rgba(245,166,35,.15)':'var(--surface2)',
+                border:filterCC?'1px solid #f5a623':'1px solid var(--border)',
+                transition:'all .15s'}}>
+              <div style={{fontFamily:osw,fontWeight:800,fontSize:13,
+                color:filterCC?'#f5a623':'var(--text)'}}>{count}</div>
+              <div style={{fontFamily:mono,fontSize:7,marginTop:1,
+                textTransform:'uppercase',letterSpacing:.5,
+                color:filterCC?'#f5a623':'var(--muted)'}}>
+                🤏 Close Calls{filterCC?' ✓':''}
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Table */}
@@ -8610,7 +8669,10 @@ function HROddsCell({ pid }) {
 
 // ── Injury Report — MLB Stats API SC transactions ────────────────────────────
 const INJURY_MAP = {};  // pid → { emoji, label, shortDesc, fullDesc, date, team }
-const ROTO_NEWS_BY_NAME = {}; // lowercase name → injury entry (for players not yet in INJURY_MAP)
+const ROTO_NEWS_BY_NAME = {};
+// Live close call accumulator — populated by Bat Tracking poll during active games
+// keyed by batter_id (string) → { count, plays: [{ev,la,dist,inning,half,result,ts}] }
+const LIVE_CC_MAP = {}; // lowercase name → injury entry (for players not yet in INJURY_MAP)
 const INJURY_LISTENERS = new Set();
 let   INJURY_LOADED = 0; // timestamp — refreshes every 4hrs (DTD status changes during day)
 let   INJURY_MODAL_CB = null; // set by InjuryModal component
@@ -9655,7 +9717,7 @@ function HRLeaderboardTab() {
   const [statCards, setStatCards] = React.useState({ total:0, longDist:null, longEV:null });
   const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
   const SEASON_START = '2026-03-25';
-  const ABBR = {108:'LAA',109:'ARI',110:'BAL',111:'BOS',112:'CHC',113:'CIN',114:'CLE',115:'COL',116:'DET',117:'HOU',118:'KC',119:'LAD',120:'WSH',121:'NYM',133:'ATH',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',139:'TB',140:'TEX',141:'TOR',142:'MIN',143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL'};
+  const ABBR = {108:'LAA',109:'AZ',110:'BAL',111:'BOS',112:'CHC',113:'CIN',114:'CLE',115:'COL',116:'DET',117:'HOU',118:'KC',119:'LAD',120:'WSH',121:'NYM',133:'ATH',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',139:'TB',140:'TEX',141:'TOR',142:'MIN',143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL'};
 
   React.useEffect(() => {
     const season = new Date().getFullYear();
@@ -9905,7 +9967,7 @@ function HotBatsTab() {
   const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
 
   useEffect(() => {
-    const ABBR={108:'LAA',109:'ARI',110:'BAL',111:'BOS',112:'CHC',113:'CIN',114:'CLE',115:'COL',116:'DET',117:'HOU',118:'KC',119:'LAD',120:'WSH',121:'NYM',133:'ATH',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',139:'TB',140:'TEX',141:'TOR',142:'MIN',143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL'};
+    const ABBR={108:'LAA',109:'AZ',110:'BAL',111:'BOS',112:'CHC',113:'CIN',114:'CLE',115:'COL',116:'DET',117:'HOU',118:'KC',119:'LAD',120:'WSH',121:'NYM',133:'ATH',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',139:'TB',140:'TEX',141:'TOR',142:'MIN',143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL'};
     const season = new Date().getFullYear();
     fetch(`https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories=homeRuns&season=${season}&sportId=1&limit=150`)
       .then(r => r.json())
@@ -11780,7 +11842,8 @@ function SimLabView({ data }) {
                 'Recent FB%','Recent LA','BvP EV','BvP Barrel%','BvP FB%','BvP LA',
                 'Sim H','Sim 2B','Sim BB','Sim K','Sim TB','Sim RBI',
                 'Wind','Temp','Condition',
-                'AB','H','HR','R','TB','RBI','BB','K','Avg EV','Launch Angle'];
+                'AB','H','HR','R','TB','RBI','BB','K','Avg EV','Launch Angle',
+                'Live Close Calls','Live CC Max EV','Live CC Max Dist'];
               const rows = slate.map(b => {
                 const bid = parseInt(b.batter_id) || 0;
                 const gy  = HR_DATA.some(h => h.batterId === bid ||
@@ -11811,6 +11874,10 @@ function SimLabView({ data }) {
                   lv?.totalBases??'', lv?.rbi??'', lv?.bb??'', lv?.so??'',
                   lv?.avgEV>0?lv.avgEV.toFixed(1):'',
                   lv?.launchAngle>0?lv.launchAngle.toFixed(1):'',
+                  // Live close calls — today only, not visible in table
+                  (() => { const lcc = LIVE_CC_MAP[String(bid)]; return lcc?.count||''; })(),
+                  (() => { const lcc = LIVE_CC_MAP[String(bid)]; return lcc?.plays?.length ? Math.max(...lcc.plays.map(p=>p.ev||0)).toFixed(1) : ''; })(),
+                  (() => { const lcc = LIVE_CC_MAP[String(bid)]; return lcc?.plays?.length ? Math.max(...lcc.plays.map(p=>p.dist||0)) : ''; })(),
                 ].map(esc).join(',');
               });
               const csv = bom + headers.map(esc).join(',') + '\n' + rows.join('\n');
@@ -11843,6 +11910,7 @@ function SimLabView({ data }) {
                     { label: 'Batter',   key: null },
                     { label: (<img src="/icon-192.png" alt="Yard" style={{width:15,height:15,borderRadius:2,objectFit:'cover',verticalAlign:'middle',display:'inline-block'}}/>), key: '_yard', colKey: '_yard' },
                     { label: '⚡',       key: '_sig', colKey:'_sig' },
+                    { label: '🚨 CC',    key: 'so_close_count', colKey:'so_close_count' },
                     { label: 'Form',     key: null },
                     { label: 'P.Grade',  key: null },
                     { label: 'vs Pitcher',key: null },
@@ -12061,6 +12129,20 @@ function SimLabView({ data }) {
                           if (!sig) return <span style={{color:'var(--muted)',fontSize:8}}>—</span>;
                           const col = sig>=7?'#ffd700':sig>=5?'#f5a623':sig>=3?'var(--text)':'var(--muted)';
                           return <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:11,color:col}}>{sig}</span>;
+                        })()}
+                      </td>
+                      <td style={{textAlign:'center',padding:'2px 4px',verticalAlign:'middle'}}>
+                        {(() => {
+                          const cc = parseInt(b.so_close_count||0);
+                          if (!cc) return <span style={{color:'rgba(255,255,255,.15)',fontSize:8}}>—</span>;
+                          const col = cc>=3?'#ff4020':cc>=2?'#f5a623':'var(--muted)';
+                          return (
+                            <span title={`${cc} close call${cc!==1?'s':''} yesterday · Max EV: ${b.so_close_max_ev||'—'} · Max Dist: ${b.so_close_max_dist||'—'}ft`}
+                              style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:11,
+                                color:col,cursor:'default'}}>
+                              {cc}
+                            </span>
+                          );
                         })()}
                       </td>
                       <td style={{textAlign:'center',padding:'2px 4px',verticalAlign:'middle'}}>
@@ -13916,7 +13998,7 @@ function PitcherLeaderboard() {
   const TEAM_ABBR = {
     133:'ATH',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',
     139:'TB',140:'TEX',141:'TOR',142:'MIN',143:'PHI',144:'ATL',
-    145:'CWS',146:'MIA',147:'NYY',158:'MIL',108:'LAA',109:'ARI',
+    145:'CWS',146:'MIA',147:'NYY',158:'MIL',108:'LAA',109:'AZ',
     110:'BAL',111:'BOS',112:'CHC',113:'CIN',114:'CLE',115:'COL',
     116:'DET',117:'HOU',118:'KC',119:'LAD',120:'WSH',121:'NYM',
   };
@@ -14228,7 +14310,7 @@ async function fetchGameLog(pid) {
     if (!r.ok) return [];
     const d = await r.json();
     const splits = d?.stats?.[0]?.splits || [];
-    const ABBR = {133:'ATH',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',139:'TB',140:'TEX',141:'TOR',142:'MIN',143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL',108:'LAA',109:'ARI',110:'BAL',111:'BOS',112:'CHC',113:'CIN',114:'CLE',115:'COL',116:'DET',117:'HOU',118:'KC',119:'LAD',120:'WSH',121:'NYM'};
+    const ABBR = {133:'ATH',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',139:'TB',140:'TEX',141:'TOR',142:'MIN',143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL',108:'LAA',109:'AZ',110:'BAL',111:'BOS',112:'CHC',113:'CIN',114:'CLE',115:'COL',116:'DET',117:'HOU',118:'KC',119:'LAD',120:'WSH',121:'NYM'};
     const games = splits.map(s => ({
       date:       s.date || '',
       opp:        ABBR[s.opponent?.id] || s.opponent?.abbreviation || s.opponent?.name?.replace(/^.* /,'') || '?',
