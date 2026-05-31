@@ -1,20 +1,5 @@
 Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitcher ID (Away),Game ID,Day of Week,Day Abbr,Series Game #,Games in Series,Series Position,Day Context
-2026-05-30,02:10 PM,CWS,DET,641743.0,664285.0,824593,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
-2026-05-30,04:05 PM,WSH,SD,656492.0,650633.0,822731,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
-2026-05-30,04:05 PM,TEX,KC,677958.0,607625.0,822893,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
-2026-05-30,04:05 PM,BAL,TOR,687064.0,702056.0,824833,Saturday,Sat,3,4,Middle,✅ Strong (hittable pitchers)
-2026-05-30,04:05 PM,PIT,MIN,656605.0,641927.0,823375,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
-2026-05-30,04:10 PM,CLE,BOS,800048.0,543243.0,824431,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
-2026-05-30,04:10 PM,TB,LAA,656876.0,672282.0,822975,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
-2026-05-30,04:10 PM,NYM,MIA,681035.0,663969.0,823622,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
-2026-05-30,04:10 PM,HOU,MIL,663567.0,687075.0,824190,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
-2026-05-30,07:15 PM,STL,CHC,681517.0,676962.0,823054,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
-2026-05-30,07:15 PM,CIN,ATL,663903.0,527048.0,824513,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
-2026-05-30,09:10 PM,COL,SF,663372.0,605288.0,824352,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
-2026-05-30,10:05 PM,ATH,NYY,669372.0,677960.0,825000,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
-2026-05-30,10:10 PM,SEA,AZ,693433.0,669194.0,823132,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
-2026-05-30,10:10 PM,LAD,PHI,808963.0,666200.0,823945,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
-2026-05-31,12:15 PM,BAL,TOR,680694.0,,824832,Sunday,Sun,4,4,Finale,~ Neutral (check pitcher)
+2026-05-31,12:15 PM,BAL,TOR,680694.0,693686.0,824832,Sunday,Sun,4,4,Finale,~ Neutral (check pitcher)
 2026-05-31,01:35 PM,WSH,SD,641793.0,656288.0,822729,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
 2026-05-31,01:35 PM,PIT,MIN,677952.0,805673.0,823373,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
 2026-05-31,01:40 PM,CLE,BOS,676440.0,624133.0,824430,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
@@ -25,7 +10,16 @@ Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitc
 2026-05-31,02:10 PM,HOU,MIL,837227.0,694819.0,824187,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
 2026-05-31,02:35 PM,TEX,KC,683004.0,608379.0,822895,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
 2026-05-31,03:10 PM,COL,SF,685299.0,592662.0,824354,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-05-31,04:05 PM,ATH,NYY,,701542.0,825001,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
+2026-05-31,04:05 PM,ATH,NYY,682052.0,701542.0,825001,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
 2026-05-31,04:10 PM,SEA,AZ,682243.0,518876.0,823133,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
 2026-05-31,04:10 PM,LAD,PHI,808967.0,691725.0,823944,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
 2026-05-31,07:20 PM,STL,CHC,669461.0,696136.0,823053,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
+2026-06-01,06:40 PM,TB,DET,,,822974,Monday,Mon,1,3,Opener,~ Solid
+2026-06-01,06:45 PM,WSH,MIA,,645261.0,822730,Monday,Mon,1,3,Opener,~ Solid
+2026-06-01,07:10 PM,CIN,KC,695505.0,,824510,Monday,Mon,1,3,Opener,~ Solid
+2026-06-01,07:40 PM,MIN,CWS,,,823702,Monday,Mon,1,3,Opener,~ Solid
+2026-06-01,07:40 PM,MIL,SF,,,823781,Monday,Mon,1,4,Opener,~ Solid
+2026-06-01,07:45 PM,STL,TEX,700241.0,,823050,Monday,Mon,1,3,Opener,~ Solid
+2026-06-01,09:38 PM,LAA,COL,,,824027,Monday,Mon,1,3,Opener,~ Solid
+2026-06-01,09:40 PM,AZ,LAD,,,825078,Monday,Mon,1,4,Opener,~ Solid
+2026-06-01,09:40 PM,SEA,NYM,,,823131,Monday,Mon,1,3,Opener,~ Solid
