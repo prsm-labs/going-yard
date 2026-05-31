@@ -3943,8 +3943,8 @@ async function fetchGames(setL, setG, setE, silent=false) {
     // Populate module-level cache so slideouts can look up game status by team
     LIVE_GAMES_CACHE.length = 0;
     LIVE_GAMES_CACHE.push(...games);
-    // Update background CC poller's game list
-    window._liveGamesCache = games;
+    // Kick off a CC poll immediately now that we have live games
+    pollLiveCloseCalls();
   } catch (e) {
     console.error("fetchGames error:", e.message);
     setE(e.message);
@@ -8677,11 +8677,10 @@ const ROTO_NEWS_BY_NAME = {};
 const LIVE_CC_MAP = {};
 
 // Background close call poller — runs every 90s regardless of active tab
-// Fetches playByPlay for all live games and detects close calls (98mph+ EV, 18-35° LA, 350ft+, not HR)
+// Uses LIVE_GAMES_CACHE (populated by fetchGames at app startup) to know which games are live
 async function pollLiveCloseCalls() {
   try {
-    // Get live games from cached schedule
-    const liveGames = (window._liveGamesCache || []).filter(g => g.status === 'Live');
+    const liveGames = (LIVE_GAMES_CACHE || []).filter(g => g.status === 'Live');
     if (!liveGames.length) return;
 
     await Promise.allSettled(liveGames.map(async g => {
@@ -8718,8 +8717,6 @@ async function pollLiveCloseCalls() {
 }
 
 // Start the background poller — runs every 90s from app load
-// Stores live games cache so the poller knows which games to check
-window._liveGamesCache = [];
 setInterval(pollLiveCloseCalls, 90000);
 const INJURY_LISTENERS = new Set();
 let   INJURY_LOADED = 0; // timestamp — refreshes every 4hrs (DTD status changes during day)
