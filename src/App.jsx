@@ -7339,6 +7339,31 @@ function BatTrackingTab({ games, date, isToday }) {
           </button>
         )}
 
+        {/* Export CSV — exports whatever filtered view is currently visible */}
+        <button onClick={()=>{
+          const esc = v => '"' + String(v??'').replace(/"/g,'""') + '"';
+          const headers = ['PA','Inning','Half','Batter','Team','Matchup','Result',
+            'Exit Velo','LA','Dist','Bat Speed','Pitch Velo','Is HR','Is Close Call'];
+          const rows = filtered.map(r => [
+            r.pa, r.inning, r.half==='top'?'Top':'Bot', r.batter, r.team, r.matchup,
+            r.result, r.ev??'', r.la??'', r.dist??'', r.batSpd??'', r.pitchV??'',
+            r.isHR?'YES':'', isCloseCall(r)?'YES':'',
+          ].map(esc).join(','));
+          const csv = '\uFEFF' + headers.map(esc).join(',') + '\n' + rows.join('\n');
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+          const d = new Date().toISOString().slice(0,10);
+          const tag = filterCC?'-close-calls':filterHR?'-home-runs':selGame!=='all'?`-game-${selGame}`:'';
+          a.download = `bat-tracking-${d}${tag}.csv`;
+          a.click();
+        }}
+          title="Export current filtered view to CSV"
+          style={{padding:'4px 10px',borderRadius:6,border:'1px solid var(--border)',
+            background:'var(--surface2)',color:'var(--muted)',cursor:'pointer',
+            fontFamily:mono,fontSize:9,letterSpacing:.3,marginLeft:'auto'}}>
+          ↓ CSV
+        </button>
+
         {/* Last update */}
         {lastUpd && (
           <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginLeft:'auto'}}>
@@ -11885,7 +11910,8 @@ function SimLabView({ data }) {
                 } catch(e) {}
                 // Fetch playByPlay for CC data — same games, same moment
                 try {
-                  const pbp = await fetch(`https://statsapi.mlb.com/api/v1/game/${gid}/playByPlay`).then(r=>r.json());
+                  const cleanGid = parseInt(gid);  // ensure no float like 824353.0
+                  const pbp = await fetch(`https://statsapi.mlb.com/api/v1/game/${cleanGid}/playByPlay`).then(r=>r.json());
                   (pbp?.allPlays || []).forEach(play => {
                     const hd = play.hitData || {};
                     const ev = hd.launchSpeed || 0, la = hd.launchAngle || 0, dist = hd.totalDistance || 0;
@@ -11897,18 +11923,20 @@ function SimLabView({ data }) {
                       slateCCCache[bid].count++;
                       slateCCCache[bid].maxEV   = Math.max(slateCCCache[bid].maxEV,   ev);
                       slateCCCache[bid].maxDist = Math.max(slateCCCache[bid].maxDist, dist);
-                      // Also update the global LIVE_CC_MAP while we're at it
-                      const key = bid;
-                      if (!LIVE_CC_MAP[key]) LIVE_CC_MAP[key] = { count:0, plays:[] };
-                      const pa = play.about?.atBatIndex ?? 0;
-                      if (!LIVE_CC_MAP[key].plays.some(p=>p.pa===pa&&p.gamePk===gid)) {
-                        LIVE_CC_MAP[key].count++;
-                        LIVE_CC_MAP[key].plays.push({pa,gamePk:gid,ev,la,dist});
-                      }
                     }
                   });
                 } catch(e) {}
               }));
+              // Merge LIVE_CC_MAP (populated by Bat Tracking tab) into slateCCCache
+              // LIVE_CC_MAP is already processed — use it as authoritative source
+              Object.entries(LIVE_CC_MAP).forEach(([bid, lcc]) => {
+                if (!lcc?.plays?.length) return;
+                const maxEV   = Math.max(...lcc.plays.map(p=>p.ev||0));
+                const maxDist = Math.max(...lcc.plays.map(p=>p.dist||0));
+                if (!slateCCCache[bid] || lcc.count > slateCCCache[bid].count) {
+                  slateCCCache[bid] = { count: lcc.count, maxEV, maxDist };
+                }
+              });
               const bom = '\uFEFF';
               const esc = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
               const headers = ['Grade','Pitcher Grade','Gone Yard','Is Key Matchup','Team','Batter','Hand','P.Hand','vs Pitcher',
