@@ -3943,6 +3943,8 @@ async function fetchGames(setL, setG, setE, silent=false) {
     // Populate module-level cache so slideouts can look up game status by team
     LIVE_GAMES_CACHE.length = 0;
     LIVE_GAMES_CACHE.push(...games);
+    // Update background CC poller's game list
+    window._liveGamesCache = games;
   } catch (e) {
     console.error("fetchGames error:", e.message);
     setE(e.message);
@@ -8670,9 +8672,55 @@ function HROddsCell({ pid }) {
 // ── Injury Report — MLB Stats API SC transactions ────────────────────────────
 const INJURY_MAP = {};  // pid → { emoji, label, shortDesc, fullDesc, date, team }
 const ROTO_NEWS_BY_NAME = {};
-// Live close call accumulator — populated by Bat Tracking poll during active games
+// Live close call accumulator — populated by background poll during active games
 // keyed by batter_id (string) → { count, plays: [{ev,la,dist,inning,half,result,ts}] }
-const LIVE_CC_MAP = {}; // lowercase name → injury entry (for players not yet in INJURY_MAP)
+const LIVE_CC_MAP = {};
+
+// Background close call poller — runs every 90s regardless of active tab
+// Fetches playByPlay for all live games and detects close calls (98mph+ EV, 18-35° LA, 350ft+, not HR)
+async function pollLiveCloseCalls() {
+  try {
+    // Get live games from cached schedule
+    const liveGames = (window._liveGamesCache || []).filter(g => g.status === 'Live');
+    if (!liveGames.length) return;
+
+    await Promise.allSettled(liveGames.map(async g => {
+      try {
+        const r = await fetch(`https://statsapi.mlb.com/api/v1/game/${g.gamePk}/playByPlay`);
+        const d = await r.json();
+        (d?.allPlays || []).forEach(play => {
+          const hasResult = play.result?.event && play.result.event.trim() !== '';
+          if (!play.about?.isComplete && !hasResult) return;
+          const hd = play.hitData || {};
+          const ev = hd.launchSpeed || 0;
+          const la = hd.launchAngle || 0;
+          const dist = hd.totalDistance || 0;
+          const isHR = (play.result?.event||'').toLowerCase() === 'home_run';
+          const batterId = play.matchup?.batter?.id;
+          if (!batterId) return;
+          // Close call criteria
+          if (ev >= 98 && la >= 18 && la <= 35 && dist >= 350 && !isHR) {
+            const key = String(batterId);
+            if (!LIVE_CC_MAP[key]) LIVE_CC_MAP[key] = { count:0, plays:[] };
+            const pa = play.about?.atBatIndex ?? 0;
+            const already = LIVE_CC_MAP[key].plays.some(p => p.pa===pa && p.gamePk===g.gamePk);
+            if (!already) {
+              LIVE_CC_MAP[key].count++;
+              LIVE_CC_MAP[key].plays.push({ pa, gamePk:g.gamePk, ev, la, dist,
+                inning: play.about?.inning, half: play.about?.halfInning,
+                result: play.result?.event });
+            }
+          }
+        });
+      } catch(_) {}
+    }));
+  } catch(_) {}
+}
+
+// Start the background poller — runs every 90s from app load
+// Stores live games cache so the poller knows which games to check
+window._liveGamesCache = [];
+setInterval(pollLiveCloseCalls, 90000);
 const INJURY_LISTENERS = new Set();
 let   INJURY_LOADED = 0; // timestamp — refreshes every 4hrs (DTD status changes during day)
 let   INJURY_MODAL_CB = null; // set by InjuryModal component
@@ -11910,7 +11958,6 @@ function SimLabView({ data }) {
                     { label: 'Batter',   key: null },
                     { label: (<img src="/icon-192.png" alt="Yard" style={{width:15,height:15,borderRadius:2,objectFit:'cover',verticalAlign:'middle',display:'inline-block'}}/>), key: '_yard', colKey: '_yard' },
                     { label: '⚡',       key: '_sig', colKey:'_sig' },
-                    { label: '🚨 CC',    key: 'so_close_count', colKey:'so_close_count' },
                     { label: 'Form',     key: null },
                     { label: 'P.Grade',  key: null },
                     { label: 'vs Pitcher',key: null },
@@ -11925,6 +11972,7 @@ function SimLabView({ data }) {
 
                     { label: 'L7 ISO',   key: 'l7_iso' },
                     { label: 'L7💥',     key: 'recent_hr_count' },
+                    { label: '🚨 CC',    key: 'so_close_count', colKey:'so_close_count' },
                     { label: 'ZoneFit',  key: 'zone_fit' },
                     { label: 'Grade',    key: null },
                     { label: '💣',       key: 'meatball_matchup_score' },
@@ -12132,20 +12180,6 @@ function SimLabView({ data }) {
                         })()}
                       </td>
                       <td style={{textAlign:'center',padding:'2px 4px',verticalAlign:'middle'}}>
-                        {(() => {
-                          const cc = parseInt(b.so_close_count||0);
-                          if (!cc) return <span style={{color:'rgba(255,255,255,.15)',fontSize:8}}>—</span>;
-                          const col = cc>=3?'#ff4020':cc>=2?'#f5a623':'var(--muted)';
-                          return (
-                            <span title={`${cc} close call${cc!==1?'s':''} yesterday · Max EV: ${b.so_close_max_ev||'—'} · Max Dist: ${b.so_close_max_dist||'—'}ft`}
-                              style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:11,
-                                color:col,cursor:'default'}}>
-                              {cc}
-                            </span>
-                          );
-                        })()}
-                      </td>
-                      <td style={{textAlign:'center',padding:'2px 4px',verticalAlign:'middle'}}>
                         <FormBadge formKey={getFormClass(b)}/>
                       </td>
                       {/* P.Grade + weak spot inline */}
@@ -12209,6 +12243,21 @@ function SimLabView({ data }) {
                           const n = parseInt(b.recent_hr_count||0);
                           const col = n>=3?'#ff4020':n>=1?'#f5a623':'rgba(255,255,255,.2)';
                           return <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,color:col}}>{n>0?n:'—'}</span>;
+                        })()}
+                      </td>
+                      {/* 🚨 CC — yesterday's close calls */}
+                      <td style={{textAlign:'center',padding:'2px 4px',verticalAlign:'middle'}}>
+                        {(() => {
+                          const cc = parseInt(b.so_close_count||0);
+                          if (!cc) return <span style={{color:'rgba(255,255,255,.15)',fontSize:8}}>—</span>;
+                          const col = cc>=3?'#ff4020':cc>=2?'#f5a623':'var(--muted)';
+                          return (
+                            <span title={`${cc} close call${cc!==1?'s':''} yesterday · Max EV: ${b.so_close_max_ev||'—'} · Max Dist: ${b.so_close_max_dist||'—'}ft`}
+                              style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:11,
+                                color:col,cursor:'default'}}>
+                              {cc}
+                            </span>
+                          );
                         })()}
                       </td>
 
