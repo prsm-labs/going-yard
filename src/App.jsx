@@ -16524,39 +16524,6 @@ function SoCloseTab({ data }) {
 
 const PAIR_TYPES = [
   {
-    id: 'speed_surge',
-    label: '⚡ Speed Surge',
-    color: '#60d360', bg: 'rgba(39,201,122,.08)', border: 'rgba(39,201,122,.25)',
-    desc: 'Bat speed trending 1.5mph+ above own season baseline — swing is physically peaking right now',
-    qualify: b => parseFloat(b.bat_speed_vs_baseline||0) >= 1.5,
-    sameGame: false,
-  },
-  {
-    id: 'due_factor',
-    label: '⏳ Due Factor',
-    color: '#f5a623', bg: 'rgba(245,166,35,.08)', border: 'rgba(245,166,35,.25)',
-    desc: 'ISO ≥.200 + zero HRs last 7 days — power profile strong, results lagging contact quality',
-    qualify: b => parseFloat(b.recent_iso||0) >= 0.200 && parseInt(b.recent_hr_count||0) === 0,
-    sameGame: false,
-  },
-  {
-    id: 'same_game_heat',
-    label: '🔥 Same Game Heat',
-    color: '#ff8020', bg: 'rgba(255,128,32,.08)', border: 'rgba(255,128,32,.25)',
-    desc: 'Same park + conditions, both HH% ≥32% and FB% ≥28% — hot bats sharing the same environment',
-    qualify: b => parseFloat(b.recent_hh_pct||0) >= 32 && parseFloat(b.recent_fb_pct||0) >= 28,
-    sameGame: true,
-  },
-  {
-    id: 'barrel_bros',
-    label: '🛢️ Barrel Bros',
-    color: '#ff4020', bg: 'rgba(255,64,32,.08)', border: 'rgba(255,64,32,.25)',
-    desc: 'Both with pulled barrel% ≥6% — optimal exit angle + pull-side contact, the highest HR predictor',
-    qualify: b => parseFloat(b.recent_pulled_barrel_pct||0) >= 6,
-    sameGame: false,
-  },
-const PAIR_TYPES = [
-  {
     id: 'barrel_bros',
     label: '🛢️ Barrel Bros',
     color: '#ff4020', bg: 'rgba(255,64,32,.08)', border: 'rgba(255,64,32,.25)',
