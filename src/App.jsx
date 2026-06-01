@@ -22408,7 +22408,7 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
       }))
       .sort((a,b) => b.count - a.count)
       .slice(0, 5);
-  }, [cacheVer;
+  }, [cacheVer]);
 
   const top5EV = React.useMemo(() => {
     // windows.last7.avgEV — exact same source as Heating Up tab
