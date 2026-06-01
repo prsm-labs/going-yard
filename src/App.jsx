@@ -2166,7 +2166,7 @@ function AtBatSlideIn() {
       if (!pid || parseInt(pid) <= 0) return;
       setBvpLoading(true);
       fetchBvP(parseInt(player.pid), parseInt(pid))
-        .then(d => { setBvpData({ ...d, pitcherName: pname }); setBvpLoading(false); })
+        .then(d => { setBvpData({ ...d, pitcherName: pname, pitcherId: pid, pitcherHand: dp?.pitcher_hand||'' }); setBvpLoading(false); })
         .catch(() => setBvpLoading(false));
     };
 
@@ -2744,6 +2744,21 @@ function PitcherSlideIn() {
             <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:18,letterSpacing:1}}>{pitcher.name}</span>
             <SavantLink pid={pitcher.pid} type="pitcher"/>
             <MLBNewsLink pid={pitcher.pid}/>
+            {/* Going Yard Pitcher Grade */}
+            {(()=>{
+              const pgLabel = pitcher.pgLabel || Object.values(DAILY_PICKS_CACHE).find(r=>String(r.pitcher_id||'').split('.')[0]===String(pitcher.pid||''))?._pgLabel || '';
+              const emoji = pgLabel.includes('Target')?'🎯':pgLabel.includes('Hittable')?'💥':pgLabel.includes('Average')?'🤔':pgLabel.includes('Tough')?'⚠️':pgLabel.includes('Elite')?'‼️':'';
+              const col   = pgLabel.includes('Target')?'#27c97a':pgLabel.includes('Hittable')?'#f5a623':pgLabel.includes('Tough')||pgLabel.includes('Elite')?'var(--accent)':'var(--muted)';
+              return emoji ? (
+                <span title={`Going Yard Pitcher Grade: ${pgLabel}`}
+                  style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,
+                    color:col,padding:'2px 6px',borderRadius:4,
+                    background:`${col}18`,border:`1px solid ${col}40`,
+                    flexShrink:0,cursor:'default'}}>
+                  {emoji} {pgLabel}
+                </span>
+              ) : null;
+            })()}
           </div>
           <div style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
             {pitcher.team && <span style={{color:'var(--accent2)',fontWeight:700}}>{pitcher.team}</span>}
@@ -22892,7 +22907,9 @@ function HomeTab() {
         ['🤏 Close Calls', 'Batters who nearly went yard — high EV, deep flyouts that just missed. Prime bounce-back candidates for today.'],
         ['🔗 Pairs', 'Two-batter combos sharing favorable conditions — same park, pitcher, or contact trend. Curated to 2–3 top pairs per category.'],
         ['🔮 Crystal Ball', 'The engine\'s three picks: The Chosen (elite stack), Dark Horse (under the radar), Wild Card (spike signal).'],
-        ['Dive Deeper', 'Use the → All Matchups button in Cheat Sheet to go deeper on any batter\'s full matchup data.'],
+        ['🎯 Pitcher Grades', '🎯 Target = easiest to homer off · 💥 Hittable = solid spot · 🤔 Average = neutral · ⚠️ Tough = difficult · ‼️ Elite = avoid. Tap any pitcher name to open their slideout.'],
+        ['📊 Batter Grades', 'A+ = 6–8 signals (highest HR rate ~15%) · A = 4–5 · B = 2–3 · C = 1 · D = 0. Signals include LA lock, bat speed peak, pitch convergence, handedness match, and close call streaks.'],
+        ['Dive Deeper', 'Use the → All Matchups button to go deeper on any batter\'s full matchup data.'],
       ]} onClose={()=>setShowHelp(false)}/>}
 
       {/* Sub-nav */}
