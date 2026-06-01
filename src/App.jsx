@@ -22272,13 +22272,18 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
   useEffect(() => {
     loadGameSplitsData().then(d => setGData(d));
     const id = setInterval(() => {
-      if (Object.keys(PLAYER_DATA_CACHE).length > 50 && Object.keys(DAILY_PICKS_CACHE||{}).length > 0) {
+      if (Object.keys(DAILY_PICKS_CACHE||{}).length > 0) {
         setCacheVer(v => v + 1);
         clearInterval(id);
       }
-    }, 500);
+    }, 100);
     return () => clearInterval(id);
   }, []);
+
+  // Also bump cacheVer whenever the data prop arrives (HomeTab's poll resolved)
+  useEffect(() => {
+    if (data && data.length > 0) setCacheVer(v => v + 1);
+  }, [data]);
 
   // ── Top 5 HR: high yard score + hittable/target pitcher + high ISO ──────────
   const top5HR = React.useMemo(() => {
@@ -22317,7 +22322,7 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
       .filter((r,i,arr) => arr.findIndex(x=>x._pid===r._pid)===i) // dedup
       .sort((a,b) => b._hr_score - a._hr_score)
       .slice(0,5);
-  }, [data, gData]);
+  }, [data, gData, cacheVer]);
 
   // ── Top 5 2+Bases: highest g2tb_pct in L7 with a game today ────────────────
   const top52TB = React.useMemo(() => {
@@ -22347,7 +22352,7 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
       .filter(Boolean)
       .sort((a,b) => b.sauce_score - a.sauce_score)
       .slice(0,5);
-  }, [gData]);
+  }, [gData, cacheVer]);
 
   // ── Top 5 Hit: Sauce-weighted — h_game_pct × Sim H × Sig boost ────────────
   const top5Hit = React.useMemo(() => {
@@ -22378,7 +22383,7 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
       .filter(Boolean)
       .sort((a,b) => b.sauce_score - a.sauce_score)
       .slice(0,5);
-  }, [gData]);
+  }, [gData, cacheVer]);
 
   // ── Top 5 Close Calls: highest so_close_count with a game today ─────────────
   const top5Close = React.useMemo(() => {
@@ -22403,7 +22408,7 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
       }))
       .sort((a,b) => b.count - a.count)
       .slice(0, 5);
-  }, []);
+  }, [cacheVer;
 
   const top5EV = React.useMemo(() => {
     // windows.last7.avgEV — exact same source as Heating Up tab
