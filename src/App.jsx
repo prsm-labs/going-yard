@@ -2747,15 +2747,14 @@ function PitcherSlideIn() {
             {/* Going Yard Pitcher Grade */}
             {(()=>{
               const pgLabel = pitcher.pgLabel || Object.values(DAILY_PICKS_CACHE).find(r=>String(r.pitcher_id||'').split('.')[0]===String(pitcher.pid||''))?._pgLabel || '';
-              const emoji = pgLabel.includes('Target')?'🎯':pgLabel.includes('Hittable')?'💥':pgLabel.includes('Average')?'🤔':pgLabel.includes('Tough')?'⚠️':pgLabel.includes('Elite')?'‼️':'';
-              const col   = pgLabel.includes('Target')?'#27c97a':pgLabel.includes('Hittable')?'#f5a623':pgLabel.includes('Tough')||pgLabel.includes('Elite')?'var(--accent)':'var(--muted)';
-              return emoji ? (
+              const col = pgLabel.includes('Target')?'#27c97a':pgLabel.includes('Hittable')?'#f5a623':pgLabel.includes('Tough')||pgLabel.includes('Elite')?'var(--accent)':'var(--muted)';
+              return pgLabel ? (
                 <span title={`Going Yard Pitcher Grade: ${pgLabel}`}
                   style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,
                     color:col,padding:'2px 6px',borderRadius:4,
                     background:`${col}18`,border:`1px solid ${col}40`,
                     flexShrink:0,cursor:'default'}}>
-                  {emoji} {pgLabel}
+                  {pgLabel}
                 </span>
               ) : null;
             })()}
