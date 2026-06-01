@@ -22182,7 +22182,6 @@ function HomeTab() {
     }, 200);
     return () => clearInterval(poll);
   }, [refreshKey]);
-  }, []);
 
   const stBtn = key => ({
     padding:'4px 10px', borderRadius:6, cursor:'pointer', border:'none',
