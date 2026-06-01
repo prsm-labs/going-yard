@@ -22544,9 +22544,10 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
         <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>Top 5 batters per category · today only · L7 data</span>
         {showAllMatchupsLink && (
           <button onClick={()=>{
-            // MatchupEngineTab is always mounted (display:none) — call synchronously
+            // Use module-level _GLOBAL_NAV (same as all other nav in the app)
+            // MatchupEngineTab is always mounted via display:none so setSubTab is live
             if(window._setMatchupSubTab) window._setMatchupSubTab('allmatches');
-            if(window._GLOBAL_NAV?.setTab) window._GLOBAL_NAV.setTab('matchup');
+            if(_GLOBAL_NAV?.setTab) _GLOBAL_NAV.setTab('matchup');
             window.scrollTo({top:0, behavior:'smooth'});
           }}
             style={{padding:'3px 10px',borderRadius:6,fontSize:9,cursor:'pointer',
