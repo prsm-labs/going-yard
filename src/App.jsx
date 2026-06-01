@@ -10239,6 +10239,464 @@ function HeatingUpTab() {
   );
 }
 
+// ── TEAM_MLB_IDS: abbr → {id, mlbUrl} for team slideout links ────────────────
+const TEAM_MLB_IDS = {
+  AZ:142,ATL:144,BAL:110,BOS:111,CHC:112,CWS:145,CIN:113,CLE:114,COL:115,
+  DET:116,HOU:117,KC:118,LAA:108,LAD:119,MIA:146,MIL:158,MIN:142,NYM:121,
+  NYY:147,ATH:133,PHI:143,PIT:134,SD:135,SEA:136,SF:137,STL:138,TB:139,
+  TEX:140,TOR:141,WSH:120
+};
+
+function MLBTab() {
+  const [sub, setSub]           = React.useState('standings');
+  const [view, setView]         = React.useState('division'); // division | league | wildcard
+  const [standings, setStandings] = React.useState([]);
+  const [loading, setLoading]   = React.useState(true);
+  const [teamSlide, setTeamSlide] = React.useState(null); // {teamId, abbr, name}
+  const [teamStats, setTeamStats] = React.useState(null);
+  const [teamLoading, setTeamLoading] = React.useState(false);
+  const mono = "'DM Mono',monospace";
+  const osw  = "'Oswald',sans-serif";
+
+  // ── Fetch standings ────────────────────────────────────────────────────────
+  React.useEffect(() => {
+    if (sub !== 'standings' && sub !== 'playoff') return;
+    setLoading(true);
+    fetch('https://statsapi.mlb.com/api/v1/standings?leagueId=103,104&season=2026&standingsTypes=regularSeason&hydrate=division,conference,league,record')
+      .then(r => r.json())
+      .then(d => { setStandings(d.records || []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [sub]);
+
+  // ── Fetch team stats when slideout opens ──────────────────────────────────
+  React.useEffect(() => {
+    if (!teamSlide) return;
+    setTeamLoading(true);
+    setTeamStats(null);
+    const tid = teamSlide.teamId;
+    Promise.all([
+      fetch(`https://statsapi.mlb.com/api/v1/teams/${tid}/stats?stats=season&group=hitting&season=2026`).then(r=>r.json()),
+      fetch(`https://statsapi.mlb.com/api/v1/teams/${tid}/stats?stats=season&group=pitching&season=2026`).then(r=>r.json()),
+    ]).then(([hit, pit]) => {
+      const h = hit?.stats?.[0]?.splits?.[0]?.stat || {};
+      const p = pit?.stats?.[0]?.splits?.[0]?.stat || {};
+      setTeamStats({ hitting: h, pitching: p });
+      setTeamLoading(false);
+    }).catch(() => setTeamLoading(false));
+  }, [teamSlide]);
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  const divOrder = ['AL East','AL Central','AL West','NL East','NL Central','NL West'];
+  const divRecords = standings.filter(r => r.standingsType === 'regularSeason');
+
+  const byDiv = React.useMemo(() => {
+    const map = {};
+    divRecords.forEach(rec => {
+      const key = rec.division?.nameShort || rec.division?.name || '?';
+      map[key] = (rec.teamRecords || []).map(t => ({
+        teamId:  t.team?.id,
+        abbr:    t.team?.abbreviation || '?',
+        name:    t.team?.name || '?',
+        w:       t.wins, l: t.losses,
+        pct:     parseFloat(t.winningPercentage || 0),
+        gb:      t.gamesBack || '-',
+        rs:      t.runsScored || 0,
+        ra:      t.runsAllowed || 0,
+        diff:    (t.runsScored||0) - (t.runsAllowed||0),
+        streak:  t.streak?.streakCode || '-',
+        l10:     t.records?.splitRecords?.find(s=>s.type==='lastTen')?.wins
+                   ? `${t.records.splitRecords.find(s=>s.type==='lastTen').wins}-${t.records.splitRecords.find(s=>s.type==='lastTen').losses}`
+                   : '-',
+        home:    (() => { const s = t.records?.splitRecords?.find(r=>r.type==='home'); return s?`${s.wins}-${s.losses}`:'-'; })(),
+        away:    (() => { const s = t.records?.splitRecords?.find(r=>r.type==='away'); return s?`${s.wins}-${s.losses}`:'-'; })(),
+        elim:    t.eliminationNumber || '-',
+        magicNum: t.magicNumber || '-',
+        wildCardGB: t.wildCardGamesBack || '-',
+        clinched: t.clinched || false,
+      }));
+    });
+    return map;
+  }, [divRecords]);
+
+  // Wildcard: top 3 non-division-leaders per league
+  const wildcardTeams = React.useMemo(() => {
+    const al = [], nl = [];
+    Object.entries(byDiv).forEach(([div, teams]) => {
+      const isAL = div.startsWith('AL');
+      teams.forEach((t, i) => {
+        if (i > 0) (isAL ? al : nl).push(t); // skip division leaders
+      });
+    });
+    al.sort((a,b) => b.pct - a.pct);
+    nl.sort((a,b) => b.pct - a.pct);
+    return { AL: al.slice(0,6), NL: nl.slice(0,6) };
+  }, [byDiv]);
+
+  const stBtn = key => ({
+    padding:'4px 12px', borderRadius:6, cursor:'pointer', border:'none',
+    fontFamily:osw, fontWeight:700, fontSize:10, letterSpacing:.5,
+    textTransform:'uppercase',
+    background: sub===key?'var(--accent)':'var(--surface2)',
+    color: sub===key?'white':'var(--muted)',
+    borderBottom: sub===key?'2px solid var(--accent)':'2px solid transparent',
+  });
+
+  const vBtn = key => ({
+    padding:'3px 10px', borderRadius:5, cursor:'pointer',
+    border:`1px solid ${view===key?'var(--accent2)':'var(--border)'}`,
+    fontFamily:mono, fontSize:9,
+    background: view===key?'rgba(56,184,242,.1)':'transparent',
+    color: view===key?'var(--accent2)':'var(--muted)',
+  });
+
+  // ── Team row ──────────────────────────────────────────────────────────────
+  const TeamRow = ({t, rank, showWC}) => {
+    const diffCol = t.diff > 0 ? '#27c97a' : t.diff < 0 ? 'var(--accent)' : 'var(--muted)';
+    const pctCol  = t.pct >= .600 ? '#27c97a' : t.pct >= .500 ? 'var(--text)' : t.pct < .400 ? 'var(--accent)' : 'var(--muted)';
+    return (
+      <tr style={{borderBottom:'1px solid rgba(255,255,255,.04)',
+        background: rank===1?'rgba(39,201,122,.04)':'transparent'}}>
+        <td style={{padding:'4px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',textAlign:'center',width:24}}>{rank}</td>
+        <td style={{padding:'4px 6px'}}>
+          <span onClick={()=>setTeamSlide(t)}
+            style={{fontFamily:osw,fontWeight:700,fontSize:12,color:'var(--accent2)',
+              cursor:'pointer',textDecoration:'underline',textDecorationStyle:'dotted'}}>
+            {t.abbr}
+          </span>
+          {t.clinched && <span style={{fontSize:8,color:'#27c97a',marginLeft:3}}>✓</span>}
+        </td>
+        <td style={{padding:'4px 6px',fontFamily:osw,fontWeight:700,fontSize:12,textAlign:'right'}}>{t.w}</td>
+        <td style={{padding:'4px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',textAlign:'right'}}>{t.l}</td>
+        <td style={{padding:'4px 6px',fontFamily:osw,fontWeight:700,fontSize:11,color:pctCol,textAlign:'right'}}>{t.pct.toFixed(3).replace('0.','.')}</td>
+        <td style={{padding:'4px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',textAlign:'right'}}>{showWC ? t.wildCardGB : t.gb}</td>
+        <td style={{padding:'4px 6px',fontFamily:mono,fontSize:9,textAlign:'right',color:diffCol}}>{t.diff>0?`+${t.diff}`:t.diff}</td>
+        <td style={{padding:'4px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',textAlign:'right'}}>{t.l10}</td>
+        <td style={{padding:'4px 6px',fontFamily:mono,fontSize:9,textAlign:'right',
+          color:/^W/.test(t.streak)?'#27c97a':'var(--accent)'}}>{t.streak}</td>
+      </tr>
+    );
+  };
+
+  const THead = ({gbLabel='GB'}) => (
+    <thead>
+      <tr style={{background:'var(--surface2)'}}>
+        {['#','Team','W','L','PCT',gbLabel,'DIFF','L10','STK'].map((h,i) => (
+          <th key={h} style={{padding:'4px 6px',fontFamily:mono,fontSize:8,color:'var(--muted)',
+            textTransform:'uppercase',letterSpacing:.5,textAlign:i>=2?'right':'left',
+            borderBottom:'1px solid var(--border)',fontWeight:400}}>{h}</th>
+        ))}
+      </tr>
+    </thead>
+  );
+
+  // ── Playoff picture ────────────────────────────────────────────────────────
+  const PlayoffSection = ({league}) => {
+    const divs = Object.entries(byDiv).filter(([k]) => k.startsWith(league));
+    const leaders = divs.map(([,teams]) => ({...teams[0], isDivLeader:true})).sort((a,b)=>b.pct-a.pct);
+    const wc = wildcardTeams[league].map((t,i) => ({...t, wcSeed: i+1}));
+    return (
+      <div style={{marginBottom:20}}>
+        <div style={{fontFamily:osw,fontWeight:800,fontSize:14,color:'var(--accent)',
+          letterSpacing:1,marginBottom:8,textTransform:'uppercase'}}>
+          {league === 'AL' ? '🏆 American League' : '🏆 National League'}
+        </div>
+        <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+          {/* Division leaders */}
+          <div style={{flex:1,minWidth:160}}>
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',
+              textTransform:'uppercase',letterSpacing:.5,marginBottom:4}}>Division Leaders</div>
+            {leaders.map((t,i) => (
+              <div key={t.teamId} style={{display:'flex',alignItems:'center',gap:8,
+                padding:'5px 8px',borderRadius:6,marginBottom:4,
+                background:'rgba(39,201,122,.06)',border:'1px solid rgba(39,201,122,.15)'}}>
+                <span style={{fontFamily:mono,fontSize:9,color:'#27c97a',width:14}}>{i+1}</span>
+                <span onClick={()=>setTeamSlide(t)}
+                  style={{fontFamily:osw,fontWeight:800,fontSize:12,color:'var(--accent2)',
+                    cursor:'pointer',flex:1}}>
+                  {t.abbr}
+                </span>
+                <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{t.w}-{t.l}</span>
+              </div>
+            ))}
+          </div>
+          {/* Wild card */}
+          <div style={{flex:1,minWidth:160}}>
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',
+              textTransform:'uppercase',letterSpacing:.5,marginBottom:4}}>Wild Card Race</div>
+            {wc.map((t,i) => (
+              <div key={t.teamId} style={{display:'flex',alignItems:'center',gap:8,
+                padding:'5px 8px',borderRadius:6,marginBottom:4,
+                background: i<3?'rgba(245,166,35,.06)':'rgba(255,255,255,.02)',
+                border: i<3?'1px solid rgba(245,166,35,.2)':'1px solid rgba(255,255,255,.04)'}}>
+                <span style={{fontFamily:mono,fontSize:9,color:i<3?'#f5a623':'var(--muted)',width:14}}>
+                  {i<3?'✓':'·'}
+                </span>
+                <span onClick={()=>setTeamSlide(t)}
+                  style={{fontFamily:osw,fontWeight:800,fontSize:12,color:'var(--accent2)',
+                    cursor:'pointer',flex:1}}>
+                  {t.abbr}
+                </span>
+                <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>
+                  {t.wildCardGB === '-' || t.wildCardGB === 0 ? <span style={{color:'#f5a623'}}>—</span> : `-${t.wildCardGB}`}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ── Team Stats Slideout ───────────────────────────────────────────────────
+  const TeamSlideout = () => {
+    if (!teamSlide) return null;
+    const t = teamSlide;
+    const h = teamStats?.hitting || {};
+    const p = teamStats?.pitching || {};
+    const mlbUrl = `https://www.mlb.com/${(t.name||'').toLowerCase().replace(/\s+/g,'-')}`;
+    const StatLine = ({label, val, col, sub}) => (
+      <div style={{padding:'5px 0',borderBottom:'1px solid rgba(255,255,255,.04)',
+        display:'flex',alignItems:'baseline',gap:8}}>
+        <span style={{fontFamily:osw,fontWeight:800,fontSize:14,
+          color:col||'var(--text)',flexShrink:0,width:64}}>{val||'—'}</span>
+        <div>
+          <div style={{fontFamily:mono,fontSize:10,color:'var(--text)'}}>{label}</div>
+          {sub && <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:1}}>{sub}</div>}
+        </div>
+      </div>
+    );
+    return <>
+      <div onClick={()=>setTeamSlide(null)} style={{position:'fixed',inset:0,
+        background:'rgba(0,0,0,.5)',zIndex:900}}/>
+      <div style={{position:'fixed',right:0,top:0,bottom:0,width:'min(400px,100vw)',
+        background:'var(--surface)',borderLeft:'2px solid var(--border)',
+        zIndex:901,overflowY:'auto'}}>
+        <div style={{padding:'16px 20px 12px',borderBottom:'1px solid var(--border)',
+          position:'sticky',top:0,background:'var(--surface)',zIndex:10,
+          display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+          <div>
+            <div style={{fontFamily:osw,fontWeight:800,fontSize:22,
+              letterSpacing:1,color:'var(--accent2)'}}>{t.abbr}</div>
+            <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)'}}>{t.name}</div>
+            <div style={{fontFamily:osw,fontWeight:700,fontSize:12,color:'var(--text)',marginTop:2}}>
+              {t.w}-{t.l} · {t.pct.toFixed(3).replace('0.','.')}
+            </div>
+          </div>
+          <div style={{display:'flex',flexDirection:'column',gap:6,alignItems:'flex-end'}}>
+            <button onClick={()=>setTeamSlide(null)}
+              style={{background:'none',border:'1px solid var(--border)',borderRadius:6,
+                color:'var(--muted)',cursor:'pointer',padding:'4px 10px',
+                fontFamily:mono,fontSize:10}}>✕</button>
+            <a href={mlbUrl} target="_blank" rel="noopener noreferrer"
+              style={{padding:'4px 10px',borderRadius:6,fontSize:9,
+                border:'1px solid var(--accent)',color:'var(--accent)',
+                background:'rgba(232,65,26,.08)',fontFamily:mono,textDecoration:'none',
+                fontWeight:700}}>MLB.com ↗</a>
+          </div>
+        </div>
+        <div style={{padding:'16px 20px'}}>
+          {teamLoading ? (
+            <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)',padding:20,textAlign:'center'}}>
+              Loading team stats…
+            </div>
+          ) : <>
+            {/* Record context */}
+            <div style={{display:'flex',gap:8,marginBottom:16,flexWrap:'wrap'}}>
+              {[['Home',t.home],['Away',t.away],['L10',t.l10],['Streak',t.streak],['Run Diff',t.diff>0?`+${t.diff}`:t.diff]].map(([k,v])=>(
+                <div key={k} style={{padding:'4px 10px',borderRadius:6,
+                  background:'var(--surface2)',border:'1px solid var(--border)'}}>
+                  <div style={{fontFamily:osw,fontWeight:800,fontSize:12,color:'var(--text)'}}>{v}</div>
+                  <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.5}}>{k}</div>
+                </div>
+              ))}
+            </div>
+            {/* Hitting — Going Yard relevant stats */}
+            <div style={{fontFamily:osw,fontWeight:700,fontSize:11,color:'var(--accent)',
+              letterSpacing:.8,textTransform:'uppercase',marginBottom:8,
+              borderBottom:'1px solid var(--border)',paddingBottom:4}}>
+              🏏 Team Hitting
+            </div>
+            <StatLine label="Home Runs" val={h.homeRuns} col="#ff4020" sub="Season total"/>
+            <StatLine label="OPS" val={h.ops} col={parseFloat(h.ops)>=.800?'#27c97a':parseFloat(h.ops)>=.730?'var(--text)':'var(--muted)'} sub="On-base + slugging"/>
+            <StatLine label="AVG / OBP / SLG" val={`${h.avg||'—'} / ${h.obp||'—'} / ${h.slg||'—'}`} sub="Season slash line"/>
+            <StatLine label="ISO" val={h.slg&&h.avg?(parseFloat(h.slg)-parseFloat(h.avg)).toFixed(3):null} col="#f5a623" sub="Isolated power (SLG−AVG)"/>
+            <StatLine label="Barrel%*" val={h.barrelPerBip ? `${(h.barrelPerBip*100).toFixed(1)}%` : null} col="#a78bfa" sub="*Statcast — may not be in API"/>
+            <StatLine label="Runs Scored" val={h.runs} sub="Season total"/>
+            <div style={{height:12}}/>
+            {/* Pitching — HR allowed context */}
+            <div style={{fontFamily:osw,fontWeight:700,fontSize:11,color:'#38b8f2',
+              letterSpacing:.8,textTransform:'uppercase',marginBottom:8,
+              borderBottom:'1px solid var(--border)',paddingBottom:4}}>
+              ⚾ Team Pitching
+            </div>
+            <StatLine label="HR Allowed" val={p.homeRuns} col={parseInt(p.homeRuns)>100?'var(--accent)':'var(--muted)'} sub="Key for batters playing these pitchers"/>
+            <StatLine label="ERA" val={p.era} col={parseFloat(p.era)<3.5?'#27c97a':parseFloat(p.era)>4.5?'var(--accent)':'var(--text)'}/>
+            <StatLine label="WHIP" val={p.whip} col={parseFloat(p.whip)<1.20?'#27c97a':parseFloat(p.whip)>1.40?'var(--accent)':'var(--text)'}/>
+            <StatLine label="K/9" val={p.strikeoutsPer9Inn} sub="Strikeouts per 9 innings"/>
+            <StatLine label="HR/9" val={p.homeRunsPer9} col={parseFloat(p.homeRunsPer9)>1.2?'var(--accent)':'var(--muted)'} sub="Higher = more HR-prone pitching staff"/>
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:16,lineHeight:1.5,
+              borderTop:'1px solid var(--border)',paddingTop:8}}>
+              💡 For Going Yard: high team HR Allowed + high HR/9 = weaker pitching staff.
+              Batters facing this team's pitchers are in better shape for HR props.
+            </div>
+          </>}
+        </div>
+      </div>
+    </>;
+  };
+
+  // ── RENDER ─────────────────────────────────────────────────────────────────
+  return (
+    <div>
+      <TeamSlideout/>
+      {/* Sub-nav */}
+      <div style={{display:'flex',gap:6,marginBottom:14,alignItems:'center',flexWrap:'wrap'}}>
+        <button style={stBtn('standings')} onClick={()=>setSub('standings')}>📊 Standings</button>
+        <button style={stBtn('playoff')}   onClick={()=>setSub('playoff')}>🏆 Playoff Picture</button>
+        <button style={stBtn('scores')}    onClick={()=>setSub('scores')}>📺 Scores</button>
+      </div>
+
+      {sub === 'standings' && (
+        <div>
+          {/* View toggle */}
+          <div style={{display:'flex',gap:6,marginBottom:12}}>
+            {[['division','By Division'],['league','By League'],['wildcard','Wild Card']].map(([k,l])=>(
+              <button key={k} style={vBtn(k)} onClick={()=>setView(k)}>{l}</button>
+            ))}
+          </div>
+          {loading ? (
+            <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)',padding:20,textAlign:'center'}}>
+              Loading standings…
+            </div>
+          ) : view === 'division' ? (
+            // Division view — 6 tables
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(340px,1fr))',gap:16}}>
+              {divOrder.map(divName => {
+                const teams = byDiv[divName] || byDiv[Object.keys(byDiv).find(k=>k.includes(divName.split(' ')[1]))] || [];
+                if (!teams.length) return null;
+                return (
+                  <div key={divName} style={{border:'1px solid var(--border)',borderRadius:8,overflow:'hidden'}}>
+                    <div style={{padding:'6px 10px',background:'var(--surface2)',
+                      fontFamily:osw,fontWeight:800,fontSize:12,color:'var(--accent)',
+                      letterSpacing:.8,textTransform:'uppercase'}}>{divName}</div>
+                    <table style={{width:'100%',borderCollapse:'collapse'}}>
+                      <THead/>
+                      <tbody>{teams.map((t,i)=><TeamRow key={t.teamId} t={t} rank={i+1}/>)}</tbody>
+                    </table>
+                  </div>
+                );
+              })}
+            </div>
+          ) : view === 'league' ? (
+            // League view — AL then NL
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(360px,1fr))',gap:16}}>
+              {['AL','NL'].map(lg => {
+                const teams = Object.entries(byDiv)
+                  .filter(([k])=>k.startsWith(lg))
+                  .flatMap(([,t])=>t)
+                  .sort((a,b)=>b.pct-a.pct);
+                return (
+                  <div key={lg} style={{border:'1px solid var(--border)',borderRadius:8,overflow:'hidden'}}>
+                    <div style={{padding:'6px 10px',background:'var(--surface2)',
+                      fontFamily:osw,fontWeight:800,fontSize:12,color:'var(--accent)',
+                      letterSpacing:.8}}>{lg === 'AL' ? '🏆 American League' : '🏆 National League'}</div>
+                    <table style={{width:'100%',borderCollapse:'collapse'}}>
+                      <THead/>
+                      <tbody>{teams.map((t,i)=><TeamRow key={t.teamId} t={t} rank={i+1}/>)}</tbody>
+                    </table>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            // Wildcard view
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(360px,1fr))',gap:16}}>
+              {['AL','NL'].map(lg => {
+                const teams = wildcardTeams[lg];
+                return (
+                  <div key={lg} style={{border:'1px solid var(--border)',borderRadius:8,overflow:'hidden'}}>
+                    <div style={{padding:'6px 10px',background:'var(--surface2)',
+                      fontFamily:osw,fontWeight:800,fontSize:12,color:'#f5a623',
+                      letterSpacing:.8}}>{lg} Wild Card Race</div>
+                    <table style={{width:'100%',borderCollapse:'collapse'}}>
+                      <THead gbLabel="WC GB"/>
+                      <tbody>{teams.map((t,i)=>(
+                        <tr key={t.teamId} style={{borderBottom:'1px solid rgba(255,255,255,.04)',
+                          background:i<3?'rgba(245,166,35,.03)':'transparent'}}>
+                          <td style={{padding:'4px 6px',fontFamily:mono,fontSize:9,
+                            color:i<3?'#f5a623':'var(--muted)',textAlign:'center',width:24}}>
+                            {i<3?'✓':'·'}
+                          </td>
+                          <td style={{padding:'4px 6px'}}>
+                            <span onClick={()=>setTeamSlide(t)}
+                              style={{fontFamily:osw,fontWeight:700,fontSize:12,
+                                color:'var(--accent2)',cursor:'pointer',
+                                textDecoration:'underline',textDecorationStyle:'dotted'}}>
+                              {t.abbr}
+                            </span>
+                          </td>
+                          <td style={{padding:'4px 6px',fontFamily:osw,fontWeight:700,fontSize:12,textAlign:'right'}}>{t.w}</td>
+                          <td style={{padding:'4px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',textAlign:'right'}}>{t.l}</td>
+                          <td style={{padding:'4px 6px',fontFamily:osw,fontWeight:700,fontSize:11,textAlign:'right'}}>{t.pct.toFixed(3).replace('0.','.')}</td>
+                          <td style={{padding:'4px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',textAlign:'right'}}>{t.wildCardGB===0?'—':t.wildCardGB}</td>
+                          <td style={{padding:'4px 6px',fontFamily:mono,fontSize:9,textAlign:'right',color:t.diff>0?'#27c97a':'var(--accent)'}}>{t.diff>0?`+${t.diff}`:t.diff}</td>
+                          <td style={{padding:'4px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',textAlign:'right'}}>{t.l10}</td>
+                          <td style={{padding:'4px 6px',fontFamily:mono,fontSize:9,textAlign:'right',color:/^W/.test(t.streak)?'#27c97a':'var(--accent)'}}>{t.streak}</td>
+                        </tr>
+                      ))}</tbody>
+                    </table>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {sub === 'playoff' && (
+        <div>
+          {loading
+            ? <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)',padding:20,textAlign:'center'}}>Loading…</div>
+            : <>
+              <PlayoffSection league="AL"/>
+              <PlayoffSection league="NL"/>
+              <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:8}}>
+                ✓ = currently in playoff position · Top 3 division leaders + 3 wild cards per league
+              </div>
+            </>
+          }
+        </div>
+      )}
+
+      {sub === 'scores' && (
+        <div style={{margin:'-8px -14px'}}>
+          <iframe title="MLB Scores" src="https://www.mlb.com/scores"
+            frameBorder="0" allowFullScreen
+            style={{width:'125%',height:'calc((100vh - 48px) * 1.25)',border:'none',display:'block',
+              transform:'scale(0.8)',transformOrigin:'top left'}}/>
+          <div style={{padding:'8px 14px',borderTop:'1px solid var(--border)',
+            display:'flex',justifyContent:'flex-end',background:'var(--surface)'}}>
+            <a href="https://www.mlb.com/scores" target="_blank" rel="noopener noreferrer"
+              style={{display:'flex',alignItems:'center',gap:5,padding:'5px 12px',borderRadius:6,
+                background:'var(--accent)',color:'white',fontFamily:osw,
+                fontWeight:700,fontSize:12,letterSpacing:1,textDecoration:'none'}}>
+              ↗ Open in New Tab
+            </a>
+          </div>
+        </div>
+      )}
+
+      {/* Footer note */}
+      {sub !== 'scores' && !loading && (
+        <div style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.2)',
+          marginTop:12,textAlign:'right'}}>
+          Tap any team abbreviation to open team stats · Data: MLB Stats API
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MLBScoresTab() {
   return <div style={{margin:"-16px"}}>
     <iframe
@@ -23221,7 +23679,7 @@ export default function App() {
         <div style={{display:tab==="statcast"?"block":"none"}}><StatcastTab/></div>
         <div style={{display:tab==="home"?"block":"none"}}><HomeTab/></div>
         <div style={{display:tab==="homeruns"?"block":"none"}}><HRTrackerTab/></div>
-        <div style={{display:tab==="mlbscores"?"block":"none"}}><MLBScoresTab/></div>
+        <div style={{display:tab==="mlbscores"?"block":"none"}}><MLBTab/></div>
         <div style={{display:tab==="onlyhomers"?"block":"none"}}><OnlyHomersTab/></div>
         <div style={{display:tab==="doink"?'block':'none'}}>
           <div style={{padding:"8px 14px",background:"rgba(245,166,35,.1)",
