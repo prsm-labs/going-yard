@@ -22589,7 +22589,6 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
               pitcher={r.pitcher} pgLabel={r.pgLabel}/>
           ))}
         </Section>
-        </Section>
 
         <Section emoji="🤏" title="Close Calls" color="#60d360">
           {top5Close.length===0
