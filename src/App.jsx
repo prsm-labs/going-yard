@@ -16555,13 +16555,14 @@ const PAIR_TYPES = [
     qualify: b => parseFloat(b.recent_pulled_barrel_pct||0) >= 6,
     sameGame: false,
   },
+const PAIR_TYPES = [
   {
-    id: 'close_call_combo',
-    label: '🤏 Close Call Combo',
-    color: '#fbbf24', bg: 'rgba(251,191,36,.08)', border: 'rgba(251,191,36,.25)',
-    desc: 'Both had 2+ near-HR events yesterday — deep fly outs, hard XBH, rockets that nearly left the yard',
-    qualify: b => parseInt(b.so_close_count||0) >= 2,
-    sameGame: false,
+    id: 'barrel_bros',
+    label: '🛢️ Barrel Bros',
+    color: '#ff4020', bg: 'rgba(255,64,32,.08)', border: 'rgba(255,64,32,.25)',
+    desc: 'Both with pulled barrel% ≥6% — optimal exit angle + pull-side contact, the highest HR predictor',
+    qualify: b => parseFloat(b.recent_pulled_barrel_pct||0) >= 6,
+    sameGame: false, maxPairs: 3,
   },
   {
     id: 'iso_surge',
@@ -16569,7 +16570,48 @@ const PAIR_TYPES = [
     color: '#a78bfa', bg: 'rgba(167,139,250,.08)', border: 'rgba(167,139,250,.25)',
     desc: 'Both with L7 ISO ≥.220 — genuine power surge in the last 7 days, not a season mirage',
     qualify: b => parseFloat(b.l7_iso||b.recent_iso||0) >= 0.220,
-    sameGame: false,
+    sameGame: false, maxPairs: 3,
+  },
+  {
+    id: 'same_game_heat',
+    label: '🔥 Same Game Heat',
+    color: '#ff8020', bg: 'rgba(255,128,32,.08)', border: 'rgba(255,128,32,.25)',
+    desc: 'Same park + conditions, both HH% ≥32% and FB% ≥28% — hot bats sharing the same environment',
+    qualify: b => parseFloat(b.recent_hh_pct||0) >= 32 && parseFloat(b.recent_fb_pct||0) >= 28,
+    sameGame: true, maxPairs: 2,
+  },
+  {
+    id: 'close_call_combo',
+    label: '🤏 Close Call Combo',
+    color: '#fbbf24', bg: 'rgba(251,191,36,.08)', border: 'rgba(251,191,36,.25)',
+    desc: 'Both had 2+ near-HR events yesterday — deep fly outs that nearly left the yard',
+    qualify: b => parseInt(b.so_close_count||0) >= 2,
+    sameGame: false, maxPairs: 2,
+  },
+  // ── XBH / Hits pairs — from 17k matchup analysis ──────────────────────────
+  {
+    id: 'double_trouble',
+    label: '2️⃣ Double Trouble',
+    color: '#38b8f2', bg: 'rgba(56,184,242,.08)', border: 'rgba(56,184,242,.25)',
+    desc: 'Both with Sim TB ≥1.5 and Sig ≥4 — XBH stack. Per 17k matchups: 41%+ XBH rate at this threshold',
+    qualify: b => parseFloat(b.sim_tb||0) >= 1.5 && (parseFloat(b.weighted_flag_score||0)*4.6) >= 4,
+    sameGame: false, maxPairs: 3,
+  },
+  {
+    id: 'it_takes_two',
+    label: '🏃 It Takes Two',
+    color: '#27c97a', bg: 'rgba(39,201,122,.08)', border: 'rgba(39,201,122,.25)',
+    desc: 'Both with Sim H ≥1.0 — the #1 hit predictor per model (r=0.109). 62%+ hit rate at this threshold',
+    qualify: b => parseFloat(b.sim_h||0) >= 1.0,
+    sameGame: false, maxPairs: 3,
+  },
+  {
+    id: 'hit_factory',
+    label: '🏭 Hit Factory',
+    color: '#4ade80', bg: 'rgba(74,222,128,.08)', border: 'rgba(74,222,128,.25)',
+    desc: 'Same game, both with Sim H ≥0.9 and recent AVG ≥.280 — reliable contact sharing the same matchup',
+    qualify: b => parseFloat(b.sim_h||0) >= 0.9 && parseFloat(b.recent_avg||0) >= 0.280,
+    sameGame: true, maxPairs: 2,
   },
 ];
 
@@ -16671,23 +16713,27 @@ function PairsTab({ data }) {
 
     for (const pt of types) {
       const cands = eligible.filter(b => pt.qualify(b));
+      const typePairs = [];
       for (let i = 0; i < cands.length; i++) {
         for (let j = i + 1; j < cands.length; j++) {
           const a = cands[i], b = cands[j];
           if (a.batter_id === b.batter_id) continue;
           const sameGame = String(a.game_id) === String(b.game_id);
           if (pt.sameGame && !sameGame) continue;
-          result.push({ type: pt, a, b, sameGame, score: pairScore(a, b) });
+          typePairs.push({ type: pt, a, b, sameGame, score: pairScore(a, b) });
         }
       }
+      // Sort by score and cap at maxPairs per category
+      typePairs.sort((x,y) => y.score - x.score);
+      result.push(...typePairs.slice(0, pt.maxPairs || 3));
     }
-    // Dedupe: one pair per batter combo (keep highest score)
+    // Dedupe: one pair per batter combo across all categories (keep highest score)
     const seen = new Map();
     for (const p of result) {
       const key = [String(p.a.batter_id||p.a.batter), String(p.b.batter_id||p.b.batter)].sort().join('|');
       if (!seen.has(key) || seen.get(key).score < p.score) seen.set(key, p);
     }
-    return [...seen.values()].sort((x,y) => y.score - x.score).slice(0, 50);
+    return [...seen.values()].sort((x,y) => y.score - x.score);
   }, [eligible, activeType, finalVer]);
 
   // ── Split into active vs expired based on FINAL_GAME_IDS ──────────────────
@@ -17911,35 +17957,25 @@ function MatchupEngineTab() {
     )}
 
     {/* Sub-tab navigation */}
-    {showKMHelp && <HelpSlideout title="⚡ Key Matchups Guide" items={[
-      ['⚡ Matchups', "Today's top batter vs pitcher matchups ranked by HR probability. Each card shows the Yard Score, pitcher grade, and key stats. Use filters to narrow by grade or team."],
+    {showKMHelp && <HelpSlideout title="⚡ Matchups Guide" items={[
+      ['⚡ Key Matchups', "Today's top batter vs pitcher matchups ranked by HR probability. Each card shows the Yard Score, pitcher grade, and key stats. Use filters to narrow by grade or team."],
       ['📋 All Matchups', "Full list of every scheduled batter with stats, grades, and filters. Sort by any column, filter by pitcher grade, confirmed lineup, and more."],
       ['🎲 Long Shot', "Higher-odds plays — batters with lower grades facing hittable pitchers. Good for prop diversification."],
-      ['🔗 Pairs', "Two-batter combos sharing favorable conditions like the same pitcher, park, or trend. Both need to deliver for the pair to hit."],
-      ['🧢 Batters / ⚾ Pitchers', "Stat tables for today's scheduled batters and pitchers. Filter by grade, handedness, confirmed status, and more."],
       ['📜 BvP History', "Head-to-head at-bat history between a batter and pitcher. See past results, pitch types, and trends."],
-      ['🃏 Cheat Sheet', 'Top 5 HR candidates (Yard Score + matchup), 2+ Total Bases leaders (L7 game rate), and Hit rate leaders (L7) — all for today\'s games.'],
-      ['🤏 Close Calls', "Batters who nearly hit a home run in their last game — high exit velo, deep fly balls that just missed. Prime bounce-back candidates."],
+      ['🧢 Batters / ⚾ Pitchers', "Stat tables for today's scheduled batters and pitchers. Filter by grade, handedness, confirmed status, and more."],
       ['Yard Score 🎯', "Our HR probability score (0–99). Higher = more favorable conditions. A+ batters vs Target pitchers are the top tier."],
       ['Pitcher Grades', "🎯 Target = easiest to homer off. 💥 Hittable = solid. 🤔 Average = neutral. ⚠️ Tough = difficult. ‼️ Elite = avoid."],
-      ['Legend', "A+ = 6–8 flags (highest HR rate) · A = 4–5 · B = 2–3 · C = 1 · D = 0 flags. Flags are positive indicators like high barrel rate, favorable park, recent form, and pitcher vulnerability."],
+      ['Legend', "A+ = 6–8 flags (highest HR rate) · A = 4–5 · B = 2–3 · C = 1 · D = 0 flags."],
     ]} onClose={()=>setShowKMHelp(false)}/>}
     <div style={{display:'flex',flexDirection:'column',gap:4,marginBottom:14}}>
       {/* Row 1 */}
       <div style={{display:'flex',gap:4,flexWrap:'wrap',justifyContent:'center'}}>
-        <button style={stBtn('matchups')}   onClick={()=>setSubTab('matchups')}>⚡ Matchups</button>
-        <button style={stBtn('allmatches')} onClick={()=>setSubTab('allmatches')}>📋 All Matchups</button>
-        <button style={stBtn('longshot')}   data-tip="🎲 Long Shot" onClick={()=>setSubTab('longshot')}>🎲 Long Shot</button>
+        <button style={stBtn('matchups')}   onClick={()=>setSubTab('matchups')}>⚡ Key Matchups</button>
+        <button style={stBtn('allmatches')} data-subtab="allmatches" onClick={()=>setSubTab('allmatches')}>📋 All Matchups</button>
+        <button style={stBtn('longshot')}   onClick={()=>setSubTab('longshot')}>🎲 Long Shot</button>
         <button style={stBtn('history')}    onClick={()=>setSubTab('history')}>📜 BvP History</button>
       </div>
       {/* Row 2 */}
-      <div style={{display:'flex',gap:4,flexWrap:'wrap',justifyContent:'center'}}>
-        <button style={stBtn('cheatsheet')} data-tip="🃏 Cheat Sheet" onClick={()=>setSubTab('cheatsheet')}>🃏 Cheat Sheet</button>
-        <button style={stBtn('streaks')}    data-tip="🔥 Streaks" onClick={()=>setSubTab('streaks')}>🔥 Streaks</button>
-        <button style={stBtn('soclose')}    data-tip="🤏 Close Calls" onClick={()=>setSubTab('soclose')}>🤏 Close Calls</button>
-        <button style={stBtn('pairs')}      data-tip="🔗 Pairs" onClick={()=>setSubTab('pairs')}>🔗 Pairs</button>
-      </div>
-      {/* Row 3 */}
       <div style={{display:'flex',gap:4,flexWrap:'wrap',justifyContent:'center'}}>
         <button style={stBtn('batters')}   onClick={()=>setSubTab('batters')}>🧢 Batters</button>
         <button style={stBtn('pitchers')}  onClick={()=>setSubTab('pitchers')}>⚾ Pitchers</button>
@@ -17987,7 +18023,6 @@ function MatchupEngineTab() {
     {/* Long Shot — C/D grade batters with soft pitcher or good day conditions */}
     {subTab === 'bvp'      && <BvPDeepDiveTab/>}
     {subTab === 'pairs'    && <PairsTab data={data}/>}
-    {subTab === 'cheatsheet' && <CheatSheetTab data={data}/>}
     {subTab === 'streaks'    && <StreaksTab/>}
     {subTab === 'soclose'  && <SoCloseTab data={data}/>}
     {subTab === 'longshot' && (
@@ -22148,7 +22183,84 @@ function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, on
   );
 }
 
-function CheatSheetTab({ data }) {
+// ── HomeTab — landing page with sub-nav: Cheat Sheet, Streaks, Close Calls, Pairs, Crystal Ball ──
+function HomeTab() {
+  const [sub, setSub] = React.useState('cheatsheet');
+  const [showHelp, setShowHelp] = React.useState(false);
+  const [data, setData] = React.useState([]);
+  const mono = "'DM Mono',monospace";
+  const osw  = "'Oswald',sans-serif";
+
+  React.useEffect(() => {
+    const poll = setInterval(() => {
+      const rows = Object.values(DAILY_PICKS_CACHE || {});
+      if (rows.length > 0) { setData(rows); clearInterval(poll); }
+    }, 400);
+    return () => clearInterval(poll);
+  }, []);
+
+  const stBtn = key => ({
+    padding:'4px 10px', borderRadius:6, cursor:'pointer', border:'none',
+    fontFamily:osw, fontWeight:700, fontSize:10, letterSpacing:.5,
+    textTransform:'uppercase', flexShrink:0,
+    background: sub===key ? 'var(--accent)' : 'var(--surface2)',
+    color: sub===key ? 'white' : 'var(--muted)',
+    borderBottom: sub===key ? '2px solid var(--accent)' : '2px solid transparent',
+    transition:'all .15s',
+  });
+
+  const HelpBtn2 = () => (
+    <button onClick={()=>setShowHelp(v=>!v)}
+      style={{padding:'4px 8px',borderRadius:6,cursor:'pointer',border:'1px solid var(--border)',
+        background:'var(--surface2)',color:'var(--muted)',fontFamily:mono,fontSize:10,flexShrink:0}}>
+      ?
+    </button>
+  );
+
+  return (
+    <div>
+      {showHelp && <HelpSlideout title="🏡 Home Guide" items={[
+        ['📋 Cheat Sheet', 'Top HR candidates, 2+ bases leaders, and hit machines for today — ranked by the Sauce composite score (Yard + Sim + Sig). Your daily starting point.'],
+        ['🔥 Streaks', 'Batters on multi-game hit, XBH, or HR streaks. Sustained contact quality over multiple games.'],
+        ['🤏 Close Calls', 'Batters who nearly went yard — high EV, deep flyouts that just missed. Prime bounce-back candidates for today.'],
+        ['🔗 Pairs', 'Two-batter combos sharing favorable conditions — same park, pitcher, or contact trend. Curated to 2–3 top pairs per category.'],
+        ['🔮 Crystal Ball', 'The engine\'s three picks: The Chosen (elite stack), Dark Horse (under the radar), Wild Card (spike signal).'],
+        ['Dive Deeper', 'Use the → All Matchups button in Cheat Sheet to go deeper on any batter\'s full matchup data.'],
+      ]} onClose={()=>setShowHelp(false)}/>}
+
+      {/* Sub-nav */}
+      <div style={{display:'flex',gap:4,flexWrap:'wrap',marginBottom:14,alignItems:'center'}}>
+        <button style={stBtn('cheatsheet')} onClick={()=>setSub('cheatsheet')}>📋 Cheat Sheet</button>
+        <button style={stBtn('streaks')}    onClick={()=>setSub('streaks')}>🔥 Streaks</button>
+        <button style={stBtn('soclose')}    onClick={()=>setSub('soclose')}>🤏 Close Calls</button>
+        <button style={stBtn('pairs')}      onClick={()=>setSub('pairs')}>🔗 Pairs</button>
+        <button style={stBtn('crystal')}    onClick={()=>setSub('crystal')}>🔮</button>
+        <HelpBtn2/>
+      </div>
+
+      {sub==='cheatsheet' && <CheatSheetTab data={data} showAllMatchupsLink/>}
+      {sub==='streaks'    && <StreaksTab/>}
+      {sub==='soclose'    && <SoCloseTab data={data}/>}
+      {sub==='pairs'      && <PairsTab data={data}/>}
+      {sub==='crystal'    && <CrystalBallTab embedded/>}
+    </div>
+  );
+}
+
+// Standalone CheatSheetWrapper kept for backward compat (unused in nav now)
+function CheatSheetWrapper() {
+  const [data, setData] = React.useState([]);
+  React.useEffect(() => {
+    const poll = setInterval(() => {
+      const rows = Object.values(DAILY_PICKS_CACHE || {});
+      if (rows.length > 0) { setData(rows); clearInterval(poll); }
+    }, 400);
+    return () => clearInterval(poll);
+  }, []);
+  return <div style={{padding:'8px 14px'}}><CheatSheetTab data={data}/></div>;
+}
+
+function CheatSheetTab({ data, showAllMatchupsLink }) {
   const mono = "'DM Mono',monospace";
   const osw  = "'Oswald',sans-serif";
   const [gData,    setGData]    = useState({batters:{},pitchers:{}});
@@ -22169,7 +22281,7 @@ function CheatSheetTab({ data }) {
   const top5HR = React.useMemo(() => {
     return Object.values(DAILY_PICKS_CACHE||{})
       .filter(r => {
-        if (!r._yard || parseFloat(r._yard||0) < 30) return false;
+        if (!r._yard || parseFloat(r._yard||0) < 25) return false;
         const label = r._pgLabel||'';
         if (!label.includes('Target') && !label.includes('Hittable')) return false;
         const pid = String(r.batter_id||'').split('.')[0];
@@ -22180,13 +22292,27 @@ function CheatSheetTab({ data }) {
       .map(r => {
         const pid = String(r.batter_id||'').split('.')[0];
         const gsp = gData.batters?.[pid]?.splits?.L7?.overall;
-        return { ...r, _iso: gsp?.iso||0, _pid: pid };
-      })
-      .sort((a,b) => {
-        const ya = parseFloat(a._yard||0), yb = parseFloat(b._yard||0);
-        return (yb + (b._iso||0)*50) - (ya + (a._iso||0)*50);
+        const yard   = parseFloat(r._yard||0);
+        const grade  = r.grade||r.Grade||'D';
+        const simTB  = parseFloat(r.sim_tb||0);
+        const sig    = sigCache.current[String(pid)] ?? (parseFloat(r.weighted_flag_score||0)*4.6);
+        const isTarget = (r._pgLabel||'').includes('Target');
+        // ── Sauce composite HR score ──────────────────────────────────────
+        // Calibrated from 17,340 matchups:
+        // Sig: Sig7=18.6% HR, Sig6=13.7%, Sig4=12.7%, Sig0=8.1%
+        // SimTB: ≥2.0=17.5% HR, ≥1.5=14.8%, <1.0=8.75%
+        // Grade: A+=15.5%, A=16.1%, B=12.3%, C=9.7%, D=8.3%
+        // Target pitcher: +21% lift for A+ batters
+        const sigBonus   = sig>=6?8 : sig>=4?4 : sig>=2?1 : 0;
+        const simBonus   = simTB>=2.0?6 : simTB>=1.5?3 : simTB>=1.0?1 : 0;
+        const gradeBonus = ['A+','A'].includes(grade)?5 : grade==='B'?2 : 0;
+        const pitcherBonus = isTarget?4 : 0;
+        const hr_score = yard + sigBonus + simBonus + gradeBonus + pitcherBonus;
+        return { ...r, _iso: gsp?.iso||0, _pid: pid,
+          _hr_score: hr_score, _sig: Math.round(sig), _simTB: simTB, _grade: grade };
       })
       .filter((r,i,arr) => arr.findIndex(x=>x._pid===r._pid)===i) // dedup
+      .sort((a,b) => b._hr_score - a._hr_score)
       .slice(0,5);
   }, [data, gData]);
 
@@ -22197,19 +22323,30 @@ function CheatSheetTab({ data }) {
       .filter(([id]) => todayIds.has(id))
       .map(([id, p]) => {
         const sp = p.splits?.L7?.overall;
-        if (!sp||!sp.g2tb_pct||sp.games<4) return null;  // min 4 games for meaningful sample
+        if (!sp||!sp.g2tb_pct||sp.games<4) return null;
         if (INJURY_MAP?.[parseInt(id)||0] && !LINEUP_STATUS?.[parseInt(id)||0]) return null;
         const dp = Object.values(DAILY_PICKS_CACHE).find(r=>String(r.batter_id||'').split('.')[0]===id);
         if (dp && !isActiveBatter(dp)) return null;
         const n2tb=(p.name&&!/^\d+$/.test(p.name))?p.name:getCachedPlayer(parseInt(id)||0)?.name||dp?.batter||p.name;
-        return { id, name:n2tb, team:p.team||dp?.batting_team||'', g2tb:sp.g2tb, g2tb_pct:sp.g2tb_pct, games:sp.games, pitcher:dp?.pitcher||'', pgLabel:dp?._pgLabel||'' };
+        // ── Sauce-weighted score ──
+        // g2tb_pct: recent 2+TB rate (backward-looking form)
+        // simTB: forward-looking matchup projection (engine signal)
+        // sigBoost: Sig ≥ 4 doubles base XBH rate per 17k matchup analysis
+        const simTB  = parseFloat(dp?.sim_tb||0);
+        const sig    = sigCache.current[String(id)] ?? (parseFloat(dp?.weighted_flag_score||0)*4.6);
+        const sigBoost = sig >= 6 ? 1.4 : sig >= 4 ? 1.2 : sig >= 2 ? 1.05 : 1.0;
+        const simBoost = simTB >= 2.0 ? 1.35 : simTB >= 1.5 ? 1.15 : simTB >= 1.0 ? 1.05 : 1.0;
+        const sauce_score = (sp.g2tb_pct / 100) * simBoost * sigBoost;
+        return { id, name:n2tb, team:p.team||dp?.batting_team||'', g2tb:sp.g2tb, g2tb_pct:sp.g2tb_pct,
+          games:sp.games, pitcher:dp?.pitcher||'', pgLabel:dp?._pgLabel||'',
+          simTB, sig:Math.round(sig), sauce_score };
       })
       .filter(Boolean)
-      .sort((a,b) => b.g2tb!==a.g2tb ? b.g2tb-a.g2tb : b.g2tb_pct-a.g2tb_pct) // count first, then pct
+      .sort((a,b) => b.sauce_score - a.sauce_score)
       .slice(0,5);
   }, [gData]);
 
-  // ── Top 5 Hit: highest h_game_pct in L7 with a game today ──────────────────
+  // ── Top 5 Hit: Sauce-weighted — h_game_pct × Sim H × Sig boost ────────────
   const top5Hit = React.useMemo(() => {
     const todayIds = new Set(Object.values(DAILY_PICKS_CACHE||{}).map(r=>String(r.batter_id||'').split('.')[0]));
     return Object.entries(gData.batters||{})
@@ -22221,10 +22358,22 @@ function CheatSheetTab({ data }) {
         const dp = Object.values(DAILY_PICKS_CACHE).find(r=>String(r.batter_id||'').split('.')[0]===id);
         if (dp && !isActiveBatter(dp)) return null;
         const nhit=(p.name&&!/^\d+$/.test(p.name))?p.name:getCachedPlayer(parseInt(id)||0)?.name||dp?.batter||p.name;
-        return { id, name:nhit, team:p.team||dp?.batting_team||'', h_game:sp.h_game, h_game_pct:sp.h_game_pct, avg:sp.avg, games:sp.games, pitcher:dp?.pitcher||'', pgLabel:dp?._pgLabel||'' };
+        // ── Sauce-weighted score ──
+        // h_game_pct: recent hit rate (backward-looking form)
+        // simH: forward-looking hit projection — strongest hit predictor in model (r=0.109)
+        // sigBoost: Sig ≥ 6 pushes hit rate to 65%+ per 17k matchup analysis
+        const simH   = parseFloat(dp?.sim_h||0);
+        const sig    = sigCache.current[String(id)] ?? (parseFloat(dp?.weighted_flag_score||0)*4.6);
+        const sigBoost = sig >= 6 ? 1.35 : sig >= 4 ? 1.15 : sig >= 2 ? 1.05 : 1.0;
+        const simBoost = simH >= 1.2 ? 1.3 : simH >= 1.0 ? 1.15 : simH >= 0.8 ? 1.05 : 1.0;
+        const sauce_score = (sp.h_game_pct / 100) * simBoost * sigBoost;
+        return { id, name:nhit, team:p.team||dp?.batting_team||'', h_game:sp.h_game,
+          h_game_pct:sp.h_game_pct, avg:sp.avg, games:sp.games,
+          pitcher:dp?.pitcher||'', pgLabel:dp?._pgLabel||'',
+          simH, sig:Math.round(sig), sauce_score };
       })
       .filter(Boolean)
-      .sort((a,b) => b.h_game!==a.h_game ? b.h_game-a.h_game : b.h_game_pct-a.h_game_pct)
+      .sort((a,b) => b.sauce_score - a.sauce_score)
       .slice(0,5);
   }, [gData]);
 
@@ -22388,8 +22537,25 @@ function CheatSheetTab({ data }) {
 
   return (
     <div style={{padding:'8px 4px'}}>
-      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:12}}>
+      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:12,flexWrap:'wrap'}}>
         <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>Top 5 batters per category · today only · L7 data</span>
+        {showAllMatchupsLink && (
+          <button onClick={()=>{
+            if(window._GLOBAL_NAV?.setTab) {
+              window._GLOBAL_NAV.setTab('matchup');
+              // small delay so the tab renders before setting subTab
+              setTimeout(()=>{
+                document.querySelectorAll('[data-subtab="allmatches"]').forEach(b=>b.click());
+              }, 100);
+            }
+          }}
+            style={{padding:'3px 10px',borderRadius:6,fontSize:9,cursor:'pointer',
+              border:'1px solid var(--accent2)',color:'var(--accent2)',
+              background:'rgba(56,184,242,.08)',fontFamily:mono,flexShrink:0,
+              fontWeight:700,letterSpacing:.3}}>
+            📋 → All Matchups
+          </button>
+        )}
         <button onClick={()=>{
           const rows = [
             ['Category','Rank','Name','Team','Stat','Stat Label','Pitcher','Pitcher Grade'],
@@ -22409,6 +22575,9 @@ function CheatSheetTab({ data }) {
       <div style={{display:'flex',gap:16,flexWrap:'wrap',alignItems:'flex-start'}}>
 
         <Section emoji="💥" title="HR Candidates" color="#ff4020">
+          <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',marginBottom:6,
+            padding:'3px 6px',background:'rgba(232,65,26,.06)',borderRadius:4,
+            letterSpacing:.3}}>Yard + Sig + SimTB + Grade + Pitcher — stacked signals</div>
           {top5HR.length===0
             ?<div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',padding:12}}>No matchups loaded yet</div>
             :top5HR.map((r,i)=>(
@@ -22417,12 +22586,15 @@ function CheatSheetTab({ data }) {
               team={r.batting_team||''}
               stat={parseFloat(r._yard||0).toFixed(0)}
               statLabel="Yard Score"
-              sub={r._iso>0?`ISO ${r._iso.toFixed(3)}`:''}
+              sub={`⚡${r._sig} · SimTB ${r._simTB?.toFixed(1)||'—'} · ${r._grade}`}
               pitcher={r.pitcher||''} pgLabel={r._pgLabel||''}/>
           ))}
         </Section>
 
         <Section emoji="🎯" title="2+ Bases" color="#f5a623">
+          <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',marginBottom:6,
+            padding:'3px 6px',background:'rgba(245,166,35,.06)',borderRadius:4,
+            letterSpacing:.3}}>Ranked by L7 rate × Sim TB × Sig — not just recent history</div>
           {top52TB.length===0
             ?<div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',padding:12}}>No game split data yet</div>
             :top52TB.map((r,i)=>(
@@ -22430,12 +22602,15 @@ function CheatSheetTab({ data }) {
               name={r.name} team={r.team}
               stat={`${r.g2tb_pct}%`}
               statLabel="2TB+ rate"
-              sub={`${r.g2tb}/${r.games} games`}
+              sub={`${r.g2tb}/${r.games} g · SimTB ${r.simTB?.toFixed(1)||'—'} · ⚡${r.sig}`}
               pitcher={r.pitcher} pgLabel={r.pgLabel}/>
           ))}
         </Section>
 
         <Section emoji="⚾" title="Hit Machines" color="#27c97a">
+          <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',marginBottom:6,
+            padding:'3px 6px',background:'rgba(39,201,122,.06)',borderRadius:4,
+            letterSpacing:.3}}>Ranked by L7 rate × Sim H × Sig — Sim H is the #1 hit predictor</div>
           {top5Hit.length===0
             ?<div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',padding:12}}>No game split data yet</div>
             :top5Hit.map((r,i)=>(
@@ -22443,9 +22618,10 @@ function CheatSheetTab({ data }) {
               name={r.name} team={r.team}
               stat={`${r.h_game_pct}%`}
               statLabel="Hit rate"
-              sub={`${r.h_game}/${r.games} games · ${r.avg?.toFixed?r.avg.toFixed(3):r.avg} AVG`}
+              sub={`${r.h_game}/${r.games} g · SimH ${r.simH?.toFixed(2)||'—'} · ⚡${r.sig}`}
               pitcher={r.pitcher} pgLabel={r.pgLabel}/>
           ))}
+        </Section>
         </Section>
 
         <Section emoji="🤏" title="Close Calls" color="#60d360">
@@ -22941,7 +23117,7 @@ function StreaksTab() {
 
 export default function App() {
   const [showSplash, setShowSplash] = useState(true);
-  const [tab, setTab] = useState("homeruns");
+  const [tab, setTab] = useState("home");
   const [showPicksSlideout, setShowPicksSlideout] = useState(false);
 
   // Wire global nav on mount so notifications can route to tabs
@@ -22959,20 +23135,20 @@ export default function App() {
   }, []);
 
   const NAV = [
-    {key:"homeruns",  label:"💥 HR Tracker"},
-    {key:"live",      label:"📡 Live"},
-    {key:"stats",     label:"📊 Splits"},
-    {key:"matchup",   label:"⚡ Key Matchups"},
-    {key:"powerbi",   label:"📊 Data"},
-    {key:"weather",   label:"🌤️ Weather"},
-    {key:"picks",     label:"🎯 My Picks"},
-    {key:"_sep1",     label:"|", sep:true},
-    {key:"statcast",  label:"📡 Statcast"},
-    {key:"livesports",label:"📺 Live Sports ↗",external:"https://thetvapp.to"},
-    {key:"mlbscores", label:"⚾ MLB"},
-    {key:"crystal",   label:"🔮 Crystal Ball"},
-    {key:"links",     label:"🔗 Links"},
-    {key:"getapp",    label:"📲 Get App"},
+    {key:"home",       label:"🏡 Home"},
+    {key:"homeruns",   label:"💥 HR Tracker"},
+    {key:"live",       label:"📡 Live"},
+    {key:"stats",      label:"📊 Splits"},
+    {key:"matchup",    label:"⚡ Matchups"},
+    {key:"powerbi",    label:"🤓 Data"},
+    {key:"weather",    label:"🌤️ Weather"},
+    {key:"picks",      label:"🎯 My Picks"},
+    {key:"_sep1",      label:"|", sep:true},
+    {key:"statcast",   label:"📡 Statcast"},
+    {key:"livesports", label:"📺 Live Sports ↗", external:"https://thetvapp.to"},
+    {key:"mlbscores",  label:"⚾ MLB"},
+    {key:"links",      label:"🔗 Links"},
+    {key:"getapp",     label:"📲 Get App"},
   ];
 
   return <>
@@ -23013,7 +23189,7 @@ export default function App() {
               ? <button key={n.key} className="tab"
                   onClick={()=>window.open(n.external,"_blank","noopener,noreferrer")}
                   style={{color:"var(--muted)",fontWeight:400,display:"flex",alignItems:"center",gap:4}}>
-                  {n.label} <span style={{fontSize:9,opacity:.6}}>↗</span>
+                  {n.label}
                 </button>
               : <button key={n.key} className={`tab ${tab===n.key?"active":""}`}
                   onClick={()=>setTab(n.key)}
@@ -23038,6 +23214,7 @@ export default function App() {
         {tab==="links"    && <LinksTab/>}
         <div style={{display:tab==="powerbi"?"block":"none"}}><PowerBITab/></div>
         <div style={{display:tab==="statcast"?"block":"none"}}><StatcastTab/></div>
+        <div style={{display:tab==="home"?"block":"none"}}><HomeTab/></div>
         <div style={{display:tab==="homeruns"?"block":"none"}}><HRTrackerTab/></div>
         <div style={{display:tab==="mlbscores"?"block":"none"}}><MLBScoresTab/></div>
         <div style={{display:tab==="onlyhomers"?"block":"none"}}><OnlyHomersTab/></div>
