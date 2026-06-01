@@ -8710,6 +8710,8 @@ const ROTO_NEWS_BY_NAME = {};
 // Live close call accumulator — populated by background poll during active games
 // keyed by batter_id (string) → { count, plays: [{ev,la,dist,inning,half,result,ts}] }
 const LIVE_CC_MAP = {};
+// Module-level sig cache — populated by MatchupEngineTab, read by CheatSheetTab/HomeTab
+const SIG_CACHE_GLOBAL = {};
 
 // Background close call poller — runs every 90s regardless of active tab
 // Uses LIVE_GAMES_CACHE (populated by fetchGames at app startup) to know which games are live
@@ -11494,6 +11496,10 @@ function SimLabView({ data }) {
   const [lineupOnly, setLineupOnly]   = useState(false);
   const [slBatterHand, setSlBatterHand]   = useState('ALL');
   const sigCache       = useRef({}); // caches _trackerSig per batter_id after first render
+  // Sync to module-level so CheatSheetTab can read without prop drilling
+  const syncSigCache = React.useCallback(() => {
+    Object.assign(SIG_CACHE_GLOBAL, sigCache.current);
+  }, []);
   const boomCache      = useRef({}); // caches _boom per batter_id after first render
   const userSorted     = useRef(false); // true once user manually changes sort
   const boomCacheReady = useRef(false); // true after first render populates boomCache
@@ -12174,6 +12180,7 @@ function SimLabView({ data }) {
                   b._formClass   = getFormClass(b);
                   b._boom        = computeBoomScore(b._trackerSig, b.zone_fit, b.recent_iso, b.sim_tb, b.weighted_flag_score);
                   sigCache.current[String(b.batter_id)]  = b._trackerSig;
+                  SIG_CACHE_GLOBAL[String(b.batter_id)]  = b._trackerSig; // expose to CheatSheetTab
                   boomCache.current[String(b.batter_id)] = b._boom;
                   // Write to DAILY_PICKS_CACHE directly — allPicksData rows are CSV copies,
                   // not the same objects, so b.x = y never reaches the cache the slideout reads
@@ -22262,7 +22269,7 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
         const yard   = parseFloat(r._yard||0);
         const grade  = r.grade||r.Grade||'D';
         const simTB  = parseFloat(r.sim_tb||0);
-        const sig    = sigCache.current[String(pid)] ?? (parseFloat(r.weighted_flag_score||0)*4.6);
+        const sig    = (typeof sigCache !== 'undefined' ? sigCache.current[String(pid)] : null) ?? SIG_CACHE_GLOBAL[String(pid)] ?? (parseFloat(r.weighted_flag_score||0)*4.6);
         const isTarget = (r._pgLabel||'').includes('Target');
         // ── Sauce composite HR score ──────────────────────────────────────
         // Calibrated from 17,340 matchups:
@@ -22300,7 +22307,7 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
         // simTB: forward-looking matchup projection (engine signal)
         // sigBoost: Sig ≥ 4 doubles base XBH rate per 17k matchup analysis
         const simTB  = parseFloat(dp?.sim_tb||0);
-        const sig    = sigCache.current[String(id)] ?? (parseFloat(dp?.weighted_flag_score||0)*4.6);
+        const sig    = (typeof sigCache !== 'undefined' ? sigCache.current[String(id)] : null) ?? SIG_CACHE_GLOBAL[String(id)] ?? (parseFloat(dp?.weighted_flag_score||0)*4.6);
         const sigBoost = sig >= 6 ? 1.4 : sig >= 4 ? 1.2 : sig >= 2 ? 1.05 : 1.0;
         const simBoost = simTB >= 2.0 ? 1.35 : simTB >= 1.5 ? 1.15 : simTB >= 1.0 ? 1.05 : 1.0;
         const sauce_score = (sp.g2tb_pct / 100) * simBoost * sigBoost;
@@ -22330,7 +22337,7 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
         // simH: forward-looking hit projection — strongest hit predictor in model (r=0.109)
         // sigBoost: Sig ≥ 6 pushes hit rate to 65%+ per 17k matchup analysis
         const simH   = parseFloat(dp?.sim_h||0);
-        const sig    = sigCache.current[String(id)] ?? (parseFloat(dp?.weighted_flag_score||0)*4.6);
+        const sig    = (typeof sigCache !== 'undefined' ? sigCache.current[String(id)] : null) ?? SIG_CACHE_GLOBAL[String(id)] ?? (parseFloat(dp?.weighted_flag_score||0)*4.6);
         const sigBoost = sig >= 6 ? 1.35 : sig >= 4 ? 1.15 : sig >= 2 ? 1.05 : 1.0;
         const simBoost = simH >= 1.2 ? 1.3 : simH >= 1.0 ? 1.15 : simH >= 0.8 ? 1.05 : 1.0;
         const sauce_score = (sp.h_game_pct / 100) * simBoost * sigBoost;
