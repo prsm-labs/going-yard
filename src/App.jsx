@@ -22164,15 +22164,24 @@ function HomeTab() {
   const [sub, setSub] = React.useState('cheatsheet');
   const [showHelp, setShowHelp] = React.useState(false);
   const [data, setData] = React.useState([]);
+  const [refreshKey, setRefreshKey] = React.useState(0);
   const mono = "'DM Mono',monospace";
   const osw  = "'Oswald',sans-serif";
 
+  const loadData = React.useCallback(() => {
+    const rows = Object.values(DAILY_PICKS_CACHE || {});
+    if (rows.length > 0) setData([...rows]); // spread to force re-render
+  }, []);
+
   React.useEffect(() => {
+    // Try immediately, then poll until data arrives
+    loadData();
     const poll = setInterval(() => {
       const rows = Object.values(DAILY_PICKS_CACHE || {});
-      if (rows.length > 0) { setData(rows); clearInterval(poll); }
-    }, 400);
+      if (rows.length > 0) { setData([...rows]); clearInterval(poll); }
+    }, 200);
     return () => clearInterval(poll);
+  }, [refreshKey]);
   }, []);
 
   const stBtn = key => ({
@@ -22205,14 +22214,33 @@ function HomeTab() {
       ]} onClose={()=>setShowHelp(false)}/>}
 
       {/* Sub-nav */}
-      <div style={{display:'flex',gap:4,flexWrap:'wrap',marginBottom:14,alignItems:'center'}}>
+      <div style={{display:'flex',gap:4,flexWrap:'wrap',marginBottom:10,alignItems:'center'}}>
         <button style={stBtn('cheatsheet')} onClick={()=>setSub('cheatsheet')}>📋 Cheat Sheet</button>
         <button style={stBtn('streaks')}    onClick={()=>setSub('streaks')}>🔥 Streaks</button>
         <button style={stBtn('soclose')}    onClick={()=>setSub('soclose')}>🤏 Close Calls</button>
         <button style={stBtn('pairs')}      onClick={()=>setSub('pairs')}>🔗 Pairs</button>
         <button style={stBtn('crystal')}    onClick={()=>setSub('crystal')}>🔮</button>
         <HelpBtn2/>
+        {/* Refresh — visible when on cheat sheet */}
+        {sub==='cheatsheet' && (
+          <button onClick={()=>setRefreshKey(k=>k+1)}
+            title="Refresh cheat sheet picks"
+            style={{padding:'4px 9px',borderRadius:6,cursor:'pointer',
+              border:'1px solid var(--border)',background:'var(--surface2)',
+              color:'var(--muted)',fontFamily:mono,fontSize:9,marginLeft:'auto',
+              display:'flex',alignItems:'center',gap:4}}>
+            ↺ Refresh
+          </button>
+        )}
       </div>
+      {sub==='cheatsheet' && data.length===0 && (
+        <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',
+          padding:'8px 12px',marginBottom:8,
+          background:'rgba(255,255,255,.03)',borderRadius:6,
+          border:'1px solid var(--border)'}}>
+          Loading picks… if cards don't appear, tap ↺ Refresh above.
+        </div>
+      )}
 
       {sub==='cheatsheet' && <CheatSheetTab data={data} showAllMatchupsLink/>}
       {sub==='streaks'    && <StreaksTab/>}
@@ -22517,13 +22545,10 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
         <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>Top 5 batters per category · today only · L7 data</span>
         {showAllMatchupsLink && (
           <button onClick={()=>{
-            if(window._GLOBAL_NAV?.setTab) {
-              window._GLOBAL_NAV.setTab('matchup');
-              // MatchupEngineTab registers _setMatchupSubTab on mount — use it after tab renders
-              setTimeout(()=>{
-                if(window._setMatchupSubTab) window._setMatchupSubTab('allmatches');
-              }, 150);
-            }
+            // MatchupEngineTab is always mounted (display:none) — call synchronously
+            if(window._setMatchupSubTab) window._setMatchupSubTab('allmatches');
+            if(window._GLOBAL_NAV?.setTab) window._GLOBAL_NAV.setTab('matchup');
+            window.scrollTo({top:0, behavior:'smooth'});
           }}
             style={{padding:'3px 10px',borderRadius:6,fontSize:9,cursor:'pointer',
               border:'1px solid var(--accent2)',color:'var(--accent2)',
