@@ -17615,6 +17615,8 @@ function BvPDeepDiveTab() {
 
 function MatchupEngineTab() {
   const [subTab, setSubTab]        = useState('matchups');
+  // Expose setSubTab globally so HomeTab's "→ All Matchups" button can deep-link
+  React.useEffect(() => { window._setMatchupSubTab = setSubTab; return () => { window._setMatchupSubTab = null; }; }, [setSubTab]);
   const [showKMHelp, setShowKMHelp] = useState(false);
   const [data, setData]           = useState([]);
   const [tomorrowData, setTomorrowData] = useState([]);
@@ -22517,10 +22519,10 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
           <button onClick={()=>{
             if(window._GLOBAL_NAV?.setTab) {
               window._GLOBAL_NAV.setTab('matchup');
-              // small delay so the tab renders before setting subTab
+              // MatchupEngineTab registers _setMatchupSubTab on mount — use it after tab renders
               setTimeout(()=>{
-                document.querySelectorAll('[data-subtab="allmatches"]').forEach(b=>b.click());
-              }, 100);
+                if(window._setMatchupSubTab) window._setMatchupSubTab('allmatches');
+              }, 150);
             }
           }}
             style={{padding:'3px 10px',borderRadius:6,fontSize:9,cursor:'pointer',
@@ -23111,8 +23113,8 @@ export default function App() {
     {key:"home",       label:"🏡 Home"},
     {key:"homeruns",   label:"💥 HR Tracker"},
     {key:"live",       label:"📡 Live"},
-    {key:"stats",      label:"📊 Splits"},
     {key:"matchup",    label:"⚡ Matchups"},
+    {key:"stats",      label:"📊 Splits"},
     {key:"powerbi",    label:"🤓 Data"},
     {key:"weather",    label:"🌤️ Weather"},
     {key:"picks",      label:"🎯 My Picks"},
