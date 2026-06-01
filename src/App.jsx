@@ -53,7 +53,7 @@ async function getPushState() {
   return 'default';
 }
 
-const BUILD_TIMESTAMP = "2026-05-03 11:09 PM ET";
+const BUILD_TIMESTAMP = import.meta.env.VITE_BUILD_TIME || "—";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&family=Barlow+Condensed:wght@400;500;600;700&display=swap');
@@ -1596,8 +1596,13 @@ function PickRow({p, bprops}) {
           const gc = dp?.grade ? (GRADE_CFG[dp.grade] || null) : null;
           return <>
             <div style={{fontWeight:700,fontSize:11,whiteSpace:"nowrap",overflow:"hidden",
-              textOverflow:"ellipsis",letterSpacing:.2,
-              color: gc ? gc.color : 'var(--text)'}}>{p.name}</div>
+              textOverflow:"ellipsis",letterSpacing:.2,display:'flex',alignItems:'center',gap:3,
+              color: gc ? gc.color : 'var(--text)'}}>
+              <span style={{overflow:'hidden',textOverflow:'ellipsis'}}>{p.name}</span>
+              {LINEUP_STATUS[p.pid]?.status==='confirmed' && (
+                <span title="Confirmed in today's lineup" style={{fontSize:9,lineHeight:1,flexShrink:0}}>✅</span>
+              )}
+            </div>
             <div style={{fontSize:9,fontFamily:"'DM Mono',monospace",display:"flex",gap:5,alignItems:"center",marginTop:1}}>
               <span style={{color:"var(--accent2)",fontWeight:700}}>{getTeam(p.pid, p.team)}</span>
               {gc && !INJURY_MAP[String(p.pid||'')] && <span style={{padding:'0px 4px',borderRadius:3,fontSize:8,fontWeight:800,
@@ -2908,7 +2913,12 @@ function PicksSlideout({onClose}) {
               return <div key={p.pid} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 16px",borderBottom:"1px solid rgba(30,45,58,.4)"}}>
                 <PlayerAvatar pid={p.pid} name={p.name} size={34} border={"2px solid "+cfg.color}/>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontWeight:600,fontSize:13,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{p.name}</div>
+                  <div style={{fontWeight:600,fontSize:13,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',display:'flex',alignItems:'center',gap:4}}>
+                    {p.name}
+                    {LINEUP_STATUS[p.pid]?.status==='confirmed' && (
+                      <span title="Confirmed in today's lineup" style={{fontSize:9,lineHeight:1,flexShrink:0}}>✅</span>
+                    )}
+                  </div>
                   <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",display:"flex",gap:5}}>
                     <span style={{color:"var(--accent2)",fontWeight:700}}>{getTeam(p.pid, p.team)}</span>
                   </div>
@@ -13121,6 +13131,49 @@ function CheatCodeButton() {
           </Section>
 
           {/* Daily scan */}
+          {/* XBH / Hits prediction */}
+          <Section emoji="🎯" title="Beyond HRs — Hits & XBH Prediction" color="#a78bfa">
+            <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',lineHeight:1.6,marginBottom:8}}>
+              The engine was built for home runs — but the data shows it's an equally strong predictor
+              of hits and extra-base hits. The same signals that flag HR potential flag elite contact intent.
+              Hard contact in the right direction produces doubles, triples, and long flyouts just as
+              often as it produces home runs.
+            </div>
+            <div style={{background:'rgba(167,139,250,.07)',border:'1px solid rgba(167,139,250,.2)',
+              borderRadius:8,padding:'10px 14px',marginBottom:8}}>
+              <div style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.4)',
+                textTransform:'uppercase',letterSpacing:.5,marginBottom:6}}>
+                From 17,340 tracked matchups · base rates: Hit 56.4% · XBH 31.5%
+              </div>
+              {[
+                ['A/A+ Grade + Sig ≥ 6','68.8% Hit · 50.0% XBH · 20.8% HR','48 matchups — coin flip on XBH','#a78bfa'],
+                ['Yard ≥ 45 + Sig ≥ 6', '68.1% Hit · 48.9% XBH · 21.3% HR','47 matchups — interchangeable with above','#a78bfa'],
+                ['Sig = 7',             '62.9% Hit · 48.5% XBH · 18.6% HR','Sig 7 is the single strongest XBH signal','#ffd700'],
+                ['Yard ≥ 45',          '66.7% Hit · 46.2% XBH · 17.9% HR','39 matchups','var(--accent2)'],
+                ['Yard ≥ 40',          '63.1% Hit · 41.7% XBH · 12.6% HR','103 matchups — strong and large sample','var(--accent2)'],
+                ['Sim H ≥ 1.0',        '62.3% Hit · — · 15.4% HR','Best standalone hit predictor in the model','#27c97a'],
+                ['Sim TB ≥ 2.0',       '65.3% Hit · 41.4% XBH · 17.5% HR','The 2.0 threshold matters for both HR and XBH','#38b8f2'],
+              ].map(([filter, rates, note, col]) => (
+                <div key={filter} style={{padding:'5px 0',borderBottom:'1px solid rgba(255,255,255,.04)'}}>
+                  <div style={{display:'flex',alignItems:'baseline',gap:8,flexWrap:'wrap'}}>
+                    <span style={{fontFamily:osw,fontWeight:700,fontSize:11,
+                      color:col,flexShrink:0}}>{filter}</span>
+                  </div>
+                  <div style={{fontFamily:osw,fontWeight:800,fontSize:12,
+                    color:'var(--text)',marginTop:2}}>{rates}</div>
+                  <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:1}}>{note}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',
+              lineHeight:1.6,padding:'6px 8px',background:'rgba(255,255,255,.03)',borderRadius:5}}>
+              <strong style={{color:'var(--text)'}}>For hits/TB props:</strong> Use Sim H ≥ 1.0 as
+              the primary filter. Stack with Sig ≥ 6 or Yard ≥ 40 for the highest-conviction plays.
+              The model correlates more strongly with XBH than with HRs — the engine measures
+              elite contact intent, not just home run probability.
+            </div>
+          </Section>
+
           <Section emoji="🗺️" title="Daily Scan — 5 Steps" color="#27c97a">
             <div style={{fontFamily:mono,fontSize:10,lineHeight:2.0,color:'var(--text)'}}>
               {[
@@ -21693,28 +21746,37 @@ function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, on
       </div>
 
       {/* Shared tandem filter row */}
-      <div style={{display:'flex',gap:5,flexWrap:'nowrap',alignItems:'center',marginBottom:10,overflowX:'auto',WebkitOverflowScrolling:'touch',paddingBottom:2}}>
+      <div style={{display:'flex',gap:5,flexWrap:'nowrap',alignItems:'center',marginBottom:6,overflowX:'auto',WebkitOverflowScrolling:'touch',paddingBottom:2}}>
         <PillRow items={[['','All','All hands'],['L','LHP','LHP → batters see vsLHP split'],['R','RHP','RHP → batters see vsRHP split']]} active={sharedPHand} onSelect={setSharedPHand}/>
         <PillRow items={[['','All','All batters'],['L','LHB','LHB → pitchers see vsLHB split'],['R','RHB','RHB → pitchers see vsRHB split'],['S','SWB','Switch hitters']]} active={sharedBHand} onSelect={setSharedBHand}/>
         <PillRow items={[['','All'],['home','Home'],['away','Away']]} active={sharedPLoc} onSelect={onPLocChange} color='rgba(39,201,122,.2)' activeColor='#27c97a'/>
         <PillRow items={[['','All'],['day','Day'],['night','Night']]} active={sharedDN} onSelect={v=>{setSharedDN(v);setSelDOW('');}} color='rgba(245,166,35,.2)' activeColor='#f5a623'/>
-        {/* ── Day of Week filter ─────────────────────────────────────────── */}
-        <div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}>
-          <span style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--muted)',
-            textTransform:'uppercase',letterSpacing:.5,flexShrink:0}}>DOW</span>
-          {[['','All'],['mon','Mon'],['tue','Tue'],['wed','Wed'],['thu','Thu'],
-            ['fri','Fri'],['sat','Sat'],['sun','Sun']].map(([v,l])=>(
-            <button key={v} onClick={()=>{setSelDOW(v);if(v)setSharedDN('');}}
-              style={{padding:'3px 8px',borderRadius:5,fontSize:9,cursor:'pointer',
-                fontFamily:"'DM Mono',monospace",userSelect:'none',
-                border:`1px solid ${selDOW===v&&v?'#a78bfa':'var(--border)'}`,
-                background:selDOW===v&&v?'rgba(167,139,250,.15)':'transparent',
-                color:selDOW===v&&v?'#a78bfa':'var(--muted)',
-                fontWeight:selDOW===v&&v?700:400}}>
-              {l}
-            </button>
+      </div>
+
+      {/* Day of Week — own row, dropdown to stay compact */}
+      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
+        <span style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--muted)',
+          textTransform:'uppercase',letterSpacing:.5,flexShrink:0}}>Day of Week</span>
+        <select value={selDOW} onChange={e=>{setSelDOW(e.target.value);if(e.target.value)setSharedDN('');}}
+          style={{padding:'4px 10px',borderRadius:6,fontSize:10,cursor:'pointer',
+            fontFamily:"'DM Mono',monospace",
+            border:`1px solid ${selDOW?'#a78bfa':'var(--border)'}`,
+            background:selDOW?'rgba(167,139,250,.08)':'var(--surface2)',
+            color:selDOW?'#a78bfa':'var(--text)',outline:'none'}}>
+          <option value=''>All Days</option>
+          {[['mon','Monday'],['tue','Tuesday'],['wed','Wednesday'],['thu','Thursday'],
+            ['fri','Friday'],['sat','Saturday'],['sun','Sunday']].map(([v,l])=>(
+            <option key={v} value={v}>{l}</option>
           ))}
-        </div>
+        </select>
+        {selDOW && (
+          <button onClick={()=>setSelDOW('')}
+            style={{padding:'3px 8px',borderRadius:5,fontSize:9,cursor:'pointer',
+              fontFamily:"'DM Mono',monospace",border:'1px solid var(--border)',
+              background:'transparent',color:'var(--muted)'}}>
+            ✕ Clear
+          </button>
+        )}
       </div>
 
       {/* ══ PITCHERS ══════════════════════════════════════════════════════════ */}
@@ -23007,7 +23069,7 @@ export default function App() {
       </main>
       <div style={{textAlign:"center",padding:"12px 0 8px",borderTop:"1px solid var(--border)",marginTop:24}}>
         <span style={{fontSize:10,color:"#2a3a48",fontFamily:"'DM Mono',monospace",letterSpacing:1}}>
-          Going Yard v3 · Build {BUILD_TIMESTAMP} · prsm-labs
+          Last Updated {BUILD_TIMESTAMP}
         </span>
       </div>
     </div>
