@@ -2394,7 +2394,11 @@ function AtBatSlideIn() {
         <div style={{padding:"14px 20px",borderBottom:"1px solid var(--border)"}}>
           <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",
             textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>
-            BvP vs {bvpData?.pitcherName || "Today's Pitcher"}
+            BvP vs <span
+              onClick={()=>{ if(bvpData?.pitcherId) openPitcherSlide({pid:parseInt(bvpData.pitcherId)||0,name:bvpData.pitcherName||"Today's Pitcher",team:'',hand:bvpData?.pitcherHand||'',pitchMix:[]}); }}
+              style={{color:'var(--accent2)',cursor:bvpData?.pitcherId?'pointer':'default',textDecoration:bvpData?.pitcherId?'underline':'none',textDecorationStyle:'dotted'}}>
+              {bvpData?.pitcherName || "Today's Pitcher"}
+            </span>
           </div>
           {bvpLoading ? (
             <div style={{display:"flex",alignItems:"center",gap:6,color:"var(--muted)",
@@ -10672,10 +10676,169 @@ function MLBTab() {
           {loading
             ? <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)',padding:20,textAlign:'center'}}>Loading…</div>
             : <>
-              <PlayoffSection league="AL"/>
-              <PlayoffSection league="NL"/>
-              <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:8}}>
-                ✓ = currently in playoff position · Top 3 division leaders + 3 wild cards per league
+              <div style={{display:'flex',justifyContent:'flex-end',marginBottom:10}}>
+                <button onClick={()=>{
+                  const el = document.getElementById('playoff-bracket');
+                  if(!el) return;
+                  import('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js')
+                    .then(()=> window.html2canvas(el,{backgroundColor:'#0d0f1a',scale:2}))
+                    .then(canvas=>{
+                      const a=document.createElement('a');
+                      a.download='going-yard-playoff-picture.png';
+                      a.href=canvas.toDataURL('image/png');
+                      a.click();
+                    }).catch(()=>alert('Export unavailable — try screenshotting'));
+                }}
+                  style={{padding:'4px 12px',borderRadius:6,fontSize:9,cursor:'pointer',
+                    border:'1px solid var(--border)',background:'var(--surface2)',
+                    color:'var(--muted)',fontFamily:mono,fontWeight:700}}>
+                  ↓ Download PNG
+                </button>
+              </div>
+              <div id="playoff-bracket" style={{padding:'0 4px',overflowX:'auto'}}>
+                {['AL','NL'].map(lg => {
+                  const divs = Object.entries(byDiv).filter(([k])=>k.startsWith(lg));
+                  const leaders = divs.map(([div,teams])=>({...teams[0],div})).sort((a,b)=>b.pct-a.pct);
+                  const wc = wildcardTeams[lg].slice(0,3);
+                  const BracketTeam = ({t, seed, highlight}) => t ? (
+                    <div onClick={()=>setTeamSlide(t)}
+                      style={{display:'flex',alignItems:'center',gap:6,
+                        padding:'5px 8px',borderRadius:5,cursor:'pointer',
+                        background: highlight?'rgba(39,201,122,.08)':'rgba(255,255,255,.03)',
+                        border:`1px solid ${highlight?'rgba(39,201,122,.3)':'rgba(255,255,255,.08)'}`,
+                        marginBottom:4,minWidth:150}}>
+                      <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',width:14,flexShrink:0}}>
+                        {seed}
+                      </span>
+                      <img src={t.logo} alt={t.abbr}
+                        style={{width:18,height:18,objectFit:'contain',flexShrink:0}}
+                        onError={e=>e.target.style.display='none'}/>
+                      <span style={{fontFamily:osw,fontWeight:800,fontSize:11,color:'var(--text)',flex:1}}>
+                        {t.abbr}
+                      </span>
+                      <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>
+                        {t.w}-{t.l}
+                      </span>
+                    </div>
+                  ) : (
+                    <div style={{padding:'5px 8px',borderRadius:5,marginBottom:4,
+                      background:'rgba(255,255,255,.01)',border:'1px solid rgba(255,255,255,.04)',
+                      minWidth:150}}>
+                      <span style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.2)'}}>TBD</span>
+                    </div>
+                  );
+                  const VS = () => (
+                    <div style={{fontFamily:osw,fontWeight:700,fontSize:9,
+                      color:'var(--accent)',letterSpacing:1,textAlign:'center',
+                      padding:'2px 0',margin:'2px 0'}}>vs</div>
+                  );
+                  const Round = ({title, children}) => (
+                    <div style={{flexShrink:0}}>
+                      <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',
+                        textTransform:'uppercase',letterSpacing:.5,textAlign:'center',
+                        marginBottom:6,borderBottom:'1px solid var(--border)',paddingBottom:4}}>
+                        {title}
+                      </div>
+                      {children}
+                    </div>
+                  );
+                  const Arrow = () => (
+                    <div style={{display:'flex',alignItems:'center',padding:'0 6px',
+                      color:'rgba(255,255,255,.2)',fontSize:16,alignSelf:'center'}}>›</div>
+                  );
+                  return (
+                    <div key={lg} style={{marginBottom:24}}>
+                      <div style={{fontFamily:osw,fontWeight:800,fontSize:14,
+                        color:'var(--accent)',letterSpacing:1,marginBottom:10,
+                        textTransform:'uppercase'}}>
+                        {lg==='AL'?'🏆 American League':'🏆 National League'}
+                      </div>
+                      <div style={{display:'flex',gap:0,alignItems:'stretch',overflowX:'auto',
+                        paddingBottom:8}}>
+                        {/* Wild Card round */}
+                        <Round title="Wild Card (3 games)">
+                          <div style={{marginBottom:16}}>
+                            <BracketTeam t={leaders[2]} seed={3} highlight/>
+                            <VS/>
+                            <BracketTeam t={wc[0]} seed={6}/>
+                          </div>
+                          <div style={{marginBottom:16}}>
+                            <BracketTeam t={leaders[1]} seed={2} highlight/>
+                            <VS/>
+                            <BracketTeam t={wc[1]} seed={5}/>
+                          </div>
+                          <div>
+                            <BracketTeam t={wc[2]} seed={null}/>
+                            <VS/>
+                            <BracketTeam t={wildcardTeams[lg][3]} seed={null}/>
+                          </div>
+                        </Round>
+                        <Arrow/>
+                        {/* Division Series */}
+                        <Round title="Division Series (5 games)">
+                          <div style={{marginBottom:32}}>
+                            <BracketTeam t={leaders[0]} seed={1} highlight/>
+                            <VS/>
+                            <BracketTeam t={null} seed="WC"/>
+                          </div>
+                          <div style={{marginBottom:16}}>
+                            <BracketTeam t={null} seed="WC"/>
+                            <VS/>
+                            <BracketTeam t={null} seed="WC"/>
+                          </div>
+                        </Round>
+                        <Arrow/>
+                        {/* Championship Series */}
+                        <Round title={`${lg}CS (7 games)`}>
+                          <div style={{marginTop:24}}>
+                            <BracketTeam t={null} seed=""/>
+                            <VS/>
+                            <BracketTeam t={null} seed=""/>
+                          </div>
+                        </Round>
+                        <Arrow/>
+                        {/* World Series placeholder */}
+                        <Round title="World Series">
+                          <div style={{marginTop:36}}>
+                            <BracketTeam t={null} seed="🏆"/>
+                          </div>
+                        </Round>
+                      </div>
+                      {/* Wildcard race below */}
+                      <div style={{marginTop:10}}>
+                        <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',
+                          textTransform:'uppercase',letterSpacing:.5,marginBottom:6}}>
+                          Wild Card Race — {lg}
+                        </div>
+                        <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                          {wildcardTeams[lg].map((t,i)=>(
+                            <div key={t.teamId} onClick={()=>setTeamSlide(t)}
+                              style={{display:'flex',alignItems:'center',gap:5,
+                                padding:'4px 8px',borderRadius:5,cursor:'pointer',
+                                background:i<3?'rgba(245,166,35,.06)':'rgba(255,255,255,.02)',
+                                border:i<3?'1px solid rgba(245,166,35,.2)':'1px solid rgba(255,255,255,.04)'}}>
+                              <span style={{fontFamily:mono,fontSize:8,color:i<3?'#f5a623':'var(--muted)',width:14}}>
+                                {i<3?`WC${i+1}`:`+${i-2}`}
+                              </span>
+                              <img src={t.logo} alt={t.abbr}
+                                style={{width:16,height:16,objectFit:'contain'}}
+                                onError={e=>e.target.style.display='none'}/>
+                              <span style={{fontFamily:osw,fontWeight:800,fontSize:11,
+                                color:'var(--text)'}}>{t.abbr}</span>
+                              <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>
+                                {t.wildCardGB==='-'||t.wildCardGB===0?'—':`-${t.wildCardGB}`}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                <div style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.2)',marginTop:8}}>
+                  * Bracket shows current standings projection · TBD = wild card game winners
+                  · Tap any team to view stats · Data: MLB Stats API
+                </div>
               </div>
             </>
           }
@@ -17230,7 +17393,11 @@ function PairsTab({ data }) {
               <PickButton pid={parseInt(b.batter_id)||0} name={b.batter} team={b.batting_team||''}/>
             </div>
             <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:1}}>
-              {b.batting_team} · vs {b.pitcher}
+              {b.batting_team} · vs <span
+                onClick={e=>{e.stopPropagation();if(b.pitcher_id)openPitcherSlide({pid:parseInt(b.pitcher_id)||0,name:b.pitcher,team:b.pitcher_team||'',hand:b.pitcher_hand||'',pitchMix:[]});}}
+                style={{color:'var(--accent2)',cursor:b.pitcher_id?'pointer':'default',textDecoration:b.pitcher_id?'underline':'none',textDecorationStyle:'dotted'}}>
+                {b.pitcher}
+              </span>
             </div>
           </div>
           <div style={{marginLeft:'auto',flexShrink:0}}>
@@ -18051,6 +18218,50 @@ function BvPDeepDiveTab() {
                     <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,color:xwCol(r.xwoba)}}>{r.xwoba?.toFixed(3)||'—'}</td>
                   </tr>
                 );
+              {/* ── Totals / Averages row ─────────────────────────────── */}
+              {sortedRows.length > 1 && (() => {
+                const n = sortedRows.filter(r=>r.ab>0).length || 1;
+                const sum = k => sortedRows.reduce((a,r)=>a+(parseFloat(r[k])||0),0);
+                const wavg = (k,w='ab') => {
+                  const tot = sum(w); if(!tot) return null;
+                  return sortedRows.reduce((a,r)=>a+(parseFloat(r[k])||0)*(parseFloat(r[w])||0),0)/tot;
+                };
+                const totAB=sum('ab'),totH=sum('h'),totHR=sum('hr'),totBB=sum('bb'),totK=sum('k');
+                const avgEV=sum('avg_ev')/n, avgLA=sum('avg_la')/n;
+                const avgAvg=wavg('avg'),avgOBP=wavg('obp'),avgSLG=wavg('slg');
+                const avgISO=avgSLG&&avgAvg?avgSLG-avgAvg:null;
+                const tc={padding:'2px 6px',fontFamily:"'DM Mono',monospace",fontSize:9,fontWeight:700,
+                  textAlign:'right',color:'var(--accent2)',background:'rgba(56,184,242,.06)',
+                  borderTop:'1px solid rgba(56,184,242,.2)'};
+                return (
+                  <tr style={{borderTop:'2px solid rgba(56,184,242,.25)'}}>
+                    <td className="sticky-batter" style={{...tc,textAlign:'left',
+                      position:'sticky',left:0,zIndex:5,background:'rgba(56,184,242,.06)'}}>
+                      <span style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--accent2)',fontWeight:700}}>
+                        TOTALS / AVG · {sortedRows.length} batters
+                      </span>
+                    </td>
+                    <td style={tc}>{totAB||'—'}</td>
+                    <td style={tc}>{totH||'—'}</td>
+                    <td style={tc}>{totHR||'—'}</td>
+                    <td style={tc}>{totBB||'—'}</td>
+                    <td style={tc}>{totK||'—'}</td>
+                    <td style={tc}>{avgAvg?.toFixed(3)||'—'}</td>
+                    <td style={tc}>{avgOBP?.toFixed(3)||'—'}</td>
+                    <td style={tc}>{avgSLG?.toFixed(3)||'—'}</td>
+                    <td style={tc}>{avgEV?.toFixed(1)||'—'}</td>
+                    <td style={tc}>{avgLA?.toFixed(1)||'—'}</td>
+                    <td style={tc}>{(sum('barrel_pct')/n).toFixed(1)+'%'}</td>
+                    <td style={tc}>{(sum('hh_pct')/n).toFixed(1)+'%'}</td>
+                    <td style={tc}>{(sum('fb_pct')/n).toFixed(1)+'%'}</td>
+                    <td style={tc}>{(sum('gb_pct')/n).toFixed(1)+'%'}</td>
+                    <td style={tc}>{(sum('pfb_pct')/n).toFixed(1)+'%'}</td>
+                    <td style={tc}>{avgISO?.toFixed(3)||'—'}</td>
+                    <td style={tc}>{wavg('woba')?.toFixed(3)||'—'}</td>
+                    <td style={tc}>{wavg('xwoba')?.toFixed(3)||'—'}</td>
+                  </tr>
+                );
+              })()}
               })}
             </tbody>
           </table>
@@ -22993,7 +23204,17 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
           <span style={{fontFamily:mono,fontSize:8,color:'var(--accent2)',flexShrink:0}}>{team}</span>
         </div>
         <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-          {pitcher?`vs ${pitcher} ${pgEmoji(pgLabel)}`:''}
+          {pitcher && (
+            <span>vs <span
+              onClick={e=>{e.stopPropagation();
+                const dp=Object.values(DAILY_PICKS_CACHE).find(r=>r.batter_id&&String(r.batter_id).includes(String(pid))&&r.pitcher===pitcher);
+                if(dp?.pitcher_id) openPitcherSlide({pid:parseInt(dp.pitcher_id)||0,name:pitcher,team:dp?.pitcher_team||'',hand:dp?.pitcher_hand||'',pitchMix:[]});
+              }}
+              style={{color:'var(--accent2)',cursor:'pointer',textDecoration:'underline',textDecorationStyle:'dotted'}}>
+              {pitcher}
+            </span> {pgEmoji(pgLabel)}
+            </span>
+          )}
         </div>
       </div>
       <div style={{textAlign:'right',flexShrink:0}}>
