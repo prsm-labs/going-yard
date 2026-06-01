@@ -10240,12 +10240,15 @@ function HeatingUpTab() {
 }
 
 // ── TEAM_MLB_IDS: abbr → {id, mlbUrl} for team slideout links ────────────────
-const TEAM_MLB_IDS = {
-  AZ:142,ATL:144,BAL:110,BOS:111,CHC:112,CWS:145,CIN:113,CLE:114,COL:115,
-  DET:116,HOU:117,KC:118,LAA:108,LAD:119,MIA:146,MIL:158,MIN:142,NYM:121,
-  NYY:147,ATH:133,PHI:143,PIT:134,SD:135,SEA:136,SF:137,STL:138,TB:139,
-  TEX:140,TOR:141,WSH:120
+const TEAM_ID_TO_ABBR = {
+  108:'LAA',109:'AZ',110:'BAL',111:'BOS',112:'CHC',113:'CIN',
+  114:'CLE',115:'COL',116:'DET',117:'HOU',118:'KC', 119:'LAD',
+  120:'WSH',121:'NYM',133:'ATH',134:'PIT',135:'SD', 136:'SEA',
+  137:'SF', 138:'STL',139:'TB', 140:'TEX',141:'TOR',142:'MIN',
+  143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL',
 };
+// MLB team logo URLs — official CDN
+const teamLogoUrl = id => `https://www.mlbstatic.com/team-logos/team-cap-on-light/${id}.svg`;
 
 function MLBTab() {
   const [sub, setSub]           = React.useState('standings');
@@ -10293,27 +10296,28 @@ function MLBTab() {
     const map = {};
     divRecords.forEach(rec => {
       const key = rec.division?.nameShort || rec.division?.name || '?';
-      map[key] = (rec.teamRecords || []).map(t => ({
-        teamId:  t.team?.id,
-        abbr:    t.team?.abbreviation || '?',
-        name:    t.team?.name || '?',
-        w:       t.wins, l: t.losses,
-        pct:     parseFloat(t.winningPercentage || 0),
-        gb:      t.gamesBack || '-',
-        rs:      t.runsScored || 0,
-        ra:      t.runsAllowed || 0,
-        diff:    (t.runsScored||0) - (t.runsAllowed||0),
-        streak:  t.streak?.streakCode || '-',
-        l10:     t.records?.splitRecords?.find(s=>s.type==='lastTen')?.wins
-                   ? `${t.records.splitRecords.find(s=>s.type==='lastTen').wins}-${t.records.splitRecords.find(s=>s.type==='lastTen').losses}`
-                   : '-',
-        home:    (() => { const s = t.records?.splitRecords?.find(r=>r.type==='home'); return s?`${s.wins}-${s.losses}`:'-'; })(),
-        away:    (() => { const s = t.records?.splitRecords?.find(r=>r.type==='away'); return s?`${s.wins}-${s.losses}`:'-'; })(),
-        elim:    t.eliminationNumber || '-',
-        magicNum: t.magicNumber || '-',
-        wildCardGB: t.wildCardGamesBack || '-',
-        clinched: t.clinched || false,
-      }));
+      map[key] = (rec.teamRecords || []).map(t => {
+        const tid = t.team?.id;
+        const abbr = normTeam(TEAM_ID_TO_ABBR[tid] || t.team?.abbreviation || '?');
+        return {
+          teamId:  tid,
+          abbr,
+          name:    t.team?.name || abbr,
+          logo:    teamLogoUrl(tid),
+          w:       t.wins, l: t.losses,
+          pct:     parseFloat(t.winningPercentage || 0),
+          gb:      t.gamesBack || '-',
+          rs:      t.runsScored || 0,
+          ra:      t.runsAllowed || 0,
+          diff:    (t.runsScored||0) - (t.runsAllowed||0),
+          streak:  t.streak?.streakCode || '-',
+          l10:     (() => { const s = t.records?.splitRecords?.find(r=>r.type==='lastTen'); return s?`${s.wins}-${s.losses}`:'-'; })(),
+          home:    (() => { const s = t.records?.splitRecords?.find(r=>r.type==='home');    return s?`${s.wins}-${s.losses}`:'-'; })(),
+          away:    (() => { const s = t.records?.splitRecords?.find(r=>r.type==='away');    return s?`${s.wins}-${s.losses}`:'-'; })(),
+          wildCardGB:  t.wildCardGamesBack || '-',
+          clinched:    t.clinched || false,
+        };
+      });
     });
     return map;
   }, [divRecords]);
@@ -10358,12 +10362,17 @@ function MLBTab() {
         background: rank===1?'rgba(39,201,122,.04)':'transparent'}}>
         <td style={{padding:'4px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',textAlign:'center',width:24}}>{rank}</td>
         <td style={{padding:'4px 6px'}}>
-          <span onClick={()=>setTeamSlide(t)}
-            style={{fontFamily:osw,fontWeight:700,fontSize:12,color:'var(--accent2)',
-              cursor:'pointer',textDecoration:'underline',textDecorationStyle:'dotted'}}>
-            {t.abbr}
-          </span>
-          {t.clinched && <span style={{fontSize:8,color:'#27c97a',marginLeft:3}}>✓</span>}
+          <div style={{display:'flex',alignItems:'center',gap:5,cursor:'pointer'}}
+            onClick={()=>setTeamSlide(t)}>
+            <img src={t.logo} alt={t.abbr}
+              style={{width:20,height:20,objectFit:'contain',flexShrink:0}}
+              onError={e=>e.target.style.display='none'}/>
+            <span style={{fontFamily:osw,fontWeight:700,fontSize:12,color:'var(--accent2)',
+              textDecoration:'underline',textDecorationStyle:'dotted'}}>
+              {t.abbr}
+            </span>
+            {t.clinched && <span style={{fontSize:8,color:'#27c97a'}}>✓</span>}
+          </div>
         </td>
         <td style={{padding:'4px 6px',fontFamily:osw,fontWeight:700,fontSize:12,textAlign:'right'}}>{t.w}</td>
         <td style={{padding:'4px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',textAlign:'right'}}>{t.l}</td>
@@ -10474,12 +10483,17 @@ function MLBTab() {
         <div style={{padding:'16px 20px 12px',borderBottom:'1px solid var(--border)',
           position:'sticky',top:0,background:'var(--surface)',zIndex:10,
           display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-          <div>
-            <div style={{fontFamily:osw,fontWeight:800,fontSize:22,
-              letterSpacing:1,color:'var(--accent2)'}}>{t.abbr}</div>
-            <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)'}}>{t.name}</div>
-            <div style={{fontFamily:osw,fontWeight:700,fontSize:12,color:'var(--text)',marginTop:2}}>
-              {t.w}-{t.l} · {t.pct.toFixed(3).replace('0.','.')}
+          <div style={{display:'flex',alignItems:'center',gap:12}}>
+            <img src={t.logo} alt={t.abbr}
+              style={{width:44,height:44,objectFit:'contain',flexShrink:0}}
+              onError={e=>e.target.style.display='none'}/>
+            <div>
+              <div style={{fontFamily:osw,fontWeight:800,fontSize:22,
+                letterSpacing:1,color:'var(--accent2)'}}>{t.abbr}</div>
+              <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)'}}>{t.name}</div>
+              <div style={{fontFamily:osw,fontWeight:700,fontSize:12,color:'var(--text)',marginTop:2}}>
+                {t.w}-{t.l} · {t.pct.toFixed(3).replace('0.','.')}
+              </div>
             </div>
           </div>
           <div style={{display:'flex',flexDirection:'column',gap:6,alignItems:'flex-end'}}>
