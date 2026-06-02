@@ -7100,15 +7100,18 @@ function LiveAtBatViewer({ gamePk }) {
     const poll = async () => {
       try {
         const r = await fetch(
-          `https://statsapi.mlb.com/api/v1.1/game/${gamePk}/feed/live` +
-          `?fields=liveData,plays,currentPlay,playEvents,pitchData,coordinates,` +
-          `result,count,matchup,batter,pitcher,batSide,pitchHand,about,` +
-          `halfInning,inning,isTopInning,linescore,offense,gameData,status`
+          `https://statsapi.mlb.com/api/v1.1/game/${gamePk}/feed/live`
         );
         const d = await r.json();
-        const status = d?.gameData?.status?.abstractGameState;
-        if (status === 'Final') { setState({ status:'final' }); return; }
-        if (status !== 'Live')  { setState({ status:'preview' }); return; }
+        const status = d?.gameData?.status?.abstractGameState
+                    || d?.gameData?.status?.detailedState;
+        if (!status) { setState({ status:'preview' }); return; }
+        if (status === 'Final' || status === 'Game Over' || status === 'Completed Early') {
+          setState({ status:'final' }); return;
+        }
+        if (status !== 'Live' && status !== 'In Progress') {
+          setState({ status:'preview' }); return;
+        }
 
         const cp    = d?.liveData?.plays?.currentPlay;
         const ls    = d?.liveData?.linescore;
@@ -8231,7 +8234,7 @@ function GamedayTab() {
   const loadAllLive = useCallback(async (gameList) => {
     const liveGames = (gameList || []).filter(g => g.status?.abstractGameState === 'Live');
     if (!liveGames.length) return;
-    await Promise.allSettled(todayGames.map(async g => {
+    await Promise.allSettled(liveGames.map(async g => {
       try {
         const r = await fetch(`/api/boxscore?gamePk=${g.gamePk}`);
         const d = await r.json();
