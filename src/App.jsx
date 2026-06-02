@@ -7332,22 +7332,10 @@ function LiveAtBatViewer({ gamePk }) {
   const PitchZone = () => {
     const szT  = state.lastPitch?.szTop  ?? 3.5;
     const szB  = state.lastPitch?.szBot  ?? 1.5;
-
-    // Layout constants — tight, no wasted green space
-    // Left col: count | Zone center | Right col: outs | Bottom row: pitch label + watermark
-    const zW = 90, zH = 100;
-    const countW = 44;   // width reserved left of zone for B-S count
-    const outsW  = 28;   // width reserved right of zone for out diamonds
-    const topPad = 10;   // above zone
-    const platePad = 14; // home plate below zone
-    const labelH = 14;   // pitch type label row
-    const wmH    = 18;   // watermark row at bottom
-
-    const PW = countW + zW + outsW;
-    const PH = topPad + zH + platePad + labelH + wmH;
-
-    const zX = countW;
-    const zY = topPad;
+    const PW = 190, PH = 170;
+    const zW = 90, zH = 108;
+    const zX = (PW - zW) / 2;
+    const zY = 14;
     const cellW = zW/3, cellH = zH/3;
 
     const toSvgX = pX => zX + ((pX + 1.8) / 3.6) * zW;
@@ -7363,7 +7351,7 @@ function LiveAtBatViewer({ gamePk }) {
         <svg width={PW} height={PH} viewBox={`0 0 ${PW} ${PH}`}
           style={{display:'block',maxWidth:'100%',height:'auto'}}>
           <defs>
-            <radialGradient id="turf2" cx="50%" cy="50%" r="70%">
+            <radialGradient id="turf2" cx="50%" cy="60%" r="70%">
               <stop offset="0%" stopColor="#1a3d1f"/>
               <stop offset="100%" stopColor="#0a1a0e"/>
             </radialGradient>
@@ -7383,7 +7371,7 @@ function LiveAtBatViewer({ gamePk }) {
 
           {/* Home plate */}
           <polygon
-            points={`${zX+zW/2-6},${zY+zH+4} ${zX+zW/2+6},${zY+zH+4} ${zX+zW/2+8},${zY+zH+9} ${zX+zW/2},${zY+zH+12} ${zX+zW/2-8},${zY+zH+9}`}
+            points={`${PW/2-6},${zY+zH+7} ${PW/2+6},${zY+zH+7} ${PW/2+8},${zY+zH+12} ${PW/2},${zY+zH+15} ${PW/2-8},${zY+zH+12}`}
             fill="rgba(255,255,255,.6)"/>
 
           {/* Pitch dots */}
@@ -7407,45 +7395,43 @@ function LiveAtBatViewer({ gamePk }) {
             );
           })}
 
-          {/* Count — left column, vertically centered on zone */}
-          <text x={countW-6} y={zY+zH/2-7} textAnchor="end"
+          {/* Count — left of zone as traditional B-S */}
+          <text x={zX-6} y={zY+zH/2-8} textAnchor="end"
             style={{fontFamily:osw,fontWeight:800,fontSize:22,fill:'white'}}>
             {state.balls}-{state.strikes}
           </text>
-          <text x={countW-6} y={zY+zH/2+7} textAnchor="end"
-            style={{fontFamily:mono,fontSize:6,fill:'rgba(255,255,255,.35)',letterSpacing:.3}}>
+          <text x={zX-6} y={zY+zH/2+6} textAnchor="end"
+            style={{fontFamily:mono,fontSize:7,fill:'rgba(255,255,255,.35)',letterSpacing:.3}}>
             count
           </text>
 
-          {/* Outs — right column, vertically centered on zone */}
+          {/* Outs — right of zone */}
           {[0,1,2].map(i=>(
-            <rect key={i} x={zX+zW+6} y={zY+zH/2-22+i*16} width={10} height={10}
-              rx={1} transform={`rotate(45,${zX+zW+11},${zY+zH/2-17+i*16})`}
+            <rect key={i} x={zX+zW+8} y={zY+10+i*18} width={10} height={10}
+              rx={1} transform={`rotate(45,${zX+zW+13},${zY+15+i*18})`}
               fill={i<state.outs?'rgba(255,255,255,.7)':'rgba(255,255,255,.12)'}
               stroke="rgba(255,255,255,.25)" strokeWidth="1"/>
           ))}
-          <text x={zX+zW+11} y={zY+zH/2+30} textAnchor="middle"
+          <text x={zX+zW+13} y={zY+68} textAnchor="middle"
             style={{fontFamily:mono,fontSize:6,fill:'rgba(255,255,255,.3)'}}>
             outs
           </text>
 
-          {/* Pitch label — sits between home plate and watermark */}
+          {/* Pitch label */}
           {state.lastPitch && (
-            <text x={PW/2} y={zY+zH+platePad+labelH-2} textAnchor="middle"
+            <text x={PW/2} y={PH-16} textAnchor="middle"
               style={{fontFamily:mono,fontSize:8,fill:'rgba(255,255,255,.5)',letterSpacing:.3}}>
               {state.lastPitch.type}{state.lastPitch.velo?` · ${state.lastPitch.velo.toFixed(0)} mph`:''}
             </text>
           )}
 
-          {/* Watermark — last row, always fully visible */}
-          <image href="/icon-192.png"
-            x={PW/2 - 38} y={PH - wmH + 2}
-            width={14} height={14}
+          {/* Watermark — bottom right, fits within PH */}
+          <image href="/icon-192.png" x={PW-44} y={PH-20} width={14} height={14}
             opacity={0.5} preserveAspectRatio="xMidYMid meet"/>
-          <text x={PW/2 - 22} y={PH - wmH + 12} textAnchor="start"
-            style={{fontFamily:osw,fontWeight:800,fontSize:8,letterSpacing:.5}}>
-            <tspan fill="rgba(232,65,26,.65)">GOING</tspan>
-            <tspan fill="rgba(255,255,255,.35)"> YARD</tspan>
+          <text x={PW-28} y={PH-9} textAnchor="start"
+            style={{fontFamily:osw,fontWeight:800,fontSize:7,letterSpacing:.5}}>
+            <tspan fill="rgba(232,65,26,.6)">GOING</tspan>
+            <tspan fill="rgba(255,255,255,.3)"> YARD</tspan>
           </text>
         </svg>
       </div>
@@ -23366,6 +23352,367 @@ function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, on
   );
 }
 
+// ── SimTab — Monte Carlo HR Simulator ────────────────────────────────────────
+// Runs 10,000 game simulations across all active batters today.
+// Each sim draws a random roll per batter per at-bat opportunity.
+// Base HR probability is derived from Yard Score + Sig + pitcher grade + park factor.
+// Results show top 5 batters ranked by HR% across 10k sims.
+function SimTab({ data }) {
+  const mono = "'DM Mono',monospace";
+  const osw  = "'Oswald',sans-serif";
+
+  const SIM_COUNT = 10000;
+
+  const [phase, setPhase]     = React.useState('idle');  // idle | running | done
+  const [results, setResults] = React.useState([]);
+  const [elapsed, setElapsed] = React.useState(0);
+  const [simCount, setSimCount] = React.useState(SIM_COUNT);
+  const [progress, setProgress] = React.useState(0);   // 0-100
+  const rafRef   = React.useRef(null);
+  const startRef = React.useRef(null);
+
+  // ── Derive per-batter base HR probability from engine fields ──────────────
+  const buildBatterPool = React.useCallback(() => {
+    const rows = Object.values(DAILY_PICKS_CACHE || {});
+    const seen  = new Set();
+    const pool  = [];
+
+    for (const r of rows) {
+      const pid = String(r.batter_id || '').split('.')[0];
+      if (!pid || seen.has(pid) || !r.batter || !r.game_id) continue;
+      seen.add(pid);
+      if (INJURY_MAP?.[parseInt(pid)||0] && !LINEUP_STATUS?.[parseInt(pid)||0]) continue;
+      if (!isActiveBatter(r)) continue;
+
+      // Pull scoring inputs
+      const sig    = (typeof sigCache !== 'undefined' ? sigCache.current[String(pid)] : null)
+                  ?? SIG_CACHE_GLOBAL[String(pid)]
+                  ?? (parseFloat(r.weighted_flag_score||0) * 4.6);
+      const ghr    = parseFloat(r.gHR   || 0);
+      const simTB  = parseFloat(r.sim_tb || 0);
+      const iso    = parseFloat(r.recent_iso || 0);
+      const ps     = parseFloat(r.ps_score  || 0);
+      const zf     = parseFloat(r.zone_fit  || 0);
+      const boom   = parseFloat(r._boom) || computeBoomScore(sig, zf, iso, simTB, parseFloat(r.weighted_flag_score||0));
+      const yard   = computeYardScore(sig, ghr, boom, ps);
+      const pgLabel = r._pgLabel || '';
+
+      // Pitcher modifier: Target=1.30, Hittable=1.15, Average=1.0, Tough=0.80, Elite=0.60
+      const pitcherMod = pgLabel.includes('Target')   ? 1.30
+                       : pgLabel.includes('Hittable')  ? 1.15
+                       : pgLabel.includes('Tough')     ? 0.80
+                       : pgLabel.includes('Elite')     ? 0.60 : 1.0;
+
+      // Park/wind modifier from weather data
+      const parkMod = (() => {
+        const we = parseFloat(r.wind_effect || 0);
+        if (we >= 8) return 1.20;
+        if (we >= 4) return 1.10;
+        if (we <= -4) return 0.88;
+        return 1.0;
+      })();
+
+      // Base HR probability calibrated to yard score ranges:
+      // Yard 32+: ~13% · 24-31: ~10% · 18-23: ~8% · 13-17: ~6% · <13: ~4%
+      const baseRate = yard >= 32 ? 0.130
+                     : yard >= 24 ? 0.100
+                     : yard >= 18 ? 0.080
+                     : yard >= 13 ? 0.060 : 0.040;
+
+      // Sig adds a multiplicative boost on top (sig≥6=+25%, sig≥4=+12%, sig≥2=+5%)
+      const sigMod = sig >= 6 ? 1.25 : sig >= 4 ? 1.12 : sig >= 2 ? 1.05 : 1.0;
+
+      // Final per-PA HR probability (realistic MLB plate appearance count: ~4)
+      const hrProb = Math.min(0.28, baseRate * pitcherMod * parkMod * sigMod);
+
+      // Lineup slot adjusts PA count (leadoff gets ~4.3 PA/game, 7-9 gets ~3.5)
+      const lineupSlot = parseInt(r.lineup_slot || r._lineupSlot || 5);
+      const avgPA = lineupSlot <= 2 ? 4.3
+                  : lineupSlot <= 5 ? 4.0
+                  : lineupSlot <= 7 ? 3.7 : 3.5;
+
+      pool.push({
+        pid, name: r.batter, team: r.batting_team || '',
+        pitcher: r.pitcher || '', pgLabel,
+        yard, sig: Math.round(sig), boom, ghr, ps,
+        hrProb,       // per-PA HR probability
+        avgPA,        // expected PAs this game
+        pitcherMod, parkMod, sigMod,
+      });
+    }
+
+    return pool;
+  }, [data]);
+
+  // ── Run the Monte Carlo simulation in async chunks to avoid blocking UI ────
+  const runSim = React.useCallback(() => {
+    const pool = buildBatterPool();
+    if (pool.length === 0) return;
+
+    setPhase('running');
+    setProgress(0);
+    startRef.current = performance.now();
+
+    // Accumulate HR counts per batter
+    const hrCounts = new Float32Array(pool.length);
+    const BATCH = 500;  // sims per animation frame
+    let   done  = 0;
+    const N     = simCount;
+
+    const tick = () => {
+      const batchEnd = Math.min(done + BATCH, N);
+      for (let s = done; s < batchEnd; s++) {
+        for (let b = 0; b < pool.length; b++) {
+          const { hrProb, avgPA } = pool[b];
+          // Each sim: roll for each expected PA
+          // Use Poisson-like: actual PAs = Poisson(avgPA), each PA independent Bernoulli
+          const actualPA = Math.max(1, Math.round(avgPA + (Math.random() - 0.5) * 1.4));
+          for (let pa = 0; pa < actualPA; pa++) {
+            if (Math.random() < hrProb) { hrCounts[b]++; break; } // max 1 per game sim
+          }
+        }
+      }
+      done = batchEnd;
+      setProgress(Math.round((done / N) * 100));
+
+      if (done < N) {
+        rafRef.current = requestAnimationFrame(tick);
+      } else {
+        // Build sorted results
+        const res = pool.map((b, i) => ({
+          ...b,
+          simHRs:   hrCounts[i],
+          hrPct:    (hrCounts[i] / N) * 100,
+        }))
+        .sort((a, b) => b.hrPct - a.hrPct)
+        .slice(0, 5);
+
+        setResults(res);
+        setElapsed(Math.round(performance.now() - startRef.current));
+        setPhase('done');
+      }
+    };
+
+    rafRef.current = requestAnimationFrame(tick);
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+  }, [buildBatterPool, simCount]);
+
+  React.useEffect(() => {
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+  }, []);
+
+  // ── Medal colors ──────────────────────────────────────────────────────────
+  const MEDALS = [
+    { icon:'🥇', col:'#ffd700', bg:'rgba(255,215,0,.10)',  border:'rgba(255,215,0,.25)' },
+    { icon:'🥈', col:'#c0c0c0', bg:'rgba(192,192,192,.08)',border:'rgba(192,192,192,.20)' },
+    { icon:'🥉', col:'#cd7f32', bg:'rgba(205,127,50,.10)', border:'rgba(205,127,50,.22)' },
+    { icon:'4',  col:'rgba(255,255,255,.5)', bg:'rgba(255,255,255,.04)', border:'rgba(255,255,255,.10)' },
+    { icon:'5',  col:'rgba(255,255,255,.4)', bg:'rgba(255,255,255,.03)', border:'rgba(255,255,255,.08)' },
+  ];
+
+  // ── Bar width for HR% bar chart ───────────────────────────────────────────
+  const maxPct = results.length > 0 ? results[0].hrPct : 1;
+
+  return (
+    <div style={{padding:'0 2px'}}>
+
+      {/* Header */}
+      <div style={{marginBottom:12,padding:'10px 14px',borderRadius:10,
+        background:'linear-gradient(135deg,rgba(232,65,26,.12) 0%,rgba(0,0,0,0) 100%)',
+        border:'1px solid rgba(232,65,26,.18)'}}>
+        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
+          <span style={{fontSize:18}}>🎰</span>
+          <span style={{fontFamily:osw,fontWeight:800,fontSize:14,letterSpacing:.5,
+            color:'white'}}>HR SIM</span>
+          <span style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.4)',
+            marginLeft:2}}>Monte Carlo · Today's Slate</span>
+        </div>
+        <div style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.4)',lineHeight:1.6}}>
+          Simulates today's games {simCount.toLocaleString()} times. Each run draws randomized
+          at-bat outcomes from each batter's Yard Score, pitcher grade, park &amp; wind context.
+          Results show how often each batter goes yard across all sims.
+        </div>
+      </div>
+
+      {/* Controls */}
+      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12,flexWrap:'wrap'}}>
+        {/* Sim count selector */}
+        <div style={{display:'flex',gap:4}}>
+          {[1000,5000,10000].map(n => (
+            <button key={n}
+              onClick={()=>{ if(phase!=='running') setSimCount(n); }}
+              style={{padding:'4px 9px',borderRadius:6,cursor:phase==='running'?'not-allowed':'pointer',
+                border:`1px solid ${simCount===n?'rgba(232,65,26,.5)':'var(--border)'}`,
+                background:simCount===n?'rgba(232,65,26,.15)':'var(--surface2)',
+                color:simCount===n?'#ff4020':'var(--muted)',
+                fontFamily:mono,fontSize:9,transition:'all .12s'}}>
+              {n.toLocaleString()}
+            </button>
+          ))}
+          <span style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.3)',
+            alignSelf:'center',paddingLeft:2}}>sims</span>
+        </div>
+
+        {/* Sim button */}
+        <button
+          onClick={()=>{ if(phase!=='running'){ setResults([]); setPhase('idle'); runSim(); } }}
+          disabled={phase==='running'}
+          style={{padding:'6px 18px',borderRadius:8,cursor:phase==='running'?'not-allowed':'pointer',
+            border:'none',fontFamily:osw,fontWeight:800,fontSize:12,letterSpacing:.8,
+            background:phase==='running'
+              ? 'rgba(255,255,255,.08)'
+              : 'linear-gradient(135deg,#e8411a 0%,#c42d0d 100%)',
+            color:phase==='running'?'rgba(255,255,255,.3)':'white',
+            boxShadow:phase==='running'?'none':'0 2px 12px rgba(232,65,26,.4)',
+            transition:'all .15s',display:'flex',alignItems:'center',gap:6}}>
+          {phase==='running'
+            ? <><span style={{display:'inline-block',animation:'spin 1s linear infinite'}}>⟳</span> SIMULATING…</>
+            : phase==='done' ? '↺ RE-SIM' : '▶ RUN SIM'}
+        </button>
+
+        {phase==='done' && (
+          <span style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.3)',marginLeft:'auto'}}>
+            {simCount.toLocaleString()} sims · {elapsed}ms
+          </span>
+        )}
+      </div>
+
+      {/* Progress bar */}
+      {phase==='running' && (
+        <div style={{marginBottom:12,height:3,borderRadius:2,
+          background:'rgba(255,255,255,.08)',overflow:'hidden'}}>
+          <div style={{height:'100%',borderRadius:2,
+            background:'linear-gradient(90deg,#e8411a,#f5a623)',
+            width:`${progress}%`,transition:'width .1s linear'}}/>
+        </div>
+      )}
+
+      {/* Results */}
+      {phase==='done' && results.length > 0 && (
+        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+
+          {/* "Sim says…" header */}
+          <div style={{fontFamily:osw,fontWeight:800,fontSize:10,letterSpacing:.8,
+            color:'rgba(255,255,255,.3)',textTransform:'uppercase',marginBottom:2}}>
+            Sim says… top 5 today
+          </div>
+
+          {results.map((b, i) => {
+            const m = MEDALS[i] || MEDALS[4];
+            const barW = Math.round((b.hrPct / maxPct) * 100);
+            const pitcherTag = b.pgLabel.includes('Target')  ? { txt:'🎯 Target',  col:'#27c97a' }
+                             : b.pgLabel.includes('Hittable') ? { txt:'💥 Hit',     col:'#f5a623' }
+                             : b.pgLabel.includes('Tough')    ? { txt:'⚠️ Tough',   col:'#ef4444' }
+                             : b.pgLabel.includes('Elite')    ? { txt:'‼️ Elite',   col:'#ef4444' }
+                             : null;
+
+            return (
+              <div key={b.pid} style={{borderRadius:10,overflow:'hidden',
+                background:m.bg,border:`1px solid ${m.border}`,
+                padding:'10px 12px'}}>
+
+                {/* Top row: medal + name + team + pitcher tag */}
+                <div style={{display:'flex',alignItems:'center',gap:7,marginBottom:6}}>
+                  {i < 3
+                    ? <span style={{fontSize:16,lineHeight:1}}>{m.icon}</span>
+                    : <span style={{width:18,height:18,borderRadius:4,
+                        background:'rgba(255,255,255,.07)',display:'inline-flex',
+                        alignItems:'center',justifyContent:'center',
+                        fontFamily:mono,fontSize:9,color:m.col}}>{m.icon}</span>
+                  }
+                  <span style={{fontFamily:osw,fontWeight:800,fontSize:13,
+                    color:'white',flex:1,minWidth:0,overflow:'hidden',
+                    textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                    {b.name}
+                  </span>
+                  <span style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.4)',
+                    flexShrink:0}}>{b.team}</span>
+                  {pitcherTag && (
+                    <span style={{fontFamily:mono,fontSize:7,color:pitcherTag.col,
+                      background:`${pitcherTag.col}18`,border:`1px solid ${pitcherTag.col}40`,
+                      borderRadius:4,padding:'1px 5px',flexShrink:0}}>
+                      {pitcherTag.txt}
+                    </span>
+                  )}
+                </div>
+
+                {/* HR% bar */}
+                <div style={{marginBottom:6}}>
+                  <div style={{display:'flex',justifyContent:'space-between',
+                    alignItems:'baseline',marginBottom:3}}>
+                    <span style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.4)'}}>
+                      HR in sim
+                    </span>
+                    <span style={{fontFamily:osw,fontWeight:800,fontSize:16,color:m.col}}>
+                      {b.hrPct.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div style={{height:4,borderRadius:2,
+                    background:'rgba(255,255,255,.08)',overflow:'hidden'}}>
+                    <div style={{height:'100%',borderRadius:2,
+                      width:`${barW}%`,
+                      background:i===0
+                        ? 'linear-gradient(90deg,#ffd700,#f5a623)'
+                        : i===1
+                        ? 'linear-gradient(90deg,#a0a0a0,#c8c8c8)'
+                        : i===2
+                        ? 'linear-gradient(90deg,#cd7f32,#e8a060)'
+                        : 'rgba(255,255,255,.25)',
+                      transition:'width .4s ease'}}/>
+                  </div>
+                </div>
+
+                {/* Signal pills */}
+                <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
+                  {[
+                    { label:'Yard', val:b.yard,
+                      col: b.yard>=32?'#ffd700':b.yard>=24?'#ff4020':b.yard>=18?'#f5a623':'var(--muted)' },
+                    { label:'Sig',  val:b.sig,
+                      col: b.sig>=6?'#ff4020':b.sig>=4?'#f5a623':b.sig>=2?'#27c97a':'var(--muted)' },
+                    { label:'Boom', val:b.boom,
+                      col: b.boom>=70?'#ff4020':b.boom>=50?'#f5a623':'var(--muted)' },
+                    { label:'gHR',  val:b.ghr>0?Math.round(b.ghr):null,
+                      col: b.ghr>=70?'#ff4020':b.ghr>=50?'#f5a623':'var(--muted)' },
+                  ].filter(x=>x.val!=null&&x.val>0).map(x => (
+                    <span key={x.label} style={{fontFamily:mono,fontSize:7,
+                      color:x.col,background:`${x.col}14`,border:`1px solid ${x.col}30`,
+                      borderRadius:4,padding:'1px 5px'}}>
+                      {x.label} {x.val}
+                    </span>
+                  ))}
+                  {b.pitcher && (
+                    <span style={{fontFamily:mono,fontSize:7,
+                      color:'rgba(255,255,255,.3)',marginLeft:'auto'}}>
+                      vs {b.pitcher}
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Disclaimer */}
+          <div style={{fontFamily:mono,fontSize:7,color:'rgba(255,255,255,.22)',
+            textAlign:'center',padding:'6px 0 2px',lineHeight:1.6}}>
+            Simulation probabilities are model estimates, not guarantees.
+            Results vary each run due to random sampling.
+          </div>
+        </div>
+      )}
+
+      {/* Empty state */}
+      {phase==='idle' && (
+        <div style={{textAlign:'center',padding:'28px 14px',
+          fontFamily:mono,fontSize:9,color:'rgba(255,255,255,.2)',lineHeight:2}}>
+          Press <strong style={{color:'rgba(255,255,255,.4)'}}>▶ RUN SIM</strong> to simulate today's slate<br/>
+          and find the top HR candidates
+        </div>
+      )}
+
+    </div>
+  );
+}
+
 // ── HomeTab — landing page with sub-nav: Cheat Sheet, Streaks, Close Calls, Pairs, Crystal Ball ──
 function HomeTab() {
   const [sub, setSub] = React.useState('cheatsheet');
@@ -23415,6 +23762,7 @@ function HomeTab() {
         ['🔥 Streaks', 'Batters on multi-game hit, XBH, or HR streaks. Sustained contact quality over multiple games.'],
         ['🤏 Close Calls', 'Batters who nearly went yard — high EV, deep flyouts that just missed. Prime bounce-back candidates for today.'],
         ['🔗 Pairs', 'Two-batter combos sharing favorable conditions — same park, pitcher, or contact trend. Curated to 2–3 top pairs per category.'],
+        ['🎰 Sim', 'Monte Carlo simulator — runs up to 10,000 game simulations using each batter\'s Yard Score, pitcher grade, park & wind factors. Shows top 5 HR candidates by simulation frequency.'],
         ['🔮 Crystal Ball', 'The engine\'s three picks: The Chosen (elite stack), Dark Horse (under the radar), Wild Card (spike signal).'],
         ['🎯 Pitcher Grades', '🎯 Target = easiest to homer off · 💥 Hittable = solid spot · 🤔 Average = neutral · ⚠️ Tough = difficult · ‼️ Elite = avoid. Tap any pitcher name to open their slideout.'],
         ['📊 Batter Grades', 'A+ = 6–8 signals (highest HR rate ~15%) · A = 4–5 · B = 2–3 · C = 1 · D = 0. Signals include LA lock, bat speed peak, pitch convergence, handedness match, and close call streaks.'],
@@ -23427,6 +23775,7 @@ function HomeTab() {
         <button style={stBtn('streaks')}    onClick={()=>setSub('streaks')}>🔥 Streaks</button>
         <button style={stBtn('soclose')}    onClick={()=>setSub('soclose')}>🤏 Close Calls</button>
         <button style={stBtn('pairs')}      onClick={()=>setSub('pairs')}>🔗 Pairs</button>
+        <button style={stBtn('sim')}        onClick={()=>setSub('sim')}>🎰 Sim</button>
         <button style={stBtn('crystal')}    onClick={()=>setSub('crystal')}>🔮</button>
         <HelpBtn2/>
         {/* Refresh — visible when on cheat sheet */}
@@ -23454,6 +23803,7 @@ function HomeTab() {
       {sub==='streaks'    && <StreaksTab/>}
       {sub==='soclose'    && <SoCloseTab data={data}/>}
       {sub==='pairs'      && <PairsTab data={data}/>}
+      {sub==='sim'        && <SimTab data={data}/>}
       {sub==='crystal'    && <CrystalBallTab embedded/>}
     </div>
   );
