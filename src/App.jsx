@@ -7332,10 +7332,22 @@ function LiveAtBatViewer({ gamePk }) {
   const PitchZone = () => {
     const szT  = state.lastPitch?.szTop  ?? 3.5;
     const szB  = state.lastPitch?.szBot  ?? 1.5;
-    const PW = 190, PH = 170;
-    const zW = 90, zH = 108;
-    const zX = (PW - zW) / 2;
-    const zY = 14;
+
+    // Layout constants — tight, no wasted green space
+    // Left col: count | Zone center | Right col: outs | Bottom row: pitch label + watermark
+    const zW = 90, zH = 100;
+    const countW = 44;   // width reserved left of zone for B-S count
+    const outsW  = 28;   // width reserved right of zone for out diamonds
+    const topPad = 10;   // above zone
+    const platePad = 14; // home plate below zone
+    const labelH = 14;   // pitch type label row
+    const wmH    = 18;   // watermark row at bottom
+
+    const PW = countW + zW + outsW;
+    const PH = topPad + zH + platePad + labelH + wmH;
+
+    const zX = countW;
+    const zY = topPad;
     const cellW = zW/3, cellH = zH/3;
 
     const toSvgX = pX => zX + ((pX + 1.8) / 3.6) * zW;
@@ -7351,7 +7363,7 @@ function LiveAtBatViewer({ gamePk }) {
         <svg width={PW} height={PH} viewBox={`0 0 ${PW} ${PH}`}
           style={{display:'block',maxWidth:'100%',height:'auto'}}>
           <defs>
-            <radialGradient id="turf2" cx="50%" cy="60%" r="70%">
+            <radialGradient id="turf2" cx="50%" cy="50%" r="70%">
               <stop offset="0%" stopColor="#1a3d1f"/>
               <stop offset="100%" stopColor="#0a1a0e"/>
             </radialGradient>
@@ -7371,7 +7383,7 @@ function LiveAtBatViewer({ gamePk }) {
 
           {/* Home plate */}
           <polygon
-            points={`${PW/2-6},${zY+zH+7} ${PW/2+6},${zY+zH+7} ${PW/2+8},${zY+zH+12} ${PW/2},${zY+zH+15} ${PW/2-8},${zY+zH+12}`}
+            points={`${zX+zW/2-6},${zY+zH+4} ${zX+zW/2+6},${zY+zH+4} ${zX+zW/2+8},${zY+zH+9} ${zX+zW/2},${zY+zH+12} ${zX+zW/2-8},${zY+zH+9}`}
             fill="rgba(255,255,255,.6)"/>
 
           {/* Pitch dots */}
@@ -7395,43 +7407,45 @@ function LiveAtBatViewer({ gamePk }) {
             );
           })}
 
-          {/* Count — left of zone as traditional B-S */}
-          <text x={zX-6} y={zY+zH/2-8} textAnchor="end"
+          {/* Count — left column, vertically centered on zone */}
+          <text x={countW-6} y={zY+zH/2-7} textAnchor="end"
             style={{fontFamily:osw,fontWeight:800,fontSize:22,fill:'white'}}>
             {state.balls}-{state.strikes}
           </text>
-          <text x={zX-6} y={zY+zH/2+6} textAnchor="end"
-            style={{fontFamily:mono,fontSize:7,fill:'rgba(255,255,255,.35)',letterSpacing:.3}}>
+          <text x={countW-6} y={zY+zH/2+7} textAnchor="end"
+            style={{fontFamily:mono,fontSize:6,fill:'rgba(255,255,255,.35)',letterSpacing:.3}}>
             count
           </text>
 
-          {/* Outs — right of zone */}
+          {/* Outs — right column, vertically centered on zone */}
           {[0,1,2].map(i=>(
-            <rect key={i} x={zX+zW+8} y={zY+10+i*18} width={10} height={10}
-              rx={1} transform={`rotate(45,${zX+zW+13},${zY+15+i*18})`}
+            <rect key={i} x={zX+zW+6} y={zY+zH/2-22+i*16} width={10} height={10}
+              rx={1} transform={`rotate(45,${zX+zW+11},${zY+zH/2-17+i*16})`}
               fill={i<state.outs?'rgba(255,255,255,.7)':'rgba(255,255,255,.12)'}
               stroke="rgba(255,255,255,.25)" strokeWidth="1"/>
           ))}
-          <text x={zX+zW+13} y={zY+68} textAnchor="middle"
+          <text x={zX+zW+11} y={zY+zH/2+30} textAnchor="middle"
             style={{fontFamily:mono,fontSize:6,fill:'rgba(255,255,255,.3)'}}>
             outs
           </text>
 
-          {/* Pitch label */}
+          {/* Pitch label — sits between home plate and watermark */}
           {state.lastPitch && (
-            <text x={PW/2} y={PH-16} textAnchor="middle"
+            <text x={PW/2} y={zY+zH+platePad+labelH-2} textAnchor="middle"
               style={{fontFamily:mono,fontSize:8,fill:'rgba(255,255,255,.5)',letterSpacing:.3}}>
               {state.lastPitch.type}{state.lastPitch.velo?` · ${state.lastPitch.velo.toFixed(0)} mph`:''}
             </text>
           )}
 
-          {/* Watermark — bottom right, fits within PH */}
-          <image href="/icon-192.png" x={PW-44} y={PH-20} width={14} height={14}
+          {/* Watermark — last row, always fully visible */}
+          <image href="/icon-192.png"
+            x={PW/2 - 38} y={PH - wmH + 2}
+            width={14} height={14}
             opacity={0.5} preserveAspectRatio="xMidYMid meet"/>
-          <text x={PW-28} y={PH-9} textAnchor="start"
-            style={{fontFamily:osw,fontWeight:800,fontSize:7,letterSpacing:.5}}>
-            <tspan fill="rgba(232,65,26,.6)">GOING</tspan>
-            <tspan fill="rgba(255,255,255,.3)"> YARD</tspan>
+          <text x={PW/2 - 22} y={PH - wmH + 12} textAnchor="start"
+            style={{fontFamily:osw,fontWeight:800,fontSize:8,letterSpacing:.5}}>
+            <tspan fill="rgba(232,65,26,.65)">GOING</tspan>
+            <tspan fill="rgba(255,255,255,.35)"> YARD</tspan>
           </text>
         </svg>
       </div>
