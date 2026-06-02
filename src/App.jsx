@@ -7329,121 +7329,117 @@ function LiveAtBatViewer({ gamePk }) {
 
   // ── Pitch zone view ───────────────────────────────────────────────────────
   const PitchZone = () => {
-    const batL  = state.batSide === 'L';
-    const szT   = state.lastPitch?.szTop  ?? 3.5;
-    const szB   = state.lastPitch?.szBot  ?? 1.5;
-    const zX1   = PAD.l, zX2 = PAD.l + zoneW;
-    const zY1   = toY(szT, szT, szB), zY2 = toY(szB, szT, szB);
-    const cellW = (zX2-zX1)/3, cellH = (zY2-zY1)/3;
+    const szT  = state.lastPitch?.szTop  ?? 3.5;
+    const szB  = state.lastPitch?.szBot  ?? 1.5;
+    // Self-contained: zone centered, count below, no batter silhouette
+    // W shrunk to just fit zone + count side-by-side
+    const PW = 220, PH = 190;
+    const pPAD = { t:14, b:36, l:16, r:16 };
+    const zW = 100, zH = 120; // fixed zone size
+    const zX = (PW - zW) / 2;
+    const zY = pPAD.t;
+    const cellW = zW/3, cellH = zH/3;
 
-    // Batter silhouette path — mirror for LHB
-    const batterX = batL ? PAD.l - 18 : PAD.l + zoneW + 8;
-    const batScale = batL ? -1 : 1;
+    const toSvgX = pX => zX + ((pX + 1.8) / 3.6) * zW;
+    const toSvgY = pZ => {
+      const norm = (pZ - szB) / (szT - szB);
+      return zY + (1 - norm) * zH;
+    };
 
     return (
       <div style={{borderRadius:10,overflow:'hidden',border:'1px solid rgba(255,255,255,.08)',
         background:'linear-gradient(160deg,#0d1f12 0%,#091409 100%)',
-        position:'relative',marginBottom:10}}>
-        <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}
+        marginBottom:10,display:'flex',alignItems:'center',justifyContent:'center'}}>
+        <svg width={PW} height={PH} viewBox={`0 0 ${PW} ${PH}`}
           style={{display:'block',maxWidth:'100%',height:'auto'}}>
           <defs>
-            <radialGradient id="turf" cx="50%" cy="60%" r="70%">
+            <radialGradient id="turf2" cx="50%" cy="60%" r="70%">
               <stop offset="0%" stopColor="#1a3d1f"/>
               <stop offset="100%" stopColor="#0a1a0e"/>
             </radialGradient>
           </defs>
-          <rect width={W} height={H} fill="url(#turf)"/>
-
-          {/* Home plate */}
-          <polygon points={`${W/2-8},${H-10} ${W/2+8},${H-10} ${W/2+10},${H-4} ${W/2},${H-1} ${W/2-10},${H-4}`}
-            fill="rgba(255,255,255,.7)"/>
+          <rect width={PW} height={PH} fill="url(#turf2)"/>
 
           {/* Strike zone border */}
-          <rect x={zX1} y={zY1} width={zoneW} height={zY2-zY1}
+          <rect x={zX} y={zY} width={zW} height={zH}
             fill="rgba(255,255,255,.03)" stroke="rgba(255,255,255,.4)"
             strokeWidth="1.5" rx="2"/>
-          {/* Zone grid lines */}
-          {[1,2].map(i => (<>
-            <line key={`v${i}`} x1={zX1+cellW*i} y1={zY1} x2={zX1+cellW*i} y2={zY2}
+          {/* Grid lines */}
+          {[1,2].map(i => (<g key={i}>
+            <line x1={zX+cellW*i} y1={zY} x2={zX+cellW*i} y2={zY+zH}
               stroke="rgba(255,255,255,.15)" strokeWidth=".5"/>
-            <line key={`h${i}`} x1={zX1} y1={zY1+cellH*i} x2={zX2} y2={zY1+cellH*i}
+            <line x1={zX} y1={zY+cellH*i} x2={zX+zW} y2={zY+cellH*i}
               stroke="rgba(255,255,255,.15)" strokeWidth=".5"/>
-          </>))}
+          </g>))}
 
-          {/* Batter silhouette — simplified stick figure, mirrored for LHB */}
-          <g transform={`translate(${batL ? PAD.l - 2 : PAD.l + zoneW + 2}, ${PAD.t}) scale(${batL?-1:1},1)`}>
-            {/* body */}
-            <ellipse cx={8} cy={16} rx={7} ry={9} fill="rgba(200,200,180,.25)"/>
-            {/* head */}
-            <circle cx={8} cy={5} r={5} fill="rgba(200,200,180,.25)"/>
-            {/* helmet */}
-            <path d="M3,5 Q8,-2 13,5" fill="rgba(150,150,130,.3)" stroke="none"/>
-            {/* arms / bat */}
-            <line x1={8} y1={14} x2={batL?-6:22} y2={8} stroke="rgba(200,200,180,.4)" strokeWidth="2"/>
-            <line x1={batL?-6:22} y1={8} x2={batL?-14:30} y2={3}
-              stroke="rgba(210,180,100,.6)" strokeWidth="2.5"/>
-            {/* legs */}
-            <line x1={5} y1={25} x2={3} y2={40}  stroke="rgba(200,200,180,.25)" strokeWidth="2"/>
-            <line x1={11} y1={25} x2={13} y2={40} stroke="rgba(200,200,180,.25)" strokeWidth="2"/>
-          </g>
+          {/* Home plate below zone */}
+          <polygon
+            points={`${PW/2-7},${zY+zH+8} ${PW/2+7},${zY+zH+8} ${PW/2+9},${zY+zH+14} ${PW/2},${zY+zH+17} ${PW/2-9},${zY+zH+14}`}
+            fill="rgba(255,255,255,.6)"/>
 
-          {/* Pitch dots — current at-bat only */}
+          {/* Pitch dots */}
           {state.dots.map((dot, i) => {
             if (dot.pX == null || dot.pZ == null) return null;
-            const cx = toX(dot.pX);
-            const cy = toY(dot.pZ, szT, szB);
+            const cx = toSvgX(dot.pX);
+            const cy = toSvgY(dot.pZ);
             const isLast = i === state.dots.length - 1;
             return (
               <g key={i}>
-                {isLast && <circle cx={cx} cy={cy} r={14} fill={dot.col} opacity=".1"/>}
-                <circle cx={cx} cy={cy} r={isLast?8:6}
-                  fill={dot.col} opacity={isLast?1:0.65}
-                  stroke="rgba(0,0,0,.4)" strokeWidth="1"/>
+                {isLast && <circle cx={cx} cy={cy} r={13} fill={dot.col} opacity=".12"/>}
+                <circle cx={cx} cy={cy} r={isLast?9:7}
+                  fill={dot.col} opacity={isLast?1:0.6}
+                  stroke="rgba(0,0,0,.5)" strokeWidth="1"/>
                 <text x={cx} y={cy+1} textAnchor="middle" dominantBaseline="middle"
-                  style={{fontSize:isLast?8:7,fontFamily:mono,fill:'white',fontWeight:700,
-                    pointerEvents:'none'}}>
+                  style={{fontSize:isLast?8:7,fontFamily:mono,fill:'white',
+                    fontWeight:700,pointerEvents:'none'}}>
                   {dot.num}
                 </text>
               </g>
             );
           })}
 
-          {/* Count display — top right */}
-          <rect x={zX2+4} y={PAD.t-2} width={58} height={46} rx={5}
-            fill="rgba(0,0,0,.5)" stroke="rgba(255,255,255,.1)" strokeWidth=".5"/>
-          <text x={zX2+7} y={PAD.t+10}
-            style={{fontFamily:mono,fontSize:7,fill:'rgba(255,255,255,.4)',letterSpacing:.3}}>
-            COUNT
-          </text>
-          <text x={zX2+7} y={PAD.t+26}
-            style={{fontFamily:osw,fontWeight:800,fontSize:16,fill:'white'}}>
-            {state.balls}-{state.strikes}
-          </text>
-          <text x={zX2+7} y={PAD.t+40}
-            style={{fontFamily:mono,fontSize:7,fill:'rgba(255,255,255,.5)'}}>
-            {state.outs} OUT{state.outs!==1?'S':''}
-          </text>
+          {/* Count — left of zone */}
+          <text x={zX-8} y={zY+18} textAnchor="end"
+            style={{fontFamily:mono,fontSize:7,fill:'rgba(255,255,255,.4)',letterSpacing:.3}}>B</text>
+          <text x={zX-8} y={zY+30} textAnchor="end"
+            style={{fontFamily:osw,fontWeight:800,fontSize:22,fill:'white'}}>{state.balls}</text>
+          <text x={zX-8} y={zY+52} textAnchor="end"
+            style={{fontFamily:mono,fontSize:7,fill:'rgba(255,255,255,.4)',letterSpacing:.3}}>S</text>
+          <text x={zX-8} y={zY+64} textAnchor="end"
+            style={{fontFamily:osw,fontWeight:800,fontSize:22,fill:'white'}}>{state.strikes}</text>
 
-          {/* Pitch type label bottom */}
+          {/* Outs — right of zone */}
+          <text x={zX+zW+8} y={zY+18} textAnchor="start"
+            style={{fontFamily:mono,fontSize:7,fill:'rgba(255,255,255,.4)',letterSpacing:.3}}>OUT</text>
+          {[0,1,2].map(i=>(
+            <rect key={i} x={zX+zW+8} y={zY+24+i*14} width={10} height={10}
+              rx={1} transform={`rotate(45,${zX+zW+13},${zY+29+i*14})`}
+              fill={i<state.outs?'rgba(255,255,255,.7)':'rgba(255,255,255,.12)'}
+              stroke="rgba(255,255,255,.25)" strokeWidth="1"/>
+          ))}
+
+          {/* Pitch label — bottom center */}
           {state.lastPitch && (
-            <text x={W/2} y={H-18} textAnchor="middle"
-              style={{fontFamily:mono,fontSize:8,fill:'rgba(255,255,255,.45)',letterSpacing:.3}}>
-              {state.lastPitch.type} {state.lastPitch.velo ? `· ${state.lastPitch.velo.toFixed(0)} mph` : ''}
+            <text x={PW/2} y={PH-20} textAnchor="middle"
+              style={{fontFamily:mono,fontSize:8,fill:'rgba(255,255,255,.5)',letterSpacing:.3}}>
+              {state.lastPitch.type}{state.lastPitch.velo?` · ${state.lastPitch.velo.toFixed(0)} mph`:''}
             </text>
           )}
 
-          {/* Going Yard watermark — logo + two-tone text */}
-          <image href="/icon-192.png" x={W-52} y={H-26} width={20} height={20}
-            opacity={0.55} preserveAspectRatio="xMidYMid meet"/>
-          <text x={W-30} y={H-14} textAnchor="start"
+          {/* Going Yard watermark */}
+          <image href="/icon-192.png" x={PW-52} y={PH-22} width={16} height={16}
+            opacity={0.5} preserveAspectRatio="xMidYMid meet"/>
+          <text x={PW-34} y={PH-11} textAnchor="start"
             style={{fontFamily:osw,fontWeight:800,fontSize:8,letterSpacing:.5}}>
             <tspan fill="rgba(232,65,26,.6)">GOING</tspan>
-            <tspan fill="rgba(255,255,255,.35)"> YARD</tspan>
+            <tspan fill="rgba(255,255,255,.3)"> YARD</tspan>
           </text>
         </svg>
       </div>
     );
   };
+
+  const [expanded, setExpanded] = React.useState(false);
 
   // ── Main render ───────────────────────────────────────────────────────────
   const showField = flash?.isBIP;
@@ -7453,10 +7449,40 @@ function LiveAtBatViewer({ gamePk }) {
       border:'1px solid rgba(255,255,255,.08)',
       background:'linear-gradient(180deg,#0f1a10 0%,#080e09 100%)'}}>
 
-      {/* Header bar — pitcher vs batter */}
-      <div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr',
-        alignItems:'center',padding:'8px 14px',
-        background:'rgba(0,0,0,.35)',borderBottom:'1px solid rgba(255,255,255,.06)'}}>
+      {/* Collapsed header — always visible, click to expand */}
+      <div onClick={()=>setExpanded(v=>!v)}
+        style={{display:'flex',alignItems:'center',gap:10,padding:'8px 14px',
+          cursor:'pointer',userSelect:'none',
+          borderBottom: expanded ? '1px solid rgba(255,255,255,.06)' : 'none'}}>
+        <img src="/icon-192.png" style={{width:16,height:16,opacity:.7,flexShrink:0}} alt=""/>
+        <span style={{fontFamily:osw,fontWeight:800,fontSize:10,
+          color:'rgba(232,65,26,.8)',letterSpacing:.5,textTransform:'uppercase'}}>
+          Live At-Bat
+        </span>
+        {state.status === 'live' && (<>
+          <span style={{fontFamily:mono,fontSize:9,color:'rgba(255,255,255,.5)'}}>
+            {state.isTop?'▲':'▼'}{state.inning} · {state.balls}-{state.strikes} · {state.outs} out{state.outs!==1?'s':''}
+          </span>
+          <span style={{fontFamily:osw,fontWeight:700,fontSize:10,
+            color:'rgba(255,255,255,.7)',marginLeft:2}}>
+            {state.batter}
+          </span>
+          <span style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.35)'}}>
+            vs {state.pitcher}
+          </span>
+        </>)}
+        <span style={{marginLeft:'auto',fontFamily:mono,fontSize:9,
+          color:'rgba(255,255,255,.3)'}}>
+          {expanded ? '▲ hide' : '▼ show'}
+        </span>
+      </div>
+
+      {/* Expanded content */}
+      {expanded && (<>
+        {/* Header bar — pitcher vs batter */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr',
+          alignItems:'center',padding:'8px 14px',
+          background:'rgba(0,0,0,.35)',borderBottom:'1px solid rgba(255,255,255,.06)'}}>
         {/* Pitcher */}
         <div>
           <div style={{fontFamily:mono,fontSize:7,color:'rgba(255,255,255,.35)',
@@ -7503,23 +7529,31 @@ function LiveAtBatViewer({ gamePk }) {
         </div>
       </div>
 
-      {/* Base runners strip */}
-      <div style={{display:'flex',justifyContent:'center',alignItems:'center',
-        gap:20,padding:'4px 14px',background:'rgba(0,0,0,.2)'}}>
-        {[
-          ['3rd', state.runners.third, '#f5a623'],
-          ['2nd', state.runners.second, '#f5a623'],
-          ['1st', state.runners.first, '#f5a623'],
-        ].map(([label, on, col]) => (
-          <div key={label} style={{display:'flex',flexDirection:'column',
-            alignItems:'center',gap:2}}>
-            <div style={{width:10,height:10,transform:'rotate(45deg)',borderRadius:1,
-              background:on?col:'rgba(255,255,255,.1)',
-              border:`1px solid ${on?col:'rgba(255,255,255,.15)'}`}}/>
-            <span style={{fontFamily:mono,fontSize:6,color:'rgba(255,255,255,.3)',
-              letterSpacing:.3}}>{label}</span>
-          </div>
-        ))}
+      {/* Base runners — diamond layout */}
+      <div style={{display:'flex',justifyContent:'center',padding:'4px 14px 0'}}>
+        <svg width={80} height={60} viewBox="0 0 80 60" style={{overflow:'visible'}}>
+          {[
+            // [x, y, label, occupied]
+            [40, 8,  '2B', state.runners.second],
+            [62, 34, '1B', state.runners.first],
+            [18, 34, '3B', state.runners.third],
+          ].map(([x,y,label,on]) => (
+            <g key={label}>
+              <rect x={x-8} y={y-8} width={16} height={16}
+                rx={1.5} transform={`rotate(45,${x},${y})`}
+                fill={on?'#f5a623':'rgba(255,255,255,.1)'}
+                stroke={on?'#f5a623':'rgba(255,255,255,.2)'} strokeWidth="1.5"/>
+              <text x={x} y={y+18} textAnchor="middle"
+                style={{fontFamily:mono,fontSize:6,
+                  fill:on?'#f5a623':'rgba(255,255,255,.25)'}}>
+                {label}
+              </text>
+            </g>
+          ))}
+          {/* Home plate */}
+          <polygon points="40,50 47,44 47,38 33,38 33,44"
+            fill="rgba(255,255,255,.25)"/>
+        </svg>
       </div>
 
       {/* Main graphic */}
@@ -7536,6 +7570,7 @@ function LiveAtBatViewer({ gamePk }) {
           </div>
         )}
       </div>
+      </>)}
     </div>
   );
 }
