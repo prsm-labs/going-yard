@@ -7192,9 +7192,24 @@ function LiveAtBatViewer({ gamePk }) {
     return () => clearInterval(pollRef.current);
   }, [gamePk]);
 
-  if (!gamePk || !state) return null;
-  if (state.status === 'preview') return null; // game not started yet
-  if (state.status === 'final')   return null; // game over
+  if (!gamePk || !state) return (
+    <div style={{padding:'10px 14px',borderRadius:10,marginBottom:10,
+      background:'rgba(255,255,255,.03)',border:'1px solid rgba(255,255,255,.06)',
+      fontFamily:mono,fontSize:9,color:'var(--muted)',textAlign:'center'}}>
+      Loading live data…
+    </div>
+  );
+  if (state.status === 'preview') return null;
+  if (state.status === 'final') return (
+    <div style={{padding:'10px 14px',borderRadius:10,marginBottom:10,
+      background:'rgba(255,255,255,.02)',border:'1px solid rgba(255,255,255,.05)',
+      display:'flex',alignItems:'center',gap:8}}>
+      <img src="/icon-192.png" style={{width:18,height:18,opacity:.4}} alt=""/>
+      <span style={{fontFamily:mono,fontSize:9,color:'rgba(255,255,255,.25)'}}>
+        Game Final — live at-bat view available during active games
+      </span>
+    </div>
+  );
 
   const W = 260, H = 220;  // strike zone canvas
   const FW = 320, FH = 240; // field view canvas
@@ -7840,8 +7855,8 @@ function BatTrackingTab({ games, date, isToday }) {
         )}
       </div>
 
-      {/* Live at-bat viewer — shows current pitch zone for selected live game */}
-      {selGame !== 'all' && liveAndFinal.find(g=>String(g.gamePk)===selGame)?.status==='Live' && (
+      {/* Live at-bat viewer — Live games show current pitch zone; Final shows last at-bat */}
+      {selGame !== 'all' && liveAndFinal.find(g=>String(g.gamePk)===selGame) && (
         <LiveAtBatViewer gamePk={parseInt(selGame)}/>
       )}
 
