@@ -503,8 +503,9 @@ function PlayerAvatar({ pid, name, size=32, border='1.5px solid var(--border)', 
     <div style={{width:size,height:size,borderRadius:'50%',flexShrink:0,
       overflow:'hidden',border,...style}}>
       <img src={src} alt={name||''} onError={()=>setFailed(true)}
-        style={{width:'115%',height:'138%',objectFit:'cover',
-          objectPosition:'center 28%',marginLeft:'-7.5%',marginTop:'-15%'}}/>
+        style={{width:'100%',height:'160%',objectFit:'cover',
+          objectPosition:'center 28%',marginTop:'-18%',
+          transform:'scale(0.78)',transformOrigin:'center 38%'}}/>
     </div>
   );
 }
