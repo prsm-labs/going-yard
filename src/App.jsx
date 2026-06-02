@@ -7087,8 +7087,9 @@ const VIDEO_LINK_CACHE = {}; // gamePk_atBatIndex → savant video URL
 // field view on ball-in-play, inning transition between halves.
 // Polls /feed/live every 3s. Stores NOTHING — ephemeral display only.
 function LiveAtBatViewer({ gamePk }) {
-  const [state, setState] = React.useState(null); // null = loading/no game
-  const [flash, setFlash] = React.useState(null); // {result, isHR, isBIP} — fades out
+  const [state, setState] = React.useState(null);
+  const [flash, setFlash] = React.useState(null);
+  const [expanded, setExpanded] = React.useState(false); // collapsed by default
   const pollRef = React.useRef(null);
   const lastAbRef = React.useRef(null);
   const mono = "'DM Mono',monospace";
@@ -7439,7 +7440,6 @@ function LiveAtBatViewer({ gamePk }) {
     );
   };
 
-  const [expanded, setExpanded] = React.useState(false);
 
   // ── Main render ───────────────────────────────────────────────────────────
   const showField = flash?.isBIP;
