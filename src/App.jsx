@@ -7082,6 +7082,446 @@ const VIDEO_LINK_CACHE = {}; // gamePk_atBatIndex → savant video URL
 
 
 // ── GAMEDAY TAB ──────────────────────────────────────────────────────────────
+// ── LiveAtBatViewer ─────────────────────────────────────────────────────────
+// Shows the current live at-bat: pitch zone dots, count, batter/pitcher,
+// field view on ball-in-play, inning transition between halves.
+// Polls /feed/live every 3s. Stores NOTHING — ephemeral display only.
+function LiveAtBatViewer({ gamePk }) {
+  const [state, setState] = React.useState(null); // null = loading/no game
+  const [flash, setFlash] = React.useState(null); // {result, isHR, isBIP} — fades out
+  const pollRef = React.useRef(null);
+  const lastAbRef = React.useRef(null);
+  const mono = "'DM Mono',monospace";
+  const osw  = "'Oswald',sans-serif";
+
+  React.useEffect(() => {
+    if (!gamePk) { setState(null); return; }
+
+    const poll = async () => {
+      try {
+        const r = await fetch(
+          `https://statsapi.mlb.com/api/v1.1/game/${gamePk}/feed/live` +
+          `?fields=liveData,plays,currentPlay,playEvents,pitchData,coordinates,` +
+          `result,count,matchup,batter,pitcher,batSide,pitchHand,about,` +
+          `halfInning,inning,isTopInning,linescore,offense,gameData,status`
+        );
+        const d = await r.json();
+        const status = d?.gameData?.status?.abstractGameState;
+        if (status === 'Final') { setState({ status:'final' }); return; }
+        if (status !== 'Live')  { setState({ status:'preview' }); return; }
+
+        const cp    = d?.liveData?.plays?.currentPlay;
+        const ls    = d?.liveData?.linescore;
+        const off   = ls?.offense || {};
+        if (!cp) return;
+
+        const about   = cp.about || {};
+        const matchup = cp.matchup || {};
+        const count   = cp.count   || {};
+        const events  = cp.playEvents || [];
+        const pitches = events.filter(e => e.isPitch);
+        const last    = events[events.length - 1] || {};
+
+        // Detect new at-bat → flash result of completed play
+        const abKey = `${gamePk}_${about.atBatIndex}`;
+        if (lastAbRef.current && lastAbRef.current !== abKey) {
+          const prev = lastAbRef.current;
+          // result from the play that just ended is in last event of previous play
+          // We flash the stored state result
+          if (state?.result) {
+            const isHR  = state.result.toLowerCase().includes('home_run') || state.result.toLowerCase().includes('home run');
+            const isBIP = ['single','double','triple','home_run','field_out','flyout','lineout','groundout','error']
+              .some(k => state.result.toLowerCase().includes(k));
+            setFlash({ result: state.result, isHR, isBIP });
+            setTimeout(() => setFlash(null), 4000);
+          }
+        }
+        lastAbRef.current = abKey;
+
+        // Build pitch dots for current at-bat only
+        const dots = pitches.map((e, i) => {
+          const pd     = e.pitchData || {};
+          const coords = pd.coordinates || {};
+          const call   = e.details?.call?.code || '';
+          const type   = e.details?.type?.description || '';
+          // B=ball, C=called strike, S=swing, X=in play, F=foul, *=hit by pitch
+          const isBall   = call === 'B' || call === '*B';
+          const isStrike = ['C','S','F','T','L','O','Q'].includes(call);
+          const isInPlay = call === 'X';
+          const col = isInPlay ? '#60a5fa' : isStrike ? '#ef4444' : isBall ? '#22c55e' : '#94a3b8';
+          return {
+            pX:   coords.pX   ?? null,
+            pZ:   coords.pZ   ?? null,
+            szTop: pd.strikeZoneTop    ?? 3.5,
+            szBot: pd.strikeZoneBottom ?? 1.5,
+            velo: pd.startSpeed ?? null,
+            type, call, col,
+            num:  i + 1,
+            isBall, isStrike, isInPlay,
+            desc: e.details?.description || type,
+          };
+        });
+
+        setState({
+          status:    'live',
+          inning:    about.inning || 1,
+          isTop:     about.isTopInning ?? (about.halfInning === 'top'),
+          half:      about.halfInning || 'top',
+          outs:      count.outs ?? ls?.outs ?? 0,
+          balls:     count.balls ?? 0,
+          strikes:   count.strikes ?? 0,
+          batter:    matchup.batter?.fullName || '—',
+          batterId:  matchup.batter?.id,
+          batSide:   matchup.batSide?.code || 'R',  // R or L
+          pitcher:   matchup.pitcher?.fullName || '—',
+          pitcherId: matchup.pitcher?.id,
+          pitchHand: matchup.pitchHand?.code || 'R',
+          runners:   { first:!!off.first, second:!!off.second, third:!!off.third },
+          dots,
+          lastPitch: dots[dots.length - 1] || null,
+          result:    cp.result?.event || null,
+          isMidInning: about.halfInning !== lastAbRef._prevHalf,
+        });
+        lastAbRef._prevHalf = about.halfInning;
+
+      } catch(e) { /* silently ignore poll errors */ }
+    };
+
+    poll(); // immediate
+    pollRef.current = setInterval(poll, 3000);
+    return () => clearInterval(pollRef.current);
+  }, [gamePk]);
+
+  if (!gamePk || !state) return null;
+  if (state.status === 'preview') return null; // game not started yet
+  if (state.status === 'final')   return null; // game over
+
+  const W = 260, H = 220;  // strike zone canvas
+  const FW = 320, FH = 240; // field view canvas
+  const PAD = { t:28, b:28, l:48, r:24 };
+  const zoneW = W - PAD.l - PAD.r;
+  const zoneH = H - PAD.t - PAD.b;
+
+  // Map pX/pZ to SVG coordinates — pX: -2.5 to 2.5, pZ: 0 to 5
+  const toX = pX => PAD.l + ((pX + 2.0) / 4.0) * zoneW;
+  const toY = (pZ, szTop, szBot) => {
+    const norm = (pZ - szBot) / (szTop - szBot);
+    return PAD.t + (1 - norm) * zoneH;
+  };
+
+  // Ordinal suffix
+  const ord = n => { const s=['th','st','nd','rd']; const v=n%100; return n+(s[(v-20)%10]||s[v]||s[0]); };
+
+  // Going Yard watermark color
+  const WM = 'rgba(232,65,26,.35)';
+
+  const isFlashHR  = flash?.isHR;
+  const isFlashBIP = flash?.isBIP && !flash?.isHR;
+
+  // ── Inning between-half view ──────────────────────────────────────────────
+  const InningCard = () => (
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',
+      padding:'10px 16px',borderRadius:10,marginBottom:10,
+      background:'linear-gradient(135deg,#1e3a2f 0%,#122318 100%)',
+      border:'1px solid rgba(39,201,122,.2)'}}>
+      <div>
+        <div style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.4)',
+          textTransform:'uppercase',letterSpacing:.5,marginBottom:2}}>
+          {state.isTop ? 'TOP' : 'MIDDLE OF THE'} INNING
+        </div>
+        <div style={{fontFamily:osw,fontWeight:800,fontSize:20,letterSpacing:1,
+          color:'white'}}>{ord(state.inning)} Inning</div>
+      </div>
+      <div style={{display:'flex',gap:6}}>
+        {[0,1,2].map(i => (
+          <div key={i} style={{width:10,height:10,borderRadius:1,
+            transform:'rotate(45deg)',
+            background: i < state.outs ? 'rgba(255,255,255,.6)' : 'rgba(255,255,255,.15)',
+            border:'1px solid rgba(255,255,255,.3)'}}/>
+        ))}
+      </div>
+    </div>
+  );
+
+  // ── Field view — ball in play / flash result ──────────────────────────────
+  const FieldView = ({ result }) => {
+    const clean = (result||'').toLowerCase().replace(/_/g,' ');
+    const isHR  = clean.includes('home run');
+    const bg    = isHR
+      ? 'linear-gradient(160deg,#1a1a0a 0%,#2d2500 100%)'
+      : 'linear-gradient(160deg,#0a1a0f 0%,#0d2015 100%)';
+    const label = isHR ? '💥 HOME RUN!' : clean.replace(/\b\w/g,c=>c.toUpperCase());
+    const col   = isHR ? '#fbbf24' : '#60a5fa';
+    return (
+      <div style={{borderRadius:10,overflow:'hidden',border:'1px solid rgba(255,255,255,.1)',
+        background:bg,position:'relative',marginBottom:10}}>
+        <svg width={FW} height={FH} viewBox={`0 0 ${FW} ${FH}`}
+          style={{display:'block',maxWidth:'100%',height:'auto'}}>
+          {/* Sky gradient */}
+          <defs>
+            <radialGradient id="grass" cx="50%" cy="80%" r="90%">
+              <stop offset="0%" stopColor="#1a4a20"/>
+              <stop offset="100%" stopColor="#0d2810"/>
+            </radialGradient>
+            <radialGradient id="infield" cx="50%" cy="60%" r="50%">
+              <stop offset="0%" stopColor="#8B6914"/>
+              <stop offset="100%" stopColor="#5a4010"/>
+            </radialGradient>
+          </defs>
+          {/* Outfield grass */}
+          <rect width={FW} height={FH} fill="url(#grass)"/>
+          {/* Foul lines */}
+          <line x1={FW/2} y1={FH*0.75} x2={FW*0.04} y2={FH*0.05} stroke="rgba(255,255,200,.4)" strokeWidth="1"/>
+          <line x1={FW/2} y1={FH*0.75} x2={FW*0.96} y2={FH*0.05} stroke="rgba(255,255,200,.4)" strokeWidth="1"/>
+          {/* Warning track arc */}
+          <path d={`M ${FW*.06} ${FH*.1} Q ${FW/2} ${FH*-.15} ${FW*.94} ${FH*.1}`}
+            fill="none" stroke="rgba(180,140,60,.4)" strokeWidth="8"/>
+          {/* Infield dirt */}
+          <ellipse cx={FW/2} cy={FH*0.68} rx={FW*0.22} ry={FH*0.22} fill="url(#infield)"/>
+          {/* Pitcher mound */}
+          <ellipse cx={FW/2} cy={FH*0.56} rx={10} ry={7} fill="#9a7a30" opacity=".8"/>
+          {/* Bases */}
+          {[
+            [FW/2, FH*0.40],  // 2nd
+            [FW*0.63, FH*0.58], // 1st
+            [FW*0.37, FH*0.58], // 3rd
+            [FW/2, FH*0.75],  // home
+          ].map(([x,y],i) => (
+            <rect key={i} x={x-5} y={y-5} width={10} height={10}
+              fill="white" opacity={i===3?0.9:0.8} transform={`rotate(45,${x},${y})`}/>
+          ))}
+          {/* Result label */}
+          <text x={FW/2} y={FH*0.25} textAnchor="middle"
+            style={{fontFamily:osw,fontWeight:800,fontSize:18,fill:col,
+              filter:'drop-shadow(0 2px 4px rgba(0,0,0,.8))'}}>
+            {label}
+          </text>
+          {/* Going Yard watermark — logo + two-tone text */}
+          <image href="/icon-192.png" x={FW-86} y={FH-26} width={20} height={20}
+            opacity={0.55} preserveAspectRatio="xMidYMid meet"/>
+          <text x={FW-64} y={FH-13} textAnchor="start"
+            style={{fontFamily:osw,fontWeight:800,fontSize:9,letterSpacing:.5}}>
+            <tspan fill="rgba(232,65,26,.65)">GOING</tspan>
+            <tspan fill="rgba(255,255,255,.4)"> YARD</tspan>
+          </text>
+        </svg>
+      </div>
+    );
+  };
+
+  // ── Pitch zone view ───────────────────────────────────────────────────────
+  const PitchZone = () => {
+    const batL  = state.batSide === 'L';
+    const szT   = state.lastPitch?.szTop  ?? 3.5;
+    const szB   = state.lastPitch?.szBot  ?? 1.5;
+    const zX1   = PAD.l, zX2 = PAD.l + zoneW;
+    const zY1   = toY(szT, szT, szB), zY2 = toY(szB, szT, szB);
+    const cellW = (zX2-zX1)/3, cellH = (zY2-zY1)/3;
+
+    // Batter silhouette path — mirror for LHB
+    const batterX = batL ? PAD.l - 18 : PAD.l + zoneW + 8;
+    const batScale = batL ? -1 : 1;
+
+    return (
+      <div style={{borderRadius:10,overflow:'hidden',border:'1px solid rgba(255,255,255,.08)',
+        background:'linear-gradient(160deg,#0d1f12 0%,#091409 100%)',
+        position:'relative',marginBottom:10}}>
+        <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}
+          style={{display:'block',maxWidth:'100%',height:'auto'}}>
+          <defs>
+            <radialGradient id="turf" cx="50%" cy="60%" r="70%">
+              <stop offset="0%" stopColor="#1a3d1f"/>
+              <stop offset="100%" stopColor="#0a1a0e"/>
+            </radialGradient>
+          </defs>
+          <rect width={W} height={H} fill="url(#turf)"/>
+
+          {/* Home plate */}
+          <polygon points={`${W/2-8},${H-10} ${W/2+8},${H-10} ${W/2+10},${H-4} ${W/2},${H-1} ${W/2-10},${H-4}`}
+            fill="rgba(255,255,255,.7)"/>
+
+          {/* Strike zone border */}
+          <rect x={zX1} y={zY1} width={zoneW} height={zY2-zY1}
+            fill="rgba(255,255,255,.03)" stroke="rgba(255,255,255,.4)"
+            strokeWidth="1.5" rx="2"/>
+          {/* Zone grid lines */}
+          {[1,2].map(i => (<>
+            <line key={`v${i}`} x1={zX1+cellW*i} y1={zY1} x2={zX1+cellW*i} y2={zY2}
+              stroke="rgba(255,255,255,.15)" strokeWidth=".5"/>
+            <line key={`h${i}`} x1={zX1} y1={zY1+cellH*i} x2={zX2} y2={zY1+cellH*i}
+              stroke="rgba(255,255,255,.15)" strokeWidth=".5"/>
+          </>))}
+
+          {/* Batter silhouette — simplified stick figure, mirrored for LHB */}
+          <g transform={`translate(${batL ? PAD.l - 2 : PAD.l + zoneW + 2}, ${PAD.t}) scale(${batL?-1:1},1)`}>
+            {/* body */}
+            <ellipse cx={8} cy={16} rx={7} ry={9} fill="rgba(200,200,180,.25)"/>
+            {/* head */}
+            <circle cx={8} cy={5} r={5} fill="rgba(200,200,180,.25)"/>
+            {/* helmet */}
+            <path d="M3,5 Q8,-2 13,5" fill="rgba(150,150,130,.3)" stroke="none"/>
+            {/* arms / bat */}
+            <line x1={8} y1={14} x2={batL?-6:22} y2={8} stroke="rgba(200,200,180,.4)" strokeWidth="2"/>
+            <line x1={batL?-6:22} y1={8} x2={batL?-14:30} y2={3}
+              stroke="rgba(210,180,100,.6)" strokeWidth="2.5"/>
+            {/* legs */}
+            <line x1={5} y1={25} x2={3} y2={40}  stroke="rgba(200,200,180,.25)" strokeWidth="2"/>
+            <line x1={11} y1={25} x2={13} y2={40} stroke="rgba(200,200,180,.25)" strokeWidth="2"/>
+          </g>
+
+          {/* Pitch dots — current at-bat only */}
+          {state.dots.map((dot, i) => {
+            if (dot.pX == null || dot.pZ == null) return null;
+            const cx = toX(dot.pX);
+            const cy = toY(dot.pZ, szT, szB);
+            const isLast = i === state.dots.length - 1;
+            return (
+              <g key={i}>
+                {isLast && <circle cx={cx} cy={cy} r={14} fill={dot.col} opacity=".1"/>}
+                <circle cx={cx} cy={cy} r={isLast?8:6}
+                  fill={dot.col} opacity={isLast?1:0.65}
+                  stroke="rgba(0,0,0,.4)" strokeWidth="1"/>
+                <text x={cx} y={cy+1} textAnchor="middle" dominantBaseline="middle"
+                  style={{fontSize:isLast?8:7,fontFamily:mono,fill:'white',fontWeight:700,
+                    pointerEvents:'none'}}>
+                  {dot.num}
+                </text>
+              </g>
+            );
+          })}
+
+          {/* Count display — top right */}
+          <rect x={zX2+4} y={PAD.t-2} width={58} height={46} rx={5}
+            fill="rgba(0,0,0,.5)" stroke="rgba(255,255,255,.1)" strokeWidth=".5"/>
+          <text x={zX2+7} y={PAD.t+10}
+            style={{fontFamily:mono,fontSize:7,fill:'rgba(255,255,255,.4)',letterSpacing:.3}}>
+            COUNT
+          </text>
+          <text x={zX2+7} y={PAD.t+26}
+            style={{fontFamily:osw,fontWeight:800,fontSize:16,fill:'white'}}>
+            {state.balls}-{state.strikes}
+          </text>
+          <text x={zX2+7} y={PAD.t+40}
+            style={{fontFamily:mono,fontSize:7,fill:'rgba(255,255,255,.5)'}}>
+            {state.outs} OUT{state.outs!==1?'S':''}
+          </text>
+
+          {/* Pitch type label bottom */}
+          {state.lastPitch && (
+            <text x={W/2} y={H-18} textAnchor="middle"
+              style={{fontFamily:mono,fontSize:8,fill:'rgba(255,255,255,.45)',letterSpacing:.3}}>
+              {state.lastPitch.type} {state.lastPitch.velo ? `· ${state.lastPitch.velo.toFixed(0)} mph` : ''}
+            </text>
+          )}
+
+          {/* Going Yard watermark — logo + two-tone text */}
+          <image href="/icon-192.png" x={W-52} y={H-26} width={20} height={20}
+            opacity={0.55} preserveAspectRatio="xMidYMid meet"/>
+          <text x={W-30} y={H-14} textAnchor="start"
+            style={{fontFamily:osw,fontWeight:800,fontSize:8,letterSpacing:.5}}>
+            <tspan fill="rgba(232,65,26,.6)">GOING</tspan>
+            <tspan fill="rgba(255,255,255,.35)"> YARD</tspan>
+          </text>
+        </svg>
+      </div>
+    );
+  };
+
+  // ── Main render ───────────────────────────────────────────────────────────
+  const showField = flash?.isBIP;
+
+  return (
+    <div style={{marginBottom:12,borderRadius:10,overflow:'hidden',
+      border:'1px solid rgba(255,255,255,.08)',
+      background:'linear-gradient(180deg,#0f1a10 0%,#080e09 100%)'}}>
+
+      {/* Header bar — pitcher vs batter */}
+      <div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr',
+        alignItems:'center',padding:'8px 14px',
+        background:'rgba(0,0,0,.35)',borderBottom:'1px solid rgba(255,255,255,.06)'}}>
+        {/* Pitcher */}
+        <div>
+          <div style={{fontFamily:mono,fontSize:7,color:'rgba(255,255,255,.35)',
+            textTransform:'uppercase',letterSpacing:.5}}>Pitcher</div>
+          <div style={{fontFamily:osw,fontWeight:700,fontSize:12,color:'var(--text)',
+            cursor:state.pitcherId?'pointer':'default',
+            textDecoration:state.pitcherId?'underline':'none',
+            textDecorationStyle:'dotted',color:'rgba(255,255,255,.85)'}}
+            onClick={()=>state.pitcherId&&openPitcherSlide({
+              pid:state.pitcherId,name:state.pitcher,team:'',hand:state.pitchHand})}>
+            {state.pitcher}
+          </div>
+          <div style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.3)'}}>{state.pitchHand}HP</div>
+        </div>
+        {/* Inning badge */}
+        <div style={{textAlign:'center',padding:'2px 12px',borderRadius:6,
+          background:'rgba(255,255,255,.06)',border:'1px solid rgba(255,255,255,.1)'}}>
+          <div style={{fontFamily:mono,fontSize:7,color:'rgba(255,255,255,.4)',
+            textTransform:'uppercase',letterSpacing:.5}}>
+            {state.isTop ? '▲' : '▼'} {ord(state.inning)}
+          </div>
+          <div style={{display:'flex',gap:4,justifyContent:'center',marginTop:2}}>
+            {[0,1,2].map(i => (
+              <div key={i} style={{width:8,height:8,borderRadius:.5,transform:'rotate(45deg)',
+                background:i<state.outs?'rgba(255,255,255,.7)':'rgba(255,255,255,.12)',
+                border:'1px solid rgba(255,255,255,.25)'}}/>
+            ))}
+          </div>
+        </div>
+        {/* Batter */}
+        <div style={{textAlign:'right'}}>
+          <div style={{fontFamily:mono,fontSize:7,color:'rgba(255,255,255,.35)',
+            textTransform:'uppercase',letterSpacing:.5}}>Batter</div>
+          <div style={{fontFamily:osw,fontWeight:700,fontSize:12,
+            color:'rgba(255,255,255,.85)',cursor:state.batterId?'pointer':'default',
+            textDecoration:state.batterId?'underline':'none',textDecorationStyle:'dotted'}}
+            onClick={()=>state.batterId&&openAtBatSlide({
+              pid:state.batterId,name:state.batter,team:''})}>
+            {state.batter}
+          </div>
+          <div style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.3)'}}>
+            {state.batSide==='L'?'LHB':'RHB'}
+          </div>
+        </div>
+      </div>
+
+      {/* Base runners strip */}
+      <div style={{display:'flex',justifyContent:'center',alignItems:'center',
+        gap:20,padding:'4px 14px',background:'rgba(0,0,0,.2)'}}>
+        {[
+          ['3rd', state.runners.third, '#f5a623'],
+          ['2nd', state.runners.second, '#f5a623'],
+          ['1st', state.runners.first, '#f5a623'],
+        ].map(([label, on, col]) => (
+          <div key={label} style={{display:'flex',flexDirection:'column',
+            alignItems:'center',gap:2}}>
+            <div style={{width:10,height:10,transform:'rotate(45deg)',borderRadius:1,
+              background:on?col:'rgba(255,255,255,.1)',
+              border:`1px solid ${on?col:'rgba(255,255,255,.15)'}`}}/>
+            <span style={{fontFamily:mono,fontSize:6,color:'rgba(255,255,255,.3)',
+              letterSpacing:.3}}>{label}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Main graphic */}
+      <div style={{padding:'8px 10px 4px'}}>
+        {showField
+          ? <FieldView result={flash.result}/>
+          : <PitchZone/>
+        }
+        {/* Last pitch description */}
+        {state.lastPitch?.desc && !showField && (
+          <div style={{fontFamily:mono,fontSize:9,color:'rgba(255,255,255,.45)',
+            textAlign:'center',marginBottom:6,letterSpacing:.3}}>
+            {state.lastPitch.desc}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function BatTrackingTab({ games, date, isToday }) {
   const mono  = "'DM Mono',monospace";
   const osw   = "'Oswald',sans-serif";
@@ -7399,6 +7839,11 @@ function BatTrackingTab({ games, date, isToday }) {
           </span>
         )}
       </div>
+
+      {/* Live at-bat viewer — shows current pitch zone for selected live game */}
+      {selGame !== 'all' && liveAndFinal.find(g=>String(g.gamePk)===selGame)?.status==='Live' && (
+        <LiveAtBatViewer gamePk={parseInt(selGame)}/>
+      )}
 
       {/* Stats bar + filter buttons */}
       <div style={{display:'flex',gap:8,marginBottom:10,flexWrap:'wrap',alignItems:'center'}}>
