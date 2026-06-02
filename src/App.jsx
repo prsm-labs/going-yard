@@ -23434,6 +23434,8 @@ function SimTab({ data }) {
       pool.push({
         pid, name: r.batter, team: r.batting_team || '',
         pitcher: r.pitcher || '', pgLabel,
+        pitcherId: String(r.pitcher_id || '').split('.')[0] || null,
+        pitcherHand: r.pitcher_hand || '',
         yard, sig: Math.round(sig), boom, ghr, ps,
         hrProb,       // per-PA HR probability
         avgPA,        // expected PAs this game
@@ -23606,47 +23608,100 @@ function SimTab({ data }) {
                              : b.pgLabel.includes('Elite')    ? { txt:'‼️ Elite',   col:'#ef4444' }
                              : null;
 
+            const handleBatter = e => {
+              e.stopPropagation();
+              const cp = getCachedPlayer(parseInt(b.pid)||0) || {};
+              openAtBatSlide({ pid:parseInt(b.pid)||0, name:b.name, team:b.team,
+                avgEV:cp.avgEV, barrel:cp.barrel, hardHit:cp.hardHit,
+                flyBall:cp.flyBall, hr:cp.hr, avg:cp.avg, obp:cp.obp,
+                slg:cp.slg, xwoba:cp.xwoba, kPct:cp.kPct, bbPct:cp.bbPct,
+                launchAngle:cp.launchAngle });
+            };
+            const handlePitcher = e => {
+              e.stopPropagation();
+              if (!b.pitcherId) return;
+              openPitcherSlide({ pid:parseInt(b.pitcherId)||0, name:b.pitcher,
+                team:'', hand:b.pitcherHand, pitchMix:[] });
+            };
+
             return (
               <div key={b.pid} style={{borderRadius:10,overflow:'hidden',
-                background:m.bg,border:`1px solid ${m.border}`,
+                background:m.bg, border:`1px solid ${m.border}`,
                 padding:'10px 12px'}}>
 
-                {/* Top row: medal + name + team + pitcher tag */}
-                <div style={{display:'flex',alignItems:'center',gap:7,marginBottom:6}}>
+                {/* Top row: medal + avatar + name + team + HR% */}
+                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:7}}>
+
+                  {/* Medal */}
                   {i < 3
-                    ? <span style={{fontSize:16,lineHeight:1}}>{m.icon}</span>
-                    : <span style={{width:18,height:18,borderRadius:4,
+                    ? <span style={{fontSize:15,lineHeight:1,flexShrink:0}}>{m.icon}</span>
+                    : <span style={{width:16,height:16,borderRadius:3,
                         background:'rgba(255,255,255,.07)',display:'inline-flex',
-                        alignItems:'center',justifyContent:'center',
-                        fontFamily:mono,fontSize:9,color:m.col}}>{m.icon}</span>
+                        alignItems:'center',justifyContent:'center',flexShrink:0,
+                        fontFamily:mono,fontSize:8,color:m.col}}>{m.icon}</span>
                   }
-                  <span style={{fontFamily:osw,fontWeight:800,fontSize:13,
-                    color:'white',flex:1,minWidth:0,overflow:'hidden',
-                    textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                    {b.name}
-                  </span>
-                  <span style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.4)',
-                    flexShrink:0}}>{b.team}</span>
-                  {pitcherTag && (
-                    <span style={{fontFamily:mono,fontSize:7,color:pitcherTag.col,
-                      background:`${pitcherTag.col}18`,border:`1px solid ${pitcherTag.col}40`,
-                      borderRadius:4,padding:'1px 5px',flexShrink:0}}>
-                      {pitcherTag.txt}
-                    </span>
-                  )}
+
+                  {/* Avatar — clickable */}
+                  <div onClick={handleBatter} style={{cursor:'pointer',flexShrink:0}}>
+                    <PlayerAvatar pid={b.pid} name={b.name} size={36}
+                      border={`2px solid ${m.col}60`}/>
+                  </div>
+
+                  {/* Name block */}
+                  <div style={{flex:1,minWidth:0}}>
+                    {/* Batter name — clickable */}
+                    <div onClick={handleBatter}
+                      style={{cursor:'pointer',fontFamily:osw,fontWeight:800,fontSize:13,
+                        color:'white',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',
+                        textDecoration:'underline',textDecorationStyle:'dotted',
+                        textDecorationColor:'rgba(255,255,255,.25)',
+                        lineHeight:1.2,marginBottom:2}}>
+                      {b.name}
+                    </div>
+                    {/* Team + pitcher line */}
+                    <div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}>
+                      <span style={{fontFamily:mono,fontSize:8,
+                        color:'rgba(255,255,255,.45)',flexShrink:0}}>
+                        {b.team}
+                      </span>
+                      {b.pitcher && (<>
+                        <span style={{fontFamily:mono,fontSize:7,
+                          color:'rgba(255,255,255,.2)'}}>vs</span>
+                        <span onClick={handlePitcher}
+                          style={{cursor:b.pitcherId?'pointer':'default',
+                            fontFamily:mono,fontSize:8,
+                            color:b.pitcherId?'rgba(255,255,255,.55)':'rgba(255,255,255,.3)',
+                            textDecoration:b.pitcherId?'underline':'none',
+                            textDecorationStyle:'dotted',
+                            textDecorationColor:'rgba(255,255,255,.2)'}}>
+                          {b.pitcher}
+                        </span>
+                      </>)}
+                      {pitcherTag && (
+                        <span style={{fontFamily:mono,fontSize:7,color:pitcherTag.col,
+                          background:`${pitcherTag.col}18`,border:`1px solid ${pitcherTag.col}40`,
+                          borderRadius:4,padding:'1px 5px',flexShrink:0}}>
+                          {pitcherTag.txt}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* HR% big number — right side */}
+                  <div style={{textAlign:'right',flexShrink:0}}>
+                    <div style={{fontFamily:osw,fontWeight:800,fontSize:20,
+                      color:m.col,lineHeight:1}}>
+                      {b.hrPct.toFixed(1)}%
+                    </div>
+                    <div style={{fontFamily:mono,fontSize:7,
+                      color:'rgba(255,255,255,.3)',marginTop:1}}>
+                      HR in sim
+                    </div>
+                  </div>
                 </div>
 
                 {/* HR% bar */}
-                <div style={{marginBottom:6}}>
-                  <div style={{display:'flex',justifyContent:'space-between',
-                    alignItems:'baseline',marginBottom:3}}>
-                    <span style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.4)'}}>
-                      HR in sim
-                    </span>
-                    <span style={{fontFamily:osw,fontWeight:800,fontSize:16,color:m.col}}>
-                      {b.hrPct.toFixed(1)}%
-                    </span>
-                  </div>
+                <div style={{marginBottom:7}}>
                   <div style={{height:4,borderRadius:2,
                     background:'rgba(255,255,255,.08)',overflow:'hidden'}}>
                     <div style={{height:'100%',borderRadius:2,
@@ -23680,12 +23735,6 @@ function SimTab({ data }) {
                       {x.label} {x.val}
                     </span>
                   ))}
-                  {b.pitcher && (
-                    <span style={{fontFamily:mono,fontSize:7,
-                      color:'rgba(255,255,255,.3)',marginLeft:'auto'}}>
-                      vs {b.pitcher}
-                    </span>
-                  )}
                 </div>
               </div>
             );
