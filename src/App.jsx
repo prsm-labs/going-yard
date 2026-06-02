@@ -490,7 +490,7 @@ function PlayerAvatar({ pid, name, size=32, border='1.5px solid var(--border)', 
   const initials = ini(name||'');
   if (!src || failed) {
     return (
-      <div style={{width:size,height:size,borderRadius:6,flexShrink:0,
+      <div style={{width:size,height:Math.round(size*1.25),borderRadius:6,flexShrink:0,
         background:'var(--surface2)',border,
         display:'flex',alignItems:'center',justifyContent:'center',
         fontFamily:"'DM Mono',monospace",fontWeight:700,
@@ -500,12 +500,11 @@ function PlayerAvatar({ pid, name, size=32, border='1.5px solid var(--border)', 
     );
   }
   return (
-    <div style={{width:size,height:size,borderRadius:6,flexShrink:0,
+    <div style={{width:size,height:Math.round(size*1.25),borderRadius:6,flexShrink:0,
       overflow:'hidden',border,...style}}>
       <img src={src} alt={name||''} onError={()=>setFailed(true)}
-        style={{width:'100%',height:'160%',objectFit:'cover',
-          objectPosition:'center 28%',marginTop:'-18%',
-          transform:'scale(0.78)',transformOrigin:'center 38%'}}/>
+        style={{width:'100%',height:'100%',objectFit:'cover',
+          objectPosition:'center 15%'}}/>
     </div>
   );
 }
