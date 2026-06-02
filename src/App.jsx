@@ -7332,13 +7332,10 @@ function LiveAtBatViewer({ gamePk }) {
   const PitchZone = () => {
     const szT  = state.lastPitch?.szTop  ?? 3.5;
     const szB  = state.lastPitch?.szBot  ?? 1.5;
-    // Self-contained: zone centered, count below, no batter silhouette
-    // W shrunk to just fit zone + count side-by-side
-    const PW = 220, PH = 190;
-    const pPAD = { t:14, b:36, l:16, r:16 };
-    const zW = 100, zH = 120; // fixed zone size
+    const PW = 190, PH = 170;
+    const zW = 90, zH = 108;
     const zX = (PW - zW) / 2;
-    const zY = pPAD.t;
+    const zY = 14;
     const cellW = zW/3, cellH = zH/3;
 
     const toSvgX = pX => zX + ((pX + 1.8) / 3.6) * zW;
@@ -7361,11 +7358,10 @@ function LiveAtBatViewer({ gamePk }) {
           </defs>
           <rect width={PW} height={PH} fill="url(#turf2)"/>
 
-          {/* Strike zone border */}
+          {/* Strike zone */}
           <rect x={zX} y={zY} width={zW} height={zH}
             fill="rgba(255,255,255,.03)" stroke="rgba(255,255,255,.4)"
             strokeWidth="1.5" rx="2"/>
-          {/* Grid lines */}
           {[1,2].map(i => (<g key={i}>
             <line x1={zX+cellW*i} y1={zY} x2={zX+cellW*i} y2={zY+zH}
               stroke="rgba(255,255,255,.15)" strokeWidth=".5"/>
@@ -7373,9 +7369,9 @@ function LiveAtBatViewer({ gamePk }) {
               stroke="rgba(255,255,255,.15)" strokeWidth=".5"/>
           </g>))}
 
-          {/* Home plate below zone */}
+          {/* Home plate */}
           <polygon
-            points={`${PW/2-7},${zY+zH+8} ${PW/2+7},${zY+zH+8} ${PW/2+9},${zY+zH+14} ${PW/2},${zY+zH+17} ${PW/2-9},${zY+zH+14}`}
+            points={`${PW/2-6},${zY+zH+7} ${PW/2+6},${zY+zH+7} ${PW/2+8},${zY+zH+12} ${PW/2},${zY+zH+15} ${PW/2-8},${zY+zH+12}`}
             fill="rgba(255,255,255,.6)"/>
 
           {/* Pitch dots */}
@@ -7386,8 +7382,8 @@ function LiveAtBatViewer({ gamePk }) {
             const isLast = i === state.dots.length - 1;
             return (
               <g key={i}>
-                {isLast && <circle cx={cx} cy={cy} r={13} fill={dot.col} opacity=".12"/>}
-                <circle cx={cx} cy={cy} r={isLast?9:7}
+                {isLast && <circle cx={cx} cy={cy} r={12} fill={dot.col} opacity=".12"/>}
+                <circle cx={cx} cy={cy} r={isLast?8:6}
                   fill={dot.col} opacity={isLast?1:0.6}
                   stroke="rgba(0,0,0,.5)" strokeWidth="1"/>
                 <text x={cx} y={cy+1} textAnchor="middle" dominantBaseline="middle"
@@ -7399,39 +7395,41 @@ function LiveAtBatViewer({ gamePk }) {
             );
           })}
 
-          {/* Count — left of zone */}
-          <text x={zX-8} y={zY+18} textAnchor="end"
-            style={{fontFamily:mono,fontSize:7,fill:'rgba(255,255,255,.4)',letterSpacing:.3}}>B</text>
-          <text x={zX-8} y={zY+30} textAnchor="end"
-            style={{fontFamily:osw,fontWeight:800,fontSize:22,fill:'white'}}>{state.balls}</text>
-          <text x={zX-8} y={zY+52} textAnchor="end"
-            style={{fontFamily:mono,fontSize:7,fill:'rgba(255,255,255,.4)',letterSpacing:.3}}>S</text>
-          <text x={zX-8} y={zY+64} textAnchor="end"
-            style={{fontFamily:osw,fontWeight:800,fontSize:22,fill:'white'}}>{state.strikes}</text>
+          {/* Count — left of zone as traditional B-S */}
+          <text x={zX-6} y={zY+zH/2-8} textAnchor="end"
+            style={{fontFamily:osw,fontWeight:800,fontSize:22,fill:'white'}}>
+            {state.balls}-{state.strikes}
+          </text>
+          <text x={zX-6} y={zY+zH/2+6} textAnchor="end"
+            style={{fontFamily:mono,fontSize:7,fill:'rgba(255,255,255,.35)',letterSpacing:.3}}>
+            count
+          </text>
 
           {/* Outs — right of zone */}
-          <text x={zX+zW+8} y={zY+18} textAnchor="start"
-            style={{fontFamily:mono,fontSize:7,fill:'rgba(255,255,255,.4)',letterSpacing:.3}}>OUT</text>
           {[0,1,2].map(i=>(
-            <rect key={i} x={zX+zW+8} y={zY+24+i*14} width={10} height={10}
-              rx={1} transform={`rotate(45,${zX+zW+13},${zY+29+i*14})`}
+            <rect key={i} x={zX+zW+8} y={zY+10+i*18} width={10} height={10}
+              rx={1} transform={`rotate(45,${zX+zW+13},${zY+15+i*18})`}
               fill={i<state.outs?'rgba(255,255,255,.7)':'rgba(255,255,255,.12)'}
               stroke="rgba(255,255,255,.25)" strokeWidth="1"/>
           ))}
+          <text x={zX+zW+13} y={zY+68} textAnchor="middle"
+            style={{fontFamily:mono,fontSize:6,fill:'rgba(255,255,255,.3)'}}>
+            outs
+          </text>
 
-          {/* Pitch label — bottom center */}
+          {/* Pitch label */}
           {state.lastPitch && (
-            <text x={PW/2} y={PH-20} textAnchor="middle"
+            <text x={PW/2} y={PH-16} textAnchor="middle"
               style={{fontFamily:mono,fontSize:8,fill:'rgba(255,255,255,.5)',letterSpacing:.3}}>
               {state.lastPitch.type}{state.lastPitch.velo?` · ${state.lastPitch.velo.toFixed(0)} mph`:''}
             </text>
           )}
 
-          {/* Going Yard watermark */}
-          <image href="/icon-192.png" x={PW-52} y={PH-22} width={16} height={16}
+          {/* Watermark — bottom right, fits within PH */}
+          <image href="/icon-192.png" x={PW-44} y={PH-20} width={14} height={14}
             opacity={0.5} preserveAspectRatio="xMidYMid meet"/>
-          <text x={PW-34} y={PH-11} textAnchor="start"
-            style={{fontFamily:osw,fontWeight:800,fontSize:8,letterSpacing:.5}}>
+          <text x={PW-28} y={PH-9} textAnchor="start"
+            style={{fontFamily:osw,fontWeight:800,fontSize:7,letterSpacing:.5}}>
             <tspan fill="rgba(232,65,26,.6)">GOING</tspan>
             <tspan fill="rgba(255,255,255,.3)"> YARD</tspan>
           </text>
