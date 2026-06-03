@@ -14374,7 +14374,7 @@ function CheatCodeButton() {
             </div>
             <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',
               marginTop:2,letterSpacing:.5}}>
-              638,357 at-bats · 19,561 HRs · 2023–2026 · first principles
+              638,357 at-bats &middot; 19,561 HRs &middot; 2023-2026 &middot; first principles
             </div>
           </div>
           <button onClick={()=>setOpen(false)}
@@ -14392,7 +14392,7 @@ function CheatCodeButton() {
               letterSpacing:.8,marginBottom:6}}>DATA FOUNDATION</div>
             <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',lineHeight:1.7}}>
               Every signal in this model was validated against 638,357 at-bats
-              from 2023–2026 (19,561 home runs across 1,962 batters). Baseline HR
+              from 2023-2026 (19,561 home runs across 1,962 batters). Baseline HR
               rate: 10.64% per game. The scoring weights reflect actual HR rate
               gaps measured in the data — not theory.
             </div>
@@ -14416,12 +14416,12 @@ function CheatCodeButton() {
           <Section emoji="📊" title="What 638k At-Bats Confirmed" color="#27c97a">
             <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',
               marginBottom:8,letterSpacing:.5,textTransform:'uppercase'}}>
-              HR rate gaps measured from first principles · baseline 10.64%
+              HR rate gaps measured from first principles &middot; baseline 10.64%
             </div>
             {[
               ['Lineup slot 3 vs 9','7.74pt gap','Slot 3: 14.88% · Slot 9: 7.14% — biggest single variable in the dataset','#ffd700'],
               ['Days rest 0 vs 4+','5.71pt gap','0 days rest: 13.13% · 4 days: 7.42% — rhythm breaks with rest','#f5a623'],
-              ['Count discipline','3.89pt gap','Batter-ahead count >25%: 12.08% · <10%: 8.19% — patience predicts power','#27c97a'],
+              ['Count discipline','3.89pt gap','Batter-ahead count >25%: 12.08% &middot; <10%: 8.19% &mdash; patience predicts power','#27c97a'],
               ['Hot hand (2+ HR/3g)','3.38pt gap','13.16% vs 9.78% — hot hand is real and confirmed','#27c97a'],
               ['Barrel rate (5g)','19.7% edge','HR games show barrel rate 19.7% higher than non-HR games','#38b8f2'],
               ['Barrel spike vs baseline','2.00pt','Recent barrel% above personal norm: 12.73% vs flat 7.26%','#38b8f2'],
@@ -14626,273 +14626,6 @@ function CheatCodeButton() {
             ⚡ The Sauce is a living model &mdash; updated as the season sample grows.<br/>
             <span style={{color:'rgba(255,255,255,.2)',fontSize:7,marginTop:4,display:'block'}}>
               v7 &middot; 638,357 at-bats &middot; 19,561 HRs &middot; 10.64% base rate &middot; 2023-2026
-            </span>
-          </div>
-
-        </div>
-      </div>
-    </>}
-  </>;
-}
-
-function BvPHistoryTab({ data }) {
-  useHROdds();
-
-        <div style={{padding:'20px',flex:1}}>
-
-          {/* #1 misconception */}
-          <div style={{background:'rgba(255,64,32,.07)',border:'1px solid rgba(255,64,32,.25)',
-            borderRadius:8,padding:'12px 14px',marginBottom:20}}>
-            <div style={{fontFamily:osw,fontWeight:700,fontSize:13,color:'var(--accent)',
-              letterSpacing:.8,marginBottom:6}}>YARD SCORE ≠ BEST PICK</div>
-            <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',lineHeight:1.7}}>
-              The highest Yard Score is not automatically the best play.
-              A Yard 48 batter facing a Tough pitcher is often a worse bet than
-              a Yard 26 with a Target pitcher, confirmed in lineup, and a hot EV
-              reading. The signal is how many independent factors stack at once —
-              not the raw number.
-            </div>
-          </div>
-
-          {/* Proven numbers */}
-          <Section emoji="📊" title="What the Data Actually Shows" color="var(--accent2)">
-            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',
-              marginBottom:8,letterSpacing:.5,textTransform:'uppercase'}}>
-              From 18,207 tracked matchups — 2024/25/26 seasons
-            </div>
-            <Stat val="30.0%" label="A+ Grade + 🎯 Target pitcher"
-              sub="30 matchups, 9 HRs. The single best confirmed combo in the dataset."/>
-            <Stat val="14.8%" label="Sim TB ≥ 2.0"
-              sub="Meaningfully above base (8.63%). The 2.0 threshold is real."/>
-            <Stat val="15.1%" label="Recent EV 102+ mph"
-              sub="Batter is genuinely elite-hot. EV 95–98 still solid at 11.5%."/>
-            <Stat val="12.5%" label="Zone Fit 4–6"
-              sub="The sweet spot. Below 4 = weak. Above 8 = overcorrects, drops back to 4%."/>
-            <Stat val="~10%+" label="Sig Score 4+"
-              sub="Sig 4 = 9.3%, Sig 6 = 10.5%, Sig 7 = 11.3%. Real signal, not linear — 4+ doubles the base rate."/>
-            <Stat val="3.6%" label="A+ Grade + ⚠️ Tough pitcher"
-              sub="Below base rate. Grade doesn't overcome a genuinely tough arm."/>
-          </Section>
-
-          {/* Grade reality */}
-          <Section emoji="🎖️" title="Grade — What It Actually Means" color="#f5a623">
-            <div style={{background:'rgba(245,166,35,.06)',border:'1px solid rgba(245,166,35,.2)',
-              borderRadius:8,padding:'10px 14px',marginBottom:8}}>
-              {[['A+','14.4%','201 matchups'],['A','14.0%','1,055'],
-                ['B','10.9%','3,374'],['C','8.6%','5,963'],['D','6.7%','7,614']
-              ].map(([g,r,n]) => (
-                <div key={g} style={{display:'flex',alignItems:'center',
-                  gap:8,padding:'3px 0',borderBottom:'1px solid rgba(255,255,255,.04)'}}>
-                  <span style={{fontFamily:osw,fontWeight:800,fontSize:13,
-                    color:{'A+':'#f5a623','A':'#e8411a','B':'#38b8f2','C':'var(--muted)','D':'var(--muted)'}[g],
-                    width:24}}>{g}</span>
-                  <span style={{fontFamily:osw,fontWeight:700,fontSize:13,
-                    color:'var(--text)',width:48}}>{r}</span>
-                  <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{n} matchups</span>
-                </div>
-              ))}
-            </div>
-            <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',lineHeight:1.5}}>
-              Grades are clean and monotonic across 18k rows. A+ and A are
-              genuinely distinct from the field. But pitcher grade still matters —
-              an A+ vs Tough pitcher (3.6%) is worse than a B vs Target (14.0%).
-            </div>
-          </Section>
-
-          {/* Sim TB reality */}
-          <Section emoji="📐" title="Sim TB — The Real Thresholds" color="var(--ice)">
-            <Row label="Sim TB ≥ 2.0" value="14.8% HR rate" color="var(--ice)" col="SIM TB"
-              sub="Filter here for high-ceiling plays. This is where it gets meaningfully better."/>
-            <Row label="Sim TB 1.3–2.0" value="~10.6% HR rate" color="var(--muted)" col="SIM TB"
-              sub="Above base, roughly flat across this whole band. Solid, not elite."/>
-            <Row label="Sim TB < 1.0" value="5.2% HR rate" color="var(--accent)" col="SIM TB"
-              sub="Below base — fade."/>
-            <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginTop:6,
-              padding:'6px 8px',background:'rgba(255,255,255,.03)',borderRadius:5}}>
-              There is no mystery dip. The 1.3–2.0 range performs consistently.
-              The big jump is at 2.0 — that's the real filter threshold.
-            </div>
-          </Section>
-
-          {/* Sig reality */}
-          <Section emoji="⚡" title="Sig Score — The Real Story" color="#ffd700">
-            <Row label="Sig 0" value="3.7%" color="var(--muted)" col="⚡ SIG"
-              sub="Below base — no meaningful signals firing"/>
-            <Row label="Sig 1–3" value="5.7–8.2%" color="var(--muted)" col="⚡ SIG"
-              sub="Approaching base rate. Not strong enough alone."/>
-            <Row label="Sig 4–5" value="9.3–9.4%" color="#f5a623" col="⚡ SIG"
-              sub="Doubles the base rate. This is the real floor for actionable plays."/>
-            <Row label="Sig 6–7" value="10.5–11.3%" color="#ffd700" col="⚡ SIG"
-              sub="Strong signal. Use the ⚡ Sig filter box — set minimum to 4."/>
-            <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginTop:6,
-              padding:'6px 8px',background:'rgba(255,215,0,.06)',borderRadius:5,
-              border:'1px solid rgba(255,215,0,.15)'}}>
-              Sig is not "higher = always better." It's roughly flat from 4–9.
-              The value is the 4+ threshold doubling the base rate — not chasing
-              the highest number.
-            </div>
-          </Section>
-
-          {/* Zone Fit */}
-          <Section emoji="🎯" title="Zone Fit — The Sweet Spot" color="var(--ice)">
-            <Row label="Zone Fit 4–6" value="12.5% HR rate" color="var(--ice)" col="ZONEFIT"
-              sub="The confirmed sweet spot across 18k rows."/>
-            <Row label="Zone Fit < 2" value="4.4% HR rate" color="var(--accent)"
-              sub="Below base — pitcher doesn't throw to this batter's damage zone."/>
-            <Row label="Zone Fit > 8" value="4.1% HR rate" color="var(--accent)"
-              sub="Overcorrects — extreme zone fit actually drops back below base. Don't chase the highest number."/>
-          </Section>
-
-          {/* Handedness */}
-          <Section emoji="🤝" title="Handedness — New in v6" color="#a78bfa">
-            <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',
-              lineHeight:1.6,marginBottom:8}}>
-              Now scored explicitly. The engine reads pitcher splits vs each
-              batter's hand and boosts Sig when the compound matches: platoon
-              advantage + pitcher weak vs this hand + batter strong vs that hand.
-              You'll see it reflected in elevated Sig scores — no separate column needed.
-            </div>
-            <div style={{background:'rgba(167,139,250,.07)',border:'1px solid rgba(167,139,250,.2)',
-              borderRadius:6,padding:'8px 10px'}}>
-              <div style={{fontFamily:mono,fontSize:9,color:'#a78bfa',lineHeight:1.6}}>
-                💡 For deeper handedness research, go to the{' '}
-                <strong style={{color:'var(--text)'}}>Splits page</strong> — filter by
-                pitcher hand (LHP/RHP) to see exactly how any batter performs vs
-                each arm. That's where you find the .320 vs LHP batters before
-                the engine does.
-              </div>
-            </div>
-          </Section>
-
-          {/* Daily scan */}
-          {/* XBH / Hits prediction */}
-          <Section emoji="🎯" title="Beyond HRs — Hits & XBH Prediction" color="#a78bfa">
-            <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',lineHeight:1.6,marginBottom:8}}>
-              The engine was built for home runs — but the data shows it's an equally strong predictor
-              of hits and extra-base hits. The same signals that flag HR potential flag elite contact intent.
-              Hard contact in the right direction produces doubles, triples, and long flyouts just as
-              often as it produces home runs.
-            </div>
-            <div style={{background:'rgba(167,139,250,.07)',border:'1px solid rgba(167,139,250,.2)',
-              borderRadius:8,padding:'10px 14px',marginBottom:8}}>
-              <div style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.4)',
-                textTransform:'uppercase',letterSpacing:.5,marginBottom:6}}>
-                From 17,340 tracked matchups · base rates: Hit 56.4% · XBH 31.5%
-              </div>
-              {[
-                ['A/A+ Grade + Sig ≥ 6','68.8% Hit · 50.0% XBH · 20.8% HR','48 matchups — coin flip on XBH','#a78bfa'],
-                ['Yard ≥ 45 + Sig ≥ 6', '68.1% Hit · 48.9% XBH · 21.3% HR','47 matchups — interchangeable with above','#a78bfa'],
-                ['Sig = 7',             '62.9% Hit · 48.5% XBH · 18.6% HR','Sig 7 is the single strongest XBH signal','#ffd700'],
-                ['Yard ≥ 45',          '66.7% Hit · 46.2% XBH · 17.9% HR','39 matchups','var(--accent2)'],
-                ['Yard ≥ 40',          '63.1% Hit · 41.7% XBH · 12.6% HR','103 matchups — strong and large sample','var(--accent2)'],
-                ['Sim H ≥ 1.0',        '62.3% Hit · — · 15.4% HR','Best standalone hit predictor in the model','#27c97a'],
-                ['Sim TB ≥ 2.0',       '65.3% Hit · 41.4% XBH · 17.5% HR','The 2.0 threshold matters for both HR and XBH','#38b8f2'],
-              ].map(([filter, rates, note, col]) => (
-                <div key={filter} style={{padding:'5px 0',borderBottom:'1px solid rgba(255,255,255,.04)'}}>
-                  <div style={{display:'flex',alignItems:'baseline',gap:8,flexWrap:'wrap'}}>
-                    <span style={{fontFamily:osw,fontWeight:700,fontSize:11,
-                      color:col,flexShrink:0}}>{filter}</span>
-                  </div>
-                  <div style={{fontFamily:osw,fontWeight:800,fontSize:12,
-                    color:'var(--text)',marginTop:2}}>{rates}</div>
-                  <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:1}}>{note}</div>
-                </div>
-              ))}
-            </div>
-            <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',
-              lineHeight:1.6,padding:'6px 8px',background:'rgba(255,255,255,.03)',borderRadius:5}}>
-              <strong style={{color:'var(--text)'}}>For hits/TB props:</strong> Use Sim H ≥ 1.0 as
-              the primary filter. Stack with Sig ≥ 6 or Yard ≥ 40 for the highest-conviction plays.
-              The model correlates more strongly with XBH than with HRs — the engine measures
-              elite contact intent, not just home run probability.
-            </div>
-          </Section>
-
-          <Section emoji="🗺️" title="Daily Scan — 5 Steps" color="#27c97a">
-            <div style={{fontFamily:mono,fontSize:10,lineHeight:2.0,color:'var(--text)'}}>
-              {[
-                ['1','Filter Sim TB ≥ 1.5 — cuts low-ceiling noise immediately'],
-                ['2','Filter P.Grade to 🎯 Target + 💥 Hittable'],
-                ['3','Look for Grade A or A+ in what remains'],
-                ['4','Confirm ✅ lineup + check Sig ≥ 4 with the ⚡ Sig filter'],
-                ['5','Check FORM — Moonshot and Gap over Cold and Worm'],
-                ['✱','A+ vs Target (30% HR rate) is the single best combo in the data'],
-              ].map(([n,txt]) => (
-                <div key={n} style={{display:'flex',gap:8,alignItems:'baseline'}}>
-                  <span style={{color:'var(--accent2)',fontWeight:700,
-                    flexShrink:0,width:14}}>{n}.</span>
-                  <span>{txt}</span>
-                </div>
-              ))}
-            </div>
-          </Section>
-
-          {/* Fade */}
-          <Section emoji="❌" title="Fade These" color="var(--accent)">
-            <Fade label="A+ vs ⚠️ Tough or ‼️ Elite pitcher"
-              sub="A+ + Tough = 3.6% — below base rate. Grade doesn't overcome a tough arm."/>
-            <Fade label="Sim TB below 1.0"
-              sub="5.2% HR rate. Half the base rate. Cut with the Sim TB filter."/>
-            <Fade label="Zone Fit above 8"
-              sub="Overcorrects — drops back to 4.1%. The sweet spot is 4–6, not highest."/>
-            <Fade label="Recent EV below 88 mph"
-              sub="6.75% — below base. Batter is cold. Combine with Cold form = double fade."/>
-            <Fade label="Cold form + no confirmed lineup"
-              sub="Two independent negatives before you even look at anything else."/>
-          </Section>
-
-          {/* Form */}
-          <Section emoji="🔥" title="Form Class — What Each Means" color="var(--accent2)">
-            {[
-              ['Moonshot','9.8%','High launch angle + EV profile. Barely above base — context matters more than label alone.'],
-              ['Contact', '9.2%','Consistent hard contact. Reliable but not a power signal on its own.'],
-              ['Gap',     '7.8%','Hard contact, XBH-oriented. Solid. Pairs well with a Target pitcher.'],
-              ['Whiff',   '6.3%','K-prone. Below base — avoid unless Sig is stacked.'],
-              ['Worm',    '5.0%','Ground ball tendency. Lowest power profile. Fade.'],
-              ['Cold',    '4.1%','No recent heat. Well below base. Hard avoid.'],
-            ].map(([fc,rate,desc]) => (
-              <div key={fc} style={{display:'flex',gap:8,padding:'5px 0',
-                borderBottom:'1px solid rgba(255,255,255,.04)'}}>
-                <div style={{flexShrink:0,width:68}}>
-                  <div style={{fontFamily:osw,fontWeight:700,fontSize:11}}>{fc}</div>
-                  <div style={{fontFamily:mono,fontSize:9,
-                    color:parseFloat(rate)>=9?'#27c97a':parseFloat(rate)<=5?'var(--accent)':'var(--muted)'}}>{rate}</div>
-                </div>
-                <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',
-                  lineHeight:1.4,flex:1}}>{desc}</div>
-              </div>
-            ))}
-          </Section>
-
-          {/* Column guide */}
-          <Section emoji="📋" title="Column Guide" color="var(--muted)">
-            {[
-              ['YARD',    'Composite score. Starting point only — stack the signals.'],
-              ['⚡ SIG',  'Stacked signal count. Filter ≥ 4. Doubles the base HR rate.'],
-              ['FORM',    'Swing profile. Moonshot/Gap = power. Cold/Worm = fade.'],
-              ['P.GRADE', '🎯 Target = exploit. 💥 Hittable = good. ⚠️ Tough/‼️ Elite = fade unless grade A+.'],
-              ['SIM TB',  'Simulated total bases. Filter ≥ 1.5 to start, ≥ 2.0 for elite plays.'],
-              ['ZONEFIT', 'Pitch zone alignment. Sweet spot 4–6. Ignore if > 8 or < 2.'],
-              ['L7 EV',   'Last 7 days exit velocity. ≥ 95 = hot. ≥ 102 = elite hot.'],
-              ['BS Δ',    'Bat speed vs season baseline. Positive = accelerating. Key Sig input.'],
-              ['DIST',    'Recent near-miss distances. Balls near the wall = HR intent is there.'],
-            ].map(([col,desc]) => (
-              <div key={col} style={{display:'flex',gap:8,padding:'5px 0',
-                borderBottom:'1px solid rgba(255,255,255,.04)'}}>
-                <span style={{fontFamily:mono,fontSize:9,color:'var(--accent2)',
-                  fontWeight:700,flexShrink:0,width:56,letterSpacing:.3}}>{col}</span>
-                <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)',
-                  lineHeight:1.4}}>{desc}</span>
-              </div>
-            ))}
-          </Section>
-
-          <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',
-            textAlign:'center',marginTop:8,lineHeight:1.6,
-            borderTop:'1px solid var(--border)',paddingTop:12}}>
-            ⚡ The Sauce is a living model &mdash; updated as the season sample grows.<br/>
-            <span style={{color:'rgba(255,255,255,.2)',fontSize:7,marginTop:4,display:'block'}}>
-              v6 &middot; 18,207 matchups &middot; 1,572 HRs &middot; 8.63% base rate &middot; 2024-26
             </span>
           </div>
 
