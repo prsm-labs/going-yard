@@ -14412,77 +14412,18 @@ function CheatCodeButton() {
             </div>
           </div>
 
-          {/* New 638k signals */}
-          <Section emoji="📊" title="What 638k At-Bats Confirmed" color="#27c97a">
-            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',
-              marginBottom:8,letterSpacing:.5,textTransform:'uppercase'}}>
-              HR rate gaps measured from first principles &middot; baseline 10.64%
-            </div>
-            {[
-              ['Lineup slot 3 vs 9','7.74pt gap','Slot 3: 14.88% · Slot 9: 7.14% — biggest single variable in the dataset','#ffd700'],
-              ['Days rest 0 vs 4+','5.71pt gap','0 days rest: 13.13% · 4 days: 7.42% — rhythm breaks with rest','#f5a623'],
-              ['Count discipline','3.89pt gap','Batter-ahead count >25%: 12.08% &middot; <10%: 8.19% &mdash; patience predicts power','#27c97a'],
-              ['Hot hand (2+ HR/3g)','3.38pt gap','13.16% vs 9.78% — hot hand is real and confirmed','#27c97a'],
-              ['Barrel rate (5g)','19.7% edge','HR games show barrel rate 19.7% higher than non-HR games','#38b8f2'],
-              ['Barrel spike vs baseline','2.00pt','Recent barrel% above personal norm: 12.73% vs flat 7.26%','#38b8f2'],
-              ['Platoon (LHB vs LHP)','0.63pt/PA','-0.626%/PA for same-side matchup — real and now in scoring','#a78bfa'],
-              ['Hard hit precursor','1.32pt','Loud contact, no HR last game = setup for next game','#f5a623'],
-            ].map(([sig,gap,desc,col])=>(
-              <div key={sig} style={{padding:'6px 0',borderBottom:'1px solid rgba(255,255,255,.04)'}}>
-                <div style={{display:'flex',alignItems:'baseline',gap:8}}>
-                  <span style={{fontFamily:osw,fontWeight:700,fontSize:11,color:col,flexShrink:0}}>{sig}</span>
-                  <span style={{fontFamily:mono,fontSize:9,color:'rgba(255,255,255,.4)',marginLeft:'auto',flexShrink:0}}>{gap}</span>
-                </div>
-                <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:2,lineHeight:1.4}}>{desc}</div>
-              </div>
-            ))}
-          </Section>
-
-          {/* Score architecture */}
-          <Section emoji="🔬" title="Score Architecture — Updated June 2026" color="var(--accent2)">
-            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',lineHeight:1.7,marginBottom:10}}>
-              <strong style={{color:'var(--text)'}}>Boom Score</strong> (0–99) — composite HR readiness:
-            </div>
-            {[
-              ['Zone Fit','28%','Spatial pitch/batter zone overlap · non-linear bell curve · peak at ZF 4–6'],
-              ['Sig','26%','Stacked signal count · cleanest linear predictor in the data'],
-              ['Sim TB','18%','Full-game simulation output'],
-              ['Barrel Spike','8%','Recent barrel% above personal season baseline — NEW'],
-              ['ISO','8%','Season isolated power profile (trimmed from 15%)'],
-              ['Hot Hand','5%','2+ HRs in last 3 games — NEW'],
-              ['Count Discipline','4%','Batter-ahead count frequency — NEW'],
-              ['HH Precursor','2%','Loud contact, no HR last game — NEW'],
-              ['Engine Score','0%','Removed — was double-counting Sig'],
-            ].map(([c,w,d])=>(
-              <div key={c} style={{display:'flex',gap:8,padding:'3px 0',borderBottom:'1px solid rgba(255,255,255,.03)'}}>
-                <span style={{fontFamily:mono,fontSize:8,color:'var(--accent2)',width:90,flexShrink:0}}>{c}</span>
-                <span style={{fontFamily:mono,fontSize:8,color:w==='0%'?'rgba(255,255,255,.2)':w>='8%'?'#27c97a':'var(--muted)',width:30,flexShrink:0}}>{w}</span>
-                <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',lineHeight:1.4}}>{d}</span>
-              </div>
-            ))}
-            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',lineHeight:1.7,marginTop:10}}>
-              <strong style={{color:'var(--text)'}}>Yard Score</strong> &mdash; Boom(35%) + PS(22%) + Sig(20%) + gHR(18%)<br/>
-              <strong style={{color:'var(--text)'}}>× three post-score multipliers:</strong><br/>
-              Platoon: LHB vs LHP ×0.88 · LHB vs RHP ×1.03<br/>
-              Days rest: 0 days ×1.08 · 4+ days ×0.87<br/>
-              Lineup slot: slot 3–4 ×1.04 · slot 9 ×0.88
-            </div>
-          </Section>
-
           {/* Proven numbers */}
-          <Section emoji="🎯" title="What the Data Actually Shows" color="var(--accent2)">
-            <Stat val="14.88%" label="Lineup slot 3 — highest HR rate"
-              sub="Slot 9 = 7.14%. Biggest single-variable gap in 638k rows."/>
-            <Stat val="13.13%" label="0 days rest (just played)"
-              sub="4 days rest = 7.42%. Playing every day keeps timing grooved."/>
-            <Stat val="13.16%" label="2+ HRs in last 3 games"
-              sub="Zero HRs last 3g = 9.78%. Hot hand is real. Back-to-back HR games = +2.77pt."/>
-            <Stat val="12.08%" label="Batter-ahead count > 25%"
-              sub="<10% = 8.19%. Plate discipline predicts power almost as strongly as barrel rate."/>
-            <Stat val="4.60%" label="Soft fastball (≤93mph)"
-              sub="vs 2.70% on hard FF (96+). Velocity drop on the primary pitch = 1.9pt gap."/>
+          <Section emoji="📊" title="Numbers Worth Knowing" color="var(--accent2)">
             <Stat val="30.0%" label="A+ Grade + 🎯 Target pitcher"
-              sub="30 matchups, 9 HRs. The single best confirmed combo in the dataset."/>
+              sub="30 matchups, 9 HRs. Single best confirmed combo in the dataset."/>
+            <Stat val="14.8%" label="Sim TB ≥ 2.0"
+              sub="Meaningfully above the 10.64% baseline. The 2.0 threshold is real."/>
+            <Stat val="15.1%" label="Recent EV 102+ mph"
+              sub="Elite-hot batter. EV 95-98 is still solid at 11.5%."/>
+            <Stat val="12.5%" label="Zone Fit 4-6"
+              sub="The sweet spot. Below 4 = weak. Above 8 = overcorrects, drops to 4%."/>
+            <Stat val="3.6%" label="A+ Grade + ⚠️ Tough pitcher"
+              sub="Below baseline. Grade alone does not overcome a tough arm."/>
           </Section>
 
           {/* Grade reality */}
