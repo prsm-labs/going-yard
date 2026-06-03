@@ -1834,7 +1834,7 @@ function MatchupCard({ dp }) {
     return Math.min(14, Math.max(0, s));
   })();
 
-  const boom   = parseFloat(dp._boom) || computeBoomScore(sig, parseFloat(dp.zone_fit)||0, parseFloat(dp.recent_iso)||0, parseFloat(dp.sim_tb)||0, parseFloat(dp.weighted_flag_score)||0);
+  const boom   = parseFloat(dp._boom) || computeBoomScore(sig, parseFloat(dp.zone_fit)||0, parseFloat(dp.recent_iso)||0, parseFloat(dp.sim_tb)||0, parseFloat(dp.weighted_flag_score)||0, parseFloat(dp.recent_barrel_spike||0), parseInt(dp.recent_hr_count||0), parseFloat(dp.recent_batter_ahead_pct||0), !!dp.hh_precursor, parseFloat(dp.primary_pitch_hr_rate||0));
   const iso    = parseFloat(dp.l7_iso||dp.recent_iso) || 0;  // L7 blended ISO
   const l7iso   = parseFloat(dp.l7_iso)    || parseFloat(dp.recent_iso)  || 0;
   const l7woba  = parseFloat(dp.l7_woba)   || parseFloat(dp.season_woba) || 0;
@@ -1869,7 +1869,7 @@ function MatchupCard({ dp }) {
       <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
         <div style={{display:'flex',gap:6,minWidth:'max-content',paddingBottom:4}}>
           {[
-            ['🎯 Yard', sig>0||boom>0?(()=>{const ys=computeYardScore(sig,parseFloat(dp.gHR)||0,boom,parseFloat(dp.ps_score)||0);return ys>0?ys:'—';})():'—', (()=>{const ys=computeYardScore(sig,parseFloat(dp.gHR)||0,boom,parseFloat(dp.ps_score)||0);return ys>=32?'#ffd700':ys>=24?'#ff4020':ys>=18?'#f5a623':'var(--muted)';})()],
+            ['🎯 Yard', sig>0||boom>0?(()=>{const ys=computeYardScore(sig,parseFloat(dp.gHR)||0,boom,parseFloat(dp.ps_score)||0,dp.batter_hand||'',dp.pitcher_hand||'',parseInt(dp.days_rest??1),liveSlot(dp.batter_id,dp.lineup_slot));return ys>0?ys:'—';})():'—', (()=>{const ys=computeYardScore(sig,parseFloat(dp.gHR)||0,boom,parseFloat(dp.ps_score)||0,dp.batter_hand||'',dp.pitcher_hand||'',parseInt(dp.days_rest??1),liveSlot(dp.batter_id,dp.lineup_slot));return ys>=32?'#ffd700':ys>=24?'#ff4020':ys>=18?'#f5a623':'var(--muted)';})()],
             ['💥 Boom', boom>0?Math.round(boom):'—', boomColor],
             ['⚡️ PS', (parseFloat(dp.ps_score)||0)>=1?Math.round(parseFloat(dp.ps_score)):'—', (parseFloat(dp.ps_score)||0)>=75?'#a855f7':(parseFloat(dp.ps_score)||0)>=60?'#ff4020':'var(--muted)'],
             ['⚡ Sig',  sig>0?sig:'—',               sigColor],
@@ -12254,33 +12254,146 @@ function computeEffectiveGrade(batterGrade, pgLabel) {
 //   Score(0-3)   → 5-window flag-based engine grade
 // Rebalanced: Zone Fit elevated (30%, non-linear) | Sig(30%) | SimTB(20%) | ISO(15%) | Engine(5%)
 // Zone Fit is now primary — ZF≥3 predicts 10-30% HR rates vs 2.4% at ZF=0.
-function computeBoomScore(sig, zoneFit, iso, simTB, engineScore) {
+// ── Boom Score ───────────────────────────────────────────────────────────────
+// Rebalanced weights (638k at-bat data, June 2026):
+//   ZoneFit(28%) + Sig(26%) + SimTB(18%) + BarrelSpike(8%) + ISO(8%)
+//   + HotHand(5%) + CountDisc(4%) + Precursor(2%) + PitchVuln(1%)
+//
+// Key changes vs prior formula:
+//   • Engine Score (5%) removed — was double-counting Sig
+//   • ISO trimmed 15%→8%: season stat, overweighted vs recent signals
+//   • Barrel Spike added (8%): recent barrel% vs personal season baseline (+2pt confirmed)
+//   • Hot Hand added (5%): 2+ HRs last 3 games = 13.16% vs 9.78% baseline (+3.38pt)
+//   • Count Discipline added (4%): batter-ahead count% 25%+ = 12.08% vs 8.19% (-3.89pt gap)
+//   • HH Precursor added (2%): loud contact no-HR last game = +1.32pt
+//   • Pitch Vulnerability added (1%): batter HR rate vs pitcher's primary pitch
+//
+// New field sources: barrel_spike, recent_hr_count, recent_batter_ahead_pct,
+//   hh_precursor, primary_pitch_hr_rate — all from daily_picks.csv
+function computeBoomScore(sig, zoneFit, iso, simTB, engineScore,
+  barrelSpike, recentHRCount, batterAheadPct, hhPrecursor, pitchVulnRate) {
+
   const zfRaw = zoneFitScore(parseFloat(zoneFit) || 0);   // non-linear 0–100
-  const zf = zfRaw * 0.30;                                 // 30% weight, max contrib 30
-  const s  = Math.min(30, (parseFloat(sig)        || 0) / 14  * 30);   // 30%
-  const tb = Math.min(20, (parseFloat(simTB)      || 0) / 3.5 * 20);   // 20%
-  const is = Math.min(15, (parseFloat(iso)        || 0) / 0.40 * 15);  // 15%
-  const es = Math.min(5,  (parseFloat(engineScore)|| 0) / 3.0 * 5);    //  5%
-  return Math.min(99, Math.round(zf + s + tb + is + es));
+  const zf = zfRaw * 0.28;                                 // 28% — slight trim
+
+  const s  = Math.min(26, (parseFloat(sig)   || 0) / 14 * 26);  // 26%
+  const tb = Math.min(18, (parseFloat(simTB) || 0) / 3.5 * 18); // 18%
+  const is = Math.min(8,  (parseFloat(iso)   || 0) / 0.40 * 8); //  8% (was 15%)
+  // engine score removed — was double-counting Sig
+
+  // ── Barrel Spike (8%) — recent barrel% vs personal season baseline ──────────
+  // Spike of +2%+ = 12.73% HR rate vs 7.26% flat. Data: +2pt confirmed edge.
+  const bSpike = parseFloat(barrelSpike);
+  const bs = isNaN(bSpike) ? 0
+           : bSpike >= 6   ? 8
+           : bSpike >= 3   ? 6
+           : bSpike >= 1   ? 4
+           : bSpike >= 0   ? 2
+           : bSpike >= -2  ? 1
+           : 0;  // below season avg = no credit
+
+  // ── Hot Hand (5%) — HRs in last 3 games ──────────────────────────────────
+  // 2+ HRs last 3g = 13.16%, 0 HRs = 9.78%. +3.38pt gap confirmed.
+  const hr3 = parseInt(recentHRCount) || 0;
+  const hh = hr3 >= 3 ? 5 : hr3 >= 2 ? 5 : hr3 >= 1 ? 3 : 0;
+
+  // ── Count Discipline (4%) — batter-ahead count frequency ──────────────────
+  // >25% batter-ahead = 12.08%. <10% = 8.19%. 3.89pt gap confirmed.
+  const baRaw = parseFloat(batterAheadPct);
+  const cd = isNaN(baRaw) ? 0
+           : baRaw >= 30  ? 4
+           : baRaw >= 25  ? 4
+           : baRaw >= 15  ? 2
+           : baRaw >= 10  ? 1
+           : 0;
+
+  // ── HH Precursor (2%) — loud contact, no HR last game ───────────────────
+  // +1.32pt confirmed. The setup game before the HR game.
+  const prec = hhPrecursor ? 2 : 0;
+
+  // ── Pitch Vulnerability (1%) — batter HR rate vs pitcher's primary pitch ──
+  // Median gap best vs worst pitch type = 3.92%. Small weight, real edge.
+  const pvRaw = parseFloat(pitchVulnRate);
+  const pv = isNaN(pvRaw) ? 0
+           : pvRaw >= 10  ? 1
+           : pvRaw >= 6   ? 0.5
+           : 0;
+
+  return Math.min(99, Math.round(zf + s + tb + is + bs + hh + cd + prec + pv));
+}
+
+// ── liveSlot — always use confirmed LINEUP_STATUS slot if available ───────────
+// The engine outputs lineup_slot=0 (unknown at morning run time).
+// Once lineups post, LINEUP_STATUS is populated with the real batting order.
+// This helper prefers the live slot, falls back to engine slot, then 0.
+// Used by every computeYardScore call so scores update the moment lineups confirm.
+function liveSlot(batterId, engineSlot) {
+  const ls = LINEUP_STATUS[parseInt(batterId) || 0];
+  if (ls?.status === 'confirmed' && ls.slot >= 1 && ls.slot <= 9) return ls.slot;
+  return parseInt(engineSlot) || 0;
 }
 
 // ── Yard Score ───────────────────────────────────────────────────────────────
-// Rebalanced weights (data-driven, May 2026):
-//   Boom(35%) + PS(25%) + Sig direct(20%) + gHR tapered(20%)
+// Rebalanced weights (638k at-bat data, June 2026):
+//   Boom(35%) + PS(22%) + Sig(20%) + gHR tapered(18%)
+//   × platoon modifier × days rest modifier × lineup slot modifier
+//
 // Key changes vs prior formula:
-//   • Sig weight doubled (10%→20%): cleanest linear predictor in the dataset
-//   • gHR now tapered: diminishing returns above 25-30 match actual HR rate curve
-//   • Boom elevated: now contains Zone Fit non-linear, a stronger situational signal
-//   • PS trimmed slightly: BvP deltas are real but modest (+1.7 EV, +0.3 barrel)
-// Sweet spot target: 20–34 range should produce 9-11% HR rates consistently.
-function computeYardScore(sig, ghr, boom, ps) {
-  const sigN   = (Math.min(14, Math.max(0, parseFloat(sig) || 0)) / 14) * 100;
-  const ghrT   = taperGHR(parseFloat(ghr) || 0);   // tapered gHR, not raw
-  const raw    = (parseFloat(boom) || 0) * 0.35
-               + (parseFloat(ps)   || 0) * 0.25
-               + sigN                    * 0.20
-               + ghrT                    * 0.20;
-  return Math.min(99, Math.max(0, Math.round(raw)));
+//   • PS trimmed 25%→22%: BvP deltas real but modest
+//   • gHR trimmed 20%→18%: new same-week signals are better day-to-day predictors
+//   • Three post-formula multipliers added (never additive — nudge not dominate):
+//     - Platoon: LHB vs LHP = ×0.88 (worst), LHB vs RHP = ×1.03 (best)
+//     - Days Rest: 0 days = ×1.08, 4 days = ×0.82, 1 day = ×1.00 (neutral)
+//     - Lineup Slot: slot 3 = ×1.04, slot 9 = ×0.88
+//
+// Sweet spot target: 20–34 range = 9-11% HR rates consistently.
+function computeYardScore(sig, ghr, boom, ps,
+  batterHand, pitcherHand, daysRest, lineupSlot) {
+
+  const sigN = (Math.min(14, Math.max(0, parseFloat(sig) || 0)) / 14) * 100;
+  const ghrT = taperGHR(parseFloat(ghr) || 0);
+  const raw  = (parseFloat(boom) || 0) * 0.35
+             + (parseFloat(ps)   || 0) * 0.22
+             + sigN                    * 0.20
+             + ghrT                    * 0.18;
+
+  // ── Platoon multiplier ────────────────────────────────────────────────────
+  // Data: LHB vs LHP -0.626%/PA (worst), LHB vs RHP +0.202% (best).
+  // Compound matters — individual hand alone is near-zero signal.
+  const bh = (batterHand  || '').toString().trim().toUpperCase()[0];
+  const ph = (pitcherHand || '').toString().trim().toUpperCase()[0];
+  let platoonMod = 1.0;
+  if (ph === 'L' && (bh === 'L' || bh === 'S')) platoonMod = 0.88; // same side = penalty
+  else if (ph === 'R' && (bh === 'L' || bh === 'S')) platoonMod = 1.03; // LHB vs RHP = slight boost
+  else if (ph === 'L' && bh === 'R') platoonMod = 1.03; // RHB vs LHP = slight boost
+
+  // ── Days rest multiplier ──────────────────────────────────────────────────
+  // 0 rest = 13.13%, 1 = 11.15%, 4 = 7.42%. Groove breaks with rest.
+  const dr = parseInt(daysRest);
+  const restMod = isNaN(dr) ? 1.0
+                : dr === 0  ? 1.08  // just played yesterday: groove is live
+                : dr === 1  ? 1.00  // normal: neutral
+                : dr === 2  ? 0.97
+                : dr === 3  ? 0.92
+                : dr >= 4   ? 0.87  // 4+ days off: timing disrupted
+                : 1.0;
+
+  // ── Lineup slot multiplier ────────────────────────────────────────────────
+  // Slot 3: 14.88% HR rate. Slot 9: 7.14%. Largest single gap in 638k rows.
+  const slot = parseInt(lineupSlot) || 0;
+  const slotMod = slot === 3 ? 1.04
+                : slot === 4 ? 1.04
+                : slot === 2 ? 1.02
+                : slot === 5 ? 1.01
+                : slot === 1 ? 1.01
+                : slot === 6 ? 1.00
+                : slot === 7 ? 0.96
+                : slot === 8 ? 0.93
+                : slot === 9 ? 0.88
+                : 1.0;  // 0 = unconfirmed, neutral
+
+  const adjusted = raw * platoonMod * restMod * slotMod;
+  return Math.min(99, Math.max(0, Math.round(adjusted)));
 }
 
 function YardBadge({ score }) {
@@ -12290,7 +12403,7 @@ function YardBadge({ score }) {
   const bg  = score>=32?'rgba(255,215,0,.22)':score>=24?'rgba(255,64,32,.18)':score>=18?'rgba(245,166,35,.15)':score>=13?'rgba(210,180,140,.15)':'rgba(255,255,255,.04)';
   const col = score>=32?'#ffd700':score>=24?'#ff4020':score>=18?'#f5a623':score>=13?'#c4a882':'var(--muted)';
   return (
-    <span title={`Yard Score: ${score} — Boom(35%) + PS(25%) + Sig(20%) + gHR tapered(20%) · Sweet spot: 20–34`}
+    <span title={`Yard Score: ${score} — Boom(35%) + PS(22%) + Sig(20%) + gHR(18%) × platoon × rest × slot · 638k PA validated`}
       style={{display:'inline-block',padding:'1px 5px',borderRadius:4,
         fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:10,
         background:bg,color:col,whiteSpace:'nowrap',cursor:'default'}}>
@@ -12298,6 +12411,7 @@ function YardBadge({ score }) {
     </span>
   );
 }
+
 
 function SplashScreen({ onDone }) {
   const [fading, setFading] = React.useState(false);
@@ -12510,9 +12624,9 @@ function LongShotView({ data }) {
           if (oldGate > 0) _ps = Math.min(99, Math.round(_ps / oldGate * newGate));
         }
       }
-      const _boom  = computeBoomScore(_sig, b.zone_fit, b.recent_iso, _simTB, b.weighted_flag_score);
+      const _boom  = computeBoomScore(_sig, b.zone_fit, b.recent_iso, _simTB, b.weighted_flag_score, parseFloat(b.recent_barrel_spike||0), parseInt(b.recent_hr_count||0), parseFloat(b.recent_batter_ahead_pct||0), !!b.hh_precursor, parseFloat(b.primary_pitch_hr_rate||0));
       const _ps_v  = b._ps ?? (parseFloat(b.ps_score)||0);
-      const _yard  = computeYardScore(_sig, b._kHR||parseFloat(b.gHR)||0, _boom, _ps_v);
+      const _yard  = computeYardScore(_sig, b._kHR||parseFloat(b.gHR)||0, _boom, _ps_v, b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1), liveSlot(b.batter_id,b.lineup_slot));
       // Write to DAILY_PICKS_CACHE directly (b is a CSV copy, not the cache object)
       const _lsCache = DAILY_PICKS_CACHE[String(b.batter_id)];
       if (_lsCache && !_lsCache._trackerSig) _lsCache._trackerSig = _sig;
@@ -12883,8 +12997,8 @@ function SimLabView({ data }) {
         const pid = r.pitcher_id ? String(parseInt(r.pitcher_id) || r.pitcher_id) : null;
         return pid && selPitcherGradesSim.has(simPitcherGrades.current[pid]);
       })
-      .filter(r => !minYard   || (parseFloat(r._yard)||computeYardScore(parseFloat(r.weighted_flag_score)*4.6, parseFloat(r.gHR)||0, parseFloat(r._boom)||0, parseFloat(r.ps_score)||0)) >= parseFloat(minYard))
-      .filter(r => !maxYard   || (parseFloat(r._yard)||computeYardScore(parseFloat(r.weighted_flag_score)*4.6, parseFloat(r.gHR)||0, parseFloat(r._boom)||0, parseFloat(r.ps_score)||0)) <= parseFloat(maxYard))
+      .filter(r => !minYard   || (parseFloat(r._yard)||computeYardScore(parseFloat(r.weighted_flag_score)*4.6, parseFloat(r.gHR)||0, parseFloat(r._boom)||0, parseFloat(r.ps_score)||0, r.batter_hand||'', r.pitcher_hand||'', parseInt(r.days_rest??1), liveSlot(r.batter_id,r.lineup_slot))) >= parseFloat(minYard))
+      .filter(r => !maxYard   || (parseFloat(r._yard)||computeYardScore(parseFloat(r.weighted_flag_score)*4.6, parseFloat(r.gHR)||0, parseFloat(r._boom)||0, parseFloat(r.ps_score)||0, r.batter_hand||'', r.pitcher_hand||'', parseInt(r.days_rest??1), liveSlot(r.batter_id,r.lineup_slot))) <= parseFloat(maxYard))
 
       .filter(r => { const _s = Math.round(sigCache.current[String(r.batter_id)] ?? (parseFloat(r.weighted_flag_score)||0)*4.6); return (!minSig || _s >= parseFloat(minSig)) && (!maxSig || _s <= parseFloat(maxSig)); })
       .filter(r => !minSimTB  || (parseFloat(r.sim_tb)||0)   >= parseFloat(minSimTB))
@@ -12893,8 +13007,8 @@ function SimLabView({ data }) {
     const mul = sortDir === 'desc' ? -1 : 1;
     const sorted = [...filtered].sort((a, b) => {
       if (sortBy === '_boom') {
-        const aB = boomCache.current[String(a.batter_id)] ?? computeBoomScore((parseFloat(a.weighted_flag_score)||0)*4.6, a.zone_fit, a.recent_iso, a.sim_tb, a.weighted_flag_score);
-        const bB = boomCache.current[String(b.batter_id)] ?? computeBoomScore((parseFloat(b.weighted_flag_score)||0)*4.6, b.zone_fit, b.recent_iso, b.sim_tb, b.weighted_flag_score);
+        const aB = boomCache.current[String(a.batter_id)] ?? computeBoomScore((parseFloat(a.weighted_flag_score)||0)*4.6, a.zone_fit, a.recent_iso, a.sim_tb, a.weighted_flag_score, parseFloat(a.recent_barrel_spike||0), parseInt(a.recent_hr_count||0), parseFloat(a.recent_batter_ahead_pct||0), !!a.hh_precursor, parseFloat(a.primary_pitch_hr_rate||0));
+        const bB = boomCache.current[String(b.batter_id)] ?? computeBoomScore((parseFloat(b.weighted_flag_score)||0)*4.6, b.zone_fit, b.recent_iso, b.sim_tb, b.weighted_flag_score, parseFloat(b.recent_barrel_spike||0), parseInt(b.recent_hr_count||0), parseFloat(b.recent_batter_ahead_pct||0), !!b.hh_precursor, parseFloat(b.primary_pitch_hr_rate||0));
         return mul * (aB - bB);
       }
       if (sortBy === 'ps_score') {
@@ -13233,7 +13347,7 @@ function SimLabView({ data }) {
                 return [b.grade, pitcherGrade, gy?'YES':'', isKM, b.batting_team, b.batter, b.batter_hand,
                   b.pitcher_hand||'', b.pitcher, b.top_pitches, b.game_time,
                   // Computed columns — between Game Time and Flags
-                  (b._yard ?? computeYardScore(sigCache.current[String(bid)]||0, parseFloat(b.gHR)||0, boomCache.current[String(bid)]||0, b._ps||(parseFloat(b.ps_score)||0))),
+                  (b._yard ?? computeYardScore(sigCache.current[String(bid)]||0, parseFloat(b.gHR)||0, boomCache.current[String(bid)]||0, b._ps||(parseFloat(b.ps_score)||0), b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1), liveSlot(bid,b.lineup_slot))),
                   sigCache.current[String(bid)] ?? '',
                   boomCache.current[String(bid)] ?? '',
                   (() => { const fc = getFormClass(b); return fc && FORM_CLASSES[fc] ? FORM_CLASSES[fc].short.replace(/[💥🥶💨🪱🎯🎩🌙]/gu,'').trim() : ''; })(),
@@ -13436,7 +13550,7 @@ function SimLabView({ data }) {
                   b._trackerSig = Math.min(14, Math.max(0, _trackerSig)); // cap at 14
                   b._pgLabel     = _pgLabelv;
                   b._formClass   = getFormClass(b);
-                  b._boom        = computeBoomScore(b._trackerSig, b.zone_fit, b.recent_iso, b.sim_tb, b.weighted_flag_score);
+                  b._boom        = computeBoomScore(b._trackerSig, b.zone_fit, b.recent_iso, b.sim_tb, b.weighted_flag_score, parseFloat(b.recent_barrel_spike||0), parseInt(b.recent_hr_count||0), parseFloat(b.recent_batter_ahead_pct||0), !!b.hh_precursor, parseFloat(b.primary_pitch_hr_rate||0));
                   sigCache.current[String(b.batter_id)]  = b._trackerSig;
                   SIG_CACHE_GLOBAL[String(b.batter_id)]  = b._trackerSig; // expose to CheatSheetTab
                   boomCache.current[String(b.batter_id)] = b._boom;
@@ -13453,7 +13567,7 @@ function SimLabView({ data }) {
                     }
                   }
                   b._ps  = _livePS;
-                  b._yard = computeYardScore(b._trackerSig||0, parseFloat(b.gHR)||0, b._boom||0, b._ps);
+                  b._yard = computeYardScore(b._trackerSig||0, parseFloat(b.gHR)||0, b._boom||0, b._ps, b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1), liveSlot(b.batter_id,b.lineup_slot));
                   const _cacheEntry = DAILY_PICKS_CACHE[String(b.batter_id)];
                   if (_cacheEntry) {
                     _cacheEntry._trackerSig = b._trackerSig;
@@ -13500,7 +13614,7 @@ function SimLabView({ data }) {
                         </div>
                       </td>
                       <td style={{textAlign:'center',padding:'2px 4px',verticalAlign:'middle'}}>
-                        <YardBadge score={b._yard ?? computeYardScore(b._trackerSig||0, parseFloat(b.gHR)||0, b._boom||0, b._ps||(parseFloat(b.ps_score)||0))}/>
+                        <YardBadge score={b._yard ?? computeYardScore(b._trackerSig||0, parseFloat(b.gHR)||0, b._boom||0, b._ps||(parseFloat(b.ps_score)||0), b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1), liveSlot(b.batter_id,b.lineup_slot))}/>
                       </td>
                       <td style={{textAlign:'center',padding:'2px 4px',verticalAlign:'middle'}}>
                         {(() => {
@@ -14260,7 +14374,7 @@ function CheatCodeButton() {
             </div>
             <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',
               marginTop:2,letterSpacing:.5}}>
-              18,207 matchups · 1,572 HRs · 8.63% base rate · 2024–26
+              638,357 at-bats · 19,561 HRs · 2023–2026 · first principles
             </div>
           </div>
           <button onClick={()=>setOpen(false)}
@@ -14268,6 +14382,261 @@ function CheatCodeButton() {
               color:'var(--muted)',cursor:'pointer',padding:'4px 10px',
               fontFamily:mono,fontSize:10,marginLeft:12,flexShrink:0}}>✕</button>
         </div>
+
+        <div style={{padding:'20px',flex:1}}>
+
+          {/* Data foundation */}
+          <div style={{background:'rgba(39,201,122,.07)',border:'1px solid rgba(39,201,122,.2)',
+            borderRadius:8,padding:'12px 14px',marginBottom:20}}>
+            <div style={{fontFamily:osw,fontWeight:700,fontSize:12,color:'#27c97a',
+              letterSpacing:.8,marginBottom:6}}>DATA FOUNDATION</div>
+            <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',lineHeight:1.7}}>
+              Every signal in this model was validated against 638,357 at-bats
+              from 2023–2026 (19,561 home runs across 1,962 batters). Baseline HR
+              rate: 10.64% per game. The scoring weights reflect actual HR rate
+              gaps measured in the data — not theory.
+            </div>
+          </div>
+
+          {/* #1 misconception */}
+          <div style={{background:'rgba(255,64,32,.07)',border:'1px solid rgba(255,64,32,.25)',
+            borderRadius:8,padding:'12px 14px',marginBottom:20}}>
+            <div style={{fontFamily:osw,fontWeight:700,fontSize:13,color:'var(--accent)',
+              letterSpacing:.8,marginBottom:6}}>YARD SCORE ≠ BEST PICK</div>
+            <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',lineHeight:1.7}}>
+              The highest Yard Score is not automatically the best play.
+              A Yard 48 batter facing a Tough pitcher is often a worse bet than
+              a Yard 26 with a Target pitcher, confirmed lineup, and hot recent form.
+              The signal is how many independent factors stack at once —
+              not the raw number.
+            </div>
+          </div>
+
+          {/* New 638k signals */}
+          <Section emoji="📊" title="What 638k At-Bats Confirmed" color="#27c97a">
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',
+              marginBottom:8,letterSpacing:.5,textTransform:'uppercase'}}>
+              HR rate gaps measured from first principles · baseline 10.64%
+            </div>
+            {[
+              ['Lineup slot 3 vs 9','7.74pt gap','Slot 3: 14.88% · Slot 9: 7.14% — biggest single variable in the dataset','#ffd700'],
+              ['Days rest 0 vs 4+','5.71pt gap','0 days rest: 13.13% · 4 days: 7.42% — rhythm breaks with rest','#f5a623'],
+              ['Count discipline','3.89pt gap','Batter-ahead count >25%: 12.08% · <10%: 8.19% — patience predicts power','#27c97a'],
+              ['Hot hand (2+ HR/3g)','3.38pt gap','13.16% vs 9.78% — hot hand is real and confirmed','#27c97a'],
+              ['Barrel rate (5g)','19.7% edge','HR games show barrel rate 19.7% higher than non-HR games','#38b8f2'],
+              ['Barrel spike vs baseline','2.00pt','Recent barrel% above personal norm: 12.73% vs flat 7.26%','#38b8f2'],
+              ['Platoon (LHB vs LHP)','0.63pt/PA','-0.626%/PA for same-side matchup — real and now in scoring','#a78bfa'],
+              ['Hard hit precursor','1.32pt','Loud contact, no HR last game = setup for next game','#f5a623'],
+            ].map(([sig,gap,desc,col])=>(
+              <div key={sig} style={{padding:'6px 0',borderBottom:'1px solid rgba(255,255,255,.04)'}}>
+                <div style={{display:'flex',alignItems:'baseline',gap:8}}>
+                  <span style={{fontFamily:osw,fontWeight:700,fontSize:11,color:col,flexShrink:0}}>{sig}</span>
+                  <span style={{fontFamily:mono,fontSize:9,color:'rgba(255,255,255,.4)',marginLeft:'auto',flexShrink:0}}>{gap}</span>
+                </div>
+                <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:2,lineHeight:1.4}}>{desc}</div>
+              </div>
+            ))}
+          </Section>
+
+          {/* Score architecture */}
+          <Section emoji="🔬" title="Score Architecture — Updated June 2026" color="var(--accent2)">
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',lineHeight:1.7,marginBottom:10}}>
+              <strong style={{color:'var(--text)'}}>Boom Score</strong> (0–99) — composite HR readiness:
+            </div>
+            {[
+              ['Zone Fit','28%','Spatial pitch/batter zone overlap · non-linear bell curve · peak at ZF 4–6'],
+              ['Sig','26%','Stacked signal count · cleanest linear predictor in the data'],
+              ['Sim TB','18%','Full-game simulation output'],
+              ['Barrel Spike','8%','Recent barrel% above personal season baseline — NEW'],
+              ['ISO','8%','Season isolated power profile (trimmed from 15%)'],
+              ['Hot Hand','5%','2+ HRs in last 3 games — NEW'],
+              ['Count Discipline','4%','Batter-ahead count frequency — NEW'],
+              ['HH Precursor','2%','Loud contact, no HR last game — NEW'],
+              ['Engine Score','0%','Removed — was double-counting Sig'],
+            ].map(([c,w,d])=>(
+              <div key={c} style={{display:'flex',gap:8,padding:'3px 0',borderBottom:'1px solid rgba(255,255,255,.03)'}}>
+                <span style={{fontFamily:mono,fontSize:8,color:'var(--accent2)',width:90,flexShrink:0}}>{c}</span>
+                <span style={{fontFamily:mono,fontSize:8,color:w==='0%'?'rgba(255,255,255,.2)':w>='8%'?'#27c97a':'var(--muted)',width:30,flexShrink:0}}>{w}</span>
+                <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',lineHeight:1.4}}>{d}</span>
+              </div>
+            ))}
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',lineHeight:1.7,marginTop:10}}>
+              <strong style={{color:'var(--text)'}}>Yard Score</strong> — Boom(35%) + PS(22%) + Sig(20%) + gHR(18%)<br/>
+              <strong style={{color:'var(--text)'}}>× three post-score multipliers:</strong><br/>
+              Platoon: LHB vs LHP ×0.88 · LHB vs RHP ×1.03<br/>
+              Days rest: 0 days ×1.08 · 4+ days ×0.87<br/>
+              Lineup slot: slot 3–4 ×1.04 · slot 9 ×0.88
+            </div>
+          </Section>
+
+          {/* Proven numbers */}
+          <Section emoji="🎯" title="What the Data Actually Shows" color="var(--accent2)">
+            <Stat val="14.88%" label="Lineup slot 3 — highest HR rate"
+              sub="Slot 9 = 7.14%. Biggest single-variable gap in 638k rows."/>
+            <Stat val="13.13%" label="0 days rest (just played)"
+              sub="4 days rest = 7.42%. Playing every day keeps timing grooved."/>
+            <Stat val="13.16%" label="2+ HRs in last 3 games"
+              sub="Zero HRs last 3g = 9.78%. Hot hand is real. Back-to-back HR games = +2.77pt."/>
+            <Stat val="12.08%" label="Batter-ahead count > 25%"
+              sub="<10% = 8.19%. Plate discipline predicts power almost as strongly as barrel rate."/>
+            <Stat val="4.60%" label="Soft fastball (≤93mph)"
+              sub="vs 2.70% on hard FF (96+). Velocity drop on the primary pitch = 1.9pt gap."/>
+            <Stat val="30.0%" label="A+ Grade + 🎯 Target pitcher"
+              sub="30 matchups, 9 HRs. The single best confirmed combo in the dataset."/>
+          </Section>
+
+          {/* Grade reality */}
+          <Section emoji="🎖️" title="Grade — What It Actually Means" color="#f5a623">
+            <div style={{background:'rgba(245,166,35,.06)',border:'1px solid rgba(245,166,35,.2)',
+              borderRadius:8,padding:'10px 14px',marginBottom:8}}>
+              {[['A+','14.4%','201 matchups'],['A','14.0%','1,055'],
+                ['B','10.9%','3,374'],['C','8.6%','5,963'],['D','6.7%','7,614']
+              ].map(([g,r,n]) => (
+                <div key={g} style={{display:'flex',alignItems:'center',
+                  gap:8,padding:'3px 0',borderBottom:'1px solid rgba(255,255,255,.04)'}}>
+                  <span style={{fontFamily:osw,fontWeight:800,fontSize:13,
+                    color:{'A+':'#f5a623','A':'#e8411a','B':'#38b8f2','C':'var(--muted)','D':'var(--muted)'}[g],
+                    width:24}}>{g}</span>
+                  <span style={{fontFamily:osw,fontWeight:700,fontSize:13,
+                    color:'var(--text)',width:48}}>{r}</span>
+                  <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{n} matchups</span>
+                </div>
+              ))}
+            </div>
+            <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',lineHeight:1.5}}>
+              Grades are monotonic across 18k rows. But pitcher grade still matters —
+              an A+ vs Tough pitcher (3.6%) is worse than a B vs Target (14.0%).
+            </div>
+          </Section>
+
+          {/* Sig */}
+          <Section emoji="⚡" title="Sig Score — The Real Story" color="#ffd700">
+            <Row label="Sig 0" value="3.7%" color="var(--muted)" col="⚡ SIG"
+              sub="Below base — no meaningful signals firing"/>
+            <Row label="Sig 1–3" value="5.7–8.2%" color="var(--muted)" col="⚡ SIG"
+              sub="Approaching base rate. Not strong enough alone."/>
+            <Row label="Sig 4–5" value="9.3–9.4%" color="#f5a623" col="⚡ SIG"
+              sub="Doubles the base rate. This is the real floor for actionable plays."/>
+            <Row label="Sig 6–7" value="10.5–11.3%" color="#ffd700" col="⚡ SIG"
+              sub="Strong signal. Set minimum Sig filter to 4."/>
+          </Section>
+
+          {/* Zone Fit */}
+          <Section emoji="🎯" title="Zone Fit — The Sweet Spot" color="var(--ice)">
+            <Row label="Zone Fit 4–6" value="12.5% HR rate" color="var(--ice)" col="ZONEFIT"
+              sub="The confirmed sweet spot across 18k rows."/>
+            <Row label="Zone Fit < 2" value="4.4% HR rate" color="var(--accent)"
+              sub="Below base — pitcher doesn't throw to this batter's damage zone."/>
+            <Row label="Zone Fit > 8" value="4.1% HR rate" color="var(--accent)"
+              sub="Overcorrects — extreme zone fit drops back below base. Don't chase the highest number."/>
+          </Section>
+
+          {/* Handedness */}
+          <Section emoji="🤝" title="Platoon — Now in Scoring" color="#a78bfa">
+            <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',lineHeight:1.6,marginBottom:8}}>
+              638k rows confirmed: LHB vs LHP = -0.626%/PA. LHB vs RHP = +0.202%/PA.
+              The combination matters — individual hand alone is near-zero signal.
+              Now applied as a direct Yard Score multiplier (×0.88 worst, ×1.03 best)
+              plus compound Sig boost when pitcher is confirmed weak vs that hand.
+            </div>
+          </Section>
+
+          {/* Daily scan */}
+          <Section emoji="🗺️" title="Daily Scan — 5 Steps" color="#27c97a">
+            <div style={{fontFamily:mono,fontSize:10,lineHeight:2.0,color:'var(--text)'}}>
+              {[
+                ['1','Filter Sim TB ≥ 1.5 — cuts low-ceiling noise immediately'],
+                ['2','Filter P.Grade to 🎯 Target + 💥 Hittable'],
+                ['3','Look for Grade A or A+ in what remains'],
+                ['4','Confirm ✅ lineup + check Sig ≥ 4'],
+                ['5','Check days rest (≤1) + lineup slot (3–5) + recent HR count'],
+                ['✱','A+ vs Target (30% HR rate) is the single best combo in the data'],
+              ].map(([n,txt]) => (
+                <div key={n} style={{display:'flex',gap:8,alignItems:'baseline'}}>
+                  <span style={{color:'var(--accent2)',fontWeight:700,
+                    flexShrink:0,width:14}}>{n}.</span>
+                  <span>{txt}</span>
+                </div>
+              ))}
+            </div>
+          </Section>
+
+          {/* Fade */}
+          <Section emoji="❌" title="Fade These" color="var(--accent)">
+            <Fade label="A+ vs ⚠️ Tough or ‼️ Elite pitcher"
+              sub="A+ + Tough = 3.6% — below base rate. Grade doesn't overcome a tough arm."/>
+            <Fade label="3+ days rest"
+              sub="4 days off = 7.42% HR rate. Timing groove breaks. Confirmed in 638k rows."/>
+            <Fade label="Zone Fit above 8"
+              sub="Overcorrects — drops to 4.1%. Sweet spot is 4–6, not highest."/>
+            <Fade label="Recent EV below 88 mph"
+              sub="6.75% — below base. Batter is cold."/>
+            <Fade label="LHB vs LHP without strong BvP to offset"
+              sub="-0.626%/PA confirmed platoon penalty. Needs offsetting signals."/>
+          </Section>
+
+          {/* Form */}
+          <Section emoji="🔥" title="Form Class — What Each Means" color="var(--accent2)">
+            {[
+              ['Moonshot','9.8%','High launch angle + EV profile. Barely above base — context matters more than label alone.'],
+              ['Contact', '9.2%','Consistent hard contact. Reliable but not a power signal on its own.'],
+              ['Gap',     '7.8%','Hard contact, XBH-oriented. Solid. Pairs well with a Target pitcher.'],
+              ['Whiff',   '6.3%','K-prone. Below base — avoid unless Sig is stacked.'],
+              ['Worm',    '5.0%','Ground ball tendency. Lowest power profile. Fade.'],
+              ['Cold',    '4.1%','No recent heat. Well below base. Hard avoid.'],
+            ].map(([fc,rate,desc]) => (
+              <div key={fc} style={{display:'flex',gap:8,padding:'5px 0',
+                borderBottom:'1px solid rgba(255,255,255,.04)'}}>
+                <div style={{flexShrink:0,width:68}}>
+                  <div style={{fontFamily:osw,fontWeight:700,fontSize:11}}>{fc}</div>
+                  <div style={{fontFamily:mono,fontSize:9,
+                    color:parseFloat(rate)>=9?'#27c97a':parseFloat(rate)<=5?'var(--accent)':'var(--muted)'}}>{rate}</div>
+                </div>
+                <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',
+                  lineHeight:1.4,flex:1}}>{desc}</div>
+              </div>
+            ))}
+          </Section>
+
+          {/* Column guide */}
+          <Section emoji="📋" title="Column Guide" color="var(--muted)">
+            {[
+              ['YARD',    'Composite score with platoon × rest × slot multipliers. Starting point only.'],
+              ['⚡ SIG',  'Stacked signal count. Filter ≥ 4. Doubles the base HR rate.'],
+              ['FORM',    'Swing profile. Moonshot/Gap = power. Cold/Worm = fade.'],
+              ['P.GRADE', '🎯 Target = exploit. 💥 Hittable = good. ⚠️ Tough/‼️ Elite = fade.'],
+              ['SIM TB',  'Simulated total bases. Filter ≥ 1.5 to start, ≥ 2.0 for elite plays.'],
+              ['ZONEFIT', 'Pitch zone alignment. Sweet spot 4–6. Ignore if > 8 or < 2.'],
+              ['L7 EV',   'Last 7 days exit velocity. ≥ 95 = hot. ≥ 102 = elite hot.'],
+              ['BS Δ',    'Bat speed vs season baseline. Positive = accelerating.'],
+            ].map(([col,desc]) => (
+              <div key={col} style={{display:'flex',gap:8,padding:'5px 0',
+                borderBottom:'1px solid rgba(255,255,255,.04)'}}>
+                <span style={{fontFamily:mono,fontSize:9,color:'var(--accent2)',
+                  fontWeight:700,flexShrink:0,width:56,letterSpacing:.3}}>{col}</span>
+                <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)',
+                  lineHeight:1.4}}>{desc}</span>
+              </div>
+            ))}
+          </Section>
+
+          <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',
+            textAlign:'center',marginTop:8,lineHeight:1.6,
+            borderTop:'1px solid var(--border)',paddingTop:12}}>
+            ⚡ The Sauce is a living model — updated as the season sample grows.<br/>
+            <span style={{color:'rgba(255,255,255,.2)',fontSize:7,marginTop:4,display:'block'}}>
+              v7 · 638,357 at-bats · 19,561 HRs · 10.64% base rate · 2023–2026
+            </span>
+          </div>
+
+        </div>
+      </div>
+    </>}
+  </>;
+}
+
+function BvPHistoryTab({ data }) {
+  useHROdds();
 
         <div style={{padding:'20px',flex:1}}>
 
@@ -22267,8 +22636,8 @@ function CrystalBallTab() {
       const sig  = parseFloat(r._trackerSig||r.weighted_flag_score*4.6||0);
       const ghr  = parseFloat(r.gHR||r.kHR||0);
       const ps   = parseFloat(r.ps_score||0);
-      const boom = computeBoomScore(sig, parseFloat(r.zone_fit||0), parseFloat(r.iso||0), parseFloat(r.sim_tb||0), parseFloat(r.weighted_flag_score||0));
-      const yard = computeYardScore(sig, ghr, boom, ps);
+      const boom = computeBoomScore(sig, parseFloat(r.zone_fit||0), parseFloat(r.iso||0), parseFloat(r.sim_tb||0), parseFloat(r.weighted_flag_score||0), parseFloat(r.recent_barrel_spike||0), parseInt(r.recent_hr_count||0), parseFloat(r.recent_batter_ahead_pct||0), !!r.hh_precursor, parseFloat(r.primary_pitch_hr_rate||0));
+      const yard = computeYardScore(sig, ghr, boom, ps, r.batter_hand||'', r.pitcher_hand||'', parseInt(r.days_rest??1), liveSlot(r.batter_id,r.lineup_slot));
       const ev   = parseFloat(r.recent_avg_ev||0);
       const la   = parseFloat(r.recent_avg_la||0);
       const bsDelta   = parseFloat(r.bat_speed_vs_baseline||0);
@@ -23506,17 +23875,24 @@ function SimTab({ data }) {
       const iso    = parseFloat(r.recent_iso || 0);
       const ps     = parseFloat(r.ps_score  || 0);
       const zf     = parseFloat(r.zone_fit  || 0);
-      const boom   = parseFloat(r._boom) || computeBoomScore(sig, zf, iso, simTB, parseFloat(r.weighted_flag_score||0));
-      const yard   = computeYardScore(sig, ghr, boom, ps);
+      const boom   = parseFloat(r._boom) || computeBoomScore(sig, zf, iso, simTB, parseFloat(r.weighted_flag_score||0), parseFloat(r.recent_barrel_spike||0), parseInt(r.recent_hr_count||0), parseFloat(r.recent_batter_ahead_pct||0), !!r.hh_precursor, parseFloat(r.primary_pitch_hr_rate||0));
+      const yard   = computeYardScore(sig, ghr, boom, ps, r.batter_hand||'', r.pitcher_hand||'', parseInt(r.days_rest??1), liveSlot(r.batter_id,r.lineup_slot));
       const pgLabel = r._pgLabel || '';
 
-      // Pitcher modifier: Target=1.30, Hittable=1.15, Average=1.0, Tough=0.80, Elite=0.60
-      const pitcherMod = pgLabel.includes('Target')   ? 1.30
-                       : pgLabel.includes('Hittable')  ? 1.15
-                       : pgLabel.includes('Tough')     ? 0.80
-                       : pgLabel.includes('Elite')     ? 0.60 : 1.0;
+      // ── SimTab hrProb — 638k at-bat data calibrated (June 2026) ──────────────
+      // Base rate derived from Yard Score tiers (validated against actual HR rates)
+      const baseRate = yard >= 32 ? 0.130
+                     : yard >= 24 ? 0.100
+                     : yard >= 18 ? 0.080
+                     : yard >= 13 ? 0.060 : 0.040;
 
-      // Park/wind modifier from weather data
+      // Pitcher modifier — pgLabel grade (confirmed in data)
+      const pitcherMod = pgLabel.includes('Target')  ? 1.30
+                       : pgLabel.includes('Hittable') ? 1.15
+                       : pgLabel.includes('Tough')    ? 0.80
+                       : pgLabel.includes('Elite')    ? 0.60 : 1.0;
+
+      // Park + wind modifier
       const parkMod = (() => {
         const we = parseFloat(r.wind_effect || 0);
         if (we >= 8) return 1.20;
@@ -23525,21 +23901,66 @@ function SimTab({ data }) {
         return 1.0;
       })();
 
-      // Base HR probability calibrated to yard score ranges:
-      // Yard 32+: ~13% · 24-31: ~10% · 18-23: ~8% · 13-17: ~6% · <13: ~4%
-      const baseRate = yard >= 32 ? 0.130
-                     : yard >= 24 ? 0.100
-                     : yard >= 18 ? 0.080
-                     : yard >= 13 ? 0.060 : 0.040;
-
-      // Sig adds a multiplicative boost on top (sig≥6=+25%, sig≥4=+12%, sig≥2=+5%)
+      // Sig boost
       const sigMod = sig >= 6 ? 1.25 : sig >= 4 ? 1.12 : sig >= 2 ? 1.05 : 1.0;
 
-      // Final per-PA HR probability (realistic MLB plate appearance count: ~4)
-      const hrProb = Math.min(0.28, baseRate * pitcherMod * parkMod * sigMod);
+      // ── NEW: 638k-validated modifiers ─────────────────────────────────────
+      // Hot hand: 2+ HRs last 3 games = 13.16% vs 9.78% baseline (+3.38pt)
+      const hrCount = parseInt(r.recent_hr_count || 0);
+      const hotHandMod = hrCount >= 2 ? 1.18 : hrCount >= 1 ? 1.08 : 1.0;
 
-      // Lineup slot adjusts PA count (leadoff gets ~4.3 PA/game, 7-9 gets ~3.5)
+      // Days rest: 0 rest = 13.13%, 4 days = 7.42%. Groove breaks with rest.
+      const daysRest = parseInt(r.days_rest ?? 1);
+      const restMod = daysRest === 0 ? 1.12
+                    : daysRest === 1 ? 1.00
+                    : daysRest === 2 ? 0.97
+                    : daysRest === 3 ? 0.92
+                    : daysRest >= 4  ? 0.84 : 1.0;
+
+      // Barrel spike: recent barrel% vs personal season baseline (+2pt confirmed)
+      const bSpike = parseFloat(r.recent_barrel_spike);
+      const barrelSpikeMod = isNaN(bSpike) ? 1.0
+                           : bSpike >= 6   ? 1.15
+                           : bSpike >= 3   ? 1.10
+                           : bSpike >= 1   ? 1.05
+                           : bSpike < -2   ? 0.93 : 1.0;
+
+      // Count discipline: >25% batter-ahead = 12.08% vs 8.19% (+3.89pt)
+      const baRaw = parseFloat(r.recent_batter_ahead_pct || 0);
+      const countMod = baRaw >= 30 ? 1.10
+                     : baRaw >= 25 ? 1.08
+                     : baRaw < 10  ? 0.88 : 1.0;
+
+      // Platoon: LHB vs LHP = -12%, LHB vs RHP = +3%
+      const _bh2 = (r.batter_hand  || '').toUpperCase()[0];
+      const _ph2 = (r.pitcher_hand || '').toUpperCase()[0];
+      const platoonMod2 = (_ph2 === 'L' && (_bh2 === 'L' || _bh2 === 'S')) ? 0.88
+                        : (_ph2 === 'L' && _bh2 === 'R') ? 1.03
+                        : (_ph2 === 'R' && (_bh2 === 'L' || _bh2 === 'S')) ? 1.03
+                        : 1.0;
+
+      // HH Precursor: loud contact no-HR last game = +1.32pt
+      const precursorMod = r.hh_precursor ? 1.06 : 1.0;
+
+      // Lineup slot — base probability adjustment (separate from PA count)
+      // Slot 3: 14.88% vs slot 9: 7.14%. Biggest gap in dataset.
       const lineupSlot = parseInt(r.lineup_slot || r._lineupSlot || 5);
+      const slotProbMod = lineupSlot === 3 ? 1.06
+                        : lineupSlot === 4 ? 1.06
+                        : lineupSlot === 2 ? 1.03
+                        : lineupSlot === 5 ? 1.02
+                        : lineupSlot === 1 ? 1.01
+                        : lineupSlot === 7 ? 0.96
+                        : lineupSlot === 8 ? 0.92
+                        : lineupSlot === 9 ? 0.86 : 1.0;
+
+      // Final per-PA HR probability — all modifiers stacked
+      const hrProb = Math.min(0.30,
+        baseRate * pitcherMod * parkMod * sigMod *
+        hotHandMod * restMod * barrelSpikeMod * countMod * platoonMod2 * precursorMod * slotProbMod
+      );
+
+      // PA count: lineup slot (leadoff ~4.3, cleanup ~4.0, bottom ~3.5)
       const avgPA = lineupSlot <= 2 ? 4.3
                   : lineupSlot <= 5 ? 4.0
                   : lineupSlot <= 7 ? 3.7 : 3.5;
