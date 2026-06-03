@@ -14461,7 +14461,7 @@ function CheatCodeButton() {
               </div>
             ))}
             <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',lineHeight:1.7,marginTop:10}}>
-              <strong style={{color:'var(--text)'}}>Yard Score</strong> — Boom(35%) + PS(22%) + Sig(20%) + gHR(18%)<br/>
+              <strong style={{color:'var(--text)'}}>Yard Score</strong> &mdash; Boom(35%) + PS(22%) + Sig(20%) + gHR(18%)<br/>
               <strong style={{color:'var(--text)'}}>× three post-score multipliers:</strong><br/>
               Platoon: LHB vs LHP ×0.88 · LHB vs RHP ×1.03<br/>
               Days rest: 0 days ×1.08 · 4+ days ×0.87<br/>
@@ -14623,9 +14623,9 @@ function CheatCodeButton() {
           <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',
             textAlign:'center',marginTop:8,lineHeight:1.6,
             borderTop:'1px solid var(--border)',paddingTop:12}}>
-            ⚡ The Sauce is a living model — updated as the season sample grows.<br/>
+            ⚡ The Sauce is a living model &mdash; updated as the season sample grows.<br/>
             <span style={{color:'rgba(255,255,255,.2)',fontSize:7,marginTop:4,display:'block'}}>
-              v7 · 638,357 at-bats · 19,561 HRs · 10.64% base rate · 2023–2026
+              v7 &middot; 638,357 at-bats &middot; 19,561 HRs &middot; 10.64% base rate &middot; 2023-2026
             </span>
           </div>
 
@@ -14890,9 +14890,9 @@ function BvPHistoryTab({ data }) {
           <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',
             textAlign:'center',marginTop:8,lineHeight:1.6,
             borderTop:'1px solid var(--border)',paddingTop:12}}>
-            ⚡ The Sauce is a living model — updated as the season sample grows.<br/>
+            ⚡ The Sauce is a living model &mdash; updated as the season sample grows.<br/>
             <span style={{color:'rgba(255,255,255,.2)',fontSize:7,marginTop:4,display:'block'}}>
-              v6 · 18,207 matchups · 1,572 HRs · 8.63% base rate · 2024–26
+              v6 &middot; 18,207 matchups &middot; 1,572 HRs &middot; 8.63% base rate &middot; 2024-26
             </span>
           </div>
 
