@@ -8,7 +8,7 @@ Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitc
 2026-06-03,07:05 PM,NYY,CLE,543037.0,668909.0,823540,Wednesday,Wed,2,3,Middle,~ Neutral
 2026-06-03,07:10 PM,CIN,KC,695505.0,663568.0,824509,Wednesday,Wed,3,3,Finale,~ Neutral
 2026-06-03,07:15 PM,ATL,TOR,656550.0,571578.0,824917,Wednesday,Wed,2,3,Middle,~ Neutral
-2026-06-03,07:40 PM,MIL,SF,,657277.0,823780,Wednesday,Wed,3,4,Middle,~ Neutral
+2026-06-03,07:40 PM,MIL,SF,688107.0,657277.0,823780,Wednesday,Wed,3,4,Middle,~ Neutral
 2026-06-03,07:45 PM,STL,TEX,669467.0,669022.0,823051,Wednesday,Wed,3,3,Finale,~ Neutral
 2026-06-03,08:05 PM,CHC,ATH,607067.0,605488.0,824671,Wednesday,Wed,2,3,Middle,~ Neutral
 2026-06-03,08:10 PM,HOU,PIT,681293.0,694973.0,824188,Wednesday,Wed,2,3,Middle,~ Neutral
@@ -17,9 +17,9 @@ Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitc
 2026-06-04,01:05 PM,PHI,SD,554430.0,608337.0,823457,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
 2026-06-04,01:35 PM,BOS,BAL,,669432.0,824753,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
 2026-06-04,01:35 PM,NYY,CLE,607074.0,677944.0,823542,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
-2026-06-04,02:10 PM,MIL,SF,,605288.0,823779,Thursday,Thu,4,4,Finale,✅ Best Day (getaway)
+2026-06-04,02:10 PM,MIL,SF,689441.0,605288.0,823779,Thursday,Thu,4,4,Finale,✅ Best Day (getaway)
 2026-06-04,07:15 PM,ATL,TOR,519242.0,,824919,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
-2026-06-04,07:40 PM,MIN,KC,,,823698,Thursday,Thu,1,4,Opener,✅ Best Day (getaway)
+2026-06-04,07:40 PM,MIN,KC,,607625.0,823698,Thursday,Thu,1,4,Opener,✅ Best Day (getaway)
 2026-06-04,08:05 PM,CHC,ATH,684007.0,,824672,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
 2026-06-04,08:10 PM,HOU,PIT,678906.0,683003.0,824185,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
 2026-06-04,09:40 PM,AZ,LAD,669194.0,680736.0,825076,Thursday,Thu,4,4,Finale,✅ Best Day (getaway)
