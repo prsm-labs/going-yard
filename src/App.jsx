@@ -7176,7 +7176,7 @@ function LiveAtBatViewer({ gamePk }) {
           strikes:   count.strikes ?? 0,
           batter:    matchup.batter?.fullName || '—',
           batterId:  matchup.batter?.id,
-          batSide:   matchup.batSide?.code || 'R',  // R or L
+          batSide:   matchup.batSide?.code || 'R',
           pitcher:   matchup.pitcher?.fullName || '—',
           pitcherId: matchup.pitcher?.id,
           pitchHand: matchup.pitchHand?.code || 'R',
@@ -7185,6 +7185,52 @@ function LiveAtBatViewer({ gamePk }) {
           lastPitch: dots[dots.length - 1] || null,
           result:    cp.result?.event || null,
           isMidInning: about.halfInning !== lastAbRef._prevHalf,
+          // Today's game stats pulled from boxscore in the live feed
+          batterStats:  (() => {
+            const box = d?.liveData?.boxscore;
+            if (!box || !matchup.batter?.id) return null;
+            const bid = String(matchup.batter.id);
+            for (const side of ['home','away']) {
+              const p = box.teams?.[side]?.players;
+              if (!p) continue;
+              const entry = Object.values(p).find(x => String(x.person?.id) === bid);
+              if (entry) {
+                const s = entry.stats?.batting || {};
+                return {
+                  ab:  s.atBats   ?? 0,
+                  h:   s.hits     ?? 0,
+                  hr:  s.homeRuns ?? 0,
+                  rbi: s.rbi      ?? 0,
+                  k:   s.strikeOuts ?? 0,
+                  bb:  s.baseOnBalls ?? 0,
+                };
+              }
+            }
+            return null;
+          })(),
+          pitcherStats: (() => {
+            const box = d?.liveData?.boxscore;
+            if (!box || !matchup.pitcher?.id) return null;
+            const pid2 = String(matchup.pitcher.id);
+            for (const side of ['home','away']) {
+              const p = box.teams?.[side]?.players;
+              if (!p) continue;
+              const entry = Object.values(p).find(x => String(x.person?.id) === pid2);
+              if (entry) {
+                const s = entry.stats?.pitching || {};
+                const outs3 = s.outs ?? 0;
+                const ip = `${Math.floor(outs3/3)}.${outs3%3}`;
+                return {
+                  ip,
+                  k:   s.strikeOuts ?? 0,
+                  er:  s.earnedRuns ?? 0,
+                  bb:  s.baseOnBalls ?? 0,
+                  pc:  s.numberOfPitches ?? 0,
+                };
+              }
+            }
+            return null;
+          })(),
         });
         lastAbRef._prevHalf = about.halfInning;
 
@@ -7481,30 +7527,59 @@ function LiveAtBatViewer({ gamePk }) {
       {expanded && (<>
         {/* Header bar — pitcher vs batter */}
         <div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr',
-          alignItems:'center',padding:'8px 14px',
+          alignItems:'start',padding:'10px 14px 8px',gap:8,
           background:'rgba(0,0,0,.35)',borderBottom:'1px solid rgba(255,255,255,.06)'}}>
-        {/* Pitcher */}
-        <div>
+
+        {/* Pitcher — left col */}
+        <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>
           <div style={{fontFamily:mono,fontSize:7,color:'rgba(255,255,255,.35)',
             textTransform:'uppercase',letterSpacing:.5}}>Pitcher</div>
-          <div style={{fontFamily:osw,fontWeight:700,fontSize:12,color:'var(--text)',
+          <div style={{cursor:state.pitcherId?'pointer':'default'}}
+            onClick={()=>state.pitcherId&&openPitcherSlide({
+              pid:state.pitcherId,name:state.pitcher,team:'',hand:state.pitchHand})}>
+            <PlayerAvatar pid={state.pitcherId} name={state.pitcher} size={48}
+              border="1.5px solid rgba(255,255,255,.12)"/>
+          </div>
+          <div style={{fontFamily:osw,fontWeight:700,fontSize:11,
+            color:'rgba(255,255,255,.85)',textAlign:'center',
             cursor:state.pitcherId?'pointer':'default',
             textDecoration:state.pitcherId?'underline':'none',
-            textDecorationStyle:'dotted',color:'rgba(255,255,255,.85)'}}
+            textDecorationStyle:'dotted',textDecorationColor:'rgba(255,255,255,.25)',
+            lineHeight:1.2}}
             onClick={()=>state.pitcherId&&openPitcherSlide({
               pid:state.pitcherId,name:state.pitcher,team:'',hand:state.pitchHand})}>
             {state.pitcher}
           </div>
-          <div style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.3)'}}>{state.pitchHand}HP</div>
+          <div style={{fontFamily:mono,fontSize:7,color:'rgba(255,255,255,.28)'}}>
+            {state.pitchHand}HP
+          </div>
+          {state.pitcherStats && (
+            <div style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.5)',
+              textAlign:'center',lineHeight:1.9,marginTop:1}}>
+              <span style={{color:'rgba(255,255,255,.9)',fontWeight:700}}>
+                {state.pitcherStats.pc}P
+              </span>
+              <span style={{color:'rgba(255,255,255,.18)',margin:'0 4px'}}>|</span>
+              <span>{state.pitcherStats.ip} IP</span>
+              <br/>
+              <span style={{color:'#f87171'}}>{state.pitcherStats.k}K</span>
+              <span style={{color:'rgba(255,255,255,.18)',margin:'0 4px'}}>·</span>
+              <span style={{color:state.pitcherStats.er>0?'#fb923c':'rgba(255,255,255,.4)'}}>
+                {state.pitcherStats.er}ER
+              </span>
+            </div>
+          )}
         </div>
-        {/* Inning badge */}
-        <div style={{textAlign:'center',padding:'2px 12px',borderRadius:6,
-          background:'rgba(255,255,255,.06)',border:'1px solid rgba(255,255,255,.1)'}}>
+
+        {/* Inning badge — center */}
+        <div style={{textAlign:'center',padding:'4px 10px',borderRadius:6,
+          background:'rgba(255,255,255,.06)',border:'1px solid rgba(255,255,255,.1)',
+          marginTop:22,flexShrink:0}}>
           <div style={{fontFamily:mono,fontSize:7,color:'rgba(255,255,255,.4)',
             textTransform:'uppercase',letterSpacing:.5}}>
             {state.isTop ? '▲' : '▼'} {ord(state.inning)}
           </div>
-          <div style={{display:'flex',gap:4,justifyContent:'center',marginTop:2}}>
+          <div style={{display:'flex',gap:4,justifyContent:'center',marginTop:3}}>
             {[0,1,2].map(i => (
               <div key={i} style={{width:8,height:8,borderRadius:.5,transform:'rotate(45deg)',
                 background:i<state.outs?'rgba(255,255,255,.7)':'rgba(255,255,255,.12)',
@@ -7512,23 +7587,59 @@ function LiveAtBatViewer({ gamePk }) {
             ))}
           </div>
         </div>
-        {/* Batter */}
-        <div style={{textAlign:'right'}}>
+
+        {/* Batter — right col */}
+        <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>
           <div style={{fontFamily:mono,fontSize:7,color:'rgba(255,255,255,.35)',
             textTransform:'uppercase',letterSpacing:.5}}>Batter</div>
-          <div style={{fontFamily:osw,fontWeight:700,fontSize:12,
-            color:'rgba(255,255,255,.85)',cursor:state.batterId?'pointer':'default',
-            textDecoration:state.batterId?'underline':'none',textDecorationStyle:'dotted'}}
+          <div style={{cursor:state.batterId?'pointer':'default'}}
+            onClick={()=>state.batterId&&openAtBatSlide({
+              pid:state.batterId,name:state.batter,team:''})}>
+            <PlayerAvatar pid={state.batterId} name={state.batter} size={48}
+              border="1.5px solid rgba(255,255,255,.12)"/>
+          </div>
+          <div style={{fontFamily:osw,fontWeight:700,fontSize:11,
+            color:'rgba(255,255,255,.85)',textAlign:'center',
+            cursor:state.batterId?'pointer':'default',
+            textDecoration:state.batterId?'underline':'none',
+            textDecorationStyle:'dotted',textDecorationColor:'rgba(255,255,255,.25)',
+            lineHeight:1.2}}
             onClick={()=>state.batterId&&openAtBatSlide({
               pid:state.batterId,name:state.batter,team:''})}>
             {state.batter}
           </div>
-          <div style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.3)'}}>
+          <div style={{fontFamily:mono,fontSize:7,color:'rgba(255,255,255,.28)'}}>
             {state.batSide==='L'?'LHB':'RHB'}
           </div>
+          {state.batterStats && (
+            <div style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.5)',
+              textAlign:'center',lineHeight:1.9,marginTop:1}}>
+              <span style={{
+                color: state.batterStats.h > 0 ? 'rgba(255,255,255,.9)' : 'rgba(255,255,255,.5)',
+                fontWeight:700}}>
+                {state.batterStats.h}-{state.batterStats.ab}
+              </span>
+              {state.batterStats.hr > 0 && (<>
+                <span style={{color:'rgba(255,255,255,.18)',margin:'0 3px'}}>·</span>
+                <span style={{color:'#fbbf24',fontWeight:700}}>{state.batterStats.hr}HR</span>
+              </>)}
+              <br/>
+              {state.batterStats.rbi > 0 && (
+                <span>{state.batterStats.rbi}RBI</span>
+              )}
+              {state.batterStats.rbi > 0 && state.batterStats.k > 0 && (
+                <span style={{color:'rgba(255,255,255,.18)',margin:'0 3px'}}>·</span>
+              )}
+              {state.batterStats.k > 0 && (
+                <span style={{color:'rgba(239,68,68,.7)'}}>{state.batterStats.k}K</span>
+              )}
+              {state.batterStats.rbi === 0 && state.batterStats.k === 0 && (
+                <span style={{color:'rgba(255,255,255,.2)'}}>—</span>
+              )}
+            </div>
+          )}
         </div>
       </div>
-
       {/* Base runners — diamond layout */}
       <div style={{display:'flex',justifyContent:'center',padding:'4px 14px 0'}}>
         <svg width={80} height={60} viewBox="0 0 80 60" style={{overflow:'visible'}}>
