@@ -7419,16 +7419,18 @@ function LiveAtBatViewer({ gamePk }) {
 
           {/* Pitch label */}
           {state.lastPitch && (
-            <text x={PW/2} y={PH-16} textAnchor="middle"
+            <text x={PW/2} y={PH-22} textAnchor="middle"
               style={{fontFamily:mono,fontSize:8,fill:'rgba(255,255,255,.5)',letterSpacing:.3}}>
               {state.lastPitch.type}{state.lastPitch.velo?` · ${state.lastPitch.velo.toFixed(0)} mph`:''}
             </text>
           )}
 
-          {/* Watermark — bottom right, fits within PH */}
-          <image href="/icon-192.png" x={PW-44} y={PH-20} width={14} height={14}
-            opacity={0.5} preserveAspectRatio="xMidYMid meet"/>
-          <text x={PW-28} y={PH-9} textAnchor="start"
+          {/* Watermark — centered at very bottom, always fully inside SVG */}
+          <image href="/icon-192.png"
+            x={PW/2 - 36} y={PH-14}
+            width={12} height={12}
+            opacity={0.45} preserveAspectRatio="xMidYMid meet"/>
+          <text x={PW/2 - 22} y={PH-5} textAnchor="start"
             style={{fontFamily:osw,fontWeight:800,fontSize:7,letterSpacing:.5}}>
             <tspan fill="rgba(232,65,26,.6)">GOING</tspan>
             <tspan fill="rgba(255,255,255,.3)"> YARD</tspan>
