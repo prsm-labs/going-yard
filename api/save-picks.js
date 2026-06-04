@@ -1,6 +1,6 @@
 // api/save-picks.js
+import { createClerkClient, verifyToken } from '@clerk/backend';
 import { Redis } from '@upstash/redis';
-import { createClerkClient } from '@clerk/backend';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -9,8 +9,10 @@ export default async function handler(req, res) {
     const token = req.headers.authorization?.replace('Bearer ', '');
     if (!token) return res.status(401).json({ error: 'No token' });
 
-    const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
-    const payload = await clerk.verifyToken(token);
+    // Verify token directly (not via clerk instance)
+    const payload = await verifyToken(token, {
+      secretKey: process.env.CLERK_SECRET_KEY,
+    });
     const userId = payload.sub;
     if (!userId) return res.status(401).json({ error: 'Invalid token' });
 
