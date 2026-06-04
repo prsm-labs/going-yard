@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import ReactDOM from "react-dom";
+import { UserButton, SignedIn, SignedOut, SignInButton } from "@clerk/clerk-react";
 
 // ── PWA Push Notifications ───────────────────────────────────────────────────
 const VAPID_PUBLIC_KEY = (typeof window !== 'undefined' && window.__VAPID_KEY__) || '';
@@ -25001,12 +25002,26 @@ export default function App() {
           <NotificationBell/>
           <LegendButton/>
           <button onClick={()=>setShowPicksSlideout(s=>!s)}
-            style={{padding:"3px 7px",borderRadius:6,border:"1px solid var(--border)",
-              background:"var(--surface2)",color:"var(--accent2)",cursor:"pointer",
-              fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:9,letterSpacing:.6,
-              display:"flex",alignItems:"center",gap:3,flexShrink:0,whiteSpace:'nowrap'}}>
-            🎯 Picks
+            title="My Picks"
+            style={{padding:"3px 6px",borderRadius:6,border:"1px solid var(--border)",
+              background:"var(--surface2)",cursor:"pointer",fontSize:14,lineHeight:1,
+              display:"flex",alignItems:"center",flexShrink:0}}>
+            🎯
           </button>
+          <SignedOut>
+            <SignInButton mode="modal">
+              <button style={{padding:"3px 8px",borderRadius:6,border:"1px solid var(--border)",
+                background:"var(--surface2)",color:"var(--accent)",cursor:"pointer",
+                fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:9,letterSpacing:.6,
+                flexShrink:0,whiteSpace:'nowrap'}}>
+                LOG IN
+              </button>
+            </SignInButton>
+          </SignedOut>
+          <SignedIn>
+            <UserButton afterSignOutUrl={window.location.href}
+              appearance={{elements:{avatarBox:{width:24,height:24}}}}/>
+          </SignedIn>
           <ContactBtn/>
             </div>
       </header>
