@@ -25002,23 +25002,39 @@ export default function App() {
     fetchPlayers(noop, noop, noop, false);
   }, []);
 
-  // ── Cloud picks sync: load from cloud when user logs in ─────────────────
-  useEffect(() => {
-    if (!isSignedIn) return;
-    loadPicksCloud(getToken).then(cloudPicks => {
-      if (!cloudPicks) return;
-      const local = loadPicks();
-      const merged = { ...local, ...cloudPicks };
-      savePicks(merged);
-      GLOBAL_PICKS = merged;
-      PICKS_LISTENERS.forEach(fn => fn({...merged}));
-    });
-  }, [isSignedIn, getToken]);
+  // ── Cloud picks sync ────────────────────────────────────────────────────
+  const prevSignedIn = useRef(false);
 
-  // ── Cloud picks sync: save to cloud whenever picks change ───────────────
   useEffect(() => {
-    if (!isSignedIn) return;
-    savePicksCloud(GLOBAL_PICKS, getToken);
+    const justLoggedIn  = isSignedIn && !prevSignedIn.current;
+    const justLoggedOut = !isSignedIn && prevSignedIn.current;
+    prevSignedIn.current = !!isSignedIn;
+
+    if (justLoggedIn) {
+      // Load cloud picks on login
+      loadPicksCloud(getToken).then(cloudPicks => {
+        const cloudCount = cloudPicks ? Object.keys(cloudPicks).length : 0;
+        if (cloudCount > 0) {
+          // Cloud has picks → use cloud, overwrite local
+          savePicks(cloudPicks);
+          GLOBAL_PICKS = cloudPicks;
+          PICKS_LISTENERS.forEach(fn => fn({...cloudPicks}));
+        } else {
+          // Cloud empty → keep local picks and push them up to cloud
+          const local = loadPicks();
+          if (Object.keys(local).length > 0) {
+            savePicksCloud(local, getToken);
+          }
+        }
+      });
+    }
+
+    if (justLoggedOut) {
+      // Clear local picks on logout — safely stored in cloud
+      savePicks({});
+      GLOBAL_PICKS = {};
+      PICKS_LISTENERS.forEach(fn => fn({}));
+    }
   }, [isSignedIn, getToken]);
 
   const NAV = [
