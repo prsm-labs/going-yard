@@ -872,6 +872,7 @@ const PICK_TYPES = {
   darkhorse: {label:"⭐ Dark Horse",  cls:"darkhorse", color:"#f5a623"},
   longshot:  {label:"🎯 Longshot",    cls:"longshot",  color:"#38b8f2"},
   daylate:   {label:"📆 Day Late",    cls:"daylate",   color:"#a855f7"},
+  storm:     {label:"⚡ Perfect Storm", cls:"storm",    color:"#facc15"},
   due:       {label:"⏳ Due",         cls:"due",        color:"#22d3ee"},
   tailed:    {label:"🤝 Tailed",      cls:"tailed",    color:"#34d399"},
   hotbat:    {label:"🔥 Hot Bat",     cls:"hotbat",    color:"#fb923c"},
@@ -1864,7 +1865,7 @@ function MatchupCard({ dp }) {
     return Math.min(14, Math.max(0, s));
   })();
 
-  const boom   = parseFloat(dp._boom) || computeBoomScore(sig, parseFloat(dp.zone_fit)||0, parseFloat(dp.recent_iso)||0, parseFloat(dp.sim_tb)||0, parseFloat(dp.weighted_flag_score)||0, parseFloat(dp.recent_barrel_spike||0), parseInt(dp.recent_hr_count||0), parseFloat(dp.recent_batter_ahead_pct||0), !!dp.hh_precursor, parseFloat(dp.primary_pitch_hr_rate||0));
+  const boom   = parseFloat(dp._boom) || computeBoomScore(sig, parseFloat(dp.zone_fit)||0, parseFloat(dp.recent_iso)||0, parseFloat(dp.sim_tb)||0, parseFloat(dp.weighted_flag_score)||0, parseFloat(dp.recent_barrel_spike||0), parseInt(dp.recent_hr_count||0), parseFloat(dp.recent_batter_ahead_pct||0), !!dp.hh_precursor, parseFloat(dp.primary_pitch_hr_rate||0), parseInt(dp.recent_barrels_3d)||0, parseInt(dp.recent_hrs_3d)||0, parseFloat(dp.recent_avg_bat_speed)||0);
   const iso    = parseFloat(dp.l7_iso||dp.recent_iso) || 0;  // L7 blended ISO
   const l7iso   = parseFloat(dp.l7_iso)    || parseFloat(dp.recent_iso)  || 0;
   const l7woba  = parseFloat(dp.l7_woba)   || parseFloat(dp.season_woba) || 0;
@@ -12301,18 +12302,18 @@ function computeEffectiveGrade(batterGrade, pgLabel) {
 // New field sources: barrel_spike, recent_hr_count, recent_batter_ahead_pct,
 //   hh_precursor, primary_pitch_hr_rate — all from daily_picks.csv
 function computeBoomScore(sig, zoneFit, iso, simTB, engineScore,
-  barrelSpike, recentHRCount, batterAheadPct, hhPrecursor, pitchVulnRate) {
+  barrelSpike, recentHRCount, batterAheadPct, hhPrecursor, pitchVulnRate,
+  dayLateBarrels, dayLateHRs, recentBatSpeed) {
 
-  const zfRaw = zoneFitScore(parseFloat(zoneFit) || 0);   // non-linear 0–100
-  const zf = zfRaw * 0.28;                                 // 28% — slight trim
+  // ── Zone Fit (24%) — trimmed from 28%, 4pts redirected to Day Late + Bat Speed ──
+  const zfRaw = zoneFitScore(parseFloat(zoneFit) || 0);
+  const zf = zfRaw * 0.24;                                 // 24% (was 28%)
 
   const s  = Math.min(26, (parseFloat(sig)   || 0) / 14 * 26);  // 26%
   const tb = Math.min(18, (parseFloat(simTB) || 0) / 3.5 * 18); // 18%
-  const is = Math.min(8,  (parseFloat(iso)   || 0) / 0.40 * 8); //  8% (was 15%)
-  // engine score removed — was double-counting Sig
+  const is = Math.min(8,  (parseFloat(iso)   || 0) / 0.40 * 8); //  8%
 
   // ── Barrel Spike (8%) — recent barrel% vs personal season baseline ──────────
-  // Spike of +2%+ = 12.73% HR rate vs 7.26% flat. Data: +2pt confirmed edge.
   const bSpike = parseFloat(barrelSpike);
   const bs = isNaN(bSpike) ? 0
            : bSpike >= 6   ? 8
@@ -12320,15 +12321,13 @@ function computeBoomScore(sig, zoneFit, iso, simTB, engineScore,
            : bSpike >= 1   ? 4
            : bSpike >= 0   ? 2
            : bSpike >= -2  ? 1
-           : 0;  // below season avg = no credit
+           : 0;
 
   // ── Hot Hand (5%) — HRs in last 3 games ──────────────────────────────────
-  // 2+ HRs last 3g = 13.16%, 0 HRs = 9.78%. +3.38pt gap confirmed.
   const hr3 = parseInt(recentHRCount) || 0;
   const hh = hr3 >= 3 ? 5 : hr3 >= 2 ? 5 : hr3 >= 1 ? 3 : 0;
 
   // ── Count Discipline (4%) — batter-ahead count frequency ──────────────────
-  // >25% batter-ahead = 12.08%. <10% = 8.19%. 3.89pt gap confirmed.
   const baRaw = parseFloat(batterAheadPct);
   const cd = isNaN(baRaw) ? 0
            : baRaw >= 30  ? 4
@@ -12337,19 +12336,33 @@ function computeBoomScore(sig, zoneFit, iso, simTB, engineScore,
            : baRaw >= 10  ? 1
            : 0;
 
+  // ── Day Late (4%) — 2+ barrels last 3 days, 0 HRs — 639k validated 1.24x lift ──
+  // 13.23% HR rate when triggered vs 10.72% baseline. Proprietary signal.
+  const dlBarrels = parseInt(dayLateBarrels) || 0;
+  const dlHRs     = parseInt(dayLateHRs)     || 0;
+  const dl = (dlHRs === 0 && dlBarrels >= 2) ? 4
+           : (dlHRs === 0 && dlBarrels === 1) ? 2
+           : 0;
+
+  // ── Bat Speed Tier (4%) — strongest individual HR predictor in 639k data ──
+  // BS77+ = 9.18% HR rate (3x baseline). BS74-77 = 6.11% (2x baseline).
+  const bsRaw = parseFloat(recentBatSpeed) || 0;
+  const bst = bsRaw >= 77 ? 4
+            : bsRaw >= 74 ? 3
+            : bsRaw >= 71 ? 1
+            : 0;
+
   // ── HH Precursor (2%) — loud contact, no HR last game ───────────────────
-  // +1.32pt confirmed. The setup game before the HR game.
   const prec = hhPrecursor ? 2 : 0;
 
   // ── Pitch Vulnerability (1%) — batter HR rate vs pitcher's primary pitch ──
-  // Median gap best vs worst pitch type = 3.92%. Small weight, real edge.
   const pvRaw = parseFloat(pitchVulnRate);
   const pv = isNaN(pvRaw) ? 0
            : pvRaw >= 10  ? 1
            : pvRaw >= 6   ? 0.5
            : 0;
 
-  return Math.min(99, Math.round(zf + s + tb + is + bs + hh + cd + prec + pv));
+  return Math.min(99, Math.round(zf + s + tb + is + bs + hh + cd + dl + bst + prec + pv));
 }
 
 // ── liveSlot — always use confirmed LINEUP_STATUS slot if available ───────────
@@ -12364,19 +12377,20 @@ function liveSlot(batterId, engineSlot) {
 }
 
 // ── Yard Score ───────────────────────────────────────────────────────────────
-// Rebalanced weights (638k at-bat data, June 2026):
+// Weights (639k at-bat data, June 2026):
 //   Boom(35%) + PS(22%) + Sig(20%) + gHR tapered(18%)
-//   × platoon modifier × days rest modifier × lineup slot modifier
+//   × platoon modifier × days rest modifier
 //
-// Key changes vs prior formula:
-//   • PS trimmed 25%→22%: BvP deltas real but modest
-//   • gHR trimmed 20%→18%: new same-week signals are better day-to-day predictors
-//   • Three post-formula multipliers added (never additive — nudge not dominate):
-//     - Platoon: LHB vs LHP = ×0.88 (worst), LHB vs RHP = ×1.03 (best)
-//     - Days Rest: 0 days = ×1.08, 4 days = ×0.82, 1 day = ×1.00 (neutral)
-//     - Lineup Slot: slot 3 = ×1.04, slot 9 = ×0.88
+// Lineup slot modifier REMOVED (June 2026):
+//   Data showed slot consistency year-over-year only 12% (near random).
+//   Slot 1-3 batters already score higher via gHR/Boom naturally.
+//   Penalizing slot 6-9 was double-penalizing correctly-scored batters.
+//   Only remaining slot signal: unconfirmed lineup (slot=0) = ×0.95.
 //
-// Sweet spot target: 20–34 range = 9-11% HR rates consistently.
+// Multipliers (never additive — nudge not dominate):
+//   - Platoon: LHB vs LHP = ×0.88, LHB vs RHP = ×1.03
+//   - Days Rest: 0 days = ×1.08, 4+ days = ×0.87
+//   - Unconfirmed lineup: ×0.95 (not yet in starting lineup)
 function computeYardScore(sig, ghr, boom, ps,
   batterHand, pitcherHand, daysRest, lineupSlot) {
 
@@ -12389,40 +12403,31 @@ function computeYardScore(sig, ghr, boom, ps,
 
   // ── Platoon multiplier ────────────────────────────────────────────────────
   // Data: LHB vs LHP -0.626%/PA (worst), LHB vs RHP +0.202% (best).
-  // Compound matters — individual hand alone is near-zero signal.
   const bh = (batterHand  || '').toString().trim().toUpperCase()[0];
   const ph = (pitcherHand || '').toString().trim().toUpperCase()[0];
   let platoonMod = 1.0;
-  if (ph === 'L' && (bh === 'L' || bh === 'S')) platoonMod = 0.88; // same side = penalty
-  else if (ph === 'R' && (bh === 'L' || bh === 'S')) platoonMod = 1.03; // LHB vs RHP = slight boost
-  else if (ph === 'L' && bh === 'R') platoonMod = 1.03; // RHB vs LHP = slight boost
+  if (ph === 'L' && (bh === 'L' || bh === 'S')) platoonMod = 0.88;
+  else if (ph === 'R' && (bh === 'L' || bh === 'S')) platoonMod = 1.03;
+  else if (ph === 'L' && bh === 'R') platoonMod = 1.03;
 
   // ── Days rest multiplier ──────────────────────────────────────────────────
   // 0 rest = 13.13%, 1 = 11.15%, 4 = 7.42%. Groove breaks with rest.
   const dr = parseInt(daysRest);
   const restMod = isNaN(dr) ? 1.0
-                : dr === 0  ? 1.08  // just played yesterday: groove is live
-                : dr === 1  ? 1.00  // normal: neutral
+                : dr === 0  ? 1.08
+                : dr === 1  ? 1.00
                 : dr === 2  ? 0.97
                 : dr === 3  ? 0.92
-                : dr >= 4   ? 0.87  // 4+ days off: timing disrupted
+                : dr >= 4   ? 0.87
                 : 1.0;
 
-  // ── Lineup slot multiplier ────────────────────────────────────────────────
-  // Slot 3: 14.88% HR rate. Slot 9: 7.14%. Largest single gap in 638k rows.
+  // ── Lineup confirmation modifier ──────────────────────────────────────────
+  // Slot 0 = not yet confirmed in starting lineup — small penalty.
+  // All confirmed slots (1-9) are neutral — position is already in Boom/gHR.
   const slot = parseInt(lineupSlot) || 0;
-  const slotMod = slot === 3 ? 1.04
-                : slot === 4 ? 1.04
-                : slot === 2 ? 1.02
-                : slot === 5 ? 1.01
-                : slot === 1 ? 1.01
-                : slot === 6 ? 1.00
-                : slot === 7 ? 0.96
-                : slot === 8 ? 0.93
-                : slot === 9 ? 0.88
-                : 1.0;  // 0 = unconfirmed, neutral
+  const confirmMod = slot === 0 ? 0.95 : 1.0;
 
-  const adjusted = raw * platoonMod * restMod * slotMod;
+  const adjusted = raw * platoonMod * restMod * confirmMod;
   return Math.min(99, Math.max(0, Math.round(adjusted)));
 }
 
@@ -12433,7 +12438,7 @@ function YardBadge({ score }) {
   const bg  = score>=32?'rgba(255,215,0,.22)':score>=24?'rgba(255,64,32,.18)':score>=18?'rgba(245,166,35,.15)':score>=13?'rgba(210,180,140,.15)':'rgba(255,255,255,.04)';
   const col = score>=32?'#ffd700':score>=24?'#ff4020':score>=18?'#f5a623':score>=13?'#c4a882':'var(--muted)';
   return (
-    <span title={`Yard Score: ${score} — Boom(35%) + PS(22%) + Sig(20%) + gHR(18%) × platoon × rest × slot · 638k PA validated`}
+    <span title={`Yard Score: ${score} — Boom(35%) + PS(22%) + Sig(20%) + gHR(18%) × platoon × rest · 639k PA validated · Day Late + Bat Speed signals included`}
       style={{display:'inline-block',padding:'1px 5px',borderRadius:4,
         fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:10,
         background:bg,color:col,whiteSpace:'nowrap',cursor:'default'}}>
@@ -12654,7 +12659,7 @@ function LongShotView({ data }) {
           if (oldGate > 0) _ps = Math.min(99, Math.round(_ps / oldGate * newGate));
         }
       }
-      const _boom  = computeBoomScore(_sig, b.zone_fit, b.recent_iso, _simTB, b.weighted_flag_score, parseFloat(b.recent_barrel_spike||0), parseInt(b.recent_hr_count||0), parseFloat(b.recent_batter_ahead_pct||0), !!b.hh_precursor, parseFloat(b.primary_pitch_hr_rate||0));
+      const _boom  = computeBoomScore(_sig, b.zone_fit, b.recent_iso, _simTB, b.weighted_flag_score, parseFloat(b.recent_barrel_spike||0), parseInt(b.recent_hr_count||0), parseFloat(b.recent_batter_ahead_pct||0), !!b.hh_precursor, parseFloat(b.primary_pitch_hr_rate||0), parseInt(b.recent_barrels_3d)||0, parseInt(b.recent_hrs_3d)||0, parseFloat(b.recent_avg_bat_speed)||0);
       const _ps_v  = b._ps ?? (parseFloat(b.ps_score)||0);
       const _yard  = computeYardScore(_sig, b._kHR||parseFloat(b.gHR)||0, _boom, _ps_v, b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1), liveSlot(b.batter_id,b.lineup_slot));
       // Write to DAILY_PICKS_CACHE directly (b is a CSV copy, not the cache object)
@@ -13037,8 +13042,8 @@ function SimLabView({ data }) {
     const mul = sortDir === 'desc' ? -1 : 1;
     const sorted = [...filtered].sort((a, b) => {
       if (sortBy === '_boom') {
-        const aB = boomCache.current[String(a.batter_id)] ?? computeBoomScore((parseFloat(a.weighted_flag_score)||0)*4.6, a.zone_fit, a.recent_iso, a.sim_tb, a.weighted_flag_score, parseFloat(a.recent_barrel_spike||0), parseInt(a.recent_hr_count||0), parseFloat(a.recent_batter_ahead_pct||0), !!a.hh_precursor, parseFloat(a.primary_pitch_hr_rate||0));
-        const bB = boomCache.current[String(b.batter_id)] ?? computeBoomScore((parseFloat(b.weighted_flag_score)||0)*4.6, b.zone_fit, b.recent_iso, b.sim_tb, b.weighted_flag_score, parseFloat(b.recent_barrel_spike||0), parseInt(b.recent_hr_count||0), parseFloat(b.recent_batter_ahead_pct||0), !!b.hh_precursor, parseFloat(b.primary_pitch_hr_rate||0));
+        const aB = boomCache.current[String(a.batter_id)] ?? computeBoomScore((parseFloat(a.weighted_flag_score)||0)*4.6, a.zone_fit, a.recent_iso, a.sim_tb, a.weighted_flag_score, parseFloat(a.recent_barrel_spike||0), parseInt(a.recent_hr_count||0), parseFloat(a.recent_batter_ahead_pct||0), !!a.hh_precursor, parseFloat(a.primary_pitch_hr_rate||0), parseInt(a.recent_barrels_3d)||0, parseInt(a.recent_hrs_3d)||0, parseFloat(a.recent_avg_bat_speed)||0);
+        const bB = boomCache.current[String(b.batter_id)] ?? computeBoomScore((parseFloat(b.weighted_flag_score)||0)*4.6, b.zone_fit, b.recent_iso, b.sim_tb, b.weighted_flag_score, parseFloat(b.recent_barrel_spike||0), parseInt(b.recent_hr_count||0), parseFloat(b.recent_batter_ahead_pct||0), !!b.hh_precursor, parseFloat(b.primary_pitch_hr_rate||0), parseInt(b.recent_barrels_3d)||0, parseInt(b.recent_hrs_3d)||0, parseFloat(b.recent_avg_bat_speed)||0);
         return mul * (aB - bB);
       }
       if (sortBy === 'ps_score') {
@@ -13580,7 +13585,7 @@ function SimLabView({ data }) {
                   b._trackerSig = Math.min(14, Math.max(0, _trackerSig)); // cap at 14
                   b._pgLabel     = _pgLabelv;
                   b._formClass   = getFormClass(b);
-                  b._boom        = computeBoomScore(b._trackerSig, b.zone_fit, b.recent_iso, b.sim_tb, b.weighted_flag_score, parseFloat(b.recent_barrel_spike||0), parseInt(b.recent_hr_count||0), parseFloat(b.recent_batter_ahead_pct||0), !!b.hh_precursor, parseFloat(b.primary_pitch_hr_rate||0));
+                  b._boom        = computeBoomScore(b._trackerSig, b.zone_fit, b.recent_iso, b.sim_tb, b.weighted_flag_score, parseFloat(b.recent_barrel_spike||0), parseInt(b.recent_hr_count||0), parseFloat(b.recent_batter_ahead_pct||0), !!b.hh_precursor, parseFloat(b.primary_pitch_hr_rate||0), parseInt(b.recent_barrels_3d)||0, parseInt(b.recent_hrs_3d)||0, parseFloat(b.recent_avg_bat_speed)||0);
                   sigCache.current[String(b.batter_id)]  = b._trackerSig;
                   SIG_CACHE_GLOBAL[String(b.batter_id)]  = b._trackerSig; // expose to CheatSheetTab
                   boomCache.current[String(b.batter_id)] = b._boom;
@@ -22340,7 +22345,7 @@ function CrystalBallTab() {
       const sig  = parseFloat(r._trackerSig||r.weighted_flag_score*4.6||0);
       const ghr  = parseFloat(r.gHR||r.kHR||0);
       const ps   = parseFloat(r.ps_score||0);
-      const boom = computeBoomScore(sig, parseFloat(r.zone_fit||0), parseFloat(r.iso||0), parseFloat(r.sim_tb||0), parseFloat(r.weighted_flag_score||0), parseFloat(r.recent_barrel_spike||0), parseInt(r.recent_hr_count||0), parseFloat(r.recent_batter_ahead_pct||0), !!r.hh_precursor, parseFloat(r.primary_pitch_hr_rate||0));
+      const boom = computeBoomScore(sig, parseFloat(r.zone_fit||0), parseFloat(r.iso||0), parseFloat(r.sim_tb||0), parseFloat(r.weighted_flag_score||0), parseFloat(r.recent_barrel_spike||0), parseInt(r.recent_hr_count||0), parseFloat(r.recent_batter_ahead_pct||0), !!r.hh_precursor, parseFloat(r.primary_pitch_hr_rate||0), parseInt(r.recent_barrels_3d)||0, parseInt(r.recent_hrs_3d)||0, parseFloat(r.recent_avg_bat_speed)||0);
       const yard = computeYardScore(sig, ghr, boom, ps, r.batter_hand||'', r.pitcher_hand||'', parseInt(r.days_rest??1), liveSlot(r.batter_id,r.lineup_slot));
       const ev   = parseFloat(r.recent_avg_ev||0);
       const la   = parseFloat(r.recent_avg_la||0);
@@ -23579,7 +23584,7 @@ function SimTab({ data }) {
       const iso    = parseFloat(r.recent_iso || 0);
       const ps     = parseFloat(r.ps_score  || 0);
       const zf     = parseFloat(r.zone_fit  || 0);
-      const boom   = parseFloat(r._boom) || computeBoomScore(sig, zf, iso, simTB, parseFloat(r.weighted_flag_score||0), parseFloat(r.recent_barrel_spike||0), parseInt(r.recent_hr_count||0), parseFloat(r.recent_batter_ahead_pct||0), !!r.hh_precursor, parseFloat(r.primary_pitch_hr_rate||0));
+      const boom   = parseFloat(r._boom) || computeBoomScore(sig, zf, iso, simTB, parseFloat(r.weighted_flag_score||0), parseFloat(r.recent_barrel_spike||0), parseInt(r.recent_hr_count||0), parseFloat(r.recent_batter_ahead_pct||0), !!r.hh_precursor, parseFloat(r.primary_pitch_hr_rate||0), parseInt(r.recent_barrels_3d)||0, parseInt(r.recent_hrs_3d)||0, parseFloat(r.recent_avg_bat_speed)||0);
       const yard   = computeYardScore(sig, ghr, boom, ps, r.batter_hand||'', r.pitcher_hand||'', parseInt(r.days_rest??1), liveSlot(r.batter_id,r.lineup_slot));
       const pgLabel = r._pgLabel || '';
 
