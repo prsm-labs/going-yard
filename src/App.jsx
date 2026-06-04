@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import ReactDOM from "react-dom";
-import { UserButton, SignedIn, SignedOut, SignInButton } from "@clerk/clerk-react";
 
 // ── PWA Push Notifications ───────────────────────────────────────────────────
 const VAPID_PUBLIC_KEY = (typeof window !== 'undefined' && window.__VAPID_KEY__) || '';
@@ -877,15 +876,42 @@ const PICK_TYPES = {
 };
 function loadPicks() { try { return JSON.parse(localStorage.getItem("gy_picks")||"{}"); } catch { return {}; } }
 function savePicks(p) { try { localStorage.setItem("gy_picks",JSON.stringify(p)); } catch {} }
+
+// ── Cloud picks sync (Clerk + Upstash) ──────────────────────────────────────
+async function savePicksCloud(picks, getToken) {
+  try {
+    const token = await getToken();
+    if (!token) return;
+    await fetch('/api/save-picks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ picks })
+    });
+  } catch(e) { console.warn('cloud save failed:', e); }
+}
+
+async function loadPicksCloud(getToken) {
+  try {
+    const token = await getToken();
+    if (!token) return null;
+    const r = await fetch('/api/get-picks', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const d = await r.json();
+    return d.picks || null;
+  } catch(e) { console.warn('cloud load failed:', e); return null; }
+}
 let GLOBAL_PICKS = loadPicks();
 const PICKS_LISTENERS = new Set();
 function subscribePicks(fn) { PICKS_LISTENERS.add(fn); return ()=>PICKS_LISTENERS.delete(fn); }
-function setPick(pid, name, team, type) {
+function setPick(pid, name, team, type, getToken) {
   pid = String(pid);
   if (GLOBAL_PICKS[pid]?.type===type) { delete GLOBAL_PICKS[pid]; }
   else { GLOBAL_PICKS[pid]={pid,name,team,type,ts:Date.now()}; }
   savePicks(GLOBAL_PICKS);
   PICKS_LISTENERS.forEach(fn=>fn({...GLOBAL_PICKS}));
+  // Sync to cloud if user is logged in
+  if (getToken) savePicksCloud(GLOBAL_PICKS, getToken);
 }
 function usePicks() {
   const [picks,setPicksState] = useState({...GLOBAL_PICKS});
@@ -24951,6 +24977,7 @@ export default function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [tab, setTab] = useState("home");
   const [showPicksSlideout, setShowPicksSlideout] = useState(false);
+  const { isSignedIn, getToken } = useAuth();
 
   // Wire global nav on mount so notifications can route to tabs
   useEffect(() => {
@@ -24965,6 +24992,26 @@ export default function App() {
     const noop = () => {};
     fetchPlayers(noop, noop, noop, false);
   }, []);
+
+  // ── Cloud picks sync: load from cloud when user logs in ─────────────────
+  useEffect(() => {
+    if (!isSignedIn) return;
+    loadPicksCloud(getToken).then(cloudPicks => {
+      if (!cloudPicks) return;
+      // Merge cloud picks into local — cloud wins
+      const local = loadPicks();
+      const merged = { ...local, ...cloudPicks };
+      savePicks(merged);
+      GLOBAL_PICKS = merged;
+      PICKS_LISTENERS.forEach(fn => fn({...merged}));
+    });
+  }, [isSignedIn, getToken]);
+
+  // ── Cloud picks sync: save to cloud whenever picks change ───────────────
+  useEffect(() => {
+    if (!isSignedIn) return;
+    savePicksCloud(GLOBAL_PICKS, getToken);
+  }, [isSignedIn, getToken]);
 
   const NAV = [
     {key:"home",       label:"🏡 Home"},
@@ -25002,26 +25049,12 @@ export default function App() {
           <NotificationBell/>
           <LegendButton/>
           <button onClick={()=>setShowPicksSlideout(s=>!s)}
-            title="My Picks"
-            style={{padding:"3px 6px",borderRadius:6,border:"1px solid var(--border)",
-              background:"var(--surface2)",cursor:"pointer",fontSize:14,lineHeight:1,
-              display:"flex",alignItems:"center",flexShrink:0}}>
-            🎯
+            style={{padding:"3px 7px",borderRadius:6,border:"1px solid var(--border)",
+              background:"var(--surface2)",color:"var(--accent2)",cursor:"pointer",
+              fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:9,letterSpacing:.6,
+              display:"flex",alignItems:"center",gap:3,flexShrink:0,whiteSpace:'nowrap'}}>
+            🎯 Picks
           </button>
-          <SignedOut>
-            <SignInButton mode="modal">
-              <button style={{padding:"3px 8px",borderRadius:6,border:"1px solid var(--border)",
-                background:"var(--surface2)",color:"var(--accent)",cursor:"pointer",
-                fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:9,letterSpacing:.6,
-                flexShrink:0,whiteSpace:'nowrap'}}>
-                LOG IN
-              </button>
-            </SignInButton>
-          </SignedOut>
-          <SignedIn>
-            <UserButton afterSignOutUrl={window.location.href}
-              appearance={{elements:{avatarBox:{width:24,height:24}}}}/>
-          </SignedIn>
           <ContactBtn/>
             </div>
       </header>
