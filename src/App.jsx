@@ -23971,59 +23971,60 @@ function SimTab({ data }) {
 }
 
 // ── ExVDeltaTab — Exit Velocity Delta (Hot Hitters) ─────────────────────────
-// Shows how much harder each batter is hitting the ball recently vs their
-// personal season baseline. Filterable by team, pitcher hand, time window.
-// ExVΔ = recent_avg_ev minus season_avg_ev (from player cache).
+// Shows how much harder each batter is hitting recently vs their season baseline.
+// ExVΔ = recent_avg_ev minus season_avg_ev (player cache).
+// Filterable by team, pitcher hand, time window. Batter search included.
 function ExVDeltaTab({ data }) {
-  const mono = "\'DM Mono\',monospace";
-  const osw  = "\'Oswald\',sans-serif";
+  const mono = "'DM Mono',monospace";
+  const osw  = "'Oswald',sans-serif";
 
-  const [teamFilter,   setTeamFilter]   = React.useState(\'ALL\');
-  const [handFilter,   setHandFilter]   = React.useState(\'ALL\');
-  const [windowFilter, setWindowFilter] = React.useState(\'recent_7\');
-  const [search,       setSearch]       = React.useState(\'\');
+  const [teamFilter,   setTeamFilter]   = React.useState('ALL');
+  const [handFilter,   setHandFilter]   = React.useState('ALL');
+  const [windowFilter, setWindowFilter] = React.useState('recent_7');
+  const [search,       setSearch]       = React.useState('');
   const [sortDir,      setSortDir]      = React.useState(-1);
 
   const WINDOWS = [
-    { key:\'recent_7\', label:\'Last 7\' },
-    { key:\'l15\',      label:\'Last 15\' },
-    { key:\'season\',   label:\'Season\' },
+    { key:'recent_7', label:'Last 7' },
+    { key:'l15',      label:'Last 15' },
+    { key:'season',   label:'Season' },
   ];
 
   const rows = React.useMemo(() => {
     const seen = new Set();
     const out  = [];
     for (const r of Object.values(DAILY_PICKS_CACHE || {})) {
-      const pid = String(r.batter_id || \'\').split(\'.\')[0];
+      const pid = String(r.batter_id || '').split('.')[0];
       if (!pid || seen.has(pid) || !r.batter) continue;
       seen.add(pid);
       if (!isActiveBatter(r)) continue;
 
-      const cached    = getCachedPlayer(parseInt(pid) || 0) || {};
-      const seasonEV  = parseFloat(cached.avgEV) || parseFloat(r.blended_ev) || 0;
-      const recentEV7 = parseFloat(r.recent_avg_ev) || parseFloat(cached.recentAvgEV) || 0;
+      const cached     = getCachedPlayer(parseInt(pid) || 0) || {};
+      const seasonEV   = parseFloat(cached.avgEV) || parseFloat(r.blended_ev) || 0;
+      const recentEV7  = parseFloat(r.recent_avg_ev) || parseFloat(cached.recentAvgEV) || 0;
       const recentEV15 = (recentEV7 > 0 && seasonEV > 0)
         ? parseFloat(((recentEV7 * 0.6) + (seasonEV * 0.4)).toFixed(1))
         : recentEV7 || seasonEV;
 
       const evByWindow = { recent_7: recentEV7, l15: recentEV15, season: seasonEV };
       const windowEV   = evByWindow[windowFilter] || 0;
-      const delta = windowFilter === \'season\'
+      const delta = windowFilter === 'season'
         ? 0
         : (seasonEV > 0 && windowEV > 0)
           ? parseFloat((windowEV - seasonEV).toFixed(2))
           : null;
 
       const ab = parseInt(
-        windowFilter === \'recent_7\'  ? (r.recent_pa || 0) :
-        windowFilter === \'l15\'       ? (r.l15_pa || r.recent_pa || 0) :
+        windowFilter === 'recent_7' ? (r.recent_pa || 0) :
+        windowFilter === 'l15'      ? (r.l15_pa || r.recent_pa || 0) :
         (r.season_pa || r.recent_pa || 0)
       );
 
       out.push({
-        pid, name: r.batter, team: r.batting_team || \'\',
-        batterHand: r.batter_hand || \'\', pitcherHand: r.pitcher_hand || \'\',
-        pitcher: r.pitcher || \'\', pitcherId: String(r.pitcher_id || \'\').split(\'.\')[0] || null,
+        pid, name: r.batter, team: r.batting_team || '',
+        batterHand: r.batter_hand || '', pitcherHand: r.pitcher_hand || '',
+        pitcher: r.pitcher || '',
+        pitcherId: String(r.pitcher_id || '').split('.')[0] || null,
         windowEV, seasonEV, delta, ab,
         hr:  parseInt(r.recent_hr_count  || 0),
         xbh: parseInt(r.recent_xbh_count || 0),
@@ -24036,14 +24037,14 @@ function ExVDeltaTab({ data }) {
 
   const teams = React.useMemo(() => {
     const ts = [...new Set(rows.map(r => r.team).filter(Boolean))].sort();
-    return [\'ALL\', ...ts];
+    return ['ALL', ...ts];
   }, [rows]);
 
   const filtered = React.useMemo(() => {
     let out = rows.filter(r => {
-      if (teamFilter !== \'ALL\'  && r.team        !== teamFilter) return false;
-      if (handFilter === \'R\'    && r.pitcherHand !== \'R\')      return false;
-      if (handFilter === \'L\'    && r.pitcherHand !== \'L\')      return false;
+      if (teamFilter !== 'ALL' && r.team        !== teamFilter) return false;
+      if (handFilter === 'R'  && r.pitcherHand  !== 'R')        return false;
+      if (handFilter === 'L'  && r.pitcherHand  !== 'L')        return false;
       if (search) {
         const q = search.toLowerCase();
         if (!r.name.toLowerCase().includes(q) && !r.team.toLowerCase().includes(q)) return false;
@@ -24051,7 +24052,7 @@ function ExVDeltaTab({ data }) {
       if (!r.windowEV || r.windowEV < 70) return false;
       return true;
     });
-    const sortKey = windowFilter === \'season\' ? \'windowEV\' : \'delta\';
+    const sortKey = windowFilter === 'season' ? 'windowEV' : 'delta';
     out.sort((a, b) => {
       const av = a[sortKey] ?? -99;
       const bv = b[sortKey] ?? -99;
@@ -24061,162 +24062,174 @@ function ExVDeltaTab({ data }) {
   }, [rows, teamFilter, handFilter, search, windowFilter, sortDir]);
 
   const deltaColor = d => {
-    if (d === null || d === 0) return \'var(--muted)\';
-    if (d >=  4)   return \'#ff4020\';
-    if (d >=  2)   return \'#f5a623\';
-    if (d >=  0.5) return \'#27c97a\';
-    if (d <= -3)   return \'#ef4444\';
-    if (d <= -1)   return \'#f97316\';
-    return \'var(--muted)\';
+    if (d === null || d === 0) return 'var(--muted)';
+    if (d >=  4)   return '#ff4020';
+    if (d >=  2)   return '#f5a623';
+    if (d >=  0.5) return '#27c97a';
+    if (d <= -3)   return '#ef4444';
+    if (d <= -1)   return '#f97316';
+    return 'var(--muted)';
   };
 
-  const deltaLabel = d => d === null ? \'\u2014\'
-    : (d >= 0 ? \'+\' : \'\') + d.toFixed(1);
+  const deltaLabel = d => d === null
+    ? '\u2014'
+    : (d >= 0 ? '+' : '') + d.toFixed(1);
 
   const selStyle = {
-    background:\'var(--surface2)\', border:\'1px solid var(--border)\',
-    borderRadius:6, color:\'var(--text)\', fontFamily:mono, fontSize:9,
-    padding:\'4px 8px\', cursor:\'pointer\',
+    background:'var(--surface2)', border:'1px solid var(--border)',
+    borderRadius:6, color:'var(--text)', fontFamily:mono, fontSize:9,
+    padding:'4px 8px', cursor:'pointer',
   };
 
   return (
-    <div style={{padding:\'0 2px\'}}>
+    <div style={{padding:'0 2px'}}>
 
-      <div style={{marginBottom:10,padding:\'10px 14px\',borderRadius:10,
-        background:\'linear-gradient(135deg,rgba(55,138,221,.10) 0%,rgba(0,0,0,0) 100%)\',
-        border:\'1px solid rgba(55,138,221,.18)\'}}>
-        <div style={{display:\'flex\',alignItems:\'center\',gap:8,marginBottom:3}}>
-          <span style={{fontSize:16}}>⚡</span>
+      {/* Header */}
+      <div style={{marginBottom:10,padding:'10px 14px',borderRadius:10,
+        background:'linear-gradient(135deg,rgba(55,138,221,.10) 0%,rgba(0,0,0,0) 100%)',
+        border:'1px solid rgba(55,138,221,.18)'}}>
+        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:3}}>
+          <span style={{fontSize:16}}>{'\u26a1'}</span>
           <span style={{fontFamily:osw,fontWeight:800,fontSize:14,letterSpacing:.5,
-            color:\'white\'}}>ExV&#916; &mdash; Exit Velocity Delta</span>
+            color:'white'}}>ExV&#916; &mdash; Exit Velocity Delta</span>
         </div>
-        <div style={{fontFamily:mono,fontSize:8,color:\'rgba(255,255,255,.4)\',lineHeight:1.6}}>
-          How much harder is each batter hitting the ball recently vs their season baseline?
+        <div style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.4)',lineHeight:1.6}}>
+          How much harder is each batter hitting recently vs their season baseline?
           Positive = heating up &mdash; Negative = cooling off.
         </div>
       </div>
 
-      <div style={{display:\'flex\',gap:6,flexWrap:\'wrap\',marginBottom:10,alignItems:\'center\'}}>
+      {/* Filters */}
+      <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:10,alignItems:'center'}}>
         <input value={search} onChange={e=>setSearch(e.target.value)}
           placeholder="Search batter or team..."
-          style={{...selStyle,flex:\'1 1 120px\',minWidth:100,outline:\'none\'}}/>
+          style={{...selStyle,flex:'1 1 120px',minWidth:100,outline:'none'}}/>
         <select value={teamFilter} onChange={e=>setTeamFilter(e.target.value)} style={selStyle}>
-          {teams.map(t => <option key={t} value={t}>{t===\'ALL\'?\'All Teams\'  :t}</option>)}
+          {teams.map(t => <option key={t} value={t}>{t==='ALL'?'All Teams':t}</option>)}
         </select>
         <select value={handFilter} onChange={e=>setHandFilter(e.target.value)} style={selStyle}>
           <option value="ALL">vs All</option>
           <option value="R">vs RHP</option>
           <option value="L">vs LHP</option>
         </select>
-        <div style={{display:\'flex\',gap:3}}>
+        <div style={{display:'flex',gap:3}}>
           {WINDOWS.map(w => (
             <button key={w.key} onClick={()=>setWindowFilter(w.key)}
-              style={{padding:\'4px 9px\',borderRadius:6,cursor:\'pointer\',
-                border:`1px solid ${windowFilter===w.key?\'rgba(55,138,221,.5)\':\'var(--border)\'}`,
-                background:windowFilter===w.key?\'rgba(55,138,221,.18)\':\'var(--surface2)\',
-                color:windowFilter===w.key?\'#58a6ff\':\'var(--muted)\',
-                fontFamily:mono,fontSize:9,transition:\'all .12s\'}}>
+              style={{padding:'4px 9px',borderRadius:6,cursor:'pointer',
+                border:`1px solid ${windowFilter===w.key?'rgba(55,138,221,.5)':'var(--border)'}`,
+                background:windowFilter===w.key?'rgba(55,138,221,.18)':'var(--surface2)',
+                color:windowFilter===w.key?'#58a6ff':'var(--muted)',
+                fontFamily:mono,fontSize:9,transition:'all .12s'}}>
               {w.label}
             </button>
           ))}
         </div>
-        <button onClick={()=>setSortDir(d=>d*-1)} style={{...selStyle,padding:\'4px 8px\',flexShrink:0}}>
-          {sortDir===-1?\'\u2193 High\u2192Low\':\'\u2191 Low\u2192High\'}
+        <button onClick={()=>setSortDir(d=>d*-1)}
+          style={{...selStyle,padding:'4px 8px',flexShrink:0}}>
+          {sortDir===-1?'\u2193 High\u2192Low':'\u2191 Low\u2192High'}
         </button>
-        <span style={{fontFamily:mono,fontSize:8,color:\'rgba(255,255,255,.25)\',marginLeft:\'auto\',flexShrink:0}}>
+        <span style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.25)',
+          marginLeft:'auto',flexShrink:0}}>
           {filtered.length} batters
         </span>
       </div>
 
-      <div style={{display:\'grid\',
-        gridTemplateColumns:\'36px 1fr 44px 52px 44px 44px 44px 44px\',
-        gap:4,padding:\'4px 8px\',marginBottom:4}}>
-        {[\'\',\'BATTER\',\'Season EV\',\'ExV\u0394\',\'AB\',\'HR\',\'HH%\',\'BRL%\'].map((h,i)=>(
+      {/* Column headers */}
+      <div style={{display:'grid',
+        gridTemplateColumns:'36px 1fr 52px 52px 44px 44px 44px 44px',
+        gap:4,padding:'4px 8px',marginBottom:4}}>
+        {['','BATTER','Season EV','ExV\u0394','AB','HR','HH%','BRL%'].map((h,i)=>(
           <div key={i} style={{fontFamily:mono,fontSize:7,
-            color:\'rgba(255,255,255,.3)\',textAlign:i>1?\'center\':\'left\',
-            letterSpacing:.4,textTransform:\'uppercase\'}}>{h}</div>
+            color:'rgba(255,255,255,.3)',textAlign:i>1?'center':'left',
+            letterSpacing:.4,textTransform:'uppercase'}}>{h}</div>
         ))}
       </div>
 
+      {/* Rows */}
       {filtered.length === 0 ? (
-        <div style={{textAlign:\'center\',padding:\'28px 0\',
-          fontFamily:mono,fontSize:9,color:\'rgba(255,255,255,.2)\'}}>
+        <div style={{textAlign:'center',padding:'28px 0',
+          fontFamily:mono,fontSize:9,color:'rgba(255,255,255,.2)'}}>
           No batters match the current filters
         </div>
       ) : (
-        <div style={{display:\'flex\',flexDirection:\'column\',gap:4}}>
+        <div style={{display:'flex',flexDirection:'column',gap:4}}>
           {filtered.map((r,i) => {
             const d  = r.delta;
             const dc = deltaColor(d);
             const isTop = i < 3 && d !== null && d > 0;
             return (
-              <div key={r.pid} style={{display:\'grid\',
-                gridTemplateColumns:\'36px 1fr 44px 52px 44px 44px 44px 44px\',
-                gap:4,padding:\'7px 8px\',borderRadius:8,alignItems:\'center\',
-                background: isTop ? `${dc}0d` : \'rgba(255,255,255,.03)\',
-                border:`1px solid ${isTop ? dc+\'30\':\'rgba(255,255,255,.06)\'}`,
-                transition:\'background .15s\'}}>
+              <div key={r.pid} style={{display:'grid',
+                gridTemplateColumns:'36px 1fr 52px 52px 44px 44px 44px 44px',
+                gap:4,padding:'7px 8px',borderRadius:8,alignItems:'center',
+                background: isTop ? `${dc}0d` : 'rgba(255,255,255,.03)',
+                border:`1px solid ${isTop ? dc+'30' : 'rgba(255,255,255,.06)'}`,
+                transition:'background .15s'}}>
 
-                <div onClick={()=>openAtBatSlide({pid:parseInt(r.pid)||0,name:r.name,team:r.team})}
-                  style={{cursor:\'pointer\'}}>
+                <div onClick={()=>openAtBatSlide({
+                    pid:parseInt(r.pid)||0, name:r.name, team:r.team})}
+                  style={{cursor:'pointer'}}>
                   <PlayerAvatar pid={r.pid} name={r.name} size={28}
-                    border={`1.5px solid ${isTop?dc+\'60\':\'rgba(255,255,255,.1)\'}`}/>
+                    border={`1.5px solid ${isTop ? dc+'60' : 'rgba(255,255,255,.1)'}`}/>
                 </div>
 
                 <div style={{minWidth:0}}>
-                  <div onClick={()=>openAtBatSlide({pid:parseInt(r.pid)||0,name:r.name,team:r.team})}
-                    style={{cursor:\'pointer\',fontFamily:osw,fontWeight:700,fontSize:11,
-                      color:\'white\',overflow:\'hidden\',textOverflow:\'ellipsis\',
-                      whiteSpace:\'nowrap\',textDecoration:\'underline\',
-                      textDecorationStyle:\'dotted\',
-                      textDecorationColor:\'rgba(255,255,255,.2)\',lineHeight:1.2}}>
+                  <div onClick={()=>openAtBatSlide({
+                      pid:parseInt(r.pid)||0, name:r.name, team:r.team})}
+                    style={{cursor:'pointer',fontFamily:osw,fontWeight:700,fontSize:11,
+                      color:'white',overflow:'hidden',textOverflow:'ellipsis',
+                      whiteSpace:'nowrap',textDecoration:'underline',
+                      textDecorationStyle:'dotted',
+                      textDecorationColor:'rgba(255,255,255,.2)',lineHeight:1.2}}>
                     {r.name}
                   </div>
-                  <div style={{fontFamily:mono,fontSize:7,color:\'rgba(255,255,255,.35)\',
-                    marginTop:1,overflow:\'hidden\',textOverflow:\'ellipsis\',whiteSpace:\'nowrap\'}}>
-                    {r.team}{r.batterHand?` · ${r.batterHand}HB`:\'\'}{r.pitcher?` · vs ${r.pitcher}`:\'\'}
+                  <div style={{fontFamily:mono,fontSize:7,color:'rgba(255,255,255,.35)',
+                    marginTop:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                    {r.team}{r.batterHand ? ` \u00b7 ${r.batterHand}HB` : ''}{r.pitcher ? ` \u00b7 vs ${r.pitcher}` : ''}
                   </div>
                 </div>
 
-                <div style={{textAlign:\'center\',fontFamily:mono,fontSize:9,color:\'rgba(255,255,255,.4)\'}}>
-                  {r.seasonEV > 0 ? r.seasonEV.toFixed(1) : \'\u2014\'}
+                <div style={{textAlign:'center',fontFamily:mono,fontSize:9,
+                  color:'rgba(255,255,255,.4)'}}>
+                  {r.seasonEV > 0 ? r.seasonEV.toFixed(1) : '\u2014'}
                 </div>
 
-                <div style={{textAlign:\'center\'}}>
+                <div style={{textAlign:'center'}}>
                   <span style={{fontFamily:osw,fontWeight:800,fontSize:13,color:dc}}>
-                    {windowFilter===\'season\'
-                      ? (r.windowEV>0?r.windowEV.toFixed(1):\'\u2014\')
+                    {windowFilter === 'season'
+                      ? (r.windowEV > 0 ? r.windowEV.toFixed(1) : '\u2014')
                       : deltaLabel(d)}
                   </span>
-                  {windowFilter!==\'season\'&&d!==null&&(
-                    <div style={{fontFamily:mono,fontSize:7,color:\'rgba(255,255,255,.25)\',marginTop:1}}>
+                  {windowFilter !== 'season' && d !== null && (
+                    <div style={{fontFamily:mono,fontSize:7,
+                      color:'rgba(255,255,255,.25)',marginTop:1}}>
                       {r.windowEV.toFixed(1)} mph
                     </div>
                   )}
                 </div>
 
-                <div style={{textAlign:\'center\',fontFamily:mono,fontSize:9,color:\'rgba(255,255,255,.5)\'}}>
-                  {r.ab>0?r.ab:\'\u2014\'}
+                <div style={{textAlign:'center',fontFamily:mono,fontSize:9,
+                  color:'rgba(255,255,255,.5)'}}>
+                  {r.ab > 0 ? r.ab : '\u2014'}
                 </div>
 
-                <div style={{textAlign:\'center\',fontFamily:mono,fontSize:9,
-                  color:r.hr>0?\'#fbbf24\':\'rgba(255,255,255,.3)\',
-                  fontWeight:r.hr>0?700:400}}>
-                  {r.hr||\'\u2014\'}
+                <div style={{textAlign:'center',fontFamily:mono,fontSize:9,
+                  color: r.hr > 0 ? '#fbbf24' : 'rgba(255,255,255,.3)',
+                  fontWeight: r.hr > 0 ? 700 : 400}}>
+                  {r.hr || '\u2014'}
                 </div>
 
-                <div style={{textAlign:\'center\',fontFamily:mono,fontSize:9,
-                  color:r.hh>=50?\'#f5a623\'
-                       :r.hh>=40?\'#27c97a\'
-                       :\'rgba(255,255,255,.3)\'}}>
-                  {r.hh>0?Math.round(r.hh)+\'%\':\'\u2014\'}
+                <div style={{textAlign:'center',fontFamily:mono,fontSize:9,
+                  color: r.hh >= 50 ? '#f5a623'
+                       : r.hh >= 40 ? '#27c97a'
+                       : 'rgba(255,255,255,.3)'}}>
+                  {r.hh > 0 ? Math.round(r.hh) + '%' : '\u2014'}
                 </div>
 
-                <div style={{textAlign:\'center\',fontFamily:mono,fontSize:9,
-                  color:r.brl>=10?\'#ff4020\'
-                       :r.brl>=6?\'#f5a623\'
-                       :\'rgba(255,255,255,.3)\'}}>
-                  {r.brl>0?r.brl.toFixed(1)+\'%\':\'\u2014\'}
+                <div style={{textAlign:'center',fontFamily:mono,fontSize:9,
+                  color: r.brl >= 10 ? '#ff4020'
+                       : r.brl >= 6  ? '#f5a623'
+                       : 'rgba(255,255,255,.3)'}}>
+                  {r.brl > 0 ? r.brl.toFixed(1) + '%' : '\u2014'}
                 </div>
 
               </div>
@@ -24225,13 +24238,14 @@ function ExVDeltaTab({ data }) {
         </div>
       )}
 
+      {/* Legend */}
       <div style={{marginTop:12,fontFamily:mono,fontSize:7,
-        color:\'rgba(255,255,255,.2)\',lineHeight:1.8,textAlign:\'center\'}}>
+        color:'rgba(255,255,255,.2)',lineHeight:1.8,textAlign:'center'}}>
         ExV&#916; = recent window EV minus season avg EV &nbsp;&middot;&nbsp;
-        <span style={{color:\'#ff4020\'}}>&gt;+4.0</span> elite &nbsp;
-        <span style={{color:\'#f5a623\'}}>&gt;+2.0</span> hot &nbsp;
-        <span style={{color:\'#27c97a\'}}>&gt;+0.5</span> warm &nbsp;
-        <span style={{color:\'#ef4444\'}}>&lt;-1.0</span> cooling
+        <span style={{color:'#ff4020'}}>&gt;+4.0</span> elite &nbsp;
+        <span style={{color:'#f5a623'}}>&gt;+2.0</span> hot &nbsp;
+        <span style={{color:'#27c97a'}}>&gt;+0.5</span> warm &nbsp;
+        <span style={{color:'#ef4444'}}>&lt;-1.0</span> cooling
       </div>
 
     </div>
