@@ -2,6 +2,9 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import ReactDOM from "react-dom";
 import { UserButton, SignedIn, SignedOut, SignInButton, useAuth } from "@clerk/clerk-react";
 
+// Global ref so non-React functions (setPick) can trigger cloud saves
+let _GLOBAL_GET_TOKEN = null;
+
 // ── PWA Push Notifications ───────────────────────────────────────────────────
 const VAPID_PUBLIC_KEY = (typeof window !== 'undefined' && window.__VAPID_KEY__) || '';
 if ('serviceWorker' in navigator) {
@@ -911,6 +914,7 @@ function setPick(pid, name, team, type) {
   else { GLOBAL_PICKS[pid]={pid,name,team,type,ts:Date.now()}; }
   savePicks(GLOBAL_PICKS);
   PICKS_LISTENERS.forEach(fn=>fn({...GLOBAL_PICKS}));
+  if (_GLOBAL_GET_TOKEN) savePicksCloud(GLOBAL_PICKS, _GLOBAL_GET_TOKEN);
 }
 function usePicks() {
   const [picks,setPicksState] = useState({...GLOBAL_PICKS});
@@ -24977,6 +24981,12 @@ export default function App() {
   const [tab, setTab] = useState("home");
   const [showPicksSlideout, setShowPicksSlideout] = useState(false);
   const { isSignedIn, getToken } = useAuth();
+
+  // Keep global token ref updated so setPick (outside React) can reach it
+  useEffect(() => {
+    _GLOBAL_GET_TOKEN = isSignedIn ? getToken : null;
+    return () => { _GLOBAL_GET_TOKEN = null; };
+  }, [isSignedIn, getToken]);
 
   // Wire global nav on mount so notifications can route to tabs
   useEffect(() => {
