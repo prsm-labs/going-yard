@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import ReactDOM from "react-dom";
-import { UserButton, SignedIn, SignedOut, SignInButton, useAuth } from "@clerk/clerk-react";
+import { UserButton, SignedIn, SignedOut, SignInButton, useAuth, useClerk } from "@clerk/clerk-react";
 
 // Global ref so non-React functions (setPick) can trigger cloud saves
 let _GLOBAL_GET_TOKEN = null;
@@ -25003,24 +25003,24 @@ export default function App() {
   }, []);
 
   // ── Cloud picks sync ────────────────────────────────────────────────────
+  const { addListener } = useClerk();
   const prevSignedIn = useRef(false);
 
+  // Load picks when user logs in
   useEffect(() => {
-    const justLoggedIn  = isSignedIn && !prevSignedIn.current;
-    const justLoggedOut = !isSignedIn && prevSignedIn.current;
+    const justLoggedIn = isSignedIn && !prevSignedIn.current;
     prevSignedIn.current = !!isSignedIn;
 
     if (justLoggedIn) {
-      // Load cloud picks on login
       loadPicksCloud(getToken).then(cloudPicks => {
         const cloudCount = cloudPicks ? Object.keys(cloudPicks).length : 0;
         if (cloudCount > 0) {
-          // Cloud has picks → use cloud, overwrite local
+          // Cloud has picks → overwrite local
           savePicks(cloudPicks);
           GLOBAL_PICKS = cloudPicks;
           PICKS_LISTENERS.forEach(fn => fn({...cloudPicks}));
         } else {
-          // Cloud empty → keep local picks and push them up to cloud
+          // Cloud empty → push local picks to cloud
           const local = loadPicks();
           if (Object.keys(local).length > 0) {
             savePicksCloud(local, getToken);
@@ -25028,14 +25028,20 @@ export default function App() {
         }
       });
     }
-
-    if (justLoggedOut) {
-      // Clear local picks on logout — safely stored in cloud
-      savePicks({});
-      GLOBAL_PICKS = {};
-      PICKS_LISTENERS.forEach(fn => fn({}));
-    }
   }, [isSignedIn, getToken]);
+
+  // Clear picks on logout via Clerk listener (more reliable than isSignedIn transition)
+  useEffect(() => {
+    const unsub = addListener(({ session }) => {
+      if (!session) {
+        savePicks({});
+        GLOBAL_PICKS = {};
+        PICKS_LISTENERS.forEach(fn => fn({}));
+        _GLOBAL_GET_TOKEN = null;
+      }
+    });
+    return () => unsub && unsub();
+  }, [addListener]);
 
   const NAV = [
     {key:"home",       label:"🏡 Home"},
