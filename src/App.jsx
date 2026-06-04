@@ -24981,6 +24981,7 @@ export default function App() {
   const [tab, setTab] = useState("home");
   const [showPicksSlideout, setShowPicksSlideout] = useState(false);
   const { isSignedIn, getToken } = useAuth();
+  const { addListener } = useClerk();
 
   // Keep global token ref updated so setPick (outside React) can reach it
   useEffect(() => {
@@ -25003,24 +25004,24 @@ export default function App() {
   }, []);
 
   // ── Cloud picks sync ────────────────────────────────────────────────────
-  const { addListener } = useClerk();
   const prevSignedIn = useRef(false);
 
-  // Load picks when user logs in
   useEffect(() => {
-    const justLoggedIn = isSignedIn && !prevSignedIn.current;
+    const justLoggedIn  = isSignedIn && !prevSignedIn.current;
+    const justLoggedOut = !isSignedIn && prevSignedIn.current;
     prevSignedIn.current = !!isSignedIn;
 
     if (justLoggedIn) {
+      // Load cloud picks on login
       loadPicksCloud(getToken).then(cloudPicks => {
         const cloudCount = cloudPicks ? Object.keys(cloudPicks).length : 0;
         if (cloudCount > 0) {
-          // Cloud has picks → overwrite local
+          // Cloud has picks → use cloud, overwrite local
           savePicks(cloudPicks);
           GLOBAL_PICKS = cloudPicks;
           PICKS_LISTENERS.forEach(fn => fn({...cloudPicks}));
         } else {
-          // Cloud empty → push local picks to cloud
+          // Cloud empty → keep local picks and push them up to cloud
           const local = loadPicks();
           if (Object.keys(local).length > 0) {
             savePicksCloud(local, getToken);
@@ -25028,9 +25029,10 @@ export default function App() {
         }
       });
     }
+
   }, [isSignedIn, getToken]);
 
-  // Clear picks on logout via Clerk listener (more reliable than isSignedIn transition)
+  // useClerk listener — catches logout reliably even through undefined isSignedIn transition
   useEffect(() => {
     const unsub = addListener(({ session }) => {
       if (!session) {
