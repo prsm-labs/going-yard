@@ -12918,11 +12918,19 @@ function SimLabView({ data }) {
   const [simHotOnly, setSimHotOnly]               = useState(false);
   const [minYard,    setMinYard]     = useState('');
   const [maxYard,    setMaxYard]     = useState('');
-
   const [minSig,     setMinSig]      = useState('');
   const [maxSig,     setMaxSig]      = useState('');
   const [minSimTB,   setMinSimTB]    = useState('');
   const [minOdds,    setMinOdds]     = useState('');
+  const [minBoom,    setMinBoom]     = useState('');
+  const [minBrl,     setMinBrl]      = useState('');
+  const [minZoneFit, setMinZoneFit]  = useState('');
+  const [maxZoneFit, setMaxZoneFit]  = useState('');
+  const [minL7EV,    setMinL7EV]     = useState('');
+  const [maxL7EV,    setMaxL7EV]     = useState('');
+  const [minHitPct,  setMinHitPct]   = useState('');
+  const [minXbhPct,  setMinXbhPct]   = useState('');
+  const [filtersOpen,setFiltersOpen] = useState(false);
   const [simSearch,   setSimSearch]    = useState('');  // batter name search
   const [selPitcherGradesSim, setSelPitcherGradesSim] = useState(new Set()); // empty = All
   const [selBatterGradesSim,  setSelBatterGradesSim]  = useState(new Set()); // empty = All grades
@@ -13029,6 +13037,14 @@ function SimLabView({ data }) {
       })
       .filter(r => !minYard   || (parseFloat(r._yard)||computeYardScore(parseFloat(r.weighted_flag_score)*4.6, parseFloat(r.gHR)||0, parseFloat(r._boom)||0, parseFloat(r.ps_score)||0, r.batter_hand||'', r.pitcher_hand||'', parseInt(r.days_rest??1), liveSlot(r.batter_id,r.lineup_slot))) >= parseFloat(minYard))
       .filter(r => !maxYard   || (parseFloat(r._yard)||computeYardScore(parseFloat(r.weighted_flag_score)*4.6, parseFloat(r.gHR)||0, parseFloat(r._boom)||0, parseFloat(r.ps_score)||0, r.batter_hand||'', r.pitcher_hand||'', parseInt(r.days_rest??1), liveSlot(r.batter_id,r.lineup_slot))) <= parseFloat(maxYard))
+      .filter(r => !minBoom    || (parseFloat(r._boom)||0) >= parseFloat(minBoom))
+      .filter(r => !minBrl     || (parseFloat(r.recent_barrel_pct)||0) >= parseFloat(minBrl))
+      .filter(r => !minZoneFit || (parseFloat(r.zone_fit)||0) >= parseFloat(minZoneFit))
+      .filter(r => !maxZoneFit || (parseFloat(r.zone_fit)||0) <= parseFloat(maxZoneFit))
+      .filter(r => !minL7EV   || (parseFloat(r.recent_avg_ev)||0) >= parseFloat(minL7EV))
+      .filter(r => !maxL7EV   || (parseFloat(r.recent_avg_ev)||0) <= parseFloat(maxL7EV))
+      .filter(r => !minHitPct  || (parseFloat(r.proj_hit_prob)||0)*100 >= parseFloat(minHitPct))
+      .filter(r => !minXbhPct  || (parseFloat(r.proj_xbh_prob)||0)*100 >= parseFloat(minXbhPct))
 
       .filter(r => { const _s = Math.round(sigCache.current[String(r.batter_id)] ?? (parseFloat(r.weighted_flag_score)||0)*4.6); return (!minSig || _s >= parseFloat(minSig)) && (!maxSig || _s <= parseFloat(maxSig)); })
       .filter(r => !minSimTB  || (parseFloat(r.sim_tb)||0)   >= parseFloat(minSimTB))
@@ -13058,7 +13074,7 @@ function SimLabView({ data }) {
       return mul * ((parseFloat(a[sortBy]) || 0) - (parseFloat(b[sortBy]) || 0));
     });
     return sorted;
-  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, filterKeyMatchup, minYard, maxYard, minSig, maxSig, minSimTB, minOdds, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal]);
+  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, filterKeyMatchup, minYard, maxYard, minSig, maxSig, minSimTB, minOdds, minBoom, minBrl, minZoneFit, maxZoneFit, minL7EV, maxL7EV, minHitPct, minXbhPct, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal]);
 
   // Auto-select top batter when data loads
   useEffect(() => {
@@ -13110,160 +13126,232 @@ function SimLabView({ data }) {
       {/* ── SLATE RANKINGS ── */}
       {view === 'slate' && (
         <div>
-          {/* ── Row 1: Matchup dropdown + Search ── */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          
+          {/* ── Filter bar: matchup dropdown + search + FILTERS button + pitcher grades ── */}
+          <div style={{display:'flex',gap:6,marginBottom:8,alignItems:'center',flexWrap:'wrap'}}>
+
             {/* Matchup dropdown */}
-            <div ref={matchupDropRef} style={{ position: 'relative' }}>
-              <button onClick={() => setShowMatchupDrop(v => !v)}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 7, cursor: 'pointer',
-                  border: `1px solid ${selMatchups.size > 0 ? 'var(--accent)' : 'var(--border)'}`,
-                  background: selMatchups.size > 0 ? 'rgba(232,65,26,.10)' : 'var(--surface2)',
-                  color: selMatchups.size > 0 ? 'var(--accent)' : 'var(--muted)',
-                  fontFamily: "'DM Mono',monospace", fontSize: 11, fontWeight: selMatchups.size > 0 ? 700 : 400, whiteSpace: 'nowrap' }}>
-                🗓 {selMatchups.size === 0 ? 'All Games' : `${selMatchups.size} Game${selMatchups.size > 1 ? 's' : ''} ✓`}
-                <span style={{ fontSize: 9, opacity: .6, marginLeft: 2 }}>{showMatchupDrop ? '▲' : '▼'}</span>
-              </button>
-              {showMatchupDrop && (
-                <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 200,
-                  background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8,
-                  padding: '8px 6px', minWidth: 220, boxShadow: '0 8px 24px rgba(0,0,0,.5)',
-                  display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 260, overflowY: 'auto' }}>
-                  <button onClick={() => { setSelMatchups(new Set()); setShowMatchupDrop(false); }}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 5, cursor: 'pointer', border: 'none', textAlign: 'left',
-                      background: selMatchups.size === 0 ? 'rgba(232,65,26,.12)' : 'transparent',
-                      color: selMatchups.size === 0 ? 'var(--accent)' : 'var(--muted)',
-                      fontFamily: "'DM Mono',monospace", fontSize: 11, fontWeight: selMatchups.size === 0 ? 700 : 400, width: '100%' }}>
-                    <span style={{ width: 12, height: 12, borderRadius: 3, flexShrink: 0,
-                      border: `1.5px solid ${selMatchups.size === 0 ? 'var(--accent)' : 'var(--muted)'}`,
-                      background: selMatchups.size === 0 ? 'var(--accent)' : 'transparent',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: 'white' }}>
-                      {selMatchups.size === 0 ? '✓' : ''}
-                    </span>
-                    All Games
+            <select value={selMatchups.size===1?[...selMatchups][0]:'ALL'}
+              onChange={e=>{const v=e.target.value;if(v==='ALL')setSelMatchups(new Set());else setSelMatchups(new Set([v]));}}
+              style={{padding:'3px 8px',borderRadius:6,fontSize:10,fontFamily:"'DM Mono',monospace",
+                border:`1px solid ${selMatchups.size?'var(--accent2)':'var(--border)'}`,
+                background:'var(--surface2)',color:'var(--text)',cursor:'pointer',maxWidth:140}}>
+              <option value="ALL">All Matchups</option>
+              {matchupList.map(m=>(<option key={m.id} value={m.id}>{m.away} @ {m.home}</option>))}
+            </select>
+
+            {/* Search */}
+            <input value={simSearch} onChange={e=>setSimSearch(e.target.value)}
+              placeholder="Search batter…"
+              style={{padding:'4px 10px',borderRadius:6,fontSize:10,fontFamily:"'DM Mono',monospace",
+                width:130,border:`1px solid ${simSearch?'var(--accent2)':'var(--border)'}`,
+                background:'var(--surface2)',color:'var(--text)',outline:'none'}}/>
+
+            {/* FILTERS button with active count badge */}
+            {(()=>{
+              const activeCount=[filterGoneYardSim,filterDueSim,filterDiamondSim,simPicksOnly,
+                simActiveOnly,simInjuredOnly,simHotOnly,filterKeyMatchup,lineupOnly,
+                slBatterHand!=='ALL',slPitcherHand!=='ALL',slFormFilter.size>0,slHideFinal,
+                !!minYard,!!maxYard,!!minSig,!!maxSig,!!minSimTB,!!minOdds,
+                !!minBoom,!!minBrl,!!minZoneFit,!!maxZoneFit,!!minL7EV,!!maxL7EV,
+                !!minHitPct,!!minXbhPct,...[...selBatterGradesSim].map(()=>true)
+              ].filter(Boolean).length;
+              const anyActive=activeCount>0;
+              return(
+                <button onClick={()=>setFiltersOpen(v=>!v)}
+                  style={{padding:'4px 12px',borderRadius:6,cursor:'pointer',
+                    fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,letterSpacing:.6,
+                    border:`1px solid ${filtersOpen||anyActive?'var(--accent2)':'var(--border)'}`,
+                    background:filtersOpen?'rgba(245,166,35,.18)':anyActive?'rgba(245,166,35,.10)':'var(--surface2)',
+                    color:filtersOpen||anyActive?'var(--accent2)':'var(--text)',
+                    display:'flex',alignItems:'center',gap:5,whiteSpace:'nowrap'}}>
+                  <span style={{fontSize:11}}>{filtersOpen?'✕':'⚙️'}</span>
+                  {filtersOpen?'CLOSE':'FILTERS'}
+                  {anyActive&&!filtersOpen&&<span style={{
+                    background:'var(--accent2)',color:'#000',borderRadius:10,
+                    padding:'0 5px',fontSize:8,fontWeight:900,lineHeight:'16px',minWidth:14,textAlign:'center'}}>
+                    {activeCount}
+                  </span>}
+                </button>
+              );
+            })()}
+
+            {/* Pitcher grade buttons — stay outside */}
+            <div style={{display:'flex',gap:4,alignItems:'center',marginLeft:'auto',flexWrap:'wrap'}}>
+              <button onClick={()=>setSelPitcherGradesSim(new Set())}
+                style={{padding:'3px 8px',borderRadius:6,cursor:'pointer',
+                  background:selPitcherGradesSim.size===0?'rgba(255,255,255,.08)':'transparent',
+                  color:selPitcherGradesSim.size===0?'var(--text)':'var(--muted)',
+                  border:`1px solid ${selPitcherGradesSim.size===0?'var(--text)':'var(--border)'}`,
+                  fontFamily:"'DM Mono',monospace",fontWeight:selPitcherGradesSim.size===0?700:400,fontSize:10}}>All P</button>
+              {['‼️ Elite','⚠️ Tough','🤔 Average','💥 Hittable','🎯 Target'].map(g=>{
+                const active=selPitcherGradesSim.has(g);
+                const col={'‼️ Elite':'#ff4020','⚠️ Tough':'#ff8020','🤔 Average':'var(--muted)','💥 Hittable':'#27c97a','🎯 Target':'#38b8f2'}[g];
+                return(<button key={g} onClick={()=>setSelPitcherGradesSim(prev=>{const next=new Set(prev);next.has(g)?next.delete(g):next.add(g);return next;})}
+                  style={{padding:'3px 8px',borderRadius:6,cursor:'pointer',
+                    background:active?'rgba(255,255,255,.08)':'transparent',color:active?col:'var(--muted)',
+                    border:`1px solid ${active?col:'var(--border)'}`,
+                    fontFamily:"'DM Mono',monospace",fontWeight:active?700:400,fontSize:14}}>
+                  {g.split(' ')[0]}
+                </button>);
+              })}
+            </div>
+          </div>
+
+          {/* ── FILTERS SLIDEOUT ─────────────────────────────────────────── */}
+          {filtersOpen&&(
+            <div style={{background:'var(--surface2)',border:'1px solid var(--border)',
+              borderRadius:10,padding:'14px 16px',marginBottom:10,
+              display:'flex',flexDirection:'column',gap:14,
+              boxShadow:'0 4px 24px rgba(0,0,0,.45)'}}>
+
+              {/* Top: title + clear all */}
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,
+                  letterSpacing:.8,color:'var(--text)',textTransform:'uppercase'}}>Filter Matchups</span>
+                <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                  <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)'}}>{slate.length} shown</span>
+                  <button onClick={()=>{
+                    setFilterGoneYardSim(false);setFilterDueSim(false);setFilterDiamondSim(false);
+                    setSimPicksOnly(false);setSimActiveOnly(false);setSimInjuredOnly(false);
+                    setSimHotOnly(false);setFilterKeyMatchup(false);setLineupOnly(false);
+                    setSlBatterHand('ALL');setSlPitcherHand('ALL');setSlFormFilter(new Set());
+                    setSlHideFinal(false);setSelBatterGradesSim(new Set());
+                    setMinYard('');setMaxYard('');setMinSig('');setMaxSig('');
+                    setMinSimTB('');setMinOdds('');setMinBoom('');setMinBrl('');
+                    setMinZoneFit('');setMaxZoneFit('');setMinL7EV('');setMaxL7EV('');
+                    setMinHitPct('');setMinXbhPct('');
+                  }} style={{padding:'3px 10px',borderRadius:5,border:'1px solid rgba(255,64,32,.3)',
+                    background:'rgba(255,64,32,.08)',color:'var(--accent)',
+                    fontFamily:"'DM Mono',monospace",fontSize:9,cursor:'pointer',fontWeight:700}}>
+                    ✕ Clear All
                   </button>
-                  <div style={{ height: 1, background: 'var(--border)', margin: '3px 0' }}/>
-                  {matchupList.map(g => {
-                    const isChecked = selMatchups.has(g.id);
-                    const toggle = () => setSelMatchups(prev => { const next = new Set(prev); isChecked ? next.delete(g.id) : next.add(g.id); return next; });
-                    return (
-                      <button key={g.id} onClick={toggle}
-                        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 5, cursor: 'pointer', border: 'none', textAlign: 'left',
-                          background: isChecked ? 'rgba(232,65,26,.10)' : 'transparent', color: isChecked ? 'var(--accent)' : 'var(--text)',
-                          fontFamily: "'Oswald',sans-serif", fontSize: 12, fontWeight: isChecked ? 700 : 500, width: '100%', whiteSpace: 'nowrap' }}>
-                        <span style={{ width: 12, height: 12, borderRadius: 3, flexShrink: 0,
-                          border: `1.5px solid ${isChecked ? 'var(--accent)' : 'var(--muted)'}`,
-                          background: isChecked ? 'var(--accent)' : 'transparent',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: 'white' }}>
-                          {isChecked ? '✓' : ''}
-                        </span>
-                        <span style={{ flex: 1 }}>{g.away} @ {g.home}</span>
-                        {g.time && <span style={{ fontSize: 9, color: 'var(--muted)', marginLeft: 4 }}>{g.time}</span>}
-                      </button>
-                    );
-                  })}
-                  {selMatchups.size > 0 && (
-                    <div style={{ marginTop: 4, paddingTop: 4, borderTop: '1px solid var(--border)', textAlign: 'right' }}>
-                      <span onClick={() => { setSelMatchups(new Set()); setShowMatchupDrop(false); }}
-                        style={{ fontSize: 9, color: 'var(--accent)', fontFamily: "'DM Mono',monospace", cursor: 'pointer', textDecoration: 'underline' }}>clear all</span>
-                    </div>
-                  )}
                 </div>
-              )}
-            </div>
-            {/* Search batter */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginLeft: 'auto' }}>
-              <input type="text" value={simSearch} onChange={e => setSimSearch(e.target.value)} placeholder="Search batter…"
-                style={{ padding: '4px 10px', borderRadius: 6, fontSize: 10, fontFamily: "'DM Mono',monospace",
-                  border: `1px solid ${simSearch ? 'var(--accent2)' : 'var(--border)'}`,
-                  background: 'var(--surface2)', color: 'var(--text)', width: 140, outline: 'none' }}/>
-              {simSearch && <button onClick={() => setSimSearch('')}
-                style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontFamily: "'DM Mono',monospace", fontSize: 10, padding: '0 2px' }}>✕</button>}
-            </div>
-          </div>
+              </div>
 
-          {/* ── Row 2: Batter filter emoji stickers ── */}
-            <div style={{display:"flex",gap:6,marginBottom:4,flexWrap:"wrap",alignItems:"center"}}>
-              <HandFilter mode="batter" value={slBatterHand} onChange={setSlBatterHand}/>
-              <HandFilter mode="pitcher" value={slPitcherHand} onChange={setSlPitcherHand}/>
-              <FormClassFilter selected={slFormFilter} onChange={setSlFormFilter}/>
-              <button onClick={()=>setSlHideFinal(v=>!v)} style={{padding:'3px 9px',borderRadius:6,
-                border:`1px solid ${slHideFinal?'#ff4020':'var(--border)'}`,
-                background:slHideFinal?'rgba(255,64,32,.12)':'transparent',
-                color:slHideFinal?'#ff4020':'var(--muted)',fontFamily:"'DM Mono',monospace",
-                fontSize:9,cursor:'pointer',whiteSpace:'nowrap'}}>
-                {slHideFinal?'✓ Hiding Final':'Hide Final'}
-              </button>
+              {/* Batter Flags */}
+              <div>
+                <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--muted)',
+                  textTransform:'uppercase',letterSpacing:1,marginBottom:7}}>Batter Flags</div>
+                <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                  {[
+                    [()=>setLineupOnly(v=>!v),        lineupOnly,        '#27c97a',        '✅ In Lineup'],
+                    [()=>setFilterGoneYardSim(v=>!v), filterGoneYardSim, 'var(--accent)',  '💥 Gone Yard Today'],
+                    [()=>setFilterDueSim(v=>!v),      filterDueSim,      'var(--ice)',     '⏳ Due'],
+                    [()=>{setSimActiveOnly(s=>!s);if(!simActiveOnly)setSimInjuredOnly(false);}, simActiveOnly,'#34d399','☑️ Active Only'],
+                    [()=>{setSimInjuredOnly(s=>!s);if(!simInjuredOnly)setSimActiveOnly(false);},simInjuredOnly,'#fb923c','🤕 Injured'],
+                    [()=>setSimHotOnly(s=>!s),        simHotOnly,        '#fb923c',        '🔥 Hot Bat'],
+                    [()=>setSimPicksOnly(s=>!s),      simPicksOnly,      'var(--accent2)', '🎯 My Picks'],
+                    [()=>setFilterDiamondSim(v=>!v),  filterDiamondSim,  '#ffcc00',        '💎 Diamond'],
+                    [()=>setFilterKeyMatchup(v=>!v),  filterKeyMatchup,  '#ffd700',        '🔑 Key Matchup'],
+                    [()=>setSlHideFinal(v=>!v),       slHideFinal,       '#ff6b6b',        '🚫 Hide Final Games'],
+                  ].map(([fn,active,col,label])=>(
+                    <button key={label} onClick={fn}
+                      style={{padding:'5px 11px',borderRadius:7,cursor:'pointer',fontSize:10,
+                        fontFamily:"'DM Mono',monospace",fontWeight:active?700:400,
+                        border:`1px solid ${active?col:'var(--border)'}`,
+                        background:active?`${col}22`:'transparent',
+                        color:active?col:'var(--muted)',whiteSpace:'nowrap',
+                        display:'flex',alignItems:'center',gap:6}}>
+                      <span style={{width:9,height:9,borderRadius:2,flexShrink:0,
+                        border:`1.5px solid ${active?col:'var(--border)'}`,
+                        background:active?col:'transparent',display:'inline-block'}}/>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Batter Grade */}
+              <div>
+                <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--muted)',
+                  textTransform:'uppercase',letterSpacing:1,marginBottom:7}}>Batter Grade</div>
+                <div style={{display:'flex',gap:5,flexWrap:'wrap',alignItems:'center'}}>
+                  {['A+','A','B','C','D'].map(g=>{
+                    const active=selBatterGradesSim.has(g);
+                    const col={'A+':'#f5a623','A':'#e8411a','B':'#38b8f2','C':'var(--muted)','D':'var(--muted)'}[g]||'var(--muted)';
+                    return(<button key={g} onClick={()=>setSelBatterGradesSim(prev=>{const next=new Set(prev);active?next.delete(g):next.add(g);return next;})}
+                      style={{padding:'5px 13px',borderRadius:5,cursor:'pointer',fontWeight:active?800:500,
+                        border:`1px solid ${active?col:'var(--border)'}`,background:active?`${col}22`:'transparent',
+                        color:active?col:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:11}}>{g}</button>);
+                  })}
+                  {selBatterGradesSim.size>0&&<span onClick={()=>setSelBatterGradesSim(new Set())}
+                    style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+                      cursor:'pointer',textDecoration:'underline',marginLeft:4}}>clear</span>}
+                </div>
+              </div>
+
+              {/* Hand + Form */}
+              <div style={{display:'flex',gap:16,flexWrap:'wrap',alignItems:'flex-start'}}>
+                <div>
+                  <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--muted)',
+                    textTransform:'uppercase',letterSpacing:1,marginBottom:6}}>Batter Hand</div>
+                  <HandFilter mode="batter" value={slBatterHand} onChange={setSlBatterHand}/>
+                </div>
+                <div>
+                  <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--muted)',
+                    textTransform:'uppercase',letterSpacing:1,marginBottom:6}}>Pitcher Hand</div>
+                  <HandFilter mode="pitcher" value={slPitcherHand} onChange={setSlPitcherHand}/>
+                </div>
+                <div>
+                  <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--muted)',
+                    textTransform:'uppercase',letterSpacing:1,marginBottom:6}}>Form Class</div>
+                  <FormClassFilter selected={slFormFilter} onChange={setSlFormFilter}/>
+                </div>
+              </div>
+
+              {/* Score Ranges */}
+              <div>
+                <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--muted)',
+                  textTransform:'uppercase',letterSpacing:1,marginBottom:8}}>Score Ranges</div>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))',gap:8}}>
+                  {[
+                    {label:'🎯 Yard Score',  minV:minYard,    setMin:setMinYard,    maxV:maxYard,    setMax:setMaxYard,    phMin:'min',phMax:'max'},
+                    {label:'⚡ Sig Score',   minV:minSig,     setMin:setMinSig,     maxV:maxSig,     setMax:setMaxSig,     phMin:'min',phMax:'max'},
+                    {label:'💥 Boom Score',  minV:minBoom,    setMin:setMinBoom,    maxV:null,       setMax:null,          phMin:'40', phMax:null},
+                    {label:'🛢️ L7 Brl%',    minV:minBrl,     setMin:setMinBrl,     maxV:null,       setMax:null,          phMin:'8',  phMax:null},
+                    {label:'🗺️ Zone Fit %',  minV:minZoneFit, setMin:setMinZoneFit, maxV:maxZoneFit, setMax:setMaxZoneFit, phMin:'min',phMax:'max'},
+                    {label:'⚡ L7 EV (mph)', minV:minL7EV,    setMin:setMinL7EV,    maxV:maxL7EV,    setMax:setMaxL7EV,    phMin:'95', phMax:'max'},
+                    {label:'📊 Sim TB',      minV:minSimTB,   setMin:setMinSimTB,   maxV:null,       setMax:null,          phMin:'1.5',phMax:null},
+                    {label:'📈 Hit %',       minV:minHitPct,  setMin:setMinHitPct,  maxV:null,       setMax:null,          phMin:'25', phMax:null},
+                    {label:'📊 XBH %',       minV:minXbhPct,  setMin:setMinXbhPct,  maxV:null,       setMax:null,          phMin:'10', phMax:null},
+                    {label:'📉 Odds %',      minV:minOdds,    setMin:setMinOdds,    maxV:null,       setMax:null,          phMin:'8',  phMax:null},
+                  ].map(({label,minV,setMin,maxV,setMax,phMin,phMax})=>{
+                    const active=!!(minV||(maxV||''));
+                    return(
+                    <div key={label} style={{background:'var(--surface)',borderRadius:7,padding:'8px 10px',
+                      border:`1px solid ${active?'var(--accent2)':'var(--border)'}`}}>
+                      <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,
+                        color:active?'var(--accent2)':'var(--muted)',marginBottom:5,fontWeight:active?700:400}}>
+                        {label}
+                      </div>
+                      <div style={{display:'flex',alignItems:'center',gap:4}}>
+                        <input type="number" value={minV} onChange={e=>setMin(e.target.value)}
+                          placeholder={phMin}
+                          style={{width:'100%',padding:'3px 6px',borderRadius:4,
+                            border:`1px solid ${minV?'var(--accent2)':'var(--border)'}`,
+                            background:'var(--surface2)',color:'var(--text)',
+                            fontFamily:"'DM Mono',monospace",fontSize:10}}/>
+                        {setMax&&(<>
+                          <span style={{color:'var(--muted)',fontSize:9,flexShrink:0}}>–</span>
+                          <input type="number" value={maxV||''} onChange={e=>setMax(e.target.value)}
+                            placeholder={phMax||'max'}
+                            style={{width:'100%',padding:'3px 6px',borderRadius:4,
+                              border:`1px solid ${maxV?'var(--accent2)':'var(--border)'}`,
+                              background:'var(--surface2)',color:'var(--text)',
+                              fontFamily:"'DM Mono',monospace",fontSize:10}}/>
+                        </>)}
+                      </div>
+                    </div>
+                  );})}
+                </div>
+              </div>
+
             </div>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            {[
-              [() => setLineupOnly(v=>!v),        lineupOnly,        'rgba(39,201,122,.12)', '#27c97a',       '✅'],
-              [() => setFilterGoneYardSim(v=>!v), filterGoneYardSim, 'rgba(255,64,32,.15)',  'var(--accent)', '💥'],
-              [() => setFilterDueSim(v=>!v),      filterDueSim,      'rgba(56,184,242,.18)', 'var(--ice)',    '⏳'],
-              [()=>{setSimActiveOnly(s=>!s);if(!simActiveOnly)setSimInjuredOnly(false);}, simActiveOnly,  'rgba(52,211,153,.12)', '#34d399', '☑️'],
-              [() => setSimHotOnly(s=>!s),        simHotOnly,        'rgba(251,146,60,.12)', '#fb923c',       '🔥'],
-              [() => setSimPicksOnly(s=>!s),       simPicksOnly,      'rgba(245,166,35,.12)', 'var(--accent2)','🎯'],
-              [() => setFilterDiamondSim(v=>!v),  filterDiamondSim,  'rgba(255,204,0,.18)',  '#ffcc00',       '💎'],
-              [() => setFilterKeyMatchup(v=>!v),  filterKeyMatchup,  'rgba(255,215,0,.18)',  '#ffd700',       '🔑'],
-            ].map(([fn, active, bg, col, emoji]) => {
-              const EMOJI_TIPS = {
-                '✅': 'Show confirmed lineup batters only',
-                '💥': 'Show batters who went yard today (live)',
-                '⏳': 'Show batters who are "due" — overdue for a HR by AB count',
-                '☑️': 'Show active (non-injured) batters only',
-                '🔥': 'Show hot bat batters — 3+ HRs in last 7 days',
-                '🎯': 'Show only batters in My Picks list',
-                '💎': 'Show Diamond tier picks only',
-                '🔑': 'Show Key Matchup batters only',
-              };
-              return (
-              <button key={emoji} onClick={fn}
-                data-tip={EMOJI_TIPS[emoji] || emoji}
-                style={{ padding: '4px 9px', borderRadius: 7, cursor: 'pointer', flexShrink: 0, fontSize: 14,
-                  border: `1px solid ${active ? col : 'var(--border)'}`,
-                  background: active ? bg : 'transparent', color: active ? col : 'var(--muted)' }}>
-                {emoji}
-              </button>
-            );})}
-          </div>
-          {/* ⚡ The Sauce — faintly hidden cheat sheet, visible in All Matchups */}
+          )}
+
+          {/* ⚡ The Sauce */}
           <div style={{display:'flex',alignItems:'center',marginBottom:4}}><CheatCodeButton/></div>
-
-          {/* ── Row 3: Batter grades ── */}
-          <div style={{ display: 'flex', gap: 6, marginBottom: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", textTransform: 'uppercase', letterSpacing: 1 }}>Grade:</span>
-            {['A+','A','B','C','D'].map(g => {
-              const active = selBatterGradesSim.has(g);
-              const col = {'A+':'#f5a623','A':'#e8411a','B':'#38b8f2','C':'var(--muted)','D':'var(--muted)'}[g]||'var(--muted)';
-              return (<button key={g} onClick={() => setSelBatterGradesSim(prev => { const next=new Set(prev); active?next.delete(g):next.add(g); return next; })}
-                style={{ padding:'3px 10px', borderRadius:5, cursor:'pointer', fontWeight:active?800:500,
-                  border:`1px solid ${active?col:'var(--border)'}`, background:active?`${col}20`:'transparent',
-                  color:active?col:'var(--muted)', fontFamily:"'DM Mono',monospace", fontSize:11 }}>{g}</button>);
-            })}
-            {selBatterGradesSim.size > 0 && <span onClick={() => setSelBatterGradesSim(new Set())}
-              style={{ fontSize:9, color:'var(--muted)', fontFamily:"'DM Mono',monospace", cursor:'pointer', textDecoration:'underline' }}>clear</span>}
-          </div>
-
-          {/* ── Row 4: Pitcher grades ── */}
-          <div style={{ display: 'flex', gap: 6, marginBottom: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", textTransform: 'uppercase', letterSpacing: 1 }}>Pitcher:</span>
-            <button onClick={() => setSelPitcherGradesSim(new Set())}
-              style={{ padding:'3px 9px', borderRadius:6, cursor:'pointer',
-                background:selPitcherGradesSim.size===0?'rgba(255,255,255,.08)':'transparent',
-                color:selPitcherGradesSim.size===0?'var(--text)':'var(--muted)',
-                border:`1px solid ${selPitcherGradesSim.size===0?'var(--text)':'var(--border)'}`,
-                fontFamily:"'DM Mono',monospace", fontWeight:selPitcherGradesSim.size===0?700:400, fontSize:10 }}>All</button>
-            {['‼️ Elite','⚠️ Tough','🤔 Average','💥 Hittable','🎯 Target'].map(g => {
-              const active = selPitcherGradesSim.has(g);
-              const col = {'‼️ Elite':'#ff4020','⚠️ Tough':'#ff8020','🤔 Average':'var(--muted)','💥 Hittable':'#27c97a','🎯 Target':'#38b8f2'}[g];
-              return (<button key={g} onClick={() => setSelPitcherGradesSim(prev => { const next=new Set(prev); next.has(g)?next.delete(g):next.add(g); return next; })}
-                style={{ padding:'3px 9px', borderRadius:6, cursor:'pointer',
-                  background:active?'rgba(255,255,255,.08)':'transparent', color:active?col:'var(--muted)',
-                  border:`1px solid ${active?col:'var(--border)'}`,
-                  fontFamily:"'DM Mono',monospace", fontWeight:active?700:400, fontSize:14 }}>
-                {g.split(' ')[0]}
-              </button>);
-            })}
-          </div>
 
           {/* Hidden PitcherCard renders to populate simPitcherGrades cache */}
           <div style={{ display: 'none' }}>
@@ -13271,45 +13359,6 @@ function SimLabView({ data }) {
               <PitcherCard key={pid} pitcherId={pid} pitcherName=""
                 onGrade={(id, g) => { simPitcherGrades.current[id] = g; }}/>
             ))}
-          </div>
-
-          {/* Min-value filter bar */}
-          <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center',marginBottom:8}}>
-            {/* Min+Max filters */}
-            {[
-              { label:'🎯 Yard', minV:minYard, setMin:setMinYard, maxV:maxYard, setMax:setMaxYard, hasMax:true,  ph:'30' },
-
-              { label:'⚡ Sig',   minV:minSig,  setMin:setMinSig,  maxV:maxSig,  setMax:setMaxSig,   hasMax:true,  ph:'4'  },
-              { label:'Sim TB',  minV:minSimTB,setMin:setMinSimTB,maxV:'',      setMax:null,        hasMax:false, ph:'1.5'},
-              { label:'Odds %',  minV:minOdds, setMin:setMinOdds, maxV:'',      setMax:null,        hasMax:false, ph:'8'  },
-            ].map(({ label, minV, setMin, maxV, setMax, hasMax, ph }) => (
-              <div key={label} style={{display:'flex',alignItems:'center',gap:3,background:'var(--surface2)',
-                border:`1px solid ${minV||maxV?'var(--accent2)':'var(--border)'}`,
-                borderRadius:6,padding:'3px 7px'}}>
-                <span style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",flexShrink:0,marginRight:2}}>{label}</span>
-                <input type="number" value={minV} onChange={e=>setMin(e.target.value)} placeholder={ph}
-                  style={{width:42,padding:'1px 4px',borderRadius:4,
-                    border:`1px solid ${minV?'var(--accent2)':'var(--border)'}`,
-                    background:'var(--surface)',color:'var(--text)',
-                    fontFamily:"'DM Mono',monospace",fontSize:9}}/>
-                {hasMax && <>
-                  <span style={{fontSize:8,color:'rgba(255,255,255,.2)',margin:'0 1px'}}>–</span>
-                  <input type="number" value={maxV} onChange={e=>setMax(e.target.value)} placeholder="max"
-                    style={{width:42,padding:'1px 4px',borderRadius:4,
-                      border:`1px solid ${maxV?'var(--accent2)':'var(--border)'}`,
-                      background:'var(--surface)',color:'var(--text)',
-                      fontFamily:"'DM Mono',monospace",fontSize:9}}/>
-                </>}
-              </div>
-            ))}
-            {(minYard||maxYard||minSig||maxSig||minSimTB||minOdds) && (
-              <button onClick={()=>{setMinYard('');setMaxYard('');setMinSig('');setMaxSig('');setMinSimTB('');setMinOdds('');}}
-                style={{padding:'3px 9px',borderRadius:5,border:'1px solid rgba(255,64,32,.3)',
-                  background:'rgba(255,64,32,.08)',color:'var(--accent)',
-                  fontFamily:"'DM Mono',monospace",fontSize:9,cursor:'pointer',fontWeight:700}}>
-                ✕ Clear
-              </button>
-            )}
           </div>
 
           {/* Export current filtered slate — same format as Key Matchups CSV */}
