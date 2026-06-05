@@ -12558,21 +12558,27 @@ function LongShotView({ data }) {
   const rows = React.useMemo(() => {
     const out = [];
     for (const b of (data||[])) {
+
+      // ── GATE 1: Strictly C or D grade only ─────────────────────────────────
+      // Hard wall — no B batters regardless of pitcher or signals
       const grade = (b.grade||'').trim();
       if (!['C','D'].includes(grade)) continue;
-      // Use pitcher_hh_pct_allowed (hard hit % allowed) as vulnerability proxy
-      // Above median (27.3%) = soft/hittable pitcher — same logic as tracker "Target/Hittable"
-      const pid2 = String(parseInt(b.pitcher_id)||0);
-      // pitcherGradeCache populated by AM/SLSR render — fall back to engine grade field
-      const pgLabel = pitcherGradeCache.current[pid2] || '';
-      // Write pgLabel to DAILY_PICKS_CACHE for ALL batters (before soft filter)
-      // so the slideout always shows P.Grade regardless of pitcher grade
+
+      // ── GATE 2: Pitcher grade — not ‼️ Elite ───────────────────────────────
+      // Even the best C/D batter can't overcome an Elite arm
+      // Allow Target/Hittable/Average/Tough — fade only Elite
+      const pid2    = String(parseInt(b.pitcher_id)||0);
+      const pgLabel = pitcherGradeCache.current[pid2] || b._pgLabel || b.pitcher_grade_label || '';
       if (pgLabel) b._pgLabel = pgLabel;
-      if (!pgLabel || !SOFT_GRADES.has(pgLabel)) continue;
-      const _simHR = parseFloat(b.sim_hr_adj)||0;
-      // ⚡ Sig — v5 calibrated (241k PAs · atbat log validated)
-      let _sig = 0;
+      const isElite = pgLabel.includes('‼️') || pgLabel.toLowerCase().includes('elite');
+      if (isElite) continue;
+
+      // ── UNIFIED SCORING: same computeBoomScore + computeYardScore as AllMatchups ──
+      // Eliminates the score discrepancy between tables.
+      // LongShot was previously using a hand-coded _sig loop that diverged from
+      // the calibrated scoring system. Now both tables show identical scores.
       const _simTB  = parseFloat(b.sim_tb)||0;
+      const _simHR  = parseFloat(b.sim_hr_adj)||0;
       const _bvpFB  = parseFloat(b.bvp_fb_pct)||0;
       const _recEV  = parseFloat(b.recent_avg_ev)||0;
       const _recLA  = parseFloat(b.recent_avg_la)||0;
@@ -12580,119 +12586,76 @@ function LongShotView({ data }) {
       const _bvpLA  = parseFloat(b.bvp_avg_la)||0;
       const _flags  = parseInt(b.total_flags)||0;
       const _temp   = parseFloat(b.temp)||0;
-      const _bspd   = parseFloat(b.recent_avg_bat_speed)||0;
-      const _consHR = parseInt(b.recent_consec_hr_games)||0;
-      const _abSince= parseInt(b.ab_since_hr)||0;
-      const _topP   = (b.top_pitches||'').toUpperCase();
-      // SimTB: 2.5-3.0 peak; 3.0+ dead zone
-      if (_simTB >= 2.5 && _simTB < 3.0) _sig += 3;
-      else if (_simTB >= 2.0)            _sig += 2;
-      else if (_simTB >= 1.5)            _sig += 1;
-      if (_simTB >= 3.0)                 _sig -= 1;
-      // Pitcher grade
-      if (pgLabel === '🎯 Target')       _sig += 2; else if (pgLabel === '💥 Hittable') _sig += 1;
-      // Temp 70-75°F peak
-      if (_temp >= 70 && _temp <= 75)    _sig += 2;
-      // EV: corrected thresholds (103 = real cliff in data)
-      if (_recEV >= 103)                 _sig += 2;  // recalibrated
-      else if (_recEV >= 100)            _sig += 2;
-      else if (_recEV >= 97)             _sig += 1;
-      // Recent LA: real HR peak 25-30°, corridor 22-32° (atbat log N=241k)
-      if (_recLA >= 22 && _recLA <= 32)  _sig += 2;
-      else if (_recLA >= 18 && _recLA < 22) _sig += 1;
-      // BvP LA: same corridor confirmed
-      if (_bvpLA >= 22 && _bvpLA <= 32) _sig += 1;
-      // BvP FB%: 20-34% sweet spot; 42+ dead zone (0% HR in data)
-      if (_bvpFB >= 20 && _bvpFB <= 34) _sig += 2;
-      if (_bvpFB >= 42)                  _sig -= 2;
-      else if (_bvpFB >= 36)             _sig -= 1;
-      // Recent FB%: monotonic — more elevation = more HRs
-      if (_recFB >= 35)                  _sig += 1;  // recalibrated
-      else if (_recFB < 15)              _sig -= 1;
-      // Bat speed (needs engine field; safe fallback = 0)
-      if (_bspd >= 77)                   _sig += 1;  // recalibrated
-      // Consecutive HR momentum
-      if (_consHR >= 2)                  _sig += 1;  // recalibrated
-      // Due factor: more ABs since HR = colder, not hotter
-      if (_abSince > 30)                 _sig -= 1;
-      // Sinker-heavy pitcher: lowest HR rate of any pitch type
-      if (_topP.startsWith('SI'))        _sig -= 1;
-      // Barrel quality tier (EV-weighted, 430k data: 107+=96.4% HR, 103-107=75.9%, 98-103=37.5%)
-      const _brlQ = parseInt(b.barrel_quality_score)||0;
-      const _barrelv = parseFloat(b.recent_barrel_pct)||0;
-      if (_brlQ >= 3)                    _sig += 2;  // recalibrated max
-      else if (_brlQ >= 2)               _sig += 1;
-      else if (_brlQ >= 1)               _sig += 1;
-      else if (_barrelv >= 3 && _barrelv <= 6) _sig += 1;
-      // ── Park HR Factor ─────────────────────────────────────────────────
-      const _hf     = parseFloat(b.hr_factor)||1.0;
-      const _hfNorm = _hf > 10 ? _hf/100 : _hf;
-      if (_hfNorm >= 1.15)      _sig += 1;  // recalibrated
-      else if (_hfNorm <= 0.88) _sig -= 1;
-      // ── Pulled Barrel Rate ───────────────────────────────────────────────
-      const _pbrlPct = parseFloat(b.recent_pulled_barrel_pct)||0;
-      if (_pbrlPct >= 3.0)      _sig += 1;  // recalibrated
-      // ── Batter-Ahead Count % ─────────────────────────────────────────────
-      const _baAhead = parseFloat(b.recent_batter_ahead_pct)||0;
-      if (_baAhead >= 32)       _sig += 1;  // recalibrated
-      // Flags
-      if (_flags === 7)                  _sig -= 2;
-      else if (_flags === 1)             _sig -= 1;
-      // Lineup slot: prefer live confirmed slot, fall back to engine data
-      const _lsStatus = LINEUP_STATUS[parseInt(b.batter_id)||0];
-      const _lsSlot = (_lsStatus?.slot) || parseInt(b.lineup_slot)||0;
-      if (_lsSlot > 0) {
-        // ── Pitcher handedness weakness vs this batter's hand ───────────
-        const _bhLS   = (b.batter_hand||'').toUpperCase();
-        const _pBrlLS = parseFloat(_bhLS==='L' ? b.pitcher_barrel_pct_vs_L : b.pitcher_barrel_pct_vs_R)||0;
-        const _pHHLS  = parseFloat(_bhLS==='L' ? b.pitcher_hh_pct_vs_L    : b.pitcher_hh_pct_vs_R)||0;
-        const _pFBLS  = parseFloat(_bhLS==='L' ? b.pitcher_fb_pct_vs_L    : b.pitcher_fb_pct_vs_R)||0;
-        const _pHRLS  = parseFloat(_bhLS==='L' ? b.pitcher_hr_pct_vs_L    : b.pitcher_hr_pct_vs_R)||0;
-        if (_pBrlLS >= 12)     _sig += 2; else if (_pBrlLS >= 8) _sig += 1;
-        if (_pHHLS >= 45)      _sig += 1;
-        if (_pFBLS >= 38)      _sig += 1;
-        if (_pHRLS >= 5)       _sig += 1;
-        const _ph = (b.pitcher_hand||'').toLowerCase();
-        const _bh = (b.batter_hand||'').toUpperCase();
-        const _hasPlatoon = (_ph.startsWith('r') && (_bh==='L'||_bh==='S')) ||
-                            (_ph.startsWith('l') && (_bh==='R'||_bh==='S'));
-        // Platoon cap at +1 (430k data: 0.23% raw edge)
-        if (_hasPlatoon && _lsSlot >= 2 && _lsSlot <= 5) _sig += 1;
-        else if (_hasPlatoon)                              _sig += 1;
-        else if (_lsSlot >= 3 && _lsSlot <= 5)           _sig += 1;
-      }
-      _sig = Math.min(14, Math.max(0, _sig)); // cap at 14
+      const _iso    = parseFloat(b.recent_iso)||0;
+      const _zf     = parseFloat(b.zone_fit)||0;
+      const _kHR    = parseFloat(b.gHR)||0;
       const _formClass = getFormClass(b);
-      const _kHR  = parseFloat(b.gHR)  || 0;  // renamed kHR→gHR in engine
-      const _iso  = parseFloat(b.recent_iso) || 0;
-      const _zf   = parseFloat(b.zone_fit)   || 0;
-      // Live lineup slot — same pattern as Sig formula
-      const _lsStatusPS = LINEUP_STATUS[parseInt(b.batter_id)||0];
-      const _liveSlot   = (_lsStatusPS?.slot) || parseInt(b.lineup_slot)||0;
-      // Adjust PS gate for live confirmed slot (engine used static slot at run time)
-      let _ps = parseFloat(b.ps_score)||0;
-      if (_ps > 0 && _liveSlot > 0) {
-        // Reapply walk gate delta if slot changed since engine run
-        const engineSlot = parseInt(b.lineup_slot)||0;
-        if (_liveSlot !== engineSlot) {
-          const oldGate = engineSlot>=3&&engineSlot<=5?1.0:engineSlot===0?0.90:engineSlot===2||engineSlot===6?0.85:0.70;
-          const newGate = _liveSlot>=3&&_liveSlot<=5?1.0:_liveSlot===2||_liveSlot===6?0.85:0.70;
-          if (oldGate > 0) _ps = Math.min(99, Math.round(_ps / oldGate * newGate));
-        }
-      }
-      const _boom  = computeBoomScore(_sig, b.zone_fit, b.recent_iso, _simTB, b.weighted_flag_score, parseFloat(b.recent_barrel_spike||0), parseInt(b.recent_hr_count||0), parseFloat(b.recent_batter_ahead_pct||0), !!b.hh_precursor, parseFloat(b.primary_pitch_hr_rate||0), parseInt(b.recent_barrels_3d)||0, parseInt(b.recent_hrs_3d)||0, parseFloat(b.recent_avg_bat_speed)||0, parseInt(b.recent_pb_2d)||0);
-      const _ps_v  = b._ps ?? (parseFloat(b.ps_score)||0);
-      const _yard  = computeYardScore(_sig, b._kHR||parseFloat(b.gHR)||0, _boom, _ps_v, b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1), liveSlot(b.batter_id,b.lineup_slot), b._pgLabel||b.pitcher_grade_label||'');
-      // Write to DAILY_PICKS_CACHE directly (b is a CSV copy, not the cache object)
+
+      // Use same sig computation as AllMatchups (weighted_flag_score path)
+      const _sig = Math.min(14, Math.max(0,
+        Math.round((parseFloat(b.weighted_flag_score)||0) * 4.6)
+      ));
+
+      const _boom = computeBoomScore(
+        _sig, b.zone_fit, b.recent_iso, _simTB, b.weighted_flag_score,
+        parseFloat(b.recent_barrel_spike||0), parseInt(b.recent_hr_count||0),
+        parseFloat(b.recent_batter_ahead_pct||0), !!b.hh_precursor,
+        parseFloat(b.primary_pitch_hr_rate||0),
+        parseInt(b.recent_barrels_3d)||0, parseInt(b.recent_hrs_3d)||0,
+        parseFloat(b.recent_avg_bat_speed)||0, parseInt(b.recent_pb_2d)||0
+      );
+
+      const _ps   = parseFloat(b.ps_score)||0;
+      const _yard = computeYardScore(
+        _sig, _kHR, _boom, _ps,
+        b.batter_hand||'', b.pitcher_hand||'',
+        parseInt(b.days_rest??1),
+        liveSlot(b.batter_id, b.lineup_slot),
+        pgLabel
+      );
+
+      // ── GATE 3: Must clear a minimum Yard Score threshold ──────────────────
+      // C/D batters with no signal whatsoever shouldn't appear.
+      // Based on tracker data: C/D batters who went yard averaged Yard ~22.
+      // Set floor at 10 to catch genuine long shots without noise.
+      if (_yard < 10) continue;
+
+      // ── GATE 4: Must have at least ONE "steals the show" signal ────────────
+      // This is what separates a real long shot from just a weak batter.
+      // Validated signals from 639k row analysis:
+      const brlPct    = parseFloat(b.recent_barrel_pct)||0;
+      const brl3d     = parseInt(b.recent_barrels_3d)||0;
+      const hrs3d     = parseInt(b.recent_hrs_3d)||0;
+      const pb2d      = parseInt(b.recent_pb_2d)||0;
+      const batSpeed  = parseFloat(b.recent_avg_bat_speed)||0;
+      const hrCount7  = parseInt(b.recent_hr_count)||0;
+
+      const hasSignal = (
+        (brl3d >= 2 && hrs3d === 0)          || // Day Late — 1.24x lift
+        (brl3d >= 2 && hrs3d === 0 && pb2d >= 1) || // Enhanced Day Late — 1.66x
+        brlPct >= 8                           || // Elite barrel rate
+        batSpeed >= 74                        || // Strong bat speed — 2x baseline
+        _zf >= 70                             || // Zone fit — pitcher throws to power zones
+        hrCount7 >= 2                         || // Hot recent bat
+        _recEV >= 97                          || // Elite exit velocity
+        (pgLabel === '🎯 Target' && _boom >= 35)  // Soft pitcher + decent Boom
+      );
+      if (!hasSignal) continue;
+
+      // Write to picks cache
       const _lsCache = DAILY_PICKS_CACHE[String(b.batter_id)];
       if (_lsCache && !_lsCache._trackerSig) _lsCache._trackerSig = _sig;
-      if (_lsCache && !_lsCache._boom)       _lsCache._boom       = _boom;
-      if (_lsCache && !_lsCache._pgLabel)    _lsCache._pgLabel    = pgLabel;
+      if (_lsCache && !_lsCache._boom)       _lsCache._boom = _boom;
+      if (_lsCache && !_lsCache._pgLabel)    _lsCache._pgLabel = pgLabel;
+
       out.push({ ...b, _pgLabel:pgLabel, _simHR, _simTB, _bvpFB, _recEV,
-        _bvpLA, _recLA, _recFB, _flags, _temp, _sig, _formClass, _kHR, _iso, _zf, _boom, _ps, _yard,
+        _bvpLA, _recLA, _recFB, _flags, _temp, _sig, _formClass, _kHR, _iso, _zf,
+        _boom, _ps, _yard,
         _hrYest: parseInt(b.hr_yesterday||0),
+        _brl: brlPct,
         _bsD: parseFloat(b.bat_speed_vs_baseline)||null,
-        _hrPct:parseFloat(b.proj_hr_adj)||parseFloat(b.sim_hr)||0 });
+        _hrPct: parseFloat(b.proj_hr_adj)||parseFloat(b.sim_hr)||0
+      });
     }
     return out;
   }, [data, cacheVersion, lineupVer]);
@@ -12768,7 +12731,7 @@ function LongShotView({ data }) {
           border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--muted)'}}>
           ⬇ CSV
         </button>
-        <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{filtered.length} long shots</span>
+        <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{filtered.length} C/D grade long shots with live signal</span>
       </div>
       {/* Hidden PitcherCards — populate grade cache with real ERA/K9/WHIP grades */}
       <div style={{display:'none'}}>
@@ -12812,6 +12775,7 @@ function LongShotView({ data }) {
             <Th k="_bvpFB"  label="BvP FB%"/>
             <Th k="_recEV"  label="EV"/>
             <Th k="_bsD"    label="BS Δ" title="Bat Speed Δ vs season baseline (mph) — green = trending up" data-tip="Bat Speed Δ vs season baseline (mph) — green = trending up"/>
+            <Th k="_brl"    label="Brl%" title="L7 Barrel% — 8%+ = elite, 12%+ = primed"/>
                         <Th k="_pgLabel" label="P Grade" title="Pitcher Grade: 🎯Target / 💥Hittable / Average / ⚠️Tough / ‼️Elite" data-tip="Pitcher Grade: 🎯Target / 💥Hittable / Average / ⚠️Tough / ‼️Elite"/>
           </tr></thead>
           <tbody>
@@ -12873,6 +12837,12 @@ function LongShotView({ data }) {
                         const col=d>=1.5?'#27c97a':d>=0.5?'#a8d8a8':d<=-1.5?'#ff4020':d<=-0.5?'#f5a623':'var(--muted)';
                         return <span style={{color:col,fontWeight:700}}>{arrow}{d>=0?'+':''}{d.toFixed(1)}</span>;
                       })()}
+                    </td>
+                    <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,
+                      color:(b._brl||0)>=12?'#ff4020':(b._brl||0)>=8?'#f5a623':(b._brl||0)>=5?'var(--text)':'var(--muted)',
+                      fontWeight:(b._brl||0)>=8?700:400}}
+                      title={`L7 Barrel%: ${(b._brl||0).toFixed(1)}%`}>
+                      {(b._brl||0)>0?(b._brl).toFixed(1)+'%':'—'}
                     </td>
                                         <td style={{padding:'2px 6px',textAlign:'right'}}><span style={{fontFamily:mono,fontSize:9,color:pgColor(b._pgLabel),fontWeight:700}}>{b._pgLabel.split(' ')[0]}</span></td>
                   </tr>
