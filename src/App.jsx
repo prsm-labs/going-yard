@@ -20224,7 +20224,7 @@ function MatchupEngineTab() {
                   if(la7>=22&&la7<=32) bullets.push({icon:'📐',color:'#27c97a',text:`${la7.toFixed(1)}° avg launch angle — in the 22-32° HR sweet spot`});
                   const platAdv=(ph==='L'&&(bh==='R'||bh==='S'))||(ph==='R'&&(bh==='L'||bh==='S'));
                   if(platAdv) bullets.push({icon:'🤝',color:'#38b8f2',text:`Power-side advantage — ${bh==='R'?'RHB':'LHB'} vs ${ph==='L'?'LHP':'RHP'}`});
-                  if(hotHand>=3) bullets.push({icon:'🔥',color:'#fb923c',text:`${hotHand} HRs in last 3 games — genuinely hot`});
+                  if(hotHand>=3) bullets.push({icon:'🔥',color:'#fb923c',text:`${hotHand} HR in last 7 days — on fire 🔥`});
                   if(bvpHR>=2&&bvpPA>=8) bullets.push({icon:'🆚',color:'#38b8f2',text:`${bvpHR} HR in ${bvpPA} PA vs this pitch mix`});
                   if(psScore>=75) bullets.push({icon:'🎯',color:'#27c97a',text:`PS Score ${psScore.toFixed(0)} — elite pitch convergence`});
                   if(pBarrel>=10) bullets.push({icon:'🎯',color:'#ff4020',text:`${pBarrel.toFixed(1)}% barrel rate allowed — pitcher is hittable`});
@@ -20233,7 +20233,7 @@ function MatchupEngineTab() {
                   if(bullets.length===0) return null;
                   return(
                     <div style={{marginBottom:12,background:'rgba(0,0,0,.3)',borderRadius:8,padding:'10px 12px',border:'1px solid rgba(255,255,255,.06)'}}>
-                      <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:10,color:'var(--muted)',textTransform:'uppercase',letterSpacing:1,marginBottom:8}}>WHY TONIGHT</div>
+                      <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:10,color:'var(--muted)',textTransform:'uppercase',letterSpacing:1,marginBottom:8}}>WHY TODAY</div>
                       <div style={{display:'flex',flexDirection:'column',gap:5}}>
                         {bullets.map((bl,i)=>(
                           <div key={i} style={{display:'flex',alignItems:'flex-start',gap:7}}>
@@ -20264,7 +20264,7 @@ function MatchupEngineTab() {
                     {label:'Zone Fit 70%+',ok:zf>=70,       val:`${zf.toFixed(0)}%`},
                     {label:'Platoon Adv',  ok:platoon,      val:platoon?'✓':'—'},
                     {label:'P Gives Brls', ok:pBarrel>=6,   val:pBarrel>0?`${pBarrel.toFixed(1)}%`:'—'},
-                    {label:'Park/Wind',    ok:hrFact>=105||windOk, val:hrFact>0?`${hrFact>100?'+':''}${hrFact-100}%`:(windOk?'✓':'—')},
+                    {label:'Park/Wind',    ok:(parseFloat(b.hr_factor)||100)>=105||windOk, val:(()=>{const hf=parseFloat(b.hr_factor);if(!hf||hf<=0)return windOk?'✓':'—';const d=Math.round(hf-100);return d>0?`+${d}%`:d<0?`${d}%`:'Neutral';})()},
                   ];
                   const lit=checks.filter(ch=>ch.ok).length;
                   const upside=lit>=7?'ELITE':lit>=5?'STRONG':lit>=3?'GOOD':'BELOW AVG';
@@ -20303,7 +20303,7 @@ function MatchupEngineTab() {
                       <div style={{height:4,borderRadius:2,background:'rgba(255,255,255,.08)',overflow:'hidden',marginBottom:4}}>
                         <div style={{height:'100%',borderRadius:2,background:simHRPct>=15?'#ff4020':simHRPct>=10?'#f5a623':'#27c97a',width:`${Math.min(100,simHRPct*3.5)}%`,transition:'width .4s'}}/>
                       </div>
-                      <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--muted)'}}>{recentHRs>0?`${recentHRs} HR last 3g · `:''}Sim-based · see chart below</div>
+                      <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--muted)'}}>{recentHRs>0?`${recentHRs} HR last 7d · `:''}Sim-based · see chart below</div>
                     </div>
                   );
                 })()}
