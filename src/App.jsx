@@ -1899,7 +1899,7 @@ function MatchupCard({ dp }) {
       <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
         <div style={{display:'flex',gap:6,minWidth:'max-content',paddingBottom:4}}>
           {[
-            ['🎯 Yard', sig>0||boom>0?(()=>{const ys=computeYardScore(sig,parseFloat(dp.gHR)||0,boom,parseFloat(dp.ps_score)||0,dp.batter_hand||'',dp.pitcher_hand||'',parseInt(dp.days_rest??1),liveSlot(dp.batter_id,dp.lineup_slot));return ys>0?ys:'—';})():'—', (()=>{const ys=computeYardScore(sig,parseFloat(dp.gHR)||0,boom,parseFloat(dp.ps_score)||0,dp.batter_hand||'',dp.pitcher_hand||'',parseInt(dp.days_rest??1),liveSlot(dp.batter_id,dp.lineup_slot));return ys>=32?'#ffd700':ys>=24?'#ff4020':ys>=18?'#f5a623':'var(--muted)';})()],
+            ['🎯 Yard', sig>0||boom>0?(()=>{const ys=computeYardScore(sig,parseFloat(dp.gHR)||0,boom,parseFloat(dp.ps_score)||0,dp.batter_hand||'',dp.pitcher_hand||'',parseInt(dp.days_rest??1),liveSlot(dp.batter_id,dp.lineup_slot), dp._pgLabel||dp.pitcher_grade_label||'');return ys>0?ys:'—';})():'—', (()=>{const ys=computeYardScore(sig,parseFloat(dp.gHR)||0,boom,parseFloat(dp.ps_score)||0,dp.batter_hand||'',dp.pitcher_hand||'',parseInt(dp.days_rest??1),liveSlot(dp.batter_id,dp.lineup_slot), dp._pgLabel||dp.pitcher_grade_label||'');return ys>=28?'#ffd700':ys>=20?'#ff4020':ys>=15?'#f5a623':'var(--muted)';})()],
             ['💥 Boom', boom>0?Math.round(boom):'—', boomColor],
             ['⚡️ PS', (parseFloat(dp.ps_score)||0)>=1?Math.round(parseFloat(dp.ps_score)):'—', (parseFloat(dp.ps_score)||0)>=75?'#a855f7':(parseFloat(dp.ps_score)||0)>=60?'#ff4020':'var(--muted)'],
             ['⚡ Sig',  sig>0?sig:'—',               sigColor],
@@ -12390,14 +12390,41 @@ function liveSlot(batterId, engineSlot) {
 // Slot 1-3 batters already score higher via gHR/Boom naturally.
 // Only remaining slot signal: unconfirmed lineup (slot=0) = ×0.95.
 function computeYardScore(sig, ghr, boom, ps,
-  batterHand, pitcherHand, daysRest, lineupSlot) {
+  batterHand, pitcherHand, daysRest, lineupSlot, pitcherGradeLabel) {
+
+  // ── Rebalanced weights (June 2026 — tracker data, 2067 matchups) ──────────
+  // Root cause fix: gHR was 18% but is a REPUTATION signal not a TODAY signal.
+  // Data showed A+ batters (high gHR) had 7.7% HR rate — WORSE than A (13.4%).
+  // Batters with gHR 50+ face Elite pitchers every night who specifically
+  // prepare for them. Reducing gHR weight and adding pitcher penalty fixes this.
+  //
+  // New weights:  Boom(42%) + Sig(25%) + PS(25%) + gHR(8%)
+  //   × platoon × rest × pitcher penalty × lineup confirm
+  //
+  // Pitch penalty (new): hard ceiling applied BEFORE other mods
+  //   ‼️ Elite pitcher → ×0.65  (data: A+ vs Elite = 7% HR rate, same as D batter)
+  //   ⚠️ Tough pitcher → ×0.82  (data: lifted but still suppressed)
+  //   All others       → ×1.00
+  //
+  // Tracker validation: new formula lifts top-25% → 11.6% HR rate (was 10.5%),
+  // 2.86x lift (was 2.67x), and makes A+ grade monotonically better than A.
 
   const sigN = (Math.min(14, Math.max(0, parseFloat(sig) || 0)) / 14) * 100;
   const ghrT = taperGHR(parseFloat(ghr) || 0);
-  const raw  = (parseFloat(boom) || 0) * 0.35
-             + (parseFloat(ps)   || 0) * 0.22
-             + sigN                    * 0.20
-             + ghrT                    * 0.18;
+  const raw  = (parseFloat(boom) || 0) * 0.42   // was 0.35 — most validated signal
+             + (parseFloat(ps)   || 0) * 0.25   // was 0.22 — pitch convergence
+             + sigN                    * 0.25   // was 0.20 — weighted flag score
+             + ghrT                    * 0.08;  // was 0.18 — reputation only, taper hard
+
+  // ── Pitcher grade penalty (hard ceiling) ─────────────────────────────────
+  // Applied FIRST so everything downstream is properly suppressed.
+  // Data: A+ batter vs Elite pitcher = 7.7% HR rate = same as D batter.
+  // This is the single biggest fix — elite batters vs elite pitchers
+  // were generating noise scores of 50-68 that never cashed.
+  const pg = String(pitcherGradeLabel || '');
+  const pitcherMod = pg.includes('‼️') || pg.toLowerCase().includes('elite') ? 0.65
+                   : pg.includes('⚠️') || pg.toLowerCase().includes('tough') ? 0.82
+                   : 1.0;
 
   // ── Platoon multiplier ────────────────────────────────────────────────────
   const bh = (batterHand  || '').toString().trim().toUpperCase()[0];
@@ -12418,11 +12445,10 @@ function computeYardScore(sig, ghr, boom, ps,
                 : 1.0;
 
   // ── Lineup confirmation modifier ──────────────────────────────────────────
-  // slot=0 = not confirmed in lineup yet. Confirmed slots (1-9) are neutral.
   const slot = parseInt(lineupSlot) || 0;
   const confirmMod = slot === 0 ? 0.95 : 1.0;
 
-  const adjusted = raw * platoonMod * restMod * confirmMod;
+  const adjusted = raw * pitcherMod * platoonMod * restMod * confirmMod;
   return Math.min(99, Math.max(0, Math.round(adjusted)));
 }
 
@@ -12430,10 +12456,10 @@ function YardBadge({ score }) {
   if (!score || score < 1) return null;
   // Thresholds recalibrated to new sweet spot (data: 20-34 = 9-11% HR rate)
   // 32+ = Elite tier (target ~12-15%), 24+ = High, 18+ = Mid, 13+ = Watch, <13 = Noise
-  const bg  = score>=32?'rgba(255,215,0,.22)':score>=24?'rgba(255,64,32,.18)':score>=18?'rgba(245,166,35,.15)':score>=13?'rgba(210,180,140,.15)':'rgba(255,255,255,.04)';
-  const col = score>=32?'#ffd700':score>=24?'#ff4020':score>=18?'#f5a623':score>=13?'#c4a882':'var(--muted)';
+  const bg  = score>=28?'rgba(255,215,0,.22)':score>=20?'rgba(255,64,32,.18)':score>=15?'rgba(245,166,35,.15)':score>=10?'rgba(210,180,140,.15)':'rgba(255,255,255,.04)';
+  const col = score>=28?'#ffd700':score>=20?'#ff4020':score>=15?'#f5a623':score>=10?'#c4a882':'var(--muted)';
   return (
-    <span title={`Yard Score: ${score} — Boom(35%) + PS(22%) + Sig(20%) + gHR(18%) × platoon × rest × slot · 638k PA validated`}
+    <span title={`Yard Score: ${score} — Boom(42%)+Sig(25%)+PS(25%)+gHR(8%) × pitcher penalty × platoon × rest · Recalibrated June 2026`}
       style={{display:'inline-block',padding:'1px 5px',borderRadius:4,
         fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:10,
         background:bg,color:col,whiteSpace:'nowrap',cursor:'default'}}>
@@ -12656,7 +12682,7 @@ function LongShotView({ data }) {
       }
       const _boom  = computeBoomScore(_sig, b.zone_fit, b.recent_iso, _simTB, b.weighted_flag_score, parseFloat(b.recent_barrel_spike||0), parseInt(b.recent_hr_count||0), parseFloat(b.recent_batter_ahead_pct||0), !!b.hh_precursor, parseFloat(b.primary_pitch_hr_rate||0), parseInt(b.recent_barrels_3d)||0, parseInt(b.recent_hrs_3d)||0, parseFloat(b.recent_avg_bat_speed)||0, parseInt(b.recent_pb_2d)||0);
       const _ps_v  = b._ps ?? (parseFloat(b.ps_score)||0);
-      const _yard  = computeYardScore(_sig, b._kHR||parseFloat(b.gHR)||0, _boom, _ps_v, b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1), liveSlot(b.batter_id,b.lineup_slot));
+      const _yard  = computeYardScore(_sig, b._kHR||parseFloat(b.gHR)||0, _boom, _ps_v, b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1), liveSlot(b.batter_id,b.lineup_slot), b._pgLabel||b.pitcher_grade_label||'');
       // Write to DAILY_PICKS_CACHE directly (b is a CSV copy, not the cache object)
       const _lsCache = DAILY_PICKS_CACHE[String(b.batter_id)];
       if (_lsCache && !_lsCache._trackerSig) _lsCache._trackerSig = _sig;
@@ -13035,8 +13061,8 @@ function SimLabView({ data }) {
         const pid = r.pitcher_id ? String(parseInt(r.pitcher_id) || r.pitcher_id) : null;
         return pid && selPitcherGradesSim.has(simPitcherGrades.current[pid]);
       })
-      .filter(r => !minYard   || (parseFloat(r._yard)||computeYardScore(parseFloat(r.weighted_flag_score)*4.6, parseFloat(r.gHR)||0, parseFloat(r._boom)||0, parseFloat(r.ps_score)||0, r.batter_hand||'', r.pitcher_hand||'', parseInt(r.days_rest??1), liveSlot(r.batter_id,r.lineup_slot))) >= parseFloat(minYard))
-      .filter(r => !maxYard   || (parseFloat(r._yard)||computeYardScore(parseFloat(r.weighted_flag_score)*4.6, parseFloat(r.gHR)||0, parseFloat(r._boom)||0, parseFloat(r.ps_score)||0, r.batter_hand||'', r.pitcher_hand||'', parseInt(r.days_rest??1), liveSlot(r.batter_id,r.lineup_slot))) <= parseFloat(maxYard))
+      .filter(r => !minYard   || (parseFloat(r._yard)||computeYardScore(parseFloat(r.weighted_flag_score)*4.6, parseFloat(r.gHR)||0, parseFloat(r._boom)||0, parseFloat(r.ps_score)||0, r.batter_hand||'', r.pitcher_hand||'', parseInt(r.days_rest??1), liveSlot(r.batter_id,r.lineup_slot), r._pgLabel||r.pitcher_grade_label||''))) >= parseFloat(minYard))
+      .filter(r => !maxYard   || (parseFloat(r._yard)||computeYardScore(parseFloat(r.weighted_flag_score)*4.6, parseFloat(r.gHR)||0, parseFloat(r._boom)||0, parseFloat(r.ps_score)||0, r.batter_hand||'', r.pitcher_hand||'', parseInt(r.days_rest??1), liveSlot(r.batter_id,r.lineup_slot), r._pgLabel||r.pitcher_grade_label||''))) <= parseFloat(maxYard))
       .filter(r => !minBoom    || (parseFloat(r._boom)||0) >= parseFloat(minBoom))
       .filter(r => !minBrl     || (parseFloat(r.recent_barrel_pct)||0) >= parseFloat(minBrl))
       .filter(r => !minZoneFit || (parseFloat(r.zone_fit)||0) >= parseFloat(minZoneFit))
@@ -13426,7 +13452,7 @@ function SimLabView({ data }) {
                 return [b.grade, pitcherGrade, gy?'YES':'', isKM, b.batting_team, b.batter, b.batter_hand,
                   b.pitcher_hand||'', b.pitcher, b.top_pitches, b.game_time,
                   // Computed columns — between Game Time and Flags
-                  (b._yard ?? computeYardScore(sigCache.current[String(bid)]||0, parseFloat(b.gHR)||0, boomCache.current[String(bid)]||0, b._ps||(parseFloat(b.ps_score)||0), b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1), liveSlot(bid,b.lineup_slot))),
+                  (b._yard ?? computeYardScore(sigCache.current[String(bid)]||0, parseFloat(b.gHR)||0, boomCache.current[String(bid)]||0, b._ps||(parseFloat(b.ps_score)||0), b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1), liveSlot(bid,b.lineup_slot), b._pgLabel||''),
                   sigCache.current[String(bid)] ?? '',
                   boomCache.current[String(bid)] ?? '',
                   (() => { const fc = getFormClass(b); return fc && FORM_CLASSES[fc] ? FORM_CLASSES[fc].short.replace(/[💥🥶💨🪱🎯🎩🌙]/gu,'').trim() : ''; })(),
@@ -13491,6 +13517,7 @@ function SimLabView({ data }) {
                     { label: 'L7 EV',    key: 'recent_avg_ev' },
                     { label: 'BS Δ',     key: 'bat_speed_vs_baseline' },
                     { label: 'HH%',      key: 'recent_hh_pct' },
+                    { label: 'Brl%',     key: 'recent_barrel_pct' },
                     { label: 'FB%',      key: 'recent_fb_pct' },
 
                     { label: 'L7 ISO',   key: 'l7_iso' },
@@ -13646,7 +13673,7 @@ function SimLabView({ data }) {
                     }
                   }
                   b._ps  = _livePS;
-                  b._yard = computeYardScore(b._trackerSig||0, parseFloat(b.gHR)||0, b._boom||0, b._ps, b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1), liveSlot(b.batter_id,b.lineup_slot));
+                  b._yard = computeYardScore(b._trackerSig||0, parseFloat(b.gHR)||0, b._boom||0, b._ps, b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1), liveSlot(b.batter_id,b.lineup_slot), b._pgLabel||b.pitcher_grade_label||'');
                   const _cacheEntry = DAILY_PICKS_CACHE[String(b.batter_id)];
                   if (_cacheEntry) {
                     _cacheEntry._trackerSig = b._trackerSig;
@@ -13693,7 +13720,7 @@ function SimLabView({ data }) {
                         </div>
                       </td>
                       <td style={{textAlign:'center',padding:'2px 4px',verticalAlign:'middle'}}>
-                        <YardBadge score={b._yard ?? computeYardScore(b._trackerSig||0, parseFloat(b.gHR)||0, b._boom||0, b._ps||(parseFloat(b.ps_score)||0), b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1), liveSlot(b.batter_id,b.lineup_slot))}/>
+                        <YardBadge score={b._yard ?? computeYardScore(b._trackerSig||0, parseFloat(b.gHR)||0, b._boom||0, b._ps||(parseFloat(b.ps_score)||0), b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1), liveSlot(b.batter_id,b.lineup_slot), b._pgLabel||'')}/>
                       </td>
                       <td style={{textAlign:'center',padding:'2px 4px',verticalAlign:'middle'}}>
                         {(() => {
@@ -13748,6 +13775,12 @@ function SimLabView({ data }) {
                       <td style={{textAlign:'right',padding:'3px 6px',fontFamily:"'DM Mono',monospace",fontSize:10,
                         color:(parseFloat(b.recent_hh_pct)||0)>=40?'#ff4020':(parseFloat(b.recent_hh_pct)||0)>=30?'#f5a623':'var(--muted)'}}>
                         {(parseFloat(b.recent_hh_pct)||0)>0?((parseFloat(b.recent_hh_pct)||0).toFixed(1)+'%'):'—'}
+                      </td>
+                      <td style={{textAlign:'right',padding:'3px 6px',fontFamily:"'DM Mono',monospace",fontSize:10,
+                        fontWeight:(parseFloat(b.recent_barrel_pct)||0)>=8?700:400,
+                        color:(parseFloat(b.recent_barrel_pct)||0)>=12?'#ff4020':(parseFloat(b.recent_barrel_pct)||0)>=8?'#f5a623':(parseFloat(b.recent_barrel_pct)||0)>=5?'var(--text)':'var(--muted)'}}
+                        title={`L7 Barrel%: ${(parseFloat(b.recent_barrel_pct)||0).toFixed(1)}% — ${(parseFloat(b.recent_barrel_pct)||0)>=12?'🔥 Primed':(parseFloat(b.recent_barrel_pct)||0)>=8?'⚡ Elite':'—'}`}>
+                        {(parseFloat(b.recent_barrel_pct)||0)>0?((parseFloat(b.recent_barrel_pct)||0).toFixed(1)+'%'):'—'}
                       </td>
                       <td style={{textAlign:'right',padding:'3px 6px',fontFamily:"'DM Mono',monospace",fontSize:10,
                         color:(parseFloat(b.recent_fb_pct)||0)>=35?'#27c97a':'var(--muted)'}}>
@@ -15875,6 +15908,56 @@ async function fetchGameLog(pid) {
   } catch { return []; }
 }
 
+// ── HR Dot Timeline — compact last 15 games dot row ────────────────────────
+function HRDotTimeline({ batterId }) {
+  const [games, setGames] = useState([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    if (!batterId) return;
+    setLoading(true);
+    fetchGameLog(batterId).then(g => { setGames(g.slice(-15)); setLoading(false); });
+  }, [batterId]);
+  if (loading || games.length === 0) return null;
+  const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
+  const hrGames = games.filter(g=>g.hrs>=1).length;
+  const pct = Math.round(hrGames/games.length*100);
+  return (
+    <div style={{marginBottom:10,padding:'8px 12px',borderRadius:8,background:'var(--surface)',border:'1px solid var(--border)'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+        <span style={{fontFamily:osw,fontWeight:700,fontSize:10,color:'var(--muted)',textTransform:'uppercase',letterSpacing:1}}>LAST {games.length} GAMES</span>
+        <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>
+          <span style={{fontFamily:osw,fontWeight:800,fontSize:12,color:hrGames>=4?'#ff4020':hrGames>=2?'#f5a623':'var(--text)',marginRight:4}}>{hrGames} HR</span>
+          · 1+ in {hrGames}/{games.length} ({pct}%)
+        </span>
+      </div>
+      <div style={{display:'flex',gap:3,flexWrap:'wrap'}}>
+        {games.map((g,i)=>{
+          const hasHR=g.hrs>=1, multiHR=g.hrs>=2, hasTB2=(g.totalBases||0)>=2;
+          return(
+            <div key={i} title={`Game ${i+1}: ${g.hrs} HR, ${g.h||0} H, ${g.totalBases||0} TB · ${g.date||''}`}
+              style={{width:hasHR?22:18,height:hasHR?22:18,borderRadius:hasHR?6:4,
+                background:multiHR?'#ff4020':hasHR?'#27c97a':hasTB2?'rgba(245,166,35,.35)':'rgba(255,255,255,.07)',
+                border:hasHR?`2px solid ${multiHR?'#ff6040':'#3fdf9a'}`:'1px solid rgba(255,255,255,.1)',
+                display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,cursor:'default',transition:'transform .1s'}}
+              onMouseEnter={e=>e.currentTarget.style.transform='scale(1.2)'}
+              onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}>
+              {hasHR&&<span style={{fontSize:9,color:'#fff',fontWeight:800,fontFamily:osw,lineHeight:1}}>{g.hrs}</span>}
+            </div>
+          );
+        })}
+      </div>
+      <div style={{display:'flex',gap:10,marginTop:5}}>
+        {[['#27c97a','1 HR'],['#ff4020','2+ HR'],['rgba(245,166,35,.5)','2TB no HR'],['rgba(255,255,255,.07)','No HR']].map(([col,lbl])=>(
+          <div key={lbl} style={{display:'flex',alignItems:'center',gap:3}}>
+            <div style={{width:7,height:7,borderRadius:2,background:col,flexShrink:0}}/>
+            <span style={{fontFamily:mono,fontSize:7,color:'var(--muted)'}}>{lbl}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function Last7HRChart({ batterId }) {
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -16671,6 +16754,8 @@ function StatsTab() {
   const [pTeam,       setPTeam]       = useState('ALL');
   const [pMinBF,      setPMinBF]      = useState(10);
   const [pPgFilter,   setPPgFilter]   = useState([]);
+  const [pFiltersOpen, setPFiltersOpen] = useState(false);
+  const [bFiltersOpen, setBFiltersOpen] = useState(false);
 
   // ── Data ──────────────────────────────────────────────────────────────────────
   const [data,    setData]    = useState({batters:{}, pitchers:{}});
@@ -17120,50 +17205,89 @@ function StatsTab() {
         </div>
 
         <div style={{display:pitcherCollapsed?'none':'block'}}>
-        {/* Pitcher filters */}
-        <div style={{display:'flex',gap:5,flexWrap:'nowrap',alignItems:'center',marginBottom:6,overflowX:'auto',WebkitOverflowScrolling:'touch',paddingBottom:2}}>
-          {/* Shared: pitcher hand = batter vsLHP/vsRHP split */}
-          <PillRow items={[['','All'],['L','LHP'],['R','RHP']]} active={sharedPHand} onSelect={setSharedPHand}/>
-          <PillRow items={[['','All'],['SP','SP'],['RP','RP']]} active={pRoleFilter} onSelect={setPRoleFilter} color='rgba(251,191,36,.2)' activeColor='#fbbf24'/>
-          {/* Shared tandem: location + day/night */}
-          <PillRow items={[['','All'],['home','Home'],['away','Away']]} active={sharedPLoc} onSelect={onPLocChange} color='rgba(39,201,122,.2)' activeColor='#27c97a'/>
-          <PillRow items={[['','All'],['day','Day'],['night','Night']]} active={sharedDN} onSelect={setSharedDN} color='rgba(245,166,35,.2)' activeColor='#f5a623'/>
-          {/* Scheduled starters only */}
-          <button onClick={()=>setPScheduledOnly(v=>!v)} data-tip="Scheduled starting pitchers only"
-            style={{padding:'3px 8px',borderRadius:5,fontSize:12,cursor:'pointer',flexShrink:0,
-              border:`1px solid ${pScheduledOnly?'#f5a623':'var(--border)'}`,
-              background:pScheduledOnly?'rgba(245,166,35,.15)':'transparent'}}>
-            ⚾
-          </button>
-          <div style={{display:'flex',gap:2}}>
-            {gradeEmojis.map(([key,emoji])=>(
-              <button key={key} onClick={()=>setPPgFilter(f=>f.includes(key)?f.filter(x=>x!==key):[...f,key])}
-                data-tip={key+' pitcher'}
-                style={{padding:'3px 7px',borderRadius:5,fontSize:12,cursor:'pointer',
-                  border:`1px solid ${pPgFilter.includes(key)?pgCol('‼️ '+key):'var(--border)'}`,
-                  background:pPgFilter.includes(key)?'rgba(255,255,255,.08)':'transparent'}}>
-                {emoji}
-              </button>
-            ))}
-            {pPgFilter.length>0&&<button onClick={()=>setPPgFilter([])} style={{padding:'2px 5px',borderRadius:5,fontSize:8,fontFamily:mono,cursor:'pointer',border:'1px solid var(--border)',color:'var(--muted)',background:'transparent'}}>✕</button>}
-          </div>
-          <div style={{display:'flex',alignItems:'center',gap:4}}>
-            <span data-tip='Minimum batters faced — filters out small samples' style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0}}>Min BF:</span>
-            <input type="number" min={1} max={500} value={pMinBF}
-              onChange={e=>setPMinBF(+e.target.value||1)}
-              style={{width:44,padding:'4px 6px',borderRadius:5,border:'1px solid var(--border)',
-                background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:9,textAlign:'center',outline:'none'}}/>
-          </div>
-          <input value={pSearch} onChange={e=>setPSearch(e.target.value)}
-            placeholder="Search…"
-            style={{flex:'0 0 120px',minWidth:80,padding:'5px 9px',borderRadius:6,border:'1px solid var(--border)',
+        {/* Pitcher: search + team always visible, rest in FILTERS slideout */}
+        <div style={{display:'flex',gap:5,alignItems:'center',marginBottom:6,flexWrap:'wrap'}}>
+          <input value={pSearch} onChange={e=>setPSearch(e.target.value)} placeholder="Search pitcher…"
+            style={{flex:'0 0 110px',minWidth:80,padding:'5px 9px',borderRadius:6,border:'1px solid var(--border)',
               background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:9,outline:'none'}}/>
           <select value={pTeam} onChange={e=>onPTeamChange(e.target.value)}
             style={{fontFamily:mono,fontSize:8,background:'var(--surface2)',color:'var(--text)',
               border:'1px solid var(--border)',borderRadius:5,padding:'4px 7px',cursor:'pointer'}}>
             {pTeams.map(t=><option key={t} value={t}>{t==='ALL'?'All Teams':t}</option>)}
           </select>
+          {(()=>{
+            const cnt=[sharedPHand!=='',pRoleFilter!=='',sharedPLoc!=='',sharedDN!=='',
+              !pScheduledOnly,pPgFilter.length>0,pMinBF!==10].filter(Boolean).length;
+            return(
+              <button onClick={()=>setPFiltersOpen(v=>!v)}
+                style={{padding:'4px 10px',borderRadius:6,cursor:'pointer',
+                  fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,letterSpacing:.5,
+                  border:`1px solid ${pFiltersOpen||cnt>0?'var(--accent2)':'var(--border)'}`,
+                  background:pFiltersOpen?'rgba(245,166,35,.18)':cnt>0?'rgba(245,166,35,.10)':'var(--surface2)',
+                  color:pFiltersOpen||cnt>0?'var(--accent2)':'var(--text)',
+                  display:'flex',alignItems:'center',gap:4}}>
+                <span>{pFiltersOpen?'✕':'⚙️'}</span>{pFiltersOpen?'CLOSE':'FILTERS'}
+                {cnt>0&&!pFiltersOpen&&<span style={{background:'var(--accent2)',color:'#000',borderRadius:8,padding:'0 4px',fontSize:8,fontWeight:900}}>{cnt}</span>}
+              </button>
+            );
+          })()}
         </div>
+        {pFiltersOpen&&(
+          <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:8,
+            padding:'12px 14px',marginBottom:8,display:'flex',flexDirection:'column',gap:10,
+            boxShadow:'0 4px 20px rgba(0,0,0,.4)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'var(--text)',textTransform:'uppercase',letterSpacing:.7}}>Pitcher Filters</span>
+              <button onClick={()=>{setSharedPHand('');setPRoleFilter('');onPLocChange('');setSharedDN('');setPScheduledOnly(true);setPPgFilter([]);setPMinBF(10);}}
+                style={{padding:'2px 8px',borderRadius:5,border:'1px solid rgba(255,64,32,.3)',background:'rgba(255,64,32,.08)',color:'var(--accent)',fontFamily:mono,fontSize:9,cursor:'pointer',fontWeight:700}}>✕ Clear</button>
+            </div>
+            <div style={{display:'flex',gap:5,flexWrap:'wrap',alignItems:'center'}}>
+              <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0,minWidth:32}}>Hand:</span>
+              <PillRow items={[['','All'],['L','LHP'],['R','RHP']]} active={sharedPHand} onSelect={setSharedPHand}/>
+              <span style={{fontFamily:mono,fontSize:8,color:'var(--accent2)',marginLeft:4,opacity:.6}}>↕ affects batter splits</span>
+            </div>
+            <div style={{display:'flex',gap:5,flexWrap:'wrap',alignItems:'center'}}>
+              <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0,minWidth:32}}>Role:</span>
+              <PillRow items={[['','All'],['SP','SP'],['RP','RP']]} active={pRoleFilter} onSelect={setPRoleFilter} color='rgba(251,191,36,.2)' activeColor='#fbbf24'/>
+            </div>
+            <div style={{display:'flex',gap:5,flexWrap:'wrap',alignItems:'center'}}>
+              <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0,minWidth:32}}>Loc:</span>
+              <PillRow items={[['','All'],['home','Home'],['away','Away']]} active={sharedPLoc} onSelect={onPLocChange} color='rgba(39,201,122,.2)' activeColor='#27c97a'/>
+              <span style={{fontFamily:mono,fontSize:8,color:'var(--accent2)',marginLeft:4,opacity:.6}}>↕ flips batter location</span>
+            </div>
+            <div style={{display:'flex',gap:5,flexWrap:'wrap',alignItems:'center'}}>
+              <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0,minWidth:32}}>D/N:</span>
+              <PillRow items={[['','All'],['day','Day'],['night','Night']]} active={sharedDN} onSelect={setSharedDN} color='rgba(245,166,35,.2)' activeColor='#f5a623'/>
+              <span style={{fontFamily:mono,fontSize:8,color:'var(--accent2)',marginLeft:4,opacity:.6}}>↕ affects both tables</span>
+            </div>
+            <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+              <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0,minWidth:32}}>More:</span>
+              <button onClick={()=>setPScheduledOnly(v=>!v)}
+                style={{padding:'3px 8px',borderRadius:5,fontSize:10,cursor:'pointer',fontFamily:mono,fontWeight:700,flexShrink:0,
+                  border:`1px solid ${pScheduledOnly?'#f5a623':'var(--border)'}`,
+                  background:pScheduledOnly?'rgba(245,166,35,.15)':'transparent',color:pScheduledOnly?'#f5a623':'var(--muted)'}}>
+                ⚾ Scheduled SP
+              </button>
+              <div style={{display:'flex',gap:2,alignItems:'center'}}>
+                <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0}}>Grade:</span>
+                {gradeEmojis.map(([key,emoji])=>(
+                  <button key={key} onClick={()=>setPPgFilter(f=>f.includes(key)?f.filter(x=>x!==key):[...f,key])}
+                    style={{padding:'3px 7px',borderRadius:5,fontSize:12,cursor:'pointer',
+                      border:`1px solid ${pPgFilter.includes(key)?pgCol('‼️ '+key):'var(--border)'}`,
+                      background:pPgFilter.includes(key)?'rgba(255,255,255,.08)':'transparent'}}>
+                    {emoji}
+                  </button>
+                ))}
+                {pPgFilter.length>0&&<button onClick={()=>setPPgFilter([])} style={{padding:'2px 5px',borderRadius:5,fontSize:8,fontFamily:mono,cursor:'pointer',border:'1px solid var(--border)',color:'var(--muted)',background:'transparent'}}>✕</button>}
+              </div>
+              <div style={{display:'flex',alignItems:'center',gap:4}}>
+                <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0}}>Min BF:</span>
+                <input type="number" min={1} max={500} value={pMinBF} onChange={e=>setPMinBF(+e.target.value||1)}
+                  style={{width:44,padding:'4px 6px',borderRadius:5,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:9,textAlign:'center',outline:'none'}}/>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Pitcher table */}
         <div style={{overflowX:'auto'}}>
@@ -17313,84 +17437,106 @@ function StatsTab() {
         </div>
 
         <div style={{display:batterCollapsed?'none':'block'}}>
-        {/* Batter filters — row 1: shared tandem filters */}
-        <div style={{display:'flex',gap:5,flexWrap:'nowrap',alignItems:'center',marginBottom:4,overflowX:'auto',WebkitOverflowScrolling:'touch',paddingBottom:2}}>
-          {/* Shared: batter hand = pitcher vsLHB/vsRHB split */}
-          <PillRow items={[['','All'],['L','LHB'],['R','RHB'],['S','SWB']]} active={sharedBHand} onSelect={setSharedBHand}/>
-          {/* Shared: location + day/night affect both splits */}
-          <PillRow items={[['','All'],['home','Home'],['away','Away']]} active={sharedBLoc} onSelect={onBLocChange} color='rgba(39,201,122,.2)' activeColor='#27c97a'/>
-          <PillRow items={[['','All'],['day','Day'],['night','Night']]} active={sharedDN} onSelect={setSharedDN} color='rgba(245,166,35,.2)' activeColor='#f5a623'/>
-          {/* Batter-only: additional hand filter on top of split */}
-          <PillRow items={[['','All'],['L','L only'],['R','R only'],['S','S only']]} active={bHandFilter} onSelect={setBHandFilter}/>
-        </div>
-
-        {/* Batter filters — row 1b: pitch group filter */}
-        <div style={{display:'flex',gap:4,flexWrap:'nowrap',alignItems:'center',marginBottom:4,overflowX:'auto',WebkitOverflowScrolling:'touch',paddingBottom:2}}>
-          <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0}}>Pitch:</span>
-          {[
-            ['','All','All pitch types — no pitch filter active'],
-            ['fastball','🔥 Fastball','4-Seam (FF), Sinker (SI), Cutter (FC), 2-Seam (FT) · Hard velocity, 88-100+ mph'],
-            ['breaking','🌀 Breaking','Slider (SL), Curveball (CU), Sweeper (SV/ST), Knuckle-curve (KC) · Lateral/downward movement, 72-90 mph'],
-            ['offspeed','💨 Offspeed','Changeup (CH), Splitter (FS), Forkball (FO) · Deceptive speed, disrupts timing, 78-88 mph'],
-          ].map(([val,lbl,tip])=>(
-            <button key={val} onClick={()=>setPitchGroup(p=>p===val&&val?'':val)}
-              data-tip={tip}
-              style={{padding:'3px 8px',borderRadius:5,fontSize:8,fontFamily:mono,cursor:'pointer',flexShrink:0,
-                border:`1px solid ${pitchGroup===val&&val?'var(--accent)':!val&&!pitchGroup?'var(--accent)':'var(--border)'}`,
-                background:pitchGroup===val&&val?'rgba(232,65,26,.2)':!val&&!pitchGroup?'rgba(232,65,26,.08)':'transparent',
-                color:pitchGroup===val||(!val&&!pitchGroup)?'var(--accent)':'var(--muted)',
-                fontWeight:pitchGroup===val||(!val&&!pitchGroup)?700:400}}>
-              {lbl}
-            </button>
-          ))}
-          {pitchGroup && sharedPHand && (
-            <span style={{fontFamily:mono,fontSize:8,color:'var(--accent2)',flexShrink:0,marginLeft:4}}>
-              + {sharedPHand==='L'?'vs LHP':'vs RHP'}
-            </span>
-          )}
-        </div>
-        {/* Batter filters — row 2: stickers + opp grade + controls */}
-        <div style={{display:'flex',gap:5,flexWrap:'nowrap',alignItems:'center',marginBottom:6,overflowX:'auto',WebkitOverflowScrolling:'touch',paddingBottom:2}}>
-          {/* Sticker filters */}
-          {[
-            [bPicksOnly, setBPicksOnly, '🎯', 'My Picks only'],
-            [bConfirmed, setBConfirmed, '✅', 'Confirmed lineup only'],
-            [bHotOnly,   setBHotOnly,   '🔥', '3+ HRs in last 7 days'],
-            [bGYOnly,    setBGYOnly,    '💥', 'Gone yard today'],
-            [bHideInj,   setBHideInj,   '🤕', 'Hide injured'],
-          ].map(([active, setFn, emoji, tip]) => (
-            <button key={emoji} onClick={()=>setFn(v=>!v)} data-tip={tip}
-              style={{padding:'3px 7px',borderRadius:5,fontSize:12,cursor:'pointer',flexShrink:0,
-                border:`1px solid ${active?'var(--accent)':'var(--border)'}`,
-                background:active?'rgba(232,65,26,.15)':'transparent'}}>
-              {emoji}
-            </button>
-          ))}
-          <div style={{width:1,height:14,background:'var(--border)',flexShrink:0}}/>
-          <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0}}>Opp:</span>
-          {gradeEmojis.map(([key,emoji])=>(
-            <button key={key} onClick={()=>setBPgFilter(f=>f.includes(key)?f.filter(x=>x!==key):[...f,key])}
-              data-tip={key+' opposing pitcher'}
-              style={{padding:'3px 7px',borderRadius:5,fontSize:12,cursor:'pointer',
-                border:`1px solid ${bPgFilter.includes(key)?'var(--accent)':'var(--border)'}`,
-                background:bPgFilter.includes(key)?'rgba(232,65,26,.12)':'transparent'}}>
-              {emoji}
-            </button>
-          ))}
-          {bPgFilter.length>0&&<button onClick={()=>setBPgFilter([])} style={{padding:'2px 5px',borderRadius:5,fontSize:8,fontFamily:mono,cursor:'pointer',border:'1px solid var(--border)',color:'var(--muted)',background:'transparent'}}>✕</button>}
-          <div style={{display:'flex',alignItems:'center',gap:4,marginLeft:4}}>
-            <span data-tip='Minimum plate appearances — filters out small samples' style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0}}>Min PA:</span>
-            <input type="number" min={1} max={500} value={bMinPA} onChange={e=>setBMinPA(+e.target.value||1)}
-              style={{width:44,padding:'4px 6px',borderRadius:5,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:9,textAlign:'center',outline:'none'}}/>
-          </div>
-          <input value={bSearch} onChange={e=>setBSearch(e.target.value)}
-            placeholder="Search…"
-            style={{flex:'0 0 120px',minWidth:80,padding:'5px 9px',borderRadius:6,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:9,outline:'none'}}/>
+        {/* Batter: search + team always visible, rest in FILTERS slideout */}
+        <div style={{display:'flex',gap:5,alignItems:'center',marginBottom:6,flexWrap:'wrap'}}>
+          <input value={bSearch} onChange={e=>setBSearch(e.target.value)} placeholder="Search batter…"
+            style={{flex:'0 0 110px',minWidth:80,padding:'5px 9px',borderRadius:6,border:'1px solid var(--border)',
+              background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:9,outline:'none'}}/>
           <select value={bTeam} onChange={e=>onBTeamChange(e.target.value)}
-            style={{fontFamily:mono,fontSize:8,background:'var(--surface2)',color:'var(--text)',border:'1px solid var(--border)',borderRadius:5,padding:'4px 7px',cursor:'pointer'}}>
+            style={{fontFamily:mono,fontSize:8,background:'var(--surface2)',color:'var(--text)',
+              border:'1px solid var(--border)',borderRadius:5,padding:'4px 7px',cursor:'pointer'}}>
             {bTeams.map(t=><option key={t} value={t}>{t==='ALL'?'All Teams':t}</option>)}
           </select>
+          {(()=>{
+            const cnt=[sharedBHand!=='',sharedBLoc!=='',sharedDN!=='',bHandFilter!=='',
+              pitchGroup!=='',bPicksOnly,bConfirmed,bHotOnly,bGYOnly,bHideInj,
+              bPgFilter.length>0,bMinPA!==10].filter(Boolean).length;
+            return(
+              <button onClick={()=>setBFiltersOpen(v=>!v)}
+                style={{padding:'4px 10px',borderRadius:6,cursor:'pointer',
+                  fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,letterSpacing:.5,
+                  border:`1px solid ${bFiltersOpen||cnt>0?'var(--accent2)':'var(--border)'}`,
+                  background:bFiltersOpen?'rgba(245,166,35,.18)':cnt>0?'rgba(245,166,35,.10)':'var(--surface2)',
+                  color:bFiltersOpen||cnt>0?'var(--accent2)':'var(--text)',
+                  display:'flex',alignItems:'center',gap:4}}>
+                <span>{bFiltersOpen?'✕':'⚙️'}</span>{bFiltersOpen?'CLOSE':'FILTERS'}
+                {cnt>0&&!bFiltersOpen&&<span style={{background:'var(--accent2)',color:'#000',borderRadius:8,padding:'0 4px',fontSize:8,fontWeight:900}}>{cnt}</span>}
+              </button>
+            );
+          })()}
         </div>
+        {bFiltersOpen&&(
+          <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:8,
+            padding:'12px 14px',marginBottom:8,display:'flex',flexDirection:'column',gap:10,
+            boxShadow:'0 4px 20px rgba(0,0,0,.4)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'var(--text)',textTransform:'uppercase',letterSpacing:.7}}>Batter Filters</span>
+              <button onClick={()=>{setSharedBHand('');onBLocChange('');setSharedDN('');setBHandFilter('');
+                setPitchGroup('');setBPicksOnly(false);setBConfirmed(false);setBHotOnly(false);
+                setBGYOnly(false);setBHideInj(false);setBPgFilter([]);setBMinPA(10);}}
+                style={{padding:'2px 8px',borderRadius:5,border:'1px solid rgba(255,64,32,.3)',background:'rgba(255,64,32,.08)',color:'var(--accent)',fontFamily:mono,fontSize:9,cursor:'pointer',fontWeight:700}}>✕ Clear</button>
+            </div>
+            <div style={{display:'flex',gap:5,flexWrap:'wrap',alignItems:'center'}}>
+              <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0,minWidth:32}}>Hand:</span>
+              <PillRow items={[['','All'],['L','LHB'],['R','RHB'],['S','SWB']]} active={sharedBHand} onSelect={setSharedBHand}/>
+              <span style={{fontFamily:mono,fontSize:8,color:'var(--accent2)',marginLeft:4,opacity:.6}}>↕ affects pitcher splits</span>
+            </div>
+            <div style={{display:'flex',gap:5,flexWrap:'wrap',alignItems:'center'}}>
+              <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0,minWidth:32}}>Loc:</span>
+              <PillRow items={[['','All'],['home','Home'],['away','Away']]} active={sharedBLoc} onSelect={onBLocChange} color='rgba(39,201,122,.2)' activeColor='#27c97a'/>
+              <span style={{fontFamily:mono,fontSize:8,color:'var(--accent2)',marginLeft:4,opacity:.6}}>↕ flips pitcher location</span>
+            </div>
+            <div style={{display:'flex',gap:5,flexWrap:'wrap',alignItems:'center'}}>
+              <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0,minWidth:32}}>D/N:</span>
+              <PillRow items={[['','All'],['day','Day'],['night','Night']]} active={sharedDN} onSelect={setSharedDN} color='rgba(245,166,35,.2)' activeColor='#f5a623'/>
+              <span style={{fontFamily:mono,fontSize:8,color:'var(--accent2)',marginLeft:4,opacity:.6}}>↕ affects both tables</span>
+            </div>
+            <div style={{display:'flex',gap:5,flexWrap:'wrap',alignItems:'center'}}>
+              <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0,minWidth:32}}>B.Hand:</span>
+              <PillRow items={[['','All'],['L','L only'],['R','R only'],['S','S only']]} active={bHandFilter} onSelect={setBHandFilter}/>
+            </div>
+            <div style={{display:'flex',gap:4,flexWrap:'wrap',alignItems:'center'}}>
+              <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0,minWidth:32}}>Pitch:</span>
+              {[['','All','All pitch types'],['fastball','🔥 Fastball','FF/SI/FC'],['breaking','🌀 Breaking','SL/CU/ST'],['offspeed','💨 Offspeed','CH/FS/FO']].map(([val,lbl,tip])=>(
+                <button key={val} onClick={()=>setPitchGroup(p=>p===val&&val?'':val)} data-tip={tip}
+                  style={{padding:'3px 8px',borderRadius:5,fontSize:9,fontFamily:mono,cursor:'pointer',
+                    border:`1px solid ${pitchGroup===val&&val?'var(--accent)':!val&&!pitchGroup?'var(--accent)':'var(--border)'}`,
+                    background:pitchGroup===val&&val?'rgba(232,65,26,.2)':!val&&!pitchGroup?'rgba(232,65,26,.08)':'transparent',
+                    color:pitchGroup===val||(!val&&!pitchGroup)?'var(--accent)':'var(--muted)',fontWeight:pitchGroup===val||(!val&&!pitchGroup)?700:400}}>
+                  {lbl}
+                </button>
+              ))}
+              {pitchGroup&&sharedPHand&&<span style={{fontFamily:mono,fontSize:8,color:'var(--accent2)',flexShrink:0}}>+ {sharedPHand==='L'?'vs LHP':'vs RHP'}</span>}
+            </div>
+            <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
+              <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0,minWidth:32}}>Flags:</span>
+              {[[bPicksOnly,setBPicksOnly,'var(--accent2)','🎯 My Picks'],[bConfirmed,setBConfirmed,'#27c97a','✅ Confirmed'],[bHotOnly,setBHotOnly,'#fb923c','🔥 Hot Bat'],[bGYOnly,setBGYOnly,'var(--accent)','💥 Gone Yard'],[bHideInj,setBHideInj,'#fb923c','🤕 Hide Inj']].map(([active,setFn,col,label])=>(
+                <button key={label} onClick={()=>setFn(v=>!v)}
+                  style={{padding:'4px 9px',borderRadius:6,cursor:'pointer',fontSize:9,fontFamily:mono,fontWeight:active?700:400,
+                    border:`1px solid ${active?col:'var(--border)'}`,background:active?`${col}22`:'transparent',
+                    color:active?col:'var(--muted)',whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:5}}>
+                  <span style={{width:8,height:8,borderRadius:2,flexShrink:0,border:`1.5px solid ${active?col:'var(--border)'}`,background:active?col:'transparent',display:'inline-block'}}/>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div style={{display:'flex',gap:5,flexWrap:'wrap',alignItems:'center'}}>
+              <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0,minWidth:32}}>Opp:</span>
+              {gradeEmojis.map(([key,emoji])=>(
+                <button key={key} onClick={()=>setBPgFilter(f=>f.includes(key)?f.filter(x=>x!==key):[...f,key])}
+                  style={{padding:'3px 7px',borderRadius:5,fontSize:12,cursor:'pointer',
+                    border:`1px solid ${bPgFilter.includes(key)?'var(--accent)':'var(--border)'}`,
+                    background:bPgFilter.includes(key)?'rgba(232,65,26,.12)':'transparent'}}>{emoji}</button>
+              ))}
+              {bPgFilter.length>0&&<button onClick={()=>setBPgFilter([])} style={{padding:'2px 5px',borderRadius:5,fontSize:8,fontFamily:mono,cursor:'pointer',border:'1px solid var(--border)',color:'var(--muted)',background:'transparent'}}>✕</button>}
+              <div style={{display:'flex',alignItems:'center',gap:4,marginLeft:8}}>
+                <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0}}>Min PA:</span>
+                <input type="number" min={1} max={500} value={bMinPA} onChange={e=>setBMinPA(+e.target.value||1)}
+                  style={{width:44,padding:'4px 6px',borderRadius:5,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:9,textAlign:'center',outline:'none'}}/>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Batter table */}
         <div style={{overflowX:'auto'}}>
@@ -19075,6 +19221,7 @@ function MatchupEngineTab() {
   const [filterDue, setFilterDue]             = useState(false);
   const [filterDiamond, setFilterDiamond]     = useState(false);
   const [kmPicksOnly, setKmPicksOnly]         = useState(false);
+  const [kmFiltersOpen,setKmFiltersOpen]       = useState(false);
   // Date slot — 'today' or 'tomorrow'. Respects 4am ET cutoff same as HR tracker.
   const [dateSlot, setDateSlot] = useState('today');
   const picks = usePicks();
@@ -19583,121 +19730,124 @@ function MatchupEngineTab() {
           fontFamily:"'DM Mono',monospace",fontSize:9,cursor:'pointer',fontWeight:700}}>✕</button>}
     </div>}
 
-    {/* Grade filter */}
-    {!loading && !error && activeData.length > 0 && <div style={{display:'flex',gap:6,marginBottom:14,flexWrap:'wrap',alignItems:'center'}}>
-      <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1}}>Grade</span>
-      <button onClick={()=>setSelGrade('all')}
-        style={{padding:'3px 12px',borderRadius:6,cursor:'pointer',
-          background:selGrade==='all'?'var(--surface2)':'transparent',
-          color:selGrade==='all'?'var(--text)':'var(--muted)',
-          border:`1px solid ${selGrade==='all'?'var(--accent)':'var(--border)'}`,
-          fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:selGrade==='all'?700:400}}>
-        All
-      </button>
-      {Object.keys(GRADE_CFG).map(g => {
-        const c = GRADE_CFG[g];
-        const active = selGrade === g;
-        return <button key={g} onClick={()=>setSelGrade(s=>s===g?'all':g)}
-          style={{padding:'3px 12px',borderRadius:6,cursor:'pointer',
-            background:active?c.bg:'transparent',
-            color:active?c.color:'var(--muted)',
-            border:`1px solid ${active?c.border:'var(--border)'}`,
-            fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:11,letterSpacing:.5}}>
-          {g}
-        </button>;
-      })}
-            <div style={{display:"flex",gap:6,marginBottom:6,flexWrap:"wrap",alignItems:"center"}}>
-        <HandFilter mode="batter" value={kmBatterHand} onChange={setKmBatterHand}/>
-        <HandFilter mode="pitcher" value={kmPitcherHand} onChange={setKmPitcherHand}/>
-        <FormClassFilter selected={kmFormFilter} onChange={setKmFormFilter}/>
-        <button onClick={()=>setKmHideFinal(v=>!v)} style={{padding:'3px 9px',borderRadius:6,
-          border:`1px solid ${kmHideFinal?'#ff4020':'var(--border)'}`,
-          background:kmHideFinal?'rgba(255,64,32,.12)':'transparent',
-          color:kmHideFinal?'#ff4020':'var(--muted)',fontFamily:"'DM Mono',monospace",
-          fontSize:9,cursor:'pointer',whiteSpace:'nowrap'}}>
-          {kmHideFinal?'✓ Hiding Final':'Hide Final'}
-        </button>
-      </div>
-{/* Gone Yard filter — show only batters who have already hit a HR today */}
-      <button onClick={()=>setFilterGoneYard(s=>!s)}
-        style={{padding:'3px 12px',borderRadius:6,cursor:'pointer',marginLeft:4,
-          background:filterGoneYard?'rgba(255,20,0,.18)':'transparent',
-          color:filterGoneYard?'#ff4020':'var(--muted)',
-          border:`1px solid ${filterGoneYard?'rgba(255,20,0,.5)':'var(--border)'}`,
-          fontFamily:"'DM Mono',monospace",fontWeight:filterGoneYard?700:400,fontSize:11}}>
-        💥
-      </button>
-      <button onClick={()=>setFilterDue(v=>!v)}
-        style={{padding:'3px 12px',borderRadius:6,cursor:'pointer',marginLeft:4,
-          background:filterDue?'rgba(56,184,242,.18)':'transparent',
-          color:filterDue?'var(--ice)':'var(--muted)',
-          border:`1px solid ${filterDue?'rgba(56,184,242,.5)':'var(--border)'}`,
-          fontFamily:"'DM Mono',monospace",fontWeight:filterDue?700:400,fontSize:11}}>
-        ⏳
-      </button>
-      <button onClick={()=>{setKmActiveOnly(s=>!s);if(!kmActiveOnly)setKmInjuredOnly(false);}}
-        style={{padding:'3px 12px',borderRadius:6,cursor:'pointer',
-          border:`1px solid ${kmActiveOnly?'#34d399':'var(--border)'}`,
-          background:kmActiveOnly?'rgba(52,211,153,.12)':'transparent',
-          color:kmActiveOnly?'#34d399':'var(--muted)',
-          fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:kmActiveOnly?700:400,
-          whiteSpace:'nowrap',marginLeft:4}}>
-        ☑️
-      </button>
-      <button onClick={()=>{setKmInjuredOnly(s=>!s);if(!kmInjuredOnly)setKmActiveOnly(false);}}
-        style={{padding:'3px 12px',borderRadius:6,cursor:'pointer',
-          border:`1px solid ${kmInjuredOnly?'#fb923c':'var(--border)'}`,
-          background:kmInjuredOnly?'rgba(251,146,60,.12)':'transparent',
-          color:kmInjuredOnly?'#fb923c':'var(--muted)',
-          fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:kmInjuredOnly?700:400,
-          whiteSpace:'nowrap',marginLeft:4}}>
-        🤕
-      </button>
-      <button onClick={()=>setKmHotOnly(s=>!s)}
-        style={{padding:'3px 12px',borderRadius:6,cursor:'pointer',
-          border:`1px solid ${kmHotOnly?'#fb923c':'var(--border)'}`,
-          background:kmHotOnly?'rgba(251,146,60,.12)':'transparent',
-          color:kmHotOnly?'#fb923c':'var(--muted)',
-          fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:kmHotOnly?700:400,
-          whiteSpace:'nowrap',marginLeft:4}}>
-        🔥
-      </button>
-      <button onClick={()=>setKmPicksOnly(s=>!s)}
-        style={{padding:'3px 12px',borderRadius:6,cursor:'pointer',
-          border:`1px solid ${kmPicksOnly?'var(--accent2)':'var(--border)'}`,
-          background:kmPicksOnly?'rgba(245,166,35,.12)':'transparent',
-          color:kmPicksOnly?'var(--accent2)':'var(--muted)',
-          fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:kmPicksOnly?700:400,
-          whiteSpace:'nowrap',marginLeft:4}}>
-        🎯 {kmPicksOnly ? 'My Picks ✓' : 'My Picks'}
-      </button>
-      <button onClick={()=>setFilterDiamond(v=>!v)}
-        style={{padding:'3px 12px',borderRadius:6,cursor:'pointer',marginLeft:4,
-          background:filterDiamond?'rgba(255,204,0,.18)':'transparent',
-          color:filterDiamond?'#ffcc00':'var(--muted)',
-          border:`1px solid ${filterDiamond?'rgba(255,204,0,.5)':'var(--border)'}`,
-          fontFamily:"'DM Mono',monospace",fontWeight:filterDiamond?700:400,fontSize:11}}
-        title="Tier 1 Locks: A+ grade + Sim TB≥2.0 + Hittable/Target pitcher">
-        💎 {filterDiamond ? 'Diamond ✓' : 'Diamond'}
-      </button>
-    </div>}
-    {loading && <div className="lw"><div className="sp"/><div className="lt">Loading matchup data…</div></div>}
-    {/* Pitcher grade filter */}
-    {!loading && !error && activeData.length > 0 && <div style={{display:'flex',gap:6,marginBottom:14,flexWrap:'wrap',alignItems:'center'}}>
-      <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1}}>Pitcher:</span>
-      {['all','‼️ Elite','⚠️ Tough','🤔 Average','💥 Hittable','🎯 Target'].map(g => {
-        const active = selPitcherGrade === g;
-        const col = g==='‼️ Elite'?'#ff4020':g==='⚠️ Tough'?'#ff8020':g==='🤔 Average'?'var(--muted)':g==='💥 Hittable'?'#27c97a':g==='🎯 Target'?'#38b8f2':'var(--text)';
-        return <button key={g} onClick={()=>setSelPitcherGrade(s=>s===g?'all':g)}
-          style={{padding:'3px 12px',borderRadius:6,cursor:'pointer',
-            background:active?'rgba(255,255,255,.08)':'transparent',
-            color:active?col:'var(--muted)',
-            border:`1px solid ${active?col:'var(--border)'}`,
-            fontFamily:"'DM Mono',monospace",fontWeight:active?700:400,fontSize:11}}>
-          {g==='all'?'All':g.split(' ')[0]}
-        </button>;
-      })}
-    </div>}
+    
+    {/* ── KEY MATCHUPS FILTERS BUTTON + SLIDEOUT ── */}
+    {!loading && !error && activeData.length > 0 && (()=>{
+      const kmActiveCount = [
+        selGrade!=='all', selPitcherGrade!=='all',
+        kmBatterHand!=='ALL', kmPitcherHand!=='ALL', kmFormFilter.size>0,
+        kmHideFinal, filterGoneYard, filterDue, kmActiveOnly, kmInjuredOnly,
+        kmHotOnly, kmPicksOnly, filterDiamond,
+      ].filter(Boolean).length;
+      return (
+        <div style={{marginBottom:10}}>
+          <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap',marginBottom:6}}>
+            <button onClick={()=>setKmFiltersOpen(v=>!v)}
+              style={{padding:'4px 12px',borderRadius:6,cursor:'pointer',
+                fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,letterSpacing:.6,
+                border:`1px solid ${kmFiltersOpen||kmActiveCount>0?'var(--accent2)':'var(--border)'}`,
+                background:kmFiltersOpen?'rgba(245,166,35,.18)':kmActiveCount>0?'rgba(245,166,35,.10)':'var(--surface2)',
+                color:kmFiltersOpen||kmActiveCount>0?'var(--accent2)':'var(--text)',
+                display:'flex',alignItems:'center',gap:5,whiteSpace:'nowrap'}}>
+              <span>{kmFiltersOpen?'✕':'⚙️'}</span>
+              {kmFiltersOpen?'CLOSE':'FILTERS'}
+              {kmActiveCount>0&&!kmFiltersOpen&&<span style={{background:'var(--accent2)',color:'#000',
+                borderRadius:10,padding:'0 5px',fontSize:8,fontWeight:900,lineHeight:'16px',minWidth:14,textAlign:'center'}}>
+                {kmActiveCount}
+              </span>}
+            </button>
+            <div style={{display:'flex',gap:4,alignItems:'center',marginLeft:'auto',flexWrap:'wrap'}}>
+              {['all','‼️ Elite','⚠️ Tough','🤔 Average','💥 Hittable','🎯 Target'].map(g=>{
+                const active=selPitcherGrade===g;
+                const col={'‼️ Elite':'#ff4020','⚠️ Tough':'#ff8020','🤔 Average':'var(--muted)','💥 Hittable':'#27c97a','🎯 Target':'#38b8f2'}[g]||'var(--text)';
+                return(<button key={g} onClick={()=>setSelPitcherGrade(s=>s===g?'all':g)}
+                  style={{padding:'3px 8px',borderRadius:6,cursor:'pointer',
+                    background:active?'rgba(255,255,255,.08)':'transparent',color:active?col:'var(--muted)',
+                    border:`1px solid ${active?col:'var(--border)'}`,
+                    fontFamily:"'DM Mono',monospace",fontWeight:active?700:400,fontSize:g==='all'?10:14}}>
+                  {g==='all'?'All P':g.split(' ')[0]}
+                </button>);
+              })}
+            </div>
+          </div>
+          {kmFiltersOpen&&(
+            <div style={{background:'var(--surface2)',border:'1px solid var(--border)',
+              borderRadius:10,padding:'14px 16px',marginBottom:10,
+              display:'flex',flexDirection:'column',gap:12,
+              boxShadow:'0 4px 24px rgba(0,0,0,.45)'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,
+                  color:'var(--text)',textTransform:'uppercase',letterSpacing:.8}}>Filter Key Matchups</span>
+                <button onClick={()=>{setSelGrade('all');setKmBatterHand('ALL');setKmPitcherHand('ALL');
+                  setKmFormFilter(new Set());setKmHideFinal(false);setFilterGoneYard(false);
+                  setFilterDue(false);setKmActiveOnly(false);setKmInjuredOnly(false);
+                  setKmHotOnly(false);setKmPicksOnly(false);setFilterDiamond(false);
+                }} style={{padding:'3px 10px',borderRadius:5,border:'1px solid rgba(255,64,32,.3)',
+                  background:'rgba(255,64,32,.08)',color:'var(--accent)',
+                  fontFamily:"'DM Mono',monospace",fontSize:9,cursor:'pointer',fontWeight:700}}>✕ Clear All</button>
+              </div>
+              <div>
+                <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:1,marginBottom:6}}>Batter Grade</div>
+                <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
+                  {['all',...Object.keys(GRADE_CFG)].map(g=>{
+                    const active=selGrade===g;
+                    const gc=GRADE_CFG[g]||{color:'var(--text)',bg:'transparent',border:'var(--border)'};
+                    return(<button key={g} onClick={()=>setSelGrade(s=>s===g?'all':g)}
+                      style={{padding:'5px 12px',borderRadius:5,cursor:'pointer',
+                        border:`1px solid ${active?(gc.border||gc.color):'var(--border)'}`,
+                        background:active?(gc.bg||`${gc.color}22`):'transparent',
+                        color:active?gc.color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+                        fontWeight:active?800:500,fontSize:11}}>
+                      {g==='all'?'All':g}
+                    </button>);
+                  })}
+                </div>
+              </div>
+              <div>
+                <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:1,marginBottom:6}}>Flags</div>
+                <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                  {[
+                    [()=>setFilterGoneYard(s=>!s), filterGoneYard, 'var(--accent)',  '💥 Gone Yard'],
+                    [()=>setFilterDue(v=>!v),       filterDue,      'var(--ice)',     '⏳ Due'],
+                    [()=>{setKmActiveOnly(s=>!s);if(!kmActiveOnly)setKmInjuredOnly(false);},kmActiveOnly,'#34d399','☑️ Active Only'],
+                    [()=>{setKmInjuredOnly(s=>!s);if(!kmInjuredOnly)setKmActiveOnly(false);},kmInjuredOnly,'#fb923c','🤕 Injured'],
+                    [()=>setKmHotOnly(s=>!s),       kmHotOnly,      '#fb923c',       '🔥 Hot Bat'],
+                    [()=>setKmPicksOnly(s=>!s),     kmPicksOnly,    'var(--accent2)','🎯 My Picks'],
+                    [()=>setFilterDiamond(v=>!v),   filterDiamond,  '#ffcc00',       '💎 Diamond'],
+                    [()=>setKmHideFinal(v=>!v),     kmHideFinal,    '#ff6b6b',       '🚫 Hide Final'],
+                  ].map(([fn,active,col,label])=>(
+                    <button key={label} onClick={fn}
+                      style={{padding:'5px 11px',borderRadius:7,cursor:'pointer',fontSize:10,
+                        fontFamily:"'DM Mono',monospace",fontWeight:active?700:400,
+                        border:`1px solid ${active?col:'var(--border)'}`,background:active?`${col}22`:'transparent',
+                        color:active?col:'var(--muted)',whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:6}}>
+                      <span style={{width:9,height:9,borderRadius:2,flexShrink:0,
+                        border:`1.5px solid ${active?col:'var(--border)'}`,background:active?col:'transparent',display:'inline-block'}}/>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div style={{display:'flex',gap:16,flexWrap:'wrap'}}>
+                <div>
+                  <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:1,marginBottom:6}}>Batter Hand</div>
+                  <HandFilter mode="batter" value={kmBatterHand} onChange={setKmBatterHand}/>
+                </div>
+                <div>
+                  <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:1,marginBottom:6}}>Pitcher Hand</div>
+                  <HandFilter mode="pitcher" value={kmPitcherHand} onChange={setKmPitcherHand}/>
+                </div>
+                <div>
+                  <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:1,marginBottom:6}}>Form Class</div>
+                  <FormClassFilter selected={kmFormFilter} onChange={setKmFormFilter}/>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    })()}
+
     {error && <div style={{padding:'30px 20px',textAlign:'center',color:'var(--muted)',
       fontFamily:"'DM Mono',monospace",fontSize:12,lineHeight:1.8}}>
       <div style={{fontSize:20,marginBottom:8}}>📭</div>
@@ -20045,6 +20195,119 @@ function MatchupEngineTab() {
                   );
                 })()}
 
+                {/* ── WHY TONIGHT ─────────────────────────────────────── */}
+                {(()=>{
+                  const bullets=[];
+                  const brlPct=parseFloat(b.recent_barrel_pct)||0,ev7=parseFloat(b.recent_avg_ev)||0;
+                  const la7=parseFloat(b.recent_avg_la)||0,zf=parseFloat(b.zone_fit)||0;
+                  const pbPct=parseFloat(b.recent_pulled_barrel_pct)||0;
+                  const brl3d=parseInt(b.recent_barrels_3d)||0,hrs3d=parseInt(b.recent_hrs_3d)||0;
+                  const pb2d=parseInt(b.recent_pb_2d)||0,hotHand=parseInt(b.recent_hr_count)||0;
+                  const bsSpeed=parseFloat(b.recent_avg_bat_speed)||0,psScore=parseFloat(b.ps_score)||0;
+                  const bvpHR=parseInt(b.bvp_hr)||0,bvpPA=parseInt(b.bvp_pa)||0;
+                  const windEff=b.wind_effect||'',ph=(b.pitcher_hand||'').toUpperCase()[0],bh=(b.batter_hand||'').toUpperCase()[0];
+                  const pBarrel=parseFloat(b.pitcher_barrel_pct_allowed)||0;
+                  const perfStorm=parseInt(b.perfect_storm)||0;
+                  const enhDL=hrs3d===0&&brl3d>=2&&pb2d>=1,stdDL=hrs3d===0&&brl3d>=2&&!enhDL;
+                  if(perfStorm) bullets.push({icon:'⚡',color:'#facc15',text:'PERFECT STORM — all signals aligned: bat speed, zone fit, count discipline, matchup',bold:true});
+                  if(enhDL)    bullets.push({icon:'↙',color:'#f5a623',text:`Enhanced Day Late — pulled barrel last 2d + ${brl3d} barrels/3d, 0 HRs · 1.66x HR lift`,bold:true});
+                  else if(stdDL) bullets.push({icon:'📆',color:'#a855f7',text:`Day Late — ${brl3d} barrels/3d, 0 HRs · 1.24x HR lift`,bold:false});
+                  if(bsSpeed>=77) bullets.push({icon:'💨',color:'#38b8f2',text:`${bsSpeed.toFixed(1)} mph bat speed — elite tier · 3x HR baseline`});
+                  else if(bsSpeed>=74) bullets.push({icon:'💨',color:'#38b8f2',text:`${bsSpeed.toFixed(1)} mph bat speed — strong tier · 2x HR baseline`});
+                  if(ev7>=100) bullets.push({icon:'⚡',color:'#ff4020',text:`${ev7.toFixed(1)} mph avg EV L7 — elite exit velocity`});
+                  else if(ev7>=95) bullets.push({icon:'⚡',color:'#f5a623',text:`${ev7.toFixed(1)} mph avg EV L7 — above average contact`});
+                  if(brlPct>=12) bullets.push({icon:'🛢️',color:'#ff4020',text:`${brlPct.toFixed(1)}% Barrel% L7 — 🔥 Primed tier`});
+                  else if(brlPct>=8) bullets.push({icon:'🛢️',color:'#f5a623',text:`${brlPct.toFixed(1)}% Barrel% L7 — elite barrel rate`});
+                  if(pbPct>=6&&pbPct<15) bullets.push({icon:'↙',color:'#27c97a',text:`${pbPct.toFixed(1)}% pulled barrel L7 — hitting with pull-side power`});
+                  if(zf>=85) bullets.push({icon:'🗺️',color:'#27c97a',text:`${zf.toFixed(0)}% Zone Fit — pitcher throws where this batter crushes`});
+                  else if(zf>=70) bullets.push({icon:'🗺️',color:'#f5a623',text:`${zf.toFixed(0)}% Zone Fit — favorable overlap`});
+                  if(la7>=22&&la7<=32) bullets.push({icon:'📐',color:'#27c97a',text:`${la7.toFixed(1)}° avg launch angle — in the 22-32° HR sweet spot`});
+                  const platAdv=(ph==='L'&&(bh==='R'||bh==='S'))||(ph==='R'&&(bh==='L'||bh==='S'));
+                  if(platAdv) bullets.push({icon:'🤝',color:'#38b8f2',text:`Power-side advantage — ${bh==='R'?'RHB':'LHB'} vs ${ph==='L'?'LHP':'RHP'}`});
+                  if(hotHand>=3) bullets.push({icon:'🔥',color:'#fb923c',text:`${hotHand} HRs in last 3 games — genuinely hot`});
+                  if(bvpHR>=2&&bvpPA>=8) bullets.push({icon:'🆚',color:'#38b8f2',text:`${bvpHR} HR in ${bvpPA} PA vs this pitch mix`});
+                  if(psScore>=75) bullets.push({icon:'🎯',color:'#27c97a',text:`PS Score ${psScore.toFixed(0)} — elite pitch convergence`});
+                  if(pBarrel>=10) bullets.push({icon:'🎯',color:'#ff4020',text:`${pBarrel.toFixed(1)}% barrel rate allowed — pitcher is hittable`});
+                  if(windEff&&windEff!=='N/A'&&(windEff.includes('Out')||windEff.includes('Help')||windEff.includes('Boost')))
+                    bullets.push({icon:'🌬️',color:'#38b8f2',text:`Wind: ${windEff}`});
+                  if(bullets.length===0) return null;
+                  return(
+                    <div style={{marginBottom:12,background:'rgba(0,0,0,.3)',borderRadius:8,padding:'10px 12px',border:'1px solid rgba(255,255,255,.06)'}}>
+                      <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:10,color:'var(--muted)',textTransform:'uppercase',letterSpacing:1,marginBottom:8}}>WHY TONIGHT</div>
+                      <div style={{display:'flex',flexDirection:'column',gap:5}}>
+                        {bullets.map((bl,i)=>(
+                          <div key={i} style={{display:'flex',alignItems:'flex-start',gap:7}}>
+                            <span style={{fontSize:11,flexShrink:0,marginTop:1}}>{bl.icon}</span>
+                            <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,lineHeight:1.5,color:bl.color||'var(--text)',fontWeight:bl.bold?700:400}}>{bl.text}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* ── HR CHECKLIST ─────────────────────────────────────────── */}
+                {(()=>{
+                  const ev7=parseFloat(b.recent_avg_ev)||0,brlPct=parseFloat(b.recent_barrel_pct)||0;
+                  const la7=parseFloat(b.recent_avg_la)||0,fb7=parseFloat(b.recent_fb_pct)||0;
+                  const pbPct=parseFloat(b.recent_pulled_barrel_pct)||0,zf=parseFloat(b.zone_fit)||0;
+                  const ph=(b.pitcher_hand||'').toUpperCase()[0],bh=(b.batter_hand||'').toUpperCase()[0];
+                  const pBarrel=parseFloat(b.pitcher_barrel_pct_allowed)||0;
+                  const hrFact=parseInt(b.hr_factor)||0;
+                  const windOk=b.wind_effect&&b.wind_effect!=='N/A'&&(b.wind_effect.includes('Out')||b.wind_effect.includes('Help')||b.wind_effect.includes('Boost'));
+                  const platoon=(ph==='L'&&(bh==='R'||bh==='S'))||(ph==='R'&&(bh==='L'||bh==='S'));
+                  const checks=[
+                    {label:'Barrel% 8%+',  ok:brlPct>=8,    val:`${brlPct.toFixed(1)}%`},
+                    {label:'EV 92+ mph',   ok:ev7>=92,      val:`${ev7.toFixed(1)}`},
+                    {label:'LA 22-32°',    ok:la7>=22&&la7<=32, val:la7>0?`${la7.toFixed(1)}°`:'—'},
+                    {label:'Pull FB%',     ok:pbPct>=6||fb7>=35, val:pbPct>0?`↙${pbPct.toFixed(0)}%`:`FB${fb7.toFixed(0)}%`},
+                    {label:'Zone Fit 70%+',ok:zf>=70,       val:`${zf.toFixed(0)}%`},
+                    {label:'Platoon Adv',  ok:platoon,      val:platoon?'✓':'—'},
+                    {label:'P Gives Brls', ok:pBarrel>=6,   val:pBarrel>0?`${pBarrel.toFixed(1)}%`:'—'},
+                    {label:'Park/Wind',    ok:hrFact>=105||windOk, val:hrFact>0?`${hrFact>100?'+':''}${hrFact-100}%`:(windOk?'✓':'—')},
+                  ];
+                  const lit=checks.filter(ch=>ch.ok).length;
+                  const upside=lit>=7?'ELITE':lit>=5?'STRONG':lit>=3?'GOOD':'BELOW AVG';
+                  const uCol=lit>=7?'#ff4020':lit>=5?'#f5a623':lit>=3?'#27c97a':'var(--muted)';
+                  return(
+                    <div style={{marginBottom:12,background:'var(--surface)',borderRadius:8,padding:'10px 12px',border:'1px solid var(--border)'}}>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+                        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:10,color:'var(--muted)',textTransform:'uppercase',letterSpacing:1}}>HR CHECKLIST</span>
+                        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:12,color:uCol,letterSpacing:.5}}>HR UPSIDE: {upside}</span>
+                      </div>
+                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px 12px'}}>
+                        {checks.map(ch=>(
+                          <div key={ch.label} style={{display:'flex',alignItems:'center',gap:6,padding:'3px 0'}}>
+                            <span style={{fontSize:10,flexShrink:0,color:ch.ok?'#27c97a':'rgba(255,255,255,.18)'}}>{ch.ok?'✅':'○'}</span>
+                            <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:ch.ok?'var(--text)':'var(--muted)',fontWeight:ch.ok?600:400,flex:1}}>{ch.label}</span>
+                            <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:ch.ok?'#27c97a':'var(--muted)',fontWeight:ch.ok?700:400,flexShrink:0}}>{ch.val}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{marginTop:6,fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--muted)',textAlign:'right'}}>{lit}/{checks.length} conditions met</div>
+                    </div>
+                  );
+                })()}
+
+                {/* ── PROJECTED HR BAR ─────────────────────────────────────── */}
+                {(()=>{
+                  const simHRPct=Math.round((parseFloat(b.proj_hr_adj)||parseFloat(b.sim_hr)||0)*100);
+                  const recentHRs=parseInt(b.recent_hr_count)||0;
+                  if(simHRPct<=0) return null;
+                  return(
+                    <div style={{marginBottom:10,padding:'8px 12px',borderRadius:8,background:'var(--surface)',border:'1px solid var(--border)'}}>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+                        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,color:'var(--muted)',textTransform:'uppercase',letterSpacing:1}}>PROJECTED HR</span>
+                        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:16,color:simHRPct>=15?'#ff4020':simHRPct>=10?'#f5a623':'var(--text)'}}>{simHRPct}%</span>
+                      </div>
+                      <div style={{height:4,borderRadius:2,background:'rgba(255,255,255,.08)',overflow:'hidden',marginBottom:4}}>
+                        <div style={{height:'100%',borderRadius:2,background:simHRPct>=15?'#ff4020':simHRPct>=10?'#f5a623':'#27c97a',width:`${Math.min(100,simHRPct*3.5)}%`,transition:'width .4s'}}/>
+                      </div>
+                      <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--muted)'}}>{recentHRs>0?`${recentHRs} HR last 3g · `:''}Sim-based · see chart below</div>
+                    </div>
+                  );
+                })()}
+
                 {/* Environment */}
                 <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
                   {/* Statcast link pill — left of wind */}
@@ -20122,6 +20385,9 @@ function MatchupEngineTab() {
                 </div>
                 {/* Live box score — fetches real game data */}
                 <LiveBatterBox batterId={b.batter_id} gamePk={b.game_id} onData={(id,d)=>{liveCache.current[id]=d;}}/>
+
+                {/* HR Dot Timeline — compact last 15 games */}
+                <HRDotTimeline batterId={b.batter_id}/>
 
                 {/* Recent Game Log — pregame only, fetched from MLB Stats API */}
                 <Last7HRChart batterId={b.batter_id}/>
@@ -22390,7 +22656,7 @@ function CrystalBallTab() {
       const ghr  = parseFloat(r.gHR||r.kHR||0);
       const ps   = parseFloat(r.ps_score||0);
       const boom = computeBoomScore(sig, parseFloat(r.zone_fit||0), parseFloat(r.iso||0), parseFloat(r.sim_tb||0), parseFloat(r.weighted_flag_score||0), parseFloat(r.recent_barrel_spike||0), parseInt(r.recent_hr_count||0), parseFloat(r.recent_batter_ahead_pct||0), !!r.hh_precursor, parseFloat(r.primary_pitch_hr_rate||0), parseInt(r.recent_barrels_3d)||0, parseInt(r.recent_hrs_3d)||0, parseFloat(r.recent_avg_bat_speed)||0, parseInt(r.recent_pb_2d)||0);
-      const yard = computeYardScore(sig, ghr, boom, ps, r.batter_hand||'', r.pitcher_hand||'', parseInt(r.days_rest??1), liveSlot(r.batter_id,r.lineup_slot));
+      const yard = computeYardScore(sig, ghr, boom, ps, r.batter_hand||'', r.pitcher_hand||'', parseInt(r.days_rest??1), liveSlot(r.batter_id,r.lineup_slot), r._pgLabel||'');
       const ev   = parseFloat(r.recent_avg_ev||0);
       const la   = parseFloat(r.recent_avg_la||0);
       const bsDelta   = parseFloat(r.bat_speed_vs_baseline||0);
@@ -22864,6 +23130,8 @@ function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, on
   const [bHideInj,       setBHideInj]       = useState(false);
   const [batterCollapsed,setBatterCollapsed]= useState(false);
   const [expandedB,      setExpandedB]      = useState(null);
+  const [gpFiltersOpen,  setGpFiltersOpen]  = useState(false);
+  const [gbFiltersOpen,  setGbFiltersOpen]  = useState(false);
 
   // ── Teams state ────────────────────────────────────────────────────────────
   const [tSortBy,        setTSortBy]        = useState('g2tb_pct');
@@ -23232,24 +23500,39 @@ function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, on
             style={{padding:'3px 8px',borderRadius:6,fontSize:9,cursor:'pointer',border:'1px solid var(--border)',color:'var(--muted)',background:'transparent',fontFamily:mono,flexShrink:0}}>⬇ CSV</button>
         </div>
         <div style={{display:pitcherCollapsed?'none':'block'}}>
-          <div style={{display:'flex',gap:5,flexWrap:'nowrap',alignItems:'center',marginBottom:6,overflowX:'auto',WebkitOverflowScrolling:'touch',paddingBottom:2}}>
-            <PillRow items={[['','All'],['SP','SP'],['RP','RP']]} active={pRoleFilter} onSelect={setPRoleFilter} color='rgba(251,191,36,.2)' activeColor='#fbbf24'/>
-            <button onClick={()=>setPScheduledOnly(v=>!v)} data-tip="Scheduled starting pitchers only"
-              style={{padding:'3px 8px',borderRadius:5,fontSize:12,cursor:'pointer',flexShrink:0,
-                border:`1px solid ${pScheduledOnly?'#f5a623':'var(--border)'}`,
-                background:pScheduledOnly?'rgba(245,166,35,.15)':'transparent'}}>⚾</button>
-            <div style={{display:'flex',alignItems:'center',gap:4}}>
-              <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0}} data-tip="Minimum games in window">Min G:</span>
-              <input type="number" min={1} max={50} value={pMinBF} onChange={e=>setPMinBF(+e.target.value||1)}
-                style={{width:44,padding:'4px 6px',borderRadius:5,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:9,textAlign:'center',outline:'none'}}/>
-            </div>
-            <input value={pSearch} onChange={e=>setPSearch(e.target.value)} placeholder="Search…"
-              style={{flex:'0 0 120px',minWidth:80,padding:'5px 9px',borderRadius:6,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:9,outline:'none'}}/>
+          <div style={{display:'flex',gap:5,alignItems:'center',marginBottom:4,flexWrap:'wrap'}}>
+            <input value={pSearch} onChange={e=>setPSearch(e.target.value)} placeholder="Search pitcher…"
+              style={{flex:'0 0 110px',minWidth:80,padding:'5px 9px',borderRadius:6,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:9,outline:'none'}}/>
             <select value={pTeam} onChange={e=>onPTeamChange(e.target.value)}
               style={{fontFamily:mono,fontSize:8,background:'var(--surface2)',color:'var(--text)',border:'1px solid var(--border)',borderRadius:5,padding:'4px 7px',cursor:'pointer'}}>
               {pTeams.map(t=><option key={t} value={t}>{t==='ALL'?'All Teams':t}</option>)}
             </select>
+            {(()=>{const cnt=[pRoleFilter!=='',!pScheduledOnly,pMinBF!==2].filter(Boolean).length;return(
+              <button onClick={()=>setGpFiltersOpen(v=>!v)}
+                style={{padding:'3px 8px',borderRadius:6,cursor:'pointer',fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:9,letterSpacing:.4,
+                  border:`1px solid ${gpFiltersOpen||cnt>0?'var(--accent2)':'var(--border)'}`,
+                  background:gpFiltersOpen?'rgba(245,166,35,.18)':cnt>0?'rgba(245,166,35,.10)':'var(--surface2)',
+                  color:gpFiltersOpen||cnt>0?'var(--accent2)':'var(--text)',display:'flex',alignItems:'center',gap:3}}>
+                <span>{gpFiltersOpen?'✕':'⚙️'}</span>{gpFiltersOpen?'CLOSE':'FILTERS'}
+                {cnt>0&&!gpFiltersOpen&&<span style={{background:'var(--accent2)',color:'#000',borderRadius:8,padding:'0 4px',fontSize:8,fontWeight:900}}>{cnt}</span>}
+              </button>
+            );})()}
           </div>
+          {gpFiltersOpen&&(
+            <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:7,padding:'10px 12px',marginBottom:8,display:'flex',flexWrap:'wrap',gap:8,alignItems:'center',boxShadow:'0 3px 16px rgba(0,0,0,.4)'}}>
+              <PillRow items={[['','All'],['SP','SP'],['RP','RP']]} active={pRoleFilter} onSelect={setPRoleFilter} color='rgba(251,191,36,.2)' activeColor='#fbbf24'/>
+              <button onClick={()=>setPScheduledOnly(v=>!v)}
+                style={{padding:'3px 8px',borderRadius:5,fontSize:10,cursor:'pointer',fontFamily:mono,fontWeight:700,
+                  border:`1px solid ${pScheduledOnly?'#f5a623':'var(--border)'}`,background:pScheduledOnly?'rgba(245,166,35,.15)':'transparent',color:pScheduledOnly?'#f5a623':'var(--muted)'}}>⚾ Scheduled</button>
+              <div style={{display:'flex',alignItems:'center',gap:4}}>
+                <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0}}>Min G:</span>
+                <input type="number" min={1} max={50} value={pMinBF} onChange={e=>setPMinBF(+e.target.value||1)}
+                  style={{width:40,padding:'3px 5px',borderRadius:5,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:9,textAlign:'center',outline:'none'}}/>
+              </div>
+              <button onClick={()=>{setPRoleFilter('');setPScheduledOnly(true);setPMinBF(2);}}
+                style={{padding:'2px 7px',borderRadius:5,border:'1px solid rgba(255,64,32,.3)',background:'rgba(255,64,32,.08)',color:'var(--accent)',fontFamily:mono,fontSize:8,cursor:'pointer'}}>✕ Clear</button>
+            </div>
+          )}
           <div style={{overflowX:'auto'}}>
             <div style={{maxHeight:360,overflowY:'auto',borderRadius:8,border:'1px solid var(--border)'}}>
               <table style={{width:'100%',borderCollapse:'collapse',fontSize:10}}>
@@ -23383,28 +23666,43 @@ function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, on
             style={{padding:'3px 8px',borderRadius:6,fontSize:9,cursor:'pointer',border:'1px solid var(--border)',color:'var(--muted)',background:'transparent',fontFamily:mono,flexShrink:0}}>⬇ CSV</button>
         </div>
         <div style={{display:batterCollapsed?'none':'block'}}>
-          <div style={{display:'flex',gap:5,flexWrap:'nowrap',alignItems:'center',marginBottom:4,overflowX:'auto',WebkitOverflowScrolling:'touch',paddingBottom:2}}>
-            <PillRow items={[['','All'],['L','LHB'],['R','RHB'],['S','SWB']]} active={bHandFilter} onSelect={setBHandFilter}/>
-            <div style={{display:'flex',gap:2}}>
-              {[[bPicksOnly,setBPicksOnly,'🎯','My Picks only'],[bConfirmed,setBConfirmed,'✅','Confirmed lineup only'],[bHideInj,setBHideInj,'🤕','Hide injured']].map(([active,setFn,emoji,tip])=>(
-                <button key={emoji} onClick={()=>setFn(v=>!v)} data-tip={tip}
-                  style={{padding:'3px 7px',borderRadius:5,fontSize:12,cursor:'pointer',flexShrink:0,
-                    border:`1px solid ${active?'var(--accent)':'var(--border)'}`,
-                    background:active?'rgba(232,65,26,.15)':'transparent'}}>{emoji}</button>
-              ))}
-            </div>
-            <div style={{display:'flex',alignItems:'center',gap:4}}>
-              <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0}} data-tip="Minimum games in window">Min G:</span>
-              <input type="number" min={1} max={50} value={bMinGames} onChange={e=>setBMinGames(+e.target.value||1)}
-                style={{width:44,padding:'4px 6px',borderRadius:5,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:9,textAlign:'center',outline:'none'}}/>
-            </div>
-            <input value={bSearch} onChange={e=>setBSearch(e.target.value)} placeholder="Search…"
-              style={{flex:'0 0 120px',minWidth:80,padding:'5px 9px',borderRadius:6,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:9,outline:'none'}}/>
+          <div style={{display:'flex',gap:5,alignItems:'center',marginBottom:4,flexWrap:'wrap'}}>
+            <input value={bSearch} onChange={e=>setBSearch(e.target.value)} placeholder="Search batter…"
+              style={{flex:'0 0 110px',minWidth:80,padding:'5px 9px',borderRadius:6,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:9,outline:'none'}}/>
             <select value={bTeam} onChange={e=>onBTeamChange(e.target.value)}
               style={{fontFamily:mono,fontSize:8,background:'var(--surface2)',color:'var(--text)',border:'1px solid var(--border)',borderRadius:5,padding:'4px 7px',cursor:'pointer'}}>
               {bTeams.map(t=><option key={t} value={t}>{t==='ALL'?'All Teams':t}</option>)}
             </select>
+            {(()=>{const cnt=[bHandFilter!=='',bPicksOnly,bConfirmed,bHideInj,bMinGames!==2].filter(Boolean).length;return(
+              <button onClick={()=>setGbFiltersOpen(v=>!v)}
+                style={{padding:'3px 8px',borderRadius:6,cursor:'pointer',fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:9,letterSpacing:.4,
+                  border:`1px solid ${gbFiltersOpen||cnt>0?'var(--accent2)':'var(--border)'}`,
+                  background:gbFiltersOpen?'rgba(245,166,35,.18)':cnt>0?'rgba(245,166,35,.10)':'var(--surface2)',
+                  color:gbFiltersOpen||cnt>0?'var(--accent2)':'var(--text)',display:'flex',alignItems:'center',gap:3}}>
+                <span>{gbFiltersOpen?'✕':'⚙️'}</span>{gbFiltersOpen?'CLOSE':'FILTERS'}
+                {cnt>0&&!gbFiltersOpen&&<span style={{background:'var(--accent2)',color:'#000',borderRadius:8,padding:'0 4px',fontSize:8,fontWeight:900}}>{cnt}</span>}
+              </button>
+            );})()}
           </div>
+          {gbFiltersOpen&&(
+            <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:7,padding:'10px 12px',marginBottom:8,display:'flex',flexWrap:'wrap',gap:8,alignItems:'center',boxShadow:'0 3px 16px rgba(0,0,0,.4)'}}>
+              <PillRow items={[['','All'],['L','LHB'],['R','RHB'],['S','SWB']]} active={bHandFilter} onSelect={setBHandFilter}/>
+              {[[bPicksOnly,setBPicksOnly,'var(--accent2)','🎯 Picks'],[bConfirmed,setBConfirmed,'#27c97a','✅ Confirmed'],[bHideInj,setBHideInj,'#fb923c','🤕 Hide Inj']].map(([active,setFn,col,label])=>(
+                <button key={label} onClick={()=>setFn(v=>!v)}
+                  style={{padding:'3px 8px',borderRadius:5,fontSize:9,cursor:'pointer',fontFamily:mono,fontWeight:active?700:400,
+                    border:`1px solid ${active?col:'var(--border)'}`,background:active?`${col}22`:'transparent',color:active?col:'var(--muted)'}}>
+                  {label}
+                </button>
+              ))}
+              <div style={{display:'flex',alignItems:'center',gap:4}}>
+                <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0}}>Min G:</span>
+                <input type="number" min={1} max={50} value={bMinGames} onChange={e=>setBMinGames(+e.target.value||1)}
+                  style={{width:40,padding:'3px 5px',borderRadius:5,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:9,textAlign:'center',outline:'none'}}/>
+              </div>
+              <button onClick={()=>{setBHandFilter('');setBPicksOnly(false);setBConfirmed(false);setBHideInj(false);setBMinGames(2);}}
+                style={{padding:'2px 7px',borderRadius:5,border:'1px solid rgba(255,64,32,.3)',background:'rgba(255,64,32,.08)',color:'var(--accent)',fontFamily:mono,fontSize:8,cursor:'pointer'}}>✕ Clear</button>
+            </div>
+          )}
           <div style={{overflowX:'auto'}}>
             <div style={{maxHeight:360,overflowY:'auto',borderRadius:8,border:'1px solid var(--border)'}}>
               <table style={{width:'100%',borderCollapse:'collapse',fontSize:10}}>
@@ -23629,7 +23927,7 @@ function SimTab({ data }) {
       const ps     = parseFloat(r.ps_score  || 0);
       const zf     = parseFloat(r.zone_fit  || 0);
       const boom   = parseFloat(r._boom) || computeBoomScore(sig, zf, iso, simTB, parseFloat(r.weighted_flag_score||0), parseFloat(r.recent_barrel_spike||0), parseInt(r.recent_hr_count||0), parseFloat(r.recent_batter_ahead_pct||0), !!r.hh_precursor, parseFloat(r.primary_pitch_hr_rate||0), parseInt(r.recent_barrels_3d)||0, parseInt(r.recent_hrs_3d)||0, parseFloat(r.recent_avg_bat_speed)||0, parseInt(r.recent_pb_2d)||0);
-      const yard   = computeYardScore(sig, ghr, boom, ps, r.batter_hand||'', r.pitcher_hand||'', parseInt(r.days_rest??1), liveSlot(r.batter_id,r.lineup_slot));
+      const yard   = computeYardScore(sig, ghr, boom, ps, r.batter_hand||'', r.pitcher_hand||'', parseInt(r.days_rest??1), liveSlot(r.batter_id,r.lineup_slot), r._pgLabel||'');
       const pgLabel = r._pgLabel || '';
 
       // ── SimTab hrProb — 638k at-bat data calibrated (June 2026) ──────────────
