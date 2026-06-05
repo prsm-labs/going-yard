@@ -25396,7 +25396,7 @@ export default function App() {
     {key:"home",       label:"🏡 Home"},
     {key:"homeruns",   label:"💥 HR Tracker"},
     {key:"live",       label:"📡 Live"},
-    {key:"matchup",    label:"⚡ Matchups"},
+    {key:"matchup",    label:"📋 Scouting"},
     {key:"stats",      label:"📊 Splits"},
     {key:"powerbi",    label:"🤓 Data"},
     {key:"weather",    label:"🌤️ Weather"},
