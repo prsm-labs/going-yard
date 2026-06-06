@@ -13145,37 +13145,37 @@ function SimLabView({ data }) {
                 width:130,border:`1px solid ${simSearch?'var(--accent2)':'var(--border)'}`,
                 background:'var(--surface2)',color:'var(--text)',outline:'none'}}/>
 
-            {/* FILTERS button with active count badge */}
-            {(()=>{
-              const activeCount=[filterGoneYardSim,filterDueSim,filterDiamondSim,simPicksOnly,
-                simActiveOnly,simInjuredOnly,simHotOnly,filterKeyMatchup,lineupOnly,
-                slBatterHand!=='ALL',slPitcherHand!=='ALL',slFormFilter.size>0,slHideFinal,
-                !!minYard,!!maxYard,!!minSig,!!maxSig,!!minSimTB,!!minOdds,
-                !!minBoom,!!minBrl,!!minZoneFit,!!maxZoneFit,!!minL7EV,!!maxL7EV,
-                !!minHitPct,!!minXbhPct,...[...selBatterGradesSim].map(()=>true)
-              ].filter(Boolean).length;
-              const anyActive=activeCount>0;
-              return(
-                <button onClick={()=>setFiltersOpen(v=>!v)}
-                  style={{padding:'4px 12px',borderRadius:6,cursor:'pointer',
-                    fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,letterSpacing:.6,
-                    border:`1px solid ${filtersOpen||anyActive?'var(--accent2)':'var(--border)'}`,
-                    background:filtersOpen?'rgba(245,166,35,.18)':anyActive?'rgba(245,166,35,.10)':'var(--surface2)',
-                    color:filtersOpen||anyActive?'var(--accent2)':'var(--text)',
-                    display:'flex',alignItems:'center',gap:5,whiteSpace:'nowrap'}}>
-                  <span style={{fontSize:11}}>{filtersOpen?'✕':'⚙️'}</span>
-                  {filtersOpen?'CLOSE':'FILTERS'}
-                  {anyActive&&!filtersOpen&&<span style={{
-                    background:'var(--accent2)',color:'#000',borderRadius:10,
-                    padding:'0 5px',fontSize:8,fontWeight:900,lineHeight:'16px',minWidth:14,textAlign:'center'}}>
-                    {activeCount}
-                  </span>}
-                </button>
-              );
-            })()}
-
-            {/* Pitcher grade buttons — stay outside */}
+            {/* Pitcher grade buttons + FILTERS on same row */}
             <div style={{display:'flex',gap:4,alignItems:'center',marginLeft:'auto',flexWrap:'wrap'}}>
+              {/* FILTERS button — same row as pitcher grades */}
+              {(()=>{
+                const activeCount=[filterGoneYardSim,filterDueSim,filterDiamondSim,simPicksOnly,
+                  simActiveOnly,simInjuredOnly,simHotOnly,filterKeyMatchup,lineupOnly,
+                  slBatterHand!=='ALL',slPitcherHand!=='ALL',slFormFilter.size>0,slHideFinal,
+                  !!minYard,!!maxYard,!!minSig,!!maxSig,!!minSimTB,!!minOdds,
+                  !!minBoom,!!minBrl,!!minZoneFit,!!maxZoneFit,!!minL7EV,!!maxL7EV,
+                  !!minHitPct,!!minXbhPct,...[...selBatterGradesSim].map(()=>true)
+                ].filter(Boolean).length;
+                const anyActive=activeCount>0;
+                return(
+                  <button onClick={()=>setFiltersOpen(v=>!v)}
+                    style={{padding:'4px 10px',borderRadius:6,cursor:'pointer',
+                      fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,letterSpacing:.6,
+                      border:`1px solid ${filtersOpen||anyActive?'var(--accent2)':'var(--border)'}`,
+                      background:filtersOpen?'rgba(245,166,35,.18)':anyActive?'rgba(245,166,35,.10)':'var(--surface2)',
+                      color:filtersOpen||anyActive?'var(--accent2)':'var(--text)',
+                      display:'flex',alignItems:'center',gap:4,whiteSpace:'nowrap'}}>
+                    <span style={{fontSize:11}}>{filtersOpen?'✕':'⚙️'}</span>
+                    {filtersOpen?'CLOSE':'FILTERS'}
+                    {anyActive&&!filtersOpen&&<span style={{
+                      background:'var(--accent2)',color:'#000',borderRadius:10,
+                      padding:'0 5px',fontSize:8,fontWeight:900,lineHeight:'16px',minWidth:14,textAlign:'center'}}>
+                      {activeCount}
+                    </span>}
+                  </button>
+                );
+              })()}
+              <div style={{width:1,height:16,background:'var(--border)',flexShrink:0}}/>
               <button onClick={()=>setSelPitcherGradesSim(new Set())}
                 style={{padding:'3px 8px',borderRadius:6,cursor:'pointer',
                   background:selPitcherGradesSim.size===0?'rgba(255,255,255,.08)':'transparent',
@@ -13356,9 +13356,8 @@ function SimLabView({ data }) {
             ))}
           </div>
 
-          {/* Export current filtered slate — same format as Key Matchups CSV */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
-            <button onClick={async () => {
+          {/* Export CSV — triggered by the ⬇ CSV button in the date row */}
+          <button id="allmatches-csv-trigger" style={{display:'none'}} onClick={async () => {
               // Fetch live box scores for all games in current slate
               const slateGameIds = [...new Set(slate.map(r => r.game_id).filter(Boolean))];
               const slateLiveCache = {};
@@ -13465,7 +13464,6 @@ function SimLabView({ data }) {
               fontFamily: "'DM Mono',monospace", fontSize: 11 }}>
               ⬇ Export CSV ({slate.length})
             </button>
-          </div>
 
           <div className="tw">
             <table>
@@ -19527,6 +19525,19 @@ function MatchupEngineTab() {
             </button>
           );
         })}
+        {/* ⬇ CSV — right-aligned, only shown on All Matchups */}
+        {subTab === 'allmatches' && (
+          <div style={{marginLeft:'auto'}}>
+            <button
+              onClick={()=>document.getElementById('allmatches-csv-trigger')?.click()}
+              style={{display:'flex',alignItems:'center',gap:4,padding:'4px 10px',
+                borderRadius:6,cursor:'pointer',border:'1px solid var(--border)',
+                background:'var(--surface2)',color:'var(--muted)',
+                fontFamily:"'DM Mono',monospace",fontSize:10,whiteSpace:'nowrap'}}>
+              ⬇ CSV
+            </button>
+          </div>
+        )}
       </div>
     )}
 
