@@ -13877,19 +13877,73 @@ function SimLabView({ data }) {
               <div>
                 {/* Header card */}
                 <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 16px', marginBottom: 14, borderLeft: `3px solid ${gc.color}` }}>
-                  {/* HR Upside verdict in Deep Dive */}
-                  {(()=>{const u=computeHRUpside(b);return(
-                    <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
-                      <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:11,
-                        color:u.color,letterSpacing:.6,padding:'2px 8px',borderRadius:5,
-                        background:`${u.color}18`,border:`1px solid ${u.color}44`}}>
-                        HR UPSIDE: {u.label}
-                      </span>
-                      <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)'}}>
-                        {u.lit}/{u.total} conditions met
-                      </span>
-                    </div>
-                  );})()}
+                  {/* HR Upside full checklist card in Deep Dive */}
+                  {(()=>{
+                    const ev7    = parseFloat(b.recent_avg_ev)||0;
+                    const brlPct = parseFloat(b.recent_barrel_pct)||0;
+                    const la7    = parseFloat(b.recent_avg_la)||0;
+                    const fb7    = parseFloat(b.recent_fb_pct)||0;
+                    const pbPct  = parseFloat(b.recent_pulled_barrel_pct)||0;
+                    const zf     = parseFloat(b.zone_fit)||0;
+                    const ph     = (b.pitcher_hand||'').toUpperCase()[0];
+                    const bh     = (b.batter_hand||'').toUpperCase()[0];
+                    const pBrl   = parseFloat(b.pitcher_barrel_pct_allowed)||0;
+                    const hrFact = parseFloat(b.hr_factor)||100;
+                    const windOk = b.wind_effect && b.wind_effect!=='N/A' &&
+                                   (b.wind_effect.includes('Out')||b.wind_effect.includes('Help')||b.wind_effect.includes('Boost'));
+                    const platoon = (ph==='L'&&(bh==='R'||bh==='S'))||(ph==='R'&&(bh==='L'||bh==='S'));
+                    const checks = [
+                      {label:'Barrel% 8%+',   ok:brlPct>=8,                val:`${brlPct.toFixed(1)}%`,   tip:'Elite barrel rate — hard contact at optimal angle'},
+                      {label:'EV 92+ mph',    ok:ev7>=92,                  val:`${ev7.toFixed(1)}`,        tip:'Exit velocity above HR threshold'},
+                      {label:'LA 22-32°',     ok:la7>=22&&la7<=32,         val:la7>0?`${la7.toFixed(1)}°`:'—', tip:'Optimal HR launch angle window'},
+                      {label:'Pull FB%',      ok:pbPct>=6||fb7>=35,        val:pbPct>0?`↙${pbPct.toFixed(0)}%`:`FB${fb7.toFixed(0)}%`, tip:'Pull-side flyball tendency'},
+                      {label:'Zone Fit 70%+', ok:zf>=70,                   val:`${zf.toFixed(0)}%`,        tip:'Pitcher throws to batter power zones'},
+                      {label:'Platoon Adv',   ok:platoon,                  val:platoon?'✓':'—',            tip:'Favorable handedness matchup'},
+                      {label:'P Gives Brls',  ok:pBrl>=6,                  val:pBrl>0?`${pBrl.toFixed(1)}%`:'—', tip:'Pitcher allows barrels regularly'},
+                      {label:'Park / Wind',   ok:hrFact>=105||windOk,      val:(()=>{const hf=parseFloat(b.hr_factor);if(!hf||hf<=0)return windOk?'✓':'—';const d=Math.round(hf-100);return d>0?`+${d}%`:d===0?'Neutral':`${d}%`;})(), tip:'Park factor or wind favors HRs'},
+                    ];
+                    const lit = checks.filter(ch=>ch.ok).length;
+                    const label = lit>=7?'ELITE':lit>=5?'STRONG':lit>=3?'GOOD':'BELOW AVG';
+                    const uColor = lit>=7?'#ff4020':lit>=5?'#f5a623':lit>=3?'#27c97a':'var(--muted)';
+                    return(
+                      <div style={{background:'var(--surface)',border:`1px solid ${uColor}33`,
+                        borderRadius:9,padding:'12px 14px',marginBottom:12}}>
+                        {/* Header row */}
+                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+                          <span style={{fontFamily:"'DM Mono',monospace",fontSize:8,
+                            color:'var(--muted)',textTransform:'uppercase',letterSpacing:1}}>
+                            HR CHECKLIST
+                          </span>
+                          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:12,
+                            color:uColor,letterSpacing:.5}}>
+                            {label} · {lit}/{checks.length}
+                          </span>
+                        </div>
+                        {/* 2-column grid of conditions */}
+                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'5px 14px'}}>
+                          {checks.map(ch=>(
+                            <div key={ch.label} title={ch.tip}
+                              style={{display:'flex',alignItems:'center',gap:6,padding:'3px 0',
+                                borderBottom:'1px solid rgba(255,255,255,.04)'}}>
+                              <span style={{fontSize:11,flexShrink:0,
+                                color:ch.ok?'#27c97a':'rgba(255,255,255,.15)'}}>
+                                {ch.ok?'✅':'○'}
+                              </span>
+                              <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,flex:1,
+                                color:ch.ok?'var(--text)':'var(--muted)',fontWeight:ch.ok?600:400}}>
+                                {ch.label}
+                              </span>
+                              <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,flexShrink:0,
+                                fontWeight:ch.ok?700:400,
+                                color:ch.ok?'#27c97a':'rgba(255,255,255,.2)'}}>
+                                {ch.val}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
