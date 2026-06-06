@@ -12695,7 +12695,7 @@ function LongShotView({ data }) {
     <div>
 
       <div style={{display:'flex',gap:6,marginBottom:10,flexWrap:'wrap',alignItems:'center'}}>
-        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search batter…"
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search batter or team…"
           style={{padding:'4px 10px',borderRadius:6,fontSize:10,fontFamily:mono,width:130,outline:'none',
             border:`1px solid ${search?'var(--accent2)':'var(--border)'}`,background:'var(--surface2)',color:'var(--text)'}}/>
         <select value={teamFilter} onChange={e=>setTeamFilter(e.target.value)}
@@ -13045,7 +13045,7 @@ function SimLabView({ data }) {
       .filter(r => { const _s = Math.round(sigCache.current[String(r.batter_id)] ?? (parseFloat(r.weighted_flag_score)||0)*4.6); return (!minSig || _s >= parseFloat(minSig)) && (!maxSig || _s <= parseFloat(maxSig)); })
       .filter(r => !minSimTB  || (parseFloat(r.sim_tb)||0)   >= parseFloat(minSimTB))
       .filter(r => !minOdds   || (() => { const d = HR_ODDS_MAP[String(parseInt(r.batter_id)||0)]; return d?.implied && (d.implied * 100) >= parseFloat(minOdds); })())
-      .filter(r => !simSearch || (r.batter||'').toLowerCase().includes(simSearch.toLowerCase()));
+      .filter(r => !simSearch || (r.batter||'').toLowerCase().includes(simSearch.toLowerCase()) || (r.batting_team||r.team||'').toLowerCase().includes(simSearch.toLowerCase()));
     const mul = sortDir === 'desc' ? -1 : 1;
     const sorted = [...filtered].sort((a, b) => {
       if (sortBy === '_boom') {
@@ -13113,10 +13113,12 @@ function SimLabView({ data }) {
   return (
     <div>
       {/* Inner view toggle */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 16, padding: '3px', background: 'var(--surface)', borderRadius: 8, border: '1px solid var(--border)', width: 'fit-content' }}>
-        <button style={vBtn('slate', '📊 Slate')} onClick={() => setView('slate')}>📊 Slate Rankings</button>
-        <button style={vBtn('deepdive', '🔬')} onClick={() => setView('deepdive')}>🔬 Deep Dive</button>
-        {/* Prop Match hidden — too bulky, not required */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 16, alignItems:'center' }}>
+        <div style={{ display: 'flex', gap: 4, padding: '3px', background: 'var(--surface)', borderRadius: 8, border: '1px solid var(--border)' }}>
+          <button style={vBtn('slate', '📊 Slate')} onClick={() => setView('slate')}>📊 Slate Rankings</button>
+          <button style={vBtn('deepdive', '🔬')} onClick={() => setView('deepdive')}>🔬 Deep Dive</button>
+        </div>
+        <CheatCodeButton/>
       </div>
 
       {/* ── SLATE RANKINGS ── */}
@@ -13345,9 +13347,6 @@ function SimLabView({ data }) {
 
             </div>
           )}
-
-          {/* ⚡ The Sauce */}
-          <div style={{display:'flex',alignItems:'center',marginBottom:4}}><CheatCodeButton/></div>
 
           {/* Hidden PitcherCard renders to populate simPitcherGrades cache */}
           <div style={{ display: 'none' }}>
@@ -19489,17 +19488,17 @@ function MatchupEngineTab() {
       ['Legend', "A+ = 6–8 flags (highest HR rate) · A = 4–5 · B = 2–3 · C = 1 · D = 0 flags."],
     ]} onClose={()=>setShowKMHelp(false)}/>}
     <div style={{display:'flex',flexDirection:'column',gap:4,marginBottom:14}}>
-      {/* Row 1 */}
+      {/* Row 1: main scoring tabs */}
       <div style={{display:'flex',gap:4,flexWrap:'wrap',justifyContent:'center'}}>
         <button style={stBtn('matchups')}   onClick={()=>setSubTab('matchups')}>⚡ Key Matchups</button>
         <button style={stBtn('allmatches')} data-subtab="allmatches" onClick={()=>setSubTab('allmatches')}>📋 All Matchups</button>
         <button style={stBtn('longshot')}   onClick={()=>setSubTab('longshot')}>🎲 Long Shot</button>
-        <button style={stBtn('history')}    onClick={()=>setSubTab('history')}>📜 BvP History</button>
       </div>
-      {/* Row 2 */}
+      {/* Row 2: supporting tools */}
       <div style={{display:'flex',gap:4,flexWrap:'wrap',justifyContent:'center'}}>
         <button style={stBtn('batters')}   onClick={()=>setSubTab('batters')}>🧢 Batters</button>
         <button style={stBtn('pitchers')}  onClick={()=>setSubTab('pitchers')}>⚾ Pitchers</button>
+        <button style={stBtn('history')}   onClick={()=>setSubTab('history')}>📜 BvP History</button>
         <HelpBtn onClick={()=>setShowKMHelp(v=>!v)}/>
       </div>
     </div>
