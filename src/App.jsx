@@ -1905,6 +1905,7 @@ function MatchupCard({ dp }) {
             ['⚡ Sig',  sig>0?sig:'—',               sigColor],
             ['P.Grade', pgLabel.split(' ')[0],        pgColor],
             ['Form',    fc?fc.short:'—',              fc?fc.color:'var(--muted)'],
+            ['HR⬆', (()=>{const u=computeHRUpside(dp);return u.label==='BELOW AVG'?'LOW':u.label==='STRONG'?'STR':u.label;})(), (()=>{const u=computeHRUpside(dp);return u.color;})()],
             ['Sim TB',  simTB>0?simTB.toFixed(2):'—','var(--text)'],
             ['gHR',     ghr>0?Math.round(ghr):'—',   ghr>=70?'#ff4020':ghr>=50?'#f5a623':'var(--muted)'],
             ['L7 ISO',  iso>0?iso.toFixed(3):'—',     iso>=0.25?'#ff8020':iso>=0.18?'#f5a623':'var(--muted)'],
@@ -3952,6 +3953,14 @@ async function fetchGames(setL, setG, setE, silent=false) {
       outs:   ls.outs ?? null,
     },
         venue,
+        // TV broadcast networks
+        broadcasts: (() => {
+          const bcast = g.broadcasts || [];
+          return bcast
+            .filter(b => b.type !== 'MLB' && b.name !== 'MLB.TV' && b.name !== 'Peacock')
+            .map(b => b.name || b.callSign || '')
+            .filter(Boolean).slice(0, 3).join(', ');
+        })(),
         gameTime: (() => {
           // Game start time in ET
           const gt = g.gameDate || g.gameTime || "";
@@ -3999,9 +4008,25 @@ async function fetchGames(setL, setG, setE, silent=false) {
       }
     });
     setG(games);
-    // Populate module-level cache so slideouts can look up game status by team
     LIVE_GAMES_CACHE.length = 0;
     LIVE_GAMES_CACHE.push(...games);
+    // Enrich with broadcast data if not already in API response
+    if (games.some(g => !g.broadcasts)) {
+      const etDate2 = new Date().toLocaleDateString("en-US",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"});
+      const [m2,d2,y2] = etDate2.split("/");
+      const td2 = `${y2}-${m2}-${d2}`;
+      fetch(`https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${td2}&hydrate=broadcasts,team&gameType=R`)
+        .then(r=>r.json()).then(bData=>{
+          const bGames = bData?.dates?.[0]?.games||[];
+          const bMap = {};
+          bGames.forEach(bg=>{
+            const bc=(bg.broadcasts||[]).filter(b=>b.type!=='MLB'&&b.name!=='MLB.TV'&&b.name!=='Peacock').map(b=>b.name||'').filter(Boolean).slice(0,3).join(', ');
+            bMap[String(bg.gamePk)]=bc;
+          });
+          const enriched=games.map(g=>({...g,broadcasts:bMap[String(g.gamePk)]||g.broadcasts||''}));
+          setG(enriched); LIVE_GAMES_CACHE.length=0; LIVE_GAMES_CACHE.push(...enriched);
+        }).catch(()=>{});
+    }
     // Kick off a CC poll immediately now that we have live games
     pollLiveCloseCalls();
   } catch (e) {
@@ -4802,19 +4827,23 @@ function LRow({b, rank}) {
       const abPerHR  = cp?.abPerHR && cp.abPerHR < 99
         ? Math.round(cp.abPerHR)
         : (cp?.hr > 0 ? Math.round((cp.pa || cp.ab || 1) / cp.hr) : null);
-      // abSinceHR — from real window data, then daysSinceHR * 3.8 estimate
-      const abSinceHR = cp?.windows?.last7?.abSinceHR != null
-        ? cp.windows.last7.abSinceHR
-        : cp?.daysSinceHR != null
-          ? Math.round(cp.daysSinceHR * 3.8)
-          : null;
+      const dp = DAILY_PICKS_CACHE[String(b.id)];
+      // ab_since_hr from engine (real count) — never use daysSinceHR*3.8 estimate
+      const abSinceHR = dp?.ab_since_hr!=null && parseInt(dp.ab_since_hr)>=0
+        ? parseInt(dp.ab_since_hr)
+        : cp?.windows?.last7?.abSinceHR != null ? cp.windows.last7.abSinceHR : null;
+      const zf = parseFloat(dp?.zone_fit)||0;
       const due = abSinceHR!=null && abPerHR!=null && abSinceHR > abPerHR*1.15;
       return <div className="lmini">
-        <div className="lms"><div className="lmsv" style={{color:brl>=10?'#ff8020':brl>=6?'var(--accent2)':'var(--text)'}}>{brl>0?brl.toFixed(0)+'%':'—'}</div><div className="lmsl">Brl</div></div>
-        <div className="lms"><div className="lmsv" style={{color:fb>=30?'#ff8020':fb>=22?'var(--accent2)':'var(--text)'}}>{fb>0?fb.toFixed(0)+'%':'—'}</div><div className="lmsl">FB%</div></div>
+        <div className="lms"><div className="lmsv" style={{color:brl>=10?'#ff8020':brl>=6?'var(--accent2)':'var(--text)'}}>{brl>0?brl.toFixed(0)+'%':'—'}</div><div className="lmsl">Brl%</div></div>
         <div className="lms"><div className="lmsv" style={{color:ev>=T.EV_HH?'#ff8020':'var(--text)'}}>{ev>0?ev.toFixed(0):'—'}</div><div className="lmsl">EV</div></div>
         <div className="lms"><div className="lmsv" style={{color:abPerHR&&abPerHR<=18?'#ff8020':abPerHR&&abPerHR<=25?'#ffc840':'var(--text)'}}>{abPerHR||'—'}</div><div className="lmsl">AB/HR</div></div>
-        <div className="lms" style={{background:due?'rgba(56,184,242,.1)':undefined}}><div className="lmsv" style={{color:due?'var(--ice)':abSinceHR!=null&&abSinceHR>=5?'#ffc840':'var(--text)'}}>{abSinceHR!=null?abSinceHR:'—'}</div><div className="lmsl">Since HR</div></div>
+        <div className="lms" style={{background:due?'rgba(56,184,242,.1)':undefined}}>
+          <div className="lmsv" style={{color:due?'var(--ice)':abSinceHR!=null&&abSinceHR>=10?'#ffc840':'var(--text)'}}>
+            {abSinceHR!=null?abSinceHR:'—'}
+          </div><div className="lmsl">AB Since</div>
+        </div>
+        <div className="lms"><div className="lmsv" style={{color:zf>=80?'#27c97a':zf>=65?'var(--accent2)':'var(--muted)'}}>{zf>0?zf.toFixed(0)+'%':'—'}</div><div className="lmsl">ZF%</div></div>
       </div>;
     })()}
   </div>;
@@ -5113,6 +5142,13 @@ function GCard({game}) {
             {isLive ? (game.inning||'Live') : isFin ? 'Final' : (game.gameTime ? game.gameTime+' ET' : 'Upcoming')}
           </span>
         </div>
+        {/* TV network */}
+        {game.broadcasts && (
+          <span style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.35)',
+            textTransform:'uppercase',letterSpacing:.5,display:'flex',alignItems:'center',gap:4}}>
+            <span style={{fontSize:9,opacity:.6}}>📺</span>{game.broadcasts}
+          </span>
+        )}
         <span style={{fontFamily:mono,fontSize:10,color:'rgba(255,255,255,.25)'}}>
           {exp ? '▴' : '▾'}
         </span>
@@ -12301,6 +12337,32 @@ function computeEffectiveGrade(batterGrade, pgLabel) {
 //
 // New field sources: barrel_spike, recent_hr_count, recent_batter_ahead_pct,
 //   hh_precursor, primary_pitch_hr_rate — all from daily_picks.csv
+
+// ── HR UPSIDE — shared computation, used in table, slideout, and deep dive ──
+// Returns { label:'ELITE'|'STRONG'|'GOOD'|'BELOW AVG', color, lit, total }
+function computeHRUpside(b) {
+  const ev7     = parseFloat(b.recent_avg_ev)||0;
+  const brlPct  = parseFloat(b.recent_barrel_pct)||0;
+  const la7     = parseFloat(b.recent_avg_la)||0;
+  const fb7     = parseFloat(b.recent_fb_pct)||0;
+  const pbPct   = parseFloat(b.recent_pulled_barrel_pct)||0;
+  const zf      = parseFloat(b.zone_fit)||0;
+  const ph      = (b.pitcher_hand||'').toUpperCase()[0];
+  const bh      = (b.batter_hand||'').toUpperCase()[0];
+  const pBarrel = parseFloat(b.pitcher_barrel_pct_allowed)||0;
+  const hrFact  = parseFloat(b.hr_factor)||100;
+  const windOk  = b.wind_effect && b.wind_effect!=='N/A' &&
+                  (b.wind_effect.includes('Out')||b.wind_effect.includes('Help')||b.wind_effect.includes('Boost'));
+  const platoon = (ph==='L'&&(bh==='R'||bh==='S'))||(ph==='R'&&(bh==='L'||bh==='S'));
+  const lit = [
+    brlPct>=8, ev7>=92, la7>=22&&la7<=32,
+    pbPct>=6||fb7>=35, zf>=70, platoon, pBarrel>=6, hrFact>=105||windOk
+  ].filter(Boolean).length;
+  const label = lit>=7?'ELITE':lit>=5?'STRONG':lit>=3?'GOOD':'BELOW AVG';
+  const color = lit>=7?'#ff4020':lit>=5?'#f5a623':lit>=3?'#27c97a':'var(--muted)';
+  return { label, color, lit, total:8 };
+}
+
 function computeBoomScore(sig, zoneFit, iso, simTB, engineScore,
   barrelSpike, recentHRCount, batterAheadPct, hhPrecursor, pitchVulnRate,
   dayLateBarrels, dayLateHRs, recentBatSpeed, dayLatePulled) {
@@ -12558,103 +12620,51 @@ function LongShotView({ data }) {
   const rows = React.useMemo(() => {
     const out = [];
     for (const b of (data||[])) {
-
-      // ── GATE 1: Strictly C or D grade only ─────────────────────────────────
-      // Hard wall — no B batters regardless of pitcher or signals
+      // ── GATE 1: Strictly C or D grade only ───────────────────────────────
       const grade = (b.grade||'').trim();
       if (!['C','D'].includes(grade)) continue;
-
-      // ── GATE 2: Pitcher grade — not ‼️ Elite ───────────────────────────────
-      // Even the best C/D batter can't overcome an Elite arm
-      // Allow Target/Hittable/Average/Tough — fade only Elite
+      // ── GATE 2: Not ‼️ Elite pitcher ─────────────────────────────────────
       const pid2    = String(parseInt(b.pitcher_id)||0);
       const pgLabel = pitcherGradeCache.current[pid2] || b._pgLabel || b.pitcher_grade_label || '';
       if (pgLabel) b._pgLabel = pgLabel;
-      const isElite = pgLabel.includes('‼️') || pgLabel.toLowerCase().includes('elite');
-      if (isElite) continue;
-
-      // ── UNIFIED SCORING: same computeBoomScore + computeYardScore as AllMatchups ──
-      // Eliminates the score discrepancy between tables.
-      // LongShot was previously using a hand-coded _sig loop that diverged from
-      // the calibrated scoring system. Now both tables show identical scores.
-      const _simTB  = parseFloat(b.sim_tb)||0;
-      const _simHR  = parseFloat(b.sim_hr_adj)||0;
-      const _bvpFB  = parseFloat(b.bvp_fb_pct)||0;
-      const _recEV  = parseFloat(b.recent_avg_ev)||0;
-      const _recLA  = parseFloat(b.recent_avg_la)||0;
-      const _recFB  = parseFloat(b.recent_fb_pct)||0;
-      const _bvpLA  = parseFloat(b.bvp_avg_la)||0;
-      const _flags  = parseInt(b.total_flags)||0;
-      const _temp   = parseFloat(b.temp)||0;
-      const _iso    = parseFloat(b.recent_iso)||0;
-      const _zf     = parseFloat(b.zone_fit)||0;
-      const _kHR    = parseFloat(b.gHR)||0;
-      const _formClass = getFormClass(b);
-
-      // Use same sig computation as AllMatchups (weighted_flag_score path)
-      const _sig = Math.min(14, Math.max(0,
-        Math.round((parseFloat(b.weighted_flag_score)||0) * 4.6)
-      ));
-
-      const _boom = computeBoomScore(
-        _sig, b.zone_fit, b.recent_iso, _simTB, b.weighted_flag_score,
-        parseFloat(b.recent_barrel_spike||0), parseInt(b.recent_hr_count||0),
-        parseFloat(b.recent_batter_ahead_pct||0), !!b.hh_precursor,
-        parseFloat(b.primary_pitch_hr_rate||0),
+      if (pgLabel.includes('‼️') || pgLabel.toLowerCase().includes('elite')) continue;
+      // ── UNIFIED SCORING — same as AllMatchups ─────────────────────────────
+      const _sig = Math.min(14, Math.max(0, Math.round((parseFloat(b.weighted_flag_score)||0) * 4.6)));
+      const _boom = computeBoomScore(_sig, b.zone_fit, b.recent_iso, parseFloat(b.sim_tb)||0, b.weighted_flag_score,
+        parseFloat(b.recent_barrel_spike||0), parseInt(b.recent_hr_count||0), parseFloat(b.recent_batter_ahead_pct||0),
+        !!b.hh_precursor, parseFloat(b.primary_pitch_hr_rate||0),
         parseInt(b.recent_barrels_3d)||0, parseInt(b.recent_hrs_3d)||0,
-        parseFloat(b.recent_avg_bat_speed)||0, parseInt(b.recent_pb_2d)||0
-      );
-
+        parseFloat(b.recent_avg_bat_speed)||0, parseInt(b.recent_pb_2d)||0);
       const _ps   = parseFloat(b.ps_score)||0;
-      const _yard = computeYardScore(
-        _sig, _kHR, _boom, _ps,
-        b.batter_hand||'', b.pitcher_hand||'',
-        parseInt(b.days_rest??1),
-        liveSlot(b.batter_id, b.lineup_slot),
-        pgLabel
-      );
-
-      // ── GATE 3: Must clear a minimum Yard Score threshold ──────────────────
-      // C/D batters with no signal whatsoever shouldn't appear.
-      // Based on tracker data: C/D batters who went yard averaged Yard ~22.
-      // Set floor at 10 to catch genuine long shots without noise.
+      const _yard = computeYardScore(_sig, parseFloat(b.gHR)||0, _boom, _ps,
+        b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1),
+        liveSlot(b.batter_id, b.lineup_slot), pgLabel);
+      // ── GATE 3: Minimum Yard Score ─────────────────────────────────────────
       if (_yard < 10) continue;
-
-      // ── GATE 4: Must have at least ONE "steals the show" signal ────────────
-      // This is what separates a real long shot from just a weak batter.
-      // Validated signals from 639k row analysis:
-      const brlPct    = parseFloat(b.recent_barrel_pct)||0;
-      const brl3d     = parseInt(b.recent_barrels_3d)||0;
-      const hrs3d     = parseInt(b.recent_hrs_3d)||0;
-      const pb2d      = parseInt(b.recent_pb_2d)||0;
-      const batSpeed  = parseFloat(b.recent_avg_bat_speed)||0;
-      const hrCount7  = parseInt(b.recent_hr_count)||0;
-
+      // ── GATE 4: Must have at least one live signal ─────────────────────────
+      const brlPct  = parseFloat(b.recent_barrel_pct)||0;
+      const brl3d   = parseInt(b.recent_barrels_3d)||0;
+      const hrs3d   = parseInt(b.recent_hrs_3d)||0;
+      const pb2d    = parseInt(b.recent_pb_2d)||0;
+      const batSpeed= parseFloat(b.recent_avg_bat_speed)||0;
+      const hrCount7= parseInt(b.recent_hr_count)||0;
+      const _zf     = parseFloat(b.zone_fit)||0;
       const hasSignal = (
-        (brl3d >= 2 && hrs3d === 0)          || // Day Late — 1.24x lift
-        (brl3d >= 2 && hrs3d === 0 && pb2d >= 1) || // Enhanced Day Late — 1.66x
-        brlPct >= 8                           || // Elite barrel rate
-        batSpeed >= 74                        || // Strong bat speed — 2x baseline
-        _zf >= 70                             || // Zone fit — pitcher throws to power zones
-        hrCount7 >= 2                         || // Hot recent bat
-        _recEV >= 97                          || // Elite exit velocity
-        (pgLabel === '🎯 Target' && _boom >= 35)  // Soft pitcher + decent Boom
+        (brl3d >= 2 && hrs3d === 0) || brlPct >= 8 || batSpeed >= 74 ||
+        _zf >= 70 || hrCount7 >= 2 || (parseFloat(b.recent_avg_ev)||0) >= 97 ||
+        (pgLabel === '🎯 Target' && _boom >= 35)
       );
       if (!hasSignal) continue;
-
-      // Write to picks cache
-      const _lsCache = DAILY_PICKS_CACHE[String(b.batter_id)];
-      if (_lsCache && !_lsCache._trackerSig) _lsCache._trackerSig = _sig;
-      if (_lsCache && !_lsCache._boom)       _lsCache._boom = _boom;
-      if (_lsCache && !_lsCache._pgLabel)    _lsCache._pgLabel = pgLabel;
-
-      out.push({ ...b, _pgLabel:pgLabel, _simHR, _simTB, _bvpFB, _recEV,
-        _bvpLA, _recLA, _recFB, _flags, _temp, _sig, _formClass, _kHR, _iso, _zf,
-        _boom, _ps, _yard,
+      out.push({ ...b, _pgLabel:pgLabel,
+        _simHR: parseFloat(b.sim_hr_adj)||0, _simTB: parseFloat(b.sim_tb)||0,
+        _bvpFB: parseFloat(b.bvp_fb_pct)||0, _recEV: parseFloat(b.recent_avg_ev)||0,
+        _bvpLA: parseFloat(b.bvp_avg_la)||0, _recLA: parseFloat(b.recent_avg_la)||0,
+        _recFB: parseFloat(b.recent_fb_pct)||0, _flags: parseInt(b.total_flags)||0,
+        _sig, _boom, _ps, _yard, _kHR: parseFloat(b.gHR)||0,
+        _brl: brlPct, _zf,
+        _formClass: getFormClass(b),
         _hrYest: parseInt(b.hr_yesterday||0),
-        _brl: brlPct,
-        _bsD: parseFloat(b.bat_speed_vs_baseline)||null,
-        _hrPct: parseFloat(b.proj_hr_adj)||parseFloat(b.sim_hr)||0
+        _hrPct: parseFloat(b.proj_hr_adj)||parseFloat(b.sim_hr)||0,
       });
     }
     return out;
@@ -12695,7 +12705,7 @@ function LongShotView({ data }) {
     <div>
 
       <div style={{display:'flex',gap:6,marginBottom:10,flexWrap:'wrap',alignItems:'center'}}>
-        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search batter or team…"
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search batter…"
           style={{padding:'4px 10px',borderRadius:6,fontSize:10,fontFamily:mono,width:130,outline:'none',
             border:`1px solid ${search?'var(--accent2)':'var(--border)'}`,background:'var(--surface2)',color:'var(--text)'}}/>
         <select value={teamFilter} onChange={e=>setTeamFilter(e.target.value)}
@@ -12731,7 +12741,7 @@ function LongShotView({ data }) {
           border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--muted)'}}>
           ⬇ CSV
         </button>
-        <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{filtered.length} C/D grade long shots with live signal</span>
+        <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{filtered.length} long shots</span>
       </div>
       {/* Hidden PitcherCards — populate grade cache with real ERA/K9/WHIP grades */}
       <div style={{display:'none'}}>
@@ -12775,7 +12785,6 @@ function LongShotView({ data }) {
             <Th k="_bvpFB"  label="BvP FB%"/>
             <Th k="_recEV"  label="EV"/>
             <Th k="_bsD"    label="BS Δ" title="Bat Speed Δ vs season baseline (mph) — green = trending up" data-tip="Bat Speed Δ vs season baseline (mph) — green = trending up"/>
-            <Th k="_brl"    label="Brl%" title="L7 Barrel% — 8%+ = elite, 12%+ = primed"/>
                         <Th k="_pgLabel" label="P Grade" title="Pitcher Grade: 🎯Target / 💥Hittable / Average / ⚠️Tough / ‼️Elite" data-tip="Pitcher Grade: 🎯Target / 💥Hittable / Average / ⚠️Tough / ‼️Elite"/>
           </tr></thead>
           <tbody>
@@ -12803,6 +12812,18 @@ function LongShotView({ data }) {
                     </td>
                     <td style={{padding:'2px 4px',textAlign:'center',verticalAlign:'middle'}}>
                       <FormBadge formKey={b._formClass}/>
+                    </td>
+                    <td style={{padding:'2px 4px',textAlign:'center',verticalAlign:'middle'}}>
+                      {(()=>{const u=computeHRUpside(b);const short=u.label==='BELOW AVG'?'LOW':u.label==='STRONG'?'STR':u.label==='ELITE'?'ELITE':'GOOD';return(
+                        <span title={`HR Upside: ${u.label} — ${u.lit}/${u.total} conditions met`}
+                          style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:7,
+                            color:u.color,letterSpacing:.3,whiteSpace:'nowrap',
+                            padding:'1px 3px',borderRadius:3,
+                            background:`${u.color}18`,border:`1px solid ${u.color}33`,
+                            cursor:'default'}}>
+                          {short}
+                        </span>
+                      );})()}
                     </td>
                     <td style={{padding:'2px 6px',textAlign:'center',fontFamily:osw,fontWeight:800,fontSize:10}}>
                       {(() => {
@@ -12837,12 +12858,6 @@ function LongShotView({ data }) {
                         const col=d>=1.5?'#27c97a':d>=0.5?'#a8d8a8':d<=-1.5?'#ff4020':d<=-0.5?'#f5a623':'var(--muted)';
                         return <span style={{color:col,fontWeight:700}}>{arrow}{d>=0?'+':''}{d.toFixed(1)}</span>;
                       })()}
-                    </td>
-                    <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,
-                      color:(b._brl||0)>=12?'#ff4020':(b._brl||0)>=8?'#f5a623':(b._brl||0)>=5?'var(--text)':'var(--muted)',
-                      fontWeight:(b._brl||0)>=8?700:400}}
-                      title={`L7 Barrel%: ${(b._brl||0).toFixed(1)}%`}>
-                      {(b._brl||0)>0?(b._brl).toFixed(1)+'%':'—'}
                     </td>
                                         <td style={{padding:'2px 6px',textAlign:'right'}}><span style={{fontFamily:mono,fontSize:9,color:pgColor(b._pgLabel),fontWeight:700}}>{b._pgLabel.split(' ')[0]}</span></td>
                   </tr>
@@ -12927,6 +12942,7 @@ function SimLabView({ data }) {
   const [minHitPct,  setMinHitPct]   = useState('');
   const [minXbhPct,  setMinXbhPct]   = useState('');
   const [filtersOpen,setFiltersOpen] = useState(false);
+  const [selHRUpside,setSelHRUpside]  = useState(new Set());
   const [simSearch,   setSimSearch]    = useState('');  // batter name search
   const [selPitcherGradesSim, setSelPitcherGradesSim] = useState(new Set()); // empty = All
   const [selBatterGradesSim,  setSelBatterGradesSim]  = useState(new Set()); // empty = All grades
@@ -13041,11 +13057,12 @@ function SimLabView({ data }) {
       .filter(r => !maxL7EV   || (parseFloat(r.recent_avg_ev)||0) <= parseFloat(maxL7EV))
       .filter(r => !minHitPct  || (parseFloat(r.proj_hit_prob)||0)*100 >= parseFloat(minHitPct))
       .filter(r => !minXbhPct  || (parseFloat(r.proj_xbh_prob)||0)*100 >= parseFloat(minXbhPct))
+      .filter(r => !selHRUpside?.size || (()=>{ const u=computeHRUpside(r); return selHRUpside.has(u.label); })())
 
       .filter(r => { const _s = Math.round(sigCache.current[String(r.batter_id)] ?? (parseFloat(r.weighted_flag_score)||0)*4.6); return (!minSig || _s >= parseFloat(minSig)) && (!maxSig || _s <= parseFloat(maxSig)); })
       .filter(r => !minSimTB  || (parseFloat(r.sim_tb)||0)   >= parseFloat(minSimTB))
       .filter(r => !minOdds   || (() => { const d = HR_ODDS_MAP[String(parseInt(r.batter_id)||0)]; return d?.implied && (d.implied * 100) >= parseFloat(minOdds); })())
-      .filter(r => !simSearch || (r.batter||'').toLowerCase().includes(simSearch.toLowerCase()) || (r.batting_team||r.team||'').toLowerCase().includes(simSearch.toLowerCase()));
+      .filter(r => !simSearch || (r.batter||'').toLowerCase().includes(simSearch.toLowerCase()));
     const mul = sortDir === 'desc' ? -1 : 1;
     const sorted = [...filtered].sort((a, b) => {
       if (sortBy === '_boom') {
@@ -13070,7 +13087,7 @@ function SimLabView({ data }) {
       return mul * ((parseFloat(a[sortBy]) || 0) - (parseFloat(b[sortBy]) || 0));
     });
     return sorted;
-  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, filterKeyMatchup, minYard, maxYard, minSig, maxSig, minSimTB, minOdds, minBoom, minBrl, minZoneFit, maxZoneFit, minL7EV, maxL7EV, minHitPct, minXbhPct, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal]);
+  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, filterKeyMatchup, minYard, maxYard, minSig, maxSig, minSimTB, minOdds, minBoom, minBrl, minZoneFit, maxZoneFit, minL7EV, maxL7EV, minHitPct, minXbhPct, selHRUpside, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal]);
 
   // Auto-select top batter when data loads
   useEffect(() => {
@@ -13147,14 +13164,13 @@ function SimLabView({ data }) {
 
             {/* Pitcher grade buttons + FILTERS on same row */}
             <div style={{display:'flex',gap:4,alignItems:'center',marginLeft:'auto',flexWrap:'wrap'}}>
-              {/* FILTERS button — same row as pitcher grades */}
               {(()=>{
                 const activeCount=[filterGoneYardSim,filterDueSim,filterDiamondSim,simPicksOnly,
                   simActiveOnly,simInjuredOnly,simHotOnly,filterKeyMatchup,lineupOnly,
                   slBatterHand!=='ALL',slPitcherHand!=='ALL',slFormFilter.size>0,slHideFinal,
                   !!minYard,!!maxYard,!!minSig,!!maxSig,!!minSimTB,!!minOdds,
                   !!minBoom,!!minBrl,!!minZoneFit,!!maxZoneFit,!!minL7EV,!!maxL7EV,
-                  !!minHitPct,!!minXbhPct,...[...selBatterGradesSim].map(()=>true)
+                  !!minHitPct,!!minXbhPct,...[...selBatterGradesSim].map(()=>true),...[...(selHRUpside||new Set())].map(()=>true)
                 ].filter(Boolean).length;
                 const anyActive=activeCount>0;
                 return(
@@ -13218,7 +13234,7 @@ function SimLabView({ data }) {
                     setMinYard('');setMaxYard('');setMinSig('');setMaxSig('');
                     setMinSimTB('');setMinOdds('');setMinBoom('');setMinBrl('');
                     setMinZoneFit('');setMaxZoneFit('');setMinL7EV('');setMaxL7EV('');
-                    setMinHitPct('');setMinXbhPct('');
+                    setMinHitPct('');setMinXbhPct('');setSelHRUpside(new Set());
                   }} style={{padding:'3px 10px',borderRadius:5,border:'1px solid rgba(255,64,32,.3)',
                     background:'rgba(255,64,32,.08)',color:'var(--accent)',
                     fontFamily:"'DM Mono',monospace",fontSize:9,cursor:'pointer',fontWeight:700}}>
@@ -13257,6 +13273,32 @@ function SimLabView({ data }) {
                       {label}
                     </button>
                   ))}
+                </div>
+              </div>
+
+              {/* HR Upside filter */}
+              <div>
+                <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--muted)',
+                  textTransform:'uppercase',letterSpacing:1,marginBottom:7}}>HR Upside</div>
+                <div style={{display:'flex',gap:5,flexWrap:'wrap',alignItems:'center'}}>
+                  {[
+                    ['ELITE',    '#ff4020'], ['STRONG', '#f5a623'],
+                    ['GOOD',     '#27c97a'], ['LOW',    'var(--muted)'],
+                  ].map(([label,col])=>{
+                    const key = label==='LOW'?'BELOW AVG':label;
+                    const active = selHRUpside?.has(key);
+                    return(<button key={label} onClick={()=>setSelHRUpside(prev=>{const next=new Set(prev||[]);active?next.delete(key):next.add(key);return next;})}
+                      style={{padding:'4px 10px',borderRadius:5,cursor:'pointer',
+                        border:`1px solid ${active?col:'var(--border)'}`,
+                        background:active?`${col}22`:'transparent',
+                        color:active?col:'var(--muted)',
+                        fontFamily:"'Oswald',sans-serif",fontWeight:active?800:500,fontSize:10}}>
+                      {label}
+                    </button>);
+                  })}
+                  {(selHRUpside?.size||0)>0&&<span onClick={()=>setSelHRUpside(new Set())}
+                    style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+                      cursor:'pointer',textDecoration:'underline',marginLeft:4}}>clear</span>}
                 </div>
               </div>
 
@@ -13356,7 +13398,7 @@ function SimLabView({ data }) {
             ))}
           </div>
 
-          {/* Export CSV — triggered by the ⬇ CSV button in the date row */}
+          {/* Export CSV — triggered by ⬇ CSV button in date row */}
           <div style={{display:'none'}}>
           <button id="allmatches-csv-trigger" onClick={async () => {
               // Fetch live box scores for all games in current slate
@@ -13421,7 +13463,7 @@ function SimLabView({ data }) {
                 return [b.grade, pitcherGrade, gy?'YES':'', isKM, b.batting_team, b.batter, b.batter_hand,
                   b.pitcher_hand||'', b.pitcher, b.top_pitches, b.game_time,
                   // Computed columns — between Game Time and Flags
-                  (b._yard ?? computeYardScore(sigCache.current[String(bid)]||0, parseFloat(b.gHR)||0, boomCache.current[String(bid)]||0, b._ps||(parseFloat(b.ps_score)||0), b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1), liveSlot(bid,b.lineup_slot), b._pgLabel||'')),
+                  (b._yard ?? computeYardScore(sigCache.current[String(bid)]||0, parseFloat(b.gHR)||0, boomCache.current[String(bid)]||0, b._ps||(parseFloat(b.ps_score)||0), b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1), liveSlot(bid,b.lineup_slot), b._pgLabel||''),
                   sigCache.current[String(bid)] ?? '',
                   boomCache.current[String(bid)] ?? '',
                   (() => { const fc = getFormClass(b); return fc && FORM_CLASSES[fc] ? FORM_CLASSES[fc].short.replace(/[💥🥶💨🪱🎯🎩🌙]/gu,'').trim() : ''; })(),
@@ -13477,6 +13519,7 @@ function SimLabView({ data }) {
                     { label: (<img src="/icon-192.png" alt="Yard" style={{width:15,height:15,borderRadius:2,objectFit:'cover',verticalAlign:'middle',display:'inline-block'}}/>), key: '_yard', colKey: '_yard' },
                     { label: '⚡',       key: '_sig', colKey:'_sig' },
                     { label: 'Form',     key: null },
+                    { label: 'HR⬆',      key: null },
                     { label: 'P.Grade',  key: null },
                     { label: 'vs Pitcher',key: null },
                     /* HR% (proj_hr_adj) removed — inflated by small BvP samples */
@@ -13816,23 +13859,7 @@ function SimLabView({ data }) {
       {/* ── DEEP DIVE ── */}
       {view === 'deepdive' && (
         <div>
-          {/* Batter selector */}
-          <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-            <select value={selBatter ? `${selBatter.batter_id}|${selBatter.game_id}` : ''}
-              onChange={e => {
-                const [bid, gid] = e.target.value.split('|');
-                const found = data.find(r => String(r.batter_id) === bid && String(r.game_id) === gid);
-                if (found) setSelBatter(found);
-              }}
-              style={{ flex: '1 1 220px', padding: '8px 12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontFamily: "'DM Mono',monospace", fontSize: 12, cursor: 'pointer' }}>
-              {[...data].sort((a, b) => (parseFloat(b.proj_hr_adj) || 0) - (parseFloat(a.proj_hr_adj) || 0))
-                .map(b => (
-                  <option key={`${b.batter_id}|${b.game_id}`} value={`${b.batter_id}|${b.game_id}`}>
-                    {b.batter} ({b.batting_team}) vs {b.pitcher} · {pctRaw(b.proj_hr_adj).toFixed(1)}% HR
-                  </option>
-                ))}
-            </select>
-          </div>
+          {/* Batter selector removed — click row in Slate Rankings to open Deep Dive */}
 
           {selBatter && (() => {
             const b = selBatter;
@@ -13850,6 +13877,19 @@ function SimLabView({ data }) {
               <div>
                 {/* Header card */}
                 <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 16px', marginBottom: 14, borderLeft: `3px solid ${gc.color}` }}>
+                  {/* HR Upside verdict in Deep Dive */}
+                  {(()=>{const u=computeHRUpside(b);return(
+                    <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+                      <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:11,
+                        color:u.color,letterSpacing:.6,padding:'2px 8px',borderRadius:5,
+                        background:`${u.color}18`,border:`1px solid ${u.color}44`}}>
+                        HR UPSIDE: {u.label}
+                      </span>
+                      <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)'}}>
+                        {u.lit}/{u.total} conditions met
+                      </span>
+                    </div>
+                  );})()}
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -19527,11 +19567,9 @@ function MatchupEngineTab() {
             </button>
           );
         })}
-        {/* ⬇ CSV — right-aligned, only shown on All Matchups */}
         {subTab === 'allmatches' && (
           <div style={{marginLeft:'auto'}}>
-            <button
-              onClick={()=>document.getElementById('allmatches-csv-trigger')?.click()}
+            <button onClick={()=>document.getElementById('allmatches-csv-trigger')?.click()}
               style={{display:'flex',alignItems:'center',gap:4,padding:'4px 10px',
                 borderRadius:6,cursor:'pointer',border:'1px solid var(--border)',
                 background:'var(--surface2)',color:'var(--muted)',
