@@ -13357,7 +13357,8 @@ function SimLabView({ data }) {
           </div>
 
           {/* Export CSV — triggered by the ⬇ CSV button in the date row */}
-          <button id="allmatches-csv-trigger" style={{display:'none'}} onClick={async () => {
+          <div style={{display:'none'}}>
+          <button id="allmatches-csv-trigger" onClick={async () => {
               // Fetch live box scores for all games in current slate
               const slateGameIds = [...new Set(slate.map(r => r.game_id).filter(Boolean))];
               const slateLiveCache = {};
@@ -13464,6 +13465,7 @@ function SimLabView({ data }) {
               fontFamily: "'DM Mono',monospace", fontSize: 11 }}>
               ⬇ Export CSV ({slate.length})
             </button>
+          </div>
 
           <div className="tw">
             <table>
