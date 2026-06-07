@@ -2297,7 +2297,7 @@ function AtBatSlideIn() {
               .then(r2=>r2.json())
               .then(d2=>{
                 const splits = (d2?.stats||[]).flatMap(s=>s.splits||[])
-                  .filter(sp=>(sp.stat?.atBats||0)>0)
+                  .filter(sp=>(sp.stat?.atBats||0)>0 && sp.season)  // sp.season undefined = aggregate total row, exclude
                   .sort((a,b)=>(b.season||'0').localeCompare(a.season||'0'));
                 setH2hLog(splits);
                 setH2hLogLoad(false);
@@ -2683,6 +2683,20 @@ function AtBatSlideIn() {
                                 </tr>
                               );
                             })}
+                          {/* Computed total row */}
+                          {h2hLog.length>1&&(
+                            <tr style={{borderTop:'2px solid var(--border)',background:'rgba(255,255,255,.03)'}}>
+                              <td style={{padding:'4px 6px',fontFamily:"'DM Mono',monospace",color:'var(--muted)',fontSize:9}}>—</td>
+                              <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'DM Mono',monospace",color:'var(--muted)',fontSize:9}}>{h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.plateAppearances||sp.stat?.atBats||0)),0)}</td>
+                              <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11}}>{h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.atBats||0)),0)}</td>
+                              <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.hits||0)),0)>0?'#27c97a':'var(--text)'}}>{h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.hits||0)),0)}</td>
+                              <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.homeRuns||0)),0)>0?'var(--accent)':'var(--text)'}}>{h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.homeRuns||0)),0)}</td>
+                              <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'DM Mono',monospace",color:'var(--muted)',fontSize:9}}>{h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.doubles||0)),0)||'∅'}</td>
+                              <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'DM Mono',monospace",fontSize:9,color:h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.baseOnBalls||0)),0)>0?'#27c97a':'var(--muted)'}}>{h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.baseOnBalls||0)),0)||'∅'}</td>
+                              <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'DM Mono',monospace",fontSize:9,color:h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.strikeOuts||0)),0)>0?'var(--ice)':'var(--muted)'}}>{h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.strikeOuts||0)),0)||'∅'}</td>
+                              {(()=>{const ab=h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.atBats||0)),0);const h=h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.hits||0)),0);const avg=ab>0?'.'+String(Math.round(h/ab*1000)).padStart(3,'0'):'.000';return<td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'DM Mono',monospace",fontSize:9,color:parseFloat(avg)>=0.280?'#27c97a':parseFloat(avg)>=0.250?'var(--text)':'var(--muted)'}}>{avg}</td>;})()}
+                            </tr>
+                          )}
                           </tbody>
                         </table>
                     }
