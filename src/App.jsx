@@ -12620,8 +12620,10 @@ function computeEffectiveGrade(batterGrade, pgLabel) {
 
 // ── HR UPSIDE — shared computation, used in table, slideout, and deep dive ──
 // Returns { label:'ELITE'|'STRONG'|'GOOD'|'BELOW AVG', color, lit, total }
-// ── Pure engine-based HR Upside (8 conditions, no async data) ────────────────
-// Used for table column + filter. No H2H — that requires async bvpData.
+// ── HR Upside — uses prefetched H2H when available, engine-only otherwise ────
+// For table/KM/Deep Dive: checks H2H_PREFETCH first (populated for top 50)
+// Returns { label, color, lit, total, h2hLoaded }
+// h2hLoaded=false means H2H wasn't prefetched — show * to invite slideout
 function computeHRUpside(b) {
   const ev7     = parseFloat(b.recent_avg_ev)||0;
   const brlPct  = parseFloat(b.recent_barrel_pct)||0;
@@ -12636,13 +12638,31 @@ function computeHRUpside(b) {
   const windOk  = b.wind_effect && b.wind_effect!=='N/A' &&
                   (b.wind_effect.includes('Out')||b.wind_effect.includes('Help')||b.wind_effect.includes('Boost'));
   const platoon = (ph==='L'&&(bh==='R'||bh==='S'))||(ph==='R'&&(bh==='L'||bh==='S'));
-  const lit = [
+  const base8 = [
     brlPct>=8, ev7>=92, la7>=22&&la7<=32,
     pbPct>=6||fb7>=35, zf>=70, platoon, pBarrel>=6, hrFact>=105||windOk
   ].filter(Boolean).length;
-  const label = lit>=6?'ELITE':lit>=4?'STRONG':lit>=2?'GOOD':'BELOW AVG';
-  const color = lit>=6?'#ff4020':lit>=4?'#f5a623':lit>=2?'#27c97a':'var(--muted)';
-  return { label, color, lit, total:8 };
+
+  // Check if H2H was prefetched for this batter
+  const bid = String(b.batter_id||b.player_id||'');
+  const h2h = b._h2hData || H2H_PREFETCH[bid];
+  const h2hLoaded = h2h?.loaded === true;
+
+  let lit = base8, total = 8, h2hAdj = 0;
+  if (h2hLoaded && (h2h.pa||0) >= 4) {
+    const avg = parseFloat(h2h.avg)||0;
+    const hrR = (h2h.pa||1) > 0 ? (h2h.hr||0)/(h2h.pa||1) : 0;
+    total = 9;
+    if (hrR >= 0.08 || avg >= 0.280)          { h2hAdj =  1; lit = base8 + 1; } // boost
+    else if (avg <= 0.150 && (h2h.pa||0) >= 6){ h2hAdj = -1; lit = Math.max(0, base8 - 1); } // penalty
+    else                                        { lit = base8; } // neutral
+  }
+
+  const label = (total===9)
+    ? (lit>=7?'ELITE':lit>=5?'STRONG':lit>=3?'GOOD':'BELOW AVG')
+    : (lit>=6?'ELITE':lit>=4?'STRONG':lit>=2?'GOOD':'BELOW AVG');
+  const color = label==='ELITE'?'#ff4020':label==='STRONG'?'#f5a623':label==='GOOD'?'#27c97a':'var(--muted)';
+  return { label, color, lit, total, h2hLoaded, h2hAdj };
 }
 
 // ── H2H-enriched HR Upside (9 conditions, requires bvpData from Stats API) ───
@@ -13154,13 +13174,13 @@ function LongShotView({ data }) {
                     </td>
                     <td style={{padding:'2px 4px',textAlign:'center',verticalAlign:'middle'}}>
                       {(()=>{const u=computeHRUpside(b);const short=u.label==='BELOW AVG'?'LOW':u.label==='STRONG'?'STR':u.label==='ELITE'?'ELITE':'GOOD';return(
-                        <span title={`HR Upside: ${u.label} — ${u.lit}/${u.total} conditions met`}
+                        <span title={'HR Upside: '+u.label+' — '+u.lit+'/'+u.total+' conditions'+(u.h2hLoaded===false?' (* = open slideout for H2H grade)':' (H2H incl.)')}
                           style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:7,
                             color:u.color,letterSpacing:.3,whiteSpace:'nowrap',
                             padding:'1px 3px',borderRadius:3,
                             background:`${u.color}18`,border:`1px solid ${u.color}33`,
                             cursor:'default'}}>
-                          {short}
+                          {short}{u.h2hLoaded===false?'*':''}
                         </span>
                       );})()}
                     </td>
@@ -14093,7 +14113,7 @@ function SimLabView({ data }) {
                               padding:'1px 3px',borderRadius:3,
                               background:u.color+'18',border:'1px solid '+u.color+'33',
                               cursor:'default'}}>
-                            {short}
+                            {short}{u.h2hLoaded===false?'*':''}
                           </span>
                         );})()}
                       </td>
@@ -14302,7 +14322,14 @@ function SimLabView({ data }) {
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                         <PlayerAvatar pid={parseInt(b.batter_id)||0} name={b.batter} size={40}/>
-                        <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 22, color: 'var(--text)' }}>{b.batter}</span>
+                        <span
+                          onClick={()=>openAtBatSlide({pid:parseInt(b.batter_id)||0,name:b.batter,team:b.batting_team})}
+                          style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 22,
+                            color: 'var(--text)', cursor: 'pointer',
+                            borderBottom: '1px dotted rgba(255,255,255,.25)' }}
+                          title="Open batter slideout">
+                          {b.batter}
+                        </span>
                         <SavantLink pid={parseInt(b.batter_id)||0} type="batter"/>
                         {!INJURY_MAP[String(parseInt(b.batter_id)||0)] && <span title={`Effective Grade: ${_effGradeSimLab} (Batter: ${b.grade||'?'} × Pitcher context)`} style={{ padding: '3px 9px', borderRadius: 6, fontSize: 11, fontFamily: "'Oswald',sans-serif", fontWeight: 800, background: gc.bg, color: gc.color, border: `1px solid ${gc.border}` }}>{_effGradeSimLab}</span>}
                         <InjuryBadge pid={parseInt(b.batter_id)||0} name={b.batter}/>
@@ -14643,6 +14670,41 @@ function SimLabView({ data }) {
 
 const BVP_CACHE = {}; // module-level cache: "batterId_pitcherId" → {data, ts}
 const BVP_TTL   = 4 * 60 * 60 * 1000;
+// H2H prefetch cache — top 50 batters fetched silently at load time
+// keyed by batter_id → { pa, avg, hr, loaded:true } or { loaded:false }
+const H2H_PREFETCH = {};
+
+// ── Background H2H prefetch for top 50 batters ───────────────────────────────
+// Fires once after allPicksData loads. Fetches real H2H stats from MLB Stats API
+// for the top 50 batters by Yard Score so computeHRUpside can use real H2H
+// without waiting for the slideout to open.
+async function prefetchH2HForTopBatters(picksData) {
+  if (!picksData || picksData.length === 0) return;
+  // Sort by _yard (computed) or sim_hr as proxy, take top 50
+  const sorted = [...picksData]
+    .filter(b => b.pitcher_id && b.batter_id)
+    .sort((a, b) => (parseFloat(b.weighted_flag_score)||0) - (parseFloat(a.weighted_flag_score)||0))
+    .slice(0, 50);
+  // Stagger fetches — 200ms apart to avoid hammering the API
+  for (let i = 0; i < sorted.length; i++) {
+    const row = sorted[i];
+    const bid = String(parseInt(row.batter_id)||0);
+    const pid = String(parseInt(row.pitcher_id)||0);
+    if (!bid || bid==='0' || !pid || pid==='0') continue;
+    if (H2H_PREFETCH[bid]?.loaded) continue; // already fetched
+    await new Promise(r => setTimeout(r, 200)); // 200ms stagger
+    try {
+      const d = await fetchBvP(parseInt(bid), parseInt(pid));
+      H2H_PREFETCH[bid] = { ...d, loaded:true, pitcherId:pid };
+      // Write into DAILY_PICKS_CACHE so computeHRUpside can read it
+      if (DAILY_PICKS_CACHE[bid]) {
+        DAILY_PICKS_CACHE[bid]._h2hData = H2H_PREFETCH[bid];
+      }
+    } catch(e) {
+      H2H_PREFETCH[bid] = { loaded:false };
+    }
+  }
+}
 
 async function fetchBvP(batterId, pitcherId) {
   const k = `${batterId}_${pitcherId}`;
@@ -19665,7 +19727,12 @@ function MatchupEngineTab() {
     // Load full batter slate (daily_picks.csv = all batters, not just top 3/team)
     fetch('/data/daily_picks.csv')
       .then(r => r.ok ? r.text() : Promise.reject('no picks'))
-      .then(text => { setAllPicksData(parseCSVText(text)); })
+      .then(text => {
+        const parsed = parseCSVText(text);
+        setAllPicksData(parsed);
+        // Background H2H prefetch for top 50 — fires after 2s to let page settle
+        setTimeout(() => prefetchH2HForTopBatters(parsed), 2000);
+      })
       .catch(() => {});
     // Also fetch tomorrow's engine output (silently — may not exist yet)
     fetch('/data/daily_summary_tomorrow.csv')
