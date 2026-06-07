@@ -2214,6 +2214,9 @@ function AtBatSlideIn() {
   const [risp,   setRisp]   = useState(null); // {avg, obp, slg, ops, pa} // correct HR count from MLB Stats API
   const [bvpData, setBvpData] = useState(null);  // BvP vs today's pitcher
   const [bvpLoading, setBvpLoading] = useState(false);
+  const [h2hLogOpen,  setH2hLogOpen]  = useState(false);
+  const [h2hLog,      setH2hLog]      = useState([]);
+  const [h2hLogLoad,  setH2hLogLoad]  = useState(false);
 
   useEffect(() => {
     AB_SLIDE_LISTENER = setPlayer;
@@ -2279,6 +2282,7 @@ function AtBatSlideIn() {
     const doBvpFetch = (pid, pname) => {
       if (!pid || parseInt(pid) <= 0) return;
       setBvpLoading(true);
+      setH2hLogOpen(false); setH2hLog([]); setH2hLogLoad(false);
       fetchBvP(parseInt(player.pid), parseInt(pid))
         .then(d => { setBvpData({ ...d, pitcherName: pname, pitcherId: pid, pitcherHand: dp?.pitcher_hand||'' }); setBvpLoading(false); })
         .catch(() => setBvpLoading(false));
@@ -2503,67 +2507,177 @@ function AtBatSlideIn() {
         <MatchupCard dp={DAILY_PICKS_CACHE[String(player.pid)]}/>
       )}
 
-      {/* BvP vs Today's Pitcher */}
+      {/* H2H vs Today's Pitcher */}
       {(bvpData || bvpLoading) && (
         <div style={{padding:"14px 20px",borderBottom:"1px solid var(--border)"}}>
-          <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",
-            textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>
-            BvP vs <span
-              onClick={()=>{ if(bvpData?.pitcherId) openPitcherSlide({pid:parseInt(bvpData.pitcherId)||0,name:bvpData.pitcherName||"Today's Pitcher",team:'',hand:bvpData?.pitcherHand||'',pitchMix:[]}); }}
-              style={{color:'var(--accent2)',cursor:bvpData?.pitcherId?'pointer':'default',textDecoration:bvpData?.pitcherId?'underline':'none',textDecorationStyle:'dotted'}}>
-              {bvpData?.pitcherName || "Today's Pitcher"}
-            </span>
+
+          {/* Header row — H2H label + pitcher link + H2H grade badge */}
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+            <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",
+              textTransform:"uppercase",letterSpacing:1}}>
+              H2H vs <span
+                onClick={()=>{ if(bvpData?.pitcherId) openPitcherSlide({pid:parseInt(bvpData.pitcherId)||0,name:bvpData.pitcherName||"Today's Pitcher",team:'',hand:bvpData?.pitcherHand||'',pitchMix:[]}); }}
+                style={{color:'var(--accent2)',cursor:bvpData?.pitcherId?'pointer':'default',textDecoration:bvpData?.pitcherId?'underline':'none',textDecorationStyle:'dotted'}}>
+                {bvpData?.pitcherName || "Today's Pitcher"}
+              </span>
+            </div>
+            {/* H2H Grade badge — only shown with meaningful sample */}
+            {!bvpLoading && bvpData?.pa >= 8 && (()=>{
+              const avg = parseFloat(bvpData.avg)||0;
+              const hr  = bvpData.hr||0;
+              const pa  = bvpData.pa||1;
+              const hrR = hr/pa;
+              const grade = hrR>=0.10||avg>=0.320 ? 'STRONG'
+                          : hrR>=0.05||avg>=0.260 ? 'GOOD'
+                          : avg>=0.200             ? 'NEUTRAL'
+                          :                         'WEAK';
+              const col = grade==='STRONG'?'#27c97a':grade==='GOOD'?'#f5a623':grade==='NEUTRAL'?'var(--muted)':'#ff4020';
+              return (
+                <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:9,
+                  color:col,padding:'2px 7px',borderRadius:4,letterSpacing:.5,
+                  background:col+'18',border:'1px solid '+col+'44'}}>
+                  H2H: {grade}
+                </span>
+              );
+            })()}
           </div>
+
           {bvpLoading ? (
             <div style={{display:"flex",alignItems:"center",gap:6,color:"var(--muted)",
               fontFamily:"'DM Mono',monospace",fontSize:10}}>
-              <div className="sp" style={{width:12,height:12,borderWidth:2}}/> Loading BvP…
+              <div className="sp" style={{width:12,height:12,borderWidth:2}}/> Loading H2H…
             </div>
           ) : bvpData?.pa > 0 ? (
-            <div style={{overflowX:"auto"}}>
-              <table style={{width:"100%",borderCollapse:"collapse"}}>
-                <thead>
-                  <tr style={{borderBottom:"2px solid var(--border)"}}>
-                    {["PA","AB","H","HR","2B","BB","K","AVG","OBP","SLG"].map(h=>(
-                      <th key={h} style={{padding:"4px 8px",fontSize:9,color:"var(--muted)",
-                        fontFamily:"'DM Mono',monospace",textTransform:"uppercase",
-                        letterSpacing:1,textAlign:"center",whiteSpace:"nowrap"}}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    {[
-                      [bvpData.pa,  null],
-                      [bvpData.ab,  null],
-                      [bvpData.h,   bvpData.h>0?"var(--green)":null],
-                      [bvpData.hr,  bvpData.hr>0?"var(--accent)":null],
-                      [bvpData.b2 ?? bvpData.doubles ?? '—', null],
-                      [bvpData.bb,  bvpData.bb>0?"#27c97a":null],
-                      [bvpData.k,   bvpData.k>0?"var(--ice)":null],
-                      [bvpData.avg, null],
-                      [bvpData.obp, null],
-                      [bvpData.slg, null],
-                    ].map(([v,col],i)=>(
-                      <td key={i} style={{padding:"7px 8px",fontFamily:i>=7?"'DM Mono',monospace":"'Oswald',sans-serif",
-                        fontWeight:i>=7?400:700,fontSize:i>=7?11:13,textAlign:"center",
-                        color:col||(i===3&&bvpData.hr>0?"var(--accent)":"var(--text)")}}>
-                        {v ?? '—'}
-                      </td>
-                    ))}
-                  </tr>
-                </tbody>
-              </table>
-              {bvpData.pa > 0 && (
-                <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:"var(--muted)",
-                  marginTop:6,textAlign:"center"}}>
-                  {bvpData.pa} career plate appearance{bvpData.pa!==1?'s':''} vs this pitcher
-                </div>
-              )}
+            <div>
+              {/* Career line stats table */}
+              <div style={{overflowX:"auto"}}>
+                <table style={{width:"100%",borderCollapse:"collapse"}}>
+                  <thead>
+                    <tr style={{borderBottom:"2px solid var(--border)"}}>
+                      {["PA","AB","H","HR","2B","BB","K","AVG","OBP","SLG"].map(h=>(
+                        <th key={h} style={{padding:"4px 8px",fontSize:9,color:"var(--muted)",
+                          fontFamily:"'DM Mono',monospace",textTransform:"uppercase",
+                          letterSpacing:1,textAlign:"center",whiteSpace:"nowrap"}}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      {[
+                        [bvpData.pa,  null],
+                        [bvpData.ab,  null],
+                        [bvpData.h,   bvpData.h>0?"#27c97a":null],
+                        [bvpData.hr,  bvpData.hr>0?"var(--accent)":null],
+                        [bvpData.b2 ?? bvpData.doubles ?? '—', null],
+                        [bvpData.bb,  bvpData.bb>0?"#27c97a":null],
+                        [bvpData.k,   bvpData.k>0?"var(--ice)":null],
+                        [bvpData.avg, null],
+                        [bvpData.obp, null],
+                        [bvpData.slg, null],
+                      ].map(([v,col],i)=>(
+                        <td key={i} style={{padding:"7px 8px",fontFamily:i>=7?"'DM Mono',monospace":"'Oswald',sans-serif",
+                          fontWeight:i>=7?400:700,fontSize:i>=7?11:13,textAlign:"center",
+                          color:col||(i===3&&bvpData.hr>0?"var(--accent)":"var(--text)")}}>
+                          {v ?? '—'}
+                        </td>
+                      ))}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Per-game at-bat log — lazy loaded on expand */}
+              <div style={{marginTop:10}}>
+                <button
+                  onClick={async()=>{
+                    if(h2hLogOpen){ setH2hLogOpen(false); return; }
+                    if(h2hLog.length>0){ setH2hLogOpen(true); return; }
+                    // Lazy fetch — only fires when user expands
+                    setH2hLogLoad(true); setH2hLogOpen(true);
+                    try{
+                      const pid  = player?.pid;
+                      const ppid = bvpData?.pitcherId;
+                      if(!pid||!ppid){ setH2hLogLoad(false); return; }
+                      // MLB Stats API: batter splits vs specific pitcher
+                      const url = 'https://statsapi.mlb.com/api/v1/people/'+pid+
+                        '/stats?stats=vsPlayer&opposingPlayerId='+ppid+
+                        '&group=hitting&season=2026,2025,2024,2023&sportId=1&hydrate=team';
+                      const r   = await fetch(url);
+                      const d   = await r.json();
+                      const splits = d?.stats?.[0]?.splits || [];
+                      // Each split = one season or one game depending on granularity
+                      // Try game-by-game first via the pitchLog endpoint
+                      const logUrl = 'https://statsapi.mlb.com/api/v1/people/'+pid+
+                        '/stats?stats=vsPlayerTotal&opposingPlayerId='+ppid+
+                        '&group=hitting&sportId=1&sitCodes=h,a&hydrate=team,game';
+                      const r2  = await fetch(logUrl);
+                      const d2  = await r2.json();
+                      const allSplits = d2?.stats?.[0]?.splits || splits;
+                      setH2hLog(allSplits);
+                    } catch(e){ console.warn('H2H log fetch failed',e); }
+                    setH2hLogLoad(false);
+                  }}
+                  style={{display:'flex',alignItems:'center',gap:5,padding:'4px 10px',
+                    borderRadius:6,cursor:'pointer',border:'1px solid var(--border)',
+                    background:'var(--surface2)',color:'var(--muted)',
+                    fontFamily:"'DM Mono',monospace",fontSize:9,marginBottom:6}}>
+                  {h2hLogLoad
+                    ? <><div className="sp" style={{width:9,height:9,borderWidth:1.5}}/> Loading at-bats…</>
+                    : <>{h2hLogOpen?'▴':'▾'} {h2hLogOpen?'Hide':'Show'} per-game at-bat log</>}
+                </button>
+
+                {h2hLogOpen && !h2hLogLoad && (
+                  <div style={{overflowX:'auto'}}>
+                    {h2hLog.length === 0
+                      ? <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',padding:'6px 0'}}>No game-by-game data available.</div>
+                      : <table style={{width:'100%',borderCollapse:'collapse',fontSize:9}}>
+                          <thead>
+                            <tr style={{borderBottom:'1px solid var(--border)'}}>
+                              {['Season','Date','AB','H','HR','2B','BB','K','AVG'].map(h=>(
+                                <th key={h} style={{padding:'3px 6px',fontFamily:"'DM Mono',monospace",
+                                  fontSize:8,color:'var(--muted)',textTransform:'uppercase',
+                                  letterSpacing:.7,textAlign:h==='Season'||h==='Date'?'left':'center',
+                                  whiteSpace:'nowrap'}}>{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {h2hLog.map((sp,i)=>{
+                              const s = sp.stat||{};
+                              const dt = sp.date||(sp.season?sp.season+'':null)||(sp.game?.gameDate?.slice(0,10))||'—';
+                              const sea = sp.season||'—';
+                              const hrv = parseInt(s.homeRuns||0);
+                              const hv  = parseInt(s.hits||0);
+                              return(
+                                <tr key={i} style={{borderBottom:'1px solid rgba(255,255,255,.03)',
+                                  background:hrv>0?'rgba(232,65,26,.06)':i%2===0?'transparent':'rgba(255,255,255,.01)'}}>
+                                  <td style={{padding:'4px 6px',fontFamily:"'DM Mono',monospace",color:'var(--muted)'}}>{sea}</td>
+                                  <td style={{padding:'4px 6px',fontFamily:"'DM Mono',monospace",color:'var(--muted)',whiteSpace:'nowrap'}}>{dt}</td>
+                                  <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'Oswald',sans-serif",fontWeight:700}}>{s.atBats??'—'}</td>
+                                  <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'Oswald',sans-serif",fontWeight:700,color:hv>0?'#27c97a':'var(--text)'}}>{s.hits??'—'}</td>
+                                  <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'Oswald',sans-serif",fontWeight:700,color:hrv>0?'var(--accent)':'var(--text)'}}>{s.homeRuns??'—'}</td>
+                                  <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'DM Mono',monospace",color:'var(--muted)'}}>{s.doubles??'—'}</td>
+                                  <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'DM Mono',monospace",color:parseInt(s.baseOnBalls||0)>0?'#27c97a':'var(--muted)'}}>{s.baseOnBalls??'—'}</td>
+                                  <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'DM Mono',monospace",color:parseInt(s.strikeOuts||0)>0?'var(--ice)':'var(--muted)'}}>{s.strikeOuts??'—'}</td>
+                                  <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'DM Mono',monospace",color:parseFloat(s.avg||0)>=0.300?'#27c97a':parseFloat(s.avg||0)>=0.250?'var(--text)':'var(--muted)'}}>{s.avg??'—'}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                    }
+                  </div>
+                )}
+              </div>
+
+              <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:"var(--muted)",marginTop:4}}>
+                {bvpData.pa} career PA vs this pitcher
+                {bvpData.pa < 8 && ' · small sample — use caution'}
+              </div>
             </div>
           ) : (
             <div style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--muted)"}}>
-              No career history vs this pitcher
+              No career H2H history vs this pitcher
             </div>
           )}
         </div>
@@ -12431,13 +12545,27 @@ function computeHRUpside(b) {
   const windOk  = b.wind_effect && b.wind_effect!=='N/A' &&
                   (b.wind_effect.includes('Out')||b.wind_effect.includes('Help')||b.wind_effect.includes('Boost'));
   const platoon = (ph==='L'&&(bh==='R'||bh==='S'))||(ph==='R'&&(bh==='L'||bh==='S'));
+  // H2H / BvP performance — bvp_hr_rate and bvp_hit_rate from engine CSV
+  // These measure batter performance vs this pitcher's pitch mix profile
+  // Strong: meaningful HR or hit history vs this pitch mix type
+  // Weak: genuinely cold vs this arsenal (only penalize with 8+ PA)
+  const bvpPA      = parseFloat(b.bvp_pa)||0;
+  const bvpHRRate  = parseFloat(b.bvp_hr_rate)||0;
+  const bvpHitRate = parseFloat(b.bvp_hit_rate)||0;
+  const h2hStrong  = bvpPA>=8 && (bvpHRRate>=0.08 || bvpHitRate>=0.300);
+  const h2hWeak    = bvpPA>=8 && bvpHRRate===0 && bvpHitRate<0.150;
+  // Net: strong = boost, weak = no credit, neutral = ignore
+  // h2hStrong and !h2hWeak as separate checklist conditions
   const lit = [
     brlPct>=8, ev7>=92, la7>=22&&la7<=32,
-    pbPct>=6||fb7>=35, zf>=70, platoon, pBarrel>=6, hrFact>=105||windOk
+    pbPct>=6||fb7>=35, zf>=70, platoon, pBarrel>=6, hrFact>=105||windOk,
+    h2hStrong  // H2H / pitch-mix history boost (requires 8+ PA)
   ].filter(Boolean).length;
-  const label = lit>=7?'ELITE':lit>=5?'STRONG':lit>=3?'GOOD':'BELOW AVG';
-  const color = lit>=7?'#ff4020':lit>=5?'#f5a623':lit>=3?'#27c97a':'var(--muted)';
-  return { label, color, lit, total:8 };
+  // H2H weakness subtracts from lit count
+  const litAdj = Math.max(0, lit - (h2hWeak ? 1 : 0));
+  const label = litAdj>=7?'ELITE':litAdj>=5?'STRONG':litAdj>=3?'GOOD':'BELOW AVG';
+  const color = litAdj>=7?'#ff4020':litAdj>=5?'#f5a623':litAdj>=3?'#27c97a':'var(--muted)';
+  return { label, color, lit:litAdj, total:9, h2hStrong, h2hWeak };
 }
 
 function computeBoomScore(sig, zoneFit, iso, simTB, engineScore,
@@ -14014,6 +14142,7 @@ function SimLabView({ data }) {
                       {label:'LA 22-32°',     ok:la7>=22&&la7<=32,         val:la7>0?`${la7.toFixed(1)}°`:'—', tip:'Optimal HR launch angle window'},
                       {label:'Pull FB%',      ok:pbPct>=6||fb7>=35,        val:pbPct>0?`↙${pbPct.toFixed(0)}%`:`FB${fb7.toFixed(0)}%`, tip:'Pull-side flyball tendency'},
                       {label:'LA Locked',     ok:b.la_locked===true||b.la_locked==='True', val:(b.la_locked===true||b.la_locked==='True')?`${la7.toFixed(1)}°`:'—', tip:'Launch angle tight + centered in HR zone (stddev<8°)'},
+                      {label:'H2H History',  ok:(parseFloat(b.bvp_pa)||0)>=8&&((parseFloat(b.bvp_hr_rate)||0)>=0.08||(parseFloat(b.bvp_hit_rate)||0)>=0.300), val:(parseFloat(b.bvp_pa)||0)>0?((parseFloat(b.bvp_hit_rate)||0).toFixed(3)+' avg'):'—', tip:'Career performance vs this pitcher\'s pitch mix (8+ PA required)'},
                       {label:'Zone Fit 70%+', ok:zf>=70,                   val:`${zf.toFixed(0)}%`,        tip:'Pitcher throws to batter power zones'},
                       {label:'Platoon Adv',   ok:platoon,                  val:platoon?'✓':'—',            tip:'Favorable handedness matchup'},
                       {label:'P Gives Brls',  ok:pBrl>=6,                  val:pBrl>0?`${pBrl.toFixed(1)}%`:'—', tip:'Pitcher allows barrels regularly'},
@@ -20461,6 +20590,7 @@ function MatchupEngineTab() {
                     {label:'LA 22-32°',    ok:la7>=22&&la7<=32, val:la7>0?`${la7.toFixed(1)}°`:'—'},
                     {label:'Pull FB%',     ok:pbPct>=6||fb7>=35, val:pbPct>0?`↙${pbPct.toFixed(0)}%`:`FB${fb7.toFixed(0)}%`},
                     {label:'LA Locked',    ok:b.la_locked===true||b.la_locked==='True', val:(b.la_locked===true||b.la_locked==='True')?'✓':'—'},
+                    {label:'H2H History',  ok:(parseFloat(b.bvp_pa)||0)>=8&&((parseFloat(b.bvp_hr_rate)||0)>=0.08||(parseFloat(b.bvp_hit_rate)||0)>=0.300), val:(parseFloat(b.bvp_pa)||0)>0?((parseFloat(b.bvp_hit_rate)||0).toFixed(3)):'—', tip:'Career vs this pitcher pitch mix'},
                     {label:'Zone Fit 70%+',ok:zf>=70,       val:`${zf.toFixed(0)}%`},
                     {label:'Platoon Adv',  ok:platoon,      val:platoon?'✓':'—'},
                     {label:'P Gives Brls', ok:pBarrel>=6,   val:pBarrel>0?`${pBarrel.toFixed(1)}%`:'—'},
