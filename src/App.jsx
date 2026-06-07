@@ -2522,7 +2522,21 @@ function AtBatSlideIn() {
               </span>
             </div>
             {/* H2H Grade badge — only shown with meaningful sample */}
-            {!bvpLoading && bvpData?.pa >= 8 && (()=>{
+            {!bvpLoading && (()=>{
+              const _cpa = (h2hLog&&h2hLog.length>0)
+                ? h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.plateAppearances||sp.stat?.atBats||0)),0)
+                : (bvpData?.pa||0);
+              if (_cpa < 4) return null;
+              const _cavg = (h2hLog&&h2hLog.length>0 && h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.atBats||0)),0)>0)
+                ? h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.hits||0)),0) /
+                  h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.atBats||0)),0)
+                : (parseFloat(bvpData?.avg)||0);
+              const _chr = (h2hLog&&h2hLog.length>0)
+                ? h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.homeRuns||0)),0)
+                : (bvpData?.hr||0);
+              const _cpaV = _cpa||1;
+              return (()=>{
+              const avg = _cavg; const hr = _chr; const pa = _cpaV; const hrR = hr/pa;
               const avg = parseFloat(bvpData.avg)||0;
               const hr  = bvpData.hr||0;
               const pa  = bvpData.pa||1;
@@ -2539,7 +2553,7 @@ function AtBatSlideIn() {
                   H2H: {grade}
                 </span>
               );
-            })()}
+            })();})()}
           </div>
 
           {bvpLoading ? (
@@ -2549,42 +2563,59 @@ function AtBatSlideIn() {
             </div>
           ) : bvpData?.pa > 0 ? (
             <div>
-              {/* Career line stats table */}
-              <div style={{overflowX:"auto"}}>
-                <table style={{width:"100%",borderCollapse:"collapse"}}>
-                  <thead>
-                    <tr style={{borderBottom:"2px solid var(--border)"}}>
-                      {["PA","AB","H","HR","2B","BB","K","AVG","OBP","SLG"].map(h=>(
-                        <th key={h} style={{padding:"4px 8px",fontSize:9,color:"var(--muted)",
-                          fontFamily:"'DM Mono',monospace",textTransform:"uppercase",
-                          letterSpacing:1,textAlign:"center",whiteSpace:"nowrap"}}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      {[
-                        [bvpData.pa,  null],
-                        [bvpData.ab,  null],
-                        [bvpData.h,   bvpData.h>0?"#27c97a":null],
-                        [bvpData.hr,  bvpData.hr>0?"var(--accent)":null],
-                        [bvpData.b2 ?? bvpData.doubles ?? '—', null],
-                        [bvpData.bb,  bvpData.bb>0?"#27c97a":null],
-                        [bvpData.k,   bvpData.k>0?"var(--ice)":null],
-                        [bvpData.avg, null],
-                        [bvpData.obp, null],
-                        [bvpData.slg, null],
-                      ].map(([v,col],i)=>(
-                        <td key={i} style={{padding:"7px 8px",fontFamily:i>=7?"'DM Mono',monospace":"'Oswald',sans-serif",
-                          fontWeight:i>=7?400:700,fontSize:i>=7?11:13,textAlign:"center",
-                          color:col||(i===3&&bvpData.hr>0?"var(--accent)":"var(--text)")}}>
-                          {v ?? '—'}
-                        </td>
-                      ))}
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+              {/* Career totals — computed from h2hLog (per-season API) when loaded,
+                  else fall back to bvpData (current season only from /api/bvp) */}
+              {(()=>{
+                // Sum all per-season rows for true career totals
+                const uselog = h2hLog && h2hLog.length > 0;
+                const careerPA  = uselog ? h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.plateAppearances||sp.stat?.atBats||0)),0) : bvpData.pa;
+                const careerAB  = uselog ? h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.atBats||0)),0)             : bvpData.ab;
+                const careerH   = uselog ? h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.hits||0)),0)               : bvpData.h;
+                const careerHR  = uselog ? h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.homeRuns||0)),0)           : bvpData.hr;
+                const career2B  = uselog ? h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.doubles||0)),0)            : (bvpData.b2??bvpData.doubles??0);
+                const careerBB  = uselog ? h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.baseOnBalls||0)),0)        : bvpData.bb;
+                const careerK   = uselog ? h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.strikeOuts||0)),0)         : bvpData.k;
+                // Compute career AVG from summed H/AB
+                const careerAVG = careerAB > 0 ? '.'+String(Math.round(careerH/careerAB*1000)).padStart(3,'0') : '.000';
+                // Use bvpData for OBP/SLG (not easily summed without PA breakdowns)
+                const careerOBP = bvpData.obp;
+                const careerSLG = bvpData.slg;
+                const rows = [
+                  [careerPA, null],[careerAB, null],
+                  [careerH,  careerH>0?"#27c97a":null],
+                  [careerHR, careerHR>0?"var(--accent)":null],
+                  [career2B||'—', null],[careerBB, careerBB>0?"#27c97a":null],
+                  [careerK,  careerK>0?"var(--ice)":null],
+                  [careerAVG,null],[careerOBP,null],[careerSLG,null],
+                ];
+                return (
+                  <div style={{overflowX:"auto"}}>
+                    <table style={{width:"100%",borderCollapse:"collapse"}}>
+                      <thead>
+                        <tr style={{borderBottom:"2px solid var(--border)"}}>
+                          {["PA","AB","H","HR","2B","BB","K","AVG","OBP","SLG"].map(h=>(
+                            <th key={h} style={{padding:"4px 8px",fontSize:9,color:"var(--muted)",
+                              fontFamily:"'DM Mono',monospace",textTransform:"uppercase",
+                              letterSpacing:1,textAlign:"center",whiteSpace:"nowrap"}}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          {rows.map(([v,col],i)=>(
+                            <td key={i} style={{padding:"7px 8px",
+                              fontFamily:i>=7?"'DM Mono',monospace":"'Oswald',sans-serif",
+                              fontWeight:i>=7?400:700,fontSize:i>=7?11:13,textAlign:"center",
+                              color:col||(i===3&&careerHR>0?"var(--accent)":"var(--text)")}}>
+                              {v ?? '—'}
+                            </td>
+                          ))}
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
 
               {/* Per-game at-bat log — lazy loaded on expand */}
               <div style={{marginTop:10}}>
@@ -2666,8 +2697,8 @@ function AtBatSlideIn() {
               </div>
 
               <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:"var(--muted)",marginTop:4}}>
-                {bvpData.pa} PA vs this pitch mix (engine window)
-                {bvpData.pa < 8 && ' · small sample — use caution'}
+                {(_logPA>0?_logPA:bvpData.pa)} career PA vs this pitcher
+                {(_logPA>0?_logPA:bvpData.pa) < 8 && ' · small sample — use caution'}
               </div>
             </div>
           ) : (
@@ -2708,13 +2739,23 @@ function AtBatSlideIn() {
           {label:'Zone Fit 70%+',ok:zf>=70,              val:zf.toFixed(0)+'%'},
           {label:'Platoon Adv',  ok:plat,                val:plat?'✓':'—'},
           {label:'P Gives Brls', ok:pBrl>=6,             val:pBrl>0?(pBrl.toFixed(1)+'%'):'—'},
-          {label:'Park/Wind',    ok:hf>=105||windOk,     val:(()=>{const d=Math.round(hf-100);return hf<=0?windOk?'✓':'—':d>0?('+'+d+'%'):d===0?'Neutral':(d+'%');})()},
+          {label:'Park/Wind',    ok:(hf>0&&hf<=10?hf*100:hf)>=105||windOk,     val:(()=>{const hfn=hf>0&&hf<=10?hf*100:hf;if(!hfn||hfn<=0)return windOk?'✓':'—';const d=Math.round(hfn-100);return d>0?('+'+d+'%'):d===0?'Neutral':(d+'%');})()},
         ];
-        // Add H2H condition if we have enough PA
-        const h2hPA = bvpData?.pa||0;
+        // Add H2H condition — use career totals from h2hLog when loaded
+        const _logPA = (h2hLog&&h2hLog.length>0)
+          ? h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.plateAppearances||sp.stat?.atBats||0)),0) : 0;
+        const _logAB = (h2hLog&&h2hLog.length>0)
+          ? h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.atBats||0)),0) : 0;
+        const _logH  = (h2hLog&&h2hLog.length>0)
+          ? h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.hits||0)),0) : 0;
+        const _logHR = (h2hLog&&h2hLog.length>0)
+          ? h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.homeRuns||0)),0) : 0;
+        const h2hPA  = _logPA > 0 ? _logPA : (bvpData?.pa||0);
+        const h2hAVG = _logAB > 0 ? _logH/_logAB : (parseFloat(bvpData?.avg)||0);
+        const h2hHR  = _logPA > 0 ? _logHR : (bvpData?.hr||0);
         if (h2hPA >= 4) {
-          const h2hAvg = parseFloat(bvpData?.avg)||0;
-          const h2hHRR = h2hPA > 0 ? (bvpData?.hr||0)/h2hPA : 0;
+          const h2hAvg = h2hAVG;
+          const h2hHRR = h2hPA > 0 ? h2hHR/h2hPA : 0;
           checks.push({
             label: 'H2H vs Pitcher',
             ok:    h2hAvg >= 0.280 || h2hHRR >= 0.08,
@@ -20769,7 +20810,7 @@ function MatchupEngineTab() {
                     {label:'Zone Fit 70%+',ok:zf>=70,       val:`${zf.toFixed(0)}%`},
                     {label:'Platoon Adv',  ok:platoon,      val:platoon?'✓':'—'},
                     {label:'P Gives Brls', ok:pBarrel>=6,   val:pBarrel>0?`${pBarrel.toFixed(1)}%`:'—'},
-                    {label:'Park/Wind',    ok:(parseFloat(b.hr_factor)||100)>=105||windOk, val:(()=>{const hf=parseFloat(b.hr_factor);if(!hf||hf<=0)return windOk?'✓':'—';const d=Math.round(hf-100);return d>0?`+${d}%`:d<0?`${d}%`:'Neutral';})()},
+                    {label:'Park/Wind',    ok:(parseFloat(b.hr_factor)||100)>=105||windOk, val:(()=>{const hfr=parseFloat(b.hr_factor)||0;const hfn=hfr>0&&hfr<=10?hfr*100:hfr;if(!hfn)return windOk?'✓':'—';const d=Math.round(hfn-100);return d>0?('+'+d+'%'):d===0?'Neutral':(d+'%');})()},
                   ];
                   const lit=checks.filter(ch=>ch.ok).length;
                   const upside=lit>=7?'ELITE':lit>=5?'STRONG':lit>=3?'GOOD':'BELOW AVG';
