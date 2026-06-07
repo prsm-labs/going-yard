@@ -2537,10 +2537,6 @@ function AtBatSlideIn() {
               const _cpaV = _cpa||1;
               return (()=>{
               const avg = _cavg; const hr = _chr; const pa = _cpaV; const hrR = hr/pa;
-              const avg = parseFloat(bvpData.avg)||0;
-              const hr  = bvpData.hr||0;
-              const pa  = bvpData.pa||1;
-              const hrR = hr/pa;
               const grade = hrR>=0.10||avg>=0.320 ? 'STRONG'
                           : hrR>=0.05||avg>=0.260 ? 'GOOD'
                           : avg>=0.200             ? 'NEUTRAL'
