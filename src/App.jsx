@@ -2284,7 +2284,27 @@ function AtBatSlideIn() {
       setBvpLoading(true);
       setH2hLogOpen(false); setH2hLog([]); setH2hLogLoad(false);
       fetchBvP(parseInt(player.pid), parseInt(pid))
-        .then(d => { setBvpData({ ...d, pitcherName: pname, pitcherId: pid, pitcherHand: dp?.pitcher_hand||'' }); setBvpLoading(false); })
+        .then(d => {
+          setBvpData({ ...d, pitcherName: pname, pitcherId: pid, pitcherHand: dp?.pitcher_hand||'' });
+          setBvpLoading(false);
+          // Auto-fetch per-season log immediately so career totals are ready
+          // without requiring the user to expand the dropdown first
+          const bid2 = parseInt(player.pid), ppid2 = parseInt(pid);
+          if (bid2 && ppid2) {
+            setH2hLogLoad(true);
+            fetch('https://statsapi.mlb.com/api/v1/people/'+bid2+
+              '/stats?stats=vsPlayer&opposingPlayerId='+ppid2+'&group=hitting&sportId=1')
+              .then(r2=>r2.json())
+              .then(d2=>{
+                const splits = (d2?.stats||[]).flatMap(s=>s.splits||[])
+                  .filter(sp=>(sp.stat?.atBats||0)>0)
+                  .sort((a,b)=>(b.season||'0').localeCompare(a.season||'0'));
+                setH2hLog(splits);
+                setH2hLogLoad(false);
+              })
+              .catch(()=>setH2hLogLoad(false));
+          }
+        })
         .catch(() => setBvpLoading(false));
     };
 
@@ -2616,29 +2636,7 @@ function AtBatSlideIn() {
               {/* Per-game at-bat log — lazy loaded on expand */}
               <div style={{marginTop:10}}>
                 <button
-                  onClick={async()=>{
-                    if(h2hLogOpen){ setH2hLogOpen(false); return; }
-                    if(h2hLog.length>0){ setH2hLogOpen(true); return; }
-                    // Lazy fetch — only fires when user expands
-                    setH2hLogLoad(true); setH2hLogOpen(true);
-                    try{
-                      const pid  = player?.pid;
-                      const ppid = bvpData?.pitcherId;
-                      if(!pid||!ppid){ setH2hLogLoad(false); return; }
-                      // vsPlayer returns per-season splits (2023/24/25/26)
-                      // Much more useful than vsPlayerTotal (one aggregate row)
-                      const logUrl = 'https://statsapi.mlb.com/api/v1/people/'+pid+
-                        '/stats?stats=vsPlayer&opposingPlayerId='+ppid+
-                        '&group=hitting&sportId=1';
-                      const r2  = await fetch(logUrl);
-                      const d2  = await r2.json();
-                      const allSplits = (d2?.stats||[]).flatMap(s=>s.splits||[])
-                        .filter(sp=>(sp.stat?.atBats||0)>0)  // only seasons with real ABs
-                        .sort((a,b)=>(b.season||'0').localeCompare(a.season||'0')); // newest first
-                      setH2hLog(allSplits);
-                    } catch(e){ console.warn('H2H log fetch failed',e); }
-                    setH2hLogLoad(false);
-                  }}
+                  onClick={()=>setH2hLogOpen(v=>!v)}
                   style={{display:'flex',alignItems:'center',gap:5,padding:'4px 10px',
                     borderRadius:6,cursor:'pointer',border:'1px solid var(--border)',
                     background:'var(--surface2)',color:'var(--muted)',
