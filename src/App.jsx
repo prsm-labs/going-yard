@@ -2112,7 +2112,6 @@ function MatchupCard({ dp }) {
               );
             })()}
           </div>
-          </div>
         </div>
       )}
     </div>
