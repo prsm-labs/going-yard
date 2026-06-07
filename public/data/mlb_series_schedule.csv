@@ -1,5 +1,5 @@
 Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitcher ID (Away),Game ID,Day of Week,Day Abbr,Series Game #,Games in Series,Series Position,Day Context
-2026-06-07,01:35 PM,ATL,PIT,693821.0,696149.0,824916,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
+2026-06-07,01:35 PM,ATL,PIT,693821.0,682254.0,824916,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
 2026-06-07,01:35 PM,PHI,CWS,605400.0,656457.0,823453,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
 2026-06-07,01:35 PM,NYY,BOS,693645.0,624133.0,823537,Sunday,Sun,2,2,Finale,~ Neutral (check pitcher)
 2026-06-07,01:37 PM,TOR,BAL,592332.0,669358.0,822807,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
@@ -14,7 +14,7 @@ Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitc
 2026-06-07,04:10 PM,LAD,LAA,686218.0,667755.0,823941,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
 2026-06-07,04:10 PM,SD,NYM,681190.0,623211.0,823291,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
 2026-06-07,08:30 PM,CHC,SF,592791.0,686790.0,824670,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-06-08,06:35 PM,BAL,SEA,,,824829,Monday,Mon,1,4,Opener,~ Solid
+2026-06-08,06:35 PM,BAL,SEA,,676106.0,824829,Monday,Mon,1,4,Opener,~ Solid
 2026-06-08,06:40 PM,TB,BOS,,,822972,Monday,Mon,1,3,Opener,~ Solid
 2026-06-08,06:40 PM,CLE,NYY,668909.0,701542.0,824427,Monday,Mon,1,3,Opener,~ Solid
 2026-06-08,07:07 PM,TOR,PHI,,,822806,Monday,Mon,1,3,Opener,~ Solid
