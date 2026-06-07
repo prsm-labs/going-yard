@@ -2093,8 +2093,8 @@ function MatchupCard({ dp }) {
                   {/* Vulnerability vs this batter's hand */}
                   <div style={{display:'flex',gap:14,flexWrap:'wrap'}}>
                     {[
-                      {lbl:`Brl vs ${bh||'?'}HB`, val:pBrlVsH, thresh:[8,5], suf:'%'},
-                      {lbl:`HH vs ${bh||'?'}HB`,  val:pHHVsH,  thresh:[42,38], suf:'%'},
+                      {lbl:`Brl vs ${bh||'—'}HB`, val:pBrlVsH, thresh:[8,5], suf:'%'},
+                      {lbl:`HH vs ${bh||'—'}HB`,  val:pHHVsH,  thresh:[42,38], suf:'%'},
                       {lbl:'Brl Allowed',           val:parseFloat(dp.pitcher_barrel_pct_allowed)||0, thresh:[8,5], suf:'%'},
                       {lbl:'HH Allowed',            val:parseFloat(dp.pitcher_hh_pct_allowed)||0,     thresh:[42,38], suf:'%'},
                     ].map(({lbl,val,thresh,suf})=>{
