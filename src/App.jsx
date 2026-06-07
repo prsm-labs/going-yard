@@ -2598,21 +2598,16 @@ function AtBatSlideIn() {
                       const pid  = player?.pid;
                       const ppid = bvpData?.pitcherId;
                       if(!pid||!ppid){ setH2hLogLoad(false); return; }
-                      // MLB Stats API: batter splits vs specific pitcher
-                      const url = 'https://statsapi.mlb.com/api/v1/people/'+pid+
-                        '/stats?stats=vsPlayer&opposingPlayerId='+ppid+
-                        '&group=hitting&season=2026,2025,2024,2023&sportId=1&hydrate=team';
-                      const r   = await fetch(url);
-                      const d   = await r.json();
-                      const splits = d?.stats?.[0]?.splits || [];
-                      // Each split = one season or one game depending on granularity
-                      // Try game-by-game first via the pitchLog endpoint
+                      // vsPlayer returns per-season splits (2023/24/25/26)
+                      // Much more useful than vsPlayerTotal (one aggregate row)
                       const logUrl = 'https://statsapi.mlb.com/api/v1/people/'+pid+
-                        '/stats?stats=vsPlayerTotal&opposingPlayerId='+ppid+
-                        '&group=hitting&sportId=1&sitCodes=h,a&hydrate=team,game';
+                        '/stats?stats=vsPlayer&opposingPlayerId='+ppid+
+                        '&group=hitting&sportId=1';
                       const r2  = await fetch(logUrl);
                       const d2  = await r2.json();
-                      const allSplits = d2?.stats?.[0]?.splits || splits;
+                      const allSplits = (d2?.stats||[]).flatMap(s=>s.splits||[])
+                        .filter(sp=>(sp.stat?.atBats||0)>0)  // only seasons with real ABs
+                        .sort((a,b)=>(b.season||'0').localeCompare(a.season||'0')); // newest first
                       setH2hLog(allSplits);
                     } catch(e){ console.warn('H2H log fetch failed',e); }
                     setH2hLogLoad(false);
@@ -2633,7 +2628,7 @@ function AtBatSlideIn() {
                       : <table style={{width:'100%',borderCollapse:'collapse',fontSize:9}}>
                           <thead>
                             <tr style={{borderBottom:'1px solid var(--border)'}}>
-                              {['Season','Date','AB','H','HR','2B','BB','K','AVG'].map(h=>(
+                              {['Season','PA','AB','H','HR','2B','BB','K','AVG'].map(h=>(
                                 <th key={h} style={{padding:'3px 6px',fontFamily:"'DM Mono',monospace",
                                   fontSize:8,color:'var(--muted)',textTransform:'uppercase',
                                   letterSpacing:.7,textAlign:h==='Season'||h==='Date'?'left':'center',
@@ -2644,15 +2639,15 @@ function AtBatSlideIn() {
                           <tbody>
                             {h2hLog.map((sp,i)=>{
                               const s = sp.stat||{};
-                              const dt = sp.date||(sp.season?sp.season+'':null)||(sp.game?.gameDate?.slice(0,10))||'—';
                               const sea = sp.season||'—';
+                              const pav = parseInt(s.plateAppearances||s.atBats||0);
                               const hrv = parseInt(s.homeRuns||0);
                               const hv  = parseInt(s.hits||0);
                               return(
                                 <tr key={i} style={{borderBottom:'1px solid rgba(255,255,255,.03)',
                                   background:hrv>0?'rgba(232,65,26,.06)':i%2===0?'transparent':'rgba(255,255,255,.01)'}}>
-                                  <td style={{padding:'4px 6px',fontFamily:"'DM Mono',monospace",color:'var(--muted)'}}>{sea}</td>
-                                  <td style={{padding:'4px 6px',fontFamily:"'DM Mono',monospace",color:'var(--muted)',whiteSpace:'nowrap'}}>{dt}</td>
+                                  <td style={{padding:'4px 6px',fontFamily:"'Oswald',sans-serif",fontWeight:700,color:'var(--text)'}}>{sea}</td>
+                                  <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'DM Mono',monospace",color:'var(--muted)'}}>{pav||'—'}</td>
                                   <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'Oswald',sans-serif",fontWeight:700}}>{s.atBats??'—'}</td>
                                   <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'Oswald',sans-serif",fontWeight:700,color:hv>0?'#27c97a':'var(--text)'}}>{s.hits??'—'}</td>
                                   <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'Oswald',sans-serif",fontWeight:700,color:hrv>0?'var(--accent)':'var(--text)'}}>{s.homeRuns??'—'}</td>
@@ -2671,7 +2666,7 @@ function AtBatSlideIn() {
               </div>
 
               <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:"var(--muted)",marginTop:4}}>
-                {bvpData.pa} career PA vs this pitcher
+                {bvpData.pa} PA vs this pitch mix (engine window)
                 {bvpData.pa < 8 && ' · small sample — use caution'}
               </div>
             </div>
@@ -2682,6 +2677,98 @@ function AtBatSlideIn() {
           )}
         </div>
       )}
+
+      {/* ── HR UPSIDE WITH H2H — enriched checklist, only available here ── */}
+      {(()=>{
+        const dp3 = DAILY_PICKS_CACHE[String(player?.pid)];
+        if (!dp3) return null;
+        const u = computeHRUpsideWithH2H(dp3, bvpData);
+        const mono2 = "'DM Mono',monospace";
+        const osw2  = "'Oswald',sans-serif";
+        // Build the 8 engine checks + optional H2H check
+        const ev7   = parseFloat(dp3.recent_avg_ev)||0;
+        const brlPct= parseFloat(dp3.recent_barrel_pct)||0;
+        const la7   = parseFloat(dp3.recent_avg_la)||0;
+        const fb7   = parseFloat(dp3.recent_fb_pct)||0;
+        const pbPct = parseFloat(dp3.recent_pulled_barrel_pct)||0;
+        const zf    = parseFloat(dp3.zone_fit)||0;
+        const ph    = (dp3.pitcher_hand||'').toUpperCase()[0];
+        const bh    = (dp3.batter_hand||'').toUpperCase()[0];
+        const pBrl  = parseFloat(dp3.pitcher_barrel_pct_allowed)||0;
+        const hf    = parseFloat(dp3.hr_factor)||100;
+        const windOk= dp3.wind_effect&&dp3.wind_effect!=='N/A'&&
+                      (dp3.wind_effect.includes('Out')||dp3.wind_effect.includes('Help')||dp3.wind_effect.includes('Boost'));
+        const plat  = (ph==='L'&&(bh==='R'||bh==='S'))||(ph==='R'&&(bh==='L'||bh==='S'));
+        const checks = [
+          {label:'Barrel% 8%+',  ok:brlPct>=8,          val:brlPct.toFixed(1)+'%'},
+          {label:'EV 92+ mph',   ok:ev7>=92,             val:ev7.toFixed(1)},
+          {label:'LA 22-32°',    ok:la7>=22&&la7<=32,    val:la7>0?(la7.toFixed(1)+'°'):'—'},
+          {label:'Pull FB%',     ok:pbPct>=6||fb7>=35,   val:pbPct>0?('↙'+pbPct.toFixed(0)+'%'):('FB'+fb7.toFixed(0)+'%')},
+          {label:'Zone Fit 70%+',ok:zf>=70,              val:zf.toFixed(0)+'%'},
+          {label:'Platoon Adv',  ok:plat,                val:plat?'✓':'—'},
+          {label:'P Gives Brls', ok:pBrl>=6,             val:pBrl>0?(pBrl.toFixed(1)+'%'):'—'},
+          {label:'Park/Wind',    ok:hf>=105||windOk,     val:(()=>{const d=Math.round(hf-100);return hf<=0?windOk?'✓':'—':d>0?('+'+d+'%'):d===0?'Neutral':(d+'%');})()},
+        ];
+        // Add H2H condition if we have enough PA
+        const h2hPA = bvpData?.pa||0;
+        if (h2hPA >= 4) {
+          const h2hAvg = parseFloat(bvpData?.avg)||0;
+          const h2hHRR = h2hPA > 0 ? (bvpData?.hr||0)/h2hPA : 0;
+          checks.push({
+            label: 'H2H vs Pitcher',
+            ok:    h2hAvg >= 0.280 || h2hHRR >= 0.08,
+            val:   bvpData?.avg || '—',
+            fade:  h2hAvg <= 0.150 && h2hPA >= 6,
+          });
+        }
+        const litFinal = checks.filter(ch=>ch.ok).length - checks.filter(ch=>ch.fade).length;
+        const litClamp = Math.max(0, litFinal);
+        const total    = checks.length;
+        const uLabel   = litClamp>=Math.round(total*.75)?'ELITE':litClamp>=Math.round(total*.55)?'STRONG':litClamp>=Math.round(total*.35)?'GOOD':'BELOW AVG';
+        const uCol     = uLabel==='ELITE'?'#ff4020':uLabel==='STRONG'?'#f5a623':uLabel==='GOOD'?'#27c97a':'var(--muted)';
+        return (
+          <div style={{padding:'14px 20px',borderBottom:'1px solid var(--border)'}}>
+            <div style={{background:'var(--surface2)',borderRadius:9,
+              border:'1px solid '+uCol+'33',padding:'12px 14px'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+                <span style={{fontFamily:mono2,fontSize:8,color:'var(--muted)',
+                  textTransform:'uppercase',letterSpacing:1}}>HR UPSIDE</span>
+                <span style={{fontFamily:osw2,fontWeight:800,fontSize:13,
+                  color:uCol,letterSpacing:.5}}>
+                  {uLabel}{h2hPA>=4?' (H2H incl.)':''}
+                </span>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px 12px'}}>
+                {checks.map((ch,i)=>{
+                  const isFade = ch.fade;
+                  const isOk   = ch.ok && !isFade;
+                  const dotCol = isOk?'#27c97a':isFade?'#ff4020':'rgba(255,255,255,.15)';
+                  const icon   = isOk?'✅':isFade?'⚠️':'○';
+                  return(
+                    <div key={i} style={{display:'flex',alignItems:'center',gap:6,padding:'3px 0',
+                      borderBottom:'1px solid rgba(255,255,255,.04)'}}>
+                      <span style={{fontSize:10,flexShrink:0,color:dotCol}}>{icon}</span>
+                      <span style={{fontFamily:mono2,fontSize:9,flex:1,
+                        color:isOk?'var(--text)':isFade?'#ff4020':'var(--muted)',
+                        fontWeight:isOk||isFade?600:400}}>{ch.label}</span>
+                      <span style={{fontFamily:mono2,fontSize:9,flexShrink:0,
+                        fontWeight:isOk?700:400,
+                        color:isOk?'#27c97a':isFade?'#ff4020':'rgba(255,255,255,.2)'}}>
+                        {ch.val}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{marginTop:6,fontFamily:mono2,fontSize:8,color:'var(--muted)',
+                textAlign:'right'}}>
+                {litClamp}/{total} conditions met
+                {h2hPA>0&&h2hPA<4&&' · H2H excluded (< 4 PA)'}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Recent Game Log */}
       <div style={{padding:"14px 20px",flex:1}}>
@@ -12531,6 +12618,8 @@ function computeEffectiveGrade(batterGrade, pgLabel) {
 
 // ── HR UPSIDE — shared computation, used in table, slideout, and deep dive ──
 // Returns { label:'ELITE'|'STRONG'|'GOOD'|'BELOW AVG', color, lit, total }
+// ── Pure engine-based HR Upside (8 conditions, no async data) ────────────────
+// Used for table column + filter. No H2H — that requires async bvpData.
 function computeHRUpside(b) {
   const ev7     = parseFloat(b.recent_avg_ev)||0;
   const brlPct  = parseFloat(b.recent_barrel_pct)||0;
@@ -12545,27 +12634,44 @@ function computeHRUpside(b) {
   const windOk  = b.wind_effect && b.wind_effect!=='N/A' &&
                   (b.wind_effect.includes('Out')||b.wind_effect.includes('Help')||b.wind_effect.includes('Boost'));
   const platoon = (ph==='L'&&(bh==='R'||bh==='S'))||(ph==='R'&&(bh==='L'||bh==='S'));
-  // H2H / BvP performance — bvp_hr_rate and bvp_hit_rate from engine CSV
-  // These measure batter performance vs this pitcher's pitch mix profile
-  // Strong: meaningful HR or hit history vs this pitch mix type
-  // Weak: genuinely cold vs this arsenal (only penalize with 8+ PA)
-  const bvpPA      = parseFloat(b.bvp_pa)||0;
-  const bvpHRRate  = parseFloat(b.bvp_hr_rate)||0;
-  const bvpHitRate = parseFloat(b.bvp_hit_rate)||0;
-  const h2hStrong  = bvpPA>=8 && (bvpHRRate>=0.08 || bvpHitRate>=0.300);
-  const h2hWeak    = bvpPA>=8 && bvpHRRate===0 && bvpHitRate<0.150;
-  // Net: strong = boost, weak = no credit, neutral = ignore
-  // h2hStrong and !h2hWeak as separate checklist conditions
   const lit = [
     brlPct>=8, ev7>=92, la7>=22&&la7<=32,
-    pbPct>=6||fb7>=35, zf>=70, platoon, pBarrel>=6, hrFact>=105||windOk,
-    h2hStrong  // H2H / pitch-mix history boost (requires 8+ PA)
+    pbPct>=6||fb7>=35, zf>=70, platoon, pBarrel>=6, hrFact>=105||windOk
   ].filter(Boolean).length;
-  // H2H weakness subtracts from lit count
-  const litAdj = Math.max(0, lit - (h2hWeak ? 1 : 0));
-  const label = litAdj>=7?'ELITE':litAdj>=5?'STRONG':litAdj>=3?'GOOD':'BELOW AVG';
-  const color = litAdj>=7?'#ff4020':litAdj>=5?'#f5a623':litAdj>=3?'#27c97a':'var(--muted)';
-  return { label, color, lit:litAdj, total:9, h2hStrong, h2hWeak };
+  const label = lit>=6?'ELITE':lit>=4?'STRONG':lit>=2?'GOOD':'BELOW AVG';
+  const color = lit>=6?'#ff4020':lit>=4?'#f5a623':lit>=2?'#27c97a':'var(--muted)';
+  return { label, color, lit, total:8 };
+}
+
+// ── H2H-enriched HR Upside (9 conditions, requires bvpData from Stats API) ───
+// Used only in the batter slideout where bvpData is available.
+// pa = career H2H plate appearances vs THIS specific pitcher (MLB Stats API)
+// avg, hr = real H2H results, not pitch-mix proxies
+function computeHRUpsideWithH2H(b, bvpData) {
+  const base  = computeHRUpside(b);
+  const pa    = bvpData?.pa  || 0;
+  const avg   = parseFloat(bvpData?.avg)  || 0;
+  const hr    = bvpData?.hr  || 0;
+  const hrR   = pa > 0 ? hr/pa : null;
+
+  // Only apply H2H adjustment with meaningful sample (4+ PA)
+  // Thresholds validated against 639k AB log:
+  //   avg >= .280 or hr_rate >= .08  → STRONG history (genuine lift)
+  //   avg <= .150 and pa >= 6        → WEAK history  (genuine fade signal)
+  let h2hAdj  = 0;
+  let h2hLabel = null;
+  let h2hOk    = false;
+  if (pa >= 4) {
+    if (hrR >= 0.08 || avg >= 0.280) { h2hAdj = 1;  h2hLabel = 'Strong H2H'; h2hOk = true;  }
+    else if (avg <= 0.150 && pa >= 6){ h2hAdj = -1; h2hLabel = 'Weak H2H';   h2hOk = false; }
+    else                              { h2hLabel = 'Neutral H2H'; }
+  }
+
+  const litAdj  = Math.max(0, base.lit + h2hAdj);
+  const total   = pa >= 4 ? 9 : 8;  // only count H2H when sample exists
+  const label   = litAdj>=(total===9?7:6)?'ELITE':litAdj>=(total===9?5:4)?'STRONG':litAdj>=(total===9?3:2)?'GOOD':'BELOW AVG';
+  const color   = litAdj>=(total===9?7:6)?'#ff4020':litAdj>=(total===9?5:4)?'#f5a623':litAdj>=(total===9?3:2)?'#27c97a':'var(--muted)';
+  return { ...base, label, color, lit:litAdj, total, h2hAdj, h2hLabel, h2hOk, h2hPA:pa };
 }
 
 function computeBoomScore(sig, zoneFit, iso, simTB, engineScore,
@@ -14142,14 +14248,14 @@ function SimLabView({ data }) {
                       {label:'LA 22-32°',     ok:la7>=22&&la7<=32,         val:la7>0?`${la7.toFixed(1)}°`:'—', tip:'Optimal HR launch angle window'},
                       {label:'Pull FB%',      ok:pbPct>=6||fb7>=35,        val:pbPct>0?`↙${pbPct.toFixed(0)}%`:`FB${fb7.toFixed(0)}%`, tip:'Pull-side flyball tendency'},
                       {label:'LA Locked',     ok:b.la_locked===true||b.la_locked==='True', val:(b.la_locked===true||b.la_locked==='True')?`${la7.toFixed(1)}°`:'—', tip:'Launch angle tight + centered in HR zone (stddev<8°)'},
-                      {label:'H2H History',  ok:(parseFloat(b.bvp_pa)||0)>=8&&((parseFloat(b.bvp_hr_rate)||0)>=0.08||(parseFloat(b.bvp_hit_rate)||0)>=0.300), val:(parseFloat(b.bvp_pa)||0)>0?((parseFloat(b.bvp_hit_rate)||0).toFixed(3)+' avg'):'—', tip:'Career performance vs this pitcher\'s pitch mix (8+ PA required)'},
+
                       {label:'Zone Fit 70%+', ok:zf>=70,                   val:`${zf.toFixed(0)}%`,        tip:'Pitcher throws to batter power zones'},
                       {label:'Platoon Adv',   ok:platoon,                  val:platoon?'✓':'—',            tip:'Favorable handedness matchup'},
                       {label:'P Gives Brls',  ok:pBrl>=6,                  val:pBrl>0?`${pBrl.toFixed(1)}%`:'—', tip:'Pitcher allows barrels regularly'},
                       {label:'Park / Wind',   ok:hrFact>=105||windOk,      val:(()=>{const hf=parseFloat(b.hr_factor);if(!hf||hf<=0)return windOk?'✓':'—';const d=Math.round(hf-100);return d>0?`+${d}%`:d===0?'Neutral':`${d}%`;})(), tip:'Park factor or wind favors HRs'},
                     ];
                     const lit = checks.filter(ch=>ch.ok).length;
-                    const label = lit>=7?'ELITE':lit>=5?'STRONG':lit>=3?'GOOD':'BELOW AVG';
+                    const label = lit>=6?'ELITE':lit>=4?'STRONG':lit>=2?'GOOD':'BELOW AVG';
                     const uColor = lit>=7?'#ff4020':lit>=5?'#f5a623':lit>=3?'#27c97a':'var(--muted)';
                     return(
                       <div style={{background:'var(--surface)',border:`1px solid ${uColor}33`,
@@ -20590,7 +20696,7 @@ function MatchupEngineTab() {
                     {label:'LA 22-32°',    ok:la7>=22&&la7<=32, val:la7>0?`${la7.toFixed(1)}°`:'—'},
                     {label:'Pull FB%',     ok:pbPct>=6||fb7>=35, val:pbPct>0?`↙${pbPct.toFixed(0)}%`:`FB${fb7.toFixed(0)}%`},
                     {label:'LA Locked',    ok:b.la_locked===true||b.la_locked==='True', val:(b.la_locked===true||b.la_locked==='True')?'✓':'—'},
-                    {label:'H2H History',  ok:(parseFloat(b.bvp_pa)||0)>=8&&((parseFloat(b.bvp_hr_rate)||0)>=0.08||(parseFloat(b.bvp_hit_rate)||0)>=0.300), val:(parseFloat(b.bvp_pa)||0)>0?((parseFloat(b.bvp_hit_rate)||0).toFixed(3)):'—', tip:'Career vs this pitcher pitch mix'},
+
                     {label:'Zone Fit 70%+',ok:zf>=70,       val:`${zf.toFixed(0)}%`},
                     {label:'Platoon Adv',  ok:platoon,      val:platoon?'✓':'—'},
                     {label:'P Gives Brls', ok:pBarrel>=6,   val:pBarrel>0?`${pBarrel.toFixed(1)}%`:'—'},
