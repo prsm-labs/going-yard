@@ -1864,7 +1864,7 @@ function MatchupCard({ dp }) {
     return Math.min(14, Math.max(0, s));
   })();
 
-  const boom   = parseFloat(dp._boom) || computeBoomScore(sig, parseFloat(dp.zone_fit)||0, parseFloat(dp.recent_iso)||0, parseFloat(dp.sim_tb)||0, parseFloat(dp.weighted_flag_score)||0, parseFloat(dp.recent_barrel_spike||0), parseInt(dp.recent_hr_count||0), parseFloat(dp.recent_batter_ahead_pct||0), !!dp.hh_precursor, parseFloat(dp.primary_pitch_hr_rate||0), parseInt(dp.recent_barrels_3d)||0, parseInt(dp.recent_hrs_3d)||0, parseFloat(dp.recent_avg_bat_speed)||0, parseInt(dp.recent_pb_2d)||0);
+  const boom   = parseFloat(dp._boom) || computeBoomScore(sig, parseFloat(dp.zone_fit)||0, parseFloat(dp.recent_iso)||0, parseFloat(dp.sim_tb)||0, parseFloat(dp.weighted_flag_score)||0, parseFloat(dp.recent_barrel_spike||0), parseInt(dp.recent_hr_count||0), parseFloat(dp.recent_batter_ahead_pct||0), !!dp.hh_precursor, parseFloat(dp.primary_pitch_hr_rate||0), parseInt(dp.recent_barrels_3d)||0, parseInt(dp.recent_hrs_3d)||0, parseFloat(dp.recent_avg_bat_speed)||0, parseInt(dp.recent_pb_2d)||0, dp.la_locked, parseFloat(dp.season_swstr_pct)||0, parseFloat(dp.park_pull_fit)||0);
   const iso    = parseFloat(dp.l7_iso||dp.recent_iso) || 0;  // L7 blended ISO
   const l7iso   = parseFloat(dp.l7_iso)    || parseFloat(dp.recent_iso)  || 0;
   const l7woba  = parseFloat(dp.l7_woba)   || parseFloat(dp.season_woba) || 0;
@@ -2003,32 +2003,113 @@ function MatchupCard({ dp }) {
                   </div>
                 </div>
               )}
-              {/* Pitcher Vuln */}
+              {/* Pitch Mix Matchup Card — full signal surface */}
           <div style={{background:'var(--surface2)',borderRadius:8,border:'1px solid var(--border)',padding:'10px 12px',gridColumn:'1/-1'}}>
-            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:8}}>
-              🎯 Pitcher Vuln — {dp.pitcher||'Today\'s Pitcher'}
-            </div>
-            <div style={{display:'flex',gap:12,flexWrap:'wrap'}}>
-              {[
-                ['HH Allowed',    dp.pitcher_hh_pct_allowed,    '%', v=>parseFloat(v)>=40?'#ff8020':'var(--muted)'],
-                ['FB Allowed',    dp.pitcher_fb_pct_allowed,    '%', ()=>'var(--muted)'],
-                ['Brl Allowed',   dp.pitcher_barrel_pct_allowed,'%', v=>parseFloat(v)>=8?'#ff4020':parseFloat(v)>=5?'#f5a623':'var(--muted)'],
-                ['Meatball%',     dp.pitcher_meatball_pct,      '%', v=>parseFloat(v)>=55?'#ff8020':'var(--muted)'],
-                ['Zone Fit',      dp.zone_fit,                   '%', v=>parseFloat(v)>=8?'#ff4020':parseFloat(v)>=5?'#f5a623':parseFloat(v)>=2?'#27c97a':'var(--muted)'],
-              ].map(([lbl,val,suf,col])=>{
-                if (!val && val!==0) return null;
-                const v = parseFloat(val);
-                if (!v && v!==0) return null;
-                return (
-                  <div key={lbl} style={{textAlign:'center',minWidth:70}}>
-                    <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.5,marginBottom:2}}>{lbl}</div>
-                    <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:col(val)}}>
-                      {v.toFixed(1)}{suf}
+            {(()=>{
+              const mono2    = "'DM Mono',monospace";
+              const ps       = parseFloat(dp.ps_score)||0;
+              const psColor  = ps>=75?'#a855f7':ps>=60?'#ff4020':ps>=45?'#f5a623':'var(--muted)';
+              const psLabel  = ps>=75?'Perfect Storm':ps>=60?'Elite':ps>=45?'Favorable':'Below Avg';
+              const veloR    = parseFloat(dp.fastball_velo_recent)||0;
+              const veloS    = parseFloat(dp.fastball_velo_season)||0;
+              const veloDrop = parseFloat(dp.pitcher_velo_drop||dp.fastball_velo_decay)||0;
+              const veloDec  = veloDrop>0.5;
+              const mb       = parseFloat(dp.pitcher_meatball_pct)||0;
+              const countMb  = parseFloat(dp.count_meatball_pct)||0;
+              const bh       = (dp.batter_hand||'').toUpperCase()[0];
+              const ph       = (dp.pitcher_hand||'').toUpperCase()[0];
+              const pBrlVsH  = parseFloat(bh==='L'?dp.pitcher_barrel_pct_vs_L:dp.pitcher_barrel_pct_vs_R)||parseFloat(dp.pitcher_barrel_pct_allowed)||0;
+              const pHHVsH   = parseFloat(bh==='L'?dp.pitcher_hh_pct_vs_L:dp.pitcher_hh_pct_vs_R)||parseFloat(dp.pitcher_hh_pct_allowed)||0;
+              const zf       = parseFloat(dp.zone_fit)||0;
+              const primaryHR= parseFloat(dp.primary_pitch_hr_rate)||0;
+              const topPitch = dp.top_pitches||'';
+              const platoon  = (ph==='L'&&(bh==='R'||bh==='S'))||(ph==='R'&&(bh==='L'||bh==='S'));
+              return (
+                <div>
+                  {/* Header */}
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+                    <span style={{fontFamily:mono2,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8}}>
+                      ⚡ Pitch Mix Matchup — {dp.pitcher||"Today's Pitcher"}
+                    </span>
+                    {ps>0&&<span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:10,
+                      color:psColor,padding:'1px 6px',borderRadius:4,
+                      background:`${psColor}18`,border:`1px solid ${psColor}44`,letterSpacing:.3}}>
+                      PS {Math.round(ps)} · {psLabel}
+                    </span>}
+                  </div>
+
+                  {/* Arsenal row */}
+                  {topPitch&&(
+                    <div style={{marginBottom:8,padding:'5px 8px',borderRadius:5,
+                      background:'rgba(0,0,0,.25)',border:'1px solid rgba(255,255,255,.06)'}}>
+                      <span style={{fontFamily:mono2,fontSize:7,color:'var(--muted)',
+                        textTransform:'uppercase',letterSpacing:.7,marginRight:6}}>Arsenal:</span>
+                      <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'var(--text)'}}>{topPitch}</span>
+                      {primaryHR>0&&<span style={{fontFamily:mono2,fontSize:9,marginLeft:8,
+                        color:primaryHR>=8?'#ff4020':primaryHR>=5?'#f5a623':'var(--muted)'}}>
+                        · {primaryHR.toFixed(1)}% HR vs primary pitch
+                      </span>}
+                      {platoon&&<span style={{fontFamily:mono2,fontSize:9,color:'#38b8f2',fontWeight:700,marginLeft:8}}>· ✓ platoon adv</span>}
+                    </div>
+                  )}
+
+                  {/* 3 key stats */}
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6,marginBottom:8}}>
+                    <div style={{padding:'6px 8px',borderRadius:6,textAlign:'center',
+                      background:zf>=8?'rgba(255,64,32,.1)':zf>=5?'rgba(245,166,35,.1)':zf>=2?'rgba(39,201,122,.08)':'rgba(0,0,0,.2)',
+                      border:`1px solid ${zf>=8?'rgba(255,64,32,.3)':zf>=5?'rgba(245,166,35,.3)':zf>=2?'rgba(39,201,122,.2)':'var(--border)'}`}}>
+                      <div style={{fontFamily:mono2,fontSize:7,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.4,marginBottom:2}}>Zone Fit</div>
+                      <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:16,
+                        color:zf>=8?'#ff4020':zf>=5?'#f5a623':zf>=2?'#27c97a':'var(--muted)'}}>
+                        {zf>0?zf.toFixed(1)+'%':'—'}
+                      </div>
+                      <div style={{fontFamily:mono2,fontSize:7,color:'var(--muted)',marginTop:1}}>location overlap</div>
+                    </div>
+                    <div style={{padding:'6px 8px',borderRadius:6,textAlign:'center',
+                      background:mb>=55?'rgba(255,128,32,.1)':mb>=45?'rgba(245,166,35,.08)':'rgba(0,0,0,.2)',
+                      border:`1px solid ${mb>=55?'rgba(255,128,32,.3)':mb>=45?'rgba(245,166,35,.3)':'var(--border)'}`}}>
+                      <div style={{fontFamily:mono2,fontSize:7,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.4,marginBottom:2}}>Meatball%</div>
+                      <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:16,
+                        color:mb>=55?'#ff4020':mb>=45?'#f5a623':'var(--muted)'}}>
+                        {mb>0?mb.toFixed(1)+'%':'—'}
+                      </div>
+                      {countMb>0&&<div style={{fontFamily:mono2,fontSize:7,
+                        color:countMb>=40?'#ff8020':countMb>=32?'#f5a623':'var(--muted)',marginTop:1}}>
+                        {countMb.toFixed(0)}% behind in count
+                      </div>}
+                    </div>
+                    <div style={{padding:'6px 8px',borderRadius:6,textAlign:'center',
+                      background:veloDec?'rgba(56,184,242,.08)':'rgba(0,0,0,.2)',
+                      border:`1px solid ${veloDec?'rgba(56,184,242,.25)':'var(--border)'}`}}>
+                      <div style={{fontFamily:mono2,fontSize:7,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.4,marginBottom:2}}>FB Velo</div>
+                      <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:16,color:veloDec?'#38b8f2':'var(--text)'}}>
+                        {(veloR||veloS)>0?(veloR||veloS).toFixed(1):'—'}
+                        <span style={{fontSize:8,fontWeight:400,color:'var(--muted)'}}> mph</span>
+                      </div>
+                      {veloDec&&veloDrop>0&&<div style={{fontFamily:mono2,fontSize:7,color:'#38b8f2',marginTop:1}}>↓ {veloDrop.toFixed(1)} vs season</div>}
                     </div>
                   </div>
-                );
-              }).filter(Boolean)}
-            </div>
+
+                  {/* Vulnerability vs this batter's hand */}
+                  <div style={{display:'flex',gap:14,flexWrap:'wrap'}}>
+                    {[
+                      {lbl:`Brl vs ${bh||'?'}HB`, val:pBrlVsH, thresh:[8,5], suf:'%'},
+                      {lbl:`HH vs ${bh||'?'}HB`,  val:pHHVsH,  thresh:[42,38], suf:'%'},
+                      {lbl:'Brl Allowed',           val:parseFloat(dp.pitcher_barrel_pct_allowed)||0, thresh:[8,5], suf:'%'},
+                      {lbl:'HH Allowed',            val:parseFloat(dp.pitcher_hh_pct_allowed)||0,     thresh:[42,38], suf:'%'},
+                    ].map(({lbl,val,thresh,suf})=>{
+                      if(!val) return null;
+                      const color=val>=thresh[0]?'#ff4020':val>=thresh[1]?'#f5a623':'var(--muted)';
+                      return(<div key={lbl} style={{textAlign:'center',minWidth:60}}>
+                        <div style={{fontFamily:mono2,fontSize:7,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.3,marginBottom:2}}>{lbl}</div>
+                        <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color}}>{val.toFixed(1)}{suf}</div>
+                      </div>);
+                    }).filter(Boolean)}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
           </div>
         </div>
       )}
@@ -5085,7 +5166,6 @@ function GPanel({game, isLive, isFinal=false}) {
               </div>,
               isE && <div key={`${b.id}-x`} style={{background:"rgba(232,65,26,.03)",
                 borderBottom:"1px solid rgba(30,45,58,.5)"}}>
-                {isLive && <LiveBatterBox batterId={b.id} gamePk={game.gamePk}/>}
                 <XRow b={b}/>
               </div>
             ];
@@ -12322,21 +12402,17 @@ function computeEffectiveGrade(batterGrade, pgLabel) {
 // Rebalanced: Zone Fit elevated (30%, non-linear) | Sig(30%) | SimTB(20%) | ISO(15%) | Engine(5%)
 // Zone Fit is now primary — ZF≥3 predicts 10-30% HR rates vs 2.4% at ZF=0.
 // ── Boom Score ───────────────────────────────────────────────────────────────
-// Rebalanced weights (638k at-bat data, June 2026):
-//   ZoneFit(28%) + Sig(26%) + SimTB(18%) + BarrelSpike(8%) + ISO(8%)
-//   + HotHand(5%) + CountDisc(4%) + Precursor(2%) + PitchVuln(1%)
+// Weights (638k at-bat data, June 2026 + July recalibration):
+//   ZoneFit(24%) + Sig(26%) + SimTB(18%) + BarrelSpike(8%) + ISO(8%)
+//   + DayLate(4-6%) + BatSpeedTier(4%) + HotHand(5%) + CountDisc(4%)
+//   + Precursor(2%) + PitchVuln(1%) + LaLocked(+3) + SwStrPen(0 to -4) + PullParkFit(0-3)
 //
-// Key changes vs prior formula:
-//   • Engine Score (5%) removed — was double-counting Sig
-//   • ISO trimmed 15%→8%: season stat, overweighted vs recent signals
-//   • Barrel Spike added (8%): recent barrel% vs personal season baseline (+2pt confirmed)
-//   • Hot Hand added (5%): 2+ HRs last 3 games = 13.16% vs 9.78% baseline (+3.38pt)
-//   • Count Discipline added (4%): batter-ahead count% 25%+ = 12.08% vs 8.19% (-3.89pt gap)
-//   • HH Precursor added (2%): loud contact no-HR last game = +1.32pt
-//   • Pitch Vulnerability added (1%): batter HR rate vs pitcher's primary pitch
+// New signals (July 2026):
+//   • LA Locked (+3): la_stddev<8° centered 18-28° = tight HR profile
+//   • SwStr% penalty (-1 to -4): swing-and-miss risk vs breaking ball pitchers
+//   • Pull×Park Fit (+1-3): pulled_fb_pct × park hr_factor on pull side
 //
-// New field sources: barrel_spike, recent_hr_count, recent_batter_ahead_pct,
-//   hh_precursor, primary_pitch_hr_rate — all from daily_picks.csv
+// Field sources: la_locked, season_swstr_pct, park_pull_fit — all from engine output
 
 // ── HR UPSIDE — shared computation, used in table, slideout, and deep dive ──
 // Returns { label:'ELITE'|'STRONG'|'GOOD'|'BELOW AVG', color, lit, total }
@@ -12365,7 +12441,8 @@ function computeHRUpside(b) {
 
 function computeBoomScore(sig, zoneFit, iso, simTB, engineScore,
   barrelSpike, recentHRCount, batterAheadPct, hhPrecursor, pitchVulnRate,
-  dayLateBarrels, dayLateHRs, recentBatSpeed, dayLatePulled) {
+  dayLateBarrels, dayLateHRs, recentBatSpeed, dayLatePulled,
+  laLocked, swstrPct, pullParkFit) {
 
   // ── Zone Fit (24%) — trimmed from 28%, redirected to Day Late + Bat Speed ──
   const zfRaw = zoneFitScore(parseFloat(zoneFit) || 0);
@@ -12429,7 +12506,32 @@ function computeBoomScore(sig, zoneFit, iso, simTB, engineScore,
            : pvRaw >= 6   ? 0.5
            : 0;
 
-  return Math.min(99, Math.round(zf + s + tb + is + bs + hh + cd + dl + bst + prec + pv));
+  // ── Launch Angle Locked (3%) ──────────────────────────────────────────────
+  // la_locked = LA stddev < 8° centered 18-28° — tight HR profile
+  // Computed by compute_la_stddev_flag() in engine. Batter consistently
+  // hitting at the right angle → higher barrel conversion rate.
+  const laLock = (laLocked === true || laLocked === 'True' || laLocked === 1) ? 3 : 0;
+
+  // ── SwStr% Penalty (0 to -4) ───────────────────────────────────────────────
+  // High whiff rate = swing-and-miss risk, especially vs breaking ball pitchers.
+  // SwStr% > 18% = meaningful negative HR predictor.
+  const swst = parseFloat(swstrPct) || 0;
+  const swPen = swst >= 22 ? -4
+              : swst >= 18 ? -2
+              : swst >= 15 ? -1
+              : 0;
+
+  // ── Pull Direction × Park Fit (0-3) ────────────────────────────────────────
+  // pull_park_fit: compound of pulled_fb_pct × park hr_factor on pull side.
+  // If batter pulls to power alley and park rewards it → bonus pts.
+  // Engine field park_pull_fit (0-10 scale) → map to Boom pts.
+  const ppf = parseFloat(pullParkFit) || 0;
+  const ppPts = ppf >= 7 ? 3
+              : ppf >= 5 ? 2
+              : ppf >= 3 ? 1
+              : 0;
+
+  return Math.min(99, Math.round(zf + s + tb + is + bs + hh + cd + dl + bst + prec + pv + laLock + swPen + ppPts));
 }
 
 // ── liveSlot — always use confirmed LINEUP_STATUS slot if available ───────────
@@ -12473,10 +12575,10 @@ function computeYardScore(sig, ghr, boom, ps,
 
   const sigN = (Math.min(14, Math.max(0, parseFloat(sig) || 0)) / 14) * 100;
   const ghrT = taperGHR(parseFloat(ghr) || 0);
-  const raw  = (parseFloat(boom) || 0) * 0.42   // was 0.35 — most validated signal
-             + (parseFloat(ps)   || 0) * 0.25   // was 0.22 — pitch convergence
-             + sigN                    * 0.25   // was 0.20 — weighted flag score
-             + ghrT                    * 0.08;  // was 0.18 — reputation only, taper hard
+  const raw  = (parseFloat(boom) || 0) * 0.38   // Boom: 42%→38% — pitch mix now gets more weight
+             + (parseFloat(ps)   || 0) * 0.32   // PS: 25%→32% — pitch mix convergence is the matchup signal
+             + sigN                    * 0.22   // Sig: 25%→22% — weighted flag score
+             + ghrT                    * 0.08;  // gHR: unchanged — reputation taper
 
   // ── Pitcher grade penalty (hard ceiling) ─────────────────────────────────
   // Applied FIRST so everything downstream is properly suppressed.
@@ -12634,7 +12736,7 @@ function LongShotView({ data }) {
         parseFloat(b.recent_barrel_spike||0), parseInt(b.recent_hr_count||0), parseFloat(b.recent_batter_ahead_pct||0),
         !!b.hh_precursor, parseFloat(b.primary_pitch_hr_rate||0),
         parseInt(b.recent_barrels_3d)||0, parseInt(b.recent_hrs_3d)||0,
-        parseFloat(b.recent_avg_bat_speed)||0, parseInt(b.recent_pb_2d)||0);
+        parseFloat(b.recent_avg_bat_speed)||0, parseInt(b.recent_pb_2d)||0, b.la_locked, parseFloat(b.season_swstr_pct)||0, parseFloat(b.park_pull_fit)||0);
       const _ps   = parseFloat(b.ps_score)||0;
       const _yard = computeYardScore(_sig, parseFloat(b.gHR)||0, _boom, _ps,
         b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1),
@@ -13066,8 +13168,8 @@ function SimLabView({ data }) {
     const mul = sortDir === 'desc' ? -1 : 1;
     const sorted = [...filtered].sort((a, b) => {
       if (sortBy === '_boom') {
-        const aB = boomCache.current[String(a.batter_id)] ?? computeBoomScore((parseFloat(a.weighted_flag_score)||0)*4.6, a.zone_fit, a.recent_iso, a.sim_tb, a.weighted_flag_score, parseFloat(a.recent_barrel_spike||0), parseInt(a.recent_hr_count||0), parseFloat(a.recent_batter_ahead_pct||0), !!a.hh_precursor, parseFloat(a.primary_pitch_hr_rate||0), parseInt(a.recent_barrels_3d)||0, parseInt(a.recent_hrs_3d)||0, parseFloat(a.recent_avg_bat_speed)||0, parseInt(a.recent_pb_2d)||0);
-        const bB = boomCache.current[String(b.batter_id)] ?? computeBoomScore((parseFloat(b.weighted_flag_score)||0)*4.6, b.zone_fit, b.recent_iso, b.sim_tb, b.weighted_flag_score, parseFloat(b.recent_barrel_spike||0), parseInt(b.recent_hr_count||0), parseFloat(b.recent_batter_ahead_pct||0), !!b.hh_precursor, parseFloat(b.primary_pitch_hr_rate||0), parseInt(b.recent_barrels_3d)||0, parseInt(b.recent_hrs_3d)||0, parseFloat(b.recent_avg_bat_speed)||0, parseInt(b.recent_pb_2d)||0);
+        const aB = boomCache.current[String(a.batter_id)] ?? computeBoomScore((parseFloat(a.weighted_flag_score)||0)*4.6, a.zone_fit, a.recent_iso, a.sim_tb, a.weighted_flag_score, parseFloat(a.recent_barrel_spike||0), parseInt(a.recent_hr_count||0), parseFloat(a.recent_batter_ahead_pct||0), !!a.hh_precursor, parseFloat(a.primary_pitch_hr_rate||0), parseInt(a.recent_barrels_3d)||0, parseInt(a.recent_hrs_3d)||0, parseFloat(a.recent_avg_bat_speed)||0, parseInt(a.recent_pb_2d)||0, a.la_locked, parseFloat(a.season_swstr_pct)||0, parseFloat(a.park_pull_fit)||0);
+        const bB = boomCache.current[String(b.batter_id)] ?? computeBoomScore((parseFloat(b.weighted_flag_score)||0)*4.6, b.zone_fit, b.recent_iso, b.sim_tb, b.weighted_flag_score, parseFloat(b.recent_barrel_spike||0), parseInt(b.recent_hr_count||0), parseFloat(b.recent_batter_ahead_pct||0), !!b.hh_precursor, parseFloat(b.primary_pitch_hr_rate||0), parseInt(b.recent_barrels_3d)||0, parseInt(b.recent_hrs_3d)||0, parseFloat(b.recent_avg_bat_speed)||0, parseInt(b.recent_pb_2d)||0, b.la_locked, parseFloat(b.season_swstr_pct)||0, parseFloat(b.park_pull_fit)||0);
         return mul * (aB - bB);
       }
       if (sortBy === 'ps_score') {
@@ -13668,7 +13770,7 @@ function SimLabView({ data }) {
                   b._trackerSig = Math.min(14, Math.max(0, _trackerSig)); // cap at 14
                   b._pgLabel     = _pgLabelv;
                   b._formClass   = getFormClass(b);
-                  b._boom        = computeBoomScore(b._trackerSig, b.zone_fit, b.recent_iso, b.sim_tb, b.weighted_flag_score, parseFloat(b.recent_barrel_spike||0), parseInt(b.recent_hr_count||0), parseFloat(b.recent_batter_ahead_pct||0), !!b.hh_precursor, parseFloat(b.primary_pitch_hr_rate||0), parseInt(b.recent_barrels_3d)||0, parseInt(b.recent_hrs_3d)||0, parseFloat(b.recent_avg_bat_speed)||0, parseInt(b.recent_pb_2d)||0);
+                  b._boom        = computeBoomScore(b._trackerSig, b.zone_fit, b.recent_iso, b.sim_tb, b.weighted_flag_score, parseFloat(b.recent_barrel_spike||0), parseInt(b.recent_hr_count||0), parseFloat(b.recent_batter_ahead_pct||0), !!b.hh_precursor, parseFloat(b.primary_pitch_hr_rate||0), parseInt(b.recent_barrels_3d)||0, parseInt(b.recent_hrs_3d)||0, parseFloat(b.recent_avg_bat_speed)||0, parseInt(b.recent_pb_2d)||0, b.la_locked, parseFloat(b.season_swstr_pct)||0, parseFloat(b.park_pull_fit)||0);
                   sigCache.current[String(b.batter_id)]  = b._trackerSig;
                   SIG_CACHE_GLOBAL[String(b.batter_id)]  = b._trackerSig; // expose to CheatSheetTab
                   boomCache.current[String(b.batter_id)] = b._boom;
@@ -13897,6 +13999,7 @@ function SimLabView({ data }) {
                       {label:'EV 92+ mph',    ok:ev7>=92,                  val:`${ev7.toFixed(1)}`,        tip:'Exit velocity above HR threshold'},
                       {label:'LA 22-32°',     ok:la7>=22&&la7<=32,         val:la7>0?`${la7.toFixed(1)}°`:'—', tip:'Optimal HR launch angle window'},
                       {label:'Pull FB%',      ok:pbPct>=6||fb7>=35,        val:pbPct>0?`↙${pbPct.toFixed(0)}%`:`FB${fb7.toFixed(0)}%`, tip:'Pull-side flyball tendency'},
+                      {label:'LA Locked',     ok:b.la_locked===true||b.la_locked==='True', val:(b.la_locked===true||b.la_locked==='True')?`${la7.toFixed(1)}°`:'—', tip:'Launch angle tight + centered in HR zone (stddev<8°)'},
                       {label:'Zone Fit 70%+', ok:zf>=70,                   val:`${zf.toFixed(0)}%`,        tip:'Pitcher throws to batter power zones'},
                       {label:'Platoon Adv',   ok:platoon,                  val:platoon?'✓':'—',            tip:'Favorable handedness matchup'},
                       {label:'P Gives Brls',  ok:pBrl>=6,                  val:pBrl>0?`${pBrl.toFixed(1)}%`:'—', tip:'Pitcher allows barrels regularly'},
@@ -20296,6 +20399,14 @@ function MatchupEngineTab() {
                   if(zf>=85) bullets.push({icon:'🗺️',color:'#27c97a',text:`${zf.toFixed(0)}% Zone Fit — pitcher throws where this batter crushes`});
                   else if(zf>=70) bullets.push({icon:'🗺️',color:'#f5a623',text:`${zf.toFixed(0)}% Zone Fit — favorable overlap`});
                   if(la7>=22&&la7<=32) bullets.push({icon:'📐',color:'#27c97a',text:`${la7.toFixed(1)}° avg launch angle — in the 22-32° HR sweet spot`});
+                  // LA Locked — tight angle consistency
+                  if(b.la_locked===true||b.la_locked==='True') bullets.push({icon:'🎯',color:'#27c97a',text:'Launch angle locked — consistent HR-zone contact profile (stddev < 8°)'});
+                  // SwStr% warning
+                  const swst2=parseFloat(b.season_swstr_pct)||0;
+                  if(swst2>=18) bullets.push({icon:'⚠️',color:'#f97316',text:`${swst2.toFixed(1)}% SwStr% — elevated whiff rate, fade if pitcher has sharp breaking ball`,bold:false});
+                  // Pull × Park
+                  const ppf2=parseFloat(b.park_pull_fit)||0;
+                  if(ppf2>=5) bullets.push({icon:'🏟️',color:'#27c97a',text:`Pull×Park Fit ${ppf2.toFixed(0)}/10 — pull tendency aligns with this park's power alley`});
                   const platAdv=(ph==='L'&&(bh==='R'||bh==='S'))||(ph==='R'&&(bh==='L'||bh==='S'));
                   if(platAdv) bullets.push({icon:'🤝',color:'#38b8f2',text:`Power-side advantage — ${bh==='R'?'RHB':'LHB'} vs ${ph==='L'?'LHP':'RHP'}`});
                   if(hotHand>=3) bullets.push({icon:'🔥',color:'#fb923c',text:`${hotHand} HR in last 7 days — on fire 🔥`});
@@ -20335,6 +20446,7 @@ function MatchupEngineTab() {
                     {label:'EV 92+ mph',   ok:ev7>=92,      val:`${ev7.toFixed(1)}`},
                     {label:'LA 22-32°',    ok:la7>=22&&la7<=32, val:la7>0?`${la7.toFixed(1)}°`:'—'},
                     {label:'Pull FB%',     ok:pbPct>=6||fb7>=35, val:pbPct>0?`↙${pbPct.toFixed(0)}%`:`FB${fb7.toFixed(0)}%`},
+                    {label:'LA Locked',    ok:b.la_locked===true||b.la_locked==='True', val:(b.la_locked===true||b.la_locked==='True')?'✓':'—'},
                     {label:'Zone Fit 70%+',ok:zf>=70,       val:`${zf.toFixed(0)}%`},
                     {label:'Platoon Adv',  ok:platoon,      val:platoon?'✓':'—'},
                     {label:'P Gives Brls', ok:pBarrel>=6,   val:pBarrel>0?`${pBarrel.toFixed(1)}%`:'—'},
@@ -22729,7 +22841,7 @@ function CrystalBallTab() {
       const sig  = parseFloat(r._trackerSig||r.weighted_flag_score*4.6||0);
       const ghr  = parseFloat(r.gHR||r.kHR||0);
       const ps   = parseFloat(r.ps_score||0);
-      const boom = computeBoomScore(sig, parseFloat(r.zone_fit||0), parseFloat(r.iso||0), parseFloat(r.sim_tb||0), parseFloat(r.weighted_flag_score||0), parseFloat(r.recent_barrel_spike||0), parseInt(r.recent_hr_count||0), parseFloat(r.recent_batter_ahead_pct||0), !!r.hh_precursor, parseFloat(r.primary_pitch_hr_rate||0), parseInt(r.recent_barrels_3d)||0, parseInt(r.recent_hrs_3d)||0, parseFloat(r.recent_avg_bat_speed)||0, parseInt(r.recent_pb_2d)||0);
+      const boom = computeBoomScore(sig, parseFloat(r.zone_fit||0), parseFloat(r.iso||0), parseFloat(r.sim_tb||0), parseFloat(r.weighted_flag_score||0), parseFloat(r.recent_barrel_spike||0), parseInt(r.recent_hr_count||0), parseFloat(r.recent_batter_ahead_pct||0), !!r.hh_precursor, parseFloat(r.primary_pitch_hr_rate||0), parseInt(r.recent_barrels_3d)||0, parseInt(r.recent_hrs_3d)||0, parseFloat(r.recent_avg_bat_speed)||0, parseInt(r.recent_pb_2d)||0, r.la_locked, parseFloat(r.season_swstr_pct)||0, parseFloat(r.park_pull_fit)||0);
       const yard = computeYardScore(sig, ghr, boom, ps, r.batter_hand||'', r.pitcher_hand||'', parseInt(r.days_rest??1), liveSlot(r.batter_id,r.lineup_slot), r._pgLabel||'');
       const ev   = parseFloat(r.recent_avg_ev||0);
       const la   = parseFloat(r.recent_avg_la||0);
@@ -24000,7 +24112,7 @@ function SimTab({ data }) {
       const iso    = parseFloat(r.recent_iso || 0);
       const ps     = parseFloat(r.ps_score  || 0);
       const zf     = parseFloat(r.zone_fit  || 0);
-      const boom   = parseFloat(r._boom) || computeBoomScore(sig, zf, iso, simTB, parseFloat(r.weighted_flag_score||0), parseFloat(r.recent_barrel_spike||0), parseInt(r.recent_hr_count||0), parseFloat(r.recent_batter_ahead_pct||0), !!r.hh_precursor, parseFloat(r.primary_pitch_hr_rate||0), parseInt(r.recent_barrels_3d)||0, parseInt(r.recent_hrs_3d)||0, parseFloat(r.recent_avg_bat_speed)||0, parseInt(r.recent_pb_2d)||0);
+      const boom   = parseFloat(r._boom) || computeBoomScore(sig, zf, iso, simTB, parseFloat(r.weighted_flag_score||0), parseFloat(r.recent_barrel_spike||0), parseInt(r.recent_hr_count||0), parseFloat(r.recent_batter_ahead_pct||0), !!r.hh_precursor, parseFloat(r.primary_pitch_hr_rate||0), parseInt(r.recent_barrels_3d)||0, parseInt(r.recent_hrs_3d)||0, parseFloat(r.recent_avg_bat_speed)||0, parseInt(r.recent_pb_2d)||0, r.la_locked, parseFloat(r.season_swstr_pct)||0, parseFloat(r.park_pull_fit)||0);
       const yard   = computeYardScore(sig, ghr, boom, ps, r.batter_hand||'', r.pitcher_hand||'', parseInt(r.days_rest??1), liveSlot(r.batter_id,r.lineup_slot), r._pgLabel||'');
       const pgLabel = r._pgLabel || '';
 
