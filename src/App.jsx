@@ -13848,6 +13848,19 @@ function SimLabView({ data }) {
                       <td style={{textAlign:'center',padding:'2px 4px',verticalAlign:'middle'}}>
                         <FormBadge formKey={getFormClass(b)}/>
                       </td>
+                      {/* HR Upside badge */}
+                      <td style={{textAlign:'center',padding:'2px 4px',verticalAlign:'middle'}}>
+                        {(()=>{const u=computeHRUpside(b);const short=u.label==='BELOW AVG'?'LOW':u.label==='STRONG'?'STR':u.label==='ELITE'?'ELITE':'GOOD';return(
+                          <span title={'HR Upside: '+u.label+' — '+u.lit+'/'+u.total+' conditions'}
+                            style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:7,
+                              color:u.color,letterSpacing:.3,whiteSpace:'nowrap',
+                              padding:'1px 3px',borderRadius:3,
+                              background:u.color+'18',border:'1px solid '+u.color+'33',
+                              cursor:'default'}}>
+                            {short}
+                          </span>
+                        );})()}
+                      </td>
                       {/* P.Grade + weak spot inline */}
                       <td style={{ textAlign: 'center', padding:'3px 4px' }}>
                         {(() => {
