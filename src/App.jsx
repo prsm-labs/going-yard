@@ -2693,8 +2693,7 @@ function AtBatSlideIn() {
               </div>
 
               <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:"var(--muted)",marginTop:4}}>
-                {(_logPA>0?_logPA:bvpData.pa)} career PA vs this pitcher
-                {(_logPA>0?_logPA:bvpData.pa) < 8 && ' · small sample — use caution'}
+                {(()=>{const _pa=(h2hLog&&h2hLog.length>0)?h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.plateAppearances||sp.stat?.atBats||0)),0):0;const pa=_pa>0?_pa:bvpData.pa;return pa+' career PA vs this pitcher'+(pa<8?' · small sample — use caution':'');})()}
               </div>
             </div>
           ) : (
