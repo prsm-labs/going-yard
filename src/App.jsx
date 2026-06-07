@@ -2003,48 +2003,53 @@ function MatchupCard({ dp }) {
                   </div>
                 </div>
               )}
-              {/* Pitch Mix Matchup Card — full signal surface */}
+              {/* Pitch Mix Matchup Card */}
           <div style={{background:'var(--surface2)',borderRadius:8,border:'1px solid var(--border)',padding:'10px 12px',gridColumn:'1/-1'}}>
             {(()=>{
-              const mono2    = "'DM Mono',monospace";
-              const ps       = parseFloat(dp.ps_score)||0;
-              const psColor  = ps>=75?'#a855f7':ps>=60?'#ff4020':ps>=45?'#f5a623':'var(--muted)';
-              const psLabel  = ps>=75?'Perfect Storm':ps>=60?'Elite':ps>=45?'Favorable':'Below Avg';
-              const veloR    = parseFloat(dp.fastball_velo_recent)||0;
-              const veloS    = parseFloat(dp.fastball_velo_season)||0;
-              const veloDrop = parseFloat(dp.pitcher_velo_drop||dp.fastball_velo_decay)||0;
-              const veloDec  = veloDrop>0.5;
-              const mb       = parseFloat(dp.pitcher_meatball_pct)||0;
-              const countMb  = parseFloat(dp.count_meatball_pct)||0;
-              const bh       = (dp.batter_hand||'').toUpperCase()[0];
-              const ph       = (dp.pitcher_hand||'').toUpperCase()[0];
-              const pBrlVsH  = parseFloat(bh==='L'?dp.pitcher_barrel_pct_vs_L:dp.pitcher_barrel_pct_vs_R)||parseFloat(dp.pitcher_barrel_pct_allowed)||0;
-              const pHHVsH   = parseFloat(bh==='L'?dp.pitcher_hh_pct_vs_L:dp.pitcher_hh_pct_vs_R)||parseFloat(dp.pitcher_hh_pct_allowed)||0;
-              const zf       = parseFloat(dp.zone_fit)||0;
-              const primaryHR= parseFloat(dp.primary_pitch_hr_rate)||0;
-              const topPitch = dp.top_pitches||'';
-              const platoon  = (ph==='L'&&(bh==='R'||bh==='S'))||(ph==='R'&&(bh==='L'||bh==='S'));
-              // Pre-computed to avoid nested ternaries inside template literals (Vite/rolldown limitation)
-              const zfBg     = zf>=8?'rgba(255,64,32,.1)':zf>=5?'rgba(245,166,35,.1)':zf>=2?'rgba(39,201,122,.08)':'rgba(0,0,0,.2)';
-              const zfBorder = zf>=8?'rgba(255,64,32,.3)':zf>=5?'rgba(245,166,35,.3)':zf>=2?'rgba(39,201,122,.2)':'var(--border)';
-              const mbBg     = mb>=55?'rgba(255,128,32,.1)':mb>=45?'rgba(245,166,35,.08)':'rgba(0,0,0,.2)';
-              const mbBorder = mb>=55?'rgba(255,128,32,.3)':mb>=45?'rgba(245,166,35,.3)':'var(--border)';
-              const veloBorder = veloDec?'rgba(56,184,242,.25)':'var(--border)';
+              const mono2     = "'DM Mono',monospace";
+              const ps        = parseFloat(dp.ps_score)||0;
+              const psCol     = ps>=75?'#a855f7':ps>=60?'#ff4020':ps>=45?'#f5a623':'var(--muted)';
+              const psLbl     = ps>=75?'Perfect Storm':ps>=60?'Elite':ps>=45?'Favorable':'Below Avg';
+              const veloR     = parseFloat(dp.fastball_velo_recent)||0;
+              const veloS     = parseFloat(dp.fastball_velo_season)||0;
+              const veloDrop  = parseFloat(dp.pitcher_velo_drop||dp.fastball_velo_decay)||0;
+              const veloDec   = veloDrop>0.5;
+              const mb        = parseFloat(dp.pitcher_meatball_pct)||0;
+              const countMb   = parseFloat(dp.count_meatball_pct)||0;
+              const bh        = (dp.batter_hand||'').toUpperCase()[0];
+              const ph        = (dp.pitcher_hand||'').toUpperCase()[0];
+              const pBrlVsH   = parseFloat(bh==='L'?dp.pitcher_barrel_pct_vs_L:dp.pitcher_barrel_pct_vs_R)||parseFloat(dp.pitcher_barrel_pct_allowed)||0;
+              const pHHVsH    = parseFloat(bh==='L'?dp.pitcher_hh_pct_vs_L:dp.pitcher_hh_pct_vs_R)||parseFloat(dp.pitcher_hh_pct_allowed)||0;
+              const zf        = parseFloat(dp.zone_fit)||0;
+              const primaryHR = parseFloat(dp.primary_pitch_hr_rate)||0;
+              const topPitch  = dp.top_pitches||'';
+              const platoon   = (ph==='L'&&(bh==='R'||bh==='S'))||(ph==='R'&&(bh==='L'||bh==='S'));
+              const bhnm      = bh||'?';
+              // Pre-computed styles — avoid nested ternaries in template literals
+              const zfBg      = zf>=8?'rgba(255,64,32,.1)':zf>=5?'rgba(245,166,35,.1)':zf>=2?'rgba(39,201,122,.08)':'rgba(0,0,0,.2)';
+              const zfBd      = '1px solid '+(zf>=8?'rgba(255,64,32,.3)':zf>=5?'rgba(245,166,35,.3)':zf>=2?'rgba(39,201,122,.2)':'var(--border)');
+              const zfCol     = zf>=8?'#ff4020':zf>=5?'#f5a623':zf>=2?'#27c97a':'var(--muted)';
+              const mbBg      = mb>=55?'rgba(255,128,32,.1)':mb>=45?'rgba(245,166,35,.08)':'rgba(0,0,0,.2)';
+              const mbBd      = '1px solid '+(mb>=55?'rgba(255,128,32,.3)':mb>=45?'rgba(245,166,35,.3)':'var(--border)');
+              const mbCol     = mb>=55?'#ff4020':mb>=45?'#f5a623':'var(--muted)';
+              const veloBd    = '1px solid '+(veloDec?'rgba(56,184,242,.25)':'var(--border)');
+              const veloBg    = veloDec?'rgba(56,184,242,.08)':'rgba(0,0,0,.2)';
+              const veloCol   = veloDec?'#38b8f2':'var(--text)';
+              const cmCol     = countMb>=40?'#ff8020':countMb>=32?'#f5a623':'var(--muted)';
+              const psBg      = ps>0?(psCol+'18'):'transparent';
+              const psBd      = '1px solid '+(ps>0?(psCol+'44'):'transparent');
               return (
                 <div>
-                  {/* Header */}
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
                     <span style={{fontFamily:mono2,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8}}>
-                      ⚡ Pitch Mix Matchup — {dp.pitcher||"Today's Pitcher"}
+                      {'⚡ Pitch Mix Matchup — '+(dp.pitcher||"Today's Pitcher")}
                     </span>
                     {ps>0&&<span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:10,
-                      color:psColor,padding:'1px 6px',borderRadius:4,
-                      background:`${psColor}18`,border:`1px solid ${psColor}44`,letterSpacing:.3}}>
-                      PS {Math.round(ps)} · {psLabel}
+                      color:psCol,padding:'1px 6px',borderRadius:4,background:psBg,border:psBd,letterSpacing:.3}}>
+                      {'PS '+Math.round(ps)+' · '+psLbl}
                     </span>}
                   </div>
 
-                  {/* Arsenal row */}
                   {topPitch&&(
                     <div style={{marginBottom:8,padding:'5px 8px',borderRadius:5,
                       background:'rgba(0,0,0,.25)',border:'1px solid rgba(255,255,255,.06)'}}>
@@ -2053,62 +2058,53 @@ function MatchupCard({ dp }) {
                       <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'var(--text)'}}>{topPitch}</span>
                       {primaryHR>0&&<span style={{fontFamily:mono2,fontSize:9,marginLeft:8,
                         color:primaryHR>=8?'#ff4020':primaryHR>=5?'#f5a623':'var(--muted)'}}>
-                        · {primaryHR.toFixed(1)}% HR vs primary pitch
+                        {'· '+primaryHR.toFixed(1)+'% HR vs primary pitch'}
                       </span>}
-                      {platoon&&<span style={{fontFamily:mono2,fontSize:9,color:'#38b8f2',fontWeight:700,marginLeft:8}}>· ✓ platoon adv</span>}
+                      {platoon&&<span style={{fontFamily:mono2,fontSize:9,color:'#38b8f2',fontWeight:700,marginLeft:8}}>{'· ✓ platoon adv'}</span>}
                     </div>
                   )}
 
-                  {/* 3 key stats */}
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6,marginBottom:8}}>
-                    <div style={{padding:'6px 8px',borderRadius:6,textAlign:'center',
-                      background:zfBg,
-                      border:`1px solid ${zfBorder}`}}>
+                    <div style={{padding:'6px 8px',borderRadius:6,textAlign:'center',background:zfBg,border:zfBd}}>
                       <div style={{fontFamily:mono2,fontSize:7,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.4,marginBottom:2}}>Zone Fit</div>
-                      <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:16,
-                        color:zf>=8?'#ff4020':zf>=5?'#f5a623':zf>=2?'#27c97a':'var(--muted)'}}>
+                      <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:16,color:zfCol}}>
                         {zf>0?zf.toFixed(1)+'%':'—'}
                       </div>
                       <div style={{fontFamily:mono2,fontSize:7,color:'var(--muted)',marginTop:1}}>location overlap</div>
                     </div>
-                    <div style={{padding:'6px 8px',borderRadius:6,textAlign:'center',
-                      background:mbBg,
-                      border:`1px solid ${mbBorder}`}}>
+                    <div style={{padding:'6px 8px',borderRadius:6,textAlign:'center',background:mbBg,border:mbBd}}>
                       <div style={{fontFamily:mono2,fontSize:7,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.4,marginBottom:2}}>Meatball%</div>
-                      <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:16,
-                        color:mb>=55?'#ff4020':mb>=45?'#f5a623':'var(--muted)'}}>
+                      <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:16,color:mbCol}}>
                         {mb>0?mb.toFixed(1)+'%':'—'}
                       </div>
-                      {countMb>0&&<div style={{fontFamily:mono2,fontSize:7,
-                        color:countMb>=40?'#ff8020':countMb>=32?'#f5a623':'var(--muted)',marginTop:1}}>
-                        {countMb.toFixed(0)}% behind in count
+                      {countMb>0&&<div style={{fontFamily:mono2,fontSize:7,color:cmCol,marginTop:1}}>
+                        {countMb.toFixed(0)+'% behind in count'}
                       </div>}
                     </div>
-                    <div style={{padding:'6px 8px',borderRadius:6,textAlign:'center',
-                      background:veloDec?'rgba(56,184,242,.08)':'rgba(0,0,0,.2)',
-                      border:`1px solid ${veloBorder}`}}>
+                    <div style={{padding:'6px 8px',borderRadius:6,textAlign:'center',background:veloBg,border:veloBd}}>
                       <div style={{fontFamily:mono2,fontSize:7,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.4,marginBottom:2}}>FB Velo</div>
-                      <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:16,color:veloDec?'#38b8f2':'var(--text)'}}>
+                      <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:16,color:veloCol}}>
                         {(veloR||veloS)>0?(veloR||veloS).toFixed(1):'—'}
                         <span style={{fontSize:8,fontWeight:400,color:'var(--muted)'}}> mph</span>
                       </div>
-                      {veloDec&&veloDrop>0&&<div style={{fontFamily:mono2,fontSize:7,color:'#38b8f2',marginTop:1}}>↓ {veloDrop.toFixed(1)} vs season</div>}
+                      {veloDec&&veloDrop>0&&<div style={{fontFamily:mono2,fontSize:7,color:'#38b8f2',marginTop:1}}>
+                        {'↓ '+veloDrop.toFixed(1)+' vs season'}
+                      </div>}
                     </div>
                   </div>
 
-                  {/* Vulnerability vs this batter's hand */}
                   <div style={{display:'flex',gap:14,flexWrap:'wrap'}}>
                     {[
-                      {lbl:`Brl vs ${bh||'—'}HB`, val:pBrlVsH, thresh:[8,5], suf:'%'},
-                      {lbl:`HH vs ${bh||'—'}HB`,  val:pHHVsH,  thresh:[42,38], suf:'%'},
-                      {lbl:'Brl Allowed',           val:parseFloat(dp.pitcher_barrel_pct_allowed)||0, thresh:[8,5], suf:'%'},
-                      {lbl:'HH Allowed',            val:parseFloat(dp.pitcher_hh_pct_allowed)||0,     thresh:[42,38], suf:'%'},
-                    ].map(({lbl,val,thresh,suf})=>{
+                      {lbl:'Brl vs '+bhnm+'HB', val:pBrlVsH, t1:8,  t2:5,  suf:'%'},
+                      {lbl:'HH vs '+bhnm+'HB',  val:pHHVsH,  t1:42, t2:38, suf:'%'},
+                      {lbl:'Brl Allowed',        val:parseFloat(dp.pitcher_barrel_pct_allowed)||0, t1:8,  t2:5,  suf:'%'},
+                      {lbl:'HH Allowed',         val:parseFloat(dp.pitcher_hh_pct_allowed)||0,    t1:42, t2:38, suf:'%'},
+                    ].map(({lbl,val,t1,t2,suf})=>{
                       if(!val) return null;
-                      const color=val>=thresh[0]?'#ff4020':val>=thresh[1]?'#f5a623':'var(--muted)';
+                      const col=val>=t1?'#ff4020':val>=t2?'#f5a623':'var(--muted)';
                       return(<div key={lbl} style={{textAlign:'center',minWidth:60}}>
                         <div style={{fontFamily:mono2,fontSize:7,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.3,marginBottom:2}}>{lbl}</div>
-                        <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color}}>{val.toFixed(1)}{suf}</div>
+                        <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color:col}}>{val.toFixed(1)+suf}</div>
                       </div>);
                     }).filter(Boolean)}
                   </div>
