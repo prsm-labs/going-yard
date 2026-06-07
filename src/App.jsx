@@ -2024,6 +2024,12 @@ function MatchupCard({ dp }) {
               const primaryHR= parseFloat(dp.primary_pitch_hr_rate)||0;
               const topPitch = dp.top_pitches||'';
               const platoon  = (ph==='L'&&(bh==='R'||bh==='S'))||(ph==='R'&&(bh==='L'||bh==='S'));
+              // Pre-computed to avoid nested ternaries inside template literals (Vite/rolldown limitation)
+              const zfBg     = zf>=8?'rgba(255,64,32,.1)':zf>=5?'rgba(245,166,35,.1)':zf>=2?'rgba(39,201,122,.08)':'rgba(0,0,0,.2)';
+              const zfBorder = zf>=8?'rgba(255,64,32,.3)':zf>=5?'rgba(245,166,35,.3)':zf>=2?'rgba(39,201,122,.2)':'var(--border)';
+              const mbBg     = mb>=55?'rgba(255,128,32,.1)':mb>=45?'rgba(245,166,35,.08)':'rgba(0,0,0,.2)';
+              const mbBorder = mb>=55?'rgba(255,128,32,.3)':mb>=45?'rgba(245,166,35,.3)':'var(--border)';
+              const veloBorder = veloDec?'rgba(56,184,242,.25)':'var(--border)';
               return (
                 <div>
                   {/* Header */}
@@ -2056,8 +2062,8 @@ function MatchupCard({ dp }) {
                   {/* 3 key stats */}
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6,marginBottom:8}}>
                     <div style={{padding:'6px 8px',borderRadius:6,textAlign:'center',
-                      background:zf>=8?'rgba(255,64,32,.1)':zf>=5?'rgba(245,166,35,.1)':zf>=2?'rgba(39,201,122,.08)':'rgba(0,0,0,.2)',
-                      border:`1px solid ${zf>=8?'rgba(255,64,32,.3)':zf>=5?'rgba(245,166,35,.3)':zf>=2?'rgba(39,201,122,.2)':'var(--border)'}`}}>
+                      background:zfBg,
+                      border:`1px solid ${zfBorder}`}}>
                       <div style={{fontFamily:mono2,fontSize:7,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.4,marginBottom:2}}>Zone Fit</div>
                       <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:16,
                         color:zf>=8?'#ff4020':zf>=5?'#f5a623':zf>=2?'#27c97a':'var(--muted)'}}>
@@ -2066,8 +2072,8 @@ function MatchupCard({ dp }) {
                       <div style={{fontFamily:mono2,fontSize:7,color:'var(--muted)',marginTop:1}}>location overlap</div>
                     </div>
                     <div style={{padding:'6px 8px',borderRadius:6,textAlign:'center',
-                      background:mb>=55?'rgba(255,128,32,.1)':mb>=45?'rgba(245,166,35,.08)':'rgba(0,0,0,.2)',
-                      border:`1px solid ${mb>=55?'rgba(255,128,32,.3)':mb>=45?'rgba(245,166,35,.3)':'var(--border)'}`}}>
+                      background:mbBg,
+                      border:`1px solid ${mbBorder}`}}>
                       <div style={{fontFamily:mono2,fontSize:7,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.4,marginBottom:2}}>Meatball%</div>
                       <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:16,
                         color:mb>=55?'#ff4020':mb>=45?'#f5a623':'var(--muted)'}}>
@@ -2080,7 +2086,7 @@ function MatchupCard({ dp }) {
                     </div>
                     <div style={{padding:'6px 8px',borderRadius:6,textAlign:'center',
                       background:veloDec?'rgba(56,184,242,.08)':'rgba(0,0,0,.2)',
-                      border:`1px solid ${veloDec?'rgba(56,184,242,.25)':'var(--border)'}`}}>
+                      border:`1px solid ${veloBorder}`}}>
                       <div style={{fontFamily:mono2,fontSize:7,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.4,marginBottom:2}}>FB Velo</div>
                       <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:16,color:veloDec?'#38b8f2':'var(--text)'}}>
                         {(veloR||veloS)>0?(veloR||veloS).toFixed(1):'—'}
