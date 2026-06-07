@@ -2296,8 +2296,35 @@ function AtBatSlideIn() {
               '/stats?stats=vsPlayer&opposingPlayerId='+ppid2+'&group=hitting&sportId=1')
               .then(r2=>r2.json())
               .then(d2=>{
-                const splits = (d2?.stats||[]).flatMap(s=>s.splits||[])
-                  .filter(sp=>(sp.stat?.atBats||0)>0 && sp.season)  // sp.season undefined = aggregate total row, exclude
+                // Group by season — API sometimes returns per-game rows instead of per-season
+                // Aggregate all rows with the same season into one summary row
+                const rawSplits = (d2?.stats||[]).flatMap(s=>s.splits||[])
+                  .filter(sp=>(sp.stat?.atBats||0)>0 && sp.season);
+                const bySeasonMap = {};
+                rawSplits.forEach(sp => {
+                  const yr = sp.season||'—';
+                  if (!bySeasonMap[yr]) bySeasonMap[yr] = {
+                    season: yr,
+                    stat: { atBats:0, plateAppearances:0, hits:0, homeRuns:0,
+                            doubles:0, baseOnBalls:0, strikeOuts:0 }
+                  };
+                  const t = bySeasonMap[yr].stat, s2 = sp.stat||{};
+                  t.atBats          += parseInt(s2.atBats||0);
+                  t.plateAppearances+= parseInt(s2.plateAppearances||s2.atBats||0);
+                  t.hits            += parseInt(s2.hits||0);
+                  t.homeRuns        += parseInt(s2.homeRuns||0);
+                  t.doubles         += parseInt(s2.doubles||0);
+                  t.baseOnBalls     += parseInt(s2.baseOnBalls||0);
+                  t.strikeOuts      += parseInt(s2.strikeOuts||0);
+                });
+                // Compute AVG per season from aggregated H/AB
+                Object.values(bySeasonMap).forEach(row => {
+                  const ab = row.stat.atBats;
+                  row.stat.avg = ab > 0
+                    ? '.'+String(Math.round(row.stat.hits/ab*1000)).padStart(3,'0')
+                    : '.000';
+                });
+                const splits = Object.values(bySeasonMap)
                   .sort((a,b)=>(b.season||'0').localeCompare(a.season||'0'));
                 setH2hLog(splits);
                 setH2hLogLoad(false);
@@ -2679,7 +2706,7 @@ function AtBatSlideIn() {
                                   <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'DM Mono',monospace",color:'var(--muted)'}}>{s.doubles??'—'}</td>
                                   <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'DM Mono',monospace",color:parseInt(s.baseOnBalls||0)>0?'#27c97a':'var(--muted)'}}>{s.baseOnBalls??'—'}</td>
                                   <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'DM Mono',monospace",color:parseInt(s.strikeOuts||0)>0?'var(--ice)':'var(--muted)'}}>{s.strikeOuts??'—'}</td>
-                                  <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'DM Mono',monospace",color:parseFloat(s.avg||0)>=0.300?'#27c97a':parseFloat(s.avg||0)>=0.250?'var(--text)':'var(--muted)'}}>{s.avg??'—'}</td>
+                                  <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'DM Mono',monospace",color:(()=>{const av=typeof s.avg==='string'?parseFloat(s.avg):parseFloat(s.avg||0);return av>=0.300?'#27c97a':av>=0.250?'var(--text)':'var(--muted)';})()}}>{s.avg??'—'}</td>
                                 </tr>
                               );
                             })}
