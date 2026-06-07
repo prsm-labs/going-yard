@@ -2704,6 +2704,7 @@ function AtBatSlideIn() {
           {label:'EV 92+ mph',   ok:ev7>=92,             val:ev7.toFixed(1)},
           {label:'LA 22-32°',    ok:la7>=22&&la7<=32,    val:la7>0?(la7.toFixed(1)+'°'):'—'},
           {label:'Pull FB%',     ok:pbPct>=6||fb7>=35,   val:pbPct>0?('↙'+pbPct.toFixed(0)+'%'):('FB'+fb7.toFixed(0)+'%')},
+          {label:'LA Locked',    ok:dp3.la_locked===true||dp3.la_locked==='True', val:(dp3.la_locked===true||dp3.la_locked==='True')?'✓':'—'},
           {label:'Zone Fit 70%+',ok:zf>=70,              val:zf.toFixed(0)+'%'},
           {label:'Platoon Adv',  ok:plat,                val:plat?'✓':'—'},
           {label:'P Gives Brls', ok:pBrl>=6,             val:pBrl>0?(pBrl.toFixed(1)+'%'):'—'},
@@ -2724,7 +2725,8 @@ function AtBatSlideIn() {
         const litFinal = checks.filter(ch=>ch.ok).length - checks.filter(ch=>ch.fade).length;
         const litClamp = Math.max(0, litFinal);
         const total    = checks.length;
-        const uLabel   = litClamp>=Math.round(total*.75)?'ELITE':litClamp>=Math.round(total*.55)?'STRONG':litClamp>=Math.round(total*.35)?'GOOD':'BELOW AVG';
+        // Thresholds match KM checklist: 7+/9=ELITE, 5+/9=STRONG, 3+/9=GOOD
+        const uLabel   = litClamp>=(total===10?8:7)?'ELITE':litClamp>=(total===10?6:5)?'STRONG':litClamp>=(total===10?4:3)?'GOOD':'BELOW AVG';
         const uCol     = uLabel==='ELITE'?'#ff4020':uLabel==='STRONG'?'#f5a623':uLabel==='GOOD'?'#27c97a':'var(--muted)';
         return (
           <div style={{padding:'14px 20px',borderBottom:'1px solid var(--border)'}}>
