@@ -2762,42 +2762,16 @@ function AtBatSlideIn() {
             if(!bid||!ppid){ setZoneData({}); return; }
             setZoneLoad(true);
             try{
-              // MLB Stats API hotColdZones — same underlying data as Savant zones page
-              // Works from browser (CORS-allowed), genuinely public endpoint
-              // statType maps to different hotColdZones endpoints
-              const statTypeMap = {hr:'hotColdZonesBatting', barrel:'hotColdZonesBatting', hardhit:'hotColdZonesBatting'};
-              const bUrl = 'https://statsapi.mlb.com/api/v1/people/'+bid+'/stats?stats=hotColdZones&group=hitting&season=2026&sportId=1';
-              // Pitcher zone data: use hotColdZones with pitching group
-              // If empty, pitchZones covers where pitcher throws by zone
-              const pUrl = 'https://statsapi.mlb.com/api/v1/people/'+ppid+'/stats?stats=hotColdZones&group=pitching&season=2026&sportId=1';
-              const pUrl2 = 'https://statsapi.mlb.com/api/v1/people/'+ppid+'/stats?stats=pitchZones&group=pitching&season=2026&sportId=1';
-              const [bRes, pRes, pRes2] = await Promise.all([fetch(bUrl), fetch(pUrl), fetch(pUrl2)]);
-              const [bJson, pJson, pJson2] = await Promise.all([bRes.json(), pRes.json(), pRes2.json()]);
-              // Use whichever pitcher response has zone data
-              const pJsonFinal = (pJson?.stats?.flatMap(s=>s.splits||[]).flatMap(sp=>sp.stat?.zones||[]).length > 0)
-                ? pJson : pJson2;
-              // Response: {stats:[{splits:[{stat:{zones:[{zone:"1",value:23,...}]}}]}]}
-              const extractZones = (j) => {
-                const splits = j?.stats?.flatMap(s=>s.splits||[]) || [];
-                return splits.flatMap(sp => sp.stat?.zones || []);
-              };
-              const bZones = extractZones(bJson);
-              const pZones = extractZones(pJsonFinal);
-              console.log('[Zones] bZones:', bZones.length, JSON.stringify(bZones[0]));
-              console.log('[Zones] pZones:', pZones.length, JSON.stringify(pZones[0]));
-              console.log('[Zones] batter sample:', bZones[0]);
-              console.log('[Zones] pitcher sample:', pZones[0]);
-              // Build zone maps — try multiple possible zone id field names
+              // Load zone_splits.json — built daily by build_zone_splits.py
+              // Real 2026 per-zone stats from mlb_atbat_log_full.csv (Mar 25 onward)
+              // Batter: HR%, Barrel%, HH% per zone | Pitcher: usage% per zone
+              const zRes  = await fetch('/data/zone_splits.json');
+              const zJson = await zRes.json();
+              const bRaw  = zJson?.batters?.[String(bid)]  || {};
+              const pRaw  = zJson?.pitchers?.[String(ppid)] || {};
               const bMap = {}, pMap = {};
-              // MLB Stats API zone field is a string: "1"-"9" for core, "11"-"14" for edges
-              const getZoneId = z => {
-                const raw = z.zone ?? z.zoneId ?? z.zone_id ?? z.id ?? z.Zone;
-                return raw != null ? parseInt(raw) : null;
-              };
-              bZones.forEach(z=>{ const id=getZoneId(z); if(id!=null) bMap[id]=z; });
-              pZones.forEach(z=>{ const id=getZoneId(z); if(id!=null) pMap[id]=z; });
-              console.log('[Zones] bMap keys:', Object.keys(bMap));
-              console.log('[Zones] pMap keys:', Object.keys(pMap));
+              Object.entries(bRaw).forEach(([z,d])=>{ bMap[parseInt(z)] = d; });
+              Object.entries(pRaw).forEach(([z,d])=>{ pMap[parseInt(z)] = d; });
               // Compute overlap edges: zones where pitcher usage% >= 7 AND batter is strong
               const edges = [];
               const CORE_ZONES = [1,2,3,4,5,6,7,8,9];
@@ -2806,14 +2780,15 @@ function AtBatSlideIn() {
                 const bz = bMap[zn] || bMap[String(zn)];
                 if(!pz||!bz) return;
                 // MLB Stats API: zonePct = usage%, zoneHitRate = batter metric, value = count
-                // value = 0-1 decimal → ×100 for 0-100 heat scale
-                const usage = Math.round((parseFloat(pz.value ?? 0)) * 100);
-                if(usage < 5) return; // pitcher rarely throws here — skip
-                const bScore = Math.round((parseFloat(bz.value ?? 0)) * 100);
-                const bHR = bScore; const bBrl = bScore; const bHH = bScore;
-                // Hot zone for batter = heat score >= 60 (above average)
-                if(bScore >= 60){
-                  edges.push({ zone:zn, usage, bHR, bBrl, bHH,
+                // Real rates: pitcher usage_pct, batter hr/barrel/hh rates
+                const usage = pz.usage_pct ?? 0;
+                if(usage < 8) return; // pitcher throws < 8% here — not a real target zone
+                const bHR  = bz.hr_rate     ?? 0;
+                const bBrl = bz.barrel_rate ?? 0;
+                const bHH  = bz.hh_rate     ?? 0;
+                // Edge = pitcher targets this zone AND batter has real power here
+                if(bHR >= 8 || bBrl >= 12 || bHH >= 50){
+                  edges.push({ zone:zn, usage:parseFloat(usage.toFixed(1)), bHR:parseFloat(bHR.toFixed(1)), bBrl:parseFloat(bBrl.toFixed(1)), bHH:parseFloat(bHH.toFixed(1)),
                     label: zn<=3?'Up':zn<=6?'Middle':'Down' });
                 }
               });
@@ -2870,26 +2845,33 @@ function AtBatSlideIn() {
           const getBatterVal = (zn) => {
             const bz = bMap[zn] || bMap[String(zn)];
             if(!bz) return null;
-            // hotColdZones value = 0.0-1.0 decimal → multiply ×100 for display (0-100 scale)
-            const raw = parseFloat(bz.value ?? 0);
-            return isNaN(raw) ? null : Math.round(raw * 100);
+            // Real 2026 rates from mlb_atbat_log_full.csv
+            // zoneStat: 'hr' → hr_rate, 'barrel' → barrel_rate, 'hardhit' → hh_rate
+            const v = zoneStat==='hr'      ? bz.hr_rate
+                    : zoneStat==='barrel'   ? bz.barrel_rate
+                    : bz.hh_rate;
+            return v ?? null;
           };
           const getPitcherUsage = (zn) => {
             const pz = pMap[zn] || pMap[String(zn)];
-            if(!pz) return 0;
-            const raw = parseFloat(pz.value ?? pz.zonePct ?? 0);
-            return isNaN(raw) ? 0 : Math.round(raw * 100);
+            return pz ? (pz.usage_pct ?? 0) : 0;
           };
           // Color batter zone by strength
           const zoneColor = (val) => {
-            if(val===null) return 'rgba(255,255,255,.04)';
-            // hotColdZones 0-100 heat score: 67+ = hot (red), 33-66 = average, <33 = cold (blue)
-            return val>=67?'rgba(232,65,26,.75)':val>=50?'rgba(232,65,26,.4)':val>=33?'rgba(245,166,35,.25)':'rgba(52,100,200,.25)';
+            if(val===null||val===undefined) return 'rgba(255,255,255,.04)';
+            // Thresholds based on 2026 actual rates:
+            // HR%: elite=10%+, good=5%+, avg=2%+
+            // Barrel%: elite=15%+, good=8%+, avg=3%+
+            // HH%: elite=60%+, good=45%+, avg=30%+
+            const hi = zoneStat==='hr'     ? [10,5,2]
+                      : zoneStat==='barrel' ? [15,8,3]
+                      : [60,45,30];
+            return val>=hi[0]?'rgba(232,65,26,.8)':val>=hi[1]?'rgba(232,65,26,.45)':val>=hi[2]?'rgba(245,166,35,.3)':'rgba(52,100,200,.2)';
           };
           const fmtVal = (val) => {
             if(val===null||val===undefined) return '—';
-            // Heat score 0-100
-            return Math.round(val)+'';
+            // Real rate — show 1 decimal + %
+            return parseFloat(val).toFixed(1)+'%';
           };
 
           const ZoneCell = ({zn, showPitcher}) => {
@@ -2935,7 +2917,7 @@ function AtBatSlideIn() {
                     {lbl}
                   </button>
                 ))}
-                <span style={{fontFamily:mono3,fontSize:7,color:'rgba(255,255,255,.25)',marginLeft:4}}>0-100 heat score</span>
+                <span style={{fontFamily:mono3,fontSize:7,color:'rgba(255,255,255,.25)',marginLeft:4}}>2026 season · {Object.keys(bMap).length>0?Object.values(bMap).reduce((s,v)=>s+(v.pa||0),0)+' PA':''}</span>
               </div>
 
               {/* Matchup Edges */}
@@ -2969,7 +2951,7 @@ function AtBatSlideIn() {
                       <span style={{color:'var(--muted)'}}>{e.label}</span>
                       <span style={{color:'#ff4020',fontWeight:700}}>{e.usage.toFixed(0)}% usage</span>
                       <span style={{color:'rgba(255,255,255,.5)'}}>
-                        heat {Math.round(e.bHR)}/100
+                        {e.bHR>0?e.bHR.toFixed(1)+'% HR':''}{e.bBrl>0?' '+e.bBrl.toFixed(0)+'% Brl':''}
                       </span>
                     </div>
                   ))}
@@ -2981,7 +2963,7 @@ function AtBatSlideIn() {
                 <div>
                   <div style={{fontFamily:mono3,fontSize:8,color:'var(--muted)',
                     textTransform:'uppercase',letterSpacing:.7,marginBottom:6,textAlign:'center'}}>
-                    Batter — {zoneStat==='hr'?'HR Rate':zoneStat==='barrel'?'Barrel%':'Hard Hit%'} (heat)
+                    Batter — {zoneStat==='hr'?'HR%':zoneStat==='barrel'?'Barrel%':'Hard Hit%'}
                   </div>
                   <GridRow zones={[1,2,3]} showPitcher={false}/>
                   <div style={{height:3}}/>
@@ -2992,7 +2974,7 @@ function AtBatSlideIn() {
                 <div>
                   <div style={{fontFamily:mono3,fontSize:8,color:'var(--muted)',
                     textTransform:'uppercase',letterSpacing:.7,marginBottom:6,textAlign:'center'}}>
-                    Pitcher — Usage %
+                    Pitcher — Zone Usage %
                   </div>
                   <GridRow zones={[1,2,3]} showPitcher={true}/>
                   <div style={{height:3}}/>
@@ -3004,7 +2986,7 @@ function AtBatSlideIn() {
 
               <div style={{fontFamily:mono3,fontSize:7,color:'rgba(255,255,255,.2)',
                 marginTop:8,textAlign:'center'}}>
-                ★ = edge zone · Source: MLB Stats API hotColdZones 2026 · 0-100 heat score
+                ★ = edge zone · Source: 2026 Statcast AB log · real HR% / Barrel% / HH% per zone
               </div>
             </div>
           );
