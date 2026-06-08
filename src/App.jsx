@@ -13553,7 +13553,6 @@ function SimLabView({ data }) {
                   setSlFormFilter(new Set(['moonshot','gap']));
                   setMinL7EV('90');
                   setMinZoneFit('2');
-                  setMaxZoneFit('8');
                 } else {
                   setMinSimTB('');
                   setSelPitcherGradesSim(new Set());
@@ -13563,7 +13562,6 @@ function SimLabView({ data }) {
                   setSlFormFilter(new Set());
                   setMinL7EV('');
                   setMinZoneFit('');
-                  setMaxZoneFit('');
                 }
               }}
             />
@@ -15263,7 +15261,7 @@ function CheatCodeButton({ onSauceFilter }) {
                 ✔ Sim TB ≥ 1.5 &nbsp;✔ Pitcher: Target / Hittable / Average<br/>
                 ✔ Grade: A or A+ &nbsp;✔ Sig ≥ 4<br/>
                 ✔ Active batters only &nbsp;✔ Form: Moonshot / Gap<br/>
-                ✔ L7 EV ≥ 90 mph &nbsp;✔ Zone Fit 2–8<br/>
+                ✔ L7 EV ≥ 90 mph &nbsp;✔ Zone Fit ≥ 2<br/>
                 <span style={{color:'rgba(255,255,255,.3)',marginTop:4,display:'block'}}>
                   Tap ⋄ SAUCE ON to disable and reset all filters
                 </span>
