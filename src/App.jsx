@@ -13550,7 +13550,7 @@ function SimLabView({ data }) {
                   setSelBatterGradesSim(new Set(['A','A+']));
                   setMinSig('4');
                   setSimActiveOnly(true);
-                  setSlFormFilter(new Set(['Moonshot','Gap']));
+                  setSlFormFilter(new Set(['moonshot','gap']));
                   setMinL7EV('90');
                   setMinZoneFit('2');
                   setMaxZoneFit('8');
