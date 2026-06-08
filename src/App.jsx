@@ -2220,7 +2220,7 @@ function AtBatSlideIn() {
   const [zoneOpen,    setZoneOpen]    = useState(false);
   const [zoneData,    setZoneData]    = useState(null);   // {batter:[], pitcher:[], edges:[]}
   const [zoneLoad,    setZoneLoad]    = useState(false);
-  const [zoneStat,    setZoneStat]    = useState('hr'); // 'hr' | 'barrel' | 'hardhit'
+  const [zoneStat,    setZoneStat]    = useState('hr'); // 'hr' | 'barrel' | 'hardhit' | 'k'
 
   useEffect(() => {
     AB_SLIDE_LISTENER = setPlayer;
@@ -2849,6 +2849,7 @@ function AtBatSlideIn() {
             // zoneStat: 'hr' → hr_rate, 'barrel' → barrel_rate, 'hardhit' → hh_rate
             const v = zoneStat==='hr'      ? bz.hr_rate
                     : zoneStat==='barrel'   ? bz.barrel_rate
+                    : zoneStat==='k'        ? bz.k_rate
                     : bz.hh_rate;
             return v ?? null;
           };
@@ -2863,6 +2864,10 @@ function AtBatSlideIn() {
             // HR%: elite=10%+, good=5%+, avg=2%+
             // Barrel%: elite=15%+, good=8%+, avg=3%+
             // HH%: elite=60%+, good=45%+, avg=30%+
+            // K% is inverted — high K rate = weakness (blue), low = strength (red)
+            if(zoneStat==='k') {
+              return val>=35?'rgba(52,100,200,.8)':val>=20?'rgba(52,100,200,.45)':val>=10?'rgba(245,166,35,.3)':'rgba(232,65,26,.4)';
+            }
             const hi = zoneStat==='hr'     ? [10,5,2]
                       : zoneStat==='barrel' ? [15,8,3]
                       : [60,45,30];
@@ -2907,7 +2912,7 @@ function AtBatSlideIn() {
             <div style={{padding:'0 20px 16px'}}>
               {/* Stat selector + legend */}
               <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
-                {[['hr','HR Rate'],['barrel','Barrel%'],['hardhit','Hard Hit%']].map(([k,lbl])=>(
+                {[['hr','HR Rate'],['barrel','Barrel%'],['hardhit','Hard Hit%'],['k','K%']].map(([k,lbl])=>(
                   <button key={k} onClick={()=>setZoneStat(k)}
                     style={{fontFamily:mono3,fontSize:8,padding:'3px 8px',borderRadius:4,
                       cursor:'pointer',
@@ -2963,7 +2968,7 @@ function AtBatSlideIn() {
                 <div>
                   <div style={{fontFamily:mono3,fontSize:8,color:'var(--muted)',
                     textTransform:'uppercase',letterSpacing:.7,marginBottom:6,textAlign:'center'}}>
-                    Batter — {zoneStat==='hr'?'HR%':zoneStat==='barrel'?'Barrel%':'Hard Hit%'}
+                    Batter — {zoneStat==='hr'?'HR%':zoneStat==='barrel'?'Barrel%':zoneStat==='k'?'K%':'Hard Hit%'}
                   </div>
                   <GridRow zones={[1,2,3]} showPitcher={false}/>
                   <div style={{height:3}}/>
