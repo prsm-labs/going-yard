@@ -2783,6 +2783,9 @@ function AtBatSlideIn() {
               };
               const bZones = flattenZones(bJson);
               const pZones = flattenZones(pJson);
+              console.log('[Zones] raw bJson type:', typeof bJson, Array.isArray(bJson), bJson === null);
+              console.log('[Zones] raw bJson:', JSON.stringify(bJson)?.slice(0,300));
+              console.log('[Zones] raw pJson:', JSON.stringify(pJson)?.slice(0,300));
               console.log('[Zones] batter sample:', bZones[0]);
               console.log('[Zones] pitcher sample:', pZones[0]);
               // Build zone maps — try multiple possible zone id field names
