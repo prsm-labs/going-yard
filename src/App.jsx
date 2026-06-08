@@ -2296,35 +2296,8 @@ function AtBatSlideIn() {
               '/stats?stats=vsPlayer&opposingPlayerId='+ppid2+'&group=hitting&sportId=1')
               .then(r2=>r2.json())
               .then(d2=>{
-                // Group by season — API sometimes returns per-game rows instead of per-season
-                // Aggregate all rows with the same season into one summary row
-                const rawSplits = (d2?.stats||[]).flatMap(s=>s.splits||[])
-                  .filter(sp=>(sp.stat?.atBats||0)>0 && sp.season);
-                const bySeasonMap = {};
-                rawSplits.forEach(sp => {
-                  const yr = sp.season||'—';
-                  if (!bySeasonMap[yr]) bySeasonMap[yr] = {
-                    season: yr,
-                    stat: { atBats:0, plateAppearances:0, hits:0, homeRuns:0,
-                            doubles:0, baseOnBalls:0, strikeOuts:0 }
-                  };
-                  const t = bySeasonMap[yr].stat, s2 = sp.stat||{};
-                  t.atBats          += parseInt(s2.atBats||0);
-                  t.plateAppearances+= parseInt(s2.plateAppearances||s2.atBats||0);
-                  t.hits            += parseInt(s2.hits||0);
-                  t.homeRuns        += parseInt(s2.homeRuns||0);
-                  t.doubles         += parseInt(s2.doubles||0);
-                  t.baseOnBalls     += parseInt(s2.baseOnBalls||0);
-                  t.strikeOuts      += parseInt(s2.strikeOuts||0);
-                });
-                // Compute AVG per season from aggregated H/AB
-                Object.values(bySeasonMap).forEach(row => {
-                  const ab = row.stat.atBats;
-                  row.stat.avg = ab > 0
-                    ? '.'+String(Math.round(row.stat.hits/ab*1000)).padStart(3,'0')
-                    : '.000';
-                });
-                const splits = Object.values(bySeasonMap)
+                const splits = (d2?.stats||[]).flatMap(s=>s.splits||[])
+                  .filter(sp=>(sp.stat?.atBats||0)>0 && sp.season)  // sp.season undefined = aggregate total row, exclude
                   .sort((a,b)=>(b.season||'0').localeCompare(a.season||'0'));
                 setH2hLog(splits);
                 setH2hLogLoad(false);
@@ -2706,7 +2679,7 @@ function AtBatSlideIn() {
                                   <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'DM Mono',monospace",color:'var(--muted)'}}>{s.doubles??'—'}</td>
                                   <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'DM Mono',monospace",color:parseInt(s.baseOnBalls||0)>0?'#27c97a':'var(--muted)'}}>{s.baseOnBalls??'—'}</td>
                                   <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'DM Mono',monospace",color:parseInt(s.strikeOuts||0)>0?'var(--ice)':'var(--muted)'}}>{s.strikeOuts??'—'}</td>
-                                  <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'DM Mono',monospace",color:(()=>{const av=typeof s.avg==='string'?parseFloat(s.avg):parseFloat(s.avg||0);return av>=0.300?'#27c97a':av>=0.250?'var(--text)':'var(--muted)';})()}}>{s.avg??'—'}</td>
+                                  <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'DM Mono',monospace",color:parseFloat(s.avg||0)>=0.300?'#27c97a':parseFloat(s.avg||0)>=0.250?'var(--text)':'var(--muted)'}}>{s.avg??'—'}</td>
                                 </tr>
                               );
                             })}
@@ -13569,7 +13542,31 @@ function SimLabView({ data }) {
           <button style={vBtn('slate', '📊 Slate')} onClick={() => setView('slate')}>📊 Slate Rankings</button>
           <button style={vBtn('deepdive', '🔬')} onClick={() => setView('deepdive')}>🔬 Deep Dive</button>
         </div>
-        <CheatCodeButton/>
+        <CheatCodeButton
+              onSauceFilter={(enable)=>{
+                if(enable){
+                  setMinSimTB('1.5');
+                  setSelPitcherGradesSim(new Set(['🎯 Target','💥 Hittable','🤔 Average']));
+                  setSelBatterGradesSim(new Set(['A','A+']));
+                  setMinSig('4');
+                  setSimActiveOnly(true);
+                  setSlFormFilter(new Set(['Moonshot','Gap']));
+                  setMinL7EV('90');
+                  setMinZoneFit('2');
+                  setMaxZoneFit('8');
+                } else {
+                  setMinSimTB('');
+                  setSelPitcherGradesSim(new Set());
+                  setSelBatterGradesSim(new Set());
+                  setMinSig('');
+                  setSimActiveOnly(false);
+                  setSlFormFilter(new Set());
+                  setMinL7EV('');
+                  setMinZoneFit('');
+                  setMaxZoneFit('');
+                }
+              }}
+            />
       </div>
 
       {/* ── SLATE RANKINGS ── */}
@@ -14953,8 +14950,16 @@ function NotifyBell() {
   );
 }
 
-function CheatCodeButton() {
+function CheatCodeButton({ onSauceFilter }) {
   const [open, setOpen] = useState(false);
+  const [sauceOn, setSauceOn] = useState(false);
+
+  const toggleSauce = () => {
+    const next = !sauceOn;
+    setSauceOn(next);
+    if (onSauceFilter) onSauceFilter(next);
+  };
+
   const mono = "'DM Mono',monospace";
   const osw  = "'Oswald',sans-serif";
 
@@ -15043,10 +15048,28 @@ function CheatCodeButton() {
               638,357 at-bats &middot; 19,561 HRs &middot; 2023-2026 &middot; first principles
             </div>
           </div>
-          <button onClick={()=>setOpen(false)}
-            style={{background:'none',border:'1px solid var(--border)',borderRadius:6,
-              color:'var(--muted)',cursor:'pointer',padding:'4px 10px',
-              fontFamily:mono,fontSize:10,marginLeft:12,flexShrink:0}}>✕</button>
+          <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:6}}>
+            {/* SECRET SAUCE FILTER — only appears in this slideout */}
+            <button onClick={toggleSauce}
+              title={sauceOn ? 'Disable Sauce Filter' : 'Enable recommended Sauce filter set'}
+              style={{
+                background: sauceOn ? 'rgba(232,65,26,.9)' : 'rgba(232,65,26,.12)',
+                border: '1px solid ' + (sauceOn ? '#e8411a' : 'rgba(232,65,26,.4)'),
+                borderRadius: 6, cursor: 'pointer',
+                color: sauceOn ? '#fff' : '#e8411a',
+                fontFamily: mono, fontSize: 9, fontWeight: 700,
+                padding: '5px 10px', letterSpacing: .5,
+                transition: 'all .2s', whiteSpace: 'nowrap',
+              }}>
+              {sauceOn ? '✔ SAUCE ON' : '⚡ ENABLE SAUCE FILTER'}
+            </button>
+            <button onClick={()=>setOpen(false)}
+              style={{background:'none',border:'1px solid var(--border)',borderRadius:6,
+                color:'var(--muted)',cursor:'pointer',padding:'4px 10px',
+                fontFamily:mono,fontSize:10}}>
+              ✕
+            </button>
+          </div>
         </div>
 
         <div style={{padding:'20px',flex:1}}>
@@ -15057,10 +15080,11 @@ function CheatCodeButton() {
             <div style={{fontFamily:osw,fontWeight:700,fontSize:12,color:'#27c97a',
               letterSpacing:.8,marginBottom:6}}>DATA FOUNDATION</div>
             <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',lineHeight:1.7}}>
-              Every signal in this model was validated against 638,357 at-bats
-              from 2023-2026 (19,561 home runs across 1,962 batters). Baseline HR
-              rate: 10.64% per game. The scoring weights reflect actual HR rate
-              gaps measured in the data — not theory.
+              Every signal validated against 638,357 at-bats (2023-2026)
+              + 24,112 daily matchup rows (75 days, 2,016 HRs). Baseline HR rate:
+              8.36% per game. Scores are directionally correct &mdash; higher score
+              = higher actual HR rate &mdash; but the scale overestimates by ~2.5x.
+              Use relative ranking and signal stacking, not absolute numbers.
             </div>
           </div>
 
@@ -15080,14 +15104,16 @@ function CheatCodeButton() {
 
           {/* Proven numbers */}
           <Section emoji="📊" title="Numbers Worth Knowing" color="var(--accent2)">
-            <Stat val="30.0%" label="A+ Grade + 🎯 Target pitcher"
-              sub="30 matchups, 9 HRs. Single best confirmed combo in the dataset."/>
-            <Stat val="14.8%" label="Sim TB ≥ 2.0"
-              sub="Meaningfully above the 10.64% baseline. The 2.0 threshold is real."/>
-            <Stat val="15.1%" label="Recent EV 102+ mph"
-              sub="Elite-hot batter. EV 95-98 is still solid at 11.5%."/>
-            <Stat val="12.5%" label="Zone Fit 4-6"
-              sub="The sweet spot. Below 4 = weak. Above 8 = overcorrects, drops to 4%."/>
+            <Stat val="21.3%" label="Key Matchup + Grade A"
+              sub="169 matchups, 36 HRs. Most reliable compound signal in 24k rows. Your daily anchor."/>
+            <Stat val="20.0%" label="KM + Moonshot + Sig 3+"
+              sub="140 matchups, 28 HRs. 2.7x lift. Consistent across 7 of 8 days tested."/>
+            <Stat val="13.2%" label="Sim TB ≥ 2.2"
+              sub="798 matchups, 105 HRs. 1.57x lift. One of the best individual signals."/>
+            <Stat val="13.4%" label="Sig ≥ 7"
+              sub="Only Sig 7+ produces real lift. Sig 1-6 is near baseline noise at scale."/>
+            <Stat val="15.0%" label="Boom ≥ 55"
+              sub="200 matchups. The real Boom threshold — below 55 adds minimal lift."/>
             <Stat val="3.6%" label="A+ Grade + ⚠️ Tough pitcher"
               sub="Below baseline. Grade alone does not overcome a tough arm."/>
           </Section>
@@ -15153,11 +15179,12 @@ function CheatCodeButton() {
             <div style={{fontFamily:mono,fontSize:10,lineHeight:2.0,color:'var(--text)'}}>
               {[
                 ['1','Filter Sim TB ≥ 1.5 — cuts low-ceiling noise immediately'],
-                ['2','Filter P.Grade to 🎯 Target + 💥 Hittable'],
-                ['3','Look for Grade A or A+ in what remains'],
-                ['4','Confirm ✅ lineup + check Sig ≥ 4'],
-                ['5','Check days rest (≤1) + lineup slot (3–5) + recent HR count'],
-                ['✱','A+ vs Target (30% HR rate) is the single best combo in the data'],
+                ['2','Filter P.Grade to 🎯 Target + 💥 Hittable (+ 🤔 Average)'],
+                ['3','Grade A in what remains — A outperforms A+ at scale (14.3% vs 13.5%)'],
+                ['4','Key Matchup flag + Sig ≥ 4 (lineup confirmation optional)'],
+                ['5','Zone Fit 2–8 + Boom ≥ 50 + Form Moonshot or Gap'],
+                ['✺','KM + Grade A = 21.3% HR rate — 2.5x lift, 75 days validated'],
+                ['⚡','Enable Sauce Filter at top of this panel to apply all at once'],
               ].map(([n,txt]) => (
                 <div key={n} style={{display:'flex',gap:8,alignItems:'baseline'}}>
                   <span style={{color:'var(--accent2)',fontWeight:700,
@@ -15227,12 +15254,28 @@ function CheatCodeButton() {
             ))}
           </Section>
 
+          {sauceOn && (
+            <div style={{background:'rgba(232,65,26,.08)',border:'1px solid rgba(232,65,26,.3)',
+              borderRadius:8,padding:'10px 14px',marginBottom:16}}>
+              <div style={{fontFamily:mono,fontSize:9,color:'#e8411a',fontWeight:700,
+                marginBottom:6,letterSpacing:.5}}>⚡ SAUCE FILTER ACTIVE</div>
+              <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',lineHeight:1.8}}>
+                ✔ Sim TB ≥ 1.5 &nbsp;✔ Pitcher: Target / Hittable / Average<br/>
+                ✔ Grade: A or A+ &nbsp;✔ Sig ≥ 4<br/>
+                ✔ Active batters only &nbsp;✔ Form: Moonshot / Gap<br/>
+                ✔ L7 EV ≥ 90 mph &nbsp;✔ Zone Fit 2–8<br/>
+                <span style={{color:'rgba(255,255,255,.3)',marginTop:4,display:'block'}}>
+                  Tap ⋄ SAUCE ON to disable and reset all filters
+                </span>
+              </div>
+            </div>
+          )}
           <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',
             textAlign:'center',marginTop:8,lineHeight:1.6,
             borderTop:'1px solid var(--border)',paddingTop:12}}>
             ⚡ The Sauce is a living model &mdash; updated as the season sample grows.<br/>
             <span style={{color:'rgba(255,255,255,.2)',fontSize:7,marginTop:4,display:'block'}}>
-              v7 &middot; 638,357 at-bats &middot; 19,561 HRs &middot; 10.64% base rate &middot; 2023-2026
+              v8 &middot; 24,112 matchup rows &middot; 75 days &middot; 8.36% base rate &middot; 2026
             </span>
           </div>
 
