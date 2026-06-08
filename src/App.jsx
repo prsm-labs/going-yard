@@ -2769,24 +2769,41 @@ function AtBatSlideIn() {
               const [bJson, pJson] = await Promise.all([bRes.json(), pRes.json()]);
               // Zones 1-9 (standard Statcast grid) plus edges (11-14 = corners/edges)
               // Response: array of {zone, count, hr, barrel, hard_hit, ...}
-              const bZones = Array.isArray(bJson) ? bJson : (bJson?.zones||bJson?.data||[]);
-              const pZones = Array.isArray(pJson) ? pJson : (pJson?.zones||pJson?.data||[]);
-              // Build zone maps: zoneId → stats
+              // Flatten whatever structure Savant returns
+              const flattenZones = (j) => {
+                if (Array.isArray(j)) return j;
+                if (j?.zones) return j.zones;
+                if (j?.data)  return j.data;
+                // Savant sometimes returns {1:{...}, 2:{...}} keyed by zone
+                if (j && typeof j === 'object') {
+                  const vals = Object.values(j);
+                  if (vals.length > 0 && typeof vals[0] === 'object') return vals;
+                }
+                return [];
+              };
+              const bZones = flattenZones(bJson);
+              const pZones = flattenZones(pJson);
+              console.log('[Zones] batter sample:', bZones[0]);
+              console.log('[Zones] pitcher sample:', pZones[0]);
+              // Build zone maps — try multiple possible zone id field names
               const bMap = {}, pMap = {};
-              bZones.forEach(z=>{ if(z.zone) bMap[z.zone] = z; });
-              pZones.forEach(z=>{ if(z.zone) pMap[z.zone] = z; });
+              const getZoneId = z => z.zone ?? z.zoneId ?? z.zone_id ?? z.id ?? z.Zone;
+              bZones.forEach(z=>{ const id=getZoneId(z); if(id!=null) bMap[id]=z; });
+              pZones.forEach(z=>{ const id=getZoneId(z); if(id!=null) pMap[id]=z; });
+              console.log('[Zones] bMap keys:', Object.keys(bMap));
+              console.log('[Zones] pMap keys:', Object.keys(pMap));
               // Compute overlap edges: zones where pitcher usage% >= 7 AND batter is strong
               const edges = [];
               const CORE_ZONES = [1,2,3,4,5,6,7,8,9];
               CORE_ZONES.forEach(zn=>{
-                const pz = pMap[zn];
-                const bz = bMap[zn];
+                const pz = pMap[zn] || pMap[String(zn)];
+                const bz = bMap[zn] || bMap[String(zn)];
                 if(!pz||!bz) return;
-                const usage = parseFloat(pz.percent||pz.usage||0);
-                if(usage < 7) return; // pitcher doesn't throw here enough
-                const bHR  = parseFloat(bz.hr_rate||bz.hr||0);
-                const bBrl = parseFloat(bz.barrel_rate||bz.barrel||bz.barrelPercent||0);
-                const bHH  = parseFloat(bz.hard_hit_rate||bz.hard_hit||0);
+                const usage = parseFloat(pz.percent??pz.usage??pz.pitchPercent??pz.pitch_percent??pz.pct??0);
+                if(usage < 7) return;
+                const bHR  = parseFloat(bz.hr_rate??bz.hrRate??bz.homeRunRate??bz.hr??0);
+                const bBrl = parseFloat(bz.barrel_rate??bz.barrelRate??bz.barrelPercent??bz.barrel??0);
+                const bHH  = parseFloat(bz.hard_hit_rate??bz.hardHitRate??bz.hardHitPercent??bz.hard_hit??0);
                 if(bHR >= 8 || bBrl >= 12 || bHH >= 45){
                   edges.push({ zone:zn, usage, bHR, bBrl, bHH,
                     label: zn<=3?'Up':zn<=6?'Middle':'Down' });
@@ -2843,14 +2860,24 @@ function AtBatSlideIn() {
 
           // Zone grid helpers
           const getBatterVal = (zn) => {
-            const bz = bMap[zn];
+            const bz = bMap[zn] || bMap[String(zn)];
             if(!bz) return null;
-            const v = parseFloat(bz[activeStat.bKey]||bz[activeStat.bFallback]||0);
+            // Try all possible field name variations Savant might use
+            const v = parseFloat(
+              bz[activeStat.bKey] ?? bz[activeStat.bFallback] ??
+              bz.hr_rate ?? bz.hrRate ?? bz.homeRunRate ??
+              bz.barrel_rate ?? bz.barrelRate ?? bz.barrelPercent ??
+              bz.hard_hit_rate ?? bz.hardHitRate ?? bz.hardHitPercent ?? 0
+            );
             return isNaN(v) ? null : v;
           };
           const getPitcherUsage = (zn) => {
-            const pz = pMap[zn];
-            return pz ? parseFloat(pz.percent||pz.usage||0) : 0;
+            const pz = pMap[zn] || pMap[String(zn)];
+            if(!pz) return 0;
+            return parseFloat(
+              pz.percent ?? pz.usage ?? pz.pitchPercent ??
+              pz.pitch_percent ?? pz.pct ?? 0
+            );
           };
           // Color batter zone by strength
           const zoneColor = (val, key) => {
