@@ -2864,7 +2864,7 @@ function AtBatSlideIn() {
             // HR%: elite=10%+, good=5%+, avg=2%+
             // Barrel%: elite=15%+, good=8%+, avg=3%+
             // HH%: elite=60%+, good=45%+, avg=30%+
-            // K% is inverted — high K rate = weakness (blue), low = strength (red)
+            // K% inverted: high = weakness (blue), low = strength (warm)
             if(zoneStat==='k') {
               return val>=35?'rgba(52,100,200,.8)':val>=20?'rgba(52,100,200,.45)':val>=10?'rgba(245,166,35,.3)':'rgba(232,65,26,.4)';
             }
