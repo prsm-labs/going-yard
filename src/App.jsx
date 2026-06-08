@@ -13547,7 +13547,6 @@ function SimLabView({ data }) {
                 if(enable){
                   setMinSimTB('1.5');
                   setSelPitcherGradesSim(new Set(['🎯 Target','💥 Hittable','🤔 Average']));
-                  setSelBatterGradesSim(new Set(['A','A+']));
                   setMinSig('4');
                   setSimActiveOnly(true);
                   setSlFormFilter(new Set(['moonshot','gap']));
@@ -13556,7 +13555,6 @@ function SimLabView({ data }) {
                 } else {
                   setMinSimTB('');
                   setSelPitcherGradesSim(new Set());
-                  setSelBatterGradesSim(new Set());
                   setMinSig('');
                   setSimActiveOnly(false);
                   setSlFormFilter(new Set());
@@ -15259,7 +15257,7 @@ function CheatCodeButton({ onSauceFilter }) {
                 marginBottom:6,letterSpacing:.5}}>⚡ SAUCE FILTER ACTIVE</div>
               <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',lineHeight:1.8}}>
                 ✔ Sim TB ≥ 1.5 &nbsp;✔ Pitcher: Target / Hittable / Average<br/>
-                ✔ Grade: A or A+ &nbsp;✔ Sig ≥ 4<br/>
+                ✔ Sig ≥ 4<br/>
                 ✔ Active batters only &nbsp;✔ Form: Moonshot / Gap<br/>
                 ✔ L7 EV ≥ 90 mph &nbsp;✔ Zone Fit ≥ 2<br/>
                 <span style={{color:'rgba(255,255,255,.3)',marginTop:4,display:'block'}}>
