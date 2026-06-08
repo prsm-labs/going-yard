@@ -2765,16 +2765,22 @@ function AtBatSlideIn() {
               // MLB Stats API hotColdZones — same underlying data as Savant zones page
               // Works from browser (CORS-allowed), genuinely public endpoint
               const bUrl = 'https://statsapi.mlb.com/api/v1/people/'+bid+'/stats?stats=hotColdZones&group=hitting&season=2026&sportId=1';
+              // Pitcher zone data: use hotColdZones with pitching group
+              // If empty, pitchZones covers where pitcher throws by zone
               const pUrl = 'https://statsapi.mlb.com/api/v1/people/'+ppid+'/stats?stats=hotColdZones&group=pitching&season=2026&sportId=1';
-              const [bRes, pRes] = await Promise.all([fetch(bUrl), fetch(pUrl)]);
-              const [bJson, pJson] = await Promise.all([bRes.json(), pRes.json()]);
+              const pUrl2 = 'https://statsapi.mlb.com/api/v1/people/'+ppid+'/stats?stats=pitchZones&group=pitching&season=2026&sportId=1';
+              const [bRes, pRes, pRes2] = await Promise.all([fetch(bUrl), fetch(pUrl), fetch(pUrl2)]);
+              const [bJson, pJson, pJson2] = await Promise.all([bRes.json(), pRes.json(), pRes2.json()]);
+              // Use whichever pitcher response has zone data
+              const pJsonFinal = (pJson?.stats?.flatMap(s=>s.splits||[]).flatMap(sp=>sp.stat?.zones||[]).length > 0)
+                ? pJson : pJson2;
               // Response: {stats:[{splits:[{stat:{zones:[{zone:"1",value:23,...}]}}]}]}
               const extractZones = (j) => {
                 const splits = j?.stats?.flatMap(s=>s.splits||[]) || [];
                 return splits.flatMap(sp => sp.stat?.zones || []);
               };
               const bZones = extractZones(bJson);
-              const pZones = extractZones(pJson);
+              const pZones = extractZones(pJsonFinal);
               console.log('[Zones] bZones:', bZones.length, JSON.stringify(bZones[0]));
               console.log('[Zones] pZones:', pZones.length, JSON.stringify(pZones[0]));
               console.log('[Zones] batter sample:', bZones[0]);
@@ -2798,12 +2804,16 @@ function AtBatSlideIn() {
                 const bz = bMap[zn] || bMap[String(zn)];
                 if(!pz||!bz) return;
                 // MLB Stats API: zonePct = usage%, zoneHitRate = batter metric, value = count
-                const usage = parseFloat(pz.zonePct ?? pz.zoneHitRate ?? 0);
-                if(usage < 7) return;
-                const bHR  = parseFloat(bz.zoneHitRate ?? 0);   // hit rate in zone
-                const bBrl = parseFloat(bz.zonePct     ?? 0);   // zone contact %
-                const bHH  = parseFloat(bz.value       ?? 0);   // raw hard hit count
-                if(bHR >= 8 || bBrl >= 12 || bHH >= 45){
+                // value is decimal rate × 100 after scaling above
+                const pRaw = parseFloat(pz.value ?? pz.zonePct ?? pz.zoneHitRate ?? 0);
+                const usage = pRaw < 1 ? pRaw * 100 : pRaw;
+                if(usage < 5) return; // pitcher throws < 5% here — skip
+                const bRaw = parseFloat(bz.value ?? bz.zoneHitRate ?? 0);
+                const bHR  = bRaw < 1 ? bRaw * 100 : bRaw;
+                const bBrl = bHR; // same field for barrel/HH tabs
+                const bHH  = bHR;
+                // For per-pitch rates: 0.5%+ HR rate = strong zone (Pete Alonso best = 0.6%)
+                if(bHR >= 0.4 || bBrl >= 0.4 || bHH >= 0.4){
                   edges.push({ zone:zn, usage, bHR, bBrl, bHH,
                     label: zn<=3?'Up':zn<=6?'Middle':'Down' });
                 }
@@ -2861,31 +2871,34 @@ function AtBatSlideIn() {
           const getBatterVal = (zn) => {
             const bz = bMap[zn] || bMap[String(zn)];
             if(!bz) return null;
-            // MLB Stats API hotColdZones: value=count, zoneHitRate=hit%, zonePct=pitch%
-            const v = parseFloat(bz.value ?? bz.zoneHitRate ?? bz.zonePct ?? 0);
-            return isNaN(v) ? null : v;
+            // MLB Stats API hotColdZones: value is decimal rate (0.003 = 0.3%)
+            // Multiply by 100 for display
+            const raw = parseFloat(bz.value ?? bz.zoneHitRate ?? bz.zonePct ?? 0);
+            if(isNaN(raw)) return null;
+            return raw < 1 ? raw * 100 : raw;
           };
           const getPitcherUsage = (zn) => {
             const pz = pMap[zn] || pMap[String(zn)];
             if(!pz) return 0;
-            return parseFloat(
-              pz.percent ?? pz.usage ?? pz.pitchPercent ??
-              pz.pitch_percent ?? pz.pct ?? 0
-            );
+            const raw = parseFloat(pz.value ?? pz.zonePct ?? pz.zoneHitRate ?? pz.percent ?? 0);
+            return raw < 1 ? raw * 100 : raw;
           };
           // Color batter zone by strength
           const zoneColor = (val, key) => {
             if(val===null) return 'rgba(255,255,255,.04)';
-            if(key==='hr_rate')    return val>=15?'rgba(232,65,26,.7)':val>=8?'rgba(232,65,26,.4)':val>=3?'rgba(245,166,35,.25)':'rgba(52,100,200,.2)';
-            if(key==='barrel_pct') return val>=20?'rgba(232,65,26,.7)':val>=10?'rgba(232,65,26,.4)':val>=5?'rgba(245,166,35,.25)':'rgba(52,100,200,.2)';
-            if(key==='hard_hit')   return val>=50?'rgba(232,65,26,.7)':val>=40?'rgba(232,65,26,.4)':val>=30?'rgba(245,166,35,.25)':'rgba(52,100,200,.2)';
+            // Per-pitch rates scaled to %: Pete Alonso's Z8 HR rate ~0.6%, Hard Hit ~3%
+            // Thresholds calibrated to actual MLB hotColdZones scale
+            if(key==='hr_rate')    return val>=0.5?'rgba(232,65,26,.7)':val>=0.3?'rgba(232,65,26,.4)':val>=0.1?'rgba(245,166,35,.25)':'rgba(52,100,200,.2)';
+            if(key==='barrel_pct') return val>=3.0?'rgba(232,65,26,.7)':val>=1.5?'rgba(232,65,26,.4)':val>=0.5?'rgba(245,166,35,.25)':'rgba(52,100,200,.2)';
+            if(key==='hard_hit')   return val>=4.0?'rgba(232,65,26,.7)':val>=2.0?'rgba(232,65,26,.4)':val>=0.5?'rgba(245,166,35,.25)':'rgba(52,100,200,.2)';
             return 'rgba(255,255,255,.06)';
           };
           const fmtVal = (val, key) => {
             if(val===null||val===undefined) return '—';
-            if(key==='hr_rate') return val.toFixed(1)+'%';
-            if(key==='barrel_pct') return Math.round(val)+'%';
-            if(key==='hard_hit') return Math.round(val)+'%';
+            // Values are per-pitch rates scaled to %: show 1 decimal for small numbers
+            if(key==='hr_rate')    return val >= 1 ? val.toFixed(1)+'%' : val.toFixed(2)+'%';
+            if(key==='barrel_pct') return val.toFixed(1)+'%';
+            if(key==='hard_hit')   return val.toFixed(1)+'%';
             return val+'';
           };
 
