@@ -2804,16 +2804,13 @@ function AtBatSlideIn() {
                 const bz = bMap[zn] || bMap[String(zn)];
                 if(!pz||!bz) return;
                 // MLB Stats API: zonePct = usage%, zoneHitRate = batter metric, value = count
-                // value is decimal rate × 100 after scaling above
-                const pRaw = parseFloat(pz.value ?? pz.zonePct ?? pz.zoneHitRate ?? 0);
-                const usage = pRaw < 1 ? pRaw * 100 : pRaw;
-                if(usage < 5) return; // pitcher throws < 5% here — skip
-                const bRaw = parseFloat(bz.value ?? bz.zoneHitRate ?? 0);
-                const bHR  = bRaw < 1 ? bRaw * 100 : bRaw;
-                const bBrl = bHR; // same field for barrel/HH tabs
-                const bHH  = bHR;
-                // For per-pitch rates: 0.5%+ HR rate = strong zone (Pete Alonso best = 0.6%)
-                if(bHR >= 0.4 || bBrl >= 0.4 || bHH >= 0.4){
+                // heat score 0-100: pitcher usage and batter strength
+                const usage = parseFloat(pz.value ?? 0);
+                if(usage < 5) return; // pitcher rarely throws here — skip
+                const bScore = parseFloat(bz.value ?? 0);
+                const bHR = bScore; const bBrl = bScore; const bHH = bScore;
+                // Hot zone for batter = heat score >= 60 (above average)
+                if(bScore >= 60){
                   edges.push({ zone:zn, usage, bHR, bBrl, bHH,
                     label: zn<=3?'Up':zn<=6?'Middle':'Down' });
                 }
@@ -2871,35 +2868,27 @@ function AtBatSlideIn() {
           const getBatterVal = (zn) => {
             const bz = bMap[zn] || bMap[String(zn)];
             if(!bz) return null;
-            // MLB Stats API hotColdZones: value is decimal rate (0.003 = 0.3%)
-            // Multiply by 100 for display
-            const raw = parseFloat(bz.value ?? bz.zoneHitRate ?? bz.zonePct ?? 0);
-            if(isNaN(raw)) return null;
-            return raw < 1 ? raw * 100 : raw;
+            // hotColdZones returns 0-100 normalized heat score per zone
+            // Higher = batter performs better in that zone
+            const v = parseFloat(bz.value ?? 0);
+            return isNaN(v) ? null : v;
           };
           const getPitcherUsage = (zn) => {
             const pz = pMap[zn] || pMap[String(zn)];
             if(!pz) return 0;
-            const raw = parseFloat(pz.value ?? pz.zonePct ?? pz.zoneHitRate ?? pz.percent ?? 0);
-            return raw < 1 ? raw * 100 : raw;
+            const v = parseFloat(pz.value ?? pz.zonePct ?? 0);
+            return isNaN(v) ? 0 : v;
           };
           // Color batter zone by strength
-          const zoneColor = (val, key) => {
+          const zoneColor = (val) => {
             if(val===null) return 'rgba(255,255,255,.04)';
-            // Per-pitch rates scaled to %: Pete Alonso's Z8 HR rate ~0.6%, Hard Hit ~3%
-            // Thresholds calibrated to actual MLB hotColdZones scale
-            if(key==='hr_rate')    return val>=0.5?'rgba(232,65,26,.7)':val>=0.3?'rgba(232,65,26,.4)':val>=0.1?'rgba(245,166,35,.25)':'rgba(52,100,200,.2)';
-            if(key==='barrel_pct') return val>=3.0?'rgba(232,65,26,.7)':val>=1.5?'rgba(232,65,26,.4)':val>=0.5?'rgba(245,166,35,.25)':'rgba(52,100,200,.2)';
-            if(key==='hard_hit')   return val>=4.0?'rgba(232,65,26,.7)':val>=2.0?'rgba(232,65,26,.4)':val>=0.5?'rgba(245,166,35,.25)':'rgba(52,100,200,.2)';
-            return 'rgba(255,255,255,.06)';
+            // hotColdZones 0-100 heat score: 67+ = hot (red), 33-66 = average, <33 = cold (blue)
+            return val>=67?'rgba(232,65,26,.75)':val>=50?'rgba(232,65,26,.4)':val>=33?'rgba(245,166,35,.25)':'rgba(52,100,200,.25)';
           };
-          const fmtVal = (val, key) => {
+          const fmtVal = (val) => {
             if(val===null||val===undefined) return '—';
-            // Values are per-pitch rates scaled to %: show 1 decimal for small numbers
-            if(key==='hr_rate')    return val >= 1 ? val.toFixed(1)+'%' : val.toFixed(2)+'%';
-            if(key==='barrel_pct') return val.toFixed(1)+'%';
-            if(key==='hard_hit')   return val.toFixed(1)+'%';
-            return val+'';
+            // Heat score 0-100
+            return Math.round(val)+'';
           };
 
           const ZoneCell = ({zn, showPitcher}) => {
@@ -2908,7 +2897,7 @@ function AtBatSlideIn() {
             const isEdge = edges.some(e=>e.zone===zn);
             const bg = showPitcher
               ? (usage>=10?'rgba(232,65,26,.5)':usage>=7?'rgba(232,65,26,.25)':'rgba(255,255,255,.05)')
-              : zoneColor(val, statKey);
+              : zoneColor(val);
             return (
               <div style={{background:bg,borderRadius:4,padding:'5px 3px',textAlign:'center',
                 position:'relative',border:isEdge&&!showPitcher?'1px solid #ff4020':'1px solid rgba(255,255,255,.06)',
@@ -2919,7 +2908,7 @@ function AtBatSlideIn() {
                 <div style={{fontFamily:mono3,fontSize:7,color:'rgba(255,255,255,.4)',marginBottom:2}}>Z{zn}</div>
                 <div style={{fontFamily:osw3,fontWeight:700,fontSize:10,
                   color:showPitcher?(usage>=7?'#fff':'rgba(255,255,255,.4)'):'var(--text)'}}>
-                  {showPitcher ? (usage>0?usage.toFixed(0)+'%':'—') : fmtVal(val, statKey)}
+                  {showPitcher ? (usage>0?usage.toFixed(0)+'%':'—') : fmtVal(val)}
                 </div>
               </div>
             );
@@ -2933,16 +2922,14 @@ function AtBatSlideIn() {
 
           return (
             <div style={{padding:'0 20px 16px'}}>
-              {/* Stat selector */}
-              <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
-                {statOpts.map(opt=>(
-                  <button key={opt.key} onClick={()=>setZoneStat(opt.key)}
-                    style={{fontFamily:mono3,fontSize:8,padding:'3px 8px',borderRadius:4,
-                      cursor:'pointer',border:'1px solid '+(statKey===opt.key?'rgba(232,65,26,.6)':'var(--border)'),
-                      background:statKey===opt.key?'rgba(232,65,26,.12)':'none',
-                      color:statKey===opt.key?'#ff4020':'var(--muted)'}}>
-                    {opt.label}
-                  </button>
+              {/* Heat score legend */}
+              <div style={{display:'flex',gap:8,marginBottom:12,alignItems:'center',flexWrap:'wrap'}}>
+                <span style={{fontFamily:mono3,fontSize:8,color:'var(--muted)'}}>HEAT SCORE (0-100)</span>
+                {[['rgba(232,65,26,.75)','Hot (67+)'],['rgba(245,166,35,.25)','Avg (33-66)'],['rgba(52,100,200,.25)','Cold (<33)']].map(([bg,lbl])=>(
+                  <span key={lbl} style={{display:'flex',alignItems:'center',gap:4,fontFamily:mono3,fontSize:8,color:'var(--muted)'}}>
+                    <span style={{width:10,height:10,borderRadius:2,background:bg,display:'inline-block'}}/>
+                    {lbl}
+                  </span>
                 ))}
               </div>
 
@@ -2977,7 +2964,7 @@ function AtBatSlideIn() {
                       <span style={{color:'var(--muted)'}}>{e.label}</span>
                       <span style={{color:'#ff4020',fontWeight:700}}>{e.usage.toFixed(0)}% usage</span>
                       <span style={{color:'rgba(255,255,255,.5)'}}>
-                        {e.bHR>0?e.bHR.toFixed(1)+'% HR':''}{e.bBrl>0?' / '+e.bBrl.toFixed(0)+'% Brl':''}
+                        heat {Math.round(e.bHR)}/100
                       </span>
                     </div>
                   ))}
@@ -2989,7 +2976,7 @@ function AtBatSlideIn() {
                 <div>
                   <div style={{fontFamily:mono3,fontSize:8,color:'var(--muted)',
                     textTransform:'uppercase',letterSpacing:.7,marginBottom:6,textAlign:'center'}}>
-                    Batter — {activeStat.label}
+                    Batter — Heat Score
                   </div>
                   <GridRow zones={[1,2,3]} showPitcher={false}/>
                   <div style={{height:3}}/>
@@ -3012,7 +2999,7 @@ function AtBatSlideIn() {
 
               <div style={{fontFamily:mono3,fontSize:7,color:'rgba(255,255,255,.2)',
                 marginTop:8,textAlign:'center'}}>
-                ★ = edge zone · Source: Baseball Savant 2026 · zones 1-9 (standard grid)
+                ★ = edge zone · Source: MLB Stats API hotColdZones 2026 · 0-100 heat score
               </div>
             </div>
           );
