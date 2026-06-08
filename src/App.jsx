@@ -2762,35 +2762,30 @@ function AtBatSlideIn() {
             if(!bid||!ppid){ setZoneData({}); return; }
             setZoneLoad(true);
             try{
-              // Baseball Savant zones API — batter hot zones
-              const bUrl = 'https://baseballsavant.mlb.com/player-services/zones?playerId='+bid+'&type=Batter&season=2026';
-              const pUrl = 'https://baseballsavant.mlb.com/player-services/zones?playerId='+ppid+'&type=Pitcher&season=2026';
+              // MLB Stats API hotColdZones — same underlying data as Savant zones page
+              // Works from browser (CORS-allowed), genuinely public endpoint
+              const bUrl = 'https://statsapi.mlb.com/api/v1/people/'+bid+'/stats?stats=hotColdZones&group=hitting&season=2026&sportId=1';
+              const pUrl = 'https://statsapi.mlb.com/api/v1/people/'+ppid+'/stats?stats=hotColdZones&group=pitching&season=2026&sportId=1';
               const [bRes, pRes] = await Promise.all([fetch(bUrl), fetch(pUrl)]);
               const [bJson, pJson] = await Promise.all([bRes.json(), pRes.json()]);
-              // Zones 1-9 (standard Statcast grid) plus edges (11-14 = corners/edges)
-              // Response: array of {zone, count, hr, barrel, hard_hit, ...}
-              // Flatten whatever structure Savant returns
-              const flattenZones = (j) => {
-                if (Array.isArray(j)) return j;
-                if (j?.zones) return j.zones;
-                if (j?.data)  return j.data;
-                // Savant sometimes returns {1:{...}, 2:{...}} keyed by zone
-                if (j && typeof j === 'object') {
-                  const vals = Object.values(j);
-                  if (vals.length > 0 && typeof vals[0] === 'object') return vals;
-                }
-                return [];
+              // Response: {stats:[{splits:[{stat:{zones:[{zone:"1",value:23,...}]}}]}]}
+              const extractZones = (j) => {
+                const splits = j?.stats?.flatMap(s=>s.splits||[]) || [];
+                return splits.flatMap(sp => sp.stat?.zones || []);
               };
-              const bZones = flattenZones(bJson);
-              const pZones = flattenZones(pJson);
-              console.log('[Zones] raw bJson type:', typeof bJson, Array.isArray(bJson), bJson === null);
-              console.log('[Zones] raw bJson:', JSON.stringify(bJson)?.slice(0,300));
-              console.log('[Zones] raw pJson:', JSON.stringify(pJson)?.slice(0,300));
+              const bZones = extractZones(bJson);
+              const pZones = extractZones(pJson);
+              console.log('[Zones] bZones:', bZones.length, JSON.stringify(bZones[0]));
+              console.log('[Zones] pZones:', pZones.length, JSON.stringify(pZones[0]));
               console.log('[Zones] batter sample:', bZones[0]);
               console.log('[Zones] pitcher sample:', pZones[0]);
               // Build zone maps — try multiple possible zone id field names
               const bMap = {}, pMap = {};
-              const getZoneId = z => z.zone ?? z.zoneId ?? z.zone_id ?? z.id ?? z.Zone;
+              // MLB Stats API zone field is a string: "1"-"9" for core, "11"-"14" for edges
+              const getZoneId = z => {
+                const raw = z.zone ?? z.zoneId ?? z.zone_id ?? z.id ?? z.Zone;
+                return raw != null ? parseInt(raw) : null;
+              };
               bZones.forEach(z=>{ const id=getZoneId(z); if(id!=null) bMap[id]=z; });
               pZones.forEach(z=>{ const id=getZoneId(z); if(id!=null) pMap[id]=z; });
               console.log('[Zones] bMap keys:', Object.keys(bMap));
@@ -2802,11 +2797,12 @@ function AtBatSlideIn() {
                 const pz = pMap[zn] || pMap[String(zn)];
                 const bz = bMap[zn] || bMap[String(zn)];
                 if(!pz||!bz) return;
-                const usage = parseFloat(pz.percent??pz.usage??pz.pitchPercent??pz.pitch_percent??pz.pct??0);
+                // MLB Stats API: zonePct = usage%, zoneHitRate = batter metric, value = count
+                const usage = parseFloat(pz.zonePct ?? pz.zoneHitRate ?? 0);
                 if(usage < 7) return;
-                const bHR  = parseFloat(bz.hr_rate??bz.hrRate??bz.homeRunRate??bz.hr??0);
-                const bBrl = parseFloat(bz.barrel_rate??bz.barrelRate??bz.barrelPercent??bz.barrel??0);
-                const bHH  = parseFloat(bz.hard_hit_rate??bz.hardHitRate??bz.hardHitPercent??bz.hard_hit??0);
+                const bHR  = parseFloat(bz.zoneHitRate ?? 0);   // hit rate in zone
+                const bBrl = parseFloat(bz.zonePct     ?? 0);   // zone contact %
+                const bHH  = parseFloat(bz.value       ?? 0);   // raw hard hit count
                 if(bHR >= 8 || bBrl >= 12 || bHH >= 45){
                   edges.push({ zone:zn, usage, bHR, bBrl, bHH,
                     label: zn<=3?'Up':zn<=6?'Middle':'Down' });
@@ -2865,13 +2861,8 @@ function AtBatSlideIn() {
           const getBatterVal = (zn) => {
             const bz = bMap[zn] || bMap[String(zn)];
             if(!bz) return null;
-            // Try all possible field name variations Savant might use
-            const v = parseFloat(
-              bz[activeStat.bKey] ?? bz[activeStat.bFallback] ??
-              bz.hr_rate ?? bz.hrRate ?? bz.homeRunRate ??
-              bz.barrel_rate ?? bz.barrelRate ?? bz.barrelPercent ??
-              bz.hard_hit_rate ?? bz.hardHitRate ?? bz.hardHitPercent ?? 0
-            );
+            // MLB Stats API hotColdZones: value=count, zoneHitRate=hit%, zonePct=pitch%
+            const v = parseFloat(bz.value ?? bz.zoneHitRate ?? bz.zonePct ?? 0);
             return isNaN(v) ? null : v;
           };
           const getPitcherUsage = (zn) => {
