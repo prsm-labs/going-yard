@@ -25335,9 +25335,12 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
   const osw  = "'Oswald',sans-serif";
   const [gData,    setGData]    = useState({batters:{},pitchers:{}});
   const [cacheVer, setCacheVer] = useState(0);
+  const [zoneSplits, setZoneSplits] = useState(null); // zone_splits.json cache
 
   useEffect(() => {
     loadGameSplitsData().then(d => setGData(d));
+    // Preload zone_splits.json for Zone Matchups section — one fetch, no per-batter API calls
+    fetch('/data/zone_splits.json').then(r=>r.ok?r.json():null).then(d=>{ if(d) setZoneSplits(d); }).catch(()=>{});
     const id = setInterval(() => {
       if (Object.keys(DAILY_PICKS_CACHE||{}).length > 0) {
         setCacheVer(v => v + 1);
@@ -25508,70 +25511,71 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
       .slice(0, 5);
   }, [cacheVer]);
 
-  // ── Top 5 Due: EV uptrend ≥95 + elevated bat speed + solid LA + close call(s)
-  //    + recent HR pattern (not cold) + favorable pitcher only
-  //    Explicitly NOT "hasn't hit in a while" — abSinceHR gate keeps cold streaks OUT
-  const top5Due = React.useMemo(() => {
+  // ── Top 5 Zone Matchups: highest zone overlap score vs today's pitcher ──────
+  // Score = sum of (pitcher_usage_pct × batter_hr_rate) across all edge zones
+  // Edge zone = pitcher usage ≥8% AND (batter HR%≥8 OR Barrel%≥12 OR HH%≥50)
+  // Ranked by total zone score — no API calls, all from zone_splits.json
+  const top5Zone = React.useMemo(() => {
+    if (!zoneSplits) return [];
+    const bMap = zoneSplits.batters  || {};
+    const pMap = zoneSplits.pitchers || {};
+    const CORE_ZONES = [1,2,3,4,5,6,7,8,9];
     const seen = new Set();
     return Object.values(DAILY_PICKS_CACHE||{})
       .filter(r => {
         const bid = String(r.batter_id||'').split('.')[0];
-        if (!bid || seen.has(bid) || !r.batter || !r.game_id) return false;
+        if (!bid||seen.has(bid)||!r.batter||!r.game_id) return false;
         seen.add(bid);
         if (INJURY_MAP?.[parseInt(bid)||0] && !LINEUP_STATUS?.[parseInt(bid)||0]) return false;
-        if (!isActiveBatter(r)) return false; // hide stale/inactive batters
-        // Pitcher gate: Target, Hittable, Average only — not Elite or Tough
-        const pg = r._pgLabel||'';
-        if (pg.includes('Elite') || pg.includes('Tough')) return false;
-        // EV uptrend ≥ 95mph recent
-        const ev = parseFloat(r.recent_avg_ev||0);
-        if (ev < 95) return false;
-        // Bat speed elevated above baseline
-        const bsDelta = parseFloat(r.bat_speed_vs_baseline||0);
-        if (bsDelta < 0.5) return false;
-        // Solid launch angle (sweet spot range 20–35°)
-        const la = parseFloat(r.recent_avg_la||0);
-        if (la < 18 || la > 38) return false;
-        // At least 1 close call — "on the doorstep" signal
-        const closeCall = parseInt(r.so_close_count||0);
-        if (closeCall < 1) return false;
-        // Recent HR pattern — NOT a cold streak: abSinceHR ≤ 20
-        // This is the key gate that prevents "he hasn't hit in 3 weeks" false positives
-        const player = getCachedPlayer(parseInt(bid)||0);
-        const abSinceHR = player?.windows?.last7?.abSinceHR ?? player?.abSinceHR ?? 99;
-        if (abSinceHR > 20) return false;
+        if (!isActiveBatter(r)) return false;
         return true;
       })
       .map(r => {
-        const bid = String(r.batter_id||'').split('.')[0];
-        const player = getCachedPlayer(parseInt(bid)||0);
-        const ev      = parseFloat(r.recent_avg_ev||0);
-        const la      = parseFloat(r.recent_avg_la||0);
-        const bsDelta = parseFloat(r.bat_speed_vs_baseline||0);
-        const closeCall = parseInt(r.so_close_count||0);
-        const abSinceHR = player?.windows?.last7?.abSinceHR ?? player?.abSinceHR ?? 0;
-        // Due Score: composite rank signal — higher = more aligned
-        const dueScore = (ev - 95) * 2          // EV above 95 threshold
-                       + bsDelta * 4            // bat speed delta
-                       + (la >= 22 ? (la-18)*0.5 : 0) // LA sweet spot bonus
-                       + closeCall * 3          // each close call = meaningful signal
-                       + Math.max(0, (20-abSinceHR)*0.5); // more recent HR = higher
-        const name = (r.batter&&!/^\d+$/.test(r.batter))
+        const bid  = String(r.batter_id||'').split('.')[0];
+        const ppid = String(r.pitcher_id||'').split('.')[0];
+        const bZones = bMap[bid]  || {};
+        const pZones = pMap[ppid] || {};
+        if (!Object.keys(bZones).length || !Object.keys(pZones).length) return null;
+
+        let zoneScore = 0;
+        const edges = [];
+        CORE_ZONES.forEach(zn => {
+          const bz = bZones[zn] || bZones[String(zn)];
+          const pz = pZones[zn] || pZones[String(zn)];
+          if (!bz || !pz) return;
+          const usage  = pz.usage_pct  ?? 0;
+          const bHR    = bz.hr_rate    ?? 0;
+          const bBrl   = bz.barrel_rate?? 0;
+          const bHH    = bz.hh_rate    ?? 0;
+          if (usage < 8) return;
+          if (bHR >= 8 || bBrl >= 12 || bHH >= 50) {
+            const contribution = (usage / 100) * bHR; // weighted HR contribution
+            zoneScore += contribution;
+            edges.push({ zone: zn, usage: parseFloat(usage.toFixed(1)), bHR: parseFloat(bHR.toFixed(1)), bBrl: parseFloat(bBrl.toFixed(1)) });
+          }
+        });
+        if (edges.length === 0) return null;
+        edges.sort((a,b) => b.bHR - a.bHR);
+        const name = (r.batter && !/^\d+$/.test(r.batter))
           ? r.batter
           : getCachedPlayer(parseInt(bid)||0)?.name || r.batter || bid;
         return {
           id: bid,
           name,
-          team: r.batting_team || player?.team || '',
-          ev, la, bsDelta, closeCall, abSinceHR, dueScore,
-          pitcher: r.pitcher||'',
-          pgLabel: r._pgLabel||'',
+          team: r.batting_team || '',
+          pitcher: r.pitcher || '',
+          pgLabel: r._pgLabel || '',
+          zoneScore: parseFloat(zoneScore.toFixed(2)),
+          edgeCount: edges.length,
+          topEdge: edges[0],
+          edges,
         };
       })
-      .sort((a,b) => b.dueScore - a.dueScore)
-      .filter((r,i,arr) => arr.findIndex(x=>x.id===r.id)===i) // dedup
+      .filter(Boolean)
+      .filter((r,i,arr) => arr.findIndex(x=>x.id===r.id)===i)
+      .sort((a,b) => b.zoneScore - a.zoneScore)
       .slice(0, 5);
-  }, [cacheVer]);
+  }, [zoneSplits, cacheVer]);
 
   const pgEmoji = l => l?.includes('Target')?'🎯':l?.includes('Hittable')?'💥':l?.includes('Elite')?'‼️':l?.includes('Tough')?'⚠️':'🤔';
 
@@ -25647,7 +25651,7 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
             ...top5Hit.map((r,i)=>['Hit Rate',      i+1, r.name, r.team, r.h_game_pct+'%', 'Hit rate '+r.h_game+'/'+r.games+' g', r.pitcher, r.pgLabel]),
             ...top5Close.map((r,i)=>['Close Calls',  i+1, r.name, r.team, r.count, 'near-misses', r.pitcher, r.pgLabel]),
             ...top5EV.map((r,i)=>[ 'Avg Exit Velo', i+1, r.name, r.team, r.ev.toFixed(1), 'avg EV (L7)', r.pitcher, r.pgLabel]),
-            ...top5Due.map((r,i)=>['Due',           i+1, r.name, r.team, r.ev.toFixed(1)+'ev / '+r.la.toFixed(0)+'°', `BS+${r.bsDelta.toFixed(1)} · ${r.closeCall}CC · ${r.abSinceHR}AB`, r.pitcher, r.pgLabel]),
+            ...top5Zone.map((r,i)=>['Zone Matchups', i+1, r.name, r.team, r.zoneScore.toFixed(2), `${r.edgeCount} edge zones`, r.pitcher, r.pgLabel]),
           ];
           const csv = rows.map(r=>r.map(v=>String(v||'').includes(',')?`"${v}"`:v).join(',')).join('\n');
           const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='cheat-sheet.csv'; a.click();
@@ -25732,18 +25736,20 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
           ))}
         </Section>
 
-        <Section emoji="⏳" title="Due" color="#f5a623">
-          {top5Due.length===0
-            ?<div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',padding:12}}>
-                No "due" batters found today — needs EV≥95, elevated bat speed,<br/>
-                solid LA, 1+ close calls, recent HR (≤20 AB), vs Avg/Hittable/Target
-              </div>
-            :top5Due.map((r,i)=>(
+        <Section emoji="🎯" title="Zone Matchups" color="#22d3ee">
+          <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',marginBottom:6,
+            padding:'3px 6px',background:'rgba(34,211,238,.06)',borderRadius:4,
+            letterSpacing:.3}}>Pitcher zone usage &#215; batter HR rate &#8212; hot zones today</div>
+          {!zoneSplits
+            ?<div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',padding:12}}>Loading zone data&#8230;</div>
+            :top5Zone.length===0
+            ?<div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',padding:12}}>No zone overlap data &#8212; run build_zone_splits.py</div>
+            :top5Zone.map((r,i)=>(
             <Card key={r.id} rank={i+1} pid={r.id}
               name={r.name} team={r.team}
-              stat={`${r.ev.toFixed(1)}`}
-              statLabel={`${r.la.toFixed(0)}° LA · BS+${r.bsDelta.toFixed(1)}`}
-              sub={`${r.closeCall} close call${r.closeCall!==1?'s':''} · ${r.abSinceHR} AB ago`}
+              stat={r.zoneScore.toFixed(1)}
+              statLabel="zone score"
+              sub={`${r.edgeCount} edge${r.edgeCount!==1?'s':''} \u00b7 Z${r.topEdge.zone} ${r.topEdge.bHR.toFixed(0)}% HR`}
               pitcher={r.pitcher} pgLabel={r.pgLabel}/>
           ))}
         </Section>
