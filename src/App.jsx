@@ -25526,7 +25526,7 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
         const bid = String(r.batter_id||'').split('.')[0];
         if (!bid||seen.has(bid)||!r.batter||!r.game_id) return false;
         seen.add(bid);
-        if (INJURY_MAP?.[parseInt(bid)||0] && !LINEUP_STATUS?.[parseInt(bid)||0]) return false;
+        if (INJURY_MAP?.[String(bid)] && !LINEUP_STATUS?.[parseInt(bid)||0]) return false;
         if (!isActiveBatter(r)) return false;
         return true;
       })
@@ -25536,21 +25536,19 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
         const bZones = bMap[bid]  || {};
         const pZones = pMap[ppid] || {};
         if (!Object.keys(bZones).length || !Object.keys(pZones).length) return null;
-
         let zoneScore = 0;
         const edges = [];
         CORE_ZONES.forEach(zn => {
           const bz = bZones[zn] || bZones[String(zn)];
           const pz = pZones[zn] || pZones[String(zn)];
           if (!bz || !pz) return;
-          const usage  = pz.usage_pct  ?? 0;
-          const bHR    = bz.hr_rate    ?? 0;
-          const bBrl   = bz.barrel_rate?? 0;
-          const bHH    = bz.hh_rate    ?? 0;
+          const usage = pz.usage_pct   ?? 0;
+          const bHR   = bz.hr_rate     ?? 0;
+          const bBrl  = bz.barrel_rate ?? 0;
+          const bHH   = bz.hh_rate     ?? 0;
           if (usage < 8) return;
           if (bHR >= 8 || bBrl >= 12 || bHH >= 50) {
-            const contribution = (usage / 100) * bHR; // weighted HR contribution
-            zoneScore += contribution;
+            zoneScore += (usage / 100) * bHR;
             edges.push({ zone: zn, usage: parseFloat(usage.toFixed(1)), bHR: parseFloat(bHR.toFixed(1)), bBrl: parseFloat(bBrl.toFixed(1)) });
           }
         });
@@ -25560,8 +25558,7 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
           ? r.batter
           : getCachedPlayer(parseInt(bid)||0)?.name || r.batter || bid;
         return {
-          id: bid,
-          name,
+          id: bid, name,
           team: r.batting_team || '',
           pitcher: r.pitcher || '',
           pgLabel: r._pgLabel || '',
