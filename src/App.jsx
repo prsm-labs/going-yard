@@ -13919,6 +13919,7 @@ function SimLabView({ data }) {
                   background:'transparent',flexShrink:0,whiteSpace:'nowrap'}}>
                 ↺ Reset
               </button>
+              <button onClick={()=>setSelPitcherGradesSim(new Set())}
                 style={{padding:'3px 8px',borderRadius:6,cursor:'pointer',
                   background:selPitcherGradesSim.size===0?'rgba(255,255,255,.08)':'transparent',
                   color:selPitcherGradesSim.size===0?'var(--text)':'var(--muted)',
