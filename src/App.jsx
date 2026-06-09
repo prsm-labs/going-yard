@@ -11069,6 +11069,7 @@ function HRLeaderboardTab() {
   const [teamFilter, setTeamFilter] = React.useState('ALL');
   const [expPid,  setExpPid]  = React.useState(null);
   const [statCards, setStatCards] = React.useState({ total:0, longDist:null, longEV:null });
+  const [displayLimit, setDisplayLimit] = React.useState(150);
   const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
   const SEASON_START = '2026-03-25';
   const ABBR = {108:'LAA',109:'AZ',110:'BAL',111:'BOS',112:'CHC',113:'CIN',114:'CLE',115:'COL',116:'DET',117:'HOU',118:'KC',119:'LAD',120:'WSH',121:'NYM',133:'ATH',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',139:'TB',140:'TEX',141:'TOR',142:'MIN',143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL'};
@@ -11171,6 +11172,9 @@ function HRLeaderboardTab() {
     })
     .sort((a,b) => sortDir * ((b[sort]||0)-(a[sort]||0)));
 
+  // Reset row cap when filters change
+  React.useEffect(() => { setDisplayLimit(150); }, [sort, sortDir, teamFilter, search]);
+
   const Th = ({col, label, tip}) => (
     <th title={tip} onClick={() => hs(col)}
       style={{padding:'5px 6px',fontSize:7,fontFamily:mono,textTransform:'uppercase',letterSpacing:.6,
@@ -11262,7 +11266,7 @@ function HRLeaderboardTab() {
             <Th col="hh110"    label="⚡ HH 110" tip="All batted balls 110+ mph"/>
           </tr></thead>
           <tbody>
-            {sorted.map((r,i) => [
+            {sorted.slice(0, displayLimit).map((r,i) => [
               (<tr key={r.pid} onClick={()=>setExpPid(v=>v===r.pid?null:r.pid)}
                 style={{cursor:'pointer',height:28,borderBottom:'1px solid rgba(255,255,255,.04)',
                   background:expPid===r.pid?'rgba(255,255,255,.04)':isKeyMatchup(r.pid,r.name)?'rgba(255,130,32,.05)':'transparent'}}>
@@ -11303,6 +11307,16 @@ function HRLeaderboardTab() {
             ])}
           </tbody>
         </table>
+        {sorted.length > displayLimit && (
+          <div style={{textAlign:'center',padding:'12px 0'}}>
+            <button onClick={()=>setDisplayLimit(v=>v+150)}
+              style={{fontFamily:"'DM Mono',monospace",fontSize:9,padding:'6px 16px',
+                borderRadius:6,border:'1px solid var(--border)',background:'rgba(255,255,255,.05)',
+                color:'var(--muted)',cursor:'pointer',letterSpacing:.5}}>
+              Show more ({sorted.length - displayLimit} remaining)
+            </button>
+          </div>
+        )}
       </div>
       <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:8,lineHeight:1.6}}>
         HR = MLB official season total · 💣🔥 Laser = HR at EV threshold · 💪⚡ HH = any batted ball at EV threshold
