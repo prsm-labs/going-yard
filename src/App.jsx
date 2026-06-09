@@ -13897,7 +13897,28 @@ function SimLabView({ data }) {
                 );
               })()}
               <div style={{width:1,height:16,background:'var(--border)',flexShrink:0}}/>
-              <button onClick={()=>setSelPitcherGradesSim(new Set())}
+              <button onClick={()=>{
+                setSortBy('_yard'); setSortDir('desc');
+                setSimActiveOnly(true); setSimInjuredOnly(false); setSimHotOnly(false);
+                setLineupOnly(false); setFilterGoneYardSim(false); setFilterDueSim(false);
+                setFilterDiamondSim(false); setSimPicksOnly(false); setFilterKeyMatchup(false);
+                setMinYard(''); setMaxYard(''); setMinSig(''); setMaxSig('');
+                setMinSimTB('0.01'); setMinOdds(''); setMinBoom(''); setMinBrl('');
+                setMinZoneFit(''); setMaxZoneFit(''); setMinL7EV(''); setMaxL7EV('');
+                setMinHitPct(''); setMinXbhPct('');
+                setSelBatterGradesSim(new Set()); setSelPitcherGradesSim(new Set());
+                setSelHRUpside && setSelHRUpside(new Set());
+                setSlBatterHand('ALL'); setSlPitcherHand('ALL');
+                setSlFormFilter(new Set()); setSlHideFinal(false);
+                setSimSearch(''); setSelMatchups(new Set());
+                setDisplayLimit(150);
+              }} data-tip="Reset all filters to defaults"
+                style={{padding:'3px 8px',borderRadius:6,fontSize:9,cursor:'pointer',
+                  fontFamily:"'DM Mono',monospace",
+                  border:'1px solid var(--border)',color:'var(--muted)',
+                  background:'transparent',flexShrink:0,whiteSpace:'nowrap'}}>
+                ↺ Reset
+              </button>
                 style={{padding:'3px 8px',borderRadius:6,cursor:'pointer',
                   background:selPitcherGradesSim.size===0?'rgba(255,255,255,.08)':'transparent',
                   color:selPitcherGradesSim.size===0?'var(--text)':'var(--muted)',
