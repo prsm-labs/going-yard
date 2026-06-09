@@ -13613,8 +13613,7 @@ function SimLabView({ data }) {
   const [maxYard,    setMaxYard]     = useState('');
   const [minSig,     setMinSig]      = useState('');
   const [maxSig,     setMaxSig]      = useState('');
-  const [minSimTB,   setMinSimTB]    = useState('');
-  const [minSimTB,   setMinSimTB]    = useState('0.01');
+    const [minSimTB,   setMinSimTB]    = useState('0.01');
   const [minBoom,    setMinBoom]     = useState('');
   const [minBrl,     setMinBrl]      = useState('');
   const [minZoneFit, setMinZoneFit]  = useState('');
