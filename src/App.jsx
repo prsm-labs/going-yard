@@ -14580,9 +14580,13 @@ function SimLabView({ data }) {
                 </button>
               </div>
             )}
-        <div>
-          {/* Batter selector removed — click row in Slate Rankings to open Deep Dive */}
+          </div>
+        </div>
+      )}
 
+      {/* ── DEEP DIVE ── */}
+      {view === 'deepdive' && (
+        <div>
           {selBatter && (() => {
             const b = selBatter;
             const hrP = pctRaw(b.proj_hr_adj);
