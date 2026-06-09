@@ -2217,6 +2217,10 @@ function AtBatSlideIn() {
   const [h2hLogOpen,  setH2hLogOpen]  = useState(false);
   const [h2hLog,      setH2hLog]      = useState([]);
   const [h2hLogLoad,  setH2hLogLoad]  = useState(false);
+  const [zoneOpen,    setZoneOpen]    = useState(false);
+  const [zoneData,    setZoneData]    = useState(null);   // {bMap, pMap, edges}
+  const [zoneLoad,    setZoneLoad]    = useState(false);
+  const [zoneStat,    setZoneStat]    = useState('hr'); // 'hr' | 'barrel' | 'hardhit' | 'k'
 
   useEffect(() => {
     AB_SLIDE_LISTENER = setPlayer;
@@ -2283,6 +2287,7 @@ function AtBatSlideIn() {
       if (!pid || parseInt(pid) <= 0) return;
       setBvpLoading(true);
       setH2hLogOpen(false); setH2hLog([]); setH2hLogLoad(false);
+      setZoneOpen(false); setZoneData(null); setZoneLoad(false); setZoneStat('hr');
       fetchBvP(parseInt(player.pid), parseInt(pid))
         .then(d => {
           setBvpData({ ...d, pitcherName: pname, pitcherId: pid, pitcherHand: dp?.pitcher_hand||'' });
@@ -2715,6 +2720,243 @@ function AtBatSlideIn() {
           )}
         </div>
       )}
+
+      {/* ── ZONE OVERLAP — lazy loaded on expand ──────────────────────── */}
+      <div style={{borderBottom:'1px solid var(--border)'}}>
+        {/* Dropdown trigger */}
+        <button
+          onClick={async()=>{
+            if(zoneOpen){ setZoneOpen(false); return; }
+            setZoneOpen(true);
+            if(zoneData) return; // already loaded
+            const bid  = player?.pid;
+            const ppid = bvpData?.pitcherId || (()=>{
+              const dp4 = DAILY_PICKS_CACHE[String(player?.pid)];
+              return dp4?.pitcher_id ? String(dp4.pitcher_id).split('.')[0] : null;
+            })();
+            if(!bid||!ppid){ setZoneData({}); return; }
+            setZoneLoad(true);
+            try{
+              const zRes  = await fetch('/data/zone_splits.json');
+              const zJson = await zRes.json();
+              const bRaw  = zJson?.batters?.[String(bid)]  || {};
+              const pRaw  = zJson?.pitchers?.[String(ppid)] || {};
+              const bMap = {}, pMap = {};
+              Object.entries(bRaw).forEach(([z,d])=>{ bMap[parseInt(z)] = d; });
+              Object.entries(pRaw).forEach(([z,d])=>{ pMap[parseInt(z)] = d; });
+              const edges = [];
+              const CORE_ZONES = [1,2,3,4,5,6,7,8,9];
+              CORE_ZONES.forEach(zn=>{
+                const pz = pMap[zn] || pMap[String(zn)];
+                const bz = bMap[zn] || bMap[String(zn)];
+                if(!pz||!bz) return;
+                const usage = pz.usage_pct ?? 0;
+                if(usage < 8) return;
+                const bHR  = bz.hr_rate     ?? 0;
+                const bBrl = bz.barrel_rate ?? 0;
+                const bHH  = bz.hh_rate     ?? 0;
+                if(bHR >= 8 || bBrl >= 12 || bHH >= 50){
+                  edges.push({ zone:zn, usage:parseFloat(usage.toFixed(1)), bHR:parseFloat(bHR.toFixed(1)), bBrl:parseFloat(bBrl.toFixed(1)), bHH:parseFloat(bHH.toFixed(1)),
+                    label: zn<=3?'Up':zn<=6?'Middle':'Down' });
+                }
+              });
+              edges.sort((a,b)=>b.bHR-a.bHR);
+              setZoneData({ bMap, pMap, edges, bid, ppid });
+              if (DAILY_PICKS_CACHE[String(bid)]) {
+                DAILY_PICKS_CACHE[String(bid)]._zoneEdges = edges.length;
+              }
+            } catch(e){
+              console.warn('Zone fetch failed:',e);
+              setZoneData({ error: true });
+            }
+            setZoneLoad(false);
+          }}
+          style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',
+            padding:'10px 20px',background:'none',border:'none',cursor:'pointer',
+            borderTop:'1px solid var(--border)'}}>
+          <div style={{display:'flex',alignItems:'center',gap:8}}>
+            <span style={{fontSize:14}}>🎯</span>
+            <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',
+              textTransform:'uppercase',letterSpacing:.8}}>Zone Overlap vs Pitcher</span>
+            {zoneData?.edges?.length > 0 && (
+              <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:9,
+                color:'#ff4020',background:'rgba(255,64,32,.12)',border:'1px solid rgba(255,64,32,.3)',
+                borderRadius:4,padding:'1px 5px'}}>
+                {zoneData.edges.length} edge{zoneData.edges.length!==1?'s':''}
+              </span>
+            )}
+          </div>
+          <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--muted)'}}>
+            {zoneLoad?'loading…':zoneOpen?'▴':'▾'}
+          </span>
+        </button>
+
+        {zoneOpen && !zoneLoad && zoneData && !zoneData.error && (()=>{
+          const mono3 = "'DM Mono',monospace";
+          const osw3  = "'Oswald',sans-serif";
+          const bMap  = zoneData.bMap || {};
+          const pMap  = zoneData.pMap || {};
+          const edges = zoneData.edges || [];
+
+          const statOpts = [
+            {key:'hr',      label:'HR Rate'},
+            {key:'barrel',  label:'Barrel%'},
+            {key:'hardhit', label:'Hard Hit%'},
+            {key:'k',       label:'K%'},
+          ];
+
+          const getBatterVal = (zn) => {
+            const bz = bMap[zn] || bMap[String(zn)];
+            if(!bz) return null;
+            const v = zoneStat==='hr'      ? bz.hr_rate
+                    : zoneStat==='barrel'   ? bz.barrel_rate
+                    : zoneStat==='k'        ? bz.k_rate
+                    : bz.hh_rate;
+            return v ?? null;
+          };
+          const getPitcherUsage = (zn) => {
+            const pz = pMap[zn] || pMap[String(zn)];
+            return pz ? (pz.usage_pct ?? 0) : 0;
+          };
+          const zoneColor = (val) => {
+            if(val===null||val===undefined) return 'rgba(255,255,255,.04)';
+            if(zoneStat==='k') {
+              return val>=35?'rgba(52,100,200,.8)':val>=20?'rgba(52,100,200,.45)':val>=10?'rgba(245,166,35,.3)':'rgba(232,65,26,.4)';
+            }
+            const hi = zoneStat==='hr'     ? [10,5,2]
+                      : zoneStat==='barrel' ? [15,8,3]
+                      : [60,45,30];
+            return val>=hi[0]?'rgba(232,65,26,.8)':val>=hi[1]?'rgba(232,65,26,.45)':val>=hi[2]?'rgba(245,166,35,.3)':'rgba(52,100,200,.2)';
+          };
+          const fmtVal = (val) => {
+            if(val===null||val===undefined) return '—';
+            return parseFloat(val).toFixed(1)+'%';
+          };
+
+          const ZoneCell = ({zn, showPitcher}) => {
+            const val   = getBatterVal(zn);
+            const usage = getPitcherUsage(zn);
+            const isEdge = edges.some(e=>e.zone===zn);
+            const bgColor = showPitcher
+              ? (usage>=10?'rgba(232,65,26,.5)':usage>=7?'rgba(232,65,26,.25)':'rgba(255,255,255,.05)')
+              : zoneColor(val);
+            return (
+              <div style={{background:bgColor,borderRadius:4,padding:'5px 3px',textAlign:'center',
+                position:'relative',border:isEdge&&!showPitcher?'1px solid #ff4020':'1px solid rgba(255,255,255,.06)',
+                minHeight:42}}>
+                {isEdge && !showPitcher && (
+                  <div style={{position:'absolute',top:1,right:2,fontSize:7,color:'#ff4020'}}>★</div>
+                )}
+                <div style={{fontFamily:mono3,fontSize:7,color:'rgba(255,255,255,.4)',marginBottom:2}}>Z{zn}</div>
+                <div style={{fontFamily:osw3,fontWeight:700,fontSize:10,
+                  color:showPitcher?(usage>=7?'#fff':'rgba(255,255,255,.4)'):'var(--text)'}}>
+                  {showPitcher ? (usage>0?usage.toFixed(0)+'%':'—') : fmtVal(val)}
+                </div>
+              </div>
+            );
+          };
+
+          const GridRow = ({zones, showPitcher}) => (
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:3}}>
+              {zones.map(zn=><ZoneCell key={zn} zn={zn} showPitcher={showPitcher}/>)}
+            </div>
+          );
+
+          return (
+            <div style={{padding:'0 20px 16px'}}>
+              <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
+                {statOpts.map(({key,lbl2})=>{ const lbl=key==='hr'?'HR Rate':key==='barrel'?'Barrel%':key==='k'?'K%':'Hard Hit%'; return (
+                  <button key={key} onClick={()=>setZoneStat(key)}
+                    style={{fontFamily:mono3,fontSize:8,padding:'3px 8px',borderRadius:4,
+                      cursor:'pointer',
+                      border:'1px solid '+(zoneStat===key?'rgba(232,65,26,.6)':'var(--border)'),
+                      background:zoneStat===key?'rgba(232,65,26,.12)':'none',
+                      color:zoneStat===key?'#ff4020':'var(--muted)'}}>
+                    {lbl}
+                  </button>
+                ); })}
+                <span style={{fontFamily:mono3,fontSize:7,color:'rgba(255,255,255,.25)',marginLeft:4}}>
+                  2026 season &middot; {Object.keys(bMap).length>0?Object.values(bMap).reduce((s,v)=>s+(v.pa||0),0)+' PA':''}
+                </span>
+              </div>
+
+              {edges.length > 0 && (
+                <div style={{background:'rgba(232,65,26,.06)',border:'1px solid rgba(232,65,26,.2)',
+                  borderRadius:6,padding:'8px 10px',marginBottom:12}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+                    <div style={{fontFamily:mono3,fontSize:8,color:'#ff4020',fontWeight:700,
+                      textTransform:'uppercase',letterSpacing:.8}}>
+                      Matchup Edges &#8212; pitcher targets batter hot zones
+                    </div>
+                    {(()=>{
+                      const ze = edges.length;
+                      const boost = ze>=3?'+10%':ze>=2?'+6%':ze>=1?'+3%':'';
+                      if(!boost) return null;
+                      return (
+                        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,
+                          fontSize:9,color:'#27c97a',background:'rgba(39,201,122,.12)',
+                          border:'1px solid rgba(39,201,122,.3)',borderRadius:4,
+                          padding:'1px 6px',letterSpacing:.3}}>
+                          {boost} PS Score
+                        </span>
+                      );
+                    })()}
+                  </div>
+                  {edges.map((e,i)=>(
+                    <div key={i} style={{display:'flex',alignItems:'center',gap:8,
+                      marginBottom:4,fontFamily:mono3,fontSize:9}}>
+                      <span style={{background:'rgba(232,65,26,.3)',borderRadius:3,padding:'1px 5px',
+                        color:'#ff4020',fontWeight:700,fontSize:8}}>Z{e.zone}</span>
+                      <span style={{color:'var(--muted)'}}>{e.label}</span>
+                      <span style={{color:'#ff4020',fontWeight:700}}>{e.usage.toFixed(0)}% usage</span>
+                      <span style={{color:'rgba(255,255,255,.5)'}}>
+                        {e.bHR>0?e.bHR.toFixed(1)+'% HR':''}{e.bBrl>0?' '+e.bBrl.toFixed(0)+'% Brl':''}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                <div>
+                  <div style={{fontFamily:mono3,fontSize:8,color:'var(--muted)',
+                    textTransform:'uppercase',letterSpacing:.7,marginBottom:6,textAlign:'center'}}>
+                    Batter &#8212; {zoneStat==='hr'?'HR%':zoneStat==='barrel'?'Barrel%':zoneStat==='k'?'K%':'Hard Hit%'}
+                  </div>
+                  <GridRow zones={[1,2,3]} showPitcher={false}/>
+                  <div style={{height:3}}/>
+                  <GridRow zones={[4,5,6]} showPitcher={false}/>
+                  <div style={{height:3}}/>
+                  <GridRow zones={[7,8,9]} showPitcher={false}/>
+                </div>
+                <div>
+                  <div style={{fontFamily:mono3,fontSize:8,color:'var(--muted)',
+                    textTransform:'uppercase',letterSpacing:.7,marginBottom:6,textAlign:'center'}}>
+                    Pitcher &#8212; Zone Usage %
+                  </div>
+                  <GridRow zones={[1,2,3]} showPitcher={true}/>
+                  <div style={{height:3}}/>
+                  <GridRow zones={[4,5,6]} showPitcher={true}/>
+                  <div style={{height:3}}/>
+                  <GridRow zones={[7,8,9]} showPitcher={true}/>
+                </div>
+              </div>
+
+              <div style={{fontFamily:mono3,fontSize:7,color:'rgba(255,255,255,.2)',
+                marginTop:8,textAlign:'center'}}>
+                &#9733; = edge zone &middot; Source: 2026 Statcast AB log &middot; real HR% / Barrel% / HH% per zone
+              </div>
+            </div>
+          );
+        })()}
+
+        {zoneOpen && !zoneLoad && zoneData?.error && (
+          <div style={{padding:'10px 20px',fontFamily:"'DM Mono',monospace",
+            fontSize:9,color:'var(--muted)'}}>
+            Zone data unavailable for this matchup.
+          </div>
+        )}
+      </div>
 
       {/* ── HR UPSIDE WITH H2H — enriched checklist, only available here ── */}
       {(()=>{
@@ -21951,8 +22193,17 @@ function WeatherGameCard({ g, wd }) {
             <span style={{color:'var(--muted)',fontSize:12,fontWeight:400}}>@</span>
             &nbsp;{g.home?.abbr||'?'}
           </div>
-          <div style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginTop:3}}>
+          <div style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginTop:3,display:'flex',alignItems:'center',gap:5}}>
             {normVenue(wd.stadium)}
+            {wd.venueOverride && (
+              <span title="Special venue — not team's home park" style={{
+                fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:8,
+                color:'#f5a623',background:'rgba(245,166,35,.15)',
+                border:'1px solid rgba(245,166,35,.35)',borderRadius:3,
+                padding:'1px 4px',letterSpacing:.3,flexShrink:0}}>
+                SPECIAL
+              </span>
+            )}
           </div>
           <div style={{fontSize:10,color:'var(--accent2)',fontFamily:"'DM Mono',monospace",marginTop:1}}>
             {g.gameTime||'TBD'} ET
@@ -22312,6 +22563,8 @@ function WeatherTab() {
                     venue: normVenue(wd.stadium||park?.venue||g.home?.abbr),
                     gameTime: g.gameTime,
                     isDome: wd.isDome,
+                    venueOverride: wd.venueOverride||false,
+                    elevation: wd.elevationFt||0,
                     hrPct, xbhPct, singPct, runPct,
                     windDir, windLabel, temp,
                     rainChance: cur?.rainChance||0,
@@ -22372,9 +22625,11 @@ function WeatherTab() {
                                 <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,color:'var(--text)',display:'flex',alignItems:'center',gap:5}}>
                                   {r.away} @ {r.home}
                                   {r.weatherAlert && <span title="Weather may impact game — use caution" style={{fontSize:11}}>⚠️</span>}
+                                  {r.venueOverride && <span title="Special venue — not team's home park" style={{fontSize:9,fontFamily:"'Oswald',sans-serif",fontWeight:800,color:'#f5a623',background:'rgba(245,166,35,.12)',border:'1px solid rgba(245,166,35,.3)',borderRadius:3,padding:'0 4px',marginLeft:2}}>SPECIAL</span>}
                                 </div>
                                 <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginTop:1}}>
                                   {r.venue}{r.gameTime ? ` · ${r.gameTime}` : ''}
+                                  {r.elevation > 500 && <span style={{marginLeft:4,color:'#f5a623'}}>⛰️ {r.elevation.toLocaleString()}ft</span>}
                                 </div>
                               </td>
                               <td style={{textAlign:'center'}}>
