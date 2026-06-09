@@ -13294,7 +13294,7 @@ function LongShotView({ data }) {
         parseFloat(b.recent_barrel_spike||0), parseInt(b.recent_hr_count||0), parseFloat(b.recent_batter_ahead_pct||0),
         !!b.hh_precursor, parseFloat(b.primary_pitch_hr_rate||0),
         parseInt(b.recent_barrels_3d)||0, parseInt(b.recent_hrs_3d)||0,
-        parseFloat(b.recent_avg_bat_speed)||0, parseInt(b.recent_pb_2d)||0, b.la_locked, parseFloat(b.season_swstr_pct)||0, parseFloat(b.park_pull_fit)||0, parseInt(b._zoneEdges||0), parseInt(b._zoneKPenalty||0);
+        parseFloat(b.recent_avg_bat_speed)||0, parseInt(b.recent_pb_2d)||0, b.la_locked, parseFloat(b.season_swstr_pct)||0, parseFloat(b.park_pull_fit)||0, parseInt(b._zoneEdges||0), parseInt(b._zoneKPenalty||0));
       const _ps   = parseFloat(b.ps_score)||0;
       const _yard = computeYardScore(_sig, parseFloat(b.gHR)||0, _boom, _ps,
         b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1),
