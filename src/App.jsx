@@ -13576,6 +13576,28 @@ function SimLabView({ data }) {
   const boomCache      = useRef({}); // caches _boom per batter_id after first render
   const userSorted     = useRef(false); // true once user manually changes sort
   const boomCacheReady = useRef(false); // true after first render populates boomCache
+  const [displayLimit, setDisplayLimit] = useState(150); // row cap — prevents mobile OOM crash
+
+  // Pre-warm boomCache from data on mount so first sort never recomputes
+  useEffect(() => {
+    if (!data || data.length === 0 || boomCacheReady.current) return;
+    data.forEach(r => {
+      const key = String(r.batter_id||'');
+      if (!key || boomCache.current[key] !== undefined) return;
+      const sig = (parseFloat(r.weighted_flag_score)||0) * 4.6;
+      boomCache.current[key] = computeBoomScore(sig, r.zone_fit, r.recent_iso,
+        r.sim_tb, r.weighted_flag_score,
+        parseFloat(r.recent_barrel_spike||0), parseInt(r.recent_hr_count||0),
+        parseFloat(r.recent_batter_ahead_pct||0), !!r.hh_precursor,
+        parseFloat(r.primary_pitch_hr_rate||0),
+        parseInt(r.recent_barrels_3d)||0, parseInt(r.recent_hrs_3d)||0,
+        parseFloat(r.recent_avg_bat_speed)||0, parseInt(r.recent_pb_2d)||0,
+        r.la_locked, parseFloat(r.season_swstr_pct)||0,
+        parseFloat(r.park_pull_fit)||0,
+        parseInt(r._zoneEdges||0), parseInt(r._zoneKPenalty||0));
+    });
+    boomCacheReady.current = true;
+  }, [data]);
   const [slHideFinal, setSlHideFinal]     = useState(false);
   const [slPitcherHand, setSlPitcherHand] = useState('ALL');
   const [slFormFilter, setSlFormFilter]   = useState(new Set());
@@ -13584,7 +13606,7 @@ function SimLabView({ data }) {
   const [filterDueSim, setFilterDueSim] = useState(false);
   const [filterDiamondSim, setFilterDiamondSim] = useState(false);
   const [simPicksOnly, setSimPicksOnly]           = useState(false);
-  const [simActiveOnly, setSimActiveOnly]         = useState(false);
+  const [simActiveOnly, setSimActiveOnly]         = useState(true);
   const [simInjuredOnly, setSimInjuredOnly]       = useState(false);
   const [simHotOnly, setSimHotOnly]               = useState(false);
   const [minYard,    setMinYard]     = useState('');
@@ -13592,7 +13614,7 @@ function SimLabView({ data }) {
   const [minSig,     setMinSig]      = useState('');
   const [maxSig,     setMaxSig]      = useState('');
   const [minSimTB,   setMinSimTB]    = useState('');
-  const [minOdds,    setMinOdds]     = useState('');
+  const [minSimTB,   setMinSimTB]    = useState('0.01');
   const [minBoom,    setMinBoom]     = useState('');
   const [minBrl,     setMinBrl]      = useState('');
   const [minZoneFit, setMinZoneFit]  = useState('');
@@ -13748,6 +13770,9 @@ function SimLabView({ data }) {
     });
     return sorted;
   }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, filterKeyMatchup, minYard, maxYard, minSig, maxSig, minSimTB, minOdds, minBoom, minBrl, minZoneFit, maxZoneFit, minL7EV, maxL7EV, minHitPct, minXbhPct, selHRUpside, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal]);
+
+  // Reset row cap when filters/sort change so user always sees top results
+  useEffect(() => { setDisplayLimit(150); }, [sortBy, sortDir, selMatchups, lineupOnly, simActiveOnly, simSearch, filterKeyMatchup]);
 
   // Auto-select top batter when data loads
   useEffect(() => {
@@ -14236,7 +14261,7 @@ function SimLabView({ data }) {
                 </tr>
               </thead>
               <tbody>
-                {slate.map((b, i) => {
+                {slate.slice(0, displayLimit).map((b, i) => {
                   const hitP = pctRaw(b.proj_hit_prob);
                   const xbhP = pctRaw(b.proj_xbh_prob);
                   const tb = parseFloat(b.sim_tb) || 0;  // sim_tb = rate × proj PA (can exceed 1.5)
@@ -14545,12 +14570,16 @@ function SimLabView({ data }) {
                 })}
               </tbody>
             </table>
-          </div>
-        </div>
-      )}
-
-      {/* ── DEEP DIVE ── */}
-      {view === 'deepdive' && (
+            {slate.length > displayLimit && (
+              <div style={{textAlign:'center',padding:'12px 0'}}>
+                <button onClick={()=>setDisplayLimit(v=>v+150)}
+                  style={{fontFamily:"'DM Mono',monospace",fontSize:9,padding:'6px 16px',
+                    borderRadius:6,border:'1px solid var(--border)',background:'rgba(255,255,255,.05)',
+                    color:'var(--muted)',cursor:'pointer',letterSpacing:.5}}>
+                  Show more ({slate.length - displayLimit} remaining)
+                </button>
+              </div>
+            )}
         <div>
           {/* Batter selector removed — click row in Slate Rankings to open Deep Dive */}
 
