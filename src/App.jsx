@@ -21914,26 +21914,32 @@ function GetAppTab() {
 
 function PowerBITab() {
   const picks = usePicks();
-  // Merge Statcast cache with full MLB roster so new/low-AB players are findable
+  const [subTab, setSubTab] = useState('bvp');
+  const [searchQ, setSearchQ] = useState("");
+  const [showPicker, setShowPicker] = useState(false);
+
+  const DASHBOARDS = [
+    { key: 'bvp', label: '📊 BvP',
+      src: 'https://app.powerbi.com/view?r=eyJrIjoiMTdmYTZiZDktOTA5ZC00OTFmLWE1NTktZDgwYmNhZDAwYTkwIiwidCI6IjgzOGY2MGI3LTc4NzYtNGEwZC1iM2MxLTg1Y2VlZWE1YmJhYiIsImMiOjF9' },
+    { key: 'exv', label: '📈 ExV',
+      src: 'https://app.powerbi.com/view?r=eyJrIjoiMTdmYTZiZDktOTA5ZC00OTFmLWE1NTktZDgwYmNhZDAwYTkwIiwidCI6IjgzOGY2MGI3LTc4NzYtNGEwZC1iM2MxLTg1Y2VlZWE1YmJhYiIsImMiOjF9&pageName=b9c924fbc8753e807d82' },
+  ];
+
+  const mono = "\'DM Mono\',monospace";
+  const osw  = "\'Oswald\',sans-serif";
+
   const players = (() => {
     const cached = Object.values(PLAYER_DATA_CACHE);
     const cachedIds = new Set(cached.map(p => p.pid));
-    // Add anyone in the MLB player map who isn't in the Statcast cache
     const rosterOnly = Object.entries(GLOBAL_PLAYER_TEAM_MAP)
       .filter(([id]) => !cachedIds.has(parseInt(id)))
       .map(([id, info]) => ({
-        pid:  parseInt(id),
-        name: info.name,
-        team: info.team || '—',
-        hand: info.hand || 'R',
-        pos:  info.pos  || '',
-        // No Statcast data yet — zeros
+        pid: parseInt(id), name: info.name, team: info.team || '—',
+        hand: info.hand || 'R', pos: info.pos || '',
         avgEV: 0, barrel: 0, hardHit: 0, hr: 0, grade: null,
       }));
     return [...cached, ...rosterOnly];
   })();
-  const [searchQ, setSearchQ] = useState("");
-  const [showPicker, setShowPicker] = useState(false);
 
   const filtered = searchQ.trim()
     ? players.filter(p => p.name?.toLowerCase().includes(searchQ.toLowerCase()) ||
@@ -21941,80 +21947,97 @@ function PowerBITab() {
         .slice(0, 12)
     : [];
 
-  return <div style={{margin:"-16px"}}>
-    {/* Add to My Picks — above frame */}
-    <div style={{padding:"8px 14px",borderBottom:"1px solid var(--border)",background:"var(--surface)"}}>
-    <div style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,padding:"10px 14px"}}>
-      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:showPicker?10:0}}>
-        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,letterSpacing:1}}>🎯 Add to My Picks</span>
-        <span style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>Search any batter while browsing the dashboard</span>
-        <button onClick={()=>setShowPicker(s=>!s)}
-          style={{marginLeft:"auto",padding:"4px 12px",borderRadius:6,border:"1px solid var(--border)",
-            background:showPicker?"var(--accent)":"var(--surface2)",
-            color:showPicker?"white":"var(--muted)",cursor:"pointer",
-            fontFamily:"'DM Mono',monospace",fontSize:11}}>
-          {showPicker?"✕ Close":"＋ Open Picker"}
-        </button>
-      </div>
-      {showPicker && <>
-        <div style={{position:"relative",marginBottom:8}}>
-          <input
-            autoFocus type="text" value={searchQ}
-            onChange={e=>setSearchQ(e.target.value)}
-            placeholder="Search player or team… (e.g. DeLauter, CLE)"
-            style={{width:"100%",padding:"8px 12px 8px 32px",background:"var(--surface2)",
-              border:"1px solid var(--border)",borderRadius:8,color:"var(--text)",
-              fontFamily:"'DM Mono',monospace",fontSize:12,outline:"none",boxSizing:"border-box"}}
-          />
-          <span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:"var(--muted)",fontSize:13}}>🔍</span>
-          {searchQ && <button onClick={()=>setSearchQ("")}
-            style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",
-              background:"none",border:"none",color:"var(--muted)",cursor:"pointer",fontSize:13}}>✕</button>}
-        </div>
-        {searchQ && filtered.length === 0 && <div style={{fontSize:11,color:"var(--muted)",fontFamily:"'DM Mono',monospace",padding:"8px 0"}}>No players found.</div>}
-        {filtered.length > 0 && <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:8}}>
-          {filtered.map(p => {
-            const key = String(p.pid);
-            const current = picks[key]?.type;
-            return <div key={p.pid} style={{display:"flex",alignItems:"center",gap:8,
-              padding:"8px 10px",borderRadius:8,background:"var(--surface2)",
-              border:`1px solid ${current?PICK_TYPES[current].color:"var(--border)"}`,
-              transition:"all .15s"}}>
-              <PlayerAvatar pid={p.pid} name={p.name} size={30}/>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontWeight:600,fontSize:12,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}> {p.name}</div>
-                <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}> {getTeam(p.pid,p.team)} · {p.grade?.grade||"—"}</div>
-              </div>
-              <PickButton pid={p.pid} name={p.name} team={p.team}/>
-            </div>;
-          })}
-        </div>}
-        {!searchQ && <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",padding:"4px 0"}}>
-          Start typing to search {players.length} batters
-        </div>}
-      </>}
-    </div></div>
-    {/* iframe — full height, no scale needed for PowerBI */}
-    <iframe
-      title="Going Yard Analytics"
-      src="https://app.powerbi.com/view?r=eyJrIjoiMTdmYTZiZDktOTA5ZC00OTFmLWE1NTktZDgwYmNhZDAwYTkwIiwidCI6IjgzOGY2MGI3LTc4NzYtNGEwZC1iM2MxLTg1Y2VlZWE1YmJhYiIsImMiOjF9"
-      frameBorder="0"
-      allowFullScreen
-      style={{width:"100%",height:"calc(100vh - 130px)",border:"none",display:"block"}}
-    />
-    {/* Open in new tab below frame */}
-    <div style={{padding:"8px 14px",borderTop:"1px solid var(--border)",
-      display:"flex",justifyContent:"flex-end",background:"var(--surface)"}}>
-      <a href="https://app.powerbi.com/view?r=eyJrIjoiMTdmYTZiZDktOTA5ZC00OTFmLWE1NTktZDgwYmNhZDAwYTkwIiwidCI6IjgzOGY2MGI3LTc4NzYtNGEwZC1iM2MxLTg1Y2VlZWE1YmJhYiIsImMiOjF9" target="_blank" rel="noopener noreferrer"
-        style={{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:6,
-          background:"var(--surface2)",border:"1px solid var(--border)",
-          color:"var(--muted)",fontFamily:"'DM Mono',monospace",fontSize:11,textDecoration:"none"}}>
-        ↗ Open in Power BI
-      </a>
-    </div>
-  </div>;
-}
+  const activeDash = DASHBOARDS.find(d => d.key === subTab) || DASHBOARDS[0];
 
+  return (
+    <div style={{margin:"-16px"}}>
+      <div style={{display:'flex',gap:6,padding:'8px 14px',
+        borderBottom:'1px solid var(--border)',background:'var(--surface)',
+        overflowX:'auto'}}>
+        {DASHBOARDS.map(d => {
+          const active = subTab === d.key;
+          return (
+            <button key={d.key} onClick={()=>setSubTab(d.key)}
+              style={{padding:'5px 14px',borderRadius:6,cursor:'pointer',
+                fontFamily:mono,fontSize:11,whiteSpace:'nowrap',
+                border:`1px solid ${active?'var(--accent)':'var(--border)'}`,
+                background:active?'rgba(232,65,26,.08)':'transparent',
+                color:active?'var(--accent)':'var(--muted)',
+                fontWeight:active?700:400}}>
+              {d.label}
+            </button>
+          );
+        })}
+      </div>
+      <div style={{padding:"8px 14px",borderBottom:"1px solid var(--border)",background:"var(--surface)"}}>
+        <div style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,padding:"10px 14px"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:showPicker?10:0}}>
+            <span style={{fontFamily:osw,fontWeight:700,fontSize:13,letterSpacing:1}}>🎯 Add to My Picks</span>
+            <span style={{fontSize:10,color:"var(--muted)",fontFamily:mono}}>Search any batter while browsing the dashboard</span>
+            <button onClick={()=>setShowPicker(s=>!s)}
+              style={{marginLeft:"auto",padding:"4px 12px",borderRadius:6,border:"1px solid var(--border)",
+                background:showPicker?"var(--accent)":"var(--surface2)",
+                color:showPicker?"white":"var(--muted)",cursor:"pointer",
+                fontFamily:mono,fontSize:11}}>
+              {showPicker?"✕ Close":"＋ Open Picker"}
+            </button>
+          </div>
+          {showPicker && <>
+            <div style={{position:"relative",marginBottom:8}}>
+              <input autoFocus type="text" value={searchQ}
+                onChange={e=>setSearchQ(e.target.value)}
+                placeholder="Search player or team… (e.g. DeLauter, CLE)"
+                style={{width:"100%",padding:"8px 12px 8px 32px",background:"var(--surface2)",
+                  border:"1px solid var(--border)",borderRadius:8,color:"var(--text)",
+                  fontFamily:mono,fontSize:12,outline:"none",boxSizing:"border-box"}}/>
+              <span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:"var(--muted)",fontSize:13}}>🔍</span>
+              {searchQ && <button onClick={()=>setSearchQ("")}
+                style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",
+                  background:"none",border:"none",color:"var(--muted)",cursor:"pointer",fontSize:13}}>✕</button>}
+            </div>
+            {searchQ && filtered.length === 0 && <div style={{fontSize:11,color:"var(--muted)",fontFamily:mono,padding:"8px 0"}}>No players found.</div>}
+            {filtered.length > 0 && <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:8}}>
+              {filtered.map(p => (
+                <div key={p.pid} style={{display:"flex",alignItems:"center",gap:8,
+                  padding:"8px 10px",borderRadius:8,background:"var(--surface2)",
+                  border:"1px solid var(--border)"}}>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontFamily:osw,fontWeight:700,fontSize:12,
+                      color:"var(--text)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+                      {p.name}
+                    </div>
+                    <div style={{fontFamily:mono,fontSize:9,color:"var(--muted)"}}>{p.team}</div>
+                  </div>
+                  <PickButton pid={String(p.pid)} name={p.name} team={p.team}/>
+                </div>
+              ))}
+            </div>}
+          </>}
+        </div>
+      </div>
+      <div style={{width:'100%',height:'calc(100vh - 170px)',overflow:'hidden',position:'relative'}}>
+        <iframe
+          key={activeDash.key}
+          title={activeDash.label}
+          src={activeDash.src}
+          frameBorder="0"
+          allowFullScreen
+          style={{width:'100%',height:'calc(100% + 48px)',border:'none',display:'block',
+            position:'absolute',top:0,left:0}}
+        />
+      </div>
+      <div style={{padding:"8px 14px",borderTop:"1px solid var(--border)",
+        display:"flex",justifyContent:"flex-end",background:"var(--surface)"}}>
+        <a href={activeDash.src} target="_blank" rel="noopener noreferrer"
+          style={{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:6,
+            background:"var(--surface2)",border:"1px solid var(--border)",
+            color:"var(--muted)",fontFamily:mono,fontSize:11,textDecoration:"none"}}>
+          ↗ Open in Power BI
+        </a>
+      </div>
+    </div>
+  );
+}
 function DataStatusBadge() {
   const [status, setStatus] = useState("checking"); // checking | live | delayed | offline
   const [lastOk, setLastOk] = useState(null);
