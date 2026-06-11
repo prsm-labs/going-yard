@@ -14216,7 +14216,7 @@ function SimLabView({ data }) {
               const bom = '\uFEFF';
               const esc = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
               const headers = ['Grade','Pitcher Grade','Gone Yard','Is Key Matchup','Team','Batter','Hand','P.Hand','vs Pitcher',
-                'Top Pitches','Game Time',
+                'Top Pitches','Game Time','Lineup Slot','In Weak Slot','Pitcher Weak Slots',
                 'Yard Score','⚡ Sig','💥 Boom','Form Class','gHR','ISO','Zone Fit','xwOBA','wOBA','SwStr%',
                 'Flags','Recent EV','Recent Barrel%',
                 'Recent FB%','Recent LA','BvP EV','BvP Barrel%','BvP FB%','BvP LA',
@@ -14234,7 +14234,12 @@ function SimLabView({ data }) {
                 const isKM = isKeyMatchup(parseInt(b.batter_id)||0, b.batter) ? 'YES' : '';
                 return [b.grade, pitcherGrade, gy?'YES':'', isKM, b.batting_team, b.batter, b.batter_hand,
                   b.pitcher_hand||'', b.pitcher, b.top_pitches, b.game_time,
-                  // Computed columns — between Game Time and Flags
+                  // Lineup slot — live confirmed slot or 0
+                  liveSlot(bid, b.lineup_slot) || '',
+                  // In Weak Slot — computed live same as Boom score
+                  (()=>{const _ls=liveSlot(bid,b.lineup_slot);return _ls>0&&(b.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(_ls)?'YES':''})(),
+                  b.pitcher_weak_slots || '',
+                  // Computed columns — between Pitcher Weak Slots and Flags
                   (b._yard ?? computeYardScore(sigCache.current[String(bid)]||0, parseFloat(b.gHR)||0, boomCache.current[String(bid)]||0, b._ps||(parseFloat(b.ps_score)||0), b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1), liveSlot(bid,b.lineup_slot), b._pgLabel||'')),
                   sigCache.current[String(bid)] ?? '',
                   boomCache.current[String(bid)] ?? '',
