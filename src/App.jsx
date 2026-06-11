@@ -12976,7 +12976,17 @@ function computeHRUpside(b) {
   const h2h = b._h2hData || H2H_PREFETCH[bid];
   const h2hLoaded = h2h?.loaded === true;
 
-  let lit = base8, total = 8, h2hAdj = 0;
+  // Zone overlap edges — prefetched by prefetchZoneEdges, written to _zoneEdges
+  const zoneEdges = parseInt(b._zoneEdges||DAILY_PICKS_CACHE[bid]?._zoneEdges||0);
+  const zoneOk = zoneEdges >= 2; // 2+ edges = meaningful overlap
+
+  // Pitcher weak slot — live check (same as Boom score)
+  const _ls = liveSlot(parseInt(bid)||0, b.lineup_slot);
+  const weakSlotOk = _ls > 0 && (b.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(_ls);
+
+  // Total conditions: 8 base + zone + weak slot (both optional bonuses)
+  const bonusLit = (zoneOk?1:0) + (weakSlotOk?1:0);
+  let lit = base8 + bonusLit, total = 8 + (zoneEdges>0||weakSlotOk?2:0), h2hAdj = 0;
   if (h2hLoaded && (h2h.pa||0) >= 4) {
     const avg = parseFloat(h2h.avg)||0;
     const hrR = (h2h.pa||1) > 0 ? (h2h.hr||0)/(h2h.pa||1) : 0;
@@ -14701,6 +14711,20 @@ function SimLabView({ data }) {
                       {label:'Platoon Adv',   ok:platoon,                  val:platoon?'✓':'—',            tip:'Favorable handedness matchup'},
                       {label:'P Gives Brls',  ok:pBrl>=6,                  val:pBrl>0?`${pBrl.toFixed(1)}%`:'—', tip:'Pitcher allows barrels regularly'},
                       {label:'Park / Wind',   ok:hrFact>=105||windOk,      val:(()=>{const hf=parseFloat(b.hr_factor);if(!hf||hf<=0)return windOk?'✓':'—';const d=Math.round(hf-100);return d>0?`+${d}%`:d===0?'Neutral':`${d}%`;})(), tip:'Park factor or wind favors HRs'},
+                      // Zone overlap — pitcher usage ≥8% in batter's hot zones
+                      ...(parseInt(b._zoneEdges||DAILY_PICKS_CACHE[String(b.batter_id)]?._zoneEdges||0)>0 ? [{
+                        label:'Zone Edges',
+                        ok: parseInt(b._zoneEdges||DAILY_PICKS_CACHE[String(b.batter_id)]?._zoneEdges||0) >= 2,
+                        val: `${parseInt(b._zoneEdges||DAILY_PICKS_CACHE[String(b.batter_id)]?._zoneEdges||0)} edge${parseInt(b._zoneEdges||DAILY_PICKS_CACHE[String(b.batter_id)]?._zoneEdges||0)!==1?'s':''}`,
+                        tip: 'Pitcher throws to zones where batter has elevated HR%/Barrel%/HH% — zone overlap signal'
+                      }] : []),
+                      // Pitcher weak slot — confirmed lineup in pitcher's historically weak batting slot
+                      ...(b.pitcher_weak_slots ? [{
+                        label:'Weak Slot',
+                        ok: (()=>{const _ls=liveSlot(parseInt(b.batter_id)||0,b.lineup_slot);return _ls>0&&(b.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(_ls);})(),
+                        val: (()=>{const _ls=liveSlot(parseInt(b.batter_id)||0,b.lineup_slot);const inWeak=_ls>0&&(b.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(_ls);return inWeak?`Slot ${_ls} ✓`:`Slots ${b.pitcher_weak_slots}`;})(),
+                        tip: `Pitcher historically allows elevated HR rate in certain batting slots — weak slots: ${b.pitcher_weak_slots||'—'}`
+                      }] : []),
                     ];
                     const lit = checks.filter(ch=>ch.ok).length;
                     const label = lit>=6?'ELITE':lit>=4?'STRONG':lit>=2?'GOOD':'BELOW AVG';
