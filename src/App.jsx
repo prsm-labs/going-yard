@@ -14171,56 +14171,40 @@ function SimLabView({ data }) {
                 </div>
               </div>
 
-              {/* Lineup Slot Range \u2014 only active when \u2705 In Lineup is on */}
+              {/* Lineup Slot Range — only active when ✅ In Lineup is on */}
               <div style={{opacity: lineupOnly ? 1 : 0.35, transition:'opacity .2s',
                 pointerEvents: lineupOnly ? 'auto' : 'none'}}>
                 <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,
                   color: lineupOnly ? (slotMin||slotMax ? 'var(--accent2)' : 'var(--muted)') : 'var(--muted)',
                   textTransform:'uppercase',letterSpacing:1,marginBottom:8,
                   display:'flex',alignItems:'center',gap:6}}>
-                  \uD83D\uDD22 Lineup Slot
-                  {!lineupOnly && <span style={{fontSize:7,color:'var(--muted)',fontStyle:'italic'}}>(enable \u2705 In Lineup first)</span>}
+                  🔢 Lineup Slot
+                  {!lineupOnly && <span style={{fontSize:7,color:'var(--muted)',fontStyle:'italic'}}>(enable ✅ In Lineup first)</span>}
                 </div>
-                <div style={{background:'var(--surface)',borderRadius:7,padding:'10px 12px',
+                <div style={{background:'var(--surface)',borderRadius:7,padding:'8px 10px',
                   border:`1px solid ${lineupOnly&&(slotMin||slotMax)?'var(--accent2)':'var(--border)'}`}}>
-                  <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
-                    <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',width:14,textAlign:'center'}}>{slotMin||'1'}</span>
-                    <input type="range" min={1} max={9} step={1} value={slotMin||1}
-                      onChange={e=>setSlotMin(e.target.value==='1'?'':(e.target.value))}
-                      disabled={!lineupOnly}
-                      style={{flex:1,accentColor:'var(--accent2)',cursor:lineupOnly?'pointer':'not-allowed'}}/>
-                    <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',width:14,textAlign:'center'}}>{slotMax||'9'}</span>
-                    <input type="range" min={1} max={9} step={1} value={slotMax||9}
-                      onChange={e=>setSlotMax(e.target.value==='9'?'':(e.target.value))}
-                      disabled={!lineupOnly}
-                      style={{flex:1,accentColor:'var(--accent2)',cursor:lineupOnly?'pointer':'not-allowed'}}/>
-                  </div>
                   <div style={{display:'flex',alignItems:'center',gap:6}}>
                     <input type="number" min={1} max={9} value={slotMin}
                       onChange={e=>{const v=e.target.value;setSlotMin(v&&parseInt(v)>=1&&parseInt(v)<=9?v:'');}}
-                      placeholder="min" disabled={!lineupOnly}
+                      placeholder="min"
+                      disabled={!lineupOnly}
                       style={{width:'100%',padding:'3px 6px',borderRadius:4,textAlign:'center',
                         border:`1px solid ${slotMin?'var(--accent2)':'var(--border)'}`,
                         background:'var(--surface2)',color:'var(--text)',
                         fontFamily:"'DM Mono',monospace",fontSize:10}}/>
-                    <span style={{color:'var(--muted)',fontSize:10}}>\u2013</span>
+                    <span style={{color:'var(--muted)',fontSize:10}}>–</span>
                     <input type="number" min={1} max={9} value={slotMax}
                       onChange={e=>{const v=e.target.value;setSlotMax(v&&parseInt(v)>=1&&parseInt(v)<=9?v:'');}}
-                      placeholder="max" disabled={!lineupOnly}
+                      placeholder="max"
+                      disabled={!lineupOnly}
                       style={{width:'100%',padding:'3px 6px',borderRadius:4,textAlign:'center',
                         border:`1px solid ${slotMax?'var(--accent2)':'var(--border)'}`,
                         background:'var(--surface2)',color:'var(--text)',
                         fontFamily:"'DM Mono',monospace",fontSize:10}}/>
-                    {(slotMin||slotMax)&&lineupOnly&&(
-                      <button onClick={()=>{setSlotMin('');setSlotMax('');}}
-                        style={{padding:'2px 7px',borderRadius:4,border:'1px solid var(--border)',
-                          background:'none',color:'var(--muted)',cursor:'pointer',
-                          fontFamily:"'DM Mono',monospace",fontSize:9,flexShrink:0}}>\u2715</button>
-                    )}
                   </div>
                   {(slotMin||slotMax)&&lineupOnly&&(
                     <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--accent2)',marginTop:5}}>
-                      Slots {slotMin||'1'}\u2013{slotMax||'9'} only
+                      Slots {slotMin||'1'}–{slotMax||'9'} only
                     </div>
                   )}
                 </div>
