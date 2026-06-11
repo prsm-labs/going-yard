@@ -13639,7 +13639,7 @@ function SimLabView({ data }) {
         parseFloat(r.recent_avg_bat_speed)||0, parseInt(r.recent_pb_2d)||0,
         r.la_locked, parseFloat(r.season_swstr_pct)||0,
         parseFloat(r.park_pull_fit)||0,
-        parseInt(r._zoneEdges||0), parseInt(r._zoneKPenalty||0), (()=>{const _ls=liveSlot(r.batter_id,r.lineup_slot);return _ls>0&&(r.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(_ls);})();
+        parseInt(r._zoneEdges||0), parseInt(r._zoneKPenalty||0), (()=>{const _ls=liveSlot(r.batter_id,r.lineup_slot);return _ls>0&&(r.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(_ls);})());
     });
     boomCacheReady.current = true;
   }, [data]);
