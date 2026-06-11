@@ -11197,7 +11197,7 @@ function HRLeaderboardTab() {
     .sort((a,b) => sortDir * ((b[sort]||0)-(a[sort]||0)));
 
   // Reset row cap when filters change
-  React.useEffect(() => { setDisplayLimit(150); }, [sort, sortDir, teamFilter, search]);
+  React.useEffect(() => { setDisplayLimit(50); }, [sort, sortDir, teamFilter, search]);
 
   const Th = ({col, label, tip}) => (
     <th title={tip} onClick={() => hs(col)}
@@ -22105,7 +22105,7 @@ function PowerBITab() {
             src={d.src}
             frameBorder="0"
             allowFullScreen
-            style={{width:'100%',height:'calc(100% + 65px)',border:'none',display:'block',
+            style={{width:'100%',height:'calc(100% + 62px)',border:'none',display:'block',
               position:'absolute',top:0,left:0,
               opacity: subTab===d.key ? 1 : 0,
               pointerEvents: subTab===d.key ? 'auto' : 'none',
