@@ -12976,17 +12976,7 @@ function computeHRUpside(b) {
   const h2h = b._h2hData || H2H_PREFETCH[bid];
   const h2hLoaded = h2h?.loaded === true;
 
-  // Zone overlap edges — prefetched by prefetchZoneEdges, written to _zoneEdges
-  const zoneEdges = parseInt(b._zoneEdges||DAILY_PICKS_CACHE[bid]?._zoneEdges||0);
-  const zoneOk = zoneEdges >= 2; // 2+ edges = meaningful overlap
-
-  // Pitcher weak slot — live check (same as Boom score)
-  const _ls = liveSlot(parseInt(bid)||0, b.lineup_slot);
-  const weakSlotOk = _ls > 0 && (b.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(_ls);
-
-  // Total conditions: 8 base + zone + weak slot (both optional bonuses)
-  const bonusLit = (zoneOk?1:0) + (weakSlotOk?1:0);
-  let lit = base8 + bonusLit, total = 8 + (zoneEdges>0||weakSlotOk?2:0), h2hAdj = 0;
+  let lit = base8, total = 8, h2hAdj = 0;
   if (h2hLoaded && (h2h.pa||0) >= 4) {
     const avg = parseFloat(h2h.avg)||0;
     const hrR = (h2h.pa||1) > 0 ? (h2h.hr||0)/(h2h.pa||1) : 0;
@@ -13678,6 +13668,8 @@ function SimLabView({ data }) {
   const [maxL7EV,    setMaxL7EV]     = useState('');
   const [minHitPct,  setMinHitPct]   = useState('');
   const [minXbhPct,  setMinXbhPct]   = useState('');
+  const [slotMin,    setSlotMin]     = useState('');
+  const [slotMax,    setSlotMax]     = useState('');
   const [filtersOpen,setFiltersOpen] = useState(false);
   const [selHRUpside,setSelHRUpside]  = useState(new Set());
   const [simSearch,   setSimSearch]    = useState('');  // batter name search
@@ -13766,6 +13758,15 @@ function SimLabView({ data }) {
       .filter(r => selMatchups.size === 0 || selMatchups.has(String(r.game_id)))
       .filter(r => selBatterGradesSim.size === 0 || selBatterGradesSim.has(r.grade))
       .filter(r => !lineupOnly || isConfirmed(r))
+      .filter(r => {
+        // Lineup slot range — only active when lineupOnly is on AND slot values set
+        if (!lineupOnly) return true;
+        const slot = liveSlot(parseInt(r.batter_id||0), r.lineup_slot);
+        if (!slot || slot === 0) return true; // unconfirmed — let through, lineupOnly handles it
+        if (slotMin && slot < parseInt(slotMin)) return false;
+        if (slotMax && slot > parseInt(slotMax)) return false;
+        return true;
+      })
       .filter(r => !filterGoneYardSim || isGoneYardSim(r))
       .filter(r => !filterKeyMatchup  || isKeyMatchup(parseInt(r.batter_id)||0, r.batter))
       .filter(r => !filterDueSim || isDueFromRow(r, parseInt(r.batter_id)||0))
@@ -13824,7 +13825,7 @@ function SimLabView({ data }) {
       return mul * ((parseFloat(a[sortBy]) || 0) - (parseFloat(b[sortBy]) || 0));
     });
     return sorted;
-  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, filterKeyMatchup, minYard, maxYard, minSig, maxSig, minSimTB, minOdds, minBoom, minBrl, minZoneFit, maxZoneFit, minL7EV, maxL7EV, minHitPct, minXbhPct, selHRUpside, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal]);
+  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, filterKeyMatchup, minYard, maxYard, minSig, maxSig, minSimTB, minOdds, minBoom, minBrl, minZoneFit, maxZoneFit, minL7EV, maxL7EV, minHitPct, minXbhPct, selHRUpside, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal, slotMin, slotMax]);
 
   // Reset row cap when filters/sort change so user always sees top results
   useEffect(() => { setDisplayLimit(150); }, [sortBy, sortDir, selMatchups, lineupOnly, simActiveOnly, simSearch, filterKeyMatchup]);
@@ -13961,6 +13962,7 @@ function SimLabView({ data }) {
                 setMinSimTB('0.01'); setMinOdds(''); setMinBoom(''); setMinBrl('');
                 setMinZoneFit(''); setMaxZoneFit(''); setMinL7EV(''); setMaxL7EV('');
                 setMinHitPct(''); setMinXbhPct('');
+                setSlotMin(''); setSlotMax('');
                 setSelBatterGradesSim(new Set()); setSelPitcherGradesSim(new Set());
                 setSelHRUpside && setSelHRUpside(new Set());
                 setSlBatterHand('ALL'); setSlPitcherHand('ALL');
@@ -14169,6 +14171,61 @@ function SimLabView({ data }) {
                 </div>
               </div>
 
+              {/* Lineup Slot Range \u2014 only active when \u2705 In Lineup is on */}
+              <div style={{opacity: lineupOnly ? 1 : 0.35, transition:'opacity .2s',
+                pointerEvents: lineupOnly ? 'auto' : 'none'}}>
+                <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,
+                  color: lineupOnly ? (slotMin||slotMax ? 'var(--accent2)' : 'var(--muted)') : 'var(--muted)',
+                  textTransform:'uppercase',letterSpacing:1,marginBottom:8,
+                  display:'flex',alignItems:'center',gap:6}}>
+                  \uD83D\uDD22 Lineup Slot
+                  {!lineupOnly && <span style={{fontSize:7,color:'var(--muted)',fontStyle:'italic'}}>(enable \u2705 In Lineup first)</span>}
+                </div>
+                <div style={{background:'var(--surface)',borderRadius:7,padding:'10px 12px',
+                  border:`1px solid ${lineupOnly&&(slotMin||slotMax)?'var(--accent2)':'var(--border)'}`}}>
+                  <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+                    <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',width:14,textAlign:'center'}}>{slotMin||'1'}</span>
+                    <input type="range" min={1} max={9} step={1} value={slotMin||1}
+                      onChange={e=>setSlotMin(e.target.value==='1'?'':(e.target.value))}
+                      disabled={!lineupOnly}
+                      style={{flex:1,accentColor:'var(--accent2)',cursor:lineupOnly?'pointer':'not-allowed'}}/>
+                    <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',width:14,textAlign:'center'}}>{slotMax||'9'}</span>
+                    <input type="range" min={1} max={9} step={1} value={slotMax||9}
+                      onChange={e=>setSlotMax(e.target.value==='9'?'':(e.target.value))}
+                      disabled={!lineupOnly}
+                      style={{flex:1,accentColor:'var(--accent2)',cursor:lineupOnly?'pointer':'not-allowed'}}/>
+                  </div>
+                  <div style={{display:'flex',alignItems:'center',gap:6}}>
+                    <input type="number" min={1} max={9} value={slotMin}
+                      onChange={e=>{const v=e.target.value;setSlotMin(v&&parseInt(v)>=1&&parseInt(v)<=9?v:'');}}
+                      placeholder="min" disabled={!lineupOnly}
+                      style={{width:'100%',padding:'3px 6px',borderRadius:4,textAlign:'center',
+                        border:`1px solid ${slotMin?'var(--accent2)':'var(--border)'}`,
+                        background:'var(--surface2)',color:'var(--text)',
+                        fontFamily:"'DM Mono',monospace",fontSize:10}}/>
+                    <span style={{color:'var(--muted)',fontSize:10}}>\u2013</span>
+                    <input type="number" min={1} max={9} value={slotMax}
+                      onChange={e=>{const v=e.target.value;setSlotMax(v&&parseInt(v)>=1&&parseInt(v)<=9?v:'');}}
+                      placeholder="max" disabled={!lineupOnly}
+                      style={{width:'100%',padding:'3px 6px',borderRadius:4,textAlign:'center',
+                        border:`1px solid ${slotMax?'var(--accent2)':'var(--border)'}`,
+                        background:'var(--surface2)',color:'var(--text)',
+                        fontFamily:"'DM Mono',monospace",fontSize:10}}/>
+                    {(slotMin||slotMax)&&lineupOnly&&(
+                      <button onClick={()=>{setSlotMin('');setSlotMax('');}}
+                        style={{padding:'2px 7px',borderRadius:4,border:'1px solid var(--border)',
+                          background:'none',color:'var(--muted)',cursor:'pointer',
+                          fontFamily:"'DM Mono',monospace",fontSize:9,flexShrink:0}}>\u2715</button>
+                    )}
+                  </div>
+                  {(slotMin||slotMax)&&lineupOnly&&(
+                    <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--accent2)',marginTop:5}}>
+                      Slots {slotMin||'1'}\u2013{slotMax||'9'} only
+                    </div>
+                  )}
+                </div>
+              </div>
+
             </div>
           )}
 
@@ -14226,7 +14283,7 @@ function SimLabView({ data }) {
               const bom = '\uFEFF';
               const esc = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
               const headers = ['Grade','Pitcher Grade','Gone Yard','Is Key Matchup','Team','Batter','Hand','P.Hand','vs Pitcher',
-                'Top Pitches','Game Time','Lineup Slot','In Weak Slot','Pitcher Weak Slots',
+                'Top Pitches','Game Time',
                 'Yard Score','⚡ Sig','💥 Boom','Form Class','gHR','ISO','Zone Fit','xwOBA','wOBA','SwStr%',
                 'Flags','Recent EV','Recent Barrel%',
                 'Recent FB%','Recent LA','BvP EV','BvP Barrel%','BvP FB%','BvP LA',
@@ -14244,12 +14301,7 @@ function SimLabView({ data }) {
                 const isKM = isKeyMatchup(parseInt(b.batter_id)||0, b.batter) ? 'YES' : '';
                 return [b.grade, pitcherGrade, gy?'YES':'', isKM, b.batting_team, b.batter, b.batter_hand,
                   b.pitcher_hand||'', b.pitcher, b.top_pitches, b.game_time,
-                  // Lineup slot — live confirmed slot or 0
-                  liveSlot(bid, b.lineup_slot) || '',
-                  // In Weak Slot — computed live same as Boom score
-                  (()=>{const _ls=liveSlot(bid,b.lineup_slot);return _ls>0&&(b.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(_ls)?'YES':''})(),
-                  b.pitcher_weak_slots || '',
-                  // Computed columns — between Pitcher Weak Slots and Flags
+                  // Computed columns — between Game Time and Flags
                   (b._yard ?? computeYardScore(sigCache.current[String(bid)]||0, parseFloat(b.gHR)||0, boomCache.current[String(bid)]||0, b._ps||(parseFloat(b.ps_score)||0), b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1), liveSlot(bid,b.lineup_slot), b._pgLabel||'')),
                   sigCache.current[String(bid)] ?? '',
                   boomCache.current[String(bid)] ?? '',
@@ -14711,20 +14763,6 @@ function SimLabView({ data }) {
                       {label:'Platoon Adv',   ok:platoon,                  val:platoon?'✓':'—',            tip:'Favorable handedness matchup'},
                       {label:'P Gives Brls',  ok:pBrl>=6,                  val:pBrl>0?`${pBrl.toFixed(1)}%`:'—', tip:'Pitcher allows barrels regularly'},
                       {label:'Park / Wind',   ok:hrFact>=105||windOk,      val:(()=>{const hf=parseFloat(b.hr_factor);if(!hf||hf<=0)return windOk?'✓':'—';const d=Math.round(hf-100);return d>0?`+${d}%`:d===0?'Neutral':`${d}%`;})(), tip:'Park factor or wind favors HRs'},
-                      // Zone overlap — pitcher usage ≥8% in batter's hot zones
-                      ...(parseInt(b._zoneEdges||DAILY_PICKS_CACHE[String(b.batter_id)]?._zoneEdges||0)>0 ? [{
-                        label:'Zone Edges',
-                        ok: parseInt(b._zoneEdges||DAILY_PICKS_CACHE[String(b.batter_id)]?._zoneEdges||0) >= 2,
-                        val: `${parseInt(b._zoneEdges||DAILY_PICKS_CACHE[String(b.batter_id)]?._zoneEdges||0)} edge${parseInt(b._zoneEdges||DAILY_PICKS_CACHE[String(b.batter_id)]?._zoneEdges||0)!==1?'s':''}`,
-                        tip: 'Pitcher throws to zones where batter has elevated HR%/Barrel%/HH% — zone overlap signal'
-                      }] : []),
-                      // Pitcher weak slot — confirmed lineup in pitcher's historically weak batting slot
-                      ...(b.pitcher_weak_slots ? [{
-                        label:'Weak Slot',
-                        ok: (()=>{const _ls=liveSlot(parseInt(b.batter_id)||0,b.lineup_slot);return _ls>0&&(b.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(_ls);})(),
-                        val: (()=>{const _ls=liveSlot(parseInt(b.batter_id)||0,b.lineup_slot);const inWeak=_ls>0&&(b.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(_ls);return inWeak?`Slot ${_ls} ✓`:`Slots ${b.pitcher_weak_slots}`;})(),
-                        tip: `Pitcher historically allows elevated HR rate in certain batting slots — weak slots: ${b.pitcher_weak_slots||'—'}`
-                      }] : []),
                     ];
                     const lit = checks.filter(ch=>ch.ok).length;
                     const label = lit>=6?'ELITE':lit>=4?'STRONG':lit>=2?'GOOD':'BELOW AVG';
