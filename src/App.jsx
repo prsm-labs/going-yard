@@ -11093,7 +11093,7 @@ function HRLeaderboardTab() {
   const [teamFilter, setTeamFilter] = React.useState('ALL');
   const [expPid,  setExpPid]  = React.useState(null);
   const [statCards, setStatCards] = React.useState({ total:0, longDist:null, longEV:null });
-  const [displayLimit, setDisplayLimit] = React.useState(150);
+  const [displayLimit, setDisplayLimit] = React.useState(50);
   const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
   const SEASON_START = '2026-03-25';
   const ABBR = {108:'LAA',109:'AZ',110:'BAL',111:'BOS',112:'CHC',113:'CIN',114:'CLE',115:'COL',116:'DET',117:'HOU',118:'KC',119:'LAD',120:'WSH',121:'NYM',133:'ATH',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',139:'TB',140:'TEX',141:'TOR',142:'MIN',143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL'};
@@ -11333,7 +11333,7 @@ function HRLeaderboardTab() {
         </table>
         {sorted.length > displayLimit && (
           <div style={{textAlign:'center',padding:'12px 0'}}>
-            <button onClick={()=>setDisplayLimit(v=>v+150)}
+            <button onClick={()=>setDisplayLimit(v=>v+50)}
               style={{fontFamily:"'DM Mono',monospace",fontSize:9,padding:'6px 16px',
                 borderRadius:6,border:'1px solid var(--border)',background:'rgba(255,255,255,.05)',
                 color:'var(--muted)',cursor:'pointer',letterSpacing:.5}}>
