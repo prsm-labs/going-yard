@@ -22023,7 +22023,7 @@ function PowerBITab() {
             src={d.src}
             frameBorder="0"
             allowFullScreen
-            style={{width:'100%',height:'calc(100% + 67px)',border:'none',display:'block',
+            style={{width:'100%',height:'calc(100% + 65px)',border:'none',display:'block',
               position:'absolute',top:0,left:0,
               opacity: subTab===d.key ? 1 : 0,
               pointerEvents: subTab===d.key ? 'auto' : 'none',
