@@ -22016,15 +22016,20 @@ function PowerBITab() {
         </div>
       </div>
       <div style={{width:'100%',height:'calc(100vh - 170px)',overflow:'hidden',position:'relative'}}>
-        <iframe
-          key={activeDash.key}
-          title={activeDash.label}
-          src={activeDash.src}
-          frameBorder="0"
-          allowFullScreen
-          style={{width:'100%',height:'calc(100% + 48px)',border:'none',display:'block',
-            position:'absolute',top:0,left:0}}
-        />
+        {DASHBOARDS.map(d => (
+          <iframe
+            key={d.key}
+            title={d.label}
+            src={d.src}
+            frameBorder="0"
+            allowFullScreen
+            style={{width:'100%',height:'calc(100% + 72px)',border:'none',display:'block',
+              position:'absolute',top:0,left:0,
+              opacity: subTab===d.key ? 1 : 0,
+              pointerEvents: subTab===d.key ? 'auto' : 'none',
+              transition:'opacity .15s'}}
+          />
+        ))}
       </div>
       <div style={{padding:"8px 14px",borderTop:"1px solid var(--border)",
         display:"flex",justifyContent:"flex-end",background:"var(--surface)"}}>
