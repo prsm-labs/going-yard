@@ -20319,7 +20319,7 @@ For non-pick questions: {"intro":"your full answer","picks":[],"disclaimer":""}`
         <div style={{padding:'10px 14px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',
           justifyContent:'space-between',background:'var(--surface2)',flexShrink:0}}>
           <div style={{display:'flex',alignItems:'center',gap:8}}>
-            <span style={{fontSize:16}}>&#x1F916;</span>
+            <span style={{fontSize:16}}>🤖</span>
             <span style={{fontFamily:osw,fontWeight:800,fontSize:14,letterSpacing:.5}}>Yard Bot</span>
             <span style={{fontFamily:mono,fontSize:7,color:'var(--muted)'}}>top 50 &middot; session</span>
           </div>
@@ -20331,7 +20331,7 @@ For non-pick questions: {"intro":"your full answer","picks":[],"disclaimer":""}`
         <div style={{flex:1,overflowY:'auto',padding:'10px 12px',display:'flex',flexDirection:'column',gap:10}}>
           {messages.length===0&&(
             <div style={{textAlign:'center',padding:'16px 8px'}}>
-              <div style={{fontSize:24,marginBottom:8}}>&#x1F916;</div>
+              <div style={{fontSize:24,marginBottom:8}}>🤖</div>
               <div style={{fontFamily:osw,fontWeight:700,fontSize:12,marginBottom:4}}>Ask me about today's slate</div>
               <div style={{display:'flex',gap:5,flexWrap:'wrap',justifyContent:'center',marginTop:10}}>
                 {QUICK_PROMPTS.map((p,i)=>(
@@ -20384,7 +20384,7 @@ For non-pick questions: {"intro":"your full answer","picks":[],"disclaimer":""}`
               )}
             </div>
           ))}
-          {loading&&<div style={{display:'flex',alignItems:'center',gap:6}}><span style={{fontSize:14}}>&#x1F916;</span><span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>Scanning slate...</span></div>}
+          {loading&&<div style={{display:'flex',alignItems:'center',gap:6}}><span style={{fontSize:14}}>🤖</span><span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>Scanning slate...</span></div>}
           <div ref={bottomRef}/>
         </div>
         <div style={{padding:'8px 10px',borderTop:'1px solid var(--border)',flexShrink:0,background:'var(--surface2)'}}>
@@ -20411,7 +20411,7 @@ For non-pick questions: {"intro":"your full answer","picks":[],"disclaimer":""}`
         cursor:'pointer',zIndex:1001,display:'flex',alignItems:'center',justifyContent:'center',
         boxShadow:'0 4px 16px rgba(0,0,0,.5)',transition:'background .2s, transform .15s',
         transform:open?'scale(0.92)':'scale(1)'}}>
-      <span style={{fontSize:22}}>{open?'x':'&#x1F916;'}</span>
+      <span style={{fontSize:22}}>{open?'✕':'🤖'}</span>
       {!open&&unread>0&&(
         <div style={{position:'absolute',top:-2,right:-2,width:16,height:16,borderRadius:'50%',
           background:'#27c97a',border:'2px solid var(--bg)',display:'flex',alignItems:'center',justifyContent:'center',
