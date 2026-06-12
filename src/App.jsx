@@ -11084,15 +11084,15 @@ function HRTrackerTab() {
 // Batters who made HR-quality contact in last 7 days but got nothing — reads from mlb_atbat_log_last7.csv
 // ── HR Season Leaderboard ─────────────────────────────────────────────────────
 function HRLeaderboardTab() {
-  const [rows,    setRows]    = React.useState([]);
-  const [loading, setLoading] = React.useState(true);
-  const [error,   setError]   = React.useState(null);
-  const [sort,    setSortCol] = React.useState('hrs');
-  const [sortDir, setSortDir] = React.useState(1);
-  const [search,  setSearch]  = React.useState('');
+  const [rows,       setRows]       = React.useState([]);
+  const [lbData,     setLbData]     = React.useState({}); // hr_leaderboard.json cache
+  const [loading,    setLoading]    = React.useState(true);
+  const [error,      setError]      = React.useState(null);
+  const [sort,       setSortCol]    = React.useState('hrs');
+  const [sortDir,    setSortDir]    = React.useState(1);
+  const [search,     setSearch]     = React.useState('');
   const [teamFilter, setTeamFilter] = React.useState('ALL');
-  const [expPid,  setExpPid]  = React.useState(null);
-  const [statCards, setStatCards] = React.useState({ total:0, longDist:null, longEV:null });
+  const [statCards,  setStatCards]  = React.useState({ total:0, longDist:null, longEV:null });
   const [displayLimit, setDisplayLimit] = React.useState(50);
   const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
   const SEASON_START = '2026-03-25';
@@ -11102,7 +11102,17 @@ function HRLeaderboardTab() {
     const season = new Date().getFullYear();
     const today  = new Date().toISOString().slice(0,10);
 
-    // ── ALL batters season hitting stats — paginated, max 10 pages ──────────
+    // ── 1. Fetch hr_leaderboard.json (pipeline-built: laser/HH/moonshot stats) ──
+    const lbPromise = fetch('/data/hr_leaderboard.json')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (!d) return {};
+        setLbData(d);
+        return d;
+      })
+      .catch(() => ({}));
+
+    // ── 2. Fetch live season HR totals from MLB Stats API ──────────────────────
     const leadersPromise = (async () => {
       const map = {}; let offset = 0; let leagueTotalHRs = 0;
       const MAX_PAGES = 10; let page = 0;
@@ -11118,10 +11128,7 @@ function HRLeaderboardTab() {
           );
           clearTimeout(timer);
           d = await res.json();
-        } catch(e) {
-          console.warn(`[Leaderboard] page ${page} failed:`, e.message);
-          break;
-        }
+        } catch(e) { break; }
         const splits = d?.stats?.[0]?.splits || [];
         splits.forEach(s => {
           const hrs = parseInt(s.stat?.homeRuns || 0);
@@ -11129,8 +11136,7 @@ function HRLeaderboardTab() {
           if (hrs < 1) return;
           const pid = s.player?.id; if (!pid) return;
           const teamAbbr = ABBR[s.team?.id] || s.team?.abbreviation || '';
-          map[pid] = { pid, name: s.player?.fullName||'', team: teamAbbr,
-            hrs, laser105:0, laser110:0, hh105:0, hh110:0 };
+          map[pid] = { pid, name: s.player?.fullName||'', team: teamAbbr, hrs };
         });
         if (splits.length < 500) break;
         offset += 500;
@@ -11138,52 +11144,41 @@ function HRLeaderboardTab() {
       return { map, leagueTotalHRs };
     })();
 
-    // ── Laser HR stats — loaded AFTER API calls finish to avoid concurrent memory pressure
-    // Running both simultaneously crashes iOS Safari; sequential is safer
-    leadersPromise.then(({ map }) => {
-      if (!Object.keys(map).length) return; // no data, skip
-      loadAtBatLog().then(rows => {
-        const evMap = {}; let longDist = null, longEV = null;
-        rows.forEach(r => {
-          const pid = parseInt(r['Batter'] || 0); if (!pid) return;
-          const ev   = parseFloat(r['Exit Velocity']) || 0;
-          const isHR = parseInt(r['Is Home Run'] || 0) === 1;
-          if (!evMap[pid]) evMap[pid] = { laser105:0, laser110:0, hh105:0, hh110:0 };
-          const m = evMap[pid];
-          if (isHR) {
-            if (ev>=105) m.laser105++; if (ev>=110) m.laser110++;
-            const dist = parseFloat(r['Hit Distance']) || 0;
-            if (dist > 0 && (!longDist || dist > longDist.dist)) longDist = { pid, dist, ev };
-            if (ev > 0  && (!longEV   || ev > longEV.ev))        longEV   = { pid, ev, dist: parseFloat(r['Hit Distance'])||0 };
-          }
-          if (ev>=105) m.hh105++; if (ev>=110) m.hh110++;
-        });
-        // Merge laser data into existing rows
-        setRows(prev => prev.map(r => {
-          const ev = evMap[r.pid] || {};
-          return { ...r, laser105:ev.laser105||0, laser110:ev.laser110||0, hh105:ev.hh105||0, hh110:ev.hh110||0 };
-        }));
-        const findName = pid => { const f = rows.find ? undefined : undefined; return map[pid]?.name || `#${pid}`; };
-        const findTeam = pid => map[pid]?.team || '';
-        setStatCards(prev => ({
-          ...prev,
-          longDist: longDist ? { name:map[longDist.pid]?.name||`#${longDist.pid}`, team:map[longDist.pid]?.team||'', dist:longDist.dist } : null,
-          longEV:   longEV   ? { name:map[longEV.pid]?.name  ||`#${longEV.pid}`,   team:map[longEV.pid]?.team  ||'', ev:longEV.ev       } : null,
-        }));
-      }).catch(() => {});
-    });
+    // ── 3. Merge API data + leaderboard JSON ───────────────────────────────────
+    Promise.all([leadersPromise, lbPromise]).then(([{ map, leagueTotalHRs }, lb]) => {
+      const lbBatters = {};
+      (lb?.batters || []).forEach(b => { lbBatters[b.pid] = b; });
 
-    // Run API calls — leaderboard rows load immediately, laser data updates after
-    leadersPromise
-      .then(({ map, leagueTotalHRs }) => {
-        const out = Object.values(map)
-          .filter(r => r.pid && typeof r.pid === 'number' && r.hrs >= 1)
-          .map(r => ({ ...r, laser105:0, laser110:0, hh105:0, hh110:0 }))
-          .sort((a,b) => b.hrs - a.hrs).map((r,i) => ({ ...r, rank: i+1 }));
-        const total = leagueTotalHRs || out.reduce((s,r)=>s+r.hrs,0);
-        setStatCards({ total, longDist:null, longEV:null }); // laser stat cards populated after CSV loads
-        setRows(out); setLoading(false);
-      }).catch(e => { setError(e.message); setLoading(false); });
+      const out = Object.values(map)
+        .filter(r => r.pid && r.hrs >= 1)
+        .map(r => {
+          const lb = lbBatters[r.pid] || {};
+          return {
+            ...r,
+            laser105:  lb.laser105  || 0,
+            laser110:  lb.laser110  || 0,
+            moonshots: lb.moonshots || 0,
+            hh105:     lb.hh105     || 0,
+            hh110:     lb.hh110     || 0,
+          };
+        })
+        .sort((a,b) => b.hrs - a.hrs)
+        .map((r,i) => ({ ...r, rank: i+1 }));
+
+      const total = leagueTotalHRs || out.reduce((s,r)=>s+r.hrs,0);
+
+      // League stat cards — from hr_leaderboard.json (pipeline-computed)
+      const ll = lb?.league?.longest_hr;
+      const lh = lb?.league?.hardest_hr;
+      setStatCards({
+        total,
+        longDist: ll?.name ? { name: ll.name, team: ll.team, dist: ll.dist } : null,
+        longEV:   lh?.name ? { name: lh.name, team: lh.team, ev:   lh.ev   } : null,
+      });
+
+      setRows(out);
+      setLoading(false);
+    }).catch(e => { setError(e.message); setLoading(false); });
   }, []);
 
   const hs = col => { if (sort===col) setSortDir(d=>-d); else { setSortCol(col); setSortDir(1); } };
@@ -11196,69 +11191,62 @@ function HRLeaderboardTab() {
     })
     .sort((a,b) => sortDir * ((b[sort]||0)-(a[sort]||0)));
 
-  // Reset row cap when filters change
   React.useEffect(() => { setDisplayLimit(50); }, [sort, sortDir, teamFilter, search]);
 
   const Th = ({col, label, tip}) => (
     <th title={tip} onClick={() => hs(col)}
       style={{padding:'5px 6px',fontSize:7,fontFamily:mono,textTransform:'uppercase',letterSpacing:.6,
-        whiteSpace:'nowrap',cursor:'pointer',textAlign:'right',
-        color:sort===col?'var(--accent2)':'var(--muted)',borderBottom:'1px solid var(--border)',
+        color:sort===col?'var(--accent2)':'var(--muted)',cursor:'pointer',textAlign:'right',
+        whiteSpace:'nowrap',borderBottom:'1px solid var(--border)',
         background:'var(--surface2)',position:'sticky',top:0,zIndex:10}}>
       {label}{sort===col?(sortDir===1?' ▼':' ▲'):''}
     </th>
   );
 
-  if (loading) return <div style={{display:'flex',alignItems:'center',gap:8,padding:20,color:'var(--muted)',fontFamily:mono,fontSize:11}}><div className="sp"/> Loading season HR leaderboard…</div>;
-  if (error)   return <div style={{padding:20,color:'var(--accent)',fontFamily:mono,fontSize:11}}>⚠ {error}</div>;
+  if (loading) return <div style={{padding:24,textAlign:'center',fontFamily:mono,fontSize:10,color:'var(--muted)'}}>Loading leaderboard…</div>;
+  if (error)   return <div style={{padding:24,textAlign:'center',fontFamily:mono,fontSize:10,color:'#ff4020'}}>Error: {error}</div>;
 
   return (
-    <div>
-      {/* ── Stat Cards ── */}
-      <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}>
-        {/* Total HRs */}
-        <div style={{flex:'1 1 100px',minWidth:100,background:'var(--surface2)',borderRadius:8,
-          border:'1px solid var(--border)',padding:'10px 14px',display:'flex',
-          flexDirection:'column',gap:2}}>
-          <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',
-            letterSpacing:.8}}>2026 Total HRs</div>
-          <div style={{fontFamily:osw,fontWeight:800,fontSize:28,color:'var(--accent)',
-            lineHeight:1}}>{statCards.total.toLocaleString()}</div>
-          <div style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.25)'}}>season to date</div>
+    <div style={{padding:'12px 16px'}}>
+      {/* Stat Cards */}
+      <div style={{display:'flex',gap:10,marginBottom:14,flexWrap:'wrap'}}>
+        <div style={{flex:'1 1 120px',minWidth:120,background:'var(--surface2)',borderRadius:8,
+          border:'1px solid var(--border)',padding:'10px 14px',display:'flex',flexDirection:'column',gap:2}}>
+          <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8}}>💥 Season HRs</div>
+          <div style={{fontFamily:osw,fontWeight:800,fontSize:28,color:'var(--accent)',lineHeight:1}}>
+            {statCards.total.toLocaleString()}
+          </div>
+          <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>MLB total · 2026</div>
         </div>
-        {/* Longest Distance */}
         <div style={{flex:'2 1 160px',minWidth:160,background:'var(--surface2)',borderRadius:8,
-          border:'1px solid var(--border)',padding:'10px 14px',display:'flex',
-          flexDirection:'column',gap:2}}>
-          <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',
-            letterSpacing:.8}}>📏 Longest HR</div>
+          border:'1px solid var(--border)',padding:'10px 14px',display:'flex',flexDirection:'column',gap:2}}>
+          <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8}}>🚀 Longest HR</div>
           {statCards.longDist ? <>
-            <div style={{fontFamily:osw,fontWeight:800,fontSize:22,color:'#f5a623',lineHeight:1}}>
-              {statCards.longDist.dist.toFixed(0)} ft
+            <div style={{fontFamily:osw,fontWeight:800,fontSize:22,color:'#38b8f2',lineHeight:1}}>
+              {statCards.longDist.dist} ft
             </div>
             <div style={{fontFamily:mono,fontSize:9,color:'var(--text)',marginTop:1}}>
               {statCards.longDist.name}
-              {statCards.longDist.team ? <span style={{color:'var(--muted)',marginLeft:4,fontSize:8}}>{statCards.longDist.team}</span> : null}
+              {statCards.longDist.team && <span style={{color:'var(--muted)',marginLeft:4,fontSize:8}}>{statCards.longDist.team}</span>}
             </div>
           </> : <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)'}}>Loading…</div>}
         </div>
-        {/* Highest EV */}
         <div style={{flex:'2 1 160px',minWidth:160,background:'var(--surface2)',borderRadius:8,
-          border:'1px solid var(--border)',padding:'10px 14px',display:'flex',
-          flexDirection:'column',gap:2}}>
-          <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',
-            letterSpacing:.8}}>⚡ Hardest Hit HR</div>
+          border:'1px solid var(--border)',padding:'10px 14px',display:'flex',flexDirection:'column',gap:2}}>
+          <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8}}>⚡ Hardest Hit HR</div>
           {statCards.longEV ? <>
             <div style={{fontFamily:osw,fontWeight:800,fontSize:22,color:'#ff4020',lineHeight:1}}>
               {statCards.longEV.ev.toFixed(1)} mph
             </div>
             <div style={{fontFamily:mono,fontSize:9,color:'var(--text)',marginTop:1}}>
               {statCards.longEV.name}
-              {statCards.longEV.team ? <span style={{color:'var(--muted)',marginLeft:4,fontSize:8}}>{statCards.longEV.team}</span> : null}
+              {statCards.longEV.team && <span style={{color:'var(--muted)',marginLeft:4,fontSize:8}}>{statCards.longEV.team}</span>}
             </div>
           </> : <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)'}}>Loading…</div>}
         </div>
       </div>
+
+      {/* Search + Team Filter */}
       <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10,flexWrap:'wrap'}}>
         <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search batter or team…"
           style={{padding:'3px 10px',borderRadius:6,border:'1px solid var(--border)',background:'var(--surface2)',
@@ -11269,36 +11257,41 @@ function HRLeaderboardTab() {
           {teams.map(t=><option key={t} value={t}>{t==='ALL'?'All Teams':t}</option>)}
         </select>
         <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginLeft:'auto'}}>
-          {sorted.length} batters · 2026 season · tap row to expand
+          {sorted.length} batters · 2026 season
         </div>
       </div>
+
+      {/* Table */}
       <div className="tw">
         <table style={{width:'100%'}}>
           <thead><tr>
-            <th onClick={()=>hs('rank')} style={{padding:'5px 6px',fontSize:7,fontFamily:mono,textTransform:'uppercase',letterSpacing:.6,
-              color:sort==='rank'?'var(--accent2)':'var(--muted)',cursor:'pointer',textAlign:'left',whiteSpace:'nowrap',
-              borderBottom:'1px solid var(--border)',background:'var(--surface2)',position:'sticky',top:0,zIndex:10}}>
+            <th onClick={()=>hs('rank')} style={{padding:'5px 6px',fontSize:7,fontFamily:mono,
+              textTransform:'uppercase',letterSpacing:.6,color:sort==='rank'?'var(--accent2)':'var(--muted)',
+              cursor:'pointer',textAlign:'left',whiteSpace:'nowrap',borderBottom:'1px solid var(--border)',
+              background:'var(--surface2)',position:'sticky',top:0,zIndex:10}}>
               #{sort==='rank'?(sortDir===1?' ▼':' ▲'):''}
             </th>
             <th style={{padding:'5px 6px',fontSize:7,fontFamily:mono,textTransform:'uppercase',letterSpacing:.6,
               color:'var(--muted)',textAlign:'left',whiteSpace:'nowrap',borderBottom:'1px solid var(--border)',
               background:'var(--surface2)',position:'sticky',top:0,zIndex:10}}>Batter</th>
-            <Th col="hrs"      label="💥 HR"    tip="Total home runs this season"/>
-            <Th col="laser105" label="💣 105+"  tip="HRs hit at 105+ mph exit velocity"/>
-            <Th col="laser110" label="🔥 110+"  tip="HRs hit at 110+ mph exit velocity"/>
-            <Th col="hh105"    label="💪 HH 105" tip="All batted balls 105+ mph"/>
-            <Th col="hh110"    label="⚡ HH 110" tip="All batted balls 110+ mph"/>
+            <Th col="hrs"       label="💥 HR"      tip="Total home runs this season (live from MLB API)"/>
+            <Th col="laser105"  label="💣 105+"     tip="HRs hit at 105+ mph exit velocity"/>
+            <Th col="laser110"  label="🔥 110+"     tip="HRs hit at 110+ mph exit velocity"/>
+            <Th col="moonshots" label="🌙 420ft+"   tip="Moonshot HRs — 420+ feet"/>
+            <Th col="hh105"     label="💪 HH 105"   tip="All batted balls 105+ mph exit velocity"/>
+            <Th col="hh110"     label="⚡ HH 110"   tip="All batted balls 110+ mph exit velocity"/>
           </tr></thead>
           <tbody>
-            {sorted.slice(0, displayLimit).map((r,i) => [
-              (<tr key={r.pid} onClick={()=>setExpPid(v=>v===r.pid?null:r.pid)}
+            {sorted.slice(0, displayLimit).map((r,i) => (
+              <tr key={r.pid}
+                onClick={()=>openAtBatSlide({pid:r.pid, name:r.name, team:r.team})}
                 style={{cursor:'pointer',height:28,borderBottom:'1px solid rgba(255,255,255,.04)',
-                  background:expPid===r.pid?'rgba(255,255,255,.04)':isKeyMatchup(r.pid,r.name)?'rgba(255,130,32,.05)':'transparent'}}>
+                  background:isKeyMatchup(r.pid,r.name)?'rgba(255,130,32,.05)':'transparent'}}>
                 <td style={{padding:'2px 6px',fontFamily:osw,fontWeight:700,fontSize:10,
                   color:r.rank<=3?'var(--accent2)':'var(--muted)',whiteSpace:'nowrap'}}>
                   {r.rank<=3?['🥇','🥈','🥉'][r.rank-1]:r.rank}
                 </td>
-                <td onClick={e=>{e.stopPropagation();openAtBatSlide({pid:r.pid,name:r.name,team:r.team});}} style={{padding:'2px 5px',maxWidth:170,cursor:'pointer'}}>
+                <td style={{padding:'2px 5px',maxWidth:170}}>
                   <div style={{display:'flex',alignItems:'center',gap:4,overflow:'hidden'}}>
                     <PlayerAvatar pid={r.pid} name={r.name} size={16}/>
                     <span style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'var(--accent2)',whiteSpace:'nowrap',flexShrink:0}}>{r.team}</span>
@@ -11317,18 +11310,16 @@ function HRLeaderboardTab() {
                   <span style={{fontFamily:osw,fontWeight:700,fontSize:11,color:r.laser110>0?'#ff3010':'var(--muted)'}}>{r.laser110||'—'}</span>
                 </td>
                 <td style={{padding:'2px 6px',textAlign:'right'}}>
+                  <span style={{fontFamily:osw,fontWeight:700,fontSize:11,color:r.moonshots>0?'#a78bfa':'var(--muted)'}}>{r.moonshots||'—'}</span>
+                </td>
+                <td style={{padding:'2px 6px',textAlign:'right'}}>
                   <span style={{fontFamily:osw,fontWeight:700,fontSize:11,color:r.hh105>=40?'#38b8f2':r.hh105>=20?'#27c97a':'var(--text)'}}>{r.hh105||'—'}</span>
                 </td>
                 <td style={{padding:'2px 6px',textAlign:'right'}}>
                   <span style={{fontFamily:osw,fontWeight:700,fontSize:11,color:r.hh110>=8?'#27c97a':'var(--text)'}}>{r.hh110||'—'}</span>
                 </td>
-              </tr>),
-              expPid===r.pid && !loading && (
-                <tr key={r.pid+'x'}><td colSpan={7} style={{padding:'0 10px 10px',background:'rgba(255,255,255,.02)'}}>
-                  <Last7HRChart batterId={r.pid}/><RecentGameLog batterId={r.pid}/>
-                </td></tr>
-              )
-            ])}
+              </tr>
+            ))}
           </tbody>
         </table>
         {sorted.length > displayLimit && (
@@ -11343,7 +11334,7 @@ function HRLeaderboardTab() {
         )}
       </div>
       <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:8,lineHeight:1.6}}>
-        HR = MLB official season total · 💣🔥 Laser = HR at EV threshold · 💪⚡ HH = any batted ball at EV threshold
+        HR = MLB official season total (live) · 💣🔥 Laser/🌙 Moonshot/💪⚡ HH = from Statcast AB log · tap row to open batter slideout
       </div>
     </div>
   );
