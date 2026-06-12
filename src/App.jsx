@@ -10525,7 +10525,7 @@ let _notifyNewHR = null; // callback set by useHRNotifications hook
 
 // Global navigation — lets notifications route to tabs/views without prop drilling
 let _GLOBAL_NAV = null; // { setTab, setLiveView } — set by App on mount
-let _OPEN_TEAM_SLIDE = null; // (teamObj) => void — set by HRTrackerTab on mount
+let _OPEN_TEAM_SLIDE = null; // (teamObj) => void — set by App on mount, universal across all tabs
 function navTo(tab, liveView) {
   if (!_GLOBAL_NAV) return;
   _GLOBAL_NAV.setTab(tab);
@@ -11538,19 +11538,8 @@ function MLBTab() {
   const [view, setView]         = React.useState('division'); // division | league | wildcard
   const [standings, setStandings] = React.useState([]);
   const [loading, setLoading]   = React.useState(true);
-  const [teamSlide, setTeamSlide] = React.useState(null); // {teamId, abbr, name}
-  const [teamStats, setTeamStats] = React.useState(null);
-  const [teamLoading, setTeamLoading] = React.useState(false);
-  const [teamSchedule, setTeamSchedule] = React.useState([]); // upcoming + recent games
-  const [schedLoading, setSchedLoading] = React.useState(false);
   const mono = "'DM Mono',monospace";
   const osw  = "'Oswald',sans-serif";
-
-  // Wire global opener so Splits tab can trigger this slideout
-  React.useEffect(() => {
-    _OPEN_TEAM_SLIDE = (t) => setTeamSlide(t);
-    return () => { _OPEN_TEAM_SLIDE = null; };
-  }, []);
 
   // ── Fetch standings ────────────────────────────────────────────────────────
   React.useEffect(() => {
@@ -11562,52 +11551,7 @@ function MLBTab() {
       .catch(() => setLoading(false));
   }, [sub]);
 
-  // ── Fetch team stats when slideout opens ──────────────────────────────────
-  React.useEffect(() => {
-    if (!teamSlide) { setTeamSchedule([]); return; }
-    const tid = teamSlide.teamId;
-    setTeamLoading(true);
-    setTeamStats(null);
-    setTeamSchedule([]);
 
-    // Team stats
-    Promise.all([
-      fetch(`https://statsapi.mlb.com/api/v1/teams/${tid}/stats?stats=season&group=hitting&season=2026`).then(r=>r.json()),
-      fetch(`https://statsapi.mlb.com/api/v1/teams/${tid}/stats?stats=season&group=pitching&season=2026`).then(r=>r.json()),
-    ]).then(([hit, pit]) => {
-      const h = hit?.stats?.[0]?.splits?.[0]?.stat || {};
-      const p = pit?.stats?.[0]?.splits?.[0]?.stat || {};
-      setTeamStats({ hitting: h, pitching: p });
-      setTeamLoading(false);
-    }).catch(() => setTeamLoading(false));
-
-    // Schedule: 4 recent + 5 upcoming games
-    setSchedLoading(true);
-    const today = new Date();
-    const fmt = d => d.toISOString().slice(0,10);
-    const past  = fmt(new Date(today - 8*864e5));  // 8 days back
-    const future = fmt(new Date(+today + 8*864e5)); // 8 days ahead
-    fetch(`https://statsapi.mlb.com/api/v1/schedule?teamId=${tid}&startDate=${past}&endDate=${future}&sportId=1&gameType=R&hydrate=linescore,team`)
-      .then(r=>r.json())
-      .then(d => {
-        const games = (d.dates||[]).flatMap(date =>
-          (date.games||[]).map(g => ({
-            date:       date.date,
-            gameId:     g.gamePk,
-            status:     g.status?.detailedState||'',
-            home:       g.teams?.home?.team?.abbreviation||'',
-            away:       g.teams?.away?.team?.abbreviation||'',
-            homeScore:  g.teams?.home?.score,
-            awayScore:  g.teams?.away?.score,
-            gameTime:   g.gameDate ? new Date(g.gameDate).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',timeZone:'America/New_York',hour12:true})+' ET' : '',
-            isHome:     g.teams?.home?.team?.id === tid,
-            isFinal:    (g.status?.abstractGameState||'') === 'Final',
-          }))
-        ).sort((a,b) => a.date.localeCompare(b.date));
-        setTeamSchedule(games);
-        setSchedLoading(false);
-      }).catch(() => setSchedLoading(false));
-  }, [teamSlide]);
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   const divOrder = ['AL East','AL Central','AL West','NL East','NL Central','NL West'];
@@ -11684,7 +11628,7 @@ function MLBTab() {
         <td style={{padding:'4px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',textAlign:'center',width:24}}>{rank}</td>
         <td style={{padding:'4px 6px'}}>
           <div style={{display:'flex',alignItems:'center',gap:5,cursor:'pointer'}}
-            onClick={()=>setTeamSlide(t)}>
+            onClick={()=>_OPEN_TEAM_SLIDE?.(t)}>
             <img src={t.logo} alt={t.abbr}
               style={{width:20,height:20,objectFit:'contain',flexShrink:0}}
               onError={e=>e.target.style.display='none'}/>
@@ -11740,7 +11684,7 @@ function MLBTab() {
                 padding:'5px 8px',borderRadius:6,marginBottom:4,
                 background:'rgba(39,201,122,.06)',border:'1px solid rgba(39,201,122,.15)'}}>
                 <span style={{fontFamily:mono,fontSize:9,color:'#27c97a',width:14}}>{i+1}</span>
-                <span onClick={()=>setTeamSlide(t)}
+                <span onClick={()=>_OPEN_TEAM_SLIDE?.(t)}
                   style={{fontFamily:osw,fontWeight:800,fontSize:12,color:'var(--accent2)',
                     cursor:'pointer',flex:1}}>
                   {t.abbr}
@@ -11761,7 +11705,7 @@ function MLBTab() {
                 <span style={{fontFamily:mono,fontSize:9,color:i<3?'#f5a623':'var(--muted)',width:14}}>
                   {i<3?'✓':'·'}
                 </span>
-                <span onClick={()=>setTeamSlide(t)}
+                <span onClick={()=>_OPEN_TEAM_SLIDE?.(t)}
                   style={{fontFamily:osw,fontWeight:800,fontSize:12,color:'var(--accent2)',
                     cursor:'pointer',flex:1}}>
                   {t.abbr}
@@ -11778,158 +11722,10 @@ function MLBTab() {
   };
 
   // ── Team Stats Slideout ───────────────────────────────────────────────────
-  const TeamSlideout = () => {
-    if (!teamSlide) return null;
-    const t = teamSlide;
-    const h = teamStats?.hitting || {};
-    const p = teamStats?.pitching || {};
-    const mlbUrl = `https://www.mlb.com/${(t.name||'').toLowerCase().replace(/\s+/g,'-')}`;
-    const StatLine = ({label, val, col, sub}) => (
-      <div style={{padding:'5px 0',borderBottom:'1px solid rgba(255,255,255,.04)',
-        display:'flex',alignItems:'baseline',gap:8}}>
-        <span style={{fontFamily:osw,fontWeight:800,fontSize:14,
-          color:col||'var(--text)',flexShrink:0,width:64}}>{val||'—'}</span>
-        <div>
-          <div style={{fontFamily:mono,fontSize:10,color:'var(--text)'}}>{label}</div>
-          {sub && <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:1}}>{sub}</div>}
-        </div>
-      </div>
-    );
-    return <>
-      <div onClick={()=>setTeamSlide(null)} style={{position:'fixed',inset:0,
-        background:'rgba(0,0,0,.5)',zIndex:900}}/>
-      <div style={{position:'fixed',right:0,top:0,bottom:0,width:'min(400px,100vw)',
-        background:'var(--surface)',borderLeft:'2px solid var(--border)',
-        zIndex:901,overflowY:'auto'}}>
-        <div style={{padding:'16px 20px 12px',borderBottom:'1px solid var(--border)',
-          position:'sticky',top:0,background:'var(--surface)',zIndex:10,
-          display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-          <div style={{display:'flex',alignItems:'center',gap:12}}>
-            <img src={t.logo} alt={t.abbr}
-              style={{width:44,height:44,objectFit:'contain',flexShrink:0}}
-              onError={e=>e.target.style.display='none'}/>
-            <div>
-              <div style={{fontFamily:osw,fontWeight:800,fontSize:22,
-                letterSpacing:1,color:'var(--accent2)'}}>{t.abbr}</div>
-              <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)'}}>{t.name}</div>
-              <div style={{fontFamily:osw,fontWeight:700,fontSize:12,color:'var(--text)',marginTop:2}}>
-                {t.w}-{t.l} · {t.pct.toFixed(3).replace('0.','.')}
-              </div>
-            </div>
-          </div>
-          <div style={{display:'flex',flexDirection:'column',gap:6,alignItems:'flex-end'}}>
-            <button onClick={()=>setTeamSlide(null)}
-              style={{background:'none',border:'1px solid var(--border)',borderRadius:6,
-                color:'var(--muted)',cursor:'pointer',padding:'4px 10px',
-                fontFamily:mono,fontSize:10}}>✕</button>
-            <a href={mlbUrl} target="_blank" rel="noopener noreferrer"
-              style={{padding:'4px 10px',borderRadius:6,fontSize:9,
-                border:'1px solid var(--accent)',color:'var(--accent)',
-                background:'rgba(232,65,26,.08)',fontFamily:mono,textDecoration:'none',
-                fontWeight:700}}>MLB.com ↗</a>
-          </div>
-        </div>
-        <div style={{padding:'16px 20px'}}>
-          {teamLoading ? (
-            <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)',padding:20,textAlign:'center'}}>
-              Loading team stats…
-            </div>
-          ) : <>
-            {/* Record context */}
-            <div style={{display:'flex',gap:8,marginBottom:16,flexWrap:'wrap'}}>
-              {[['Home',t.home],['Away',t.away],['L10',t.l10],['Streak',t.streak],['Run Diff',t.diff>0?`+${t.diff}`:t.diff]].map(([k,v])=>(
-                <div key={k} style={{padding:'4px 10px',borderRadius:6,
-                  background:'var(--surface2)',border:'1px solid var(--border)'}}>
-                  <div style={{fontFamily:osw,fontWeight:800,fontSize:12,color:'var(--text)'}}>{v}</div>
-                  <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.5}}>{k}</div>
-                </div>
-              ))}
-            </div>
-            {/* Hitting — Going Yard relevant stats */}
-            <div style={{fontFamily:osw,fontWeight:700,fontSize:11,color:'var(--accent)',
-              letterSpacing:.8,textTransform:'uppercase',marginBottom:8,
-              borderBottom:'1px solid var(--border)',paddingBottom:4}}>
-              🏏 Team Hitting
-            </div>
-            <StatLine label="Home Runs" val={h.homeRuns} col="#ff4020" sub="Season total"/>
-            <StatLine label="OPS" val={h.ops} col={parseFloat(h.ops)>=.800?'#27c97a':parseFloat(h.ops)>=.730?'var(--text)':'var(--muted)'} sub="On-base + slugging"/>
-            <StatLine label="AVG / OBP / SLG" val={`${h.avg||'—'} / ${h.obp||'—'} / ${h.slg||'—'}`} sub="Season slash line"/>
-            <StatLine label="ISO" val={h.slg&&h.avg?(parseFloat(h.slg)-parseFloat(h.avg)).toFixed(3):null} col="#f5a623" sub="Isolated power (SLG−AVG)"/>
-            <StatLine label="Barrel%*" val={h.barrelPerBip ? `${(h.barrelPerBip*100).toFixed(1)}%` : null} col="#a78bfa" sub="*Statcast — may not be in API"/>
-            <StatLine label="Runs Scored" val={h.runs} sub="Season total"/>
-            <div style={{height:12}}/>
-            {/* Pitching — HR allowed context */}
-            <div style={{fontFamily:osw,fontWeight:700,fontSize:11,color:'#38b8f2',
-              letterSpacing:.8,textTransform:'uppercase',marginBottom:8,
-              borderBottom:'1px solid var(--border)',paddingBottom:4}}>
-              ⚾ Team Pitching
-            </div>
-            <StatLine label="HR Allowed" val={p.homeRuns} col={parseInt(p.homeRuns)>100?'var(--accent)':'var(--muted)'} sub="Key for batters playing these pitchers"/>
-            <StatLine label="ERA" val={p.era} col={parseFloat(p.era)<3.5?'#27c97a':parseFloat(p.era)>4.5?'var(--accent)':'var(--text)'}/>
-            <StatLine label="WHIP" val={p.whip} col={parseFloat(p.whip)<1.20?'#27c97a':parseFloat(p.whip)>1.40?'var(--accent)':'var(--text)'}/>
-            <StatLine label="K/9" val={p.strikeoutsPer9Inn} sub="Strikeouts per 9 innings"/>
-            <StatLine label="HR/9" val={p.homeRunsPer9} col={parseFloat(p.homeRunsPer9)>1.2?'var(--accent)':'var(--muted)'} sub="Higher = more HR-prone pitching staff"/>
-            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:16,lineHeight:1.5,
-              borderTop:'1px solid var(--border)',paddingTop:8}}>
-              💡 For Going Yard: high team HR Allowed + high HR/9 = weaker pitching staff.
-              Batters facing this team's pitchers are in better shape for HR props.
-            </div>
-
-            {/* Schedule — recent + upcoming */}
-            <div style={{marginTop:16,borderTop:'1px solid var(--border)',paddingTop:14}}>
-              <div style={{fontFamily:osw,fontWeight:700,fontSize:11,color:'#a78bfa',
-                letterSpacing:.8,textTransform:'uppercase',marginBottom:10,
-                borderBottom:'1px solid var(--border)',paddingBottom:4}}>
-                📅 Schedule
-              </div>
-              {schedLoading ? (
-                <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',padding:'8px 0'}}>Loading schedule…</div>
-              ) : teamSchedule.length === 0 ? (
-                <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',padding:'8px 0'}}>No games found</div>
-              ) : (()=>{
-                const today = new Date().toISOString().slice(0,10);
-                const past    = teamSchedule.filter(g => g.date <  today).slice(-4);
-                const upcoming = teamSchedule.filter(g => g.date >= today).slice(0,5);
-                const all = [...past, ...upcoming];
-                return all.map(g => {
-                  const isToday = g.date === today;
-                  const opp = g.isHome ? g.away : g.home;
-                  const vsAt = g.isHome ? 'vs' : '@';
-                  const score = g.isFinal
-                    ? `${g.awayScore}–${g.homeScore}`
-                    : (g.status.includes('Progress') ? '🔴 Live' : g.gameTime);
-                  const won = g.isFinal && g.isHome  ? g.homeScore > g.awayScore
-                             : g.isFinal && !g.isHome ? g.awayScore > g.homeScore : null;
-                  return (
-                    <div key={g.gameId} style={{display:'flex',alignItems:'center',gap:8,
-                      padding:'5px 0',borderBottom:'1px solid rgba(255,255,255,.04)',
-                      opacity: g.date < today && !g.isFinal ? .5 : 1}}>
-                      <div style={{fontFamily:mono,fontSize:8,color:isToday?'var(--accent2)':'var(--muted)',
-                        width:52,flexShrink:0,fontWeight:isToday?700:400}}>
-                        {isToday ? 'TODAY' : new Date(g.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}
-                      </div>
-                      <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',width:12,flexShrink:0,textAlign:'center'}}>{vsAt}</div>
-                      <div style={{fontFamily:osw,fontWeight:800,fontSize:11,color:'var(--text)',width:36,flexShrink:0}}>{opp}</div>
-                      <div style={{fontFamily:mono,fontSize:9,flex:1,
-                        color: won===true?'#27c97a':won===false?'var(--accent)':isToday?'var(--accent2)':'var(--muted)'}}>
-                        {score}
-                        {g.isFinal && won !== null && <span style={{marginLeft:4,fontWeight:700}}>{won?'W':'L'}</span>}
-                      </div>
-                    </div>
-                  );
-                });
-              })()}
-            </div>
-          </>}
-        </div>
-      </div>
-    </>;
-  };
 
   // ── RENDER ─────────────────────────────────────────────────────────────────
   return (
     <div>
-      <TeamSlideout/>
       {/* Sub-nav */}
       <div style={{display:'flex',gap:6,marginBottom:14,alignItems:'center',flexWrap:'wrap'}}>
         <button style={stBtn('standings')} onClick={()=>setSub('standings')}>📊 Standings</button>
@@ -12009,7 +11805,7 @@ function MLBTab() {
                             {i<3?'✓':'·'}
                           </td>
                           <td style={{padding:'4px 6px'}}>
-                            <span onClick={()=>setTeamSlide(t)}
+                            <span onClick={()=>_OPEN_TEAM_SLIDE?.(t)}
                               style={{fontFamily:osw,fontWeight:700,fontSize:12,
                                 color:'var(--accent2)',cursor:'pointer',
                                 textDecoration:'underline',textDecorationStyle:'dotted'}}>
@@ -12064,7 +11860,7 @@ function MLBTab() {
                   const leaders = divs.map(([div,teams])=>({...teams[0],div})).sort((a,b)=>b.pct-a.pct);
                   const wc = wildcardTeams[lg].slice(0,3);
                   const BracketTeam = ({t, seed, highlight}) => t ? (
-                    <div onClick={()=>setTeamSlide(t)}
+                    <div onClick={()=>_OPEN_TEAM_SLIDE?.(t)}
                       style={{display:'flex',alignItems:'center',gap:6,
                         padding:'5px 8px',borderRadius:5,cursor:'pointer',
                         background: highlight?'rgba(39,201,122,.08)':'rgba(255,255,255,.03)',
@@ -12175,7 +11971,7 @@ function MLBTab() {
                         </div>
                         <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
                           {wildcardTeams[lg].map((t,i)=>(
-                            <div key={t.teamId} onClick={()=>setTeamSlide(t)}
+                            <div key={t.teamId} onClick={()=>_OPEN_TEAM_SLIDE?.(t)}
                               style={{display:'flex',alignItems:'center',gap:5,
                                 padding:'4px 8px',borderRadius:5,cursor:'pointer',
                                 background:i<3?'rgba(245,166,35,.06)':'rgba(255,255,255,.02)',
@@ -20254,6 +20050,328 @@ function BvPDeepDiveTab() {
   );
 }
 
+
+// ── TeamBtn — universal team name click → opens team slideout ─────────────
+// Usage: <TeamBtn abbr="NYY"/> anywhere in the app
+function TeamBtn({ abbr, style }) {
+  if (!abbr || abbr === '—') return <span style={style}>{abbr||'—'}</span>;
+  const ABBR_TO_ID = {LAA:108,AZ:109,BAL:110,BOS:111,CHC:112,CIN:113,CLE:114,COL:115,DET:116,HOU:117,KC:118,LAD:119,WSH:120,NYM:121,ATH:133,PIT:134,SD:135,SEA:136,SF:137,STL:138,TB:139,TEX:140,TOR:141,MIN:142,PHI:143,ATL:144,CWS:145,MIA:146,NYY:147,MIL:158};
+  const tid = ABBR_TO_ID[abbr];
+  if (!tid) return <span style={style}>{abbr}</span>;
+  return (
+    <span onClick={e=>{e.stopPropagation();if(_OPEN_TEAM_SLIDE)_OPEN_TEAM_SLIDE({
+      teamId:tid, abbr, name:abbr,
+      logo:`https://www.mlbstatic.com/team-logos/${tid}.svg`,
+      w:0,l:0,pct:0,home:'—',away:'—',l10:'—',streak:'—',diff:0
+    });}}
+      title={`Open ${abbr} team info`}
+      style={{cursor:'pointer',textDecoration:'underline dotted',textUnderlineOffset:2,...(style||{})}}>
+      {abbr}
+    </span>
+  );
+}
+
+// ── AppTeamSlideout — App-level team info panel ──────────────────────────
+function AppTeamSlideout({ t, teamStats, teamLoading, teamSchedule, schedLoading, onClose }) {
+  const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
+  const h = teamStats?.hitting || {}, p = teamStats?.pitching || {};
+  const mlbUrl = `https://www.mlb.com/${(t.name||t.abbr||'').toLowerCase().replace(/\s+/g,'-')}`;
+  const StatLine = ({label,val,col,sub}) => (
+    <div style={{padding:'5px 0',borderBottom:'1px solid rgba(255,255,255,.04)',display:'flex',alignItems:'baseline',gap:8}}>
+      <span style={{fontFamily:osw,fontWeight:800,fontSize:14,color:col||'var(--text)',flexShrink:0,width:64}}>{val||'—'}</span>
+      <div>
+        <div style={{fontFamily:mono,fontSize:10,color:'var(--text)'}}>{label}</div>
+        {sub&&<div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:1}}>{sub}</div>}
+      </div>
+    </div>
+  );
+  return <>
+    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.5)',zIndex:900}}/>
+    <div style={{position:'fixed',right:0,top:0,bottom:0,width:'min(400px,100vw)',
+      background:'var(--surface)',borderLeft:'2px solid var(--border)',zIndex:901,overflowY:'auto'}}>
+      {/* Header */}
+      <div style={{padding:'16px 20px 12px',borderBottom:'1px solid var(--border)',
+        position:'sticky',top:0,background:'var(--surface)',zIndex:10,
+        display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+        <div style={{display:'flex',alignItems:'center',gap:12}}>
+          <img src={t.logo} alt={t.abbr} style={{width:44,height:44,objectFit:'contain',flexShrink:0}}
+            onError={e=>e.target.style.display='none'}/>
+          <div>
+            <div style={{fontFamily:osw,fontWeight:800,fontSize:22,letterSpacing:1,color:'var(--accent2)'}}>{t.abbr}</div>
+            <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)'}}>{t.name}</div>
+            {t.w>0&&<div style={{fontFamily:osw,fontWeight:700,fontSize:12,color:'var(--text)',marginTop:2}}>{t.w}-{t.l} · {typeof t.pct==='number'?t.pct.toFixed(3).replace('0.','.'):'—'}</div>}
+          </div>
+        </div>
+        <div style={{display:'flex',flexDirection:'column',gap:6,alignItems:'flex-end'}}>
+          <button onClick={onClose} style={{background:'none',border:'1px solid var(--border)',borderRadius:6,color:'var(--muted)',cursor:'pointer',padding:'4px 10px',fontFamily:mono,fontSize:10}}>✕</button>
+          <a href={mlbUrl} target="_blank" rel="noopener noreferrer"
+            style={{padding:'4px 10px',borderRadius:6,fontSize:9,border:'1px solid var(--accent)',color:'var(--accent)',background:'rgba(232,65,26,.08)',fontFamily:mono,textDecoration:'none',fontWeight:700}}>MLB.com ↗</a>
+        </div>
+      </div>
+      <div style={{padding:'16px 20px'}}>
+        {/* Record context */}
+        {t.w>0&&<div style={{display:'flex',gap:8,marginBottom:16,flexWrap:'wrap'}}>
+          {[['Home',t.home],['Away',t.away],['L10',t.l10],['Streak',t.streak],['Run Diff',t.diff>0?`+${t.diff}`:t.diff]].map(([k,v])=>(
+            <div key={k} style={{padding:'4px 10px',borderRadius:6,background:'var(--surface2)',border:'1px solid var(--border)'}}>
+              <div style={{fontFamily:osw,fontWeight:800,fontSize:12,color:'var(--text)'}}>{v}</div>
+              <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.5}}>{k}</div>
+            </div>
+          ))}
+        </div>}
+        {teamLoading
+          ? <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)',padding:20,textAlign:'center'}}>Loading team stats…</div>
+          : <>
+            <div style={{fontFamily:osw,fontWeight:700,fontSize:11,color:'var(--accent)',letterSpacing:.8,textTransform:'uppercase',marginBottom:8,borderBottom:'1px solid var(--border)',paddingBottom:4}}>🏏 Team Hitting</div>
+            <StatLine label="Home Runs" val={h.homeRuns} col="#ff4020" sub="Season total"/>
+            <StatLine label="OPS" val={h.ops} col={parseFloat(h.ops)>=.800?'#27c97a':parseFloat(h.ops)>=.730?'var(--text)':'var(--muted)'} sub="On-base + slugging"/>
+            <StatLine label="AVG / OBP / SLG" val={`${h.avg||'—'} / ${h.obp||'—'} / ${h.slg||'—'}`} sub="Season slash line"/>
+            <StatLine label="ISO" val={h.slg&&h.avg?(parseFloat(h.slg)-parseFloat(h.avg)).toFixed(3):null} col="#f5a623" sub="Isolated power"/>
+            <StatLine label="Runs Scored" val={h.runs} sub="Season total"/>
+            <div style={{height:12}}/>
+            <div style={{fontFamily:osw,fontWeight:700,fontSize:11,color:'#38b8f2',letterSpacing:.8,textTransform:'uppercase',marginBottom:8,borderBottom:'1px solid var(--border)',paddingBottom:4}}>⚾ Team Pitching</div>
+            <StatLine label="HR Allowed" val={p.homeRuns} col={parseInt(p.homeRuns)>100?'var(--accent)':'var(--muted)'} sub="Key for batters facing these pitchers"/>
+            <StatLine label="ERA" val={p.era} col={parseFloat(p.era)<3.5?'#27c97a':parseFloat(p.era)>4.5?'var(--accent)':'var(--text)'}/>
+            <StatLine label="WHIP" val={p.whip} col={parseFloat(p.whip)<1.20?'#27c97a':parseFloat(p.whip)>1.40?'var(--accent)':'var(--text)'}/>
+            <StatLine label="K/9" val={p.strikeoutsPer9Inn} sub="Strikeouts per 9 innings"/>
+            <StatLine label="HR/9" val={p.homeRunsPer9} col={parseFloat(p.homeRunsPer9)>1.2?'var(--accent)':'var(--muted)'} sub="Higher = more HR-prone staff"/>
+            {/* Schedule */}
+            <div style={{marginTop:16,borderTop:'1px solid var(--border)',paddingTop:14}}>
+              <div style={{fontFamily:osw,fontWeight:700,fontSize:11,color:'#a78bfa',letterSpacing:.8,textTransform:'uppercase',marginBottom:10,borderBottom:'1px solid var(--border)',paddingBottom:4}}>📅 Schedule</div>
+              {schedLoading
+                ? <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',padding:'8px 0'}}>Loading schedule…</div>
+                : teamSchedule.length===0
+                  ? <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',padding:'8px 0'}}>No games found</div>
+                  : (()=>{
+                      const today=new Date().toISOString().slice(0,10);
+                      const all=[...teamSchedule.filter(g=>g.date<today).slice(-4),...teamSchedule.filter(g=>g.date>=today).slice(0,5)];
+                      return all.map(g=>{
+                        const isToday=g.date===today, opp=g.isHome?g.away:g.home, vsAt=g.isHome?'vs':'@';
+                        const score=g.isFinal?`${g.awayScore}–${g.homeScore}`:g.status.includes('Progress')?'🔴 Live':g.gameTime;
+                        const won=g.isFinal?(g.isHome?g.homeScore>g.awayScore:g.awayScore>g.homeScore):null;
+                        return (
+                          <div key={g.gameId} style={{display:'flex',alignItems:'center',gap:8,padding:'5px 0',borderBottom:'1px solid rgba(255,255,255,.04)'}}>
+                            <div style={{fontFamily:mono,fontSize:8,color:isToday?'var(--accent2)':'var(--muted)',width:52,flexShrink:0,fontWeight:isToday?700:400}}>
+                              {isToday?'TODAY':new Date(g.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}
+                            </div>
+                            <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',width:12,flexShrink:0,textAlign:'center'}}>{vsAt}</div>
+                            <div style={{fontFamily:osw,fontWeight:800,fontSize:11,color:'var(--text)',width:36,flexShrink:0}}>{opp}</div>
+                            <div style={{fontFamily:mono,fontSize:9,flex:1,color:won===true?'#27c97a':won===false?'var(--accent)':isToday?'var(--accent2)':'var(--muted)'}}>
+                              {score}{g.isFinal&&won!==null&&<span style={{marginLeft:4,fontWeight:700}}>{won?'W':'L'}</span>}
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()
+              }
+            </div>
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:16,lineHeight:1.5,borderTop:'1px solid var(--border)',paddingTop:8}}>
+              💡 High HR Allowed + high HR/9 = weaker pitching staff — better for HR props.
+            </div>
+          </>
+        }
+      </div>
+    </div>
+  </>;
+}
+
+// ── Yard Bot — AI parlay/pick generator using today's slate ──────────────────
+function YardBotTab({ data }) {
+  const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
+  const [input,    setInput]    = useState('');
+  const [loading,  setLoading]  = useState(false);
+  const [messages, setMessages] = useState([]);
+  const bottomRef = useRef(null);
+
+  const QUICK_PROMPTS = [
+    '3 legger HR play vs top pitching targets',
+    'safe 2 leg strikeout parlay',
+    '4 leg total bases longshot',
+    'best solo HR plays today under the radar',
+    'who has the best zone overlap today',
+  ];
+
+  const GRADE_COLORS = {'A+':'#ff4020','A':'#f5a623','B+':'#27c97a','B':'#38b8f2','C+':'var(--muted)','C':'var(--muted)','D':'var(--muted)'};
+
+  const buildSlateSummary = () => [...(data||[])]
+    .sort((a,b)=>(parseFloat(b._yard||b.yard_score||0))-(parseFloat(a._yard||a.yard_score||0)))
+    .slice(0,50)
+    .map(r=>{
+      const bid=String(parseInt(r.batter_id)||0);
+      const ls=liveSlot(parseInt(bid),r.lineup_slot);
+      const ze=parseInt(r._zoneEdges||DAILY_PICKS_CACHE[bid]?._zoneEdges||0);
+      const inWeak=ls>0&&(r.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(ls);
+      return {name:r.batter||'',team:r.batting_team||'',grade:r.grade||'',pg:r._pgLabel||'',
+        yard:parseFloat(r._yard||0).toFixed(1),boom:parseInt(r._boom||DAILY_PICKS_CACHE[bid]?._boom||0),
+        sig:parseFloat(r.weighted_flag_score||0).toFixed(1),form:r._formClass||r.form_class||'',
+        simTB:parseFloat(r.sim_tb||0).toFixed(2),ev:parseFloat(r.recent_avg_ev||0).toFixed(1),
+        pitcher:r.pitcher||'',pHand:r.pitcher_hand||'',bHand:r.batter_hand||'',
+        zoneEdges:ze,weakSlot:inWeak,slot:ls||0,swstr:parseFloat(r.season_swstr_pct||0).toFixed(1)};
+    }).filter(r=>r.name);
+
+  const SYSTEM_PROMPT = `You are Yard Bot, an MLB power hitting analyst for the Going Yard app.
+You receive today's top 50 batters by Yard Score and build parlay picks from natural language requests.
+SCORING: Yard Score (HR prob), Boom (contact quality 0-99), Sig (flag count), Pitcher Grade (🎯 Target > 💥 Hittable > 🤔 Average > ⚠️ Tough > ‼️ Elite), Form (Moonshot=peak, Whiff=bad), zoneEdges (higher=better overlap), weakSlot (pitcher historically weak at this batting order slot).
+RESPONSE: Valid JSON only, no markdown.
+{"intro":"1-2 sentence setup","picks":[{"name":"","team":"","grade":"","betType":"","confidence":"High|Medium|Speculative","reasons":["",""]}],"disclaimer":"optional risk note"}`;
+
+  const send = async(text)=>{
+    if(!text.trim()||loading) return;
+    const userMsg={role:'user',content:text};
+    const newMessages=[...messages,userMsg];
+    setMessages(newMessages); setInput(''); setLoading(true);
+    try {
+      const slate=buildSlateSummary();
+      const history=newMessages.slice(-6).map((m,i)=>({
+        role:m.role,
+        content:m.role==='user'
+          ?(i===0?`Slate (top ${slate.length}):
+${JSON.stringify(slate)}
+
+Request: ${m.content}`:m.content)
+          :JSON.stringify(m.raw||m.content)
+      }));
+      if(history[0]?.role==='user'&&!history[0].content.includes('Slate'))
+        history[0].content=`Slate (top ${slate.length}):
+${JSON.stringify(slate)}
+
+Request: ${history[0].content}`;
+      const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,system:SYSTEM_PROMPT,messages:history})});
+      const d=await res.json();
+      const raw=d.content?.find(c=>c.type==='text')?.text||'{}';
+      let parsed={};
+      try{parsed=JSON.parse(raw.replace(/```json|```/g,''));}
+      catch(e){parsed={intro:raw,picks:[],disclaimer:''};}
+      setMessages(prev=>[...prev,{role:'assistant',content:parsed,raw:parsed}]);
+    } catch(e){
+      setMessages(prev=>[...prev,{role:'assistant',content:{intro:'Something went wrong — try again.',picks:[],disclaimer:''}}]);
+    }
+    setLoading(false);
+  };
+
+  useEffect(()=>{bottomRef.current?.scrollIntoView({behavior:'smooth'});},[messages,loading]);
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',height:'calc(100vh - 200px)',minHeight:400}}>
+      <div style={{padding:'10px 0 8px',borderBottom:'1px solid var(--border)',marginBottom:12}}>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <span style={{fontSize:20}}>🤖</span>
+          <div>
+            <div style={{fontFamily:osw,fontWeight:800,fontSize:16,letterSpacing:.5}}>Yard Bot</div>
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>AI parlay builder &middot; top 50 by Yard Score &middot; session resets on refresh</div>
+          </div>
+        </div>
+      </div>
+      <div style={{flex:1,overflowY:'auto',display:'flex',flexDirection:'column',gap:14,paddingBottom:8}}>
+        {messages.length===0&&(
+          <div style={{textAlign:'center',padding:'32px 20px'}}>
+            <div style={{fontSize:32,marginBottom:12}}>🤖</div>
+            <div style={{fontFamily:osw,fontWeight:700,fontSize:15,marginBottom:6}}>Ask me anything about today's slate</div>
+            <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginBottom:20,lineHeight:1.7}}>
+              I know today's Yard Scores, Boom Scores, pitcher grades,<br/>zone overlaps, lineup slots, form classes &amp; Statcast metrics.
+            </div>
+            <div style={{display:'flex',gap:6,flexWrap:'wrap',justifyContent:'center'}}>
+              {QUICK_PROMPTS.map((p,i)=>(
+                <button key={i} onClick={()=>send(p)}
+                  style={{padding:'5px 12px',borderRadius:20,border:'1px solid var(--border)',
+                    background:'var(--surface2)',color:'var(--muted)',cursor:'pointer',
+                    fontFamily:mono,fontSize:9,letterSpacing:.3}}>
+                  &ldquo;{p}&rdquo;
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {messages.map((m,i)=>(
+          <div key={i}>
+            {m.role==='user'&&(
+              <div style={{display:'flex',justifyContent:'flex-end'}}>
+                <div style={{maxWidth:'80%',background:'rgba(232,65,26,.12)',border:'1px solid rgba(232,65,26,.25)',
+                  borderRadius:'12px 12px 4px 12px',padding:'8px 14px',fontFamily:mono,fontSize:11,color:'var(--text)',lineHeight:1.5}}>
+                  {m.content}
+                </div>
+              </div>
+            )}
+            {m.role==='assistant'&&m.content&&(
+              <div style={{display:'flex',flexDirection:'column',gap:10}}>
+                {m.content.intro&&<div style={{fontFamily:mono,fontSize:10,color:'var(--muted)',lineHeight:1.6,padding:'6px 2px'}}>{m.content.intro}</div>}
+                {(m.content.picks||[]).map((pick,pi)=>(
+                  <div key={pi} style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:10,padding:'12px 14px',borderLeft:`3px solid ${GRADE_COLORS[pick.grade]||'var(--border)'}`}}>
+                    <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+                      <span style={{fontFamily:osw,fontWeight:800,fontSize:16,color:GRADE_COLORS[pick.grade]||'var(--text)'}}>{pick.grade||'—'}</span>
+                      <div style={{flex:1}}>
+                        <div style={{fontFamily:osw,fontWeight:700,fontSize:14,color:'var(--text)'}}>
+                          {pick.name}{pick.team&&<span style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginLeft:6}}>{pick.team}</span>}
+                        </div>
+                        <div style={{fontFamily:mono,fontSize:9,color:'var(--accent)',marginTop:1,letterSpacing:.3}}>{pick.betType}</div>
+                      </div>
+                      <div style={{padding:'3px 8px',borderRadius:4,fontSize:8,fontFamily:mono,fontWeight:700,
+                        background:pick.confidence==='High'?'rgba(39,201,122,.15)':pick.confidence==='Medium'?'rgba(245,166,35,.15)':'rgba(255,255,255,.06)',
+                        color:pick.confidence==='High'?'#27c97a':pick.confidence==='Medium'?'#f5a623':'var(--muted)',
+                        border:`1px solid ${pick.confidence==='High'?'rgba(39,201,122,.3)':pick.confidence==='Medium'?'rgba(245,166,35,.3)':'var(--border)'}`}}>
+                        {pick.confidence||'—'}
+                      </div>
+                    </div>
+                    <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                      {(pick.reasons||[]).map((r,ri)=>(
+                        <div key={ri} style={{display:'flex',alignItems:'flex-start',gap:6,fontFamily:mono,fontSize:9,color:'rgba(255,255,255,.6)',lineHeight:1.5}}>
+                          <span style={{color:'var(--accent)',flexShrink:0,marginTop:1}}>›</span>{r}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                {m.content.disclaimer&&<div style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.25)',fontStyle:'italic',padding:'2px 2px'}}>{m.content.disclaimer}</div>}
+              </div>
+            )}
+          </div>
+        ))}
+        {loading&&(
+          <div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 2px'}}>
+            <span style={{fontSize:16}}>🤖</span>
+            <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)'}}>Scanning today's slate&hellip;</div>
+          </div>
+        )}
+        <div ref={bottomRef}/>
+      </div>
+      <div style={{borderTop:'1px solid var(--border)',paddingTop:10,marginTop:4}}>
+        {messages.length>0&&(
+          <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:8}}>
+            {QUICK_PROMPTS.slice(0,3).map((p,i)=>(
+              <button key={i} onClick={()=>send(p)}
+                style={{padding:'3px 10px',borderRadius:20,border:'1px solid var(--border)',
+                  background:'var(--surface2)',color:'var(--muted)',cursor:'pointer',fontFamily:mono,fontSize:8}}>
+                &ldquo;{p}&rdquo;
+              </button>
+            ))}
+            <button onClick={()=>setMessages([])}
+              style={{padding:'3px 10px',borderRadius:20,border:'1px solid var(--border)',
+                background:'none',color:'rgba(255,255,255,.25)',cursor:'pointer',fontFamily:mono,fontSize:8,marginLeft:'auto'}}>
+              &#8635; clear
+            </button>
+          </div>
+        )}
+        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+          <input value={input} onChange={e=>setInput(e.target.value)}
+            onKeyDown={e=>e.key==='Enter'&&!e.shiftKey&&send(input)}
+            placeholder='Describe a parlay… e.g. “3 legger HR play vs top pitching targets”'
+            disabled={loading}
+            style={{flex:1,padding:'10px 16px',borderRadius:24,border:'1px solid var(--border)',
+              background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:11,outline:'none',opacity:loading?.6:1}}/>
+          <button onClick={()=>send(input)} disabled={loading||!input.trim()}
+            style={{padding:'10px 20px',borderRadius:24,border:'none',
+              background:loading||!input.trim()?'rgba(232,65,26,.3)':'var(--accent)',
+              color:'white',fontFamily:osw,fontWeight:800,fontSize:13,
+              cursor:loading||!input.trim()?'not-allowed':'pointer',letterSpacing:.5,flexShrink:0,transition:'background .2s'}}>
+            {loading?'…':'Generate'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MatchupEngineTab() {
   const [subTab, setSubTab]        = useState('matchups');
   // Expose setSubTab globally so HomeTab's "→ All Matchups" button can deep-link
@@ -20598,6 +20716,7 @@ function MatchupEngineTab() {
         <button style={stBtn('matchups')}   onClick={()=>setSubTab('matchups')}>⚡ Key Matchups</button>
         <button style={stBtn('allmatches')} data-subtab="allmatches" onClick={()=>setSubTab('allmatches')}>📋 All Matchups</button>
         <button style={stBtn('longshot')}   onClick={()=>setSubTab('longshot')}>🎲 Long Shot</button>
+        <button style={stBtn('yardbot')}    onClick={()=>setSubTab('yardbot')}>🤖 Yard Bot</button>
       </div>
       {/* Row 2: supporting tools */}
       <div style={{display:'flex',gap:4,flexWrap:'wrap',justifyContent:'center'}}>
@@ -20658,6 +20777,7 @@ function MatchupEngineTab() {
 
     {/* Long Shot — C/D grade batters with soft pitcher or good day conditions */}
     {subTab === 'bvp'      && <BvPDeepDiveTab/>}
+    {subTab === 'yardbot'  && <YardBotTab data={dateSlot==="tomorrow"&&allPicksTomorrowData.length>0 ? allPicksTomorrowData : allPicksData}/>}
     {subTab === 'pairs'    && <PairsTab data={data}/>}
     {subTab === 'streaks'    && <StreaksTab/>}
     {subTab === 'soclose'  && <SoCloseTab data={data}/>}
@@ -26466,6 +26586,11 @@ export default function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [tab, setTab] = useState("home");
   const [showPicksSlideout, setShowPicksSlideout] = useState(false);
+  const [appTeamSlide, setAppTeamSlide] = useState(null); // universal team slideout
+  const [appTeamStats, setAppTeamStats] = useState(null);
+  const [appTeamLoading, setAppTeamLoading] = useState(false);
+  const [appTeamSchedule, setAppTeamSchedule] = useState([]);
+  const [appSchedLoading, setAppSchedLoading] = useState(false);
   const { isSignedIn, getToken } = useAuth();
   const { addListener } = useClerk();
 
@@ -26480,6 +26605,40 @@ export default function App() {
     _GLOBAL_NAV = { setTab };
     return () => { _GLOBAL_NAV = null; };
   }, [setTab]);
+
+  // Wire universal team slideout — available from any tab
+  useEffect(() => {
+    _OPEN_TEAM_SLIDE = (t) => setAppTeamSlide(t);
+    return () => { _OPEN_TEAM_SLIDE = null; };
+  }, []);
+
+  // Fetch team stats + schedule when app-level team slideout opens
+  useEffect(() => {
+    if (!appTeamSlide) { setAppTeamStats(null); setAppTeamSchedule([]); return; }
+    const tid = appTeamSlide.teamId;
+    setAppTeamLoading(true); setAppTeamStats(null);
+    Promise.all([
+      fetch(`https://statsapi.mlb.com/api/v1/teams/${tid}/stats?stats=season&group=hitting&season=2026`).then(r=>r.json()),
+      fetch(`https://statsapi.mlb.com/api/v1/teams/${tid}/stats?stats=season&group=pitching&season=2026`).then(r=>r.json()),
+    ]).then(([hit,pit]) => {
+      setAppTeamStats({ hitting: hit?.stats?.[0]?.splits?.[0]?.stat||{}, pitching: pit?.stats?.[0]?.splits?.[0]?.stat||{} });
+      setAppTeamLoading(false);
+    }).catch(()=>setAppTeamLoading(false));
+    setAppSchedLoading(true);
+    const today = new Date(), fmt = d=>d.toISOString().slice(0,10);
+    const past=fmt(new Date(today-8*864e5)), future=fmt(new Date(+today+8*864e5));
+    fetch(`https://statsapi.mlb.com/api/v1/schedule?teamId=${tid}&startDate=${past}&endDate=${future}&sportId=1&gameType=R&hydrate=linescore,team`)
+      .then(r=>r.json()).then(d=>{
+        setAppTeamSchedule((d.dates||[]).flatMap(date=>(date.games||[]).map(g=>({
+          date:date.date, gameId:g.gamePk, status:g.status?.detailedState||'',
+          home:g.teams?.home?.team?.abbreviation||'', away:g.teams?.away?.team?.abbreviation||'',
+          homeScore:g.teams?.home?.score, awayScore:g.teams?.away?.score,
+          gameTime:g.gameDate?new Date(g.gameDate).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',timeZone:'America/New_York',hour12:true})+' ET':'',
+          isHome:g.teams?.home?.team?.id===tid, isFinal:(g.status?.abstractGameState||'')==='Final',
+        }))).sort((a,b)=>a.date.localeCompare(b.date)));
+        setAppSchedLoading(false);
+      }).catch(()=>setAppSchedLoading(false));
+  }, [appTeamSlide]);
 
   // Load player data at startup
   useEffect(() => {
@@ -26666,6 +26825,7 @@ export default function App() {
     <PitcherSlideIn/>
     {showPicksSlideout && <PicksSlideout onClose={()=>setShowPicksSlideout(false)}/>}
     <InjuryModal/>
+    {appTeamSlide && <AppTeamSlideout t={appTeamSlide} teamStats={appTeamStats} teamLoading={appTeamLoading} teamSchedule={appTeamSchedule} schedLoading={appSchedLoading} onClose={()=>setAppTeamSlide(null)}/>}
   </>;
 
 }
