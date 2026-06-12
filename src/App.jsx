@@ -13518,6 +13518,8 @@ function SimLabView({ data }) {
   const [maxL7EV,    setMaxL7EV]     = useState('');
   const [minHitPct,  setMinHitPct]   = useState('');
   const [minXbhPct,  setMinXbhPct]   = useState('');
+  const [slotMin,    setSlotMin]     = useState('');
+  const [slotMax,    setSlotMax]     = useState('');
   const [filtersOpen,setFiltersOpen] = useState(false);
   const [selHRUpside,setSelHRUpside]  = useState(new Set());
   const [simSearch,   setSimSearch]    = useState('');  // batter name search
@@ -13606,6 +13608,14 @@ function SimLabView({ data }) {
       .filter(r => selMatchups.size === 0 || selMatchups.has(String(r.game_id)))
       .filter(r => selBatterGradesSim.size === 0 || selBatterGradesSim.has(r.grade))
       .filter(r => !lineupOnly || isConfirmed(r))
+      .filter(r => {
+        if (!lineupOnly) return true;
+        const slot = liveSlot(parseInt(r.batter_id||0), r.lineup_slot);
+        if (!slot || slot === 0) return true;
+        if (slotMin && slot < parseInt(slotMin)) return false;
+        if (slotMax && slot > parseInt(slotMax)) return false;
+        return true;
+      })
       .filter(r => !filterGoneYardSim || isGoneYardSim(r))
       .filter(r => !filterKeyMatchup  || isKeyMatchup(parseInt(r.batter_id)||0, r.batter))
       .filter(r => !filterDueSim || isDueFromRow(r, parseInt(r.batter_id)||0))
@@ -13664,10 +13674,10 @@ function SimLabView({ data }) {
       return mul * ((parseFloat(a[sortBy]) || 0) - (parseFloat(b[sortBy]) || 0));
     });
     return sorted;
-  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, filterKeyMatchup, minYard, maxYard, minSig, maxSig, minSimTB, minOdds, minBoom, minBrl, minZoneFit, maxZoneFit, minL7EV, maxL7EV, minHitPct, minXbhPct, selHRUpside, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal]);
+  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, filterKeyMatchup, minYard, maxYard, minSig, maxSig, minSimTB, minOdds, minBoom, minBrl, minZoneFit, maxZoneFit, minL7EV, maxL7EV, minHitPct, minXbhPct, selHRUpside, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal, slotMin, slotMax]);
 
   // Reset row cap when filters/sort change so user always sees top results
-  useEffect(() => { setDisplayLimit(150); }, [sortBy, sortDir, selMatchups, lineupOnly, simActiveOnly, simSearch, filterKeyMatchup]);
+  useEffect(() => { setDisplayLimit(150); }, [sortBy, sortDir, selMatchups, lineupOnly, simActiveOnly, simSearch, filterKeyMatchup, slotMin, slotMax]);
 
   // Auto-select top batter when data loads
   useEffect(() => {
@@ -13801,6 +13811,7 @@ function SimLabView({ data }) {
                 setMinSimTB('0.01'); setMinOdds(''); setMinBoom(''); setMinBrl('');
                 setMinZoneFit(''); setMaxZoneFit(''); setMinL7EV(''); setMaxL7EV('');
                 setMinHitPct(''); setMinXbhPct('');
+                setSlotMin(''); setSlotMax('');
                 setSelBatterGradesSim(new Set()); setSelPitcherGradesSim(new Set());
                 setSelHRUpside && setSelHRUpside(new Set());
                 setSlBatterHand('ALL'); setSlPitcherHand('ALL');
@@ -14006,6 +14017,39 @@ function SimLabView({ data }) {
                       </div>
                     </div>
                   );})}
+                </div>
+              </div>
+
+              {/* Lineup Slot Range */}
+              <div style={{opacity: lineupOnly ? 1 : 0.35, transition:'opacity .2s', pointerEvents: lineupOnly ? 'auto' : 'none'}}>
+                <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,
+                  color: lineupOnly ? (slotMin||slotMax ? 'var(--accent2)' : 'var(--muted)') : 'var(--muted)',
+                  textTransform:'uppercase',letterSpacing:1,marginBottom:8,display:'flex',alignItems:'center',gap:6}}>
+                  Lineup Slot
+                  {!lineupOnly && <span style={{fontSize:7,color:'var(--muted)',fontStyle:'italic'}}>(enable In Lineup first)</span>}
+                </div>
+                <div style={{background:'var(--surface)',borderRadius:7,padding:'8px 10px',
+                  border:`1px solid ${lineupOnly&&(slotMin||slotMax)?'var(--accent2)':'var(--border)'}`}}>
+                  <div style={{display:'flex',alignItems:'center',gap:6}}>
+                    <input type="number" min={1} max={9} value={slotMin}
+                      onChange={e=>{const v=e.target.value;setSlotMin(v&&parseInt(v)>=1&&parseInt(v)<=9?v:'');}}
+                      placeholder="min" disabled={!lineupOnly}
+                      style={{width:'100%',padding:'3px 6px',borderRadius:4,textAlign:'center',
+                        border:`1px solid ${slotMin?'var(--accent2)':'var(--border)'}`,
+                        background:'var(--surface2)',color:'var(--text)',fontFamily:"'DM Mono',monospace",fontSize:10}}/>
+                    <span style={{color:'var(--muted)',fontSize:10}}>-</span>
+                    <input type="number" min={1} max={9} value={slotMax}
+                      onChange={e=>{const v=e.target.value;setSlotMax(v&&parseInt(v)>=1&&parseInt(v)<=9?v:'');}}
+                      placeholder="max" disabled={!lineupOnly}
+                      style={{width:'100%',padding:'3px 6px',borderRadius:4,textAlign:'center',
+                        border:`1px solid ${slotMax?'var(--accent2)':'var(--border)'}`,
+                        background:'var(--surface2)',color:'var(--text)',fontFamily:"'DM Mono',monospace",fontSize:10}}/>
+                  </div>
+                  {(slotMin||slotMax)&&lineupOnly&&(
+                    <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--accent2)',marginTop:5}}>
+                      Slots {slotMin||'1'}-{slotMax||'9'} only
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -20192,7 +20236,7 @@ function YardBotTab({ data }) {
 
   const GRADE_COLORS = {'A+':'#ff4020','A':'#f5a623','B+':'#27c97a','B':'#38b8f2','C+':'var(--muted)','C':'var(--muted)','D':'var(--muted)'};
 
-  const buildSlateSummary = () => [...(data||[])]
+  const buildSlateSummary = () => Object.values(DAILY_PICKS_CACHE||{})
     .sort((a,b)=>(parseFloat(b._yard||b.yard_score||0))-(parseFloat(a._yard||a.yard_score||0)))
     .slice(0,50)
     .map(r=>{
@@ -20208,9 +20252,17 @@ function YardBotTab({ data }) {
         zoneEdges:ze,weakSlot:inWeak,slot:ls||0,swstr:parseFloat(r.season_swstr_pct||0).toFixed(1)};
     }).filter(r=>r.name);
 
+  // Schedule from LIVE_GAMES_CACHE — always in memory after Live tab loads
+  const buildScheduleContext = () => LIVE_GAMES_CACHE
+    .filter(g=>g.status!=='Final')
+    .map(g=>({away:g.away?.abbr||'',home:g.home?.abbr||'',time:g.gameTime||'TBD',
+      status:g.status||'Preview',awayP:g.away?.probablePitcher||'TBD',
+      homeP:g.home?.probablePitcher||'TBD',venue:g.venue||''}));
+
   const SYSTEM_PROMPT = `You are Yard Bot, an MLB power hitting analyst for the Going Yard app.
-You receive today's top 50 batters by Yard Score and build parlay picks from natural language requests.
+You have access to today's slate, the live schedule, and season HR leaders.
 SCORING: Yard Score (HR prob), Boom (contact quality 0-99), Sig (flag count), Pitcher Grade (🎯 Target > 💥 Hittable > 🤔 Average > ⚠️ Tough > ‼️ Elite), Form (Moonshot=peak, Whiff=bad), zoneEdges (higher=better overlap), weakSlot (pitcher historically weak at this batting order slot).
+SCHEDULE DATA: away@home, time ET, probable starters. HR LEADERS: season totals (laser HRs, moonshots). NOTE: 30-day splits unavailable.
 RESPONSE: Valid JSON only, no markdown.
 {"intro":"1-2 sentence setup","picks":[{"name":"","team":"","grade":"","betType":"","confidence":"High|Medium|Speculative","reasons":["",""]}],"disclaimer":"optional risk note"}`;
 
@@ -20220,24 +20272,29 @@ RESPONSE: Valid JSON only, no markdown.
     const newMessages=[...messages,userMsg];
     setMessages(newMessages); setInput(''); setLoading(true);
     try {
-      const slate=buildSlateSummary();
+      const slate    = buildSlateSummary();
+      const schedule = buildScheduleContext();
+      let leaders = [];
+      try {
+        const lbRes = await fetch('/data/hr_leaderboard.json');
+        if (lbRes.ok) {
+          const lbData = await lbRes.json();
+          leaders = (lbData.batters||[]).sort((a,b)=>b.hrs-a.hrs).slice(0,30)
+            .map(r=>({name:r.name,team:r.team,hrs:r.hrs,laser105:r.laser105,laser110:r.laser110,moonshots:r.moonshots}));
+        }
+      } catch(e) {}
+      const ctx = 'SCHEDULE (' + schedule.length + ' games):\n' + JSON.stringify(schedule) + '\n\nHR LEADERS (season top 30):\n' + JSON.stringify(leaders) + '\n\nSLATE (top ' + slate.length + '):\n' + JSON.stringify(slate);
       const history=newMessages.slice(-6).map((m,i)=>({
         role:m.role,
         content:m.role==='user'
-          ?(i===0?`Slate (top ${slate.length}):
-${JSON.stringify(slate)}
-
-Request: ${m.content}`:m.content)
+          ?(i===0?(ctx + '\n\nRequest: ' + m.content):m.content)
           :JSON.stringify(m.raw||m.content)
       }));
-      if(history[0]?.role==='user'&&!history[0].content.includes('Slate'))
-        history[0].content=`Slate (top ${slate.length}):
-${JSON.stringify(slate)}
-
-Request: ${history[0].content}`;
-      const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
+      if(history[0]?.role==='user'&&!history[0].content.includes('SCHEDULE'))
+        history[0].content = ctx + '\n\nRequest: ' + history[0].content;
+      const res=await fetch('/api/yardbot',{method:'POST',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,system:SYSTEM_PROMPT,messages:history})});
+        body:JSON.stringify({system:SYSTEM_PROMPT,messages:history})});
       const d=await res.json();
       const raw=d.content?.find(c=>c.type==='text')?.text||'{}';
       let parsed={};
@@ -20355,7 +20412,7 @@ Request: ${history[0].content}`;
         <div style={{display:'flex',gap:8,alignItems:'center'}}>
           <input value={input} onChange={e=>setInput(e.target.value)}
             onKeyDown={e=>e.key==='Enter'&&!e.shiftKey&&send(input)}
-            placeholder='Describe a parlay... e.g. "3 legger HR play vs top pitching targets"'
+            placeholder='Describe a parlay… e.g. “3 legger HR play vs top pitching targets”'
             disabled={loading}
             style={{flex:1,padding:'10px 16px',borderRadius:24,border:'1px solid var(--border)',
               background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:11,outline:'none',opacity:loading?.6:1}}/>
@@ -20369,240 +20426,6 @@ Request: ${history[0].content}`;
         </div>
       </div>
     </div>
-  );
-}
-
-// ── YardBotFloat — floating chat bubble, bottom-left, accessible from any tab ─
-function YardBotFloat() {
-  const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
-  const [open,     setOpen]     = useState(false);
-  const [input,    setInput]    = useState('');
-  const [loading,  setLoading]  = useState(false);
-  const [messages, setMessages] = useState([]);
-  const [unread,   setUnread]   = useState(0);
-  const bottomRef = useRef(null);
-
-  const GRADE_COLORS = {'A+':'#ff4020','A':'#f5a623','B+':'#27c97a','B':'#38b8f2','C+':'var(--muted)','C':'var(--muted)','D':'var(--muted)'};
-
-  const QUICK_PROMPTS = [
-    '3 legger HR play vs top pitching targets',
-    'safe 2 leg strikeout parlay',
-    'best solo HR plays today under the radar',
-  ];
-
-  const buildSlateSummary = () => Object.values(DAILY_PICKS_CACHE||{})
-    .sort((a,b)=>(parseFloat(b._yard||b.yard_score||0))-(parseFloat(a._yard||a.yard_score||0)))
-    .slice(0,50)
-    .map(r=>{
-      const bid=String(parseInt(r.batter_id)||0);
-      const ls=liveSlot(parseInt(bid),r.lineup_slot);
-      const ze=parseInt(r._zoneEdges||DAILY_PICKS_CACHE[bid]?._zoneEdges||0);
-      const inWeak=ls>0&&(r.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(ls);
-      return {name:r.batter||'',team:r.batting_team||'',grade:r.grade||'',pg:r._pgLabel||'',
-        yard:parseFloat(r._yard||0).toFixed(1),boom:parseInt(r._boom||0),
-        sig:parseFloat(r.weighted_flag_score||0).toFixed(1),form:r._formClass||r.form_class||'',
-        simTB:parseFloat(r.sim_tb||0).toFixed(2),ev:parseFloat(r.recent_avg_ev||0).toFixed(1),
-        pitcher:r.pitcher||'',pHand:r.pitcher_hand||'',bHand:r.batter_hand||'',
-        zoneEdges:ze,weakSlot:inWeak,slot:ls||0,swstr:parseFloat(r.season_swstr_pct||0).toFixed(1)};
-    }).filter(r=>r.name);
-
-  const SYSTEM_PROMPT = `You are Yard Bot, an MLB power hitting analyst for the Going Yard app.
-You receive today's top 50 batters by Yard Score and build parlay picks from natural language requests.
-SCORING: Yard Score (HR prob), Boom (contact quality 0-99), Sig (flag count), Pitcher Grade (🎯 Target > 💥 Hittable > 🤔 Average > ⚠️ Tough > ‼️ Elite), Form (Moonshot=peak, Whiff=bad), zoneEdges (higher=better overlap), weakSlot (pitcher historically weak at this batting order slot).
-RESPONSE: Valid JSON only, no markdown.
-{"intro":"1-2 sentence setup","picks":[{"name":"","team":"","grade":"","betType":"","confidence":"High|Medium|Speculative","reasons":["",""]}],"disclaimer":"optional risk note"}`;
-
-  const send = async(text)=>{
-    if(!text.trim()||loading) return;
-    const userMsg={role:'user',content:text};
-    const newMessages=[...messages,userMsg];
-    setMessages(newMessages); setInput(''); setLoading(true);
-    try {
-      const slate=buildSlateSummary();
-      const history=newMessages.slice(-6).map((m,i)=>({
-        role:m.role,
-        content:m.role==='user'
-          ?(i===0?`Slate (top ${slate.length}):\n${JSON.stringify(slate)}\n\nRequest: ${m.content}`:m.content)
-          :JSON.stringify(m.raw||m.content)
-      }));
-      if(history[0]?.role==='user'&&!history[0].content.includes('Slate'))
-        history[0].content=`Slate (top ${slate.length}):\n${JSON.stringify(slate)}\n\nRequest: ${history[0].content}`;
-      const res=await fetch('/api/yardbot',{method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({system:SYSTEM_PROMPT,messages:history})});
-      const d=await res.json();
-      const raw=d.content?.find(c=>c.type==='text')?.text||'{}';
-      let parsed={};
-      try{parsed=JSON.parse(raw.replace(/```json|```/g,''));}
-      catch(e){parsed={intro:raw,picks:[],disclaimer:''};}
-      setMessages(prev=>[...prev,{role:'assistant',content:parsed,raw:parsed}]);
-      if(!open) setUnread(u=>u+1);
-    } catch(e){
-      setMessages(prev=>[...prev,{role:'assistant',content:{intro:'Something went wrong — try again.',picks:[],disclaimer:''}}]);
-    }
-    setLoading(false);
-  };
-
-  useEffect(()=>{ if(open){ setUnread(0); setTimeout(()=>bottomRef.current?.scrollIntoView({behavior:'smooth'}),100); } },[open,messages]);
-
-  return (
-    <>
-      {/* Expanded panel */}
-      {open && (
-        <div style={{position:'fixed',bottom:72,left:12,width:'min(380px,calc(100vw - 24px))',
-          height:'50vh',background:'var(--surface)',border:'1px solid var(--border)',
-          borderRadius:16,zIndex:1000,display:'flex',flexDirection:'column',
-          boxShadow:'0 8px 32px rgba(0,0,0,.6)',overflow:'hidden'}}>
-
-          {/* Panel header */}
-          <div style={{padding:'10px 14px',borderBottom:'1px solid var(--border)',
-            display:'flex',alignItems:'center',justifyContent:'space-between',
-            background:'var(--surface2)',flexShrink:0}}>
-            <div style={{display:'flex',alignItems:'center',gap:8}}>
-              <span style={{fontSize:16}}>🤖</span>
-              <span style={{fontFamily:osw,fontWeight:800,fontSize:14,letterSpacing:.5}}>Yard Bot</span>
-              <span style={{fontFamily:mono,fontSize:7,color:'var(--muted)'}}>top 50 · session memory</span>
-            </div>
-            <div style={{display:'flex',gap:6,alignItems:'center'}}>
-              {messages.length>0&&(
-                <button onClick={()=>setMessages([])}
-                  style={{background:'none',border:'none',color:'rgba(255,255,255,.25)',
-                    cursor:'pointer',fontFamily:mono,fontSize:9,padding:'2px 6px'}}>
-                  ↺
-                </button>
-              )}
-              <button onClick={()=>setOpen(false)}
-                style={{background:'none',border:'none',color:'var(--muted)',
-                  cursor:'pointer',fontSize:14,padding:'2px 6px',lineHeight:1}}>
-                ✕
-              </button>
-            </div>
-          </div>
-
-          {/* Messages */}
-          <div style={{flex:1,overflowY:'auto',padding:'10px 12px',display:'flex',flexDirection:'column',gap:10}}>
-            {messages.length===0&&(
-              <div style={{textAlign:'center',padding:'16px 8px'}}>
-                <div style={{fontSize:24,marginBottom:8}}>🤖</div>
-                <div style={{fontFamily:osw,fontWeight:700,fontSize:12,marginBottom:4}}>Ask me about today's slate</div>
-                <div style={{display:'flex',gap:5,flexWrap:'wrap',justifyContent:'center',marginTop:10}}>
-                  {QUICK_PROMPTS.map((p,i)=>(
-                    <button key={i} onClick={()=>send(p)}
-                      style={{padding:'4px 10px',borderRadius:16,border:'1px solid var(--border)',
-                        background:'var(--surface2)',color:'var(--muted)',cursor:'pointer',
-                        fontFamily:mono,fontSize:8}}>
-                      &ldquo;{p}&rdquo;
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            {messages.map((m,i)=>(
-              <div key={i}>
-                {m.role==='user'&&(
-                  <div style={{display:'flex',justifyContent:'flex-end'}}>
-                    <div style={{maxWidth:'85%',background:'rgba(232,65,26,.12)',
-                      border:'1px solid rgba(232,65,26,.2)',borderRadius:'10px 10px 3px 10px',
-                      padding:'6px 10px',fontFamily:mono,fontSize:10,color:'var(--text)',lineHeight:1.5}}>
-                      {m.content}
-                    </div>
-                  </div>
-                )}
-                {m.role==='assistant'&&m.content&&(
-                  <div style={{display:'flex',flexDirection:'column',gap:8}}>
-                    {m.content.intro&&<div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',lineHeight:1.5}}>{m.content.intro}</div>}
-                    {(m.content.picks||[]).map((pick,pi)=>{
-                      const cacheRow=Object.values(DAILY_PICKS_CACHE).find(r=>r.batter&&r.batter.toLowerCase()===pick.name.toLowerCase());
-                      const pid=cacheRow?String(parseInt(cacheRow.batter_id)||0):null;
-                      const team=pick.team||cacheRow?.batting_team||'';
-                      return (
-                        <div key={pi} style={{background:'var(--surface2)',borderRadius:8,padding:'8px 10px',
-                          borderLeft:`2px solid ${GRADE_COLORS[pick.grade]||'var(--border)'}`}}>
-                          <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:5}}>
-                            {pid&&<div onClick={()=>{setOpen(false);const cp=getCachedPlayer(parseInt(pid)||0)||{};openAtBatSlide({pid:parseInt(pid),name:pick.name,team,avgEV:cp.avgEV,barrel:cp.barrel,hr:cp.hr,avg:cp.avg,obp:cp.obp,slg:cp.slg});}} style={{cursor:'pointer',flexShrink:0}}>
-                              <PlayerAvatar pid={parseInt(pid)} name={pick.name} size={28}/>
-                            </div>}
-                            <div style={{flex:1,minWidth:0}}>
-                              <div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}>
-                                <span style={{fontFamily:osw,fontWeight:800,fontSize:13,color:GRADE_COLORS[pick.grade]||'var(--text)'}}>{pick.grade||'—'}</span>
-                                <span onClick={pid?()=>{setOpen(false);const cp=getCachedPlayer(parseInt(pid)||0)||{};openAtBatSlide({pid:parseInt(pid),name:pick.name,team,avgEV:cp.avgEV,barrel:cp.barrel,hr:cp.hr,avg:cp.avg,obp:cp.obp,slg:cp.slg});}:undefined}
-                                  style={{fontFamily:osw,fontWeight:700,fontSize:12,color:'var(--text)',cursor:pid?'pointer':'default',textDecoration:pid?'underline dotted':'none',textUnderlineOffset:2}}>
-                                  {pick.name}
-                                </span>
-                                {team&&<span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>{team}</span>}
-                                {pid&&<span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={pid} name={pick.name} team={team}/></span>}
-                              </div>
-                              <div style={{fontFamily:mono,fontSize:8,color:'var(--accent)',marginTop:1}}>{pick.betType}</div>
-                            </div>
-                            <div style={{padding:'2px 6px',borderRadius:3,fontSize:7,fontFamily:mono,fontWeight:700,flexShrink:0,
-                              background:pick.confidence==='High'?'rgba(39,201,122,.15)':pick.confidence==='Medium'?'rgba(245,166,35,.15)':'rgba(255,255,255,.05)',
-                              color:pick.confidence==='High'?'#27c97a':pick.confidence==='Medium'?'#f5a623':'var(--muted)',
-                              border:`1px solid ${pick.confidence==='High'?'rgba(39,201,122,.25)':pick.confidence==='Medium'?'rgba(245,166,35,.25)':'var(--border)'}`}}>
-                              {pick.confidence}
-                            </div>
-                          </div>
-                          {(pick.reasons||[]).map((r,ri)=>(
-                            <div key={ri} style={{display:'flex',gap:5,fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.5)',lineHeight:1.4,marginTop:2}}>
-                              <span style={{color:'var(--accent)',flexShrink:0}}>›</span>{r}
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    })}
-                    {m.content.disclaimer&&<div style={{fontFamily:mono,fontSize:7,color:'rgba(255,255,255,.2)',fontStyle:'italic'}}>{m.content.disclaimer}</div>}
-                  </div>
-                )}
-              </div>
-            ))}
-            {loading&&(
-              <div style={{display:'flex',alignItems:'center',gap:6}}>
-                <span style={{fontSize:14}}>🤖</span>
-                <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>Scanning slate&hellip;</span>
-              </div>
-            )}
-            <div ref={bottomRef}/>
-          </div>
-
-          {/* Input */}
-          <div style={{padding:'8px 10px',borderTop:'1px solid var(--border)',flexShrink:0,background:'var(--surface2)'}}>
-            <div style={{display:'flex',gap:6,alignItems:'center'}}>
-              <input value={input} onChange={e=>setInput(e.target.value)}
-                onKeyDown={e=>e.key==='Enter'&&!e.shiftKey&&send(input)}
-                placeholder="Ask about today's slate..."
-                disabled={loading}
-                style={{flex:1,padding:'7px 12px',borderRadius:20,border:'1px solid var(--border)',
-                  background:'var(--surface)',color:'var(--text)',fontFamily:mono,fontSize:10,
-                  outline:'none',opacity:loading?.6:1}}/>
-              <button onClick={()=>send(input)} disabled={loading||!input.trim()}
-                style={{padding:'7px 14px',borderRadius:20,border:'none',
-                  background:loading||!input.trim()?'rgba(232,65,26,.3)':'var(--accent)',
-                  color:'white',fontFamily:osw,fontWeight:800,fontSize:11,
-                  cursor:loading||!input.trim()?'not-allowed':'pointer',flexShrink:0}}>
-                {loading?'…':'Go'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Floating bubble button */}
-      <button onClick={()=>setOpen(o=>!o)}
-        style={{position:'fixed',bottom:12,left:12,width:52,height:52,borderRadius:'50%',
-          background:open?'var(--surface2)':'var(--accent)',border:`2px solid ${open?'var(--border)':'var(--accent)'}`,
-          cursor:'pointer',zIndex:1001,display:'flex',alignItems:'center',justifyContent:'center',
-          boxShadow:'0 4px 16px rgba(0,0,0,.5)',transition:'background .2s, transform .15s',
-          transform:open?'scale(0.92)':'scale(1)'}}>
-        <span style={{fontSize:22}}>{open?'✕':'🤖'}</span>
-        {!open&&unread>0&&(
-          <div style={{position:'absolute',top:-2,right:-2,width:16,height:16,borderRadius:'50%',
-            background:'#27c97a',border:'2px solid var(--bg)',
-            display:'flex',alignItems:'center',justifyContent:'center',
-            fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:8,color:'white'}}>
-            {unread}
-          </div>
-        )}
-      </button>
-    </>
   );
 }
 
@@ -27060,7 +26883,6 @@ export default function App() {
     {showPicksSlideout && <PicksSlideout onClose={()=>setShowPicksSlideout(false)}/>}
     <InjuryModal/>
     {appTeamSlide && <AppTeamSlideout t={appTeamSlide} teamStats={appTeamStats} teamLoading={appTeamLoading} teamSchedule={appTeamSchedule} schedLoading={appSchedLoading} onClose={()=>setAppTeamSlide(null)}/>}
-    <YardBotFloat/>
   </>;
 
 }
