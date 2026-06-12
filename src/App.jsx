@@ -10525,6 +10525,7 @@ let _notifyNewHR = null; // callback set by useHRNotifications hook
 
 // Global navigation — lets notifications route to tabs/views without prop drilling
 let _GLOBAL_NAV = null; // { setTab, setLiveView } — set by App on mount
+let _OPEN_TEAM_SLIDE = null; // (teamObj) => void — set by HRTrackerTab on mount
 function navTo(tab, liveView) {
   if (!_GLOBAL_NAV) return;
   _GLOBAL_NAV.setTab(tab);
@@ -11540,8 +11541,16 @@ function MLBTab() {
   const [teamSlide, setTeamSlide] = React.useState(null); // {teamId, abbr, name}
   const [teamStats, setTeamStats] = React.useState(null);
   const [teamLoading, setTeamLoading] = React.useState(false);
+  const [teamSchedule, setTeamSchedule] = React.useState([]); // upcoming + recent games
+  const [schedLoading, setSchedLoading] = React.useState(false);
   const mono = "'DM Mono',monospace";
   const osw  = "'Oswald',sans-serif";
+
+  // Wire global opener so Splits tab can trigger this slideout
+  React.useEffect(() => {
+    _OPEN_TEAM_SLIDE = (t) => setTeamSlide(t);
+    return () => { _OPEN_TEAM_SLIDE = null; };
+  }, []);
 
   // ── Fetch standings ────────────────────────────────────────────────────────
   React.useEffect(() => {
@@ -11555,10 +11564,13 @@ function MLBTab() {
 
   // ── Fetch team stats when slideout opens ──────────────────────────────────
   React.useEffect(() => {
-    if (!teamSlide) return;
+    if (!teamSlide) { setTeamSchedule([]); return; }
+    const tid = teamSlide.teamId;
     setTeamLoading(true);
     setTeamStats(null);
-    const tid = teamSlide.teamId;
+    setTeamSchedule([]);
+
+    // Team stats
     Promise.all([
       fetch(`https://statsapi.mlb.com/api/v1/teams/${tid}/stats?stats=season&group=hitting&season=2026`).then(r=>r.json()),
       fetch(`https://statsapi.mlb.com/api/v1/teams/${tid}/stats?stats=season&group=pitching&season=2026`).then(r=>r.json()),
@@ -11568,6 +11580,33 @@ function MLBTab() {
       setTeamStats({ hitting: h, pitching: p });
       setTeamLoading(false);
     }).catch(() => setTeamLoading(false));
+
+    // Schedule: 4 recent + 5 upcoming games
+    setSchedLoading(true);
+    const today = new Date();
+    const fmt = d => d.toISOString().slice(0,10);
+    const past  = fmt(new Date(today - 8*864e5));  // 8 days back
+    const future = fmt(new Date(+today + 8*864e5)); // 8 days ahead
+    fetch(`https://statsapi.mlb.com/api/v1/schedule?teamId=${tid}&startDate=${past}&endDate=${future}&sportId=1&gameType=R&hydrate=linescore,team`)
+      .then(r=>r.json())
+      .then(d => {
+        const games = (d.dates||[]).flatMap(date =>
+          (date.games||[]).map(g => ({
+            date:       date.date,
+            gameId:     g.gamePk,
+            status:     g.status?.detailedState||'',
+            home:       g.teams?.home?.team?.abbreviation||'',
+            away:       g.teams?.away?.team?.abbreviation||'',
+            homeScore:  g.teams?.home?.score,
+            awayScore:  g.teams?.away?.score,
+            gameTime:   g.gameDate ? new Date(g.gameDate).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',timeZone:'America/New_York',hour12:true})+' ET' : '',
+            isHome:     g.teams?.home?.team?.id === tid,
+            isFinal:    (g.status?.abstractGameState||'') === 'Final',
+          }))
+        ).sort((a,b) => a.date.localeCompare(b.date));
+        setTeamSchedule(games);
+        setSchedLoading(false);
+      }).catch(() => setSchedLoading(false));
   }, [teamSlide]);
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -11834,6 +11873,52 @@ function MLBTab() {
               borderTop:'1px solid var(--border)',paddingTop:8}}>
               💡 For Going Yard: high team HR Allowed + high HR/9 = weaker pitching staff.
               Batters facing this team's pitchers are in better shape for HR props.
+            </div>
+
+            {/* Schedule — recent + upcoming */}
+            <div style={{marginTop:16,borderTop:'1px solid var(--border)',paddingTop:14}}>
+              <div style={{fontFamily:osw,fontWeight:700,fontSize:11,color:'#a78bfa',
+                letterSpacing:.8,textTransform:'uppercase',marginBottom:10,
+                borderBottom:'1px solid var(--border)',paddingBottom:4}}>
+                📅 Schedule
+              </div>
+              {schedLoading ? (
+                <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',padding:'8px 0'}}>Loading schedule…</div>
+              ) : teamSchedule.length === 0 ? (
+                <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',padding:'8px 0'}}>No games found</div>
+              ) : (()=>{
+                const today = new Date().toISOString().slice(0,10);
+                const past    = teamSchedule.filter(g => g.date <  today).slice(-4);
+                const upcoming = teamSchedule.filter(g => g.date >= today).slice(0,5);
+                const all = [...past, ...upcoming];
+                return all.map(g => {
+                  const isToday = g.date === today;
+                  const opp = g.isHome ? g.away : g.home;
+                  const vsAt = g.isHome ? 'vs' : '@';
+                  const score = g.isFinal
+                    ? `${g.awayScore}–${g.homeScore}`
+                    : (g.status.includes('Progress') ? '🔴 Live' : g.gameTime);
+                  const won = g.isFinal && g.isHome  ? g.homeScore > g.awayScore
+                             : g.isFinal && !g.isHome ? g.awayScore > g.homeScore : null;
+                  return (
+                    <div key={g.gameId} style={{display:'flex',alignItems:'center',gap:8,
+                      padding:'5px 0',borderBottom:'1px solid rgba(255,255,255,.04)',
+                      opacity: g.date < today && !g.isFinal ? .5 : 1}}>
+                      <div style={{fontFamily:mono,fontSize:8,color:isToday?'var(--accent2)':'var(--muted)',
+                        width:52,flexShrink:0,fontWeight:isToday?700:400}}>
+                        {isToday ? 'TODAY' : new Date(g.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}
+                      </div>
+                      <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',width:12,flexShrink:0,textAlign:'center'}}>{vsAt}</div>
+                      <div style={{fontFamily:osw,fontWeight:800,fontSize:11,color:'var(--text)',width:36,flexShrink:0}}>{opp}</div>
+                      <div style={{fontFamily:mono,fontSize:9,flex:1,
+                        color: won===true?'#27c97a':won===false?'var(--accent)':isToday?'var(--accent2)':'var(--muted)'}}>
+                        {score}
+                        {g.isFinal && won !== null && <span style={{marginLeft:4,fontWeight:700}}>{won?'W':'L'}</span>}
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
             </div>
           </>}
         </div>
@@ -13637,8 +13722,6 @@ function SimLabView({ data }) {
   const [maxL7EV,    setMaxL7EV]     = useState('');
   const [minHitPct,  setMinHitPct]   = useState('');
   const [minXbhPct,  setMinXbhPct]   = useState('');
-  const [slotMin,    setSlotMin]     = useState('');
-  const [slotMax,    setSlotMax]     = useState('');
   const [filtersOpen,setFiltersOpen] = useState(false);
   const [selHRUpside,setSelHRUpside]  = useState(new Set());
   const [simSearch,   setSimSearch]    = useState('');  // batter name search
@@ -13727,14 +13810,6 @@ function SimLabView({ data }) {
       .filter(r => selMatchups.size === 0 || selMatchups.has(String(r.game_id)))
       .filter(r => selBatterGradesSim.size === 0 || selBatterGradesSim.has(r.grade))
       .filter(r => !lineupOnly || isConfirmed(r))
-      .filter(r => {
-        if (!lineupOnly) return true;
-        const slot = liveSlot(parseInt(r.batter_id||0), r.lineup_slot);
-        if (!slot || slot === 0) return true;
-        if (slotMin && slot < parseInt(slotMin)) return false;
-        if (slotMax && slot > parseInt(slotMax)) return false;
-        return true;
-      })
       .filter(r => !filterGoneYardSim || isGoneYardSim(r))
       .filter(r => !filterKeyMatchup  || isKeyMatchup(parseInt(r.batter_id)||0, r.batter))
       .filter(r => !filterDueSim || isDueFromRow(r, parseInt(r.batter_id)||0))
@@ -13793,10 +13868,10 @@ function SimLabView({ data }) {
       return mul * ((parseFloat(a[sortBy]) || 0) - (parseFloat(b[sortBy]) || 0));
     });
     return sorted;
-  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, filterKeyMatchup, minYard, maxYard, minSig, maxSig, minSimTB, minOdds, minBoom, minBrl, minZoneFit, maxZoneFit, minL7EV, maxL7EV, minHitPct, minXbhPct, selHRUpside, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal, slotMin, slotMax]);
+  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, filterKeyMatchup, minYard, maxYard, minSig, maxSig, minSimTB, minOdds, minBoom, minBrl, minZoneFit, maxZoneFit, minL7EV, maxL7EV, minHitPct, minXbhPct, selHRUpside, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal]);
 
   // Reset row cap when filters/sort change so user always sees top results
-  useEffect(() => { setDisplayLimit(150); }, [sortBy, sortDir, selMatchups, lineupOnly, simActiveOnly, simSearch, filterKeyMatchup, slotMin, slotMax]);
+  useEffect(() => { setDisplayLimit(150); }, [sortBy, sortDir, selMatchups, lineupOnly, simActiveOnly, simSearch, filterKeyMatchup]);
 
   // Auto-select top batter when data loads
   useEffect(() => {
@@ -13930,7 +14005,6 @@ function SimLabView({ data }) {
                 setMinSimTB('0.01'); setMinOdds(''); setMinBoom(''); setMinBrl('');
                 setMinZoneFit(''); setMaxZoneFit(''); setMinL7EV(''); setMaxL7EV('');
                 setMinHitPct(''); setMinXbhPct('');
-                setSlotMin(''); setSlotMax('');
                 setSelBatterGradesSim(new Set()); setSelPitcherGradesSim(new Set());
                 setSelHRUpside && setSelHRUpside(new Set());
                 setSlBatterHand('ALL'); setSlPitcherHand('ALL');
@@ -14139,43 +14213,6 @@ function SimLabView({ data }) {
                 </div>
               </div>
 
-              {/* Lineup Slot Range — only active when ✅ In Lineup is on */}
-              <div style={{opacity: lineupOnly ? 1 : 0.35, transition:'opacity .2s',
-                pointerEvents: lineupOnly ? 'auto' : 'none'}}>
-                <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,
-                  color: lineupOnly ? (slotMin||slotMax ? 'var(--accent2)' : 'var(--muted)') : 'var(--muted)',
-                  textTransform:'uppercase',letterSpacing:1,marginBottom:8,
-                  display:'flex',alignItems:'center',gap:6}}>
-                  🔢 Lineup Slot
-                  {!lineupOnly && <span style={{fontSize:7,color:'var(--muted)',fontStyle:'italic'}}>(enable ✅ In Lineup first)</span>}
-                </div>
-                <div style={{background:'var(--surface)',borderRadius:7,padding:'8px 10px',
-                  border:`1px solid ${lineupOnly&&(slotMin||slotMax)?'var(--accent2)':'var(--border)'}`}}>
-                  <div style={{display:'flex',alignItems:'center',gap:6}}>
-                    <input type="number" min={1} max={9} value={slotMin}
-                      onChange={e=>{const v=e.target.value;setSlotMin(v&&parseInt(v)>=1&&parseInt(v)<=9?v:'');}}
-                      placeholder="min" disabled={!lineupOnly}
-                      style={{width:'100%',padding:'3px 6px',borderRadius:4,textAlign:'center',
-                        border:`1px solid ${slotMin?'var(--accent2)':'var(--border)'}`,
-                        background:'var(--surface2)',color:'var(--text)',
-                        fontFamily:"'DM Mono',monospace",fontSize:10}}/>
-                    <span style={{color:'var(--muted)',fontSize:10}}>–</span>
-                    <input type="number" min={1} max={9} value={slotMax}
-                      onChange={e=>{const v=e.target.value;setSlotMax(v&&parseInt(v)>=1&&parseInt(v)<=9?v:'');}}
-                      placeholder="max" disabled={!lineupOnly}
-                      style={{width:'100%',padding:'3px 6px',borderRadius:4,textAlign:'center',
-                        border:`1px solid ${slotMax?'var(--accent2)':'var(--border)'}`,
-                        background:'var(--surface2)',color:'var(--text)',
-                        fontFamily:"'DM Mono',monospace",fontSize:10}}/>
-                  </div>
-                  {(slotMin||slotMax)&&lineupOnly&&(
-                    <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--accent2)',marginTop:5}}>
-                      Slots {slotMin||'1'}–{slotMax||'9'} only
-                    </div>
-                  )}
-                </div>
-              </div>
-
             </div>
           )}
 
@@ -14233,7 +14270,7 @@ function SimLabView({ data }) {
               const bom = '\uFEFF';
               const esc = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
               const headers = ['Grade','Pitcher Grade','Gone Yard','Is Key Matchup','Team','Batter','Hand','P.Hand','vs Pitcher',
-                'Top Pitches','Game Time','Lineup Slot','In Weak Slot','Pitcher Weak Slots',
+                'Top Pitches','Game Time',
                 'Yard Score','⚡ Sig','💥 Boom','Form Class','gHR','ISO','Zone Fit','xwOBA','wOBA','SwStr%',
                 'Flags','Recent EV','Recent Barrel%',
                 'Recent FB%','Recent LA','BvP EV','BvP Barrel%','BvP FB%','BvP LA',
@@ -14251,11 +14288,7 @@ function SimLabView({ data }) {
                 const isKM = isKeyMatchup(parseInt(b.batter_id)||0, b.batter) ? 'YES' : '';
                 return [b.grade, pitcherGrade, gy?'YES':'', isKM, b.batting_team, b.batter, b.batter_hand,
                   b.pitcher_hand||'', b.pitcher, b.top_pitches, b.game_time,
-                  // Lineup slot columns
-                  liveSlot(bid, b.lineup_slot) || '',
-                  (()=>{const _ls=liveSlot(bid,b.lineup_slot);return _ls>0&&(b.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(_ls)?'YES':''})(),
-                  b.pitcher_weak_slots||'',
-                  // Computed columns — between Pitcher Weak Slots and Flags
+                  // Computed columns — between Game Time and Flags
                   (b._yard ?? computeYardScore(sigCache.current[String(bid)]||0, parseFloat(b.gHR)||0, boomCache.current[String(bid)]||0, b._ps||(parseFloat(b.ps_score)||0), b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1), liveSlot(bid,b.lineup_slot), b._pgLabel||'')),
                   sigCache.current[String(bid)] ?? '',
                   boomCache.current[String(bid)] ?? '',
@@ -18741,7 +18774,9 @@ function StatsTab() {
                           onClick={()=>onBTeamChange(bTeam===r.team?'ALL':r.team)}>
                           {r.team}
                         </span>
-                        
+                        <span title="Open team slideout" onClick={e=>{e.stopPropagation();if(_OPEN_TEAM_SLIDE){const ABBR_TO_ID={LAA:108,AZ:109,BAL:110,BOS:111,CHC:112,CIN:113,CLE:114,COL:115,DET:116,HOU:117,KC:118,LAD:119,WSH:120,NYM:121,ATH:133,PIT:134,SD:135,SEA:136,SF:137,STL:138,TB:139,TEX:140,TOR:141,MIN:142,PHI:143,ATL:144,CWS:145,MIA:146,NYY:147,MIL:158};const tid=ABBR_TO_ID[r.team];if(tid)_OPEN_TEAM_SLIDE({teamId:tid,abbr:r.team,name:r.team,logo:`https://www.mlbstatic.com/team-logos/${tid}.svg`,w:0,l:0,pct:0,home:'—',away:'—',l10:'—',streak:'—',diff:0});}}}
+                          style={{marginLeft:4,fontSize:9,cursor:'pointer',color:'var(--muted)',opacity:.6,flexShrink:0}}
+                          >↗</span>
                       </td>
                       <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{r.players}</td>
                       <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{Math.round(r.pa)}</td>
