@@ -20355,7 +20355,7 @@ Request: ${history[0].content}`;
         <div style={{display:'flex',gap:8,alignItems:'center'}}>
           <input value={input} onChange={e=>setInput(e.target.value)}
             onKeyDown={e=>e.key==='Enter'&&!e.shiftKey&&send(input)}
-            placeholder='Describe a parlay… e.g. “3 legger HR play vs top pitching targets”'
+            placeholder='Describe a parlay... e.g. "3 legger HR play vs top pitching targets"'
             disabled={loading}
             style={{flex:1,padding:'10px 16px',borderRadius:24,border:'1px solid var(--border)',
               background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:11,outline:'none',opacity:loading?.6:1}}/>
@@ -20568,7 +20568,7 @@ RESPONSE: Valid JSON only, no markdown.
             <div style={{display:'flex',gap:6,alignItems:'center'}}>
               <input value={input} onChange={e=>setInput(e.target.value)}
                 onKeyDown={e=>e.key==='Enter'&&!e.shiftKey&&send(input)}
-                placeholder='Ask about today's slate…'
+                placeholder='Ask about today's slate...'
                 disabled={loading}
                 style={{flex:1,padding:'7px 12px',borderRadius:20,border:'1px solid var(--border)',
                   background:'var(--surface)',color:'var(--text)',fontFamily:mono,fontSize:10,
