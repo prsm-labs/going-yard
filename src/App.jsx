@@ -20235,9 +20235,9 @@ Request: ${m.content}`:m.content)
 ${JSON.stringify(slate)}
 
 Request: ${history[0].content}`;
-      const res=await fetch('/api/yardbot',{method:'POST',
+      const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({system:SYSTEM_PROMPT,messages:history})});
+        body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,system:SYSTEM_PROMPT,messages:history})});
       const d=await res.json();
       const raw=d.content?.find(c=>c.type==='text')?.text||'{}';
       let parsed={};
@@ -20296,17 +20296,55 @@ Request: ${history[0].content}`;
             {m.role==='assistant'&&m.content&&(
               <div style={{display:'flex',flexDirection:'column',gap:10}}>
                 {m.content.intro&&<div style={{fontFamily:mono,fontSize:10,color:'var(--muted)',lineHeight:1.6,padding:'6px 2px'}}>{m.content.intro}</div>}
-                {(m.content.picks||[]).map((pick,pi)=>(
-                  <div key={pi} style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:10,padding:'12px 14px',borderLeft:`3px solid ${GRADE_COLORS[pick.grade]||'var(--border)'}`}}>
+                {(m.content.picks||[]).map((pick,pi)=>{
+                  // Resolve pid from DAILY_PICKS_CACHE by name match
+                  const cacheRow = Object.values(DAILY_PICKS_CACHE).find(r=>
+                    r.batter && r.batter.toLowerCase()===pick.name.toLowerCase()
+                  );
+                  const pid = cacheRow ? String(parseInt(cacheRow.batter_id)||0) : null;
+                  const team = pick.team || cacheRow?.batting_team || '';
+                  return (
+                  <div key={pi} style={{background:'var(--surface)',border:'1px solid var(--border)',
+                    borderRadius:10,padding:'12px 14px',
+                    borderLeft:`3px solid ${GRADE_COLORS[pick.grade]||'var(--border)'}`}}>
                     <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
-                      <span style={{fontFamily:osw,fontWeight:800,fontSize:16,color:GRADE_COLORS[pick.grade]||'var(--text)'}}>{pick.grade||'—'}</span>
-                      <div style={{flex:1}}>
-                        <div style={{fontFamily:osw,fontWeight:700,fontSize:14,color:'var(--text)'}}>
-                          {pick.name}{pick.team&&<span style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginLeft:6}}>{pick.team}</span>}
+                      {/* Avatar — clickable to open batter slideout */}
+                      {pid && <div onClick={()=>{
+                        const cp=getCachedPlayer(parseInt(pid)||0)||{};
+                        openAtBatSlide({pid:parseInt(pid),name:pick.name,team,
+                          avgEV:cp.avgEV,barrel:cp.barrel,hr:cp.hr,avg:cp.avg,obp:cp.obp,slg:cp.slg});
+                      }} style={{cursor:'pointer',flexShrink:0}}>
+                        <PlayerAvatar pid={parseInt(pid)} name={pick.name} size={36}/>
+                      </div>}
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                          <span style={{fontFamily:osw,fontWeight:800,fontSize:16,
+                            color:GRADE_COLORS[pick.grade]||'var(--text)',flexShrink:0}}>
+                            {pick.grade||'—'}
+                          </span>
+                          {/* Clickable name → opens batter slideout */}
+                          <span onClick={pid?()=>{
+                            const cp=getCachedPlayer(parseInt(pid)||0)||{};
+                            openAtBatSlide({pid:parseInt(pid),name:pick.name,team,
+                              avgEV:cp.avgEV,barrel:cp.barrel,hr:cp.hr,avg:cp.avg,obp:cp.obp,slg:cp.slg});
+                          }:undefined}
+                            style={{fontFamily:osw,fontWeight:700,fontSize:14,
+                              color:'var(--text)',cursor:pid?'pointer':'default',
+                              textDecoration:pid?'underline dotted':'none',
+                              textUnderlineOffset:2}}>
+                            {pick.name}
+                          </span>
+                          {team&&<span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{team}</span>}
+                          {/* Add to My Picks button */}
+                          {pid&&<span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}>
+                            <PickButton pid={pid} name={pick.name} team={team}/>
+                          </span>}
                         </div>
-                        <div style={{fontFamily:mono,fontSize:9,color:'var(--accent)',marginTop:1,letterSpacing:.3}}>{pick.betType}</div>
+                        <div style={{fontFamily:mono,fontSize:9,color:'var(--accent)',marginTop:2,letterSpacing:.3}}>
+                          {pick.betType}
+                        </div>
                       </div>
-                      <div style={{padding:'3px 8px',borderRadius:4,fontSize:8,fontFamily:mono,fontWeight:700,
+                      <div style={{padding:'3px 8px',borderRadius:4,fontSize:8,fontFamily:mono,fontWeight:700,flexShrink:0,
                         background:pick.confidence==='High'?'rgba(39,201,122,.15)':pick.confidence==='Medium'?'rgba(245,166,35,.15)':'rgba(255,255,255,.06)',
                         color:pick.confidence==='High'?'#27c97a':pick.confidence==='Medium'?'#f5a623':'var(--muted)',
                         border:`1px solid ${pick.confidence==='High'?'rgba(39,201,122,.3)':pick.confidence==='Medium'?'rgba(245,166,35,.3)':'var(--border)'}`}}>
@@ -20315,13 +20353,14 @@ Request: ${history[0].content}`;
                     </div>
                     <div style={{display:'flex',flexDirection:'column',gap:4}}>
                       {(pick.reasons||[]).map((r,ri)=>(
-                        <div key={ri} style={{display:'flex',alignItems:'flex-start',gap:6,fontFamily:mono,fontSize:9,color:'rgba(255,255,255,.6)',lineHeight:1.5}}>
+                        <div key={ri} style={{display:'flex',alignItems:'flex-start',gap:6,
+                          fontFamily:mono,fontSize:9,color:'rgba(255,255,255,.6)',lineHeight:1.5}}>
                           <span style={{color:'var(--accent)',flexShrink:0,marginTop:1}}>›</span>{r}
                         </div>
                       ))}
                     </div>
                   </div>
-                ))}
+                );})}
                 {m.content.disclaimer&&<div style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.25)',fontStyle:'italic',padding:'2px 2px'}}>{m.content.disclaimer}</div>}
               </div>
             )}
