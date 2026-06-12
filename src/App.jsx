@@ -20075,7 +20075,29 @@ function TeamBtn({ abbr, style }) {
 function AppTeamSlideout({ t, teamStats, teamLoading, teamSchedule, schedLoading, onClose }) {
   const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
   const h = teamStats?.hitting || {}, p = teamStats?.pitching || {};
+  const [rec, setRec] = React.useState(t.w > 0 ? t : null);
   const mlbUrl = `https://www.mlb.com/${(t.name||t.abbr||'').toLowerCase().replace(/\s+/g,'-')}`;
+
+  // Fetch standings record if not provided (e.g. opened from Splits tab)
+  React.useEffect(() => {
+    if (t.w > 0) { setRec(t); return; }
+    fetch('https://statsapi.mlb.com/api/v1/standings?leagueId=103,104&season=2026&standingsTypes=regularSeason&hydrate=team,record')
+      .then(r=>r.json())
+      .then(d => {
+        const all = (d.records||[]).flatMap(r=>r.teamRecords||[]);
+        const found = all.find(r=>r.team?.id===t.teamId);
+        if (found) setRec({
+          ...t,
+          w: found.wins, l: found.losses,
+          pct: parseFloat(found.winningPercentage||0),
+          home: `${found.records?.splitRecords?.find(s=>s.type==='home')?.wins||0}-${found.records?.splitRecords?.find(s=>s.type==='home')?.losses||0}`,
+          away: `${found.records?.splitRecords?.find(s=>s.type==='away')?.wins||0}-${found.records?.splitRecords?.find(s=>s.type==='away')?.losses||0}`,
+          l10:  `${found.records?.splitRecords?.find(s=>s.type==='lastTen')?.wins||0}-${found.records?.splitRecords?.find(s=>s.type==='lastTen')?.losses||0}`,
+          streak: found.streak?.streakCode||'—',
+          diff: found.runDifferential||0,
+        });
+      }).catch(()=>{});
+  }, [t.teamId]);
   const StatLine = ({label,val,col,sub}) => (
     <div style={{padding:'5px 0',borderBottom:'1px solid rgba(255,255,255,.04)',display:'flex',alignItems:'baseline',gap:8}}>
       <span style={{fontFamily:osw,fontWeight:800,fontSize:14,color:col||'var(--text)',flexShrink:0,width:64}}>{val||'—'}</span>
@@ -20099,7 +20121,7 @@ function AppTeamSlideout({ t, teamStats, teamLoading, teamSchedule, schedLoading
           <div>
             <div style={{fontFamily:osw,fontWeight:800,fontSize:22,letterSpacing:1,color:'var(--accent2)'}}>{t.abbr}</div>
             <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)'}}>{t.name}</div>
-            {t.w>0&&<div style={{fontFamily:osw,fontWeight:700,fontSize:12,color:'var(--text)',marginTop:2}}>{t.w}-{t.l} · {typeof t.pct==='number'?t.pct.toFixed(3).replace('0.','.'):'—'}</div>}
+            {rec&&<div style={{fontFamily:osw,fontWeight:700,fontSize:12,color:'var(--text)',marginTop:2}}>{rec.w}-{rec.l} · {typeof rec.pct==='number'?rec.pct.toFixed(3).replace('0.','.'):'—'}</div>}
           </div>
         </div>
         <div style={{display:'flex',flexDirection:'column',gap:6,alignItems:'flex-end'}}>
@@ -20110,8 +20132,8 @@ function AppTeamSlideout({ t, teamStats, teamLoading, teamSchedule, schedLoading
       </div>
       <div style={{padding:'16px 20px'}}>
         {/* Record context */}
-        {t.w>0&&<div style={{display:'flex',gap:8,marginBottom:16,flexWrap:'wrap'}}>
-          {[['Home',t.home],['Away',t.away],['L10',t.l10],['Streak',t.streak],['Run Diff',t.diff>0?`+${t.diff}`:t.diff]].map(([k,v])=>(
+        {rec&&<div style={{display:'flex',gap:8,marginBottom:16,flexWrap:'wrap'}}>
+          {[['Home',rec.home],['Away',rec.away],['L10',rec.l10],['Streak',rec.streak],['Run Diff',rec.diff>0?`+${rec.diff}`:rec.diff]].map(([k,v])=>(
             <div key={k} style={{padding:'4px 10px',borderRadius:6,background:'var(--surface2)',border:'1px solid var(--border)'}}>
               <div style={{fontFamily:osw,fontWeight:800,fontSize:12,color:'var(--text)'}}>{v}</div>
               <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.5}}>{k}</div>
@@ -20236,7 +20258,9 @@ ${JSON.stringify(slate)}
 
 Request: ${history[0].content}`;
       const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
-        headers:{'Content-Type':'application/json'},
+        headers:{'Content-Type':'application/json',
+          'anthropic-version':'2023-06-01',
+          'anthropic-dangerous-direct-browser-ipc':'true'},
         body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,system:SYSTEM_PROMPT,messages:history})});
       const d=await res.json();
       const raw=d.content?.find(c=>c.type==='text')?.text||'{}';
