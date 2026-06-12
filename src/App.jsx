@@ -1864,7 +1864,7 @@ function MatchupCard({ dp }) {
     return Math.min(14, Math.max(0, s));
   })();
 
-  const boom   = parseFloat(dp._boom) || computeBoomScore(sig, parseFloat(dp.zone_fit)||0, parseFloat(dp.recent_iso)||0, parseFloat(dp.sim_tb)||0, parseFloat(dp.weighted_flag_score)||0, parseFloat(dp.recent_barrel_spike||0), parseInt(dp.recent_hr_count||0), parseFloat(dp.recent_batter_ahead_pct||0), !!dp.hh_precursor, parseFloat(dp.primary_pitch_hr_rate||0), parseInt(dp.recent_barrels_3d)||0, parseInt(dp.recent_hrs_3d)||0, parseFloat(dp.recent_avg_bat_speed)||0, parseInt(dp.recent_pb_2d)||0, dp.la_locked, parseFloat(dp.season_swstr_pct)||0, parseFloat(dp.park_pull_fit)||0, parseInt(dp._zoneEdges||0), parseInt(dp._zoneKPenalty||0), (()=>{const _ls=liveSlot(dp.batter_id,dp.lineup_slot);return _ls>0&&(dp.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(_ls);})());
+  const boom   = parseFloat(dp._boom) || computeBoomScore(sig, parseFloat(dp.zone_fit)||0, parseFloat(dp.recent_iso)||0, parseFloat(dp.sim_tb)||0, parseFloat(dp.weighted_flag_score)||0, parseFloat(dp.recent_barrel_spike||0), parseInt(dp.recent_hr_count||0), parseFloat(dp.recent_batter_ahead_pct||0), !!dp.hh_precursor, parseFloat(dp.primary_pitch_hr_rate||0), parseInt(dp.recent_barrels_3d)||0, parseInt(dp.recent_hrs_3d)||0, parseFloat(dp.recent_avg_bat_speed)||0, parseInt(dp.recent_pb_2d)||0, dp.la_locked, parseFloat(dp.season_swstr_pct)||0, parseFloat(dp.park_pull_fit)||0, parseInt(dp._zoneEdges||0), parseInt(dp._zoneKPenalty||0));
   const iso    = parseFloat(dp.l7_iso||dp.recent_iso) || 0;  // L7 blended ISO
   const l7iso   = parseFloat(dp.l7_iso)    || parseFloat(dp.recent_iso)  || 0;
   const l7woba  = parseFloat(dp.l7_woba)   || parseFloat(dp.season_woba) || 0;
@@ -2478,30 +2478,6 @@ function AtBatSlideIn() {
           <InjuryBanner pid={player.pid} playerName={player.name}/>
         </div>
       )}
-      {/* Pitcher Weak Slot banner — fires when lineup confirmed + batter in pitcher's historical weak spot */}
-      {(()=>{
-        const dp4 = DAILY_PICKS_CACHE[String(player?.pid)];
-        const isWeak = (()=>{const _ls=liveSlot(player?.pid, dp4?.lineup_slot);return _ls>0&&(dp4?.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(_ls);})();
-        const slot = liveSlot(player?.pid, dp4?.lineup_slot);
-        if (!isWeak || !slot) return null;
-        return (
-          <div style={{margin:'6px 20px 0',padding:'8px 12px',borderRadius:8,
-            background:'rgba(255,215,0,.08)',border:'1px solid rgba(255,215,0,.25)',
-            display:'flex',alignItems:'center',gap:8}}>
-            <span style={{fontSize:16}}>🎯</span>
-            <div>
-              <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:11,
-                color:'#ffd700',letterSpacing:.5}}>
-                PITCHER WEAK SPOT &#8212; Batting #{slot}
-              </div>
-              <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,
-                color:'rgba(255,255,255,.5)',marginTop:2}}>
-                This pitcher historically allows elevated HR rate to the #{slot} hitter &#183; +3 Boom
-              </div>
-            </div>
-          </div>
-        );
-      })()}
       {/* Last 7 Games HR Chart */}
       {player?.pid && (
         <div style={{padding:'0 20px'}}>
@@ -10911,7 +10887,7 @@ function HRTrackerTab() {
   return <div>
     <HRNav/>
     <div className="hrow">
-      <button id="hr-tracker-csv-trigger" onClick={exportHRCsv}
+      <button onClick={exportHRCsv}
         style={{padding:"4px 12px",borderRadius:6,border:"1px solid var(--border)",
           background:"var(--surface2)",color:"var(--muted)",cursor:"pointer",
           fontFamily:"'DM Mono',monospace",fontSize:11,display:"flex",alignItems:"center",gap:5}}>
@@ -11084,16 +11060,16 @@ function HRTrackerTab() {
 // Batters who made HR-quality contact in last 7 days but got nothing — reads from mlb_atbat_log_last7.csv
 // ── HR Season Leaderboard ─────────────────────────────────────────────────────
 function HRLeaderboardTab() {
-  const [rows,       setRows]       = React.useState([]);
-  const [lbData,     setLbData]     = React.useState({}); // hr_leaderboard.json cache
-  const [loading,    setLoading]    = React.useState(true);
-  const [error,      setError]      = React.useState(null);
-  const [sort,       setSortCol]    = React.useState('hrs');
-  const [sortDir,    setSortDir]    = React.useState(1);
-  const [search,     setSearch]     = React.useState('');
+  const [rows,    setRows]    = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error,   setError]   = React.useState(null);
+  const [sort,    setSortCol] = React.useState('hrs');
+  const [sortDir, setSortDir] = React.useState(1);
+  const [search,  setSearch]  = React.useState('');
   const [teamFilter, setTeamFilter] = React.useState('ALL');
-  const [statCards,  setStatCards]  = React.useState({ total:0, longDist:null, longEV:null });
-  const [displayLimit, setDisplayLimit] = React.useState(50);
+  const [expPid,  setExpPid]  = React.useState(null);
+  const [statCards, setStatCards] = React.useState({ total:0, longDist:null, longEV:null });
+  const [displayLimit, setDisplayLimit] = React.useState(150);
   const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
   const SEASON_START = '2026-03-25';
   const ABBR = {108:'LAA',109:'AZ',110:'BAL',111:'BOS',112:'CHC',113:'CIN',114:'CLE',115:'COL',116:'DET',117:'HOU',118:'KC',119:'LAD',120:'WSH',121:'NYM',133:'ATH',134:'PIT',135:'SD',136:'SEA',137:'SF',138:'STL',139:'TB',140:'TEX',141:'TOR',142:'MIN',143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL'};
@@ -11102,17 +11078,7 @@ function HRLeaderboardTab() {
     const season = new Date().getFullYear();
     const today  = new Date().toISOString().slice(0,10);
 
-    // ── 1. Fetch hr_leaderboard.json (pipeline-built: laser/HH/moonshot stats) ──
-    const lbPromise = fetch('/data/hr_leaderboard.json')
-      .then(r => r.ok ? r.json() : null)
-      .then(d => {
-        if (!d) return {};
-        setLbData(d);
-        return d;
-      })
-      .catch(() => ({}));
-
-    // ── 2. Fetch live season HR totals from MLB Stats API ──────────────────────
+    // ── ALL batters season hitting stats — paginated, max 10 pages ──────────
     const leadersPromise = (async () => {
       const map = {}; let offset = 0; let leagueTotalHRs = 0;
       const MAX_PAGES = 10; let page = 0;
@@ -11128,7 +11094,10 @@ function HRLeaderboardTab() {
           );
           clearTimeout(timer);
           d = await res.json();
-        } catch(e) { break; }
+        } catch(e) {
+          console.warn(`[Leaderboard] page ${page} failed:`, e.message);
+          break;
+        }
         const splits = d?.stats?.[0]?.splits || [];
         splits.forEach(s => {
           const hrs = parseInt(s.stat?.homeRuns || 0);
@@ -11136,7 +11105,8 @@ function HRLeaderboardTab() {
           if (hrs < 1) return;
           const pid = s.player?.id; if (!pid) return;
           const teamAbbr = ABBR[s.team?.id] || s.team?.abbreviation || '';
-          map[pid] = { pid, name: s.player?.fullName||'', team: teamAbbr, hrs };
+          map[pid] = { pid, name: s.player?.fullName||'', team: teamAbbr,
+            hrs, laser105:0, laser110:0, hh105:0, hh110:0 };
         });
         if (splits.length < 500) break;
         offset += 500;
@@ -11144,41 +11114,52 @@ function HRLeaderboardTab() {
       return { map, leagueTotalHRs };
     })();
 
-    // ── 3. Merge API data + leaderboard JSON ───────────────────────────────────
-    Promise.all([leadersPromise, lbPromise]).then(([{ map, leagueTotalHRs }, lb]) => {
-      const lbBatters = {};
-      (lb?.batters || []).forEach(b => { lbBatters[b.pid] = b; });
+    // ── Laser HR stats — loaded AFTER API calls finish to avoid concurrent memory pressure
+    // Running both simultaneously crashes iOS Safari; sequential is safer
+    leadersPromise.then(({ map }) => {
+      if (!Object.keys(map).length) return; // no data, skip
+      loadAtBatLog().then(rows => {
+        const evMap = {}; let longDist = null, longEV = null;
+        rows.forEach(r => {
+          const pid = parseInt(r['Batter'] || 0); if (!pid) return;
+          const ev   = parseFloat(r['Exit Velocity']) || 0;
+          const isHR = parseInt(r['Is Home Run'] || 0) === 1;
+          if (!evMap[pid]) evMap[pid] = { laser105:0, laser110:0, hh105:0, hh110:0 };
+          const m = evMap[pid];
+          if (isHR) {
+            if (ev>=105) m.laser105++; if (ev>=110) m.laser110++;
+            const dist = parseFloat(r['Hit Distance']) || 0;
+            if (dist > 0 && (!longDist || dist > longDist.dist)) longDist = { pid, dist, ev };
+            if (ev > 0  && (!longEV   || ev > longEV.ev))        longEV   = { pid, ev, dist: parseFloat(r['Hit Distance'])||0 };
+          }
+          if (ev>=105) m.hh105++; if (ev>=110) m.hh110++;
+        });
+        // Merge laser data into existing rows
+        setRows(prev => prev.map(r => {
+          const ev = evMap[r.pid] || {};
+          return { ...r, laser105:ev.laser105||0, laser110:ev.laser110||0, hh105:ev.hh105||0, hh110:ev.hh110||0 };
+        }));
+        const findName = pid => { const f = rows.find ? undefined : undefined; return map[pid]?.name || `#${pid}`; };
+        const findTeam = pid => map[pid]?.team || '';
+        setStatCards(prev => ({
+          ...prev,
+          longDist: longDist ? { name:map[longDist.pid]?.name||`#${longDist.pid}`, team:map[longDist.pid]?.team||'', dist:longDist.dist } : null,
+          longEV:   longEV   ? { name:map[longEV.pid]?.name  ||`#${longEV.pid}`,   team:map[longEV.pid]?.team  ||'', ev:longEV.ev       } : null,
+        }));
+      }).catch(() => {});
+    });
 
-      const out = Object.values(map)
-        .filter(r => r.pid && r.hrs >= 1)
-        .map(r => {
-          const lb = lbBatters[r.pid] || {};
-          return {
-            ...r,
-            laser105:  lb.laser105  || 0,
-            laser110:  lb.laser110  || 0,
-            moonshots: lb.moonshots || 0,
-            hh105:     lb.hh105     || 0,
-            hh110:     lb.hh110     || 0,
-          };
-        })
-        .sort((a,b) => b.hrs - a.hrs)
-        .map((r,i) => ({ ...r, rank: i+1 }));
-
-      const total = leagueTotalHRs || out.reduce((s,r)=>s+r.hrs,0);
-
-      // League stat cards — from hr_leaderboard.json (pipeline-computed)
-      const ll = lb?.league?.longest_hr;
-      const lh = lb?.league?.hardest_hr;
-      setStatCards({
-        total,
-        longDist: ll?.name ? { name: ll.name, team: ll.team, dist: ll.dist } : null,
-        longEV:   lh?.name ? { name: lh.name, team: lh.team, ev:   lh.ev   } : null,
-      });
-
-      setRows(out);
-      setLoading(false);
-    }).catch(e => { setError(e.message); setLoading(false); });
+    // Run API calls — leaderboard rows load immediately, laser data updates after
+    leadersPromise
+      .then(({ map, leagueTotalHRs }) => {
+        const out = Object.values(map)
+          .filter(r => r.pid && typeof r.pid === 'number' && r.hrs >= 1)
+          .map(r => ({ ...r, laser105:0, laser110:0, hh105:0, hh110:0 }))
+          .sort((a,b) => b.hrs - a.hrs).map((r,i) => ({ ...r, rank: i+1 }));
+        const total = leagueTotalHRs || out.reduce((s,r)=>s+r.hrs,0);
+        setStatCards({ total, longDist:null, longEV:null }); // laser stat cards populated after CSV loads
+        setRows(out); setLoading(false);
+      }).catch(e => { setError(e.message); setLoading(false); });
   }, []);
 
   const hs = col => { if (sort===col) setSortDir(d=>-d); else { setSortCol(col); setSortDir(1); } };
@@ -11191,62 +11172,69 @@ function HRLeaderboardTab() {
     })
     .sort((a,b) => sortDir * ((b[sort]||0)-(a[sort]||0)));
 
-  React.useEffect(() => { setDisplayLimit(50); }, [sort, sortDir, teamFilter, search]);
+  // Reset row cap when filters change
+  React.useEffect(() => { setDisplayLimit(150); }, [sort, sortDir, teamFilter, search]);
 
   const Th = ({col, label, tip}) => (
     <th title={tip} onClick={() => hs(col)}
       style={{padding:'5px 6px',fontSize:7,fontFamily:mono,textTransform:'uppercase',letterSpacing:.6,
-        color:sort===col?'var(--accent2)':'var(--muted)',cursor:'pointer',textAlign:'right',
-        whiteSpace:'nowrap',borderBottom:'1px solid var(--border)',
+        whiteSpace:'nowrap',cursor:'pointer',textAlign:'right',
+        color:sort===col?'var(--accent2)':'var(--muted)',borderBottom:'1px solid var(--border)',
         background:'var(--surface2)',position:'sticky',top:0,zIndex:10}}>
       {label}{sort===col?(sortDir===1?' ▼':' ▲'):''}
     </th>
   );
 
-  if (loading) return <div style={{padding:24,textAlign:'center',fontFamily:mono,fontSize:10,color:'var(--muted)'}}>Loading leaderboard…</div>;
-  if (error)   return <div style={{padding:24,textAlign:'center',fontFamily:mono,fontSize:10,color:'#ff4020'}}>Error: {error}</div>;
+  if (loading) return <div style={{display:'flex',alignItems:'center',gap:8,padding:20,color:'var(--muted)',fontFamily:mono,fontSize:11}}><div className="sp"/> Loading season HR leaderboard…</div>;
+  if (error)   return <div style={{padding:20,color:'var(--accent)',fontFamily:mono,fontSize:11}}>⚠ {error}</div>;
 
   return (
-    <div style={{padding:'12px 16px'}}>
-      {/* Stat Cards */}
-      <div style={{display:'flex',gap:10,marginBottom:14,flexWrap:'wrap'}}>
-        <div style={{flex:'1 1 120px',minWidth:120,background:'var(--surface2)',borderRadius:8,
-          border:'1px solid var(--border)',padding:'10px 14px',display:'flex',flexDirection:'column',gap:2}}>
-          <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8}}>💥 Season HRs</div>
-          <div style={{fontFamily:osw,fontWeight:800,fontSize:28,color:'var(--accent)',lineHeight:1}}>
-            {statCards.total.toLocaleString()}
-          </div>
-          <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>MLB total · 2026</div>
+    <div>
+      {/* ── Stat Cards ── */}
+      <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}>
+        {/* Total HRs */}
+        <div style={{flex:'1 1 100px',minWidth:100,background:'var(--surface2)',borderRadius:8,
+          border:'1px solid var(--border)',padding:'10px 14px',display:'flex',
+          flexDirection:'column',gap:2}}>
+          <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',
+            letterSpacing:.8}}>2026 Total HRs</div>
+          <div style={{fontFamily:osw,fontWeight:800,fontSize:28,color:'var(--accent)',
+            lineHeight:1}}>{statCards.total.toLocaleString()}</div>
+          <div style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.25)'}}>season to date</div>
         </div>
+        {/* Longest Distance */}
         <div style={{flex:'2 1 160px',minWidth:160,background:'var(--surface2)',borderRadius:8,
-          border:'1px solid var(--border)',padding:'10px 14px',display:'flex',flexDirection:'column',gap:2}}>
-          <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8}}>🚀 Longest HR</div>
+          border:'1px solid var(--border)',padding:'10px 14px',display:'flex',
+          flexDirection:'column',gap:2}}>
+          <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',
+            letterSpacing:.8}}>📏 Longest HR</div>
           {statCards.longDist ? <>
-            <div style={{fontFamily:osw,fontWeight:800,fontSize:22,color:'#38b8f2',lineHeight:1}}>
-              {statCards.longDist.dist} ft
+            <div style={{fontFamily:osw,fontWeight:800,fontSize:22,color:'#f5a623',lineHeight:1}}>
+              {statCards.longDist.dist.toFixed(0)} ft
             </div>
             <div style={{fontFamily:mono,fontSize:9,color:'var(--text)',marginTop:1}}>
               {statCards.longDist.name}
-              {statCards.longDist.team && <span style={{color:'var(--muted)',marginLeft:4,fontSize:8}}>{statCards.longDist.team}</span>}
+              {statCards.longDist.team ? <span style={{color:'var(--muted)',marginLeft:4,fontSize:8}}>{statCards.longDist.team}</span> : null}
             </div>
           </> : <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)'}}>Loading…</div>}
         </div>
+        {/* Highest EV */}
         <div style={{flex:'2 1 160px',minWidth:160,background:'var(--surface2)',borderRadius:8,
-          border:'1px solid var(--border)',padding:'10px 14px',display:'flex',flexDirection:'column',gap:2}}>
-          <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8}}>⚡ Hardest Hit HR</div>
+          border:'1px solid var(--border)',padding:'10px 14px',display:'flex',
+          flexDirection:'column',gap:2}}>
+          <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',
+            letterSpacing:.8}}>⚡ Hardest Hit HR</div>
           {statCards.longEV ? <>
             <div style={{fontFamily:osw,fontWeight:800,fontSize:22,color:'#ff4020',lineHeight:1}}>
               {statCards.longEV.ev.toFixed(1)} mph
             </div>
             <div style={{fontFamily:mono,fontSize:9,color:'var(--text)',marginTop:1}}>
               {statCards.longEV.name}
-              {statCards.longEV.team && <span style={{color:'var(--muted)',marginLeft:4,fontSize:8}}>{statCards.longEV.team}</span>}
+              {statCards.longEV.team ? <span style={{color:'var(--muted)',marginLeft:4,fontSize:8}}>{statCards.longEV.team}</span> : null}
             </div>
           </> : <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)'}}>Loading…</div>}
         </div>
       </div>
-
-      {/* Search + Team Filter */}
       <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10,flexWrap:'wrap'}}>
         <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search batter or team…"
           style={{padding:'3px 10px',borderRadius:6,border:'1px solid var(--border)',background:'var(--surface2)',
@@ -11257,41 +11245,36 @@ function HRLeaderboardTab() {
           {teams.map(t=><option key={t} value={t}>{t==='ALL'?'All Teams':t}</option>)}
         </select>
         <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginLeft:'auto'}}>
-          {sorted.length} batters · 2026 season
+          {sorted.length} batters · 2026 season · tap row to expand
         </div>
       </div>
-
-      {/* Table */}
       <div className="tw">
         <table style={{width:'100%'}}>
           <thead><tr>
-            <th onClick={()=>hs('rank')} style={{padding:'5px 6px',fontSize:7,fontFamily:mono,
-              textTransform:'uppercase',letterSpacing:.6,color:sort==='rank'?'var(--accent2)':'var(--muted)',
-              cursor:'pointer',textAlign:'left',whiteSpace:'nowrap',borderBottom:'1px solid var(--border)',
-              background:'var(--surface2)',position:'sticky',top:0,zIndex:10}}>
+            <th onClick={()=>hs('rank')} style={{padding:'5px 6px',fontSize:7,fontFamily:mono,textTransform:'uppercase',letterSpacing:.6,
+              color:sort==='rank'?'var(--accent2)':'var(--muted)',cursor:'pointer',textAlign:'left',whiteSpace:'nowrap',
+              borderBottom:'1px solid var(--border)',background:'var(--surface2)',position:'sticky',top:0,zIndex:10}}>
               #{sort==='rank'?(sortDir===1?' ▼':' ▲'):''}
             </th>
             <th style={{padding:'5px 6px',fontSize:7,fontFamily:mono,textTransform:'uppercase',letterSpacing:.6,
               color:'var(--muted)',textAlign:'left',whiteSpace:'nowrap',borderBottom:'1px solid var(--border)',
               background:'var(--surface2)',position:'sticky',top:0,zIndex:10}}>Batter</th>
-            <Th col="hrs"       label="💥 HR"      tip="Total home runs this season (live from MLB API)"/>
-            <Th col="laser105"  label="💣 105+"     tip="HRs hit at 105+ mph exit velocity"/>
-            <Th col="laser110"  label="🔥 110+"     tip="HRs hit at 110+ mph exit velocity"/>
-            <Th col="moonshots" label="🌙 420ft+"   tip="Moonshot HRs — 420+ feet"/>
-            <Th col="hh105"     label="💪 HH 105"   tip="All batted balls 105+ mph exit velocity"/>
-            <Th col="hh110"     label="⚡ HH 110"   tip="All batted balls 110+ mph exit velocity"/>
+            <Th col="hrs"      label="💥 HR"    tip="Total home runs this season"/>
+            <Th col="laser105" label="💣 105+"  tip="HRs hit at 105+ mph exit velocity"/>
+            <Th col="laser110" label="🔥 110+"  tip="HRs hit at 110+ mph exit velocity"/>
+            <Th col="hh105"    label="💪 HH 105" tip="All batted balls 105+ mph"/>
+            <Th col="hh110"    label="⚡ HH 110" tip="All batted balls 110+ mph"/>
           </tr></thead>
           <tbody>
-            {sorted.slice(0, displayLimit).map((r,i) => (
-              <tr key={r.pid}
-                onClick={()=>openAtBatSlide({pid:r.pid, name:r.name, team:r.team})}
+            {sorted.slice(0, displayLimit).map((r,i) => [
+              (<tr key={r.pid} onClick={()=>setExpPid(v=>v===r.pid?null:r.pid)}
                 style={{cursor:'pointer',height:28,borderBottom:'1px solid rgba(255,255,255,.04)',
-                  background:isKeyMatchup(r.pid,r.name)?'rgba(255,130,32,.05)':'transparent'}}>
+                  background:expPid===r.pid?'rgba(255,255,255,.04)':isKeyMatchup(r.pid,r.name)?'rgba(255,130,32,.05)':'transparent'}}>
                 <td style={{padding:'2px 6px',fontFamily:osw,fontWeight:700,fontSize:10,
                   color:r.rank<=3?'var(--accent2)':'var(--muted)',whiteSpace:'nowrap'}}>
                   {r.rank<=3?['🥇','🥈','🥉'][r.rank-1]:r.rank}
                 </td>
-                <td style={{padding:'2px 5px',maxWidth:170}}>
+                <td onClick={e=>{e.stopPropagation();openAtBatSlide({pid:r.pid,name:r.name,team:r.team});}} style={{padding:'2px 5px',maxWidth:170,cursor:'pointer'}}>
                   <div style={{display:'flex',alignItems:'center',gap:4,overflow:'hidden'}}>
                     <PlayerAvatar pid={r.pid} name={r.name} size={16}/>
                     <span style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'var(--accent2)',whiteSpace:'nowrap',flexShrink:0}}>{r.team}</span>
@@ -11310,21 +11293,23 @@ function HRLeaderboardTab() {
                   <span style={{fontFamily:osw,fontWeight:700,fontSize:11,color:r.laser110>0?'#ff3010':'var(--muted)'}}>{r.laser110||'—'}</span>
                 </td>
                 <td style={{padding:'2px 6px',textAlign:'right'}}>
-                  <span style={{fontFamily:osw,fontWeight:700,fontSize:11,color:r.moonshots>0?'#a78bfa':'var(--muted)'}}>{r.moonshots||'—'}</span>
-                </td>
-                <td style={{padding:'2px 6px',textAlign:'right'}}>
                   <span style={{fontFamily:osw,fontWeight:700,fontSize:11,color:r.hh105>=40?'#38b8f2':r.hh105>=20?'#27c97a':'var(--text)'}}>{r.hh105||'—'}</span>
                 </td>
                 <td style={{padding:'2px 6px',textAlign:'right'}}>
                   <span style={{fontFamily:osw,fontWeight:700,fontSize:11,color:r.hh110>=8?'#27c97a':'var(--text)'}}>{r.hh110||'—'}</span>
                 </td>
-              </tr>
-            ))}
+              </tr>),
+              expPid===r.pid && !loading && (
+                <tr key={r.pid+'x'}><td colSpan={7} style={{padding:'0 10px 10px',background:'rgba(255,255,255,.02)'}}>
+                  <Last7HRChart batterId={r.pid}/><RecentGameLog batterId={r.pid}/>
+                </td></tr>
+              )
+            ])}
           </tbody>
         </table>
         {sorted.length > displayLimit && (
           <div style={{textAlign:'center',padding:'12px 0'}}>
-            <button onClick={()=>setDisplayLimit(v=>v+50)}
+            <button onClick={()=>setDisplayLimit(v=>v+150)}
               style={{fontFamily:"'DM Mono',monospace",fontSize:9,padding:'6px 16px',
                 borderRadius:6,border:'1px solid var(--border)',background:'rgba(255,255,255,.05)',
                 color:'var(--muted)',cursor:'pointer',letterSpacing:.5}}>
@@ -11334,7 +11319,7 @@ function HRLeaderboardTab() {
         )}
       </div>
       <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:8,lineHeight:1.6}}>
-        HR = MLB official season total (live) · 💣🔥 Laser/🌙 Moonshot/💪⚡ HH = from Statcast AB log · tap row to open batter slideout
+        HR = MLB official season total · 💣🔥 Laser = HR at EV threshold · 💪⚡ HH = any batted ball at EV threshold
       </div>
     </div>
   );
@@ -13018,8 +13003,7 @@ function computeHRUpsideWithH2H(b, bvpData) {
 function computeBoomScore(sig, zoneFit, iso, simTB, engineScore,
   barrelSpike, recentHRCount, batterAheadPct, hhPrecursor, pitchVulnRate,
   dayLateBarrels, dayLateHRs, recentBatSpeed, dayLatePulled,
-  laLocked, swstrPct, pullParkFit, zoneEdges, zoneKPenalty,
-  inPitcherWeakSlot) {
+  laLocked, swstrPct, pullParkFit, zoneEdges, zoneKPenalty) {
 
   // ── Zone Fit (24%) — trimmed from 28%, redirected to Day Late + Bat Speed ──
   const zfRaw = zoneFitScore(parseFloat(zoneFit) || 0);
@@ -13119,13 +13103,7 @@ function computeBoomScore(sig, zoneFit, iso, simTB, engineScore,
   // Only apply if we actually have zone data (either signal non-zero means data exists)
   const zoneSignal = (ze > 0 || zk > 0) ? (zoneBoost + zonePen) : 0;
 
-  // ── Pitcher Weak Slot (0 or +3) ───────────────────────────────────────────
-  // Fires only when lineup is confirmed AND batter's slot is in pitcher's
-  // historically weak slots (HR rate >= 1.5x pitcher avg, min 8 PA sample).
-  // Same tier as Close Call — meaningful positional exploit signal.
-  const slotBoost = (inPitcherWeakSlot === true || inPitcherWeakSlot === 'true' || inPitcherWeakSlot === 1) ? 3 : 0;
-
-  return Math.min(99, Math.round(zf + s + tb + is + bs + hh + cd + dl + bst + prec + pv + laLock + swPen + ppPts + zoneSignal + slotBoost));
+  return Math.min(99, Math.round(zf + s + tb + is + bs + hh + cd + dl + bst + prec + pv + laLock + swPen + ppPts + zoneSignal));
 }
 
 // ── liveSlot — always use confirmed LINEUP_STATUS slot if available ───────────
@@ -13330,7 +13308,7 @@ function LongShotView({ data }) {
         parseFloat(b.recent_barrel_spike||0), parseInt(b.recent_hr_count||0), parseFloat(b.recent_batter_ahead_pct||0),
         !!b.hh_precursor, parseFloat(b.primary_pitch_hr_rate||0),
         parseInt(b.recent_barrels_3d)||0, parseInt(b.recent_hrs_3d)||0,
-        parseFloat(b.recent_avg_bat_speed)||0, parseInt(b.recent_pb_2d)||0, b.la_locked, parseFloat(b.season_swstr_pct)||0, parseFloat(b.park_pull_fit)||0, parseInt(b._zoneEdges||0), parseInt(b._zoneKPenalty||0), (()=>{const _ls=liveSlot(b.batter_id,b.lineup_slot);return _ls>0&&(b.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(_ls);})());
+        parseFloat(b.recent_avg_bat_speed)||0, parseInt(b.recent_pb_2d)||0, b.la_locked, parseFloat(b.season_swstr_pct)||0, parseFloat(b.park_pull_fit)||0, parseInt(b._zoneEdges||0), parseInt(b._zoneKPenalty||0));
       const _ps   = parseFloat(b.ps_score)||0;
       const _yard = computeYardScore(_sig, parseFloat(b.gHR)||0, _boom, _ps,
         b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1),
@@ -13630,7 +13608,7 @@ function SimLabView({ data }) {
         parseFloat(r.recent_avg_bat_speed)||0, parseInt(r.recent_pb_2d)||0,
         r.la_locked, parseFloat(r.season_swstr_pct)||0,
         parseFloat(r.park_pull_fit)||0,
-        parseInt(r._zoneEdges||0), parseInt(r._zoneKPenalty||0), (()=>{const _ls=liveSlot(r.batter_id,r.lineup_slot);return _ls>0&&(r.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(_ls);})());
+        parseInt(r._zoneEdges||0), parseInt(r._zoneKPenalty||0));
     });
     boomCacheReady.current = true;
   }, [data]);
@@ -13659,8 +13637,6 @@ function SimLabView({ data }) {
   const [maxL7EV,    setMaxL7EV]     = useState('');
   const [minHitPct,  setMinHitPct]   = useState('');
   const [minXbhPct,  setMinXbhPct]   = useState('');
-  const [slotMin,    setSlotMin]     = useState('');
-  const [slotMax,    setSlotMax]     = useState('');
   const [filtersOpen,setFiltersOpen] = useState(false);
   const [selHRUpside,setSelHRUpside]  = useState(new Set());
   const [simSearch,   setSimSearch]    = useState('');  // batter name search
@@ -13749,15 +13725,6 @@ function SimLabView({ data }) {
       .filter(r => selMatchups.size === 0 || selMatchups.has(String(r.game_id)))
       .filter(r => selBatterGradesSim.size === 0 || selBatterGradesSim.has(r.grade))
       .filter(r => !lineupOnly || isConfirmed(r))
-      .filter(r => {
-        // Lineup slot range — only active when lineupOnly is on AND slot values set
-        if (!lineupOnly) return true;
-        const slot = liveSlot(parseInt(r.batter_id||0), r.lineup_slot);
-        if (!slot || slot === 0) return true; // unconfirmed — let through, lineupOnly handles it
-        if (slotMin && slot < parseInt(slotMin)) return false;
-        if (slotMax && slot > parseInt(slotMax)) return false;
-        return true;
-      })
       .filter(r => !filterGoneYardSim || isGoneYardSim(r))
       .filter(r => !filterKeyMatchup  || isKeyMatchup(parseInt(r.batter_id)||0, r.batter))
       .filter(r => !filterDueSim || isDueFromRow(r, parseInt(r.batter_id)||0))
@@ -13795,8 +13762,8 @@ function SimLabView({ data }) {
     const mul = sortDir === 'desc' ? -1 : 1;
     const sorted = [...filtered].sort((a, b) => {
       if (sortBy === '_boom') {
-        const aB = boomCache.current[String(a.batter_id)] ?? computeBoomScore((parseFloat(a.weighted_flag_score)||0)*4.6, a.zone_fit, a.recent_iso, a.sim_tb, a.weighted_flag_score, parseFloat(a.recent_barrel_spike||0), parseInt(a.recent_hr_count||0), parseFloat(a.recent_batter_ahead_pct||0), !!a.hh_precursor, parseFloat(a.primary_pitch_hr_rate||0), parseInt(a.recent_barrels_3d)||0, parseInt(a.recent_hrs_3d)||0, parseFloat(a.recent_avg_bat_speed)||0, parseInt(a.recent_pb_2d)||0, a.la_locked, parseFloat(a.season_swstr_pct)||0, parseFloat(a.park_pull_fit)||0, parseInt(a._zoneEdges||0), parseInt(a._zoneKPenalty||0), (()=>{const _ls=liveSlot(a.batter_id,a.lineup_slot);return _ls>0&&(a.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(_ls);})());
-        const bB = boomCache.current[String(b.batter_id)] ?? computeBoomScore((parseFloat(b.weighted_flag_score)||0)*4.6, b.zone_fit, b.recent_iso, b.sim_tb, b.weighted_flag_score, parseFloat(b.recent_barrel_spike||0), parseInt(b.recent_hr_count||0), parseFloat(b.recent_batter_ahead_pct||0), !!b.hh_precursor, parseFloat(b.primary_pitch_hr_rate||0), parseInt(b.recent_barrels_3d)||0, parseInt(b.recent_hrs_3d)||0, parseFloat(b.recent_avg_bat_speed)||0, parseInt(b.recent_pb_2d)||0, b.la_locked, parseFloat(b.season_swstr_pct)||0, parseFloat(b.park_pull_fit)||0, parseInt(b._zoneEdges||0), parseInt(b._zoneKPenalty||0), (()=>{const _ls=liveSlot(b.batter_id,b.lineup_slot);return _ls>0&&(b.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(_ls);})());
+        const aB = boomCache.current[String(a.batter_id)] ?? computeBoomScore((parseFloat(a.weighted_flag_score)||0)*4.6, a.zone_fit, a.recent_iso, a.sim_tb, a.weighted_flag_score, parseFloat(a.recent_barrel_spike||0), parseInt(a.recent_hr_count||0), parseFloat(a.recent_batter_ahead_pct||0), !!a.hh_precursor, parseFloat(a.primary_pitch_hr_rate||0), parseInt(a.recent_barrels_3d)||0, parseInt(a.recent_hrs_3d)||0, parseFloat(a.recent_avg_bat_speed)||0, parseInt(a.recent_pb_2d)||0, a.la_locked, parseFloat(a.season_swstr_pct)||0, parseFloat(a.park_pull_fit)||0, parseInt(a._zoneEdges||0), parseInt(a._zoneKPenalty||0));
+        const bB = boomCache.current[String(b.batter_id)] ?? computeBoomScore((parseFloat(b.weighted_flag_score)||0)*4.6, b.zone_fit, b.recent_iso, b.sim_tb, b.weighted_flag_score, parseFloat(b.recent_barrel_spike||0), parseInt(b.recent_hr_count||0), parseFloat(b.recent_batter_ahead_pct||0), !!b.hh_precursor, parseFloat(b.primary_pitch_hr_rate||0), parseInt(b.recent_barrels_3d)||0, parseInt(b.recent_hrs_3d)||0, parseFloat(b.recent_avg_bat_speed)||0, parseInt(b.recent_pb_2d)||0, b.la_locked, parseFloat(b.season_swstr_pct)||0, parseFloat(b.park_pull_fit)||0, parseInt(b._zoneEdges||0), parseInt(b._zoneKPenalty||0));
         return mul * (aB - bB);
       }
       if (sortBy === 'ps_score') {
@@ -13816,7 +13783,7 @@ function SimLabView({ data }) {
       return mul * ((parseFloat(a[sortBy]) || 0) - (parseFloat(b[sortBy]) || 0));
     });
     return sorted;
-  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, filterKeyMatchup, minYard, maxYard, minSig, maxSig, minSimTB, minOdds, minBoom, minBrl, minZoneFit, maxZoneFit, minL7EV, maxL7EV, minHitPct, minXbhPct, selHRUpside, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal, slotMin, slotMax]);
+  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, filterKeyMatchup, minYard, maxYard, minSig, maxSig, minSimTB, minOdds, minBoom, minBrl, minZoneFit, maxZoneFit, minL7EV, maxL7EV, minHitPct, minXbhPct, selHRUpside, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal]);
 
   // Reset row cap when filters/sort change so user always sees top results
   useEffect(() => { setDisplayLimit(150); }, [sortBy, sortDir, selMatchups, lineupOnly, simActiveOnly, simSearch, filterKeyMatchup]);
@@ -13953,7 +13920,6 @@ function SimLabView({ data }) {
                 setMinSimTB('0.01'); setMinOdds(''); setMinBoom(''); setMinBrl('');
                 setMinZoneFit(''); setMaxZoneFit(''); setMinL7EV(''); setMaxL7EV('');
                 setMinHitPct(''); setMinXbhPct('');
-                setSlotMin(''); setSlotMax('');
                 setSelBatterGradesSim(new Set()); setSelPitcherGradesSim(new Set());
                 setSelHRUpside && setSelHRUpside(new Set());
                 setSlBatterHand('ALL'); setSlPitcherHand('ALL');
@@ -14162,45 +14128,6 @@ function SimLabView({ data }) {
                 </div>
               </div>
 
-              {/* Lineup Slot Range — only active when ✅ In Lineup is on */}
-              <div style={{opacity: lineupOnly ? 1 : 0.35, transition:'opacity .2s',
-                pointerEvents: lineupOnly ? 'auto' : 'none'}}>
-                <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,
-                  color: lineupOnly ? (slotMin||slotMax ? 'var(--accent2)' : 'var(--muted)') : 'var(--muted)',
-                  textTransform:'uppercase',letterSpacing:1,marginBottom:8,
-                  display:'flex',alignItems:'center',gap:6}}>
-                  🔢 Lineup Slot
-                  {!lineupOnly && <span style={{fontSize:7,color:'var(--muted)',fontStyle:'italic'}}>(enable ✅ In Lineup first)</span>}
-                </div>
-                <div style={{background:'var(--surface)',borderRadius:7,padding:'8px 10px',
-                  border:`1px solid ${lineupOnly&&(slotMin||slotMax)?'var(--accent2)':'var(--border)'}`}}>
-                  <div style={{display:'flex',alignItems:'center',gap:6}}>
-                    <input type="number" min={1} max={9} value={slotMin}
-                      onChange={e=>{const v=e.target.value;setSlotMin(v&&parseInt(v)>=1&&parseInt(v)<=9?v:'');}}
-                      placeholder="min"
-                      disabled={!lineupOnly}
-                      style={{width:'100%',padding:'3px 6px',borderRadius:4,textAlign:'center',
-                        border:`1px solid ${slotMin?'var(--accent2)':'var(--border)'}`,
-                        background:'var(--surface2)',color:'var(--text)',
-                        fontFamily:"'DM Mono',monospace",fontSize:10}}/>
-                    <span style={{color:'var(--muted)',fontSize:10}}>–</span>
-                    <input type="number" min={1} max={9} value={slotMax}
-                      onChange={e=>{const v=e.target.value;setSlotMax(v&&parseInt(v)>=1&&parseInt(v)<=9?v:'');}}
-                      placeholder="max"
-                      disabled={!lineupOnly}
-                      style={{width:'100%',padding:'3px 6px',borderRadius:4,textAlign:'center',
-                        border:`1px solid ${slotMax?'var(--accent2)':'var(--border)'}`,
-                        background:'var(--surface2)',color:'var(--text)',
-                        fontFamily:"'DM Mono',monospace",fontSize:10}}/>
-                  </div>
-                  {(slotMin||slotMax)&&lineupOnly&&(
-                    <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--accent2)',marginTop:5}}>
-                      Slots {slotMin||'1'}–{slotMax||'9'} only
-                    </div>
-                  )}
-                </div>
-              </div>
-
             </div>
           )}
 
@@ -14258,7 +14185,7 @@ function SimLabView({ data }) {
               const bom = '\uFEFF';
               const esc = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
               const headers = ['Grade','Pitcher Grade','Gone Yard','Is Key Matchup','Team','Batter','Hand','P.Hand','vs Pitcher',
-                'Top Pitches','Game Time',
+                'Top Pitches','Game Time','Lineup Slot','In Weak Slot','Pitcher Weak Slots',
                 'Yard Score','⚡ Sig','💥 Boom','Form Class','gHR','ISO','Zone Fit','xwOBA','wOBA','SwStr%',
                 'Flags','Recent EV','Recent Barrel%',
                 'Recent FB%','Recent LA','BvP EV','BvP Barrel%','BvP FB%','BvP LA',
@@ -14276,7 +14203,11 @@ function SimLabView({ data }) {
                 const isKM = isKeyMatchup(parseInt(b.batter_id)||0, b.batter) ? 'YES' : '';
                 return [b.grade, pitcherGrade, gy?'YES':'', isKM, b.batting_team, b.batter, b.batter_hand,
                   b.pitcher_hand||'', b.pitcher, b.top_pitches, b.game_time,
-                  // Computed columns — between Game Time and Flags
+                  // Lineup slot columns
+                  liveSlot(bid, b.lineup_slot) || '',
+                  (()=>{const _ls=liveSlot(bid,b.lineup_slot);return _ls>0&&(b.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(_ls)?'YES':''})(),
+                  b.pitcher_weak_slots||'',
+                  // Computed columns — between Pitcher Weak Slots and Flags
                   (b._yard ?? computeYardScore(sigCache.current[String(bid)]||0, parseFloat(b.gHR)||0, boomCache.current[String(bid)]||0, b._ps||(parseFloat(b.ps_score)||0), b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1), liveSlot(bid,b.lineup_slot), b._pgLabel||'')),
                   sigCache.current[String(bid)] ?? '',
                   boomCache.current[String(bid)] ?? '',
@@ -14482,7 +14413,7 @@ function SimLabView({ data }) {
                   b._trackerSig = Math.min(14, Math.max(0, _trackerSig)); // cap at 14
                   b._pgLabel     = _pgLabelv;
                   b._formClass   = getFormClass(b);
-                  b._boom        = computeBoomScore(b._trackerSig, b.zone_fit, b.recent_iso, b.sim_tb, b.weighted_flag_score, parseFloat(b.recent_barrel_spike||0), parseInt(b.recent_hr_count||0), parseFloat(b.recent_batter_ahead_pct||0), !!b.hh_precursor, parseFloat(b.primary_pitch_hr_rate||0), parseInt(b.recent_barrels_3d)||0, parseInt(b.recent_hrs_3d)||0, parseFloat(b.recent_avg_bat_speed)||0, parseInt(b.recent_pb_2d)||0, b.la_locked, parseFloat(b.season_swstr_pct)||0, parseFloat(b.park_pull_fit)||0, parseInt(b._zoneEdges||0), parseInt(b._zoneKPenalty||0), (()=>{const _ls=liveSlot(b.batter_id,b.lineup_slot);return _ls>0&&(b.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(_ls);})());
+                  b._boom        = computeBoomScore(b._trackerSig, b.zone_fit, b.recent_iso, b.sim_tb, b.weighted_flag_score, parseFloat(b.recent_barrel_spike||0), parseInt(b.recent_hr_count||0), parseFloat(b.recent_batter_ahead_pct||0), !!b.hh_precursor, parseFloat(b.primary_pitch_hr_rate||0), parseInt(b.recent_barrels_3d)||0, parseInt(b.recent_hrs_3d)||0, parseFloat(b.recent_avg_bat_speed)||0, parseInt(b.recent_pb_2d)||0, b.la_locked, parseFloat(b.season_swstr_pct)||0, parseFloat(b.park_pull_fit)||0, parseInt(b._zoneEdges||0), parseInt(b._zoneKPenalty||0));
                   sigCache.current[String(b.batter_id)]  = b._trackerSig;
                   SIG_CACHE_GLOBAL[String(b.batter_id)]  = b._trackerSig; // expose to CheatSheetTab
                   boomCache.current[String(b.batter_id)] = b._boom;
@@ -22096,7 +22027,7 @@ function PowerBITab() {
             src={d.src}
             frameBorder="0"
             allowFullScreen
-            style={{width:'100%',height:'calc(100% + 62px)',border:'none',display:'block',
+            style={{width:'100%',height:'calc(100% + 65px)',border:'none',display:'block',
               position:'absolute',top:0,left:0,
               opacity: subTab===d.key ? 1 : 0,
               pointerEvents: subTab===d.key ? 'auto' : 'none',
@@ -23777,7 +23708,7 @@ function CrystalBallTab() {
       const sig  = parseFloat(r._trackerSig||r.weighted_flag_score*4.6||0);
       const ghr  = parseFloat(r.gHR||r.kHR||0);
       const ps   = parseFloat(r.ps_score||0);
-      const boom = computeBoomScore(sig, parseFloat(r.zone_fit||0), parseFloat(r.iso||0), parseFloat(r.sim_tb||0), parseFloat(r.weighted_flag_score||0), parseFloat(r.recent_barrel_spike||0), parseInt(r.recent_hr_count||0), parseFloat(r.recent_batter_ahead_pct||0), !!r.hh_precursor, parseFloat(r.primary_pitch_hr_rate||0), parseInt(r.recent_barrels_3d)||0, parseInt(r.recent_hrs_3d)||0, parseFloat(r.recent_avg_bat_speed)||0, parseInt(r.recent_pb_2d)||0, r.la_locked, parseFloat(r.season_swstr_pct)||0, parseFloat(r.park_pull_fit)||0, parseInt(r._zoneEdges||0), parseInt(r._zoneKPenalty||0), (()=>{const _ls=liveSlot(r.batter_id,r.lineup_slot);return _ls>0&&(r.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(_ls);})());
+      const boom = computeBoomScore(sig, parseFloat(r.zone_fit||0), parseFloat(r.iso||0), parseFloat(r.sim_tb||0), parseFloat(r.weighted_flag_score||0), parseFloat(r.recent_barrel_spike||0), parseInt(r.recent_hr_count||0), parseFloat(r.recent_batter_ahead_pct||0), !!r.hh_precursor, parseFloat(r.primary_pitch_hr_rate||0), parseInt(r.recent_barrels_3d)||0, parseInt(r.recent_hrs_3d)||0, parseFloat(r.recent_avg_bat_speed)||0, parseInt(r.recent_pb_2d)||0, r.la_locked, parseFloat(r.season_swstr_pct)||0, parseFloat(r.park_pull_fit)||0, parseInt(r._zoneEdges||0), parseInt(r._zoneKPenalty||0));
       const yard = computeYardScore(sig, ghr, boom, ps, r.batter_hand||'', r.pitcher_hand||'', parseInt(r.days_rest??1), liveSlot(r.batter_id,r.lineup_slot), r._pgLabel||'');
       const ev   = parseFloat(r.recent_avg_ev||0);
       const la   = parseFloat(r.recent_avg_la||0);
@@ -25048,7 +24979,7 @@ function SimTab({ data }) {
       const iso    = parseFloat(r.recent_iso || 0);
       const ps     = parseFloat(r.ps_score  || 0);
       const zf     = parseFloat(r.zone_fit  || 0);
-      const boom   = parseFloat(r._boom) || computeBoomScore(sig, zf, iso, simTB, parseFloat(r.weighted_flag_score||0), parseFloat(r.recent_barrel_spike||0), parseInt(r.recent_hr_count||0), parseFloat(r.recent_batter_ahead_pct||0), !!r.hh_precursor, parseFloat(r.primary_pitch_hr_rate||0), parseInt(r.recent_barrels_3d)||0, parseInt(r.recent_hrs_3d)||0, parseFloat(r.recent_avg_bat_speed)||0, parseInt(r.recent_pb_2d)||0, r.la_locked, parseFloat(r.season_swstr_pct)||0, parseFloat(r.park_pull_fit)||0, parseInt(r._zoneEdges||0), parseInt(r._zoneKPenalty||0), (()=>{const _ls=liveSlot(r.batter_id,r.lineup_slot);return _ls>0&&(r.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(_ls);})());
+      const boom   = parseFloat(r._boom) || computeBoomScore(sig, zf, iso, simTB, parseFloat(r.weighted_flag_score||0), parseFloat(r.recent_barrel_spike||0), parseInt(r.recent_hr_count||0), parseFloat(r.recent_batter_ahead_pct||0), !!r.hh_precursor, parseFloat(r.primary_pitch_hr_rate||0), parseInt(r.recent_barrels_3d)||0, parseInt(r.recent_hrs_3d)||0, parseFloat(r.recent_avg_bat_speed)||0, parseInt(r.recent_pb_2d)||0, r.la_locked, parseFloat(r.season_swstr_pct)||0, parseFloat(r.park_pull_fit)||0, parseInt(r._zoneEdges||0), parseInt(r._zoneKPenalty||0));
       const yard   = computeYardScore(sig, ghr, boom, ps, r.batter_hand||'', r.pitcher_hand||'', parseInt(r.days_rest??1), liveSlot(r.batter_id,r.lineup_slot), r._pgLabel||'');
       const pgLabel = r._pgLabel || '';
 
