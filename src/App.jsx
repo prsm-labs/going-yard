@@ -13637,6 +13637,8 @@ function SimLabView({ data }) {
   const [maxL7EV,    setMaxL7EV]     = useState('');
   const [minHitPct,  setMinHitPct]   = useState('');
   const [minXbhPct,  setMinXbhPct]   = useState('');
+  const [slotMin,    setSlotMin]     = useState('');
+  const [slotMax,    setSlotMax]     = useState('');
   const [filtersOpen,setFiltersOpen] = useState(false);
   const [selHRUpside,setSelHRUpside]  = useState(new Set());
   const [simSearch,   setSimSearch]    = useState('');  // batter name search
@@ -13725,6 +13727,14 @@ function SimLabView({ data }) {
       .filter(r => selMatchups.size === 0 || selMatchups.has(String(r.game_id)))
       .filter(r => selBatterGradesSim.size === 0 || selBatterGradesSim.has(r.grade))
       .filter(r => !lineupOnly || isConfirmed(r))
+      .filter(r => {
+        if (!lineupOnly) return true;
+        const slot = liveSlot(parseInt(r.batter_id||0), r.lineup_slot);
+        if (!slot || slot === 0) return true;
+        if (slotMin && slot < parseInt(slotMin)) return false;
+        if (slotMax && slot > parseInt(slotMax)) return false;
+        return true;
+      })
       .filter(r => !filterGoneYardSim || isGoneYardSim(r))
       .filter(r => !filterKeyMatchup  || isKeyMatchup(parseInt(r.batter_id)||0, r.batter))
       .filter(r => !filterDueSim || isDueFromRow(r, parseInt(r.batter_id)||0))
@@ -13783,10 +13793,10 @@ function SimLabView({ data }) {
       return mul * ((parseFloat(a[sortBy]) || 0) - (parseFloat(b[sortBy]) || 0));
     });
     return sorted;
-  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, filterKeyMatchup, minYard, maxYard, minSig, maxSig, minSimTB, minOdds, minBoom, minBrl, minZoneFit, maxZoneFit, minL7EV, maxL7EV, minHitPct, minXbhPct, selHRUpside, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal]);
+  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, filterKeyMatchup, minYard, maxYard, minSig, maxSig, minSimTB, minOdds, minBoom, minBrl, minZoneFit, maxZoneFit, minL7EV, maxL7EV, minHitPct, minXbhPct, selHRUpside, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal, slotMin, slotMax]);
 
   // Reset row cap when filters/sort change so user always sees top results
-  useEffect(() => { setDisplayLimit(150); }, [sortBy, sortDir, selMatchups, lineupOnly, simActiveOnly, simSearch, filterKeyMatchup]);
+  useEffect(() => { setDisplayLimit(150); }, [sortBy, sortDir, selMatchups, lineupOnly, simActiveOnly, simSearch, filterKeyMatchup, slotMin, slotMax]);
 
   // Auto-select top batter when data loads
   useEffect(() => {
@@ -13920,6 +13930,7 @@ function SimLabView({ data }) {
                 setMinSimTB('0.01'); setMinOdds(''); setMinBoom(''); setMinBrl('');
                 setMinZoneFit(''); setMaxZoneFit(''); setMinL7EV(''); setMaxL7EV('');
                 setMinHitPct(''); setMinXbhPct('');
+                setSlotMin(''); setSlotMax('');
                 setSelBatterGradesSim(new Set()); setSelPitcherGradesSim(new Set());
                 setSelHRUpside && setSelHRUpside(new Set());
                 setSlBatterHand('ALL'); setSlPitcherHand('ALL');
@@ -14125,6 +14136,43 @@ function SimLabView({ data }) {
                       </div>
                     </div>
                   );})}
+                </div>
+              </div>
+
+              {/* Lineup Slot Range — only active when ✅ In Lineup is on */}
+              <div style={{opacity: lineupOnly ? 1 : 0.35, transition:'opacity .2s',
+                pointerEvents: lineupOnly ? 'auto' : 'none'}}>
+                <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,
+                  color: lineupOnly ? (slotMin||slotMax ? 'var(--accent2)' : 'var(--muted)') : 'var(--muted)',
+                  textTransform:'uppercase',letterSpacing:1,marginBottom:8,
+                  display:'flex',alignItems:'center',gap:6}}>
+                  🔢 Lineup Slot
+                  {!lineupOnly && <span style={{fontSize:7,color:'var(--muted)',fontStyle:'italic'}}>(enable ✅ In Lineup first)</span>}
+                </div>
+                <div style={{background:'var(--surface)',borderRadius:7,padding:'8px 10px',
+                  border:`1px solid ${lineupOnly&&(slotMin||slotMax)?'var(--accent2)':'var(--border)'}`}}>
+                  <div style={{display:'flex',alignItems:'center',gap:6}}>
+                    <input type="number" min={1} max={9} value={slotMin}
+                      onChange={e=>{const v=e.target.value;setSlotMin(v&&parseInt(v)>=1&&parseInt(v)<=9?v:'');}}
+                      placeholder="min" disabled={!lineupOnly}
+                      style={{width:'100%',padding:'3px 6px',borderRadius:4,textAlign:'center',
+                        border:`1px solid ${slotMin?'var(--accent2)':'var(--border)'}`,
+                        background:'var(--surface2)',color:'var(--text)',
+                        fontFamily:"'DM Mono',monospace",fontSize:10}}/>
+                    <span style={{color:'var(--muted)',fontSize:10}}>–</span>
+                    <input type="number" min={1} max={9} value={slotMax}
+                      onChange={e=>{const v=e.target.value;setSlotMax(v&&parseInt(v)>=1&&parseInt(v)<=9?v:'');}}
+                      placeholder="max" disabled={!lineupOnly}
+                      style={{width:'100%',padding:'3px 6px',borderRadius:4,textAlign:'center',
+                        border:`1px solid ${slotMax?'var(--accent2)':'var(--border)'}`,
+                        background:'var(--surface2)',color:'var(--text)',
+                        fontFamily:"'DM Mono',monospace",fontSize:10}}/>
+                  </div>
+                  {(slotMin||slotMax)&&lineupOnly&&(
+                    <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--accent2)',marginTop:5}}>
+                      Slots {slotMin||'1'}–{slotMax||'9'} only
+                    </div>
+                  )}
                 </div>
               </div>
 
