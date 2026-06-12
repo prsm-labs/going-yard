@@ -20568,7 +20568,7 @@ RESPONSE: Valid JSON only, no markdown.
             <div style={{display:'flex',gap:6,alignItems:'center'}}>
               <input value={input} onChange={e=>setInput(e.target.value)}
                 onKeyDown={e=>e.key==='Enter'&&!e.shiftKey&&send(input)}
-                placeholder='Ask about today's slate...'
+                placeholder="Ask about today's slate..."
                 disabled={loading}
                 style={{flex:1,padding:'7px 12px',borderRadius:20,border:'1px solid var(--border)',
                   background:'var(--surface)',color:'var(--text)',fontFamily:mono,fontSize:10,
