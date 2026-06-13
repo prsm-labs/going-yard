@@ -14046,6 +14046,33 @@ function SimLabView({ data }) {
               const slateLiveCache = {};
               // Build live CC cache at export time — same approach as box scores
               const slateCCCache = {}; // batter_id → { count, maxEV, maxDist }
+
+              // ── Fetch batting order fresh from boxscore API ──────────────────
+              // Uses same endpoint as box score stats — stays populated after games end.
+              // Do NOT use liveSlot()/LINEUP_STATUS — that clears when games finish.
+              const exportLineupMap = {}; // batterId (string) → slot (1-9)
+              await Promise.all(slateGameIds.map(async gid => {
+                try {
+                  const cleanGid = parseInt(gid);
+                  const d = await fetch(`https://statsapi.mlb.com/api/v1/game/${cleanGid}/boxscore`).then(r=>r.json());
+                  ['away','home'].forEach(side => {
+                    const order = d?.teams?.[side]?.battingOrder || [];
+                    order.forEach((pid, idx) => {
+                      if (pid) exportLineupMap[String(pid)] = idx + 1;
+                    });
+                    // Also cover substitutes/pinch hitters in players map
+                    const players = d?.teams?.[side]?.players || {};
+                    Object.values(players).forEach(p => {
+                      const bo = p?.battingOrder;
+                      const pid = p?.person?.id;
+                      if (pid && bo && bo % 100 === 0) {
+                        exportLineupMap[String(pid)] = Math.round(bo / 100);
+                      }
+                    });
+                  });
+                } catch(e) {}
+              }));
+
               await Promise.all(slateGameIds.map(async gid => {
                 try {
                   const result = await fetchLiveBatters(gid);
@@ -14100,11 +14127,15 @@ function SimLabView({ data }) {
                 const pitchCleanId = b.pitcher_id ? String(parseInt(b.pitcher_id)||b.pitcher_id) : '';
                 const pitcherGrade = simPitcherGrades.current[pitchCleanId] || '';
                 const isKM = isKeyMatchup(parseInt(b.batter_id)||0, b.batter) ? 'YES' : '';
+                // Lineup slot — from fresh boxscore API fetch (persists after games end, same as AB/H/HR)
+                const exportSlot = exportLineupMap[String(bid)] || 0;
+                const weakSlots  = (b.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean);
+                const inWeakSlot = exportSlot > 0 && weakSlots.includes(exportSlot) ? 'YES' : '';
                 return [b.grade, pitcherGrade, gy?'YES':'', isKM, b.batting_team, b.batter, b.batter_hand,
                   b.pitcher_hand||'', b.pitcher, b.top_pitches, b.game_time,
-                  // Lineup slot columns
-                  liveSlot(bid, b.lineup_slot) || '',
-                  (()=>{const _ls=liveSlot(bid,b.lineup_slot);return _ls>0&&(b.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(_ls)?'YES':''})(),
+                  // Lineup slot columns — from fresh boxscore API, stays populated post-game
+                  exportSlot || '',
+                  inWeakSlot,
                   b.pitcher_weak_slots||'',
                   // Computed columns — between Pitcher Weak Slots and Flags
                   (b._yard ?? computeYardScore(sigCache.current[String(bid)]||0, parseFloat(b.gHR)||0, boomCache.current[String(bid)]||0, b._ps||(parseFloat(b.ps_score)||0), b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1), liveSlot(bid,b.lineup_slot), b._pgLabel||'')),
