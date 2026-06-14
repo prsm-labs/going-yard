@@ -14041,71 +14041,37 @@ function SimLabView({ data }) {
           {/* Export CSV — triggered by ⬇ CSV button in date row */}
           <div style={{display:'none'}}>
           <button id="allmatches-csv-trigger" onClick={async () => {
-              // Fetch live box scores for all games in current slate
               const slateGameIds = [...new Set(slate.map(r => r.game_id).filter(Boolean))];
               const slateLiveCache = {};
-              // Build live CC cache at export time — same approach as box scores
-              const slateCCCache = {}; // batter_id → { count, maxEV, maxDist }
 
-              // ── Fetch batting order fresh from boxscore API ──────────────────
-              // Uses same endpoint as box score stats — stays populated after games end.
-              // Do NOT use liveSlot()/LINEUP_STATUS — that clears when games finish.
-              const exportLineupMap = {}; // batterId (string) → slot (1-9)
-              await Promise.all(slateGameIds.map(async gid => {
-                try {
-                  const cleanGid = parseInt(gid);
-                  const d = await fetch(`https://statsapi.mlb.com/api/v1/game/${cleanGid}/boxscore`).then(r=>r.json());
-                  ['away','home'].forEach(side => {
-                    const order = d?.teams?.[side]?.battingOrder || [];
-                    order.forEach((pid, idx) => {
-                      if (pid) exportLineupMap[String(pid)] = idx + 1;
-                    });
-                    // Also cover substitutes/pinch hitters in players map
-                    const players = d?.teams?.[side]?.players || {};
-                    Object.values(players).forEach(p => {
-                      const bo = p?.battingOrder;
-                      const pid = p?.person?.id;
-                      if (pid && bo && bo % 100 === 0) {
-                        exportLineupMap[String(pid)] = Math.round(bo / 100);
-                      }
-                    });
-                  });
-                } catch(e) {}
-              }));
-
+              // ── Single source of truth: /api/boxscore proxy ──────────────────
+              // All five post-game columns (Lineup Slot, In Weak Slot, CC x3) come
+              // from the same server-side proxy that keeps AB/H/HR populated.
+              // No direct statsapi.mlb.com browser calls — those lose Statcast/lineup
+              // data after games finalize.
               await Promise.all(slateGameIds.map(async gid => {
                 try {
                   const result = await fetchLiveBatters(gid);
                   const batters = result?.batters || result || [];
                   batters.forEach(bt => { if (bt.id) slateLiveCache[String(bt.id)] = bt; });
                 } catch(e) {}
-                // Fetch playByPlay for CC data — same games, same moment
-                try {
-                  const cleanGid = parseInt(gid);  // ensure no float like 824353.0
-                  const pbp = await fetch(`https://statsapi.mlb.com/api/v1/game/${cleanGid}/playByPlay`).then(r=>r.json());
-                  (pbp?.allPlays || []).forEach(play => {
-                    const hd = play.hitData || {};
-                    const ev = hd.launchSpeed || 0, la = hd.launchAngle || 0, dist = hd.totalDistance || 0;
-                    const isHR = (play.result?.event||'').toLowerCase() === 'home_run';
-                    const bid = String(play.matchup?.batter?.id || '');
-                    if (!bid) return;
-                    if (ev >= 98 && la >= 18 && la <= 35 && dist >= 350 && !isHR) {
-                      if (!slateCCCache[bid]) slateCCCache[bid] = { count:0, maxEV:0, maxDist:0 };
-                      slateCCCache[bid].count++;
-                      slateCCCache[bid].maxEV   = Math.max(slateCCCache[bid].maxEV,   ev);
-                      slateCCCache[bid].maxDist = Math.max(slateCCCache[bid].maxDist, dist);
-                    }
-                  });
-                } catch(e) {}
               }));
-              // Merge LIVE_CC_MAP (populated by Bat Tracking tab) into slateCCCache
-              // LIVE_CC_MAP is already processed — use it as authoritative source
+
+              // Build exportLineupMap from proxy's lineupSlot field (already on each batter)
+              const exportLineupMap = {};
+              Object.entries(slateLiveCache).forEach(([bid, bt]) => {
+                if (bt?.lineupSlot > 0) exportLineupMap[bid] = bt.lineupSlot;
+              });
+
+              // Merge LIVE_CC_MAP as in-session fallback for CC data
               Object.entries(LIVE_CC_MAP).forEach(([bid, lcc]) => {
                 if (!lcc?.plays?.length) return;
-                const maxEV   = Math.max(...lcc.plays.map(p=>p.ev||0));
-                const maxDist = Math.max(...lcc.plays.map(p=>p.dist||0));
-                if (!slateCCCache[bid] || lcc.count > slateCCCache[bid].count) {
-                  slateCCCache[bid] = { count: lcc.count, maxEV, maxDist };
+                const lv = slateLiveCache[bid];
+                if (!lv || !lv.closeCalls) {
+                  const maxEV   = Math.max(...lcc.plays.map(p=>p.ev||0));
+                  const maxDist = Math.max(...lcc.plays.map(p=>p.dist||0));
+                  if (!slateLiveCache[bid]) slateLiveCache[bid] = {};
+                  slateLiveCache[bid]._ccFallback = { count: lcc.count, maxEV, maxDist };
                 }
               });
               const bom = '\uFEFF';
@@ -14157,10 +14123,11 @@ function SimLabView({ data }) {
                   lv?.totalBases??'', lv?.rbi??'', lv?.bb??'', lv?.so??'',
                   lv?.avgEV>0?lv.avgEV.toFixed(1):'',
                   lv?.launchAngle>0?lv.launchAngle.toFixed(1):'',
-                  // Live close calls — fetched fresh at export time, same as box scores
-                  slateCCCache[String(bid)]?.count || '',
-                  slateCCCache[String(bid)]?.maxEV  ? slateCCCache[String(bid)].maxEV.toFixed(1)  : '',
-                  slateCCCache[String(bid)]?.maxDist ? slateCCCache[String(bid)].maxDist : '',
+                  // Live close calls — from /api/boxscore proxy (server-side, same persistence as AB/H/HR)
+                  // Falls back to LIVE_CC_MAP if proxy data unavailable
+                  (()=>{ const lv=slateLiveCache[String(bid)]; const cc=lv?.closeCalls||(lv?._ccFallback?.count)||0; return cc||''; })(),
+                  (()=>{ const lv=slateLiveCache[String(bid)]; const ev=lv?.ccMaxEV||(lv?._ccFallback?.maxEV)||0; return ev>0?parseFloat(ev).toFixed(1):''; })(),
+                  (()=>{ const lv=slateLiveCache[String(bid)]; const d=lv?.ccMaxDist||(lv?._ccFallback?.maxDist)||0; return d>0?d:''; })(),
                 ].map(esc).join(',');
               });
               const csv = bom + headers.map(esc).join(',') + '\n' + rows.join('\n');

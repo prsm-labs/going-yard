@@ -20,7 +20,7 @@ export default async function handler(req, res) {
     const boxData = await boxRes.json();
 
     // Parse live feed for Statcast hitData per batter
-    // Returns map: batterId → { evs, las, distances, hardHits, barrels, atBats[] }
+    // Returns map: batterId → { evs, las, distances, hardHits, barrels, atBats[], closeCalls }
     const statcastByBatter = {};
 
     let currentBatterId = null;
@@ -71,6 +71,10 @@ export default async function handler(req, res) {
             evs: [], las: [], distances: [],
             hardHits: 0, barrels: 0,
             atBats: [],
+            // ── Close call tracking ──────────────────────────────
+            // Non-HR batted balls: EV≥98, LA 18-35°, dist≥350ft
+            // Collected server-side so data persists after game ends
+            closeCalls: 0, ccMaxEV: 0, ccMaxDist: 0,
           };
         }
 
@@ -78,6 +82,7 @@ export default async function handler(req, res) {
         const result     = play.result?.event || play.result?.description || null;
         const inning     = play.about?.inning      || null;
         const halfInning = play.about?.halfInning   || null;
+        const isHR       = (play.result?.event || '').toLowerCase() === 'home_run';
 
         let ev = null, la = null, dist = null, pitchType = null;
 
@@ -109,6 +114,15 @@ export default async function handler(req, res) {
             (ev >= 99  && la >= 25 && la <= 33) ||
             (ev >= 98  && la >= 26 && la <= 30);
           if (barrel) sc.barrels++;
+
+          // ── Close call detection ─────────────────────────────────
+          // Same criteria as LIVE_CC_MAP in App.jsx — computed here
+          // server-side so it survives game finalization
+          if (!isHR && ev >= 98 && la >= 18 && la <= 35 && dist >= 350) {
+            sc.closeCalls++;
+            if (ev   > sc.ccMaxEV)   sc.ccMaxEV   = ev;
+            if (dist > sc.ccMaxDist) sc.ccMaxDist = dist;
+          }
         }
 
         if (result) {
