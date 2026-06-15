@@ -58,8 +58,8 @@ player_id,name,team,stolen_bases,caught_stealing,sb_pct,sb_opportunities
 701358,Cam Smith,HOU,8,1,88.9,0
 677942,Blaze Alexander,BAL,7,3,70.0,0
 622761,Jorge Mateo,ATL,7,1,87.5,0
-678882,Ceddanne Rafaela,BOS,7,6,53.8,0
 701762,Nick Kurtz,ATH,7,1,87.5,0
+678882,Ceddanne Rafaela,BOS,7,6,53.8,0
 680869,Zack Gelof,ATH,7,1,87.5,0
 681624,Andy Pages,LAD,7,3,70.0,0
 805999,A.J. Ewing,NYM,7,3,70.0,0
@@ -94,9 +94,9 @@ player_id,name,team,stolen_bases,caught_stealing,sb_pct,sb_opportunities
 677649,Ezequiel Duran,TEX,5,1,83.3,0
 665489,Vladimir Guerrero Jr.,TOR,5,1,83.3,0
 592885,Christian Yelich,MIL,5,0,100.0,0
-643396,Isiah Kiner-Falefa,BOS,5,2,71.4,0
 650489,Willi Castro,COL,5,4,55.6,0
 641343,Jake Bauers,MIL,5,1,83.3,0
+643396,Isiah Kiner-Falefa,BOS,5,2,71.4,0
 665161,Jeremy Peña,HOU,5,1,83.3,0
 671289,Tyler Freeman,COL,5,2,71.4,0
 668804,Bryan Reynolds,PIT,5,0,100.0,0
@@ -152,8 +152,8 @@ player_id,name,team,stolen_bases,caught_stealing,sb_pct,sb_opportunities
 668715,Spencer Steer,CIN,3,0,100.0,0
 678009,Parker Meadows,DET,3,0,100.0,0
 807713,Matt Shaw,CHC,3,1,75.0,0
-694671,Wyatt Langford,TEX,3,0,100.0,0
 687637,Dylan Beavers,BAL,3,1,75.0,0
+694671,Wyatt Langford,TEX,3,0,100.0,0
 687231,Darell Hernaiz,ATH,3,0,100.0,0
 686797,Brooks Lee,MIN,3,2,60.0,0
 678554,Curtis Mead,WSH,3,2,60.0,0
@@ -194,8 +194,8 @@ player_id,name,team,stolen_bases,caught_stealing,sb_pct,sb_opportunities
 800050,Chase DeLauter,CLE,2,1,66.7,0
 702284,Cole Young,SEA,2,3,40.0,0
 671277,Luis García Jr.,WSH,2,1,66.7,0
-607043,Brandon Nimmo,TEX,2,1,66.7,0
 621493,Taylor Ward,BAL,2,2,50.0,0
+607043,Brandon Nimmo,TEX,2,1,66.7,0
 656484,Tristan Gray,MIN,2,0,100.0,0
 609280,Miguel Andujar,SD,2,2,50.0,0
 683737,Michael Busch,CHC,2,0,100.0,0
@@ -241,9 +241,9 @@ player_id,name,team,stolen_bases,caught_stealing,sb_pct,sb_opportunities
 670541,Yordan Alvarez,HOU,1,0,100.0,0
 650490,Yandy Díaz,TB,1,0,100.0,0
 673962,Josh Jung,TEX,1,1,50.0,0
+575929,Willson Contreras,BOS,1,1,50.0,0
 686948,Drake Baldwin,ATL,1,1,50.0,0
 666126,Carlos Cortes,ATH,1,0,100.0,0
-575929,Willson Contreras,BOS,1,1,50.0,0
 691740,Daniel Susac,SF,1,1,50.0,0
 682985,Riley Greene,DET,1,1,50.0,0
 680777,Ryan Jeffers,MIN,1,0,100.0,0
@@ -253,7 +253,6 @@ player_id,name,team,stolen_bases,caught_stealing,sb_pct,sb_opportunities
 660821,Jesús Sánchez,TOR,1,1,50.0,0
 686527,Dominic Canzone,SEA,1,1,50.0,0
 686894,Joey Wiemer,WSH,1,0,100.0,0
-670032,Nicky Lopez,TEX,1,0,100.0,0
 660688,Keibert Ruiz,WSH,1,1,50.0,0
 687462,Spencer Horwitz,PIT,1,0,100.0,0
 669127,Shea Langeliers,ATH,1,0,100.0,0
@@ -263,6 +262,7 @@ player_id,name,team,stolen_bases,caught_stealing,sb_pct,sb_opportunities
 689414,Liam Hicks,MIA,1,0,100.0,0
 656811,Ryan O'Hearn,PIT,1,0,100.0,0
 680977,Brendan Donovan,SEA,1,1,50.0,0
+670032,Nicky Lopez,TEX,1,0,100.0,0
 595978,Austin Hedges,CLE,1,1,50.0,0
 545121,Ildemaro Vargas,AZ,1,0,100.0,0
 686681,Michael Massey,KC,1,0,100.0,0
@@ -277,13 +277,13 @@ player_id,name,team,stolen_bases,caught_stealing,sb_pct,sb_opportunities
 669397,Nick Allen,HOU,1,0,100.0,0
 656413,Stuart Fairchild,CLE,1,0,100.0,0
 664068,Scott Kingery,CHC,1,0,100.0,0
-669394,Jake Burger,TEX,1,0,100.0,0
 656941,Kyle Schwarber,PHI,1,0,100.0,0
+669394,Jake Burger,TEX,1,0,100.0,0
+807799,Masataka Yoshida,BOS,1,0,100.0,0
 677592,Everson Pereira,CWS,1,0,100.0,0
-655316,Andruw Monasterio,BOS,1,3,25.0,0
 691016,Tyler Soderstrom,ATH,1,1,50.0,0
 670042,Luke Raley,SEA,1,1,50.0,0
-807799,Masataka Yoshida,BOS,1,0,100.0,0
+655316,Andruw Monasterio,BOS,1,3,25.0,0
 808959,Munetaka Murakami,CWS,1,3,25.0,0
 666182,Bo Bichette,NYM,1,0,100.0,0
 514888,Jose Altuve,HOU,1,2,33.3,0
@@ -338,9 +338,9 @@ player_id,name,team,stolen_bases,caught_stealing,sb_pct,sb_opportunities
 571771,Enrique Hernández,LAD,0,0,0.0,0
 804668,Rafael Flores Jr.,PIT,0,0,0.0,0
 694224,Gabriel Gonzalez,MIN,0,0,0.0,0
-683227,Cody Freeman,TEX,0,0,0.0,0
 695238,Will Wagner,SD,0,0,0.0,0
 691458,Blaze Jordan,STL,0,0,0.0,0
+683227,Cody Freeman,TEX,0,0,0.0,0
 683021,Michael Stefanic,ATH,0,0,0.0,0
 683734,Andrew Vaughn,MIL,0,0,0.0,0
 676369,Nelson Velázquez,STL,0,0,0.0,0
@@ -409,10 +409,10 @@ player_id,name,team,stolen_bases,caught_stealing,sb_pct,sb_opportunities
 807747,Rikuu Nishida,CWS,0,0,0.0,0
 687515,Colby Thomas,ATH,0,1,0.0,0
 664040,Brandon Lowe,PIT,0,0,0.0,0
-592626,Joc Pederson,TEX,0,0,0.0,0
 691788,Joe Mack,MIA,0,0,0.0,0
 700932,Kyle Manzardo,CLE,0,0,0.0,0
 641680,Jonah Heim,ATH,0,0,0.0,0
+592626,Joc Pederson,TEX,0,0,0.0,0
 682626,Francisco Alvarez,NYM,0,0,0.0,0
 673237,Yainer Diaz,HOU,0,1,0.0,0
 681481,Kerry Carpenter,DET,0,0,0.0,0
@@ -421,12 +421,12 @@ player_id,name,team,stolen_bases,caught_stealing,sb_pct,sb_opportunities
 681807,David Fry,CLE,0,0,0.0,0
 672960,Kazuma Okamoto,TOR,0,0,0.0,0
 646240,Rafael Devers,SF,0,0,0.0,0
+543309,Kyle Higashioka,TEX,0,0,0.0,0
 669720,Austin Hays,CWS,0,1,0.0,0
 664731,P.J. Higgins,CIN,0,0,0.0,0
 664954,Brett Sullivan,COL,0,0,0.0,0
 670623,Isaac Paredes,HOU,0,0,0.0,0
 687551,Drew Gilbert,SF,0,0,0.0,0
-543309,Kyle Higashioka,TEX,0,0,0.0,0
 694371,Tommy Troy,AZ,0,0,0.0,0
 596142,Gary Sánchez,MIL,0,0,0.0,0
 672284,Jarred Kelenic,CWS,0,0,0.0,0
@@ -592,7 +592,6 @@ player_id,name,team,stolen_bases,caught_stealing,sb_pct,sb_opportunities
 676568,Ricky Vanasco,DET,0,0,0.0,0
 681402,Gus Varland,WSH,0,0,0.0,0
 680767,Victor Vodnik,COL,0,0,0.0,0
-670245,Ryan Watson,BOS,0,0,0.0,0
 596133,Luke Weaver,NYM,0,0,0.0,0
 673995,Davis Wendzel,PIT,0,0,0.0,0
 676477,Garrett Whitlock,BOS,0,0,0.0,0
