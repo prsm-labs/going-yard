@@ -20476,15 +20476,18 @@ function KPropsTab() {
   const gradeColor = g => g==='KE'?'#ff4020':g==='KH'?'#f5a623':g==='KA'?'#27c97a':'var(--muted)';
   const gradeLabel = g => g==='KE'?'⚡ Elite':g==='KH'?'🔥 High':g==='KA'?'~ Avg':'🟢 Low';
 
-  // Build unique game list for matchup filter
+  // Build unique game list — "Away @ Home · HH:MM", sorted earliest first
   const games = useMemo(() => {
     const seen = new Set(); const out = [];
+    const toMins = t => { try { const m=String(t).trim().match(/(\d+):(\d+)\s*(AM|PM)/i); if(!m) return 9999; let h=parseInt(m[1]),mn=parseInt(m[2]); if(m[3].toUpperCase()==='PM'&&h!==12)h+=12; if(m[3].toUpperCase()==='AM'&&h===12)h=0; return h*60+mn; } catch{ return 9999; } };
     rows.forEach(r => {
       if (r.gameId && !seen.has(r.gameId)) {
         seen.add(r.gameId);
-        out.push({ id: r.gameId, label: r.gameTime || r.gameId });
+        const label = r.gameTime ? `${r.pitcherTeam} vs ${r.battingTeam} \u00b7 ${r.gameTime}` : `${r.pitcherTeam} vs ${r.battingTeam}`;
+        out.push({ id: r.gameId, label, time: r.gameTime || '' });
       }
     });
+    out.sort((a,b) => toMins(a.time) - toMins(b.time));
     return out;
   }, [rows]);
 
@@ -20512,16 +20515,16 @@ function KPropsTab() {
     <div>
       {/* Filters */}
       <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:9,padding:'10px 14px',marginBottom:10}}>
-        {/* Row 0: search + game */}
+        {/* Row 0: search + game dropdown */}
         <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center',marginBottom:8}}>
           <input value={searchQ} onChange={e=>setSearchQ(e.target.value)} placeholder="Search pitcher or team…"
             style={{fontFamily:mono,fontSize:10,padding:'3px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',width:170}}/>
-          <button className={`chip ${selGame==='all'?'active':''}`} onClick={()=>setSelGame('all')} style={{fontFamily:mono,fontSize:10}}>All Games</button>
-          {games.map(g=>(
-            <button key={g.id} className={`chip ${selGame===g.id?'active':''}`} onClick={()=>setSelGame(g.id)} style={{fontFamily:mono,fontSize:10}}>{g.label}</button>
-          ))}
+          <select value={selGame} onChange={e=>setSelGame(e.target.value)}
+            style={{fontFamily:mono,fontSize:10,padding:'3px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',cursor:'pointer'}}>
+            <option value="all">All Games</option>
+            {games.map(g=><option key={g.id} value={g.id}>{g.label}</option>)}
+          </select>
         </div>
-        {/* Row 1: hand + pitcher K% */}
         <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center',marginBottom:8}}>
           <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)',textTransform:'uppercase',letterSpacing:1}}>Hand:</span>
           {[['all','All'],['R','RHP'],['L','LHP']].map(([v,l])=>(
@@ -20705,12 +20708,15 @@ function SBPropsTab() {
 
   const games = useMemo(() => {
     const seen = new Set(); const out = [];
+    const toMins = t => { try { const m=String(t).trim().match(/(\d+):(\d+)\s*(AM|PM)/i); if(!m) return 9999; let h=parseInt(m[1]),mn=parseInt(m[2]); if(m[3].toUpperCase()==='PM'&&h!==12)h+=12; if(m[3].toUpperCase()==='AM'&&h===12)h=0; return h*60+mn; } catch{ return 9999; } };
     rows.forEach(r => {
       if (r.gameId && !seen.has(r.gameId)) {
         seen.add(r.gameId);
-        out.push({ id: r.gameId, label: r.gameTime || r.gameId });
+        const label = r.gameTime ? `${r.batterTeam} vs ${r.pitcherTeam} \u00b7 ${r.gameTime}` : `${r.batterTeam} vs ${r.pitcherTeam}`;
+        out.push({ id: r.gameId, label, time: r.gameTime || '' });
       }
     });
+    out.sort((a,b) => toMins(a.time) - toMins(b.time));
     return out;
   }, [rows]);
 
@@ -20737,14 +20743,15 @@ function SBPropsTab() {
     <div>
       {/* Filters */}
       <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:9,padding:'10px 14px',marginBottom:10}}>
-        {/* Row 0: search + game */}
+        {/* Row 0: search + game dropdown */}
         <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center',marginBottom:8}}>
           <input value={searchQ} onChange={e=>setSearchQ(e.target.value)} placeholder="Search runner or team…"
             style={{fontFamily:mono,fontSize:10,padding:'3px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',width:170}}/>
-          <button className={`chip ${selGame==='all'?'active':''}`} onClick={()=>setSelGame('all')} style={{fontFamily:mono,fontSize:10}}>All Games</button>
-          {games.map(g=>(
-            <button key={g.id} className={`chip ${selGame===g.id?'active':''}`} onClick={()=>setSelGame(g.id)} style={{fontFamily:mono,fontSize:10}}>{g.label}</button>
-          ))}
+          <select value={selGame} onChange={e=>setSelGame(e.target.value)}
+            style={{fontFamily:mono,fontSize:10,padding:'3px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',cursor:'pointer'}}>
+            <option value="all">All Games</option>
+            {games.map(g=><option key={g.id} value={g.id}>{g.label}</option>)}
+          </select>
         </div>
         {/* Row 1: SB count + confirmed */}
         <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center',marginBottom:8}}>
