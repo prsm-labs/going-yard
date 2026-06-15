@@ -13312,6 +13312,8 @@ function LongShotView({ data }) {
             <Th k="_simTB"  label="Sim TB"/>
             <Th k="_iso"    label="ISO" title="Isolated Power — raw power metric (SLG − AVG)" data-tip="Isolated Power — raw power metric (SLG − AVG)"/>
             <Th k="_zf"     label="ZoneFit" title="Zone Fit — contact zone overlap with pitcher tendencies" data-tip="Zone Fit — contact zone overlap with pitcher tendencies"/>
+            <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'center',borderBottom:'1px solid var(--border)'}} title="Pitcher Weak Slot — batter's lineup position is historically a weak spot for this pitcher">WkSpt</th>
+            <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'center',borderBottom:'1px solid var(--border)'}} title="Zone Edges — number of zones where pitcher usage overlaps with batter power zones">ZEdge</th>
             <Th k="_bvpFB"  label="BvP FB%"/>
             <Th k="_recEV"  label="EV"/>
             <Th k="_bsD"    label="BS Δ" title="Bat Speed Δ vs season baseline (mph) — green = trending up" data-tip="Bat Speed Δ vs season baseline (mph) — green = trending up"/>
@@ -13378,6 +13380,8 @@ function LongShotView({ data }) {
                       color:b._zf>=8?'#ff4020':b._zf>=5?'#f5a623':b._zf>=2?'#27c97a':'var(--muted)'}}>
                       {b._zf>0?b._zf.toFixed(1)+'%':'—'}
                     </td>
+                    <td style={{padding:'2px 4px',textAlign:'center',fontSize:11}}>{(()=>{const _ls=liveSlot(b.batter_id,b.lineup_slot);return _ls>0&&(b.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(_ls)?'🟢':'';})()}</td>
+                    <td style={{padding:'2px 4px',textAlign:'center',fontFamily:mono,fontSize:9}}>{(()=>{const ze=parseInt(b._zoneEdges||DAILY_PICKS_CACHE[String(parseInt(b.batter_id)||0)]?._zoneEdges||0);return ze>0?<span style={{color:ze>=3?'#ff4020':ze>=2?'#f5a623':'var(--muted)',fontWeight:ze>=2?700:400}}>{ze}</span>:'—';})()}</td>
                     <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,color:b._bvpFB>=20&&b._bvpFB<36?'#27c97a':b._bvpFB>=36&&b._bvpFB<42?'#f5a623':'var(--muted)'}}>{b._bvpFB>0?`${b._bvpFB.toFixed(0)}%`:'—'}</td>
                     <td style={{padding:'2px 6px',textAlign:'right',fontFamily:osw,fontWeight:700,fontSize:10,color:b._recEV>=97?'#ff8020':b._recEV>=93?'var(--text)':'var(--muted)'}}>{b._recEV>0?b._recEV.toFixed(1):'—'}</td>
                     <td style={{padding:'2px 5px',textAlign:'right',fontFamily:mono,fontSize:9}}>
@@ -13392,7 +13396,7 @@ function LongShotView({ data }) {
                                         <td style={{padding:'2px 6px',textAlign:'right'}}><span style={{fontFamily:mono,fontSize:9,color:pgColor(b._pgLabel),fontWeight:700}}>{b._pgLabel.split(' ')[0]}</span></td>
                   </tr>
                   {isExp && (
-                    <tr><td colSpan={10} style={{padding:'0 10px 10px',background:'rgba(255,255,255,.02)'}}>
+                    <tr><td colSpan={12} style={{padding:'0 10px 10px',background:'rgba(255,255,255,.02)'}}>
                       <Last7HRChart batterId={pid}/>
                       <RecentGameLog batterId={pid}/>
                     </td></tr>
@@ -13401,7 +13405,7 @@ function LongShotView({ data }) {
               );
             })}
             {filtered.length===0 && (
-              <tr><td colSpan={10} style={{padding:'30px',textAlign:'center',fontFamily:mono,fontSize:10,color:'var(--muted)'}}>
+              <tr><td colSpan={12} style={{padding:'30px',textAlign:'center',fontFamily:mono,fontSize:10,color:'var(--muted)'}}>
                 No long shots match current filters.
               </td></tr>
             )}
@@ -13438,7 +13442,7 @@ function SimLabView({ data }) {
   const [sortPropDir, setSortPropDir] = useState('desc');
   const [lineupOnly, setLineupOnly]   = useState(false);
   const [slBatterHand, setSlBatterHand]   = useState('ALL');
-  const sigCache       = useRef({}); // caches _trackerSig per batter_id after first render
+  const [weakSpotOnly, setWeakSpotOnly] = useState(false);
   // Sync to module-level so CheatSheetTab can read without prop drilling
   const syncSigCache = React.useCallback(() => {
     Object.assign(SIG_CACHE_GLOBAL, sigCache.current);
@@ -13488,6 +13492,7 @@ function SimLabView({ data }) {
   const [minBoom,    setMinBoom]     = useState('');
   const [minBrl,     setMinBrl]      = useState('');
   const [minZoneFit, setMinZoneFit]  = useState('');
+  const [minZoneEdge, setMinZoneEdge]= useState('');
   const [maxZoneFit, setMaxZoneFit]  = useState('');
   const [minL7EV,    setMinL7EV]     = useState('');
   const [maxL7EV,    setMaxL7EV]     = useState('');
@@ -13624,7 +13629,9 @@ function SimLabView({ data }) {
       .filter(r => { const _s = Math.round(sigCache.current[String(r.batter_id)] ?? (parseFloat(r.weighted_flag_score)||0)*4.6); return (!minSig || _s >= parseFloat(minSig)) && (!maxSig || _s <= parseFloat(maxSig)); })
       .filter(r => !minSimTB  || (parseFloat(r.sim_tb)||0)   >= parseFloat(minSimTB))
       .filter(r => !minOdds   || (() => { const d = HR_ODDS_MAP[String(parseInt(r.batter_id)||0)]; return d?.implied && (d.implied * 100) >= parseFloat(minOdds); })())
-      .filter(r => !simSearch || (r.batter||'').toLowerCase().includes(simSearch.toLowerCase()));
+      .filter(r => !simSearch || (r.batter||'').toLowerCase().includes(simSearch.toLowerCase()))
+      .filter(r => !weakSpotOnly || (()=>{ const _ls=liveSlot(r.batter_id,r.lineup_slot); return _ls>0&&(r.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(_ls); })())
+      .filter(r => !minZoneEdge || (parseInt(r._zoneEdges)||parseInt(DAILY_PICKS_CACHE[String(parseInt(r.batter_id)||0)]?._zoneEdges)||0) >= parseInt(minZoneEdge));
     const mul = sortDir === 'desc' ? -1 : 1;
     const sorted = [...filtered].sort((a, b) => {
       if (sortBy === '_boom') {
@@ -13649,7 +13656,7 @@ function SimLabView({ data }) {
       return mul * ((parseFloat(a[sortBy]) || 0) - (parseFloat(b[sortBy]) || 0));
     });
     return sorted;
-  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, filterKeyMatchup, minYard, maxYard, minSig, maxSig, minSimTB, minOdds, minBoom, minBrl, minZoneFit, maxZoneFit, minL7EV, maxL7EV, minHitPct, minXbhPct, selHRUpside, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal, slotMin, slotMax]);
+  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, filterKeyMatchup, minYard, maxYard, minSig, maxSig, minSimTB, minOdds, minBoom, minBrl, minZoneFit, maxZoneFit, minZoneEdge, minL7EV, maxL7EV, minHitPct, minXbhPct, selHRUpside, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal, slotMin, slotMax, weakSpotOnly]);
 
   // Reset row cap when filters/sort change so user always sees top results
   useEffect(() => { setDisplayLimit(150); }, [sortBy, sortDir, selMatchups, lineupOnly, simActiveOnly, simSearch, filterKeyMatchup, slotMin, slotMax]);
@@ -13750,10 +13757,10 @@ function SimLabView({ data }) {
             <div style={{display:'flex',gap:4,alignItems:'center',marginLeft:'auto',flexWrap:'wrap'}}>
               {(()=>{
                 const activeCount=[filterGoneYardSim,filterDueSim,filterDiamondSim,simPicksOnly,
-                  simActiveOnly,simInjuredOnly,simHotOnly,filterKeyMatchup,lineupOnly,
+                  simActiveOnly,simInjuredOnly,simHotOnly,filterKeyMatchup,lineupOnly,weakSpotOnly,
                   slBatterHand!=='ALL',slPitcherHand!=='ALL',slFormFilter.size>0,slHideFinal,
                   !!minYard,!!maxYard,!!minSig,!!maxSig,!!minSimTB,!!minOdds,
-                  !!minBoom,!!minBrl,!!minZoneFit,!!maxZoneFit,!!minL7EV,!!maxL7EV,
+                  !!minBoom,!!minBrl,!!minZoneFit,!!maxZoneFit,!!minZoneEdge,!!minL7EV,!!maxL7EV,
                   !!minHitPct,!!minXbhPct,...[...selBatterGradesSim].map(()=>true),...[...(selHRUpside||new Set())].map(()=>true)
                 ].filter(Boolean).length;
                 const anyActive=activeCount>0;
@@ -13781,9 +13788,10 @@ function SimLabView({ data }) {
                 setSimActiveOnly(true); setSimInjuredOnly(false); setSimHotOnly(false);
                 setLineupOnly(false); setFilterGoneYardSim(false); setFilterDueSim(false);
                 setFilterDiamondSim(false); setSimPicksOnly(false); setFilterKeyMatchup(false);
+                setWeakSpotOnly(false);
                 setMinYard(''); setMaxYard(''); setMinSig(''); setMaxSig('');
                 setMinSimTB('0.01'); setMinOdds(''); setMinBoom(''); setMinBrl('');
-                setMinZoneFit(''); setMaxZoneFit(''); setMinL7EV(''); setMaxL7EV('');
+                setMinZoneFit(''); setMaxZoneFit(''); setMinZoneEdge(''); setMinL7EV(''); setMaxL7EV('');
                 setMinHitPct(''); setMinXbhPct('');
                 setSlotMin(''); setSlotMax('');
                 setSelBatterGradesSim(new Set()); setSelPitcherGradesSim(new Set());
@@ -13835,12 +13843,12 @@ function SimLabView({ data }) {
                   <button onClick={()=>{
                     setFilterGoneYardSim(false);setFilterDueSim(false);setFilterDiamondSim(false);
                     setSimPicksOnly(false);setSimActiveOnly(false);setSimInjuredOnly(false);
-                    setSimHotOnly(false);setFilterKeyMatchup(false);setLineupOnly(false);
+                    setSimHotOnly(false);setFilterKeyMatchup(false);setLineupOnly(false);setWeakSpotOnly(false);
                     setSlBatterHand('ALL');setSlPitcherHand('ALL');setSlFormFilter(new Set());
                     setSlHideFinal(false);setSelBatterGradesSim(new Set());
                     setMinYard('');setMaxYard('');setMinSig('');setMaxSig('');
                     setMinSimTB('');setMinOdds('');setMinBoom('');setMinBrl('');
-                    setMinZoneFit('');setMaxZoneFit('');setMinL7EV('');setMaxL7EV('');
+                    setMinZoneFit('');setMaxZoneFit('');setMinZoneEdge('');setMinL7EV('');setMaxL7EV('');
                     setMinHitPct('');setMinXbhPct('');setSelHRUpside(new Set());
                   }} style={{padding:'3px 10px',borderRadius:5,border:'1px solid rgba(255,64,32,.3)',
                     background:'rgba(255,64,32,.08)',color:'var(--accent)',
@@ -13865,6 +13873,7 @@ function SimLabView({ data }) {
                     [()=>setSimPicksOnly(s=>!s),      simPicksOnly,      'var(--accent2)', '🎯 My Picks'],
                     [()=>setFilterDiamondSim(v=>!v),  filterDiamondSim,  '#ffcc00',        '💎 Diamond'],
                     [()=>setFilterKeyMatchup(v=>!v),  filterKeyMatchup,  '#ffd700',        '🔑 Key Matchup'],
+                    [()=>setWeakSpotOnly(v=>!v),      weakSpotOnly,      '#a78bfa',        '🟢 Weak Spot'],
                     [()=>setSlHideFinal(v=>!v),       slHideFinal,       '#ff6b6b',        '🚫 Hide Final Games'],
                   ].map(([fn,active,col,label])=>(
                     <button key={label} onClick={fn}
@@ -13958,6 +13967,7 @@ function SimLabView({ data }) {
                     {label:'💥 Boom Score',  minV:minBoom,    setMin:setMinBoom,    maxV:null,       setMax:null,          phMin:'40', phMax:null},
                     {label:'🛢️ L7 Brl%',    minV:minBrl,     setMin:setMinBrl,     maxV:null,       setMax:null,          phMin:'8',  phMax:null},
                     {label:'🗺️ Zone Fit %',  minV:minZoneFit, setMin:setMinZoneFit, maxV:maxZoneFit, setMax:setMaxZoneFit, phMin:'min',phMax:'max'},
+                    {label:'🔲 Zone Edges',  minV:minZoneEdge,setMin:setMinZoneEdge,maxV:null,       setMax:null,          phMin:'1',  phMax:null},
                     {label:'⚡ L7 EV (mph)', minV:minL7EV,    setMin:setMinL7EV,    maxV:maxL7EV,    setMax:setMaxL7EV,    phMin:'95', phMax:'max'},
                     {label:'📊 Sim TB',      minV:minSimTB,   setMin:setMinSimTB,   maxV:null,       setMax:null,          phMin:'1.5',phMax:null},
                     {label:'📈 Hit %',       minV:minHitPct,  setMin:setMinHitPct,  maxV:null,       setMax:null,          phMin:'25', phMax:null},
