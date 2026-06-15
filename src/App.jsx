@@ -20945,6 +20945,7 @@ function WalksTab() {
   const [sortDir,     setSortDir]     = useState('desc');
   const [minBBPct,    setMinBBPct]    = useState(0);
   const [minPBBPct,   setMinPBBPct]   = useState(0);
+  const [minPA,       setMinPA]       = useState(5);
   const [wildOnly,    setWildOnly]    = useState(false);
   const [confirmedOnly,setConfirmedOnly]= useState(false);
   const [selGame,     setSelGame]     = useState('all');
@@ -20998,7 +20999,8 @@ function WalksTab() {
         if (batBBPct >= 12 && pitBBPct >= 10) bbGrade = 'BE';   // BB Elite
         else if (batBBPct >= 10 || pitBBPct >= 10) bbGrade = 'BH'; // BB High
         else if (batBBPct >= 8  || pitBBPct >= 8)  bbGrade = 'BA'; // BB Avg
-        const isWild = pitBBPct >= 10;
+        const isWild    = pitBBPct >= 10;
+        const seasonPA  = parseInt(dp.season_pa) || 0;
 
         const confirmed  = LINEUP_STATUS[bid]?.status === 'confirmed';
         const slot        = parseInt(dp.lineup_slot) || 0;
@@ -21015,7 +21017,7 @@ function WalksTab() {
           gameId: gid, gameTime: dp.game_time || '',
           lineupSlot: slot, confirmed,
           batBBPct, recentBBPct, discScore, ozSwing, simBB,
-          pitBBPct, meatball, bbScore, bbGrade, isWild,
+          pitBBPct, meatball, bbScore, bbGrade, isWild, seasonPA,
         });
       });
 
@@ -21045,6 +21047,7 @@ function WalksTab() {
   const filtered = rows.filter(r =>
     (selGame === 'all' || r.gameId === selGame) &&
     (!searchQ || r.batterName.toLowerCase().includes(searchQ.toLowerCase()) || r.batterTeam.toLowerCase().includes(searchQ.toLowerCase()) || r.pitcherName.toLowerCase().includes(searchQ.toLowerCase())) &&
+    r.seasonPA  >= minPA &&
     r.batBBPct  >= minBBPct &&
     r.pitBBPct  >= minPBBPct &&
     (!wildOnly       || r.isWild) &&
@@ -21075,17 +21078,24 @@ function WalksTab() {
             {games.map(g=><option key={g.id} value={g.id}>{g.label}</option>)}
           </select>
         </div>
-        {/* Row 1: batter BB% + confirmed */}
+        {/* Row 1: min PA + confirmed */}
         <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center',marginBottom:8}}>
-          <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)',textTransform:'uppercase',letterSpacing:1}}>Batter BB%:</span>
-          {[0,7,10,12,15].map(v=>(
-            <button key={v} className={`chip ${minBBPct===v?'active':''}`} onClick={()=>setMinBBPct(v)} style={{fontFamily:mono,fontSize:10}}>{v===0?'All':v+'%+'}</button>
+          <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)',textTransform:'uppercase',letterSpacing:1}}>Min PA:</span>
+          {[0,5,20,50,100].map(v=>(
+            <button key={v} className={`chip ${minPA===v?'active':''}`} onClick={()=>setMinPA(v)} style={{fontFamily:mono,fontSize:10}}>{v===0?'All':v+'+'}</button>
           ))}
           <button className={`chip ${confirmedOnly?'active':''}`} onClick={()=>setConfirmedOnly(v=>!v)} style={{marginLeft:8,fontFamily:mono,fontSize:10,color:confirmedOnly?'white':'#27c97a'}}>
             ✅ Confirmed Only
           </button>
         </div>
-        {/* Row 2: pitcher BB% + wild toggle */}
+        {/* Row 2: batter BB% */}
+        <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center',marginBottom:8}}>
+          <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)',textTransform:'uppercase',letterSpacing:1}}>Batter BB%:</span>
+          {[0,7,10,12,15].map(v=>(
+            <button key={v} className={`chip ${minBBPct===v?'active':''}`} onClick={()=>setMinBBPct(v)} style={{fontFamily:mono,fontSize:10}}>{v===0?'All':v+'%+'}</button>
+          ))}
+        </div>
+        {/* Row 3: pitcher BB% + wild toggle */}
         <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
           <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)',textTransform:'uppercase',letterSpacing:1}}>Pitcher BB%:</span>
           {[0,6,8,10,12].map(v=>(
