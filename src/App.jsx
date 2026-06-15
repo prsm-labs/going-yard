@@ -20240,7 +20240,7 @@ function YardBotFloat() {
   const bottomRef = useRef(null);
 
   const GRADE_COLORS = {'A+':'#ff4020','A':'#f5a623','B+':'#27c97a','B':'#38b8f2','C+':'var(--muted)','C':'var(--muted)','D':'var(--muted)'};
-  const QUICK_PROMPTS = ['3 legger HR play vs top pitching targets','safe 2 leg strikeout parlay','best solo HR plays today'];
+  const QUICK_PROMPTS = ['3 legger HR play vs top pitching targets','safe 2 leg strikeout parlay','best solo HR plays today','top SB candidates today','walk prop targets today'];
 
   const buildSlateSummary = () => Object.values(DAILY_PICKS_CACHE||{})
     .sort((a,b)=>(parseFloat(b._yard||0))-(parseFloat(a._yard||0))).slice(0,50)
@@ -20261,10 +20261,102 @@ function YardBotFloat() {
     .map(g=>({away:g.away?.abbr||'',home:g.home?.abbr||'',time:g.gameTime||'TBD',
       status:g.status||'Preview',awayP:g.away?.probablePitcher||'TBD',homeP:g.home?.probablePitcher||'TBD'}));
 
-  const SYSTEM_PROMPT = `You are Yard Bot, an MLB power hitting analyst for the Going Yard app.
-You have today's top 50 batters by Yard Score, the live schedule, and season HR leaders.
-SCORING: Yard Score=HR prob, Boom=contact quality 0-99, Pitcher Grade (Target=easiest to Elite=hardest), Form (Moonshot=peak, Whiff=bad), zoneEdges=higher is better, weakSlot=pitcher historically weak at this batting order slot.
-SCHEDULE: away@home, time ET, probable starters. HR leaders: season totals only, no 30-day splits.
+  // Weather context — top games by HR factor, dome/wind flags
+  const buildWeatherContext = async () => {
+    try {
+      const r = await fetch('/data/weather.json');
+      if (!r.ok) return [];
+      const d = await r.json();
+      const games = Object.values(d.weather || {});
+      return games
+        .filter(g => !g.isDome)
+        .sort((a,b) => (b.hr_factor||0) - (a.hr_factor||0))
+        .slice(0, 10)
+        .map(g => ({
+          matchup: `${g['Away Team'] || ''} @ ${g['Home Team'] || ''}`,
+          temp: g.temp_f ? Math.round(g.temp_f)+'F' : '?',
+          wind: g.wind_speed_mph ? `${Math.round(g.wind_speed_mph)}mph ${g.wind_effect||''}`.trim() : 'calm',
+          hrFactor: g.hr_factor || 100,
+          hrGrade: g['HR Grade'] || '',
+          condition: g.condition || '',
+          rain: g.chance_of_rain ? g.chance_of_rain+'%' : '0%',
+        }));
+    } catch(e) { return []; }
+  };
+
+  // K Props context — top K matchups from today's slate
+  const buildKContext = () => {
+    try {
+      const picks = Object.values(DAILY_PICKS_CACHE);
+      const seen  = new Set(); const out = [];
+      picks.forEach(dp => {
+        const pid = String(dp.pitcher_id||'').split('.')[0];
+        if (!pid || seen.has(pid)) return;
+        seen.add(pid);
+        const bKPct = parseFloat(dp.recent_k_pct) || 0;
+        if (bKPct < 20 && parseFloat(dp.season_swstr_pct||0) < 10) return;
+        out.push({
+          pitcher: dp.pitcher||'', team: dp.pitcher_team||'', hand: dp.pitcher_hand||'',
+          vs: dp.batting_team||'', oppKPct: bKPct.toFixed(1),
+          swStr: parseFloat(dp.season_swstr_pct||0).toFixed(1),
+        });
+      });
+      return out.slice(0, 12);
+    } catch(e) { return []; }
+  };
+
+  // SB Props context — top SB candidates from today's slate
+  const buildSBContext = () => {
+    try {
+      const picks = Object.values(DAILY_PICKS_CACHE);
+      const seen  = new Set(); const out = [];
+      picks.forEach(dp => {
+        const bid = String(dp.batter_id||'').split('.')[0];
+        if (!bid || seen.has(bid)) return;
+        seen.add(bid);
+        const seaSB = parseInt(dp.season_sb||0);
+        const bbPct = parseFloat(dp.season_bb_pct||0);
+        if (seaSB < 3 && bbPct < 8) return;
+        out.push({
+          batter: dp.batter||'', team: dp.batting_team||'',
+          vs: dp.pitcher||'', slot: parseInt(dp.lineup_slot)||0,
+          seasonSB: seaSB,
+        });
+      });
+      return out.sort((a,b)=>b.seasonSB-a.seasonSB).slice(0, 12);
+    } catch(e) { return []; }
+  };
+
+  // Walk Props context — top walk candidates from today's slate
+  const buildBBContext = () => {
+    try {
+      const picks = Object.values(DAILY_PICKS_CACHE);
+      const seen  = new Set(); const out = [];
+      picks.forEach(dp => {
+        const bid = String(dp.batter_id||'').split('.')[0];
+        if (!bid || seen.has(bid)) return;
+        seen.add(bid);
+        const bbPct   = parseFloat(dp.season_bb_pct||0);
+        const discScr = parseFloat(dp.discipline_score||0);
+        const ozSwing = parseFloat(dp.oz_swing_pct||100);
+        if (bbPct < 8 && discScr < 55) return;
+        out.push({
+          batter: dp.batter||'', team: dp.batting_team||'',
+          vs: dp.pitcher||'', bbPct: bbPct.toFixed(1),
+          disc: Math.round(discScr), chase: ozSwing < 100 ? ozSwing.toFixed(1) : '?',
+        });
+      });
+      return out.sort((a,b)=>parseFloat(b.bbPct)-parseFloat(a.bbPct)).slice(0, 12);
+    } catch(e) { return []; }
+  };
+
+  const SYSTEM_PROMPT = `You are Yard Bot, an MLB analyst for the Going Yard app covering HR, K, SB, and walk props.
+You have today's top 50 batters by Yard Score, the live schedule, HR leaders, weather, K matchups, SB candidates, and walk targets.
+HR SCORING: Yard Score=HR prob, Boom=contact quality 0-99, Pitcher Grade (Target=easiest to Elite=hardest), Form (Moonshot=peak, Whiff=bad), zoneEdges=higher is better, weakSlot=pitcher historically weak at this batting order slot.
+WEATHER: hr_factor >110 = hitter friendly, <90 = pitcher friendly. Wind effect describes direction vs CF. Dome=weather irrelevant. Temp>78F helps HRs.
+K PROPS: high oppKPct (batter K%) + high swStr (pitcher SwStr%) = strong K matchup. Both >28%/14% is elite compound.
+SB PROPS: higher seasonSB = more prolific stealer. Slots 1-2 get most SB opportunities.
+WALK PROPS: high bbPct + low chase% + disciplined = walk candidate. Wild pitchers (high pitcher BB%) amplify.
 RESPONSE: Valid JSON only, no markdown.
 {"intro":"answer or setup","picks":[{"name":"","team":"","grade":"","betType":"","confidence":"High|Medium|Speculative","reasons":[""]}],"disclaimer":""}
 For non-pick questions: {"intro":"your full answer","picks":[],"disclaimer":""}`;
@@ -20278,7 +20370,15 @@ For non-pick questions: {"intro":"your full answer","picks":[],"disclaimer":""}`
       const slate=buildSlateSummary(), schedule=buildScheduleContext();
       let leaders=[];
       try{const lr=await fetch('/data/hr_leaderboard.json');if(lr.ok){const ld=await lr.json();leaders=(ld.batters||[]).sort((a,b)=>b.hrs-a.hrs).slice(0,30).map(r=>({name:r.name,team:r.team,hrs:r.hrs,laser105:r.laser105,moonshots:r.moonshots}));}}catch(e){}
-      const ctx='SCHEDULE ('+schedule.length+' games):\n'+JSON.stringify(schedule)+'\n\nHR LEADERS (top 30):\n'+JSON.stringify(leaders)+'\n\nSLATE (top '+slate.length+'):\n'+JSON.stringify(slate);
+      const weather=await buildWeatherContext();
+      const kPicks=buildKContext(), sbPicks=buildSBContext(), bbPicks=buildBBContext();
+      const ctx='SCHEDULE ('+schedule.length+' games):\n'+JSON.stringify(schedule)
+        +'\n\nHR LEADERS (top 30):\n'+JSON.stringify(leaders)
+        +'\n\nWEATHER (top games):\n'+JSON.stringify(weather)
+        +'\n\nK MATCHUPS:\n'+JSON.stringify(kPicks)
+        +'\n\nSB CANDIDATES:\n'+JSON.stringify(sbPicks)
+        +'\n\nWALK TARGETS:\n'+JSON.stringify(bbPicks)
+        +'\n\nHR SLATE (top '+slate.length+'):\n'+JSON.stringify(slate);
       const history=newMessages.slice(-6).map((m,i)=>({
         role:m.role,
         content:m.role==='user'?(i===0?ctx+'\n\nRequest: '+m.content:m.content):JSON.stringify(m.raw||m.content)
@@ -20835,6 +20935,232 @@ function SBPropsTab() {
   );
 }
 
+// ── WalksTab ──────────────────────────────────────────────────────────────────
+function WalksTab() {
+  const mono = "'DM Mono',monospace";
+  const osw  = "'Oswald',sans-serif";
+  const [rows,        setRows]        = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [sortCol,     setSortCol]     = useState('bbScore');
+  const [sortDir,     setSortDir]     = useState('desc');
+  const [minBBPct,    setMinBBPct]    = useState(0);
+  const [minPBBPct,   setMinPBBPct]   = useState(0);
+  const [wildOnly,    setWildOnly]    = useState(false);
+  const [confirmedOnly,setConfirmedOnly]= useState(false);
+  const [selGame,     setSelGame]     = useState('all');
+  const [searchQ,     setSearchQ]     = useState('');
+
+  useEffect(() => {
+    fetch('/data/pitcher_splits.json').then(r => r.ok ? r.json() : {}).then(pSplits => {
+      const picks = Object.values(DAILY_PICKS_CACHE);
+      if (!picks.length) { setLoading(false); return; }
+
+      const seen  = new Set();
+      const built = [];
+
+      picks.forEach(dp => {
+        const bid = String(dp.batter_id || '').split('.')[0];
+        if (!bid || seen.has(bid)) return;
+        seen.add(bid);
+
+        const pid = String(dp.pitcher_id || '').split('.')[0];
+        const ps  = pSplits[pid]?.splits?.season?.overall || {};
+
+        // Batter walk signals — all from DAILY_PICKS_CACHE
+        const batBBPct    = parseFloat(dp.season_bb_pct)    || 0;
+        const recentBBPct = parseFloat(dp.recent_bb_pct)    || 0;
+        const discScore   = parseFloat(dp.discipline_score) || 0;
+        const ozSwing     = parseFloat(dp.oz_swing_pct)     || 100;
+        const simBB       = parseFloat(dp.sim_bb)           || 0;
+        const bvpAhead    = parseFloat(dp.bvp_batter_ahead_pct) || 0;
+
+        // Pitcher walk signals — from pitcher_splits.json
+        const pitBBPct    = parseFloat(ps.bb_pct)       || 0;
+        const meatball    = parseFloat(ps.meatball_pct) || 0;
+        const bbAllowed   = parseInt(ps.bb_allowed)     || 0;
+        const bf          = parseInt(ps.bf)             || 1;
+
+        // BB Score (0–100)
+        const batNorm   = Math.min(batBBPct / 20, 1);    // 20% BB = max batter contribution
+        const pitNorm   = Math.min(pitBBPct / 15, 1);    // 15% BB allowed = max pitcher contrib
+        const discNorm  = discScore / 100;
+        let bbScore = (batNorm * 40) + (pitNorm * 35) + (discNorm * 25);
+
+        // Multipliers
+        if (ozSwing < 22)         bbScore *= 1.20;  // very patient
+        if (meatball > 12)        bbScore *= 1.15;  // command issues
+        if (bvpAhead > 38)        bbScore *= 1.10;  // dominates counts vs this pitcher
+        if (recentBBPct > batBBPct * 1.25) bbScore *= 1.08; // trending more patient
+        bbScore = Math.min(99, Math.round(bbScore));
+
+        // BB Grade
+        let bbGrade = 'BD';
+        if (batBBPct >= 12 && pitBBPct >= 10) bbGrade = 'BE';   // BB Elite
+        else if (batBBPct >= 10 || pitBBPct >= 10) bbGrade = 'BH'; // BB High
+        else if (batBBPct >= 8  || pitBBPct >= 8)  bbGrade = 'BA'; // BB Avg
+        const isWild = pitBBPct >= 10;
+
+        const confirmed  = LINEUP_STATUS[bid]?.status === 'confirmed';
+        const slot        = parseInt(dp.lineup_slot) || 0;
+        const gid         = String(dp._gid || dp.game_id || '');
+
+        built.push({
+          batterId:    bid,
+          batterName:  dp.batter       || '',
+          batterTeam:  dp.batting_team || '',
+          pitcherId:   pid,
+          pitcherName: dp.pitcher      || '',
+          pitcherHand: dp.pitcher_hand || '',
+          pitcherTeam: dp.pitcher_team || '',
+          gameId: gid, gameTime: dp.game_time || '',
+          lineupSlot: slot, confirmed,
+          batBBPct, recentBBPct, discScore, ozSwing, simBB,
+          pitBBPct, meatball, bbScore, bbGrade, isWild,
+        });
+      });
+
+      setRows(built);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  const gradeColor = g => g==='BE'?'#27c97a':g==='BH'?'#38b8f2':g==='BA'?'#f5a623':'var(--muted)';
+  const gradeLabel = g => g==='BE'?'🚶 Elite':g==='BH'?'💧 High':g==='BA'?'~ Avg':'🔴 Low';
+
+  // Game dropdown — sorted earliest first
+  const games = useMemo(() => {
+    const seen = new Set(); const out = [];
+    const toMins = t => { try { const m=String(t).trim().match(/(\d+):(\d+)\s*(AM|PM)/i); if(!m) return 9999; let h=parseInt(m[1]),mn=parseInt(m[2]); if(m[3].toUpperCase()==='PM'&&h!==12)h+=12; if(m[3].toUpperCase()==='AM'&&h===12)h=0; return h*60+mn; } catch{ return 9999; } };
+    rows.forEach(r => {
+      if (r.gameId && !seen.has(r.gameId)) {
+        seen.add(r.gameId);
+        const label = r.gameTime ? `${r.batterTeam} vs ${r.pitcherTeam} \u00b7 ${r.gameTime}` : `${r.batterTeam} vs ${r.pitcherTeam}`;
+        out.push({ id: r.gameId, label, time: r.gameTime || '' });
+      }
+    });
+    out.sort((a,b) => toMins(a.time) - toMins(b.time));
+    return out;
+  }, [rows]);
+
+  const filtered = rows.filter(r =>
+    (selGame === 'all' || r.gameId === selGame) &&
+    (!searchQ || r.batterName.toLowerCase().includes(searchQ.toLowerCase()) || r.batterTeam.toLowerCase().includes(searchQ.toLowerCase()) || r.pitcherName.toLowerCase().includes(searchQ.toLowerCase())) &&
+    r.batBBPct  >= minBBPct &&
+    r.pitBBPct  >= minPBBPct &&
+    (!wildOnly       || r.isWild) &&
+    (!confirmedOnly  || r.confirmed)
+  );
+
+  const sorted = [...filtered].sort((a,b) => {
+    const v = r => r[sortCol] ?? 0;
+    return sortDir==='desc' ? v(b)-v(a) : v(a)-v(b);
+  });
+
+  const hs  = col => { if (sortCol===col) setSortDir(d=>d==='desc'?'asc':'desc'); else { setSortCol(col); setSortDir('desc'); } };
+  const thS = col => ({ cursor:'pointer', userSelect:'none', color:sortCol===col?'var(--accent)':'var(--muted)', fontFamily:mono, fontSize:10, whiteSpace:'nowrap' });
+  const stickyTh = col => ({ ...thS(col), position:'sticky', left:0, zIndex:21, background:'var(--surface2)' });
+  const stickyTd = { position:'sticky', left:0, zIndex:5, background:'var(--surface)', minWidth:210 };
+
+  return (
+    <div>
+      {/* Filters */}
+      <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:9,padding:'10px 14px',marginBottom:10}}>
+        {/* Row 0: search + game dropdown */}
+        <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center',marginBottom:8}}>
+          <input value={searchQ} onChange={e=>setSearchQ(e.target.value)} placeholder="Search batter, pitcher or team…"
+            style={{fontFamily:mono,fontSize:10,padding:'3px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',width:190}}/>
+          <select value={selGame} onChange={e=>setSelGame(e.target.value)}
+            style={{fontFamily:mono,fontSize:10,padding:'3px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',cursor:'pointer'}}>
+            <option value="all">All Games</option>
+            {games.map(g=><option key={g.id} value={g.id}>{g.label}</option>)}
+          </select>
+        </div>
+        {/* Row 1: batter BB% + confirmed */}
+        <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center',marginBottom:8}}>
+          <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)',textTransform:'uppercase',letterSpacing:1}}>Batter BB%:</span>
+          {[0,7,10,12,15].map(v=>(
+            <button key={v} className={`chip ${minBBPct===v?'active':''}`} onClick={()=>setMinBBPct(v)} style={{fontFamily:mono,fontSize:10}}>{v===0?'All':v+'%+'}</button>
+          ))}
+          <button className={`chip ${confirmedOnly?'active':''}`} onClick={()=>setConfirmedOnly(v=>!v)} style={{marginLeft:8,fontFamily:mono,fontSize:10,color:confirmedOnly?'white':'#27c97a'}}>
+            ✅ Confirmed Only
+          </button>
+        </div>
+        {/* Row 2: pitcher BB% + wild toggle */}
+        <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
+          <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)',textTransform:'uppercase',letterSpacing:1}}>Pitcher BB%:</span>
+          {[0,6,8,10,12].map(v=>(
+            <button key={v} className={`chip ${minPBBPct===v?'active':''}`} onClick={()=>setMinPBBPct(v)} style={{fontFamily:mono,fontSize:10}}>{v===0?'All':v+'%+'}</button>
+          ))}
+          <button className={`chip ${wildOnly?'active':''}`} onClick={()=>setWildOnly(v=>!v)} style={{marginLeft:8,fontFamily:mono,fontSize:10,color:wildOnly?'white':'var(--accent)'}}>
+            💧 Wild Pitchers Only
+          </button>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="lw"><div className="sp"/><div className="lt">Loading Walks…</div></div>
+      ) : sorted.length === 0 ? (
+        <div style={{padding:20,textAlign:'center',color:'var(--muted)',fontFamily:mono,fontSize:12}}>No matchups match current filters</div>
+      ) : (
+        <div className="tw-scroll"><div className="tw-scroll-inner"><table><thead><tr>
+          <th className="sticky-batter" style={stickyTh('batterName')} onClick={()=>hs('batterName')}>Batter</th>
+          <th style={thS('bbGrade')}   onClick={()=>hs('bbGrade')}>BB Grade</th>
+          <th style={thS('batBBPct')}  onClick={()=>hs('batBBPct')}>Batter BB%</th>
+          <th style={thS('recentBBPct')} onClick={()=>hs('recentBBPct')}>L7 BB%</th>
+          <th style={thS('ozSwing')}   onClick={()=>hs('ozSwing')}>Chase%</th>
+          <th style={thS('discScore')} onClick={()=>hs('discScore')}>Disc.</th>
+          <th style={thS('pitBBPct')}  onClick={()=>hs('pitBBPct')}>Pitcher BB%</th>
+          <th style={thS('meatball')}  onClick={()=>hs('meatball')}>Meat%</th>
+          <th style={thS('simBB')}     onClick={()=>hs('simBB')}>Sim BB</th>
+          <th style={thS('bbScore')}   onClick={()=>hs('bbScore')}>BB Score</th>
+        </tr></thead><tbody>
+          {sorted.map(r => (
+            <tr key={r.batterId} style={{borderBottom:'1px solid var(--border)'}}>
+              <td className="sticky-batter" style={stickyTd}>
+                <div style={{display:'flex',alignItems:'center',gap:6}}>
+                  <PlayerAvatar pid={r.batterId} name={r.batterName} size={28}/>
+                  <div style={{minWidth:0}}>
+                    <div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}>
+                      <span style={{fontFamily:osw,fontWeight:700,fontSize:12,cursor:'pointer',color:'var(--text)'}}
+                        onClick={()=>openAtBatSlide({pid:parseInt(r.batterId)||0,name:r.batterName,team:r.batterTeam})}>
+                        {r.batterName}
+                      </span>
+                      {r.confirmed && <span title="Confirmed in today's lineup" style={{fontSize:9,lineHeight:1}}>✅</span>}
+                      <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}>
+                        <PickButton pid={parseInt(r.batterId)||0} name={r.batterName} team={r.batterTeam}/>
+                      </span>
+                    </div>
+                    <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>
+                      {r.batterTeam} vs{' '}
+                      <span style={{cursor:'pointer',color:'var(--accent)'}}
+                        onClick={()=>openPitcherSlide({pid:parseInt(r.pitcherId)||0,name:r.pitcherName,team:r.pitcherTeam,hand:r.pitcherHand,pitchMix:[]})}>
+                        {r.pitcherName}
+                      </span>
+                      {' '}&middot; {r.gameTime}
+                    </div>
+                  </div>
+                </div>
+              </td>
+              <td><span style={{fontFamily:mono,fontSize:10,fontWeight:700,color:gradeColor(r.bbGrade)}}>{gradeLabel(r.bbGrade)}</span></td>
+              <td style={{fontFamily:mono,fontSize:11,textAlign:'right',color:r.batBBPct>=12?'#27c97a':r.batBBPct>=9?'#38b8f2':'var(--text)'}}>{r.batBBPct>0?r.batBBPct.toFixed(1)+'%':'—'}</td>
+              <td style={{fontFamily:mono,fontSize:11,textAlign:'right',color:r.recentBBPct>r.batBBPct*1.2?'#27c97a':'var(--muted)'}}>{r.recentBBPct>0?r.recentBBPct.toFixed(1)+'%':'—'}</td>
+              <td style={{fontFamily:mono,fontSize:11,textAlign:'right',color:r.ozSwing<22?'#27c97a':r.ozSwing>30?'#ff4020':'var(--text)'}}>{r.ozSwing<100?r.ozSwing.toFixed(1)+'%':'—'}</td>
+              <td style={{fontFamily:mono,fontSize:11,textAlign:'right',color:r.discScore>=70?'#27c97a':r.discScore>=50?'var(--text)':'var(--muted)'}}>{r.discScore>0?Math.round(r.discScore):'—'}</td>
+              <td style={{fontFamily:mono,fontSize:11,textAlign:'right',color:r.pitBBPct>=10?'#f5a623':r.pitBBPct>=8?'#38b8f2':'var(--muted)'}}>{r.pitBBPct>0?r.pitBBPct.toFixed(1)+'%':'—'}</td>
+              <td style={{fontFamily:mono,fontSize:11,textAlign:'right',color:r.meatball>=12?'#f5a623':'var(--muted)'}}>{r.meatball>0?r.meatball.toFixed(1)+'%':'—'}</td>
+              <td style={{fontFamily:mono,fontSize:11,textAlign:'right'}}>{r.simBB>0?r.simBB.toFixed(2):'—'}</td>
+              <td><span style={{fontFamily:mono,fontSize:11,fontWeight:700,color:r.bbScore>=65?'#27c97a':r.bbScore>=45?'#38b8f2':'var(--muted)'}}>{r.bbScore}</span></td>
+            </tr>
+          ))}
+        </tbody></table></div></div>
+      )}
+      <div style={{marginTop:8,fontFamily:mono,fontSize:9,color:'var(--muted)',textAlign:'right'}}>
+        {sorted.length} batters &middot; discipline + pitcher BB% &middot; daily_picks.csv + pitcher_splits.json
+      </div>
+    </div>
+  );
+}
+
 function MatchupEngineTab() {
   const [subTab, setSubTab]        = useState('matchups');
   // Expose setSubTab globally so HomeTab's "→ All Matchups" button can deep-link
@@ -21187,6 +21513,7 @@ function MatchupEngineTab() {
         <button style={stBtn('history')}   onClick={()=>setSubTab('history')}>📜 BvP History</button>
         <button style={stBtn('kprops')}    onClick={()=>setSubTab('kprops')}>⚡ Strikeouts</button>
         <button style={stBtn('sbprops')}   onClick={()=>setSubTab('sbprops')}>🏃 Stolen Bases</button>
+        <button style={stBtn('walks')}     onClick={()=>setSubTab('walks')}>🚶 Walks</button>
         <HelpBtn onClick={()=>setShowKMHelp(v=>!v)}/>
       </div>
     </div>
@@ -21284,6 +21611,7 @@ function MatchupEngineTab() {
 
     {subTab==='kprops'  && <KPropsTab/>}
     {subTab==='sbprops' && <SBPropsTab/>}
+    {subTab==='walks'   && <WalksTab/>}
 
     {/* Matchups content (hidden when on other tabs) */}
     {subTab==='matchups' && <>
