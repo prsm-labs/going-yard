@@ -13443,6 +13443,7 @@ function SimLabView({ data }) {
   const [lineupOnly, setLineupOnly]   = useState(false);
   const [slBatterHand, setSlBatterHand]   = useState('ALL');
   const [weakSpotOnly, setWeakSpotOnly] = useState(false);
+  const sigCache       = useRef({}); // caches _trackerSig per batter_id after first render
   // Sync to module-level so CheatSheetTab can read without prop drilling
   const syncSigCache = React.useCallback(() => {
     Object.assign(SIG_CACHE_GLOBAL, sigCache.current);
