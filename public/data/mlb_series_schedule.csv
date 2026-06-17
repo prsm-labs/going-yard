@@ -3,7 +3,7 @@ Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitc
 2026-06-17,01:05 PM,WSH,KC,641793.0,679883.0,822721,3309,Nationals Park,Wednesday,Wed,3,3,Finale,~ Neutral
 2026-06-17,01:05 PM,PHI,MIA,691725.0,645261.0,823450,2681,Citizens Bank Park,Wednesday,Wed,3,3,Finale,~ Neutral
 2026-06-17,02:10 PM,HOU,DET,663567.0,663554.0,824178,2392,Daikin Park,Wednesday,Wed,3,3,Finale,~ Neutral
-2026-06-17,02:15 PM,STL,SD,681517.0,,823044,2889,Busch Stadium,Wednesday,Wed,3,3,Finale,~ Neutral
+2026-06-17,02:15 PM,STL,SD,681517.0,699134.0,823044,2889,Busch Stadium,Wednesday,Wed,3,3,Finale,~ Neutral
 2026-06-17,03:10 PM,LAD,TB,660271.0,663556.0,823940,22,UNIQLO Field at Dodger Stadium,Wednesday,Wed,3,3,Finale,~ Neutral
 2026-06-17,03:40 PM,AZ,LAA,593958.0,691951.0,825072,15,Chase Field,Wednesday,Wed,3,3,Finale,~ Neutral
 2026-06-17,06:45 PM,BOS,TOR,687562.0,453286.0,824746,3,Fenway Park,Wednesday,Wed,2,3,Middle,~ Neutral
@@ -17,8 +17,8 @@ Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitc
 2026-06-18,02:10 PM,MIL,CLE,675660.0,800048.0,823772,32,American Family Field,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
 2026-06-18,02:35 PM,TEX,MIN,683004.0,657746.0,822889,5325,Globe Life Field,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
 2026-06-18,04:10 PM,SEA,BAL,693433.0,669358.0,823125,680,T-Mobile Park,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
-2026-06-18,06:40 PM,PHI,NYM,,640455.0,823448,2681,Citizens Bank Park,Thursday,Thu,1,3,Opener,✅ Best Day (getaway)
+2026-06-18,06:40 PM,PHI,NYM,605400.0,640455.0,823448,2681,Citizens Bank Park,Thursday,Thu,1,3,Opener,✅ Best Day (getaway)
 2026-06-18,07:05 PM,NYY,CWS,677960.0,680732.0,823533,3313,Yankee Stadium,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
 2026-06-18,07:15 PM,ATL,SF,527048.0,694738.0,824911,4705,Truist Park,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
-2026-06-18,07:40 PM,KC,STL,,669461.0,824098,7,Kauffman Stadium,Thursday,Thu,1,3,Opener,✅ Best Day (getaway)
+2026-06-18,07:40 PM,KC,STL,702070.0,669461.0,824098,7,Kauffman Stadium,Thursday,Thu,1,3,Opener,✅ Best Day (getaway)
 2026-06-18,09:40 PM,ATH,LAA,,,824989,2529,Sutter Health Park,Thursday,Thu,1,4,Opener,✅ Best Day (getaway)
