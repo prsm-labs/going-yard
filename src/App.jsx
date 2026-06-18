@@ -14086,7 +14086,7 @@ function SimLabView({ data }) {
               const esc = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
               const headers = ['Grade','Pitcher Grade','Gone Yard','Is Key Matchup','Team','Batter','Hand','P.Hand','vs Pitcher',
                 'Top Pitches','Game Time','Lineup Slot','In Weak Slot','Pitcher Weak Slots',
-                'Yard Score','⚡ Sig','💥 Boom','Form Class','gHR','ISO','Zone Fit','xwOBA','wOBA','SwStr%',
+                'Yard Score','⚡ Sig','💥 Boom','Form Class','gHR','ISO','Zone Fit','HR Upside','Zone Edges','xwOBA','wOBA','SwStr%',
                 'Flags','Recent EV','Recent Barrel%',
                 'Recent FB%','Recent LA','BvP EV','BvP Barrel%','BvP FB%','BvP LA',
                 'Sim H','Sim 2B','Sim BB','Sim K','Sim TB','Sim RBI',
@@ -14119,6 +14119,8 @@ function SimLabView({ data }) {
                   b.gHR ?? '',
                   b.recent_iso ? parseFloat(b.recent_iso).toFixed(3) : '',
                   b.zone_fit        ? parseFloat(b.zone_fit).toFixed(1)        : '',
+                  (()=>{const u=computeHRUpside(b);return u.label==='BELOW AVG'?'LOW':u.label==='STRONG'?'STR':u.label;})(),
+                  parseInt(b._zoneEdges||DAILY_PICKS_CACHE[String(parseInt(b.batter_id)||0)]?._zoneEdges||0) || '',
                   b.season_xwoba    ? parseFloat(b.season_xwoba).toFixed(3)    : '',
                   b.season_woba     ? parseFloat(b.season_woba).toFixed(3)     : '',
                   b.season_swstr_pct? parseFloat(b.season_swstr_pct).toFixed(1): '',
