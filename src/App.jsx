@@ -21185,6 +21185,171 @@ function WalksTab() {
   );
 }
 
+// ── PitchersToAttackTab ───────────────────────────────────────────────────────
+function PitchersToAttackTab() {
+  const mono = "'DM Mono',monospace";
+  const osw  = "'Oswald',sans-serif";
+  const [rows,      setRows]      = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [batHand,   setBatHand]   = useState('L');   // 'L' (vs LHB) | 'R' (vs RHB)
+  const [sortCol,   setSortCol]   = useState('hrPer9');
+  const [sortDir,   setSortDir]   = useState('desc');
+  const [minBF,     setMinBF]     = useState(15);
+  const [searchQ,   setSearchQ]   = useState('');
+  const [todayOnly, setTodayOnly] = useState(false);
+
+  useEffect(() => {
+    fetch('/data/pitcher_splits.json').then(r => r.ok ? r.json() : {}).then(pSplits => {
+      const todayPitcherIds = new Set(
+        Object.values(DAILY_PICKS_CACHE).map(dp => String(dp.pitcher_id || '').split('.')[0]).filter(Boolean)
+      );
+      const todayMap = {};
+      Object.values(DAILY_PICKS_CACHE).forEach(dp => {
+        const pid = String(dp.pitcher_id || '').split('.')[0];
+        if (pid && !todayMap[pid]) {
+          todayMap[pid] = { vs: dp.batting_team || '', gameTime: dp.game_time || '' };
+        }
+      });
+
+      const splitKey = batHand === 'L' ? 'vsLHB' : 'vsRHB';
+      const built = [];
+
+      Object.entries(pSplits).forEach(([pid, p]) => {
+        const win = p?.splits?.L30?.[splitKey];
+        if (!win || !win.bf) return;
+
+        const bf       = parseInt(win.bf)              || 0;
+        const hrAllow  = parseInt(win.hr_allowed)       || 0;
+        const brlPct   = parseFloat(win.brl_pct_allowed)|| 0;
+        const hhPct    = parseFloat(win.hh_pct_allowed) || 0;
+        const fbPct    = parseFloat(win.fb_pct_allowed) || 0;
+
+        // Derived metrics
+        const abPerHR  = hrAllow > 0 ? bf / hrAllow : 0;
+        const hrPer9   = bf > 0 ? (hrAllow / (bf / 4.3)) * 9 / 4.3 : 0; // bf→innings proxy (~4.3 BF/inning)
+        const fbCount  = bf * (fbPct / 100);
+        const hrPerFB  = fbCount > 0 ? (hrAllow / fbCount) * 100 : 0;
+
+        const today = todayMap[pid];
+
+        built.push({
+          pitcherId:   pid,
+          pitcherName: p.name || pid,
+          pitcherTeam: p.team || '',
+          pitcherHand: p.hand || '',
+          pitcherRole: p.role || '',
+          vsToday:     today?.vs || '',
+          gameTime:    today?.gameTime || '',
+          isToday:     !!today,
+          bf, hrAllow, brlPct, hhPct, fbPct, abPerHR, hrPer9, hrPerFB,
+        });
+      });
+
+      setRows(built);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, [batHand]);
+
+  const filtered = rows.filter(r =>
+    r.bf >= minBF &&
+    (!todayOnly || r.isToday) &&
+    (!searchQ || r.pitcherName.toLowerCase().includes(searchQ.toLowerCase()) || r.pitcherTeam.toLowerCase().includes(searchQ.toLowerCase()))
+  );
+
+  const sorted = [...filtered].sort((a, b) => {
+    const v = r => r[sortCol] ?? 0;
+    return sortDir === 'desc' ? v(b) - v(a) : v(a) - v(b);
+  });
+
+  const hs  = col => { if (sortCol === col) setSortDir(d => d === 'desc' ? 'asc' : 'desc'); else { setSortCol(col); setSortDir('desc'); } };
+  const thS = col => ({ cursor:'pointer', userSelect:'none', color: sortCol===col ? 'var(--accent)' : 'var(--muted)', fontFamily:mono, fontSize:10, whiteSpace:'nowrap' });
+  const stickyTh = { ...thS('pitcherName'), position:'sticky', left:0, zIndex:21, background:'var(--surface2)' };
+  const stickyTd = { position:'sticky', left:0, zIndex:5, background:'var(--surface)', minWidth:200 };
+
+  // Heat scale helpers — red=danger to pitcher (attack him), green=safe for pitcher
+  const heatHR9   = v => v>=1.8?'#ff4020':v>=1.3?'#f5a623':v>=0.8?'#fbbf24':'#27c97a';
+  const heatBrl    = v => v>=12?'#ff4020':v>=8?'#f5a623':v>=5?'#fbbf24':'#27c97a';
+  const heatHH     = v => v>=45?'#ff4020':v>=38?'#f5a623':v>=32?'#fbbf24':'#27c97a';
+  const heatHRFB   = v => v>=20?'#ff4020':v>=14?'#f5a623':v>=8?'#fbbf24':'#27c97a';
+  const heatFB     = v => v>=30?'#f5a623':v>=22?'#fbbf24':'var(--text)';
+
+  return (
+    <div>
+      {/* Filters */}
+      <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:9,padding:'10px 14px',marginBottom:10}}>
+        <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center',marginBottom:8}}>
+          <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)',textTransform:'uppercase',letterSpacing:1}}>Vs Batter Hand:</span>
+          {[['L','vs LHB'],['R','vs RHB']].map(([v,l])=>(
+            <button key={v} className={`chip ${batHand===v?'active':''}`} onClick={()=>setBatHand(v)} style={{fontFamily:mono,fontSize:10}}>{l}</button>
+          ))}
+          <input value={searchQ} onChange={e=>setSearchQ(e.target.value)} placeholder="Search pitcher or team…"
+            style={{marginLeft:8,fontFamily:mono,fontSize:10,padding:'3px 8px',borderRadius:6,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',width:170}}/>
+        </div>
+        <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
+          <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)',textTransform:'uppercase',letterSpacing:1}}>Min BF (L30):</span>
+          {[10,15,25,40].map(v=>(
+            <button key={v} className={`chip ${minBF===v?'active':''}`} onClick={()=>setMinBF(v)} style={{fontFamily:mono,fontSize:10}}>{v}+</button>
+          ))}
+          <button className={`chip ${todayOnly?'active':''}`} onClick={()=>setTodayOnly(v=>!v)} style={{marginLeft:8,fontFamily:mono,fontSize:10,color:todayOnly?'white':'#27c97a'}}>
+            📅 Pitching Today Only
+          </button>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="lw"><div className="sp"/><div className="lt">Loading Pitchers to Attack…</div></div>
+      ) : sorted.length === 0 ? (
+        <div style={{padding:20,textAlign:'center',color:'var(--muted)',fontFamily:mono,fontSize:12}}>No pitchers match current filters</div>
+      ) : (
+        <div className="tw-scroll"><div className="tw-scroll-inner"><table><thead><tr>
+          <th className="sticky-batter" style={stickyTh} onClick={()=>hs('pitcherName')}>Pitcher</th>
+          <th style={thS('bf')}      onClick={()=>hs('bf')}>BF (L30)</th>
+          <th style={thS('hrAllow')} onClick={()=>hs('hrAllow')}>HR</th>
+          <th style={thS('abPerHR')} onClick={()=>hs('abPerHR')}>BF/HR</th>
+          <th style={thS('hrPer9')}  onClick={()=>hs('hrPer9')}>HR/9</th>
+          <th style={thS('brlPct')}  onClick={()=>hs('brlPct')}>Barrel%</th>
+          <th style={thS('hhPct')}   onClick={()=>hs('hhPct')}>Hard Hit%</th>
+          <th style={thS('hrPerFB')} onClick={()=>hs('hrPerFB')}>HR/FB%</th>
+          <th style={thS('fbPct')}   onClick={()=>hs('fbPct')}>FB%</th>
+        </tr></thead><tbody>
+          {sorted.map(r => (
+            <tr key={r.pitcherId} style={{borderBottom:'1px solid var(--border)'}}>
+              <td className="sticky-batter" style={stickyTd}>
+                <div style={{display:'flex',alignItems:'center',gap:6}}>
+                  <PlayerAvatar pid={r.pitcherId} name={r.pitcherName} size={28}/>
+                  <div style={{minWidth:0}}>
+                    <div style={{display:'flex',alignItems:'center',gap:5}}>
+                      <span style={{fontFamily:osw,fontWeight:700,fontSize:12,cursor:'pointer',color:'var(--text)'}}
+                        onClick={()=>openPitcherSlide({pid:parseInt(r.pitcherId)||0,name:r.pitcherName,team:r.pitcherTeam,hand:r.pitcherHand,pitchMix:[]})}>
+                        {r.pitcherName}
+                      </span>
+                      {r.isToday && <span title="Pitching today" style={{fontSize:9,lineHeight:1}}>📅</span>}
+                    </div>
+                    <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>
+                      {r.pitcherHand==='L'?'LHP':'RHP'} · {r.pitcherTeam}{r.isToday ? ` vs ${r.vsToday} · ${r.gameTime}` : ''}
+                    </div>
+                  </div>
+                </div>
+              </td>
+              <td style={{fontFamily:mono,fontSize:11,textAlign:'right'}}>{r.bf}</td>
+              <td style={{fontFamily:osw,fontWeight:800,fontSize:12,textAlign:'right',color:r.hrAllow>=8?'#ff4020':r.hrAllow>=4?'#f5a623':'var(--muted)'}}>{r.hrAllow}</td>
+              <td style={{fontFamily:mono,fontSize:11,textAlign:'right'}}>{r.abPerHR>0?r.abPerHR.toFixed(1):'—'}</td>
+              <td style={{fontFamily:mono,fontSize:11,fontWeight:700,textAlign:'right',color:heatHR9(r.hrPer9)}}>{r.hrPer9>0?r.hrPer9.toFixed(2):'—'}</td>
+              <td style={{fontFamily:mono,fontSize:11,textAlign:'right',color:heatBrl(r.brlPct)}}>{r.brlPct>0?r.brlPct.toFixed(1)+'%':'—'}</td>
+              <td style={{fontFamily:mono,fontSize:11,textAlign:'right',color:heatHH(r.hhPct)}}>{r.hhPct>0?r.hhPct.toFixed(1)+'%':'—'}</td>
+              <td style={{fontFamily:mono,fontSize:11,textAlign:'right',color:heatHRFB(r.hrPerFB)}}>{r.hrPerFB>0?r.hrPerFB.toFixed(1)+'%':'—'}</td>
+              <td style={{fontFamily:mono,fontSize:11,textAlign:'right',color:heatFB(r.fbPct)}}>{r.fbPct>0?r.fbPct.toFixed(1)+'%':'—'}</td>
+            </tr>
+          ))}
+        </tbody></table></div></div>
+      )}
+      <div style={{marginTop:8,fontFamily:mono,fontSize:9,color:'var(--muted)',textAlign:'right'}}>
+        {sorted.length} pitchers &middot; L30 rolling window &middot; pitcher_splits.json
+      </div>
+    </div>
+  );
+}
+
 function MatchupEngineTab() {
   const [subTab, setSubTab]        = useState('matchups');
   // Expose setSubTab globally so HomeTab's "→ All Matchups" button can deep-link
@@ -21538,6 +21703,7 @@ function MatchupEngineTab() {
         <button style={stBtn('kprops')}    onClick={()=>setSubTab('kprops')}>⚡ Strikeouts</button>
         <button style={stBtn('sbprops')}   onClick={()=>setSubTab('sbprops')}>🏃 Stolen Bases</button>
         <button style={stBtn('walks')}     onClick={()=>setSubTab('walks')}>🚶 Walks</button>
+        <button style={stBtn('attack')}    onClick={()=>setSubTab('attack')}>🎯 Pitchers to Attack</button>
         <HelpBtn onClick={()=>setShowKMHelp(v=>!v)}/>
       </div>
     </div>
@@ -21636,6 +21802,7 @@ function MatchupEngineTab() {
     {subTab==='kprops'  && <KPropsTab/>}
     {subTab==='sbprops' && <SBPropsTab/>}
     {subTab==='walks'   && <WalksTab/>}
+    {subTab==='attack'  && <PitchersToAttackTab/>}
 
     {/* Matchups content (hidden when on other tabs) */}
     {subTab==='matchups' && <>
