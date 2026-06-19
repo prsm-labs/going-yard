@@ -21689,21 +21689,24 @@ function MatchupEngineTab() {
       ['Legend', "A+ = 6–8 flags (highest HR rate) · A = 4–5 · B = 2–3 · C = 1 · D = 0 flags."],
     ]} onClose={()=>setShowKMHelp(false)}/>}
     <div style={{display:'flex',flexDirection:'column',gap:4,marginBottom:14}}>
-      {/* Row 1: main scoring tabs */}
+      {/* Row 1: matchup boards */}
       <div style={{display:'flex',gap:4,flexWrap:'wrap',justifyContent:'center'}}>
         <button style={stBtn('matchups')}   onClick={()=>setSubTab('matchups')}>⚡ Key Matchups</button>
         <button style={stBtn('allmatches')} data-subtab="allmatches" onClick={()=>setSubTab('allmatches')}>📋 All Matchups</button>
         <button style={stBtn('longshot')}   onClick={()=>setSubTab('longshot')}>🎲 Long Shot</button>
+        <button style={stBtn('attack')}     onClick={()=>setSubTab('attack')}>🎯 Attack List</button>
       </div>
-      {/* Row 2: supporting tools */}
+      {/* Row 2: prop markets */}
+      <div style={{display:'flex',gap:4,flexWrap:'wrap',justifyContent:'center'}}>
+        <button style={stBtn('kprops')}    onClick={()=>setSubTab('kprops')}>⚡ Strikeouts</button>
+        <button style={stBtn('sbprops')}   onClick={()=>setSubTab('sbprops')}>🏃 Stolen Bases</button>
+        <button style={stBtn('walks')}     onClick={()=>setSubTab('walks')}>🚶 Walks</button>
+      </div>
+      {/* Row 3: reference / research */}
       <div style={{display:'flex',gap:4,flexWrap:'wrap',justifyContent:'center'}}>
         <button style={stBtn('batters')}   onClick={()=>setSubTab('batters')}>🧢 Batters</button>
         <button style={stBtn('pitchers')}  onClick={()=>setSubTab('pitchers')}>⚾ Pitchers</button>
         <button style={stBtn('history')}   onClick={()=>setSubTab('history')}>📜 BvP History</button>
-        <button style={stBtn('kprops')}    onClick={()=>setSubTab('kprops')}>⚡ Strikeouts</button>
-        <button style={stBtn('sbprops')}   onClick={()=>setSubTab('sbprops')}>🏃 Stolen Bases</button>
-        <button style={stBtn('walks')}     onClick={()=>setSubTab('walks')}>🚶 Walks</button>
-        <button style={stBtn('attack')}    onClick={()=>setSubTab('attack')}>🎯 Pitchers to Attack</button>
         <HelpBtn onClick={()=>setShowKMHelp(v=>!v)}/>
       </div>
     </div>
