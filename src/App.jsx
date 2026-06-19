@@ -21226,7 +21226,7 @@ function PitchersToAttackTab() {
 
         // Derived metrics
         const abPerHR  = hrAllow > 0 ? bf / hrAllow : 0;
-        const hrPer9   = bf > 0 ? (hrAllow / (bf / 4.3)) * 9 / 4.3 : 0; // bf→innings proxy (~4.3 BF/inning)
+        const hrPer9   = bf > 0 ? (hrAllow / (bf / 4.3)) * 9 : 0; // bf→innings proxy (~4.3 BF/inning)
         const fbCount  = bf * (fbPct / 100);
         const hrPerFB  = fbCount > 0 ? (hrAllow / fbCount) * 100 : 0;
 
