@@ -13708,11 +13708,11 @@ function SimLabView({ data }) {
         <CheatCodeButton
               onSauceFilter={(enable)=>{
                 if(enable){
-                  setMinSimTB('1.0');
+                  setMinSimTB('0.7');
                   setSelPitcherGradesSim(new Set(['🎯 Target','💥 Hittable','🤔 Average']));
                   setMinSig('4');
                   setSimActiveOnly(true);
-                  setMinL7EV('90');
+                  setMinL7EV('86');
                   setMinZoneFit('2');
                 } else {
                   setMinSimTB('');
