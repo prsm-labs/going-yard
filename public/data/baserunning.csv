@@ -536,7 +536,6 @@ player_id,name,team,stolen_bases,caught_stealing,sb_pct,sb_opportunities
 682634,Kevin Alcántara,CHC,0,1,0.0,0
 600869,Jeimer Candelario,LAA,0,0,0.0,0
 699013,Esmerlyn Valdez,PIT,0,0,0.0,0
-687282,Gabriel Rincones Jr.,PHI,0,0,0.0,0
 700246,Carson Williams,TB,0,0,0.0,0
 665561,Rafael Marchán,PHI,0,0,0.0,0
 660644,Vidal Bruján,NYM,0,1,0.0,0
@@ -550,6 +549,7 @@ player_id,name,team,stolen_bases,caught_stealing,sb_pct,sb_opportunities
 683766,Christian Koss,SF,0,0,0.0,0
 669221,Sean Murphy,ATL,0,0,0.0,0
 663967,César Salazar,HOU,0,0,0.0,0
+687282,Gabriel Rincones Jr.,PHI,0,0,0.0,0
 680718,Addison Barger,TOR,0,0,0.0,0
 677060,Chad Stevens,COL,0,0,0.0,0
 690925,Clayton Beeter,WSH,0,0,0.0,0
