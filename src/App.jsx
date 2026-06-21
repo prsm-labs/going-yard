@@ -3878,7 +3878,7 @@ async function loadTodayLineups() {
               // battingOrder from API is 100,200,...900 — divide by 100 for slot 1-9
               // Fallback to array index+1 if battingOrder missing
               const slot = p.battingOrder ? Math.round(p.battingOrder / 100) : (idx + 1);
-              const pos = p.position?.abbreviation || p.positionType || '';
+              const pos = p.primaryPosition?.abbreviation || p.positionType || '';
               LINEUP_STATUS[p.id] = { status: 'confirmed', team: teamAbbr, slot, pos };
             }
           });
