@@ -13504,13 +13504,6 @@ function SimLabView({ data }) {
   const [selPitcherGradesSim, setSelPitcherGradesSim] = useState(new Set()); // empty = All
   const [selBatterGradesSim,  setSelBatterGradesSim]  = useState(new Set()); // empty = All grades
   const [selPositionsSim,     setSelPositionsSim]      = useState(new Set()); // empty = All positions
-  const [posDropdownOpen,     setPosDropdownOpen]      = useState(false);
-  useEffect(() => {
-    if (!posDropdownOpen) return;
-    const handler = () => setPosDropdownOpen(false);
-    document.addEventListener('click', handler);
-    return () => document.removeEventListener('click', handler);
-  }, [posDropdownOpen]);
   const simPitcherGrades = useRef({}); // pitcher_id → grade label
 
   const pf = (v, d=1) => v != null && !isNaN(parseFloat(v)) ? parseFloat(v).toFixed(d) : null;
@@ -13899,48 +13892,28 @@ function SimLabView({ data }) {
                 </div>
               </div>
 
-              {/* Position filter — dropdown multi-select */}
-              <div style={{marginBottom:14,position:'relative'}}>
+              {/* Position filter — simple pill toggles */}
+              <div style={{marginBottom:14}}>
                 <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',textTransform:'uppercase',letterSpacing:1,marginBottom:6}}>Position</div>
-                <button onClick={()=>setPosDropdownOpen(o=>!o)}
-                  style={{padding:'6px 12px',borderRadius:7,cursor:'pointer',fontSize:10,
-                    fontFamily:"'DM Mono',monospace",fontWeight:selPositionsSim.size>0?700:400,
-                    border:`1px solid ${selPositionsSim.size>0?'var(--ice)':'var(--border)'}`,
-                    background:selPositionsSim.size>0?'rgba(56,184,242,.12)':'var(--surface2)',
-                    color:selPositionsSim.size>0?'var(--ice)':'var(--text)',
-                    display:'flex',alignItems:'center',gap:8,minWidth:160,justifyContent:'space-between'}}>
-                  <span>{selPositionsSim.size===0?'All Positions':[...selPositionsSim].join(', ')}</span>
-                  <span style={{opacity:.6,fontSize:9}}>{posDropdownOpen?'▲':'▼'}</span>
-                </button>
-                {posDropdownOpen && (
-                  <div onClick={e=>e.stopPropagation()}
-                    style={{position:'absolute',top:'100%',left:0,marginTop:4,zIndex:9999,
-                      background:'#0d1318',border:'1px solid var(--border)',borderRadius:8,padding:6,
-                      display:'flex',flexDirection:'column',gap:2,minWidth:160,
-                      boxShadow:'0 8px 28px rgba(0,0,0,.85)'}}>
-                    {['C','1B','2B','3B','SS','LF','CF','RF','DH'].map(pos=>{
-                      const active = selPositionsSim.has(pos);
-                      return (
-                        <label key={pos} style={{display:'flex',alignItems:'center',gap:8,padding:'5px 8px',
-                          borderRadius:5,cursor:'pointer',fontSize:11,fontFamily:"'DM Mono',monospace",
-                          color:active?'var(--ice)':'var(--text)',background:active?'rgba(56,184,242,.10)':'transparent'}}>
-                          <input type="checkbox" checked={active}
-                            onChange={()=>setSelPositionsSim(s=>{const n=new Set(s);n.has(pos)?n.delete(pos):n.add(pos);return n;})}
-                            style={{accentColor:'var(--ice)',cursor:'pointer'}}/>
-                          {pos}
-                        </label>
-                      );
-                    })}
-                    {selPositionsSim.size>0 && (
-                      <button onClick={()=>setSelPositionsSim(new Set())}
-                        style={{marginTop:4,padding:'5px 8px',borderRadius:5,cursor:'pointer',fontSize:10,
-                          fontFamily:"'DM Mono',monospace",color:'var(--accent)',background:'transparent',
-                          border:'1px solid var(--border)'}}>
-                        ✕ Clear
+                <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                  {['C','1B','2B','3B','SS','LF','CF','RF','DH'].map(pos=>{
+                    const active = selPositionsSim.has(pos);
+                    return (
+                      <button key={pos} onClick={()=>setSelPositionsSim(s=>{const n=new Set(s);n.has(pos)?n.delete(pos):n.add(pos);return n;})}
+                        style={{padding:'5px 11px',borderRadius:7,cursor:'pointer',fontSize:10,
+                          fontFamily:"'DM Mono',monospace",fontWeight:active?700:400,
+                          border:`1px solid ${active?'var(--ice)':'var(--border)'}`,
+                          background:active?'rgba(56,184,242,.18)':'transparent',
+                          color:active?'var(--ice)':'var(--muted)'}}>
+                        {pos}
                       </button>
-                    )}
-                  </div>
-                )}
+                    );
+                  })}
+                  {selPositionsSim.size>0 && <span onClick={()=>setSelPositionsSim(new Set())}
+                    style={{padding:'5px 11px',borderRadius:7,cursor:'pointer',fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--accent)',border:'1px solid var(--border)'}}>
+                    ✕ Clear
+                  </span>}
+                </div>
               </div>
 
               {/* HR Upside filter */}
