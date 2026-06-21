@@ -1,29 +1,29 @@
 Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitcher ID (Away),Game ID,Venue ID,Venue Name,Day of Week,Day Abbr,Series Game #,Games in Series,Series Position,Day Context
-2026-06-21,01:35 PM,NYY,CIN,695684.0,695505.0,823531,3313,Yankee Stadium,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-06-21,01:35 PM,ATL,MIL,693821.0,688107.0,824908,4705,Truist Park,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-06-21,01:40 PM,TB,WSH,607259.0,674841.0,822968,12,Tropicana Field,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-06-21,01:40 PM,DET,CWS,672456.0,663436.0,824260,2394,Comerica Park,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-06-21,01:40 PM,MIA,SF,687473.0,657277.0,823852,4169,loanDepot park,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-06-21,02:10 PM,HOU,CLE,678906.0,677944.0,824177,2392,Daikin Park,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-06-21,02:10 PM,KC,STL,663568.0,669160.0,824095,7,Kauffman Stadium,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-06-21,02:20 PM,CHC,TOR,684007.0,656302.0,824664,17,Wrigley Field,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-06-21,02:35 PM,TEX,SD,543135.0,,822883,5325,Globe Life Field,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-06-21,03:10 PM,COL,PIT,547179.0,683003.0,824343,19,Coors Field,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-06-21,03:15 PM,AZ,MIN,703615.0,702474.0,825067,15,Chase Field,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-06-21,04:05 PM,ATH,LAA,678022.0,672282.0,824987,2529,Sutter Health Park,Sunday,Sun,4,4,Finale,~ Neutral (check pitcher)
-2026-06-21,04:10 PM,LAD,BAL,686218.0,687064.0,823934,22,UNIQLO Field at Dodger Stadium,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-06-21,04:10 PM,SEA,BOS,669302.0,801139.0,823123,680,T-Mobile Park,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-06-21,07:20 PM,PHI,NYM,554430.0,656849.0,823449,2681,Citizens Bank Park,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-06-22,06:10 PM,DET,NYY,,543037.0,824261,2394,Comerica Park,Monday,Mon,1,3,Opener,~ Solid
-2026-06-22,06:40 PM,TB,KC,,,822964,12,Tropicana Field,Monday,Mon,1,4,Opener,~ Solid
-2026-06-22,06:40 PM,MIA,TEX,,,823851,4169,loanDepot park,Monday,Mon,1,3,Opener,~ Solid
-2026-06-22,06:45 PM,WSH,PHI,,,822720,3309,Nationals Park,Monday,Mon,1,4,Opener,~ Solid
-2026-06-22,07:07 PM,TOR,HOU,,,822800,14,Rogers Centre,Monday,Mon,1,3,Opener,~ Solid
-2026-06-22,07:10 PM,NYM,CHC,673540.0,,823613,3289,Citi Field,Monday,Mon,1,4,Opener,~ Solid
-2026-06-22,07:10 PM,CIN,MIL,663903.0,,824502,2602,Great American Ball Park,Monday,Mon,1,3,Opener,~ Solid
-2026-06-22,07:40 PM,MIN,LAD,,,823692,3312,Target Field,Monday,Mon,1,3,Opener,~ Solid
-2026-06-22,07:40 PM,CWS,CLE,641743.0,668909.0,824585,4,Rate Field,Monday,Mon,1,3,Opener,~ Solid
-2026-06-22,07:45 PM,STL,AZ,669467.0,,823040,2889,Busch Stadium,Monday,Mon,1,4,Opener,~ Solid
-2026-06-22,08:40 PM,COL,BOS,,,824344,19,Coors Field,Monday,Mon,1,3,Opener,~ Solid
-2026-06-22,09:38 PM,LAA,BAL,,,824016,1,Angel Stadium,Monday,Mon,1,3,Opener,~ Solid
-2026-06-22,10:10 PM,SD,ATL,,,823288,2680,Petco Park,Monday,Mon,1,3,Opener,~ Solid
+2026-06-21,01:35 PM,NYY,CIN,695684.0,695505.0,823531,3313,Yankee Stadium,Sunday,Sun,3.0,3.0,Finale,~ Neutral (check pitcher)
+2026-06-21,01:35 PM,ATL,MIL,693821.0,688107.0,824908,4705,Truist Park,Sunday,Sun,3.0,3.0,Finale,~ Neutral (check pitcher)
+2026-06-21,01:40 PM,TB,WSH,607259.0,674841.0,822968,12,Tropicana Field,Sunday,Sun,3.0,3.0,Finale,~ Neutral (check pitcher)
+2026-06-21,01:40 PM,DET,CWS,672456.0,663436.0,824260,2394,Comerica Park,Sunday,Sun,3.0,3.0,Finale,~ Neutral (check pitcher)
+2026-06-21,01:40 PM,MIA,SF,687473.0,657277.0,823852,4169,loanDepot park,Sunday,Sun,3.0,3.0,Finale,~ Neutral (check pitcher)
+2026-06-21,02:10 PM,HOU,CLE,678906.0,677944.0,824177,2392,Daikin Park,Sunday,Sun,3.0,3.0,Finale,~ Neutral (check pitcher)
+2026-06-21,02:10 PM,KC,STL,663568.0,669160.0,824095,7,Kauffman Stadium,Sunday,Sun,3.0,3.0,Finale,~ Neutral (check pitcher)
+2026-06-21,02:20 PM,CHC,TOR,684007.0,656302.0,824664,17,Wrigley Field,,,,,,
+2026-06-21,02:35 PM,TEX,SD,543135.0,593974.0,822883,5325,Globe Life Field,Sunday,Sun,3.0,3.0,Finale,~ Neutral (check pitcher)
+2026-06-21,03:10 PM,COL,PIT,547179.0,683003.0,824343,19,Coors Field,Sunday,Sun,3.0,3.0,Finale,~ Neutral (check pitcher)
+2026-06-21,03:15 PM,AZ,MIN,703615.0,702474.0,825067,15,Chase Field,Sunday,Sun,3.0,3.0,Finale,~ Neutral (check pitcher)
+2026-06-21,04:05 PM,ATH,LAA,678022.0,672282.0,824987,2529,Sutter Health Park,Sunday,Sun,4.0,4.0,Finale,~ Neutral (check pitcher)
+2026-06-21,04:10 PM,LAD,BAL,686218.0,687064.0,823934,22,UNIQLO Field at Dodger Stadium,Sunday,Sun,3.0,3.0,Finale,~ Neutral (check pitcher)
+2026-06-21,04:10 PM,SEA,BOS,669302.0,801139.0,823123,680,T-Mobile Park,Sunday,Sun,3.0,3.0,Finale,~ Neutral (check pitcher)
+2026-06-21,07:20 PM,PHI,NYM,554430.0,656849.0,823449,2681,Citizens Bank Park,Sunday,Sun,3.0,3.0,Finale,~ Neutral (check pitcher)
+2026-06-22,06:10 PM,DET,NYY,,543037.0,824261,2394,Comerica Park,Monday,Mon,1.0,3.0,Opener,~ Solid
+2026-06-22,06:40 PM,TB,KC,,,822964,12,Tropicana Field,Monday,Mon,1.0,4.0,Opener,~ Solid
+2026-06-22,06:40 PM,MIA,TEX,,,823851,4169,loanDepot park,Monday,Mon,1.0,3.0,Opener,~ Solid
+2026-06-22,06:45 PM,WSH,PHI,,,822720,3309,Nationals Park,Monday,Mon,1.0,4.0,Opener,~ Solid
+2026-06-22,07:07 PM,TOR,HOU,,,822800,14,Rogers Centre,Monday,Mon,1.0,3.0,Opener,~ Solid
+2026-06-22,07:10 PM,NYM,CHC,673540.0,,823613,3289,Citi Field,Monday,Mon,1.0,4.0,Opener,~ Solid
+2026-06-22,07:10 PM,CIN,MIL,663903.0,,824502,2602,Great American Ball Park,Monday,Mon,1.0,3.0,Opener,~ Solid
+2026-06-22,07:40 PM,MIN,LAD,,,823692,3312,Target Field,Monday,Mon,1.0,3.0,Opener,~ Solid
+2026-06-22,07:40 PM,CWS,CLE,641743.0,668909.0,824585,4,Rate Field,Monday,Mon,1.0,3.0,Opener,~ Solid
+2026-06-22,07:45 PM,STL,AZ,669467.0,,823040,2889,Busch Stadium,Monday,Mon,1.0,4.0,Opener,~ Solid
+2026-06-22,08:40 PM,COL,BOS,,,824344,19,Coors Field,Monday,Mon,1.0,3.0,Opener,~ Solid
+2026-06-22,09:38 PM,LAA,BAL,,,824016,1,Angel Stadium,Monday,Mon,1.0,3.0,Opener,~ Solid
+2026-06-22,10:10 PM,SD,ATL,,,823288,2680,Petco Park,Monday,Mon,1.0,3.0,Opener,~ Solid
