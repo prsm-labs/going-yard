@@ -13914,7 +13914,7 @@ function SimLabView({ data }) {
                 </button>
                 {posDropdownOpen && (
                   <div onClick={e=>e.stopPropagation()}
-                    style={{position:'absolute',top:'100%',left:0,marginTop:4,zIndex:50,
+                    style={{position:'absolute',top:'100%',left:0,marginTop:4,zIndex:9999,
                       background:'#0d1318',border:'1px solid var(--border)',borderRadius:8,padding:6,
                       display:'flex',flexDirection:'column',gap:2,minWidth:160,
                       boxShadow:'0 8px 28px rgba(0,0,0,.85)'}}>
