@@ -13503,6 +13503,14 @@ function SimLabView({ data }) {
   const [simSearch,   setSimSearch]    = useState('');  // batter name search
   const [selPitcherGradesSim, setSelPitcherGradesSim] = useState(new Set()); // empty = All
   const [selBatterGradesSim,  setSelBatterGradesSim]  = useState(new Set()); // empty = All grades
+  const [selPositionsSim,     setSelPositionsSim]      = useState(new Set()); // empty = All positions
+  const [posDropdownOpen,     setPosDropdownOpen]      = useState(false);
+  useEffect(() => {
+    if (!posDropdownOpen) return;
+    const handler = () => setPosDropdownOpen(false);
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, [posDropdownOpen]);
   const simPitcherGrades = useRef({}); // pitcher_id → grade label
 
   const pf = (v, d=1) => v != null && !isNaN(parseFloat(v)) ? parseFloat(v).toFixed(d) : null;
@@ -13585,6 +13593,7 @@ function SimLabView({ data }) {
       .filter(r => !slHideFinal || !FINAL_GAME_IDS.has(String(r.game_id)))
       .filter(r => selMatchups.size === 0 || selMatchups.has(String(r.game_id)))
       .filter(r => selBatterGradesSim.size === 0 || selBatterGradesSim.has(r.grade))
+      .filter(r => selPositionsSim.size === 0 || selPositionsSim.has(LINEUP_STATUS[parseInt(r.batter_id)||0]?.pos))
       .filter(r => !lineupOnly || isConfirmed(r))
       .filter(r => {
         if (!lineupOnly) return true;
@@ -13654,7 +13663,7 @@ function SimLabView({ data }) {
       return mul * ((parseFloat(a[sortBy]) || 0) - (parseFloat(b[sortBy]) || 0));
     });
     return sorted;
-  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, filterKeyMatchup, minYard, maxYard, minSig, maxSig, minSimTB, minOdds, minBoom, minBrl, minZoneFit, maxZoneFit, minZoneEdge, minL7EV, maxL7EV, minHitPct, minXbhPct, selHRUpside, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal, slotMin, slotMax, weakSpotOnly]);
+  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, selPositionsSim, filterKeyMatchup, minYard, maxYard, minSig, maxSig, minSimTB, minOdds, minBoom, minBrl, minZoneFit, maxZoneFit, minZoneEdge, minL7EV, maxL7EV, minHitPct, minXbhPct, selHRUpside, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal, slotMin, slotMax, weakSpotOnly]);
 
   // Reset row cap when filters/sort change so user always sees top results
   useEffect(() => { setDisplayLimit(150); }, [sortBy, sortDir, selMatchups, lineupOnly, simActiveOnly, simSearch, filterKeyMatchup, slotMin, slotMax]);
@@ -13759,7 +13768,7 @@ function SimLabView({ data }) {
                   slBatterHand!=='ALL',slPitcherHand!=='ALL',slFormFilter.size>0,slHideFinal,
                   !!minYard,!!maxYard,!!minSig,!!maxSig,!!minSimTB,!!minOdds,
                   !!minBoom,!!minBrl,!!minZoneFit,!!maxZoneFit,!!minZoneEdge,!!minL7EV,!!maxL7EV,
-                  !!minHitPct,!!minXbhPct,...[...selBatterGradesSim].map(()=>true),...[...(selHRUpside||new Set())].map(()=>true)
+                  !!minHitPct,!!minXbhPct,...[...selBatterGradesSim].map(()=>true),...[...selPositionsSim].map(()=>true),...[...(selHRUpside||new Set())].map(()=>true)
                 ].filter(Boolean).length;
                 const anyActive=activeCount>0;
                 return(
@@ -13792,7 +13801,7 @@ function SimLabView({ data }) {
                 setMinZoneFit(''); setMaxZoneFit(''); setMinZoneEdge(''); setMinL7EV(''); setMaxL7EV('');
                 setMinHitPct(''); setMinXbhPct('');
                 setSlotMin(''); setSlotMax('');
-                setSelBatterGradesSim(new Set()); setSelPitcherGradesSim(new Set());
+                setSelBatterGradesSim(new Set()); setSelPitcherGradesSim(new Set()); setSelPositionsSim(new Set());
                 setSelHRUpside && setSelHRUpside(new Set());
                 setSlBatterHand('ALL'); setSlPitcherHand('ALL');
                 setSlFormFilter(new Set()); setSlHideFinal(false);
@@ -13843,7 +13852,7 @@ function SimLabView({ data }) {
                     setSimPicksOnly(false);setSimActiveOnly(false);setSimInjuredOnly(false);
                     setSimHotOnly(false);setFilterKeyMatchup(false);setLineupOnly(false);setWeakSpotOnly(false);
                     setSlBatterHand('ALL');setSlPitcherHand('ALL');setSlFormFilter(new Set());
-                    setSlHideFinal(false);setSelBatterGradesSim(new Set());
+                    setSlHideFinal(false);setSelBatterGradesSim(new Set());setSelPositionsSim(new Set());
                     setMinYard('');setMaxYard('');setMinSig('');setMaxSig('');
                     setMinSimTB('');setMinOdds('');setMinBoom('');setMinBrl('');
                     setMinZoneFit('');setMaxZoneFit('');setMinZoneEdge('');setMinL7EV('');setMaxL7EV('');
@@ -13888,6 +13897,50 @@ function SimLabView({ data }) {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* Position filter — dropdown multi-select */}
+              <div style={{marginBottom:14,position:'relative'}}>
+                <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',textTransform:'uppercase',letterSpacing:1,marginBottom:6}}>Position</div>
+                <button onClick={()=>setPosDropdownOpen(o=>!o)}
+                  style={{padding:'6px 12px',borderRadius:7,cursor:'pointer',fontSize:10,
+                    fontFamily:"'DM Mono',monospace",fontWeight:selPositionsSim.size>0?700:400,
+                    border:`1px solid ${selPositionsSim.size>0?'var(--ice)':'var(--border)'}`,
+                    background:selPositionsSim.size>0?'rgba(56,184,242,.12)':'var(--surface2)',
+                    color:selPositionsSim.size>0?'var(--ice)':'var(--text)',
+                    display:'flex',alignItems:'center',gap:8,minWidth:160,justifyContent:'space-between'}}>
+                  <span>{selPositionsSim.size===0?'All Positions':[...selPositionsSim].join(', ')}</span>
+                  <span style={{opacity:.6,fontSize:9}}>{posDropdownOpen?'▲':'▼'}</span>
+                </button>
+                {posDropdownOpen && (
+                  <div onClick={e=>e.stopPropagation()}
+                    style={{position:'absolute',top:'100%',left:0,marginTop:4,zIndex:50,
+                      background:'#0d1318',border:'1px solid var(--border)',borderRadius:8,padding:6,
+                      display:'flex',flexDirection:'column',gap:2,minWidth:160,
+                      boxShadow:'0 8px 28px rgba(0,0,0,.85)'}}>
+                    {['C','1B','2B','3B','SS','LF','CF','RF','DH'].map(pos=>{
+                      const active = selPositionsSim.has(pos);
+                      return (
+                        <label key={pos} style={{display:'flex',alignItems:'center',gap:8,padding:'5px 8px',
+                          borderRadius:5,cursor:'pointer',fontSize:11,fontFamily:"'DM Mono',monospace",
+                          color:active?'var(--ice)':'var(--text)',background:active?'rgba(56,184,242,.10)':'transparent'}}>
+                          <input type="checkbox" checked={active}
+                            onChange={()=>setSelPositionsSim(s=>{const n=new Set(s);n.has(pos)?n.delete(pos):n.add(pos);return n;})}
+                            style={{accentColor:'var(--ice)',cursor:'pointer'}}/>
+                          {pos}
+                        </label>
+                      );
+                    })}
+                    {selPositionsSim.size>0 && (
+                      <button onClick={()=>setSelPositionsSim(new Set())}
+                        style={{marginTop:4,padding:'5px 8px',borderRadius:5,cursor:'pointer',fontSize:10,
+                          fontFamily:"'DM Mono',monospace",color:'var(--accent)',background:'transparent',
+                          border:'1px solid var(--border)'}}>
+                        ✕ Clear
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* HR Upside filter */}
@@ -14065,10 +14118,10 @@ function SimLabView({ data }) {
                 } catch(e) {}
               }));
 
-              // Build exportLineupMap from proxy's lineupSlot field (already on each batter)
+              // Build exportLineupMap from proxy's lineupSlot + pos fields (both already on each batter)
               const exportLineupMap = {};
               Object.entries(slateLiveCache).forEach(([bid, bt]) => {
-                if (bt?.lineupSlot > 0) exportLineupMap[bid] = bt.lineupSlot;
+                if (bt?.lineupSlot > 0) exportLineupMap[bid] = { slot: bt.lineupSlot, pos: bt.pos || '' };
               });
 
               // Merge LIVE_CC_MAP as in-session fallback for CC data
@@ -14085,7 +14138,7 @@ function SimLabView({ data }) {
               const bom = '\uFEFF';
               const esc = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
               const headers = ['Grade','Pitcher Grade','Gone Yard','Is Key Matchup','Team','Batter','Hand','P.Hand','vs Pitcher',
-                'Top Pitches','Game Time','Lineup Slot','In Weak Slot','Pitcher Weak Slots',
+                'Top Pitches','Game Time','Lineup Slot','Position','In Weak Slot','Pitcher Weak Slots',
                 'Yard Score','⚡ Sig','💥 Boom','Form Class','gHR','ISO','Zone Fit','HR Upside','Zone Edges','xwOBA','wOBA','SwStr%',
                 'Flags','Recent EV','Recent Barrel%',
                 'Recent FB%','Recent LA','BvP EV','BvP Barrel%','BvP FB%','BvP LA',
@@ -14101,14 +14154,17 @@ function SimLabView({ data }) {
                 const pitchCleanId = b.pitcher_id ? String(parseInt(b.pitcher_id)||b.pitcher_id) : '';
                 const pitcherGrade = simPitcherGrades.current[pitchCleanId] || '';
                 const isKM = isKeyMatchup(parseInt(b.batter_id)||0, b.batter) ? 'YES' : '';
-                // Lineup slot — from fresh boxscore API fetch (persists after games end, same as AB/H/HR)
-                const exportSlot = exportLineupMap[String(bid)] || 0;
+                // Lineup slot + position — from fresh boxscore API fetch (persists after games end, same as AB/H/HR)
+                const exportEntry = exportLineupMap[String(bid)] || null;
+                const exportSlot  = exportEntry?.slot || 0;
+                const exportPos   = exportEntry?.pos  || '';
                 const weakSlots  = (b.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean);
                 const inWeakSlot = exportSlot > 0 && weakSlots.includes(exportSlot) ? 'YES' : '';
                 return [b.grade, pitcherGrade, gy?'YES':'', isKM, b.batting_team, b.batter, b.batter_hand,
                   b.pitcher_hand||'', b.pitcher, b.top_pitches, b.game_time,
-                  // Lineup slot columns — from fresh boxscore API, stays populated post-game
+                  // Lineup slot + position columns — from fresh boxscore API, stays populated post-game
                   exportSlot || '',
+                  exportPos,
                   inWeakSlot,
                   b.pitcher_weak_slots||'',
                   // Computed columns — between Pitcher Weak Slots and Flags
@@ -14168,6 +14224,7 @@ function SimLabView({ data }) {
                   {[
                     { label: '+',        key: null },
                     { label: 'Batter',   key: null },
+                    { label: 'Pos',      key: null, title: "Confirmed lineup position" },
                     { label: (<img src="/icon-192.png" alt="Yard" style={{width:15,height:15,borderRadius:2,objectFit:'cover',verticalAlign:'middle',display:'inline-block'}}/>), key: '_yard', colKey: '_yard' },
                     { label: '⚡',       key: '_sig', colKey:'_sig' },
                     { label: 'Form',     key: null },
@@ -14384,6 +14441,9 @@ function SimLabView({ data }) {
                             {WEATHER_ALERT_GAME_IDS.has(String(b.game_id)) && <span style={{fontSize:9,flexShrink:0}} title="Weather alert">⚠️</span>}
                           </div>
                         </div>
+                      </td>
+                      <td style={{textAlign:'center',padding:'2px 4px',fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)'}}>
+                        {LINEUP_STATUS[parseInt(b.batter_id)||0]?.pos || '—'}
                       </td>
                       <td style={{textAlign:'center',padding:'2px 4px',verticalAlign:'middle'}}>
                         <YardBadge score={b._yard ?? computeYardScore(b._trackerSig||0, parseFloat(b.gHR)||0, b._boom||0, b._ps||(parseFloat(b.ps_score)||0), b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1), liveSlot(b.batter_id,b.lineup_slot), b._pgLabel||'')}/>
