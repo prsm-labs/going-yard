@@ -13901,7 +13901,7 @@ function SimLabView({ data }) {
 
               {/* Position filter — dropdown multi-select */}
               <div style={{marginBottom:14,position:'relative'}}>
-                <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',textTransform:'uppercase',letterSpacing:1,marginBottom:6}}>Position</div>
+                <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',textTransform:'uppercase',letterSpacing:1,marginBottom:6}}>Position</div>
                 <button onClick={()=>setPosDropdownOpen(o=>!o)}
                   style={{padding:'6px 12px',borderRadius:7,cursor:'pointer',fontSize:10,
                     fontFamily:"'DM Mono',monospace",fontWeight:selPositionsSim.size>0?700:400,
