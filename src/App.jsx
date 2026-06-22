@@ -1864,7 +1864,7 @@ function MatchupCard({ dp }) {
     return Math.min(14, Math.max(0, s));
   })();
 
-  const boom   = parseFloat(dp._boom) || computeBoomScore(sig, parseFloat(dp.zone_fit)||0, parseFloat(dp.recent_iso)||0, parseFloat(dp.sim_tb)||0, parseFloat(dp.weighted_flag_score)||0, parseFloat(dp.recent_barrel_spike||0), parseInt(dp.recent_hr_count||0), parseFloat(dp.recent_batter_ahead_pct||0), !!dp.hh_precursor, parseFloat(dp.primary_pitch_hr_rate||0), parseInt(dp.recent_barrels_3d)||0, parseInt(dp.recent_hrs_3d)||0, parseFloat(dp.recent_avg_bat_speed)||0, parseInt(dp.recent_pb_2d)||0, dp.la_locked, parseFloat(dp.season_swstr_pct)||0, parseFloat(dp.park_pull_fit)||0, parseInt(dp._zoneEdges||0), parseInt(dp._zoneKPenalty||0), (()=>{const _ls=liveSlot(dp.batter_id,dp.lineup_slot);return _ls>0&&(dp.pitcher_weak_slots||"").split(",").map(Number).filter(Boolean).includes(_ls);})());
+  const boom   = parseFloat(dp._boom) || computeBoomScore(sig, parseFloat(dp.zone_fit)||0, parseFloat(dp.recent_iso)||0, parseFloat(dp.sim_tb)||0, parseFloat(dp.weighted_flag_score)||0, parseFloat(dp.recent_barrel_spike||0), parseInt(dp.recent_hr_count||0), parseFloat(dp.recent_batter_ahead_pct||0), !!dp.hh_precursor, parseFloat(dp.primary_pitch_hr_rate||0), parseInt(dp.recent_barrels_3d)||0, parseInt(dp.recent_hrs_3d)||0, parseFloat(dp.recent_avg_bat_speed)||0, parseInt(dp.recent_pb_2d)||0, dp.la_locked, parseFloat(dp.season_swstr_pct)||0, parseFloat(dp.park_pull_fit)||0, parseInt(dp._zoneEdges||0), parseInt(dp._zoneKPenalty||0), (()=>{const _ls=liveSlot(dp.batter_id,dp.lineup_slot);return _ls>0&&(dp.pitcher_weak_slots||"").split(",").map(Number).filter(Boolean).includes(_ls);})(), parseFloat(dp.season_xwoba)||0);
   const iso    = parseFloat(dp.l7_iso||dp.recent_iso) || 0;  // L7 blended ISO
   const l7iso   = parseFloat(dp.l7_iso)    || parseFloat(dp.recent_iso)  || 0;
   const l7woba  = parseFloat(dp.l7_woba)   || parseFloat(dp.season_woba) || 0;
@@ -12856,7 +12856,7 @@ function computeHRUpsideWithH2H(b, bvpData) {
 function computeBoomScore(sig, zoneFit, iso, simTB, engineScore,
   barrelSpike, recentHRCount, batterAheadPct, hhPrecursor, pitchVulnRate,
   dayLateBarrels, dayLateHRs, recentBatSpeed, dayLatePulled,
-  laLocked, swstrPct, pullParkFit, zoneEdges, zoneKPenalty, inPitcherWeakSlot) {
+  laLocked, swstrPct, pullParkFit, zoneEdges, zoneKPenalty, inPitcherWeakSlot, xwoba) {
 
   // ── Zone Fit (24%) — trimmed from 28%, redirected to Day Late + Bat Speed ──
   const zfRaw = zoneFitScore(parseFloat(zoneFit) || 0);
@@ -12864,7 +12864,15 @@ function computeBoomScore(sig, zoneFit, iso, simTB, engineScore,
 
   const s  = Math.min(26, (parseFloat(sig)   || 0) / 14 * 26);  // 26%
   const tb = Math.min(18, (parseFloat(simTB) || 0) / 3.5 * 18); // 18%
-  const is = Math.min(8,  (parseFloat(iso)   || 0) / 0.40 * 8); //  8%
+
+  // ── xwOBA (20%) — replaces ISO. Tracker backtest: ISO correlation with HR
+  // outcome was 0.054 (flat/non-monotonic), xwOBA was 0.100 and the single
+  // strongest standalone ranking signal in the whole dataset (daily top-10
+  // hit rate 21.1% vs Yard Score's 18.3%). Sized between Sig(26%) and
+  // SimTB(18%) per backtest — full swap at ISO's old 8% slot barely moved
+  // the needle; ~20% sizing is what actually lifted days-hitting-3-of-10
+  // from 24% to 29% in the backtest. June 2026.
+  const xw = Math.min(20, Math.max(0, (parseFloat(xwoba) || 0) - 0.300) / 0.150 * 20); // 20%
 
   // ── Barrel Spike (8%) — recent barrel% vs personal season baseline ──────────
   const bSpike = parseFloat(barrelSpike);
@@ -12959,7 +12967,7 @@ function computeBoomScore(sig, zoneFit, iso, simTB, engineScore,
   // ── Pitcher Weak Slot (+3) ────────────────────────────────────────────────
   const slotBoost = (inPitcherWeakSlot === true || inPitcherWeakSlot === 'true' || inPitcherWeakSlot === 1) ? 3 : 0;
 
-  return Math.min(99, Math.round(zf + s + tb + is + bs + hh + cd + dl + bst + prec + pv + laLock + swPen + ppPts + zoneSignal + slotBoost));
+  return Math.min(99, Math.round(zf + s + tb + xw + bs + hh + cd + dl + bst + prec + pv + laLock + swPen + ppPts + zoneSignal + slotBoost));
 }
 
 // ── liveSlot — always use confirmed LINEUP_STATUS slot if available ───────────
@@ -13164,7 +13172,7 @@ function LongShotView({ data }) {
         parseFloat(b.recent_barrel_spike||0), parseInt(b.recent_hr_count||0), parseFloat(b.recent_batter_ahead_pct||0),
         !!b.hh_precursor, parseFloat(b.primary_pitch_hr_rate||0),
         parseInt(b.recent_barrels_3d)||0, parseInt(b.recent_hrs_3d)||0,
-        parseFloat(b.recent_avg_bat_speed)||0, parseInt(b.recent_pb_2d)||0, b.la_locked, parseFloat(b.season_swstr_pct)||0, parseFloat(b.park_pull_fit)||0, parseInt(b._zoneEdges||0), parseInt(b._zoneKPenalty||0), (()=>{const _ls=liveSlot(b.batter_id,b.lineup_slot);return _ls>0&&(b.pitcher_weak_slots||"").split(",").map(Number).filter(Boolean).includes(_ls);})());
+        parseFloat(b.recent_avg_bat_speed)||0, parseInt(b.recent_pb_2d)||0, b.la_locked, parseFloat(b.season_swstr_pct)||0, parseFloat(b.park_pull_fit)||0, parseInt(b._zoneEdges||0), parseInt(b._zoneKPenalty||0), (()=>{const _ls=liveSlot(b.batter_id,b.lineup_slot);return _ls>0&&(b.pitcher_weak_slots||"").split(",").map(Number).filter(Boolean).includes(_ls);})(), parseFloat(b.season_xwoba)||0);
       const _ps   = parseFloat(b.ps_score)||0;
       const _yard = computeYardScore(_sig, parseFloat(b.gHR)||0, _boom, _ps,
         b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1),
@@ -13466,7 +13474,7 @@ function SimLabView({ data }) {
         parseFloat(r.recent_avg_bat_speed)||0, parseInt(r.recent_pb_2d)||0,
         r.la_locked, parseFloat(r.season_swstr_pct)||0,
         parseFloat(r.park_pull_fit)||0,
-        parseInt(r._zoneEdges||0), parseInt(r._zoneKPenalty||0), (()=>{const _ls=liveSlot(r.batter_id,r.lineup_slot);return _ls>0&&(r.pitcher_weak_slots||"").split(",").map(Number).filter(Boolean).includes(_ls);})());
+        parseInt(r._zoneEdges||0), parseInt(r._zoneKPenalty||0), (()=>{const _ls=liveSlot(r.batter_id,r.lineup_slot);return _ls>0&&(r.pitcher_weak_slots||"").split(",").map(Number).filter(Boolean).includes(_ls);})(), parseFloat(r.season_xwoba)||0);
     });
     boomCacheReady.current = true;
   }, [data]);
@@ -13490,6 +13498,7 @@ function SimLabView({ data }) {
   const [minBoom,    setMinBoom]     = useState('');
   const [minBrl,     setMinBrl]      = useState('');
   const [minZoneFit, setMinZoneFit]  = useState('');
+  const [minXwoba, setMinXwoba]      = useState('');
   const [minZoneEdge, setMinZoneEdge]= useState('');
   const [maxZoneFit, setMaxZoneFit]  = useState('');
   const [minL7EV,    setMinL7EV]     = useState('');
@@ -13619,6 +13628,7 @@ function SimLabView({ data }) {
       .filter(r => !minBoom    || (parseFloat(r._boom)||0) >= parseFloat(minBoom))
       .filter(r => !minBrl     || (parseFloat(r.recent_barrel_pct)||0) >= parseFloat(minBrl))
       .filter(r => !minZoneFit || (parseFloat(r.zone_fit)||0) >= parseFloat(minZoneFit))
+      .filter(r => !minXwoba  || (parseFloat(r.season_xwoba)||0) >= parseFloat(minXwoba))
       .filter(r => !maxZoneFit || (parseFloat(r.zone_fit)||0) <= parseFloat(maxZoneFit))
       .filter(r => !minL7EV   || (parseFloat(r.recent_avg_ev)||0) >= parseFloat(minL7EV))
       .filter(r => !maxL7EV   || (parseFloat(r.recent_avg_ev)||0) <= parseFloat(maxL7EV))
@@ -13635,8 +13645,8 @@ function SimLabView({ data }) {
     const mul = sortDir === 'desc' ? -1 : 1;
     const sorted = [...filtered].sort((a, b) => {
       if (sortBy === '_boom') {
-        const aB = boomCache.current[String(a.batter_id)] ?? computeBoomScore((parseFloat(a.weighted_flag_score)||0)*4.6, a.zone_fit, a.recent_iso, a.sim_tb, a.weighted_flag_score, parseFloat(a.recent_barrel_spike||0), parseInt(a.recent_hr_count||0), parseFloat(a.recent_batter_ahead_pct||0), !!a.hh_precursor, parseFloat(a.primary_pitch_hr_rate||0), parseInt(a.recent_barrels_3d)||0, parseInt(a.recent_hrs_3d)||0, parseFloat(a.recent_avg_bat_speed)||0, parseInt(a.recent_pb_2d)||0, a.la_locked, parseFloat(a.season_swstr_pct)||0, parseFloat(a.park_pull_fit)||0, parseInt(a._zoneEdges||0), parseInt(a._zoneKPenalty||0), (()=>{const _ls=liveSlot(a.batter_id,a.lineup_slot);return _ls>0&&(a.pitcher_weak_slots||"").split(",").map(Number).filter(Boolean).includes(_ls);})());
-        const bB = boomCache.current[String(b.batter_id)] ?? computeBoomScore((parseFloat(b.weighted_flag_score)||0)*4.6, b.zone_fit, b.recent_iso, b.sim_tb, b.weighted_flag_score, parseFloat(b.recent_barrel_spike||0), parseInt(b.recent_hr_count||0), parseFloat(b.recent_batter_ahead_pct||0), !!b.hh_precursor, parseFloat(b.primary_pitch_hr_rate||0), parseInt(b.recent_barrels_3d)||0, parseInt(b.recent_hrs_3d)||0, parseFloat(b.recent_avg_bat_speed)||0, parseInt(b.recent_pb_2d)||0, b.la_locked, parseFloat(b.season_swstr_pct)||0, parseFloat(b.park_pull_fit)||0, parseInt(b._zoneEdges||0), parseInt(b._zoneKPenalty||0), (()=>{const _ls=liveSlot(b.batter_id,b.lineup_slot);return _ls>0&&(b.pitcher_weak_slots||"").split(",").map(Number).filter(Boolean).includes(_ls);})());
+        const aB = boomCache.current[String(a.batter_id)] ?? computeBoomScore((parseFloat(a.weighted_flag_score)||0)*4.6, a.zone_fit, a.recent_iso, a.sim_tb, a.weighted_flag_score, parseFloat(a.recent_barrel_spike||0), parseInt(a.recent_hr_count||0), parseFloat(a.recent_batter_ahead_pct||0), !!a.hh_precursor, parseFloat(a.primary_pitch_hr_rate||0), parseInt(a.recent_barrels_3d)||0, parseInt(a.recent_hrs_3d)||0, parseFloat(a.recent_avg_bat_speed)||0, parseInt(a.recent_pb_2d)||0, a.la_locked, parseFloat(a.season_swstr_pct)||0, parseFloat(a.park_pull_fit)||0, parseInt(a._zoneEdges||0), parseInt(a._zoneKPenalty||0), (()=>{const _ls=liveSlot(a.batter_id,a.lineup_slot);return _ls>0&&(a.pitcher_weak_slots||"").split(",").map(Number).filter(Boolean).includes(_ls);})(), parseFloat(a.season_xwoba)||0);
+        const bB = boomCache.current[String(b.batter_id)] ?? computeBoomScore((parseFloat(b.weighted_flag_score)||0)*4.6, b.zone_fit, b.recent_iso, b.sim_tb, b.weighted_flag_score, parseFloat(b.recent_barrel_spike||0), parseInt(b.recent_hr_count||0), parseFloat(b.recent_batter_ahead_pct||0), !!b.hh_precursor, parseFloat(b.primary_pitch_hr_rate||0), parseInt(b.recent_barrels_3d)||0, parseInt(b.recent_hrs_3d)||0, parseFloat(b.recent_avg_bat_speed)||0, parseInt(b.recent_pb_2d)||0, b.la_locked, parseFloat(b.season_swstr_pct)||0, parseFloat(b.park_pull_fit)||0, parseInt(b._zoneEdges||0), parseInt(b._zoneKPenalty||0), (()=>{const _ls=liveSlot(b.batter_id,b.lineup_slot);return _ls>0&&(b.pitcher_weak_slots||"").split(",").map(Number).filter(Boolean).includes(_ls);})(), parseFloat(b.season_xwoba)||0);
         return mul * (aB - bB);
       }
       if (sortBy === 'ps_score') {
@@ -13656,7 +13666,7 @@ function SimLabView({ data }) {
       return mul * ((parseFloat(a[sortBy]) || 0) - (parseFloat(b[sortBy]) || 0));
     });
     return sorted;
-  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, selPositionsSim, filterKeyMatchup, minYard, maxYard, minSig, maxSig, minSimTB, minOdds, minBoom, minBrl, minZoneFit, maxZoneFit, minZoneEdge, minL7EV, maxL7EV, minHitPct, minXbhPct, selHRUpside, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal, slotMin, slotMax, weakSpotOnly]);
+  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, selPositionsSim, filterKeyMatchup, minYard, maxYard, minSig, maxSig, minSimTB, minOdds, minBoom, minBrl, minZoneFit, maxZoneFit, minZoneEdge, minXwoba, minL7EV, maxL7EV, minHitPct, minXbhPct, selHRUpside, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal, slotMin, slotMax, weakSpotOnly]);
 
   // Reset row cap when filters/sort change so user always sees top results
   useEffect(() => { setDisplayLimit(150); }, [sortBy, sortDir, selMatchups, lineupOnly, simActiveOnly, simSearch, filterKeyMatchup, slotMin, slotMax]);
@@ -13726,6 +13736,22 @@ function SimLabView({ data }) {
                   setMinZoneFit('');
                 }
               }}
+              onSauceFilter2={(enable)=>{
+                if(enable){
+                  // Sauce 2.0 — Tracker-backtested: 22.4% HR-game%, 45% of days hit 3+/10
+                  // Zone Fit + xwOBA + Pitcher Grade only — Boom/Sig/SimTB deliberately
+                  // excluded (leave-one-out test showed they diluted this combo, not helped it)
+                  setMinZoneFit('2');
+                  setMinXwoba('.360');
+                  setSelPitcherGradesSim(new Set(['🎯 Target','💥 Hittable','🤔 Average']));
+                  setSimActiveOnly(true);
+                } else {
+                  setMinZoneFit('');
+                  setMinXwoba('');
+                  setSelPitcherGradesSim(new Set());
+                  setSimActiveOnly(false);
+                }
+              }}
             />
       </div>
 
@@ -13760,7 +13786,7 @@ function SimLabView({ data }) {
                   simActiveOnly,simInjuredOnly,simHotOnly,filterKeyMatchup,lineupOnly,weakSpotOnly,
                   slBatterHand!=='ALL',slPitcherHand!=='ALL',slFormFilter.size>0,slHideFinal,
                   !!minYard,!!maxYard,!!minSig,!!maxSig,!!minSimTB,!!minOdds,
-                  !!minBoom,!!minBrl,!!minZoneFit,!!maxZoneFit,!!minZoneEdge,!!minL7EV,!!maxL7EV,
+                  !!minBoom,!!minBrl,!!minZoneFit,!!maxZoneFit,!!minZoneEdge,!!minXwoba,!!minL7EV,!!maxL7EV,
                   !!minHitPct,!!minXbhPct,...[...selBatterGradesSim].map(()=>true),...[...selPositionsSim].map(()=>true),...[...(selHRUpside||new Set())].map(()=>true)
                 ].filter(Boolean).length;
                 const anyActive=activeCount>0;
@@ -13791,7 +13817,7 @@ function SimLabView({ data }) {
                 setWeakSpotOnly(false);
                 setMinYard(''); setMaxYard(''); setMinSig(''); setMaxSig('');
                 setMinSimTB('0.01'); setMinOdds(''); setMinBoom(''); setMinBrl('');
-                setMinZoneFit(''); setMaxZoneFit(''); setMinZoneEdge(''); setMinL7EV(''); setMaxL7EV('');
+                setMinZoneFit(''); setMaxZoneFit(''); setMinZoneEdge(''); setMinXwoba(''); setMinL7EV(''); setMaxL7EV('');
                 setMinHitPct(''); setMinXbhPct('');
                 setSlotMin(''); setSlotMax('');
                 setSelBatterGradesSim(new Set()); setSelPitcherGradesSim(new Set()); setSelPositionsSim(new Set());
@@ -13848,7 +13874,7 @@ function SimLabView({ data }) {
                     setSlHideFinal(false);setSelBatterGradesSim(new Set());setSelPositionsSim(new Set());
                     setMinYard('');setMaxYard('');setMinSig('');setMaxSig('');
                     setMinSimTB('');setMinOdds('');setMinBoom('');setMinBrl('');
-                    setMinZoneFit('');setMaxZoneFit('');setMinZoneEdge('');setMinL7EV('');setMaxL7EV('');
+                    setMinZoneFit('');setMaxZoneFit('');setMinZoneEdge('');setMinXwoba('');setMinL7EV('');setMaxL7EV('');
                     setMinHitPct('');setMinXbhPct('');setSelHRUpside(new Set());
                   }} style={{padding:'3px 10px',borderRadius:5,border:'1px solid rgba(255,64,32,.3)',
                     background:'rgba(255,64,32,.08)',color:'var(--accent)',
@@ -13991,6 +14017,7 @@ function SimLabView({ data }) {
                     {label:'💥 Boom Score',  minV:minBoom,    setMin:setMinBoom,    maxV:null,       setMax:null,          phMin:'40', phMax:null},
                     {label:'🛢️ L7 Brl%',    minV:minBrl,     setMin:setMinBrl,     maxV:null,       setMax:null,          phMin:'8',  phMax:null},
                     {label:'🗺️ Zone Fit %',  minV:minZoneFit, setMin:setMinZoneFit, maxV:maxZoneFit, setMax:setMaxZoneFit, phMin:'min',phMax:'max'},
+                    {label:'📈 xwOBA',       minV:minXwoba,   setMin:setMinXwoba,   maxV:null,       setMax:null,          phMin:'.360',phMax:null},
                     {label:'🔲 Zone Edges',  minV:minZoneEdge,setMin:setMinZoneEdge,maxV:null,       setMax:null,          phMin:'1',  phMax:null},
                     {label:'⚡ L7 EV (mph)', minV:minL7EV,    setMin:setMinL7EV,    maxV:maxL7EV,    setMax:setMaxL7EV,    phMin:'95', phMax:'max'},
                     {label:'📊 Sim TB',      minV:minSimTB,   setMin:setMinSimTB,   maxV:null,       setMax:null,          phMin:'1.5',phMax:null},
@@ -14220,6 +14247,7 @@ function SimLabView({ data }) {
                     { label: 'ZoneFit',  key: 'zone_fit' },
                     { label: 'WkSpt',    key: null, title: "Pitcher Weak Slot" },
                     { label: 'ZEdge',    key: '_zoneEdges', title: "Zone Edges" },
+                    { label: 'xwOBA',    key: 'season_xwoba' },
                     { label: 'Grade',    key: null },
                     { label: '💣',       key: 'meatball_matchup_score' },
                     { label: 'HR Odds',  key: 'hr_odds_implied' },
@@ -14352,7 +14380,7 @@ function SimLabView({ data }) {
                   b._trackerSig = Math.min(14, Math.max(0, _trackerSig)); // cap at 14
                   b._pgLabel     = _pgLabelv;
                   b._formClass   = getFormClass(b);
-                  b._boom        = computeBoomScore(b._trackerSig, b.zone_fit, b.recent_iso, b.sim_tb, b.weighted_flag_score, parseFloat(b.recent_barrel_spike||0), parseInt(b.recent_hr_count||0), parseFloat(b.recent_batter_ahead_pct||0), !!b.hh_precursor, parseFloat(b.primary_pitch_hr_rate||0), parseInt(b.recent_barrels_3d)||0, parseInt(b.recent_hrs_3d)||0, parseFloat(b.recent_avg_bat_speed)||0, parseInt(b.recent_pb_2d)||0, b.la_locked, parseFloat(b.season_swstr_pct)||0, parseFloat(b.park_pull_fit)||0, parseInt(b._zoneEdges||0), parseInt(b._zoneKPenalty||0), (()=>{const _ls=liveSlot(b.batter_id,b.lineup_slot);return _ls>0&&(b.pitcher_weak_slots||"").split(",").map(Number).filter(Boolean).includes(_ls);})());
+                  b._boom        = computeBoomScore(b._trackerSig, b.zone_fit, b.recent_iso, b.sim_tb, b.weighted_flag_score, parseFloat(b.recent_barrel_spike||0), parseInt(b.recent_hr_count||0), parseFloat(b.recent_batter_ahead_pct||0), !!b.hh_precursor, parseFloat(b.primary_pitch_hr_rate||0), parseInt(b.recent_barrels_3d)||0, parseInt(b.recent_hrs_3d)||0, parseFloat(b.recent_avg_bat_speed)||0, parseInt(b.recent_pb_2d)||0, b.la_locked, parseFloat(b.season_swstr_pct)||0, parseFloat(b.park_pull_fit)||0, parseInt(b._zoneEdges||0), parseInt(b._zoneKPenalty||0), (()=>{const _ls=liveSlot(b.batter_id,b.lineup_slot);return _ls>0&&(b.pitcher_weak_slots||"").split(",").map(Number).filter(Boolean).includes(_ls);})(), parseFloat(b.season_xwoba)||0);
                   sigCache.current[String(b.batter_id)]  = b._trackerSig;
                   SIG_CACHE_GLOBAL[String(b.batter_id)]  = b._trackerSig; // expose to CheatSheetTab
                   boomCache.current[String(b.batter_id)] = b._boom;
@@ -14536,6 +14564,10 @@ function SimLabView({ data }) {
                       </td>
                       <td style={{textAlign:'center',padding:'2px 4px',fontSize:11}}>{(()=>{const _ls=liveSlot(b.batter_id,b.lineup_slot);return _ls>0&&(b.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(_ls)?'🟢':'';})()}</td>
                       <td style={{textAlign:'center',padding:'2px 4px',fontFamily:"'DM Mono',monospace",fontSize:9}}>{(()=>{const ze=parseInt(b._zoneEdges||DAILY_PICKS_CACHE[String(parseInt(b.batter_id)||0)]?._zoneEdges||0);return ze>0?<span style={{color:ze>=3?'#ff4020':ze>=2?'#f5a623':'var(--muted)',fontWeight:ze>=2?700:400}}>{ze}</span>:'—';})()}</td>
+                      <td style={{textAlign:'right',padding:'3px 6px',fontFamily:"'DM Mono',monospace",fontSize:10,
+                        color:(parseFloat(b.season_xwoba)||0)>=0.400?'#ff4020':(parseFloat(b.season_xwoba)||0)>=0.360?'#f5a623':(parseFloat(b.season_xwoba)||0)>=0.320?'#27c97a':'var(--muted)'}}>
+                        {(parseFloat(b.season_xwoba)||0)>0?(parseFloat(b.season_xwoba)).toFixed(3):'—'}
+                      </td>
                       <td style={{ textAlign: 'right', padding:'3px 4px' }}>
                         {!INJURY_MAP[String(parseInt(b.batter_id)||0)] && <span style={{ padding:'1px 6px', borderRadius:4, fontFamily:"'DM Mono',monospace", fontSize:9, color:'rgba(255,255,255,.25)', border:'1px solid rgba(255,255,255,.1)' }}>{b.grade||'—'}</span>}
                       </td>
@@ -15295,14 +15327,23 @@ function NotifyBell() {
   );
 }
 
-function CheatCodeButton({ onSauceFilter }) {
+function CheatCodeButton({ onSauceFilter, onSauceFilter2 }) {
   const [open, setOpen] = useState(false);
   const [sauceOn, setSauceOn] = useState(false);
+  const [sauce2On, setSauce2On] = useState(false);
 
   const toggleSauce = () => {
     const next = !sauceOn;
     setSauceOn(next);
+    if (next && sauce2On) { setSauce2On(false); if (onSauceFilter2) onSauceFilter2(false); }
     if (onSauceFilter) onSauceFilter(next);
+  };
+
+  const toggleSauce2 = () => {
+    const next = !sauce2On;
+    setSauce2On(next);
+    if (next && sauceOn) { setSauceOn(false); if (onSauceFilter) onSauceFilter(false); }
+    if (onSauceFilter2) onSauceFilter2(next);
   };
 
   const mono = "'DM Mono',monospace";
@@ -15394,7 +15435,7 @@ function CheatCodeButton({ onSauceFilter }) {
             </div>
           </div>
           <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:6}}>
-            {/* SECRET SAUCE FILTER — only appears in this slideout */}
+            {/* SECRET SAUCE FILTERS — only appear in this slideout */}
             <button onClick={toggleSauce}
               title={sauceOn ? 'Disable Sauce Filter' : 'Enable recommended Sauce filter set'}
               style={{
@@ -15407,6 +15448,19 @@ function CheatCodeButton({ onSauceFilter }) {
                 transition: 'all .2s', whiteSpace: 'nowrap',
               }}>
               {sauceOn ? '✔ SAUCE ON' : '⚡ ENABLE SAUCE FILTER'}
+            </button>
+            <button onClick={toggleSauce2}
+              title={sauce2On ? 'Disable Sauce 2.0' : 'Enable Sauce 2.0 — Zone Fit + xwOBA + Pitcher Grade (Tracker-backtested: 22.4% HR-game%, 45% of days hit 3+/10)'}
+              style={{
+                background: sauce2On ? 'rgba(56,184,242,.9)' : 'rgba(56,184,242,.12)',
+                border: '1px solid ' + (sauce2On ? 'var(--ice)' : 'rgba(56,184,242,.4)'),
+                borderRadius: 6, cursor: 'pointer',
+                color: sauce2On ? '#fff' : 'var(--ice)',
+                fontFamily: mono, fontSize: 9, fontWeight: 700,
+                padding: '5px 10px', letterSpacing: .5,
+                transition: 'all .2s', whiteSpace: 'nowrap',
+              }}>
+              {sauce2On ? '✔ SAUCE 2.0 ON' : '🧪 SAUCE 2.0'}
             </button>
             <button onClick={()=>setOpen(false)}
               style={{background:'none',border:'1px solid var(--border)',borderRadius:6,
@@ -24937,7 +24991,7 @@ function CrystalBallTab() {
       const sig  = parseFloat(r._trackerSig||r.weighted_flag_score*4.6||0);
       const ghr  = parseFloat(r.gHR||r.kHR||0);
       const ps   = parseFloat(r.ps_score||0);
-      const boom = computeBoomScore(sig, parseFloat(r.zone_fit||0), parseFloat(r.iso||0), parseFloat(r.sim_tb||0), parseFloat(r.weighted_flag_score||0), parseFloat(r.recent_barrel_spike||0), parseInt(r.recent_hr_count||0), parseFloat(r.recent_batter_ahead_pct||0), !!r.hh_precursor, parseFloat(r.primary_pitch_hr_rate||0), parseInt(r.recent_barrels_3d)||0, parseInt(r.recent_hrs_3d)||0, parseFloat(r.recent_avg_bat_speed)||0, parseInt(r.recent_pb_2d)||0, r.la_locked, parseFloat(r.season_swstr_pct)||0, parseFloat(r.park_pull_fit)||0, parseInt(r._zoneEdges||0), parseInt(r._zoneKPenalty||0), (()=>{const _ls=liveSlot(r.batter_id,r.lineup_slot);return _ls>0&&(r.pitcher_weak_slots||"").split(",").map(Number).filter(Boolean).includes(_ls);})());
+      const boom = computeBoomScore(sig, parseFloat(r.zone_fit||0), parseFloat(r.iso||0), parseFloat(r.sim_tb||0), parseFloat(r.weighted_flag_score||0), parseFloat(r.recent_barrel_spike||0), parseInt(r.recent_hr_count||0), parseFloat(r.recent_batter_ahead_pct||0), !!r.hh_precursor, parseFloat(r.primary_pitch_hr_rate||0), parseInt(r.recent_barrels_3d)||0, parseInt(r.recent_hrs_3d)||0, parseFloat(r.recent_avg_bat_speed)||0, parseInt(r.recent_pb_2d)||0, r.la_locked, parseFloat(r.season_swstr_pct)||0, parseFloat(r.park_pull_fit)||0, parseInt(r._zoneEdges||0), parseInt(r._zoneKPenalty||0), (()=>{const _ls=liveSlot(r.batter_id,r.lineup_slot);return _ls>0&&(r.pitcher_weak_slots||"").split(",").map(Number).filter(Boolean).includes(_ls);})(), parseFloat(r.season_xwoba)||0);
       const yard = computeYardScore(sig, ghr, boom, ps, r.batter_hand||'', r.pitcher_hand||'', parseInt(r.days_rest??1), liveSlot(r.batter_id,r.lineup_slot), r._pgLabel||'');
       const ev   = parseFloat(r.recent_avg_ev||0);
       const la   = parseFloat(r.recent_avg_la||0);
@@ -26208,7 +26262,7 @@ function SimTab({ data }) {
       const iso    = parseFloat(r.recent_iso || 0);
       const ps     = parseFloat(r.ps_score  || 0);
       const zf     = parseFloat(r.zone_fit  || 0);
-      const boom   = parseFloat(r._boom) || computeBoomScore(sig, zf, iso, simTB, parseFloat(r.weighted_flag_score||0), parseFloat(r.recent_barrel_spike||0), parseInt(r.recent_hr_count||0), parseFloat(r.recent_batter_ahead_pct||0), !!r.hh_precursor, parseFloat(r.primary_pitch_hr_rate||0), parseInt(r.recent_barrels_3d)||0, parseInt(r.recent_hrs_3d)||0, parseFloat(r.recent_avg_bat_speed)||0, parseInt(r.recent_pb_2d)||0, r.la_locked, parseFloat(r.season_swstr_pct)||0, parseFloat(r.park_pull_fit)||0, parseInt(r._zoneEdges||0), parseInt(r._zoneKPenalty||0), (()=>{const _ls=liveSlot(r.batter_id,r.lineup_slot);return _ls>0&&(r.pitcher_weak_slots||"").split(",").map(Number).filter(Boolean).includes(_ls);})());
+      const boom   = parseFloat(r._boom) || computeBoomScore(sig, zf, iso, simTB, parseFloat(r.weighted_flag_score||0), parseFloat(r.recent_barrel_spike||0), parseInt(r.recent_hr_count||0), parseFloat(r.recent_batter_ahead_pct||0), !!r.hh_precursor, parseFloat(r.primary_pitch_hr_rate||0), parseInt(r.recent_barrels_3d)||0, parseInt(r.recent_hrs_3d)||0, parseFloat(r.recent_avg_bat_speed)||0, parseInt(r.recent_pb_2d)||0, r.la_locked, parseFloat(r.season_swstr_pct)||0, parseFloat(r.park_pull_fit)||0, parseInt(r._zoneEdges||0), parseInt(r._zoneKPenalty||0), (()=>{const _ls=liveSlot(r.batter_id,r.lineup_slot);return _ls>0&&(r.pitcher_weak_slots||"").split(",").map(Number).filter(Boolean).includes(_ls);})(), parseFloat(r.season_xwoba)||0);
       const yard   = computeYardScore(sig, ghr, boom, ps, r.batter_hand||'', r.pitcher_hand||'', parseInt(r.days_rest??1), liveSlot(r.batter_id,r.lineup_slot), r._pgLabel||'');
       const pgLabel = r._pgLabel || '';
 
