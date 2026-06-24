@@ -10743,23 +10743,25 @@ function ReceiptSlideout({ onClose }) {
       display:'flex',flexDirection:'column',boxShadow:'-4px 0 24px rgba(0,0,0,.5)'}}>
       <div style={{display:'flex',alignItems:'center',gap:10,padding:'14px 16px',
         borderBottom:'1px solid var(--border)',background:'var(--surface2)',flexShrink:0}}>
-        <span style={{fontFamily:osw,fontWeight:800,fontSize:13,color:'var(--text)'}}>🧾 Receipts</span>
+        <span style={{fontFamily:osw,fontWeight:800,fontSize:13,color:'var(--text)'}}>🧾 Yard Picks</span>
         <button onClick={onClose}
           style={{marginLeft:'auto',background:'transparent',border:'none',
             color:'var(--muted)',fontSize:18,cursor:'pointer',padding:'0 4px',lineHeight:1}}>✕</button>
       </div>
       <div style={{flex:1,overflow:'hidden'}}>
-        <SignedIn>
+        {/* Clerk paywall on standby — wrap the iframe below in <SignedIn> and
+            uncomment the <SignedOut> block to re-enable the login gate later.
+        <SignedIn> */}
           <iframe
             src="https://twilight-wolf-59d.notion.site/ebd//389d3461384880f1bce0e9dd1556e9a5?v=389d346138488027be06000cda5073a4"
             style={{width:'100%',height:'100%',border:'none'}}
             allowFullScreen/>
-        </SignedIn>
+        {/* </SignedIn>
         <SignedOut>
           <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
             height:'100%',gap:14,padding:24,textAlign:'center'}}>
             <div style={{fontSize:32}}>🔒</div>
-            <div style={{fontFamily:osw,fontWeight:700,fontSize:13,color:'var(--text)'}}>Sign in to view Receipts</div>
+            <div style={{fontFamily:osw,fontWeight:700,fontSize:13,color:'var(--text)'}}>Sign in to view Yard Picks</div>
             <SignInButton mode="modal">
               <button style={{padding:'8px 18px',borderRadius:7,cursor:'pointer',fontSize:11,
                 fontFamily:osw,fontWeight:700,border:'1px solid var(--ice)',
@@ -10768,7 +10770,7 @@ function ReceiptSlideout({ onClose }) {
               </button>
             </SignInButton>
           </div>
-        </SignedOut>
+        </SignedOut> */}
       </div>
     </div>
     <div onClick={onClose} style={{position:'fixed',inset:0,zIndex:9998,background:'rgba(0,0,0,.4)'}}/>
@@ -10777,7 +10779,7 @@ function ReceiptSlideout({ onClose }) {
 
 function ReceiptBtn({ onClick }) {
   return (
-    <button onClick={onClick} data-tip="View Receipts"
+    <button onClick={onClick} data-tip="View Yard Picks"
       style={{padding:'3px 8px',borderRadius:6,fontSize:10,cursor:'pointer',
         border:'1px solid var(--border)',color:'var(--muted)',background:'transparent',
         flexShrink:0,fontWeight:700,lineHeight:1}}>🧾</button>
