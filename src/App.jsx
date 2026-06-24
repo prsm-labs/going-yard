@@ -12014,6 +12014,114 @@ function MLBScoresTab() {
   </div>;
 }
 
+function YardPicksFeedTab() {
+  const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
+  const [picks,    setPicks]    = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [error,    setError]    = useState(null);
+  const [cursor,   setCursor]   = useState(null);
+  const [hasMore,  setHasMore]  = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  const fetchPicks = async (startCursor) => {
+    try {
+      const qs = new URLSearchParams({ pageSize: '25' });
+      if (startCursor) qs.set('cursor', startCursor);
+      const r = await fetch(`/api/yardpicks?${qs.toString()}`);
+      if (!r.ok) throw new Error(`Server returned ${r.status}`);
+      const data = await r.json();
+      if (data.error) throw new Error(data.error);
+      setPicks(prev => startCursor ? [...prev, ...(data.picks||[])] : (data.picks||[]));
+      setHasMore(!!data.hasMore);
+      setCursor(data.nextCursor || null);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
+  useEffect(() => { fetchPicks(null); }, []);
+
+  const loadMore = () => {
+    if (!cursor || loadingMore) return;
+    setLoadingMore(true);
+    fetchPicks(cursor);
+  };
+
+  return (
+    <div style={{maxWidth:480,margin:'0 auto',padding:'4px 0 24px'}}>
+      <div style={{display:'flex',alignItems:'center',gap:8,padding:'4px 4px 14px'}}>
+        <span style={{fontSize:18}}>🧾</span>
+        <span style={{fontFamily:osw,fontWeight:800,fontSize:16,color:'var(--text)'}}>Yard Picks</span>
+      </div>
+
+      {loading && (
+        <div className="lw"><div className="sp"/><div className="lt">Loading Yard Picks…</div></div>
+      )}
+
+      {!loading && error && (
+        <div style={{padding:20,textAlign:'center',color:'var(--accent)',fontFamily:mono,fontSize:12}}>
+          Couldn't load Yard Picks: {error}
+        </div>
+      )}
+
+      {!loading && !error && picks.length === 0 && (
+        <div style={{padding:20,textAlign:'center',color:'var(--muted)',fontFamily:mono,fontSize:12}}>
+          No picks posted yet.
+        </div>
+      )}
+
+      {!loading && !error && picks.map(p => (
+        <div key={p.id} style={{background:'var(--surface)',border:'1px solid var(--border)',
+          borderRadius:10,marginBottom:12,overflow:'hidden'}}>
+          {p.imageUrl && (
+            <img src={p.imageUrl} alt={p.title||'Yard Pick'} loading="lazy"
+              style={{width:'100%',display:'block',maxHeight:480,objectFit:'contain',background:'#000'}}/>
+          )}
+          <div style={{padding:'10px 14px'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:4}}>
+              <span style={{fontFamily:osw,fontWeight:700,fontSize:13,color:'var(--text)'}}>
+                {p.title || 'Yard Pick'}
+              </span>
+              {p.relativeTime && (
+                <span style={{fontFamily:mono,fontSize:10,color:'var(--muted)',whiteSpace:'nowrap'}}>
+                  {p.relativeTime}
+                </span>
+              )}
+            </div>
+            {(p.estPostTime || p.date) && (
+              <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)',marginBottom:8}}>
+                {p.estPostTime}{p.estPostTime && p.date ? ' · ' : ''}{p.date}
+              </div>
+            )}
+            {p.gamblyLink && (
+              <a href={p.gamblyLink} target="_blank" rel="noopener noreferrer"
+                style={{display:'inline-flex',alignItems:'center',gap:5,padding:'6px 12px',
+                  borderRadius:6,background:'var(--accent)',color:'white',textDecoration:'none',
+                  fontFamily:osw,fontWeight:700,fontSize:11,letterSpacing:.5}}>
+                ↗ Open Gambly Slip
+              </a>
+            )}
+          </div>
+        </div>
+      ))}
+
+      {!loading && !error && hasMore && (
+        <div style={{textAlign:'center',marginTop:6}}>
+          <button onClick={loadMore} disabled={loadingMore}
+            style={{padding:'8px 20px',borderRadius:7,cursor:loadingMore?'default':'pointer',
+              border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--muted)',
+              fontFamily:osw,fontWeight:700,fontSize:11,letterSpacing:.5,opacity:loadingMore?.6:1}}>
+            {loadingMore ? 'Loading…' : 'Load More'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function OnlyHomersTab() {
   return <div style={{margin:"-16px"}}>
     {/* iframe — scaled 80% like Doink, full height */}
@@ -12038,58 +12146,6 @@ function OnlyHomersTab() {
   </div>;
 }
 
-function LiveSportsTab() {
-  const [tried, setTried] = useState(false);
-  return <div>
-
-    {/* Primary: try embedding with all bypass attributes */}
-    <div style={{borderRadius:10,overflow:"hidden",border:"1px solid var(--border)",
-      background:"var(--surface)",position:"relative",paddingBottom:"78%",height:0,marginBottom:12}}>
-      <iframe
-        title="Live Sports"
-        src="https://thetvapp.to"
-        frameBorder="0"
-        allowFullScreen
-        scrolling="yes"
-        allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation"
-        referrerPolicy="no-referrer"
-        style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",border:"none"}}
-        onLoad={()=>setTried(true)}
-        onError={()=>setTried(true)}
-      />
-      {/* Overlay that shows if iframe is blocked */}
-      {tried && <div style={{
-        position:"absolute",inset:0,display:"flex",flexDirection:"column",
-        alignItems:"center",justifyContent:"center",
-        background:"var(--surface)",pointerEvents:"none",
-        opacity:0 // hidden by default — only shows if iframe renders blank
-      }}>
-        <span style={{fontSize:40,marginBottom:12}}>📺</span>
-        <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:18,marginBottom:8}}>Site blocked embed</div>
-        <div style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:"var(--muted)",textAlign:"center",maxWidth:280}}>
-          Use the button below to open in a new tab
-        </div>
-      </div>}
-    </div>
-
-    {/* Always-visible launch button */}
-    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10}}>
-      <a href="https://thetvapp.to" target="_blank" rel="noopener noreferrer"
-        style={{display:"inline-flex",alignItems:"center",gap:8,
-          padding:"12px 28px",borderRadius:10,
-          background:"var(--accent)",color:"white",
-          fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:16,
-          letterSpacing:1,textDecoration:"none",
-          boxShadow:"0 4px 20px rgba(232,65,26,.3)"}}>
-        📺 Open Live Sports
-      </a>
-      <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textAlign:"center"}}>
-        Opens thetvapp.to · If the frame above is blank, the site blocks embeds — use this button instead
-      </div>
-    </div>
-  </div>;
-}
 
 
 function LinemateTab() {
@@ -21794,11 +21850,6 @@ function MatchupEngineTab() {
         <button style={stBtn('batters')}   onClick={()=>setSubTab('batters')}>🧢 Batters</button>
         <button style={stBtn('pitchers')}  onClick={()=>setSubTab('pitchers')}>⚾ Pitchers</button>
         <button style={stBtn('history')}   onClick={()=>setSubTab('history')}>📜 BvP History</button>
-        <a href="https://twilight-wolf-59d.notion.site/389d3461384880f1bce0e9dd1556e9a5?v=389d346138488027be06000cda5073a4&source=copy_link"
-          target="_blank" rel="noopener noreferrer" data-tip="Yard Picks"
-          style={{padding:'3px 8px',borderRadius:6,fontSize:10,cursor:'pointer',
-            border:'1px solid var(--border)',color:'var(--muted)',background:'transparent',
-            flexShrink:0,fontWeight:700,lineHeight:1,textDecoration:'none',display:'inline-block'}}>🧾</a>
         <HelpBtn onClick={()=>setShowKMHelp(v=>!v)}/>
       </div>
     </div>
@@ -27786,8 +27837,8 @@ export default function App() {
     {key:"picks",      label:"🎯 My Picks"},
     {key:"_sep1",      label:"|", sep:true},
     {key:"statcast",   label:"📡 Statcast"},
-    {key:"livesports", label:"📺 Live Sports ↗", external:"https://thetvapp.to"},
     {key:"mlbscores",  label:"⚾ MLB"},
+    {key:"yardpicks",  label:"🧾 Yard Picks"},
     {key:"links",      label:"🔗 Links"},
     {key:"getapp",     label:"📲 Get App"},
   ];
@@ -27872,6 +27923,7 @@ export default function App() {
         <div style={{display:tab==="home"?"block":"none"}}><HomeTab/></div>
         <div style={{display:tab==="homeruns"?"block":"none"}}><HRTrackerTab/></div>
         <div style={{display:tab==="mlbscores"?"block":"none"}}><MLBTab/></div>
+        <div style={{display:tab==="yardpicks"?"block":"none"}}><YardPicksFeedTab/></div>
         <div style={{display:tab==="onlyhomers"?"block":"none"}}><OnlyHomersTab/></div>
         <div style={{display:tab==="doink"?'block':'none'}}>
           <div style={{padding:"8px 14px",background:"rgba(245,166,35,.1)",
