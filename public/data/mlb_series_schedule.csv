@@ -8,7 +8,7 @@ Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitc
 2026-06-24,06:40 PM,PIT,SEA,677952.0,693433.0,823367,31,PNC Park,Wednesday,Wed,2,3,Middle,~ Neutral
 2026-06-24,06:40 PM,TB,KC,643377.0,702070.0,822965,12,Tropicana Field,Wednesday,Wed,3,4,Middle,~ Neutral
 2026-06-24,06:40 PM,DET,NYY,669373.0,677960.0,824259,2394,Comerica Park,Wednesday,Wed,3,3,Finale,~ Neutral
-2026-06-24,06:45 PM,WSH,PHI,571945.0,605400.0,822719,3309,Nationals Park,Wednesday,Wed,3,4,Middle,~ Neutral
+2026-06-24,06:45 PM,WSH,PHI,687223.0,605400.0,822719,3309,Nationals Park,Wednesday,Wed,3,4,Middle,~ Neutral
 2026-06-24,07:07 PM,TOR,HOU,702056.0,681347.0,822798,14,Rogers Centre,Wednesday,Wed,3,3,Finale,~ Neutral
 2026-06-24,07:10 PM,CIN,MIL,695076.0,675660.0,824500,2602,Great American Ball Park,Wednesday,Wed,3,3,Finale,~ Neutral
 2026-06-24,07:40 PM,MIN,LAD,657746.0,660271.0,823691,3312,Target Field,Wednesday,Wed,3,3,Finale,~ Neutral
@@ -22,5 +22,5 @@ Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitc
 2026-06-25,06:45 PM,WSH,PHI,676917.0,650911.0,822717,3309,Nationals Park,Thursday,Thu,4,4,Finale,✅ Best Day (getaway)
 2026-06-25,07:07 PM,TOR,TEX,,669022.0,822797,14,Rogers Centre,Thursday,Thu,1,4,Opener,✅ Best Day (getaway)
 2026-06-25,07:10 PM,NYM,CHC,642547.0,571510.0,823612,3289,Citi Field,Thursday,Thu,4,4,Finale,✅ Best Day (getaway)
-2026-06-25,07:10 PM,BOS,NYY,,,824747,3,Fenway Park,Thursday,Thu,1,4,Opener,✅ Best Day (getaway)
+2026-06-25,07:10 PM,BOS,NYY,813349.0,,824747,3,Fenway Park,Thursday,Thu,1,4,Opener,✅ Best Day (getaway)
 2026-06-25,07:45 PM,STL,AZ,700241.0,668678.0,823042,2889,Busch Stadium,Thursday,Thu,4,4,Finale,✅ Best Day (getaway)
