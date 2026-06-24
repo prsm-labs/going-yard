@@ -59,12 +59,17 @@ export default async function handler(req, res) {
       const title = p['Slip']?.title?.[0]?.plain_text || '';
       const date  = p['Date']?.date?.start || null;
       const estPostTime  = p['Est. Post Time']?.rich_text?.[0]?.plain_text || '';
-      const relativeTime = p['Relative Time']?.rich_text?.[0]?.plain_text || '';
       const gamblyLink    = p['Gambly Link']?.url || null;
       const postTimestamp = p['Post Timestamp']?.date?.start || null;
       const slipNumber    = p['Slip #']?.number ?? null;
       const serialNumber  = p['Serial #']?.rich_text?.[0]?.plain_text || '';
-      const archived       = p['Archived']?.checkbox || false;
+      // The "Archived" checkbox property was renamed to a blank label in
+      // Notion, so it no longer appears under the key "Archived" in the
+      // API response. Find it by TYPE instead — this database has only
+      // one checkbox property, so scanning for `type === 'checkbox'` is
+      // reliable regardless of what the property is currently named.
+      const checkboxEntry = Object.values(p).find(prop => prop?.type === 'checkbox');
+      const archived = checkboxEntry?.checkbox || false;
 
       // Image property: Notion "Files & media" can hold an uploaded file
       // OR an external URL. The pipeline notes say images are stored as
@@ -78,7 +83,6 @@ export default async function handler(req, res) {
         title,
         date,
         estPostTime,
-        relativeTime,
         gamblyLink,
         postTimestamp,
         slipNumber,
