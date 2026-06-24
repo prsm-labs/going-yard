@@ -25,17 +25,13 @@ export default async function handler(req, res) {
 
     const body = {
       page_size: pageSizeNum,
-      // Sort by Post Timestamp descending — newest pick first. This MUST
-      // match the real Notion property name exactly ("Post Timestamp"),
-      // since Notion errors on an unrecognized sort key rather than
-      // silently ignoring it.
-      sorts: [{ property: 'Post Timestamp', direction: 'descending' }],
-      // Optional: only show picks not marked Archived. Comment out the
-      // filter block below if you want every row regardless of that flag.
-      filter: {
-        property: 'Archived',
-        checkbox: { equals: false },
-      },
+      // No sorts/filter sent to Notion here on purpose — a sort or filter
+      // referencing a property that doesn't exist (or is named slightly
+      // differently than expected, e.g. "Archived" was listed as optional
+      // in setup) makes Notion reject the ENTIRE query, not just that
+      // clause. Sorting and the Archived filter are applied client-side
+      // below instead, so this call can never 500 due to a property
+      // name mismatch.
     };
     if (cursor) body.start_cursor = cursor;
 
@@ -92,8 +88,22 @@ export default async function handler(req, res) {
       };
     });
 
+    // Client-side sort (newest first) — falls back to `date` if a row has
+    // no Post Timestamp value, so a few blank rows don't break ordering.
+    picks.sort((a, b) => {
+      const ta = new Date(a.postTimestamp || a.date || 0).getTime();
+      const tb = new Date(b.postTimestamp || b.date || 0).getTime();
+      return tb - ta;
+    });
+
+    // Client-side filter — hide archived picks. Since `archived` already
+    // safely defaults to false when the property doesn't exist, this is
+    // a no-op (shows everything) on databases that never added the
+    // optional Archived checkbox.
+    const visiblePicks = picks.filter(p => !p.archived);
+
     res.status(200).json({
-      picks,
+      picks: visiblePicks,
       hasMore:   !!data.has_more,
       nextCursor: data.next_cursor || null,
     });
