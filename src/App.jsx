@@ -10732,61 +10732,6 @@ function HelpBtn({ onClick }) {
   );
 }
 
-// ── ReceiptSlideout — embeds the Notion picks/log page in the same fixed-panel ──
-// shape as HelpSlideout. Gated by Clerk SignedIn/SignedOut so it's ready to sit
-// behind a paid tier later without any structural changes — just tighten the gate.
-function ReceiptSlideout({ onClose }) {
-  const osw = "'Oswald',sans-serif";
-  return <>
-    <div style={{position:'fixed',top:0,right:0,bottom:0,width:420,zIndex:9999,
-      background:'var(--surface)',borderLeft:'1px solid var(--border)',
-      display:'flex',flexDirection:'column',boxShadow:'-4px 0 24px rgba(0,0,0,.5)'}}>
-      <div style={{display:'flex',alignItems:'center',gap:10,padding:'14px 16px',
-        borderBottom:'1px solid var(--border)',background:'var(--surface2)',flexShrink:0}}>
-        <span style={{fontFamily:osw,fontWeight:800,fontSize:13,color:'var(--text)'}}>🧾 Yard Picks</span>
-        <button onClick={onClose}
-          style={{marginLeft:'auto',background:'transparent',border:'none',
-            color:'var(--muted)',fontSize:18,cursor:'pointer',padding:'0 4px',lineHeight:1}}>✕</button>
-      </div>
-      <div style={{flex:1,overflow:'hidden'}}>
-        {/* Clerk paywall on standby — wrap the iframe below in <SignedIn> and
-            uncomment the <SignedOut> block to re-enable the login gate later.
-        <SignedIn> */}
-          <iframe
-            src="https://twilight-wolf-59d.notion.site/ebd//389d3461384880f1bce0e9dd1556e9a5?v=389d346138488027be06000cda5073a4"
-            style={{width:'100%',height:'100%',border:'none'}}
-            allowFullScreen/>
-        {/* </SignedIn>
-        <SignedOut>
-          <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
-            height:'100%',gap:14,padding:24,textAlign:'center'}}>
-            <div style={{fontSize:32}}>🔒</div>
-            <div style={{fontFamily:osw,fontWeight:700,fontSize:13,color:'var(--text)'}}>Sign in to view Yard Picks</div>
-            <SignInButton mode="modal">
-              <button style={{padding:'8px 18px',borderRadius:7,cursor:'pointer',fontSize:11,
-                fontFamily:osw,fontWeight:700,border:'1px solid var(--ice)',
-                background:'rgba(56,184,242,.12)',color:'var(--ice)'}}>
-                Sign In
-              </button>
-            </SignInButton>
-          </div>
-        </SignedOut> */}
-      </div>
-    </div>
-    <div onClick={onClose} style={{position:'fixed',inset:0,zIndex:9998,background:'rgba(0,0,0,.4)'}}/>
-  </>;
-}
-
-function ReceiptBtn({ onClick }) {
-  return (
-    <button onClick={onClick} data-tip="View Yard Picks"
-      style={{padding:'3px 8px',borderRadius:6,fontSize:10,cursor:'pointer',
-        border:'1px solid var(--border)',color:'var(--muted)',background:'transparent',
-        flexShrink:0,fontWeight:700,lineHeight:1}}>🧾</button>
-  );
-}
-
-
 function HRTrackerTab() {
   const [hrTab, setHrTab] = useState('tracker');
   const [hrs, setHrs] = useState([]);
@@ -21497,7 +21442,6 @@ function MatchupEngineTab() {
   // Expose setSubTab globally so HomeTab's "→ All Matchups" button can deep-link
   React.useEffect(() => { window._setMatchupSubTab = setSubTab; return () => { window._setMatchupSubTab = null; }; }, [setSubTab]);
   const [showKMHelp, setShowKMHelp] = useState(false);
-  const [showReceipt, setShowReceipt] = useState(false);
   const [data, setData]           = useState([]);
   const [tomorrowData, setTomorrowData] = useState([]);
   // Full engine output (all batters) for the All Matchups tab
@@ -21831,7 +21775,6 @@ function MatchupEngineTab() {
       ['Pitcher Grades', "🎯 Target = easiest to homer off. 💥 Hittable = solid. 🤔 Average = neutral. ⚠️ Tough = difficult. ‼️ Elite = avoid."],
       ['Legend', "A+ = 6–8 flags (highest HR rate) · A = 4–5 · B = 2–3 · C = 1 · D = 0 flags."],
     ]} onClose={()=>setShowKMHelp(false)}/>}
-    {showReceipt && <ReceiptSlideout onClose={()=>setShowReceipt(false)}/>}
     <div style={{display:'flex',flexDirection:'column',gap:4,marginBottom:14}}>
       {/* Row 1: matchup boards */}
       <div style={{display:'flex',gap:4,flexWrap:'wrap',justifyContent:'center'}}>
@@ -21839,6 +21782,7 @@ function MatchupEngineTab() {
         <button style={stBtn('allmatches')} data-subtab="allmatches" onClick={()=>setSubTab('allmatches')}>📋 All Matchups</button>
         <button style={stBtn('longshot')}   onClick={()=>setSubTab('longshot')}>🎲 Long Shot</button>
         <button style={stBtn('attack')}     onClick={()=>setSubTab('attack')}>🎯 Attack List</button>
+        <button style={stBtn('yardpicks')}  onClick={()=>setSubTab('yardpicks')}>🧾 Yard Picks</button>
       </div>
       {/* Row 2: prop markets */}
       <div style={{display:'flex',gap:4,flexWrap:'wrap',justifyContent:'center'}}>
@@ -21851,7 +21795,6 @@ function MatchupEngineTab() {
         <button style={stBtn('batters')}   onClick={()=>setSubTab('batters')}>🧢 Batters</button>
         <button style={stBtn('pitchers')}  onClick={()=>setSubTab('pitchers')}>⚾ Pitchers</button>
         <button style={stBtn('history')}   onClick={()=>setSubTab('history')}>📜 BvP History</button>
-        <ReceiptBtn onClick={()=>setShowReceipt(v=>!v)}/>
         <HelpBtn onClick={()=>setShowKMHelp(v=>!v)}/>
       </div>
     </div>
@@ -21951,6 +21894,18 @@ function MatchupEngineTab() {
     {subTab==='sbprops' && <SBPropsTab/>}
     {subTab==='walks'   && <WalksTab/>}
     {subTab==='attack'  && <PitchersToAttackTab/>}
+    {subTab==='yardpicks' && (
+      <div style={{width:'100%',height:'calc(100vh - 230px)',overflow:'hidden',position:'relative',
+        borderRadius:10,border:'1px solid var(--border)'}}>
+        <iframe
+          title="Yard Picks"
+          src="https://twilight-wolf-59d.notion.site/ebd//389d3461384880f1bce0e9dd1556e9a5?v=389d346138488027be06000cda5073a4"
+          frameBorder="0"
+          allowFullScreen
+          style={{width:'100%',height:'100%',border:'none',display:'block'}}
+        />
+      </div>
+    )}
 
     {/* Matchups content (hidden when on other tabs) */}
     {subTab==='matchups' && <>
