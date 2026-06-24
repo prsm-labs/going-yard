@@ -12022,6 +12022,7 @@ function YardPicksFeedTab() {
   const [cursor,   setCursor]   = useState(null);
   const [hasMore,  setHasMore]  = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const fetchPicks = async (startCursor) => {
     try {
@@ -12050,11 +12051,28 @@ function YardPicksFeedTab() {
     fetchPicks(cursor);
   };
 
+  const refresh = () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    setError(null);
+    setCursor(null);
+    fetchPicks(null).finally(() => setRefreshing(false));
+  };
+
   return (
     <div style={{maxWidth:480,margin:'0 auto',padding:'4px 0 24px'}}>
       <div style={{display:'flex',alignItems:'center',gap:8,padding:'4px 4px 14px'}}>
         <span style={{fontSize:18}}>🧾</span>
         <span style={{fontFamily:osw,fontWeight:800,fontSize:16,color:'var(--text)'}}>Yard Picks</span>
+        <button onClick={refresh} disabled={refreshing} data-tip="Refresh"
+          style={{marginLeft:'auto',padding:'4px 10px',borderRadius:6,fontSize:11,
+            cursor:refreshing?'default':'pointer',border:'1px solid var(--border)',
+            color:'var(--muted)',background:'transparent',fontWeight:700,
+            display:'flex',alignItems:'center',gap:5,opacity:refreshing?.6:1}}>
+          <span style={{display:'inline-block',transition:'transform .4s',
+            transform:refreshing?'rotate(360deg)':'none'}}>↻</span>
+          {refreshing ? 'Refreshing…' : 'Refresh'}
+        </button>
       </div>
 
       {loading && (
