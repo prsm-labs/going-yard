@@ -21794,12 +21794,11 @@ function MatchupEngineTab() {
         <button style={stBtn('batters')}   onClick={()=>setSubTab('batters')}>🧢 Batters</button>
         <button style={stBtn('pitchers')}  onClick={()=>setSubTab('pitchers')}>⚾ Pitchers</button>
         <button style={stBtn('history')}   onClick={()=>setSubTab('history')}>📜 BvP History</button>
-        <button onClick={()=>setSubTab('yardpicks')} data-tip="Yard Picks"
+        <a href="https://twilight-wolf-59d.notion.site/389d3461384880f1bce0e9dd1556e9a5?v=389d346138488027be06000cda5073a4&source=copy_link"
+          target="_blank" rel="noopener noreferrer" data-tip="Yard Picks"
           style={{padding:'3px 8px',borderRadius:6,fontSize:10,cursor:'pointer',
-            border:`1px solid ${subTab==='yardpicks'?'var(--accent2)':'var(--border)'}`,
-            color:subTab==='yardpicks'?'var(--accent2)':'var(--muted)',
-            background:subTab==='yardpicks'?'rgba(245,166,35,.1)':'transparent',
-            flexShrink:0,fontWeight:700,lineHeight:1}}>🧾</button>
+            border:'1px solid var(--border)',color:'var(--muted)',background:'transparent',
+            flexShrink:0,fontWeight:700,lineHeight:1,textDecoration:'none',display:'inline-block'}}>🧾</a>
         <HelpBtn onClick={()=>setShowKMHelp(v=>!v)}/>
       </div>
     </div>
@@ -21899,18 +21898,6 @@ function MatchupEngineTab() {
     {subTab==='sbprops' && <SBPropsTab/>}
     {subTab==='walks'   && <WalksTab/>}
     {subTab==='attack'  && <PitchersToAttackTab/>}
-    {subTab==='yardpicks' && (
-      <div style={{width:'100%',height:'calc(100vh - 230px)',overflow:'hidden',position:'relative',
-        borderRadius:10,border:'1px solid var(--border)'}}>
-        <iframe
-          title="Yard Picks"
-          src="https://twilight-wolf-59d.notion.site/389d3461384880f1bce0e9dd1556e9a5?v=389d346138488027be06000cda5073a4&source=copy_link"
-          frameBorder="0"
-          allowFullScreen
-          style={{width:'100%',height:'100%',border:'none',display:'block'}}
-        />
-      </div>
-    )}
 
     {/* Matchups content (hidden when on other tabs) */}
     {subTab==='matchups' && <>
