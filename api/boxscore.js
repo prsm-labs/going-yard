@@ -61,6 +61,19 @@ export default async function handler(req, res) {
         };
       }
 
+      // ── Truly-current pitcher (Spec 3 fix) ───────────────────────
+      // sc.currentPitcherId (set per-batter below) only reflects who THAT
+      // SPECIFIC batter last faced, which goes stale for the rest of the
+      // lineup the moment a pitching change happens but before they bat
+      // again. currentPlay always reflects the actual live state, so it's
+      // the reliable source for "who is pitching right now" — applied to
+      // every batter on the offense's team in the API response below,
+      // not looked up per-batter from history.
+      const liveCurrentPitcherId   = currentPlay?.matchup?.pitcher?.id     || null;
+      const liveCurrentPitcherName = currentPlay?.matchup?.pitcher?.fullName || null;
+      // isTopInning tells us which side is batting (away bats top, home bats bottom)
+      const offenseIsAway = currentPlay?.about?.isTopInning ?? null;
+
       // ── Statcast per batter AND per pitcher ─────────────────────
       for (const play of plays) {
         const batterId    = play.matchup?.batter?.id;
@@ -189,9 +202,10 @@ export default async function handler(req, res) {
             dist: dist ? Math.round(dist)          : null,
           });
         }
-        // Track this batter's current/most recent opposing pitcher (last play wins —
-        // allPlays is chronological, so the final assignment as the loop completes
-        // reflects who he's facing right now or most recently faced)
+        // NOTE: this per-batter currentPitcherId reflects who THIS BATTER last
+        // faced — accurate for him, but goes stale for teammates who haven't
+        // batted since a pitching change. Use liveCurrentPitcherId (below) for
+        // "who is pitching right now" instead — see fix note above.
         if (pitcherId) sc.currentPitcherId = pitcherId;
       }
     }
@@ -208,6 +222,9 @@ export default async function handler(req, res) {
       ...boxData,
       statcastByBatter,
       statcastByPitcher: statcastByPitcherOut,
+      liveCurrentPitcherId,
+      liveCurrentPitcherName,
+      offenseIsAway,    // true = away team batting (home team pitching), false = home batting
       currentBatterId,
       onDeckId,
       inTheHoleId,

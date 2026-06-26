@@ -4757,6 +4757,9 @@ async function fetchLiveBatters(gamePk) {
     // Map: batterId → { evs[], las[], distances[], hardHits, barrels }
   const liveStatcast    = data.statcastByBatter || {};
   const liveStatcastPitcher = data.statcastByPitcher || {};
+  const liveCurrentPitcherId   = data.liveCurrentPitcherId   || null;
+  const liveCurrentPitcherName = data.liveCurrentPitcherName || null;
+  const offenseIsAway = data.offenseIsAway ?? null; // true = away batting (home pitching)
   const currentBatterId = data.currentBatterId  || null;
   const onDeckId        = data.onDeckId         || null;
   const inTheHoleId     = data.inTheHoleId      || null;
@@ -4843,10 +4846,26 @@ async function fetchLiveBatters(gamePk) {
 
         // Spec 3: opposing pitcher's live Form, looked up via the pitcher he's
         // currently/most-recently facing (sc.currentPitcherId from boxscore.js)
-        const oppPitcherId = live?.currentPitcherId || null;
+        // Spec 3 fix: prefer the truly-current pitcher (from currentPlay) when
+        // this batter's side is the one actually at the plate right now — this
+        // is correct for EVERY batter on that team, not just the one currently
+        // batting, since it's "who's pitching" not "who did I personally face."
+        // Falls back to this batter's own last-faced pitcher (sc.currentPitcherId)
+        // only when we can't tell which side is current (offenseIsAway is null)
+        // or this batter's side doesn't match — keeps it accurate rather than
+        // showing a long-gone starter for the team not currently up.
+        const sideIsCurrentlyBatting = offenseIsAway !== null && (
+          (side === 'away' && offenseIsAway === true) ||
+          (side === 'home' && offenseIsAway === false)
+        );
+        const oppPitcherId = sideIsCurrentlyBatting && liveCurrentPitcherId
+          ? liveCurrentPitcherId
+          : (live?.currentPitcherId || null);
         const oppPitcherStats = oppPitcherId ? liveStatcastPitcher[oppPitcherId] : null;
         const pitcherForm = oppPitcherStats ? getPitcherForm(oppPitcherStats) : null;
-        const oppPitcherName = oppPitcherStats?.name || null;
+        const oppPitcherName = oppPitcherStats?.name
+          || (sideIsCurrentlyBatting ? liveCurrentPitcherName : null)
+          || null;
 
         // Spec 3: combined sortable scores (table default-sorts by liveScore desc)
         const liveScore = getBatterScore(heatLabel, disciplineLabel);
@@ -6129,7 +6148,9 @@ function estimateRemainingPA(inning, isTop) {
   // Rough remaining-PA estimate: ~4.3 PA/team/game season-wide, spread over 9 innings.
   // Internal only — NOT shown as a column per DJ's feedback (no reliable way to know
   // this exactly); used only to scale the projected REST-OF-GAME line below.
-  const inningsLeft = Math.max(0, 9 - (inning || 1) + (isTop ? 0.5 : 0));
+  const inningNum = parseInt(inning, 10);
+  const safeInning = Number.isFinite(inningNum) ? inningNum : 5; // mid-game fallback, never NaN
+  const inningsLeft = Math.max(0, 9 - safeInning + (isTop ? 0.5 : 0));
   return Math.max(0.3, (inningsLeft / 9) * 4.3);
 }
 
@@ -6185,7 +6206,7 @@ function LiveSimTab({ games, date, isToday }) {
             if (cancelled) return;
             const formMult = FORM_RATE_MULT[b.heatLabel?.cls] ?? 1.0;
             const pitchMult = PITCHER_FORM_MULT[b.pitcherForm?.cls] ?? 1.0;
-            const withInning = { ...b, _inning: game.inning, _isTop: game.isTop };
+            const withInning = { ...b, _inning: game.currentInning, _isTop: game.currentHalf === 'Top' };
             const proj = projectRestOfGame(withInning, formMult, pitchMult);
 
             all.push({
