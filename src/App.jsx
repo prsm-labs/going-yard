@@ -541,13 +541,19 @@ const getPitcherForm = (pc) => {
 // not a single stat). Returned alongside heatLabel, not merged into it,
 // since contact quality and plate discipline can disagree (e.g. early chase
 // problems before settling in) and collapsing them loses information.
-const getBatterDiscipline = (sc) => {
+const getBatterDiscipline = (sc, hr, hits) => {
   if (!sc || sc.pitchesSeen < 5) return null; // not enough data yet — caller should omit badge
 
   const chaseRate = sc.swings > 0 ? sc.chases / sc.swings : 0;
   const whiffRate = sc.pitchesSeen > 0 ? sc.swingingStrikes / sc.pitchesSeen : 0;
   const hardHitRate = (sc.evs.length > 0) ? sc.hardHits / sc.evs.length : null;
 
+  // "Locked In": disciplined (not chasing) AND already producing results tonight —
+  // the top tier, above "Seeing It Well" which can fire on contact quality alone
+  // with no result yet. Requires an actual hit or HR on the board.
+  if (chaseRate < 0.20 && (hr > 0 || (hits||0) >= 2)) {
+    return { label: "🔒 Locked In", cls: "elite" };
+  }
   // "Lost": chasing AND missing, regardless of contact quality so far
   if (chaseRate >= 0.40 && sc.swingingStrikes >= 2) {
     return { label: "🌀 Looks Lost", cls: "cold" };
@@ -561,6 +567,28 @@ const getBatterDiscipline = (sc) => {
     return { label: "👁️ Seeing It Well", cls: "hot" };
   }
   return null; // no strong discipline read — defer to heatLabel only
+};
+
+// ── Spec 3: combined sortable batter score ─────────────────────────────────
+// Merges heatLabel (contact quality) + discipline (chase/lost/locked-in) into
+// ONE number for default sorting, same style as getLHL's internal ep+lp+hp
+// point system. Not a new display label — heatLabel/disciplineLabel badges
+// still render as-is; this is purely for ranking the table.
+const CLS_POINTS = { gone_yard:10, elite:9, hot:6, warm:3, avg:1, cold:-3 };
+const getBatterScore = (heatLabel, disciplineLabel) => {
+  const heatPts = CLS_POINTS[heatLabel?.cls] ?? 0;
+  const discPts = disciplineLabel ? (CLS_POINTS[disciplineLabel.cls] ?? 0) : 0;
+  return heatPts + discPts;
+};
+
+// ── Spec 3: numeric pitcher score, same CLS_POINTS scale, sign-flipped sense
+// (pitcher "cold" cls = bad for him being hit hard = should rank LOW as a
+// threat-to-batters score, so we don't flip sign — "cold" pitcher cls already
+// means "getting hit," which is GOOD for the batter facing him, not the pitcher
+// himself; this score represents pitcher effectiveness, so cold = low score).
+const getPitcherScore = (pitcherForm) => {
+  if (!pitcherForm) return 0;
+  return CLS_POINTS[pitcherForm.cls] ?? 0;
 };
 
 const ini = (n) => n?.split(" ").map(p => p[0]).join("").toUpperCase().slice(0, 2) || "?";
@@ -4808,10 +4836,10 @@ async function fetchLiveBatters(gamePk) {
         return getLHL(displayEV, displayLA, gameHardHits);
       })();
 
-        // Spec 3: plate-discipline read (chase/battling) — separate from heatLabel,
-        // since contact quality and discipline can disagree. May be null if not
-        // enough pitches seen yet or no strong read either way.
-        const disciplineLabel = getBatterDiscipline(live);
+        // Spec 3: plate-discipline read (chase/battling/locked-in) — separate
+        // from heatLabel, since contact quality and discipline can disagree.
+        // May be null if not enough pitches seen yet or no strong read either way.
+        const disciplineLabel = getBatterDiscipline(live, hr, hits);
 
         // Spec 3: opposing pitcher's live Form, looked up via the pitcher he's
         // currently/most-recently facing (sc.currentPitcherId from boxscore.js)
@@ -4819,6 +4847,10 @@ async function fetchLiveBatters(gamePk) {
         const oppPitcherStats = oppPitcherId ? liveStatcastPitcher[oppPitcherId] : null;
         const pitcherForm = oppPitcherStats ? getPitcherForm(oppPitcherStats) : null;
         const oppPitcherName = oppPitcherStats?.name || null;
+
+        // Spec 3: combined sortable scores (table default-sorts by liveScore desc)
+        const liveScore = getBatterScore(heatLabel, disciplineLabel);
+        const oppPitcherScore = getPitcherScore(pitcherForm);
 
         batters.push({
           id: bid,
@@ -4848,6 +4880,8 @@ async function fetchLiveBatters(gamePk) {
           oppPitcherId,
           oppPitcherName,
           pitcherForm,            // null if pitcher has <8 pitches thrown so far
+          liveScore,              // combined Form+Discipline score, for default sort
+          oppPitcherScore,        // pitcher's own numeric score
 
           // Season baselines (from Savant cache)
           barrel:          seasonBarrel,
@@ -6070,29 +6104,70 @@ function RefBtn({refreshing, onClick}) {
 // the UI as a live estimate, not presented with pregame-Sim-level confidence.
 // See spec_03_live_sim_box_score.md.
 
+// Module-level pending gamePk — GamedayTab checks this on mount to deep-link
+// to a specific game, same lightweight pattern as _OPEN_TEAM_SLIDE/_GLOBAL_NAV.
+// Set right before calling navTo('live','gameday') from LiveSimTab.
+let _PENDING_GAMEDAY_PK = null;
+function goToGameday(gamePk) {
+  _PENDING_GAMEDAY_PK = gamePk;
+  navTo('live', 'gameday');
+}
+
 // Simple per-PA rate multipliers by Form class — first-pass, not backtested.
 // "hot"/"elite" boosts the rate, "cold" suppresses it, "warm"/"avg" ~neutral.
 const FORM_RATE_MULT = {
   gone_yard: 1.35, elite: 1.30, hot: 1.18, warm: 1.05, avg: 1.0, cold: 0.75,
 };
 const PITCHER_FORM_MULT = {
-  hot: 0.80,      // "🔥 Dealing" — suppresses batter's expected output
+  hot: 0.80,      // "🔥 Dealing" — suppresses batter's expected REST-OF-GAME output
   warm: 0.92,     // "🎯 In Control"
   avg: 1.0,
-  cold: 1.20,     // "⚠️ Getting Hit Hard" / "📉 Velo Down" — boosts batter's expected output
+  cold: 1.20,     // "⚠️ Getting Hit Hard" / "📉 Velo Down" — boosts it
 };
 
-function estimateRemainingPA(inning, isTopInning) {
+function estimateRemainingPA(inning, isTop) {
   // Rough remaining-PA estimate: ~4.3 PA/team/game season-wide, spread over 9 innings.
-  // First-pass linear estimate — not validated, intentionally simple per Spec 3 scope.
-  const inningsLeft = Math.max(0, 9 - (inning || 1) + (isTopInning ? 0.5 : 0));
+  // Internal only — NOT shown as a column per DJ's feedback (no reliable way to know
+  // this exactly); used only to scale the projected REST-OF-GAME line below.
+  const inningsLeft = Math.max(0, 9 - (inning || 1) + (isTop ? 0.5 : 0));
   return Math.max(0.3, (inningsLeft / 9) * 4.3);
 }
+
+// ── Spec 3, corrected per DJ feedback ───────────────────────────────────────
+// Projects REMAINING box-score line only, then displays it ADDED to what the
+// batter has actually recorded tonight — never a standalone number that could
+// read as contradicting the real box score (the original mistake: showing
+// "Sim TB 2.1" next to a guy who already has 3 TB looked like a competing,
+// disconnected stat instead of a projection of what's left).
+function projectRestOfGame(b, formMult, pitchMult) {
+  const remainingPA = estimateRemainingPA(b._inning, b._isTop);
+  // Per-PA rate proxies — first pass, not backtested (same caveat as before,
+  // now applied to a fuller line instead of TB alone).
+  const rH  = 0.24, rHR = 0.032, rTB = 0.42, rBB = 0.085, rK = 0.22;
+  const mult = formMult * pitchMult;
+  return {
+    remH:  Math.round(rH  * mult * remainingPA * 100) / 100,
+    remHR: Math.round(rHR * mult * remainingPA * 100) / 100,
+    remTB: Math.round(rTB * mult * remainingPA * 100) / 100,
+    remBB: Math.round(rBB * mult * remainingPA * 100) / 100,
+    remK:  Math.round(rK  / mult * remainingPA * 100) / 100, // K rate moves opposite to form
+  };
+}
+
+const SIMLIVE_SORT_COLS = {
+  score:   { label: 'Form Score', get: (b) => b.liveScore ?? 0 },
+  pscore:  { label: 'Pitcher Score', get: (b) => b.oppPitcherScore ?? 0 },
+  name:    { label: 'Batter', get: (b) => b.name || '' },
+  projTB:  { label: 'Proj. Final TB', get: (b) => (b.totalBases||0) + (b._proj?.remTB||0) },
+  projH:   { label: 'Proj. Final H',  get: (b) => (b.hits||0) + (b._proj?.remH||0) },
+};
 
 function LiveSimTab({ games, date, isToday }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(null);
+  const [sortCol, setSortCol] = useState('score');
+  const [sortDir, setSortDir] = useState('desc'); // default: highest Form score first
   const liveGames = (games||[]).filter(g => g.status==='Live');
 
   useEffect(() => {
@@ -6110,24 +6185,19 @@ function LiveSimTab({ games, date, isToday }) {
             if (cancelled) return;
             const formMult = FORM_RATE_MULT[b.heatLabel?.cls] ?? 1.0;
             const pitchMult = PITCHER_FORM_MULT[b.pitcherForm?.cls] ?? 1.0;
-            // Pregame per-PA TB rate proxy: season ISO-ish stand-in from cached season stats
-            // if available, else a flat league-ish baseline — first pass only.
-            const baseRatePerPA = (b.seasonAvgEV && b.seasonAvgEV > 0) ? 0.42 : 0.38;
-            const remainingPA = estimateRemainingPA(game.inning, game.isTop);
-            const liveSimTB = Math.round(baseRatePerPA * formMult * pitchMult * remainingPA * 100) / 100;
+            const withInning = { ...b, _inning: game.inning, _isTop: game.isTop };
+            const proj = projectRestOfGame(withInning, formMult, pitchMult);
 
             all.push({
               ...b,
               gamePk: game.gamePk,
               gameLabel: `${game.away?.abbr||'???'}@${game.home?.abbr||'???'}`,
-              remainingPA: Math.round(remainingPA*10)/10,
-              liveSimTB,
+              _proj: proj,
             });
           });
         } catch(e) {}
       }));
       if (!cancelled) {
-        all.sort((a,b)=>(b.liveSimTB||0)-(a.liveSimTB||0));
         setRows(all);
         setLoading(false);
         setLastUpdate(new Date());
@@ -6135,9 +6205,27 @@ function LiveSimTab({ games, date, isToday }) {
     };
 
     poll();
-    const interval = setInterval(poll, 15000); // 15s — slower than dev-tools test cadence, real usage doesn't need 5s
+    const interval = setInterval(poll, 15000);
     return () => { cancelled = true; clearInterval(interval); };
   }, [liveGames.length, isToday]);
+
+  const sorted = [...rows].sort((a,b) => {
+    const getter = SIMLIVE_SORT_COLS[sortCol]?.get || SIMLIVE_SORT_COLS.score.get;
+    const av = getter(a), bv = getter(b);
+    const cmp = (typeof av === 'string') ? av.localeCompare(bv) : (av - bv);
+    return sortDir === 'desc' ? -cmp : cmp;
+  });
+
+  const toggleSort = (col) => {
+    if (sortCol === col) setSortDir(d => d === 'desc' ? 'asc' : 'desc');
+    else { setSortCol(col); setSortDir('desc'); }
+  };
+
+  const SortHeader = ({col, children}) => (
+    <th onClick={()=>toggleSort(col)} style={{padding:'6px 8px',cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}}>
+      {children}{sortCol===col ? (sortDir==='desc'?' ▼':' ▲') : ''}
+    </th>
+  );
 
   if (!isToday) {
     return <div style={{padding:'50px 20px',textAlign:'center',color:'var(--muted)',
@@ -6160,14 +6248,14 @@ function LiveSimTab({ games, date, isToday }) {
     <div style={{padding:'8px 12px',marginBottom:10,borderRadius:8,
       background:'rgba(245,166,35,.08)',border:'1px solid rgba(245,166,35,.25)',
       fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace",lineHeight:1.5}}>
-      ⚠️ Live estimate — Sim TB here is a live re-projection, NOT the validated
-      pregame Sim engine. Treat as directional, not exact, until checked against
-      real results over time.
+      ⚠️ "Proj. Final" = what's already on the box score tonight + a live-estimated
+      projection of his remaining at-bats. Not the validated pregame Sim engine —
+      treat as directional, not exact, until checked against real results over time.
     </div>
 
     {loading
       ? <div className="lw" style={{padding:'40px 0'}}><div className="sp"/><div className="lt">Loading live matchups…</div></div>
-      : rows.length === 0
+      : sorted.length === 0
         ? <div style={{padding:'50px 20px',textAlign:'center',color:'var(--muted)',
             fontFamily:"'DM Mono',monospace",fontSize:12,lineHeight:2}}>
             No live games right now.<br/>Check back once tonight's games start.
@@ -6176,27 +6264,44 @@ function LiveSimTab({ games, date, isToday }) {
           <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
             <thead>
               <tr style={{borderBottom:'1px solid var(--border)',textAlign:'left',color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:10}}>
-                <th style={{padding:'6px 8px'}}>Batter</th>
+                <SortHeader col="name">Batter</SortHeader>
                 <th style={{padding:'6px 8px'}}>Game</th>
                 <th style={{padding:'6px 8px'}}>Form</th>
                 <th style={{padding:'6px 8px'}}>Discipline</th>
+                <SortHeader col="score">Score</SortHeader>
                 <th style={{padding:'6px 8px'}}>Pitcher</th>
                 <th style={{padding:'6px 8px'}}>Pitcher Form</th>
-                <th style={{padding:'6px 8px'}}>Rem. PA</th>
-                <th style={{padding:'6px 8px'}}>Live Sim TB</th>
+                <SortHeader col="pscore">P.Score</SortHeader>
+                <SortHeader col="projH">Proj. Final H</SortHeader>
+                <SortHeader col="projTB">Proj. Final TB</SortHeader>
               </tr>
             </thead>
             <tbody>
-              {rows.map((b,idx) => (
+              {sorted.map((b,idx) => (
                 <tr key={`ls-${b.id}-${idx}`} style={{borderBottom:'1px solid var(--border)'}}>
-                  <td style={{padding:'6px 8px',fontWeight:600}}>{b.name}</td>
-                  <td style={{padding:'6px 8px',color:'var(--muted)'}}>{b.gameLabel}</td>
+                  <td style={{padding:'6px 8px',fontWeight:600,cursor:'pointer',color:'var(--text)'}}
+                    onClick={()=>openAtBatSlide({pid:b.id, name:b.name, team:b.team})}>
+                    {b.name}
+                  </td>
+                  <td style={{padding:'6px 8px',color:'var(--accent2)',cursor:'pointer',textDecoration:'underline'}}
+                    onClick={()=>goToGameday(b.gamePk)}>
+                    {b.gameLabel}
+                  </td>
                   <td style={{padding:'6px 8px'}}>{b.heatLabel?.label || '—'}</td>
                   <td style={{padding:'6px 8px'}}>{b.disciplineLabel?.label || '—'}</td>
-                  <td style={{padding:'6px 8px',color:'var(--muted)'}}>{b.oppPitcherName || '—'}</td>
+                  <td style={{padding:'6px 8px',textAlign:'right',fontWeight:700}}>{b.liveScore ?? 0}</td>
+                  <td style={{padding:'6px 8px',color:'var(--accent2)',cursor:'pointer',textDecoration: b.oppPitcherId?'underline':'none'}}
+                    onClick={()=>b.oppPitcherId && openPitcherSlide({pid:b.oppPitcherId, name:b.oppPitcherName, team:'', hand:'', pitchMix:[]})}>
+                    {b.oppPitcherName || '—'}
+                  </td>
                   <td style={{padding:'6px 8px'}}>{b.pitcherForm?.label || '—'}</td>
-                  <td style={{padding:'6px 8px',textAlign:'right'}}>{b.remainingPA}</td>
-                  <td style={{padding:'6px 8px',textAlign:'right',fontWeight:700,color:'var(--accent)'}}>{b.liveSimTB}</td>
+                  <td style={{padding:'6px 8px',textAlign:'right'}}>{b.oppPitcherScore ?? 0}</td>
+                  <td style={{padding:'6px 8px',textAlign:'right'}}>
+                    {b.hits||0}<span style={{color:'var(--muted)'}}> + {b._proj?.remH ?? 0}</span>
+                  </td>
+                  <td style={{padding:'6px 8px',textAlign:'right',fontWeight:700,color:'var(--accent)'}}>
+                    {b.totalBases||0}<span style={{color:'var(--muted)',fontWeight:400}}> + {b._proj?.remTB ?? 0}</span>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -9274,6 +9379,15 @@ function GamedayTab() {
   }, []);
 
   useEffect(() => { loadSchedule(selDate); }, [selDate]);
+
+  // Spec 3: deep-link from Live Sim tab — if a game was pre-selected via
+  // goToGameday(), jump straight to it once today's schedule has loaded.
+  useEffect(() => {
+    if (_PENDING_GAMEDAY_PK && games.some(g => g.gamePk === _PENDING_GAMEDAY_PK)) {
+      setSelGamePk(_PENDING_GAMEDAY_PK);
+      _PENDING_GAMEDAY_PK = null;
+    }
+  }, [games]);
 
   // Auto-fetch live data for all live games when schedule loads
   useEffect(() => { if (games.length) loadAllLive(games); }, [games]);
