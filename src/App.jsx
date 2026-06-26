@@ -544,9 +544,14 @@ const getPitcherForm = (pc) => {
 const getBatterDiscipline = (sc, hr, hits) => {
   if (!sc || sc.pitchesSeen < 5) return null; // not enough data yet — caller should omit badge
 
-  const chaseRate = sc.swings > 0 ? sc.chases / sc.swings : 0;
-  const whiffRate = sc.pitchesSeen > 0 ? sc.swingingStrikes / sc.pitchesSeen : 0;
+  // chase rate = true chases (swung outside zone AND got beaten by it) ÷
+  // swings AT out-of-zone pitches specifically — not all swings tonight,
+  // since in-zone swings shouldn't dilute a rate about getting fooled
+  // outside the zone (per DJ).
+  const chaseRate = (sc.oobSwings || 0) > 0 ? sc.chases / sc.oobSwings : 0;
   const hardHitRate = (sc.evs.length > 0) ? sc.hardHits / sc.evs.length : null;
+  const ks = sc.strikeouts || 0;
+  const chasesDown02 = sc.chasesWhileDown02 || 0;
 
   // "Locked In": disciplined (not chasing) AND already producing results tonight —
   // the top tier, above "Seeing It Well" which can fire on contact quality alone
@@ -554,13 +559,18 @@ const getBatterDiscipline = (sc, hr, hits) => {
   if (chaseRate < 0.20 && (hr > 0 || (hits||0) >= 2)) {
     return { label: "🔒 Locked In", cls: "elite" };
   }
-  // "Lost": chasing AND missing, regardless of contact quality so far
-  if (chaseRate >= 0.40 && sc.swingingStrikes >= 2) {
+  // "Lost": checked BEFORE "Battling" — per DJ, fouling pitches off (battling-
+  // style) that ENDS IN 2+ real strikeouts tonight should read as Lost, not
+  // Battling. The earlier version had this backwards (Battling short-
+  // circuited before the K count was ever checked). High-chase-while-down-0-2
+  // is the other path in here — cornered AND chasing, not just a deep count.
+  if (ks >= 2 || (chaseRate >= 0.40 && chasesDown02 >= 1)) {
     return { label: "🌀 Looks Lost", cls: "cold" };
   }
-  // "Battling": seeing a lot of pitches, fouling off, NOT chasing — discipline good
-  // even if no results yet (distinct from getLHL, which only reads contact quality)
-  if (sc.fouls >= 2 && chaseRate < 0.25) {
+  // "Battling": a guy fouling off a lot of pitches tonight while not chasing,
+  // and NOT racking up multiple real strikeouts (caught above already) —
+  // 4+ fouls per DJ (raised from 2, since 2 is normal for one deep count).
+  if (sc.fouls >= 4 && chaseRate < 0.25) {
     return { label: "🥊 Battling", cls: "warm" };
   }
   if (hardHitRate !== null && hardHitRate >= 0.5 && chaseRate < 0.25) {
@@ -6302,7 +6312,10 @@ function LiveSimTab({ games, date, isToday }) {
                 <tr key={`ls-${b.id}-${idx}`} style={{borderBottom:'1px solid var(--border)'}}>
                   <td style={{padding:'6px 8px',fontWeight:600,cursor:'pointer',color:'var(--text)'}}
                     onClick={()=>openAtBatSlide({pid:b.id, name:b.name, team:b.team})}>
-                    {b.name}
+                    <div style={{display:'flex',alignItems:'center',gap:6}}>
+                      <PlayerAvatar pid={b.id} name={b.name} size={24}/>
+                      {b.name}
+                    </div>
                   </td>
                   <td style={{padding:'6px 8px',color:'var(--accent2)',cursor:'pointer',textDecoration:'underline'}}
                     onClick={()=>goToGameday(b.gamePk)}>
@@ -6311,9 +6324,14 @@ function LiveSimTab({ games, date, isToday }) {
                   <td style={{padding:'6px 8px'}}>{b.heatLabel?.label || '—'}</td>
                   <td style={{padding:'6px 8px'}}>{b.disciplineLabel?.label || '—'}</td>
                   <td style={{padding:'6px 8px',textAlign:'right',fontWeight:700}}>{b.liveScore ?? 0}</td>
-                  <td style={{padding:'6px 8px',color:'var(--accent2)',cursor:'pointer',textDecoration: b.oppPitcherId?'underline':'none'}}
+                  <td style={{padding:'6px 8px',color:'var(--accent2)',cursor:b.oppPitcherId?'pointer':'default',textDecoration: b.oppPitcherId?'underline':'none'}}
                     onClick={()=>b.oppPitcherId && openPitcherSlide({pid:b.oppPitcherId, name:b.oppPitcherName, team:'', hand:'', pitchMix:[]})}>
-                    {b.oppPitcherName || '—'}
+                    {b.oppPitcherId
+                      ? <div style={{display:'flex',alignItems:'center',gap:6}}>
+                          <PlayerAvatar pid={b.oppPitcherId} name={b.oppPitcherName} size={24}/>
+                          {b.oppPitcherName || '—'}
+                        </div>
+                      : '—'}
                   </td>
                   <td style={{padding:'6px 8px'}}>{b.pitcherForm?.label || '—'}</td>
                   <td style={{padding:'6px 8px',textAlign:'right'}}>{b.oppPitcherScore ?? 0}</td>

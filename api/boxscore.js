@@ -95,7 +95,11 @@ export default async function handler(req, res) {
             closeCalls: 0, ccMaxEV: 0, ccMaxDist: 0,
             // ── Form inputs (Spec 3) ──────────────────────────────
             pitchesSeen: 0, swings: 0, chases: 0, zonePitches: 0,
-            calledStrikes: 0, swingingStrikes: 0, fouls: 0,
+            calledStrikes: 0, swingingStrikes: 0, fouls: 0, strikeouts: 0, oobSwings: 0,
+            // "Looks Lost" inputs (DJ: outcome-based, not raw whiff count) —
+            // strikeouts tonight, and how many times he chased (swung at an
+            // out-of-zone pitch) specifically while down 0-2 in the count.
+            chasesWhileDown02: 0,
             trajectories: { ground_ball:0, fly_ball:0, line_drive:0, popup:0 },
             hardnessOnHard: { soft:0, medium:0, hard:0 }, // hardness tag on EV>=95 contact only
           };
@@ -120,8 +124,10 @@ export default async function handler(req, res) {
         const isHR       = (play.result?.event || '').toLowerCase() === 'home_run';
         const isK        = (play.result?.event || '').toLowerCase().includes('strikeout');
         if (isK && pc) pc.strikeouts++;
+        if (isK) sc.strikeouts++;
 
         let ev = null, la = null, dist = null, pitchType = null, trajectory = null, hardness = null;
+        let countBeforePitch = { balls: 0, strikes: 0 }; // running count WITHIN this at-bat, starts 0-0
 
         for (const evt of (play.playEvents || [])) {
           if (!evt.isPitch) continue;
@@ -140,13 +146,36 @@ export default async function handler(req, res) {
           if (inZone !== null) sc.zonePitches += inZone ? 1 : 0;
 
           const swung = det.isInPlay || (det.description||'').toLowerCase().includes('swinging') || (det.description||'').toLowerCase().includes('foul');
+          const isWhiff = (det.description||'').toLowerCase().includes('swinging strike');
+          const isFoulBall = (det.description||'').toLowerCase().includes('foul') && !det.isInPlay;
           if (swung) {
             sc.swings++;
-            if (inZone === false) sc.chases++;
+            if (inZone === false) {
+              // Denominator: ALL swings at out-of-zone pitches, regardless of
+              // outcome — this is what chase RATE divides into (per DJ).
+              sc.oobSwings = (sc.oobSwings || 0) + 1;
+              // Numerator: a TRUE chase is swinging outside the zone AND
+              // getting beaten by it (whiff or foul) — NOT any swing outside
+              // the zone, since putting an off-zone pitch in play (even
+              // weakly) means he wasn't actually fooled, he swung on purpose.
+              if (isWhiff || isFoulBall) {
+                sc.chases++;
+                // "Looks Lost" input: chasing specifically while already down
+                // 0-2 (count BEFORE this pitch — evt.count reflects the count
+                // AFTER it resolves, so we use the running tracker from prior
+                // pitches in this AB, confirmed via live capture 2026-06-25)
+                if (countBeforePitch.balls === 0 && countBeforePitch.strikes === 2) {
+                  sc.chasesWhileDown02++;
+                }
+              }
+            }
           }
           if ((det.description||'') === 'Called Strike') { sc.calledStrikes++; if (pc) pc.calledStrikes++; }
-          if ((det.description||'').toLowerCase().includes('swinging strike')) { sc.swingingStrikes++; if (pc) pc.whiffs++; }
-          if ((det.description||'').toLowerCase().includes('foul') && !det.isInPlay) { sc.fouls++; if (pc) pc.fouls++; }
+          if (isWhiff) { sc.swingingStrikes++; if (pc) pc.whiffs++; }
+          if (isFoulBall) { sc.fouls++; if (pc) pc.fouls++; }
+
+          // Update running count for the NEXT pitch in this at-bat
+          if (evt.count) countBeforePitch = { balls: evt.count.balls ?? countBeforePitch.balls, strikes: evt.count.strikes ?? countBeforePitch.strikes };
 
           const hd = evt.hitData;
           if (!hd?.launchSpeed) continue;
