@@ -22,6 +22,7 @@ export default async function handler(req, res) {
     // Parse live feed for Statcast hitData per batter
     // Returns map: batterId → { evs, las, distances, hardHits, barrels, atBats[], closeCalls }
     const statcastByBatter = {};
+    const statcastByPitcher = {};
 
     let currentBatterId = null;
     let onDeckId        = null;
@@ -60,9 +61,10 @@ export default async function handler(req, res) {
         };
       }
 
-      // ── Statcast per batter ─────────────────────────────────────
+      // ── Statcast per batter AND per pitcher ─────────────────────
       for (const play of plays) {
         const batterId    = play.matchup?.batter?.id;
+        const pitcherId    = play.matchup?.pitcher?.id;
         const pitcherName = play.matchup?.pitcher?.fullName || null;
         if (!batterId) continue;
 
@@ -75,21 +77,60 @@ export default async function handler(req, res) {
             // Non-HR batted balls: EV≥98, LA 18-35°, dist≥350ft
             // Collected server-side so data persists after game ends
             closeCalls: 0, ccMaxEV: 0, ccMaxDist: 0,
+            // ── Form inputs (Spec 3) ──────────────────────────────
+            pitchesSeen: 0, swings: 0, chases: 0, zonePitches: 0,
+            calledStrikes: 0, swingingStrikes: 0, fouls: 0,
+            trajectories: { ground_ball:0, fly_ball:0, line_drive:0, popup:0 },
+            hardnessOnHard: { soft:0, medium:0, hard:0 }, // hardness tag on EV>=95 contact only
+          };
+        }
+        if (pitcherId && !statcastByPitcher[pitcherId]) {
+          statcastByPitcher[pitcherId] = {
+            name: pitcherName, evsAllowed: [], hardHitsAllowed: 0, barrelsAllowed: 0,
+            outsOnHardHit: 0, hitsOnHardHit: 0, // Spec 3 open Q1: hard contact crossed with result
+            pitchesThrown: 0, whiffs: 0, strikeouts: 0, calledStrikes: 0, fouls: 0,
+            fbVelos: [], // fastball-only velocity this game (FF/SI/FC) — Spec 3 open Q2 (within-pitch-type)
+            battersFaced: new Set(),
           };
         }
 
         const sc = statcastByBatter[batterId];
+        const pc = pitcherId ? statcastByPitcher[pitcherId] : null;
+        if (pc) pc.battersFaced.add(batterId);
+
         const result     = play.result?.event || play.result?.description || null;
         const inning     = play.about?.inning      || null;
         const halfInning = play.about?.halfInning   || null;
         const isHR       = (play.result?.event || '').toLowerCase() === 'home_run';
+        const isK        = (play.result?.event || '').toLowerCase().includes('strikeout');
+        if (isK && pc) pc.strikeouts++;
 
-        let ev = null, la = null, dist = null, pitchType = null;
+        let ev = null, la = null, dist = null, pitchType = null, trajectory = null, hardness = null;
 
         for (const evt of (play.playEvents || [])) {
-          if (evt.details?.type?.code) {
-            pitchType = evt.details.type.description || evt.details.type.code;
+          if (!evt.isPitch) continue;
+          const det = evt.details || {};
+          if (det.type?.code) pitchType = det.type.code;
+
+          // ── Pitch-call counting (Form inputs) ───────────────────
+          sc.pitchesSeen++;
+          if (pc) pc.pitchesThrown++;
+          const isFastball = ['FF','SI','FC'].includes(det.type?.code);
+          const startSpeed = evt.pitchData?.startSpeed;
+          if (pc && isFastball && startSpeed) pc.fbVelos.push(parseFloat(startSpeed));
+
+          const zoneNum = evt.pitchData?.zone;
+          const inZone  = (zoneNum != null) ? (zoneNum <= 9) : null; // mirrors matchup_engine.py rule: zone>=11 is out
+          if (inZone !== null) sc.zonePitches += inZone ? 1 : 0;
+
+          const swung = det.isInPlay || (det.description||'').toLowerCase().includes('swinging') || (det.description||'').toLowerCase().includes('foul');
+          if (swung) {
+            sc.swings++;
+            if (inZone === false) sc.chases++;
           }
+          if ((det.description||'') === 'Called Strike') { sc.calledStrikes++; if (pc) pc.calledStrikes++; }
+          if ((det.description||'').toLowerCase().includes('swinging strike')) { sc.swingingStrikes++; if (pc) pc.whiffs++; }
+          if ((det.description||'').toLowerCase().includes('foul') && !det.isInPlay) { sc.fouls++; if (pc) pc.fouls++; }
 
           const hd = evt.hitData;
           if (!hd?.launchSpeed) continue;
@@ -97,13 +138,28 @@ export default async function handler(req, res) {
           ev   = parseFloat(hd.launchSpeed   || 0) || null;
           la   = parseFloat(hd.launchAngle   || 0);
           dist = parseFloat(hd.totalDistance || 0) || null;
+          trajectory = hd.trajectory || null;
+          hardness   = hd.hardness   || null;
 
           if (!ev || ev <= 0) { ev = null; continue; }
 
           sc.evs.push(ev);
           sc.las.push(la);
           if (dist > 0) sc.distances.push(dist);
-          if (ev >= 95) sc.hardHits++;
+          if (trajectory && sc.trajectories[trajectory] !== undefined) sc.trajectories[trajectory]++;
+          if (ev >= 95) {
+            sc.hardHits++;
+            if (hardness && sc.hardnessOnHard[hardness] !== undefined) sc.hardnessOnHard[hardness]++;
+          }
+          if (pc) {
+            pc.evsAllowed.push(ev);
+            if (ev >= 95) {
+              pc.hardHitsAllowed++;
+              // Spec 3 open Q1: cross hard contact against the actual play result
+              const wasOut = !!(play.result?.isOut);
+              if (wasOut) pc.outsOnHardHit++; else pc.hitsOnHardHit++;
+            }
+          }
 
           const barrel =
             (ev >= 116) ||
@@ -113,7 +169,7 @@ export default async function handler(req, res) {
             (ev >= 101 && la >= 25 && la <= 35) ||
             (ev >= 99  && la >= 25 && la <= 33) ||
             (ev >= 98  && la >= 26 && la <= 30);
-          if (barrel) sc.barrels++;
+          if (barrel) { sc.barrels++; if (pc) pc.barrelsAllowed++; }
 
           // ── Close call detection ─────────────────────────────────
           // Same criteria as LIVE_CC_MAP in App.jsx — computed here
@@ -127,20 +183,31 @@ export default async function handler(req, res) {
 
         if (result) {
           sc.atBats.push({
-            result, inning, halfInning, pitcherName, pitchType,
+            result, inning, halfInning, pitcherName, pitcherId: pitcherId || null, pitchType,
             ev:   ev   ? Math.round(ev * 10) / 10 : null,
             la:   ev   ? Math.round(la * 10) / 10 : null,
             dist: dist ? Math.round(dist)          : null,
           });
         }
+        // Track this batter's current/most recent opposing pitcher (last play wins —
+        // allPlays is chronological, so the final assignment as the loop completes
+        // reflects who he's facing right now or most recently faced)
+        if (pitcherId) sc.currentPitcherId = pitcherId;
       }
     }
 
-    console.log(`[Boxscore] gamePk=${gamePk} | Statcast batters: ${Object.keys(statcastByBatter).length}`);
+    // Sets don't survive JSON.stringify — convert battersFaced to a count
+    const statcastByPitcherOut = {};
+    for (const [pid, p] of Object.entries(statcastByPitcher)) {
+      statcastByPitcherOut[pid] = { ...p, battersFacedCount: p.battersFaced.size, battersFaced: undefined };
+    }
+
+    console.log(`[Boxscore] gamePk=${gamePk} | Statcast batters: ${Object.keys(statcastByBatter).length} | pitchers: ${Object.keys(statcastByPitcher).length}`);
 
     res.status(200).json({
       ...boxData,
       statcastByBatter,
+      statcastByPitcher: statcastByPitcherOut,
       currentBatterId,
       onDeckId,
       inTheHoleId,

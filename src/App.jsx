@@ -481,6 +481,88 @@ const getLHL = (ev, la, hh) => {
   const sc = ep + lp + hp;
   return sc >= 8 ? {label:"🔥 On Fire",cls:"elite"} : sc >= 5 ? {label:"🔥 Heating Up",cls:"hot"} : sc >= 3 ? {label:"🌡 Warm",cls:"warm"} : sc >= 1 ? {label:"— Neutral",cls:"avg"} : {label:"🧊 Ice Cold",cls:"cold"};
 };
+
+// ── Spec 3: Pitcher Form ──────────────────────────────────────────────────
+// Mirrors getLHL's plain, transparent, threshold style. Inputs come from the
+// new statcastByPitcher aggregation in api/boxscore.js.
+//
+// Reasonable defaults applied per DJ's "move forward as-is" direction
+// (see spec_03 open questions — these are first-pass choices, not final):
+//   - "Getting hit hard" requires hard contact that actually fell for hits,
+//     not just hard contact in general (Q1: crossed against play result).
+//   - Velo read uses fastball-only velocity this game vs. his fastball
+//     velocity earlier in this SAME game (first 15 pitches as the baseline
+//     window) — a true season-by-pitch-type baseline isn't wired in yet,
+//     so this is an in-game-relative read, not season-relative (Q2 deferred).
+//   - "Dealing" requires real strikeouts (5+), not just whiff volume (Q3:
+//     DJ's strikeout-based framing wins over a raw whiff count).
+const getPitcherForm = (pc) => {
+  if (!pc || pc.pitchesThrown < 8) return { label: "— Not enough data", cls: "avg" };
+
+  const hitsOnHard = pc.hitsOnHardHit || 0;
+  const outsOnHard = pc.outsOnHardHit || 0;
+  const gettingHit = hitsOnHard >= 3 && hitsOnHard > outsOnHard;
+
+  const fbVelos = pc.fbVelos || [];
+  let veloTrend = 0; // negative = losing velo this game
+  if (fbVelos.length >= 6) {
+    const half = Math.floor(fbVelos.length / 2);
+    const early = fbVelos.slice(0, half);
+    const late  = fbVelos.slice(half);
+    const avg = (arr) => arr.reduce((a,b)=>a+b,0) / arr.length;
+    veloTrend = avg(late) - avg(early);
+  }
+
+  const ks = pc.strikeouts || 0;
+  const whiffRate = pc.pitchesThrown > 0 ? pc.whiffs / pc.pitchesThrown : 0;
+
+  // Composite, in priority order (Q4: explicit combination rule, not one signal alone)
+  if (gettingHit && veloTrend <= -1.0) {
+    return { label: "⚠️ Getting Hit Hard — Fading", cls: "cold" };
+  }
+  if (gettingHit) {
+    return { label: "⚠️ Getting Hit Hard", cls: "cold" };
+  }
+  if (veloTrend <= -1.5) {
+    return { label: "📉 Velo Down", cls: "cold" };
+  }
+  if (ks >= 5 || (whiffRate >= 0.18 && pc.pitchesThrown >= 30)) {
+    return { label: "🔥 Dealing", cls: "hot" };
+  }
+  if (outsOnHard >= 2 && hitsOnHard === 0) {
+    return { label: "🎯 In Control", cls: "warm" };
+  }
+  return { label: "— Neutral", cls: "avg" };
+};
+
+// ── Spec 3: Batter discipline read (chase / lost vs battling) ────────────
+// Separate from getLHL's contact-quality read — this is specifically the
+// "is he chasing / does he look lost" signal DJ asked for (Q6: composite,
+// not a single stat). Returned alongside heatLabel, not merged into it,
+// since contact quality and plate discipline can disagree (e.g. early chase
+// problems before settling in) and collapsing them loses information.
+const getBatterDiscipline = (sc) => {
+  if (!sc || sc.pitchesSeen < 5) return null; // not enough data yet — caller should omit badge
+
+  const chaseRate = sc.swings > 0 ? sc.chases / sc.swings : 0;
+  const whiffRate = sc.pitchesSeen > 0 ? sc.swingingStrikes / sc.pitchesSeen : 0;
+  const hardHitRate = (sc.evs.length > 0) ? sc.hardHits / sc.evs.length : null;
+
+  // "Lost": chasing AND missing, regardless of contact quality so far
+  if (chaseRate >= 0.40 && sc.swingingStrikes >= 2) {
+    return { label: "🌀 Looks Lost", cls: "cold" };
+  }
+  // "Battling": seeing a lot of pitches, fouling off, NOT chasing — discipline good
+  // even if no results yet (distinct from getLHL, which only reads contact quality)
+  if (sc.fouls >= 2 && chaseRate < 0.25) {
+    return { label: "🥊 Battling", cls: "warm" };
+  }
+  if (hardHitRate !== null && hardHitRate >= 0.5 && chaseRate < 0.25) {
+    return { label: "👁️ Seeing It Well", cls: "hot" };
+  }
+  return null; // no strong discipline read — defer to heatLabel only
+};
+
 const ini = (n) => n?.split(" ").map(p => p[0]).join("").toUpperCase().slice(0, 2) || "?";
 
 // PlayerAvatar — MLB headshot with initials fallback
@@ -4646,6 +4728,7 @@ async function fetchLiveBatters(gamePk) {
     // Statcast data comes pre-parsed from the server
     // Map: batterId → { evs[], las[], distances[], hardHits, barrels }
   const liveStatcast    = data.statcastByBatter || {};
+  const liveStatcastPitcher = data.statcastByPitcher || {};
   const currentBatterId = data.currentBatterId  || null;
   const onDeckId        = data.onDeckId         || null;
   const inTheHoleId     = data.inTheHoleId      || null;
@@ -4725,6 +4808,18 @@ async function fetchLiveBatters(gamePk) {
         return getLHL(displayEV, displayLA, gameHardHits);
       })();
 
+        // Spec 3: plate-discipline read (chase/battling) — separate from heatLabel,
+        // since contact quality and discipline can disagree. May be null if not
+        // enough pitches seen yet or no strong read either way.
+        const disciplineLabel = getBatterDiscipline(live);
+
+        // Spec 3: opposing pitcher's live Form, looked up via the pitcher he's
+        // currently/most-recently facing (sc.currentPitcherId from boxscore.js)
+        const oppPitcherId = live?.currentPitcherId || null;
+        const oppPitcherStats = oppPitcherId ? liveStatcastPitcher[oppPitcherId] : null;
+        const pitcherForm = oppPitcherStats ? getPitcherForm(oppPitcherStats) : null;
+        const oppPitcherName = oppPitcherStats?.name || null;
+
         batters.push({
           id: bid,
           name: p?.person?.fullName || `Player ${bid}`,
@@ -4747,6 +4842,12 @@ async function fetchLiveBatters(gamePk) {
             : seasonHH > 0 ? `${seasonHH}% season` : "—",
 
           heatLabel,
+
+          // Spec 3: live Form additions
+          disciplineLabel,        // null if no strong discipline read yet
+          oppPitcherId,
+          oppPitcherName,
+          pitcherForm,            // null if pitcher has <8 pitches thrown so far
 
           // Season baselines (from Savant cache)
           barrel:          seasonBarrel,
@@ -5958,6 +6059,153 @@ function RefBtn({refreshing, onClick}) {
 // Reads live Statcast data from all live games and surfaces
 // top hard-hit / high exit velocity batters in a slideout panel
 
+// ── Spec 3: Live Simulated Expected Box Score Tab ──────────────────────────
+// Separate, duplicate live table — does NOT modify the pregame All Matchups
+// view. Polls live batter/pitcher Form data and re-projects each batter's
+// remaining-PA expected outcomes for tonight, using the same per-PA-rate ×
+// remaining-PA pattern as the pregame Sim engine (matchup_engine.py), but
+// with the rate adjusted by tonight's live Form read instead of season blend.
+//
+// Layer 2 (the re-simulated numbers) is explicitly unvalidated — flagged in
+// the UI as a live estimate, not presented with pregame-Sim-level confidence.
+// See spec_03_live_sim_box_score.md.
+
+// Simple per-PA rate multipliers by Form class — first-pass, not backtested.
+// "hot"/"elite" boosts the rate, "cold" suppresses it, "warm"/"avg" ~neutral.
+const FORM_RATE_MULT = {
+  gone_yard: 1.35, elite: 1.30, hot: 1.18, warm: 1.05, avg: 1.0, cold: 0.75,
+};
+const PITCHER_FORM_MULT = {
+  hot: 0.80,      // "🔥 Dealing" — suppresses batter's expected output
+  warm: 0.92,     // "🎯 In Control"
+  avg: 1.0,
+  cold: 1.20,     // "⚠️ Getting Hit Hard" / "📉 Velo Down" — boosts batter's expected output
+};
+
+function estimateRemainingPA(inning, isTopInning) {
+  // Rough remaining-PA estimate: ~4.3 PA/team/game season-wide, spread over 9 innings.
+  // First-pass linear estimate — not validated, intentionally simple per Spec 3 scope.
+  const inningsLeft = Math.max(0, 9 - (inning || 1) + (isTopInning ? 0.5 : 0));
+  return Math.max(0.3, (inningsLeft / 9) * 4.3);
+}
+
+function LiveSimTab({ games, date, isToday }) {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [lastUpdate, setLastUpdate] = useState(null);
+  const liveGames = (games||[]).filter(g => g.status==='Live');
+
+  useEffect(() => {
+    if (!isToday) { setLoading(false); setRows([]); return; }
+    let cancelled = false;
+
+    const poll = async () => {
+      if (liveGames.length === 0) { if(!cancelled){setRows([]);setLoading(false);} return; }
+      const all = [];
+      await Promise.all(liveGames.map(async (game) => {
+        try {
+          const result = await fetchLiveBatters(game.gamePk);
+          const liveBatters = result?.batters || result || [];
+          liveBatters.forEach(b => {
+            if (cancelled) return;
+            const formMult = FORM_RATE_MULT[b.heatLabel?.cls] ?? 1.0;
+            const pitchMult = PITCHER_FORM_MULT[b.pitcherForm?.cls] ?? 1.0;
+            // Pregame per-PA TB rate proxy: season ISO-ish stand-in from cached season stats
+            // if available, else a flat league-ish baseline — first pass only.
+            const baseRatePerPA = (b.seasonAvgEV && b.seasonAvgEV > 0) ? 0.42 : 0.38;
+            const remainingPA = estimateRemainingPA(game.inning, game.isTop);
+            const liveSimTB = Math.round(baseRatePerPA * formMult * pitchMult * remainingPA * 100) / 100;
+
+            all.push({
+              ...b,
+              gamePk: game.gamePk,
+              gameLabel: `${game.away?.abbr||'???'}@${game.home?.abbr||'???'}`,
+              remainingPA: Math.round(remainingPA*10)/10,
+              liveSimTB,
+            });
+          });
+        } catch(e) {}
+      }));
+      if (!cancelled) {
+        all.sort((a,b)=>(b.liveSimTB||0)-(a.liveSimTB||0));
+        setRows(all);
+        setLoading(false);
+        setLastUpdate(new Date());
+      }
+    };
+
+    poll();
+    const interval = setInterval(poll, 15000); // 15s — slower than dev-tools test cadence, real usage doesn't need 5s
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [liveGames.length, isToday]);
+
+  if (!isToday) {
+    return <div style={{padding:'50px 20px',textAlign:'center',color:'var(--muted)',
+      fontFamily:"'DM Mono',monospace",fontSize:12,lineHeight:2}}>
+      ⚡ Live Sim only works for today's games.<br/>Switch to today's date to use this tab.
+    </div>;
+  }
+
+  return <div>
+    <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10,flexWrap:'wrap'}}>
+      <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:16,
+        letterSpacing:.5,color:'var(--accent)',textTransform:'uppercase'}}>⚡ Live Sim</div>
+      <div style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
+        {loading ? 'Loading…' : liveGames.length===0 ? 'No live games right now'
+          : `${rows.length} batters · ${liveGames.length} live game${liveGames.length!==1?'s':''}`}
+        {lastUpdate && ` · updated ${lastUpdate.toLocaleTimeString()}`}
+      </div>
+    </div>
+
+    <div style={{padding:'8px 12px',marginBottom:10,borderRadius:8,
+      background:'rgba(245,166,35,.08)',border:'1px solid rgba(245,166,35,.25)',
+      fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace",lineHeight:1.5}}>
+      ⚠️ Live estimate — Sim TB here is a live re-projection, NOT the validated
+      pregame Sim engine. Treat as directional, not exact, until checked against
+      real results over time.
+    </div>
+
+    {loading
+      ? <div className="lw" style={{padding:'40px 0'}}><div className="sp"/><div className="lt">Loading live matchups…</div></div>
+      : rows.length === 0
+        ? <div style={{padding:'50px 20px',textAlign:'center',color:'var(--muted)',
+            fontFamily:"'DM Mono',monospace",fontSize:12,lineHeight:2}}>
+            No live games right now.<br/>Check back once tonight's games start.
+          </div>
+        : <div style={{overflowX:'auto'}}>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+            <thead>
+              <tr style={{borderBottom:'1px solid var(--border)',textAlign:'left',color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:10}}>
+                <th style={{padding:'6px 8px'}}>Batter</th>
+                <th style={{padding:'6px 8px'}}>Game</th>
+                <th style={{padding:'6px 8px'}}>Form</th>
+                <th style={{padding:'6px 8px'}}>Discipline</th>
+                <th style={{padding:'6px 8px'}}>Pitcher</th>
+                <th style={{padding:'6px 8px'}}>Pitcher Form</th>
+                <th style={{padding:'6px 8px'}}>Rem. PA</th>
+                <th style={{padding:'6px 8px'}}>Live Sim TB</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((b,idx) => (
+                <tr key={`ls-${b.id}-${idx}`} style={{borderBottom:'1px solid var(--border)'}}>
+                  <td style={{padding:'6px 8px',fontWeight:600}}>{b.name}</td>
+                  <td style={{padding:'6px 8px',color:'var(--muted)'}}>{b.gameLabel}</td>
+                  <td style={{padding:'6px 8px'}}>{b.heatLabel?.label || '—'}</td>
+                  <td style={{padding:'6px 8px'}}>{b.disciplineLabel?.label || '—'}</td>
+                  <td style={{padding:'6px 8px',color:'var(--muted)'}}>{b.oppPitcherName || '—'}</td>
+                  <td style={{padding:'6px 8px'}}>{b.pitcherForm?.label || '—'}</td>
+                  <td style={{padding:'6px 8px',textAlign:'right'}}>{b.remainingPA}</td>
+                  <td style={{padding:'6px 8px',textAlign:'right',fontWeight:700,color:'var(--accent)'}}>{b.liveSimTB}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+    }
+  </div>;
+}
+
 function HeatingUpSlideout({ games, onClose }) {
   const [batters, setBatters] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -6820,7 +7068,7 @@ function LiveTab() {
     ]} onClose={()=>setShowLiveHelp(false)}/>}
     <div style={{display:'flex',gap:5,marginBottom:12,alignItems:'center'}}>
       <div style={{display:'flex',gap:5,padding:'3px',background:'var(--surface)',borderRadius:8,border:'1px solid var(--border)',width:'fit-content'}}>
-      {[['gameday','📺 Gameday'],['battracking','🥎 Bat Tracking'],['games','🎮 Live Games'],['lineups','📋 Lineups']].map(([key,label])=>(
+      {[['gameday','📺 Gameday'],['battracking','🥎 Bat Tracking'],['simlive','⚡ Live Sim'],['games','🎮 Live Games'],['lineups','📋 Lineups']].map(([key,label])=>(
         <button key={key} onClick={()=>setLiveView(key)}
           style={{padding:'6px 14px',borderRadius:6,cursor:'pointer',border:'none',
             fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,letterSpacing:.8,
@@ -6835,6 +7083,7 @@ function LiveTab() {
     </div>
 
   {liveView==='battracking' && <BatTrackingTab games={games} date={liveDate} isToday={liveDate===liveTodayStr}/>}
+  {liveView==='simlive' && <LiveSimTab games={games} date={liveDate} isToday={liveDate===liveTodayStr}/>}
   {liveView==='lineups' && <LineupsView date={liveDate}/>}
   {liveView==='gameday' && <GamedayTab date={liveDate}/>}
 
