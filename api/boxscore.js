@@ -31,6 +31,9 @@ export default async function handler(req, res) {
     let lastPlay        = null;
     let lineupHome      = [];
     let lineupAway      = [];
+    let liveCurrentPitcherId   = null;
+    let liveCurrentPitcherName = null;
+    let offenseIsAway = null;
 
     if (liveRes.ok) {
       const liveData = await liveRes.json();
@@ -69,10 +72,10 @@ export default async function handler(req, res) {
       // the reliable source for "who is pitching right now" — applied to
       // every batter on the offense's team in the API response below,
       // not looked up per-batter from history.
-      const liveCurrentPitcherId   = currentPlay?.matchup?.pitcher?.id     || null;
-      const liveCurrentPitcherName = currentPlay?.matchup?.pitcher?.fullName || null;
+      liveCurrentPitcherId   = currentPlay?.matchup?.pitcher?.id     || null;
+      liveCurrentPitcherName = currentPlay?.matchup?.pitcher?.fullName || null;
       // isTopInning tells us which side is batting (away bats top, home bats bottom)
-      const offenseIsAway = currentPlay?.about?.isTopInning ?? null;
+      offenseIsAway = currentPlay?.about?.isTopInning ?? null;
 
       // ── Statcast per batter AND per pitcher ─────────────────────
       for (const play of plays) {
