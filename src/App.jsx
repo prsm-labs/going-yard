@@ -13359,9 +13359,17 @@ function computeBoomScore(sig, zoneFit, iso, simTB, engineScore,
            : bSpike >= -2  ? 1
            : 0;
 
-  // ── Hot Hand (5%) — HRs in last 3 games ──────────────────────────────────
-  const hr3 = parseInt(recentHRCount) || 0;
-  const hh = hr3 >= 3 ? 5 : hr3 >= 2 ? 5 : hr3 >= 1 ? 3 : 0;
+  // ── Hot Hand (was 5%) — REMOVED June 2026: direct duplicate of gHR's own
+  // recent-HR signal. gHR already carries recent HR count/rate (via recent_iso,
+  // hand-match bonus, etc. in matchup_engine.py); stacking a second, separate
+  // "HRs in last 3 games" bonus here double-rewards the same underlying event.
+  // Confirmed via tracker analysis: within the top Yard Score tier (51+), HR
+  // rate INVERTS as recent-HR signal climbs (25.0% at low recent-HR signal down
+  // to 10.0% at the highest), the same lag-echo pattern documented for gHR
+  // itself in Part 11. Parameter kept in the function signature (unused) so
+  // every existing positional call site still lines up correctly — only the
+  // contribution is zeroed, matching the engine's own _xw_bonus=0 pattern.
+  const hh = 0; // was: hr3>=3?5:hr3>=2?5:hr3>=1?3:0 — recentHRCount no longer used
 
   // ── Count Discipline (4%) ──────────────────────────────────────────────────
   const baRaw = parseFloat(batterAheadPct);
