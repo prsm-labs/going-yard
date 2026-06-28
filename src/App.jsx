@@ -13535,6 +13535,142 @@ function computeYardScore(sig, ghr, boom, ps,
   return Math.min(99, Math.max(0, Math.round(adjusted)));
 }
 
+// ── V2 functions — NOT wired into UI, for backtesting/comparison only ────────
+// Problem: Sig appears in Boom (26%) AND directly in YardScore (22%), giving
+// effective ~34.6% Sig weight vs the labeled 22%. V2 removes Sig from Boom
+// and redistributes its 26pts to terms more orthogonal to the Sig signal:
+//   ZoneFit +10pp → 34%  (most independent: spatial zone overlap, not EV/barrel/FB/LA flags)
+//   xwOBA   +12pp → 32%  (strongest standalone predictor: 0.100 backtest correlation)
+//   SimTB   +4pp  → 22%  (least additional: shares recent/BvP data windows with Sig)
+// Total main-term ceiling unchanged: 34+32+22 = 88 (was 24+26+18+20 = 88).
+function computeBoomScoreV2(sig, zoneFit, iso, simTB, engineScore,
+  barrelSpike, recentHRCount, batterAheadPct, hhPrecursor, pitchVulnRate,
+  dayLateBarrels, dayLateHRs, recentBatSpeed, dayLatePulled,
+  laLocked, swstrPct, pullParkFit, zoneEdges, zoneKPenalty, inPitcherWeakSlot, xwoba) {
+
+  // ── Zone Fit: 24% → 34% (+10pp from Sig removal) ─────────────────────────
+  const zfRaw = zoneFitScore(parseFloat(zoneFit) || 0);
+  const zf = zfRaw * 0.34;                                 // 34% (was 24%)
+
+  // sig: REMOVED — param kept for call-site compat, not used in body
+
+  // ── SimTB: 18% → 22% (+4pp from Sig removal) ─────────────────────────────
+  const tb = Math.min(22, (parseFloat(simTB) || 0) / 3.5 * 22); // 22% (was 18%)
+
+  // ── xwOBA: 20% → 32% (+12pp from Sig removal) ────────────────────────────
+  const xw = Math.min(32, Math.max(0, (parseFloat(xwoba) || 0) - 0.300) / 0.150 * 32); // 32% (was 20%)
+
+  // ── All remaining terms identical to computeBoomScore ─────────────────────
+  const bSpike = parseFloat(barrelSpike);
+  const bs = isNaN(bSpike) ? 0
+           : bSpike >= 6   ? 8
+           : bSpike >= 3   ? 6
+           : bSpike >= 1   ? 4
+           : bSpike >= 0   ? 2
+           : bSpike >= -2  ? 1
+           : 0;
+
+  const hh = 0;
+
+  const baRaw = parseFloat(batterAheadPct);
+  const cd = isNaN(baRaw) ? 0
+           : baRaw >= 30  ? 4
+           : baRaw >= 25  ? 4
+           : baRaw >= 15  ? 2
+           : baRaw >= 10  ? 1
+           : 0;
+
+  const dlBarrels = parseInt(dayLateBarrels) || 0;
+  const dlHRs     = parseInt(dayLateHRs)     || 0;
+  const dlPulled  = parseInt(dayLatePulled)  || 0;
+  const isEnhanced = dlHRs === 0 && dlBarrels >= 2 && dlPulled >= 1;
+  const isStandard = dlHRs === 0 && dlBarrels >= 2;
+  const dl = isEnhanced ? 6
+           : isStandard ? 4
+           : (dlHRs === 0 && dlBarrels === 1) ? 2
+           : 0;
+
+  const bsRaw = parseFloat(recentBatSpeed) || 0;
+  const bst = bsRaw >= 77 ? 4
+            : bsRaw >= 74 ? 3
+            : bsRaw >= 71 ? 1
+            : 0;
+
+  const prec = hhPrecursor ? 2 : 0;
+
+  const pvRaw = parseFloat(pitchVulnRate);
+  const pv = isNaN(pvRaw) ? 0
+           : pvRaw >= 10  ? 1
+           : pvRaw >= 6   ? 0.5
+           : 0;
+
+  const laLock = (laLocked === true || laLocked === 'True' || laLocked === 1) ? 3 : 0;
+
+  const swst = parseFloat(swstrPct) || 0;
+  const swPen = swst >= 22 ? -4
+              : swst >= 18 ? -2
+              : swst >= 15 ? -1
+              : 0;
+
+  const ppf = parseFloat(pullParkFit) || 0;
+  const ppPts = ppf >= 7 ? 3
+              : ppf >= 5 ? 2
+              : ppf >= 3 ? 1
+              : 0;
+
+  const ze = parseInt(zoneEdges)    || 0;
+  const zk = parseInt(zoneKPenalty) || 0;
+  const zoneBoost = ze >= 3 ? 6 : ze >= 2 ? 4 : ze >= 1 ? 2 : 0;
+  const zonePen   = zk >= 3 ? -3 : zk >= 2 ? -2 : zk >= 1 ? -1 : 0;
+  const zoneSignal = (ze > 0 || zk > 0) ? (zoneBoost + zonePen) : 0;
+
+  const slotBoost = (inPitcherWeakSlot === true || inPitcherWeakSlot === 'true' || inPitcherWeakSlot === 1) ? 3 : 0;
+
+  // note: `s` (Sig term) intentionally omitted from sum
+  return Math.min(99, Math.round(zf + tb + xw + bs + hh + cd + dl + bst + prec + pv + laLock + swPen + ppPts + zoneSignal + slotBoost));
+}
+
+// ── Yard Score V2 — intended to be called with boom from computeBoomScoreV2 ──
+// Body identical to computeYardScore; separate name enforces correct pairing.
+// Call pattern: computeYardScoreV2(sig, ghr, computeBoomScoreV2(...), ps, ...)
+function computeYardScoreV2(sig, ghr, boom, ps,
+  batterHand, pitcherHand, daysRest, lineupSlot, pitcherGradeLabel) {
+
+  const sigN = (Math.min(14, Math.max(0, parseFloat(sig) || 0)) / 14) * 100;
+  const ghrT = taperGHR(parseFloat(ghr) || 0);
+  const raw  = (parseFloat(boom) || 0) * 0.38
+             + (parseFloat(ps)   || 0) * 0.32
+             + sigN                    * 0.22
+             + ghrT                    * 0.08;
+
+  const pg = String(pitcherGradeLabel || '');
+  const pitcherMod = pg.includes('‼️') || pg.toLowerCase().includes('elite') ? 0.65
+                   : pg.includes('⚠️') || pg.toLowerCase().includes('tough') ? 0.82
+                   : 1.0;
+
+  const bh = (batterHand  || '').toString().trim().toUpperCase()[0];
+  const ph = (pitcherHand || '').toString().trim().toUpperCase()[0];
+  let platoonMod = 1.0;
+  if (ph === 'L' && (bh === 'L' || bh === 'S')) platoonMod = 0.88;
+  else if (ph === 'R' && (bh === 'L' || bh === 'S')) platoonMod = 1.03;
+  else if (ph === 'L' && bh === 'R') platoonMod = 1.03;
+
+  const dr = parseInt(daysRest);
+  const restMod = isNaN(dr) ? 1.0
+                : dr === 0  ? 1.08
+                : dr === 1  ? 1.00
+                : dr === 2  ? 0.97
+                : dr === 3  ? 0.92
+                : dr >= 4   ? 0.87
+                : 1.0;
+
+  const slot = parseInt(lineupSlot) || 0;
+  const confirmMod = slot === 0 ? 0.95 : 1.0;
+
+  const adjusted = raw * pitcherMod * platoonMod * restMod * confirmMod;
+  return Math.min(99, Math.max(0, Math.round(adjusted)));
+}
+
 function YardBadge({ score }) {
   if (!score || score < 1) return null;
   // Thresholds recalibrated to new sweet spot (data: 20-34 = 9-11% HR rate)
