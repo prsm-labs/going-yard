@@ -13260,7 +13260,7 @@ function computeHRUpside(b) {
   const platoon = (ph==='L'&&(bh==='R'||bh==='S'))||(ph==='R'&&(bh==='L'||bh==='S'));
   const base8 = [
     brlPct>=8, ev7>=92, la7>=22&&la7<=32,
-    pbPct>=6||fb7>=35, zf>=70, platoon, pBarrel>=6, hrFact>=105||windOk
+    pbPct>=6||fb7>=35, zoneFitScore(zf)>=70, platoon, pBarrel>=6, hrFact>=105||windOk
   ].filter(Boolean).length;
 
   // Check if H2H was prefetched for this batter
