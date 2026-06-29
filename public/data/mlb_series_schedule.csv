@@ -1,25 +1,10 @@
 Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitcher ID (Away),Game ID,Venue ID,Venue Name,Day of Week,Day Abbr,Series Game #,Games in Series,Series Position,Day Context
-2026-06-28,01:35 PM,BAL,WSH,680694.0,641793.0,824821,2,Oriole Park at Camden Yards,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-06-28,01:35 PM,PIT,CIN,656605.0,663903.0,823362,31,PNC Park,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-06-28,01:37 PM,TOR,TEX,669456.0,677958.0,822795,14,Rogers Centre,Sunday,Sun,4,4,Finale,~ Neutral (check pitcher)
-2026-06-28,01:40 PM,DET,HOU,656427.0,686613.0,824256,2394,Comerica Park,Sunday,Sun,4,4,Finale,~ Neutral (check pitcher)
-2026-06-28,01:40 PM,CLE,SEA,668909.0,676106.0,824422,5,Progressive Field,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-06-28,01:40 PM,TB,AZ,656876.0,518876.0,822959,12,Tropicana Field,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-06-28,01:40 PM,NYM,PHI,672335.0,666200.0,823608,3289,Citi Field,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-06-28,02:10 PM,MIN,COL,687570.0,663372.0,823686,3312,Target Field,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-06-28,02:10 PM,CWS,KC,641743.0,679883.0,824580,4,Rate Field,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-06-28,02:10 PM,MIL,CHC,605540.0,669020.0,823769,32,American Family Field,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-06-28,02:15 PM,STL,MIA,681517.0,663969.0,823037,2889,Busch Stadium,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-06-28,03:15 PM,LAA,ATH,691951.0,650644.0,824011,1,Angel Stadium,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-06-28,04:05 PM,SF,ATL,592662.0,519242.0,823204,2395,Oracle Park,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-06-28,04:10 PM,SD,LAD,650633.0,686218.0,823281,2680,Petco Park,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-06-28,07:20 PM,BOS,NYY,543243.0,607074.0,824744,3,Fenway Park,Sunday,Sun,4,4,Finale,~ Neutral (check pitcher)
 2026-06-29,06:35 PM,BAL,CWS,669358.0,680732.0,824822,2,Oriole Park at Camden Yards,Monday,Mon,1,3,Opener,~ Solid
 2026-06-29,06:40 PM,PHI,PIT,605400.0,677952.0,823444,2681,Citizens Bank Park,Monday,Mon,1,4,Opener,~ Solid
 2026-06-29,07:05 PM,NYY,DET,677960.0,663554.0,823529,3313,Yankee Stadium,Monday,Mon,1,3,Opener,~ Solid
 2026-06-29,07:07 PM,TOR,NYM,702056.0,640455.0,822792,14,Rogers Centre,Monday,Mon,1,3,Opener,~ Solid
 2026-06-29,07:10 PM,BOS,WSH,624133.0,571945.0,824741,3,Fenway Park,Monday,Mon,1,3,Opener,~ Solid
-2026-06-29,07:10 PM,CLE,TEX,800048.0,,824420,5,Progressive Field,Monday,Mon,1,3,Opener,~ Solid
+2026-06-29,07:10 PM,CLE,TEX,800048.0,641302.0,824420,5,Progressive Field,Monday,Mon,1,3,Opener,~ Solid
 2026-06-29,07:40 PM,MIL,CIN,688107.0,666157.0,823771,32,American Family Field,Monday,Mon,1,4,Opener,~ Solid
 2026-06-29,08:05 PM,CHC,SD,684007.0,,824662,17,Wrigley Field,Monday,Mon,1,3,Opener,~ Solid
 2026-06-29,08:10 PM,HOU,MIN,663567.0,805673.0,824176,2392,Daikin Park,Monday,Mon,1,3,Opener,~ Solid
@@ -27,3 +12,18 @@ Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitc
 2026-06-29,09:40 PM,ATH,LAD,695611.0,641778.0,824986,2529,Sutter Health Park,Monday,Mon,1,3,Opener,~ Solid
 2026-06-29,09:40 PM,SEA,LAA,669923.0,696270.0,823121,680,T-Mobile Park,Monday,Mon,1,3,Opener,~ Solid
 2026-06-29,09:40 PM,AZ,SF,593958.0,641816.0,825065,15,Chase Field,Monday,Mon,1,3,Opener,~ Solid
+2026-06-30,06:35 PM,BAL,CWS,694346.0,607200.0,824819,2,Oriole Park at Camden Yards,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
+2026-06-30,06:40 PM,CLE,TEX,676440.0,594798.0,824418,5,Progressive Field,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
+2026-06-30,06:40 PM,PHI,PIT,650911.0,696149.0,823445,2681,Citizens Bank Park,Tuesday,Tue,2,4,Middle,⚠️ Weakest Day
+2026-06-30,07:05 PM,NYY,DET,693645.0,669373.0,823528,3313,Yankee Stadium,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
+2026-06-30,07:07 PM,TOR,NYM,592332.0,690997.0,822793,14,Rogers Centre,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
+2026-06-30,07:10 PM,BOS,WSH,813349.0,676917.0,824742,3,Fenway Park,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
+2026-06-30,07:15 PM,ATL,STL,527048.0,669461.0,824907,4705,Truist Park,Tuesday,Tue,1,3,Opener,⚠️ Weakest Day
+2026-06-30,07:40 PM,KC,TB,702070.0,643377.0,824096,7,Kauffman Stadium,Tuesday,Tue,1,3,Opener,⚠️ Weakest Day
+2026-06-30,07:40 PM,MIL,CIN,687075.0,695076.0,823768,32,American Family Field,Tuesday,Tue,2,4,Middle,⚠️ Weakest Day
+2026-06-30,08:05 PM,CHC,SD,571510.0,676664.0,824661,17,Wrigley Field,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
+2026-06-30,08:10 PM,HOU,MIN,681347.0,657746.0,824175,2392,Daikin Park,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
+2026-06-30,08:40 PM,COL,MIA,607536.0,691587.0,824338,19,Coors Field,Tuesday,Tue,2,4,Middle,⚠️ Weakest Day
+2026-06-30,09:40 PM,ATH,LAD,605488.0,680736.0,824984,2529,Sutter Health Park,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
+2026-06-30,09:40 PM,SEA,LAA,693433.0,667755.0,823122,680,T-Mobile Park,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
+2026-06-30,09:40 PM,AZ,SF,,694738.0,825066,15,Chase Field,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
