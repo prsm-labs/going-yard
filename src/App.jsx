@@ -12415,6 +12415,213 @@ function MLBScoresTab() {
   </div>;
 }
 
+// ── ODDS CALCULATOR SLIDEOUT ──────────────────────────────────────────────────
+const CALC_CURRENCIES = ['USD','EUR','GBP','CAD','AUD','JPY'];
+const CALC_CCY_SYM = {USD:'$',EUR:'€',GBP:'£',CAD:'CA$',AUD:'A$',JPY:'¥'};
+function calcFmtCcy(n, ccy) {
+  if (n == null || isNaN(n)) return '—';
+  return (CALC_CCY_SYM[ccy] || '$') + Number(n).toLocaleString('en-US',
+    {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+function calcAmToDecimal(a) {
+  return a > 0 ? (a / 100) + 1 : (100 / Math.abs(a)) + 1;
+}
+function calcDecToAmerican(d) {
+  return d >= 2 ? Math.round((d - 1) * 100) : Math.round(-100 / (d - 1));
+}
+function calcParseOdds(raw) {
+  const s = (raw || '').trim();
+  if (!s) return null;
+  if (s.startsWith('+') || s.startsWith('-')) {
+    const a = parseFloat(s);
+    if (isNaN(a) || Math.abs(a) < 100) return null;
+    return { american: a, decimal: +calcAmToDecimal(a).toFixed(4) };
+  }
+  if (s.includes('.')) {
+    const d = parseFloat(s);
+    if (isNaN(d) || d <= 1) return null;
+    return { american: calcDecToAmerican(d), decimal: d };
+  }
+  const n = parseFloat(s);
+  if (isNaN(n)) return null;
+  if (n >= 100) return { american: n, decimal: +calcAmToDecimal(n).toFixed(4) };
+  if (n > 1)    return { american: calcDecToAmerican(n), decimal: n };
+  return null;
+}
+function OddsCalculatorSlideout({ onClose }) {
+  const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
+  const [oddsRaw,    setOddsRaw]    = useState('');
+  const [bankroll,   setBankroll]   = useState('');
+  const [unitSize,   setUnitSize]   = useState('');
+  const [unitEdited, setUnitEdited] = useState(false);
+  const [currency,   setCurrency]   = useState('USD');
+  const [result,     setResult]     = useState(null);
+  const parsed  = calcParseOdds(oddsRaw);
+  const sym     = CALC_CCY_SYM[currency] || '$';
+  const unitPct = (() => {
+    const b = parseFloat(bankroll), u = parseFloat(unitSize);
+    return (!isNaN(b) && !isNaN(u) && b > 0) ? ((u / b) * 100).toFixed(1) : null;
+  })();
+  const handleBankroll = v => {
+    setBankroll(v);
+    if (!unitEdited) {
+      const b = parseFloat(v);
+      setUnitSize((!isNaN(b) && b > 0) ? (b * 0.03).toFixed(2) : '');
+    }
+    setResult(null);
+  };
+  const handleUnitSize = v => {
+    setUnitEdited(true);
+    setUnitSize(v);
+    const u = parseFloat(v);
+    setBankroll((!isNaN(u) && u > 0) ? (u / 0.03).toFixed(2) : '');
+    setResult(null);
+  };
+  const canCalc = !!(parsed && parsed.decimal > 1 && parseFloat(unitSize) > 0);
+  const calculate = () => {
+    if (!canCalc) return;
+    const dec          = parsed.decimal;
+    const fullUnitValue = parseFloat(unitSize);
+    const estUnit      = 1 / (dec - 1);
+    const estStake     = Math.max(estUnit * fullUnitValue, 0.10);
+    const potReturn    = estStake * dec;
+    setResult({ fullUnitValue, estStake, potReturn,
+                impliedProb: (1 / dec) * 100,
+                profit: potReturn - estStake });
+  };
+  const inpStyle = {flex:1,background:'var(--surface2)',border:'1px solid var(--border)',
+    borderRadius:6,padding:'7px 10px',fontFamily:mono,fontSize:13,color:'var(--text)',
+    outline:'none',minWidth:0,WebkitAppearance:'none'};
+  const lblStyle = {fontSize:9,color:'var(--muted)',fontFamily:mono,
+    textTransform:'uppercase',letterSpacing:1,marginBottom:6,display:'block'};
+  return <>
+    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.55)',zIndex:900}}/>
+    <div style={{position:'fixed',right:0,top:0,bottom:0,width:'min(380px,100vw)',
+      background:'var(--surface)',borderLeft:'1px solid var(--border)',zIndex:901,
+      display:'flex',flexDirection:'column',boxShadow:'-4px 0 24px rgba(0,0,0,.5)'}}>
+      <div style={{padding:'14px 18px',borderBottom:'1px solid var(--border)',
+        display:'flex',alignItems:'center',gap:8,flexShrink:0,background:'var(--surface2)'}}>
+        <span style={{fontFamily:osw,fontWeight:700,fontSize:15,letterSpacing:.5,
+          color:'var(--text)'}}>🧮 Odds Calculator</span>
+        <button onClick={onClose} style={{marginLeft:'auto',background:'none',
+          border:'1px solid var(--border)',borderRadius:6,color:'var(--muted)',
+          cursor:'pointer',padding:'3px 9px',fontFamily:mono,fontSize:11}}>✕</button>
+      </div>
+      <div style={{flex:1,overflowY:'auto',padding:'16px 18px'}}>
+        {/* ── Odds ── */}
+        <div style={{marginBottom:18}}>
+          <span style={lblStyle}>Odds Input</span>
+          <input value={oddsRaw} onChange={e=>{setOddsRaw(e.target.value);setResult(null);}}
+            placeholder="+180  ·  −150  ·  2.80"
+            style={{width:'100%',boxSizing:'border-box',background:'var(--surface2)',
+              border:'1px solid var(--border)',borderRadius:6,padding:'9px 12px',
+              fontFamily:mono,fontSize:14,color:'var(--text)',outline:'none'}}/>
+          <div style={{marginTop:8,minHeight:34}}>
+            {parsed ? (
+              <div style={{display:'flex',gap:8}}>
+                <div style={{flex:1,background:'rgba(56,184,242,.08)',
+                  border:'1px solid rgba(56,184,242,.25)',borderRadius:6,
+                  padding:'5px 10px',textAlign:'center'}}>
+                  <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)',display:'block'}}>AMERICAN</span>
+                  <span style={{fontFamily:osw,fontWeight:700,fontSize:15,color:'#38b8f2'}}>
+                    {parsed.american >= 0 ? '+' : ''}{parsed.american}
+                  </span>
+                </div>
+                <div style={{flex:1,background:'rgba(245,166,35,.08)',
+                  border:'1px solid rgba(245,166,35,.25)',borderRadius:6,
+                  padding:'5px 10px',textAlign:'center'}}>
+                  <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)',display:'block'}}>DECIMAL</span>
+                  <span style={{fontFamily:osw,fontWeight:700,fontSize:15,color:'#f5a623'}}>
+                    {parsed.decimal.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            ) : oddsRaw.trim() ? (
+              <div style={{fontFamily:mono,fontSize:10,color:'var(--accent)',paddingTop:4}}>
+                Enter valid odds: +180, −150, or 2.80
+              </div>
+            ) : null}
+          </div>
+        </div>
+        <div style={{height:1,background:'var(--border)',margin:'4px 0 18px'}}/>
+        {/* ── Bankroll & Unit ── */}
+        <div style={{marginBottom:18}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+            <span style={lblStyle}>Bankroll &amp; Unit Size</span>
+            <select value={currency} onChange={e=>setCurrency(e.target.value)}
+              style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:5,
+                padding:'2px 6px',fontFamily:mono,fontSize:10,color:'var(--text)',
+                outline:'none',cursor:'pointer'}}>
+              {CALC_CURRENCIES.map(c=><option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div style={{marginBottom:10}}>
+            <span style={{fontSize:9,color:'var(--muted)',fontFamily:mono,marginBottom:4,display:'block'}}>
+              Bankroll
+            </span>
+            <div style={{display:'flex',alignItems:'center',gap:6}}>
+              <span style={{fontFamily:mono,fontSize:12,color:'var(--muted)',flexShrink:0}}>{sym}</span>
+              <input type="number" min="0" value={bankroll}
+                onChange={e=>handleBankroll(e.target.value)}
+                placeholder="e.g. 1000" style={inpStyle}/>
+            </div>
+          </div>
+          <div>
+            <span style={{fontSize:9,color:'var(--muted)',fontFamily:mono,marginBottom:4,display:'block'}}>
+              {unitPct ? `Unit Size — ${unitPct}% of bankroll` : 'Unit Size — defaults to 3% of bankroll'}
+            </span>
+            <div style={{display:'flex',alignItems:'center',gap:6}}>
+              <span style={{fontFamily:mono,fontSize:12,color:'var(--muted)',flexShrink:0}}>{sym}</span>
+              <input type="number" min="0" value={unitSize}
+                onChange={e=>handleUnitSize(e.target.value)}
+                placeholder="e.g. 30" style={inpStyle}/>
+            </div>
+          </div>
+          <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginTop:7,lineHeight:1.6}}>
+            Editing either field recalculates the other at the 3% default rate.
+          </div>
+        </div>
+        <div style={{height:1,background:'var(--border)',margin:'4px 0 18px'}}/>
+        {/* ── Calculate ── */}
+        <button onClick={calculate} disabled={!canCalc}
+          style={{width:'100%',padding:'10px',borderRadius:8,cursor:canCalc?'pointer':'not-allowed',
+            background:canCalc?'var(--accent)':'var(--surface2)',
+            border:canCalc?'none':'1px solid var(--border)',
+            color:canCalc?'white':'var(--muted)',fontFamily:osw,fontWeight:700,
+            fontSize:14,letterSpacing:.5,opacity:canCalc?1:.45,transition:'opacity .15s'}}>
+          Calculate
+        </button>
+        {/* ── Results ── */}
+        {result && (
+          <div style={{marginTop:16,background:'var(--surface2)',borderRadius:8,
+            border:'1px solid var(--border)',padding:'14px 16px'}}>
+            <div style={{fontFamily:osw,fontWeight:700,fontSize:11,color:'var(--muted)',
+              textTransform:'uppercase',letterSpacing:1,marginBottom:12}}>Results</div>
+            {[
+              ['Implied Probability', result.impliedProb.toFixed(1)+'%',          'var(--muted)'],
+              ['Full Unit Value',     calcFmtCcy(result.fullUnitValue, currency),  '#f5a623'    ],
+              ['Est. Stake',          calcFmtCcy(result.estStake, currency),       '#38f282'    ],
+              ['Total Return',        calcFmtCcy(result.potReturn, currency),      '#38b8f2'    ],
+              ['Profit on Win',       calcFmtCcy(result.profit, currency),         '#38f282'    ],
+            ].map(([lbl, val, clr]) => (
+              <div key={lbl} style={{display:'flex',justifyContent:'space-between',
+                alignItems:'baseline',padding:'6px 0',
+                borderBottom:'1px solid rgba(255,255,255,.05)'}}>
+                <span style={{fontFamily:mono,fontSize:10,color:'var(--muted)'}}>{lbl}</span>
+                <span style={{fontFamily:osw,fontWeight:700,fontSize:14,color:clr}}>{val}</span>
+              </div>
+            ))}
+            <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginTop:10,lineHeight:1.6}}>
+              Sized to return 1 unit ({calcFmtCcy(result.fullUnitValue, currency)}) profit.
+              Floor: {sym}0.10.
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  </>;
+}
+
 function YardPicksFeedTab() {
   const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
   const [picks,    setPicks]    = useState([]);
@@ -12424,6 +12631,7 @@ function YardPicksFeedTab() {
   const [hasMore,  setHasMore]  = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [showCalc,   setShowCalc]   = useState(false);
 
   const fetchPicks = async (startCursor) => {
     try {
@@ -12465,6 +12673,12 @@ function YardPicksFeedTab() {
       <div style={{display:'flex',alignItems:'center',gap:8,padding:'4px 4px 14px'}}>
         <span style={{fontSize:18}}>🧾</span>
         <span style={{fontFamily:osw,fontWeight:800,fontSize:16,color:'var(--text)'}}>Yard Picks</span>
+        <button onClick={()=>setShowCalc(c=>!c)} data-tip="Odds Calculator"
+          style={{padding:'4px 8px',borderRadius:6,fontSize:14,cursor:'pointer',
+            border:'1px solid var(--border)',lineHeight:1,
+            background:showCalc?'var(--surface2)':'transparent',color:'var(--text)'}}>
+          🧮
+        </button>
         <button onClick={refresh} disabled={refreshing} data-tip="Refresh"
           style={{marginLeft:'auto',padding:'4px 10px',borderRadius:6,fontSize:11,
             cursor:refreshing?'default':'pointer',border:'1px solid var(--border)',
@@ -12537,6 +12751,7 @@ function YardPicksFeedTab() {
           </button>
         </div>
       )}
+      {showCalc && <OddsCalculatorSlideout onClose={()=>setShowCalc(false)}/>}
     </div>
   );
 }
