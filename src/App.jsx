@@ -12453,7 +12453,6 @@ function OddsCalculatorSlideout({ onClose }) {
   const [oddsRaw,    setOddsRaw]    = useState('');
   const [bankroll,   setBankroll]   = useState('');
   const [unitSize,   setUnitSize]   = useState('');
-  const [unitEdited, setUnitEdited] = useState(false);
   const [unitRate,   setUnitRate]   = useState(3.0);
   const [currency,   setCurrency]   = useState('USD');
   const [result,     setResult]     = useState(null);
@@ -12462,14 +12461,11 @@ function OddsCalculatorSlideout({ onClose }) {
   const rateNum = parseFloat(unitRate) || 3;
   const handleBankroll = v => {
     setBankroll(v);
-    if (!unitEdited) {
-      const b = parseFloat(v), r = rateNum / 100;
-      setUnitSize((!isNaN(b) && b > 0) ? (b * r).toFixed(2) : '');
-    }
+    const b = parseFloat(v), r = rateNum / 100;
+    setUnitSize((!isNaN(b) && b > 0) ? (b * r).toFixed(2) : '');
     setResult(null);
   };
   const handleUnitSize = v => {
-    setUnitEdited(true);
     setUnitSize(v);
     const u = parseFloat(v), r = rateNum / 100;
     setBankroll((!isNaN(u) && u > 0) ? (u / r).toFixed(2) : '');
@@ -12479,8 +12475,8 @@ function OddsCalculatorSlideout({ onClose }) {
     setUnitRate(v);
     const r = (parseFloat(v) || 3) / 100;
     const b = parseFloat(bankroll), u = parseFloat(unitSize);
-    if (!unitEdited && !isNaN(b) && b > 0) setUnitSize((b * r).toFixed(2));
-    else if (unitEdited && !isNaN(u) && u > 0) setBankroll((u / r).toFixed(2));
+    if (!isNaN(b) && b > 0) setUnitSize((b * r).toFixed(2));
+    else if (!isNaN(u) && u > 0) setBankroll((u / r).toFixed(2));
     setResult(null);
   };
   const canCalc = !!(parsed && parsed.decimal > 1 && parseFloat(unitSize) > 0);
