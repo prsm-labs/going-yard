@@ -3776,8 +3776,10 @@ function WeatherBanner({ team }) {
   if (loading) return <div style={{height:44,display:"flex",alignItems:"center",padding:"0 14px",background:"var(--surface)",border:"1px solid var(--border)",borderRadius:8,marginBottom:12}}><div className="sp" style={{width:14,height:14,borderWidth:2}}/></div>;
   if (!data) return null;
 
-  const { parkFactor: pf, weather: w, hrEnvScore } = data;
-  const pfColor = getPFColor(pf?.hr || 100);
+  const { parkFactorHR, isDome, current: w } = data;
+  const pfHR = parkFactorHR || 100;
+  const hrEnvScore = w?.hrEnvScore ?? 0;
+  const pfColor = getPFColor(pfHR);
   const envLabel = hrEnvScore >= 60 ? "🔥 HR-friendly environment" : hrEnvScore >= 52 ? "📈 Slight HR boost" : hrEnvScore >= 46 ? "— Neutral conditions" : hrEnvScore >= 38 ? "📉 Slight suppressor" : "🧊 Pitcher-friendly conditions";
   const envColor = hrEnvScore >= 60 ? "#ff4020" : hrEnvScore >= 52 ? "#ff8020" : hrEnvScore >= 46 ? "var(--muted)" : hrEnvScore >= 38 ? "#38b8f2" : "#38b8f2";
 
@@ -3786,30 +3788,27 @@ function WeatherBanner({ team }) {
     <div style={{display:"flex",flexDirection:"column",gap:1}}>
       <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1}}>Park Factor</div>
       <div style={{display:"flex",alignItems:"center",gap:5}}>
-        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:18,color:pfColor}}>{pf?.hr || 100}</span>
+        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:18,color:pfColor}}>{pfHR}</span>
         <span style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>HR</span>
-        <span style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>/ {pf?.xbh || 100} XBH</span>
       </div>
-      <div style={{fontSize:9,color:pfColor,fontFamily:"'DM Mono',monospace"}}>{pf?.label || ""}</div>
     </div>
 
     <div style={{width:1,height:36,background:"var(--border)"}}/>
 
     {/* Weather — skip if dome */}
-    {w?.isDome
+    {isDome
       ? <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>🏟️ Retractable/dome — weather irrelevant</div>
       : w ? <>
           <div style={{display:"flex",flexDirection:"column",gap:1}}>
             <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1}}>Conditions</div>
-            <div style={{fontSize:12,fontFamily:"'DM Mono',monospace"}}>{getWeatherDesc(w.weatherCode)}</div>
+            <div style={{fontSize:12,fontFamily:"'DM Mono',monospace"}}>{w.condition || "—"}</div>
             <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{w.temp}°F · {w.humidity}% humidity</div>
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:1}}>
             <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1}}>Wind</div>
             <div style={{fontSize:12,fontFamily:"'DM Mono',monospace",color:w.windSpeed>=15?"#ff8020":"var(--text)"}}>{w.windLabel}</div>
-            <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{w.windSpeed} mph {getWindDir(w.windDir)}</div>
+            <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{w.windSpeed} mph {getWindDir(w.windDeg)}</div>
           </div>
-          {w.precip > 0 && <div style={{padding:"3px 8px",borderRadius:5,background:"rgba(56,184,242,.1)",border:"1px solid rgba(56,184,242,.2)",fontSize:10,color:"var(--ice)",fontFamily:"'DM Mono',monospace"}}>🌧️ {w.precip}" precip</div>}
         </>
       : null
     }
