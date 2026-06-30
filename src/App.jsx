@@ -12454,27 +12454,33 @@ function OddsCalculatorSlideout({ onClose }) {
   const [bankroll,   setBankroll]   = useState('');
   const [unitSize,   setUnitSize]   = useState('');
   const [unitEdited, setUnitEdited] = useState(false);
+  const [unitRate,   setUnitRate]   = useState(3.0);
   const [currency,   setCurrency]   = useState('USD');
   const [result,     setResult]     = useState(null);
   const parsed  = calcParseOdds(oddsRaw);
   const sym     = CALC_CCY_SYM[currency] || '$';
-  const unitPct = (() => {
-    const b = parseFloat(bankroll), u = parseFloat(unitSize);
-    return (!isNaN(b) && !isNaN(u) && b > 0) ? ((u / b) * 100).toFixed(1) : null;
-  })();
+  const rateNum = parseFloat(unitRate) || 3;
   const handleBankroll = v => {
     setBankroll(v);
     if (!unitEdited) {
-      const b = parseFloat(v);
-      setUnitSize((!isNaN(b) && b > 0) ? (b * 0.03).toFixed(2) : '');
+      const b = parseFloat(v), r = rateNum / 100;
+      setUnitSize((!isNaN(b) && b > 0) ? (b * r).toFixed(2) : '');
     }
     setResult(null);
   };
   const handleUnitSize = v => {
     setUnitEdited(true);
     setUnitSize(v);
-    const u = parseFloat(v);
-    setBankroll((!isNaN(u) && u > 0) ? (u / 0.03).toFixed(2) : '');
+    const u = parseFloat(v), r = rateNum / 100;
+    setBankroll((!isNaN(u) && u > 0) ? (u / r).toFixed(2) : '');
+    setResult(null);
+  };
+  const handleUnitRate = v => {
+    setUnitRate(v);
+    const r = (parseFloat(v) || 3) / 100;
+    const b = parseFloat(bankroll), u = parseFloat(unitSize);
+    if (!unitEdited && !isNaN(b) && b > 0) setUnitSize((b * r).toFixed(2));
+    else if (unitEdited && !isNaN(u) && u > 0) setBankroll((u / r).toFixed(2));
     setResult(null);
   };
   const canCalc = !!(parsed && parsed.decimal > 1 && parseFloat(unitSize) > 0);
@@ -12567,9 +12573,15 @@ function OddsCalculatorSlideout({ onClose }) {
             </div>
           </div>
           <div>
-            <span style={{fontSize:9,color:'var(--muted)',fontFamily:mono,marginBottom:4,display:'block'}}>
-              {unitPct ? `Unit Size — ${unitPct}% of bankroll` : 'Unit Size — defaults to 3% of bankroll'}
-            </span>
+            <div style={{display:'flex',alignItems:'center',gap:5,marginBottom:4}}>
+              <span style={{fontSize:9,color:'var(--muted)',fontFamily:mono}}>Unit Size —</span>
+              <input type="number" min="0.1" max="100" step="0.5" value={unitRate}
+                onChange={e=>handleUnitRate(e.target.value)}
+                style={{width:46,background:'var(--surface)',border:'1px solid var(--border)',
+                  borderRadius:4,padding:'1px 5px',fontFamily:mono,fontSize:9,
+                  color:'var(--text)',outline:'none',textAlign:'center',WebkitAppearance:'none'}}/>
+              <span style={{fontSize:9,color:'var(--muted)',fontFamily:mono}}>% of bankroll</span>
+            </div>
             <div style={{display:'flex',alignItems:'center',gap:6}}>
               <span style={{fontFamily:mono,fontSize:12,color:'var(--muted)',flexShrink:0}}>{sym}</span>
               <input type="number" min="0" value={unitSize}
@@ -12578,7 +12590,7 @@ function OddsCalculatorSlideout({ onClose }) {
             </div>
           </div>
           <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginTop:7,lineHeight:1.6}}>
-            Editing either field recalculates the other at the 3% default rate.
+            Editing either field recalculates the other at the selected % rate.
           </div>
         </div>
         <div style={{height:1,background:'var(--border)',margin:'4px 0 18px'}}/>
