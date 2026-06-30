@@ -13682,6 +13682,16 @@ function computeYardScoreYV2(sig, ghr, ghr_yv2, boom, ps,
     batterHand, pitcherHand, daysRest, lineupSlot, pitcherGradeLabel);
 }
 
+// ── Yard Score V2PS — uses ps_score_v2 (corrected Phase 3 weather inputs) from engine output ──
+// NOT wired into UI. For backtesting Phase 3 fix vs constant 5/25 pts baseline.
+// See CLAUDE.md "Phase 3 + Weather Pipeline — Full Fix Plan" for methodology.
+// Only difference from computeYardScore: ps_v2 substituted for ps.
+function computeYardScoreV2PS(sig, ghr, boom, ps, ps_v2,
+  batterHand, pitcherHand, daysRest, lineupSlot, pitcherGradeLabel) {
+  return computeYardScore(sig, ghr, boom, ps_v2,
+    batterHand, pitcherHand, daysRest, lineupSlot, pitcherGradeLabel);
+}
+
 function YardBadge({ score }) {
   if (!score || score < 1) return null;
   // Thresholds recalibrated to new sweet spot (data: 20-34 = 9-11% HR rate)
@@ -14858,6 +14868,7 @@ function SimLabView({ data }) {
                     { label: 'Pos',      key: null, title: "Confirmed lineup position" },
                     { label: (<img src="/icon-192.png" alt="Yard" style={{width:15,height:15,borderRadius:2,objectFit:'cover',verticalAlign:'middle',display:'inline-block'}}/>), key: '_yard', colKey: '_yard' },
                     { label: 'YV2', key: '_yard_yv2', colKey: '_yard_yv2', title: 'Yard Score YV2 — experimental shrinkage blend. Not the live score.' },
+                    { label: 'PS V2', key: '_yard_psv2', colKey: '_yard_psv2', title: 'Yard Score PS V2 — corrected Phase 3 weather inputs. Not the live score.' },
                     { label: '⚡',       key: '_sig', colKey:'_sig' },
                     { label: 'Form',     key: null },
                     { label: 'HR⬆',      key: null },
@@ -15094,6 +15105,22 @@ function SimLabView({ data }) {
                               background:'rgba(56,184,242,.10)',color:'#38b8f2',
                               border:'1px dashed rgba(56,184,242,.30)',cursor:'default',whiteSpace:'nowrap'}}>
                             {_yv2}
+                          </span>;
+                        })()}
+                      </td>
+                      {/* ── Yard Score PS V2 — corrected Phase 3 weather inputs (read-only comparison column) ── */}
+                      <td style={{textAlign:'center',padding:'2px 4px',verticalAlign:'middle'}}>
+                        {(()=>{
+                          const _psv2raw = b.ps_score_v2 != null && b.ps_score_v2 !== '' ? parseFloat(b.ps_score_v2) : NaN;
+                          if (isNaN(_psv2raw)) return <span style={{color:'rgba(255,255,255,.15)',fontSize:8}}>—</span>;
+                          const _ypsv2 = computeYardScoreV2PS(b._trackerSig||0, parseFloat(b.gHR)||0, b._boom||0, b._ps||(parseFloat(b.ps_score)||0), _psv2raw, b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1), liveSlot(b.batter_id,b.lineup_slot), b._pgLabel||b.pitcher_grade_label||'');
+                          b._yard_psv2 = _ypsv2;
+                          return <span title={`PS V2: ${_ypsv2} — corrected Phase 3 weather inputs. Not the live score.`}
+                            style={{display:'inline-block',padding:'1px 5px',borderRadius:4,
+                              fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:10,
+                              background:'rgba(56,242,130,.10)',color:'#38f282',
+                              border:'1px dashed rgba(56,242,130,.30)',cursor:'default',whiteSpace:'nowrap'}}>
+                            {_ypsv2}
                           </span>;
                         })()}
                       </td>
