@@ -12450,15 +12450,30 @@ function calcParseOdds(raw) {
 }
 function OddsCalculatorSlideout({ onClose }) {
   const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
-  const [oddsRaw,    setOddsRaw]    = useState('');
-  const [bankroll,   setBankroll]   = useState('');
-  const [unitSize,   setUnitSize]   = useState('');
-  const [unitRate,   setUnitRate]   = useState(3.0);
-  const [currency,   setCurrency]   = useState('USD');
-  const [result,     setResult]     = useState(null);
+  const [mode,      setMode]      = useState('manual');  // 'manual' | 'suggested'
+  const [oddsRaw,   setOddsRaw]   = useState('');
+  const [bankroll,  setBankroll]  = useState('');
+  const [unitSize,  setUnitSize]  = useState('');
+  const [unitRate,  setUnitRate]  = useState(3.0);
+  const [sugFrac,   setSugFrac]   = useState('');        // unit fraction field (suggested mode)
+  const [showScale, setShowScale] = useState(false);
+  const [currency,  setCurrency]  = useState('USD');
+  const [result,    setResult]    = useState(null);
+
   const parsed  = calcParseOdds(oddsRaw);
   const sym     = CALC_CCY_SYM[currency] || '$';
   const rateNum = parseFloat(unitRate) || 3;
+
+  // Method B: suggested fraction from odds
+  const computeSugFrac = p => {
+    if (!p) return 1;
+    const am = p.american;
+    const raw = am > 0 ? 100 / am : Math.min(1.5, Math.abs(am) / 100);
+    return Math.max(raw, 0.05);
+  };
+  const fmtFrac = n => parseFloat(n.toFixed(3)).toString();
+
+  // ── Bankroll / unit size handlers (Manual mode — unchanged) ──
   const handleBankroll = v => {
     setBankroll(v);
     const b = parseFloat(v), r = rateNum / 100;
@@ -12479,28 +12494,76 @@ function OddsCalculatorSlideout({ onClose }) {
     else if (!isNaN(u) && u > 0) setBankroll((u / r).toFixed(2));
     setResult(null);
   };
+
+  // ── Odds change: auto-fill sugFrac in suggested mode ──
+  const handleOddsChange = v => {
+    setOddsRaw(v);
+    setResult(null);
+    if (mode === 'suggested') {
+      const p = calcParseOdds(v);
+      if (p) setSugFrac(fmtFrac(computeSugFrac(p)));
+    }
+  };
+
+  // ── Mode switch: auto-fill if odds already present ──
+  const handleModeSwitch = m => {
+    setMode(m);
+    setResult(null);
+    if (m === 'suggested' && parsed) setSugFrac(fmtFrac(computeSugFrac(parsed)));
+  };
+
+  // ── Risk descriptor ──
+  const riskDesc = frac => {
+    if (frac >= 1.0)   return 'Full unit (Favorite)';
+    if (frac >= 0.75)  return 'Standard play';
+    if (frac >= 0.50)  return 'Half unit';
+    if (frac >= 0.25)  return 'Quarter unit';
+    if (frac >= 0.125) return 'Micro-fractional (Longshot)';
+    return 'Minimum stake (Extreme longshot)';
+  };
+
   const canCalc = !!(parsed && parsed.decimal > 1 && parseFloat(unitSize) > 0);
+
   const calculate = () => {
     if (!canCalc) return;
-    const dec          = parsed.decimal;
+    const dec           = parsed.decimal;
     const fullUnitValue = parseFloat(unitSize);
-    const estUnit      = 1 / (dec - 1);
-    const estStake     = Math.max(estUnit * fullUnitValue, 0.10);
-    const potReturn    = estStake * dec;
-    setResult({ fullUnitValue, estStake, potReturn,
+    let unitFrac;
+    if (mode === 'suggested') {
+      unitFrac = Math.max(parseFloat(sugFrac) || computeSugFrac(parsed), 0.05);
+    } else {
+      unitFrac = 1 / (dec - 1);
+    }
+    const estStake  = Math.max(unitFrac * fullUnitValue, 0.10);
+    const potReturn = estStake * dec;
+    setResult({ fullUnitValue, unitFrac, estStake, potReturn,
                 impliedProb: (1 / dec) * 100,
-                profit: potReturn - estStake });
+                profit: potReturn - estStake,
+                desc: riskDesc(unitFrac) });
   };
+
   const inpStyle = {flex:1,background:'var(--surface2)',border:'1px solid var(--border)',
     borderRadius:6,padding:'7px 10px',fontFamily:mono,fontSize:13,color:'var(--text)',
     outline:'none',minWidth:0,WebkitAppearance:'none'};
   const lblStyle = {fontSize:9,color:'var(--muted)',fontFamily:mono,
     textTransform:'uppercase',letterSpacing:1,marginBottom:6,display:'block'};
+
+  const SCALE_ROWS = [
+    ['-150 or heavier', '1.0u – 1.5u'],
+    ['-110 to +110',    '1.0u (baseline)'],
+    ['+115 to +175',    '~0.75u'],
+    ['+180 to +275',    '~0.50u'],
+    ['+300 to +490',    '~0.25u'],
+    ['+500 to +900',    '~0.125u'],
+    ['+1000 or longer', '0.05u (floor)'],
+  ];
+
   return <>
     <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.55)',zIndex:900}}/>
     <div style={{position:'fixed',right:0,top:0,bottom:0,width:'min(380px,100vw)',
       background:'var(--surface)',borderLeft:'1px solid var(--border)',zIndex:901,
       display:'flex',flexDirection:'column',boxShadow:'-4px 0 24px rgba(0,0,0,.5)'}}>
+      {/* ── Header ── */}
       <div style={{padding:'14px 18px',borderBottom:'1px solid var(--border)',
         display:'flex',alignItems:'center',gap:8,flexShrink:0,background:'var(--surface2)'}}>
         <span style={{fontFamily:osw,fontWeight:700,fontSize:15,letterSpacing:.5,
@@ -12510,10 +12573,25 @@ function OddsCalculatorSlideout({ onClose }) {
           cursor:'pointer',padding:'3px 9px',fontFamily:mono,fontSize:11}}>✕</button>
       </div>
       <div style={{flex:1,overflowY:'auto',padding:'16px 18px'}}>
+        {/* ── Mode Toggle ── */}
+        <div style={{display:'flex',gap:3,marginBottom:18,background:'var(--surface2)',
+          borderRadius:8,padding:3,border:'1px solid var(--border)'}}>
+          {[['manual','Manual'],['suggested','Suggested']].map(([m, label]) => (
+            <button key={m} onClick={()=>handleModeSwitch(m)}
+              style={{flex:1,padding:'5px 0',borderRadius:6,border:'none',cursor:'pointer',
+                fontFamily:mono,fontSize:10,fontWeight:mode===m?700:400,letterSpacing:.5,
+                textTransform:'uppercase',
+                background:mode===m?'var(--accent)':'transparent',
+                color:mode===m?'white':'var(--muted)',transition:'all .15s'}}>
+              {label}
+            </button>
+          ))}
+        </div>
+
         {/* ── Odds ── */}
         <div style={{marginBottom:18}}>
           <span style={lblStyle}>Odds Input</span>
-          <input value={oddsRaw} onChange={e=>{setOddsRaw(e.target.value);setResult(null);}}
+          <input value={oddsRaw} onChange={e=>handleOddsChange(e.target.value)}
             placeholder="+180  ·  −150  ·  2.80"
             style={{width:'100%',boxSizing:'border-box',background:'var(--surface2)',
               border:'1px solid var(--border)',borderRadius:6,padding:'9px 12px',
@@ -12546,6 +12624,7 @@ function OddsCalculatorSlideout({ onClose }) {
           </div>
         </div>
         <div style={{height:1,background:'var(--border)',margin:'4px 0 18px'}}/>
+
         {/* ── Bankroll & Unit ── */}
         <div style={{marginBottom:18}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
@@ -12589,6 +12668,82 @@ function OddsCalculatorSlideout({ onClose }) {
             Editing either field recalculates the other at the selected % rate.
           </div>
         </div>
+
+        {/* ── Suggested mode: unit fraction + scale reference ── */}
+        {mode === 'suggested' && (
+          <>
+            <div style={{height:1,background:'var(--border)',margin:'4px 0 18px'}}/>
+            <div style={{marginBottom:10}}>
+              <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:6,flexWrap:'wrap'}}>
+                <span style={{fontSize:9,color:'var(--muted)',fontFamily:mono,
+                  textTransform:'uppercase',letterSpacing:1}}>Unit Fraction</span>
+                {parsed && (
+                  <span style={{fontSize:8,color:'#f5a623',fontFamily:mono,
+                    background:'rgba(245,166,35,.10)',borderRadius:4,padding:'1px 6px',
+                    border:'1px solid rgba(245,166,35,.25)'}}>
+                    Auto-suggested · edit to override
+                  </span>
+                )}
+              </div>
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                <input type="number" min="0.05" max="2" step="0.05" value={sugFrac}
+                  onChange={e=>{setSugFrac(e.target.value);setResult(null);}}
+                  placeholder="e.g. 0.50"
+                  style={{width:90,background:'var(--surface2)',border:'1px solid var(--border)',
+                    borderRadius:6,padding:'7px 10px',fontFamily:mono,fontSize:13,
+                    color:'var(--text)',outline:'none',WebkitAppearance:'none'}}/>
+                <span style={{fontFamily:osw,fontWeight:700,fontSize:13,color:'var(--muted)'}}>u</span>
+                {sugFrac && parseFloat(unitSize) > 0 && !isNaN(parseFloat(sugFrac)) && (
+                  <span style={{fontFamily:mono,fontSize:10,color:'var(--muted)'}}>
+                    = {calcFmtCcy((parseFloat(sugFrac) || 0) * parseFloat(unitSize), currency)}
+                  </span>
+                )}
+              </div>
+            </div>
+            {/* ── Scale reference table ── */}
+            <div style={{marginBottom:18}}>
+              <button onClick={()=>setShowScale(s=>!s)}
+                style={{background:'none',border:'none',cursor:'pointer',padding:'4px 0',
+                  fontFamily:mono,fontSize:9,color:'var(--muted)',display:'flex',
+                  alignItems:'center',gap:4,letterSpacing:.5}}>
+                <span style={{textTransform:'uppercase'}}>Show scale</span>
+                <span style={{fontSize:8,display:'inline-block',transition:'transform .15s',
+                  transform:showScale?'rotate(180deg)':'none'}}>▾</span>
+              </button>
+              {showScale && (
+                <div style={{marginTop:6,border:'1px solid var(--border)',borderRadius:6,overflow:'hidden'}}>
+                  <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',padding:'5px 10px',
+                    background:'rgba(245,166,35,.06)',borderBottom:'1px solid var(--border)',
+                    letterSpacing:.3}}>
+                    Reference only — calculator uses continuous formula
+                  </div>
+                  <table style={{width:'100%',borderCollapse:'collapse',fontFamily:mono,fontSize:9}}>
+                    <thead>
+                      <tr style={{background:'var(--surface2)'}}>
+                        <th style={{padding:'5px 10px',textAlign:'left',color:'var(--muted)',
+                          fontWeight:600,borderBottom:'1px solid var(--border)'}}>Odds Range</th>
+                        <th style={{padding:'5px 10px',textAlign:'right',color:'var(--muted)',
+                          fontWeight:600,borderBottom:'1px solid var(--border)'}}>Suggested Unit</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {SCALE_ROWS.map(([range, unit], i) => (
+                        <tr key={i} style={{
+                          borderBottom:i<SCALE_ROWS.length-1?'1px solid rgba(255,255,255,.04)':'none',
+                          background:i%2===0?'transparent':'rgba(255,255,255,.02)'}}>
+                          <td style={{padding:'5px 10px',color:'var(--text)'}}>{range}</td>
+                          <td style={{padding:'5px 10px',textAlign:'right',
+                            color:'#f5a623',fontWeight:600}}>{unit}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
         <div style={{height:1,background:'var(--border)',margin:'4px 0 18px'}}/>
         {/* ── Calculate ── */}
         <button onClick={calculate} disabled={!canCalc}
@@ -12599,6 +12754,7 @@ function OddsCalculatorSlideout({ onClose }) {
             fontSize:14,letterSpacing:.5,opacity:canCalc?1:.45,transition:'opacity .15s'}}>
           Calculate
         </button>
+
         {/* ── Results ── */}
         {result && (
           <div style={{marginTop:16,background:'var(--surface2)',borderRadius:8,
@@ -12606,22 +12762,38 @@ function OddsCalculatorSlideout({ onClose }) {
             <div style={{fontFamily:osw,fontWeight:700,fontSize:11,color:'var(--muted)',
               textTransform:'uppercase',letterSpacing:1,marginBottom:12}}>Results</div>
             {[
-              ['Implied Probability', result.impliedProb.toFixed(1)+'%',          'var(--muted)'],
-              ['Full Unit Value',     calcFmtCcy(result.fullUnitValue, currency),  '#f5a623'    ],
-              ['Est. Stake',          calcFmtCcy(result.estStake, currency),       '#38f282'    ],
-              ['Total Return',        calcFmtCcy(result.potReturn, currency),      '#38b8f2'    ],
-              ['Profit on Win',       calcFmtCcy(result.profit, currency),         '#38f282'    ],
-            ].map(([lbl, val, clr]) => (
+              ['Implied Probability',
+               result.impliedProb.toFixed(1)+'%',
+               'var(--muted)', 14],
+              ['Unit Fraction',
+               `${parseFloat(result.unitFrac.toFixed(3))}u · ${calcFmtCcy(result.fullUnitValue, currency)} full unit`,
+               '#f5a623', 11],
+              ['Est. Stake',
+               calcFmtCcy(result.estStake, currency),
+               '#38f282', 14],
+              ['Total Return',
+               calcFmtCcy(result.potReturn, currency),
+               '#38b8f2', 14],
+              ['Profit on Win',
+               calcFmtCcy(result.profit, currency),
+               '#38f282', 14],
+            ].map(([lbl, val, clr, fsz]) => (
               <div key={lbl} style={{display:'flex',justifyContent:'space-between',
                 alignItems:'baseline',padding:'6px 0',
                 borderBottom:'1px solid rgba(255,255,255,.05)'}}>
                 <span style={{fontFamily:mono,fontSize:10,color:'var(--muted)'}}>{lbl}</span>
-                <span style={{fontFamily:osw,fontWeight:700,fontSize:14,color:clr}}>{val}</span>
+                <span style={{fontFamily:osw,fontWeight:700,fontSize:fsz,color:clr}}>{val}</span>
               </div>
             ))}
-            <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginTop:10,lineHeight:1.6}}>
-              Sized to return 1 unit ({calcFmtCcy(result.fullUnitValue, currency)}) profit.
-              Floor: {sym}0.10.
+            {/* Risk descriptor */}
+            <div style={{marginTop:12,padding:'7px 10px',borderRadius:6,
+              background:'rgba(56,242,130,.06)',border:'1px solid rgba(56,242,130,.18)'}}>
+              <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)',textTransform:'uppercase',
+                letterSpacing:.5}}>Risk level: </span>
+              <span style={{fontFamily:osw,fontWeight:700,fontSize:12,color:'#38f282'}}>{result.desc}</span>
+            </div>
+            <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginTop:8,lineHeight:1.6}}>
+              Floor: {sym}0.10.{mode==='manual'?' Sized to return 1 unit profit.':' Fraction auto-suggested from odds.'}
             </div>
           </div>
         )}
