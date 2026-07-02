@@ -1992,3 +1992,23 @@ game_id,game_date,runner_id,runner_name,pitcher_id,pitcher_name,stolen_base,caug
 824907,2026-06-30,691026,Masyn Winn,675916,James Karinchak,1,0,2B,6,top,top
 825066,2026-06-30,672695,Geraldo Perdomo,694738,Landen Roupp,1,0,2B,1,bottom,bottom
 825066,2026-06-30,656976,Pavin Smith,694738,Landen Roupp,1,0,2B,2,bottom,bottom
+823446,2026-07-01,804606,Konnor Griffin,554430,Zack Wheeler,1,0,2B,3,top,top
+823530,2026-07-01,665862,Jazz Chisholm Jr.,623454,Drew Anderson,1,0,2B,9,bottom,bottom
+823530,2026-07-01,665862,Jazz Chisholm Jr.,623454,Drew Anderson,1,0,3B,9,bottom,bottom
+823530,2026-07-01,683011,Anthony Volpe,623454,Drew Anderson,0,1,2B,9,bottom,bottom
+823530,2026-07-01,682985,Riley Greene,666808,Camilo Doval,1,0,2B,11,top,top
+824094,2026-07-01,670764,Taylor Walls,607625,Seth Lugo,0,1,2B,2,top,top
+824094,2026-07-01,802415,Chandler Simpson,607625,Seth Lugo,0,1,2B,4,top,top
+824174,2026-07-01,668904,Royce Lewis,837227,Tatsuya Imai,1,0,3B,1,top,top
+824174,2026-07-01,663616,Trevor Larnach,663878,Nate Pearson,0,1,2B,5,top,top
+824337,2026-07-01,691594,Javier Sanoja,607536,Kyle Freeland,0,1,2B,2,top,top
+824419,2026-07-01,800050,Chase DeLauter,692437,Winston Santos,1,0,2B,7,bottom,bottom
+824660,2026-07-01,691718,Pete Crow-Armstrong,621111,Walker Buehler,1,0,2B,1,bottom,bottom
+824740,2026-07-01,686611,Dylan Crews,663558,Jovani Morán,1,0,2B,6,top,top
+824818,2026-07-01,682668,Luisangel Acuña,665152,Dean Kremer,0,1,2B,5,top,top
+824818,2026-07-01,665750,Leody Taveras,670950,Trevor Richards,1,0,2B,6,bottom,bottom
+824905,2026-07-01,691023,Jordan Walker,625643,Reynaldo López,1,0,2B,1,top,top
+824985,2026-07-01,518692,Freddie Freeman,669372,J.T. Ginn,1,0,2B,1,top,top
+825064,2026-07-01,606466,Ketel Marte,686790,Trevor McDonald,1,0,2B,4,bottom,bottom
+825064,2026-07-01,606466,Ketel Marte,686790,Trevor McDonald,1,0,3B,4,bottom,bottom
+825064,2026-07-01,808982,Jung Hoo Lee,657044,Ryan Thompson,1,0,2B,6,top,top
