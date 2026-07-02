@@ -7095,6 +7095,346 @@ function LineupsView({ date }) {
 }
 
 
+// ── Live Themes ── real-time HR cluster detection + confirmed-batter matching ──
+function TierBadge({ tier }) {
+  const cfg = {
+    1: { color:'#f5a623', bg:'rgba(245,166,35,.14)', border:'rgba(245,166,35,.40)' },
+    2: { color:'#a0aab4', bg:'rgba(160,170,180,.10)', border:'rgba(160,170,180,.28)' },
+    3: { color:'#5a636c', bg:'rgba(90,99,108,.08)',   border:'rgba(90,99,108,.20)' },
+  }[tier] || {};
+  return (
+    <span style={{ fontFamily:"'DM Mono',monospace", fontSize:8, fontWeight:700,
+      color:cfg.color, background:cfg.bg, border:`1px solid ${cfg.border}`,
+      borderRadius:4, padding:'1px 5px', whiteSpace:'nowrap' }}>
+      T{tier}
+    </span>
+  );
+}
+
+function ThemeMatchTable({ candidates }) {
+  const mono = "'DM Mono',monospace";
+  const osw  = "'Oswald',sans-serif";
+  const [expandedId, setExpandedId] = useState(null);
+  if (!candidates || candidates.length === 0) {
+    return <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)',padding:14}}>No confirmed batters match this cluster.</div>;
+  }
+  return (
+    <div className="tw" style={{marginTop:8}}>
+      <table style={{width:'100%'}}>
+        <thead><tr style={{borderBottom:'1px solid var(--border)'}}>
+          {[['Tier','left'],['Batter','left'],['Yard','center'],['Boom','right'],
+            ['⚡','right'],['P.Grade','right'],['vs Pitcher','left'],
+            ['Sim TB','right'],['L7 EV','right'],['Brl%','right'],
+            ['ZoneFit','right'],['xwOBA','right'],['Grade','right'],['Match','right'],
+          ].map(([lbl,align])=>(
+            <th key={lbl} style={{padding:'4px 5px',fontSize:8,fontFamily:mono,
+              textTransform:'uppercase',letterSpacing:.6,color:'var(--muted)',
+              textAlign:align,whiteSpace:'nowrap'}}>{lbl}</th>
+          ))}
+        </tr></thead>
+        <tbody>
+          {candidates.map(b => {
+            const pid = parseInt(b.batter_id||0);
+            const uid = b.batter_id || b.batter;
+            const isExp = expandedId === uid;
+            const yard  = b._yard  ?? 0;
+            const boom  = b._boom  ?? 0;
+            const sig   = b._sig   ?? 0;
+            const pgLabel = b._pgLabel || '';
+            const pgColor = pgLabel.includes('‼️')||pgLabel.toLowerCase().includes('elite') ? '#ff4020'
+                          : pgLabel.includes('⚠️')||pgLabel.toLowerCase().includes('tough') ? '#ff8020'
+                          : pgLabel.includes('💥')||pgLabel.toLowerCase().includes('hittable') ? '#27c97a'
+                          : pgLabel.includes('🎯')||pgLabel.toLowerCase().includes('target') ? '#38b8f2'
+                          : 'var(--muted)';
+            const simTB = parseFloat(b.sim_tb)||0;
+            const ev7   = parseFloat(b.recent_avg_ev)||0;
+            const brl7  = parseFloat(b.recent_barrel_pct)||0;
+            const zf    = parseFloat(b.zone_fit)||0;
+            const xw    = parseFloat(b.season_xwoba)||0;
+            const effG  = computeEffectiveGrade(b.grade, pgLabel);
+            const gc    = GRADE_CFG[effG] || GRADE_CFG['D'];
+            return (
+              <React.Fragment key={uid}>
+                <tr onClick={()=>setExpandedId(v=>v===uid?null:uid)}
+                  style={{cursor:'pointer',height:26,borderBottom:'1px solid rgba(255,255,255,.04)',
+                    background:isExp?'rgba(255,255,255,.04)':'transparent',
+                    borderLeft:`2px solid ${isExp?'var(--accent)':'transparent'}`}}>
+                  <td style={{padding:'2px 5px'}}><TierBadge tier={b.tier}/></td>
+                  <td className="sticky-batter" style={{padding:'2px 6px',maxWidth:160}}>
+                    <div style={{display:'flex',alignItems:'center',gap:4,overflow:'hidden'}}>
+                      <PlayerAvatar pid={pid} name={b.batter||''} size={16}/>
+                      <span style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'var(--accent2)',whiteSpace:'nowrap',flexShrink:0}}>{b.batting_team||''}</span>
+                      <span style={{fontFamily:osw,fontWeight:700,fontSize:10,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',
+                        color:isKeyMatchup(pid,b.batter||'')?'#ff8020':'var(--text)'}}>{b.batter||'—'}</span>
+                      <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={pid} name={b.batter||''} team={b.batting_team||''}/></span>
+                    </div>
+                  </td>
+                  <td style={{padding:'2px 4px',textAlign:'center',verticalAlign:'middle'}}><YardBadge score={yard}/></td>
+                  <td style={{padding:'2px 6px',textAlign:'right',fontFamily:osw,fontWeight:800,fontSize:10,
+                    color:boom>=60?'#ff4020':boom>=45?'#f5a623':boom>=30?'var(--text)':'var(--muted)'}}>
+                    {boom>0?Math.round(boom):'—'}
+                  </td>
+                  <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,
+                    color:sig>=10?'#ff4020':sig>=7?'#f5a623':sig>=4?'#27c97a':'var(--muted)'}}>
+                    {sig>0?sig.toFixed(1):'—'}
+                  </td>
+                  <td style={{padding:'2px 6px',textAlign:'right'}}>
+                    <span style={{fontFamily:mono,fontSize:9,color:pgColor,fontWeight:700}}>{pgLabel.split(' ')[0]||'—'}</span>
+                  </td>
+                  <td style={{padding:'2px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',whiteSpace:'nowrap',maxWidth:90,overflow:'hidden',textOverflow:'ellipsis'}}>
+                    {resolvePitcherName(b.pitcher,b.batting_team,b.pitcher_id)}
+                  </td>
+                  <td style={{padding:'2px 6px',textAlign:'right',fontFamily:osw,fontWeight:800,fontSize:11,
+                    color:simTB>=2?'#ff8020':simTB>=1.5?'#f5a623':'var(--text)'}}>
+                    {simTB>0?simTB.toFixed(2):'—'}
+                  </td>
+                  <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,
+                    color:ev7>=97?'#f5a623':ev7>=93?'var(--text)':'var(--muted)'}}>
+                    {ev7>0?ev7.toFixed(1):'—'}
+                  </td>
+                  <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,
+                    color:brl7>=12?'#ff4020':brl7>=8?'#f5a623':brl7>=5?'var(--text)':'var(--muted)'}}>
+                    {brl7>0?brl7.toFixed(1)+'%':'—'}
+                  </td>
+                  <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,
+                    color:zf>=8?'#ff4020':zf>=5?'#f5a623':zf>=2?'#27c97a':'var(--muted)'}}>
+                    {zf>0?zf.toFixed(1)+'%':'—'}
+                  </td>
+                  <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,
+                    color:xw>=0.400?'#ff4020':xw>=0.360?'#f5a623':xw>=0.320?'#27c97a':'var(--muted)'}}>
+                    {xw>0?xw.toFixed(3):'—'}
+                  </td>
+                  <td style={{padding:'2px 6px',textAlign:'right'}}>
+                    <span style={{fontFamily:mono,fontSize:9,color:gc.color,fontWeight:700}}>{effG}</span>
+                  </td>
+                  <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,fontWeight:700,
+                    color:b.themeMatchScore>=70?'#ff4020':b.themeMatchScore>=50?'#f5a623':'var(--muted)'}}>
+                    {b.themeMatchScore!=null?b.themeMatchScore.toFixed(0):'—'}
+                  </td>
+                </tr>
+                {isExp && (
+                  <tr><td colSpan={14} style={{padding:'0 10px 10px',background:'rgba(255,255,255,.02)'}}>
+                    <Last7HRChart batterId={pid}/>
+                    <RecentGameLog batterId={pid}/>
+                  </td></tr>
+                )}
+              </React.Fragment>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function LiveThemesTab() {
+  const mono = "'DM Mono',monospace";
+  const osw  = "'Oswald',sans-serif";
+  const [todaysHRs, setTodaysHRs] = useState([]);
+  const [lineupVer, setLineupVer] = useState(LINEUP_VERSION);
+  const seenHRIds = useRef(new Set());
+
+  useEffect(() => {
+    const unsub = subscribeLineup(v => setLineupVer(v));
+    return unsub;
+  }, []);
+
+  // Compute boom + yard for a pick row; prefers cached values written by SimLabView
+  function pickScores(b) {
+    const cache = DAILY_PICKS_CACHE[String(parseInt(b.batter_id)||0)];
+    const _sig  = cache?._trackerSig ?? (parseFloat(b.weighted_flag_score)||0) * 4.6;
+    const _boom = cache?._boom       ?? computeBoomScore(
+      _sig, b.zone_fit, b.recent_iso, parseFloat(b.sim_tb)||0, b.weighted_flag_score,
+      parseFloat(b.recent_barrel_spike||0), parseInt(b.recent_hr_count||0),
+      parseFloat(b.recent_batter_ahead_pct||0), !!b.hh_precursor,
+      parseFloat(b.primary_pitch_hr_rate||0),
+      parseInt(b.recent_barrels_3d)||0, parseInt(b.recent_hrs_3d)||0,
+      parseFloat(b.recent_avg_bat_speed)||0, parseInt(b.recent_pb_2d)||0,
+      b.la_locked, parseFloat(b.season_swstr_pct)||0, parseFloat(b.park_pull_fit)||0,
+      parseInt(b._zoneEdges||0), parseInt(b._zoneKPenalty||0),
+      (()=>{const ls=liveSlot(b.batter_id,b.lineup_slot);return ls>0&&(b.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(ls);})(),
+      parseFloat(b.season_xwoba)||0
+    );
+    const _ps     = cache?._ps       ?? (parseFloat(b.ps_score)||0);
+    const _pgLabel = cache?._pgLabel  ?? b.pitcher_grade_label ?? '';
+    const _yard   = cache?._yard     ?? computeYardScore(
+      _sig, parseFloat(b.gHR)||0, _boom, _ps,
+      b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1),
+      liveSlot(b.batter_id, b.lineup_slot), _pgLabel
+    );
+    return { _sig, _boom, _ps, _pgLabel, _yard };
+  }
+
+  // Poll /api/homeruns every 60s; append newly-seen HRs to state
+  useEffect(() => {
+    let active = true;
+    const poll = async () => {
+      try {
+        const data = await fetchHRs(false);
+        if (!active) return;
+        const newHRs = [];
+        for (const h of data) {
+          const bid = parseInt(h.batterId||0);
+          if (!bid) continue;
+          const uid = `${h.gamePk||0}-${bid}`;
+          if (seenHRIds.current.has(uid)) continue;
+          seenHRIds.current.add(uid);
+          const pick = DAILY_PICKS_CACHE[String(bid)];
+          if (!pick) continue;
+          const { _yard, _boom } = pickScores(pick);
+          newHRs.push({
+            batter_id: bid,
+            batter_name: h.batterName || pick.batter || '',
+            yardScore: _yard,
+            boomScore: _boom,
+            xwoba: parseFloat(pick.season_xwoba)||0,
+            iso:   parseFloat(pick.recent_iso)||0,
+            game_id: String(h.gamePk||''),
+            timestamp: Date.now(),
+          });
+        }
+        if (newHRs.length > 0) setTodaysHRs(prev => [...prev, ...newHRs]);
+      } catch(e) { console.warn('[LiveThemes]', e.message); }
+    };
+    poll();
+    const id = setInterval(poll, 60000);
+    return () => { active = false; clearInterval(id); };
+  }, []); // module-level globals only; seenHRIds is a ref
+
+  // ±7 Yard Score window clustering; top 3 clusters by member count
+  const clusters = useMemo(() => {
+    if (todaysHRs.length < 3) return [];
+    const sorted = [...todaysHRs].sort((a, b) => a.yardScore - b.yardScore);
+    const groups = [];
+    let cur = [sorted[0]];
+    for (let i = 1; i < sorted.length; i++) {
+      if (sorted[i].yardScore - sorted[i-1].yardScore <= 7) { cur.push(sorted[i]); }
+      else { groups.push(cur); cur = [sorted[i]]; }
+    }
+    groups.push(cur);
+    return groups.sort((a, b) => b.length - a.length).slice(0, 3).map(members => {
+      const n = members.length;
+      return {
+        members,
+        clusterMean:     members.reduce((s,m)=>s+m.yardScore, 0) / n,
+        clusterBoomAvg:  members.reduce((s,m)=>s+m.boomScore, 0) / n,
+        clusterXwobaAvg: members.reduce((s,m)=>s+m.xwoba,     0) / n,
+        clusterIsoAvg:   members.reduce((s,m)=>s+m.iso,       0) / n,
+      };
+    });
+  }, [todaysHRs]);
+
+  // Confirmed batters (excludes already-HR'd); re-derives on lineup update
+  const confirmedPool = useMemo(() => {
+    const goneBids = new Set(todaysHRs.map(h => h.batter_id));
+    return Object.values(DAILY_PICKS_CACHE).filter(b => {
+      const bid = parseInt(b.batter_id||0);
+      if (!bid || goneBids.has(bid)) return false;
+      const fromCSV  = b.lineup_confirmed === true || b.lineup_confirmed === 'True' || b.lineup_confirmed === '1';
+      const fromLive = LINEUP_STATUS[bid]?.status === 'confirmed';
+      return fromCSV || fromLive;
+    }).map(b => ({ ...b, ...pickScores(b) }));
+  }, [todaysHRs, lineupVer]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Theme Match Score per confirmed batter per cluster; tier = rank percentile
+  const clusterTables = useMemo(() => {
+    if (!clusters.length || !confirmedPool.length) return [];
+    return clusters.map(cluster => {
+      const { clusterMean, clusterBoomAvg, clusterXwobaAvg, clusterIsoAvg } = cluster;
+      const scored = confirmedPool.map(b => {
+        const ysProx   = Math.max(0, 1 - Math.abs((b._yard||0) - clusterMean)     / 30);
+        const boomProx = Math.max(0, 1 - Math.abs((b._boom||0) - clusterBoomAvg)  / 50);
+        const xwProx   = Math.max(0, 1 - Math.abs((parseFloat(b.season_xwoba)||0) - clusterXwobaAvg) / 0.150);
+        const isoProx  = Math.max(0, 1 - Math.abs((parseFloat(b.recent_iso)||0)   - clusterIsoAvg)   / 0.200);
+        const pg = b._pgLabel || '';
+        const gradeBonus = pg.includes('‼️')||pg.toLowerCase().includes('elite') ? -0.10
+                         : pg.includes('⚠️')||pg.toLowerCase().includes('tough') ? -0.05 : 0;
+        const themeMatchScore = (ysProx*0.50 + boomProx*0.20 + xwProx*0.20 + isoProx*0.10 + gradeBonus) * 100;
+        return { ...b, themeMatchScore };
+      }).sort((a, b) => b.themeMatchScore - a.themeMatchScore);
+      const total = scored.length;
+      const t1Cut = Math.max(1, Math.ceil(total * 0.10));
+      const t2Cut = Math.ceil(total * 0.30);
+      const t3Cut = Math.ceil(total * 0.60);
+      const candidates = scored.slice(0, t3Cut).map((b, i) => ({
+        ...b, tier: i < t1Cut ? 1 : i < t2Cut ? 2 : 3,
+      }));
+      return { ...cluster, candidates };
+    });
+  }, [clusters, confirmedPool]);
+
+  const isActive = todaysHRs.length >= 3 && clusters.length > 0;
+
+  return (
+    <div>
+      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16}}>
+        <span style={{fontFamily:osw,fontWeight:800,fontSize:18,color:'var(--text)',letterSpacing:.5}}>
+          🔥 Live Themes
+        </span>
+        {todaysHRs.length > 0 && (
+          <span style={{fontFamily:mono,fontSize:10,padding:'2px 9px',borderRadius:6,
+            color:'var(--accent)',background:'rgba(232,65,26,.10)',border:'1px solid rgba(232,65,26,.28)'}}>
+            {todaysHRs.length} HR{todaysHRs.length!==1?'s':''} today
+          </span>
+        )}
+        {isActive && <span style={{width:7,height:7,borderRadius:'50%',background:'#ff3030',
+          boxShadow:'0 0 6px #ff3030',display:'inline-block',flexShrink:0}} title="Themes live"/>}
+      </div>
+
+      {!isActive ? (
+        <div style={{textAlign:'center',padding:'48px 20px',borderRadius:10,
+          border:'1px dashed rgba(255,255,255,.10)',background:'rgba(255,255,255,.02)'}}>
+          <div style={{fontSize:32,marginBottom:12}}>🔥</div>
+          <div style={{fontFamily:osw,fontWeight:700,fontSize:16,color:'var(--text)',marginBottom:8}}>
+            Themes activate when 3+ home runs land today
+          </div>
+          {todaysHRs.length > 0 && (
+            <div style={{fontFamily:mono,fontSize:11,color:'var(--accent)',marginBottom:10}}>
+              {todaysHRs.length} of 3 HRs so far today{todaysHRs.length === 2 ? ' — almost!' : ''}
+            </div>
+          )}
+          <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',letterSpacing:.5}}>
+            Watching live games · Updates every 60s
+          </div>
+        </div>
+      ) : (
+        <div>
+          {clusterTables.map((cluster, ci) => {
+            const { members, clusterMean, clusterXwobaAvg, clusterIsoAvg, clusterBoomAvg, candidates } = cluster;
+            const hrNames = members.map(m => m.batter_name).filter(Boolean).join(', ');
+            const xwStr = '.' + (clusterXwobaAvg*1000).toFixed(0).padStart(3,'0');
+            return (
+              <div key={ci} style={{marginBottom:24}}>
+                <div style={{background:'var(--surface2)',borderLeft:'3px solid var(--accent)',
+                  borderRadius:'0 8px 8px 0',padding:'10px 14px',marginBottom:8}}>
+                  <div style={{fontFamily:osw,fontWeight:800,fontSize:13,color:'var(--accent)',
+                    letterSpacing:.4,marginBottom:4}}>
+                    {`CLUSTER ${ci+1}: YS ~${Math.round(clusterMean)} · ${members.length} HR${members.length!==1?'s':''} landed · xwOBA avg ${xwStr}`}
+                  </div>
+                  <div style={{fontFamily:mono,fontSize:9,color:'var(--text)',marginBottom:3}}>
+                    <span style={{color:'var(--muted)'}}>Batters: </span>{hrNames||'—'}
+                  </div>
+                  <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',display:'flex',gap:14,flexWrap:'wrap'}}>
+                    <span>Avg YS: <strong style={{color:'var(--text)'}}>{clusterMean.toFixed(1)}</strong></span>
+                    <span>Avg Boom: <strong style={{color:'var(--text)'}}>{clusterBoomAvg.toFixed(0)}</strong></span>
+                    <span>Avg ISO: <strong style={{color:'var(--text)'}}>{'.'+(clusterIsoAvg*1000).toFixed(0).padStart(3,'0')}</strong></span>
+                    <span>Candidates: <strong style={{color:'var(--text)'}}>{candidates.length}</strong></span>
+                  </div>
+                </div>
+                <ThemeMatchTable candidates={candidates}/>
+              </div>
+            );
+          })}
+          <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',textAlign:'center',
+            marginTop:16,padding:'8px 0',borderTop:'1px solid rgba(255,255,255,.06)'}}>
+            T1 = top 10% match · T2 = 11–30% · T3 = 31–60% · Confirmed batters only
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function LiveTab() {
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -7211,7 +7551,7 @@ function LiveTab() {
     ]} onClose={()=>setShowLiveHelp(false)}/>}
     <div style={{display:'flex',gap:5,marginBottom:12,alignItems:'center'}}>
       <div style={{display:'flex',gap:5,padding:'3px',background:'var(--surface)',borderRadius:8,border:'1px solid var(--border)',width:'fit-content'}}>
-      {[['gameday','📺 Gameday'],['battracking','🥎 Bat Tracking'],['simlive','⚡ Live Sim'],['games','🎮 Live Games'],['lineups','📋 Lineups']].map(([key,label])=>(
+      {[['gameday','📺 Gameday'],['battracking','🥎 Bat Tracking'],['simlive','⚡ Live Sim'],['games','🎮 Live Games'],['lineups','📋 Lineups'],['themes','🔥 Themes']].map(([key,label])=>(
         <button key={key} onClick={()=>setLiveView(key)}
           style={{padding:'6px 14px',borderRadius:6,cursor:'pointer',border:'none',
             fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,letterSpacing:.8,
@@ -7229,6 +7569,7 @@ function LiveTab() {
   {liveView==='simlive' && <LiveSimTab games={games} date={liveDate} isToday={liveDate===liveTodayStr}/>}
   {liveView==='lineups' && <LineupsView date={liveDate}/>}
   {liveView==='gameday' && <GamedayTab date={liveDate}/>}
+  {liveView==='themes' && <LiveThemesTab/>}
 
   {liveView==='games' && <>
 
