@@ -4991,10 +4991,17 @@ async function fetchStreamUrl(gamePk, games, setStreamUrl, setStreamLoad) {
 
     if (!found) { setStreamUrl(null); setStreamLoad(false); return; }
 
-    // IMPORTANT: field names below are best-guess shapes. After first real test,
-    // console.log(found) and correct the field extraction to match actual response.
-    const url = found.streamUrl || found.sources?.[0]?.url ||
-                found.embed || found.streams?.[0]?.url || null;
+    const slugify = s => (s || '').toLowerCase()
+      .replace(/\./g, '-')
+      .replace(/\s+/g, '-');
+
+    const awayName = found?.teams?.away?.name || found?.away?.name || awayAbbr;
+    const homeName = found?.teams?.home?.name || found?.home?.name || homeAbbr;
+    const matchId  = found?.id || found?.matchId || '';
+
+    if (!matchId) { setStreamUrl(null); setStreamLoad(false); return; }
+
+    const url = `https://streamed.pk/watch/${slugify(awayName)}-vs-${slugify(homeName)}-${matchId}/admin/1`;
     setStreamUrl(url);
   } catch(e) {
     console.warn('[Watch] streamed.pk lookup failed:', e.message);
@@ -10236,7 +10243,7 @@ function GamedayTab() {
             <div style={{display:'flex',gap:2,alignItems:'center'}}>
               <button
                 onClick={() => window.open(
-                  `https://www.mlb.com/live-stream-games/${selGamePk}`,
+                  `https://www.mlb.com/tv/g${selGamePk}`,
                   '_blank','noopener'
                 )}
                 style={{padding:'4px 11px',borderRadius:'6px 0 0 6px',border:'none',
@@ -18913,6 +18920,11 @@ function StatsTab() {
   const [pPgFilter,   setPPgFilter]   = useState([]);
   const [pFiltersOpen, setPFiltersOpen] = useState(false);
   const [bFiltersOpen, setBFiltersOpen] = useState(false);
+  const [threshFilters,   setThreshFilters]   = useState([]);
+  const [threshPanelOpen, setThreshPanelOpen] = useState(false);
+  const [threshCol,       setThreshCol]       = useState('brl_pct');
+  const [threshOp,        setThreshOp]        = useState('>');
+  const [threshVal,       setThreshVal]       = useState('');
 
   // ── Data ──────────────────────────────────────────────────────────────────────
   const [data,    setData]    = useState({batters:{}, pitchers:{}});
@@ -19093,12 +19105,20 @@ function StatsTab() {
         if (bSearch && !(r.name||'').toLowerCase().includes(bSearch.toLowerCase()) && !(r.team||'').toLowerCase().includes(bSearch.toLowerCase())) return false;
         return true;
       })
+      .filter(r => {
+        if (!threshFilters.length) return true;
+        return threshFilters.every(f => {
+          const v = parseFloat(r[f.col] ?? null);
+          if (isNaN(v)) return false;
+          return f.op === '>' ? v > f.val : v < f.val;
+        });
+      })
       .sort((a,b) => {
         const av = a[bSortBy] ?? -999, bv = b[bSortBy] ?? -999;
         return bSortDir * (av - bv);
       })
       .slice(0, 300);
-  }, [data, window, bSplitKey, bSortBy, bSortDir, bSearch, bTeam, bMinPA, bHandFilter, bPgFilter, matchupTeams, sharedBHand, bConfirmed, bHotOnly, bGYOnly, bHideInj, bPicksOnly, pitchGroup, lineupVer]);
+  }, [data, window, bSplitKey, bSortBy, bSortDir, bSearch, bTeam, bMinPA, bHandFilter, bPgFilter, matchupTeams, sharedBHand, bConfirmed, bHotOnly, bGYOnly, bHideInj, bPicksOnly, pitchGroup, lineupVer, threshFilters]);
 
   // ── Pitcher rows ──────────────────────────────────────────────────────────────
   const pRows = React.useMemo(() => {
@@ -19514,15 +19534,24 @@ function StatsTab() {
                     <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.brl_pct_allowed||0)>=10?'#ff4020':(r.brl_pct_allowed||0)>=6?'#f5a623':'var(--muted)'}}>{fmtPct(r.brl_pct_allowed)}</td>
                     <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.fb_pct_allowed||0)>=40?'#ff4020':(r.fb_pct_allowed||0)>=35?'#f5a623':'var(--muted)'}}>{fmtPct(r.fb_pct_allowed)}</td>
                     <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.meatball_pct||0)>=60?'#ff4020':(r.meatball_pct||0)>=50?'#f5a623':'var(--muted)'}}>{fmtPct(r.meatball_pct)}</td>
-                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
-                      color:pitchGroup==='fastball'?'var(--accent)':(r.fb_pct_p||0)>=55?'#ff4020':(r.fb_pct_p||0)>=45?'#f5a623':'var(--muted)',
-                      fontWeight:pitchGroup==='fastball'?700:400}}>{r.fb_pct_p>0?r.fb_pct_p.toFixed(1)+'%':'—'}</td>
-                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
-                      color:pitchGroup==='breaking'?'var(--accent)':(r.br_pct_p||0)>=35?'#ff4020':(r.br_pct_p||0)>=25?'#f5a623':'var(--muted)',
-                      fontWeight:pitchGroup==='breaking'?700:400}}>{r.br_pct_p>0?r.br_pct_p.toFixed(1)+'%':'—'}</td>
-                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
-                      color:pitchGroup==='offspeed'?'var(--accent)':(r.os_pct_p||0)>=25?'#ff4020':(r.os_pct_p||0)>=15?'#f5a623':'var(--muted)',
-                      fontWeight:pitchGroup==='offspeed'?700:400}}>{r.os_pct_p>0?r.os_pct_p.toFixed(1)+'%':'—'}</td>
+                    <td onClick={e=>{e.stopPropagation();setPitchGroup(p=>p==='fastball'?'':'fastball');}}
+                      style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,cursor:'pointer',
+                        color:pitchGroup==='fastball'?'var(--accent)':(r.fb_pct_p||0)>=55?'#ff4020':(r.fb_pct_p||0)>=45?'#f5a623':'var(--muted)',
+                        fontWeight:pitchGroup==='fastball'?700:400,
+                        background:pitchGroup==='fastball'?'rgba(232,65,26,.08)':'transparent',borderRadius:3}}>
+                      {r.fb_pct_p>0?r.fb_pct_p.toFixed(1)+'%':'—'}</td>
+                    <td onClick={e=>{e.stopPropagation();setPitchGroup(p=>p==='breaking'?'':'breaking');}}
+                      style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,cursor:'pointer',
+                        color:pitchGroup==='breaking'?'#38b8f2':(r.br_pct_p||0)>=35?'#ff4020':(r.br_pct_p||0)>=25?'#f5a623':'var(--muted)',
+                        fontWeight:pitchGroup==='breaking'?700:400,
+                        background:pitchGroup==='breaking'?'rgba(56,184,242,.08)':'transparent',borderRadius:3}}>
+                      {r.br_pct_p>0?r.br_pct_p.toFixed(1)+'%':'—'}</td>
+                    <td onClick={e=>{e.stopPropagation();setPitchGroup(p=>p==='offspeed'?'':'offspeed');}}
+                      style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,cursor:'pointer',
+                        color:pitchGroup==='offspeed'?'#27c97a':(r.os_pct_p||0)>=25?'#ff4020':(r.os_pct_p||0)>=15?'#f5a623':'var(--muted)',
+                        fontWeight:pitchGroup==='offspeed'?700:400,
+                        background:pitchGroup==='offspeed'?'rgba(39,201,122,.08)':'transparent',borderRadius:3}}>
+                      {r.os_pct_p>0?r.os_pct_p.toFixed(1)+'%':'—'}</td>
                     <td style={{textAlign:'center',padding:'2px 5px',fontFamily:mono,fontSize:8,fontWeight:700,color:pgCol(r._pgLabel)}}>{r._pgLabel?.split(' ')[0]||'—'}</td>
                     <td style={{padding:'2px 8px',whiteSpace:'nowrap'}}>
                       {(()=>{
@@ -19630,7 +19659,7 @@ function StatsTab() {
               <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'var(--text)',textTransform:'uppercase',letterSpacing:.7}}>Batter Filters</span>
               <button onClick={()=>{setSharedBHand('');onBLocChange('');setSharedDN('');setBHandFilter('');
                 setPitchGroup('');setBPicksOnly(false);setBConfirmed(false);setBHotOnly(false);
-                setBGYOnly(false);setBHideInj(false);setBPgFilter([]);setBMinPA(10);}}
+                setBGYOnly(false);setBHideInj(false);setBPgFilter([]);setBMinPA(10);setThreshFilters([]);setThreshPanelOpen(false);}}
                 style={{padding:'2px 8px',borderRadius:5,border:'1px solid rgba(255,64,32,.3)',background:'rgba(255,64,32,.08)',color:'var(--accent)',fontFamily:mono,fontSize:9,cursor:'pointer',fontWeight:700}}>✕ Clear</button>
             </div>
             <div style={{display:'flex',gap:5,flexWrap:'wrap',alignItems:'center'}}>
@@ -19652,19 +19681,89 @@ function StatsTab() {
               <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0,minWidth:32}}>B.Hand:</span>
               <PillRow items={[['','All'],['L','L only'],['R','R only'],['S','S only']]} active={bHandFilter} onSelect={setBHandFilter}/>
             </div>
-            <div style={{display:'flex',gap:4,flexWrap:'wrap',alignItems:'center'}}>
-              <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0,minWidth:32}}>Pitch:</span>
-              {[['','All','All pitch types'],['fastball','🔥 Fastball','FF/SI/FC'],['breaking','🌀 Breaking','SL/CU/ST'],['offspeed','💨 Offspeed','CH/FS/FO']].map(([val,lbl,tip])=>(
-                <button key={val} onClick={()=>setPitchGroup(p=>p===val&&val?'':val)} data-tip={tip}
-                  style={{padding:'3px 8px',borderRadius:5,fontSize:9,fontFamily:mono,cursor:'pointer',
-                    border:`1px solid ${pitchGroup===val&&val?'var(--accent)':!val&&!pitchGroup?'var(--accent)':'var(--border)'}`,
-                    background:pitchGroup===val&&val?'rgba(232,65,26,.2)':!val&&!pitchGroup?'rgba(232,65,26,.08)':'transparent',
-                    color:pitchGroup===val||(!val&&!pitchGroup)?'var(--accent)':'var(--muted)',fontWeight:pitchGroup===val||(!val&&!pitchGroup)?700:400}}>
-                  {lbl}
-                </button>
-              ))}
-              {pitchGroup&&sharedPHand&&<span style={{fontFamily:mono,fontSize:8,color:'var(--accent2)',flexShrink:0}}>+ {sharedPHand==='L'?'vs LHP':'vs RHP'}</span>}
-            </div>
+            {/* Pitch group chips — show population avg usage % from filtered pitchers */}
+            {(()=>{
+              const avgFb = pRows.length
+                ? (pRows.reduce((s,r)=>s+(r.fb_pct_p||0),0)/pRows.length).toFixed(0)
+                : null;
+              const avgBk = pRows.length
+                ? (pRows.reduce((s,r)=>s+(r.br_pct_p||0),0)/pRows.length).toFixed(0)
+                : null;
+              const avgOs = pRows.length
+                ? (pRows.reduce((s,r)=>s+(r.os_pct_p||0),0)/pRows.length).toFixed(0)
+                : null;
+              return (
+                <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                  <div style={{display:'flex',gap:4,flexWrap:'wrap',alignItems:'center'}}>
+                    <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0,minWidth:32}}>Pitch:</span>
+                    <button onClick={()=>setPitchGroup('')}
+                      style={{padding:'3px 8px',borderRadius:5,fontSize:9,fontFamily:mono,cursor:'pointer',
+                        border:`1px solid ${!pitchGroup?'var(--accent)':'var(--border)'}`,
+                        background:!pitchGroup?'rgba(232,65,26,.08)':'transparent',
+                        color:!pitchGroup?'var(--accent)':'var(--muted)',fontWeight:!pitchGroup?700:400}}>
+                      All
+                    </button>
+                    <button onClick={()=>setPitchGroup(p=>p==='fastball'?'':'fastball')}
+                      style={{padding:'3px 8px',borderRadius:5,fontSize:9,fontFamily:mono,cursor:'pointer',
+                        display:'flex',alignItems:'center',gap:4,
+                        border:`1px solid ${pitchGroup==='fastball'?'var(--accent)':'var(--border)'}`,
+                        background:pitchGroup==='fastball'?'rgba(232,65,26,.2)':'transparent',
+                        color:pitchGroup==='fastball'?'var(--accent)':'var(--muted)',
+                        fontWeight:pitchGroup==='fastball'?700:400}}>
+                      🔥 Fastball
+                      {avgFb&&<span style={{fontFamily:mono,fontSize:8,opacity:.75,marginLeft:2}}>{avgFb}%</span>}
+                    </button>
+                    <button onClick={()=>setPitchGroup(p=>p==='breaking'?'':'breaking')}
+                      style={{padding:'3px 8px',borderRadius:5,fontSize:9,fontFamily:mono,cursor:'pointer',
+                        display:'flex',alignItems:'center',gap:4,
+                        border:`1px solid ${pitchGroup==='breaking'?'#38b8f2':'var(--border)'}`,
+                        background:pitchGroup==='breaking'?'rgba(56,184,242,.15)':'transparent',
+                        color:pitchGroup==='breaking'?'#38b8f2':'var(--muted)',
+                        fontWeight:pitchGroup==='breaking'?700:400}}>
+                      🌀 Breaking
+                      {avgBk&&<span style={{fontFamily:mono,fontSize:8,opacity:.75,marginLeft:2}}>{avgBk}%</span>}
+                    </button>
+                    <button onClick={()=>setPitchGroup(p=>p==='offspeed'?'':'offspeed')}
+                      style={{padding:'3px 8px',borderRadius:5,fontSize:9,fontFamily:mono,cursor:'pointer',
+                        display:'flex',alignItems:'center',gap:4,
+                        border:`1px solid ${pitchGroup==='offspeed'?'#27c97a':'var(--border)'}`,
+                        background:pitchGroup==='offspeed'?'rgba(39,201,122,.15)':'transparent',
+                        color:pitchGroup==='offspeed'?'#27c97a':'var(--muted)',
+                        fontWeight:pitchGroup==='offspeed'?700:400}}>
+                      💨 Offspeed
+                      {avgOs&&<span style={{fontFamily:mono,fontSize:8,opacity:.75,marginLeft:2}}>{avgOs}%</span>}
+                    </button>
+                  </div>
+                  {pitchGroup&&(
+                    <div style={{display:'flex',gap:4,alignItems:'center',paddingLeft:40,flexWrap:'wrap'}}>
+                      <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0}}>vs hand:</span>
+                      {[['','Both hands'],['R','vs RHP → batters see vsRHP split'],['L','vs LHP → batters see vsLHP split']].map(([val,tip])=>(
+                        <button key={val} onClick={()=>setSharedPHand(h=>h===val?'':val)} data-tip={tip}
+                          style={{padding:'2px 7px',borderRadius:5,fontSize:9,fontFamily:mono,cursor:'pointer',
+                            border:`1px solid ${sharedPHand===val?'var(--accent2)':'var(--border)'}`,
+                            background:sharedPHand===val?'rgba(245,166,35,.15)':'transparent',
+                            color:sharedPHand===val?'var(--accent2)':'var(--muted)',
+                            fontWeight:sharedPHand===val?700:400}}>
+                          {val===''?'Both':val==='R'?'RHP':'LHP'}
+                          {val!==''&&pRows.length>0&&(()=>{
+                            const handRows=pRows.filter(r=>r.hand===val);
+                            if(!handRows.length) return null;
+                            const avg=(handRows.reduce((s,r)=>s+(
+                              pitchGroup==='fastball'?r.fb_pct_p:
+                              pitchGroup==='breaking'?r.br_pct_p:r.os_pct_p
+                            ),0)/handRows.length).toFixed(0);
+                            return <span style={{fontFamily:mono,fontSize:8,opacity:.7,marginLeft:2}}>{avg}%</span>;
+                          })()}
+                        </button>
+                      ))}
+                      <span style={{fontFamily:mono,fontSize:8,color:'var(--accent2)',opacity:.8}}>
+                        → batter table shows stats {sharedPHand==='R'?'vs RHP':sharedPHand==='L'?'vs LHP':'(all hands)'} {pitchGroup} pitches
+                      </span>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
               <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0,minWidth:32}}>Flags:</span>
               {[[bPicksOnly,setBPicksOnly,'var(--accent2)','🎯 My Picks'],[bConfirmed,setBConfirmed,'#27c97a','✅ Confirmed'],[bHotOnly,setBHotOnly,'#fb923c','🔥 Hot Bat'],[bGYOnly,setBGYOnly,'var(--accent)','💥 Gone Yard'],[bHideInj,setBHideInj,'#fb923c','🤕 Hide Inj']].map(([active,setFn,col,label])=>(
@@ -19692,6 +19791,60 @@ function StatsTab() {
                   style={{width:44,padding:'4px 6px',borderRadius:5,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:9,textAlign:'center',outline:'none'}}/>
               </div>
             </div>
+            {/* Threshold filters */}
+            <div style={{display:'flex',alignItems:'center',gap:4,flexWrap:'wrap',marginTop:4}}>
+              <button onClick={()=>setThreshPanelOpen(v=>!v)}
+                style={{padding:'3px 8px',borderRadius:6,cursor:'pointer',fontFamily:mono,fontWeight:700,fontSize:9,letterSpacing:.4,
+                  border:`1px solid ${threshPanelOpen||threshFilters.length?'#a78bfa':'var(--border)'}`,
+                  background:threshFilters.length?'rgba(167,139,250,.12)':'var(--surface2)',
+                  color:threshPanelOpen||threshFilters.length?'#a78bfa':'var(--muted)',
+                  display:'flex',alignItems:'center',gap:3}}>
+                🎯 {threshPanelOpen?'CLOSE':'THRESHOLD'}
+                {threshFilters.length>0&&!threshPanelOpen&&
+                  <span style={{background:'#a78bfa',color:'#000',borderRadius:8,padding:'0 4px',fontSize:8,fontWeight:900}}>{threshFilters.length}</span>}
+              </button>
+              {threshFilters.map((f,i)=>(
+                <span key={i} style={{display:'flex',alignItems:'center',gap:3,padding:'2px 6px',borderRadius:5,fontSize:8,fontFamily:mono,
+                  background:'rgba(167,139,250,.12)',border:'1px solid rgba(167,139,250,.3)',color:'#a78bfa'}}>
+                  {f.col} {f.op} {f.val}
+                  <button onClick={()=>setThreshFilters(fs=>fs.filter((_,j)=>j!==i))}
+                    style={{background:'none',border:'none',color:'#a78bfa',cursor:'pointer',padding:0,fontSize:10}}>✕</button>
+                </span>
+              ))}
+            </div>
+            {threshPanelOpen&&(
+              <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:7,padding:'10px 12px',marginTop:6,
+                display:'flex',flexWrap:'wrap',gap:6,alignItems:'center'}}>
+                <select value={threshCol} onChange={e=>setThreshCol(e.target.value)}
+                  style={{fontFamily:mono,fontSize:9,background:'var(--surface2)',color:'var(--text)',border:'1px solid var(--border)',borderRadius:5,padding:'4px 7px',cursor:'pointer'}}>
+                  {[['brl_pct','Brl%'],['hh_pct','HH%'],['fb_pct','FB%'],['gb_pct','GB%'],
+                    ['ld_pct','LD%'],['pull_pct','Pull%'],['oppo_pct','Oppo%'],
+                    ['avg_dist','AvgDist'],['dist_350','350+'],['near_hr','NearHR'],
+                    ['swstr_pct','SwStr%'],['whiff_pct','Whiff%'],['pbrl_pct','PBrl%'],
+                    ['ev','EV'],['iso','ISO'],['woba','wOBA'],['k_pct','K%'],
+                    ['bb_pct','BB%'],['hr_rate','HR%'],['bat_speed','BatSpd'],['la_mean','LA°']
+                  ].map(([v,l])=><option key={v} value={v}>{l}</option>)}
+                </select>
+                <select value={threshOp} onChange={e=>setThreshOp(e.target.value)}
+                  style={{fontFamily:mono,fontSize:9,background:'var(--surface2)',color:'var(--text)',border:'1px solid var(--border)',borderRadius:5,padding:'4px 7px',cursor:'pointer',width:44}}>
+                  <option value=">">&gt;</option>
+                  <option value="<">&lt;</option>
+                </select>
+                <input type="number" value={threshVal} onChange={e=>setThreshVal(e.target.value)}
+                  placeholder="value" step="0.1"
+                  style={{width:60,padding:'4px 6px',borderRadius:5,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:9,outline:'none'}}/>
+                <button onClick={()=>{const v=parseFloat(threshVal);if(!isNaN(v)&&threshCol){setThreshFilters(fs=>[...fs,{col:threshCol,op:threshOp,val:v}]);setThreshVal('');}}}
+                  style={{padding:'4px 10px',borderRadius:5,border:'none',cursor:'pointer',background:'rgba(167,139,250,.2)',color:'#a78bfa',fontFamily:mono,fontSize:9,fontWeight:700}}>
+                  + Add
+                </button>
+                {threshFilters.length>0&&(
+                  <button onClick={()=>setThreshFilters([])}
+                    style={{padding:'2px 7px',borderRadius:5,border:'1px solid rgba(255,64,32,.3)',background:'rgba(255,64,32,.08)',color:'var(--accent)',fontFamily:mono,fontSize:8,cursor:'pointer'}}>
+                    ✕ Clear All
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -19722,6 +19875,20 @@ function StatsTab() {
                   <BTh col="pbrl_pct" label="PBrl%" title="Pulled barrel rate"/>
                   <BTh col="fb_pct"   label="FB%"   title="Fly ball rate"/>
                   <BTh col="la_mean"  label="LA°"   title="Average launch angle"/>
+                  <BTh col="gb_pct"      label="GB%"     title="Ground ball rate"/>
+                  <BTh col="ld_pct"      label="LD%"     title="Line drive rate"/>
+                  <BTh col="popup_pct"   label="PU%"     title="Popup rate"/>
+                  <BTh col="pull_pct"    label="Pull%"   title="Pull rate"/>
+                  <BTh col="straight_pct"label="Str%"    title="Straight-away rate"/>
+                  <BTh col="oppo_pct"    label="Oppo%"   title="Opposite field rate"/>
+                  <BTh col="avg_dist"    label="AvgDst"  title="Average hit distance (ft)"/>
+                  <BTh col="dist_300"    label="300+"    title="Batted balls 300+ feet"/>
+                  <BTh col="dist_350"    label="350+"    title="Batted balls 350+ feet"/>
+                  <BTh col="near_hr"     label="NrHR"    title="350+ ft, not a HR"/>
+                  <BTh col="swstr_pct"   label="SwStr%"  title="Swinging strike rate"/>
+                  <BTh col="whiff_pct"   label="Whiff%"  title="Whiff rate (misses/swings)"/>
+                  <BTh col="first_pitch_swing_pct" label="1stP%" title="First pitch swing rate"/>
+                  <BTh col="bat_speed"   label="BSpd"    title="Average bat speed (mph)"/>
                   <th style={{padding:'4px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.5,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)',background:'var(--surface2)',whiteSpace:'nowrap'}}>Today's Pitcher</th>
                 </tr>
               </thead>
@@ -19770,6 +19937,20 @@ function StatsTab() {
                     <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.pbrl_pct||0)>=8?'#ff4020':'var(--muted)'}}>{fmtPct(r.pbrl_pct)}</td>
                     <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.fb_pct||0)>=38?'#27c97a':'var(--muted)'}}>{fmtPct(r.fb_pct)}</td>
                     <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.la_mean||0)>=18&&(r.la_mean||0)<=30?'#27c97a':'var(--muted)'}}>{r.la_mean?r.la_mean.toFixed(1)+'°':'—'}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.gb_pct||0)>=55?'#27c97a':'var(--muted)'}}>{r.gb_pct!=null?r.gb_pct.toFixed(1)+'%':'—'}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.ld_pct||0)>=28?'#ff4020':(r.ld_pct||0)>=22?'#f5a623':'var(--muted)'}}>{r.ld_pct!=null?r.ld_pct.toFixed(1)+'%':'—'}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{r.popup_pct!=null?r.popup_pct.toFixed(1)+'%':'—'}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.pull_pct||0)>=45?'#ff4020':'var(--muted)'}}>{r.pull_pct!=null?r.pull_pct.toFixed(1)+'%':'—'}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{r.straight_pct!=null?r.straight_pct.toFixed(1)+'%':'—'}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.oppo_pct||0)>=30?'#27c97a':'var(--muted)'}}>{r.oppo_pct!=null?r.oppo_pct.toFixed(1)+'%':'—'}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.avg_dist||0)>=320?'#ff4020':(r.avg_dist||0)>=280?'#f5a623':'var(--muted)'}}>{r.avg_dist!=null?r.avg_dist.toFixed(0):'—'}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.dist_300||0)>=10?'#f5a623':'var(--muted)'}}>{r.dist_300!=null?r.dist_300:'—'}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.dist_350||0)>=5?'#ff4020':'var(--muted)'}}>{r.dist_350!=null?r.dist_350:'—'}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.near_hr||0)>=3?'#f5a623':'var(--muted)'}}>{r.near_hr!=null?r.near_hr:'—'}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.swstr_pct||0)>=15?'#27c97a':'var(--muted)'}}>{r.swstr_pct!=null?r.swstr_pct.toFixed(1)+'%':'—'}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.whiff_pct||0)>=35?'#27c97a':'var(--muted)'}}>{r.whiff_pct!=null?r.whiff_pct.toFixed(1)+'%':'—'}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{r.first_pitch_swing_pct!=null?r.first_pitch_swing_pct.toFixed(1)+'%':'—'}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.bat_speed||0)>=75?'#ff4020':(r.bat_speed||0)>=70?'#f5a623':'var(--muted)'}}>{r.bat_speed!=null?r.bat_speed.toFixed(1):'—'}</td>
 
                     <td style={{padding:'2px 8px',whiteSpace:'nowrap'}}>
                       {(()=>{
@@ -26629,11 +26810,6 @@ function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, on
   const [expandedB,      setExpandedB]      = useState(null);
   const [gpFiltersOpen,  setGpFiltersOpen]  = useState(false);
   const [gbFiltersOpen,  setGbFiltersOpen]  = useState(false);
-  const [threshFilters,    setThreshFilters]   = useState([]);   // [{col, op, val}]
-  const [threshPanelOpen,  setThreshPanelOpen] = useState(false);
-  const [threshCol,        setThreshCol]       = useState('brl_pct');
-  const [threshOp,         setThreshOp]        = useState('>');
-  const [threshVal,        setThreshVal]       = useState('');
 
   // ── Teams state ────────────────────────────────────────────────────────────
   const [tSortBy,        setTSortBy]        = useState('g2tb_pct');
@@ -26793,15 +26969,8 @@ function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, on
       if (bHideInj&&INJURY_MAP?.[bpid]&&!bls) return false;
       if (bSearch&&!(r.name||'').toLowerCase().includes(bSearch.toLowerCase())&&!(r.team||'').toLowerCase().includes(bSearch.toLowerCase())) return false;
       return true;
-    }).filter(r => {
-      if (!threshFilters.length) return true;
-      return threshFilters.every(f => {
-        const v = parseFloat(r[f.col] ?? null);
-        if (isNaN(v)) return false;
-        return f.op === '>' ? v > f.val : v < f.val;
-      });
     }).sort((a,b)=>bSortDir*((a[bSortBy]??-999)-(b[bSortBy]??-999))).slice(0,300);
-  }, [data, window, bSplitKey, bSortBy, bSortDir, bSearch, bTeam, bMinGames, bHandFilter, matchupTeams, sharedBHand, sharedPHand, bConfirmed, bPicksOnly, bHideInj, lineupVer, pitchGroup, threshFilters]);
+  }, [data, window, bSplitKey, bSortBy, bSortDir, bSearch, bTeam, bMinGames, bHandFilter, matchupTeams, sharedBHand, sharedPHand, bConfirmed, bPicksOnly, bHideInj, lineupVer, pitchGroup]);
 
   // ── Team rows ─────────────────────────────────────────────────────────────
   const teamRows = React.useMemo(() => {
@@ -27193,83 +27362,6 @@ function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, on
               </button>
             );})()}
           </div>
-          {/* Threshold filters */}
-          <div style={{display:'flex',alignItems:'center',gap:4,flexWrap:'wrap',marginTop:4,marginBottom:4}}>
-            <button onClick={()=>setThreshPanelOpen(v=>!v)}
-              style={{padding:'3px 8px',borderRadius:6,cursor:'pointer',fontFamily:mono,
-                fontWeight:700,fontSize:9,letterSpacing:.4,
-                border:`1px solid ${threshPanelOpen||threshFilters.length?'#a78bfa':'var(--border)'}`,
-                background:threshFilters.length?'rgba(167,139,250,.12)':'var(--surface2)',
-                color:threshPanelOpen||threshFilters.length?'#a78bfa':'var(--muted)',
-                display:'flex',alignItems:'center',gap:3}}>
-              🎯 {threshPanelOpen?'CLOSE':'THRESHOLD'}
-              {threshFilters.length>0&&!threshPanelOpen&&
-                <span style={{background:'#a78bfa',color:'#000',borderRadius:8,
-                  padding:'0 4px',fontSize:8,fontWeight:900}}>{threshFilters.length}</span>}
-            </button>
-            {threshFilters.map((f,i)=>(
-              <span key={i} style={{display:'flex',alignItems:'center',gap:3,
-                padding:'2px 6px',borderRadius:5,fontSize:8,fontFamily:mono,
-                background:'rgba(167,139,250,.12)',border:'1px solid rgba(167,139,250,.3)',
-                color:'#a78bfa'}}>
-                {f.col} {f.op} {f.val}
-                <button onClick={()=>setThreshFilters(fs=>fs.filter((_,j)=>j!==i))}
-                  style={{background:'none',border:'none',color:'#a78bfa',
-                    cursor:'pointer',padding:0,fontSize:10}}>✕</button>
-              </span>
-            ))}
-          </div>
-          {threshPanelOpen&&(
-            <div style={{background:'var(--surface2)',border:'1px solid var(--border)',
-              borderRadius:7,padding:'10px 12px',marginBottom:6,display:'flex',
-              flexWrap:'wrap',gap:6,alignItems:'center'}}>
-              <select value={threshCol} onChange={e=>setThreshCol(e.target.value)}
-                style={{fontFamily:mono,fontSize:9,background:'var(--surface2)',
-                  color:'var(--text)',border:'1px solid var(--border)',borderRadius:5,
-                  padding:'4px 7px',cursor:'pointer'}}>
-                {[['brl_pct','Brl%'],['hh_pct','HH%'],['fb_pct','FB%'],['gb_pct','GB%'],
-                  ['ld_pct','LD%'],['pull_pct','Pull%'],['oppo_pct','Oppo%'],
-                  ['avg_dist','AvgDist'],['dist_350','350+'],['near_hr','NearHR'],
-                  ['swstr_pct','SwStr%'],['whiff_pct','Whiff%'],['ev','EV'],
-                  ['iso','ISO'],['woba','wOBA'],['k_pct','K%'],['bb_pct','BB%'],
-                  ['hr_rate','HR%'],['bat_speed','BatSpd'],['la_mean','LA°']
-                ].map(([v,l])=><option key={v} value={v}>{l}</option>)}
-              </select>
-              <select value={threshOp} onChange={e=>setThreshOp(e.target.value)}
-                style={{fontFamily:mono,fontSize:9,background:'var(--surface2)',
-                  color:'var(--text)',border:'1px solid var(--border)',borderRadius:5,
-                  padding:'4px 7px',cursor:'pointer',width:44}}>
-                <option value=">">&gt;</option>
-                <option value="<">&lt;</option>
-              </select>
-              <input type="number" value={threshVal} onChange={e=>setThreshVal(e.target.value)}
-                placeholder="value" step="0.1"
-                style={{width:60,padding:'4px 6px',borderRadius:5,
-                  border:'1px solid var(--border)',background:'var(--surface2)',
-                  color:'var(--text)',fontFamily:mono,fontSize:9,outline:'none'}}/>
-              <button
-                onClick={()=>{
-                  const v=parseFloat(threshVal);
-                  if(!isNaN(v)&&threshCol){
-                    setThreshFilters(fs=>[...fs,{col:threshCol,op:threshOp,val:v}]);
-                    setThreshVal('');
-                  }
-                }}
-                style={{padding:'4px 10px',borderRadius:5,border:'none',cursor:'pointer',
-                  background:'rgba(167,139,250,.2)',color:'#a78bfa',
-                  fontFamily:mono,fontSize:9,fontWeight:700}}>
-                + Add
-              </button>
-              {threshFilters.length>0&&(
-                <button onClick={()=>setThreshFilters([])}
-                  style={{padding:'2px 7px',borderRadius:5,
-                    border:'1px solid rgba(255,64,32,.3)',background:'rgba(255,64,32,.08)',
-                    color:'var(--accent)',fontFamily:mono,fontSize:8,cursor:'pointer'}}>
-                  ✕ Clear All
-                </button>
-              )}
-            </div>
-          )}
           {gbFiltersOpen&&(
             <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:7,padding:'10px 12px',marginBottom:8,display:'flex',flexWrap:'wrap',gap:8,alignItems:'center',boxShadow:'0 3px 16px rgba(0,0,0,.4)'}}>
               <PillRow items={[['','All'],['L','LHB'],['R','RHB'],['S','SWB']]} active={bHandFilter} onSelect={setBHandFilter}/>
@@ -27285,7 +27377,7 @@ function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, on
                 <input type="number" min={1} max={50} value={bMinGames} onChange={e=>setBMinGames(+e.target.value||1)}
                   style={{width:40,padding:'3px 5px',borderRadius:5,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:9,textAlign:'center',outline:'none'}}/>
               </div>
-              <button onClick={()=>{setBHandFilter('');setBPicksOnly(false);setBConfirmed(false);setBHideInj(false);setBMinGames(2);setThreshFilters([]);setThreshPanelOpen(false);}}
+              <button onClick={()=>{setBHandFilter('');setBPicksOnly(false);setBConfirmed(false);setBHideInj(false);setBMinGames(2);}}
                 style={{padding:'2px 7px',borderRadius:5,border:'1px solid rgba(255,64,32,.3)',background:'rgba(255,64,32,.08)',color:'var(--accent)',fontFamily:mono,fontSize:8,cursor:'pointer'}}>✕ Clear</button>
             </div>
           )}
@@ -27315,31 +27407,11 @@ function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, on
                     <BTh col="h_game_pct"   label="H%"     title="% of games with 1+ hit"/>
                     <BTh col="k_pct"        label="K%"     title="Strikeout rate"/>
                     <BTh col="bb_pct"       label="BB%"    title="Walk rate"/>
-                    <BTh col="ev"          label="EV"      title="Average exit velocity (mph)"/>
-                    <BTh col="hh_pct"      label="HH%"     title="Hard hit rate (95+ mph EV)"/>
-                    <BTh col="brl_pct"     label="Brl%"    title="Barrel rate per PA"/>
-                    <BTh col="pbrl_pct"    label="PBrl%"   title="Pulled barrel rate"/>
-                    <BTh col="fb_pct"      label="FB%"     title="Fly ball rate"/>
-                    <BTh col="gb_pct"      label="GB%"     title="Ground ball rate"/>
-                    <BTh col="ld_pct"      label="LD%"     title="Line drive rate"/>
-                    <BTh col="popup_pct"   label="PU%"     title="Popup rate"/>
-                    <BTh col="pull_pct"    label="Pull%"   title="Pull rate (batted balls to pull side)"/>
-                    <BTh col="straight_pct"label="Str%"    title="Straight-away rate (center field)"/>
-                    <BTh col="oppo_pct"    label="Oppo%"   title="Opposite field rate"/>
-                    <BTh col="avg_dist"    label="AvgDst"  title="Average hit distance (ft)"/>
-                    <BTh col="dist_300"    label="300+"    title="Batted balls 300+ feet"/>
-                    <BTh col="dist_350"    label="350+"    title="Batted balls 350+ feet"/>
-                    <BTh col="near_hr"     label="NrHR"    title="Near-HR: 350+ ft distance, no home run"/>
-                    <BTh col="swstr_pct"   label="SwStr%"  title="Swinging strike rate per PA"/>
-                    <BTh col="whiff_pct"   label="Whiff%"  title="Whiff rate (swings and misses / swings)"/>
-                    <BTh col="first_pitch_swing_pct" label="1stP%" title="First pitch swing rate"/>
-                    <BTh col="la_mean"     label="LA°"     title="Average launch angle"/>
-                    <BTh col="bat_speed"   label="BSpd"    title="Average bat speed (mph)"/>
                   </tr>
                 </thead>
                 <tbody>
                   {bRows.length===0
-                    ?<tr><td colSpan={41} style={{textAlign:'center',padding:24,fontFamily:mono,fontSize:10,color:'var(--muted)'}}>No data — run build_game_splits.py then mlbdata_aggregate.py</td></tr>
+                    ?<tr><td colSpan={21} style={{textAlign:'center',padding:24,fontFamily:mono,fontSize:10,color:'var(--muted)'}}>No data — run build_game_splits.py then mlbdata_aggregate.py</td></tr>
                     :bRows.flatMap(r=>{
                     const mainB=(
                     <tr key={r.id} onClick={()=>setExpandedB(e=>e===r.id?null:r.id)}
@@ -27375,86 +27447,6 @@ function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, on
                       <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,fontWeight:700,color:(r.h_game_pct||0)>=80?'#27c97a':(r.h_game_pct||0)>=60?'#f5a623':'var(--muted)'}}>{fmtPct(r.h_game_pct)}</td>
                       <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.k_pct||0)>=28?'#ff4020':'var(--muted)'}}>{fmtPct(r.k_pct)}</td>
                       <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.bb_pct||0)>=12?'#27c97a':'var(--muted)'}}>{fmtPct(r.bb_pct)}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
-                        color:r.ev>=103?'#ff4020':r.ev>=97?'#f5a623':'var(--muted)'}}>
-                        {r.ev!=null?r.ev.toFixed(1):'—'}
-                      </td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
-                        color:(r.hh_pct||0)>=45?'#ff4020':(r.hh_pct||0)>=38?'#f5a623':'var(--muted)'}}>
-                        {r.hh_pct!=null?r.hh_pct.toFixed(1)+'%':'—'}
-                      </td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
-                        color:(r.brl_pct||0)>=12?'#ff4020':(r.brl_pct||0)>=7?'#f5a623':'var(--muted)'}}>
-                        {r.brl_pct!=null?r.brl_pct.toFixed(1)+'%':'—'}
-                      </td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
-                        color:(r.pbrl_pct||0)>=8?'#ff4020':'var(--muted)'}}>
-                        {r.pbrl_pct!=null?r.pbrl_pct.toFixed(1)+'%':'—'}
-                      </td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
-                        color:(r.fb_pct||0)>=45?'#ff4020':(r.fb_pct||0)>=35?'#f5a623':'var(--muted)'}}>
-                        {r.fb_pct!=null?r.fb_pct.toFixed(1)+'%':'—'}
-                      </td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
-                        color:(r.gb_pct||0)>=55?'#27c97a':'var(--muted)'}}>
-                        {r.gb_pct!=null?r.gb_pct.toFixed(1)+'%':'—'}
-                      </td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
-                        color:(r.ld_pct||0)>=28?'#ff4020':(r.ld_pct||0)>=22?'#f5a623':'var(--muted)'}}>
-                        {r.ld_pct!=null?r.ld_pct.toFixed(1)+'%':'—'}
-                      </td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
-                        color:'var(--muted)'}}>
-                        {r.popup_pct!=null?r.popup_pct.toFixed(1)+'%':'—'}
-                      </td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
-                        color:(r.pull_pct||0)>=45?'#ff4020':'var(--muted)'}}>
-                        {r.pull_pct!=null?r.pull_pct.toFixed(1)+'%':'—'}
-                      </td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
-                        color:'var(--muted)'}}>
-                        {r.straight_pct!=null?r.straight_pct.toFixed(1)+'%':'—'}
-                      </td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
-                        color:(r.oppo_pct||0)>=30?'#27c97a':'var(--muted)'}}>
-                        {r.oppo_pct!=null?r.oppo_pct.toFixed(1)+'%':'—'}
-                      </td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
-                        color:(r.avg_dist||0)>=320?'#ff4020':(r.avg_dist||0)>=280?'#f5a623':'var(--muted)'}}>
-                        {r.avg_dist!=null?r.avg_dist.toFixed(0):'—'}
-                      </td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
-                        color:(r.dist_300||0)>=10?'#f5a623':'var(--muted)'}}>
-                        {r.dist_300!=null?r.dist_300:'—'}
-                      </td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
-                        color:(r.dist_350||0)>=5?'#ff4020':'var(--muted)'}}>
-                        {r.dist_350!=null?r.dist_350:'—'}
-                      </td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
-                        color:(r.near_hr||0)>=3?'#f5a623':'var(--muted)'}}>
-                        {r.near_hr!=null?r.near_hr:'—'}
-                      </td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
-                        color:(r.swstr_pct||0)>=15?'#27c97a':'var(--muted)'}}>
-                        {r.swstr_pct!=null?r.swstr_pct.toFixed(1)+'%':'—'}
-                      </td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
-                        color:(r.whiff_pct||0)>=35?'#27c97a':'var(--muted)'}}>
-                        {r.whiff_pct!=null?r.whiff_pct.toFixed(1)+'%':'—'}
-                      </td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
-                        color:'var(--muted)'}}>
-                        {r.first_pitch_swing_pct!=null?r.first_pitch_swing_pct.toFixed(1)+'%':'—'}
-                      </td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
-                        color:r.la_mean!=null?((r.la_mean>=10&&r.la_mean<=35)?'#27c97a':'var(--muted)'):'var(--muted)'}}>
-                        {r.la_mean!=null?r.la_mean.toFixed(1)+'°':'—'}
-                      </td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
-                        color:(r.bat_speed||0)>=75?'#ff4020':(r.bat_speed||0)>=70?'#f5a623':'var(--muted)'}}>
-                        {r.bat_speed!=null?r.bat_speed.toFixed(1):'—'}
-                      </td>
                     </tr>);
                     return [mainB];
                   })}
