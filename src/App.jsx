@@ -4991,11 +4991,16 @@ async function fetchStreamUrl(gamePk, games, setStreamUrl, setStreamLoad) {
 
     if (!found) { setStreamUrl(null); setStreamLoad(false); return; }
 
-    const slug = found?.id || found?.matchId || null;
-    if (!slug) { setStreamUrl(null); setStreamLoad(false); return; }
-    const validSlug = /[a-z].*\d+$/.test(String(slug));
-    if (!validSlug) { console.warn('[Watch] Unexpected slug format:', slug); setStreamUrl(null); setStreamLoad(false); return; }
-    setStreamUrl(`https://streamed.pk/watch/${slug}`);
+    console.log('[Watch] found:', found); // temp — check for sources/embedUrl fields
+    // Use pre-built embed URL if the API provides one
+    const embedUrl = found?.sources?.[0]?.embedUrl || found?.embedUrl || found?.embed || null;
+    if (embedUrl) { setStreamUrl(embedUrl); setStreamLoad(false); return; }
+    // Construct embed URL from team names (home first per confirmed pattern)
+    const slugify = s => (s||'').toLowerCase().replace(/\./g,'-').replace(/\s+/g,'-');
+    const home = found?.teams?.home?.name || found?.home?.name || '';
+    const away = found?.teams?.away?.name || found?.away?.name || '';
+    if (!home || !away) { setStreamUrl(null); setStreamLoad(false); return; }
+    setStreamUrl(`https://embed.st/embed/admin/ppv-${slugify(home)}-vs-${slugify(away)}/1`);
   } catch(e) {
     console.warn('[Watch] streamed.pk lookup failed:', e.message);
     setStreamUrl(null);
@@ -10275,11 +10280,19 @@ function GamedayTab() {
               </div>
             )}
             {!streamLoad && streamUrl && (
-              <iframe src={streamUrl}
+              <iframe
+                src={streamUrl}
+                title="Game Stream"
+                width="100%"
+                height="100%"
+                frameBorder="0"
+                scrolling="no"
+                allowFullScreen
+                allow="encrypted-media; picture-in-picture"
+                marginHeight="0"
+                marginWidth="0"
                 style={{width:'100%',height:'100%',border:'none',display:'block'}}
-                allowFullScreen allow="autoplay; fullscreen"
-                referrerPolicy="no-referrer"
-                sandbox="allow-scripts allow-same-origin allow-presentation allow-forms"/>
+              />
             )}
             {!streamLoad && !streamUrl && (
               <div style={{display:'flex',alignItems:'center',justifyContent:'center',
