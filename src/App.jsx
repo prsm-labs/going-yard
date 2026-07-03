@@ -4991,18 +4991,11 @@ async function fetchStreamUrl(gamePk, games, setStreamUrl, setStreamLoad) {
 
     if (!found) { setStreamUrl(null); setStreamLoad(false); return; }
 
-    const slugify = s => (s || '').toLowerCase()
-      .replace(/\./g, '-')
-      .replace(/\s+/g, '-');
-
-    const awayName = found?.teams?.away?.name || found?.away?.name || awayAbbr;
-    const homeName = found?.teams?.home?.name || found?.home?.name || homeAbbr;
-    const matchId  = found?.id || found?.matchId || '';
-
-    if (!matchId) { setStreamUrl(null); setStreamLoad(false); return; }
-
-    const url = `https://streamed.pk/watch/${slugify(awayName)}-vs-${slugify(homeName)}-${matchId}/admin/1`;
-    setStreamUrl(url);
+    const slug = found?.id || found?.matchId || null;
+    if (!slug) { setStreamUrl(null); setStreamLoad(false); return; }
+    const validSlug = /[a-z].*\d+$/.test(String(slug));
+    if (!validSlug) { console.warn('[Watch] Unexpected slug format:', slug); setStreamUrl(null); setStreamLoad(false); return; }
+    setStreamUrl(`https://streamed.pk/watch/${slug}`);
   } catch(e) {
     console.warn('[Watch] streamed.pk lookup failed:', e.message);
     setStreamUrl(null);
