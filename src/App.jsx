@@ -4991,41 +4991,11 @@ async function fetchStreamUrl(gamePk, games, setStreamUrl, setStreamLoad) {
 
     if (!found) { setStreamUrl(null); setStreamLoad(false); return; }
 
-    console.log('[Watch] found:', found); // temp — identify which field has embed URL
-
-    const matchId = found?.id;
-    if (!matchId) { setStreamUrl(null); setStreamLoad(false); return; }
-
-    // Fetch stream sources directly — try known endpoints in order
-    const sourceEndpoints = [
-      `https://streamed.pk/api/stream/admin/${matchId}/1`,
-      `https://streamed.pk/api/stream/${matchId}`,
-      `https://streamed.pk/api/matches/${matchId}/streams`,
-    ];
-
-    let embedUrl = null;
-
-    for (const endpoint of sourceEndpoints) {
-      try {
-        const r = await fetch(endpoint);
-        if (!r.ok) continue;
-        const d = await r.json();
-        console.log('[Watch] source endpoint response:', endpoint, d);
-        embedUrl = d?.embedUrl || d?.embed || d?.url
-          || d?.sources?.[0]?.url || d?.streams?.[0]?.embedUrl
-          || d?.[0]?.embedUrl || d?.[0]?.url || null;
-        if (embedUrl) break;
-      } catch(e) {
-        console.warn('[Watch] source endpoint failed:', endpoint, e.message);
-      }
-    }
-
-    // Fallback — use raw match id as slug directly with embed.st
-    if (!embedUrl && matchId) {
-      embedUrl = `https://embed.st/embed/admin/${matchId}/1`;
-    }
-
-    setStreamUrl(embedUrl || null);
+    // found.id from the API is already the full watch slug
+    // e.g. "chicago-cubs-vs-st--louis-cardinals-2388199"
+    const slug = found?.id || null;
+    if (!slug) { setStreamUrl(null); setStreamLoad(false); return; }
+    setStreamUrl(`https://streamed.pk/watch/${slug}`);
   } catch(e) {
     console.warn('[Watch] streamed.pk lookup failed:', e.message);
     setStreamUrl(null);
@@ -10305,35 +10275,21 @@ function GamedayTab() {
               </div>
             )}
             {!streamLoad && streamUrl && (
-              <div style={{position:'relative',width:'100%',height:'100%'}}>
-                <iframe
-                  src={streamUrl}
-                  title="Game Stream"
-                  width="100%"
-                  height="100%"
-                  frameBorder="0"
-                  scrolling="no"
-                  allowFullScreen
-                  allow="encrypted-media; picture-in-picture"
-                  marginHeight="0"
-                  marginWidth="0"
-                  style={{width:'100%',height:'100%',border:'none',display:'block'}}
-                  onError={() => setStreamUrl(null)}
-                />
-                <div style={{position:'absolute',bottom:6,right:8,zIndex:10}}>
-                  <a href={streamUrl} target="_blank" rel="noopener"
-                    style={{fontFamily:"'DM Mono',monospace",fontSize:9,
-                      color:'rgba(255,255,255,.4)',textDecoration:'none'}}>
-                    ↗ open direct
-                  </a>
-                </div>
-              </div>
+              <iframe
+                src={streamUrl}
+                title="Game Stream"
+                width="100%"
+                height="100%"
+                frameBorder="0"
+                allowFullScreen
+                style={{width:'100%',height:'100%',border:'none',display:'block'}}
+              />
             )}
             {!streamLoad && !streamUrl && (
-              <div style={{display:'flex',flexDirection:'column',alignItems:'center',
-                justifyContent:'center',height:'100%',minHeight:120,gap:8}}>
-                <div style={{fontFamily:"'DM Mono',monospace",fontSize:11,
-                  color:'var(--muted)'}}>No stream found for this game.</div>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'center',
+                height:'100%',minHeight:120,
+                fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--muted)'}}>
+                No stream found for this game.
               </div>
             )}
           </div>
