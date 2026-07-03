@@ -4953,6 +4953,56 @@ async function fetchLiveBatters(gamePk) {
   }
 }
 
+async function fetchStreamUrl(gamePk, games, setStreamUrl, setStreamLoad) {
+  setStreamLoad(true);
+  try {
+    const game = (games || []).find(g => String(g.gamePk) === String(gamePk));
+    if (!game) { setStreamLoad(false); return; }
+
+    const homeAbbr = (game.teams?.home?.team?.abbreviation ||
+                      game.home?.abbr || '').toLowerCase();
+    const awayAbbr = (game.teams?.away?.team?.abbreviation ||
+                      game.away?.abbr || '').toLowerCase();
+
+    const ABBR_MAP = {
+      'yankees':'nyy','red sox':'bos','rays':'tb','blue jays':'tor','orioles':'bal',
+      'white sox':'cws','guardians':'cle','tigers':'det','royals':'kc','twins':'min',
+      'astros':'hou','athletics':'oak','mariners':'sea','rangers':'tex','angels':'laa',
+      'braves':'atl','marlins':'mia','mets':'nym','phillies':'phi','nationals':'wsh',
+      'cubs':'chc','reds':'cin','brewers':'mil','pirates':'pit','cardinals':'stl',
+      'dodgers':'lad','diamondbacks':'ari','rockies':'col','giants':'sf','padres':'sd',
+    };
+
+    const res = await fetch('https://streamed.pk/api/matches/baseball');
+    if (!res.ok) { setStreamLoad(false); return; }
+    const matches = await res.json();
+    if (!Array.isArray(matches)) { setStreamLoad(false); return; }
+
+    const found = matches.find(m => {
+      const mHome = (m?.teams?.home?.name || m?.home?.name || '').toLowerCase();
+      const mAway = (m?.teams?.away?.name || m?.away?.name || '').toLowerCase();
+      const mHomeAbbr = Object.entries(ABBR_MAP).find(([k]) => mHome.includes(k))?.[1] || '';
+      const mAwayAbbr = Object.entries(ABBR_MAP).find(([k]) => mAway.includes(k))?.[1] || '';
+      return (
+        (mHomeAbbr === homeAbbr || mHome.includes(homeAbbr)) &&
+        (mAwayAbbr === awayAbbr || mAway.includes(awayAbbr))
+      );
+    });
+
+    if (!found) { setStreamUrl(null); setStreamLoad(false); return; }
+
+    // IMPORTANT: field names below are best-guess shapes. After first real test,
+    // console.log(found) and correct the field extraction to match actual response.
+    const url = found.streamUrl || found.sources?.[0]?.url ||
+                found.embed || found.streams?.[0]?.url || null;
+    setStreamUrl(url);
+  } catch(e) {
+    console.warn('[Watch] streamed.pk lookup failed:', e.message);
+    setStreamUrl(null);
+  }
+  setStreamLoad(false);
+}
+
 // Cache liftoff results so they don't re-randomize on every tap
 const LIFTOFF_CACHE = {};
 
@@ -9785,6 +9835,9 @@ function GamedayTab() {
   const [liveLoad,  setLiveLoad]  = useState(false);
   const live = liveDataMap[selGamePk] || null;              // derived — detail panel
   const [boxTab,    setBoxTab]    = useState('batting'); // 'batting'|'pitching'|'plays'
+  const [showStream, setShowStream] = useState(false);
+  const [streamUrl,  setStreamUrl]  = useState(null);
+  const [streamLoad, setStreamLoad] = useState(false);
   const [plays,     setPlays]     = useState([]);
   const [playsLoad, setPlaysLoad] = useState(false);
   const [expandedPlayIdx, setExpandedPlayIdx] = useState(null);
@@ -10162,17 +10215,81 @@ function GamedayTab() {
         )}
 
         {/* Box score / Plays tabs */}
-        <div style={{display:'flex',gap:4,marginBottom:10}}>
-          {[['batting','🧢 Batting'],['pitching','⚾ Pitching'],['plays','📋 Plays']].map(([k,l]) => (
-            <button key={k} onClick={() => setBoxTab(k)}
-              style={{padding:'4px 11px',borderRadius:6,border:'none',cursor:'pointer',
-                fontFamily:mono,fontSize:10,fontWeight:boxTab===k?700:400,
-                background: boxTab===k?'var(--accent)':'var(--surface2)',
-                color: boxTab===k?'white':'var(--muted)'}}>
-              {l}
-            </button>
-          ))}
+        <div style={{display:'flex',gap:4,marginBottom:10,alignItems:'center',
+          justifyContent:'space-between'}}>
+
+          {/* Left: existing tabs — unchanged */}
+          <div style={{display:'flex',gap:4}}>
+            {[['batting','🧢 Batting'],['pitching','⚾ Pitching'],['plays','📋 Plays']].map(([k,l]) => (
+              <button key={k} onClick={() => setBoxTab(k)}
+                style={{padding:'4px 11px',borderRadius:6,border:'none',cursor:'pointer',
+                  fontFamily:mono,fontSize:10,fontWeight:boxTab===k?700:400,
+                  background: boxTab===k?'var(--accent)':'var(--surface2)',
+                  color: boxTab===k?'white':'var(--muted)'}}>
+                {l}
+              </button>
+            ))}
+          </div>
+
+          {/* Right: Watch + Easter egg arrow */}
+          {selGamePk && (
+            <div style={{display:'flex',gap:2,alignItems:'center'}}>
+              <button
+                onClick={() => window.open(
+                  `https://www.mlb.com/live-stream-games/${selGamePk}`,
+                  '_blank','noopener'
+                )}
+                style={{padding:'4px 11px',borderRadius:'6px 0 0 6px',border:'none',
+                  cursor:'pointer',fontFamily:mono,fontSize:10,fontWeight:600,
+                  background:'var(--surface2)',color:'var(--muted)',
+                  borderRight:'1px solid rgba(255,255,255,.08)',
+                  display:'flex',alignItems:'center',gap:4}}>
+                📺 Watch
+              </button>
+              <button
+                onClick={() => {
+                  if (showStream) { setShowStream(false); setStreamUrl(null); }
+                  else { setShowStream(true); fetchStreamUrl(selGamePk, games, setStreamUrl, setStreamLoad); }
+                }}
+                style={{padding:'4px 8px',borderRadius:'0 6px 6px 0',border:'none',
+                  cursor:'pointer',fontFamily:mono,fontSize:10,fontWeight:600,
+                  background:'var(--surface2)',color:'var(--muted)',
+                  transition:'transform .2s',
+                  transform:showStream?'rotate(180deg)':'rotate(0deg)'}}>
+                ▾
+              </button>
+            </div>
+          )}
+
         </div>
+
+        {/* Stream embed panel — easter egg */}
+        {showStream && (
+          <div style={{marginBottom:12,borderRadius:8,overflow:'hidden',
+            border:'1px solid var(--border)',background:'#000',position:'relative',
+            aspectRatio:'16/9',width:'100%'}}>
+            {streamLoad && (
+              <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',
+                justifyContent:'center',background:'#000',zIndex:1}}>
+                <div className="sp" style={{width:24,height:24,borderWidth:2}}/>
+              </div>
+            )}
+            {!streamLoad && streamUrl && (
+              <iframe src={streamUrl}
+                style={{width:'100%',height:'100%',border:'none',display:'block'}}
+                allowFullScreen allow="autoplay; fullscreen"
+                referrerPolicy="no-referrer"
+                sandbox="allow-scripts allow-same-origin allow-presentation allow-forms"/>
+            )}
+            {!streamLoad && !streamUrl && (
+              <div style={{display:'flex',alignItems:'center',justifyContent:'center',
+                height:'100%',minHeight:120,
+                fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--muted)'}}>
+                No stream found for this game.
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Plays tab */}
         {boxTab === 'plays' && (() => {
@@ -10508,7 +10625,7 @@ function GamedayTab() {
         const awWin = abs==='Final' && (aw?.score??0) > (hm?.score??0);
         const hmWin = abs==='Final' && (hm?.score??0) > (aw?.score??0);
         return (
-          <div key={g.gamePk} onClick={() => { setSelGamePk(sel && !isMobile ? null : g.gamePk); setBoxTab('batting'); }}
+          <div key={g.gamePk} onClick={() => { setSelGamePk(sel && !isMobile ? null : g.gamePk); setBoxTab('batting'); setShowStream(false); setStreamUrl(null); }}
             style={{background: sel ? 'var(--surface2)' : 'var(--surface)',
               border:`1px solid ${sel ? 'var(--accent)' : 'var(--border)'}`,
               borderRadius: !isMobile && selGamePk ? 0 : 9, cursor:'pointer', padding:'10px 14px',
@@ -26512,6 +26629,11 @@ function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, on
   const [expandedB,      setExpandedB]      = useState(null);
   const [gpFiltersOpen,  setGpFiltersOpen]  = useState(false);
   const [gbFiltersOpen,  setGbFiltersOpen]  = useState(false);
+  const [threshFilters,    setThreshFilters]   = useState([]);   // [{col, op, val}]
+  const [threshPanelOpen,  setThreshPanelOpen] = useState(false);
+  const [threshCol,        setThreshCol]       = useState('brl_pct');
+  const [threshOp,         setThreshOp]        = useState('>');
+  const [threshVal,        setThreshVal]       = useState('');
 
   // ── Teams state ────────────────────────────────────────────────────────────
   const [tSortBy,        setTSortBy]        = useState('g2tb_pct');
@@ -26671,8 +26793,15 @@ function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, on
       if (bHideInj&&INJURY_MAP?.[bpid]&&!bls) return false;
       if (bSearch&&!(r.name||'').toLowerCase().includes(bSearch.toLowerCase())&&!(r.team||'').toLowerCase().includes(bSearch.toLowerCase())) return false;
       return true;
+    }).filter(r => {
+      if (!threshFilters.length) return true;
+      return threshFilters.every(f => {
+        const v = parseFloat(r[f.col] ?? null);
+        if (isNaN(v)) return false;
+        return f.op === '>' ? v > f.val : v < f.val;
+      });
     }).sort((a,b)=>bSortDir*((a[bSortBy]??-999)-(b[bSortBy]??-999))).slice(0,300);
-  }, [data, window, bSplitKey, bSortBy, bSortDir, bSearch, bTeam, bMinGames, bHandFilter, matchupTeams, sharedBHand, sharedPHand, bConfirmed, bPicksOnly, bHideInj, lineupVer, pitchGroup]);
+  }, [data, window, bSplitKey, bSortBy, bSortDir, bSearch, bTeam, bMinGames, bHandFilter, matchupTeams, sharedBHand, sharedPHand, bConfirmed, bPicksOnly, bHideInj, lineupVer, pitchGroup, threshFilters]);
 
   // ── Team rows ─────────────────────────────────────────────────────────────
   const teamRows = React.useMemo(() => {
@@ -27064,6 +27193,83 @@ function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, on
               </button>
             );})()}
           </div>
+          {/* Threshold filters */}
+          <div style={{display:'flex',alignItems:'center',gap:4,flexWrap:'wrap',marginTop:4,marginBottom:4}}>
+            <button onClick={()=>setThreshPanelOpen(v=>!v)}
+              style={{padding:'3px 8px',borderRadius:6,cursor:'pointer',fontFamily:mono,
+                fontWeight:700,fontSize:9,letterSpacing:.4,
+                border:`1px solid ${threshPanelOpen||threshFilters.length?'#a78bfa':'var(--border)'}`,
+                background:threshFilters.length?'rgba(167,139,250,.12)':'var(--surface2)',
+                color:threshPanelOpen||threshFilters.length?'#a78bfa':'var(--muted)',
+                display:'flex',alignItems:'center',gap:3}}>
+              🎯 {threshPanelOpen?'CLOSE':'THRESHOLD'}
+              {threshFilters.length>0&&!threshPanelOpen&&
+                <span style={{background:'#a78bfa',color:'#000',borderRadius:8,
+                  padding:'0 4px',fontSize:8,fontWeight:900}}>{threshFilters.length}</span>}
+            </button>
+            {threshFilters.map((f,i)=>(
+              <span key={i} style={{display:'flex',alignItems:'center',gap:3,
+                padding:'2px 6px',borderRadius:5,fontSize:8,fontFamily:mono,
+                background:'rgba(167,139,250,.12)',border:'1px solid rgba(167,139,250,.3)',
+                color:'#a78bfa'}}>
+                {f.col} {f.op} {f.val}
+                <button onClick={()=>setThreshFilters(fs=>fs.filter((_,j)=>j!==i))}
+                  style={{background:'none',border:'none',color:'#a78bfa',
+                    cursor:'pointer',padding:0,fontSize:10}}>✕</button>
+              </span>
+            ))}
+          </div>
+          {threshPanelOpen&&(
+            <div style={{background:'var(--surface2)',border:'1px solid var(--border)',
+              borderRadius:7,padding:'10px 12px',marginBottom:6,display:'flex',
+              flexWrap:'wrap',gap:6,alignItems:'center'}}>
+              <select value={threshCol} onChange={e=>setThreshCol(e.target.value)}
+                style={{fontFamily:mono,fontSize:9,background:'var(--surface2)',
+                  color:'var(--text)',border:'1px solid var(--border)',borderRadius:5,
+                  padding:'4px 7px',cursor:'pointer'}}>
+                {[['brl_pct','Brl%'],['hh_pct','HH%'],['fb_pct','FB%'],['gb_pct','GB%'],
+                  ['ld_pct','LD%'],['pull_pct','Pull%'],['oppo_pct','Oppo%'],
+                  ['avg_dist','AvgDist'],['dist_350','350+'],['near_hr','NearHR'],
+                  ['swstr_pct','SwStr%'],['whiff_pct','Whiff%'],['ev','EV'],
+                  ['iso','ISO'],['woba','wOBA'],['k_pct','K%'],['bb_pct','BB%'],
+                  ['hr_rate','HR%'],['bat_speed','BatSpd'],['la_mean','LA°']
+                ].map(([v,l])=><option key={v} value={v}>{l}</option>)}
+              </select>
+              <select value={threshOp} onChange={e=>setThreshOp(e.target.value)}
+                style={{fontFamily:mono,fontSize:9,background:'var(--surface2)',
+                  color:'var(--text)',border:'1px solid var(--border)',borderRadius:5,
+                  padding:'4px 7px',cursor:'pointer',width:44}}>
+                <option value=">">&gt;</option>
+                <option value="<">&lt;</option>
+              </select>
+              <input type="number" value={threshVal} onChange={e=>setThreshVal(e.target.value)}
+                placeholder="value" step="0.1"
+                style={{width:60,padding:'4px 6px',borderRadius:5,
+                  border:'1px solid var(--border)',background:'var(--surface2)',
+                  color:'var(--text)',fontFamily:mono,fontSize:9,outline:'none'}}/>
+              <button
+                onClick={()=>{
+                  const v=parseFloat(threshVal);
+                  if(!isNaN(v)&&threshCol){
+                    setThreshFilters(fs=>[...fs,{col:threshCol,op:threshOp,val:v}]);
+                    setThreshVal('');
+                  }
+                }}
+                style={{padding:'4px 10px',borderRadius:5,border:'none',cursor:'pointer',
+                  background:'rgba(167,139,250,.2)',color:'#a78bfa',
+                  fontFamily:mono,fontSize:9,fontWeight:700}}>
+                + Add
+              </button>
+              {threshFilters.length>0&&(
+                <button onClick={()=>setThreshFilters([])}
+                  style={{padding:'2px 7px',borderRadius:5,
+                    border:'1px solid rgba(255,64,32,.3)',background:'rgba(255,64,32,.08)',
+                    color:'var(--accent)',fontFamily:mono,fontSize:8,cursor:'pointer'}}>
+                  ✕ Clear All
+                </button>
+              )}
+            </div>
+          )}
           {gbFiltersOpen&&(
             <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:7,padding:'10px 12px',marginBottom:8,display:'flex',flexWrap:'wrap',gap:8,alignItems:'center',boxShadow:'0 3px 16px rgba(0,0,0,.4)'}}>
               <PillRow items={[['','All'],['L','LHB'],['R','RHB'],['S','SWB']]} active={bHandFilter} onSelect={setBHandFilter}/>
@@ -27079,7 +27285,7 @@ function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, on
                 <input type="number" min={1} max={50} value={bMinGames} onChange={e=>setBMinGames(+e.target.value||1)}
                   style={{width:40,padding:'3px 5px',borderRadius:5,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:9,textAlign:'center',outline:'none'}}/>
               </div>
-              <button onClick={()=>{setBHandFilter('');setBPicksOnly(false);setBConfirmed(false);setBHideInj(false);setBMinGames(2);}}
+              <button onClick={()=>{setBHandFilter('');setBPicksOnly(false);setBConfirmed(false);setBHideInj(false);setBMinGames(2);setThreshFilters([]);setThreshPanelOpen(false);}}
                 style={{padding:'2px 7px',borderRadius:5,border:'1px solid rgba(255,64,32,.3)',background:'rgba(255,64,32,.08)',color:'var(--accent)',fontFamily:mono,fontSize:8,cursor:'pointer'}}>✕ Clear</button>
             </div>
           )}
@@ -27109,11 +27315,31 @@ function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, on
                     <BTh col="h_game_pct"   label="H%"     title="% of games with 1+ hit"/>
                     <BTh col="k_pct"        label="K%"     title="Strikeout rate"/>
                     <BTh col="bb_pct"       label="BB%"    title="Walk rate"/>
+                    <BTh col="ev"          label="EV"      title="Average exit velocity (mph)"/>
+                    <BTh col="hh_pct"      label="HH%"     title="Hard hit rate (95+ mph EV)"/>
+                    <BTh col="brl_pct"     label="Brl%"    title="Barrel rate per PA"/>
+                    <BTh col="pbrl_pct"    label="PBrl%"   title="Pulled barrel rate"/>
+                    <BTh col="fb_pct"      label="FB%"     title="Fly ball rate"/>
+                    <BTh col="gb_pct"      label="GB%"     title="Ground ball rate"/>
+                    <BTh col="ld_pct"      label="LD%"     title="Line drive rate"/>
+                    <BTh col="popup_pct"   label="PU%"     title="Popup rate"/>
+                    <BTh col="pull_pct"    label="Pull%"   title="Pull rate (batted balls to pull side)"/>
+                    <BTh col="straight_pct"label="Str%"    title="Straight-away rate (center field)"/>
+                    <BTh col="oppo_pct"    label="Oppo%"   title="Opposite field rate"/>
+                    <BTh col="avg_dist"    label="AvgDst"  title="Average hit distance (ft)"/>
+                    <BTh col="dist_300"    label="300+"    title="Batted balls 300+ feet"/>
+                    <BTh col="dist_350"    label="350+"    title="Batted balls 350+ feet"/>
+                    <BTh col="near_hr"     label="NrHR"    title="Near-HR: 350+ ft distance, no home run"/>
+                    <BTh col="swstr_pct"   label="SwStr%"  title="Swinging strike rate per PA"/>
+                    <BTh col="whiff_pct"   label="Whiff%"  title="Whiff rate (swings and misses / swings)"/>
+                    <BTh col="first_pitch_swing_pct" label="1stP%" title="First pitch swing rate"/>
+                    <BTh col="la_mean"     label="LA°"     title="Average launch angle"/>
+                    <BTh col="bat_speed"   label="BSpd"    title="Average bat speed (mph)"/>
                   </tr>
                 </thead>
                 <tbody>
                   {bRows.length===0
-                    ?<tr><td colSpan={21} style={{textAlign:'center',padding:24,fontFamily:mono,fontSize:10,color:'var(--muted)'}}>No data — run build_game_splits.py then mlbdata_aggregate.py</td></tr>
+                    ?<tr><td colSpan={41} style={{textAlign:'center',padding:24,fontFamily:mono,fontSize:10,color:'var(--muted)'}}>No data — run build_game_splits.py then mlbdata_aggregate.py</td></tr>
                     :bRows.flatMap(r=>{
                     const mainB=(
                     <tr key={r.id} onClick={()=>setExpandedB(e=>e===r.id?null:r.id)}
@@ -27149,6 +27375,86 @@ function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, on
                       <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,fontWeight:700,color:(r.h_game_pct||0)>=80?'#27c97a':(r.h_game_pct||0)>=60?'#f5a623':'var(--muted)'}}>{fmtPct(r.h_game_pct)}</td>
                       <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.k_pct||0)>=28?'#ff4020':'var(--muted)'}}>{fmtPct(r.k_pct)}</td>
                       <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.bb_pct||0)>=12?'#27c97a':'var(--muted)'}}>{fmtPct(r.bb_pct)}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
+                        color:r.ev>=103?'#ff4020':r.ev>=97?'#f5a623':'var(--muted)'}}>
+                        {r.ev!=null?r.ev.toFixed(1):'—'}
+                      </td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
+                        color:(r.hh_pct||0)>=45?'#ff4020':(r.hh_pct||0)>=38?'#f5a623':'var(--muted)'}}>
+                        {r.hh_pct!=null?r.hh_pct.toFixed(1)+'%':'—'}
+                      </td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
+                        color:(r.brl_pct||0)>=12?'#ff4020':(r.brl_pct||0)>=7?'#f5a623':'var(--muted)'}}>
+                        {r.brl_pct!=null?r.brl_pct.toFixed(1)+'%':'—'}
+                      </td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
+                        color:(r.pbrl_pct||0)>=8?'#ff4020':'var(--muted)'}}>
+                        {r.pbrl_pct!=null?r.pbrl_pct.toFixed(1)+'%':'—'}
+                      </td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
+                        color:(r.fb_pct||0)>=45?'#ff4020':(r.fb_pct||0)>=35?'#f5a623':'var(--muted)'}}>
+                        {r.fb_pct!=null?r.fb_pct.toFixed(1)+'%':'—'}
+                      </td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
+                        color:(r.gb_pct||0)>=55?'#27c97a':'var(--muted)'}}>
+                        {r.gb_pct!=null?r.gb_pct.toFixed(1)+'%':'—'}
+                      </td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
+                        color:(r.ld_pct||0)>=28?'#ff4020':(r.ld_pct||0)>=22?'#f5a623':'var(--muted)'}}>
+                        {r.ld_pct!=null?r.ld_pct.toFixed(1)+'%':'—'}
+                      </td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
+                        color:'var(--muted)'}}>
+                        {r.popup_pct!=null?r.popup_pct.toFixed(1)+'%':'—'}
+                      </td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
+                        color:(r.pull_pct||0)>=45?'#ff4020':'var(--muted)'}}>
+                        {r.pull_pct!=null?r.pull_pct.toFixed(1)+'%':'—'}
+                      </td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
+                        color:'var(--muted)'}}>
+                        {r.straight_pct!=null?r.straight_pct.toFixed(1)+'%':'—'}
+                      </td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
+                        color:(r.oppo_pct||0)>=30?'#27c97a':'var(--muted)'}}>
+                        {r.oppo_pct!=null?r.oppo_pct.toFixed(1)+'%':'—'}
+                      </td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
+                        color:(r.avg_dist||0)>=320?'#ff4020':(r.avg_dist||0)>=280?'#f5a623':'var(--muted)'}}>
+                        {r.avg_dist!=null?r.avg_dist.toFixed(0):'—'}
+                      </td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
+                        color:(r.dist_300||0)>=10?'#f5a623':'var(--muted)'}}>
+                        {r.dist_300!=null?r.dist_300:'—'}
+                      </td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
+                        color:(r.dist_350||0)>=5?'#ff4020':'var(--muted)'}}>
+                        {r.dist_350!=null?r.dist_350:'—'}
+                      </td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
+                        color:(r.near_hr||0)>=3?'#f5a623':'var(--muted)'}}>
+                        {r.near_hr!=null?r.near_hr:'—'}
+                      </td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
+                        color:(r.swstr_pct||0)>=15?'#27c97a':'var(--muted)'}}>
+                        {r.swstr_pct!=null?r.swstr_pct.toFixed(1)+'%':'—'}
+                      </td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
+                        color:(r.whiff_pct||0)>=35?'#27c97a':'var(--muted)'}}>
+                        {r.whiff_pct!=null?r.whiff_pct.toFixed(1)+'%':'—'}
+                      </td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
+                        color:'var(--muted)'}}>
+                        {r.first_pitch_swing_pct!=null?r.first_pitch_swing_pct.toFixed(1)+'%':'—'}
+                      </td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
+                        color:r.la_mean!=null?((r.la_mean>=10&&r.la_mean<=35)?'#27c97a':'var(--muted)'):'var(--muted)'}}>
+                        {r.la_mean!=null?r.la_mean.toFixed(1)+'°':'—'}
+                      </td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,
+                        color:(r.bat_speed||0)>=75?'#ff4020':(r.bat_speed||0)>=70?'#f5a623':'var(--muted)'}}>
+                        {r.bat_speed!=null?r.bat_speed.toFixed(1):'—'}
+                      </td>
                     </tr>);
                     return [mainB];
                   })}
