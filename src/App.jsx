@@ -7348,8 +7348,6 @@ function LiveThemesTab() {
   const [todaysHRs, setTodaysHRs]   = useState([]);
   const [lineupVer, setLineupVer]   = useState(LINEUP_VERSION);
   const [finalVer,  setFinalVer]    = useState(0);
-  const seenBids = useRef(new Set()); // dedup HR log by batter_id
-
   // Subscribe to lineup updates
   useEffect(() => {
     const unsub = subscribeLineup(v => setLineupVer(v));
@@ -7362,67 +7360,56 @@ function LiveThemesTab() {
     return () => clearInterval(id);
   }, []);
 
-  // Poll all today's games every 60s for HR events
+  // Poll /api/homeruns every 60s — same endpoint as HR Tracker
   useEffect(() => {
-    let active = true;
-    const poll = async () => {
-      const gamePks = LIVE_GAMES_CACHE.map(g => g.gamePk).filter(Boolean);
-      if (!gamePks.length) return;
-      for (const gPk of gamePks) {
-        try {
-          const batters = await fetchLiveBatters(gPk);
-          if (!active) return;
-          const newHRs = [];
-          for (const b of (batters || [])) {
-            if (!b.hr || b.hr < 1) continue;
-            const bid = String(b.id || '').trim();
-            if (!bid || bid === 'NaN' || seenBids.current.has(bid)) continue;
-            seenBids.current.add(bid);
-            const pick = DAILY_PICKS_CACHE[bid];
-            if (!pick) continue;
-            const sig  = parseFloat(pick.weighted_flag_score||0) * 4.6;
-            const boom = parseFloat(pick._boom) ||
-              computeBoomScore(sig, parseFloat(pick.zone_fit)||0,
-                parseFloat(pick.recent_iso)||0, parseFloat(pick.sim_tb)||0,
-                parseFloat(pick.weighted_flag_score)||0,
-                parseFloat(pick.recent_barrel_spike||0),
-                parseInt(pick.recent_hr_count||0),
-                parseFloat(pick.recent_batter_ahead_pct||0),
-                !!pick.hh_precursor, parseFloat(pick.primary_pitch_hr_rate||0),
-                parseInt(pick.recent_barrels_3d)||0, parseInt(pick.recent_hrs_3d)||0,
-                parseFloat(pick.recent_avg_bat_speed)||0, parseInt(pick.recent_pb_2d)||0,
-                pick.la_locked, parseFloat(pick.season_swstr_pct)||0,
-                parseFloat(pick.park_pull_fit)||0,
-                parseInt(pick._zoneEdges||0), parseInt(pick._zoneKPenalty||0),
-                (()=>{const ls=liveSlot(bid,pick.lineup_slot);return ls>0&&
-                  (pick.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(ls);})(),
-                parseFloat(pick.season_xwoba)||0);
-            const ys = computeYardScore(
-              sig, parseFloat(pick.gHR)||0, boom, parseFloat(pick.ps_score)||0,
-              pick.batter_hand||'', pick.pitcher_hand||'',
-              parseInt(pick.days_rest ?? 1),
-              liveSlot(bid, pick.lineup_slot),
-              pick.pitcher_grade_label||'');
-            newHRs.push({
-              batter_id: bid,
-              batter:    b.name || pick.batter || '',
+    const fetchHRs = async () => {
+      try {
+        const res = await fetch('/api/homeruns');
+        const d = await res.json();
+        const hrs = (d.homeruns || []).map(hr => ({
+          batter_id: String(hr.batter_id || hr.batterId || ''),
+          batter:    hr.batter_name || hr.batter || '',
+          game_id:   String(hr.game_id || hr.gamePk || ''),
+          ...(() => {
+            const bid = String(hr.batter_id || hr.batterId || '');
+            const dp = DAILY_PICKS_CACHE[bid] ||
+              Object.values(DAILY_PICKS_CACHE).find(r =>
+                String(r.batter_id||'').split('.')[0] === bid);
+            if (!dp) return { yardScore:0, boomScore:0, xwoba:0, iso:0 };
+            const sig  = parseFloat(dp.weighted_flag_score||0)*4.6;
+            const boom = computeBoomScore(sig,
+              parseFloat(dp.zone_fit||0), parseFloat(dp.recent_iso||0),
+              parseFloat(dp.sim_tb||0), parseFloat(dp.weighted_flag_score||0),
+              parseFloat(dp.recent_barrel_spike||0), parseInt(dp.recent_hr_count||0),
+              parseFloat(dp.recent_batter_ahead_pct||0), !!dp.hh_precursor,
+              parseFloat(dp.primary_pitch_hr_rate||0), parseInt(dp.recent_barrels_3d||0),
+              parseInt(dp.recent_hrs_3d||0), parseFloat(dp.recent_avg_bat_speed||0),
+              parseInt(dp.recent_pb_2d||0), dp.la_locked,
+              parseFloat(dp.season_swstr_pct||0), parseFloat(dp.park_pull_fit||0),
+              parseInt(dp._zoneEdges||0), parseInt(dp._zoneKPenalty||0), false,
+              parseFloat(dp.season_xwoba||0));
+            const ys = computeYardScore(sig, parseFloat(dp.gHR||0), boom,
+              parseFloat(dp.ps_score||0), dp.batter_hand||'', dp.pitcher_hand||'',
+              parseInt(dp.days_rest??1), liveSlot(bid, dp.lineup_slot),
+              dp.pitcher_grade_label||'');
+            return {
               yardScore: ys,
               boomScore: boom,
-              xwoba:     parseFloat(pick.season_xwoba)||0,
-              iso:       parseFloat(pick.recent_iso)||0,
-              game_id:   String(gPk),
-            });
-          }
-          if (newHRs.length > 0) setTodaysHRs(prev => [...prev, ...newHRs]);
-        } catch(e) {
-          // silent — game may not be live yet
-        }
+              xwoba: parseFloat(dp.season_xwoba||0),
+              iso:   parseFloat(dp.recent_iso||0),
+            };
+          })(),
+        }));
+        console.log('[Themes] todaysHRs:', hrs.length, hrs);
+        setTodaysHRs(hrs);
+      } catch(e) {
+        console.warn('[Themes] HR fetch failed:', e.message);
       }
     };
-    poll();
-    const id = setInterval(poll, 60000);
-    return () => { active = false; clearInterval(id); };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    fetchHRs();
+    const id = setInterval(fetchHRs, 60000);
+    return () => clearInterval(id);
+  }, []);
 
   // Cluster detection — only when 3+ HRs exist
   const clusters = useMemo(() => {
