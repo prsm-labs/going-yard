@@ -3776,10 +3776,8 @@ function WeatherBanner({ team }) {
   if (loading) return <div style={{height:44,display:"flex",alignItems:"center",padding:"0 14px",background:"var(--surface)",border:"1px solid var(--border)",borderRadius:8,marginBottom:12}}><div className="sp" style={{width:14,height:14,borderWidth:2}}/></div>;
   if (!data) return null;
 
-  const { parkFactorHR, isDome, current: w } = data;
-  const pfHR = parkFactorHR || 100;
-  const hrEnvScore = w?.hrEnvScore ?? 0;
-  const pfColor = getPFColor(pfHR);
+  const { parkFactor: pf, weather: w, hrEnvScore } = data;
+  const pfColor = getPFColor(pf?.hr || 100);
   const envLabel = hrEnvScore >= 60 ? "🔥 HR-friendly environment" : hrEnvScore >= 52 ? "📈 Slight HR boost" : hrEnvScore >= 46 ? "— Neutral conditions" : hrEnvScore >= 38 ? "📉 Slight suppressor" : "🧊 Pitcher-friendly conditions";
   const envColor = hrEnvScore >= 60 ? "#ff4020" : hrEnvScore >= 52 ? "#ff8020" : hrEnvScore >= 46 ? "var(--muted)" : hrEnvScore >= 38 ? "#38b8f2" : "#38b8f2";
 
@@ -3788,27 +3786,30 @@ function WeatherBanner({ team }) {
     <div style={{display:"flex",flexDirection:"column",gap:1}}>
       <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1}}>Park Factor</div>
       <div style={{display:"flex",alignItems:"center",gap:5}}>
-        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:18,color:pfColor}}>{pfHR}</span>
+        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:18,color:pfColor}}>{pf?.hr || 100}</span>
         <span style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>HR</span>
+        <span style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>/ {pf?.xbh || 100} XBH</span>
       </div>
+      <div style={{fontSize:9,color:pfColor,fontFamily:"'DM Mono',monospace"}}>{pf?.label || ""}</div>
     </div>
 
     <div style={{width:1,height:36,background:"var(--border)"}}/>
 
     {/* Weather — skip if dome */}
-    {isDome
+    {w?.isDome
       ? <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>🏟️ Retractable/dome — weather irrelevant</div>
       : w ? <>
           <div style={{display:"flex",flexDirection:"column",gap:1}}>
             <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1}}>Conditions</div>
-            <div style={{fontSize:12,fontFamily:"'DM Mono',monospace"}}>{w.condition || "—"}</div>
+            <div style={{fontSize:12,fontFamily:"'DM Mono',monospace"}}>{getWeatherDesc(w.weatherCode)}</div>
             <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{w.temp}°F · {w.humidity}% humidity</div>
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:1}}>
             <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1}}>Wind</div>
             <div style={{fontSize:12,fontFamily:"'DM Mono',monospace",color:w.windSpeed>=15?"#ff8020":"var(--text)"}}>{w.windLabel}</div>
-            <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{w.windSpeed} mph {getWindDir(w.windDeg)}</div>
+            <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{w.windSpeed} mph {getWindDir(w.windDir)}</div>
           </div>
+          {w.precip > 0 && <div style={{padding:"3px 8px",borderRadius:5,background:"rgba(56,184,242,.1)",border:"1px solid rgba(56,184,242,.2)",fontSize:10,color:"var(--ice)",fontFamily:"'DM Mono',monospace"}}>🌧️ {w.precip}" precip</div>}
         </>
       : null
     }
@@ -7095,12 +7096,12 @@ function LineupsView({ date }) {
 }
 
 
-// ── Live Themes ── real-time HR cluster detection + confirmed-batter matching ──
+// ── Live Themes: Tier badge ───────────────────────────────────────────────────
 function TierBadge({ tier }) {
   const cfg = {
-    1: { color:'#f5a623', bg:'rgba(245,166,35,.14)', border:'rgba(245,166,35,.40)' },
-    2: { color:'#a0aab4', bg:'rgba(160,170,180,.10)', border:'rgba(160,170,180,.28)' },
-    3: { color:'#5a636c', bg:'rgba(90,99,108,.08)',   border:'rgba(90,99,108,.20)' },
+    1: { color:'#f5a623', bg:'rgba(245,166,35,.16)', border:'rgba(245,166,35,.45)' },
+    2: { color:'#a0aab4', bg:'rgba(160,170,180,.12)', border:'rgba(160,170,180,.30)' },
+    3: { color:'#5a636c', bg:'rgba(90,99,108,.09)',   border:'rgba(90,99,108,.22)'  },
   }[tier] || {};
   return (
     <span style={{ fontFamily:"'DM Mono',monospace", fontSize:8, fontWeight:700,
@@ -7111,18 +7112,30 @@ function TierBadge({ tier }) {
   );
 }
 
-function ThemeMatchTable({ candidates }) {
+// ── Live Themes: FINAL game badge ─────────────────────────────────────────────
+function FinalBadge() {
+  return (
+    <span style={{ fontFamily:"'DM Mono',monospace", fontSize:7, fontWeight:700,
+      color:'#6b7280', background:'rgba(107,114,128,.12)', border:'1px solid rgba(107,114,128,.25)',
+      borderRadius:3, padding:'1px 4px', whiteSpace:'nowrap', marginRight:4 }}>
+      FINAL
+    </span>
+  );
+}
+
+// ── Live Themes: lightweight read-only table ──────────────────────────────────
+function ThemeMatchTable({ rows }) {
   const mono = "'DM Mono',monospace";
   const osw  = "'Oswald',sans-serif";
   const [expandedId, setExpandedId] = useState(null);
-  if (!candidates || candidates.length === 0) {
+  if (!rows || rows.length === 0) {
     return <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)',padding:14}}>No confirmed batters match this cluster.</div>;
   }
   return (
-    <div className="tw" style={{marginTop:8}}>
-      <table style={{width:'100%'}}>
+    <div className="tw" style={{marginTop:6,overflowX:'auto'}}>
+      <table style={{width:'100%',minWidth:600}}>
         <thead><tr style={{borderBottom:'1px solid var(--border)'}}>
-          {[['Tier','left'],['Batter','left'],['Yard','center'],['Boom','right'],
+          {[['Tier','center'],['Batter','left'],['Yard','center'],['Boom','right'],
             ['⚡','right'],['P.Grade','right'],['vs Pitcher','left'],
             ['Sim TB','right'],['L7 EV','right'],['Brl%','right'],
             ['ZoneFit','right'],['xwOBA','right'],['Grade','right'],['Match','right'],
@@ -7133,18 +7146,20 @@ function ThemeMatchTable({ candidates }) {
           ))}
         </tr></thead>
         <tbody>
-          {candidates.map(b => {
-            const pid = parseInt(b.batter_id||0);
-            const uid = b.batter_id || b.batter;
+          {rows.map(b => {
+            const pid  = parseInt(b.batter_id||0);
+            const uid  = String(b.batter_id||b.batter||Math.random());
             const isExp = expandedId === uid;
+            const isFinal = FINAL_GAME_IDS.has(String(b.game_id||''));
+            const tier  = b._themeTier;
             const yard  = b._yard  ?? 0;
             const boom  = b._boom  ?? 0;
             const sig   = b._sig   ?? 0;
-            const pgLabel = b._pgLabel || '';
-            const pgColor = pgLabel.includes('‼️')||pgLabel.toLowerCase().includes('elite') ? '#ff4020'
-                          : pgLabel.includes('⚠️')||pgLabel.toLowerCase().includes('tough') ? '#ff8020'
-                          : pgLabel.includes('💥')||pgLabel.toLowerCase().includes('hittable') ? '#27c97a'
-                          : pgLabel.includes('🎯')||pgLabel.toLowerCase().includes('target') ? '#38b8f2'
+            const pgLabel = b._pgLabel || b.pitcher_grade_label || '';
+            const pgColor = pgLabel.toLowerCase().includes('elite') ? '#ff4020'
+                          : pgLabel.toLowerCase().includes('tough') ? '#ff8020'
+                          : pgLabel.toLowerCase().includes('hittable') ? '#27c97a'
+                          : pgLabel.toLowerCase().includes('target') ? '#38b8f2'
                           : 'var(--muted)';
             const simTB = parseFloat(b.sim_tb)||0;
             const ev7   = parseFloat(b.recent_avg_ev)||0;
@@ -7156,12 +7171,15 @@ function ThemeMatchTable({ candidates }) {
             return (
               <React.Fragment key={uid}>
                 <tr onClick={()=>setExpandedId(v=>v===uid?null:uid)}
-                  style={{cursor:'pointer',height:26,borderBottom:'1px solid rgba(255,255,255,.04)',
+                  style={{cursor:'pointer',height:26,
+                    borderBottom:'1px solid rgba(255,255,255,.04)',
                     background:isExp?'rgba(255,255,255,.04)':'transparent',
-                    borderLeft:`2px solid ${isExp?'var(--accent)':'transparent'}`}}>
-                  <td style={{padding:'2px 5px'}}><TierBadge tier={b.tier}/></td>
-                  <td className="sticky-batter" style={{padding:'2px 6px',maxWidth:160}}>
+                    borderLeft:`2px solid ${isExp?'var(--accent)':'transparent'}`,
+                    opacity: isFinal ? 0.5 : 1}}>
+                  <td style={{padding:'2px 5px',textAlign:'center'}}><TierBadge tier={tier}/></td>
+                  <td style={{padding:'2px 6px',maxWidth:160}}>
                     <div style={{display:'flex',alignItems:'center',gap:4,overflow:'hidden'}}>
+                      {isFinal && <FinalBadge/>}
                       <PlayerAvatar pid={pid} name={b.batter||''} size={16}/>
                       <span style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'var(--accent2)',whiteSpace:'nowrap',flexShrink:0}}>{b.batting_team||''}</span>
                       <span style={{fontFamily:osw,fontWeight:700,fontSize:10,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',
@@ -7208,8 +7226,8 @@ function ThemeMatchTable({ candidates }) {
                     <span style={{fontFamily:mono,fontSize:9,color:gc.color,fontWeight:700}}>{effG}</span>
                   </td>
                   <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,fontWeight:700,
-                    color:b.themeMatchScore>=70?'#ff4020':b.themeMatchScore>=50?'#f5a623':'var(--muted)'}}>
-                    {b.themeMatchScore!=null?b.themeMatchScore.toFixed(0):'—'}
+                    color:(b._themeScore??0)>=70?'#ff4020':(b._themeScore??0)>=50?'#f5a623':'var(--muted)'}}>
+                    {b._themeScore!=null?b._themeScore.toFixed(0):'—'}
                   </td>
                 </tr>
                 {isExp && (
@@ -7223,85 +7241,140 @@ function ThemeMatchTable({ candidates }) {
           })}
         </tbody>
       </table>
+      <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textAlign:'right',
+        marginTop:4,padding:'2px 6px'}}>
+        T1=top 10% · T2=11–30% · T3=31–60% · confirmed batters only
+      </div>
     </div>
   );
 }
 
+// ── Theme Match Score — standalone, called per batter per cluster ──────────────
+function computeThemeMatchScore(batter, cluster, bid) {
+  const sig  = parseFloat(batter.weighted_flag_score||0) * 4.6;
+  const boom = parseFloat(batter._boom) ||
+    computeBoomScore(sig, parseFloat(batter.zone_fit)||0,
+      parseFloat(batter.recent_iso)||0, parseFloat(batter.sim_tb)||0,
+      parseFloat(batter.weighted_flag_score)||0,
+      parseFloat(batter.recent_barrel_spike||0),
+      parseInt(batter.recent_hr_count||0),
+      parseFloat(batter.recent_batter_ahead_pct||0),
+      !!batter.hh_precursor, parseFloat(batter.primary_pitch_hr_rate||0),
+      parseInt(batter.recent_barrels_3d)||0, parseInt(batter.recent_hrs_3d)||0,
+      parseFloat(batter.recent_avg_bat_speed)||0, parseInt(batter.recent_pb_2d)||0,
+      batter.la_locked, parseFloat(batter.season_swstr_pct)||0,
+      parseFloat(batter.park_pull_fit)||0,
+      parseInt(batter._zoneEdges||0), parseInt(batter._zoneKPenalty||0),
+      (()=>{const ls=liveSlot(bid,batter.lineup_slot);return ls>0&&
+        (batter.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(ls);})(),
+      parseFloat(batter.season_xwoba)||0);
+  const ys = computeYardScore(
+    sig, parseFloat(batter.gHR)||0, boom, parseFloat(batter.ps_score)||0,
+    batter.batter_hand||'', batter.pitcher_hand||'',
+    parseInt(batter.days_rest ?? 1),
+    liveSlot(bid, batter.lineup_slot),
+    batter.pitcher_grade_label||'');
+
+  const ysProx    = Math.max(0, 1 - Math.abs(ys - cluster.mean) / 30);
+  const boomProx  = Math.max(0, 1 - Math.abs(boom - cluster.boomAvg) / 50);
+  const xwobaProx = Math.max(0, 1 - Math.abs(
+    (parseFloat(batter.season_xwoba)||0) - cluster.xwobaAvg) / 0.150);
+  const isoProx   = Math.max(0, 1 - Math.abs(
+    (parseFloat(batter.recent_iso)||0) - cluster.isoAvg) / 0.200);
+  const gradeLabel = (batter.pitcher_grade_label||'').toLowerCase();
+  const gradeMod   = gradeLabel.includes('elite') ? -0.10
+                   : gradeLabel.includes('tough') ? -0.05 : 0;
+
+  return { ys, boom, sig,
+    score: Math.max(0,
+      (ysProx*0.50 + boomProx*0.20 + xwobaProx*0.20 + isoProx*0.10 + gradeMod) * 100) };
+}
+
+// ── LiveThemesTab — self-contained, reads from module-level globals only ──────
 function LiveThemesTab() {
   const mono = "'DM Mono',monospace";
   const osw  = "'Oswald',sans-serif";
-  const [todaysHRs, setTodaysHRs] = useState([]);
-  const [lineupVer, setLineupVer] = useState(LINEUP_VERSION);
-  const seenHRIds = useRef(new Set());
 
+  const [todaysHRs, setTodaysHRs]   = useState([]);
+  const [lineupVer, setLineupVer]   = useState(LINEUP_VERSION);
+  const [finalVer,  setFinalVer]    = useState(0);
+  const seenBids = useRef(new Set()); // dedup HR log by batter_id
+
+  // Subscribe to lineup updates
   useEffect(() => {
     const unsub = subscribeLineup(v => setLineupVer(v));
     return unsub;
   }, []);
 
-  // Compute boom + yard for a pick row; prefers cached values written by SimLabView
-  function pickScores(b) {
-    const cache = DAILY_PICKS_CACHE[String(parseInt(b.batter_id)||0)];
-    const _sig  = cache?._trackerSig ?? (parseFloat(b.weighted_flag_score)||0) * 4.6;
-    const _boom = cache?._boom       ?? computeBoomScore(
-      _sig, b.zone_fit, b.recent_iso, parseFloat(b.sim_tb)||0, b.weighted_flag_score,
-      parseFloat(b.recent_barrel_spike||0), parseInt(b.recent_hr_count||0),
-      parseFloat(b.recent_batter_ahead_pct||0), !!b.hh_precursor,
-      parseFloat(b.primary_pitch_hr_rate||0),
-      parseInt(b.recent_barrels_3d)||0, parseInt(b.recent_hrs_3d)||0,
-      parseFloat(b.recent_avg_bat_speed)||0, parseInt(b.recent_pb_2d)||0,
-      b.la_locked, parseFloat(b.season_swstr_pct)||0, parseFloat(b.park_pull_fit)||0,
-      parseInt(b._zoneEdges||0), parseInt(b._zoneKPenalty||0),
-      (()=>{const ls=liveSlot(b.batter_id,b.lineup_slot);return ls>0&&(b.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(ls);})(),
-      parseFloat(b.season_xwoba)||0
-    );
-    const _ps     = cache?._ps       ?? (parseFloat(b.ps_score)||0);
-    const _pgLabel = cache?._pgLabel  ?? b.pitcher_grade_label ?? '';
-    const _yard   = cache?._yard     ?? computeYardScore(
-      _sig, parseFloat(b.gHR)||0, _boom, _ps,
-      b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1),
-      liveSlot(b.batter_id, b.lineup_slot), _pgLabel
-    );
-    return { _sig, _boom, _ps, _pgLabel, _yard };
-  }
+  // Watch FINAL_GAME_IDS.size every 30s so final-game dimming updates
+  useEffect(() => {
+    const id = setInterval(() => setFinalVer(FINAL_GAME_IDS.size), 30000);
+    return () => clearInterval(id);
+  }, []);
 
-  // Poll /api/homeruns every 60s; append newly-seen HRs to state
+  // Poll all today's games every 60s for HR events
   useEffect(() => {
     let active = true;
     const poll = async () => {
-      try {
-        const data = await fetchHRs(false);
-        if (!active) return;
-        const newHRs = [];
-        for (const h of data) {
-          const bid = parseInt(h.batterId||0);
-          if (!bid) continue;
-          const uid = `${h.gamePk||0}-${bid}`;
-          if (seenHRIds.current.has(uid)) continue;
-          seenHRIds.current.add(uid);
-          const pick = DAILY_PICKS_CACHE[String(bid)];
-          if (!pick) continue;
-          const { _yard, _boom } = pickScores(pick);
-          newHRs.push({
-            batter_id: bid,
-            batter_name: h.batterName || pick.batter || '',
-            yardScore: _yard,
-            boomScore: _boom,
-            xwoba: parseFloat(pick.season_xwoba)||0,
-            iso:   parseFloat(pick.recent_iso)||0,
-            game_id: String(h.gamePk||''),
-            timestamp: Date.now(),
-          });
+      const gamePks = LIVE_GAMES_CACHE.map(g => g.gamePk).filter(Boolean);
+      if (!gamePks.length) return;
+      for (const gPk of gamePks) {
+        try {
+          const batters = await fetchLiveBatters(gPk);
+          if (!active) return;
+          const newHRs = [];
+          for (const b of (batters || [])) {
+            if (!b.hr || b.hr < 1) continue;
+            const bid = String(b.id || '').trim();
+            if (!bid || bid === 'NaN' || seenBids.current.has(bid)) continue;
+            seenBids.current.add(bid);
+            const pick = DAILY_PICKS_CACHE[bid];
+            if (!pick) continue;
+            const sig  = parseFloat(pick.weighted_flag_score||0) * 4.6;
+            const boom = parseFloat(pick._boom) ||
+              computeBoomScore(sig, parseFloat(pick.zone_fit)||0,
+                parseFloat(pick.recent_iso)||0, parseFloat(pick.sim_tb)||0,
+                parseFloat(pick.weighted_flag_score)||0,
+                parseFloat(pick.recent_barrel_spike||0),
+                parseInt(pick.recent_hr_count||0),
+                parseFloat(pick.recent_batter_ahead_pct||0),
+                !!pick.hh_precursor, parseFloat(pick.primary_pitch_hr_rate||0),
+                parseInt(pick.recent_barrels_3d)||0, parseInt(pick.recent_hrs_3d)||0,
+                parseFloat(pick.recent_avg_bat_speed)||0, parseInt(pick.recent_pb_2d)||0,
+                pick.la_locked, parseFloat(pick.season_swstr_pct)||0,
+                parseFloat(pick.park_pull_fit)||0,
+                parseInt(pick._zoneEdges||0), parseInt(pick._zoneKPenalty||0),
+                (()=>{const ls=liveSlot(bid,pick.lineup_slot);return ls>0&&
+                  (pick.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(ls);})(),
+                parseFloat(pick.season_xwoba)||0);
+            const ys = computeYardScore(
+              sig, parseFloat(pick.gHR)||0, boom, parseFloat(pick.ps_score)||0,
+              pick.batter_hand||'', pick.pitcher_hand||'',
+              parseInt(pick.days_rest ?? 1),
+              liveSlot(bid, pick.lineup_slot),
+              pick.pitcher_grade_label||'');
+            newHRs.push({
+              batter_id: bid,
+              batter:    b.name || pick.batter || '',
+              yardScore: ys,
+              boomScore: boom,
+              xwoba:     parseFloat(pick.season_xwoba)||0,
+              iso:       parseFloat(pick.recent_iso)||0,
+              game_id:   String(gPk),
+            });
+          }
+          if (newHRs.length > 0) setTodaysHRs(prev => [...prev, ...newHRs]);
+        } catch(e) {
+          // silent — game may not be live yet
         }
-        if (newHRs.length > 0) setTodaysHRs(prev => [...prev, ...newHRs]);
-      } catch(e) { console.warn('[LiveThemes]', e.message); }
+      }
     };
     poll();
     const id = setInterval(poll, 60000);
     return () => { active = false; clearInterval(id); };
-  }, []); // module-level globals only; seenHRIds is a ref
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ±7 Yard Score window clustering; top 3 clusters by member count
+  // Cluster detection — only when 3+ HRs exist
   const clusters = useMemo(() => {
     if (todaysHRs.length < 3) return [];
     const sorted = [...todaysHRs].sort((a, b) => a.yardScore - b.yardScore);
@@ -7312,123 +7385,106 @@ function LiveThemesTab() {
       else { groups.push(cur); cur = [sorted[i]]; }
     }
     groups.push(cur);
-    return groups.sort((a, b) => b.length - a.length).slice(0, 3).map(members => {
-      const n = members.length;
-      return {
+    const avg = arr => arr.reduce((s,x)=>s+x,0) / arr.length;
+    return groups
+      .filter(g => g.length >= 3) // only clusters with 3+ HR members
+      .sort((a, b) => b.length - a.length)
+      .slice(0, 3)
+      .map(members => ({
         members,
-        clusterMean:     members.reduce((s,m)=>s+m.yardScore, 0) / n,
-        clusterBoomAvg:  members.reduce((s,m)=>s+m.boomScore, 0) / n,
-        clusterXwobaAvg: members.reduce((s,m)=>s+m.xwoba,     0) / n,
-        clusterIsoAvg:   members.reduce((s,m)=>s+m.iso,       0) / n,
-      };
-    });
+        mean:     avg(members.map(m => m.yardScore)),
+        xwobaAvg: avg(members.map(m => m.xwoba)),
+        isoAvg:   avg(members.map(m => m.iso)),
+        boomAvg:  avg(members.map(m => m.boomScore)),
+      }));
   }, [todaysHRs]);
 
-  // Confirmed batters (excludes already-HR'd); re-derives on lineup update
-  const confirmedPool = useMemo(() => {
-    const goneBids = new Set(todaysHRs.map(h => h.batter_id));
-    return Object.values(DAILY_PICKS_CACHE).filter(b => {
-      const bid = parseInt(b.batter_id||0);
-      if (!bid || goneBids.has(bid)) return false;
-      const fromCSV  = b.lineup_confirmed === true || b.lineup_confirmed === 'True' || b.lineup_confirmed === '1';
-      const fromLive = LINEUP_STATUS[bid]?.status === 'confirmed';
-      return fromCSV || fromLive;
-    }).map(b => ({ ...b, ...pickScores(b) }));
-  }, [todaysHRs, lineupVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Confirmed pool — re-evaluates on lineup or final-game version changes
+  const hrBidSet = useMemo(
+    () => new Set(todaysHRs.map(h => h.batter_id)),
+    [todaysHRs]
+  );
 
-  // Theme Match Score per confirmed batter per cluster; tier = rank percentile
+  const confirmedPool = useMemo(() => {
+    return Object.values(DAILY_PICKS_CACHE).filter(r => {
+      const bid = String(r.batter_id||'').trim();
+      if (!bid || bid === 'NaN') return false;
+      if (LINEUP_STATUS[bid]?.status !== 'confirmed') return false;
+      if (hrBidSet.has(bid)) return false;
+      return true;
+    });
+  }, [lineupVer, finalVer, hrBidSet]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Per-cluster scored + tiered rows
   const clusterTables = useMemo(() => {
     if (!clusters.length || !confirmedPool.length) return [];
     return clusters.map(cluster => {
-      const { clusterMean, clusterBoomAvg, clusterXwobaAvg, clusterIsoAvg } = cluster;
       const scored = confirmedPool.map(b => {
-        const ysProx   = Math.max(0, 1 - Math.abs((b._yard||0) - clusterMean)     / 30);
-        const boomProx = Math.max(0, 1 - Math.abs((b._boom||0) - clusterBoomAvg)  / 50);
-        const xwProx   = Math.max(0, 1 - Math.abs((parseFloat(b.season_xwoba)||0) - clusterXwobaAvg) / 0.150);
-        const isoProx  = Math.max(0, 1 - Math.abs((parseFloat(b.recent_iso)||0)   - clusterIsoAvg)   / 0.200);
-        const pg = b._pgLabel || '';
-        const gradeBonus = pg.includes('‼️')||pg.toLowerCase().includes('elite') ? -0.10
-                         : pg.includes('⚠️')||pg.toLowerCase().includes('tough') ? -0.05 : 0;
-        const themeMatchScore = (ysProx*0.50 + boomProx*0.20 + xwProx*0.20 + isoProx*0.10 + gradeBonus) * 100;
-        return { ...b, themeMatchScore };
-      }).sort((a, b) => b.themeMatchScore - a.themeMatchScore);
-      const total = scored.length;
-      const t1Cut = Math.max(1, Math.ceil(total * 0.10));
-      const t2Cut = Math.ceil(total * 0.30);
-      const t3Cut = Math.ceil(total * 0.60);
-      const candidates = scored.slice(0, t3Cut).map((b, i) => ({
-        ...b, tier: i < t1Cut ? 1 : i < t2Cut ? 2 : 3,
+        const bid = String(b.batter_id||'').trim();
+        const { ys, boom, sig, score } = computeThemeMatchScore(b, cluster, bid);
+        return { ...b, _ys: ys, _boom: boom, _sig: sig, _themeScore: score };
+      }).sort((a, b) => b._themeScore - a._themeScore);
+
+      const n    = scored.length;
+      const t1   = Math.max(1, Math.ceil(n * 0.10));
+      const t2   = Math.ceil(n * 0.30);
+      const t3   = Math.ceil(n * 0.60);
+      const rows = scored.slice(0, t3).map((b, i) => ({
+        ...b,
+        _themeTier: i < t1 ? 1 : i < t2 ? 2 : 3,
+        _yard: b._ys,
       }));
-      return { ...cluster, candidates };
+      return { ...cluster, rows };
     });
   }, [clusters, confirmedPool]);
 
-  const isActive = todaysHRs.length >= 3 && clusters.length > 0;
+  const activeClusterCount = clusterTables.length;
+  const isActive = activeClusterCount > 0;
 
   return (
     <div>
-      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16}}>
-        <span style={{fontFamily:osw,fontWeight:800,fontSize:18,color:'var(--text)',letterSpacing:.5}}>
-          🔥 Live Themes
-        </span>
-        {todaysHRs.length > 0 && (
-          <span style={{fontFamily:mono,fontSize:10,padding:'2px 9px',borderRadius:6,
-            color:'var(--accent)',background:'rgba(232,65,26,.10)',border:'1px solid rgba(232,65,26,.28)'}}>
-            {todaysHRs.length} HR{todaysHRs.length!==1?'s':''} today
-          </span>
-        )}
-        {isActive && <span style={{width:7,height:7,borderRadius:'50%',background:'#ff3030',
-          boxShadow:'0 0 6px #ff3030',display:'inline-block',flexShrink:0}} title="Themes live"/>}
-      </div>
-
       {!isActive ? (
-        <div style={{textAlign:'center',padding:'48px 20px',borderRadius:10,
-          border:'1px dashed rgba(255,255,255,.10)',background:'rgba(255,255,255,.02)'}}>
+        <div style={{textAlign:'center',padding:'40px 20px',color:'var(--muted)'}}>
           <div style={{fontSize:32,marginBottom:12}}>🔥</div>
-          <div style={{fontFamily:osw,fontWeight:700,fontSize:16,color:'var(--text)',marginBottom:8}}>
-            Themes activate when 3+ home runs land today
+          <div style={{fontFamily:osw,fontSize:16,letterSpacing:1,
+            textTransform:'uppercase',marginBottom:8}}>
+            Live Themes
           </div>
-          {todaysHRs.length > 0 && (
-            <div style={{fontFamily:mono,fontSize:11,color:'var(--accent)',marginBottom:10}}>
-              {todaysHRs.length} of 3 HRs so far today{todaysHRs.length === 2 ? ' — almost!' : ''}
-            </div>
-          )}
-          <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',letterSpacing:.5}}>
-            Watching live games · Updates every 60s
+          <div style={{fontFamily:mono,fontSize:11,marginBottom:16}}>
+            Themes activate when 3+ home runs land today.
+          </div>
+          <div style={{fontFamily:mono,fontSize:13,color:'var(--accent)'}}>
+            {todaysHRs.length} HR{todaysHRs.length !== 1 ? 's' : ''} so far today
           </div>
         </div>
       ) : (
         <div>
-          {clusterTables.map((cluster, ci) => {
-            const { members, clusterMean, clusterXwobaAvg, clusterIsoAvg, clusterBoomAvg, candidates } = cluster;
-            const hrNames = members.map(m => m.batter_name).filter(Boolean).join(', ');
-            const xwStr = '.' + (clusterXwobaAvg*1000).toFixed(0).padStart(3,'0');
-            return (
-              <div key={ci} style={{marginBottom:24}}>
-                <div style={{background:'var(--surface2)',borderLeft:'3px solid var(--accent)',
-                  borderRadius:'0 8px 8px 0',padding:'10px 14px',marginBottom:8}}>
-                  <div style={{fontFamily:osw,fontWeight:800,fontSize:13,color:'var(--accent)',
-                    letterSpacing:.4,marginBottom:4}}>
-                    {`CLUSTER ${ci+1}: YS ~${Math.round(clusterMean)} · ${members.length} HR${members.length!==1?'s':''} landed · xwOBA avg ${xwStr}`}
-                  </div>
-                  <div style={{fontFamily:mono,fontSize:9,color:'var(--text)',marginBottom:3}}>
-                    <span style={{color:'var(--muted)'}}>Batters: </span>{hrNames||'—'}
-                  </div>
-                  <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',display:'flex',gap:14,flexWrap:'wrap'}}>
-                    <span>Avg YS: <strong style={{color:'var(--text)'}}>{clusterMean.toFixed(1)}</strong></span>
-                    <span>Avg Boom: <strong style={{color:'var(--text)'}}>{clusterBoomAvg.toFixed(0)}</strong></span>
-                    <span>Avg ISO: <strong style={{color:'var(--text)'}}>{'.'+(clusterIsoAvg*1000).toFixed(0).padStart(3,'0')}</strong></span>
-                    <span>Candidates: <strong style={{color:'var(--text)'}}>{candidates.length}</strong></span>
-                  </div>
-                </div>
-                <ThemeMatchTable candidates={candidates}/>
-              </div>
-            );
-          })}
-          <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',textAlign:'center',
-            marginTop:16,padding:'8px 0',borderTop:'1px solid rgba(255,255,255,.06)'}}>
-            T1 = top 10% match · T2 = 11–30% · T3 = 31–60% · Confirmed batters only
+          <div style={{fontFamily:osw,fontSize:13,letterSpacing:.8,
+            textTransform:'uppercase',color:'var(--muted)',marginBottom:16}}>
+            🔥 Live Themes — {todaysHRs.length} HRs landed today
           </div>
+          {clusterTables.map((cluster, ci) => (
+            <div key={ci} style={{marginBottom:24}}>
+              <div style={{background:'var(--surface2)',borderLeft:'3px solid var(--accent)',
+                borderRadius:8,padding:'10px 14px',marginBottom:8}}>
+                <div style={{fontFamily:osw,fontWeight:700,fontSize:13,letterSpacing:.8,
+                  textTransform:'uppercase',color:'var(--text)',marginBottom:4}}>
+                  YS ~{Math.round(cluster.mean)} — {cluster.members.length} HRs landed
+                </div>
+                <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)',marginBottom:4}}>
+                  {cluster.members.map(m=>m.batter).join(' · ')}
+                </div>
+                <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)',
+                  display:'flex',gap:16,flexWrap:'wrap'}}>
+                  <span>Avg YS {cluster.mean.toFixed(1)}</span>
+                  <span>Avg Boom {cluster.boomAvg.toFixed(0)}</span>
+                  <span>Avg xwOBA {cluster.xwobaAvg.toFixed(3)}</span>
+                  <span>Avg ISO {cluster.isoAvg.toFixed(3)}</span>
+                </div>
+              </div>
+              <ThemeMatchTable rows={cluster.rows}/>
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -7549,12 +7605,12 @@ function LiveTab() {
       ['🔴 Live indicator', "A red dot next to a game means it's currently in progress. Scores update automatically."],
       ['Player tap', "Tap any batter name to open their stat card with recent performance data and HR history."],
     ]} onClose={()=>setShowLiveHelp(false)}/>}
-    <div style={{display:'flex',gap:5,marginBottom:12,alignItems:'center'}}>
-      <div style={{display:'flex',gap:5,padding:'3px',background:'var(--surface)',borderRadius:8,border:'1px solid var(--border)',width:'fit-content'}}>
-      {[['gameday','📺 Gameday'],['battracking','🥎 Bat Tracking'],['simlive','⚡ Live Sim'],['games','🎮 Live Games'],['lineups','📋 Lineups'],['themes','🔥 Themes']].map(([key,label])=>(
+    <div style={{display:'flex',gap:5,marginBottom:12,alignItems:'center',flexWrap:'wrap',rowGap:6}}>
+      <div style={{display:'flex',gap:4,padding:'3px',background:'var(--surface)',borderRadius:8,border:'1px solid var(--border)',flexWrap:'wrap',rowGap:4}}>
+      {[['gameday','Gameday'],['battracking','Bat Tracking'],['simlive','Live Sim'],['games','Live Games'],['lineups','Lineups'],['themes','Themes']].map(([key,label])=>(
         <button key={key} onClick={()=>setLiveView(key)}
-          style={{padding:'6px 14px',borderRadius:6,cursor:'pointer',border:'none',
-            fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,letterSpacing:.8,
+          style={{padding:'5px 9px',borderRadius:6,cursor:'pointer',border:'none',
+            fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,letterSpacing:.5,
             textTransform:'uppercase',transition:'all .15s',
             background:liveView===key?'var(--accent)':'transparent',
             color:liveView===key?'white':'var(--muted)'}}>
@@ -12756,393 +12812,6 @@ function MLBScoresTab() {
   </div>;
 }
 
-// ── ODDS CALCULATOR SLIDEOUT ──────────────────────────────────────────────────
-const CALC_CURRENCIES = ['USD','EUR','GBP','CAD','AUD','JPY'];
-const CALC_CCY_SYM = {USD:'$',EUR:'€',GBP:'£',CAD:'CA$',AUD:'A$',JPY:'¥'};
-function calcFmtCcy(n, ccy) {
-  if (n == null || isNaN(n)) return '—';
-  return (CALC_CCY_SYM[ccy] || '$') + Number(n).toLocaleString('en-US',
-    {minimumFractionDigits:2, maximumFractionDigits:2});
-}
-function calcAmToDecimal(a) {
-  return a > 0 ? (a / 100) + 1 : (100 / Math.abs(a)) + 1;
-}
-function calcDecToAmerican(d) {
-  return d >= 2 ? Math.round((d - 1) * 100) : Math.round(-100 / (d - 1));
-}
-function calcParseOdds(raw) {
-  const s = (raw || '').trim();
-  if (!s) return null;
-  if (s.startsWith('+') || s.startsWith('-')) {
-    const a = parseFloat(s);
-    if (isNaN(a) || Math.abs(a) < 100) return null;
-    return { american: a, decimal: +calcAmToDecimal(a).toFixed(4) };
-  }
-  if (s.includes('.')) {
-    const d = parseFloat(s);
-    if (isNaN(d) || d <= 1) return null;
-    return { american: calcDecToAmerican(d), decimal: d };
-  }
-  const n = parseFloat(s);
-  if (isNaN(n)) return null;
-  if (n >= 100) return { american: n, decimal: +calcAmToDecimal(n).toFixed(4) };
-  if (n > 1)    return { american: calcDecToAmerican(n), decimal: n };
-  return null;
-}
-function OddsCalculatorSlideout({ onClose }) {
-  const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
-  const [mode,      setMode]      = useState('manual');  // 'manual' | 'suggested'
-  const [oddsRaw,   setOddsRaw]   = useState('');
-  const [bankroll,  setBankroll]  = useState('');
-  const [unitSize,  setUnitSize]  = useState('');
-  const [unitRate,  setUnitRate]  = useState(3.0);
-  const [sugFrac,   setSugFrac]   = useState('');        // unit fraction field (suggested mode)
-  const [showScale, setShowScale] = useState(false);
-  const [currency,  setCurrency]  = useState('USD');
-  const [result,    setResult]    = useState(null);
-
-  const parsed  = calcParseOdds(oddsRaw);
-  const sym     = CALC_CCY_SYM[currency] || '$';
-  const rateNum = parseFloat(unitRate) || 3;
-
-  // Method B: suggested fraction from odds
-  const computeSugFrac = p => {
-    if (!p) return 1;
-    const am = p.american;
-    const raw = am > 0 ? 100 / am : Math.min(1.5, Math.abs(am) / 100);
-    return Math.max(raw, 0.05);
-  };
-  const fmtFrac = n => parseFloat(n.toFixed(3)).toString();
-
-  // ── Bankroll / unit size handlers (Manual mode — unchanged) ──
-  const handleBankroll = v => {
-    setBankroll(v);
-    const b = parseFloat(v), r = rateNum / 100;
-    setUnitSize((!isNaN(b) && b > 0) ? (b * r).toFixed(2) : '');
-    setResult(null);
-  };
-  const handleUnitSize = v => {
-    setUnitSize(v);
-    const u = parseFloat(v), r = rateNum / 100;
-    setBankroll((!isNaN(u) && u > 0) ? (u / r).toFixed(2) : '');
-    setResult(null);
-  };
-  const handleUnitRate = v => {
-    setUnitRate(v);
-    const r = (parseFloat(v) || 3) / 100;
-    const b = parseFloat(bankroll), u = parseFloat(unitSize);
-    if (!isNaN(b) && b > 0) setUnitSize((b * r).toFixed(2));
-    else if (!isNaN(u) && u > 0) setBankroll((u / r).toFixed(2));
-    setResult(null);
-  };
-
-  // ── Odds change: auto-fill sugFrac in suggested mode ──
-  const handleOddsChange = v => {
-    setOddsRaw(v);
-    setResult(null);
-    if (mode === 'suggested') {
-      const p = calcParseOdds(v);
-      if (p) setSugFrac(fmtFrac(computeSugFrac(p)));
-    }
-  };
-
-  // ── Mode switch: auto-fill if odds already present ──
-  const handleModeSwitch = m => {
-    setMode(m);
-    setResult(null);
-    if (m === 'suggested' && parsed) setSugFrac(fmtFrac(computeSugFrac(parsed)));
-  };
-
-  // ── Risk descriptor ──
-  const riskDesc = frac => {
-    if (frac >= 1.0)   return 'Full unit (Favorite)';
-    if (frac >= 0.75)  return 'Standard play';
-    if (frac >= 0.50)  return 'Half unit';
-    if (frac >= 0.25)  return 'Quarter unit';
-    if (frac >= 0.125) return 'Micro-fractional (Longshot)';
-    return 'Minimum stake (Extreme longshot)';
-  };
-
-  const canCalc = !!(parsed && parsed.decimal > 1 && parseFloat(unitSize) > 0);
-
-  const calculate = () => {
-    if (!canCalc) return;
-    const dec           = parsed.decimal;
-    const fullUnitValue = parseFloat(unitSize);
-    let unitFrac;
-    if (mode === 'suggested') {
-      unitFrac = Math.max(parseFloat(sugFrac) || computeSugFrac(parsed), 0.05);
-    } else {
-      unitFrac = 1 / (dec - 1);
-    }
-    const estStake  = Math.max(unitFrac * fullUnitValue, 0.10);
-    const potReturn = estStake * dec;
-    setResult({ fullUnitValue, unitFrac, estStake, potReturn,
-                impliedProb: (1 / dec) * 100,
-                profit: potReturn - estStake,
-                desc: riskDesc(unitFrac) });
-  };
-
-  const inpStyle = {flex:1,background:'var(--surface2)',border:'1px solid var(--border)',
-    borderRadius:6,padding:'7px 10px',fontFamily:mono,fontSize:13,color:'var(--text)',
-    outline:'none',minWidth:0,WebkitAppearance:'none'};
-  const lblStyle = {fontSize:9,color:'var(--muted)',fontFamily:mono,
-    textTransform:'uppercase',letterSpacing:1,marginBottom:6,display:'block'};
-
-  const SCALE_ROWS = [
-    ['-150 or heavier', '1.0u – 1.5u'],
-    ['-110 to +110',    '1.0u (baseline)'],
-    ['+115 to +175',    '~0.75u'],
-    ['+180 to +275',    '~0.50u'],
-    ['+300 to +490',    '~0.25u'],
-    ['+500 to +900',    '~0.125u'],
-    ['+1000 or longer', '0.05u (floor)'],
-  ];
-
-  return <>
-    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.55)',zIndex:900}}/>
-    <div style={{position:'fixed',right:0,top:0,bottom:0,width:'min(380px,100vw)',
-      background:'var(--surface)',borderLeft:'1px solid var(--border)',zIndex:901,
-      display:'flex',flexDirection:'column',boxShadow:'-4px 0 24px rgba(0,0,0,.5)'}}>
-      {/* ── Header ── */}
-      <div style={{padding:'14px 18px',borderBottom:'1px solid var(--border)',
-        display:'flex',alignItems:'center',gap:8,flexShrink:0,background:'var(--surface2)'}}>
-        <span style={{fontFamily:osw,fontWeight:700,fontSize:15,letterSpacing:.5,
-          color:'var(--text)'}}>🧮 Odds Calculator</span>
-        <button onClick={onClose} style={{marginLeft:'auto',background:'none',
-          border:'1px solid var(--border)',borderRadius:6,color:'var(--muted)',
-          cursor:'pointer',padding:'3px 9px',fontFamily:mono,fontSize:11}}>✕</button>
-      </div>
-      <div style={{flex:1,overflowY:'auto',padding:'16px 18px'}}>
-        {/* ── Mode Toggle ── */}
-        <div style={{display:'flex',gap:3,marginBottom:18,background:'var(--surface2)',
-          borderRadius:8,padding:3,border:'1px solid var(--border)'}}>
-          {[['manual','Manual'],['suggested','Suggested']].map(([m, label]) => (
-            <button key={m} onClick={()=>handleModeSwitch(m)}
-              style={{flex:1,padding:'5px 0',borderRadius:6,border:'none',cursor:'pointer',
-                fontFamily:mono,fontSize:10,fontWeight:mode===m?700:400,letterSpacing:.5,
-                textTransform:'uppercase',
-                background:mode===m?'var(--accent)':'transparent',
-                color:mode===m?'white':'var(--muted)',transition:'all .15s'}}>
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {/* ── Odds ── */}
-        <div style={{marginBottom:18}}>
-          <span style={lblStyle}>Odds Input</span>
-          <input value={oddsRaw} onChange={e=>handleOddsChange(e.target.value)}
-            placeholder="+180  ·  −150  ·  2.80"
-            style={{width:'100%',boxSizing:'border-box',background:'var(--surface2)',
-              border:'1px solid var(--border)',borderRadius:6,padding:'9px 12px',
-              fontFamily:mono,fontSize:14,color:'var(--text)',outline:'none'}}/>
-          <div style={{marginTop:8,minHeight:34}}>
-            {parsed ? (
-              <div style={{display:'flex',gap:8}}>
-                <div style={{flex:1,background:'rgba(56,184,242,.08)',
-                  border:'1px solid rgba(56,184,242,.25)',borderRadius:6,
-                  padding:'5px 10px',textAlign:'center'}}>
-                  <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)',display:'block'}}>AMERICAN</span>
-                  <span style={{fontFamily:osw,fontWeight:700,fontSize:15,color:'#38b8f2'}}>
-                    {parsed.american >= 0 ? '+' : ''}{parsed.american}
-                  </span>
-                </div>
-                <div style={{flex:1,background:'rgba(245,166,35,.08)',
-                  border:'1px solid rgba(245,166,35,.25)',borderRadius:6,
-                  padding:'5px 10px',textAlign:'center'}}>
-                  <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)',display:'block'}}>DECIMAL</span>
-                  <span style={{fontFamily:osw,fontWeight:700,fontSize:15,color:'#f5a623'}}>
-                    {parsed.decimal.toFixed(2)}
-                  </span>
-                </div>
-              </div>
-            ) : oddsRaw.trim() ? (
-              <div style={{fontFamily:mono,fontSize:10,color:'var(--accent)',paddingTop:4}}>
-                Enter valid odds: +180, −150, or 2.80
-              </div>
-            ) : null}
-          </div>
-        </div>
-        <div style={{height:1,background:'var(--border)',margin:'4px 0 18px'}}/>
-
-        {/* ── Bankroll & Unit ── */}
-        <div style={{marginBottom:18}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-            <span style={lblStyle}>Bankroll &amp; Unit Size</span>
-            <select value={currency} onChange={e=>setCurrency(e.target.value)}
-              style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:5,
-                padding:'2px 6px',fontFamily:mono,fontSize:10,color:'var(--text)',
-                outline:'none',cursor:'pointer'}}>
-              {CALC_CURRENCIES.map(c=><option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-          <div style={{marginBottom:10}}>
-            <span style={{fontSize:9,color:'var(--muted)',fontFamily:mono,marginBottom:4,display:'block'}}>
-              Bankroll
-            </span>
-            <div style={{display:'flex',alignItems:'center',gap:6}}>
-              <span style={{fontFamily:mono,fontSize:12,color:'var(--muted)',flexShrink:0}}>{sym}</span>
-              <input type="number" min="0" value={bankroll}
-                onChange={e=>handleBankroll(e.target.value)}
-                placeholder="e.g. 1000" style={inpStyle}/>
-            </div>
-          </div>
-          <div>
-            <div style={{display:'flex',alignItems:'center',gap:5,marginBottom:4}}>
-              <span style={{fontSize:9,color:'var(--muted)',fontFamily:mono}}>Unit Size —</span>
-              <input type="number" min="0.1" max="100" step="0.5" value={unitRate}
-                onChange={e=>handleUnitRate(e.target.value)}
-                style={{width:46,background:'var(--surface)',border:'1px solid var(--border)',
-                  borderRadius:4,padding:'1px 5px',fontFamily:mono,fontSize:9,
-                  color:'var(--text)',outline:'none',textAlign:'center',WebkitAppearance:'none'}}/>
-              <span style={{fontSize:9,color:'var(--muted)',fontFamily:mono}}>% of bankroll</span>
-            </div>
-            <div style={{display:'flex',alignItems:'center',gap:6}}>
-              <span style={{fontFamily:mono,fontSize:12,color:'var(--muted)',flexShrink:0}}>{sym}</span>
-              <input type="number" min="0" value={unitSize}
-                onChange={e=>handleUnitSize(e.target.value)}
-                placeholder="e.g. 30" style={inpStyle}/>
-            </div>
-          </div>
-          <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginTop:7,lineHeight:1.6}}>
-            Editing either field recalculates the other at the selected % rate.
-          </div>
-        </div>
-
-        {/* ── Suggested mode: unit fraction + scale reference ── */}
-        {mode === 'suggested' && (
-          <>
-            <div style={{height:1,background:'var(--border)',margin:'4px 0 18px'}}/>
-            <div style={{marginBottom:10}}>
-              <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:6,flexWrap:'wrap'}}>
-                <span style={{fontSize:9,color:'var(--muted)',fontFamily:mono,
-                  textTransform:'uppercase',letterSpacing:1}}>Unit Fraction</span>
-                {parsed && (
-                  <span style={{fontSize:8,color:'#f5a623',fontFamily:mono,
-                    background:'rgba(245,166,35,.10)',borderRadius:4,padding:'1px 6px',
-                    border:'1px solid rgba(245,166,35,.25)'}}>
-                    Auto-suggested · edit to override
-                  </span>
-                )}
-              </div>
-              <div style={{display:'flex',alignItems:'center',gap:8}}>
-                <input type="number" min="0.05" max="2" step="0.05" value={sugFrac}
-                  onChange={e=>{setSugFrac(e.target.value);setResult(null);}}
-                  placeholder="e.g. 0.50"
-                  style={{width:90,background:'var(--surface2)',border:'1px solid var(--border)',
-                    borderRadius:6,padding:'7px 10px',fontFamily:mono,fontSize:13,
-                    color:'var(--text)',outline:'none',WebkitAppearance:'none'}}/>
-                <span style={{fontFamily:osw,fontWeight:700,fontSize:13,color:'var(--muted)'}}>u</span>
-                {sugFrac && parseFloat(unitSize) > 0 && !isNaN(parseFloat(sugFrac)) && (
-                  <span style={{fontFamily:mono,fontSize:10,color:'var(--muted)'}}>
-                    = {calcFmtCcy((parseFloat(sugFrac) || 0) * parseFloat(unitSize), currency)}
-                  </span>
-                )}
-              </div>
-            </div>
-            {/* ── Scale reference table ── */}
-            <div style={{marginBottom:18}}>
-              <button onClick={()=>setShowScale(s=>!s)}
-                style={{background:'none',border:'none',cursor:'pointer',padding:'4px 0',
-                  fontFamily:mono,fontSize:9,color:'var(--muted)',display:'flex',
-                  alignItems:'center',gap:4,letterSpacing:.5}}>
-                <span style={{textTransform:'uppercase'}}>Show scale</span>
-                <span style={{fontSize:8,display:'inline-block',transition:'transform .15s',
-                  transform:showScale?'rotate(180deg)':'none'}}>▾</span>
-              </button>
-              {showScale && (
-                <div style={{marginTop:6,border:'1px solid var(--border)',borderRadius:6,overflow:'hidden'}}>
-                  <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',padding:'5px 10px',
-                    background:'rgba(245,166,35,.06)',borderBottom:'1px solid var(--border)',
-                    letterSpacing:.3}}>
-                    Reference only — calculator uses continuous formula
-                  </div>
-                  <table style={{width:'100%',borderCollapse:'collapse',fontFamily:mono,fontSize:9}}>
-                    <thead>
-                      <tr style={{background:'var(--surface2)'}}>
-                        <th style={{padding:'5px 10px',textAlign:'left',color:'var(--muted)',
-                          fontWeight:600,borderBottom:'1px solid var(--border)'}}>Odds Range</th>
-                        <th style={{padding:'5px 10px',textAlign:'right',color:'var(--muted)',
-                          fontWeight:600,borderBottom:'1px solid var(--border)'}}>Suggested Unit</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {SCALE_ROWS.map(([range, unit], i) => (
-                        <tr key={i} style={{
-                          borderBottom:i<SCALE_ROWS.length-1?'1px solid rgba(255,255,255,.04)':'none',
-                          background:i%2===0?'transparent':'rgba(255,255,255,.02)'}}>
-                          <td style={{padding:'5px 10px',color:'var(--text)'}}>{range}</td>
-                          <td style={{padding:'5px 10px',textAlign:'right',
-                            color:'#f5a623',fontWeight:600}}>{unit}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </>
-        )}
-
-        <div style={{height:1,background:'var(--border)',margin:'4px 0 18px'}}/>
-        {/* ── Calculate ── */}
-        <button onClick={calculate} disabled={!canCalc}
-          style={{width:'100%',padding:'10px',borderRadius:8,cursor:canCalc?'pointer':'not-allowed',
-            background:canCalc?'var(--accent)':'var(--surface2)',
-            border:canCalc?'none':'1px solid var(--border)',
-            color:canCalc?'white':'var(--muted)',fontFamily:osw,fontWeight:700,
-            fontSize:14,letterSpacing:.5,opacity:canCalc?1:.45,transition:'opacity .15s'}}>
-          Calculate
-        </button>
-
-        {/* ── Results ── */}
-        {result && (
-          <div style={{marginTop:16,background:'var(--surface2)',borderRadius:8,
-            border:'1px solid var(--border)',padding:'14px 16px'}}>
-            <div style={{fontFamily:osw,fontWeight:700,fontSize:11,color:'var(--muted)',
-              textTransform:'uppercase',letterSpacing:1,marginBottom:12}}>Results</div>
-            {[
-              ['Implied Probability',
-               result.impliedProb.toFixed(1)+'%',
-               'var(--muted)', 14],
-              ['Unit Fraction',
-               `${parseFloat(result.unitFrac.toFixed(3))}u · ${calcFmtCcy(result.fullUnitValue, currency)} full unit`,
-               '#f5a623', 11],
-              ['Est. Stake',
-               calcFmtCcy(result.estStake, currency),
-               '#38f282', 14],
-              ['Total Return',
-               calcFmtCcy(result.potReturn, currency),
-               '#38b8f2', 14],
-              ['Profit on Win',
-               calcFmtCcy(result.profit, currency),
-               '#38f282', 14],
-            ].map(([lbl, val, clr, fsz]) => (
-              <div key={lbl} style={{display:'flex',justifyContent:'space-between',
-                alignItems:'baseline',padding:'6px 0',
-                borderBottom:'1px solid rgba(255,255,255,.05)'}}>
-                <span style={{fontFamily:mono,fontSize:10,color:'var(--muted)'}}>{lbl}</span>
-                <span style={{fontFamily:osw,fontWeight:700,fontSize:fsz,color:clr}}>{val}</span>
-              </div>
-            ))}
-            {/* Risk descriptor */}
-            <div style={{marginTop:12,padding:'7px 10px',borderRadius:6,
-              background:'rgba(56,242,130,.06)',border:'1px solid rgba(56,242,130,.18)'}}>
-              <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)',textTransform:'uppercase',
-                letterSpacing:.5}}>Risk level: </span>
-              <span style={{fontFamily:osw,fontWeight:700,fontSize:12,color:'#38f282'}}>{result.desc}</span>
-            </div>
-            <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginTop:8,lineHeight:1.6}}>
-              Floor: {sym}0.10.{mode==='manual'?' Sized to return 1 unit profit.':' Fraction auto-suggested from odds.'}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  </>;
-}
-
 function YardPicksFeedTab() {
   const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
   const [picks,    setPicks]    = useState([]);
@@ -13152,7 +12821,6 @@ function YardPicksFeedTab() {
   const [hasMore,  setHasMore]  = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [showCalc,   setShowCalc]   = useState(false);
 
   const fetchPicks = async (startCursor) => {
     try {
@@ -13194,12 +12862,6 @@ function YardPicksFeedTab() {
       <div style={{display:'flex',alignItems:'center',gap:8,padding:'4px 4px 14px'}}>
         <span style={{fontSize:18}}>🧾</span>
         <span style={{fontFamily:osw,fontWeight:800,fontSize:16,color:'var(--text)'}}>Yard Picks</span>
-        <button onClick={()=>setShowCalc(c=>!c)} data-tip="Odds Calculator"
-          style={{padding:'4px 8px',borderRadius:6,fontSize:14,cursor:'pointer',
-            border:'1px solid var(--border)',lineHeight:1,
-            background:showCalc?'var(--surface2)':'transparent',color:'var(--text)'}}>
-          🧮
-        </button>
         <button onClick={refresh} disabled={refreshing} data-tip="Refresh"
           style={{marginLeft:'auto',padding:'4px 10px',borderRadius:6,fontSize:11,
             cursor:refreshing?'default':'pointer',border:'1px solid var(--border)',
@@ -13272,7 +12934,6 @@ function YardPicksFeedTab() {
           </button>
         </div>
       )}
-      {showCalc && <OddsCalculatorSlideout onClose={()=>setShowCalc(false)}/>}
     </div>
   );
 }
@@ -14414,16 +14075,6 @@ function computeYardScoreV2(sig, ghr, boom, ps,
 function computeYardScoreYV2(sig, ghr, ghr_yv2, boom, ps,
   batterHand, pitcherHand, daysRest, lineupSlot, pitcherGradeLabel) {
   return computeYardScore(sig, ghr_yv2, boom, ps,
-    batterHand, pitcherHand, daysRest, lineupSlot, pitcherGradeLabel);
-}
-
-// ── Yard Score V2PS — uses ps_score_v2 (corrected Phase 3 weather inputs) from engine output ──
-// NOT wired into UI. For backtesting Phase 3 fix vs constant 5/25 pts baseline.
-// See CLAUDE.md "Phase 3 + Weather Pipeline — Full Fix Plan" for methodology.
-// Only difference from computeYardScore: ps_v2 substituted for ps.
-function computeYardScoreV2PS(sig, ghr, boom, ps, ps_v2,
-  batterHand, pitcherHand, daysRest, lineupSlot, pitcherGradeLabel) {
-  return computeYardScore(sig, ghr, boom, ps_v2,
     batterHand, pitcherHand, daysRest, lineupSlot, pitcherGradeLabel);
 }
 
@@ -15603,7 +15254,6 @@ function SimLabView({ data }) {
                     { label: 'Pos',      key: null, title: "Confirmed lineup position" },
                     { label: (<img src="/icon-192.png" alt="Yard" style={{width:15,height:15,borderRadius:2,objectFit:'cover',verticalAlign:'middle',display:'inline-block'}}/>), key: '_yard', colKey: '_yard' },
                     { label: 'YV2', key: '_yard_yv2', colKey: '_yard_yv2', title: 'Yard Score YV2 — experimental shrinkage blend. Not the live score.' },
-                    { label: 'PS V2', key: '_yard_psv2', colKey: '_yard_psv2', title: 'Yard Score PS V2 — corrected Phase 3 weather inputs. Not the live score.' },
                     { label: '⚡',       key: '_sig', colKey:'_sig' },
                     { label: 'Form',     key: null },
                     { label: 'HR⬆',      key: null },
@@ -15840,22 +15490,6 @@ function SimLabView({ data }) {
                               background:'rgba(56,184,242,.10)',color:'#38b8f2',
                               border:'1px dashed rgba(56,184,242,.30)',cursor:'default',whiteSpace:'nowrap'}}>
                             {_yv2}
-                          </span>;
-                        })()}
-                      </td>
-                      {/* ── Yard Score PS V2 — corrected Phase 3 weather inputs (read-only comparison column) ── */}
-                      <td style={{textAlign:'center',padding:'2px 4px',verticalAlign:'middle'}}>
-                        {(()=>{
-                          const _psv2raw = b.ps_score_v2 != null && b.ps_score_v2 !== '' ? parseFloat(b.ps_score_v2) : NaN;
-                          if (isNaN(_psv2raw)) return <span style={{color:'rgba(255,255,255,.15)',fontSize:8}}>—</span>;
-                          const _ypsv2 = computeYardScoreV2PS(b._trackerSig||0, parseFloat(b.gHR)||0, b._boom||0, b._ps||(parseFloat(b.ps_score)||0), _psv2raw, b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1), liveSlot(b.batter_id,b.lineup_slot), b._pgLabel||b.pitcher_grade_label||'');
-                          b._yard_psv2 = _ypsv2;
-                          return <span title={`PS V2: ${_ypsv2} — corrected Phase 3 weather inputs. Not the live score.`}
-                            style={{display:'inline-block',padding:'1px 5px',borderRadius:4,
-                              fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:10,
-                              background:'rgba(56,242,130,.10)',color:'#38f282',
-                              border:'1px dashed rgba(56,242,130,.30)',cursor:'default',whiteSpace:'nowrap'}}>
-                            {_ypsv2}
                           </span>;
                         })()}
                       </td>
