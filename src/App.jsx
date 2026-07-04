@@ -7348,6 +7348,20 @@ function LiveThemesTab() {
   const [todaysHRs, setTodaysHRs]   = useState([]);
   const [lineupVer, setLineupVer]   = useState(LINEUP_VERSION);
   const [finalVer,  setFinalVer]    = useState(0);
+  const [cacheReady, setCacheReady] = useState(
+    Object.keys(DAILY_PICKS_CACHE||{}).length > 0
+  );
+  // Wait for DAILY_PICKS_CACHE to populate before HR stat lookups resolve
+  useEffect(() => {
+    if (cacheReady) return;
+    const id = setInterval(() => {
+      if (Object.keys(DAILY_PICKS_CACHE||{}).length > 0) {
+        setCacheReady(true);
+        clearInterval(id);
+      }
+    }, 500);
+    return () => clearInterval(id);
+  }, [cacheReady]);
   // Subscribe to lineup updates
   useEffect(() => {
     const unsub = subscribeLineup(v => setLineupVer(v));
@@ -7361,23 +7375,21 @@ function LiveThemesTab() {
   }, []);
 
   // Poll /api/homeruns every 60s — same endpoint as HR Tracker
+  // Re-runs when cacheReady flips so stat lookups resolve on late cache load
   useEffect(() => {
     const fetchHRs = async () => {
       try {
         const res = await fetch('/api/homeruns');
         const d = await res.json();
-        const hrs = (d.homeruns || []).map(hr => ({
-          batter_id: String(hr.batter_id || hr.batterId || ''),
-          batter:    hr.batter_name || hr.batter || '',
-          game_id:   String(hr.game_id || hr.gamePk || ''),
-          ...(() => {
-            const bid = String(hr.batter_id || hr.batterId || '');
-            const dp = DAILY_PICKS_CACHE[bid] ||
-              Object.values(DAILY_PICKS_CACHE).find(r =>
-                String(r.batter_id||'').split('.')[0] === bid);
-            if (!dp) return { yardScore:0, boomScore:0, xwoba:0, iso:0 };
-            const sig  = parseFloat(dp.weighted_flag_score||0)*4.6;
-            const boom = computeBoomScore(sig,
+        const hrs = (d.homeruns || []).map(hr => {
+          const bid = String(hr.batter_id || hr.batterId || '');
+          const dp  = DAILY_PICKS_CACHE[bid] ||
+            Object.values(DAILY_PICKS_CACHE).find(r =>
+              String(r.batter_id||'').split('.')[0] === bid);
+          let yardScore=0, boomScore=0, xwoba=0, iso=0;
+          if (dp) {
+            const sig = parseFloat(dp.weighted_flag_score||0)*4.6;
+            boomScore = computeBoomScore(sig,
               parseFloat(dp.zone_fit||0), parseFloat(dp.recent_iso||0),
               parseFloat(dp.sim_tb||0), parseFloat(dp.weighted_flag_score||0),
               parseFloat(dp.recent_barrel_spike||0), parseInt(dp.recent_hr_count||0),
@@ -7388,18 +7400,26 @@ function LiveThemesTab() {
               parseFloat(dp.season_swstr_pct||0), parseFloat(dp.park_pull_fit||0),
               parseInt(dp._zoneEdges||0), parseInt(dp._zoneKPenalty||0), false,
               parseFloat(dp.season_xwoba||0));
-            const ys = computeYardScore(sig, parseFloat(dp.gHR||0), boom,
+            yardScore = computeYardScore(sig, parseFloat(dp.gHR||0), boomScore,
               parseFloat(dp.ps_score||0), dp.batter_hand||'', dp.pitcher_hand||'',
               parseInt(dp.days_rest??1), liveSlot(bid, dp.lineup_slot),
               dp.pitcher_grade_label||'');
-            return {
-              yardScore: ys,
-              boomScore: boom,
-              xwoba: parseFloat(dp.season_xwoba||0),
-              iso:   parseFloat(dp.recent_iso||0),
-            };
-          })(),
-        }));
+            xwoba = parseFloat(dp.season_xwoba||0);
+            iso   = parseFloat(dp.recent_iso||0);
+          }
+          console.log('[Themes] HR entry:', {
+            batter: hr.batter_name || hr.batter,
+            batter_id: bid,
+            cacheHit: !!dp,
+            yardScore, boomScore, xwoba, iso,
+          });
+          return {
+            batter_id: bid,
+            batter:    hr.batter_name || hr.batter || '',
+            game_id:   String(hr.game_id || hr.gamePk || ''),
+            yardScore, boomScore, xwoba, iso,
+          };
+        });
         console.log('[Themes] todaysHRs:', hrs.length, hrs);
         setTodaysHRs(hrs);
       } catch(e) {
@@ -7409,7 +7429,7 @@ function LiveThemesTab() {
     fetchHRs();
     const id = setInterval(fetchHRs, 60000);
     return () => clearInterval(id);
-  }, []);
+  }, [cacheReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Cluster detection — only when 3+ HRs exist
   const clusters = useMemo(() => {
@@ -7424,7 +7444,6 @@ function LiveThemesTab() {
     groups.push(cur);
     const avg = arr => arr.reduce((s,x)=>s+x,0) / arr.length;
     return groups
-      .filter(g => g.length >= 3) // only clusters with 3+ HR members
       .sort((a, b) => b.length - a.length)
       .slice(0, 3)
       .map(members => ({
@@ -7492,6 +7511,13 @@ function LiveThemesTab() {
           </div>
           <div style={{fontFamily:mono,fontSize:13,color:'var(--accent)'}}>
             {todaysHRs.length} HR{todaysHRs.length !== 1 ? 's' : ''} so far today
+          </div>
+          {/* DEBUG — remove after fix confirmed */}
+          <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,
+            color:'rgba(255,255,255,.3)',textAlign:'center',marginTop:8}}>
+            todaysHRs: {todaysHRs.length} |
+            clusters: {clusters.length} |
+            cacheReady: {String(cacheReady)}
           </div>
         </div>
       ) : (
@@ -10269,6 +10295,7 @@ function GamedayTab() {
                 height="100%"
                 frameBorder="0"
                 allowFullScreen
+                sandbox="allow-scripts allow-same-origin allow-presentation allow-forms"
                 style={{width:'100%',height:'100%',border:'none',display:'block'}}
               />
             )}
