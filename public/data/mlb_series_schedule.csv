@@ -1,7 +1,7 @@
 Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitcher ID (Away),Game ID,Venue ID,Venue Name,Day of Week,Day Abbr,Series Game #,Games in Series,Series Position,Day Context
 2026-07-04,11:05 AM,WSH,PIT,687223,677952.0,822716,3309,Nationals Park,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
 2026-07-04,01:35 PM,NYY,MIN,694341,805673.0,823526,3313,Yankee Stadium,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
-2026-07-04,04:05 PM,TEX,DET,677958,656427.0,822882,5325,Globe Life Field,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
+2026-07-04,04:05 PM,TEX,DET,615698,656427.0,822882,5325,Globe Life Field,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
 2026-07-04,04:10 PM,SEA,TOR,669302,669456.0,823118,680,T-Mobile Park,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
 2026-07-04,07:10 PM,CIN,BAL,668881,687064.0,824499,2602,Great American Ball Park,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
 2026-07-04,07:10 PM,HOU,TB,686613,656876.0,824171,2392,Daikin Park,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
@@ -22,7 +22,7 @@ Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitc
 2026-07-05,02:30 PM,CHC,STL,665871,669461.0,824656,17,Wrigley Field,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
 2026-07-05,03:00 PM,KC,PHI,679883,605400.0,824091,7,Kauffman Stadium,Sunday,Sun,2,3,Middle,~ Neutral (check pitcher)
 2026-07-05,03:30 PM,HOU,TB,663567,,824172,2392,Daikin Park,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-07-05,03:30 PM,TEX,DET,615698,663554.0,822879,5325,Globe Life Field,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
+2026-07-05,03:30 PM,TEX,DET,677958,663554.0,822879,5325,Globe Life Field,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
 2026-07-05,04:00 PM,COL,SF,685299,,824333,19,Coors Field,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
 2026-07-05,04:00 PM,AZ,MIL,593958,687075.0,825061,15,Chase Field,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
 2026-07-05,04:30 PM,ATH,MIA,695611,691587.0,824980,2529,Sutter Health Park,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
