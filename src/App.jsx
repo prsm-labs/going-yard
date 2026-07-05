@@ -28136,9 +28136,21 @@ function HomeTab() {
 
 // ── Barrel Lab ──────────────────────────────────────────────────────────────
 
-// PA eligibility gate — must be confirmed + 10 recent PAs
+// PA eligibility gate — confirmed via live LINEUP_STATUS, with PA fallback pre-confirmation
 function isBarrelLabEligible(r) {
-  return !!(r.batter && r.batter_id && r.game_id);
+  if (!(r.batter && r.batter_id && r.game_id)) return false;
+  const bid = String(r.batter_id || '').split('.')[0];
+
+  // Confirmed in today's lineup via live LINEUP_STATUS (same source as ✅ in All Matchups)
+  // BarrelLabTab fetches lineups itself on mount — no dependency on Live tab visit
+  if (LINEUP_STATUS[bid]?.status === 'confirmed') return true;
+
+  // Pre-confirmation gate: must have recent AND season activity
+  // Catches injured/IL players (Murakami: 0 recent PA) and
+  // roster fringe players who haven't appeared (Waddell: near-0 season PA)
+  const recentPA = parseInt(r.recent_pa || r.l7_pa || 0);
+  const seasonPA = parseInt(r.season_pa || 0);
+  return recentPA >= 10 && seasonPA >= 30;
 }
 
 function groupA_ContactQuality(r) {
@@ -28270,7 +28282,10 @@ function BarrelLabTab() {
   useEffect(() => {
     const unsub = subscribeLineup(v => setLineupVer(v));
     const finId = setInterval(() => setFinalVer(FINAL_GAME_IDS.size), 30000);
-    return () => { unsub(); clearInterval(finId); };
+    // Fetch lineups immediately so Barrel Lab doesn't require visiting the Live tab first
+    loadTodayLineups();
+    const lineupPoll = setInterval(() => loadTodayLineups(), 2 * 60 * 1000);
+    return () => { unsub(); clearInterval(finId); clearInterval(lineupPoll); };
   }, []);
 
   const eligibleBatters = useMemo(() =>
@@ -28413,7 +28428,7 @@ function BarrelLabTab() {
   };
 
   const COLS = [
-    { h:'#',         key:'lineup_slot',               acc: b => parseInt(b.lineup_slot||9),                              align:'left',  allOnly: false },
+    { h:'Slot',       key:'lineup_slot',               acc: b => parseInt(b.lineup_slot||0)||99,                              align:'left',  allOnly: false },
     { h:'Team',      key:'batting_team',               acc: b => (b.batting_team||'').toLowerCase(),                       align:'left',  allOnly: true  },
     { h:'Player',    key:'batter',                     acc: b => (b.batter||'').toLowerCase(),                            align:'left',  allOnly: false },
     { h:'TrueHR',    key:'trueHRScore',                acc: b => b.trueHRScore||0,                                        align:'right' },
@@ -28506,6 +28521,25 @@ function BarrelLabTab() {
           );
         })}
       </div>
+
+      {/* Lineup filter status */}
+      {eligibleBatters.length > 0 && (() => {
+        const confirmed  = eligibleBatters.filter(b => String(b.lineup_confirmed||'').toLowerCase()==='true' || LINEUP_STATUS[String(b.batter_id||'').split('.')[0]]?.status==='confirmed').length;
+        const isLocked   = confirmed > 0;
+        return (
+          <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',
+            marginBottom:10,display:'flex',alignItems:'center',gap:8}}>
+            <span style={{
+              display:'inline-block',width:7,height:7,borderRadius:'50%',flexShrink:0,
+              background: isLocked ? '#27c97a' : '#f5a623',
+            }}/>
+            {isLocked
+              ? `${confirmed} confirmed in lineup · unconfirmed batters hidden`
+              : `Lineups pending · showing ${eligibleBatters.length} batters with 10+ recent PA`
+            }
+          </div>
+        );
+      })()}
 
       {/* Signal Board — always shown */}
       {scoredBatters.length > 0 && (
@@ -28649,7 +28683,7 @@ function BarrelLabTab() {
                           opacity: fin ? 0.5 : 1,
                           background: b.isBarrelSignal ? 'rgba(255,153,0,.04)' : 'transparent',
                         }}>
-                          <td style={{padding:'4px 6px',color:'var(--muted)'}}>{b.lineup_slot||'—'}</td>
+                          <td style={{padding:'4px 6px',color:'var(--muted)'}}>{parseInt(b.lineup_slot||0)||'—'}</td>
                           {!selGame && <td style={{padding:'4px 6px',color:'var(--muted)',fontFamily:mono,fontSize:8}}>{b.batting_team||'—'}</td>}
                           <td style={{padding:'4px 6px',whiteSpace:'nowrap'}}>
                             <div style={{display:'flex',alignItems:'center',gap:6}}>
