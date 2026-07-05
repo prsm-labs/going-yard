@@ -28100,6 +28100,7 @@ function HomeTab() {
         <button style={stBtn('pairs')}      onClick={()=>setSub('pairs')}>🔗 Pairs</button>
         <button style={stBtn('sim')}        onClick={()=>setSub('sim')}>🎰 Sim</button>
         <button style={stBtn('crystal')}    onClick={()=>setSub('crystal')}>🔮</button>
+        <button style={stBtn('barrellab')} onClick={()=>setSub('barrellab')}>🧪 Barrel Lab</button>
         <HelpBtn2/>
         {/* Refresh — visible when on cheat sheet */}
         {sub==='cheatsheet' && (
@@ -28128,6 +28129,476 @@ function HomeTab() {
       {sub==='pairs'      && <PairsTab data={data}/>}
       {sub==='sim'        && <SimTab data={data}/>}
       {sub==='crystal'    && <CrystalBallTab embedded/>}
+      {sub==='barrellab'  && <BarrelLabTab/>}
+    </div>
+  );
+}
+
+// ── Barrel Lab ──────────────────────────────────────────────────────────────
+
+// PA eligibility gate — must be confirmed + 10 recent PAs
+function isBarrelLabEligible(r) {
+  const bid = String(r.batter_id || '').split('.')[0];
+  if (LINEUP_STATUS[bid]?.status !== 'confirmed') return false;
+  const recentPA = parseInt(r.recent_pa || r.l7_pa || 0);
+  if (recentPA < 10) {
+    // Proxy: batter has appeared recently
+    const hasRecent = parseFloat(r.gHR || 0) > 5 || parseInt(r.recent_hr_count || 0) > 0;
+    if (!hasRecent) return false;
+    console.warn('[BarrelLab] PA field missing for', r.batter, '— using proxy filter');
+  }
+  if (INJURY_MAP?.[bid] && !LINEUP_STATUS?.[bid]) return false;
+  return true;
+}
+
+function groupA_ContactQuality(r) {
+  const la    = parseFloat(r.la_mean_l15 || r.recent_avg_la || 18);
+  const laStd = parseFloat(r.la_stddev || 8);
+  const laDistScore    = Math.max(0, 1 - Math.abs(la - 19.5) / 15);
+  const laConsistency  = Math.max(0, 1 - (laStd - 5) / 12);
+  const sweetSpotScore = (laDistScore * 0.7 + laConsistency * 0.3) * 100;
+
+  const pbrl      = parseFloat(r.recent_pulled_barrel_pct || 0);
+  const pbrlScore = Math.min(100, pbrl * 8);
+
+  const hh      = parseFloat(r.recent_hh_pct || 0);
+  const hhScore = Math.min(100, hh * 2.2);
+
+  const xwoba      = parseFloat(r.season_xwoba || 0);
+  const xwobaScore = Math.min(100, Math.max(0, (xwoba - 0.250) / 0.200 * 100));
+
+  return (
+    sweetSpotScore * 0.35 +
+    pbrlScore      * 0.30 +
+    hhScore        * 0.20 +
+    xwobaScore     * 0.15
+  );
+}
+
+function groupB_MatchupVulnerability(r) {
+  const zf      = parseFloat(r.zone_fit || 0);
+  const zfScore = Math.min(100, zf * 12);
+
+  const grade = (r._pgLabel || '').toLowerCase();
+  const gradeScore =
+    grade.includes('elite')    ? 10 :
+    grade.includes('tough')    ? 30 :
+    grade.includes('target')   ? 85 :
+    grade.includes('hittable') ? 75 : 50;
+
+  // vs_hand_woba is already filtered to this pitcher's hand by the engine
+  const vsHandWoba   = parseFloat(r.vs_hand_woba || r.season_xwoba || 0);
+  const platoonScore = Math.min(100, Math.max(0, (vsHandWoba - 0.250) / 0.200 * 100));
+  const bHand = (r.batter_hand || '').toUpperCase();
+  const pHand = (r.pitcher_hand || '').replace(/^(L|R).*/i, '$1').toUpperCase();
+  const platoonDirectionMult = (bHand !== pHand) ? 1.15 : 0.88;
+
+  const ps      = parseFloat(r.ps_score || 0);
+  const psScore = Math.min(100, (ps / 25) * 100);
+
+  // Pitcher GB/K not in CSV — use league-average defaults (45/22)
+  const pitcherGB      = parseFloat(r.gb_pct_p || r.pitcher_gb_pct || 45);
+  const gbSuppression  = pitcherGB > 55 ? 0.85 : pitcherGB > 50 ? 0.92 : pitcherGB < 35 ? 1.10 : 1.0;
+  const pitcherK       = parseFloat(r.k_pct_p  || r.pitcher_k_pct  || 22);
+  const kSuppression   = pitcherK > 30 ? 0.88 : pitcherK > 25 ? 0.94 : pitcherK < 15 ? 1.08 : 1.0;
+
+  const raw = (
+    zfScore      * 0.30 +
+    gradeScore   * 0.25 +
+    platoonScore * 0.25 * platoonDirectionMult +
+    psScore      * 0.20
+  ) * gbSuppression * kSuppression;
+
+  return Math.round(Math.min(100, Math.max(0, raw)));
+}
+
+function groupC_FormRecency(r) {
+  const ghr      = parseFloat(r.gHR || 0);
+  const ghrScore = Math.min(100, ghr * 2.5);
+
+  const iso      = parseFloat(r.recent_iso || 0);
+  const isoScore = Math.min(100, Math.max(0, (iso - 0.050) / 0.350 * 100));
+
+  const recentHR      = parseInt(r.recent_hr_count || 0);
+  const recentHRScore = Math.min(100, recentHR * 25);
+
+  const formScore = (ghrScore * 1.5 + isoScore * 1.0) / 2.5;
+  return (formScore * 0.70 + recentHRScore * 0.30);
+}
+
+function computeTrueHRScore(r) {
+  const A = groupA_ContactQuality(r);
+  const B = groupB_MatchupVulnerability(r);
+  const C = groupC_FormRecency(r);
+  return Math.round(Math.min(100, Math.max(0, A * 0.40 + B * 0.35 + C * 0.25)));
+}
+
+function computeMatchupScore(r) {
+  const zf      = parseFloat(r.zone_fit || 0);
+  const zfScore = Math.min(100, zf * 12);
+
+  const ps      = parseFloat(r.ps_score || 0);
+  const psScore = Math.min(100, (ps / 25) * 100);
+
+  const vsHandWoba = parseFloat(r.vs_hand_woba || r.season_xwoba || 0);
+  const handScore  = Math.min(100, Math.max(0, (vsHandWoba - 0.250) / 0.200 * 100));
+  const bHand = (r.batter_hand || '').toUpperCase();
+  const pHand = (r.pitcher_hand || '').replace(/^(L|R).*/i, '$1').toUpperCase();
+  const platoonMult = (bHand !== pHand) ? 1.12 : 0.90;
+
+  const grade = (r._pgLabel || '').toLowerCase();
+  const gradeMult =
+    grade.includes('elite')    ? 0.55 :
+    grade.includes('tough')    ? 0.75 :
+    grade.includes('target')   ? 1.20 :
+    grade.includes('hittable') ? 1.10 : 1.0;
+
+  const pitcherGB = parseFloat(r.gb_pct_p || r.pitcher_gb_pct || 45);
+  const gbMult    = pitcherGB > 55 ? 0.88 : pitcherGB < 35 ? 1.10 : 1.0;
+
+  const raw = (
+    zfScore   * 0.40 +
+    psScore   * 0.35 +
+    handScore * 0.25 * platoonMult
+  ) * gradeMult * gbMult;
+
+  return Math.round(Math.min(100, Math.max(0, raw)));
+}
+
+function BarrelLabTab() {
+  const mono = "'DM Mono',monospace";
+  const osw  = "'Oswald',sans-serif";
+
+  const [selGame,    setSelGame]    = useState(null);
+  const [simResults, setSimResults] = useState({});
+  const [simRunning, setSimRunning] = useState(false);
+  const [lineupVer,  setLineupVer]  = useState(LINEUP_VERSION || 0);
+  const [finalVer,   setFinalVer]   = useState(0);
+
+  useEffect(() => {
+    const unsub = subscribeLineup(v => setLineupVer(v));
+    const finId = setInterval(() => setFinalVer(FINAL_GAME_IDS.size), 30000);
+    return () => { unsub(); clearInterval(finId); };
+  }, []);
+
+  const eligibleBatters = useMemo(() =>
+    Object.values(DAILY_PICKS_CACHE || {}).filter(isBarrelLabEligible),
+    [lineupVer] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  // Trigger sim when game selected or lineups update
+  const runBarrelSim = (batters) => {
+    if (!batters.length) return;
+    setSimRunning(true);
+    const worker = new Worker('/barrelWorker.js');
+    worker.postMessage({ batters });
+    worker.onmessage = (e) => {
+      setSimResults(e.data.results);
+      setSimRunning(false);
+      worker.terminate();
+      console.log('[BarrelLab] Sim complete —', Object.keys(e.data.results).length, 'batters');
+    };
+    worker.onerror = (err) => {
+      console.warn('[BarrelLab] Worker error:', err.message);
+      setSimRunning(false);
+      worker.terminate();
+    };
+  };
+
+  useEffect(() => {
+    if (selGame && eligibleBatters.length > 0) {
+      const gameBatters = eligibleBatters.filter(r =>
+        String(r.game_id) === String(selGame.gamePk || selGame.game_id || '')
+      );
+      runBarrelSim(gameBatters);
+    }
+  }, [selGame, lineupVer]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // All unique games from eligible batters
+  const gameSlate = useMemo(() => {
+    const seen = new Map();
+    Object.values(DAILY_PICKS_CACHE || {}).forEach(r => {
+      const gid = String(r.game_id || '');
+      if (!gid || seen.has(gid)) return;
+      seen.set(gid, {
+        game_id:      gid,
+        gamePk:       gid,
+        home_team:    r.pitcher_team || '',
+        away_team:    r.batting_team || '',
+        home_abbr:    r.pitcher_team || '',
+        away_abbr:    r.batting_team || '',
+      });
+    });
+    return [...seen.values()];
+  }, [lineupVer]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const gameBatters = useMemo(() => {
+    if (!selGame) return [];
+    return eligibleBatters.filter(r =>
+      String(r.game_id) === String(selGame.gamePk || selGame.game_id || '')
+    );
+  }, [selGame, eligibleBatters]);
+
+  const scoredBatters = useMemo(() =>
+    gameBatters.map(r => {
+      const bid          = String(r.batter_id || '').split('.')[0];
+      const trueHRScore  = computeTrueHRScore(r);
+      const matchupScore = computeMatchupScore(r);
+      const sim          = simResults[bid] || {};
+      const simHRPct     = sim.simHRRate != null
+        ? parseFloat((sim.simHRRate * 100).toFixed(1))
+        : null;
+      const brlBIP = parseFloat(r.recent_fb_pct || 0) > 0
+        ? parseFloat(((parseFloat(r.recent_barrel_pct||0) / parseFloat(r.recent_fb_pct||1)) * 100).toFixed(1))
+        : null;
+      const hrFB = parseFloat(r.recent_fb_pct || 0) > 0
+        ? parseFloat((parseFloat(r.recent_hr_rate||0) / parseFloat(r.recent_fb_pct||1)).toFixed(3))
+        : null;
+      const isBarrelSignal =
+        trueHRScore  >= 70 &&
+        matchupScore >= 60 &&
+        simHRPct     != null && simHRPct >= 12.0;
+      return { ...r, trueHRScore, matchupScore, simHRPct, brlBIP, hrFB, isBarrelSignal, _bid: bid };
+    }).sort((a, b) => b.trueHRScore - a.trueHRScore),
+    [gameBatters, simResults]
+  );
+
+  // Color threshold helpers
+  const clr = (v, g1, g2, y1, y2) => {
+    if (v == null || v === '') return 'var(--muted)';
+    const n = parseFloat(v);
+    if (isNaN(n)) return 'var(--muted)';
+    if (n >= g1 && (g2 == null || n <= g2)) return '#27c97a';
+    if (n >= y1 && (y2 == null || n <= y2)) return '#f5a623';
+    return '#ff6b6b';
+  };
+  const trueClr     = v => clr(v, 80, null, 60, null);
+  const matchupClr  = v => clr(v, 75, null, 50, null);
+  const simClr      = v => clr(v, 18, null, 12, null);
+  const zfClr       = v => clr(v, 7, null, 4, null);
+  const ghrClr      = v => clr(v, 25, null, 15, null);
+  const pbrlClr     = v => clr(v, 10, null, 6, null);
+  const brlBipClr   = v => clr(v, 12, null, 7, null);
+  const fmt         = (v, d=1) => v != null && !isNaN(parseFloat(v)) ? parseFloat(v).toFixed(d) : '—';
+
+  // Group by team for lineup boards
+  const byTeam = useMemo(() => {
+    const teams = {};
+    scoredBatters.forEach(b => {
+      const t = b.batting_team || '?';
+      if (!teams[t]) teams[t] = { batters:[], pitcher: b.pitcher, pitcherHand: b.pitcher_hand, pgLabel: b._pgLabel || '', pitcherGB: parseFloat(b.gb_pct_p || b.pitcher_gb_pct || 45) };
+      teams[t].batters.push(b);
+    });
+    return teams;
+  }, [scoredBatters]);
+
+  const signalCount = scoredBatters.filter(b => b.isBarrelSignal).length;
+  const topTrue     = scoredBatters[0]?.trueHRScore ?? null;
+  const topSim      = scoredBatters.reduce((m, b) => b.simHRPct != null && b.simHRPct > m ? b.simHRPct : m, 0) || null;
+
+  const isFinal = gid => FINAL_GAME_IDS.has(String(gid));
+
+  return (
+    <div style={{paddingBottom:20}}>
+      {/* Game Slate */}
+      <div style={{display:'flex',gap:8,overflowX:'auto',paddingBottom:8,marginBottom:12}}>
+        {gameSlate.length === 0 && (
+          <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)',padding:'8px 0'}}>
+            Loading game slate…
+          </div>
+        )}
+        {gameSlate.map(g => {
+          const sel = selGame?.game_id === g.game_id;
+          const fin = isFinal(g.game_id);
+          return (
+            <button key={g.game_id}
+              onClick={() => setSelGame(g)}
+              style={{
+                minWidth:110,flex:'0 0 auto',padding:'8px 10px',borderRadius:8,cursor:'pointer',
+                border:`1px solid ${sel ? 'var(--accent)' : 'var(--border)'}`,
+                background: sel ? 'rgba(255,153,0,.10)' : 'var(--surface2)',
+                textAlign:'center',opacity: fin ? 0.55 : 1,
+              }}>
+              <div style={{fontFamily:osw,fontSize:11,fontWeight:700,color: sel ? 'var(--accent)' : 'var(--text)',letterSpacing:.6}}>
+                {g.away_abbr} @ {g.home_abbr}
+              </div>
+              {fin && <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:2}}>FINAL</div>}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* No game selected */}
+      {!selGame && (
+        <div style={{textAlign:'center',padding:'32px 16px',color:'var(--muted)',fontFamily:mono,fontSize:11}}>
+          Select a game from the slate above to run simulations.
+        </div>
+      )}
+
+      {selGame && (
+        <>
+          {/* Signal Board */}
+          <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}>
+            {[
+              { label:'TOP BARRELSCORE', val: topTrue != null ? String(topTrue) : '—', sub:'Best full-board read' },
+              { label:'BARREL SIGNALS',  val: String(signalCount),                     sub:'Signals confirmed today' },
+              { label:'TOP SIM HR RATE', val: topSim  ? topSim + '%' : '—',            sub:'Best Monte Carlo read' },
+            ].map(({label,val,sub}) => (
+              <div key={label} style={{flex:'1 1 120px',background:'var(--surface2)',borderRadius:8,
+                padding:'10px 14px',border:'1px solid var(--border)'}}>
+                <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:4}}>
+                  {label}
+                </div>
+                <div style={{fontFamily:osw,fontSize:22,fontWeight:700,color:'var(--accent)',lineHeight:1}}>
+                  {val}
+                </div>
+                <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:4}}>{sub}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* No eligible batters */}
+          {!simRunning && gameBatters.length === 0 && (
+            <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)',
+              padding:'24px 16px',textAlign:'center',
+              background:'var(--surface2)',borderRadius:8,marginBottom:12}}>
+              No eligible batters for this game yet.<br/>
+              Lineups may not be confirmed, or no batters cleared the 10 PA / last 5 days activity threshold.
+            </div>
+          )}
+
+          {/* Loading */}
+          {simRunning && (
+            <div style={{display:'flex',flexDirection:'column',alignItems:'center',
+              gap:10,padding:'28px 16px',marginBottom:12}}>
+              <div className="sp" style={{width:20,height:20,borderWidth:2}}/>
+              <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)'}}>
+                Running 10,000 Monte Carlo simulations…
+              </div>
+              <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>
+                {gameBatters.length} eligible batters · Pitcher tendencies + platoon splits applied
+              </div>
+            </div>
+          )}
+
+          {!simRunning && scoredBatters.length > 0 && (
+            <>
+              {/* Top Reads */}
+              <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',
+                textTransform:'uppercase',letterSpacing:.8,marginBottom:6}}>
+                Top Reads
+              </div>
+              <div style={{display:'flex',gap:8,overflowX:'auto',paddingBottom:8,marginBottom:16}}>
+                {scoredBatters.slice(0,5).map(b => (
+                  <div key={b._bid} style={{
+                    minWidth:190,flex:'0 0 auto',
+                    background:'var(--surface2)',borderRadius:8,padding:'10px 12px',
+                    border:`1px solid ${b.isBarrelSignal ? 'var(--accent)' : 'var(--border)'}`,
+                    borderLeft:`3px solid ${b.isBarrelSignal ? 'var(--accent)' : 'var(--border)'}`,
+                    opacity: isFinal(b.game_id) ? 0.5 : 1,
+                  }}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
+                      <div>
+                        <div style={{fontFamily:osw,fontWeight:700,fontSize:13,color:'var(--text)'}}>
+                          {b.batter}
+                        </div>
+                        <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>
+                          {b.batting_team} · {b.batter_hand}v{(b.pitcher_hand||'').charAt(0)}
+                        </div>
+                      </div>
+                      <div style={{fontFamily:osw,fontSize:22,fontWeight:800,color:'var(--accent)',lineHeight:1}}>
+                        {b.trueHRScore}
+                      </div>
+                    </div>
+                    {b.isBarrelSignal && (
+                      <div style={{fontFamily:mono,fontSize:8,color:'var(--accent)',marginBottom:6}}>
+                        ★ Barrel Signal
+                      </div>
+                    )}
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px 10px',fontFamily:mono,fontSize:8}}>
+                      {[
+                        ['BARRELSCORE', b.trueHRScore, trueClr(b.trueHRScore)],
+                        ['MATCHUP',     b.matchupScore, matchupClr(b.matchupScore)],
+                        ['ZONEFIT',     fmt(b.zone_fit,1), zfClr(b.zone_fit)],
+                        ['HR FORM',     fmt(b.gHR,0), ghrClr(b.gHR)],
+                        ['PULLEDBRL',   fmt(b.recent_pulled_barrel_pct,1)+'%', pbrlClr(b.recent_pulled_barrel_pct)],
+                        ['BRL/BIP',     b.brlBIP != null ? b.brlBIP+'%' : '—', brlBipClr(b.brlBIP)],
+                        ['ISO',         fmt(b.recent_iso,3), 'var(--text)'],
+                        ['SimHR%',      b.simHRPct != null ? b.simHRPct+'%' : '—', simClr(b.simHRPct)],
+                      ].map(([lbl,val,color]) => (
+                        <div key={lbl}>
+                          <div style={{color:'var(--muted)',letterSpacing:.5}}>{lbl}</div>
+                          <div style={{color,fontWeight:600}}>{val}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Lineup Boards — one per team */}
+              {Object.entries(byTeam).map(([team, {batters:tBatters, pitcher, pitcherHand, pgLabel, pitcherGB}]) => (
+                <div key={team} style={{marginBottom:20}}>
+                  <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',
+                    textTransform:'uppercase',letterSpacing:.8,marginBottom:4}}>
+                    {team} hitters vs {pitcher || '?'} ({(pitcherHand||'').charAt(0)})
+                    {' · '}<span style={{color: pgLabel.includes('Elite')||pgLabel.includes('Tough') ? '#ff6b6b' : pgLabel.includes('Target')||pgLabel.includes('Hittable') ? '#27c97a' : 'var(--muted)'}}>{pgLabel}</span>
+                    {pitcherGB > 50 && (
+                      <span style={{color:'#f5a623',marginLeft:8}}>
+                        · Groundball pitcher — FB% suppressed in sim
+                      </span>
+                    )}
+                  </div>
+                  <div style={{overflowX:'auto'}}>
+                    <table style={{width:'100%',borderCollapse:'collapse',fontFamily:mono,fontSize:9}}>
+                      <thead>
+                        <tr style={{color:'var(--muted)',borderBottom:'1px solid var(--border)'}}>
+                          {['#','Player','TrueHR','Matchup','ZF','Form','SimHR%','ISO','xwOBA','PulledBrl%','Brl/BIP%','HR/FB%','FB%','HH%','LA°'].map(h => (
+                            <th key={h} style={{padding:'4px 6px',textAlign:'right',whiteSpace:'nowrap',
+                              textAlign: h==='Player'||h==='#' ? 'left' : 'right'}}>
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {tBatters.map((b, i) => {
+                          const fin = isFinal(b.game_id);
+                          return (
+                            <tr key={b._bid} style={{
+                              borderBottom:'1px solid rgba(255,255,255,.04)',
+                              opacity: fin ? 0.5 : 1,
+                            }}>
+                              <td style={{padding:'4px 6px',color:'var(--muted)'}}>{b.lineup_slot||'—'}</td>
+                              <td style={{padding:'4px 6px',whiteSpace:'nowrap',color:'var(--text)'}}>
+                                {b.isBarrelSignal ? '★ ' : ''}{b.batter}
+                                {fin && <span style={{marginLeft:4,fontSize:7,color:'var(--muted)',border:'1px solid var(--border)',borderRadius:3,padding:'1px 3px'}}>FINAL</span>}
+                              </td>
+                              <td style={{padding:'4px 6px',textAlign:'right',color:trueClr(b.trueHRScore),fontWeight:600}}>{b.trueHRScore}</td>
+                              <td style={{padding:'4px 6px',textAlign:'right',color:matchupClr(b.matchupScore)}}>{b.matchupScore}</td>
+                              <td style={{padding:'4px 6px',textAlign:'right',color:zfClr(b.zone_fit)}}>{fmt(b.zone_fit,1)}</td>
+                              <td style={{padding:'4px 6px',textAlign:'right',color:ghrClr(b.gHR)}}>{fmt(b.gHR,0)}</td>
+                              <td style={{padding:'4px 6px',textAlign:'right',color:simClr(b.simHRPct)}}>{b.simHRPct != null ? b.simHRPct+'%' : '—'}</td>
+                              <td style={{padding:'4px 6px',textAlign:'right'}}>{fmt(b.recent_iso,3)}</td>
+                              <td style={{padding:'4px 6px',textAlign:'right'}}>{fmt(b.season_xwoba,3)}</td>
+                              <td style={{padding:'4px 6px',textAlign:'right',color:pbrlClr(b.recent_pulled_barrel_pct)}}>{fmt(b.recent_pulled_barrel_pct,1)}%</td>
+                              <td style={{padding:'4px 6px',textAlign:'right',color:brlBipClr(b.brlBIP)}}>{b.brlBIP != null ? b.brlBIP+'%' : '—'}</td>
+                              <td style={{padding:'4px 6px',textAlign:'right'}}>{b.hrFB != null ? b.hrFB : '—'}</td>
+                              <td style={{padding:'4px 6px',textAlign:'right'}}>{fmt(b.recent_fb_pct,1)}%</td>
+                              <td style={{padding:'4px 6px',textAlign:'right'}}>{fmt(b.recent_hh_pct,1)}%</td>
+                              <td style={{padding:'4px 6px',textAlign:'right'}}>{fmt(b.la_mean_l15 || b.recent_avg_la,1)}°</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+        </>
+      )}
     </div>
   );
 }
