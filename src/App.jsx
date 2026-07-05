@@ -7661,11 +7661,13 @@ function LiveTab() {
 
     {/* Sub-view toggle */}
     {showLiveHelp && <HelpSlideout title="📺 Live Tab Guide" items={[
-      ['📺 Gameday', "In-game box scores for every game happening right now. Tap a game card to expand it and see live batter stats, pitch-by-pitch data, and base runners."],
+      ['📺 Gameday', "In-game box scores for every game happening right now. Tap a game card to expand the live linescore, batting/pitching stats, and play-by-play. Use the 📺 Watch button to open MLB.tv in a new tab for the selected game."],
+      ['🥎 Bat Tracking', "Live bat speed and swing data for batters currently in active games. Updates in real time as at-bats happen."],
+      ['⚡ Live Sim', "Monte Carlo simulation running against live in-game conditions. Recalculates as lineups and game states change throughout the day."],
       ['🎮 Live Games', "Score ticker for all today's games with live updates. Use the date picker to browse past game scores."],
-      ['📋 Lineups', "Today's confirmed and projected batting orders for every team. Tap a game to expand or collapse it. Green = confirmed lineup, yellow = projected."],
-      ['🔴 Live indicator', "A red dot next to a game means it's currently in progress. Scores update automatically."],
-      ['Player tap', "Tap any batter name to open their stat card with recent performance data and HR history."],
+      ['📋 Lineups', "Today's confirmed and projected batting orders for every team. Green = confirmed, yellow = projected. Tap any batter to open their stat slideout."],
+      ['🔥 Themes', "Live HR pattern detection. Activates when 3+ home runs land today. Detects score clusters among batters who have gone yard and surfaces confirmed lineup matches with similar profiles — organized into cluster tables that update as more HRs land throughout the day."],
+      ['📺 Watch button', "Opens MLB.tv for the selected game in a new tab. The ▾ arrow next to it reveals an embedded stream (best-effort, game dependent)."],
     ]} onClose={()=>setShowLiveHelp(false)}/>}
     <div style={{display:'flex',gap:5,marginBottom:12,alignItems:'center',flexWrap:'wrap',rowGap:6}}>
       <div style={{display:'flex',gap:4,padding:'3px',background:'var(--surface)',borderRadius:8,border:'1px solid var(--border)',flexWrap:'wrap',rowGap:4}}>
@@ -11814,12 +11816,12 @@ function HRTrackerTab() {
   };
 
   const HR_HELP = [
-    ['💥 HR Tracker', 'Every home run hit today, live. Shows who hit it, how far, exit velocity, inning, and pitch thrown. Tap any row for a short video clip.'],
-    ['🏆 HR Leaders', 'Season home run leaderboard. See who leads the league and how your picks stack up.'],
-    ['🔥 Hot Bats', 'Batters on a home run streak or heating up over the last 7 days — players to watch closely.'],
-    ['📈 Heating Up', 'Batters showing rising exit velocity and hard contact trends — surging before the HR comes.'],
-    ['Filters', 'Use the team filter to focus on a specific team, or the search bar to find a player. Sort any column by clicking the header.'],
-    ['⬇ CSV', 'Export the current view as a spreadsheet.'],
+    ['💥 HR Tracker', 'Every home run hit today, live — or any past date using the date picker. Shows batter, team, HR type, RBI, inning, launch angle, exit velocity, distance, pitch type, and pitcher. Tap any row for video.'],
+    ['🏆 HR Leaders', 'Season home run leaderboard ranked by HR count. See who leads the league, filtered by team if needed.'],
+    ['🔥 Hot Bats', 'Batters on an active home run streak or showing elevated power output over the last 7 days. Players to watch closely for repeat performances.'],
+    ['📈 Heating Up', 'Batters showing rising exit velocity, hard contact rate, and bat speed trends — surging before the home run arrives. Leading indicators, not lagging ones.'],
+    ['Filters', 'Use the team filter buttons to focus on a specific team, or the search bar to find any batter or pitcher. Sort any column by clicking its header.'],
+    ['⬇ CSV', 'Export the current HR Tracker view as a spreadsheet for your own analysis.'],
   ];
   const HRNav = () => (<>
     {showHRHelp && <HelpSlideout title="📊 HR Tracker Guide" items={HR_HELP} onClose={()=>setShowHRHelp(false)}/>}
@@ -12955,6 +12957,7 @@ function YardPicksFeedTab() {
   const [hasMore,  setHasMore]  = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [showYPHelp, setShowYPHelp] = useState(false);
 
   const fetchPicks = async (startCursor) => {
     try {
@@ -12993,6 +12996,13 @@ function YardPicksFeedTab() {
 
   return (
     <div style={{maxWidth:480,margin:'0 auto',padding:'4px 0 24px'}}>
+      {showYPHelp && <HelpSlideout title="🧾 Yard Picks Guide" onClose={()=>setShowYPHelp(false)} items={[
+        ['What is Yard Picks?', "The Going Yard official daily picks feed — curated HR prop picks posted each morning by the PRISM Labs team. Sourced from the engine's top signals each day."],
+        ['Pick cards', "Each card shows the batter, pitcher matchup, Yard Score, signal flags, odds, and the reasoning behind the pick. Newest picks appear at the top."],
+        ['🧮 Odds Calculator', "Tap the calculator button on any pick card to open the Odds Calculator slideout pre-filled with that pick's odds. Calculate your stake and payout instantly."],
+        ['Load more', 'Picks load 25 at a time. Tap Load More at the bottom to fetch older picks from the archive.'],
+        ['Refresh', 'Tap the refresh button to pull the latest picks without reloading the page.'],
+      ]}/>}
       <div style={{display:'flex',alignItems:'center',gap:8,padding:'4px 4px 14px'}}>
         <span style={{fontSize:18}}>🧾</span>
         <span style={{fontFamily:osw,fontWeight:800,fontSize:16,color:'var(--text)'}}>Yard Picks</span>
@@ -13005,6 +13015,7 @@ function YardPicksFeedTab() {
             transform:refreshing?'rotate(360deg)':'none'}}>↻</span>
           {refreshing ? 'Refreshing…' : 'Refresh'}
         </button>
+        <HelpBtn onClick={()=>setShowYPHelp(v=>!v)}/>
       </div>
 
       {loading && (
@@ -20124,17 +20135,13 @@ function StatsTab() {
         </div>
         <div style={{overflowY:'auto',padding:16,fontFamily:"'DM Mono',monospace",fontSize:10,lineHeight:1.8,color:'var(--muted)'}}>
           {[
-            ['⏱ Time Window (L7 / L15 / L30 / Szn)', 'How far back to look. L7 = last 7 days, L30 = last 30 days, Szn = full season. Applies to both tables at once.'],
-            ['🧢 LHB / RHB / SWB', 'Filter batters by which side they hit from. Selecting LHB also updates the pitcher table to show how pitchers do against left-handed hitters.'],
-            ['⚾ LHP / RHP', 'Filter pitchers by throwing hand. Selecting LHP also updates the batter table to show how batters perform against lefties.'],
-            ['🏠 Home / Away', 'Show stats from home games only or away games only. Affects both tables.'],
-            ['🌙 Day / Night', 'Filter to day games or night games. Affects both tables.'],
-            ['🔥 Pitch Groups', '🔥 Fastball = 4-seam, sinker, cutter, 2-seam (88-100+ mph). 🌀 Breaking = slider, curveball, sweeper, knuckle-curve (72-90 mph). 💨 Offspeed = changeup, splitter, forkball (78-88 mph). Select a group to see batter stats vs those pitches and auto-sort pitchers by how often they throw it. Stacks with handedness and window.'],
-            ['🎯 Matchup', 'Pick a game from the dropdown to instantly focus both tables on just those two teams.'],
-            ['👕 Team Dropdown', 'After picking a matchup, use the team dropdown to narrow down to one side — e.g. just the away team batters.'],
-            ['⚾ SP Button', "Show only today's scheduled starting pitchers."],
-            ['✅ 🔥 💥 🤕 Stickers', 'Filter batters by status: confirmed in lineup, hot bat, gone yard today, or hide injured players.'],
-            ['Min PA / Min BF', 'Minimum plate appearances or batters faced. Raise it to see only players with enough data to be meaningful.'],
+            ['📊 Splits vs Game tabs', 'Splits = per at-bat stats aggregated across all plate appearances in the window. Game = per-game stats (e.g. did this batter get 2+ total bases in this game?). Both tabs share all filters.'],
+            ['Windows', 'L7 = last 7 days · L15 = last 15 · L30 = last 30 · Season = full 2026 season from 3/25. All data filtered to 2026 season only.'],
+            ['Pitcher pitch chips', 'Filter batter stats to only plate appearances against Fastball / Breaking / Offspeed pitches thrown by the selected pitcher type. Click the FB%/BK%/OS% cells in the pitcher table to toggle directly.'],
+            ['🎯 Threshold filter', 'Add stat threshold gates (e.g. Brl% > 8, EV > 92) to narrow the batter table. Multiple thresholds stack as AND conditions. Dismiss with ✕.'],
+            ['Handedness filters', 'Filter pitchers by LHP/RHP and batters by LHB/RHB/Switch. Changing pitcher hand updates batter split stats to reflect performance vs that hand.'],
+            ['New columns (V2)', 'LD%, PU%, Pull%, Str%, Oppo%, AvgDist, 300+, 350+, NearHR, SwStr%, Whiff%, 1stP%, BSpd — available after build_splits_v2.py has run. Show — until then.'],
+            ['CSV export', 'Exports the currently filtered and sorted batter or pitcher table.'],
           ].map(([t,d])=>(
             <div key={t} style={{marginBottom:14}}><div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'var(--text)',marginBottom:3}}>{t}</div><div>{d}</div></div>
           ))}
@@ -23146,14 +23153,14 @@ function MatchupEngineTab() {
 
     {/* Sub-tab navigation */}
     {showKMHelp && <HelpSlideout title="⚡ Matchups Guide" items={[
-      ['⚡ Key Matchups', "Today's top batter vs pitcher matchups ranked by HR probability. Each card shows the Yard Score, pitcher grade, and key stats. Use filters to narrow by grade or team."],
-      ['📋 All Matchups', "Full list of every scheduled batter with stats, grades, and filters. Sort by any column, filter by pitcher grade, confirmed lineup, and more."],
-      ['🎲 Long Shot', "Higher-odds plays — batters with lower grades facing hittable pitchers. Good for prop diversification."],
-      ['📜 BvP History', "Head-to-head at-bat history between a batter and pitcher. See past results, pitch types, and trends."],
-      ['🧢 Batters / ⚾ Pitchers', "Stat tables for today's scheduled batters and pitchers. Filter by grade, handedness, confirmed status, and more."],
-      ['Yard Score 🎯', "Our HR probability score (0–99). Higher = more favorable conditions. A+ batters vs Target pitchers are the top tier."],
-      ['Pitcher Grades', "🎯 Target = easiest to homer off. 💥 Hittable = solid. 🤔 Average = neutral. ⚠️ Tough = difficult. ‼️ Elite = avoid."],
-      ['Legend', "A+ = 6–8 flags (highest HR rate) · A = 4–5 · B = 2–3 · C = 1 · D = 0 flags."],
+      ['⚡ Key Matchups', "Today's top batter vs pitcher matchups ranked by Yard Score and signal count. Each card shows pitcher grade, Boom score, key Statcast signals, and lineup confirmation. Tap any card to open the full batter slideout."],
+      ['📋 All Matchups', "Every scheduled confirmed batter with full stats, grades, and Yard Score V2. Horizontally scrollable. Sort any column, filter by pitcher grade, batter grade, confirmed status, handedness, and more. CSV export available."],
+      ['🎯 Long Shot', "Higher-odds plays — lower-grade batters facing hittable or target pitchers. Good for prop diversification and finding undervalued names."],
+      ['📜 BvP History', "Head-to-head career at-bat history between a specific batter and pitcher. See results by pitch type, contact quality, and outcomes."],
+      ['🧮 Odds Calculator', "Slideout calculator for HR prop bets. Manual mode: enter your odds and stake for payout. Suggested mode: the engine recommends a unit-fraction stake based on signal strength. Supports multiple currencies and saves named presets."],
+      ['Yard Score 🎯', "Going Yard's HR probability score (0–99). Higher = stronger alignment of contact quality, matchup, park, weather, and recent form. Not a guarantee — a signal composite."],
+      ['Pitcher Grades', "🎯 Target = most favorable to homer off · 💥 Hittable = solid spot · 🤔 Average = neutral · ⚠️ Tough = difficult · ‼️ Elite = avoid. Based on HR/9, wOBA allowed, and zone vulnerability."],
+      ['Batter Grades', "A+ = 6–8 signal flags (highest HR rate) · A = 4–5 · B = 2–3 · C = 1 · D = 0. Signals include LA lock, bat speed peak, pitch convergence, platoon match, close calls, and zone fit."],
     ]} onClose={()=>setShowKMHelp(false)}/>}
     <div style={{display:'flex',flexDirection:'column',gap:4,marginBottom:14}}>
       {/* Row 1: matchup boards */}
