@@ -28306,22 +28306,31 @@ function BarrelLabTab() {
     }
   }, [selGame, lineupVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // All unique games from eligible batters
+  // All unique games from eligible batters — sorted by game_time
   const gameSlate = useMemo(() => {
     const seen = new Map();
     Object.values(DAILY_PICKS_CACHE || {}).forEach(r => {
       const gid = String(r.game_id || '');
       if (!gid || seen.has(gid)) return;
       seen.set(gid, {
-        game_id:      gid,
-        gamePk:       gid,
-        home_team:    r.pitcher_team || '',
-        away_team:    r.batting_team || '',
-        home_abbr:    r.pitcher_team || '',
-        away_abbr:    r.batting_team || '',
+        game_id:   gid,
+        gamePk:    gid,
+        home_abbr: r.pitcher_team || '',
+        away_abbr: r.batting_team || '',
+        game_time: r.game_time    || '',
       });
     });
-    return [...seen.values()];
+    const parseTime = (t) => {
+      if (!t) return 9999;
+      const m = t.match(/(\d+):(\d+)\s*(AM|PM)/i);
+      if (!m) return 9999;
+      let h = parseInt(m[1]), min = parseInt(m[2]);
+      const pm = m[3].toUpperCase() === 'PM';
+      if (pm && h !== 12) h += 12;
+      if (!pm && h === 12) h = 0;
+      return h * 60 + min;
+    };
+    return [...seen.values()].sort((a, b) => parseTime(a.game_time) - parseTime(b.game_time));
   }, [lineupVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const gameBatters = useMemo(() => {
@@ -28490,7 +28499,9 @@ function BarrelLabTab() {
               <div style={{fontFamily:osw,fontSize:11,fontWeight:700,color: sel ? 'var(--accent)' : 'var(--text)',letterSpacing:.6}}>
                 {g.away_abbr} @ {g.home_abbr}
               </div>
-              {fin && <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:2}}>FINAL</div>}
+              <div style={{fontFamily:mono,fontSize:8,color: sel ? 'rgba(255,153,0,.7)' : 'var(--muted)',marginTop:2}}>
+                {fin ? 'FINAL' : (g.game_time || '')}
+              </div>
             </button>
           );
         })}
