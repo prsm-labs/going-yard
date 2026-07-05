@@ -19012,14 +19012,20 @@ function StatsTab() {
       headers = ['Team','Players','PA','AVG','OBP','SLG','ISO','wOBA','HR','HR%','K%','BB%','EV','HH%','PBrl%','FB%','LA'];
       rowFn = r=>[r.team,r.players,Math.round(r.pa),r.avg?.toFixed(3)||'',r.obp?.toFixed(3)||'',r.slg?.toFixed(3)||'',r.iso?.toFixed(3)||'',r.woba?.toFixed(3)||'',r.hr||0,r.hr_rate?.toFixed(1)||'',r.k_pct?.toFixed(1)||'',r.bb_pct?.toFixed(1)||'',r.ev?.toFixed(1)||'',r.hh_pct?.toFixed(1)||'',r.pbrl_pct?.toFixed(1)||'',r.fb_pct?.toFixed(1)||'',r.la_mean?.toFixed(1)||''];
     } else if (type === 'batters') {
-      headers = ['ID','Name','Team','Hand','PA','Yard Score','AVG','OBP','SLG','ISO','wOBA','HR','HR%','K%','BB%','EV','HH%','PBrl%','FB%','LA'];
+      headers = ['ID','Name','Team','Hand','PA','Yard Score','AVG','OBP','SLG','ISO','wOBA','HR','HR%','XBH','XBH%','TB','K%','BB%','EV','HH%','PBrl%','FB%','LA°','GB%','LD%','PU%','Pull%','Str%','Oppo%','AvgDst','300+','350+','NrHR','SwStr%','Whiff%','1stP%','BSpd'];
       rowFn = r => [r.id, r.name||r.id, r.team||'', r.hand||'', fv(r.pa),
         r._yard?parseFloat(r._yard).toFixed(0):'',
         r.avg?.toFixed(3)||'', r.obp?.toFixed(3)||'', r.slg?.toFixed(3)||'',
         r.iso?.toFixed(3)||'', r.woba?.toFixed(3)||'', fv(r.hr),
-        r.hr_rate?.toFixed(1)||'', r.k_pct?.toFixed(1)||'', r.bb_pct?.toFixed(1)||'',
+        r.hr_rate?.toFixed(1)||'', fv(r.xbh), r.xbh_pct?.toFixed(1)||'',
+        fv(r.tb), r.k_pct?.toFixed(1)||'', r.bb_pct?.toFixed(1)||'',
         r.ev?.toFixed(1)||'', r.hh_pct?.toFixed(1)||'', r.pbrl_pct?.toFixed(1)||'',
-        r.fb_pct?.toFixed(1)||'', r.la_mean?.toFixed(1)||''];
+        r.fb_pct?.toFixed(1)||'', r.la_mean?.toFixed(1)||'',
+        r.gb_pct?.toFixed(1)||'', r.ld_pct?.toFixed(1)||'', r.popup_pct?.toFixed(1)||'',
+        r.pull_pct?.toFixed(1)||'', r.straight_pct?.toFixed(1)||'', r.oppo_pct?.toFixed(1)||'',
+        r.avg_dist?.toFixed(0)||'', fv(r.dist_300), fv(r.dist_350), fv(r.near_hr),
+        r.swstr_pct?.toFixed(1)||'', r.whiff_pct?.toFixed(1)||'',
+        r.first_pitch_swing_pct?.toFixed(1)||'', r.bat_speed?.toFixed(1)||''];
     } else {
       headers = ['ID','Name','Team','Hand','Role','BF','HR/9','wOBA Allowed','HR','K/9','K%','BB%','EV Allowed','HH%','Brl%','FB%','MB%','FB Use%','BK Use%','OS Use%','Grade'];
       rowFn = r => [r.id, r.name||r.id, r.team||'', r.hand||'', r.role||'', fv(r.bf),
