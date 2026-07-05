@@ -28276,22 +28276,47 @@ function BarrelLabTab() {
   const [simRunning, setSimRunning] = useState(false);
   const [lineupVer,  setLineupVer]  = useState(LINEUP_VERSION || 0);
   const [finalVer,   setFinalVer]   = useState(0);
-  const [sortCol,    setSortCol]    = useState('trueHRScore');
-  const [sortDir,    setSortDir]    = useState('desc');
+  const [sortCol,       setSortCol]       = useState('trueHRScore');
+  const [sortDir,       setSortDir]       = useState('desc');
+  const [confirmedOnly, setConfirmedOnly] = useState(false);
+  const [injuryVer,    setInjuryVer]     = useState(0);
+  const [simTrigger,   setSimTrigger]    = useState(0);
 
   useEffect(() => {
-    const unsub = subscribeLineup(v => setLineupVer(v));
-    const finId = setInterval(() => setFinalVer(FINAL_GAME_IDS.size), 30000);
-    // Fetch lineups immediately so Barrel Lab doesn't require visiting the Live tab first
+    const unsub    = subscribeLineup(v => setLineupVer(v));
+    const unsubInj = subscribeInjuries(() => setInjuryVer(v => v + 1));
+    const finId    = setInterval(() => setFinalVer(FINAL_GAME_IDS.size), 30000);
+    // One-shot lineup fetch on mount — no auto-poll (sim is manual after this)
     loadTodayLineups();
-    const lineupPoll = setInterval(() => loadTodayLineups(), 2 * 60 * 1000);
-    return () => { unsub(); clearInterval(finId); clearInterval(lineupPoll); };
+    return () => { unsub(); unsubInj(); clearInterval(finId); };
   }, []);
 
-  const eligibleBatters = useMemo(() =>
-    Object.values(DAILY_PICKS_CACHE || {}).filter(isBarrelLabEligible),
-    [lineupVer] // eslint-disable-line react-hooks/exhaustive-deps
-  );
+  // Auto-switch to confirmed-only once lineups post — catches injured players the PA gate misses
+  // (engine extends recent window back to find 10 PAs, so injured players pass the PA gate)
+  useEffect(() => {
+    if (lineupVer > 0 && Object.keys(LINEUP_STATUS).length > 0) {
+      setConfirmedOnly(true);
+    }
+  }, [lineupVer]);
+
+  const eligibleBatters = useMemo(() => {
+    const base = Object.values(DAILY_PICKS_CACHE || {}).filter(r => {
+      if (!isBarrelLabEligible(r)) return false;
+      const bid = String(r.batter_id || '').split('.')[0];
+      // Always exclude injured players — same INJURY_MAP used by All Matchups 🤕
+      // fetchInjuries() auto-clears players confirmed in today's lineup, so a recovered
+      // player who gets confirmed will automatically reappear here
+      if (INJURY_MAP[bid]) return false;
+      return true;
+    });
+    if (confirmedOnly) {
+      return base.filter(r => {
+        const bid = String(r.batter_id || '').split('.')[0];
+        return LINEUP_STATUS[bid]?.status === 'confirmed';
+      });
+    }
+    return base;
+  }, [lineupVer, confirmedOnly, injuryVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Trigger sim when game selected or lineups update
   const runBarrelSim = (batters) => {
@@ -28319,7 +28344,7 @@ function BarrelLabTab() {
         : eligibleBatters;
       runBarrelSim(toSim);
     }
-  }, [selGame, lineupVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selGame, simTrigger]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // All unique games from eligible batters — sorted by game_time
   const gameSlate = useMemo(() => {
@@ -28522,21 +28547,50 @@ function BarrelLabTab() {
         })}
       </div>
 
-      {/* Lineup filter status */}
-      {eligibleBatters.length > 0 && (() => {
-        const confirmed  = eligibleBatters.filter(b => String(b.lineup_confirmed||'').toLowerCase()==='true' || LINEUP_STATUS[String(b.batter_id||'').split('.')[0]]?.status==='confirmed').length;
-        const isLocked   = confirmed > 0;
+      {/* Lineup filter status + toggle */}
+      {(() => {
+        const lineupCount = Object.keys(LINEUP_STATUS).length;
+        const lineupReady = lineupCount > 0;
         return (
           <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',
-            marginBottom:10,display:'flex',alignItems:'center',gap:8}}>
+            marginBottom:10,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
             <span style={{
               display:'inline-block',width:7,height:7,borderRadius:'50%',flexShrink:0,
-              background: isLocked ? '#27c97a' : '#f5a623',
+              background: lineupReady ? '#27c97a' : '#f5a623',
             }}/>
-            {isLocked
-              ? `${confirmed} confirmed in lineup · unconfirmed batters hidden`
-              : `Lineups pending · showing ${eligibleBatters.length} batters with 10+ recent PA`
+            {lineupReady
+              ? `${eligibleBatters.length} batters · lineups confirmed`
+              : `Lineups pending · ${eligibleBatters.length} batters (10+ recent PA)`
             }
+            {lineupReady && (
+              <button
+                onClick={() => setConfirmedOnly(v => !v)}
+                style={{
+                  background: confirmedOnly ? 'rgba(39,201,122,.12)' : 'var(--surface2)',
+                  border: `1px solid ${confirmedOnly ? 'rgba(39,201,122,.4)' : 'var(--border)'}`,
+                  color: confirmedOnly ? '#27c97a' : 'var(--muted)',
+                  borderRadius:5,padding:'2px 8px',fontSize:9,cursor:'pointer',
+                  fontFamily:"'DM Mono',monospace",lineHeight:1.5,flexShrink:0,
+                }}>
+                {confirmedOnly ? '✅ Confirmed only' : '👁 All batters'}
+              </button>
+            )}
+            <button
+              disabled={simRunning}
+              onClick={async () => {
+                await loadTodayLineups();
+                setSimTrigger(v => v + 1);
+              }}
+              style={{
+                background:'var(--surface2)',
+                border:'1px solid var(--border)',
+                color: simRunning ? 'var(--muted)' : 'var(--text)',
+                borderRadius:5,padding:'2px 8px',fontSize:9,cursor: simRunning ? 'default' : 'pointer',
+                fontFamily:"'DM Mono',monospace",lineHeight:1.5,flexShrink:0,
+                opacity: simRunning ? 0.5 : 1,
+              }}>
+              {simRunning ? '⟳ Running…' : '⟳ Refresh'}
+            </button>
           </div>
         );
       })()}
