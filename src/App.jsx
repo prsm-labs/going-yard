@@ -7415,7 +7415,7 @@ function LiveThemesTab() {
           });
           return {
             batter_id: bid,
-            batter:    hr.batter_name || hr.batter || '',
+            batter:    hr.batterName || hr.batter_name || hr.batter || '',
             game_id:   String(hr.game_id || hr.gamePk || ''),
             yardScore, boomScore, xwoba, iso,
           };
@@ -7431,28 +7431,27 @@ function LiveThemesTab() {
     return () => clearInterval(id);
   }, [cacheReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Cluster detection — only when 3+ HRs exist
+  // Cluster detection — force 3 quantile-based groups sorted high YS first
+  // Gap-based clustering produced 1–2 groups when scores were close together;
+  // quantile split always produces exactly 3 tiers (Top/Mid/Low) regardless of spread.
   const clusters = useMemo(() => {
     if (todaysHRs.length < 3) return [];
-    const sorted = [...todaysHRs].sort((a, b) => a.yardScore - b.yardScore);
-    const groups = [];
-    let cur = [sorted[0]];
-    for (let i = 1; i < sorted.length; i++) {
-      if (sorted[i].yardScore - sorted[i-1].yardScore <= 7) { cur.push(sorted[i]); }
-      else { groups.push(cur); cur = [sorted[i]]; }
-    }
-    groups.push(cur);
-    const avg = arr => arr.reduce((s,x)=>s+x,0) / arr.length;
-    return groups
-      .sort((a, b) => b.length - a.length)
-      .slice(0, 3)
-      .map(members => ({
-        members,
-        mean:     avg(members.map(m => m.yardScore)),
-        xwobaAvg: avg(members.map(m => m.xwoba)),
-        isoAvg:   avg(members.map(m => m.iso)),
-        boomAvg:  avg(members.map(m => m.boomScore)),
-      }));
+    const sorted = [...todaysHRs].sort((a, b) => b.yardScore - a.yardScore); // high first
+    const n = sorted.length;
+    const third = Math.ceil(n / 3);
+    const groups = [
+      sorted.slice(0, third),
+      sorted.slice(third, third * 2),
+      sorted.slice(third * 2),
+    ].filter(g => g.length > 0);
+    const avg = arr => arr.reduce((s, x) => s + x, 0) / arr.length;
+    return groups.map(members => ({
+      members,
+      mean:     avg(members.map(m => m.yardScore)),
+      xwobaAvg: avg(members.map(m => m.xwoba)),
+      isoAvg:   avg(members.map(m => m.iso)),
+      boomAvg:  avg(members.map(m => m.boomScore)),
+    }));
   }, [todaysHRs]);
 
   // Confirmed pool — re-evaluates on lineup or final-game version changes
@@ -17420,6 +17419,14 @@ function BatterLeaderboard() {
     { key:'xbh',  label:'XBH', render: p => { const v=ws(p,'xbh');  return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=12?'#ff8020':v>=7?'#f5a623':'var(--text)'}}>{v||0}</span>; }},
     { key:'kPct', label:'K%',  render: p => { const v=ws(p,'kPct'); return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=28?'var(--ice)':'var(--muted)'}}>{fmtPct(v)}</span>; }},
     { key:'bbPct',label:'BB%', render: p => { const v=ws(p,'bbPct'); return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=12?'#27c97a':'var(--muted)'}}>{fmtPct(v)}</span>; }},
+    { key:'bspd', label:'BSPD', render: p => {
+        const pid = String(p.pid||p.id||'');
+        const v = parseFloat(DAILY_PICKS_CACHE[pid]?.recent_avg_bat_speed || 0) || null;
+        return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,
+          color: v!=null ? (v>=77?'#ff4020':v>=74?'#f5a623':'var(--text)') : 'var(--muted)'}}>
+          {v!=null ? v.toFixed(1) : '—'}
+        </span>;
+      }},
     { key:'hrOdds',label:'HR Odds', render: p => <HROddsCell pid={p.pid||p.id}/> },
   ];
 
@@ -17539,16 +17546,26 @@ function BatterLeaderboard() {
           const teamLabel = teamFilter !== 'all' ? `-${teamFilter}` : '';
           const f3 = v => (v != null && v > 0) ? '.' + String(Math.round(v * 1000)).padStart(3, '0') : '';
           const f1 = v => (v != null && v > 0) ? v.toFixed(1) : '';
-          const hdrs = ['Batter','Team','PA','Avg EV','Brl%','HH%','FB%','GB%','Avg LA','BA','OBP','SLG','OPS','HR','K%','BB%'];
+          const hdrs = ['Batter','Team','PA','Avg EV','95+ EV','100+ EV','Brl%','HH%','FB%','GB%','Avg LA','BA','OBP','SLG','OPS','HR','L7 HR','H','XBH','K%','BB%','BSPD'];
           const rows = [hdrs.map(esc).join(',')];
           // Export the current filtered+sorted view — ws() gives window-aware values
           filtered.forEach(p => {
             const ops = (ws(p,'slg')||0) + (ws(p,'obp')||0);
+            const pid = String(p.pid||p.id||'');
+            const hhv = ws(p,'hardHit') || 0;
+            const pav = ws(p,'pa') || ws(p,'ab') || 0;
+            const ev95  = pav > 0 ? Math.round(hhv / 100 * pav) : 0;
+            const ev100 = pav > 0 ? Math.round(hhv / 100 * pav * 0.40) : 0;
+            const fromPicks = DAILY_PICKS_CACHE[pid]?.recent_hr_count;
+            const l7hr = parseInt(fromPicks != null ? fromPicks : (l7FallbackCache[pid] ?? 0));
+            const bspdRaw = parseFloat(DAILY_PICKS_CACHE[pid]?.recent_avg_bat_speed || 0);
             rows.push([
               esc(p.name),
               esc(p.team||''),
-              esc(ws(p,'pa')||0),
+              esc(pav||0),
               esc(f1(ws(p,'avgEV'))),
+              esc(ev95||0),
+              esc(ev100||0),
               esc(f1(ws(p,'barrel'))),
               esc(f1(ws(p,'hardHit'))),
               esc(f1(ws(p,'flyBall'))),
@@ -17559,8 +17576,12 @@ function BatterLeaderboard() {
               esc(f3(ws(p,'slg'))),
               esc(f3(ops || ws(p,'ops'))),
               esc(ws(p,'hr')||0),
+              esc(l7hr||0),
+              esc(ws(p,'hits')||0),
+              esc(ws(p,'xbh')||0),
               esc(f1(ws(p,'kPct'))),
               esc(f1(ws(p,'bbPct'))),
+              esc(bspdRaw > 0 ? bspdRaw.toFixed(1) : ''),
             ].join(','));
           });
           const a = document.createElement('a');
@@ -28281,15 +28302,17 @@ function BarrelLabTab() {
   const [confirmedOnly, setConfirmedOnly] = useState(false);
   const [injuryVer,    setInjuryVer]     = useState(0);
   const [simTrigger,   setSimTrigger]    = useState(0);
+  const [hrVer,        setHrVer]         = useState(0);
 
   useEffect(() => {
     const unsub    = subscribeLineup(v => setLineupVer(v));
     const unsubInj = subscribeInjuries(() => setInjuryVer(v => v + 1));
     const finId    = setInterval(() => setFinalVer(FINAL_GAME_IDS.size), 30000);
+    const hrId     = setInterval(() => { if (_HR_VER !== hrVer) setHrVer(_HR_VER); }, 5000);
     // One-shot lineup fetch on mount — no auto-poll (sim is manual after this)
     loadTodayLineups();
-    return () => { unsub(); unsubInj(); clearInterval(finId); };
-  }, []);
+    return () => { unsub(); unsubInj(); clearInterval(finId); clearInterval(hrId); };
+  }, [hrVer]);
 
   // Auto-switch to confirmed-only once lineups post — catches injured players the PA gate misses
   // (engine extends recent window back to find 10 PAs, so injured players pass the PA gate)
@@ -28591,6 +28614,48 @@ function BarrelLabTab() {
               }}>
               {simRunning ? '⟳ Running…' : '⟳ Refresh'}
             </button>
+            <button
+              onClick={() => {
+                const rows = selGame ? sortBatters(gameBatters) : flatSorted;
+                if (!rows.length) return;
+                const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
+                const f1 = v => (v != null && v !== '' && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(1) : '';
+                const f3 = v => (v != null && v !== '' && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(3) : '';
+                const hdrs = ['Slot','Team','Player','Pitcher','Grade','TrueHR','Matchup','ZF','Form (gHR)','SimHR%','ISO','xwOBA','PulledBrl%','Brl/BIP%','HR/FB%','FB%','HH%','LA°'];
+                const csvRows = [hdrs.map(esc).join(',')];
+                rows.forEach(b => {
+                  csvRows.push([
+                    esc(parseInt(b.lineup_slot||0)||''),
+                    esc(b.batting_team||''),
+                    esc(b.batter||''),
+                    esc(b.pitcher||''),
+                    esc(b._pgLabel||b.pitcher_grade_label||''),
+                    esc(b.trueHRScore||0),
+                    esc(b.matchupScore||0),
+                    esc(f1(b.zone_fit)),
+                    esc(f1(b.gHR)),
+                    esc(b.simHRPct != null ? b.simHRPct+'%' : ''),
+                    esc(f3(b.recent_iso)),
+                    esc(f3(b.season_xwoba)),
+                    esc(f1(b.recent_pulled_barrel_pct)),
+                    esc(b.brlBIP != null ? b.brlBIP+'%' : ''),
+                    esc(b.hrFB != null ? b.hrFB : ''),
+                    esc(f1(b.recent_fb_pct)),
+                    esc(f1(b.recent_hh_pct)),
+                    esc(f1(b.la_mean_l15||b.recent_avg_la)),
+                  ].join(','));
+                });
+                const a = document.createElement('a');
+                const d = new Date().toISOString().slice(0,10);
+                a.href = URL.createObjectURL(new Blob(['﻿'+csvRows.join('\n')],{type:'text/csv;charset=utf-8;'}));
+                a.download = `barrel-lab-${selGame?(selGame.home_abbr||'game'):'all'}-${d}.csv`;
+                a.click();
+              }}
+              style={{background:'var(--surface2)',border:'1px solid var(--border)',
+                color:'var(--text)',borderRadius:5,padding:'2px 8px',fontSize:9,
+                cursor:'pointer',fontFamily:"'DM Mono',monospace",lineHeight:1.5,flexShrink:0}}>
+              ⬇ CSV
+            </button>
           </div>
         );
       })()}
@@ -28746,6 +28811,12 @@ function BarrelLabTab() {
                                 <span style={{color:'var(--text)'}}>
                                   {b.isBarrelSignal ? '★ ' : ''}{b.batter}
                                 </span>
+                                {isGoneYardToday(parseInt(b.batter_id)||0, b.batter) && (
+                                  <div style={{padding:'2px 6px',borderRadius:4,flexShrink:0,
+                                    background:'rgba(255,20,0,.25)',border:'1px solid rgba(255,20,0,.5)',
+                                    color:'#fff',fontFamily:"'DM Mono',monospace",
+                                    fontWeight:800,fontSize:9,letterSpacing:.5}}>💥</div>
+                                )}
                                 {fin && <span style={{fontSize:7,color:'var(--muted)',border:'1px solid var(--border)',borderRadius:3,padding:'1px 3px'}}>FINAL</span>}
                               </div>
                             </div>
