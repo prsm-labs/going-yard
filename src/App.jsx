@@ -19742,7 +19742,7 @@ function StatsTab() {
             <option key={m.key} value={m.key}>{m.away} @ {m.home}{m.time?' · '+m.time:''}</option>
           ))}
         </select>
-        {selMatchup&&<button onClick={()=>{setSelMatchup('');setBTeam('ALL');setPTeam('ALL');}}
+        {selMatchup&&<button id="splits-matchup-clear" onClick={()=>{setSelMatchup('');setBTeam('ALL');setPTeam('ALL');}}
           style={{padding:'4px 8px',borderRadius:6,fontSize:9,fontFamily:mono,cursor:'pointer',
             border:'1px solid var(--border)',color:'var(--muted)',background:'transparent'}}>
           ✕
@@ -20025,7 +20025,7 @@ function StatsTab() {
               {batterCollapsed ? '▶' : '▼'}
             </span>
           </div>
-          <button id="splits-batter-csv-trigger" onClick={()=>exportCSV(bRows, `batter-splits-${window}.csv`, 'batters')}
+          <button id="splits-batter-csv-trigger" onClick={()=>exportCSV(bRows, `batter-splits-${window}-${getETDateStr()}.csv`, 'batters')}
             data-tip="Export batter table to CSV"
             style={{padding:'3px 8px',borderRadius:6,fontSize:9,cursor:'pointer',
               border:'1px solid var(--border)',color:'var(--muted)',background:'transparent',
@@ -28497,7 +28497,7 @@ function HomeTab() {
         <button style={stBtn('pairs')}      onClick={()=>setSub('pairs')}>🔗 Pairs</button>
         <button style={stBtn('sim')}        onClick={()=>setSub('sim')}>🎰 Sim</button>
         <button style={stBtn('crystal')}    onClick={()=>setSub('crystal')}>🔮</button>
-        <button style={stBtn('barrellab')} onClick={()=>setSub('barrellab')}>🧪 Barrel Lab</button>
+        <button data-subtab="barrellab" style={stBtn('barrellab')} onClick={()=>setSub('barrellab')}>🧪 Barrel Lab</button>
         <HelpBtn2/>
         {/* Refresh — visible when on cheat sheet */}
         {sub==='cheatsheet' && (
@@ -29022,7 +29022,7 @@ function BarrelLabTab() {
                   ].join(','));
                 });
                 const a = document.createElement('a');
-                const d = new Date().toISOString().slice(0,10);
+                const d = getETDateStr();
                 a.href = URL.createObjectURL(new Blob(['﻿'+csvRows.join('\n')],{type:'text/csv;charset=utf-8;'}));
                 a.download = `barrel-lab-${selGame?(selGame.home_abbr||'game'):'all'}-${d}.csv`;
                 a.click();
