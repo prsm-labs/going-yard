@@ -1,16 +1,26 @@
-// barrelWorker.js — Monte Carlo HR simulation for Barrel Lab
-// Receives: { batters, weatherData }
-// Posts back: { results: { batter_id: { simHRRate, simPAs } } }
+// barrelWorker.js — Going Yard Monte Carlo HR Simulation
+// 10,000 PA simulations per eligible batter. Runs in a background Web Worker thread.
+//
+// Pitcher inputs now wired from daily_picks.csv (Option 1 — July 2026):
+//   pitcher_fb_pct_vs_R / pitcher_fb_pct_vs_L  → hand-specific FB% allowed
+//   pitcher_hr_pct_vs_R / pitcher_hr_pct_vs_L  → hand-specific HR rate allowed (blended into hrPerFB)
+//   pitcher_barrel_pct_allowed                  → barrel suppressor on adjHRperFB ceiling
+//
+// Still using league-average defaults (Option 2 — requires pipeline addition):
+//   pitcher_k_pct_allowed  → not yet in matchup_engine.py pitcher_vulnerability
+//   pitcher_gb_pct_allowed → not yet in matchup_engine.py pitcher_vulnerability
+//
+// Platoon split: vs_hand_woba / season_xwoba ratio — already real data, unchanged.
+// Park factor: hr_factor decimal — already wired, unchanged.
+// Wind: wind_effect string + wind_speed_mph — already wired, unchanged.
 
 self.onmessage = function(e) {
   const { batters } = e.data;
   const N_RUNS = 10000;
   const results = {};
 
-  // Check if pitcher GB/K fields are present on any row
-  const sampleRow = batters[0] || {};
-  const hasPitcherGB = sampleRow.gb_pct_p != null || sampleRow.pitcher_gb_pct != null;
-  const hasPitcherK  = sampleRow.k_pct_p  != null || sampleRow.pitcher_k_pct  != null;
+  // Note: pitcher_gb_pct / pitcher_k_pct not yet in daily_picks.csv.
+  // Will be wired in Option 2 when matchup_engine.py adds those fields.
 
   batters.forEach(r => {
     const bid = String(r.batter_id || '').split('.')[0];
@@ -24,23 +34,54 @@ self.onmessage = function(e) {
       ? parseFloat(r.ld_pct) / 100
       : Math.max(0, (1 - fbPct - gbPct) * 0.72);
 
-    // HR/FB% — derived from batter's recent rates
-    const hrRate  = parseFloat(r.recent_hr_rate || 0) / 100;
-    const hrPerFB = fbPct > 0.01
+    // HR/FB% — blend batter tendency with pitcher HR rate allowed by hand.
+    // Pitcher-specific rate is the actual observed HR rate this pitcher
+    // allows to this batter's handedness — more predictive than batter alone.
+    const hrRate = parseFloat(r.recent_hr_rate || 0) / 100;
+    const batterHRperFB = fbPct > 0.01
       ? Math.min(0.35, hrRate / fbPct)
       : 0.10;
 
-    // ── Pitcher tendency adjustments ─────────────────────────────────────
-    // gb_pct_p / k_pct_p not in CSV — use league-average defaults
-    const pitcherGB = parseFloat(r.gb_pct_p || r.pitcher_gb_pct || 45) / 100;
-    const pitcherK  = parseFloat(r.k_pct_p  || r.pitcher_k_pct  || 22) / 100;
+    const bHand = (r.batter_hand || '').toUpperCase();
+    const pitcherHRpct = parseFloat(
+      bHand === 'R'
+        ? (r.pitcher_hr_pct_vs_R || r.pitcher_hr_pct_vs_L || 0)
+        : (r.pitcher_hr_pct_vs_L || r.pitcher_hr_pct_vs_R || 0)
+    ) / 100;
 
+    // If pitcher HR rate data exists, blend 50/50 with batter tendency.
+    // If not (new pitcher / insufficient sample), use batter rate only.
+    const hrPerFB = pitcherHRpct > 0
+      ? (batterHRperFB * 0.50 + pitcherHRpct * 0.50)
+      : batterHRperFB;
+
+    // ── Pitcher tendency adjustments (real data from daily_picks.csv) ────
+    // Use hand-specific pitcher FB% allowed — the actual rate this pitcher
+    // allows fly balls to this batter's handedness.
+    // High pitcher FB% = fly ball pitcher = more HR opportunities.
+    // Low pitcher FB% = groundball pitcher = suppressed HR opportunities.
+    const pitcherFbAllowed = parseFloat(
+      bHand === 'R'
+        ? (r.pitcher_fb_pct_vs_R || r.pitcher_fb_pct_allowed || 20)
+        : (r.pitcher_fb_pct_vs_L || r.pitcher_fb_pct_allowed || 20)
+    ) / 100;
+
+    // Blend batter FB% tendency with pitcher FB% allowed (60/40 pitcher-weighted).
+    // Pitcher controls ball type more than the batter in any given matchup.
     const adjFbPct = Math.max(0.05,
-      fbPct * (1 - Math.max(0, pitcherGB - 0.45) * 0.8)
+      fbPct * 0.40 + pitcherFbAllowed * 0.60
     );
-    const adjKPct  = Math.min(0.50,
-      kPct + Math.max(0, pitcherK - 0.22) * 0.4
-    );
+
+    // K% — pitcher-specific K rate not yet in CSV (Option 2).
+    // Use batter's own recent K% unchanged for now.
+    const adjKPct = Math.min(0.50, kPct);
+
+    // Pitcher barrel% allowed — suppresses HR/FB ceiling for tough contact pitchers.
+    const pitcherBrlAllowed = parseFloat(r.pitcher_barrel_pct_allowed || 6.5) / 100;
+    const brlSuppressor = pitcherBrlAllowed < 0.040  ? 0.88  // elite barrel suppressor
+                        : pitcherBrlAllowed < 0.055  ? 0.94  // good
+                        : pitcherBrlAllowed > 0.100  ? 1.08  // hittable — barrels allowed freely
+                        : 1.00;
 
     // ── Environmental adjustments ────────────────────────────────────────
     // hr_factor in CSV is decimal (e.g. 1.06 = 6% above neutral)
@@ -66,7 +107,6 @@ self.onmessage = function(e) {
     // vs_hand_woba is already filtered to this pitcher's hand by the engine
     const seasonWoba = parseFloat(r.season_xwoba || 0.310);
     const vsHandWoba = parseFloat(r.vs_hand_woba || seasonWoba);
-    const bHand = (r.batter_hand || '').toUpperCase();
     const pHand = (r.pitcher_hand || '').replace(/^(L|R).*/i, '$1').toUpperCase();
     const platoonMult = seasonWoba > 0
       ? Math.min(1.40, Math.max(0.70, vsHandWoba / seasonWoba))
@@ -74,7 +114,7 @@ self.onmessage = function(e) {
 
     // ── Adjusted HR/FB% ──────────────────────────────────────────────────
     const adjHRperFB = Math.min(0.45,
-      hrPerFB * parkFactor * windMult * pitcherMult * platoonMult
+      hrPerFB * parkFactor * windMult * pitcherMult * platoonMult * brlSuppressor
     );
 
     // ── PA count variance by lineup slot ────────────────────────────────
