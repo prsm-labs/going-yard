@@ -20025,7 +20025,7 @@ function StatsTab() {
               {batterCollapsed ? '▶' : '▼'}
             </span>
           </div>
-          <button onClick={()=>exportCSV(bRows, `batter-splits-${window}.csv`, 'batters')}
+          <button id="splits-batter-csv-trigger" onClick={()=>exportCSV(bRows, `batter-splits-${window}.csv`, 'batters')}
             data-tip="Export batter table to CSV"
             style={{padding:'3px 8px',borderRadius:6,fontSize:9,cursor:'pointer',
               border:'1px solid var(--border)',color:'var(--muted)',background:'transparent',
@@ -28990,7 +28990,7 @@ function BarrelLabTab() {
               }}>
               {simRunning ? '⟳ Running…' : '⟳ Refresh'}
             </button>
-            <button
+            <button id="barrel-lab-csv-trigger"
               onClick={() => {
                 const rows = selGame ? sortBatters(gameBatters) : flatSorted;
                 if (!rows.length) return;
