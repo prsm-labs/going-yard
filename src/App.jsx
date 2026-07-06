@@ -28885,9 +28885,10 @@ function BarrelLabTab() {
     return teams;
   }, [scoredBatters, selGame]);
 
-  const signalCount = scoredBatters.filter(b => b.isBarrelSignal).length;
-  const topTrue     = scoredBatters[0]?.trueHRScore ?? null;
-  const topSim      = scoredBatters.reduce((m, b) => b.simHRPct != null && b.simHRPct > m ? b.simHRPct : m, 0) || null;
+  const gameRows    = selGame ? scoredBatters.filter(b => String(b.game_id) === String(selGame.gamePk || selGame.game_id || '')) : scoredBatters;
+  const signalCount = gameRows.filter(b => b.isBarrelSignal).length;
+  const topTrue     = gameRows[0]?.trueHRScore ?? null;
+  const topSim      = gameRows.reduce((m, b) => b.simHRPct != null && b.simHRPct > m ? b.simHRPct : m, 0) || null;
 
   const isFinal = gid => FINAL_GAME_IDS.has(String(gid));
 
@@ -29146,7 +29147,7 @@ function BarrelLabTab() {
             {!selGame ? 'Top Reads — All Games Today' : 'Top Reads'}
           </div>
           <div style={{display:'flex',gap:8,overflowX:'auto',paddingBottom:8,marginBottom:16}}>
-            {(!selGame ? flatSorted : scoredBatters).slice(0,5).map(b => (
+            {(!selGame ? flatSorted : scoredBatters.filter(b => String(b.game_id) === String(selGame.gamePk || selGame.game_id || ''))).slice(0,5).map(b => (
               <div key={b._bid} style={{
                 minWidth:200,flex:'0 0 auto',
                 background:'var(--surface2)',borderRadius:8,padding:'10px 12px',
