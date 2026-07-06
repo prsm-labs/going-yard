@@ -28784,13 +28784,53 @@ function BarrelLabTab() {
     );
   }, [selGame, eligibleBatters]);
 
-  const scoredBatters = useMemo(() =>
-    gameBatters.map(r => {
-      const bid          = String(r.batter_id || '').split('.')[0];
-      const trueHRScore  = computeTrueHRScore(r);
-      const matchupScore = computeMatchupScore(r);
-      const sim          = simResults[bid] || {};
-      const simHRPct     = sim.simHRRate != null
+  function getPitcherCeiling(r) {
+    const grade = (r.pitcher_grade_label || r._pgLabel || '').toLowerCase();
+    const era   = parseFloat(r.pitcher_era || r.era || 4.00);
+    const gradeCeiling =
+      grade.includes('elite')    ? 70 :
+      grade.includes('tough')    ? 79 :
+      grade.includes('hittable') ? 93 :
+      grade.includes('target')   ? 97 :
+      grade.includes('average')  ? 86 : 84;
+    const eraAdjust = era >= 5.00 ? +3 : era >= 4.50 ? +1 : era <= 2.50 ? -4 : era <= 3.00 ? -2 : 0;
+    return Math.min(99, Math.max(55, gradeCeiling + eraAdjust));
+  }
+
+  function normalizeWithinMatchup(scoredArr) {
+    const groups = {};
+    scoredArr.forEach(r => {
+      const key = `${r.game_id}_${r.batting_team}`;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(r);
+    });
+    const normalized = [];
+    Object.values(groups).forEach(group => {
+      if (!group.length) return;
+      const ceiling  = getPitcherCeiling(group[0]);
+      const floor    = Math.round(ceiling * 0.20);
+      const rawScores = group.map(r => r._rawTrueHRScore);
+      const groupMax  = Math.max(...rawScores);
+      const groupMin  = Math.min(...rawScores);
+      const range     = groupMax - groupMin;
+      group.forEach(r => {
+        const normalizedScore = range < 1
+          ? Math.round((ceiling + floor) / 2)
+          : Math.round(floor + ((r._rawTrueHRScore - groupMin) / range) * (ceiling - floor));
+        normalized.push({ ...r, trueHRScore: Math.min(99, Math.max(0, normalizedScore)) });
+      });
+    });
+    return normalized;
+  }
+
+  const scoredBatters = useMemo(() => {
+    // Pass 1: raw scores for all eligible batters
+    const withRaw = eligibleBatters.map(r => {
+      const bid             = String(r.batter_id || '').split('.')[0];
+      const _rawTrueHRScore = computeTrueHRScore(r);
+      const matchupScore    = computeMatchupScore(r);
+      const sim             = simResults[bid] || {};
+      const simHRPct        = sim.simHRRate != null
         ? parseFloat((sim.simHRRate * 100).toFixed(1))
         : null;
       const brlBIP = parseFloat(r.recent_fb_pct || 0) > 0
@@ -28799,14 +28839,19 @@ function BarrelLabTab() {
       const hrFB = parseFloat(r.recent_fb_pct || 0) > 0
         ? parseFloat((parseFloat(r.recent_hr_rate||0) / parseFloat(r.recent_fb_pct||1)).toFixed(3))
         : null;
-      const isBarrelSignal =
-        trueHRScore  >= 70 &&
-        matchupScore >= 60 &&
-        simHRPct     != null && simHRPct >= 12.0;
-      return { ...r, trueHRScore, matchupScore, simHRPct, brlBIP, hrFB, isBarrelSignal, _bid: bid };
-    }).sort((a, b) => b.trueHRScore - a.trueHRScore),
-    [gameBatters, simResults]
-  );
+      return { ...r, _rawTrueHRScore, trueHRScore: _rawTrueHRScore, matchupScore, simHRPct, brlBIP, hrFB, _bid: bid };
+    });
+    // Pass 2: normalize within each pitcher matchup group
+    const withNormalized = normalizeWithinMatchup(withRaw);
+    // Pass 3: barrel signal uses normalized trueHRScore
+    return withNormalized.map(r => ({
+      ...r,
+      isBarrelSignal:
+        r.trueHRScore  >= 75 &&
+        r.matchupScore >= 60 &&
+        r.simHRPct     != null && r.simHRPct >= 12.0,
+    })).sort((a, b) => b.trueHRScore - a.trueHRScore);
+  }, [eligibleBatters, simResults]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Color threshold helpers
   const clr = (v, g1, g2, y1, y2) => {
@@ -28829,13 +28874,16 @@ function BarrelLabTab() {
   // Group by team for lineup boards
   const byTeam = useMemo(() => {
     const teams = {};
-    scoredBatters.forEach(b => {
+    const toGroup = selGame
+      ? scoredBatters.filter(b => String(b.game_id) === String(selGame.gamePk || selGame.game_id || ''))
+      : scoredBatters;
+    toGroup.forEach(b => {
       const t = b.batting_team || '?';
       if (!teams[t]) teams[t] = { batters:[], pitcher: b.pitcher, pitcherHand: b.pitcher_hand, pgLabel: b._pgLabel || '', pitcherGB: parseFloat(b.gb_pct_p || b.pitcher_gb_pct || 45) };
       teams[t].batters.push(b);
     });
     return teams;
-  }, [scoredBatters]);
+  }, [scoredBatters, selGame]);
 
   const signalCount = scoredBatters.filter(b => b.isBarrelSignal).length;
   const topTrue     = scoredBatters[0]?.trueHRScore ?? null;
@@ -28997,7 +29045,9 @@ function BarrelLabTab() {
             </button>
             <button id="barrel-lab-csv-trigger"
               onClick={() => {
-                const rows = selGame ? sortBatters(gameBatters) : flatSorted;
+                const rows = selGame
+                  ? sortBatters(scoredBatters.filter(b => String(b.game_id) === String(selGame.gamePk || selGame.game_id || '')))
+                  : flatSorted;
                 if (!rows.length) return;
                 const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
                 const f1 = v => (v != null && v !== '' && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(1) : '';
