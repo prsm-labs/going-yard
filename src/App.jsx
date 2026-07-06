@@ -11370,12 +11370,17 @@ function isActiveBatter(r) {
 const KEY_MATCHUP_BATTER_IDS   = new Set();
 const KEY_MATCHUP_BATTER_NAMES = new Set(); // lowercase name fallback
 let   KEY_MATCHUP_DATE = '';
+// GOING YARD DATE CUTOVER RULE — 4am ET
+// Slate day runs ~10am ET → 3:59am ET next morning.
+// Before 4:00am ET → previous calendar day. At 4:00am ET → new day.
+// All display dates and CSV filenames use this rule via getETDateStr().
+// Never inline ET date logic elsewhere — always call getETDateStr().
 const getETDateStr = () => {
   // Slate day runs 4am ET → 3:59am ET next day.
-  // Before 3am ET = still "yesterday's" slate — subtract one day.
+  // Before 4am ET = still "yesterday's" slate — subtract one day.
   const etHour = parseInt(new Date().toLocaleString('en-US',{timeZone:'America/New_York',hour:'numeric',hour12:false}));
   const d = new Date();
-  if (etHour < 3) d.setDate(d.getDate() - 1); // rewind to previous calendar day
+  if (etHour < 4) d.setDate(d.getDate() - 1); // rewind to previous calendar day
   const s = d.toLocaleDateString('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'});
   const [m,dy,y] = s.split('/'); return `${y}-${m}-${dy}`;
 };
@@ -15735,11 +15740,11 @@ function SimLabView({ data }) {
               const a = document.createElement('a');
               a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}));
               // ET date — same as Key Matchups export
-              // ET date with 3am cutoff — before 3am ET still counts as "yesterday's" slate
+              // ET date with 4am cutoff — use getETDateStr() canonical rule
               const _etRaw  = new Date().toLocaleString('en-US', {timeZone:'America/New_York',hour:'numeric',hour12:false});
               const _etH    = parseInt(_etRaw);
               const _etBase = new Date();
-              if (_etH < 3) _etBase.setDate(_etBase.getDate() - 1);
+              if (_etH < 4) _etBase.setDate(_etBase.getDate() - 1);
               const _etNow  = new Date(_etBase.toLocaleString('en-US', {timeZone:'America/New_York'}));
               const _etDate = _etNow.getFullYear()+'-'+String(_etNow.getMonth()+1).padStart(2,'0')+'-'+String(_etNow.getDate()).padStart(2,'0');
               a.download = 'all-matchups-' + _etDate + '.csv';
@@ -23277,8 +23282,8 @@ function MatchupEngineTab() {
     const base = new Date(Date.UTC(parseInt(y), parseInt(m) - 1, parseInt(d)));
     // Before 4am ET = still "yesterday" in app terms
     const etHour = parseInt(now.toLocaleString('en-US', { timeZone: 'America/New_York', hour: 'numeric', hour12: false }));
-    // Extend "today" until 3am ET — games often run past midnight
-    const dayOffset = etHour < 3 ? offsetDays - 1 : offsetDays;
+    // Before 4am ET = still "yesterday's" slate
+    const dayOffset = etHour < 4 ? offsetDays - 1 : offsetDays;
     base.setUTCDate(base.getUTCDate() + dayOffset);
     return base.toISOString().slice(0, 10); // YYYY-MM-DD
   };
@@ -23473,11 +23478,11 @@ function MatchupEngineTab() {
     const csv = bom + headers.map(esc).join(',') + String.fromCharCode(10) + rows.join(String.fromCharCode(10));
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}));
-    // ET date with 3am cutoff — before 3am ET still counts as "yesterday's" slate
+    // ET date with 4am cutoff — use getETDateStr() canonical rule
     const _etRaw  = new Date().toLocaleString('en-US', {timeZone:'America/New_York',hour:'numeric',hour12:false});
     const _etH    = parseInt(_etRaw);
     const _etBase = new Date();
-    if (_etH < 3) _etBase.setDate(_etBase.getDate() - 1);
+    if (_etH < 4) _etBase.setDate(_etBase.getDate() - 1);
     const _etNow  = new Date(_etBase.toLocaleString('en-US', {timeZone:'America/New_York'}));
     const _etDate = _etNow.getFullYear()+'-'+String(_etNow.getMonth()+1).padStart(2,'0')+'-'+String(_etNow.getDate()).padStart(2,'0');
     a.download = 'key-matchups-' + _etDate + '.csv';
