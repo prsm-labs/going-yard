@@ -28512,6 +28512,7 @@ function HomeTab() {
         <button style={stBtn('sim')}        onClick={()=>setSub('sim')}>🎰 Sim</button>
         <button style={stBtn('crystal')}    onClick={()=>setSub('crystal')}>🔮</button>
         <button data-subtab="barrellab" style={stBtn('barrellab')} onClick={()=>setSub('barrellab')}>🛢️ Daily Barrel</button>
+        <button data-subtab="onbase"    style={stBtn('onbase')}    onClick={()=>setSub('onbase')}>🔵 On Base</button>
         <HelpBtn2/>
         {/* Refresh — visible when on cheat sheet */}
         {sub==='cheatsheet' && (
@@ -28541,11 +28542,51 @@ function HomeTab() {
       {sub==='sim'        && <SimTab data={data}/>}
       {sub==='crystal'    && <CrystalBallTab embedded/>}
       {sub==='barrellab'  && <BarrelLabTab/>}
+      {sub==='onbase'     && <OnBaseTab/>}
     </div>
   );
 }
 
-// ── Barrel Lab ──────────────────────────────────────────────────────────────
+// ── Barrel Lab / On Base — shared helpers ───────────────────────────────────
+
+function getPitcherCeiling(r) {
+  const grade = (r.pitcher_grade_label || r._pgLabel || '').toLowerCase();
+  const era   = parseFloat(r.pitcher_era || r.era || 4.00);
+  const gradeCeiling =
+    grade.includes('elite')    ? 70 :
+    grade.includes('tough')    ? 79 :
+    grade.includes('hittable') ? 93 :
+    grade.includes('target')   ? 97 :
+    grade.includes('average')  ? 86 : 84;
+  const eraAdjust = era >= 5.00 ? +3 : era >= 4.50 ? +1 : era <= 2.50 ? -4 : era <= 3.00 ? -2 : 0;
+  return Math.min(99, Math.max(55, gradeCeiling + eraAdjust));
+}
+
+function normalizeWithinMatchup(scoredArr) {
+  const groups = {};
+  scoredArr.forEach(r => {
+    const key = `${r.game_id}_${r.batting_team}`;
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(r);
+  });
+  const normalized = [];
+  Object.values(groups).forEach(group => {
+    if (!group.length) return;
+    const ceiling  = getPitcherCeiling(group[0]);
+    const floor    = Math.round(ceiling * 0.20);
+    const rawScores = group.map(r => r._rawTrueHRScore);
+    const groupMax  = Math.max(...rawScores);
+    const groupMin  = Math.min(...rawScores);
+    const range     = groupMax - groupMin;
+    group.forEach(r => {
+      const normalizedScore = range < 1
+        ? Math.round((ceiling + floor) / 2)
+        : Math.round(floor + ((r._rawTrueHRScore - groupMin) / range) * (ceiling - floor));
+      normalized.push({ ...r, trueHRScore: Math.min(99, Math.max(0, normalizedScore)) });
+    });
+  });
+  return normalized;
+}
 
 // PA eligibility gate — confirmed via live LINEUP_STATUS, with PA fallback pre-confirmation
 function isBarrelLabEligible(r) {
@@ -28798,45 +28839,6 @@ function BarrelLabTab() {
       String(r.game_id) === String(selGame.gamePk || selGame.game_id || '')
     );
   }, [selGame, eligibleBatters]);
-
-  function getPitcherCeiling(r) {
-    const grade = (r.pitcher_grade_label || r._pgLabel || '').toLowerCase();
-    const era   = parseFloat(r.pitcher_era || r.era || 4.00);
-    const gradeCeiling =
-      grade.includes('elite')    ? 70 :
-      grade.includes('tough')    ? 79 :
-      grade.includes('hittable') ? 93 :
-      grade.includes('target')   ? 97 :
-      grade.includes('average')  ? 86 : 84;
-    const eraAdjust = era >= 5.00 ? +3 : era >= 4.50 ? +1 : era <= 2.50 ? -4 : era <= 3.00 ? -2 : 0;
-    return Math.min(99, Math.max(55, gradeCeiling + eraAdjust));
-  }
-
-  function normalizeWithinMatchup(scoredArr) {
-    const groups = {};
-    scoredArr.forEach(r => {
-      const key = `${r.game_id}_${r.batting_team}`;
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(r);
-    });
-    const normalized = [];
-    Object.values(groups).forEach(group => {
-      if (!group.length) return;
-      const ceiling  = getPitcherCeiling(group[0]);
-      const floor    = Math.round(ceiling * 0.20);
-      const rawScores = group.map(r => r._rawTrueHRScore);
-      const groupMax  = Math.max(...rawScores);
-      const groupMin  = Math.min(...rawScores);
-      const range     = groupMax - groupMin;
-      group.forEach(r => {
-        const normalizedScore = range < 1
-          ? Math.round((ceiling + floor) / 2)
-          : Math.round(floor + ((r._rawTrueHRScore - groupMin) / range) * (ceiling - floor));
-        normalized.push({ ...r, trueHRScore: Math.min(99, Math.max(0, normalizedScore)) });
-      });
-    });
-    return normalized;
-  }
 
   const scoredBatters = useMemo(() => {
     // Pass 1: raw scores for all eligible batters
@@ -29318,6 +29320,639 @@ function BarrelLabTab() {
                       · Groundball pitcher — FB% suppressed in sim
                     </span>
                   )}
+                </div>
+                {renderTable(sortBatters(tBatters))}
+              </div>
+            ));
+          })()}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── On Base Tab ─────────────────────────────────────────────────────────────
+
+function onbase_groupA(r) {
+  const xbhPct   = parseFloat(r.xbh_pct || 0);
+  const xbhScore = Math.min(100, xbhPct * 5.0);
+  const hh       = parseFloat(r.hh_pct || 0);
+  const hhScore  = Math.min(100, hh * 2.2);
+  const xwoba    = parseFloat(r.season_xwoba || 0);
+  const xwobaScore = Math.min(100, Math.max(0, (xwoba - 0.250) / 0.200 * 100));
+  const slg      = parseFloat(r.slg || 0);
+  const slgScore = Math.min(100, Math.max(0, (slg - 0.300) / 0.400 * 100));
+  return xbhScore * 0.35 + hhScore * 0.25 + xwobaScore * 0.25 + slgScore * 0.15;
+}
+
+function onbase_groupB(r) {
+  const zf      = parseFloat(r.zone_fit || 0);
+  const zfScore = Math.min(100, zf * 13.5);
+  const grade   = (r.pitcher_grade_label || r._pgLabel || '').toLowerCase();
+  const gradeScore =
+    grade.includes('elite')    ? 15 :
+    grade.includes('tough')    ? 40 :
+    grade.includes('hittable') ? 82 :
+    grade.includes('target')   ? 92 :
+    grade.includes('average')  ? 62 : 60;
+  const seasonWoba  = parseFloat(r.season_xwoba || 0.310);
+  const vsHandWoba  = parseFloat(r.vs_hand_woba || seasonWoba);
+  const platoonScore = Math.min(100, Math.max(0, (vsHandWoba - 0.250) / 0.200 * 100));
+  const bHand = (r.batter_hand || '').toUpperCase();
+  const pHand = (r.pitcher_hand || '').toUpperCase();
+  const platoonMult = (bHand !== pHand) ? 1.12 : 0.90;
+  const simTB      = parseFloat(r.sim_tb || 0);
+  const simTBScore = Math.min(100, (simTB / 2.5) * 100);
+  return Math.min(100, Math.max(0,
+    zfScore * 0.30 + gradeScore * 0.25 + (platoonScore * platoonMult) * 0.25 + simTBScore * 0.20
+  ));
+}
+
+function onbase_groupC(r) {
+  const g2tb         = parseFloat(r.g2tb_pct || 0);
+  const g2tbScore    = Math.min(100, g2tb * 2.0);
+  const recentXBH    = parseFloat(r.recent_xbh_rate || (parseFloat(r.xbh_pct || 0) / 100));
+  const recentXBHScore = Math.min(100, recentXBH * 500);
+  const iso          = parseFloat(r.recent_iso || 0);
+  const isoScore     = Math.min(100, Math.max(0, (iso - 0.050) / 0.350 * 100));
+  const formScore    = (recentXBHScore * 1.5 + g2tbScore * 1.0) / 2.5;
+  return formScore * 0.70 + isoScore * 0.30;
+}
+
+function computeOnBaseScore(r) {
+  const A = onbase_groupA(r);
+  const B = onbase_groupB(r);
+  const C = onbase_groupC(r);
+  return Math.round(Math.min(100, Math.max(0, A * 0.40 + B * 0.35 + C * 0.25)));
+}
+
+function computeOnBaseMatchupScore(r) {
+  const zf      = parseFloat(r.zone_fit || 0);
+  const zfScore = Math.min(100, zf * 13.5);
+  const grade   = (r.pitcher_grade_label || r._pgLabel || '').toLowerCase();
+  const gradeMult =
+    grade.includes('elite')    ? 0.55 :
+    grade.includes('tough')    ? 0.75 :
+    grade.includes('target')   ? 1.20 :
+    grade.includes('hittable') ? 1.10 : 1.0;
+  const seasonWoba = parseFloat(r.season_xwoba || 0.310);
+  const vsHandWoba = parseFloat(r.vs_hand_woba || seasonWoba);
+  const bHand = (r.batter_hand || '').toUpperCase();
+  const pHand = (r.pitcher_hand || '').toUpperCase();
+  const handScore = Math.min(100, Math.max(0, (vsHandWoba - 0.250) / 0.200 * 100));
+  const platoonMult = (bHand !== pHand) ? 1.12 : 0.90;
+  const simTB      = parseFloat(r.sim_tb || 0);
+  const simTBScore = Math.min(100, (simTB / 2.5) * 100);
+  return Math.round(Math.min(100, Math.max(0,
+    (zfScore * 0.35 + (handScore * platoonMult) * 0.35 + simTBScore * 0.30) * gradeMult
+  )));
+}
+
+function OnBaseTab() {
+  const mono = "'DM Mono',monospace";
+  const osw  = "'Oswald',sans-serif";
+
+  const [selGame,          setSelGame]          = useState(null);
+  const [simResults,       setSimResults]       = useState({});
+  const [simRunning,       setSimRunning]       = useState(false);
+  const [lineupVer,        setLineupVer]        = useState(LINEUP_VERSION || 0);
+  const [finalVer,         setFinalVer]         = useState(0);
+  const [sortCol,          setSortCol]          = useState('onBaseScore');
+  const [sortDir,          setSortDir]          = useState('desc');
+  const [confirmedOnly,    setConfirmedOnly]    = useState(false);
+  const userSetConfirmed = useRef(false);
+  const [injuryVer,        setInjuryVer]        = useState(0);
+  const [simTrigger,       setSimTrigger]       = useState(0);
+  const [liveGamesVersion, setLiveGamesVersion] = useState(LIVE_GAMES_CACHE.length);
+
+  useEffect(() => {
+    const unsub    = subscribeLineup(v => setLineupVer(v));
+    const unsubInj = subscribeInjuries(() => setInjuryVer(v => v + 1));
+    const finId    = setInterval(() => setFinalVer(FINAL_GAME_IDS.size), 30000);
+    const liveId   = setInterval(() => setLiveGamesVersion(LIVE_GAMES_CACHE.length), 15000);
+    loadTodayLineups();
+    return () => { unsub(); unsubInj(); clearInterval(finId); clearInterval(liveId); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (userSetConfirmed.current) return;
+    if (lineupVer > 0 && Object.keys(LINEUP_STATUS).length > 0) {
+      setConfirmedOnly(true);
+    }
+  }, [lineupVer]);
+
+  const eligibleBatters = useMemo(() => {
+    const base = Object.values(DAILY_PICKS_CACHE || {}).filter(r => {
+      if (!isBarrelLabEligible(r)) return false;
+      const bid = String(r.batter_id || '').split('.')[0];
+      if (INJURY_MAP[bid]) return false;
+      return true;
+    });
+    if (confirmedOnly) {
+      return base.filter(r => {
+        const bid = String(r.batter_id || '').split('.')[0];
+        return LINEUP_STATUS[bid]?.status === 'confirmed';
+      });
+    }
+    return base;
+  }, [lineupVer, confirmedOnly, injuryVer]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function runOnBaseSim(batters) {
+    if (!batters.length) return;
+    setSimRunning(true);
+    const worker = new Worker('/onBaseWorker.js');
+    worker.postMessage({ batters, weatherData: {} });
+    worker.onmessage = (e) => {
+      setSimResults(e.data.results);
+      setSimRunning(false);
+      worker.terminate();
+      console.log('[OnBase] Sim complete —', Object.keys(e.data.results).length, 'batters');
+    };
+    worker.onerror = (err) => {
+      console.warn('[OnBase] Worker error:', err.message);
+      setSimRunning(false);
+      worker.terminate();
+    };
+  }
+
+  useEffect(() => {
+    if (eligibleBatters.length > 0) {
+      const toSim = selGame
+        ? eligibleBatters.filter(r => String(r.game_id) === String(selGame.gamePk || selGame.game_id || ''))
+        : eligibleBatters;
+      runOnBaseSim(toSim);
+    }
+  }, [selGame, simTrigger]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const gameSlate = useMemo(() => {
+    const parseTime = t => {
+      if (!t) return 9999;
+      const m = t.match(/(\d+):(\d+)\s*(AM|PM)/i);
+      if (!m) return 9999;
+      let h = parseInt(m[1]), min = parseInt(m[2]);
+      const pm = m[3].toUpperCase() === 'PM';
+      if (pm && h !== 12) h += 12;
+      if (!pm && h === 12) h = 0;
+      return h * 60 + min;
+    };
+    if (LIVE_GAMES_CACHE.length > 0) {
+      return [...LIVE_GAMES_CACHE]
+        .filter(g => g.gamePk || g.id)
+        .map(g => ({
+          game_id:   String(g.gamePk || g.id || ''),
+          gamePk:    String(g.gamePk || g.id || ''),
+          away_abbr: g.away?.abbr || '',
+          home_abbr: g.home?.abbr || '',
+          game_time: g.gameTime   || '',
+          status:    g.status     || '',
+        }))
+        .sort((a, b) => parseTime(a.game_time) - parseTime(b.game_time));
+    }
+    return [];
+  }, [liveGamesVersion]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const onbaseScored = useMemo(() => {
+    const withRaw = eligibleBatters.map(r => {
+      const bid             = String(r.batter_id || '').split('.')[0];
+      const _rawOnBaseScore = computeOnBaseScore(r);
+      const matchupScore    = computeOnBaseMatchupScore(r);
+      const sim             = simResults[bid] || {};
+      const simTB2Pct       = sim.simTB2Rate != null
+        ? parseFloat((sim.simTB2Rate * 100).toFixed(1))
+        : null;
+      return { ...r, _rawTrueHRScore: _rawOnBaseScore, onBaseScore: _rawOnBaseScore, matchupScore, simTB2Pct, _bid: bid };
+    });
+
+    const withNormalized = normalizeWithinMatchup(withRaw)
+      .map(r => ({ ...r, onBaseScore: r.trueHRScore }));
+
+    return withNormalized.map(r => ({
+      ...r,
+      isTBSignal:
+        r.onBaseScore  >= 75 &&
+        r.matchupScore >= 60 &&
+        r.simTB2Pct != null && r.simTB2Pct >= 30.0,
+    })).sort((a, b) => b.onBaseScore - a.onBaseScore);
+  }, [eligibleBatters, simResults]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const byTeam = useMemo(() => {
+    const teams = {};
+    const toGroup = selGame
+      ? onbaseScored.filter(b => String(b.game_id) === String(selGame.gamePk || selGame.game_id || ''))
+      : onbaseScored;
+    toGroup.forEach(b => {
+      const t = b.batting_team || '?';
+      if (!teams[t]) teams[t] = { batters:[], pitcher: b.pitcher, pitcherHand: b.pitcher_hand, pgLabel: b._pgLabel || '' };
+      teams[t].batters.push(b);
+    });
+    return teams;
+  }, [onbaseScored, selGame]);
+
+  const gameRows    = selGame ? onbaseScored.filter(b => String(b.game_id) === String(selGame.gamePk || selGame.game_id || '')) : onbaseScored;
+  const signalCount = gameRows.filter(b => b.isTBSignal).length;
+  const topOBS      = gameRows[0]?.onBaseScore ?? null;
+  const topSim      = gameRows.reduce((m, b) => b.simTB2Pct != null && b.simTB2Pct > m ? b.simTB2Pct : m, 0) || null;
+
+  const isFinal = gid => FINAL_GAME_IDS.has(String(gid));
+
+  const openBatter = (b) => {
+    const cached = getCachedPlayer(b.batter_id);
+    openAtBatSlide(cached
+      ? { ...cached, name: b.batter, team: b.batting_team || '' }
+      : { pid: b.batter_id, name: b.batter, team: b.batting_team || '',
+          avgEV:   parseFloat(b.recent_avg_ev || 0),
+          barrel:  parseFloat(b.recent_barrel_pct || 0),
+          hardHit: parseFloat(b.recent_hh_pct || 0),
+          flyBall: parseFloat(b.recent_fb_pct || 0),
+          hr:      parseInt(b.recent_hr_count || 0) }
+    );
+  };
+
+  // Color helpers
+  const obsClr  = v => v == null ? 'var(--muted)' : v >= 80 ? '#27c97a' : v >= 60 ? '#f5a623' : v < 40 ? '#ff6b6b' : 'var(--text)';
+  const mscClr  = v => v == null ? 'var(--muted)' : v >= 75 ? '#27c97a' : v >= 50 ? '#f5a623' : v < 35 ? '#ff6b6b' : 'var(--text)';
+  const simClr  = v => v == null ? 'var(--muted)' : v >= 45 ? '#27c97a' : v >= 30 ? '#f5a623' : v < 20 ? '#ff6b6b' : 'var(--text)';
+  const g2tbClr = v => v == null ? 'var(--muted)' : v >= 50 ? '#27c97a' : v >= 38 ? '#f5a623' : v < 25 ? '#ff6b6b' : 'var(--text)';
+  const xbhClr  = v => v == null ? 'var(--muted)' : v >= 18 ? '#27c97a' : v >= 12 ? '#f5a623' : 'var(--text)';
+  const slgClr  = v => v == null ? 'var(--muted)' : v >= 0.550 ? '#27c97a' : v >= 0.450 ? '#f5a623' : v < 0.300 ? '#ff6b6b' : 'var(--text)';
+  const zfClr   = v => v == null ? 'var(--muted)' : v >= 7 ? '#27c97a' : v >= 4 ? '#f5a623' : 'var(--text)';
+  const fmt     = (v, d=1) => v != null && !isNaN(parseFloat(v)) ? parseFloat(v).toFixed(d) : '—';
+
+  const COLS = [
+    { h:'Slot',      key:'lineup_slot',     acc: b => parseInt(b.lineup_slot||0)||99,            align:'left',  allOnly:false },
+    { h:'Team',      key:'batting_team',    acc: b => (b.batting_team||'').toLowerCase(),        align:'left',  allOnly:true  },
+    { h:'Player',    key:'batter',          acc: b => (b.batter||'').toLowerCase(),              align:'left',  allOnly:false },
+    { h:'OnBase',    key:'onBaseScore',     acc: b => b.onBaseScore||0,                          align:'right' },
+    { h:'Matchup',   key:'matchupScore',    acc: b => b.matchupScore||0,                         align:'right' },
+    { h:'ZF',        key:'zone_fit',        acc: b => parseFloat(b.zone_fit||0),                 align:'right' },
+    { h:'G2TB%',     key:'g2tb_pct',        acc: b => parseFloat(b.g2tb_pct||0),                align:'right' },
+    { h:'SimTB2%',   key:'simTB2Pct',       acc: b => b.simTB2Pct ?? -1,                        align:'right' },
+    { h:'AVG',       key:'avg',             acc: b => parseFloat(b.avg||0),                      align:'right' },
+    { h:'SLG',       key:'slg',             acc: b => parseFloat(b.slg||0),                      align:'right' },
+    { h:'ISO',       key:'recent_iso',      acc: b => parseFloat(b.recent_iso||0),               align:'right' },
+    { h:'xwOBA',     key:'season_xwoba',    acc: b => parseFloat(b.season_xwoba||0),             align:'right' },
+    { h:'XBH%',      key:'xbh_pct',         acc: b => parseFloat(b.xbh_pct||0),                 align:'right' },
+    { h:'HH%',       key:'hh_pct',          acc: b => parseFloat(b.hh_pct||0),                   align:'right' },
+    { h:'SimTB',     key:'sim_tb',          acc: b => parseFloat(b.sim_tb||0),                   align:'right' },
+    { h:'LA°',       key:'la',              acc: b => parseFloat(b.la_mean_l15||b.recent_avg_la||0), align:'right' },
+  ];
+
+  const toggleSort = (key) => {
+    if (sortCol === key) setSortDir(d => d === 'desc' ? 'asc' : 'desc');
+    else { setSortCol(key); setSortDir('desc'); }
+  };
+
+  const sortBatters = (arr) => [...arr].sort((a, b) => {
+    const col = COLS.find(c => c.key === sortCol);
+    if (!col) return 0;
+    const av = col.acc(a), bv = col.acc(b);
+    if (typeof av === 'string') return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+    return sortDir === 'asc' ? av - bv : bv - av;
+  });
+
+  const flatSorted = useMemo(() => {
+    const signals    = onbaseScored.filter(b =>  b.isTBSignal);
+    const nonSignals = onbaseScored.filter(b => !b.isTBSignal);
+    const sortFn = (arr) => [...arr].sort((a, b) => {
+      const col = COLS.find(c => c.key === sortCol);
+      if (!col) return 0;
+      const av = col.acc(a), bv = col.acc(b);
+      if (typeof av === 'string') return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+      return sortDir === 'asc' ? av - bv : bv - av;
+    });
+    return [...sortFn(signals), ...sortFn(nonSignals)];
+  }, [onbaseScored, sortCol, sortDir]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const visibleCols = selGame ? COLS.filter(c => !c.allOnly) : COLS;
+
+  return (
+    <div style={{paddingBottom:20}}>
+      {/* Game Slate */}
+      <div style={{display:'flex',gap:8,overflowX:'auto',paddingBottom:8,marginBottom:12}}>
+        <button
+          onClick={() => setSelGame(null)}
+          style={{
+            minWidth:90,flex:'0 0 auto',padding:'8px 10px',borderRadius:8,cursor:'pointer',
+            border:`1px solid ${!selGame ? 'rgba(56,184,242,.8)' : 'var(--border)'}`,
+            background: !selGame ? 'rgba(56,184,242,.12)' : 'var(--surface2)',
+            textAlign:'center',
+          }}>
+          <div style={{fontFamily:osw,fontSize:11,fontWeight:700,letterSpacing:.6,
+            color: !selGame ? '#38b8f2' : 'var(--muted)'}}>
+            ALL GAMES
+          </div>
+        </button>
+        {gameSlate.length === 0 && (
+          <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)',padding:'8px 0'}}>
+            Loading game slate…
+          </div>
+        )}
+        {gameSlate.map(g => {
+          const sel = selGame?.game_id === g.game_id;
+          const fin = isFinal(g.game_id);
+          return (
+            <button key={g.game_id}
+              onClick={() => setSelGame(g)}
+              style={{
+                minWidth:110,flex:'0 0 auto',padding:'8px 10px',borderRadius:8,cursor:'pointer',
+                border:`1px solid ${sel ? 'rgba(56,184,242,.8)' : 'var(--border)'}`,
+                background: sel ? 'rgba(56,184,242,.12)' : 'var(--surface2)',
+                textAlign:'center',opacity: fin ? 0.55 : 1,
+              }}>
+              <div style={{fontFamily:osw,fontSize:11,fontWeight:700,color: sel ? '#38b8f2' : 'var(--text)',letterSpacing:.6}}>
+                {g.away_abbr} @ {g.home_abbr}
+              </div>
+              <div style={{fontFamily:mono,fontSize:8,color: sel ? 'rgba(56,184,242,.7)' : 'var(--muted)',marginTop:2}}>
+                {fin ? 'FINAL' : (g.game_time || '')}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Lineup filter status + controls */}
+      {(() => {
+        const lineupCount = Object.keys(LINEUP_STATUS).length;
+        const lineupReady = lineupCount > 0;
+        return (
+          <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',
+            marginBottom:10,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+            <span style={{
+              display:'inline-block',width:7,height:7,borderRadius:'50%',flexShrink:0,
+              background: lineupReady ? '#27c97a' : '#f5a623',
+            }}/>
+            {lineupReady
+              ? `${eligibleBatters.length} batters · lineups confirmed`
+              : `Lineups pending · ${eligibleBatters.length} batters (10+ recent PA)`
+            }
+            {lineupReady && (
+              <button
+                onClick={() => { userSetConfirmed.current = true; setConfirmedOnly(v => !v); }}
+                style={{
+                  background: confirmedOnly ? 'rgba(56,184,242,.12)' : 'var(--surface2)',
+                  border: `1px solid ${confirmedOnly ? 'rgba(56,184,242,.4)' : 'var(--border)'}`,
+                  color: confirmedOnly ? '#38b8f2' : 'var(--muted)',
+                  borderRadius:5,padding:'2px 8px',fontSize:9,cursor:'pointer',
+                  fontFamily:mono,lineHeight:1.5,flexShrink:0,
+                }}>
+                {confirmedOnly ? '✅ Confirmed only' : '👁 All batters'}
+              </button>
+            )}
+            <button
+              disabled={simRunning}
+              onClick={async () => {
+                await loadTodayLineups();
+                setSimTrigger(v => v + 1);
+              }}
+              style={{
+                background:'var(--surface2)',border:'1px solid var(--border)',
+                color: simRunning ? 'var(--muted)' : 'var(--text)',
+                borderRadius:5,padding:'2px 8px',fontSize:9,cursor: simRunning ? 'default' : 'pointer',
+                fontFamily:mono,lineHeight:1.5,flexShrink:0,opacity: simRunning ? 0.5 : 1,
+              }}>
+              {simRunning ? '⟳ Running…' : '⟳ Refresh'}
+            </button>
+            <button id="onbase-csv-trigger"
+              onClick={() => {
+                const rows = selGame
+                  ? sortBatters(onbaseScored.filter(b => String(b.game_id) === String(selGame.gamePk || selGame.game_id || '')))
+                  : flatSorted;
+                if (!rows.length) return;
+                const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
+                const f1 = v => (v != null && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(1) : '';
+                const f3 = v => (v != null && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(3) : '';
+                const hdrs = ['Slot','Team','Player','Pitcher','Grade','OnBaseScore','Matchup','ZF','G2TB%','SimTB2%','AVG','SLG','ISO','xwOBA','XBH%','HH%','SimTB','LA°','TB Signal'];
+                const csvRows = [hdrs.map(esc).join(',')];
+                rows.forEach(b => {
+                  csvRows.push([
+                    esc(parseInt(b.lineup_slot||0)||''),
+                    esc(b.batting_team||''),
+                    esc(b.batter||''),
+                    esc(b.pitcher||''),
+                    esc(b._pgLabel||b.pitcher_grade_label||''),
+                    esc(b.onBaseScore||0),
+                    esc(b.matchupScore||0),
+                    esc(f1(b.zone_fit)),
+                    esc(f1(b.g2tb_pct)),
+                    esc(b.simTB2Pct != null ? b.simTB2Pct+'%' : ''),
+                    esc(f3(b.avg)),
+                    esc(f3(b.slg)),
+                    esc(f3(b.recent_iso)),
+                    esc(f3(b.season_xwoba)),
+                    esc(f1(b.xbh_pct)),
+                    esc(f1(b.hh_pct)),
+                    esc(f1(b.sim_tb)),
+                    esc(f1(b.la_mean_l15||b.recent_avg_la)),
+                    esc(b.isTBSignal ? '1' : '0'),
+                  ].join(','));
+                });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(new Blob(['﻿'+csvRows.join('\n')],{type:'text/csv;charset=utf-8;'}));
+                a.download = `onbase-all-${getETDateStr()}.csv`;
+                a.click();
+              }}
+              style={{background:'var(--surface2)',border:'1px solid var(--border)',
+                color:'var(--text)',borderRadius:5,padding:'2px 8px',fontSize:9,
+                cursor:'pointer',fontFamily:mono,lineHeight:1.5,flexShrink:0}}>
+              ⬇ CSV
+            </button>
+          </div>
+        );
+      })()}
+
+      {/* Signal Board */}
+      {onbaseScored.length > 0 && (
+        <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}>
+          {[
+            { label: !selGame ? 'TOP ONBASESCORE TODAY' : 'TOP ONBASESCORE', val: topOBS != null ? String(topOBS) : '—', sub: !selGame ? 'Best across all games' : 'Best full-board read' },
+            { label:'TB SIGNALS',        val: String(signalCount), sub: !selGame ? 'Total signals today' : 'Signals in this game' },
+            { label:'TOP SIM TB2 RATE',  val: topSim ? topSim + '%' : '—', sub:'Best Monte Carlo read' },
+          ].map(({label,val,sub}) => (
+            <div key={label} style={{flex:'1 1 120px',background:'var(--surface2)',borderRadius:8,
+              padding:'10px 14px',border:'1px solid var(--border)'}}>
+              <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:4}}>
+                {label}
+              </div>
+              <div style={{fontFamily:osw,fontSize:22,fontWeight:700,color:'#38b8f2',lineHeight:1}}>
+                {val}
+              </div>
+              <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:4}}>{sub}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Loading */}
+      {simRunning && (
+        <div style={{display:'flex',flexDirection:'column',alignItems:'center',
+          gap:10,padding:'28px 16px',marginBottom:12}}>
+          <div className="sp" style={{width:20,height:20,borderWidth:2}}/>
+          <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)'}}>
+            Running 10,000 Total Bases simulations…
+          </div>
+          <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>
+            {eligibleBatters.length} eligible batters · Pitcher + park + platoon applied
+          </div>
+        </div>
+      )}
+
+      {/* No batters */}
+      {!simRunning && onbaseScored.length === 0 && (
+        <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)',
+          padding:'24px 16px',textAlign:'center',
+          background:'var(--surface2)',borderRadius:8,marginBottom:12}}>
+          No batters found.<br/>
+          Daily picks may still be loading — try refreshing in a moment.
+        </div>
+      )}
+
+      {!simRunning && onbaseScored.length > 0 && (
+        <>
+          {/* Top Reads */}
+          <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',
+            textTransform:'uppercase',letterSpacing:.8,marginBottom:6}}>
+            {!selGame ? 'Top Reads — All Games Today' : 'Top Reads'}
+          </div>
+          <div style={{display:'flex',gap:8,overflowX:'auto',paddingBottom:8,marginBottom:16}}>
+            {(!selGame ? flatSorted : onbaseScored.filter(b => String(b.game_id) === String(selGame.gamePk || selGame.game_id || ''))).slice(0,5).map(b => (
+              <div key={b._bid} style={{
+                minWidth:200,flex:'0 0 auto',
+                background:'var(--surface2)',borderRadius:8,padding:'10px 12px',
+                border:`1px solid ${b.isTBSignal ? 'rgba(56,184,242,.6)' : 'var(--border)'}`,
+                borderLeft:`3px solid ${b.isTBSignal ? '#38b8f2' : 'var(--border)'}`,
+                opacity: isFinal(b.game_id) ? 0.5 : 1,
+              }}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
+                  <div style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',flex:1,minWidth:0}} onClick={() => openBatter(b)}>
+                    <PlayerAvatar pid={b.batter_id} name={b.batter} size={32}/>
+                    <div style={{minWidth:0}}>
+                      <div style={{fontFamily:osw,fontWeight:700,fontSize:13,color:'var(--text)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                        {b.batter}
+                      </div>
+                      <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>
+                        {b.batting_team} · {b.batter_hand}v{(b.pitcher_hand||'').charAt(0)}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:4,flexShrink:0,marginLeft:6}}>
+                    <div style={{fontFamily:osw,fontSize:22,fontWeight:800,color:'#38b8f2',lineHeight:1}}>
+                      {b.onBaseScore}
+                    </div>
+                    <div onClick={e => e.stopPropagation()}>
+                      <PickButton pid={b.batter_id} name={b.batter} team={b.batting_team||''}/>
+                    </div>
+                  </div>
+                </div>
+                {b.isTBSignal && (
+                  <div style={{fontFamily:mono,fontSize:8,color:'#38b8f2',marginBottom:6}}>
+                    ★ TB Signal
+                  </div>
+                )}
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px 10px',fontFamily:mono,fontSize:8}}>
+                  {[
+                    ['ONBASESCORE', b.onBaseScore, obsClr(b.onBaseScore)],
+                    ['MATCHUP',     b.matchupScore, mscClr(b.matchupScore)],
+                    ['ZONEFIT',     fmt(b.zone_fit,1), zfClr(b.zone_fit)],
+                    ['G2TB%',       fmt(b.g2tb_pct,1)+'%', g2tbClr(b.g2tb_pct)],
+                    ['SLG',         fmt(b.slg,3), slgClr(b.slg)],
+                    ['XBH%',        fmt(b.xbh_pct,1)+'%', xbhClr(b.xbh_pct)],
+                    ['ISO',         fmt(b.recent_iso,3), 'var(--text)'],
+                    ['SimTB2%',     b.simTB2Pct != null ? b.simTB2Pct+'%' : '—', simClr(b.simTB2Pct)],
+                  ].map(([lbl,val,color]) => (
+                    <div key={lbl}>
+                      <div style={{color:'var(--muted)',letterSpacing:.5}}>{lbl}</div>
+                      <div style={{color,fontWeight:600}}>{val}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Table */}
+          {(() => {
+            const renderTable = (rows) => (
+              <div style={{overflowX:'auto'}}>
+                <table style={{width:'100%',borderCollapse:'collapse',fontFamily:mono,fontSize:9}}>
+                  <thead>
+                    <tr style={{borderBottom:'1px solid var(--border)'}}>
+                      {visibleCols.map(col => {
+                        const active = sortCol === col.key;
+                        return (
+                          <th key={col.key}
+                            onClick={() => toggleSort(col.key)}
+                            style={{padding:'4px 6px',textAlign:col.align||'right',whiteSpace:'nowrap',
+                              cursor:'pointer',userSelect:'none',
+                              color: active ? '#38b8f2' : 'var(--muted)',
+                              background: active ? 'rgba(56,184,242,.06)' : 'transparent',
+                            }}>
+                            {col.h}{active ? (sortDir==='desc' ? ' ▼' : ' ▲') : ''}
+                          </th>
+                        );
+                      })}
+                      <th style={{padding:'4px 6px',color:'var(--muted)',textAlign:'right',whiteSpace:'nowrap'}}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((b) => {
+                      const fin = isFinal(b.game_id);
+                      return (
+                        <tr key={b._bid} style={{
+                          borderBottom:'1px solid rgba(255,255,255,.04)',
+                          opacity: fin ? 0.5 : 1,
+                          background: b.isTBSignal ? 'rgba(56,184,242,.04)' : 'transparent',
+                        }}>
+                          <td style={{padding:'4px 6px',color:'var(--muted)'}}>{parseInt(b.lineup_slot||0)||'—'}</td>
+                          {!selGame && <td style={{padding:'4px 6px',color:'var(--muted)',fontFamily:mono,fontSize:8}}>{b.batting_team||'—'}</td>}
+                          <td style={{padding:'4px 6px',whiteSpace:'nowrap'}}>
+                            <div style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer'}} onClick={() => openBatter(b)}>
+                              <PlayerAvatar pid={b.batter_id} name={b.batter} size={22}/>
+                              <span style={{color:'var(--text)'}}>{b.isTBSignal ? '★ ' : ''}{b.batter}</span>
+                              {fin && <span style={{fontSize:7,color:'var(--muted)',border:'1px solid var(--border)',borderRadius:3,padding:'1px 3px'}}>FINAL</span>}
+                            </div>
+                          </td>
+                          <td style={{padding:'4px 6px',textAlign:'right',color:obsClr(b.onBaseScore),fontWeight:600}}>{b.onBaseScore}</td>
+                          <td style={{padding:'4px 6px',textAlign:'right',color:mscClr(b.matchupScore)}}>{b.matchupScore}</td>
+                          <td style={{padding:'4px 6px',textAlign:'right',color:zfClr(b.zone_fit)}}>{fmt(b.zone_fit,1)}</td>
+                          <td style={{padding:'4px 6px',textAlign:'right',color:g2tbClr(b.g2tb_pct)}}>{b.g2tb_pct != null && b.g2tb_pct !== '' && b.g2tb_pct !== 0 ? fmt(b.g2tb_pct,1)+'%' : '—'}</td>
+                          <td style={{padding:'4px 6px',textAlign:'right',color:simClr(b.simTB2Pct)}}>{b.simTB2Pct != null ? b.simTB2Pct+'%' : '—'}</td>
+                          <td style={{padding:'4px 6px',textAlign:'right'}}>{fmt(b.avg,3)}</td>
+                          <td style={{padding:'4px 6px',textAlign:'right',color:slgClr(b.slg)}}>{fmt(b.slg,3)}</td>
+                          <td style={{padding:'4px 6px',textAlign:'right'}}>{fmt(b.recent_iso,3)}</td>
+                          <td style={{padding:'4px 6px',textAlign:'right'}}>{fmt(b.season_xwoba,3)}</td>
+                          <td style={{padding:'4px 6px',textAlign:'right',color:xbhClr(b.xbh_pct)}}>{b.xbh_pct != null && b.xbh_pct !== '' ? fmt(b.xbh_pct,1)+'%' : '—'}</td>
+                          <td style={{padding:'4px 6px',textAlign:'right'}}>{fmt(b.hh_pct,1)}%</td>
+                          <td style={{padding:'4px 6px',textAlign:'right'}}>{fmt(b.sim_tb,2)}</td>
+                          <td style={{padding:'4px 6px',textAlign:'right'}}>{fmt(b.la_mean_l15||b.recent_avg_la,1)}°</td>
+                          <td style={{padding:'4px 6px',textAlign:'right'}} onClick={e => e.stopPropagation()}>
+                            <PickButton pid={b.batter_id} name={b.batter} team={b.batting_team||''}/>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            );
+
+            if (!selGame) {
+              return (
+                <div style={{marginBottom:20}}>
+                  <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',
+                    textTransform:'uppercase',letterSpacing:.8,marginBottom:6}}>
+                    All Batters Today — ★ TB Signals First
+                  </div>
+                  {renderTable(flatSorted)}
+                </div>
+              );
+            }
+
+            return Object.entries(byTeam).map(([team, {batters:tBatters, pitcher, pitcherHand, pgLabel}]) => (
+              <div key={team} style={{marginBottom:20}}>
+                <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',
+                  textTransform:'uppercase',letterSpacing:.8,marginBottom:4}}>
+                  {team} hitters vs {pitcher || '?'} ({(pitcherHand||'').charAt(0)})
+                  {' · '}<span style={{color: pgLabel.includes('Elite')||pgLabel.includes('Tough') ? '#ff6b6b' : pgLabel.includes('Target')||pgLabel.includes('Hittable') ? '#27c97a' : 'var(--muted)'}}>{pgLabel}</span>
                 </div>
                 {renderTable(sortBatters(tBatters))}
               </div>
