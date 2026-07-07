@@ -7232,8 +7232,12 @@ function ThemeMatchTable({ rows }) {
                       {isFinal && <FinalBadge/>}
                       <PlayerAvatar pid={pid} name={b.batter||''} size={16}/>
                       <span style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'var(--accent2)',whiteSpace:'nowrap',flexShrink:0}}>{b.batting_team||''}</span>
-                      <span style={{fontFamily:osw,fontWeight:700,fontSize:10,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',
-                        color:isKeyMatchup(pid,b.batter||'')?'#ff8020':'var(--text)'}}>{b.batter||'—'}</span>
+                      <span
+                        onClick={e => { e.stopPropagation(); openAtBatSlide({ pid, name: b.batter||'', team: b.batting_team||'' }); }}
+                        style={{fontFamily:osw,fontWeight:700,fontSize:10,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',
+                          cursor:'pointer',color:isKeyMatchup(pid,b.batter||'')?'#ff8020':'var(--text)'}}>
+                        {b.batter||'—'}
+                      </span>
                       <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={pid} name={b.batter||''} team={b.batting_team||''}/></span>
                     </div>
                   </td>
@@ -7249,7 +7253,12 @@ function ThemeMatchTable({ rows }) {
                   <td style={{padding:'2px 6px',textAlign:'right'}}>
                     <span style={{fontFamily:mono,fontSize:9,color:pgColor,fontWeight:700}}>{pgLabel.split(' ')[0]||'—'}</span>
                   </td>
-                  <td style={{padding:'2px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',whiteSpace:'nowrap',maxWidth:90,overflow:'hidden',textOverflow:'ellipsis'}}>
+                  <td
+                    onClick={e => {
+                      e.stopPropagation();
+                      if (b.pitcher_id) openPitcherSlide({ pid: parseInt(b.pitcher_id||0), name: resolvePitcherName(b.pitcher,b.batting_team,b.pitcher_id), team:'', hand: b.pitcher_hand||'', pitchMix:[] });
+                    }}
+                    style={{padding:'2px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',whiteSpace:'nowrap',maxWidth:90,overflow:'hidden',textOverflow:'ellipsis',cursor:b.pitcher_id?'pointer':'default'}}>
                     {resolvePitcherName(b.pitcher,b.batting_team,b.pitcher_id)}
                   </td>
                   <td style={{padding:'2px 6px',textAlign:'right',fontFamily:osw,fontWeight:800,fontSize:11,
@@ -28502,7 +28511,7 @@ function HomeTab() {
         <button style={stBtn('pairs')}      onClick={()=>setSub('pairs')}>🔗 Pairs</button>
         <button style={stBtn('sim')}        onClick={()=>setSub('sim')}>🎰 Sim</button>
         <button style={stBtn('crystal')}    onClick={()=>setSub('crystal')}>🔮</button>
-        <button data-subtab="barrellab" style={stBtn('barrellab')} onClick={()=>setSub('barrellab')}>🧪 Barrel Lab</button>
+        <button data-subtab="barrellab" style={stBtn('barrellab')} onClick={()=>setSub('barrellab')}>🛢️ Daily Barrel</button>
         <HelpBtn2/>
         {/* Refresh — visible when on cheat sheet */}
         {sub==='cheatsheet' && (
@@ -28681,23 +28690,28 @@ function BarrelLabTab() {
   const [sortCol,       setSortCol]       = useState('trueHRScore');
   const [sortDir,       setSortDir]       = useState('desc');
   const [confirmedOnly, setConfirmedOnly] = useState(false);
+  const userSetConfirmed = useRef(false);
   const [injuryVer,    setInjuryVer]     = useState(0);
   const [simTrigger,   setSimTrigger]    = useState(0);
-  const [hrVer,        setHrVer]         = useState(0);
+  const [hrVer,            setHrVer]            = useState(0);
+  const [liveGamesVersion, setLiveGamesVersion] = useState(LIVE_GAMES_CACHE.length);
 
   useEffect(() => {
     const unsub    = subscribeLineup(v => setLineupVer(v));
     const unsubInj = subscribeInjuries(() => setInjuryVer(v => v + 1));
     const finId    = setInterval(() => setFinalVer(FINAL_GAME_IDS.size), 30000);
     const hrId     = setInterval(() => { if (_HR_VER !== hrVer) setHrVer(_HR_VER); }, 5000);
+    const liveId   = setInterval(() => setLiveGamesVersion(LIVE_GAMES_CACHE.length), 15000);
     // One-shot lineup fetch on mount — no auto-poll (sim is manual after this)
     loadTodayLineups();
-    return () => { unsub(); unsubInj(); clearInterval(finId); clearInterval(hrId); };
+    return () => { unsub(); unsubInj(); clearInterval(finId); clearInterval(hrId); clearInterval(liveId); };
   }, [hrVer]);
 
-  // Auto-switch to confirmed-only once lineups post — catches injured players the PA gate misses
-  // (engine extends recent window back to find 10 PAs, so injured players pass the PA gate)
+  // Auto-switch to confirmed-only once lineups first post.
+  // Fires one time only — permanently disabled once the user manually
+  // changes the toggle so their preference is always respected.
   useEffect(() => {
+    if (userSetConfirmed.current) return;
     if (lineupVer > 0 && Object.keys(LINEUP_STATUS).length > 0) {
       setConfirmedOnly(true);
     }
@@ -28750,21 +28764,9 @@ function BarrelLabTab() {
     }
   }, [selGame, simTrigger]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // All unique games from eligible batters — sorted by game_time
+  // Game list from LIVE_GAMES_CACHE — authoritative home/away from MLB Stats API
   const gameSlate = useMemo(() => {
-    const seen = new Map();
-    Object.values(DAILY_PICKS_CACHE || {}).forEach(r => {
-      const gid = String(r.game_id || '');
-      if (!gid || seen.has(gid)) return;
-      seen.set(gid, {
-        game_id:   gid,
-        gamePk:    gid,
-        home_abbr: r.pitcher_team || '',
-        away_abbr: r.batting_team || '',
-        game_time: r.game_time    || '',
-      });
-    });
-    const parseTime = (t) => {
+    const parseTime = t => {
       if (!t) return 9999;
       const m = t.match(/(\d+):(\d+)\s*(AM|PM)/i);
       if (!m) return 9999;
@@ -28774,8 +28776,21 @@ function BarrelLabTab() {
       if (!pm && h === 12) h = 0;
       return h * 60 + min;
     };
-    return [...seen.values()].sort((a, b) => parseTime(a.game_time) - parseTime(b.game_time));
-  }, [lineupVer]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (LIVE_GAMES_CACHE.length > 0) {
+      return [...LIVE_GAMES_CACHE]
+        .filter(g => g.gamePk || g.id)
+        .map(g => ({
+          game_id:   String(g.gamePk || g.id || ''),
+          gamePk:    String(g.gamePk || g.id || ''),
+          away_abbr: g.away?.abbr || '',
+          home_abbr: g.home?.abbr || '',
+          game_time: g.gameTime   || '',
+          status:    g.status     || '',
+        }))
+        .sort((a, b) => parseTime(a.game_time) - parseTime(b.game_time));
+    }
+    return [];
+  }, [liveGamesVersion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const gameBatters = useMemo(() => {
     if (!selGame) return eligibleBatters;
@@ -29017,7 +29032,7 @@ function BarrelLabTab() {
             }
             {lineupReady && (
               <button
-                onClick={() => setConfirmedOnly(v => !v)}
+                onClick={() => { userSetConfirmed.current = true; setConfirmedOnly(v => !v); }}
                 style={{
                   background: confirmedOnly ? 'rgba(39,201,122,.12)' : 'var(--surface2)',
                   border: `1px solid ${confirmedOnly ? 'rgba(39,201,122,.4)' : 'var(--border)'}`,
