@@ -6445,6 +6445,83 @@ function HeatingUpSlideout({ games, onClose }) {
         return (b.avgEV||0) - (a.avgEV||0);
       });
 
+      // ── Heat-based push notifications ────────────────────────────────────
+      hot.forEach(b => {
+        const pid = String(b.id || '');
+        const gpk = String(b.gamePk || '');
+        if (!pid || !gpk) return;
+        const shortName = (name => {
+          if (!name) return name;
+          const p = name.trim().split(' ');
+          return p.length < 2 ? name : p[0][0] + '. ' + p.slice(1).join(' ');
+        })(b.name || '');
+
+        // 🔥 On Fire — heatLabel.cls === 'elite'
+        const fireKey = `${gpk}_${pid}`;
+        if (
+          b.heatLabel?.cls === 'elite' &&
+          !HEAT_NOTIF_SENT.has(fireKey) &&
+          !INJURY_MAP[pid]
+        ) {
+          HEAT_NOTIF_SENT.add(fireKey);
+          const evStr = b.avgEV > 0 ? ` · ${b.avgEV.toFixed(0)}mph avg EV` : '';
+          sendLivePush(
+            `🔥 ON FIRE — ${shortName}`,
+            `Elite contact in today's game${evStr}`,
+            `onfire-${fireKey}`,
+            '/#live/gameday'
+          );
+          if (_setQueue) {
+            const fireNotif = {
+              id:         Date.now() + Math.random(),
+              notifType:  'onFire',
+              batterName: b.name || 'Unknown',
+              batterTeam: b.team || '',
+              batterId:   pid,
+              subtitle:   `🔥 On Fire — elite in-game contact`,
+              time: new Date().toLocaleTimeString('en-US', {
+                hour:'numeric', minute:'2-digit', timeZone:'America/New_York'
+              }),
+            };
+            _setQueue(q => [...q.slice(-2), fireNotif]);
+            _notifLog = [fireNotif, ..._notifLog].slice(0, 50);
+            if (_setNotifLog) _setNotifLog([..._notifLog]);
+          }
+        }
+
+        // 🥊 Battling — disciplineLabel label includes 'Battling'
+        const battleKey = `${gpk}_${pid}`;
+        if (
+          b.disciplineLabel?.label?.includes('Battling') &&
+          !BATTLING_NOTIF_SENT.has(battleKey) &&
+          !INJURY_MAP[pid]
+        ) {
+          BATTLING_NOTIF_SENT.add(battleKey);
+          sendLivePush(
+            `🥊 BATTLING — ${shortName}`,
+            `Grinding deep counts, not chasing — watch this AB`,
+            `battling-${battleKey}`,
+            '/#live'
+          );
+          if (_setQueue) {
+            const battleNotif = {
+              id:         Date.now() + Math.random(),
+              notifType:  'battling',
+              batterName: b.name || 'Unknown',
+              batterTeam: b.team || '',
+              batterId:   pid,
+              subtitle:   `🥊 Battling — grinding deep counts`,
+              time: new Date().toLocaleTimeString('en-US', {
+                hour:'numeric', minute:'2-digit', timeZone:'America/New_York'
+              }),
+            };
+            _setQueue(q => [...q.slice(-2), battleNotif]);
+            _notifLog = [battleNotif, ..._notifLog].slice(0, 50);
+            if (_setNotifLog) _setNotifLog([..._notifLog]);
+          }
+        }
+      });
+
       setBatters(hot);
       setLoading(false);
     })();
@@ -11516,6 +11593,9 @@ let _setNotifLog = null;
 
 // Track multi-HR games for On Fire detection
 const GAME_HR_MAP = {}; // 'gamePk_batterId' → count
+// Dedup Sets for heat-based notifications — keyed by `${gamePk}_${batterId}`, reset on page reload
+const HEAT_NOTIF_SENT     = new Set();
+const BATTLING_NOTIF_SENT = new Set();
 
 // Track which teams have already fired lineup notifications
 const LINEUP_NOTIF_SENT = new Set();
@@ -26045,26 +26125,6 @@ function useHRNotifications() {
       // Body: "NYM @ PHI · Top 3 · 103mph"
       const pushBody  = [matchup, inningStr, evoStr].filter(Boolean).join(' · ');
       sendLivePush(pushTitle, pushBody, hrDedupKey);
-      // On Fire detection — same batter hits 2nd HR in same game
-      if (hr.gamePk && hr.batterId) {
-        const key = `${hr.gamePk}_${hr.batterId}`;
-        GAME_HR_MAP[key] = (GAME_HR_MAP[key] || 0) + 1;
-        if (GAME_HR_MAP[key] === 2 && _setQueue) {
-          const fireNotif = { id: Date.now()+Math.random(), notifType:'onFire',
-            batterName: hr.batterName||'Unknown', batterTeam: hr.batterTeam||'',
-            batterId: hr.batterId, subtitle: `${GAME_HR_MAP[key]} HRs this game!`,
-            time: notif.time };
-          _setQueue(q => [...q.slice(-2), fireNotif]);
-          _notifLog = [fireNotif, ..._notifLog].slice(0, 50);
-          if (_setNotifLog) _setNotifLog([..._notifLog]);
-          // Skip push if batter is injured
-        if (!INJURY_MAP[String(hr.batterId||'')]) {
-          const fireShort = (name => { if(!name)return name; const p=name.trim().split(' '); return p.length<2?name:p[0][0]+'. '+p.slice(1).join(' '); })(hr.batterName);
-          sendLivePush(`🔥 ON FIRE — ${fireShort}`,
-            `${GAME_HR_MAP[key]} home runs this game! ${hr.batterTeam}`);
-        }
-        }
-      }
     };
     return () => { _setQueue = null; }; // keep _notifyNewHR alive — avoids missed HRs during remounts
   }, []);
@@ -26117,6 +26177,28 @@ function HRNotificationBanner({ notif, onDismiss }) {
   // ── Non-HR types ────────────────────────────────────────────────────────
   if (notif.notifType === 'onFire') {
     const t = { icon:'🔥', color:'#fb923c', bg:'rgba(251,146,60,.18)', label:'ON FIRE' };
+    const tp = {...touchProps, onClick:()=>handleClick('live','gameday')};
+    return (
+      <div {...tp} style={{...wrapStyle,cursor:'pointer'}}>
+        <div style={{margin:'12px 16px 0',maxWidth:480,width:'100%',background:'rgba(10,15,20,.96)',
+          border:`1px solid ${t.color}44`,borderRadius:14,padding:'12px 16px',
+          display:'flex',alignItems:'center',gap:12,backdropFilter:'blur(16px)'}}>
+          <div style={{width:44,height:44,borderRadius:10,flexShrink:0,background:t.bg,
+            border:`1px solid ${t.color}44`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:22}}>{t.icon}</div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:11,
+              color:t.color,letterSpacing:1,textTransform:'uppercase',marginBottom:2}}>{t.label}</div>
+            <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:15,color:'var(--text)'}}>{notif.batterName}</div>
+            <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginTop:2}}>{notif.batterTeam} · {notif.subtitle}</div>
+          </div>
+          <div style={{fontSize:16,color:'var(--muted)',flexShrink:0,padding:'4px 8px',cursor:'pointer'}}>×</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (notif.notifType === 'battling') {
+    const t = { icon:'🥊', color:'#60a5fa', bg:'rgba(96,165,250,.15)', label:'BATTLING' };
     const tp = {...touchProps, onClick:()=>handleClick('live','gameday')};
     return (
       <div {...tp} style={{...wrapStyle,cursor:'pointer'}}>
@@ -26281,9 +26363,10 @@ function NotificationBell() {
     'Solo':       { icon:'💥', label:'Solo HR',    color:'#ffc840' },
   };
   const notifTypeMap = {
-    onFire:  { icon:'🔥', label:'On Fire',           color:'#fb923c' },
-    lineup:  { icon:'📋', label:'Lineup Confirmed',  color:'#38b8f2' },
-    hr:      { icon:'💥', label:'Gone Yard',         color:'#ff4020' },
+    onFire:   { icon:'🔥', label:'On Fire',           color:'#fb923c' },
+    battling: { icon:'🥊', label:'Battling',          color:'#60a5fa' },
+    lineup:   { icon:'📋', label:'Lineup Confirmed',  color:'#38b8f2' },
+    hr:       { icon:'💥', label:'Gone Yard',         color:'#ff4020' },
   };
 
   return (
@@ -26343,7 +26426,10 @@ function NotificationBell() {
                       <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,
                         fontSize:12,color:'var(--text)',
                         whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                        {n.notifType==='lineup' ? n.title : n.notifType==='onFire' ? n.batterName+' 🔥' : n.batterName}
+                        {n.notifType==='lineup'   ? n.title
+                         : n.notifType==='onFire'   ? n.batterName + ' 🔥'
+                         : n.notifType==='battling' ? n.batterName + ' 🥊'
+                         : n.batterName}
                         <span style={{color:t.color,marginLeft:5,fontSize:10}}>{t.label}</span>
                       </div>
                       <div style={{fontSize:9,color:'var(--muted)',
@@ -30850,6 +30936,8 @@ function StreaksTab() {
 export default function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [tab, setTab] = useState("home");
+  const [newVersionAvailable, setNewVersionAvailable] = useState(false);
+  const [newVersionChangelog, setNewVersionChangelog] = useState([]);
   const [showPicksSlideout, setShowPicksSlideout] = useState(false);
   const [appTeamSlide, setAppTeamSlide] = useState(null); // universal team slideout
   const [appTeamStats, setAppTeamStats] = useState(null);
@@ -30911,6 +30999,40 @@ export default function App() {
     loadDailyPicks();
     const noop = () => {};
     fetchPlayers(noop, noop, noop, false);
+  }, []);
+
+  // Version polling — detects new Vercel deploys and shows banner
+  useEffect(() => {
+    const STORED_KEY = 'gy_build_time';
+
+    const checkVersion = async () => {
+      try {
+        const res  = await fetch('/api/version', { cache: 'no-store' });
+        if (!res.ok) return;
+        const data  = await res.json();
+        const live  = data.buildTime || '';
+        const local = localStorage.getItem(STORED_KEY) || '';
+
+        if (!local) {
+          // First visit — store version silently, no banner
+          localStorage.setItem(STORED_KEY, live);
+          return;
+        }
+        if (live && live !== local) {
+          // New version detected — fetch changelog and show banner
+          try {
+            const vr    = await fetch('/version.json', { cache: 'no-store' });
+            const vdata = await vr.json();
+            if (vdata.changelog) setNewVersionChangelog(vdata.changelog);
+          } catch(_) {}
+          setNewVersionAvailable(true);
+        }
+      } catch(_) {}
+    };
+
+    checkVersion();
+    const id = setInterval(checkVersion, 12 * 60 * 1000); // every 12 minutes
+    return () => clearInterval(id);
   }, []);
 
   // ── Cloud picks sync ────────────────────────────────────────────────────
@@ -30976,6 +31098,48 @@ export default function App() {
     {showSplash && <SplashScreen onDone={() => setShowSplash(false)}/>}
     <style>{styles}</style>
     <div className="app">
+      {newVersionAvailable && (
+        <div style={{
+          position:'fixed', top:0, left:0, right:0, zIndex:99999,
+          background:'linear-gradient(90deg,#ff4020,#ff6b35)',
+          padding:'10px 16px',
+          display:'flex', alignItems:'center',
+          justifyContent:'space-between', gap:12,
+          boxShadow:'0 2px 12px rgba(0,0,0,.4)',
+        }}>
+          <div style={{display:'flex',flexDirection:'column',gap:2}}>
+            <span style={{
+              fontFamily:"'Oswald',sans-serif", fontWeight:700,
+              fontSize:12, letterSpacing:.8, color:'#fff',
+              textTransform:'uppercase',
+            }}>
+              🚀 Going Yard updated
+            </span>
+            {newVersionChangelog.length > 0 && (
+              <span style={{
+                fontFamily:"'DM Mono',monospace",
+                fontSize:9, color:'rgba(255,255,255,.85)',
+              }}>
+                {newVersionChangelog.slice(0,2).join(' · ')}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={() => {
+              localStorage.setItem('gy_build_time','');
+              window.location.reload(true);
+            }}
+            style={{
+              background:'#fff', color:'#ff4020', border:'none',
+              borderRadius:6, padding:'6px 14px', cursor:'pointer',
+              fontFamily:"'Oswald',sans-serif", fontWeight:700,
+              fontSize:11, letterSpacing:.5, textTransform:'uppercase',
+              flexShrink:0,
+            }}>
+            Refresh Now
+          </button>
+        </div>
+      )}
       <div className="app-inner">
       <HRNotifications/>
       <header className="header">

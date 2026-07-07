@@ -1,0 +1,11 @@
+{
+  "version": "2026.07.07",
+  "changelog": [
+    "🛢️ Daily Barrel — Monte Carlo HR simulation per matchup",
+    "🔵 On Base — 2+ Total Bases simulation",
+    "🔥 Live Themes — real-time HR pattern detection",
+    "📺 Watch button in Gameday",
+    "Push notifications now active"
+  ],
+  "notifyUsers": true
+}
