@@ -26681,6 +26681,586 @@ function LegendButton() {
   </>;
 }
 
+function parseCSV(text) {
+  // Handles BOM, quoted fields, emoji-mangled headers, tab separators
+  const clean = text.replace(/^﻿/, '').replace(/\r\n/g, '\n');
+  const lines = clean.split('\n').filter(Boolean);
+  if (!lines.length) return [];
+
+  const delim = lines[0].includes('\t') ? '\t' : ',';
+
+  const parseRow = line => {
+    const vals = []; let cur = ''; let inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"' && !inQ) { inQ = true; continue; }
+      if (ch === '"' &&  inQ) { inQ = false; continue; }
+      if (ch === delim && !inQ) { vals.push(cur.trim()); cur = ''; continue; }
+      cur += ch;
+    }
+    vals.push(cur.trim());
+    return vals;
+  };
+
+  const headers = parseRow(lines[0]).map(h => h.replace(/﻿/g,'').trim());
+  return lines.slice(1)
+    .filter(l => l.trim())
+    .map(l => {
+      const vals = parseRow(l);
+      return Object.fromEntries(headers.map((h,i) => [h, vals[i] ?? '']));
+    });
+}
+
+function normDate(s) {
+  if (!s) return '';
+  try {
+    const d = new Date(s.replace(/(\d+)-([A-Za-z]+)/, '$2 $1'));
+    if (isNaN(d)) return s;
+    return d.toISOString().slice(0,10);
+  } catch { return s; }
+}
+
+function TrackRecordTab() {
+  const mono = "'DM Mono',monospace";
+
+  const [allRows,        setAllRows]        = useState([]);
+  const [availableDates, setAvailableDates] = useState([]);
+  const [selDate,        setSelDate]        = useState('');
+  const [loading,        setLoading]        = useState(false);
+  const [search,         setSearch]         = useState('');
+  const [showOnlyHR,     setShowOnlyHR]     = useState(false);
+  const [showOnlySignal, setShowOnlySignal] = useState(false);
+
+  const [showMatchup,  setShowMatchup]  = useState(true);
+  const [showBarrel,   setShowBarrel]   = useState(true);
+  const [showBoxScore, setShowBoxScore] = useState(true);
+
+  const [sortCol, setSortCol] = useState('yardScore');
+  const [sortDir, setSortDir] = useState(-1);
+
+  useEffect(() => {
+    async function loadTrackRecord() {
+      setLoading(true);
+      try {
+        const [amRes, blRes] = await Promise.all([
+          fetch('/data/track-record-matchups.csv'),
+          fetch('/data/track-record-barrel.csv'),
+        ]);
+
+        const amText = await amRes.text();
+        const blText = blRes.ok ? await blRes.text() : '';
+
+        const amRows = parseCSV(amText);
+        const blRows = blText ? parseCSV(blText) : [];
+
+        // Build Barrel Lab lookup: { 'YYYY-MM-DD_battername': row }
+        const blLookup = {};
+        blRows.forEach(r => {
+          const date = normDate(r.export_date || '');
+          const name = (r.Player || r.Batter || '').trim().toLowerCase();
+          if (date && name) blLookup[`${date}_${name}`] = r;
+        });
+
+        const unified = amRows.map(r => {
+          const date  = normDate(r.export_date || '');
+          const name  = (r.Batter || '').trim().toLowerCase();
+          const blRow = blLookup[`${date}_${name}`] || {};
+
+          const wentYard = (r['Gone Yard']||'').trim().toUpperCase() === 'YES';
+          const actualHR = parseInt(r['HR'] || 0) || (wentYard ? 1 : 0);
+          const actualTB = parseInt(r['TB'] || 0);
+          const actualEV = parseFloat(r['Avg EV'] || 0);
+          const actualLA = parseFloat(r['Launch Angle'] || 0);
+
+          const simHRPct = parseFloat(
+            (blRow['SimHR%'] || '0').toString().replace('%','').trim()) || 0;
+          const trueHR   = parseFloat(blRow['TrueHR']  || 0);
+          const matchup  = parseFloat(blRow['Matchup'] || 0);
+          const simTB    = parseFloat(r['Sim TB'] || 0);
+          const brlSignal = ['true','1','yes'].includes(
+            (blRow['Barrel Signal']||'').toString().toLowerCase().trim());
+          // Prefer CSV column if present (Longshot export not yet wired as of
+          // this build — falls back to inline compute until it is)
+          const isLongshot = blRow['Longshot']
+            ? blRow['Longshot'].toString().toLowerCase() === 'true'
+            : (trueHR > 0 && trueHR <= 55 && matchup >= 65 && simTB >= 1.2);
+
+          return {
+            date,
+            batter:       r['Batter']         || '',
+            team:         r['Team']           || '',
+            hand:         r['Hand']           || '',
+            pitcher:      r['vs Pitcher']     || blRow['Pitcher'] || '',
+            lineupSlot:   parseInt(r['Lineup Slot'] || 0),
+            yardScore:    parseFloat(r['Yard Score'] || 0),
+            boom:         parseFloat((r[Object.keys(r).find(k=>k.includes('Boom'))]||0)),
+            sig:          parseFloat((r[Object.keys(r).find(k=>k.includes('Sig'))]||0)),
+            grade:        r['Grade']          || '',
+            pitcherGrade: r['Pitcher Grade']  || blRow['Grade'] || '',
+            ghr:          parseFloat(r['gHR'] || 0),
+            zoneFit:      parseFloat(r['Zone Fit'] || 0),
+            simTB,
+            xwoba:        parseFloat(r['xwOBA'] || 0),
+            flags:        parseInt(r['Flags'] || 0),
+            isKeyMatchup: (r['Is Key Matchup']||'').toUpperCase() === 'YES',
+            trueHR, matchup, simHRPct, brlSignal, isLongshot,
+            pulledBrl: parseFloat(blRow['PulledBrl%'] || 0),
+            brlBIP:    parseFloat(blRow['Brl/BIP%']   || 0),
+            hrFB:      parseFloat(blRow['HR/FB%']      || 0),
+            fb:        parseFloat(blRow['FB%']          || 0),
+            hh:        parseFloat(blRow['HH%']          || 0),
+            wentYard, actualHR, actualTB,
+            actualAB:   parseInt(r['AB'] || 0),
+            actualH:    parseInt(r['H']  || 0),
+            actualRBI:  parseInt(r['RBI']|| 0),
+            actualBB:   parseInt(r['BB'] || 0),
+            actualK:    parseInt(r['K']  || 0),
+            actualEV, actualLA,
+            closeCalls: parseInt(r['Live Close Calls'] || 0),
+            ccMaxEV:    parseFloat(r['Live CC Max EV'] || 0),
+            ccMaxDist:  parseFloat(r['Live CC Max Dist'] || 0),
+          };
+        });
+
+        setAllRows(unified);
+        const dates = [...new Set(unified.map(r => r.date))].sort().reverse();
+        setAvailableDates(dates);
+        setSelDate(dates[0] || '');
+      } catch(e) {
+        console.error('[TrackRecord] load error:', e);
+      }
+      setLoading(false);
+    }
+    loadTrackRecord();
+  }, []);
+
+  const dateRows = useMemo(() =>
+    allRows.filter(r => r.date === selDate),
+    [allRows, selDate]);
+
+  const filteredRows = useMemo(() => {
+    let rows = dateRows;
+    if (showOnlyHR)     rows = rows.filter(r => r.wentYard);
+    if (showOnlySignal) rows = rows.filter(r => r.brlSignal || r.isKeyMatchup);
+    if (search) {
+      const q = search.toLowerCase();
+      rows = rows.filter(r =>
+        r.batter.toLowerCase().includes(q) ||
+        r.team.toLowerCase().includes(q) ||
+        r.pitcher.toLowerCase().includes(q));
+    }
+    return [...rows].sort((a,b) =>
+      sortDir * ((a[sortCol]||0) - (b[sortCol]||0)));
+  }, [dateRows, showOnlyHR, showOnlySignal, search, sortCol, sortDir]);
+
+  const summary = useMemo(() => {
+    const hrs          = dateRows.filter(r => r.wentYard);
+    const signals      = dateRows.filter(r => r.brlSignal);
+    const signalHits   = signals.filter(r => r.wentYard);
+    const keyMatchups  = dateRows.filter(r => r.isKeyMatchup);
+    const kmHits       = keyMatchups.filter(r => r.wentYard);
+    const longshots    = dateRows.filter(r => r.isLongshot);
+    const lsHits       = longshots.filter(r => r.wentYard);
+    const topYS        = [...dateRows].sort((a,b) => b.yardScore - a.yardScore)[0];
+    const biggestMiss   = [...dateRows.filter(r => !r.wentYard)]
+      .sort((a,b) => b.yardScore - a.yardScore)[0];
+    const biggestUpset = [...dateRows.filter(r => r.wentYard)]
+      .sort((a,b) => a.yardScore - b.yardScore)[0];
+    return { hrs, signals, signalHits, keyMatchups, kmHits,
+             longshots, lsHits, topYS, biggestMiss, biggestUpset };
+  }, [dateRows]);
+
+  const GroupBar = ({ label, open, onToggle, color }) => (
+    <div onClick={onToggle}
+      style={{display:'flex', alignItems:'center',
+        justifyContent:'space-between',
+        padding:'4px 8px', cursor:'pointer',
+        background:`${color}18`,
+        borderLeft:`3px solid ${color}`,
+        borderRadius:4, marginBottom:2, userSelect:'none'}}>
+      <span style={{fontFamily:"'Oswald',sans-serif", fontSize:9,
+        fontWeight:700, letterSpacing:.8, textTransform:'uppercase',
+        color}}>
+        {label}
+      </span>
+      <span style={{fontSize:9, color, transition:'transform .2s',
+        display:'inline-block',
+        transform: open ? 'rotate(0deg)' : 'rotate(-90deg)'}}>
+        ▾
+      </span>
+    </div>
+  );
+
+  const SortTh = ({ col, label, title, style: s }) => (
+    <th onClick={() => {
+      if (sortCol === col) setSortDir(d => -d);
+      else { setSortCol(col); setSortDir(-1); }
+    }}
+    title={title}
+    style={{
+      padding:'3px 6px', cursor:'pointer', userSelect:'none',
+      fontFamily:mono, fontSize:8, fontWeight:700,
+      color: sortCol===col ? 'var(--accent)' : 'var(--muted)',
+      textTransform:'uppercase', whiteSpace:'nowrap',
+      ...s
+    }}>
+      {label}{sortCol===col ? (sortDir===-1 ? ' ▾':' ▴') : ''}
+    </th>
+  );
+
+  const tierColor = (val, hi, mid, lo, invert) => {
+    if (val == null || isNaN(val)) return 'var(--text)';
+    if (invert) {
+      if (val >= hi) return '#ff6b6b';
+      if (val >= mid) return '#ffc840';
+      return '#27c97a';
+    }
+    if (val >= hi) return '#27c97a';
+    if (val >= mid) return '#ffc840';
+    if (lo != null && val < lo) return '#ff6b6b';
+    return 'var(--text)';
+  };
+
+  return <div style={{padding:'0 0 20px'}}>
+    <div style={{padding:'12px 14px 0', display:'flex',
+      alignItems:'center', gap:12, flexWrap:'wrap'}}>
+      <div style={{fontFamily:"'Oswald',sans-serif", fontWeight:700,
+        fontSize:16, letterSpacing:.8, color:'var(--text)'}}>
+        📋 TRACK RECORD
+      </div>
+
+      <select
+        value={selDate}
+        onChange={e => setSelDate(e.target.value)}
+        style={{fontFamily:mono, fontSize:10,
+          background:'var(--surface2)', color:'var(--text)',
+          border:'1px solid var(--border)', borderRadius:6,
+          padding:'5px 10px', cursor:'pointer'}}>
+        {availableDates.map(d => (
+          <option key={d} value={d}>{d}</option>
+        ))}
+      </select>
+
+      <span style={{fontFamily:mono, fontSize:9, color:'var(--muted)'}}>
+        {dateRows.length} batters scored · {summary.hrs.length} HRs
+      </span>
+    </div>
+
+    {loading && (
+      <div style={{textAlign:'center', padding:40,
+        fontFamily:mono, fontSize:11, color:'var(--muted)'}}>
+        <div className="sp" style={{margin:'0 auto 12px'}}/>
+        Loading track record data...
+      </div>
+    )}
+
+    {!loading && !availableDates.length && (
+      <div style={{textAlign:'center', padding:40}}>
+        <div style={{fontFamily:"'Oswald',sans-serif", fontSize:14,
+          color:'var(--muted)', marginBottom:8}}>
+          📋 No track record data yet
+        </div>
+        <div style={{fontFamily:mono, fontSize:10, color:'var(--muted)'}}>
+          Data populates after the first pipeline run copies
+          all-matchups-season-2026.csv to public/data/
+        </div>
+      </div>
+    )}
+
+    {!loading && availableDates.length > 0 && <>
+      <div style={{padding:'10px 14px', display:'flex', gap:8,
+        overflowX:'auto', WebkitOverflowScrolling:'touch'}}>
+        {[
+          { label:'BATTERS SCORED', value: dateRows.length,       color:'var(--text)' },
+          { label:'ACTUAL HRs',     value: summary.hrs.length,    color:'var(--accent)' },
+          {
+            label:'KEY MATCHUP HIT RATE',
+            value: summary.keyMatchups.length
+              ? `${((summary.kmHits.length/summary.keyMatchups.length)*100).toFixed(0)}%`
+              : '—',
+            sub: `${summary.kmHits.length}/${summary.keyMatchups.length}`,
+            color:'#38b8f2'
+          },
+          {
+            label:'BARREL SIGNAL HIT RATE',
+            value: summary.signals.length
+              ? `${((summary.signalHits.length/summary.signals.length)*100).toFixed(0)}%`
+              : '—',
+            sub: `${summary.signalHits.length}/${summary.signals.length}`,
+            color:'var(--accent)'
+          },
+          {
+            label:'LONGSHOT HIT RATE',
+            value: summary.longshots.length
+              ? `${((summary.lsHits.length/summary.longshots.length)*100).toFixed(0)}%`
+              : '—',
+            sub: `${summary.lsHits.length}/${summary.longshots.length}`,
+            color:'#a78bfa'
+          },
+        ].map(card => (
+          <div key={card.label} style={{
+            background:'var(--surface2)', border:'1px solid var(--border)',
+            borderRadius:8, padding:'10px 14px', minWidth:120, flexShrink:0,
+          }}>
+            <div style={{fontFamily:"'Oswald',sans-serif", fontSize:8,
+              letterSpacing:.8, textTransform:'uppercase', color:'var(--muted)',
+              marginBottom:4}}>
+              {card.label}
+            </div>
+            <div style={{fontFamily:"'Oswald',sans-serif", fontSize:24,
+              fontWeight:800, color:card.color, lineHeight:1}}>
+              {card.value}
+            </div>
+            {card.sub && (
+              <div style={{fontFamily:mono, fontSize:8, color:'var(--muted)',
+                marginTop:2}}>
+                {card.sub}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {summary.biggestUpset && (
+        <div style={{fontFamily:mono, fontSize:9, color:'var(--muted)',
+          padding:'0 14px 8px'}}>
+          💥 Biggest upset: <span style={{color:'var(--accent)'}}>
+            {summary.biggestUpset.batter}
+          </span> (YS {summary.biggestUpset.yardScore}) went yard
+          {summary.biggestMiss && (
+            <> · 🚫 Biggest miss: <span style={{color:'#ff6b6b'}}>
+              {summary.biggestMiss.batter}
+            </span> (YS {summary.biggestMiss.yardScore}) did not</>
+          )}
+        </div>
+      )}
+
+      <div style={{padding:'0 14px 10px', display:'flex', gap:6,
+        flexWrap:'wrap', alignItems:'center'}}>
+        <input
+          value={search} onChange={e => setSearch(e.target.value)}
+          placeholder="Search batter, team, pitcher..."
+          style={{padding:'4px 10px', borderRadius:6, border:'1px solid var(--border)',
+            background:'var(--surface2)', color:'var(--text)',
+            fontFamily:mono, fontSize:9, minWidth:180, outline:'none'}}/>
+
+        <button onClick={() => setShowOnlyHR(v=>!v)}
+          style={{padding:'4px 10px', borderRadius:6, border:'none',
+            cursor:'pointer', fontFamily:mono, fontSize:9, fontWeight:700,
+            background: showOnlyHR ? 'rgba(232,65,26,.15)' : 'var(--surface2)',
+            color:       showOnlyHR ? 'var(--accent)' : 'var(--muted)',
+            border: `1px solid ${showOnlyHR ? 'rgba(232,65,26,.4)' : 'var(--border)'}` }}>
+          ✅ HRs Only
+        </button>
+
+        <button onClick={() => setShowOnlySignal(v=>!v)}
+          style={{padding:'4px 10px', borderRadius:6, border:'none',
+            cursor:'pointer', fontFamily:mono, fontSize:9, fontWeight:700,
+            background: showOnlySignal ? 'rgba(232,65,26,.15)' : 'var(--surface2)',
+            color:       showOnlySignal ? 'var(--accent)' : 'var(--muted)',
+            border: `1px solid ${showOnlySignal ? 'rgba(232,65,26,.4)' : 'var(--border)'}` }}>
+          ★ Signals Only
+        </button>
+      </div>
+
+      {filteredRows.length === 0 ? (
+        <div style={{fontFamily:mono, fontSize:10, color:'var(--muted)',
+          padding:'20px 14px'}}>
+          No batters match current filters.
+        </div>
+      ) : (
+        <div style={{padding:'0 14px', overflowX:'auto'}}>
+          <div style={{display:'flex', gap:6, marginBottom:4, minWidth:900}}>
+            <div style={{flex:1}}>
+              <GroupBar label="Matchup Engine" open={showMatchup}
+                onToggle={() => setShowMatchup(v=>!v)} color="#e8411a"/>
+            </div>
+            <div style={{flex:1}}>
+              <GroupBar label="Barrel Lab" open={showBarrel}
+                onToggle={() => setShowBarrel(v=>!v)} color="#38b8f2"/>
+            </div>
+            <div style={{flex:1}}>
+              <GroupBar label="Box Score" open={showBoxScore}
+                onToggle={() => setShowBoxScore(v=>!v)} color="#27c97a"/>
+            </div>
+          </div>
+          <table style={{borderCollapse:'collapse', width:'100%', minWidth:900}}>
+            <thead>
+              <tr>
+                <th style={{padding:'3px 6px', fontFamily:mono, fontSize:8,
+                  color:'var(--muted)'}}>#</th>
+                <th style={{padding:'3px 6px', fontFamily:mono, fontSize:8,
+                  color:'var(--muted)'}}>Result</th>
+                <SortTh col="batter"  label="Batter"/>
+                <th style={{padding:'3px 6px', fontFamily:mono, fontSize:8,
+                  color:'var(--muted)'}}>Team</th>
+                <SortTh col="lineupSlot" label="Slot"/>
+                <th style={{padding:'3px 6px', fontFamily:mono, fontSize:8,
+                  color:'var(--muted)'}}>Pitcher</th>
+                <th style={{padding:'3px 6px', fontFamily:mono, fontSize:8,
+                  color:'var(--muted)'}}>PGrade</th>
+
+                {showMatchup && <>
+                  <SortTh col="yardScore" label="YS"/>
+                  <SortTh col="boom"      label="Boom"/>
+                  <SortTh col="sig"       label="Sig"/>
+                  <th style={{padding:'3px 6px', fontFamily:mono, fontSize:8,
+                    color:'var(--muted)'}}>Grade</th>
+                  <SortTh col="ghr"      label="gHR"/>
+                  <SortTh col="zoneFit"  label="ZF"/>
+                  <SortTh col="simTB"    label="SimTB"/>
+                  <SortTh col="xwoba"    label="xwOBA"/>
+                  <SortTh col="flags"    label="Flags"/>
+                  <th style={{padding:'3px 6px', fontFamily:mono, fontSize:8,
+                    color:'var(--muted)'}}>KM</th>
+                </>}
+
+                {showBarrel && <>
+                  <SortTh col="trueHR"    label="TrueHR"/>
+                  <SortTh col="matchup"   label="Matchup"/>
+                  <SortTh col="simHRPct"  label="SimHR%"/>
+                  <SortTh col="pulledBrl" label="PBrl%"/>
+                  <SortTh col="brlBIP"    label="Brl/BIP"/>
+                  <SortTh col="hrFB"      label="HR/FB"/>
+                  <SortTh col="fb"        label="FB%"/>
+                  <SortTh col="hh"        label="HH%"/>
+                  <th style={{padding:'3px 6px', fontFamily:mono, fontSize:8,
+                    color:'var(--muted)'}}>Signal</th>
+                  <th style={{padding:'3px 6px', fontFamily:mono, fontSize:8,
+                    color:'var(--muted)'}}>Longshot</th>
+                </>}
+
+                {showBoxScore && <>
+                  <SortTh col="actualHR"  label="HR"/>
+                  <SortTh col="actualAB"  label="AB"/>
+                  <SortTh col="actualH"   label="H"/>
+                  <SortTh col="actualTB"  label="TB"/>
+                  <SortTh col="actualRBI" label="RBI"/>
+                  <SortTh col="actualEV"  label="EV"/>
+                  <SortTh col="actualLA"  label="LA°"/>
+                  <SortTh col="closeCalls" label="CC"/>
+                  <SortTh col="ccMaxEV"   label="CC Max EV"/>
+                  <SortTh col="ccMaxDist" label="CC Dist"/>
+                </>}
+              </tr>
+            </thead>
+            <tbody>
+              {filteredRows.map((r,i) => {
+                const bg = r.isLongshot && r.wentYard
+                  ? 'rgba(167,139,250,.12)'
+                  : r.brlSignal
+                    ? 'rgba(232,65,26,.08)'
+                    : r.wentYard
+                      ? 'rgba(39,201,122,.08)'
+                      : 'transparent';
+                return (
+                  <tr key={`${r.batter}_${i}`} style={{background:bg}}>
+                    <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
+                      color:'var(--muted)'}}>{i+1}</td>
+                    <td style={{textAlign:'center', padding:'3px 6px', fontSize:11}}>
+                      {r.wentYard
+                        ? <span title={`HR — ${r.actualEV}mph ${r.ccMaxDist}ft`}>✅</span>
+                        : r.closeCalls > 0
+                          ? <span title={`${r.closeCalls} close call(s)`}
+                              style={{color:'var(--accent2)'}}>📍</span>
+                          : <span style={{color:'var(--muted)'}}>—</span>
+                      }
+                    </td>
+                    <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
+                      color:'var(--text)', fontWeight:600, whiteSpace:'nowrap'}}>{r.batter}</td>
+                    <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
+                      color:'var(--muted)'}}>{r.team}</td>
+                    <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
+                      color:'var(--muted)', textAlign:'center'}}>{r.lineupSlot || '—'}</td>
+                    <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
+                      color:'var(--muted)', whiteSpace:'nowrap'}}>{r.pitcher}</td>
+                    <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
+                      color:'var(--muted)'}}>{r.pitcherGrade}</td>
+
+                    {showMatchup && <>
+                      <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
+                        textAlign:'center', fontWeight:700,
+                        color:tierColor(r.yardScore,50,30,20)}}>{r.yardScore || '—'}</td>
+                      <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
+                        textAlign:'center'}}>{r.boom || '—'}</td>
+                      <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
+                        textAlign:'center'}}>{r.sig || '—'}</td>
+                      <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
+                        textAlign:'center'}}>{r.grade}</td>
+                      <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
+                        textAlign:'center', color:tierColor(r.ghr,25,15,8)}}>{r.ghr || '—'}</td>
+                      <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
+                        textAlign:'center', color:tierColor(r.zoneFit,7,4,3)}}>{r.zoneFit || '—'}</td>
+                      <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
+                        textAlign:'center', color:tierColor(r.simTB,1.75,1.25,0.75)}}>{r.simTB || '—'}</td>
+                      <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
+                        textAlign:'center'}}>{r.xwoba ? r.xwoba.toFixed(3) : '—'}</td>
+                      <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
+                        textAlign:'center'}}>{r.flags || '—'}</td>
+                      <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
+                        textAlign:'center'}}>{r.isKeyMatchup ? '🔑' : ''}</td>
+                    </>}
+
+                    {showBarrel && <>
+                      <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
+                        textAlign:'center', fontWeight:700,
+                        color:tierColor(r.trueHR,75,60,40)}}>{r.trueHR || '—'}</td>
+                      <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
+                        textAlign:'center', color:tierColor(r.matchup,75,50,35)}}>{r.matchup || '—'}</td>
+                      <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
+                        textAlign:'center', color:tierColor(r.simHRPct,25,15,8)}}>{r.simHRPct ? `${r.simHRPct.toFixed(1)}%` : '—'}</td>
+                      <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
+                        textAlign:'center'}}>{r.pulledBrl ? `${r.pulledBrl.toFixed(1)}%` : '—'}</td>
+                      <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
+                        textAlign:'center'}}>{r.brlBIP ? `${r.brlBIP.toFixed(1)}%` : '—'}</td>
+                      <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
+                        textAlign:'center'}}>{r.hrFB ? `${r.hrFB.toFixed(1)}%` : '—'}</td>
+                      <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
+                        textAlign:'center'}}>{r.fb ? `${r.fb.toFixed(1)}%` : '—'}</td>
+                      <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
+                        textAlign:'center'}}>{r.hh ? `${r.hh.toFixed(1)}%` : '—'}</td>
+                      <td style={{padding:'3px 6px', textAlign:'center'}}>
+                        {r.brlSignal && <span style={{color:'var(--accent)'}}>★</span>}
+                      </td>
+                      <td style={{padding:'3px 6px', textAlign:'center'}}>
+                        {r.isLongshot && <span style={{color:'#a78bfa'}}>🎲</span>}
+                      </td>
+                    </>}
+
+                    {showBoxScore && <>
+                      <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
+                        textAlign:'center', color: r.actualHR > 0 ? 'var(--accent)' : 'var(--text)',
+                        fontWeight: r.actualHR > 0 ? 800 : 400}}>{r.actualHR || 0}</td>
+                      <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
+                        textAlign:'center'}}>{r.actualAB || 0}</td>
+                      <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
+                        textAlign:'center'}}>{r.actualH || 0}</td>
+                      <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
+                        textAlign:'center'}}>{r.actualTB || 0}</td>
+                      <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
+                        textAlign:'center'}}>{r.actualRBI || 0}</td>
+                      <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
+                        textAlign:'center', color:tierColor(r.actualEV,103,97,null)}}>{r.actualEV || '—'}</td>
+                      <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
+                        textAlign:'center'}}>{r.actualLA || '—'}</td>
+                      <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
+                        textAlign:'center'}}>{r.closeCalls || 0}</td>
+                      <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
+                        textAlign:'center'}}>{r.ccMaxEV || '—'}</td>
+                      <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
+                        textAlign:'center'}}>{r.ccMaxDist || '—'}</td>
+                    </>}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>}
+  </div>;
+}
+
 function LinksTab() {
   const mono = "'DM Mono',monospace";
   const osw  = "'Oswald',sans-serif";
@@ -31242,6 +31822,7 @@ export default function App() {
     {key:"statcast",   label:"📡 Statcast"},
     {key:"mlbscores",  label:"⚾ MLB"},
     {key:"yardpicks",  label:"🧾 Yard Picks"},
+    {key:"trackrecord",label:"📋 Track Record"},
     {key:"links",      label:"🔗 Links"},
     {key:"getapp",     label:"📲 Get App"},
   ];
@@ -31369,6 +31950,7 @@ export default function App() {
         <div style={{display:tab==="homeruns"?"block":"none"}}><HRTrackerTab/></div>
         <div style={{display:tab==="mlbscores"?"block":"none"}}><MLBTab/></div>
         <div style={{display:tab==="yardpicks"?"block":"none"}}><YardPicksFeedTab/></div>
+        <div style={{display:tab==="trackrecord"?"block":"none"}}><TrackRecordTab/></div>
         <div style={{display:tab==="onlyhomers"?"block":"none"}}><OnlyHomersTab/></div>
         <div style={{display:tab==="doink"?'block':'none'}}>
           <div style={{padding:"8px 14px",background:"rgba(245,166,35,.1)",
