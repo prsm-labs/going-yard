@@ -6249,6 +6249,7 @@ function LiveSimTab({ games, date, isToday }) {
   const [lastUpdate, setLastUpdate] = useState(null);
   const [sortCol, setSortCol] = useState('score');
   const [sortDir, setSortDir] = useState('desc'); // default: highest Form score first
+  const [simSelGame, setSimSelGame] = useState('all');
   const liveGames = (games||[]).filter(g => g.status==='Live');
 
   useEffect(() => {
@@ -6297,6 +6298,22 @@ function LiveSimTab({ games, date, isToday }) {
     return sortDir === 'desc' ? -cmp : cmp;
   });
 
+  const simGameOptions = useMemo(() => {
+    const seen = new Set();
+    const opts = [{ value:'all', label:'All Live Games' }];
+    rows.forEach(r => {
+      if (r.gamePk && !seen.has(r.gamePk)) {
+        seen.add(r.gamePk);
+        opts.push({ value: String(r.gamePk), label: r.gameLabel || String(r.gamePk) });
+      }
+    });
+    return opts;
+  }, [rows]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const filtered = simSelGame === 'all'
+    ? sorted
+    : sorted.filter(r => String(r.gamePk) === simSelGame);
+
   const toggleSort = (col) => {
     if (sortCol === col) setSortDir(d => d === 'desc' ? 'asc' : 'desc');
     else { setSortCol(col); setSortDir('desc'); }
@@ -6324,6 +6341,21 @@ function LiveSimTab({ games, date, isToday }) {
           : `${rows.length} batters · ${liveGames.length} live game${liveGames.length!==1?'s':''}`}
         {lastUpdate && ` · updated ${lastUpdate.toLocaleTimeString()}`}
       </div>
+      {simGameOptions.length > 2 && (
+        <select
+          value={simSelGame}
+          onChange={e => setSimSelGame(e.target.value)}
+          style={{
+            fontFamily:"'DM Mono',monospace", fontSize:9,
+            background:'var(--surface2)', color:'var(--text)',
+            border:'1px solid var(--border)', borderRadius:6,
+            padding:'4px 8px', cursor:'pointer',
+          }}>
+          {simGameOptions.map(o => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+      )}
     </div>
 
     <div style={{padding:'8px 12px',marginBottom:10,borderRadius:8,
@@ -6358,7 +6390,7 @@ function LiveSimTab({ games, date, isToday }) {
               </tr>
             </thead>
             <tbody>
-              {sorted.map((b,idx) => (
+              {filtered.map((b,idx) => (
                 <tr key={`ls-${b.id}-${idx}`} style={{borderBottom:'1px solid var(--border)'}}>
                   <td style={{padding:'6px 8px',fontWeight:600,cursor:'pointer',color:'var(--text)'}}
                     onClick={()=>openAtBatSlide({pid:b.id, name:b.name, team:b.team})}>
@@ -7437,6 +7469,8 @@ function LiveThemesTab() {
   const [cacheReady, setCacheReady] = useState(
     Object.keys(DAILY_PICKS_CACHE||{}).length > 0
   );
+  const [themesHideFinal, setThemesHideFinal] = useState(false);
+  const [themesSelGame,   setThemesSelGame]   = useState('all');
   // Wait for DAILY_PICKS_CACHE to populate before HR stat lookups resolve
   useEffect(() => {
     if (cacheReady) return;
@@ -7556,6 +7590,22 @@ function LiveThemesTab() {
     });
   }, [lineupVer, finalVer, hrBidSet]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const themesGameOptions = useMemo(() => {
+    const seen = new Set();
+    const opts = [{ value:'all', label:'All Games' }];
+    [...todaysHRs, ...confirmedPool].forEach(r => {
+      const gid = String(r.game_id||'');
+      if (!gid || seen.has(gid)) return;
+      seen.add(gid);
+      const g = LIVE_GAMES_CACHE.find(x => String(x.gamePk||x.id) === gid);
+      const label = g
+        ? `${g.away?.abbr||'?'} @ ${g.home?.abbr||'?'}`
+        : gid;
+      opts.push({ value: gid, label });
+    });
+    return opts;
+  }, [todaysHRs, confirmedPool]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Per-cluster scored + tiered rows
   const clusterTables = useMemo(() => {
     if (!clusters.length || !confirmedPool.length) return [];
@@ -7574,10 +7624,12 @@ function LiveThemesTab() {
         ...b,
         _themeTier: i < t1 ? 1 : i < t2 ? 2 : 3,
         _yard: b._ys,
-      }));
+      }))
+      .filter(b => !themesHideFinal || !FINAL_GAME_IDS.has(String(b.game_id)))
+      .filter(b => themesSelGame === 'all' || String(b.game_id) === themesSelGame);
       return { ...cluster, rows };
     });
-  }, [clusters, confirmedPool]);
+  }, [clusters, confirmedPool, themesHideFinal, themesSelGame, finalVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const activeClusterCount = clusterTables.length;
   const isActive = activeClusterCount > 0;
@@ -7608,8 +7660,36 @@ function LiveThemesTab() {
       ) : (
         <div>
           <div style={{fontFamily:osw,fontSize:13,letterSpacing:.8,
-            textTransform:'uppercase',color:'var(--muted)',marginBottom:16}}>
+            textTransform:'uppercase',color:'var(--muted)',marginBottom:8}}>
             🔥 Live Themes — {todaysHRs.length} HRs landed today
+          </div>
+          <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginBottom:12}}>
+            <button
+              onClick={() => setThemesHideFinal(v => !v)}
+              style={{
+                padding:'4px 10px',borderRadius:6,cursor:'pointer',
+                fontFamily:mono,fontSize:9,fontWeight:700,
+                background: themesHideFinal ? 'rgba(255,107,107,.12)' : 'var(--surface2)',
+                color:       themesHideFinal ? '#ff6b6b' : 'var(--muted)',
+                border:`1px solid ${themesHideFinal ? 'rgba(255,107,107,.4)' : 'var(--border)'}`,
+              }}>
+              {themesHideFinal ? '✓ Hiding Final' : '🚫 Hide Final'}
+            </button>
+            {themesGameOptions.length > 2 && (
+              <select
+                value={themesSelGame}
+                onChange={e => setThemesSelGame(e.target.value)}
+                style={{
+                  fontFamily:mono,fontSize:9,
+                  background:'var(--surface2)',color:'var(--text)',
+                  border:'1px solid var(--border)',borderRadius:6,
+                  padding:'4px 8px',cursor:'pointer',
+                }}>
+                {themesGameOptions.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            )}
           </div>
           {clusterTables.map((cluster, ci) => (
             <div key={ci} style={{marginBottom:24}}>
@@ -28805,6 +28885,15 @@ function computeMatchupScore(r) {
   return Math.round(Math.min(100, Math.max(0, raw)));
 }
 
+function isLongshotBatter(r, trueHRScore, matchupScore) {
+  if (trueHRScore  >  55) return false;  // not low enough profile
+  if (matchupScore <  65) return false;  // matchup not favorable enough
+  if (parseFloat(r.sim_tb || 0) < 1.2) return false; // sim too weak
+  const grade = (r.pitcher_grade_label || r._pgLabel || '').toLowerCase();
+  if (grade.includes('elite')) return false; // never vs elite
+  return true;
+}
+
 function BarrelLabTab() {
   const mono = "'DM Mono',monospace";
   const osw  = "'Oswald',sans-serif";
@@ -28822,6 +28911,8 @@ function BarrelLabTab() {
   const [simTrigger,   setSimTrigger]    = useState(0);
   const [hrVer,            setHrVer]            = useState(0);
   const [liveGamesVersion, setLiveGamesVersion] = useState(LIVE_GAMES_CACHE.length);
+  const [blHideFinal,      setBlHideFinal]      = useState(false);
+  const [blLongshotOnly,   setBlLongshotOnly]   = useState(false);
 
   useEffect(() => {
     const unsub    = subscribeLineup(v => setLineupVer(v));
@@ -28953,8 +29044,12 @@ function BarrelLabTab() {
         r.trueHRScore  >= 75 &&
         r.matchupScore >= 60 &&
         r.simHRPct     != null && r.simHRPct >= 12.0,
-    })).sort((a, b) => b.trueHRScore - a.trueHRScore);
-  }, [eligibleBatters, simResults]); // eslint-disable-line react-hooks/exhaustive-deps
+      isLongshot: isLongshotBatter(r, r.trueHRScore, r.matchupScore),
+    }))
+    .filter(r => !blHideFinal    || !FINAL_GAME_IDS.has(String(r.game_id)))
+    .filter(r => !blLongshotOnly || r.isLongshot)
+    .sort((a, b) => b.trueHRScore - a.trueHRScore);
+  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, finalVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Color threshold helpers
   const clr = (v, g1, g2, y1, y2) => {
@@ -29132,6 +29227,30 @@ function BarrelLabTab() {
               </button>
             )}
             <button
+              onClick={() => setBlHideFinal(v => !v)}
+              style={{
+                padding:'2px 8px', borderRadius:5, cursor:'pointer',
+                fontFamily:"'DM Mono',monospace", fontSize:9, fontWeight:700,
+                lineHeight:1.5, flexShrink:0,
+                background: blHideFinal ? 'rgba(255,107,107,.12)' : 'var(--surface2)',
+                color:       blHideFinal ? '#ff6b6b' : 'var(--muted)',
+                border:`1px solid ${blHideFinal ? 'rgba(255,107,107,.4)' : 'var(--border)'}`,
+              }}>
+              {blHideFinal ? '✓ Hiding Final' : '🚫 Hide Final'}
+            </button>
+            <button
+              onClick={() => setBlLongshotOnly(v => !v)}
+              style={{
+                padding:'2px 8px', borderRadius:5, cursor:'pointer',
+                fontFamily:"'DM Mono',monospace", fontSize:9, fontWeight:700,
+                lineHeight:1.5, flexShrink:0,
+                background: blLongshotOnly ? 'rgba(167,139,250,.12)' : 'var(--surface2)',
+                color:      blLongshotOnly ? '#a78bfa' : 'var(--muted)',
+                border:`1px solid ${blLongshotOnly ? 'rgba(167,139,250,.4)' : 'var(--border)'}`,
+              }}>
+              {blLongshotOnly ? '🎲 Longshots Only' : '🎲 Longshot'}
+            </button>
+            <button
               disabled={simRunning}
               onClick={async () => {
                 await loadTodayLineups();
@@ -29215,6 +29334,16 @@ function BarrelLabTab() {
               <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:4}}>{sub}</div>
             </div>
           ))}
+          <div style={{flex:'1 1 120px',background:'var(--surface2)',borderRadius:8,
+            padding:'10px 14px',border:'1px solid var(--border)'}}>
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:4}}>
+              LONGSHOTS
+            </div>
+            <div style={{fontFamily:osw,fontSize:22,fontWeight:700,color:'#a78bfa',lineHeight:1}}>
+              {gameRows.filter(r => r.isLongshot).length}
+            </div>
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:4}}>Low profile, good spot</div>
+          </div>
         </div>
       )}
 
@@ -29280,8 +29409,14 @@ function BarrelLabTab() {
                   </div>
                 </div>
                 {b.isBarrelSignal && (
-                  <div style={{fontFamily:mono,fontSize:8,color:'var(--accent)',marginBottom:6}}>
+                  <div style={{fontFamily:mono,fontSize:8,color:'var(--accent)',marginBottom:4}}>
                     ★ Barrel Signal
+                  </div>
+                )}
+                {b.isLongshot && (
+                  <div style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'#a78bfa',
+                    letterSpacing:.6,textTransform:'uppercase',marginBottom:4}}>
+                    🎲 Longshot
                   </div>
                 )}
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px 10px',fontFamily:mono,fontSize:8}}>
@@ -29345,7 +29480,9 @@ function BarrelLabTab() {
                               <div style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer',flex:1}} onClick={() => openBatter(b)}>
                                 <PlayerAvatar pid={b.batter_id} name={b.batter} size={22}/>
                                 <span style={{color:'var(--text)'}}>
-                                  {b.isBarrelSignal ? '★ ' : ''}{b.batter}
+                                  {b.isBarrelSignal && <span style={{color:'var(--accent)',marginRight:2,fontWeight:900,fontSize:9}}>★</span>}
+                                  {b.isLongshot && <span style={{color:'#a78bfa',marginRight:2,fontWeight:900,fontSize:9}}>🎲</span>}
+                                  {b.batter}
                                 </span>
                                 {isGoneYardToday(parseInt(b.batter_id)||0, b.batter) && (
                                   <div style={{padding:'2px 6px',borderRadius:4,flexShrink:0,
@@ -29510,6 +29647,7 @@ function OnBaseTab() {
   const [injuryVer,        setInjuryVer]        = useState(0);
   const [simTrigger,       setSimTrigger]       = useState(0);
   const [liveGamesVersion, setLiveGamesVersion] = useState(LIVE_GAMES_CACHE.length);
+  const [obHideFinal,      setObHideFinal]      = useState(false);
 
   useEffect(() => {
     const unsub    = subscribeLineup(v => setLineupVer(v));
@@ -29618,8 +29756,10 @@ function OnBaseTab() {
         r.onBaseScore  >= 75 &&
         r.matchupScore >= 60 &&
         r.simTB2Pct != null && r.simTB2Pct >= 30.0,
-    })).sort((a, b) => b.onBaseScore - a.onBaseScore);
-  }, [eligibleBatters, simResults]); // eslint-disable-line react-hooks/exhaustive-deps
+    }))
+    .filter(r => !obHideFinal || !FINAL_GAME_IDS.has(String(r.game_id)))
+    .sort((a, b) => b.onBaseScore - a.onBaseScore);
+  }, [eligibleBatters, simResults, obHideFinal, finalVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const byTeam = useMemo(() => {
     const teams = {};
@@ -29784,6 +29924,18 @@ function OnBaseTab() {
                 {confirmedOnly ? '✅ Confirmed only' : '👁 All batters'}
               </button>
             )}
+            <button
+              onClick={() => setObHideFinal(v => !v)}
+              style={{
+                padding:'2px 8px', borderRadius:5, cursor:'pointer',
+                fontFamily:mono, fontSize:9, fontWeight:700,
+                lineHeight:1.5, flexShrink:0,
+                background: obHideFinal ? 'rgba(255,107,107,.12)' : 'var(--surface2)',
+                color:       obHideFinal ? '#ff6b6b' : 'var(--muted)',
+                border:`1px solid ${obHideFinal ? 'rgba(255,107,107,.4)' : 'var(--border)'}`,
+              }}>
+              {obHideFinal ? '✓ Hiding Final' : '🚫 Hide Final'}
+            </button>
             <button
               disabled={simRunning}
               onClick={async () => {
