@@ -26730,6 +26730,7 @@ function TrackRecordTab() {
   const [search,         setSearch]         = useState('');
   const [showOnlyHR,     setShowOnlyHR]     = useState(false);
   const [showOnlySignal, setShowOnlySignal] = useState(false);
+  const [teamFilter,     setTeamFilter]     = useState('ALL');
 
   const [showMatchup,  setShowMatchup]  = useState(true);
   const [showBarrel,   setShowBarrel]   = useState(true);
@@ -26742,16 +26743,19 @@ function TrackRecordTab() {
     async function loadTrackRecord() {
       setLoading(true);
       try {
-        const [amRes, blRes] = await Promise.all([
+        const [amRes, blRes, idRes] = await Promise.all([
           fetch('/data/track-record-matchups.csv'),
           fetch('/data/track-record-barrel.csv'),
+          fetch('/data/player-id-roster-season-2026.csv'),
         ]);
 
         const amText = await amRes.text();
         const blText = blRes.ok ? await blRes.text() : '';
+        const idText = idRes.ok ? await idRes.text() : '';
 
         const amRows = parseCSV(amText);
         const blRows = blText ? parseCSV(blText) : [];
+        const idRows = idText ? parseCSV(idText) : [];
 
         // Build Barrel Lab lookup: { 'YYYY-MM-DD_battername': row }
         const blLookup = {};
@@ -26761,10 +26765,26 @@ function TrackRecordTab() {
           if (date && name) blLookup[`${date}_${name}`] = r;
         });
 
+        // Player ID roster lookup — only covers dates from the roster file's
+        // rollout forward (July 8 2026+); earlier dates fall back to pid=0
+        // (name-only avatar/slideout, same as before this feature existed).
+        const batterIdLookup = {};
+        const pitcherIdLookup = {};
+        idRows.forEach(r => {
+          const date = normDate(r.date || '');
+          const bName = (r.batter  || '').trim().toLowerCase();
+          const pName = (r.pitcher || '').trim().toLowerCase();
+          if (date && bName) batterIdLookup[`${date}_${bName}`]  = parseInt(r.batter_id)  || 0;
+          if (date && pName) pitcherIdLookup[`${date}_${pName}`] = parseInt(r.pitcher_id) || 0;
+        });
+
         const unified = amRows.map(r => {
           const date  = normDate(r.export_date || '');
           const name  = (r.Batter || '').trim().toLowerCase();
           const blRow = blLookup[`${date}_${name}`] || {};
+          const pitcherNameRaw = (r['vs Pitcher'] || blRow['Pitcher'] || '').trim().toLowerCase();
+          const batterId  = batterIdLookup[`${date}_${name}`] || 0;
+          const pitcherId = pitcherIdLookup[`${date}_${pitcherNameRaw}`] || 0;
 
           const wentYard = (r['Gone Yard']||'').trim().toUpperCase() === 'YES';
           const actualHR = parseInt(r['HR'] || 0) || (wentYard ? 1 : 0);
@@ -26788,6 +26808,7 @@ function TrackRecordTab() {
           return {
             date,
             batter:       r['Batter']         || '',
+            batterId, pitcherId,
             team:         r['Team']           || '',
             hand:         r['Hand']           || '',
             pitcher:      r['vs Pitcher']     || blRow['Pitcher'] || '',
@@ -26834,12 +26855,19 @@ function TrackRecordTab() {
     loadTrackRecord();
   }, []);
 
+  useEffect(() => { setTeamFilter('ALL'); }, [selDate]);
+
   const dateRows = useMemo(() =>
     allRows.filter(r => r.date === selDate),
     [allRows, selDate]);
 
+  const teams = useMemo(() =>
+    ['ALL', ...Array.from(new Set(dateRows.map(r => r.team).filter(Boolean))).sort()],
+    [dateRows]);
+
   const filteredRows = useMemo(() => {
     let rows = dateRows;
+    if (teamFilter !== 'ALL') rows = rows.filter(r => r.team === teamFilter);
     if (showOnlyHR)     rows = rows.filter(r => r.wentYard);
     if (showOnlySignal) rows = rows.filter(r => r.brlSignal || r.isKeyMatchup);
     if (search) {
@@ -26849,9 +26877,14 @@ function TrackRecordTab() {
         r.team.toLowerCase().includes(q) ||
         r.pitcher.toLowerCase().includes(q));
     }
-    return [...rows].sort((a,b) =>
-      sortDir * ((a[sortCol]||0) - (b[sortCol]||0)));
-  }, [dateRows, showOnlyHR, showOnlySignal, search, sortCol, sortDir]);
+    return [...rows].sort((a,b) => {
+      const av = a[sortCol], bv = b[sortCol];
+      if (typeof av === 'string' || typeof bv === 'string') {
+        return sortDir * String(av||'').localeCompare(String(bv||''));
+      }
+      return sortDir * ((av||0) - (bv||0));
+    });
+  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, search, sortCol, sortDir]);
 
   const summary = useMemo(() => {
     const hrs          = dateRows.filter(r => r.wentYard);
@@ -27037,6 +27070,13 @@ function TrackRecordTab() {
 
       <div style={{padding:'0 14px 10px', display:'flex', gap:6,
         flexWrap:'wrap', alignItems:'center'}}>
+        <select value={teamFilter} onChange={e => setTeamFilter(e.target.value)}
+          style={{padding:'4px 8px', borderRadius:6, border:'1px solid var(--border)',
+            background:'var(--surface2)', color:'var(--text)',
+            fontFamily:mono, fontSize:9, cursor:'pointer'}}>
+          {teams.map(t => <option key={t} value={t}>{t==='ALL'?'All Teams':t}</option>)}
+        </select>
+
         <input
           value={search} onChange={e => setSearch(e.target.value)}
           placeholder="Search batter, team, pitcher..."
@@ -27092,27 +27132,22 @@ function TrackRecordTab() {
                 <th style={{padding:'3px 6px', fontFamily:mono, fontSize:8,
                   color:'var(--muted)'}}>Result</th>
                 <SortTh col="batter"  label="Batter"/>
-                <th style={{padding:'3px 6px', fontFamily:mono, fontSize:8,
-                  color:'var(--muted)'}}>Team</th>
+                <SortTh col="team"    label="Team"/>
                 <SortTh col="lineupSlot" label="Slot"/>
-                <th style={{padding:'3px 6px', fontFamily:mono, fontSize:8,
-                  color:'var(--muted)'}}>Pitcher</th>
-                <th style={{padding:'3px 6px', fontFamily:mono, fontSize:8,
-                  color:'var(--muted)'}}>PGrade</th>
+                <SortTh col="pitcher" label="Pitcher"/>
+                <SortTh col="pitcherGrade" label="PGrade"/>
 
                 {showMatchup && <>
                   <SortTh col="yardScore" label="YS"/>
                   <SortTh col="boom"      label="Boom"/>
                   <SortTh col="sig"       label="Sig"/>
-                  <th style={{padding:'3px 6px', fontFamily:mono, fontSize:8,
-                    color:'var(--muted)'}}>Grade</th>
+                  <SortTh col="grade"    label="Grade"/>
                   <SortTh col="ghr"      label="gHR"/>
                   <SortTh col="zoneFit"  label="ZF"/>
                   <SortTh col="simTB"    label="SimTB"/>
                   <SortTh col="xwoba"    label="xwOBA"/>
                   <SortTh col="flags"    label="Flags"/>
-                  <th style={{padding:'3px 6px', fontFamily:mono, fontSize:8,
-                    color:'var(--muted)'}}>KM</th>
+                  <SortTh col="isKeyMatchup" label="KM"/>
                 </>}
 
                 {showBarrel && <>
@@ -27124,10 +27159,8 @@ function TrackRecordTab() {
                   <SortTh col="hrFB"      label="HR/FB"/>
                   <SortTh col="fb"        label="FB%"/>
                   <SortTh col="hh"        label="HH%"/>
-                  <th style={{padding:'3px 6px', fontFamily:mono, fontSize:8,
-                    color:'var(--muted)'}}>Signal</th>
-                  <th style={{padding:'3px 6px', fontFamily:mono, fontSize:8,
-                    color:'var(--muted)'}}>Longshot</th>
+                  <SortTh col="brlSignal" label="Signal"/>
+                  <SortTh col="isLongshot" label="Longshot"/>
                 </>}
 
                 {showBoxScore && <>
@@ -27167,13 +27200,23 @@ function TrackRecordTab() {
                       }
                     </td>
                     <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
-                      color:'var(--text)', fontWeight:600, whiteSpace:'nowrap'}}>{r.batter}</td>
+                      color:'var(--text)', fontWeight:600, whiteSpace:'nowrap'}}>
+                      <div style={{display:'flex', alignItems:'center', gap:5,
+                        cursor:'pointer'}}
+                        onClick={() => openAtBatSlide({pid:r.batterId, name:r.batter, team:r.team})}>
+                        <PlayerAvatar pid={r.batterId} name={r.batter} size={18}/>
+                        <span>{r.batter}</span>
+                      </div>
+                    </td>
                     <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
                       color:'var(--muted)'}}>{r.team}</td>
                     <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
                       color:'var(--muted)', textAlign:'center'}}>{r.lineupSlot || '—'}</td>
                     <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
-                      color:'var(--muted)', whiteSpace:'nowrap'}}>{r.pitcher}</td>
+                      color:'var(--muted)', whiteSpace:'nowrap', cursor:'pointer'}}
+                      onClick={() => openPitcherSlide({pid:r.pitcherId, name:r.pitcher, team:'', hand:'', pitchMix:[]})}>
+                      {r.pitcher}
+                    </td>
                     <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
                       color:'var(--muted)'}}>{r.pitcherGrade}</td>
 
