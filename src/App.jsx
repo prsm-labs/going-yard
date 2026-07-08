@@ -26730,6 +26730,7 @@ function TrackRecordTab() {
   const [search,         setSearch]         = useState('');
   const [showOnlyHR,     setShowOnlyHR]     = useState(false);
   const [showOnlySignal, setShowOnlySignal] = useState(false);
+  const [showOnlyKM,     setShowOnlyKM]     = useState(false);
   const [teamFilter,     setTeamFilter]     = useState('ALL');
 
   const [showMatchup,  setShowMatchup]  = useState(true);
@@ -26746,7 +26747,7 @@ function TrackRecordTab() {
         const [amRes, blRes, idRes] = await Promise.all([
           fetch('/data/track-record-matchups.csv'),
           fetch('/data/track-record-barrel.csv'),
-          fetch('/data/player-id-roster-season-2026.csv'),
+          fetch('/data/player_id.csv'),
         ]);
 
         const amText = await amRes.text();
@@ -26765,26 +26766,33 @@ function TrackRecordTab() {
           if (date && name) blLookup[`${date}_${name}`] = r;
         });
 
-        // Player ID roster lookup — only covers dates from the roster file's
-        // rollout forward (July 8 2026+); earlier dates fall back to pid=0
-        // (name-only avatar/slideout, same as before this feature existed).
-        const batterIdLookup = {};
-        const pitcherIdLookup = {};
+        // Player ID lookup — static roster (not date-scoped), covers any
+        // Track Record date. Keyed by name+team first (disambiguates the
+        // handful of duplicate names in the file), falls back to name-only.
+        const idByNameTeam = {};
+        const idByName = {};
         idRows.forEach(r => {
-          const date = normDate(r.date || '');
-          const bName = (r.batter  || '').trim().toLowerCase();
-          const pName = (r.pitcher || '').trim().toLowerCase();
-          if (date && bName) batterIdLookup[`${date}_${bName}`]  = parseInt(r.batter_id)  || 0;
-          if (date && pName) pitcherIdLookup[`${date}_${pName}`] = parseInt(r.pitcher_id) || 0;
+          const pname = (r['Full Name'] || '').trim().toLowerCase();
+          const pteam = (r['Team'] || '').trim().toUpperCase();
+          const pid   = parseInt(r['PlayerId']) || 0;
+          if (!pname || !pid) return;
+          if (pteam) idByNameTeam[`${pname}|${pteam}`] = pid;
+          if (!(pname in idByName)) idByName[pname] = pid;
         });
+        const resolveId = (name, team) => {
+          const n = (name || '').trim().toLowerCase();
+          const t = (team || '').trim().toUpperCase();
+          if (!n) return 0;
+          return idByNameTeam[`${n}|${t}`] || idByName[n] || 0;
+        };
 
         const unified = amRows.map(r => {
           const date  = normDate(r.export_date || '');
           const name  = (r.Batter || '').trim().toLowerCase();
           const blRow = blLookup[`${date}_${name}`] || {};
-          const pitcherNameRaw = (r['vs Pitcher'] || blRow['Pitcher'] || '').trim().toLowerCase();
-          const batterId  = batterIdLookup[`${date}_${name}`] || 0;
-          const pitcherId = pitcherIdLookup[`${date}_${pitcherNameRaw}`] || 0;
+          const pitcherNameRaw = r['vs Pitcher'] || blRow['Pitcher'] || '';
+          const batterId  = resolveId(r.Batter, r.Team);
+          const pitcherId = resolveId(pitcherNameRaw, '');
 
           const wentYard = (r['Gone Yard']||'').trim().toUpperCase() === 'YES';
           const actualHR = parseInt(r['HR'] || 0) || (wentYard ? 1 : 0);
@@ -26869,7 +26877,8 @@ function TrackRecordTab() {
     let rows = dateRows;
     if (teamFilter !== 'ALL') rows = rows.filter(r => r.team === teamFilter);
     if (showOnlyHR)     rows = rows.filter(r => r.wentYard);
-    if (showOnlySignal) rows = rows.filter(r => r.brlSignal || r.isKeyMatchup);
+    if (showOnlySignal) rows = rows.filter(r => r.brlSignal);
+    if (showOnlyKM)     rows = rows.filter(r => r.isKeyMatchup);
     if (search) {
       const q = search.toLowerCase();
       rows = rows.filter(r =>
@@ -26884,7 +26893,7 @@ function TrackRecordTab() {
       }
       return sortDir * ((av||0) - (bv||0));
     });
-  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, search, sortCol, sortDir]);
+  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, search, sortCol, sortDir]);
 
   const summary = useMemo(() => {
     const hrs          = dateRows.filter(r => r.wentYard);
@@ -26924,7 +26933,7 @@ function TrackRecordTab() {
     </div>
   );
 
-  const SortTh = ({ col, label, title, style: s }) => (
+  const SortTh = ({ col, label, title, color, style: s }) => (
     <th onClick={() => {
       if (sortCol === col) setSortDir(d => -d);
       else { setSortCol(col); setSortDir(-1); }
@@ -26933,7 +26942,7 @@ function TrackRecordTab() {
     style={{
       padding:'3px 6px', cursor:'pointer', userSelect:'none',
       fontFamily:mono, fontSize:8, fontWeight:700,
-      color: sortCol===col ? 'var(--accent)' : 'var(--muted)',
+      color: sortCol===col ? 'var(--accent)' : (color || 'var(--muted)'),
       textTransform:'uppercase', whiteSpace:'nowrap',
       ...s
     }}>
@@ -27099,7 +27108,16 @@ function TrackRecordTab() {
             background: showOnlySignal ? 'rgba(232,65,26,.15)' : 'var(--surface2)',
             color:       showOnlySignal ? 'var(--accent)' : 'var(--muted)',
             border: `1px solid ${showOnlySignal ? 'rgba(232,65,26,.4)' : 'var(--border)'}` }}>
-          ★ Signals Only
+          ★ Barrel Signal Only
+        </button>
+
+        <button onClick={() => setShowOnlyKM(v=>!v)}
+          style={{padding:'4px 10px', borderRadius:6, border:'none',
+            cursor:'pointer', fontFamily:mono, fontSize:9, fontWeight:700,
+            background: showOnlyKM ? 'rgba(56,184,242,.15)' : 'var(--surface2)',
+            color:       showOnlyKM ? '#38b8f2' : 'var(--muted)',
+            border: `1px solid ${showOnlyKM ? 'rgba(56,184,242,.4)' : 'var(--border)'}` }}>
+          🔑 Key Matchup Only
         </button>
       </div>
 
@@ -27138,42 +27156,42 @@ function TrackRecordTab() {
                 <SortTh col="pitcherGrade" label="PGrade"/>
 
                 {showMatchup && <>
-                  <SortTh col="yardScore" label="YS"/>
-                  <SortTh col="boom"      label="Boom"/>
-                  <SortTh col="sig"       label="Sig"/>
-                  <SortTh col="grade"    label="Grade"/>
-                  <SortTh col="ghr"      label="gHR"/>
-                  <SortTh col="zoneFit"  label="ZF"/>
-                  <SortTh col="simTB"    label="SimTB"/>
-                  <SortTh col="xwoba"    label="xwOBA"/>
-                  <SortTh col="flags"    label="Flags"/>
-                  <SortTh col="isKeyMatchup" label="KM"/>
+                  <SortTh col="yardScore" label="YS" color="#e8411a"/>
+                  <SortTh col="boom"      label="Boom" color="#e8411a"/>
+                  <SortTh col="sig"       label="Sig" color="#e8411a"/>
+                  <SortTh col="grade"    label="Grade" color="#e8411a"/>
+                  <SortTh col="ghr"      label="gHR" color="#e8411a"/>
+                  <SortTh col="zoneFit"  label="ZF" color="#e8411a"/>
+                  <SortTh col="simTB"    label="SimTB" color="#e8411a"/>
+                  <SortTh col="xwoba"    label="xwOBA" color="#e8411a"/>
+                  <SortTh col="flags"    label="Flags" color="#e8411a"/>
+                  <SortTh col="isKeyMatchup" label="KM" color="#e8411a"/>
                 </>}
 
                 {showBarrel && <>
-                  <SortTh col="trueHR"    label="TrueHR"/>
-                  <SortTh col="matchup"   label="Matchup"/>
-                  <SortTh col="simHRPct"  label="SimHR%"/>
-                  <SortTh col="pulledBrl" label="PBrl%"/>
-                  <SortTh col="brlBIP"    label="Brl/BIP"/>
-                  <SortTh col="hrFB"      label="HR/FB"/>
-                  <SortTh col="fb"        label="FB%"/>
-                  <SortTh col="hh"        label="HH%"/>
-                  <SortTh col="brlSignal" label="Signal"/>
-                  <SortTh col="isLongshot" label="Longshot"/>
+                  <SortTh col="trueHR"    label="TrueHR" color="#38b8f2"/>
+                  <SortTh col="matchup"   label="Matchup" color="#38b8f2"/>
+                  <SortTh col="simHRPct"  label="SimHR%" color="#38b8f2"/>
+                  <SortTh col="pulledBrl" label="PBrl%" color="#38b8f2"/>
+                  <SortTh col="brlBIP"    label="Brl/BIP" color="#38b8f2"/>
+                  <SortTh col="hrFB"      label="HR/FB" color="#38b8f2"/>
+                  <SortTh col="fb"        label="FB%" color="#38b8f2"/>
+                  <SortTh col="hh"        label="HH%" color="#38b8f2"/>
+                  <SortTh col="brlSignal" label="Signal" color="#38b8f2"/>
+                  <SortTh col="isLongshot" label="Longshot" color="#38b8f2"/>
                 </>}
 
                 {showBoxScore && <>
-                  <SortTh col="actualHR"  label="HR"/>
-                  <SortTh col="actualAB"  label="AB"/>
-                  <SortTh col="actualH"   label="H"/>
-                  <SortTh col="actualTB"  label="TB"/>
-                  <SortTh col="actualRBI" label="RBI"/>
-                  <SortTh col="actualEV"  label="EV"/>
-                  <SortTh col="actualLA"  label="LA°"/>
-                  <SortTh col="closeCalls" label="CC"/>
-                  <SortTh col="ccMaxEV"   label="CC Max EV"/>
-                  <SortTh col="ccMaxDist" label="CC Dist"/>
+                  <SortTh col="actualHR"  label="HR" color="#27c97a"/>
+                  <SortTh col="actualAB"  label="AB" color="#27c97a"/>
+                  <SortTh col="actualH"   label="H" color="#27c97a"/>
+                  <SortTh col="actualTB"  label="TB" color="#27c97a"/>
+                  <SortTh col="actualRBI" label="RBI" color="#27c97a"/>
+                  <SortTh col="actualEV"  label="EV" color="#27c97a"/>
+                  <SortTh col="actualLA"  label="LA°" color="#27c97a"/>
+                  <SortTh col="closeCalls" label="CC" color="#27c97a"/>
+                  <SortTh col="ccMaxEV"   label="CC Max EV" color="#27c97a"/>
+                  <SortTh col="ccMaxDist" label="CC Dist" color="#27c97a"/>
                 </>}
               </tr>
             </thead>
@@ -27200,13 +27218,9 @@ function TrackRecordTab() {
                       }
                     </td>
                     <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
-                      color:'var(--text)', fontWeight:600, whiteSpace:'nowrap'}}>
-                      <div style={{display:'flex', alignItems:'center', gap:5,
-                        cursor:'pointer'}}
-                        onClick={() => openAtBatSlide({pid:r.batterId, name:r.batter, team:r.team})}>
-                        <PlayerAvatar pid={r.batterId} name={r.batter} size={18}/>
-                        <span>{r.batter}</span>
-                      </div>
+                      color:'var(--text)', fontWeight:600, whiteSpace:'nowrap', cursor:'pointer'}}
+                      onClick={() => openAtBatSlide({pid:r.batterId, name:r.batter, team:r.team})}>
+                      {r.batter}
                     </td>
                     <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
                       color:'var(--muted)'}}>{r.team}</td>
