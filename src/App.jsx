@@ -26818,6 +26818,7 @@ function TrackRecordTab() {
   const [showOnlyHR,     setShowOnlyHR]     = useState(false);
   const [showOnlySignal, setShowOnlySignal] = useState(false);
   const [showOnlyKM,     setShowOnlyKM]     = useState(false);
+  const [showOnlyWeakSlot, setShowOnlyWeakSlot] = useState(false);
   const [teamFilter,     setTeamFilter]     = useState('ALL');
 
   const [showMatchup,  setShowMatchup]  = useState(true);
@@ -26919,6 +26920,8 @@ function TrackRecordTab() {
             xwoba:        parseFloat(r['xwOBA'] || 0),
             flags:        parseInt(r['Flags'] || 0),
             isKeyMatchup: (r['Is Key Matchup']||'').toUpperCase() === 'YES',
+            isWeakSlot:   (r['In Weak Slot']||'').toUpperCase() === 'YES',
+            weakSlots:    r['Pitcher Weak Slots'] || '',
             trueHR, matchup, simHRPct, brlSignal, isLongshot,
             pulledBrl: parseFloat(blRow['PulledBrl%'] || 0),
             brlBIP:    parseFloat(blRow['Brl/BIP%']   || 0),
@@ -26966,6 +26969,7 @@ function TrackRecordTab() {
     if (showOnlyHR)     rows = rows.filter(r => r.wentYard);
     if (showOnlySignal) rows = rows.filter(r => r.brlSignal);
     if (showOnlyKM)     rows = rows.filter(r => r.isKeyMatchup);
+    if (showOnlyWeakSlot) rows = rows.filter(r => r.isWeakSlot);
     if (search) {
       const q = search.toLowerCase();
       rows = rows.filter(r =>
@@ -26980,7 +26984,7 @@ function TrackRecordTab() {
       }
       return sortDir * ((av||0) - (bv||0));
     });
-  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, search, sortCol, sortDir]);
+  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, showOnlyWeakSlot, search, sortCol, sortDir]);
 
   const summary = useMemo(() => {
     const hrs          = dateRows.filter(r => r.wentYard);
@@ -26990,13 +26994,15 @@ function TrackRecordTab() {
     const kmHits       = keyMatchups.filter(r => r.wentYard);
     const longshots    = dateRows.filter(r => r.isLongshot);
     const lsHits       = longshots.filter(r => r.wentYard);
+    const weakSlots    = dateRows.filter(r => r.isWeakSlot);
+    const weakSlotHits = weakSlots.filter(r => r.wentYard);
     const topYS        = [...dateRows].sort((a,b) => b.yardScore - a.yardScore)[0];
     const biggestMiss   = [...dateRows.filter(r => !r.wentYard)]
       .sort((a,b) => b.yardScore - a.yardScore)[0];
     const biggestUpset = [...dateRows.filter(r => r.wentYard)]
       .sort((a,b) => a.yardScore - b.yardScore)[0];
     return { hrs, signals, signalHits, keyMatchups, kmHits,
-             longshots, lsHits, topYS, biggestMiss, biggestUpset };
+             longshots, lsHits, weakSlots, weakSlotHits, topYS, biggestMiss, biggestUpset };
   }, [dateRows]);
 
   const GroupBar = ({ label, open, onToggle, color }) => (
@@ -27126,6 +27132,14 @@ function TrackRecordTab() {
             sub: `${summary.lsHits.length}/${summary.longshots.length}`,
             color:'#a78bfa'
           },
+          {
+            label:'WEAK SPOT HR RATE',
+            value: summary.weakSlots.length
+              ? `${((summary.weakSlotHits.length/summary.weakSlots.length)*100).toFixed(0)}%`
+              : '—',
+            sub: `${summary.weakSlotHits.length}/${summary.weakSlots.length}`,
+            color:'#ffd60a'
+          },
         ].map(card => (
           <div key={card.label} style={{
             background:'var(--surface2)', border:'1px solid var(--border)',
@@ -27206,6 +27220,15 @@ function TrackRecordTab() {
             border: `1px solid ${showOnlyKM ? 'rgba(56,184,242,.4)' : 'var(--border)'}` }}>
           🔑 Key Matchup Only
         </button>
+
+        <button onClick={() => setShowOnlyWeakSlot(v=>!v)}
+          style={{padding:'4px 10px', borderRadius:6, border:'none',
+            cursor:'pointer', fontFamily:mono, fontSize:9, fontWeight:700,
+            background: showOnlyWeakSlot ? 'rgba(255,214,10,.15)' : 'var(--surface2)',
+            color:       showOnlyWeakSlot ? '#ffd60a' : 'var(--muted)',
+            border: `1px solid ${showOnlyWeakSlot ? 'rgba(255,214,10,.4)' : 'var(--border)'}` }}>
+          🟢 Weak Spot Only
+        </button>
       </div>
 
       {filteredRows.length === 0 ? (
@@ -27253,6 +27276,7 @@ function TrackRecordTab() {
                   <SortTh col="xwoba"    label="xwOBA" color="#e8411a"/>
                   <SortTh col="flags"    label="Flags" color="#e8411a"/>
                   <SortTh col="isKeyMatchup" label="KM" color="#e8411a"/>
+                  <SortTh col="isWeakSlot" label="Weak Spot" color="#e8411a"/>
                 </>}
 
                 {showBarrel && <>
@@ -27343,6 +27367,8 @@ function TrackRecordTab() {
                         textAlign:'center'}}>{r.flags || '—'}</td>
                       <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
                         textAlign:'center'}}>{r.isKeyMatchup ? '🔑' : ''}</td>
+                      <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
+                        textAlign:'center'}} title={r.isWeakSlot ? `Slot ${r.lineupSlot} — pitcher weak slots: ${r.weakSlots||'—'}` : ''}>{r.isWeakSlot ? '🟢' : ''}</td>
                     </>}
 
                     {showBarrel && <>
