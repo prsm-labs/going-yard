@@ -1,29 +1,29 @@
 Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitcher ID (Away),Game ID,Venue ID,Venue Name,Day of Week,Day Abbr,Series Game #,Games in Series,Series Position,Day Context
-2026-07-08,03:45 PM,SF,TOR,657277.0,656302.0,823202,2395,Oracle Park,Wednesday,Wed,3,3,Finale,~ Neutral
-2026-07-08,06:35 PM,BAL,CHC,665152.0,607067.0,824815,2,Oriole Park at Camden Yards,Wednesday,Wed,2,3,Middle,~ Neutral
-2026-07-08,06:40 PM,DET,ATH,675512.0,605488.0,824253,2394,Comerica Park,Wednesday,Wed,2,3,Middle,~ Neutral
-2026-07-08,06:40 PM,PIT,ATL,683003.0,656550.0,823360,31,PNC Park,Wednesday,Wed,2,3,Middle,~ Neutral
-2026-07-08,06:40 PM,MIA,SEA,663969.0,669923.0,823848,4169,loanDepot park,Wednesday,Wed,2,3,Middle,~ Neutral
-2026-07-08,06:40 PM,TB,NYY,663556.0,543037.0,822957,12,Tropicana Field,Wednesday,Wed,3,4,Middle,~ Neutral
-2026-07-08,06:45 PM,WSH,HOU,656492.0,681293.0,822710,3309,Nationals Park,Wednesday,Wed,3,3,Finale,~ Neutral
-2026-07-08,07:10 PM,NYM,KC,681035.0,674444.0,823605,3289,Citi Field,Wednesday,Wed,2,3,Middle,~ Neutral
-2026-07-08,07:10 PM,CIN,PHI,695505.0,660604.0,824496,2602,Great American Ball Park,Wednesday,Wed,2,3,Middle,~ Neutral
-2026-07-08,07:40 PM,MIN,CLE,687570.0,677944.0,823684,3312,Target Field,Wednesday,Wed,2,3,Middle,~ Neutral
-2026-07-08,07:40 PM,CWS,BOS,663436.0,687562.0,824578,4,Rate Field,Wednesday,Wed,2,3,Middle,~ Neutral
-2026-07-08,07:45 PM,STL,MIL,700241.0,690986.0,823032,2889,Busch Stadium,Wednesday,Wed,4,5,Middle,~ Neutral
-2026-07-08,08:05 PM,TEX,LAA,669022.0,700712.0,822880,5325,Globe Life Field,Wednesday,Wed,2,3,Middle,~ Neutral
-2026-07-08,10:10 PM,LAD,COL,808963.0,687312.0,823928,22,UNIQLO Field at Dodger Stadium,Wednesday,Wed,3,3,Finale,~ Neutral
-2026-07-08,10:10 PM,SD,AZ,650633.0,703615.0,823279,2680,Petco Park,Wednesday,Wed,3,4,Middle,~ Neutral
 2026-07-09,12:35 PM,PIT,ATL,656605.0,693821.0,823359,31,PNC Park,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
 2026-07-09,01:10 PM,NYM,KC,640455.0,608379.0,823606,3289,Citi Field,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
 2026-07-09,01:10 PM,TB,NYY,656876.0,,822954,12,Tropicana Field,Thursday,Thu,4,4,Finale,✅ Best Day (getaway)
-2026-07-09,01:40 PM,MIN,CLE,702474.0,668909.0,823683,3312,Target Field,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
+2026-07-09,01:35 PM,BAL,CHC,669432.0,656849.0,824816,2,Oriole Park at Camden Yards,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
+2026-07-09,01:40 PM,MIN,CLE,641927.0,668909.0,823683,3312,Target Field,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
 2026-07-09,02:10 PM,CWS,BOS,641743.0,663776.0,824577,4,Rate Field,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
-2026-07-09,06:35 PM,BAL,CHC,669432.0,656849.0,824816,2,Oriole Park at Camden Yards,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
 2026-07-09,06:40 PM,DET,ATH,664285.0,678022.0,824251,2394,Comerica Park,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
-2026-07-09,06:40 PM,MIA,SEA,,682243.0,823846,4169,loanDepot park,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
+2026-07-09,06:40 PM,MIA,SEA,676083.0,682243.0,823846,4169,loanDepot park,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
 2026-07-09,07:10 PM,CIN,PHI,663903.0,666200.0,824494,2602,Great American Ball Park,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
 2026-07-09,07:45 PM,STL,MIL,669467.0,701656.0,823034,2889,Busch Stadium,Thursday,Thu,5,5,Finale,✅ Best Day (getaway)
 2026-07-09,08:05 PM,TEX,LAA,543135.0,672282.0,822877,5325,Globe Life Field,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
 2026-07-09,09:40 PM,SD,AZ,656288.0,518876.0,823277,2680,Petco Park,Thursday,Thu,4,4,Finale,✅ Best Day (getaway)
 2026-07-09,09:45 PM,SF,COL,,663372.0,823201,2395,Oracle Park,Thursday,Thu,1,4,Opener,✅ Best Day (getaway)
+2026-07-10,06:40 PM,DET,PHI,,,824252,2394,Comerica Park,Friday,Fri,1,3,Opener,⚠️ Trap (ace openers)
+2026-07-10,06:40 PM,PIT,MIL,,,823357,31,PNC Park,Friday,Fri,1,3,Opener,⚠️ Trap (ace openers)
+2026-07-10,06:45 PM,WSH,NYY,641793.0,,822709,3309,Nationals Park,Friday,Fri,1,3,Opener,⚠️ Trap (ace openers)
+2026-07-10,07:05 PM,BAL,KC,,,824817,2,Oriole Park at Camden Yards,Friday,Fri,1,3,Opener,⚠️ Trap (ace openers)
+2026-07-10,07:10 PM,CIN,CHC,668881.0,684007.0,824493,2602,Great American Ball Park,Friday,Fri,1,3,Opener,⚠️ Trap (ace openers)
+2026-07-10,07:10 PM,TB,SEA,,,822955,12,Tropicana Field,Friday,Fri,1,3,Opener,⚠️ Trap (ace openers)
+2026-07-10,07:10 PM,MIA,CLE,,800048.0,823845,4169,loanDepot park,Friday,Fri,1,3,Opener,⚠️ Trap (ace openers)
+2026-07-10,07:15 PM,NYM,BOS,690997.0,543243.0,823604,3289,Citi Field,Friday,Fri,1,3,Opener,⚠️ Trap (ace openers)
+2026-07-10,07:40 PM,CWS,ATH,680732.0,,824575,4,Rate Field,Friday,Fri,1,3,Opener,⚠️ Trap (ace openers)
+2026-07-10,08:05 PM,TEX,HOU,,686613.0,822878,5325,Globe Life Field,Friday,Fri,1,3,Opener,⚠️ Trap (ace openers)
+2026-07-10,08:10 PM,MIN,LAA,805673.0,,823685,3312,Target Field,Friday,Fri,1,3,Opener,⚠️ Trap (ace openers)
+2026-07-10,08:15 PM,STL,ATL,681517.0,,823033,2889,Busch Stadium,Friday,Fri,1,3,Opener,⚠️ Trap (ace openers)
+2026-07-10,09:40 PM,SD,TOR,676664.0,,823278,2680,Petco Park,Friday,Fri,1,3,Opener,⚠️ Trap (ace openers)
+2026-07-10,10:10 PM,LAD,AZ,660271.0,,823927,22,UNIQLO Field at Dodger Stadium,Friday,Fri,1,3,Opener,⚠️ Trap (ace openers)
+2026-07-10,10:15 PM,SF,COL,,685299.0,823200,2395,Oracle Park,Friday,Fri,2,4,Middle,⚠️ Trap (ace openers)
