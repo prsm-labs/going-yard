@@ -47,9 +47,12 @@ self.onmessage = function(e) {
     // Hand-specific pitcher grade — LHB/Switch faces vs-LHB profile, RHB
     // faces vs-RHB. Falls back to the overall grade when the hand-specific
     // engine field isn't populated yet (requires a pipeline run).
+    // FIX (July 9 2026): this was inverted — vsR was being read for L/S
+    // batters and vsL for R batters. Corrected to match App.jsx's
+    // getHandSpecificGrade(), the verified-correct reference implementation.
     const gradeLabel = (bHand === 'L' || bHand === 'S')
-      ? (r.pitcher_grade_label_vsR || r.pitcher_grade_label || r._pgLabel || '')
-      : (r.pitcher_grade_label_vsL || r.pitcher_grade_label || r._pgLabel || '');
+      ? (r.pitcher_grade_label_vsL || r.pitcher_grade_label || r._pgLabel || '')
+      : (r.pitcher_grade_label_vsR || r.pitcher_grade_label || r._pgLabel || '');
     const grade = gradeLabel.toLowerCase();
 
     // Unified multipliers — matches PITCHER_GRADE_MULT in App.jsx (audit Q9:
@@ -65,9 +68,13 @@ self.onmessage = function(e) {
     const gameId     = String(r.game_id || '');
     const wx         = (weatherData && weatherData[gameId]) || {};
     const parkFactor = parseFloat(wx.hr_factor || 1.00);
+    // wind_carry_factor_v2 (Phase 3 weather fix) is a clean [0,1] cosine of
+    // wind alignment to CF; prefer it, falling back to the text heuristic.
+    const windCarryV2 = parseFloat(r.wind_carry_factor_v2 || 0);
     const windStr    = String(r.wind_effect || '').toLowerCase();
     const windMph    = parseFloat(r.wind_speed_mph || 0);
-    const windBoost  = windStr.includes('out') ?  windMph * 0.005
+    const windBoost  = windCarryV2 > 0 ? windCarryV2 * 0.05
+                     : windStr.includes('out') ?  windMph * 0.005
                      : windStr.includes('in')  ? -windMph * 0.003
                      : 0;
 

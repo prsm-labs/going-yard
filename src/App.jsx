@@ -25829,34 +25829,34 @@ function WeatherTab() {
   const PARK_DATA = [
     { abbr:'AZ',  venue:'Chase Field',                hr:103, xbh:100, single:100, runs:101, cf:80,  notes:'Retractable roof · neutral dimensions' },
     { abbr:'ATL', venue:'Truist Park',                hr:102, xbh:101, single:100, runs:101, cf:120, notes:'Moderate hitter park' },
-    { abbr:'BAL', venue:'Oriole Park at Camden Yards',hr:106, xbh:101, single:101, runs:103, cf:115, notes:'Short RF · slightly hitter-friendly' },
-    { abbr:'BOS', venue:'Fenway Park',                hr:91,  xbh:121, single:106, runs:104, cf:115, notes:'Green Monster: low HR, very high 2B' },
-    { abbr:'CHC', venue:'Wrigley Field',              hr:104, xbh:104, single:101, runs:102, cf:75,  notes:'Wind-dependent · elevated 2B in gaps' },
-    { abbr:'CIN', venue:'Great American Ball Park',   hr:127, xbh:104, single:102, runs:110, cf:110, notes:'Most HR-friendly · warm humid air' },
-    { abbr:'CLE', venue:'Progressive Field',          hr:85,  xbh:97,  single:97,  runs:94,  cf:120, notes:'Large outfield · pitcher-friendly all stats' },
+    { abbr:'BAL', venue:'Oriole Park at Camden Yards',hr:106, xbh:101, single:101, runs:103, cf:30,  notes:'Short RF · slightly hitter-friendly' },
+    { abbr:'BOS', venue:'Fenway Park',                hr:91,  xbh:121, single:106, runs:104, cf:45,  notes:'Green Monster: low HR, very high 2B' },
+    { abbr:'CHC', venue:'Wrigley Field',              hr:104, xbh:104, single:101, runs:102, cf:80,  notes:'Wind-dependent · elevated 2B in gaps' },
+    { abbr:'CIN', venue:'Great American Ball Park',   hr:127, xbh:104, single:102, runs:110, cf:350, notes:'Most HR-friendly · warm humid air' },
+    { abbr:'CLE', venue:'Progressive Field',          hr:85,  xbh:97,  single:97,  runs:94,  cf:5,   notes:'Large outfield · pitcher-friendly all stats' },
     { abbr:'COL', venue:'Coors Field',                hr:125, xbh:114, single:113, runs:118, cf:105, notes:'Altitude boosts all hit types equally' },
-    { abbr:'CWS', venue:'Guaranteed Rate Field',      hr:97,  xbh:100, single:99,  runs:98,  cf:115, notes:'Slightly pitcher-friendly' },
-    { abbr:'DET', venue:'Comerica Park',              hr:92,  xbh:96,  single:97,  runs:95,  cf:115, notes:'Large CF gap · suppresses HRs and XBH' },
-    { abbr:'HOU', venue:'Daikin Park',                hr:104, xbh:100, single:100, runs:101, cf:135, notes:'Retractable roof · neutral' },
-    { abbr:'KC',  venue:'Kauffman Stadium',           hr:82,  xbh:96,  single:97,  runs:93,  cf:115, notes:'Large outfield · pitcher-friendly' },
-    { abbr:'LAA', venue:'Angel Stadium',              hr:113, xbh:102, single:101, runs:105, cf:120, notes:'Hitter-friendly · marine layer variable' },
-    { abbr:'LAD', venue:'Dodger Stadium',             hr:128, xbh:97,  single:98,  runs:108, cf:135, notes:'High HR · short fence = fewer doubles' },
-    { abbr:'MIA', venue:'loanDepot park',             hr:90,  xbh:99,  single:99,  runs:95,  cf:100, notes:'Retractable roof · neutral to slight pitcher' },
-    { abbr:'MIL', venue:'American Family Field',      hr:106, xbh:101, single:100, runs:102, cf:125, notes:'Retractable roof · hitter-friendly' },
-    { abbr:'MIN', venue:'Target Field',               hr:106, xbh:101, single:101, runs:103, cf:115, notes:'Hitter-friendly · cold air early season' },
-    { abbr:'NYM', venue:'Citi Field',                 hr:88,  xbh:101, single:101, runs:97,  cf:118, notes:'Spacious park · suppresses HRs' },
-    { abbr:'NYY', venue:'Yankee Stadium',             hr:121, xbh:94,  single:98,  runs:107, cf:122, notes:'Short RF porch = HRs not doubles' },
+    { abbr:'CWS', venue:'Guaranteed Rate Field',      hr:97,  xbh:100, single:99,  runs:98,  cf:5,   notes:'Slightly pitcher-friendly' },
+    { abbr:'DET', venue:'Comerica Park',              hr:92,  xbh:96,  single:97,  runs:95,  cf:5,   notes:'Large CF gap · suppresses HRs and XBH' },
+    { abbr:'HOU', venue:'Daikin Park',                hr:104, xbh:100, single:100, runs:101, cf:30,  notes:'Retractable roof · neutral' },
+    { abbr:'KC',  venue:'Kauffman Stadium',           hr:82,  xbh:96,  single:97,  runs:93,  cf:10,  notes:'Large outfield · pitcher-friendly' },
+    { abbr:'LAA', venue:'Angel Stadium',              hr:113, xbh:102, single:101, runs:105, cf:335, notes:'Hitter-friendly · marine layer variable' },
+    { abbr:'LAD', venue:'Dodger Stadium',             hr:128, xbh:97,  single:98,  runs:108, cf:30,  notes:'High HR · short fence = fewer doubles' },
+    { abbr:'MIA', venue:'loanDepot park',             hr:90,  xbh:99,  single:99,  runs:95,  cf:20,  notes:'Retractable roof · neutral to slight pitcher' },
+    { abbr:'MIL', venue:'American Family Field',      hr:106, xbh:101, single:100, runs:102, cf:15,  notes:'Retractable roof · hitter-friendly' },
+    { abbr:'MIN', venue:'Target Field',               hr:106, xbh:101, single:101, runs:103, cf:30,  notes:'Hitter-friendly · cold air early season' },
+    { abbr:'NYM', venue:'Citi Field',                 hr:88,  xbh:101, single:101, runs:97,  cf:155, notes:'Spacious park · suppresses HRs' },
+    { abbr:'NYY', venue:'Yankee Stadium',             hr:121, xbh:94,  single:98,  runs:107, cf:75,  notes:'Short RF porch = HRs not doubles' },
     { abbr:'ATH', venue:'Sutter Health Park',         hr:95,  xbh:99,  single:100, runs:97,  cf:115, notes:'Temporary home 2025' },
-    { abbr:'PHI', venue:'Citizens Bank Park',         hr:113, xbh:103, single:101, runs:106, cf:115, notes:'Hitter-friendly · humid summers' },
-    { abbr:'PIT', venue:'PNC Park',                   hr:78,  xbh:95,  single:96,  runs:91,  cf:120, notes:'Most pitcher-friendly · large gaps' },
+    { abbr:'PHI', venue:'Citizens Bank Park',         hr:113, xbh:103, single:101, runs:106, cf:15,  notes:'Hitter-friendly · humid summers' },
+    { abbr:'PIT', venue:'PNC Park',                   hr:78,  xbh:95,  single:96,  runs:91,  cf:340, notes:'Most pitcher-friendly · large gaps' },
     { abbr:'SD',  venue:'Petco Park',                 hr:104, xbh:101, single:100, runs:101, cf:115, notes:'Marine layer · neutral to slight hitter' },
-    { abbr:'SEA', venue:'T-Mobile Park',              hr:100, xbh:98,  single:99,  runs:98,  cf:120, notes:'Retractable roof · neutral' },
-    { abbr:'SF',  venue:'Oracle Park',                hr:90,  xbh:97,  single:98,  runs:94,  cf:108, notes:'Bay winds + marine layer suppress all' },
-    { abbr:'STL', venue:'Busch Stadium',              hr:89,  xbh:100, single:100, runs:96,  cf:115, notes:'Open air · slight pitcher-friendly' },
-    { abbr:'TB',  venue:'Steinbrenner Field',         hr:98,  xbh:100, single:100, runs:99,  cf:115, notes:'Temporary home 2025' },
-    { abbr:'TEX', venue:'Globe Life Field',           hr:102, xbh:100, single:100, runs:101, cf:115, notes:'Retractable roof · neutral' },
-    { abbr:'TOR', venue:'Rogers Centre',              hr:103, xbh:101, single:100, runs:101, cf:105, notes:'Artificial turf · domed' },
-    { abbr:'WSH', venue:'Nationals Park',             hr:95,  xbh:99,  single:100, runs:97,  cf:115, notes:'River winds variable · slight pitcher' },
+    { abbr:'SEA', venue:'T-Mobile Park',              hr:100, xbh:98,  single:99,  runs:98,  cf:335, notes:'Retractable roof · neutral' },
+    { abbr:'SF',  venue:'Oracle Park',                hr:90,  xbh:97,  single:98,  runs:94,  cf:315, notes:'Bay winds + marine layer suppress all' },
+    { abbr:'STL', venue:'Busch Stadium',              hr:89,  xbh:100, single:100, runs:96,  cf:5,   notes:'Open air · slight pitcher-friendly' },
+    { abbr:'TB',  venue:'Steinbrenner Field',         hr:98,  xbh:100, single:100, runs:99,  cf:0,   notes:'Temporary home 2025' },
+    { abbr:'TEX', venue:'Globe Life Field',           hr:102, xbh:100, single:100, runs:101, cf:40,  notes:'Retractable roof · neutral' },
+    { abbr:'TOR', venue:'Rogers Centre',              hr:103, xbh:101, single:100, runs:101, cf:15,  notes:'Artificial turf · domed' },
+    { abbr:'WSH', venue:'Nationals Park',             hr:95,  xbh:99,  single:100, runs:97,  cf:355, notes:'River winds variable · slight pitcher' },
   ];
 
   const sortedParks = [...PARK_DATA].sort((a,b) => {
@@ -29440,7 +29440,15 @@ function HomeTab() {
 // ── Barrel Lab / On Base — shared helpers ───────────────────────────────────
 
 function getPitcherCeiling(r) {
-  const grade = (r.pitcher_grade_label || r._pgLabel || '').toLowerCase();
+  // FIX (July 9 2026): was reading the hand-agnostic overall grade only —
+  // inconsistent with groupB_MatchupVulnerability() and computeMatchupScore(),
+  // which both correctly use getHandSpecificGrade(). Confirmed during the
+  // Ben Rice (LHB) vs Rasmussen (RHP, overall Elite / vsL Average) case
+  // study: leaving this unfixed would have capped Rice's normalized
+  // TrueHRScore at the Elite ceiling (70) using Rasmussen's overall grade,
+  // right at the Barrel Signal threshold, despite facing a materially
+  // weaker hand-specific matchup (Average).
+  const grade = (getHandSpecificGrade(r) || r._pgLabel || '').toLowerCase();
   const era   = parseFloat(r.pitcher_era || r.era || 4.00);
   const gradeCeiling =
     grade.includes('elite')    ? 70 :

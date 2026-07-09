@@ -86,23 +86,35 @@ self.onmessage = function(e) {
     // ── Environmental adjustments ────────────────────────────────────────
     // hr_factor in CSV is decimal (e.g. 1.06 = 6% above neutral)
     const parkFactor = parseFloat(r.hr_factor || 1.00);
-    // wind_effect is a text string in CSV; wind_speed_mph is numeric
-    // Positive wind boost if wind_effect contains "Out", else neutral
-    const windStr   = String(r.wind_effect || '').toLowerCase();
-    const windMph   = parseFloat(r.wind_speed_mph || 0);
-    const windBoost = windStr.includes('out') ? windMph * 0.008
-                    : windStr.includes('in')  ? windMph * -0.004
-                    : 0;
-    const windMult  = 1 + windBoost;
+    // wind_carry_factor_v2 (Phase 3 weather fix, July 2026) is a clean [0,1]
+    // cosine of wind alignment to CF — 1.0 = pure tailwind, 0 = crosswind/
+    // headwind. Prefer it over the wind_effect text-string heuristic, which
+    // couldn't distinguish a direct tailwind from a quartering one. Falls
+    // back to the old heuristic when the field isn't populated yet.
+    const windCarryV2 = parseFloat(r.wind_carry_factor_v2 || 0);
+    let windMult;
+    if (windCarryV2 > 0) {
+      windMult = 1 + windCarryV2 * 0.08;
+    } else {
+      const windStr   = String(r.wind_effect || '').toLowerCase();
+      const windMph   = parseFloat(r.wind_speed_mph || 0);
+      const windBoost = windStr.includes('out') ? windMph * 0.008
+                      : windStr.includes('in')  ? windMph * -0.004
+                      : 0;
+      windMult = 1 + windBoost;
+    }
 
     // ── Pitcher grade multiplier (hand-specific) ──────────────────────────
     // LHB/Switch faces the pitcher's vs-LHB profile, RHB faces vs-RHB.
     // Falls back to the overall (hand-agnostic) grade when the hand-specific
     // engine field isn't populated yet (requires a matchup_engine.py run —
     // see PROMPT_AllSignalStackFixes.md Part 1 gate).
+    // FIX (July 9 2026): this was inverted — vsR was being read for L/S
+    // batters and vsL for R batters. Corrected to match App.jsx's
+    // getHandSpecificGrade(), the verified-correct reference implementation.
     const gradeLabel = (bHand === 'L' || bHand === 'S')
-      ? (r.pitcher_grade_label_vsR || r.pitcher_grade_label || r._pgLabel || '')
-      : (r.pitcher_grade_label_vsL || r.pitcher_grade_label || r._pgLabel || '');
+      ? (r.pitcher_grade_label_vsL || r.pitcher_grade_label || r._pgLabel || '')
+      : (r.pitcher_grade_label_vsR || r.pitcher_grade_label || r._pgLabel || '');
     const grade = gradeLabel.toLowerCase();
 
     // Unified multipliers — matches PITCHER_GRADE_MULT in App.jsx (audit Q9:

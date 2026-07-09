@@ -44,10 +44,10 @@ const METAR_STATIONS = {
 };
 
 const STADIUMS = {
-  NYY:{lat:40.8296, lon:-73.9262,  name:"Yankee Stadium",           cfDir:185, dome:false},
+  NYY:{lat:40.8296, lon:-73.9262,  name:"Yankee Stadium",           cfDir:75,  dome:false},
   NYM:{lat:40.7571, lon:-73.8458,  name:"Citi Field",               cfDir:155, dome:false},
-  BOS:{lat:42.3467, lon:-71.0972,  name:"Fenway Park",              cfDir:65,  dome:false},
-  LAD:{lat:34.0739, lon:-118.2390, name:"Dodger Stadium",           cfDir:350, dome:false},
+  BOS:{lat:42.3467, lon:-71.0972,  name:"Fenway Park",              cfDir:45,  dome:false},
+  LAD:{lat:34.0739, lon:-118.2390, name:"Dodger Stadium",           cfDir:30,  dome:false},
   LAA:{lat:33.8003, lon:-117.8827, name:"Angel Stadium",            cfDir:335, dome:false},
   HOU:{lat:29.7572, lon:-95.3556,  name:"Minute Maid Park",         cfDir:30,  dome:true },
   SF: {lat:37.7786, lon:-122.3893, name:"Oracle Park",              cfDir:315, dome:false},
@@ -61,8 +61,8 @@ const STADIUMS = {
   DET:{lat:42.3390, lon:-83.0485,  name:"Comerica Park",            cfDir:5,   dome:false},
   TOR:{lat:43.6414, lon:-79.3894,  name:"Rogers Centre",            cfDir:15,  dome:true },
   TB: {lat:27.7683, lon:-82.6534,  name:"Tropicana Field",          cfDir:0,   dome:true },
-  BAL:{lat:39.2838, lon:-76.6218,  name:"Camden Yards",             cfDir:355, dome:false},
-  PHI:{lat:39.9061, lon:-75.1665,  name:"Citizens Bank Park",       cfDir:355, dome:false},
+  BAL:{lat:39.2838, lon:-76.6218,  name:"Camden Yards",             cfDir:30,  dome:false},
+  PHI:{lat:39.9061, lon:-75.1665,  name:"Citizens Bank Park",       cfDir:15,  dome:false},
   ATL:{lat:33.8908, lon:-84.4675,  name:"Truist Park",              cfDir:120, dome:false},
   MIA:{lat:25.7781, lon:-80.2197,  name:"LoanDepot Park",           cfDir:20,  dome:true },
   WSH:{lat:38.8730, lon:-77.0074,  name:"Nationals Park",           cfDir:355, dome:false},
