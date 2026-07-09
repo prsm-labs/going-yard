@@ -1984,7 +1984,7 @@ function MatchupCard({ dp }) {
     return Math.min(14, Math.max(0, s));
   })();
 
-  const boom   = parseFloat(dp._boom) || computeBoomScore(sig, parseFloat(dp.zone_fit)||0, parseFloat(dp.recent_iso)||0, parseFloat(dp.sim_tb)||0, parseFloat(dp.weighted_flag_score)||0, parseFloat(dp.recent_barrel_spike||0), parseInt(dp.recent_hr_count||0), parseFloat(dp.recent_batter_ahead_pct||0), !!dp.hh_precursor, parseFloat(dp.primary_pitch_hr_rate||0), parseInt(dp.recent_barrels_3d)||0, parseInt(dp.recent_hrs_3d)||0, parseFloat(dp.recent_avg_bat_speed)||0, parseInt(dp.recent_pb_2d)||0, dp.la_locked, parseFloat(dp.season_swstr_pct)||0, parseFloat(dp.park_pull_fit)||0, parseInt(dp._zoneEdges||0), parseInt(dp._zoneKPenalty||0), (()=>{const _ls=liveSlot(dp.batter_id,dp.lineup_slot);return _ls>0&&(dp.pitcher_weak_slots||"").split(",").map(Number).filter(Boolean).includes(_ls);})(), parseFloat(dp.season_xwoba)||0);
+  const boom   = parseFloat(dp._boom) || computeBoomScore(sig, getZoneFit(dp), parseFloat(dp.recent_iso)||0, parseFloat(dp.sim_tb)||0, parseFloat(dp.weighted_flag_score)||0, shrinkageAdjBarrelSpike(dp), parseInt(dp.recent_hr_count||0), parseFloat(dp.recent_batter_ahead_pct||0), !!dp.hh_precursor, parseFloat(dp.primary_pitch_hr_rate||0), parseInt(dp.recent_barrels_3d)||0, parseInt(dp.recent_hrs_3d)||0, parseFloat(dp.recent_avg_bat_speed)||0, parseInt(dp.recent_pb_2d)||0, dp.la_locked, parseFloat(dp.season_swstr_pct)||0, parseFloat(dp.park_pull_fit)||0, parseInt(dp._zoneEdges||0), parseInt(dp._zoneKPenalty||0), (()=>{const _ls=liveSlot(dp.batter_id,dp.lineup_slot);return _ls>0&&(dp.pitcher_weak_slots||"").split(",").map(Number).filter(Boolean).includes(_ls);})(), parseFloat(dp.season_xwoba)||0);
   const iso    = parseFloat(dp.l7_iso||dp.recent_iso) || 0;  // L7 blended ISO
   const l7iso   = parseFloat(dp.l7_iso)    || parseFloat(dp.recent_iso)  || 0;
   const l7woba  = parseFloat(dp.l7_woba)   || parseFloat(dp.season_woba) || 0;
@@ -2019,9 +2019,9 @@ function MatchupCard({ dp }) {
       <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
         <div style={{display:'flex',gap:6,minWidth:'max-content',paddingBottom:4}}>
           {[
-            ['🎯 Yard', sig>0||boom>0?(()=>{const ys=computeYardScore(sig,parseFloat(dp.gHR)||0,boom,parseFloat(dp.ps_score)||0,dp.batter_hand||'',dp.pitcher_hand||'',parseInt(dp.days_rest??1),liveSlot(dp.batter_id,dp.lineup_slot), dp._pgLabel||dp.pitcher_grade_label||'');return ys>0?ys:'—';})():'—', (()=>{const ys=computeYardScore(sig,parseFloat(dp.gHR)||0,boom,parseFloat(dp.ps_score)||0,dp.batter_hand||'',dp.pitcher_hand||'',parseInt(dp.days_rest??1),liveSlot(dp.batter_id,dp.lineup_slot), dp._pgLabel||dp.pitcher_grade_label||'');return ys>=28?'#ffd700':ys>=20?'#ff4020':ys>=15?'#f5a623':'var(--muted)';})()],
+            ['🎯 Yard', sig>0||boom>0?(()=>{const ys=computeYardScore(sig,parseFloat(dp.gHR)||0,boom,getPS(dp),dp.batter_hand||'',dp.pitcher_hand||'',parseInt(dp.days_rest??1),liveSlot(dp.batter_id,dp.lineup_slot), getHandSpecificGrade(dp));return ys>0?ys:'—';})():'—', (()=>{const ys=computeYardScore(sig,parseFloat(dp.gHR)||0,boom,getPS(dp),dp.batter_hand||'',dp.pitcher_hand||'',parseInt(dp.days_rest??1),liveSlot(dp.batter_id,dp.lineup_slot), getHandSpecificGrade(dp));return ys>=28?'#ffd700':ys>=20?'#ff4020':ys>=15?'#f5a623':'var(--muted)';})()],
             ['💥 Boom', boom>0?Math.round(boom):'—', boomColor],
-            ['⚡️ PS', (parseFloat(dp.ps_score)||0)>=1?Math.round(parseFloat(dp.ps_score)):'—', (parseFloat(dp.ps_score)||0)>=75?'#a855f7':(parseFloat(dp.ps_score)||0)>=60?'#ff4020':'var(--muted)'],
+            ['⚡️ PS', getPS(dp)>=1?Math.round(getPS(dp)):'—', getPS(dp)>=75?'#a855f7':getPS(dp)>=60?'#ff4020':'var(--muted)'],
             ['⚡ Sig',  sig>0?sig:'—',               sigColor],
             ['P.Grade', pgLabel.split(' ')[0],        pgColor],
             ['Form',    fc?fc.short:'—',              fc?fc.color:'var(--muted)'],
@@ -2127,7 +2127,7 @@ function MatchupCard({ dp }) {
           <div style={{background:'var(--surface2)',borderRadius:8,border:'1px solid var(--border)',padding:'10px 12px',gridColumn:'1/-1'}}>
             {(()=>{
               const mono2     = "'DM Mono',monospace";
-              const ps        = parseFloat(dp.ps_score)||0;
+              const ps        = getPS(dp);
               const psCol     = ps>=75?'#a855f7':ps>=60?'#ff4020':ps>=45?'#f5a623':'var(--muted)';
               const psLbl     = ps>=75?'Perfect Storm':ps>=60?'Elite':ps>=45?'Favorable':'Below Avg';
               const veloR     = parseFloat(dp.fastball_velo_recent)||0;
@@ -6767,7 +6767,7 @@ function InlinePitcherCard({ pitcherId, pitcherName }) {
     stats.k9 && stats.k9 !== '—' ? stats.k9
       : (parseFloat(stats.ip) > 0 && parseInt(stats.so||0) > 0
           ? ((parseInt(stats.so) / parseFloat(stats.ip)) * 9).toFixed(2) : '0'),
-    stats.whip, stats.bb9, stats.hr9, stats.avg, stats.obp
+    stats.whip, stats.bb9, stats.hr9, stats.avg, stats.obp, stats.ip
   ) : null;
 
   const eraC  = v => { const n=parseFloat(v); return n<2.5?'#ff4020':n<3.5?'#ff8020':n<4.5?'var(--text)':'#27c97a'; };
@@ -7421,10 +7421,10 @@ function ThemeMatchTable({ rows }) {
 function computeThemeMatchScore(batter, cluster, bid) {
   const sig  = parseFloat(batter.weighted_flag_score||0) * 4.6;
   const boom = parseFloat(batter._boom) ||
-    computeBoomScore(sig, parseFloat(batter.zone_fit)||0,
+    computeBoomScore(sig, getZoneFit(batter),
       parseFloat(batter.recent_iso)||0, parseFloat(batter.sim_tb)||0,
       parseFloat(batter.weighted_flag_score)||0,
-      parseFloat(batter.recent_barrel_spike||0),
+      shrinkageAdjBarrelSpike(batter),
       parseInt(batter.recent_hr_count||0),
       parseFloat(batter.recent_batter_ahead_pct||0),
       !!batter.hh_precursor, parseFloat(batter.primary_pitch_hr_rate||0),
@@ -7437,11 +7437,11 @@ function computeThemeMatchScore(batter, cluster, bid) {
         (batter.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(ls);})(),
       parseFloat(batter.season_xwoba)||0);
   const ys = computeYardScore(
-    sig, parseFloat(batter.gHR)||0, boom, parseFloat(batter.ps_score)||0,
+    sig, parseFloat(batter.gHR)||0, boom, getPS(batter),
     batter.batter_hand||'', batter.pitcher_hand||'',
     parseInt(batter.days_rest ?? 1),
     liveSlot(bid, batter.lineup_slot),
-    batter.pitcher_grade_label||'');
+    getHandSpecificGrade(batter));
 
   const ysProx    = Math.max(0, 1 - Math.abs(ys - cluster.mean) / 30);
   const boomProx  = Math.max(0, 1 - Math.abs(boom - cluster.boomAvg) / 50);
@@ -7510,9 +7510,9 @@ function LiveThemesTab() {
           if (dp) {
             const sig = parseFloat(dp.weighted_flag_score||0)*4.6;
             boomScore = computeBoomScore(sig,
-              parseFloat(dp.zone_fit||0), parseFloat(dp.recent_iso||0),
+              getZoneFit(dp), parseFloat(dp.recent_iso||0),
               parseFloat(dp.sim_tb||0), parseFloat(dp.weighted_flag_score||0),
-              parseFloat(dp.recent_barrel_spike||0), parseInt(dp.recent_hr_count||0),
+              shrinkageAdjBarrelSpike(dp), parseInt(dp.recent_hr_count||0),
               parseFloat(dp.recent_batter_ahead_pct||0), !!dp.hh_precursor,
               parseFloat(dp.primary_pitch_hr_rate||0), parseInt(dp.recent_barrels_3d||0),
               parseInt(dp.recent_hrs_3d||0), parseFloat(dp.recent_avg_bat_speed||0),
@@ -7521,9 +7521,9 @@ function LiveThemesTab() {
               parseInt(dp._zoneEdges||0), parseInt(dp._zoneKPenalty||0), false,
               parseFloat(dp.season_xwoba||0));
             yardScore = computeYardScore(sig, parseFloat(dp.gHR||0), boomScore,
-              parseFloat(dp.ps_score||0), dp.batter_hand||'', dp.pitcher_hand||'',
+              getPS(dp), dp.batter_hand||'', dp.pitcher_hand||'',
               parseInt(dp.days_rest??1), liveSlot(bid, dp.lineup_slot),
-              dp.pitcher_grade_label||'');
+              getHandSpecificGrade(dp));
             xwoba = parseFloat(dp.season_xwoba||0);
             iso   = parseFloat(dp.recent_iso||0);
           }
@@ -13903,7 +13903,7 @@ function LiveBatterBox({ batterId, gamePk, onData }) {
 
 
 // Graded pitcher stats fetched from existing pitcher API
-function gradePitcher(era, k9, whip, bb9, hr9, avg, obp) {
+function gradePitcher(era, k9, whip, bb9, hr9, avg, obp, ip = 999) {
   const e  = parseFloat(era)  || 99;
   const k  = parseFloat(k9)   || 0;
   const w  = parseFloat(whip) || 99;
@@ -13919,6 +13919,20 @@ function gradePitcher(era, k9, whip, bb9, hr9, avg, obp) {
   if (h <= 0.8)  s += 2; else if (h <= 1.1)   s += 1;
   if (av <= .210) s += 2; else if (av <= .240) s += 1;
   if (ob <= .275) s += 2; else if (ob <= .320) s += 1;
+
+  // IP confidence discount — confirmed audit finding: thin-sample pitchers
+  // (e.g. Dean Kremer at 22 IP) can earn an Elite grade on the same formula
+  // that a 100+ IP starter needs, then flip to Tough/worse within one bad
+  // outing. Cap how extreme a grade a small sample can produce.
+  const ipF = parseFloat(ip) || 0;
+  if (ipF < 10) {
+    if (s >= 5) return { label:'💥 Hittable', color:'#27c97a',
+      bg:'rgba(39,201,122,.08)', desc:'Small sample (<10 IP) — grade capped at Hittable' };
+  } else if (ipF < 20) {
+    if (s >= 13) return { label:'⚠️ Tough', color:'#ff8020',
+      bg:'rgba(255,128,32,.08)', desc:'Small sample (<20 IP) — Elite requires ≥20 IP' };
+  }
+
   if (s >= 13) return { label:'‼️ Elite',   color:'#ff4020', bg:'rgba(255,64,32,.10)',    desc:'Elite ERA/K-rate/WHIP' };
   if (s >= 9)  return { label:'⚠️ Tough',   color:'#ff8020', bg:'rgba(255,128,32,.08)',   desc:'Above-average pitcher' };
   if (s >= 5)  return { label:'🤔 Average', color:'var(--muted)', bg:'rgba(255,255,255,.04)', desc:'League-average matchup' };
@@ -13931,8 +13945,8 @@ function PitcherCard({ pitcherId, pitcherName, onGrade }) {
   const [open, setOpen]       = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const gradeStats = (era, k9, whip, bb9, hr9, avg, obp) =>
-    gradePitcher(era, k9, whip, bb9, hr9, avg, obp);
+  const gradeStats = (era, k9, whip, bb9, hr9, avg, obp, ip) =>
+    gradePitcher(era, k9, whip, bb9, hr9, avg, obp, ip);
 
   // Auto-fetch on mount so grade shows immediately without clicking
   useEffect(() => {
@@ -13961,7 +13975,7 @@ function PitcherCard({ pitcherId, pitcherName, onGrade }) {
       (parseFloat(stats.ip) > 0 && parseInt(stats.so||0) > 0
         ? ((parseInt(stats.so) / parseFloat(stats.ip)) * 9).toFixed(2)
         : '0')),
-    stats.whip, stats.bb9, stats.hr9, stats.avg, stats.obp
+    stats.whip, stats.bb9, stats.hr9, stats.avg, stats.obp, stats.ip
   ) : null;
   useEffect(() => {
     if (grade && pitcherId && onGrade) {
@@ -14231,6 +14245,83 @@ function FormBadge({ formKey }) {
       {fc.short}
     </span>
   );
+}
+
+// ── getPS — best available PS Score for a batter row ──────────────────────────
+// Prefers ps_score_v2 (weather-adjusted, Phase 3) over ps_score (V1). The
+// engine has computed ps_score_v2 all season but the App.jsx display layer
+// that read it was lost in a prior revert (confirmed via Full Signal Stack
+// Audit — zero references to ps_score_v2 anywhere before this fix). Null-safe:
+// falls back to ps_score when ps_score_v2 isn't populated yet.
+function getPS(r) {
+  const v2 = parseFloat(r?.ps_score_v2);
+  if (!isNaN(v2) && v2 > 0) return v2;
+  return parseFloat(r?.ps_score || 0);
+}
+
+// ── PITCHER_GRADE_MULT — single source of truth for grade penalties ──────────
+// Replaces 5 independent multiplicative implementations found in the audit
+// (Elite ranged 0.55-0.72 depending on which scoring function). Values here
+// split the difference between the harshest and most lenient prior values.
+const PITCHER_GRADE_MULT = {
+  elite:    0.62,  // was 0.55 (Barrel Lab) to 0.72 (onBaseWorker.js)
+  tough:    0.80,  // was 0.75-0.85
+  average:  1.00,
+  hittable: 1.12,  // was 1.10-1.15
+  target:   1.22,  // was 1.18-1.25
+};
+
+function pitcherGradeMult(label) {
+  const l = String(label || '').toLowerCase();
+  if (l.includes('elite')    || l.includes('‼️')) return PITCHER_GRADE_MULT.elite;
+  if (l.includes('tough')    || l.includes('⚠️')) return PITCHER_GRADE_MULT.tough;
+  if (l.includes('hittable') || l.includes('💥')) return PITCHER_GRADE_MULT.hittable;
+  if (l.includes('target')   || l.includes('🎯')) return PITCHER_GRADE_MULT.target;
+  return PITCHER_GRADE_MULT.average;
+}
+
+// ── getHandSpecificGrade — pitcher grade for THIS batter's handedness ────────
+// LHB/Switch faces the pitcher's performance-vs-LHB profile → pitcher_grade_label_vsL
+// RHB faces the pitcher's performance-vs-RHB profile → pitcher_grade_label_vsR
+// Falls back to the overall (hand-agnostic) grade — the only grade that
+// existed before this fix — when the new engine field isn't populated yet
+// (requires a pipeline run; see PROMPT_AllSignalStackFixes.md Part 1 gate).
+function getHandSpecificGrade(r) {
+  const bHand = (r?.batter_hand || '').toUpperCase().trim()[0];
+  const overall = r?.pitcher_grade_label || r?._pgLabel || '';
+  if (bHand === 'L' || bHand === 'S') {
+    return r?.pitcher_grade_label_vsL || overall;
+  }
+  return r?.pitcher_grade_label_vsR || overall;
+}
+
+// ── shrinkageAdjBarrelSpike — shrinks recent_barrel_spike toward 0 for thin samples ──
+// Confirmed audit finding: 62.6% of established batters show a negative
+// recent_barrel_spike purely from small-sample statistics (P(0 barrels in
+// 26 PA at a true 1.6% rate) = 65.7%), not genuine decline. Anchor: 40 PA =
+// full confidence in the raw spike value; below that, shrink toward 0.
+function shrinkageAdjBarrelSpike(r) {
+  const rawSpike = parseFloat(r?.recent_barrel_spike);
+  if (isNaN(rawSpike)) return 0;
+  const recentPA = parseInt(r?.recent_pa || 0);
+  if (recentPA <= 0) return rawSpike * 0.5; // unknown PA = half confidence
+  const ANCHOR_PA = 40;
+  const alpha = Math.min(1.0, recentPA / ANCHOR_PA);
+  return parseFloat((rawSpike * alpha).toFixed(2));
+}
+
+// ── getZoneFit — season-level zone_fit fallback ───────────────────────────────
+// zone_fit=0 costs the single largest possible swing in Boom (up to 24 pts
+// direct) and hits 7.2% of established batters (confirmed audit finding) due
+// to a >=10 season-meatball-PA threshold in the engine. zone_fit_season uses
+// a relaxed 3-PA threshold — prefer it over hard-zeroing when the primary
+// zone_fit came back 0. Null-safe: zone_fit_season is 0 until the pipeline
+// runs Part 1, in which case this behaves identically to reading zone_fit alone.
+function getZoneFit(r) {
+  const recent = parseFloat(r?.zone_fit || 0);
+  if (recent > 0) return recent;
+  const season = parseFloat(r?.zone_fit_season || 0);
+  return season;
 }
 
 // ── Boom Score — final composite HR probability (0–99) ───────────────────────
@@ -14562,10 +14653,9 @@ function computeYardScore(sig, ghr, boom, ps,
   // New weights:  Boom(42%) + Sig(25%) + PS(25%) + gHR(8%)
   //   × platoon × rest × pitcher penalty × lineup confirm
   //
-  // Pitch penalty (new): hard ceiling applied BEFORE other mods
-  //   ‼️ Elite pitcher → ×0.65  (data: A+ vs Elite = 7% HR rate, same as D batter)
-  //   ⚠️ Tough pitcher → ×0.82  (data: lifted but still suppressed)
-  //   All others       → ×1.00
+  // Pitch penalty: hard ceiling applied BEFORE other mods, now sourced from
+  // the unified PITCHER_GRADE_MULT table (was inline 0.65/0.82 — see
+  // pitcherGradeMult() for the current values and audit rationale).
   //
   // Tracker validation: new formula lifts top-25% → 11.6% HR rate (was 10.5%),
   // 2.86x lift (was 2.67x), and makes A+ grade monotonically better than A.
@@ -14582,10 +14672,7 @@ function computeYardScore(sig, ghr, boom, ps,
   // Data: A+ batter vs Elite pitcher = 7.7% HR rate = same as D batter.
   // This is the single biggest fix — elite batters vs elite pitchers
   // were generating noise scores of 50-68 that never cashed.
-  const pg = String(pitcherGradeLabel || '');
-  const pitcherMod = pg.includes('‼️') || pg.toLowerCase().includes('elite') ? 0.65
-                   : pg.includes('⚠️') || pg.toLowerCase().includes('tough') ? 0.82
-                   : 1.0;
+  const pitcherMod = pitcherGradeMult(pitcherGradeLabel);
 
   // ── Platoon multiplier ────────────────────────────────────────────────────
   const bh = (batterHand  || '').toString().trim().toUpperCase()[0];
@@ -14876,15 +14963,15 @@ function LongShotView({ data }) {
       if (pgLabel.includes('‼️') || pgLabel.toLowerCase().includes('elite')) continue;
       // ── UNIFIED SCORING — same as AllMatchups ─────────────────────────────
       const _sig = Math.min(14, Math.max(0, Math.round((parseFloat(b.weighted_flag_score)||0) * 4.6)));
-      const _boom = computeBoomScore(_sig, b.zone_fit, b.recent_iso, parseFloat(b.sim_tb)||0, b.weighted_flag_score,
-        parseFloat(b.recent_barrel_spike||0), parseInt(b.recent_hr_count||0), parseFloat(b.recent_batter_ahead_pct||0),
+      const _boom = computeBoomScore(_sig, getZoneFit(b), b.recent_iso, parseFloat(b.sim_tb)||0, b.weighted_flag_score,
+        shrinkageAdjBarrelSpike(b), parseInt(b.recent_hr_count||0), parseFloat(b.recent_batter_ahead_pct||0),
         !!b.hh_precursor, parseFloat(b.primary_pitch_hr_rate||0),
         parseInt(b.recent_barrels_3d)||0, parseInt(b.recent_hrs_3d)||0,
         parseFloat(b.recent_avg_bat_speed)||0, parseInt(b.recent_pb_2d)||0, b.la_locked, parseFloat(b.season_swstr_pct)||0, parseFloat(b.park_pull_fit)||0, parseInt(b._zoneEdges||0), parseInt(b._zoneKPenalty||0), (()=>{const _ls=liveSlot(b.batter_id,b.lineup_slot);return _ls>0&&(b.pitcher_weak_slots||"").split(",").map(Number).filter(Boolean).includes(_ls);})(), parseFloat(b.season_xwoba)||0);
-      const _ps   = parseFloat(b.ps_score)||0;
+      const _ps   = getPS(b);
       const _yard = computeYardScore(_sig, parseFloat(b.gHR)||0, _boom, _ps,
         b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1),
-        liveSlot(b.batter_id, b.lineup_slot), pgLabel);
+        liveSlot(b.batter_id, b.lineup_slot), getHandSpecificGrade(b));
       // ── GATE 3: Minimum Yard Score ─────────────────────────────────────────
       if (_yard < 10) continue;
       // ── GATE 4: Must have at least one live signal ─────────────────────────
@@ -15173,9 +15260,9 @@ function SimLabView({ data }) {
       const key = String(r.batter_id||'');
       if (!key || boomCache.current[key] !== undefined) return;
       const sig = (parseFloat(r.weighted_flag_score)||0) * 4.6;
-      boomCache.current[key] = computeBoomScore(sig, r.zone_fit, r.recent_iso,
+      boomCache.current[key] = computeBoomScore(sig, getZoneFit(r), r.recent_iso,
         r.sim_tb, r.weighted_flag_score,
-        parseFloat(r.recent_barrel_spike||0), parseInt(r.recent_hr_count||0),
+        shrinkageAdjBarrelSpike(r), parseInt(r.recent_hr_count||0),
         parseFloat(r.recent_batter_ahead_pct||0), !!r.hh_precursor,
         parseFloat(r.primary_pitch_hr_rate||0),
         parseInt(r.recent_barrels_3d)||0, parseInt(r.recent_hrs_3d)||0,
@@ -15331,8 +15418,8 @@ function SimLabView({ data }) {
         const pid = r.pitcher_id ? String(parseInt(r.pitcher_id) || r.pitcher_id) : null;
         return pid && selPitcherGradesSim.has(simPitcherGrades.current[pid]);
       })
-      .filter(r => !minYard   || (parseFloat(r._yard)||computeYardScore(parseFloat(r.weighted_flag_score)*4.6, parseFloat(r.gHR)||0, parseFloat(r._boom)||0, parseFloat(r.ps_score)||0, r.batter_hand||'', r.pitcher_hand||'', parseInt(r.days_rest??1), liveSlot(r.batter_id,r.lineup_slot), r._pgLabel||r.pitcher_grade_label||'')) >= parseFloat(minYard))
-      .filter(r => !maxYard   || (parseFloat(r._yard)||computeYardScore(parseFloat(r.weighted_flag_score)*4.6, parseFloat(r.gHR)||0, parseFloat(r._boom)||0, parseFloat(r.ps_score)||0, r.batter_hand||'', r.pitcher_hand||'', parseInt(r.days_rest??1), liveSlot(r.batter_id,r.lineup_slot), r._pgLabel||r.pitcher_grade_label||'')) <= parseFloat(maxYard))
+      .filter(r => !minYard   || (parseFloat(r._yard)||computeYardScore(parseFloat(r.weighted_flag_score)*4.6, parseFloat(r.gHR)||0, parseFloat(r._boom)||0, getPS(r), r.batter_hand||'', r.pitcher_hand||'', parseInt(r.days_rest??1), liveSlot(r.batter_id,r.lineup_slot), getHandSpecificGrade(r))) >= parseFloat(minYard))
+      .filter(r => !maxYard   || (parseFloat(r._yard)||computeYardScore(parseFloat(r.weighted_flag_score)*4.6, parseFloat(r.gHR)||0, parseFloat(r._boom)||0, getPS(r), r.batter_hand||'', r.pitcher_hand||'', parseInt(r.days_rest??1), liveSlot(r.batter_id,r.lineup_slot), getHandSpecificGrade(r))) <= parseFloat(maxYard))
       .filter(r => !minBoom    || (parseFloat(r._boom)||0) >= parseFloat(minBoom))
       .filter(r => !minBrl     || (parseFloat(r.recent_barrel_pct)||0) >= parseFloat(minBrl))
       .filter(r => !minZoneFit || (parseFloat(r.zone_fit)||0) >= parseFloat(minZoneFit))
@@ -15353,12 +15440,12 @@ function SimLabView({ data }) {
     const mul = sortDir === 'desc' ? -1 : 1;
     const sorted = [...filtered].sort((a, b) => {
       if (sortBy === '_boom') {
-        const aB = boomCache.current[String(a.batter_id)] ?? computeBoomScore((parseFloat(a.weighted_flag_score)||0)*4.6, a.zone_fit, a.recent_iso, a.sim_tb, a.weighted_flag_score, parseFloat(a.recent_barrel_spike||0), parseInt(a.recent_hr_count||0), parseFloat(a.recent_batter_ahead_pct||0), !!a.hh_precursor, parseFloat(a.primary_pitch_hr_rate||0), parseInt(a.recent_barrels_3d)||0, parseInt(a.recent_hrs_3d)||0, parseFloat(a.recent_avg_bat_speed)||0, parseInt(a.recent_pb_2d)||0, a.la_locked, parseFloat(a.season_swstr_pct)||0, parseFloat(a.park_pull_fit)||0, parseInt(a._zoneEdges||0), parseInt(a._zoneKPenalty||0), (()=>{const _ls=liveSlot(a.batter_id,a.lineup_slot);return _ls>0&&(a.pitcher_weak_slots||"").split(",").map(Number).filter(Boolean).includes(_ls);})(), parseFloat(a.season_xwoba)||0);
-        const bB = boomCache.current[String(b.batter_id)] ?? computeBoomScore((parseFloat(b.weighted_flag_score)||0)*4.6, b.zone_fit, b.recent_iso, b.sim_tb, b.weighted_flag_score, parseFloat(b.recent_barrel_spike||0), parseInt(b.recent_hr_count||0), parseFloat(b.recent_batter_ahead_pct||0), !!b.hh_precursor, parseFloat(b.primary_pitch_hr_rate||0), parseInt(b.recent_barrels_3d)||0, parseInt(b.recent_hrs_3d)||0, parseFloat(b.recent_avg_bat_speed)||0, parseInt(b.recent_pb_2d)||0, b.la_locked, parseFloat(b.season_swstr_pct)||0, parseFloat(b.park_pull_fit)||0, parseInt(b._zoneEdges||0), parseInt(b._zoneKPenalty||0), (()=>{const _ls=liveSlot(b.batter_id,b.lineup_slot);return _ls>0&&(b.pitcher_weak_slots||"").split(",").map(Number).filter(Boolean).includes(_ls);})(), parseFloat(b.season_xwoba)||0);
+        const aB = boomCache.current[String(a.batter_id)] ?? computeBoomScore((parseFloat(a.weighted_flag_score)||0)*4.6, getZoneFit(a), a.recent_iso, a.sim_tb, a.weighted_flag_score, shrinkageAdjBarrelSpike(a), parseInt(a.recent_hr_count||0), parseFloat(a.recent_batter_ahead_pct||0), !!a.hh_precursor, parseFloat(a.primary_pitch_hr_rate||0), parseInt(a.recent_barrels_3d)||0, parseInt(a.recent_hrs_3d)||0, parseFloat(a.recent_avg_bat_speed)||0, parseInt(a.recent_pb_2d)||0, a.la_locked, parseFloat(a.season_swstr_pct)||0, parseFloat(a.park_pull_fit)||0, parseInt(a._zoneEdges||0), parseInt(a._zoneKPenalty||0), (()=>{const _ls=liveSlot(a.batter_id,a.lineup_slot);return _ls>0&&(a.pitcher_weak_slots||"").split(",").map(Number).filter(Boolean).includes(_ls);})(), parseFloat(a.season_xwoba)||0);
+        const bB = boomCache.current[String(b.batter_id)] ?? computeBoomScore((parseFloat(b.weighted_flag_score)||0)*4.6, getZoneFit(b), b.recent_iso, b.sim_tb, b.weighted_flag_score, shrinkageAdjBarrelSpike(b), parseInt(b.recent_hr_count||0), parseFloat(b.recent_batter_ahead_pct||0), !!b.hh_precursor, parseFloat(b.primary_pitch_hr_rate||0), parseInt(b.recent_barrels_3d)||0, parseInt(b.recent_hrs_3d)||0, parseFloat(b.recent_avg_bat_speed)||0, parseInt(b.recent_pb_2d)||0, b.la_locked, parseFloat(b.season_swstr_pct)||0, parseFloat(b.park_pull_fit)||0, parseInt(b._zoneEdges||0), parseInt(b._zoneKPenalty||0), (()=>{const _ls=liveSlot(b.batter_id,b.lineup_slot);return _ls>0&&(b.pitcher_weak_slots||"").split(",").map(Number).filter(Boolean).includes(_ls);})(), parseFloat(b.season_xwoba)||0);
         return mul * (aB - bB);
       }
       if (sortBy === 'ps_score') {
-        return mul * ((parseFloat(a.ps_score)||0) - (parseFloat(b.ps_score)||0));
+        return mul * (getPS(a) - getPS(b));
       }
       if (sortBy === 'hr_odds_implied') {
         const aO = HR_ODDS_MAP[String(parseInt(a.batter_id)||0)]?.implied || 0;
@@ -15876,7 +15963,7 @@ function SimLabView({ data }) {
                   inWeakSlot,
                   b.pitcher_weak_slots||'',
                   // Computed columns — between Pitcher Weak Slots and Flags
-                  (b._yard ?? computeYardScore(sigCache.current[String(bid)]||0, parseFloat(b.gHR)||0, boomCache.current[String(bid)]||0, b._ps||(parseFloat(b.ps_score)||0), b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1), liveSlot(bid,b.lineup_slot), b._pgLabel||'')),
+                  (b._yard ?? computeYardScore(sigCache.current[String(bid)]||0, parseFloat(b.gHR)||0, boomCache.current[String(bid)]||0, b._ps||getPS(b), b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1), liveSlot(bid,b.lineup_slot), getHandSpecificGrade(b))),
                   sigCache.current[String(bid)] ?? '',
                   boomCache.current[String(bid)] ?? '',
                   (() => { const fc = getFormClass(b); return fc && FORM_CLASSES[fc] ? FORM_CLASSES[fc].short.replace(/[💥🥶💨🪱🎯🎩🌙]/gu,'').trim() : ''; })(),
@@ -16090,14 +16177,14 @@ function SimLabView({ data }) {
                   b._trackerSig = Math.min(14, Math.max(0, _trackerSig)); // cap at 14
                   b._pgLabel     = _pgLabelv;
                   b._formClass   = getFormClass(b);
-                  b._boom        = computeBoomScore(b._trackerSig, b.zone_fit, b.recent_iso, b.sim_tb, b.weighted_flag_score, parseFloat(b.recent_barrel_spike||0), parseInt(b.recent_hr_count||0), parseFloat(b.recent_batter_ahead_pct||0), !!b.hh_precursor, parseFloat(b.primary_pitch_hr_rate||0), parseInt(b.recent_barrels_3d)||0, parseInt(b.recent_hrs_3d)||0, parseFloat(b.recent_avg_bat_speed)||0, parseInt(b.recent_pb_2d)||0, b.la_locked, parseFloat(b.season_swstr_pct)||0, parseFloat(b.park_pull_fit)||0, parseInt(b._zoneEdges||0), parseInt(b._zoneKPenalty||0), (()=>{const _ls=liveSlot(b.batter_id,b.lineup_slot);return _ls>0&&(b.pitcher_weak_slots||"").split(",").map(Number).filter(Boolean).includes(_ls);})(), parseFloat(b.season_xwoba)||0);
+                  b._boom        = computeBoomScore(b._trackerSig, getZoneFit(b), b.recent_iso, b.sim_tb, b.weighted_flag_score, shrinkageAdjBarrelSpike(b), parseInt(b.recent_hr_count||0), parseFloat(b.recent_batter_ahead_pct||0), !!b.hh_precursor, parseFloat(b.primary_pitch_hr_rate||0), parseInt(b.recent_barrels_3d)||0, parseInt(b.recent_hrs_3d)||0, parseFloat(b.recent_avg_bat_speed)||0, parseInt(b.recent_pb_2d)||0, b.la_locked, parseFloat(b.season_swstr_pct)||0, parseFloat(b.park_pull_fit)||0, parseInt(b._zoneEdges||0), parseInt(b._zoneKPenalty||0), (()=>{const _ls=liveSlot(b.batter_id,b.lineup_slot);return _ls>0&&(b.pitcher_weak_slots||"").split(",").map(Number).filter(Boolean).includes(_ls);})(), parseFloat(b.season_xwoba)||0);
                   sigCache.current[String(b.batter_id)]  = b._trackerSig;
                   SIG_CACHE_GLOBAL[String(b.batter_id)]  = b._trackerSig; // expose to CheatSheetTab
                   boomCache.current[String(b.batter_id)] = b._boom;
                   // Write to DAILY_PICKS_CACHE directly — allPicksData rows are CSV copies,
                   // not the same objects, so b.x = y never reaches the cache the slideout reads
                   // Adjust PS Score live using confirmed lineup slot
-                  let _livePS = parseFloat(b.ps_score)||0;
+                  let _livePS = getPS(b);
                   if (_livePS > 0 && _slotv > 0) {
                     const _engSlot = parseInt(b.lineup_slot)||0;
                     if (_slotv !== _engSlot && _engSlot > 0) {
@@ -16107,7 +16194,7 @@ function SimLabView({ data }) {
                     }
                   }
                   b._ps  = _livePS;
-                  b._yard = computeYardScore(b._trackerSig||0, parseFloat(b.gHR)||0, b._boom||0, b._ps, b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1), liveSlot(b.batter_id,b.lineup_slot), b._pgLabel||b.pitcher_grade_label||'');
+                  b._yard = computeYardScore(b._trackerSig||0, parseFloat(b.gHR)||0, b._boom||0, b._ps, b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1), liveSlot(b.batter_id,b.lineup_slot), getHandSpecificGrade(b));
                   const _cacheEntry = DAILY_PICKS_CACHE[String(b.batter_id)];
                   if (_cacheEntry) {
                     _cacheEntry._trackerSig = b._trackerSig;
@@ -16157,7 +16244,7 @@ function SimLabView({ data }) {
                         {LINEUP_STATUS[parseInt(b.batter_id)||0]?.pos || '—'}
                       </td>
                       <td style={{textAlign:'center',padding:'2px 4px',verticalAlign:'middle'}}>
-                        <YardBadge score={b._yard ?? computeYardScore(b._trackerSig||0, parseFloat(b.gHR)||0, b._boom||0, b._ps||(parseFloat(b.ps_score)||0), b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1), liveSlot(b.batter_id,b.lineup_slot), b._pgLabel||'')}/>
+                        <YardBadge score={b._yard ?? computeYardScore(b._trackerSig||0, parseFloat(b.gHR)||0, b._boom||0, b._ps||getPS(b), b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1), liveSlot(b.batter_id,b.lineup_slot), getHandSpecificGrade(b))}/>
                       </td>
                       {/* ── Yard Score YV2 — experimental shrinkage blend (read-only comparison column) ── */}
                       <td style={{textAlign:'center',padding:'2px 4px',verticalAlign:'middle'}}>
@@ -16739,7 +16826,7 @@ function SimLabView({ data }) {
                         </td>
                         <td style={{ textAlign: 'left' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)' }}>{resolvePitcherName(b.pitcher, b.batting_team, b.pitcher_id)}</span></td>
                         <td style={{textAlign:'center',padding:'2px 4px'}}>
-                          <PSBadge score={b._ps ?? (parseFloat(b.ps_score)||0)}/>
+                          <PSBadge score={b._ps ?? getPS(b)}/>
                         </td>
                         <td style={{textAlign:'center',padding:'2px 4px'}}>
                           <BoomBadge score={b._boom}/>
@@ -18382,7 +18469,7 @@ function PitcherLeaderboard() {
   // Pre-compute grade for every pitcher so we can filter + display it
   const withGrades = pitchers.map(p => ({
     ...p,
-    _grade: gradePitcher(p.era, p.k9, p.whip, p.bb9, p.hr9, p.avg, p.obp),
+    _grade: gradePitcher(p.era, p.k9, p.whip, p.bb9, p.hr9, p.avg, p.obp, p.ip),
   }));
 
   const filtered = withGrades
@@ -20746,7 +20833,7 @@ function SoCloseTab({ data }) {
           reasons:   b.so_close_reasons || '',
           rec_ev:    parseFloat(b.recent_avg_ev||0),
           sim_tb:    parseFloat(b.sim_tb||0),
-          ps_score:  parseFloat(b.ps_score||0),
+          ps_score:  getPS(b),
           iso:       parseFloat(b.recent_iso||0),
         };
       })
@@ -21058,7 +21145,7 @@ function pitcherTier(b) {
 
 function pairScore(a, b) {
   const yA = parseFloat(a._yard||0),    yB = parseFloat(b._yard||0);
-  const psA = parseFloat(a.ps_score||0), psB = parseFloat(b.ps_score||0);
+  const psA = getPS(a), psB = getPS(b);
   const bsA = parseFloat(a.bat_speed_vs_baseline||0), bsB = parseFloat(b.bat_speed_vs_baseline||0);
   const pbA = parseFloat(a.recent_pulled_barrel_pct||0), pbB = parseFloat(b.recent_pulled_barrel_pct||0);
   const scA = parseInt(a.so_close_count||0), scB = parseInt(b.so_close_count||0);
@@ -21173,7 +21260,7 @@ function PairsTab({ data }) {
   function BatterCard({ b, type }) {
     const yard = parseFloat(b._yard||0);
     const bs   = parseFloat(b.bat_speed_vs_baseline||0);
-    const ps   = parseFloat(b.ps_score||0);
+    const ps   = getPS(b);
     const iso  = parseFloat(b.recent_iso||0);
     const hh   = parseFloat(b.recent_hh_pct||0);
     const fb   = parseFloat(b.recent_fb_pct||0);
@@ -21592,9 +21679,9 @@ function BvPDeepDiveTab() {
           rec_k:       parseFloat(dp.recent_k_pct||0),
           rec_bs:      parseFloat(dp.recent_avg_bat_speed||0),
           // ── PS / sim ───────────────────────────────────────────────────
-          ps_score:    parseFloat(dp.ps_score||0),
+          ps_score:    getPS(dp),
           sim_tb:      parseFloat(dp.sim_tb||0),
-          zone_fit:    parseFloat(dp.zone_fit||0),
+          zone_fit:    getZoneFit(dp),
           bat_speed_delta: parseFloat(dp.bat_speed_vs_baseline||0),
           la_mean:     parseFloat(dp.la_mean_l15||0),
           la_std:      parseFloat(dp.la_stddev||0),
@@ -24403,11 +24490,11 @@ function MatchupEngineTab() {
                 {(()=>{
                   const bullets=[];
                   const brlPct=parseFloat(b.recent_barrel_pct)||0,ev7=parseFloat(b.recent_avg_ev)||0;
-                  const la7=parseFloat(b.recent_avg_la)||0,zf=parseFloat(b.zone_fit)||0;
+                  const la7=parseFloat(b.recent_avg_la)||0,zf=getZoneFit(b);
                   const pbPct=parseFloat(b.recent_pulled_barrel_pct)||0;
                   const brl3d=parseInt(b.recent_barrels_3d)||0,hrs3d=parseInt(b.recent_hrs_3d)||0;
                   const pb2d=parseInt(b.recent_pb_2d)||0,hotHand=parseInt(b.recent_hr_count)||0;
-                  const bsSpeed=parseFloat(b.recent_avg_bat_speed)||0,psScore=parseFloat(b.ps_score)||0;
+                  const bsSpeed=parseFloat(b.recent_avg_bat_speed)||0,psScore=getPS(b);
                   const bvpHR=parseInt(b.bvp_hr)||0,bvpPA=parseInt(b.bvp_pa)||0;
                   const windEff=b.wind_effect||'',ph=(b.pitcher_hand||'').toUpperCase()[0],bh=(b.batter_hand||'').toUpperCase()[0];
                   const pBarrel=parseFloat(b.pitcher_barrel_pct_allowed)||0;
@@ -27557,9 +27644,9 @@ function CrystalBallTab() {
       if (pg.includes('Elite')||pg.includes('Tough')) return;
       const sig  = parseFloat(r._trackerSig||r.weighted_flag_score*4.6||0);
       const ghr  = parseFloat(r.gHR||r.kHR||0);
-      const ps   = parseFloat(r.ps_score||0);
-      const boom = computeBoomScore(sig, parseFloat(r.zone_fit||0), parseFloat(r.iso||0), parseFloat(r.sim_tb||0), parseFloat(r.weighted_flag_score||0), parseFloat(r.recent_barrel_spike||0), parseInt(r.recent_hr_count||0), parseFloat(r.recent_batter_ahead_pct||0), !!r.hh_precursor, parseFloat(r.primary_pitch_hr_rate||0), parseInt(r.recent_barrels_3d)||0, parseInt(r.recent_hrs_3d)||0, parseFloat(r.recent_avg_bat_speed)||0, parseInt(r.recent_pb_2d)||0, r.la_locked, parseFloat(r.season_swstr_pct)||0, parseFloat(r.park_pull_fit)||0, parseInt(r._zoneEdges||0), parseInt(r._zoneKPenalty||0), (()=>{const _ls=liveSlot(r.batter_id,r.lineup_slot);return _ls>0&&(r.pitcher_weak_slots||"").split(",").map(Number).filter(Boolean).includes(_ls);})(), parseFloat(r.season_xwoba)||0);
-      const yard = computeYardScore(sig, ghr, boom, ps, r.batter_hand||'', r.pitcher_hand||'', parseInt(r.days_rest??1), liveSlot(r.batter_id,r.lineup_slot), r._pgLabel||'');
+      const ps   = getPS(r);
+      const boom = computeBoomScore(sig, getZoneFit(r), parseFloat(r.iso||0), parseFloat(r.sim_tb||0), parseFloat(r.weighted_flag_score||0), shrinkageAdjBarrelSpike(r), parseInt(r.recent_hr_count||0), parseFloat(r.recent_batter_ahead_pct||0), !!r.hh_precursor, parseFloat(r.primary_pitch_hr_rate||0), parseInt(r.recent_barrels_3d)||0, parseInt(r.recent_hrs_3d)||0, parseFloat(r.recent_avg_bat_speed)||0, parseInt(r.recent_pb_2d)||0, r.la_locked, parseFloat(r.season_swstr_pct)||0, parseFloat(r.park_pull_fit)||0, parseInt(r._zoneEdges||0), parseInt(r._zoneKPenalty||0), (()=>{const _ls=liveSlot(r.batter_id,r.lineup_slot);return _ls>0&&(r.pitcher_weak_slots||"").split(",").map(Number).filter(Boolean).includes(_ls);})(), parseFloat(r.season_xwoba)||0);
+      const yard = computeYardScore(sig, ghr, boom, ps, r.batter_hand||'', r.pitcher_hand||'', parseInt(r.days_rest??1), liveSlot(r.batter_id,r.lineup_slot), getHandSpecificGrade(r));
       const ev   = parseFloat(r.recent_avg_ev||0);
       const la   = parseFloat(r.recent_avg_la||0);
       const bsDelta   = parseFloat(r.bat_speed_vs_baseline||0);
@@ -28827,10 +28914,10 @@ function SimTab({ data }) {
       const ghr    = parseFloat(r.gHR   || 0);
       const simTB  = parseFloat(r.sim_tb || 0);
       const iso    = parseFloat(r.recent_iso || 0);
-      const ps     = parseFloat(r.ps_score  || 0);
-      const zf     = parseFloat(r.zone_fit  || 0);
-      const boom   = parseFloat(r._boom) || computeBoomScore(sig, zf, iso, simTB, parseFloat(r.weighted_flag_score||0), parseFloat(r.recent_barrel_spike||0), parseInt(r.recent_hr_count||0), parseFloat(r.recent_batter_ahead_pct||0), !!r.hh_precursor, parseFloat(r.primary_pitch_hr_rate||0), parseInt(r.recent_barrels_3d)||0, parseInt(r.recent_hrs_3d)||0, parseFloat(r.recent_avg_bat_speed)||0, parseInt(r.recent_pb_2d)||0, r.la_locked, parseFloat(r.season_swstr_pct)||0, parseFloat(r.park_pull_fit)||0, parseInt(r._zoneEdges||0), parseInt(r._zoneKPenalty||0), (()=>{const _ls=liveSlot(r.batter_id,r.lineup_slot);return _ls>0&&(r.pitcher_weak_slots||"").split(",").map(Number).filter(Boolean).includes(_ls);})(), parseFloat(r.season_xwoba)||0);
-      const yard   = computeYardScore(sig, ghr, boom, ps, r.batter_hand||'', r.pitcher_hand||'', parseInt(r.days_rest??1), liveSlot(r.batter_id,r.lineup_slot), r._pgLabel||'');
+      const ps     = getPS(r);
+      const zf     = getZoneFit(r);
+      const boom   = parseFloat(r._boom) || computeBoomScore(sig, zf, iso, simTB, parseFloat(r.weighted_flag_score||0), shrinkageAdjBarrelSpike(r), parseInt(r.recent_hr_count||0), parseFloat(r.recent_batter_ahead_pct||0), !!r.hh_precursor, parseFloat(r.primary_pitch_hr_rate||0), parseInt(r.recent_barrels_3d)||0, parseInt(r.recent_hrs_3d)||0, parseFloat(r.recent_avg_bat_speed)||0, parseInt(r.recent_pb_2d)||0, r.la_locked, parseFloat(r.season_swstr_pct)||0, parseFloat(r.park_pull_fit)||0, parseInt(r._zoneEdges||0), parseInt(r._zoneKPenalty||0), (()=>{const _ls=liveSlot(r.batter_id,r.lineup_slot);return _ls>0&&(r.pitcher_weak_slots||"").split(",").map(Number).filter(Boolean).includes(_ls);})(), parseFloat(r.season_xwoba)||0);
+      const yard   = computeYardScore(sig, ghr, boom, ps, r.batter_hand||'', r.pitcher_hand||'', parseInt(r.days_rest??1), liveSlot(r.batter_id,r.lineup_slot), getHandSpecificGrade(r));
       const pgLabel = r._pgLabel || '';
 
       // ── SimTab hrProb — 638k at-bat data calibrated (June 2026) ──────────────
@@ -29415,7 +29502,17 @@ function groupA_ContactQuality(r) {
   const laConsistency  = Math.max(0, 1 - (laStd - 5) / 12);
   const sweetSpotScore = (laDistScore * 0.7 + laConsistency * 0.3) * 100;
 
-  const pbrl      = parseFloat(r.recent_pulled_barrel_pct || 0);
+  // Blend: BvP barrel rate (most specific) → season/vs-hand rate → recent rate.
+  // recent_pulled_barrel_pct is L7-only and confirmed (audit) to be 0 for the
+  // majority of the field from thin-sample statistics alone, not decline —
+  // same root cause class as the recent_barrel_spike bias (see shrinkageAdjBarrelSpike).
+  const pbrlBvP    = parseFloat(r.bvp_pulled_barrel_pct    || 0);
+  const pbrlVsHand = parseFloat(r.vs_hand_pulled_barrel_pct || 0);
+  const pbrlRecent = parseFloat(r.recent_pulled_barrel_pct   || 0);
+  const pbrlSeason = pbrlVsHand || pbrlRecent;
+  const pbrl = pbrlBvP > 0
+    ? (pbrlBvP * 0.50 + pbrlSeason * 0.30 + pbrlRecent * 0.20)
+    : (pbrlSeason * 0.70 + pbrlRecent * 0.30);
   const pbrlScore = Math.min(100, pbrl * 8);
 
   const hh      = parseFloat(r.recent_hh_pct || 0);
@@ -29433,15 +29530,12 @@ function groupA_ContactQuality(r) {
 }
 
 function groupB_MatchupVulnerability(r) {
-  const zf      = parseFloat(r.zone_fit || 0);
+  const zf      = getZoneFit(r);
   const zfScore = Math.min(100, zf * 12);
 
-  const grade = (r._pgLabel || '').toLowerCase();
-  const gradeScore =
-    grade.includes('elite')    ? 10 :
-    grade.includes('tough')    ? 30 :
-    grade.includes('target')   ? 85 :
-    grade.includes('hittable') ? 75 : 50;
+  // Anchored to the same PITCHER_GRADE_MULT scale as the multiplicative
+  // functions (was a separate, wider 10-85 additive scale — see audit Q9).
+  const gradeScore = pitcherGradeMult(getHandSpecificGrade(r)) * 50;
 
   // vs_hand_woba is already filtered to this pitcher's hand by the engine
   const vsHandWoba   = parseFloat(r.vs_hand_woba || r.season_xwoba || 0);
@@ -29450,7 +29544,7 @@ function groupB_MatchupVulnerability(r) {
   const pHand = (r.pitcher_hand || '').replace(/^(L|R).*/i, '$1').toUpperCase();
   const platoonDirectionMult = (bHand !== pHand) ? 1.15 : 0.88;
 
-  const ps      = parseFloat(r.ps_score || 0);
+  const ps      = getPS(r);
   const psScore = Math.min(100, (ps / 25) * 100);
 
   // Pitcher GB/K not in CSV — use league-average defaults (45/22)
@@ -29491,10 +29585,10 @@ function computeTrueHRScore(r) {
 }
 
 function computeMatchupScore(r) {
-  const zf      = parseFloat(r.zone_fit || 0);
+  const zf      = getZoneFit(r);
   const zfScore = Math.min(100, zf * 12);
 
-  const ps      = parseFloat(r.ps_score || 0);
+  const ps      = getPS(r);
   const psScore = Math.min(100, (ps / 25) * 100);
 
   const vsHandWoba = parseFloat(r.vs_hand_woba || r.season_xwoba || 0);
@@ -29503,12 +29597,7 @@ function computeMatchupScore(r) {
   const pHand = (r.pitcher_hand || '').replace(/^(L|R).*/i, '$1').toUpperCase();
   const platoonMult = (bHand !== pHand) ? 1.12 : 0.90;
 
-  const grade = (r._pgLabel || '').toLowerCase();
-  const gradeMult =
-    grade.includes('elite')    ? 0.55 :
-    grade.includes('tough')    ? 0.75 :
-    grade.includes('target')   ? 1.20 :
-    grade.includes('hittable') ? 1.10 : 1.0;
+  const gradeMult = pitcherGradeMult(getHandSpecificGrade(r));
 
   const pitcherGB = parseFloat(r.gb_pct_p || r.pitcher_gb_pct || 45);
   const gbMult    = pitcherGB > 55 ? 0.88 : pitcherGB < 35 ? 1.10 : 1.0;
@@ -30206,15 +30295,11 @@ function onbase_groupA(r) {
 }
 
 function onbase_groupB(r) {
-  const zf      = parseFloat(r.zone_fit || 0);
+  const zf      = getZoneFit(r);
   const zfScore = Math.min(100, zf * 13.5);
-  const grade   = (r.pitcher_grade_label || r._pgLabel || '').toLowerCase();
-  const gradeScore =
-    grade.includes('elite')    ? 15 :
-    grade.includes('tough')    ? 40 :
-    grade.includes('hittable') ? 82 :
-    grade.includes('target')   ? 92 :
-    grade.includes('average')  ? 62 : 60;
+  // Anchored to the same PITCHER_GRADE_MULT scale as the multiplicative
+  // functions (was a separate, wider 15-92 additive scale — see audit Q9).
+  const gradeScore = pitcherGradeMult(getHandSpecificGrade(r)) * 50;
   const seasonWoba  = parseFloat(r.season_xwoba || 0.310);
   const vsHandWoba  = parseFloat(r.vs_hand_woba || seasonWoba);
   const platoonScore = Math.min(100, Math.max(0, (vsHandWoba - 0.250) / 0.200 * 100));
@@ -30247,14 +30332,9 @@ function computeOnBaseScore(r) {
 }
 
 function computeOnBaseMatchupScore(r) {
-  const zf      = parseFloat(r.zone_fit || 0);
+  const zf      = getZoneFit(r);
   const zfScore = Math.min(100, zf * 13.5);
-  const grade   = (r.pitcher_grade_label || r._pgLabel || '').toLowerCase();
-  const gradeMult =
-    grade.includes('elite')    ? 0.55 :
-    grade.includes('tough')    ? 0.75 :
-    grade.includes('target')   ? 1.20 :
-    grade.includes('hittable') ? 1.10 : 1.0;
+  const gradeMult = pitcherGradeMult(getHandSpecificGrade(r));
   const seasonWoba = parseFloat(r.season_xwoba || 0.310);
   const vsHandWoba = parseFloat(r.vs_hand_woba || seasonWoba);
   const bHand = (r.batter_hand || '').toUpperCase();

@@ -44,12 +44,22 @@ self.onmessage = function(e) {
     const xbhMult = 1 + (pitcherFbAllowed - 0.20) * 0.5
                       + (pitcherBrlAllowed - 0.065) * 0.3;
 
-    const grade = (r.pitcher_grade_label || r._pgLabel || '').toLowerCase();
+    // Hand-specific pitcher grade — LHB/Switch faces vs-LHB profile, RHB
+    // faces vs-RHB. Falls back to the overall grade when the hand-specific
+    // engine field isn't populated yet (requires a pipeline run).
+    const gradeLabel = (bHand === 'L' || bHand === 'S')
+      ? (r.pitcher_grade_label_vsR || r.pitcher_grade_label || r._pgLabel || '')
+      : (r.pitcher_grade_label_vsL || r.pitcher_grade_label || r._pgLabel || '');
+    const grade = gradeLabel.toLowerCase();
+
+    // Unified multipliers — matches PITCHER_GRADE_MULT in App.jsx (audit Q9:
+    // this file previously used its own Elite=0.72, the most lenient of 5
+    // divergent values found).
     const gradeMult =
-      grade.includes('elite')    ? 0.72 :
-      grade.includes('tough')    ? 0.85 :
-      grade.includes('target')   ? 1.18 :
-      grade.includes('hittable') ? 1.10 : 1.00;
+      grade.includes('elite')    || grade.includes('‼️') ? 0.62 :
+      grade.includes('tough')    || grade.includes('⚠️') ? 0.80 :
+      grade.includes('hittable') || grade.includes('💥') ? 1.12 :
+      grade.includes('target')   || grade.includes('🎯') ? 1.22 : 1.00;
 
     // ── Environmental adjustments ───────────────────────────────────────────
     const gameId     = String(r.game_id || '');

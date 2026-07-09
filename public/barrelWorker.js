@@ -95,13 +95,23 @@ self.onmessage = function(e) {
                     : 0;
     const windMult  = 1 + windBoost;
 
-    // ── Pitcher grade multiplier ─────────────────────────────────────────
-    const grade = (r._pgLabel || '').toLowerCase();
+    // ── Pitcher grade multiplier (hand-specific) ──────────────────────────
+    // LHB/Switch faces the pitcher's vs-LHB profile, RHB faces vs-RHB.
+    // Falls back to the overall (hand-agnostic) grade when the hand-specific
+    // engine field isn't populated yet (requires a matchup_engine.py run —
+    // see PROMPT_AllSignalStackFixes.md Part 1 gate).
+    const gradeLabel = (bHand === 'L' || bHand === 'S')
+      ? (r.pitcher_grade_label_vsR || r.pitcher_grade_label || r._pgLabel || '')
+      : (r.pitcher_grade_label_vsL || r.pitcher_grade_label || r._pgLabel || '');
+    const grade = gradeLabel.toLowerCase();
+
+    // Unified multipliers — matches PITCHER_GRADE_MULT in App.jsx (audit Q9:
+    // this file previously used its own Elite=0.60, one of 5 divergent values).
     const pitcherMult =
-      grade.includes('elite')    ? 0.60 :
-      grade.includes('tough')    ? 0.78 :
-      grade.includes('target')   ? 1.25 :
-      grade.includes('hittable') ? 1.15 : 1.00;
+      grade.includes('elite')    || grade.includes('‼️') ? 0.62 :
+      grade.includes('tough')    || grade.includes('⚠️') ? 0.80 :
+      grade.includes('hittable') || grade.includes('💥') ? 1.12 :
+      grade.includes('target')   || grade.includes('🎯') ? 1.22 : 1.00;
 
     // ── Full platoon split adjustment ────────────────────────────────────
     // vs_hand_woba is already filtered to this pitcher's hand by the engine
