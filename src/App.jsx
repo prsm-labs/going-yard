@@ -28985,7 +28985,7 @@ function SimTab({ data }) {
 
       // Lineup slot — base probability adjustment (separate from PA count)
       // Slot 3: 14.88% vs slot 9: 7.14%. Biggest gap in dataset.
-      const lineupSlot = parseInt(r.lineup_slot || r._lineupSlot || 5);
+      const lineupSlot = liveSlot(parseInt(r.batter_id||0), r.lineup_slot) || parseInt(r._lineupSlot||0) || 5;
       const slotProbMod = lineupSlot === 3 ? 1.06
                         : lineupSlot === 4 ? 1.06
                         : lineupSlot === 2 ? 1.03
@@ -29779,6 +29779,10 @@ function BarrelLabTab() {
         r.matchupScore >= 60 &&
         r.simHRPct     != null && r.simHRPct >= 12.0,
       isLongshot: isLongshotBatter(r, r.trueHRScore, r.matchupScore),
+      isWeakSlot: (() => {
+        const _ls = liveSlot(parseInt(r.batter_id||0), r.lineup_slot);
+        return _ls > 0 && (r.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(_ls);
+      })(),
     }))
     .filter(r => !blHideFinal    || !FINAL_GAME_IDS.has(String(r.game_id)))
     .filter(r => !blLongshotOnly || r.isLongshot)
@@ -29838,7 +29842,7 @@ function BarrelLabTab() {
   };
 
   const COLS = [
-    { h:'Slot',       key:'lineup_slot',               acc: b => parseInt(b.lineup_slot||0)||99,                              align:'left',  allOnly: false },
+    { h:'Slot',       key:'lineup_slot',               acc: b => liveSlot(parseInt(b.batter_id||0), b.lineup_slot)||99,                              align:'left',  allOnly: false },
     { h:'Team',      key:'batting_team',               acc: b => (b.batting_team||'').toLowerCase(),                       align:'left',  allOnly: true  },
     { h:'Player',    key:'batter',                     acc: b => (b.batter||'').toLowerCase(),                            align:'left',  allOnly: false },
     { h:'TrueHR',    key:'trueHRScore',                acc: b => b.trueHRScore||0,                                        align:'right' },
@@ -30013,7 +30017,7 @@ function BarrelLabTab() {
                 const csvRows = [hdrs.map(esc).join(',')];
                 rows.forEach(b => {
                   csvRows.push([
-                    esc(parseInt(b.lineup_slot||0)||''),
+                    esc(liveSlot(parseInt(b.batter_id||0), b.lineup_slot)||''),
                     esc(b.batting_team||''),
                     esc(b.batter||''),
                     esc(b.pitcher||''),
@@ -30205,9 +30209,9 @@ function BarrelLabTab() {
                         <tr key={b._bid} style={{
                           borderBottom:'1px solid rgba(255,255,255,.04)',
                           opacity: fin ? 0.5 : 1,
-                          background: b.isBarrelSignal ? 'rgba(255,153,0,.04)' : 'transparent',
+                          background: b.isWeakSlot ? 'rgba(255,214,10,.14)' : b.isBarrelSignal ? 'rgba(255,153,0,.04)' : 'transparent',
                         }}>
-                          <td style={{padding:'4px 6px',color:'var(--muted)'}}>{parseInt(b.lineup_slot||0)||'—'}</td>
+                          <td style={{padding:'4px 6px',color:'var(--muted)'}}>{liveSlot(parseInt(b.batter_id||0), b.lineup_slot) || '—'}</td>
                           {!selGame && <td style={{padding:'4px 6px',color:'var(--muted)',fontFamily:mono,fontSize:8}}>{b.batting_team||'—'}</td>}
                           <td style={{padding:'4px 6px',whiteSpace:'nowrap'}}>
                             <div style={{display:'flex',alignItems:'center',gap:6}}>
@@ -30481,6 +30485,10 @@ function OnBaseTab() {
         r.onBaseScore  >= 75 &&
         r.matchupScore >= 60 &&
         r.simTB2Pct != null && r.simTB2Pct >= 30.0,
+      isWeakSlot: (() => {
+        const _ls = liveSlot(parseInt(r.batter_id||0), r.lineup_slot);
+        return _ls > 0 && (r.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(_ls);
+      })(),
     }))
     .filter(r => !obHideFinal || !FINAL_GAME_IDS.has(String(r.game_id)))
     .sort((a, b) => b.onBaseScore - a.onBaseScore);
@@ -30530,7 +30538,7 @@ function OnBaseTab() {
   const fmt     = (v, d=1) => v != null && !isNaN(parseFloat(v)) ? parseFloat(v).toFixed(d) : '—';
 
   const COLS = [
-    { h:'Slot',      key:'lineup_slot',     acc: b => parseInt(b.lineup_slot||0)||99,            align:'left',  allOnly:false },
+    { h:'Slot',      key:'lineup_slot',     acc: b => liveSlot(parseInt(b.batter_id||0), b.lineup_slot)||99,            align:'left',  allOnly:false },
     { h:'Team',      key:'batting_team',    acc: b => (b.batting_team||'').toLowerCase(),        align:'left',  allOnly:true  },
     { h:'Player',    key:'batter',          acc: b => (b.batter||'').toLowerCase(),              align:'left',  allOnly:false },
     { h:'OnBase',    key:'onBaseScore',     acc: b => b.onBaseScore||0,                          align:'right' },
@@ -30688,7 +30696,7 @@ function OnBaseTab() {
                 const csvRows = [hdrs.map(esc).join(',')];
                 rows.forEach(b => {
                   csvRows.push([
-                    esc(parseInt(b.lineup_slot||0)||''),
+                    esc(liveSlot(parseInt(b.batter_id||0), b.lineup_slot)||''),
                     esc(b.batting_team||''),
                     esc(b.batter||''),
                     esc(b.pitcher||''),
@@ -30863,9 +30871,9 @@ function OnBaseTab() {
                         <tr key={b._bid} style={{
                           borderBottom:'1px solid rgba(255,255,255,.04)',
                           opacity: fin ? 0.5 : 1,
-                          background: b.isTBSignal ? 'rgba(56,184,242,.04)' : 'transparent',
+                          background: b.isWeakSlot ? 'rgba(255,214,10,.14)' : b.isTBSignal ? 'rgba(56,184,242,.04)' : 'transparent',
                         }}>
-                          <td style={{padding:'4px 6px',color:'var(--muted)'}}>{parseInt(b.lineup_slot||0)||'—'}</td>
+                          <td style={{padding:'4px 6px',color:'var(--muted)'}}>{liveSlot(parseInt(b.batter_id||0), b.lineup_slot) || '—'}</td>
                           {!selGame && <td style={{padding:'4px 6px',color:'var(--muted)',fontFamily:mono,fontSize:8}}>{b.batting_team||'—'}</td>}
                           <td style={{padding:'4px 6px',whiteSpace:'nowrap'}}>
                             <div style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer'}} onClick={() => openBatter(b)}>
