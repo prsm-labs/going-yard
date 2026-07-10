@@ -26832,19 +26832,22 @@ function TrackRecordTab() {
     async function loadTrackRecord() {
       setLoading(true);
       try {
-        const [amRes, blRes, idRes] = await Promise.all([
+        const [amRes, blRes, idRes, hrRes] = await Promise.all([
           fetch('/data/track-record-matchups.csv'),
           fetch('/data/track-record-barrel.csv'),
           fetch('/data/player_id.csv'),
+          fetch('/data/track-record-hr.csv'),
         ]);
 
         const amText = await amRes.text();
         const blText = blRes.ok ? await blRes.text() : '';
         const idText = idRes.ok ? await idRes.text() : '';
+        const hrText = hrRes.ok ? await hrRes.text() : '';
 
         const amRows = parseCSV(amText);
         const blRows = blText ? parseCSV(blText) : [];
         const idRows = idText ? parseCSV(idText) : [];
+        const hrRows = hrText ? parseCSV(hrText) : [];
 
         // Build Barrel Lab lookup: { 'YYYY-MM-DD_battername': row }
         const blLookup = {};
@@ -26853,6 +26856,24 @@ function TrackRecordTab() {
           const name = (r.Player || r.Batter || '').trim().toLowerCase();
           if (date && name) blLookup[`${date}_${name}`] = r;
         });
+
+        // Build HR Tracker lookup: { 'YYYY-MM-DD_battername': [{pitcher, hrNum, ...}] }
+        // — the actual pitcher a batter went deep against, which can differ from
+        // the pre-game 'vs Pitcher' (always the probable starter) if a reliever
+        // gave it up. Sorted by HR# so [0] is always that day's first HR.
+        const hrLookup = {};
+        hrRows.forEach(r => {
+          const date = normDate(r.export_date || '');
+          const name = (r.Batter || '').trim().toLowerCase();
+          if (!date || !name) return;
+          const key = `${date}_${name}`;
+          if (!hrLookup[key]) hrLookup[key] = [];
+          hrLookup[key].push({
+            pitcher: (r.Pitcher || '').trim(),
+            hrNum:   parseInt(r['HR#'] || 0) || 0,
+          });
+        });
+        Object.values(hrLookup).forEach(arr => arr.sort((a,b) => a.hrNum - b.hrNum));
 
         // Player ID lookup — static roster (not date-scoped), covers any
         // Track Record date. Keyed by name+team first (disambiguates the
@@ -26882,6 +26903,20 @@ function TrackRecordTab() {
           const batterId  = resolveId(r.Batter, r.Team);
           const pitcherId = resolveId(pitcherNameRaw, '');
 
+          // Actual pitcher(s) this batter went deep against, from the HR Tracker —
+          // may differ from pitcherNameRaw (the pre-game starter) if a reliever
+          // allowed it. SP/RP is derived, not stored anywhere: the pre-game
+          // matchup engine only ever generates a row against the probable
+          // STARTER, so if the HR Tracker's pitcher name doesn't match that
+          // starter's name, it can only be a reliever.
+          const hrEvents = hrLookup[`${date}_${name}`] || [];
+          const actualPitcher = hrEvents[0]?.pitcher || '';
+          const actualPitcherIsSP = actualPitcher
+            ? actualPitcher.trim().toLowerCase() === pitcherNameRaw.trim().toLowerCase()
+            : true;
+          const actualPitcherId = actualPitcher ? resolveId(actualPitcher, '') : 0;
+          const actualPitcherMulti = new Set(hrEvents.map(h => h.pitcher)).size > 1;
+
           const wentYard = (r['Gone Yard']||'').trim().toUpperCase() === 'YES';
           const actualHR = parseInt(r['HR'] || 0) || (wentYard ? 1 : 0);
           const actualTB = parseInt(r['TB'] || 0);
@@ -26908,6 +26943,7 @@ function TrackRecordTab() {
             team:         r['Team']           || '',
             hand:         r['Hand']           || '',
             pitcher:      r['vs Pitcher']     || blRow['Pitcher'] || '',
+            actualPitcher, actualPitcherIsSP, actualPitcherId, actualPitcherMulti,
             lineupSlot:   parseInt(r['Lineup Slot'] || 0),
             yardScore:    parseFloat(r['Yard Score'] || 0),
             boom:         parseFloat((r[Object.keys(r).find(k=>k.includes('Boom'))]||0)),
@@ -27229,6 +27265,50 @@ function TrackRecordTab() {
             border: `1px solid ${showOnlyWeakSlot ? 'rgba(255,214,10,.4)' : 'var(--border)'}` }}>
           🟢 Weak Spot Only
         </button>
+
+        <button id="track-record-csv-trigger" onClick={() => {
+            if (!filteredRows.length) return;
+            const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
+            const headers = ['Date','Batter','Team','Hand','Lineup Slot',
+              'Pre-Game Pitcher','Went Yard Vs','SP/RP','Pitcher Grade',
+              'Yard Score','Boom','Sig','Grade','gHR','Zone Fit','Sim TB','xwOBA','Flags',
+              'Is Key Matchup','Weak Spot',
+              'TrueHR','Matchup','SimHR%','Barrel Signal','Longshot',
+              'PulledBrl%','Brl/BIP','HR/FB','FB%','HH%',
+              'Went Yard','HR','AB','H','TB','RBI','BB','K','Avg EV','Launch Angle',
+              'Live Close Calls','Live CC Max EV','Live CC Max Dist'];
+            const csvRows = [headers.map(esc).join(',')];
+            filteredRows.forEach(r => {
+              csvRows.push([
+                r.date, r.batter, r.team, r.hand, r.lineupSlot || '',
+                r.pitcher,
+                r.wentYard && r.actualPitcher ? r.actualPitcher : '',
+                r.wentYard && r.actualPitcher ? (r.actualPitcherIsSP ? 'SP' : 'RP') : '',
+                (r.wentYard && r.actualPitcher && !r.actualPitcherIsSP) ? '' : r.pitcherGrade,
+                r.yardScore || '', r.boom || '', r.sig || '', r.grade || '', r.ghr || '',
+                r.zoneFit || '', r.simTB || '', r.xwoba || '', r.flags || '',
+                r.isKeyMatchup ? 'YES' : '', r.isWeakSlot ? 'YES' : '',
+                r.trueHR || '', r.matchup || '', r.simHRPct || '',
+                r.brlSignal ? 'YES' : '', r.isLongshot ? 'YES' : '',
+                r.pulledBrl || '', r.brlBIP || '', r.hrFB || '', r.fb || '', r.hh || '',
+                r.wentYard ? 'YES' : '', r.actualHR || 0, r.actualAB || 0, r.actualH || 0,
+                r.actualTB || 0, r.actualRBI || 0, r.actualBB || 0, r.actualK || 0,
+                r.actualEV || '', r.actualLA || '',
+                r.closeCalls || 0, r.ccMaxEV || '', r.ccMaxDist || '',
+              ].map(esc).join(','));
+            });
+            const blob = new Blob(['﻿'+csvRows.join('\n')], {type:'text/csv;charset=utf-8;'});
+            const url = URL.createObjectURL(blob);
+            const a = Object.assign(document.createElement('a'),
+              {href:url, download:`track-record-${selDate || 'export'}.csv`});
+            a.click();
+            URL.revokeObjectURL(url);
+          }}
+          style={{padding:'4px 10px', borderRadius:6, cursor:'pointer', fontSize:9, fontFamily:mono,
+            border:'1px solid var(--border)', background:'var(--surface2)', color:'var(--muted)',
+            display:'flex', alignItems:'center', gap:5}}>
+          ⬇ CSV
+        </button>
       </div>
 
       {filteredRows.length === 0 ? (
@@ -27339,11 +27419,28 @@ function TrackRecordTab() {
                       color:'var(--muted)', textAlign:'center'}}>{r.lineupSlot || '—'}</td>
                     <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
                       color:'var(--muted)', whiteSpace:'nowrap', cursor:'pointer'}}
-                      onClick={() => openPitcherSlide({pid:r.pitcherId, name:r.pitcher, team:'', hand:'', pitchMix:[]})}>
-                      {r.pitcher}
+                      title={r.wentYard && r.actualPitcher && !r.actualPitcherIsSP
+                        ? `Faced ${r.pitcher} pre-game — actually went yard off this reliever${r.actualPitcherMulti ? ' (multiple pitchers faced that game)' : ''}. Click for live grade.`
+                        : ''}
+                      onClick={() => r.wentYard && r.actualPitcher
+                        ? openPitcherSlide({pid:r.actualPitcherId, name:r.actualPitcher, team:'', hand:'', pitchMix:[]})
+                        : openPitcherSlide({pid:r.pitcherId, name:r.pitcher, team:'', hand:'', pitchMix:[]})}>
+                      {r.wentYard && r.actualPitcher ? r.actualPitcher : r.pitcher}
+                      {r.wentYard && r.actualPitcher && (
+                        <span style={{marginLeft:4, padding:'1px 4px', borderRadius:3,
+                          fontSize:7, fontWeight:800, letterSpacing:.4,
+                          color: r.actualPitcherIsSP ? '#38b8f2' : '#ff8020',
+                          border:`1px solid ${r.actualPitcherIsSP ? 'rgba(56,184,242,.4)' : 'rgba(255,128,32,.4)'}`}}>
+                          {r.actualPitcherIsSP ? 'SP' : 'RP'}
+                        </span>
+                      )}
                     </td>
                     <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
-                      color:'var(--muted)'}}>{r.pitcherGrade}</td>
+                      color:'var(--muted)'}}>
+                      {r.wentYard && r.actualPitcher && !r.actualPitcherIsSP
+                        ? <span title="No historical grade data for relievers — click the pitcher name for a live grade">—</span>
+                        : r.pitcherGrade}
+                    </td>
 
                     {showMatchup && <>
                       <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
