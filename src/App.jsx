@@ -3041,7 +3041,7 @@ function AtBatSlideIn() {
                           fontSize:9,color:'#27c97a',background:'rgba(39,201,122,.12)',
                           border:'1px solid rgba(39,201,122,.3)',borderRadius:4,
                           padding:'1px 6px',letterSpacing:.3}}>
-                          {boost} PS Score
+                          {boost} Boom Score
                         </span>
                       );
                     })()}
@@ -29774,6 +29774,7 @@ function isLongshotBatter(r, trueHRScore, matchupScore) {
 function BarrelLabTab() {
   const mono = "'DM Mono',monospace";
   const osw  = "'Oswald',sans-serif";
+  const picks = usePicks();
 
   const [selGame,    setSelGame]    = useState(null);
   const [simResults, setSimResults] = useState({});
@@ -29790,6 +29791,7 @@ function BarrelLabTab() {
   const [liveGamesVersion, setLiveGamesVersion] = useState(LIVE_GAMES_CACHE.length);
   const [blHideFinal,      setBlHideFinal]      = useState(false);
   const [blLongshotOnly,   setBlLongshotOnly]   = useState(false);
+  const [blPicksOnly,      setBlPicksOnly]      = useState(false);
 
   useEffect(() => {
     const unsub    = subscribeLineup(v => setLineupVer(v));
@@ -29929,8 +29931,9 @@ function BarrelLabTab() {
     }))
     .filter(r => !blHideFinal    || !FINAL_GAME_IDS.has(String(r.game_id)))
     .filter(r => !blLongshotOnly || r.isLongshot)
+    .filter(r => !blPicksOnly    || picks[String(parseInt(r.batter_id)||0)])
     .sort((a, b) => b.trueHRScore - a.trueHRScore);
-  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, finalVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, blPicksOnly, picks, finalVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Color threshold helpers
   const clr = (v, g1, g2, y1, y2) => {
@@ -30130,6 +30133,18 @@ function BarrelLabTab() {
                 border:`1px solid ${blLongshotOnly ? 'rgba(167,139,250,.4)' : 'var(--border)'}`,
               }}>
               {blLongshotOnly ? '🎲 Longshots Only' : '🎲 Longshot'}
+            </button>
+            <button
+              onClick={() => setBlPicksOnly(v => !v)}
+              style={{
+                padding:'2px 8px', borderRadius:5, cursor:'pointer',
+                fontFamily:"'DM Mono',monospace", fontSize:9, fontWeight:700,
+                lineHeight:1.5, flexShrink:0,
+                background: blPicksOnly ? 'rgba(245,166,35,.12)' : 'var(--surface2)',
+                color:      blPicksOnly ? 'var(--accent2)' : 'var(--muted)',
+                border:`1px solid ${blPicksOnly ? 'rgba(245,166,35,.4)' : 'var(--border)'}`,
+              }}>
+              🎯 {blPicksOnly ? 'My Picks ✓' : 'My Picks'}
             </button>
             <button
               disabled={simRunning}
@@ -30506,6 +30521,7 @@ function computeOnBaseMatchupScore(r) {
 function OnBaseTab() {
   const mono = "'DM Mono',monospace";
   const osw  = "'Oswald',sans-serif";
+  const picks = usePicks();
 
   const [selGame,          setSelGame]          = useState(null);
   const [simResults,       setSimResults]       = useState({});
@@ -30520,6 +30536,7 @@ function OnBaseTab() {
   const [simTrigger,       setSimTrigger]       = useState(0);
   const [liveGamesVersion, setLiveGamesVersion] = useState(LIVE_GAMES_CACHE.length);
   const [obHideFinal,      setObHideFinal]      = useState(false);
+  const [obPicksOnly,      setObPicksOnly]      = useState(false);
 
   useEffect(() => {
     const unsub    = subscribeLineup(v => setLineupVer(v));
@@ -30634,8 +30651,9 @@ function OnBaseTab() {
       })(),
     }))
     .filter(r => !obHideFinal || !FINAL_GAME_IDS.has(String(r.game_id)))
+    .filter(r => !obPicksOnly || picks[String(parseInt(r.batter_id)||0)])
     .sort((a, b) => b.onBaseScore - a.onBaseScore);
-  }, [eligibleBatters, simResults, obHideFinal, finalVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [eligibleBatters, simResults, obHideFinal, obPicksOnly, picks, finalVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const byTeam = useMemo(() => {
     const teams = {};
@@ -30811,6 +30829,18 @@ function OnBaseTab() {
                 border:`1px solid ${obHideFinal ? 'rgba(255,107,107,.4)' : 'var(--border)'}`,
               }}>
               {obHideFinal ? '✓ Hiding Final' : '🚫 Hide Final'}
+            </button>
+            <button
+              onClick={() => setObPicksOnly(v => !v)}
+              style={{
+                padding:'2px 8px', borderRadius:5, cursor:'pointer',
+                fontFamily:mono, fontSize:9, fontWeight:700,
+                lineHeight:1.5, flexShrink:0,
+                background: obPicksOnly ? 'rgba(245,166,35,.12)' : 'var(--surface2)',
+                color:      obPicksOnly ? 'var(--accent2)' : 'var(--muted)',
+                border:`1px solid ${obPicksOnly ? 'rgba(245,166,35,.4)' : 'var(--border)'}`,
+              }}>
+              🎯 {obPicksOnly ? 'My Picks ✓' : 'My Picks'}
             </button>
             <button
               disabled={simRunning}
