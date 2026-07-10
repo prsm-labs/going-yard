@@ -4888,6 +4888,15 @@ async function fetchLiveBatters(gamePk) {
           pos: p?.position?.abbreviation || cachedP?.pos || '',
           ab, hits, hr, rbi, bb, so, runs, totalBases,
 
+          // Close calls — computed server-side (api/boxscore.js) so they
+          // survive game finalization, but were never copied off `live`
+          // onto this object (confirmed bug, July 10 2026 — every All
+          // Matchups export's Live Close Calls / CC Max EV / CC Max Dist
+          // columns came up blank regardless of when the export ran).
+          closeCalls: live?.closeCalls || 0,
+          ccMaxEV:    live?.ccMaxEV    || 0,
+          ccMaxDist:  live?.ccMaxDist  || 0,
+
           // In-game Statcast (from live feed play-by-play)
           avgEV:       gameAvgEV   !== null ? gameAvgEV   : seasonEV,
           launchAngle: gameAvgLA   !== null ? gameAvgLA   : (cachedP?.launchAngle ?? 0),
@@ -26819,6 +26828,7 @@ function TrackRecordTab() {
   const [showOnlySignal, setShowOnlySignal] = useState(false);
   const [showOnlyKM,     setShowOnlyKM]     = useState(false);
   const [showOnlyWeakSlot, setShowOnlyWeakSlot] = useState(false);
+  const [showOnlyCC,     setShowOnlyCC]     = useState(false);
   const [teamFilter,     setTeamFilter]     = useState('ALL');
 
   const [showMatchup,  setShowMatchup]  = useState(true);
@@ -27006,6 +27016,7 @@ function TrackRecordTab() {
     if (showOnlySignal) rows = rows.filter(r => r.brlSignal);
     if (showOnlyKM)     rows = rows.filter(r => r.isKeyMatchup);
     if (showOnlyWeakSlot) rows = rows.filter(r => r.isWeakSlot);
+    if (showOnlyCC)     rows = rows.filter(r => r.closeCalls > 0);
     if (search) {
       const q = search.toLowerCase();
       rows = rows.filter(r =>
@@ -27020,7 +27031,7 @@ function TrackRecordTab() {
       }
       return sortDir * ((av||0) - (bv||0));
     });
-  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, showOnlyWeakSlot, search, sortCol, sortDir]);
+  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, showOnlyWeakSlot, showOnlyCC, search, sortCol, sortDir]);
 
   const summary = useMemo(() => {
     const hrs          = dateRows.filter(r => r.wentYard);
@@ -27264,6 +27275,15 @@ function TrackRecordTab() {
             color:       showOnlyWeakSlot ? '#ffd60a' : 'var(--muted)',
             border: `1px solid ${showOnlyWeakSlot ? 'rgba(255,214,10,.4)' : 'var(--border)'}` }}>
           🟢 Weak Spot Only
+        </button>
+
+        <button onClick={() => setShowOnlyCC(v=>!v)}
+          style={{padding:'4px 10px', borderRadius:6, border:'none',
+            cursor:'pointer', fontFamily:mono, fontSize:9, fontWeight:700,
+            background: showOnlyCC ? 'rgba(245,166,35,.15)' : 'var(--surface2)',
+            color:       showOnlyCC ? '#f5a623' : 'var(--muted)',
+            border: `1px solid ${showOnlyCC ? 'rgba(245,166,35,.4)' : 'var(--border)'}` }}>
+          📍 Close Call Only
         </button>
 
         <button id="track-record-csv-trigger" onClick={() => {
