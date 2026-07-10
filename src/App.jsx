@@ -26829,6 +26829,7 @@ function TrackRecordTab() {
   const [showOnlyKM,     setShowOnlyKM]     = useState(false);
   const [showOnlyWeakSlot, setShowOnlyWeakSlot] = useState(false);
   const [showOnlyCC,     setShowOnlyCC]     = useState(false);
+  const [showOnlySauce2, setShowOnlySauce2] = useState(false);
   const [teamFilter,     setTeamFilter]     = useState('ALL');
 
   const [showMatchup,  setShowMatchup]  = useState(true);
@@ -26968,6 +26969,12 @@ function TrackRecordTab() {
             isKeyMatchup: (r['Is Key Matchup']||'').toUpperCase() === 'YES',
             isWeakSlot:   (r['In Weak Slot']||'').toUpperCase() === 'YES',
             weakSlots:    r['Pitcher Weak Slots'] || '',
+            // Sauce 2.0 (CLAUDE.md validated filter): Zone Fit >= 2, xwOBA >= .360,
+            // Pitcher Grade = Target/Hittable/Average (excludes Elite/Tough).
+            isSauce2: parseFloat(r['Zone Fit']||0) >= 2
+              && parseFloat(r['xwOBA']||0) >= 0.360
+              && !!(r['Pitcher Grade']||blRow['Grade'])
+              && !/elite|tough/i.test(r['Pitcher Grade']||blRow['Grade']||''),
             trueHR, matchup, simHRPct, brlSignal, isLongshot,
             pulledBrl: parseFloat(blRow['PulledBrl%'] || 0),
             brlBIP:    parseFloat(blRow['Brl/BIP%']   || 0),
@@ -27017,6 +27024,7 @@ function TrackRecordTab() {
     if (showOnlyKM)     rows = rows.filter(r => r.isKeyMatchup);
     if (showOnlyWeakSlot) rows = rows.filter(r => r.isWeakSlot);
     if (showOnlyCC)     rows = rows.filter(r => r.closeCalls > 0);
+    if (showOnlySauce2) rows = rows.filter(r => r.isSauce2);
     if (search) {
       const q = search.toLowerCase();
       rows = rows.filter(r =>
@@ -27031,7 +27039,7 @@ function TrackRecordTab() {
       }
       return sortDir * ((av||0) - (bv||0));
     });
-  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, showOnlyWeakSlot, showOnlyCC, search, sortCol, sortDir]);
+  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, showOnlyWeakSlot, showOnlyCC, showOnlySauce2, search, sortCol, sortDir]);
 
   const summary = useMemo(() => {
     const hrs          = dateRows.filter(r => r.wentYard);
@@ -27043,13 +27051,15 @@ function TrackRecordTab() {
     const lsHits       = longshots.filter(r => r.wentYard);
     const weakSlots    = dateRows.filter(r => r.isWeakSlot);
     const weakSlotHits = weakSlots.filter(r => r.wentYard);
+    const sauce2       = dateRows.filter(r => r.isSauce2);
+    const sauce2Hits    = sauce2.filter(r => r.wentYard);
     const topYS        = [...dateRows].sort((a,b) => b.yardScore - a.yardScore)[0];
     const biggestMiss   = [...dateRows.filter(r => !r.wentYard)]
       .sort((a,b) => b.yardScore - a.yardScore)[0];
     const biggestUpset = [...dateRows.filter(r => r.wentYard)]
       .sort((a,b) => a.yardScore - b.yardScore)[0];
     return { hrs, signals, signalHits, keyMatchups, kmHits,
-             longshots, lsHits, weakSlots, weakSlotHits, topYS, biggestMiss, biggestUpset };
+             longshots, lsHits, weakSlots, weakSlotHits, sauce2, sauce2Hits, topYS, biggestMiss, biggestUpset };
   }, [dateRows]);
 
   const GroupBar = ({ label, open, onToggle, color }) => (
@@ -27187,6 +27197,14 @@ function TrackRecordTab() {
             sub: `${summary.weakSlotHits.length}/${summary.weakSlots.length}`,
             color:'#ffd60a'
           },
+          {
+            label:'SAUCE 2.0 HIT RATE',
+            value: summary.sauce2.length
+              ? `${((summary.sauce2Hits.length/summary.sauce2.length)*100).toFixed(0)}%`
+              : '—',
+            sub: `${summary.sauce2Hits.length}/${summary.sauce2.length}`,
+            color:'#34d399'
+          },
         ].map(card => (
           <div key={card.label} style={{
             background:'var(--surface2)', border:'1px solid var(--border)',
@@ -27286,13 +27304,22 @@ function TrackRecordTab() {
           📍 Close Call Only
         </button>
 
+        <button onClick={() => setShowOnlySauce2(v=>!v)}
+          style={{padding:'4px 10px', borderRadius:6, border:'none',
+            cursor:'pointer', fontFamily:mono, fontSize:9, fontWeight:700,
+            background: showOnlySauce2 ? 'rgba(52,211,153,.15)' : 'var(--surface2)',
+            color:       showOnlySauce2 ? '#34d399' : 'var(--muted)',
+            border: `1px solid ${showOnlySauce2 ? 'rgba(52,211,153,.4)' : 'var(--border)'}` }}>
+          🍯 Sauce 2.0 Only
+        </button>
+
         <button id="track-record-csv-trigger" onClick={() => {
             if (!filteredRows.length) return;
             const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
             const headers = ['Date','Batter','Team','Hand','Lineup Slot',
               'Pre-Game Pitcher','Went Yard Vs','SP/RP','Pitcher Grade',
               'Yard Score','Boom','Sig','Grade','gHR','Zone Fit','Sim TB','xwOBA','Flags',
-              'Is Key Matchup','Weak Spot',
+              'Is Key Matchup','Weak Spot','Sauce 2.0',
               'TrueHR','Matchup','SimHR%','Barrel Signal','Longshot',
               'PulledBrl%','Brl/BIP','HR/FB','FB%','HH%',
               'Went Yard','HR','AB','H','TB','RBI','BB','K','Avg EV','Launch Angle',
@@ -27307,7 +27334,7 @@ function TrackRecordTab() {
                 (r.wentYard && r.actualPitcher && !r.actualPitcherIsSP) ? '' : r.pitcherGrade,
                 r.yardScore || '', r.boom || '', r.sig || '', r.grade || '', r.ghr || '',
                 r.zoneFit || '', r.simTB || '', r.xwoba || '', r.flags || '',
-                r.isKeyMatchup ? 'YES' : '', r.isWeakSlot ? 'YES' : '',
+                r.isKeyMatchup ? 'YES' : '', r.isWeakSlot ? 'YES' : '', r.isSauce2 ? 'YES' : '',
                 r.trueHR || '', r.matchup || '', r.simHRPct || '',
                 r.brlSignal ? 'YES' : '', r.isLongshot ? 'YES' : '',
                 r.pulledBrl || '', r.brlBIP || '', r.hrFB || '', r.fb || '', r.hh || '',
