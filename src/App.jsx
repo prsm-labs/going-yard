@@ -13182,6 +13182,26 @@ function calcParseOdds(raw) {
   if (n > 1)    return { american: calcDecToAmerican(n), decimal: n };
   return null;
 }
+
+// ── Round Robin — all size-K combinations of leg indices [0..n-1] ───────────
+// Standard round robin math: every combo of K legs becomes its own separate
+// parlay with an equal stake. Needs only K (not all N) legs to hit to pay out
+// that specific line — the whole point vs a straight N-leg parlay.
+function rrCombinations(n, k) {
+  const idx = Array.from({length:n}, (_,i)=>i);
+  const out = [];
+  const build = (start, combo) => {
+    if (combo.length === k) { out.push([...combo]); return; }
+    for (let i = start; i < idx.length; i++) {
+      combo.push(idx[i]);
+      build(i+1, combo);
+      combo.pop();
+    }
+  };
+  build(0, []);
+  return out;
+}
+
 function OddsCalculatorSlideout({ onClose }) {
   const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
   const [mode,      setMode]      = useState('manual');
@@ -13193,6 +13213,14 @@ function OddsCalculatorSlideout({ onClose }) {
   const [showScale, setShowScale] = useState(false);
   const [currency,  setCurrency]  = useState('USD');
   const [result,    setResult]    = useState(null);
+
+  // ── Round Robin state ──────────────────────────────────────────────────
+  const [rrPickNum,       setRrPickNum]       = useState(2);
+  const [rrEnabled,       setRrEnabled]       = useState(false);
+  const [rrComboSize,     setRrComboSize]     = useState(2);
+  const [rrOddsRaw,       setRrOddsRaw]       = useState(['', '']);
+  const [rrStakePerCombo, setRrStakePerCombo] = useState('');
+  const [rrResult,        setRrResult]        = useState(null);
 
   const parsed  = calcParseOdds(oddsRaw);
   const sym     = CALC_CCY_SYM[currency] || '$';
@@ -13271,6 +13299,50 @@ function OddsCalculatorSlideout({ onClose }) {
                 desc: riskDesc(unitFrac) });
   };
 
+  // ── Round Robin ──────────────────────────────────────────────────────────
+  const rrComboSizeOptions = Array.from({length: Math.max(0, rrPickNum - 2)}, (_,i) => i + 2); // 2..N-1
+
+  const handleRrPickNum = v => {
+    const n = Math.max(2, Math.min(5, parseInt(v) || 2));
+    setRrPickNum(n);
+    setRrOddsRaw(prev => {
+      const next = [...prev];
+      while (next.length < n) next.push('');
+      return next.slice(0, n);
+    });
+    if (n < 3) setRrEnabled(false);
+    setRrComboSize(2);
+    setRrResult(null);
+  };
+  const handleRrOddsChange = (i, v) => {
+    setRrOddsRaw(prev => { const next = [...prev]; next[i] = v; return next; });
+    setRrResult(null);
+  };
+  const rrParsedOdds = rrOddsRaw.map(o => calcParseOdds(o));
+  const rrAllOddsValid = rrEnabled && rrParsedOdds.length === rrPickNum
+    && rrParsedOdds.every(p => p && p.decimal > 1);
+  const rrCanCalc = rrAllOddsValid && parseFloat(rrStakePerCombo) > 0
+    && rrComboSize >= 2 && rrComboSize <= rrPickNum - 1;
+
+  const calculateRR = () => {
+    if (!rrCanCalc) return;
+    const stake = parseFloat(rrStakePerCombo);
+    const combos = rrCombinations(rrPickNum, rrComboSize).map(legIdxs => {
+      const dec = legIdxs.reduce((p, i) => p * rrParsedOdds[i].decimal, 1);
+      return { legIdxs, decimal: dec, payout: stake * dec, profit: stake * dec - stake };
+    });
+    const totalStake  = stake * combos.length;
+    const maxPayout    = combos.reduce((s, c) => s + c.payout, 0);
+    const floorCombo   = combos.reduce((min, c) => c.payout < min.payout ? c : min, combos[0]);
+    const ceilCombo     = combos.reduce((max, c) => c.payout > max.payout ? c : max, combos[0]);
+    setRrResult({
+      combos, totalStake, maxPayout,
+      maxProfit: maxPayout - totalStake,
+      floorPayout: floorCombo.payout,
+      ceilPayout: ceilCombo.payout,
+    });
+  };
+
   const inpStyle = {flex:1,background:'var(--surface2)',border:'1px solid var(--border)',
     borderRadius:6,padding:'7px 10px',fontFamily:mono,fontSize:13,color:'var(--text)',
     outline:'none',minWidth:0,WebkitAppearance:'none'};
@@ -13305,7 +13377,7 @@ function OddsCalculatorSlideout({ onClose }) {
         {/* ── Mode Toggle ── */}
         <div style={{display:'flex',gap:3,marginBottom:18,background:'var(--surface2)',
           borderRadius:8,padding:3,border:'1px solid var(--border)'}}>
-          {[['manual','Manual'],['suggested','Suggested']].map(([m, label]) => (
+          {[['manual','Manual'],['suggested','Suggested'],['roundrobin','Round Robin']].map(([m, label]) => (
             <button key={m} onClick={()=>handleModeSwitch(m)}
               style={{flex:1,padding:'5px 0',borderRadius:6,border:'none',cursor:'pointer',
                 fontFamily:mono,fontSize:10,fontWeight:mode===m?700:400,letterSpacing:.5,
@@ -13317,7 +13389,8 @@ function OddsCalculatorSlideout({ onClose }) {
           ))}
         </div>
 
-        {/* ── Odds ── */}
+        {/* ── Odds (single-bet modes only — Round Robin has its own per-leg inputs) ── */}
+        {mode !== 'roundrobin' && (
         <div style={{marginBottom:18}}>
           <span style={lblStyle}>Odds Input</span>
           <input value={oddsRaw} onChange={e=>handleOddsChange(e.target.value)}
@@ -13360,6 +13433,7 @@ function OddsCalculatorSlideout({ onClose }) {
             ) : null}
           </div>
         </div>
+        )}
 
         {/* ── Currency ── */}
         <div style={{marginBottom:18}}>
@@ -13378,7 +13452,84 @@ function OddsCalculatorSlideout({ onClose }) {
         </div>
 
         {/* ── Bankroll / Unit (Manual) or Unit Size (Suggested) ── */}
-        {mode === 'manual' ? (
+        {mode === 'roundrobin' ? (
+          <>
+            {/* ── Pick Number ── */}
+            <div style={{marginBottom:14}}>
+              <span style={lblStyle}>Pick Number</span>
+              <select value={rrPickNum} onChange={e=>handleRrPickNum(e.target.value)}
+                style={{...inpStyle,flex:'unset',width:'100%',boxSizing:'border-box',
+                  appearance:'auto',cursor:'pointer'}}>
+                {[2,3,4,5].map(n => <option key={n} value={n}>{n} picks</option>)}
+              </select>
+            </div>
+
+            {/* ── Enable Round Robin checkbox — disabled below 3 picks ── */}
+            <label style={{display:'flex',alignItems:'center',gap:8,marginBottom:14,
+              cursor:rrPickNum>=3?'pointer':'not-allowed',opacity:rrPickNum>=3?1:.45}}>
+              <input type="checkbox" checked={rrEnabled}
+                disabled={rrPickNum<3}
+                onChange={e=>{ setRrEnabled(e.target.checked); setRrResult(null); }}
+                style={{width:16,height:16,cursor:rrPickNum>=3?'pointer':'not-allowed'}}/>
+              <span style={{fontFamily:mono,fontSize:11,color:'var(--text)'}}>
+                Enable Round Robin
+              </span>
+              {rrPickNum<3 && (
+                <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>
+                  (select 3+ picks)
+                </span>
+              )}
+            </label>
+
+            {rrEnabled && rrPickNum>=3 && (
+              <>
+                {/* ── Combo Size ── */}
+                <div style={{marginBottom:14}}>
+                  <span style={lblStyle}>Combo Size (legs per line)</span>
+                  <select value={rrComboSize}
+                    onChange={e=>{ setRrComboSize(parseInt(e.target.value)); setRrResult(null); }}
+                    style={{...inpStyle,flex:'unset',width:'100%',boxSizing:'border-box',
+                      appearance:'auto',cursor:'pointer'}}>
+                    {rrComboSizeOptions.map(k => (
+                      <option key={k} value={k}>
+                        {k === 2 ? 'Doubles' : k === 3 ? 'Trebles' : `${k}-leg combos`} — {rrCombinations(rrPickNum,k).length} lines
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* ── Per-leg odds ── */}
+                <div style={{marginBottom:14}}>
+                  <span style={lblStyle}>Odds — each pick</span>
+                  {rrOddsRaw.map((o, i) => {
+                    const p = calcParseOdds(o);
+                    return (
+                      <div key={i} style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
+                        <span style={{fontFamily:mono,fontSize:10,color:'var(--muted)',width:14}}>{i+1}</span>
+                        <input value={o} onChange={e=>handleRrOddsChange(i, e.target.value)}
+                          placeholder="+180  ·  −150  ·  2.80"
+                          style={{...inpStyle,fontSize:12}}/>
+                        <span style={{fontFamily:mono,fontSize:10,width:44,textAlign:'right',
+                          color:p?'#38f282':'var(--muted)'}}>
+                          {p ? p.decimal.toFixed(2) : '—'}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* ── Stake per combo ── */}
+                <div style={{marginBottom:14}}>
+                  <span style={lblStyle}>Stake per Combination ({sym})</span>
+                  <input value={rrStakePerCombo}
+                    onChange={e=>{ setRrStakePerCombo(e.target.value); setRrResult(null); }}
+                    placeholder="e.g. 5" type="number" min="0"
+                    style={{...inpStyle,flex:'unset',width:'100%',boxSizing:'border-box'}}/>
+                </div>
+              </>
+            )}
+          </>
+        ) : mode === 'manual' ? (
           <>
             <div style={{marginBottom:14}}>
               <span style={lblStyle}>Bankroll ({sym})</span>
@@ -13450,7 +13601,8 @@ function OddsCalculatorSlideout({ onClose }) {
           </>
         )}
 
-        {/* ── Calculate button ── */}
+        {/* ── Calculate button (single-bet modes) ── */}
+        {mode !== 'roundrobin' && (<>
         <button onClick={calculate} disabled={!canCalc}
           style={{width:'100%',padding:'10px',borderRadius:7,border:'none',
             cursor:canCalc?'pointer':'default',fontFamily:osw,fontWeight:700,fontSize:13,
@@ -13498,6 +13650,76 @@ function OddsCalculatorSlideout({ onClose }) {
               Floor: {sym}0.10.{mode==='manual'?' Sized to return 1 unit profit.':' Fraction auto-suggested from odds.'}
             </div>
           </div>
+        )}
+        </>)}
+
+        {/* ── Round Robin: Calculate button + Result ── */}
+        {mode === 'roundrobin' && rrEnabled && rrPickNum>=3 && (
+          <>
+            <button onClick={calculateRR} disabled={!rrCanCalc}
+              style={{width:'100%',padding:'10px',borderRadius:7,border:'none',
+                cursor:rrCanCalc?'pointer':'default',fontFamily:osw,fontWeight:700,fontSize:13,
+                letterSpacing:.5,textTransform:'uppercase',transition:'all .15s',
+                background:rrCanCalc?'var(--accent)':'var(--surface2)',
+                color:rrCanCalc?'white':'var(--muted)',opacity:rrCanCalc?1:.5,marginBottom:16}}>
+              Calculate Round Robin
+            </button>
+
+            {rrResult && (
+              <div style={{background:'var(--surface2)',border:'1px solid var(--border)',
+                borderRadius:8,padding:'14px 16px'}}>
+                {[
+                  ['Lines (combinations)', String(rrResult.combos.length), 'var(--text)', 13],
+                  ['Total Stake',      calcFmtCcy(rrResult.totalStake, currency), '#38f282', 14],
+                  ['Max Payout (all hit)',  calcFmtCcy(rrResult.maxPayout, currency),  '#38b8f2', 14],
+                  ['Max Profit (all hit)',  calcFmtCcy(rrResult.maxProfit, currency),  '#38f282', 14],
+                  ['Best single line',  calcFmtCcy(rrResult.ceilPayout, currency),  '#f5a623', 12],
+                  ['Floor — worst winning line', calcFmtCcy(rrResult.floorPayout, currency), '#f5a623', 12],
+                ].map(([lbl, val, clr, fsz]) => (
+                  <div key={lbl} style={{display:'flex',justifyContent:'space-between',
+                    alignItems:'baseline',padding:'6px 0',
+                    borderBottom:'1px solid rgba(255,255,255,.05)'}}>
+                    <span style={{fontFamily:mono,fontSize:10,color:'var(--muted)'}}>{lbl}</span>
+                    <span style={{fontFamily:osw,fontWeight:700,fontSize:fsz,color:clr}}>{val}</span>
+                  </div>
+                ))}
+
+                {/* ── Per-line breakdown ── */}
+                <div style={{marginTop:12,borderRadius:6,overflow:'hidden',border:'1px solid var(--border)'}}>
+                  <table style={{width:'100%',borderCollapse:'collapse',fontFamily:mono,fontSize:10}}>
+                    <thead>
+                      <tr style={{background:'var(--surface2)'}}>
+                        <th style={{padding:'5px 8px',textAlign:'left',color:'var(--muted)',fontWeight:600}}>Line</th>
+                        <th style={{padding:'5px 8px',textAlign:'right',color:'var(--muted)',fontWeight:600}}>Odds</th>
+                        <th style={{padding:'5px 8px',textAlign:'right',color:'var(--muted)',fontWeight:600}}>Payout</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rrResult.combos.map((c, i) => (
+                        <tr key={i} style={{
+                          borderBottom:i<rrResult.combos.length-1?'1px solid rgba(255,255,255,.04)':'none',
+                          background:i%2===0?'transparent':'rgba(255,255,255,.02)'}}>
+                          <td style={{padding:'5px 8px',color:'var(--text)'}}>
+                            {c.legIdxs.map(idx => `#${idx+1}`).join(' + ')}
+                          </td>
+                          <td style={{padding:'5px 8px',textAlign:'right',color:'var(--text)'}}>
+                            {c.decimal.toFixed(2)}
+                          </td>
+                          <td style={{padding:'5px 8px',textAlign:'right',color:'#38f282',fontWeight:700}}>
+                            {calcFmtCcy(c.payout, currency)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginTop:10,lineHeight:1.6}}>
+                  Any {rrComboSize} of your {rrPickNum} picks hitting together pays that line — you don't need all {rrPickNum} to win something.
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -29837,6 +30059,7 @@ function BarrelLabTab() {
   const [blHideFinal,      setBlHideFinal]      = useState(false);
   const [blLongshotOnly,   setBlLongshotOnly]   = useState(false);
   const [blPicksOnly,      setBlPicksOnly]      = useState(false);
+  const [blGoneYardOnly,   setBlGoneYardOnly]   = useState(false);
 
   useEffect(() => {
     const unsub    = subscribeLineup(v => setLineupVer(v));
@@ -29941,6 +30164,18 @@ function BarrelLabTab() {
     );
   }, [selGame, eligibleBatters]);
 
+  // "Gone Yard Today" check — same HR_DATA/HR_DATA_DATE pattern as All Matchups'
+  // isGoneYardSim(). hrVer (polled every 5s from _HR_VER) keeps this current
+  // without a page reload as HRs land throughout the day.
+  const blEtToday = (() => { const s = new Date().toLocaleDateString('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}); const [m,d,y]=s.split('/'); return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`; })();
+  const blHrDataIsToday = HR_DATA_DATE === blEtToday;
+  const isGoneYardBL = b => {
+    if (!blHrDataIsToday) return false;
+    const pid = parseInt(b.batter_id) || 0;
+    const name = (b.batter || '').toLowerCase();
+    return HR_DATA.some(h => h.batterId === pid || (h.batterName && h.batterName.toLowerCase() === name));
+  };
+
   const scoredBatters = useMemo(() => {
     // Pass 1: raw scores for all eligible batters
     const withRaw = eligibleBatters.map(r => {
@@ -29977,8 +30212,9 @@ function BarrelLabTab() {
     .filter(r => !blHideFinal    || !FINAL_GAME_IDS.has(String(r.game_id)))
     .filter(r => !blLongshotOnly || r.isLongshot)
     .filter(r => !blPicksOnly    || picks[String(parseInt(r.batter_id)||0)])
+    .filter(r => !blGoneYardOnly || isGoneYardBL(r))
     .sort((a, b) => b.trueHRScore - a.trueHRScore);
-  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, blPicksOnly, picks, finalVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, blPicksOnly, picks, blGoneYardOnly, hrVer, finalVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Color threshold helpers
   const clr = (v, g1, g2, y1, y2) => {
@@ -30190,6 +30426,18 @@ function BarrelLabTab() {
                 border:`1px solid ${blPicksOnly ? 'rgba(245,166,35,.4)' : 'var(--border)'}`,
               }}>
               🎯 {blPicksOnly ? 'My Picks ✓' : 'My Picks'}
+            </button>
+            <button
+              onClick={() => setBlGoneYardOnly(v => !v)}
+              style={{
+                padding:'2px 8px', borderRadius:5, cursor:'pointer',
+                fontFamily:"'DM Mono',monospace", fontSize:9, fontWeight:700,
+                lineHeight:1.5, flexShrink:0,
+                background: blGoneYardOnly ? 'rgba(232,65,26,.12)' : 'var(--surface2)',
+                color:      blGoneYardOnly ? 'var(--accent)' : 'var(--muted)',
+                border:`1px solid ${blGoneYardOnly ? 'rgba(232,65,26,.4)' : 'var(--border)'}`,
+              }}>
+              💥 {blGoneYardOnly ? 'Gone Yard ✓' : 'Gone Yard Today'}
             </button>
             <button
               disabled={simRunning}
