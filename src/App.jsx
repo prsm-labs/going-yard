@@ -7560,27 +7560,45 @@ function LiveThemesTab() {
     return () => clearInterval(id);
   }, [cacheReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Cluster detection — force 3 quantile-based groups sorted high YS first
-  // Gap-based clustering produced 1–2 groups when scores were close together;
-  // quantile split always produces exactly 3 tiers (Top/Mid/Low) regardless of spread.
+  // Cluster detection — gap-based (restored July 10 2026). Sort ascending by
+  // Yard Score and walk the list; a gap > 7 YS points between consecutive
+  // batters starts a new cluster. Only clusters with 3+ members count (a
+  // single fluke HR isn't a trend), then keep the top 3 by member count.
+  // This can legitimately produce 1, 2, or 3 clusters on a given day — that's
+  // correct, not a bug: a day with one real concentration should show one
+  // cluster, not be force-split into three. A prior version replaced this
+  // with a fixed tertile split (Math.ceil(n/3) into exactly 3 even groups
+  // regardless of the real distribution), which defeated the feature's
+  // purpose — it degenerated into re-sorting today's HRs into thirds, the
+  // same information already visible in All Matchups' sort-by-score view.
   const clusters = useMemo(() => {
     if (todaysHRs.length < 3) return [];
-    const sorted = [...todaysHRs].sort((a, b) => b.yardScore - a.yardScore); // high first
-    const n = sorted.length;
-    const third = Math.ceil(n / 3);
-    const groups = [
-      sorted.slice(0, third),
-      sorted.slice(third, third * 2),
-      sorted.slice(third * 2),
-    ].filter(g => g.length > 0);
+    const sorted = [...todaysHRs].sort((a, b) => a.yardScore - b.yardScore); // low first
+    const groups = [];
+    let current = [sorted[0]];
+    for (let i = 1; i < sorted.length; i++) {
+      if (sorted[i].yardScore - sorted[i - 1].yardScore > 7) {
+        groups.push(current);
+        current = [];
+      }
+      current.push(sorted[i]);
+    }
+    groups.push(current);
     const avg = arr => arr.reduce((s, x) => s + x, 0) / arr.length;
-    return groups.map(members => ({
-      members,
-      mean:     avg(members.map(m => m.yardScore)),
-      xwobaAvg: avg(members.map(m => m.xwoba)),
-      isoAvg:   avg(members.map(m => m.iso)),
-      boomAvg:  avg(members.map(m => m.boomScore)),
-    }));
+    return groups
+      .filter(g => g.length >= 3)
+      .sort((a, b) => b.length - a.length)
+      .slice(0, 3)
+      .map(members => {
+        const sortedMembers = [...members].sort((a, b) => b.yardScore - a.yardScore); // high first for display
+        return {
+          members: sortedMembers,
+          mean:     avg(members.map(m => m.yardScore)),
+          xwobaAvg: avg(members.map(m => m.xwoba)),
+          isoAvg:   avg(members.map(m => m.iso)),
+          boomAvg:  avg(members.map(m => m.boomScore)),
+        };
+      });
   }, [todaysHRs]);
 
   // Confirmed pool — re-evaluates on lineup or final-game version changes
