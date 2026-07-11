@@ -1,11 +1,11 @@
 {
-  "version": "2026.07.07",
+  "version": "2026.07.11",
   "changelog": [
-    "🛢️ Daily Barrel — Monte Carlo HR simulation per matchup",
-    "🔵 On Base — 2+ Total Bases simulation",
-    "🔥 Live Themes — real-time HR pattern detection",
-    "📺 Watch button in Gameday",
-    "Push notifications now active"
+    "Rework Parlay tab: standalone parlay calc at any pick count",
+    "Round Robin as add-on",
+    "rename from Round   Robin",
+    "fix app-update version detection",
+    "add Gone Yard filter to Barrel Lab"
   ],
   "notifyUsers": true
 }
