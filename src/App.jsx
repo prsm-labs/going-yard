@@ -13214,12 +13214,16 @@ function OddsCalculatorSlideout({ onClose }) {
   const [currency,  setCurrency]  = useState('USD');
   const [result,    setResult]    = useState(null);
 
-  // ── Round Robin state — shares bankroll/unitSize/unitRate with Manual mode,
-  // no separate stake input; each combo line gets its own suggested stake. ──
+  // ── Parlay tab state — shares bankroll/unitSize/unitRate with Manual mode.
+  // Any pick count (2+) computes a straight full-leg parlay (parlayResult).
+  // "Enable Round Robin" is an add-on, only available at 3+ picks — it
+  // additionally breaks the same legs into every combo of a chosen size
+  // (rrResult), it does not gate the base parlay calculation. ──
   const [rrPickNum,       setRrPickNum]       = useState(2);
   const [rrEnabled,       setRrEnabled]       = useState(false);
   const [rrComboSize,     setRrComboSize]     = useState(2);
   const [rrOddsRaw,       setRrOddsRaw]       = useState(['', '']);
+  const [parlayResult,    setParlayResult]    = useState(null);
   const [rrResult,        setRrResult]        = useState(null);
 
   const parsed  = calcParseOdds(oddsRaw);
@@ -13302,7 +13306,7 @@ function OddsCalculatorSlideout({ onClose }) {
                 desc: riskDesc(unitFrac) });
   };
 
-  // ── Round Robin ──────────────────────────────────────────────────────────
+  // ── Parlay / Round Robin ────────────────────────────────────────────────
   const rrComboSizeOptions = Array.from({length: Math.max(0, rrPickNum - 2)}, (_,i) => i + 2); // 2..N-1
 
   const handleRrPickNum = v => {
@@ -13315,21 +13319,25 @@ function OddsCalculatorSlideout({ onClose }) {
     });
     if (n < 3) setRrEnabled(false);
     setRrComboSize(2);
+    setParlayResult(null);
     setRrResult(null);
   };
   const handleRrOddsChange = (i, v) => {
     setRrOddsRaw(prev => { const next = [...prev]; next[i] = v; return next; });
+    setParlayResult(null);
     setRrResult(null);
   };
   const rrParsedOdds = rrOddsRaw.map(o => calcParseOdds(o));
-  const rrAllOddsValid = rrEnabled && rrParsedOdds.length === rrPickNum
+  // Valid for a straight parlay at ANY pick count (2+) — independent of the
+  // Round Robin checkbox, which only adds the combo breakdown on top.
+  const rrAllOddsValid = rrPickNum >= 2 && rrParsedOdds.length === rrPickNum
     && rrParsedOdds.every(p => p && p.decimal > 1);
-  const rrCanCalc = rrAllOddsValid && parseFloat(unitSize) > 0
-    && rrComboSize >= 2 && rrComboSize <= rrPickNum - 1;
+  const rrCanCalc = rrAllOddsValid && parseFloat(unitSize) > 0;
 
-  // Suggested stake fraction for one combo's combined decimal odds.
-  // Same anchor as Suggested mode's computeSugFrac (~1 unit profit, 0.05u
-  // floor for longshots) — but round robin combos can compound multiple
+  // Suggested stake fraction for a given combined decimal odds value (used
+  // for both the straight parlay and each round-robin combo line). Same
+  // anchor as Suggested mode's computeSugFrac (~1 unit profit, 0.05u floor
+  // for longshots) — but parlay/round-robin odds can compound multiple
   // longshot legs into odds far beyond anything a single bet would show,
   // where a flat 0.05u floor can suggest a payout many multiples of the
   // whole bankroll. Second ceiling: if even the floor stake's payout would
@@ -13349,24 +13357,42 @@ function OddsCalculatorSlideout({ onClose }) {
     if (!rrCanCalc) return;
     const unitVal     = parseFloat(unitSize);
     const bankrollVal = parseFloat(bankroll) || 0;
-    const combos = rrCombinations(rrPickNum, rrComboSize).map(legIdxs => {
-      const dec   = legIdxs.reduce((p, i) => p * rrParsedOdds[i].decimal, 1);
-      const frac  = computeSugFracFromDecimal(dec, bankrollVal, unitVal);
-      const stake = Math.max(frac * unitVal, 0.10);
-      const payout = stake * dec;
-      return { legIdxs, decimal: dec, frac, stake, payout,
-               profit: payout - stake, desc: riskDesc(frac) };
+
+    // ── Straight parlay — all N legs combined into one bet. Computed for
+    // any pick count, regardless of the Round Robin checkbox. ──
+    const parlayDec    = rrParsedOdds.reduce((p, o) => p * o.decimal, 1);
+    const parlayFrac   = computeSugFracFromDecimal(parlayDec, bankrollVal, unitVal);
+    const parlayStake  = Math.max(parlayFrac * unitVal, 0.10);
+    const parlayPayout = parlayStake * parlayDec;
+    setParlayResult({
+      decimal: parlayDec, american: calcDecToAmerican(parlayDec),
+      frac: parlayFrac, stake: parlayStake, payout: parlayPayout,
+      profit: parlayPayout - parlayStake, desc: riskDesc(parlayFrac),
     });
-    const totalStake  = combos.reduce((s, c) => s + c.stake, 0);
-    const maxPayout    = combos.reduce((s, c) => s + c.payout, 0);
-    const floorCombo   = combos.reduce((min, c) => c.payout < min.payout ? c : min, combos[0]);
-    const ceilCombo     = combos.reduce((max, c) => c.payout > max.payout ? c : max, combos[0]);
-    setRrResult({
-      combos, totalStake, maxPayout,
-      maxProfit: maxPayout - totalStake,
-      floorPayout: floorCombo.payout,
-      ceilPayout: ceilCombo.payout,
-    });
+
+    // ── Round Robin combo breakdown — add-on, only when enabled + 3+ picks ──
+    if (rrEnabled && rrPickNum >= 3 && rrComboSize >= 2 && rrComboSize <= rrPickNum - 1) {
+      const combos = rrCombinations(rrPickNum, rrComboSize).map(legIdxs => {
+        const dec   = legIdxs.reduce((p, i) => p * rrParsedOdds[i].decimal, 1);
+        const frac  = computeSugFracFromDecimal(dec, bankrollVal, unitVal);
+        const stake = Math.max(frac * unitVal, 0.10);
+        const payout = stake * dec;
+        return { legIdxs, decimal: dec, frac, stake, payout,
+                 profit: payout - stake, desc: riskDesc(frac) };
+      });
+      const totalStake  = combos.reduce((s, c) => s + c.stake, 0);
+      const maxPayout    = combos.reduce((s, c) => s + c.payout, 0);
+      const floorCombo   = combos.reduce((min, c) => c.payout < min.payout ? c : min, combos[0]);
+      const ceilCombo     = combos.reduce((max, c) => c.payout > max.payout ? c : max, combos[0]);
+      setRrResult({
+        combos, totalStake, maxPayout,
+        maxProfit: maxPayout - totalStake,
+        floorPayout: floorCombo.payout,
+        ceilPayout: ceilCombo.payout,
+      });
+    } else {
+      setRrResult(null);
+    }
   };
 
   const inpStyle = {flex:1,background:'var(--surface2)',border:'1px solid var(--border)',
@@ -13403,7 +13429,7 @@ function OddsCalculatorSlideout({ onClose }) {
         {/* ── Mode Toggle ── */}
         <div style={{display:'flex',gap:3,marginBottom:18,background:'var(--surface2)',
           borderRadius:8,padding:3,border:'1px solid var(--border)'}}>
-          {[['manual','Manual'],['suggested','Suggested'],['roundrobin','Round Robin']].map(([m, label]) => (
+          {[['manual','Manual'],['suggested','Suggested'],['roundrobin','Parlay']].map(([m, label]) => (
             <button key={m} onClick={()=>handleModeSwitch(m)}
               style={{flex:1,padding:'5px 0',borderRadius:6,border:'none',cursor:'pointer',
                 fontFamily:mono,fontSize:10,fontWeight:mode===m?700:400,letterSpacing:.5,
@@ -13515,7 +13541,9 @@ function OddsCalculatorSlideout({ onClose }) {
               </select>
             </div>
 
-            {/* ── Enable Round Robin checkbox — disabled below 3 picks ── */}
+            {/* ── Enable Round Robin checkbox — disabled below 3 picks. This
+                only ADDS the combo breakdown below; the straight parlay
+                calculation works at any pick count regardless of this. ── */}
             <label style={{display:'flex',alignItems:'center',gap:8,marginBottom:14,
               cursor:rrPickNum>=3?'pointer':'not-allowed',opacity:rrPickNum>=3?1:.45}}>
               <input type="checkbox" checked={rrEnabled}
@@ -13532,48 +13560,48 @@ function OddsCalculatorSlideout({ onClose }) {
               )}
             </label>
 
+            {/* ── Combo Size — round robin add-on only ── */}
             {rrEnabled && rrPickNum>=3 && (
-              <>
-                {/* ── Combo Size ── */}
-                <div style={{marginBottom:14}}>
-                  <span style={lblStyle}>Combo Size (legs per line)</span>
-                  <select value={rrComboSize}
-                    onChange={e=>{ setRrComboSize(parseInt(e.target.value)); setRrResult(null); }}
-                    style={{...inpStyle,flex:'unset',width:'100%',boxSizing:'border-box',
-                      appearance:'auto',cursor:'pointer'}}>
-                    {rrComboSizeOptions.map(k => (
-                      <option key={k} value={k}>
-                        {k === 2 ? 'Doubles' : k === 3 ? 'Trebles' : `${k}-leg combos`} — {rrCombinations(rrPickNum,k).length} lines
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* ── Per-leg odds ── */}
-                <div style={{marginBottom:14}}>
-                  <span style={lblStyle}>Odds — each pick</span>
-                  {rrOddsRaw.map((o, i) => {
-                    const p = calcParseOdds(o);
-                    return (
-                      <div key={i} style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
-                        <span style={{fontFamily:mono,fontSize:10,color:'var(--muted)',width:14}}>{i+1}</span>
-                        <input value={o} onChange={e=>handleRrOddsChange(i, e.target.value)}
-                          placeholder="+180  ·  −150  ·  2.80"
-                          style={{...inpStyle,fontSize:12}}/>
-                        <span style={{fontFamily:mono,fontSize:10,width:44,textAlign:'right',
-                          color:p?'#38f282':'var(--muted)'}}>
-                          {p ? p.decimal.toFixed(2) : '—'}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-                <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginBottom:2}}>
-                  Each line below gets its own suggested stake, sized off the Unit Size above —
-                  same ~1 unit profit target as Suggested mode, capped at 1 full bankroll for extreme odds.
-                </div>
-              </>
+              <div style={{marginBottom:14}}>
+                <span style={lblStyle}>Combo Size (legs per line)</span>
+                <select value={rrComboSize}
+                  onChange={e=>{ setRrComboSize(parseInt(e.target.value)); setRrResult(null); }}
+                  style={{...inpStyle,flex:'unset',width:'100%',boxSizing:'border-box',
+                    appearance:'auto',cursor:'pointer'}}>
+                  {rrComboSizeOptions.map(k => (
+                    <option key={k} value={k}>
+                      {k === 2 ? 'Doubles' : k === 3 ? 'Trebles' : `${k}-leg combos`} — {rrCombinations(rrPickNum,k).length} lines
+                    </option>
+                  ))}
+                </select>
+              </div>
             )}
+
+            {/* ── Per-leg odds — always shown at 2+ picks, independent of
+                the Round Robin checkbox ── */}
+            <div style={{marginBottom:14}}>
+              <span style={lblStyle}>Odds — each pick</span>
+              {rrOddsRaw.map((o, i) => {
+                const p = calcParseOdds(o);
+                return (
+                  <div key={i} style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
+                    <span style={{fontFamily:mono,fontSize:10,color:'var(--muted)',width:14}}>{i+1}</span>
+                    <input value={o} onChange={e=>handleRrOddsChange(i, e.target.value)}
+                      placeholder="+180  ·  −150  ·  2.80"
+                      style={{...inpStyle,fontSize:12}}/>
+                    <span style={{fontFamily:mono,fontSize:10,width:44,textAlign:'right',
+                      color:p?'#38f282':'var(--muted)'}}>
+                      {p ? p.decimal.toFixed(2) : '—'}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginBottom:2}}>
+              {rrEnabled && rrPickNum>=3
+                ? 'Straight parlay below uses all picks together. Each round robin line below gets its own suggested stake — same ~1 unit profit target as Suggested mode, capped at 1 full bankroll for extreme odds.'
+                : 'Suggested stake sized to the same ~1 unit profit target as Suggested mode, capped at 1 full bankroll for extreme odds.'}
+            </div>
           </>
         ) : mode === 'manual' ? (
           <>
@@ -13699,8 +13727,8 @@ function OddsCalculatorSlideout({ onClose }) {
         )}
         </>)}
 
-        {/* ── Round Robin: Calculate button + Result ── */}
-        {mode === 'roundrobin' && rrEnabled && rrPickNum>=3 && (
+        {/* ── Parlay / Round Robin: Calculate button + Result ── */}
+        {mode === 'roundrobin' && rrPickNum>=2 && (
           <>
             <button onClick={calculateRR} disabled={!rrCanCalc}
               style={{width:'100%',padding:'10px',borderRadius:7,border:'none',
@@ -13708,9 +13736,44 @@ function OddsCalculatorSlideout({ onClose }) {
                 letterSpacing:.5,textTransform:'uppercase',transition:'all .15s',
                 background:rrCanCalc?'var(--accent)':'var(--surface2)',
                 color:rrCanCalc?'white':'var(--muted)',opacity:rrCanCalc?1:.5,marginBottom:16}}>
-              Calculate Round Robin
+              {rrEnabled && rrPickNum>=3 ? 'Calculate Parlay + Round Robin' : 'Calculate Parlay'}
             </button>
 
+            {/* ── Straight parlay — all picks combined, always shown ── */}
+            {parlayResult && (
+              <div style={{background:'var(--surface2)',border:'1px solid var(--border)',
+                borderRadius:8,padding:'14px 16px',marginBottom:rrResult?16:0}}>
+                <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',textTransform:'uppercase',
+                  letterSpacing:.8,marginBottom:8}}>
+                  {rrPickNum}-Leg Parlay
+                </div>
+                {[
+                  ['Parlay Odds', `${parlayResult.american>=0?'+':''}${parlayResult.american}  ·  ${parlayResult.decimal.toFixed(2)}`, 'var(--text)', 13],
+                  ['Suggested Unit', `${fmtFrac(parlayResult.frac)}u of ${sym}${(parseFloat(unitSize)||0).toFixed(2)}`, '#f5a623', 12],
+                  ['Suggested Stake', calcFmtCcy(parlayResult.stake, currency), '#38f282', 14],
+                  ['Total Payout', calcFmtCcy(parlayResult.payout, currency), '#38b8f2', 14],
+                  ['Profit on Win', calcFmtCcy(parlayResult.profit, currency), '#38f282', 14],
+                ].map(([lbl, val, clr, fsz]) => (
+                  <div key={lbl} style={{display:'flex',justifyContent:'space-between',
+                    alignItems:'baseline',padding:'6px 0',
+                    borderBottom:'1px solid rgba(255,255,255,.05)'}}>
+                    <span style={{fontFamily:mono,fontSize:10,color:'var(--muted)'}}>{lbl}</span>
+                    <span style={{fontFamily:osw,fontWeight:700,fontSize:fsz,color:clr}}>{val}</span>
+                  </div>
+                ))}
+                <div style={{marginTop:10,padding:'6px 10px',borderRadius:6,
+                  background:'rgba(56,242,130,.06)',border:'1px solid rgba(56,242,130,.18)'}}>
+                  <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)',textTransform:'uppercase',
+                    letterSpacing:.5}}>Risk level: </span>
+                  <span style={{fontFamily:osw,fontWeight:700,fontSize:11,color:'#38f282'}}>{parlayResult.desc}</span>
+                </div>
+                <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginTop:8}}>
+                  All {rrPickNum} picks must hit for this bet to pay out.
+                </div>
+              </div>
+            )}
+
+            {/* ── Round Robin combo breakdown — add-on, only when enabled ── */}
             {rrResult && (
               <div style={{background:'var(--surface2)',border:'1px solid var(--border)',
                 borderRadius:8,padding:'14px 16px'}}>
