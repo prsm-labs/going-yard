@@ -13214,12 +13214,12 @@ function OddsCalculatorSlideout({ onClose }) {
   const [currency,  setCurrency]  = useState('USD');
   const [result,    setResult]    = useState(null);
 
-  // ── Round Robin state ──────────────────────────────────────────────────
+  // ── Round Robin state — shares bankroll/unitSize/unitRate with Manual mode,
+  // no separate stake input; each combo line gets its own suggested stake. ──
   const [rrPickNum,       setRrPickNum]       = useState(2);
   const [rrEnabled,       setRrEnabled]       = useState(false);
   const [rrComboSize,     setRrComboSize]     = useState(2);
   const [rrOddsRaw,       setRrOddsRaw]       = useState(['', '']);
-  const [rrStakePerCombo, setRrStakePerCombo] = useState('');
   const [rrResult,        setRrResult]        = useState(null);
 
   const parsed  = calcParseOdds(oddsRaw);
@@ -13239,12 +13239,14 @@ function OddsCalculatorSlideout({ onClose }) {
     const b = parseFloat(v), r = rateNum / 100;
     setUnitSize((!isNaN(b) && b > 0) ? (b * r).toFixed(2) : '');
     setResult(null);
+    setRrResult(null);
   };
   const handleUnitSize = v => {
     setUnitSize(v);
     const u = parseFloat(v), r = rateNum / 100;
     setBankroll((!isNaN(u) && u > 0) ? (u / r).toFixed(2) : '');
     setResult(null);
+    setRrResult(null);
   };
   const handleUnitRate = v => {
     setUnitRate(v);
@@ -13253,6 +13255,7 @@ function OddsCalculatorSlideout({ onClose }) {
     if (!isNaN(b) && b > 0) setUnitSize((b * r).toFixed(2));
     else if (!isNaN(u) && u > 0) setBankroll((u / r).toFixed(2));
     setResult(null);
+    setRrResult(null);
   };
 
   const handleOddsChange = v => {
@@ -13321,17 +13324,40 @@ function OddsCalculatorSlideout({ onClose }) {
   const rrParsedOdds = rrOddsRaw.map(o => calcParseOdds(o));
   const rrAllOddsValid = rrEnabled && rrParsedOdds.length === rrPickNum
     && rrParsedOdds.every(p => p && p.decimal > 1);
-  const rrCanCalc = rrAllOddsValid && parseFloat(rrStakePerCombo) > 0
+  const rrCanCalc = rrAllOddsValid && parseFloat(unitSize) > 0
     && rrComboSize >= 2 && rrComboSize <= rrPickNum - 1;
+
+  // Suggested stake fraction for one combo's combined decimal odds.
+  // Same anchor as Suggested mode's computeSugFrac (~1 unit profit, 0.05u
+  // floor for longshots) — but round robin combos can compound multiple
+  // longshot legs into odds far beyond anything a single bet would show,
+  // where a flat 0.05u floor can suggest a payout many multiples of the
+  // whole bankroll. Second ceiling: if even the floor stake's payout would
+  // exceed the full bankroll, shrink the stake further so payout caps at
+  // exactly 1 bankroll instead.
+  const computeSugFracFromDecimal = (dec, bankrollVal, unitVal) => {
+    const rawFrac = 1 / Math.max(dec - 1, 0.0001);
+    let frac = Math.max(rawFrac, 0.05);
+    if (bankrollVal > 0 && unitVal > 0) {
+      const floorPayout = frac * unitVal * dec;
+      if (floorPayout > bankrollVal) frac = (bankrollVal / dec) / unitVal;
+    }
+    return Math.max(frac, 0.001);
+  };
 
   const calculateRR = () => {
     if (!rrCanCalc) return;
-    const stake = parseFloat(rrStakePerCombo);
+    const unitVal     = parseFloat(unitSize);
+    const bankrollVal = parseFloat(bankroll) || 0;
     const combos = rrCombinations(rrPickNum, rrComboSize).map(legIdxs => {
-      const dec = legIdxs.reduce((p, i) => p * rrParsedOdds[i].decimal, 1);
-      return { legIdxs, decimal: dec, payout: stake * dec, profit: stake * dec - stake };
+      const dec   = legIdxs.reduce((p, i) => p * rrParsedOdds[i].decimal, 1);
+      const frac  = computeSugFracFromDecimal(dec, bankrollVal, unitVal);
+      const stake = Math.max(frac * unitVal, 0.10);
+      const payout = stake * dec;
+      return { legIdxs, decimal: dec, frac, stake, payout,
+               profit: payout - stake, desc: riskDesc(frac) };
     });
-    const totalStake  = stake * combos.length;
+    const totalStake  = combos.reduce((s, c) => s + c.stake, 0);
     const maxPayout    = combos.reduce((s, c) => s + c.payout, 0);
     const floorCombo   = combos.reduce((min, c) => c.payout < min.payout ? c : min, combos[0]);
     const ceilCombo     = combos.reduce((max, c) => c.payout > max.payout ? c : max, combos[0]);
@@ -13454,6 +13480,31 @@ function OddsCalculatorSlideout({ onClose }) {
         {/* ── Bankroll / Unit (Manual) or Unit Size (Suggested) ── */}
         {mode === 'roundrobin' ? (
           <>
+            {/* ── Bankroll / Unit — same shared state as Manual mode, carries over ── */}
+            <div style={{marginBottom:14}}>
+              <span style={lblStyle}>Bankroll ({sym})</span>
+              <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                <input value={bankroll} onChange={e=>handleBankroll(e.target.value)}
+                  placeholder="e.g. 1000" type="number" min="0" style={inpStyle}/>
+              </div>
+            </div>
+            <div style={{marginBottom:14}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+                <span style={{...lblStyle,marginBottom:0}}>Unit Size ({sym})</span>
+                <div style={{display:'flex',alignItems:'center',gap:5}}>
+                  <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>% of bankroll:</span>
+                  <input value={unitRate} onChange={e=>handleUnitRate(e.target.value)}
+                    type="number" min="0.1" max="100" step="0.5"
+                    style={{width:48,background:'var(--surface2)',border:'1px solid var(--border)',
+                      borderRadius:4,padding:'3px 6px',fontFamily:mono,fontSize:11,
+                      color:'var(--text)',outline:'none',textAlign:'right'}}/>
+                  <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>%</span>
+                </div>
+              </div>
+              <input value={unitSize} onChange={e=>handleUnitSize(e.target.value)}
+                placeholder="e.g. 30" type="number" min="0" style={{...inpStyle,flex:'unset',width:'100%',boxSizing:'border-box'}}/>
+            </div>
+
             {/* ── Pick Number ── */}
             <div style={{marginBottom:14}}>
               <span style={lblStyle}>Pick Number</span>
@@ -13517,14 +13568,9 @@ function OddsCalculatorSlideout({ onClose }) {
                     );
                   })}
                 </div>
-
-                {/* ── Stake per combo ── */}
-                <div style={{marginBottom:14}}>
-                  <span style={lblStyle}>Stake per Combination ({sym})</span>
-                  <input value={rrStakePerCombo}
-                    onChange={e=>{ setRrStakePerCombo(e.target.value); setRrResult(null); }}
-                    placeholder="e.g. 5" type="number" min="0"
-                    style={{...inpStyle,flex:'unset',width:'100%',boxSizing:'border-box'}}/>
+                <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginBottom:2}}>
+                  Each line below gets its own suggested stake, sized off the Unit Size above —
+                  same ~1 unit profit target as Suggested mode, capped at 1 full bankroll for extreme odds.
                 </div>
               </>
             )}
@@ -13691,6 +13737,8 @@ function OddsCalculatorSlideout({ onClose }) {
                       <tr style={{background:'var(--surface2)'}}>
                         <th style={{padding:'5px 8px',textAlign:'left',color:'var(--muted)',fontWeight:600}}>Line</th>
                         <th style={{padding:'5px 8px',textAlign:'right',color:'var(--muted)',fontWeight:600}}>Odds</th>
+                        <th style={{padding:'5px 8px',textAlign:'right',color:'var(--muted)',fontWeight:600}}>Unit</th>
+                        <th style={{padding:'5px 8px',textAlign:'right',color:'var(--muted)',fontWeight:600}}>Stake</th>
                         <th style={{padding:'5px 8px',textAlign:'right',color:'var(--muted)',fontWeight:600}}>Payout</th>
                       </tr>
                     </thead>
@@ -13705,6 +13753,12 @@ function OddsCalculatorSlideout({ onClose }) {
                           <td style={{padding:'5px 8px',textAlign:'right',color:'var(--text)'}}>
                             {c.decimal.toFixed(2)}
                           </td>
+                          <td style={{padding:'5px 8px',textAlign:'right',color:'#f5a623'}}>
+                            {fmtFrac(c.frac)}u
+                          </td>
+                          <td style={{padding:'5px 8px',textAlign:'right',color:'var(--text)'}}>
+                            {calcFmtCcy(c.stake, currency)}
+                          </td>
                           <td style={{padding:'5px 8px',textAlign:'right',color:'#38f282',fontWeight:700}}>
                             {calcFmtCcy(c.payout, currency)}
                           </td>
@@ -13716,6 +13770,7 @@ function OddsCalculatorSlideout({ onClose }) {
 
                 <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginTop:10,lineHeight:1.6}}>
                   Any {rrComboSize} of your {rrPickNum} picks hitting together pays that line — you don't need all {rrPickNum} to win something.
+                  Unit column shows each line's suggested stake as a fraction of your Unit Size (e.g. 0.125u = {calcFmtCcy((parseFloat(unitSize)||0)*0.125, currency)} of a {calcFmtCcy(parseFloat(unitSize)||0, currency)} unit).
                 </div>
               </div>
             )}
