@@ -1,11 +1,7 @@
 {
   "version": "2026.07.11",
   "changelog": [
-    "Rework Parlay tab: standalone parlay calc at any pick count",
-    "Round Robin as add-on",
-    "rename from Round   Robin",
-    "fix app-update version detection",
-    "add Gone Yard filter to Barrel Lab"
+    "Auto-generate update banner changelog from git commit message on every build"
   ],
   "notifyUsers": true
 }
