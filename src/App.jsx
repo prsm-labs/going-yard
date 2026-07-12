@@ -8789,6 +8789,20 @@ const isGoneYardToday = (pid, name) => {
     (h.batterName && name && h.batterName.toLowerCase() === name.toLowerCase())
   );
 };
+// "2-bagger" — batter has 2+ total bases today but has NOT homered. Mutually
+// exclusive with isGoneYardToday by construction (source list excludes any
+// batter with homeRuns>0 for the day — see api/homeruns.js twoBaggers).
+let TB2_DATA = [];
+let TB2_DATA_DATE = '';
+let _TB2_VER = 0; // incremented alongside _HR_VER — same fetchHRs() poll cycle
+const is2BagToday = (pid, name) => {
+  if (!TB2_DATA.length) return false;
+  if (TB2_DATA_DATE && TB2_DATA_DATE !== _etTodayYMD()) return false;
+  return TB2_DATA.some(t =>
+    t.batterId === pid ||
+    (t.batterName && name && t.batterName.toLowerCase() === name.toLowerCase())
+  );
+};
 const VIDEO_LINK_CACHE = {}; // gamePk_atBatIndex → savant video URL
 
 
@@ -10684,6 +10698,7 @@ function GamedayTab() {
                         const gc        = dp?.grade ? (GRADE_CFG[dp.grade] || null) : null;
                         const goneYard  = HR_DATA.some(h => h.batterId === r.id ||
                           (r.name && h.batterName && h.batterName.toLowerCase() === r.name.toLowerCase()));
+                        const is2Bag    = is2BagToday(r.id, r.name);
                         const isDiamond = dp?.is_diamond === 'True' || dp?.is_diamond === true;
                         const isDue     = dp ? isDueFromRow(dp, r.id) : false;
                         const isHot     = isHotBatPlayer(dp || getCachedPlayer(r.id));
@@ -10717,6 +10732,7 @@ function GamedayTab() {
                                 </span>}
                                 {/* Stickers */}
                                 {goneYard  && <span title="Gone Yard today" style={{fontSize:10,flexShrink:0}}>💥</span>}
+                                {!goneYard && is2Bag && <span title="2+ total bases today (no HR)" style={{fontSize:10,flexShrink:0}}>2️⃣</span>}
                                 {isDiamond && <span title="Diamond — Tier 1 Lock" style={{fontSize:10,flexShrink:0}}>💎</span>}
                                 {isDue     && <span title="Due — AB since last HR exceeds normal rate" style={{fontSize:10,flexShrink:0}}>⏳</span>}
                                 {isHot     && <span title="Hot Bat — 3+ HRs in last 7 days" style={{fontSize:10,flexShrink:0}}>🔥</span>}
@@ -11732,6 +11748,9 @@ async function fetchHRs(force=false) {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     const newHRs = data.homeruns || [];
+    // 2-baggers refresh every successful fetch, independent of HR count —
+    // no "keep yesterday's" carryover needed (badge-only signal, not a ticker).
+    TB2_DATA = data.twoBaggers || []; TB2_DATA_DATE = data.date || ''; _TB2_VER = (_TB2_VER||0) + 1;
     // Keep yesterday's HRs in ticker until today's games produce at least 3 HRs
     // This way the ticker stays alive past midnight until next day's games start
     if (newHRs.length > 0) {
@@ -15644,6 +15663,7 @@ function SimLabView({ data }) {
   const [slPitcherHand, setSlPitcherHand] = useState('ALL');
   const [slFormFilter, setSlFormFilter]   = useState(new Set());
   const [filterGoneYardSim, setFilterGoneYardSim] = useState(false);
+  const [filterTB2Sim, setFilterTB2Sim] = useState(false);
   const [filterKeyMatchup,  setFilterKeyMatchup]  = useState(false);
   const [filterDueSim, setFilterDueSim] = useState(false);
   const [filterDiamondSim, setFilterDiamondSim] = useState(false);
@@ -15748,6 +15768,13 @@ function SimLabView({ data }) {
     const name = (b.batter || '').toLowerCase();
     return HR_DATA.some(h => h.batterId === pid || (h.batterName && h.batterName.toLowerCase() === name));
   };
+  const tb2DataIsTodaySim = TB2_DATA_DATE === etTodaySim;
+  const is2BagSim = b => {
+    if (!tb2DataIsTodaySim) return false;
+    const pid = parseInt(b.batter_id) || 0;
+    const name = (b.batter || '').toLowerCase();
+    return TB2_DATA.some(t => t.batterId === pid || (t.batterName && t.batterName.toLowerCase() === name));
+  };
 
   const slate = useMemo(() => {
     const filtered = data.filter(r => r.batter && r.batting_team)
@@ -15768,6 +15795,7 @@ function SimLabView({ data }) {
         return true;
       })
       .filter(r => !filterGoneYardSim || isGoneYardSim(r))
+      .filter(r => !filterTB2Sim || is2BagSim(r))
       .filter(r => !filterKeyMatchup  || isKeyMatchup(parseInt(r.batter_id)||0, r.batter))
       .filter(r => !filterDueSim || isDueFromRow(r, parseInt(r.batter_id)||0))
       .filter(r => !simPicksOnly || picks[String(parseInt(r.batter_id)||0)])
@@ -15828,7 +15856,7 @@ function SimLabView({ data }) {
       return mul * ((parseFloat(a[sortBy]) || 0) - (parseFloat(b[sortBy]) || 0));
     });
     return sorted;
-  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, selPositionsSim, filterKeyMatchup, minYard, maxYard, minSig, maxSig, minSimTB, minOdds, minBoom, minBrl, minZoneFit, maxZoneFit, minZoneEdge, minXwoba, minL7EV, maxL7EV, minHitPct, minL7Iso, selHRUpside, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal, slotMin, slotMax, weakSpotOnly]);
+  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterTB2Sim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, selPositionsSim, filterKeyMatchup, minYard, maxYard, minSig, maxSig, minSimTB, minOdds, minBoom, minBrl, minZoneFit, maxZoneFit, minZoneEdge, minXwoba, minL7EV, maxL7EV, minHitPct, minL7Iso, selHRUpside, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal, slotMin, slotMax, weakSpotOnly]);
 
   // Reset row cap when filters/sort change so user always sees top results
   useEffect(() => { setDisplayLimit(150); }, [sortBy, sortDir, selMatchups, lineupOnly, simActiveOnly, simSearch, filterKeyMatchup, slotMin, slotMax]);
@@ -15944,7 +15972,7 @@ function SimLabView({ data }) {
             {/* Pitcher grade buttons + FILTERS on same row */}
             <div style={{display:'flex',gap:4,alignItems:'center',marginLeft:'auto',flexWrap:'wrap'}}>
               {(()=>{
-                const activeCount=[filterGoneYardSim,filterDueSim,filterDiamondSim,simPicksOnly,
+                const activeCount=[filterGoneYardSim,filterTB2Sim,filterDueSim,filterDiamondSim,simPicksOnly,
                   simActiveOnly,simInjuredOnly,simHotOnly,filterKeyMatchup,lineupOnly,weakSpotOnly,
                   slBatterHand!=='ALL',slPitcherHand!=='ALL',slFormFilter.size>0,slHideFinal,
                   !!minYard,!!maxYard,!!minSig,!!maxSig,!!minSimTB,!!minOdds,
@@ -16054,6 +16082,7 @@ function SimLabView({ data }) {
                   {[
                     [()=>setLineupOnly(v=>!v),        lineupOnly,        '#27c97a',        '✅ In Lineup'],
                     [()=>setFilterGoneYardSim(v=>!v), filterGoneYardSim, 'var(--accent)',  '💥 Gone Yard Today'],
+                    [()=>setFilterTB2Sim(v=>!v),      filterTB2Sim,      '#38b8f2',        '2️⃣ 2+ TB Today'],
                     [()=>setFilterDueSim(v=>!v),      filterDueSim,      'var(--ice)',     '⏳ Due'],
                     [()=>{setSimActiveOnly(s=>!s);if(!simActiveOnly)setSimInjuredOnly(false);}, simActiveOnly,'#34d399','☑️ Active Only'],
                     [()=>{setSimInjuredOnly(s=>!s);if(!simInjuredOnly)setSimActiveOnly(false);},simInjuredOnly,'#fb923c','🤕 Injured'],
@@ -16600,6 +16629,7 @@ function SimLabView({ data }) {
                             {isHotBatPlayer(b)     && <span style={{fontSize:9,flexShrink:0}} title="🔥 Hot Bat" data-tip="🔥 Hot Bat — 3 or more HRs in the last 7 days">🔥</span>}
                             {isConfirmed(b)         && <span style={{fontSize:9,flexShrink:0,color:'#27c97a'}}>✅</span>}
                             {isGoneYardSim(b)       && <span style={{fontSize:9,flexShrink:0}}>💥</span>}
+                            {!isGoneYardSim(b) && is2BagSim(b) && <span title="2+ total bases today (no HR)" style={{fontSize:9,flexShrink:0}}>2️⃣</span>}
                             {isDueFromRow(b,parseInt(b.batter_id)||0) && <span style={{fontSize:9,flexShrink:0}} title="Due" data-tip="⏳ Overdue — AB count since last HR exceeds normal rate">⏳</span>}
                             {(b.is_diamond==='True'||b.is_diamond===true) && <span style={{fontSize:9,flexShrink:0}}>💎</span>}
                             {(b.in_slump==='True'||b.in_slump===true) && <span style={{fontSize:9,flexShrink:0}} title="Slump" data-tip="📉 In a slump — multiple negative contact indicators">📉</span>}
@@ -18210,6 +18240,7 @@ function BatterLeaderboard() {
   const [players, setPlayers] = useState([]);
   const [showPicksOnly, setShowPicksOnly] = useState(false);
   const [filterGoneYard, setFilterGoneYard] = useState(false);
+  const [filterTB2, setFilterTB2] = useState(false);
   const [filterDue, setFilterDue] = useState(false);
   const [blBatterHand, setBlBatterHand] = useState('ALL');
   const picks = usePicks();
@@ -18321,6 +18352,11 @@ function BatterLeaderboard() {
     h.batterId === p.pid ||
     (h.batterName && p.name && h.batterName.toLowerCase() === p.name.toLowerCase())
   );
+  const tb2DataIsToday = TB2_DATA_DATE === etToday;
+  const isTB2 = p => tb2DataIsToday && TB2_DATA.some(t =>
+    t.batterId === p.pid ||
+    (t.batterName && p.name && t.batterName.toLowerCase() === p.name.toLowerCase())
+  );
 
   const filtered = allPlayers
     .filter(p => {
@@ -18346,6 +18382,7 @@ function BatterLeaderboard() {
     .filter(p => !injuredOnly || !!INJURY_MAP[String(p.pid||p.id)])
     .filter(p => !hotBatOnly || isHotBatPlayer(p))
     .filter(p => !filterGoneYard || isGoneYard(p))
+    .filter(p => !filterTB2 || isTB2(p))
     .filter(p => !filterDue || isDue(p.pid||p.id))
     .sort((a, b) => {
       const evCount = (p, thresh) => {
@@ -18530,6 +18567,15 @@ function BatterLeaderboard() {
             whiteSpace:'nowrap',transition:'all .15s'}}>
           💥
         </button>
+        <button onClick={()=>setFilterTB2(s=>!s)}
+          style={{padding:'6px 12px',borderRadius:7,cursor:'pointer',
+            border:`1px solid ${filterTB2?'rgba(56,184,242,.5)':'var(--border)'}`,
+            background:filterTB2?'rgba(56,184,242,.18)':'var(--surface2)',
+            color:filterTB2?'#38b8f2':'var(--muted)',
+            fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:filterTB2?700:400,
+            whiteSpace:'nowrap',transition:'all .15s'}}>
+          2️⃣
+        </button>
         <button onClick={()=>setFilterDue(v=>!v)}
           style={{padding:'4px 10px',borderRadius:6,cursor:'pointer',
             background:filterDue?'rgba(56,184,242,.18)':'transparent',
@@ -18701,6 +18747,9 @@ function BatterLeaderboard() {
                         {isGoneYard(p) && <span style={{fontSize:7,padding:'1px 4px',borderRadius:3,
                           background:'rgba(255,20,0,.25)',border:'1px solid rgba(255,20,0,.5)',
                           color:'#fff',fontFamily:"'DM Mono',monospace",fontWeight:800,flexShrink:0}}>GY</span>}
+                        {!isGoneYard(p) && isTB2(p) && <span title="2+ total bases today (no HR)" style={{fontSize:7,padding:'1px 4px',borderRadius:3,
+                          background:'rgba(56,184,242,.20)',border:'1px solid rgba(56,184,242,.4)',
+                          color:'#38b8f2',fontFamily:"'DM Mono',monospace",fontWeight:800,flexShrink:0}}>2B</span>}
                         {isHotBatPlayer(p) && <span style={{fontSize:10,flexShrink:0,lineHeight:1}}
                           title={`🔥 Hot Bat — ${parseFloat(p.windows?.last7?.hr??0).toFixed(0)} HR in last 7 days`}>🔥</span>}
                         <InjuryBadge pid={p.pid||p.id} name={p.name}/>
@@ -19926,6 +19975,7 @@ function StatsTab() {
   const [bConfirmed,  setBConfirmed]  = useState(false);
   const [bHotOnly,    setBHotOnly]    = useState(false);
   const [bGYOnly,     setBGYOnly]     = useState(false);
+  const [bTB2Only,    setBTB2Only]    = useState(false);
   const [bHideInj,    setBHideInj]    = useState(false);
   const [bSortBy,     setBSortBy]     = useState('iso');
   const [bSortDir,    setBSortDir]    = useState(-1);
@@ -20135,6 +20185,7 @@ function StatsTab() {
         const bls  = LINEUP_STATUS[bpid];
         if (bConfirmed && bls?.status !== 'confirmed') return false;
         if (bGYOnly    && !isGoneYardToday(bpid, r.name)) return false;
+        if (bTB2Only   && !is2BagToday(bpid, r.name)) return false;
         if (bHotOnly   && !(parseInt(r.recent_hr_count||0)>=3||(getCachedPlayer(bpid)?.recentHR||0)>=3)) return false;
         if (bHideInj   && INJURY_MAP?.[bpid] && !LINEUP_STATUS?.[bpid]) return false;
         if (bPgFilter.length > 0) {
@@ -20158,7 +20209,7 @@ function StatsTab() {
         return bSortDir * (av - bv);
       })
       .slice(0, 300);
-  }, [data, window, bSplitKey, bSortBy, bSortDir, bSearch, bTeam, bMinPA, bHandFilter, bPgFilter, matchupTeams, sharedBHand, bConfirmed, bHotOnly, bGYOnly, bHideInj, bPicksOnly, pitchGroup, lineupVer, threshFilters]);
+  }, [data, window, bSplitKey, bSortBy, bSortDir, bSearch, bTeam, bMinPA, bHandFilter, bPgFilter, matchupTeams, sharedBHand, bConfirmed, bHotOnly, bGYOnly, bTB2Only, bHideInj, bPicksOnly, pitchGroup, lineupVer, threshFilters]);
 
   // ── Pitcher rows ──────────────────────────────────────────────────────────────
   const pRows = React.useMemo(() => {
@@ -20675,7 +20726,7 @@ function StatsTab() {
           </select>
           {(()=>{
             const cnt=[sharedBHand!=='',sharedBLoc!=='',sharedDN!=='',bHandFilter!=='',
-              pitchGroup!=='',bPicksOnly,bConfirmed,bHotOnly,bGYOnly,bHideInj,
+              pitchGroup!=='',bPicksOnly,bConfirmed,bHotOnly,bGYOnly,bTB2Only,bHideInj,
               bPgFilter.length>0,bMinPA!==10].filter(Boolean).length;
             return(
               <button onClick={()=>setBFiltersOpen(v=>!v)}
@@ -20806,7 +20857,7 @@ function StatsTab() {
             })()}
             <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
               <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0,minWidth:32}}>Flags:</span>
-              {[[bPicksOnly,setBPicksOnly,'var(--accent2)','🎯 My Picks'],[bConfirmed,setBConfirmed,'#27c97a','✅ Confirmed'],[bHotOnly,setBHotOnly,'#fb923c','🔥 Hot Bat'],[bGYOnly,setBGYOnly,'var(--accent)','💥 Gone Yard'],[bHideInj,setBHideInj,'#fb923c','🤕 Hide Inj']].map(([active,setFn,col,label])=>(
+              {[[bPicksOnly,setBPicksOnly,'var(--accent2)','🎯 My Picks'],[bConfirmed,setBConfirmed,'#27c97a','✅ Confirmed'],[bHotOnly,setBHotOnly,'#fb923c','🔥 Hot Bat'],[bGYOnly,setBGYOnly,'var(--accent)','💥 Gone Yard'],[bTB2Only,setBTB2Only,'#38b8f2','2️⃣ 2+ TB'],[bHideInj,setBHideInj,'#fb923c','🤕 Hide Inj']].map(([active,setFn,col,label])=>(
                 <button key={label} onClick={()=>setFn(v=>!v)}
                   style={{padding:'4px 9px',borderRadius:6,cursor:'pointer',fontSize:9,fontFamily:mono,fontWeight:active?700:400,
                     border:`1px solid ${active?col:'var(--border)'}`,background:active?`${col}22`:'transparent',
@@ -20950,6 +21001,7 @@ function StatsTab() {
                         {r.hand&&<span style={{fontFamily:mono,fontSize:7,color:'var(--muted)'}}>{r.hand}</span>}
                         {LINEUP_STATUS[parseInt(r.id)||0]?.status==='confirmed'&&<span title="Confirmed in lineup" style={{fontSize:9,flexShrink:0}}>✅</span>}
                         {isGoneYardToday(parseInt(r.id)||0,r.name)&&<span title="Gone yard today" style={{fontSize:9,flexShrink:0}}>💥</span>}
+                        {!isGoneYardToday(parseInt(r.id)||0,r.name) && is2BagToday(parseInt(r.id)||0,r.name) && <span title="2+ total bases today (no HR)" style={{fontSize:9,flexShrink:0}}>2️⃣</span>}
                         {isHotBatPlayer(getCachedPlayer(parseInt(r.id)||0)||{})&&<span title="Hot bat 3+ HR L7" style={{fontSize:9,flexShrink:0}}>🔥</span>}
                         {INJURY_MAP?.[parseInt(r.id)||0]&&!LINEUP_STATUS?.[parseInt(r.id)||0]&&<span title={INJURY_MAP[parseInt(r.id)||0]?.label||'Injured'} style={{fontSize:9,flexShrink:0}}>🤕</span>}
                         <PickButton pid={parseInt(r.id)||0} name={r.name||r.id} team={r.team||''}/>
@@ -21339,6 +21391,7 @@ function SoCloseTab({ data }) {
                         {r.confirmed && <span title="Confirmed in lineup" data-tip="✅ Confirmed in today's lineup" style={{fontSize:8,flexShrink:0}}>✅</span>}
                         {r.isDiamond  && <span style={{padding:'1px 3px',borderRadius:3,fontSize:7,fontWeight:700,background:'rgba(255,204,0,.15)',color:'#ffcc00',border:'1px solid rgba(255,204,0,.3)',flexShrink:0}}>💎</span>}
                         {isGoneYardToday(r.pid,r.name) && <span title="💥 Gone Yard Today" style={{fontSize:9,flexShrink:0}}>💥</span>}
+                        {!isGoneYardToday(r.pid,r.name) && is2BagToday(r.pid,r.name) && <span title="2️⃣ 2+ total bases today (no HR)" style={{fontSize:9,flexShrink:0}}>2️⃣</span>}
                         {isHotBatPlayer(getCachedPlayer(r.pid)||{recent_hr_count:r.count}) && <span title="🔥 3+ HRs L7" style={{fontSize:9,flexShrink:0}}>🔥</span>}
                         {r.on_tear && <span title="💣 On a tear" style={{fontSize:9,flexShrink:0}}>💣</span>}
                         <span onClick={e=>{e.stopPropagation();openAtBatSlide({pid:r.pid,name:r.name,team:r.team});}}
@@ -21648,6 +21701,9 @@ function PairsTab({ data }) {
               {isGoneYardToday(parseInt(b.batter_id)||0, b.batter)&&(
                 <span title="💥 Gone Yard Today" data-tip="💥 Hit a HR in today's live games" style={{fontSize:10,lineHeight:1}}>💥</span>
               )}
+              {!isGoneYardToday(parseInt(b.batter_id)||0, b.batter) && is2BagToday(parseInt(b.batter_id)||0, b.batter)&&(
+                <span title="2️⃣ 2+ Total Bases Today" data-tip="2️⃣ 2+ total bases today (no HR)" style={{fontSize:10,lineHeight:1}}>2️⃣</span>
+              )}
               {isHotBatPlayer(getCachedPlayer(parseInt(b.batter_id)||0)||b)&&(
                 <span title="🔥 Hot Bat — 3+ HRs in last 7 days" data-tip="🔥 Hot Bat — 3 or more HRs in the last 7 days" style={{fontSize:10,lineHeight:1}}>🔥</span>
               )}
@@ -21817,6 +21873,9 @@ function PairsTab({ data }) {
                 {(()=>{
                   const bothYard = isGoneYardToday(parseInt(pair.a.batter_id)||0,pair.a.batter) &&
                                    isGoneYardToday(parseInt(pair.b.batter_id)||0,pair.b.batter);
+                  const bothTB2 = !bothYard &&
+                                   is2BagToday(parseInt(pair.a.batter_id)||0,pair.a.batter) &&
+                                   is2BagToday(parseInt(pair.b.batter_id)||0,pair.b.batter);
                   return (
                 <div style={{padding:'8px 14px',display:'flex',alignItems:'center',gap:8,
                   background:isExp?pt.bg:bothYard?'rgba(255,64,32,.06)':showExpired?'rgba(148,163,184,.04)':'transparent',
@@ -21828,6 +21887,7 @@ function PairsTab({ data }) {
                     {pt.label}
                   </span>
                   {bothYard && <span title="Both went yard today!" data-tip="💥💥 Both batters in this pair went yard today" style={{fontSize:14,flexShrink:0}}>💥</span>}
+                  {bothTB2 && <span title="Both got 2+ total bases today!" data-tip="2️⃣2️⃣ Both batters in this pair got 2+ total bases today (no HR)" style={{fontSize:14,flexShrink:0}}>2️⃣</span>}
                   {pair.sameGame && (
                     <span style={{padding:'2px 6px',borderRadius:4,fontSize:7,fontFamily:mono,
                       color:'var(--muted)',border:'1px solid var(--border)',flexShrink:0}}>
@@ -23846,6 +23906,7 @@ function MatchupEngineTab() {
   const [kmInjuredOnly, setKmInjuredOnly]       = useState(false);
   const [kmHotOnly, setKmHotOnly]               = useState(false);
   const [filterGoneYard, setFilterGoneYard]   = useState(false);
+  const [filterTB2, setFilterTB2]             = useState(false);
   const [filterDue, setFilterDue]             = useState(false);
   const [filterDiamond, setFilterDiamond]     = useState(false);
   const [kmPicksOnly, setKmPicksOnly]         = useState(false);
@@ -23982,6 +24043,11 @@ function MatchupEngineTab() {
       if (filterDue) {
         const bid = parseInt(r.batter_id)||0;
         if (!isDueFromRow(r, bid)) return false;
+      }
+      if (filterTB2) {
+        const bid2 = parseInt(r.batter_id) || 0;
+        if (!TB2_DATA.some(t => t.batterId === bid2 ||
+          (r.batter && t.batterName && t.batterName.toLowerCase() === r.batter.toLowerCase()))) return false;
       }
       if (!filterGoneYard) return true;
       const bid = parseInt(r.batter_id) || 0;
@@ -24394,7 +24460,7 @@ function MatchupEngineTab() {
       const kmActiveCount = [
         selGrade!=='all', selPitcherGrade!=='all',
         kmBatterHand!=='ALL', kmPitcherHand!=='ALL', kmFormFilter.size>0,
-        kmHideFinal, filterGoneYard, filterDue, kmActiveOnly, kmInjuredOnly,
+        kmHideFinal, filterGoneYard, filterTB2, filterDue, kmActiveOnly, kmInjuredOnly,
         kmHotOnly, kmPicksOnly, filterDiamond,
       ].filter(Boolean).length;
       return (
@@ -24466,6 +24532,7 @@ function MatchupEngineTab() {
                 <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
                   {[
                     [()=>setFilterGoneYard(s=>!s), filterGoneYard, 'var(--accent)',  '💥 Gone Yard'],
+                    [()=>setFilterTB2(s=>!s), filterTB2, '#38b8f2',  '2️⃣ 2+ TB'],
                     [()=>setFilterDue(v=>!v),       filterDue,      'var(--ice)',     '⏳ Due'],
                     [()=>{setKmActiveOnly(s=>!s);if(!kmActiveOnly)setKmInjuredOnly(false);},kmActiveOnly,'#34d399','☑️ Active Only'],
                     [()=>{setKmInjuredOnly(s=>!s);if(!kmInjuredOnly)setKmActiveOnly(false);},kmInjuredOnly,'#fb923c','🤕 Injured'],
@@ -24603,6 +24670,8 @@ function MatchupEngineTab() {
             const etToday = (() => { const d=new Date(); const s=d.toLocaleDateString('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}); const [m,dy,y]=s.split('/'); return `${y}-${m.padStart(2,'0')}-${dy.padStart(2,'0')}`; })();
             const hrIsToday = HR_DATA_DATE === etToday;
             const goneYard = hrIsToday && HR_DATA.some(h => h.batterId === pid || (b.batter && h.batterName && h.batterName.toLowerCase() === b.batter.toLowerCase()));
+            const tb2IsToday = TB2_DATA_DATE === etToday;
+            const is2Bag = !goneYard && tb2IsToday && TB2_DATA.some(t => t.batterId === pid || (b.batter && t.batterName && t.batterName.toLowerCase() === b.batter.toLowerCase()));
             const projHR   = parseFloat(b.proj_hr_adj)||0;
 
             return <div key={uid}>
@@ -24628,6 +24697,11 @@ function MatchupEngineTab() {
                     color:'#fff',fontFamily:"'DM Mono',monospace",
                     fontWeight:800,fontSize:10,letterSpacing:.5}}>
                     💥</div>}
+                  {is2Bag && <div style={{padding:'2px 8px',borderRadius:5,flexShrink:0,
+                    background:'rgba(56,184,242,.20)',border:'1px solid rgba(56,184,242,.4)',
+                    color:'#38b8f2',fontFamily:"'DM Mono',monospace",
+                    fontWeight:800,fontSize:10,letterSpacing:.5}}>
+                    2️⃣</div>}
                   {(b.is_hit_specialist==='True'||b.is_hit_specialist===true) && (
                     <div style={{padding:'2px 7px',borderRadius:5,flexShrink:0,
                       background:'rgba(39,201,122,.15)',border:'1px solid rgba(39,201,122,.35)',
@@ -27183,6 +27257,8 @@ function TrackRecordTab() {
   const [showOnlyWeakSlot, setShowOnlyWeakSlot] = useState(false);
   const [showOnlyCC,     setShowOnlyCC]     = useState(false);
   const [showOnlySauce2, setShowOnlySauce2] = useState(false);
+  const [showOnly2Bagger, setShowOnly2Bagger] = useState(false);
+  const [showOnlySimTB2, setShowOnlySimTB2] = useState(false);
   const [teamFilter,     setTeamFilter]     = useState('ALL');
 
   const [showMatchup,  setShowMatchup]  = useState(true);
@@ -27328,6 +27404,17 @@ function TrackRecordTab() {
               && parseFloat(r['xwOBA']||0) >= 0.360
               && !!(r['Pitcher Grade']||blRow['Grade'])
               && !/elite|tough/i.test(r['Pitcher Grade']||blRow['Grade']||''),
+            // 2-Bagger (Non-HR): 2+ total bases in the game, but did not homer.
+            // Mutually exclusive with wentYard — matches the live 2️⃣ badge's
+            // definition app-wide. actualTB/wentYard already parsed above.
+            is2Bagger: parseInt(r['TB'] || 0) >= 2 && (r['Gone Yard']||'').trim().toUpperCase() !== 'YES',
+            // hitTB2: honest "reached 2+ total bases, any way" outcome — INCLUDES
+            // HR games (a HR is 4 TB, trivially clears the bar). This is the
+            // correct outcome for validating TB-prediction signals (Sim TB, and
+            // eventually the OnBase tab's SimTB2%); is2Bagger above is narrower
+            // by design (excludes HR) to match the 2️⃣ badge's display parity
+            // with 💥 — do not use is2Bagger to judge signal predictive power.
+            hitTB2: parseInt(r['TB'] || 0) >= 2,
             trueHR, matchup, simHRPct, brlSignal, isLongshot,
             pulledBrl: parseFloat(blRow['PulledBrl%'] || 0),
             brlBIP:    parseFloat(blRow['Brl/BIP%']   || 0),
@@ -27378,6 +27465,8 @@ function TrackRecordTab() {
     if (showOnlyWeakSlot) rows = rows.filter(r => r.isWeakSlot);
     if (showOnlyCC)     rows = rows.filter(r => r.closeCalls > 0);
     if (showOnlySauce2) rows = rows.filter(r => r.isSauce2);
+    if (showOnly2Bagger) rows = rows.filter(r => r.is2Bagger);
+    if (showOnlySimTB2) rows = rows.filter(r => r.simTB >= 2.0);
     if (search) {
       const q = search.toLowerCase();
       rows = rows.filter(r =>
@@ -27392,7 +27481,7 @@ function TrackRecordTab() {
       }
       return sortDir * ((av||0) - (bv||0));
     });
-  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, showOnlyWeakSlot, showOnlyCC, showOnlySauce2, search, sortCol, sortDir]);
+  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, showOnlyWeakSlot, showOnlyCC, showOnlySauce2, showOnly2Bagger, showOnlySimTB2, search, sortCol, sortDir]);
 
   const summary = useMemo(() => {
     const hrs          = dateRows.filter(r => r.wentYard);
@@ -27406,13 +27495,16 @@ function TrackRecordTab() {
     const weakSlotHits = weakSlots.filter(r => r.wentYard);
     const sauce2       = dateRows.filter(r => r.isSauce2);
     const sauce2Hits    = sauce2.filter(r => r.wentYard);
+    const twoBaggers    = dateRows.filter(r => r.is2Bagger);
+    const simTB2        = dateRows.filter(r => r.simTB >= 2.0);
+    const simTB2Hits    = simTB2.filter(r => r.hitTB2);
     const topYS        = [...dateRows].sort((a,b) => b.yardScore - a.yardScore)[0];
     const biggestMiss   = [...dateRows.filter(r => !r.wentYard)]
       .sort((a,b) => b.yardScore - a.yardScore)[0];
     const biggestUpset = [...dateRows.filter(r => r.wentYard)]
       .sort((a,b) => a.yardScore - b.yardScore)[0];
     return { hrs, signals, signalHits, keyMatchups, kmHits,
-             longshots, lsHits, weakSlots, weakSlotHits, sauce2, sauce2Hits, topYS, biggestMiss, biggestUpset };
+             longshots, lsHits, weakSlots, weakSlotHits, sauce2, sauce2Hits, twoBaggers, simTB2, simTB2Hits, topYS, biggestMiss, biggestUpset };
   }, [dateRows]);
 
   const GroupBar = ({ label, open, onToggle, color }) => (
@@ -27558,6 +27650,22 @@ function TrackRecordTab() {
             sub: `${summary.sauce2Hits.length}/${summary.sauce2.length}`,
             color:'#34d399'
           },
+          {
+            label:'2-BAGGER (NON-HR) RATE',
+            value: dateRows.length
+              ? `${((summary.twoBaggers.length/dateRows.length)*100).toFixed(0)}%`
+              : '—',
+            sub: `${summary.twoBaggers.length}/${dateRows.length}`,
+            color:'#38b8f2'
+          },
+          {
+            label:'SIM TB ≥2.0 HIT RATE',
+            value: summary.simTB2.length
+              ? `${((summary.simTB2Hits.length/summary.simTB2.length)*100).toFixed(0)}%`
+              : '—',
+            sub: `${summary.simTB2Hits.length}/${summary.simTB2.length}`,
+            color:'#a78bfa'
+          },
         ].map(card => (
           <div key={card.label} style={{
             background:'var(--surface2)', border:'1px solid var(--border)',
@@ -27666,13 +27774,31 @@ function TrackRecordTab() {
           🍯 Sauce 2.0 Only
         </button>
 
+        <button onClick={() => setShowOnly2Bagger(v=>!v)}
+          style={{padding:'4px 10px', borderRadius:6, border:'none',
+            cursor:'pointer', fontFamily:mono, fontSize:9, fontWeight:700,
+            background: showOnly2Bagger ? 'rgba(56,184,242,.15)' : 'var(--surface2)',
+            color:       showOnly2Bagger ? '#38b8f2' : 'var(--muted)',
+            border: `1px solid ${showOnly2Bagger ? 'rgba(56,184,242,.4)' : 'var(--border)'}` }}>
+          2️⃣ 2-Bagger (Non-HR) Only
+        </button>
+
+        <button onClick={() => setShowOnlySimTB2(v=>!v)}
+          style={{padding:'4px 10px', borderRadius:6, border:'none',
+            cursor:'pointer', fontFamily:mono, fontSize:9, fontWeight:700,
+            background: showOnlySimTB2 ? 'rgba(167,139,250,.15)' : 'var(--surface2)',
+            color:       showOnlySimTB2 ? '#a78bfa' : 'var(--muted)',
+            border: `1px solid ${showOnlySimTB2 ? 'rgba(167,139,250,.4)' : 'var(--border)'}` }}>
+          🎲 Sim TB ≥2.0 Only
+        </button>
+
         <button id="track-record-csv-trigger" onClick={() => {
             if (!filteredRows.length) return;
             const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
             const headers = ['Date','Batter','Team','Hand','Lineup Slot',
               'Pre-Game Pitcher','Went Yard Vs','SP/RP','Pitcher Grade',
               'Yard Score','Boom','Sig','Grade','gHR','Zone Fit','Sim TB','xwOBA','Flags',
-              'Is Key Matchup','Weak Spot','Sauce 2.0',
+              'Is Key Matchup','Weak Spot','Sauce 2.0','2-Bagger (Non-HR)','Hit 2+ TB (Any)',
               'TrueHR','Matchup','SimHR%','Barrel Signal','Longshot',
               'PulledBrl%','Brl/BIP','HR/FB','FB%','HH%',
               'Went Yard','HR','AB','H','TB','RBI','BB','K','Avg EV','Launch Angle',
@@ -27687,7 +27813,7 @@ function TrackRecordTab() {
                 (r.wentYard && r.actualPitcher && !r.actualPitcherIsSP) ? '' : r.pitcherGrade,
                 r.yardScore || '', r.boom || '', r.sig || '', r.grade || '', r.ghr || '',
                 r.zoneFit || '', r.simTB || '', r.xwoba || '', r.flags || '',
-                r.isKeyMatchup ? 'YES' : '', r.isWeakSlot ? 'YES' : '', r.isSauce2 ? 'YES' : '',
+                r.isKeyMatchup ? 'YES' : '', r.isWeakSlot ? 'YES' : '', r.isSauce2 ? 'YES' : '', r.is2Bagger ? 'YES' : '', r.hitTB2 ? 'YES' : '',
                 r.trueHR || '', r.matchup || '', r.simHRPct || '',
                 r.brlSignal ? 'YES' : '', r.isLongshot ? 'YES' : '',
                 r.pulledBrl || '', r.brlBIP || '', r.hrFB || '', r.fb || '', r.hh || '',
@@ -27777,6 +27903,7 @@ function TrackRecordTab() {
                   <SortTh col="actualAB"  label="AB" color="#27c97a"/>
                   <SortTh col="actualH"   label="H" color="#27c97a"/>
                   <SortTh col="actualTB"  label="TB" color="#27c97a"/>
+                  <SortTh col="is2Bagger" label="2B" color="#27c97a"/>
                   <SortTh col="actualRBI" label="RBI" color="#27c97a"/>
                   <SortTh col="actualEV"  label="EV" color="#27c97a"/>
                   <SortTh col="actualLA"  label="LA°" color="#27c97a"/>
@@ -27904,6 +28031,8 @@ function TrackRecordTab() {
                         textAlign:'center'}}>{r.actualH || 0}</td>
                       <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
                         textAlign:'center'}}>{r.actualTB || 0}</td>
+                      <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
+                        textAlign:'center'}} title={r.is2Bagger ? '2+ total bases, no HR' : ''}>{r.is2Bagger ? '2️⃣' : ''}</td>
                       <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
                         textAlign:'center'}}>{r.actualRBI || 0}</td>
                       <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
@@ -28441,6 +28570,16 @@ function CrystalBallTab() {
                         ) && (
                           <span title="💥 Gone Yard today"
                             style={{fontSize:11,flexShrink:0,lineHeight:1}}>💥</span>
+                        )}
+                        {!(Array.isArray(HR_DATA) && HR_DATA.some(h =>
+                          h.batterId === parseInt(p.id)||0 ||
+                          (h.batterName && h.batterName.toLowerCase() === p.name.toLowerCase())
+                        )) && Array.isArray(TB2_DATA) && TB2_DATA.some(t =>
+                          t.batterId === parseInt(p.id)||0 ||
+                          (t.batterName && t.batterName.toLowerCase() === p.name.toLowerCase())
+                        ) && (
+                          <span title="2️⃣ 2+ total bases today (no HR)"
+                            style={{fontSize:11,flexShrink:0,lineHeight:1}}>2️⃣</span>
                         )}
                       </div>}
                     </div>
@@ -30173,6 +30312,7 @@ function BarrelLabTab() {
   const [blLongshotOnly,   setBlLongshotOnly]   = useState(false);
   const [blPicksOnly,      setBlPicksOnly]      = useState(false);
   const [blGoneYardOnly,   setBlGoneYardOnly]   = useState(false);
+  const [blTB2Only,        setBlTB2Only]        = useState(false);
 
   useEffect(() => {
     const unsub    = subscribeLineup(v => setLineupVer(v));
@@ -30288,6 +30428,13 @@ function BarrelLabTab() {
     const name = (b.batter || '').toLowerCase();
     return HR_DATA.some(h => h.batterId === pid || (h.batterName && h.batterName.toLowerCase() === name));
   };
+  const blTb2DataIsToday = TB2_DATA_DATE === blEtToday;
+  const is2BagBL = b => {
+    if (!blTb2DataIsToday) return false;
+    const pid = parseInt(b.batter_id) || 0;
+    const name = (b.batter || '').toLowerCase();
+    return TB2_DATA.some(t => t.batterId === pid || (t.batterName && t.batterName.toLowerCase() === name));
+  };
 
   const scoredBatters = useMemo(() => {
     // Pass 1: raw scores for all eligible batters
@@ -30326,8 +30473,9 @@ function BarrelLabTab() {
     .filter(r => !blLongshotOnly || r.isLongshot)
     .filter(r => !blPicksOnly    || picks[String(parseInt(r.batter_id)||0)])
     .filter(r => !blGoneYardOnly || isGoneYardBL(r))
+    .filter(r => !blTB2Only || is2BagBL(r))
     .sort((a, b) => b.trueHRScore - a.trueHRScore);
-  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, blPicksOnly, picks, blGoneYardOnly, hrVer, finalVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, blPicksOnly, picks, blGoneYardOnly, blTB2Only, hrVer, finalVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Color threshold helpers
   const clr = (v, g1, g2, y1, y2) => {
@@ -30551,6 +30699,18 @@ function BarrelLabTab() {
                 border:`1px solid ${blGoneYardOnly ? 'rgba(232,65,26,.4)' : 'var(--border)'}`,
               }}>
               💥 {blGoneYardOnly ? 'Gone Yard ✓' : 'Gone Yard Today'}
+            </button>
+            <button
+              onClick={() => setBlTB2Only(v => !v)}
+              style={{
+                padding:'2px 8px', borderRadius:5, cursor:'pointer',
+                fontFamily:"'DM Mono',monospace", fontSize:9, fontWeight:700,
+                lineHeight:1.5, flexShrink:0,
+                background: blTB2Only ? 'rgba(56,184,242,.12)' : 'var(--surface2)',
+                color:      blTB2Only ? '#38b8f2' : 'var(--muted)',
+                border:`1px solid ${blTB2Only ? 'rgba(56,184,242,.4)' : 'var(--border)'}`,
+              }}>
+              2️⃣ {blTB2Only ? '2+ TB ✓' : '2+ TB Today'}
             </button>
             <button
               disabled={simRunning}
@@ -30792,6 +30952,12 @@ function BarrelLabTab() {
                                     color:'#fff',fontFamily:"'DM Mono',monospace",
                                     fontWeight:800,fontSize:9,letterSpacing:.5}}>💥</div>
                                 )}
+                                {!isGoneYardToday(parseInt(b.batter_id)||0, b.batter) && is2BagToday(parseInt(b.batter_id)||0, b.batter) && (
+                                  <div style={{padding:'2px 6px',borderRadius:4,flexShrink:0,
+                                    background:'rgba(56,184,242,.20)',border:'1px solid rgba(56,184,242,.4)',
+                                    color:'#38b8f2',fontFamily:"'DM Mono',monospace",
+                                    fontWeight:800,fontSize:9,letterSpacing:.5}}>2️⃣</div>
+                                )}
                                 {fin && <span style={{fontSize:7,color:'var(--muted)',border:'1px solid var(--border)',borderRadius:3,padding:'1px 3px'}}>FINAL</span>}
                               </div>
                             </div>
@@ -30943,15 +31109,39 @@ function OnBaseTab() {
   const [liveGamesVersion, setLiveGamesVersion] = useState(LIVE_GAMES_CACHE.length);
   const [obHideFinal,      setObHideFinal]      = useState(false);
   const [obPicksOnly,      setObPicksOnly]      = useState(false);
+  const [obGoneYardOnly,   setObGoneYardOnly]   = useState(false);
+  const [obTB2Only,        setObTB2Only]        = useState(false);
+  const [hrVer, setHrVer] = useState(_HR_VER||0);
 
   useEffect(() => {
     const unsub    = subscribeLineup(v => setLineupVer(v));
     const unsubInj = subscribeInjuries(() => setInjuryVer(v => v + 1));
     const finId    = setInterval(() => setFinalVer(FINAL_GAME_IDS.size), 30000);
     const liveId   = setInterval(() => setLiveGamesVersion(LIVE_GAMES_CACHE.length), 15000);
+    const hrId     = setInterval(() => { if (_HR_VER !== hrVer) setHrVer(_HR_VER); }, 5000);
     loadTodayLineups();
-    return () => { unsub(); unsubInj(); clearInterval(finId); clearInterval(liveId); };
+    return () => { unsub(); unsubInj(); clearInterval(finId); clearInterval(liveId); clearInterval(hrId); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // "Gone Yard Today" / "2+ TB Today" checks — same HR_DATA/TB2_DATA pattern
+  // as Barrel Lab's isGoneYardBL/is2BagBL. hrVer (polled every 5s from
+  // _HR_VER, which bumps alongside _TB2_VER in the same fetchHRs() cycle)
+  // keeps both current without a page reload as events land throughout the day.
+  const obEtToday = (() => { const s = new Date().toLocaleDateString('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}); const [m,d,y]=s.split('/'); return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`; })();
+  const obHrDataIsToday = HR_DATA_DATE === obEtToday;
+  const isGoneYardOB = b => {
+    if (!obHrDataIsToday) return false;
+    const pid = parseInt(b.batter_id) || 0;
+    const name = (b.batter || '').toLowerCase();
+    return HR_DATA.some(h => h.batterId === pid || (h.batterName && h.batterName.toLowerCase() === name));
+  };
+  const obTb2DataIsToday = TB2_DATA_DATE === obEtToday;
+  const is2BagOB = b => {
+    if (!obTb2DataIsToday) return false;
+    const pid = parseInt(b.batter_id) || 0;
+    const name = (b.batter || '').toLowerCase();
+    return TB2_DATA.some(t => t.batterId === pid || (t.batterName && t.batterName.toLowerCase() === name));
+  };
 
   useEffect(() => {
     if (userSetConfirmed.current) return;
@@ -31055,11 +31245,15 @@ function OnBaseTab() {
         const _ls = liveSlot(parseInt(r.batter_id||0), r.lineup_slot);
         return _ls > 0 && (r.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(_ls);
       })(),
+      isGoneYard: isGoneYardOB(r),
+      is2Bag: !isGoneYardOB(r) && is2BagOB(r),
     }))
     .filter(r => !obHideFinal || !FINAL_GAME_IDS.has(String(r.game_id)))
     .filter(r => !obPicksOnly || picks[String(parseInt(r.batter_id)||0)])
+    .filter(r => !obGoneYardOnly || isGoneYardOB(r))
+    .filter(r => !obTB2Only || is2BagOB(r))
     .sort((a, b) => b.onBaseScore - a.onBaseScore);
-  }, [eligibleBatters, simResults, obHideFinal, obPicksOnly, picks, finalVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [eligibleBatters, simResults, obHideFinal, obPicksOnly, obGoneYardOnly, obTB2Only, picks, finalVer, hrVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const byTeam = useMemo(() => {
     const teams = {};
@@ -31247,6 +31441,30 @@ function OnBaseTab() {
                 border:`1px solid ${obPicksOnly ? 'rgba(245,166,35,.4)' : 'var(--border)'}`,
               }}>
               🎯 {obPicksOnly ? 'My Picks ✓' : 'My Picks'}
+            </button>
+            <button
+              onClick={() => setObGoneYardOnly(v => !v)}
+              style={{
+                padding:'2px 8px', borderRadius:5, cursor:'pointer',
+                fontFamily:mono, fontSize:9, fontWeight:700,
+                lineHeight:1.5, flexShrink:0,
+                background: obGoneYardOnly ? 'rgba(232,65,26,.12)' : 'var(--surface2)',
+                color:      obGoneYardOnly ? 'var(--accent)' : 'var(--muted)',
+                border:`1px solid ${obGoneYardOnly ? 'rgba(232,65,26,.4)' : 'var(--border)'}`,
+              }}>
+              💥 {obGoneYardOnly ? 'Gone Yard ✓' : 'Gone Yard Today'}
+            </button>
+            <button
+              onClick={() => setObTB2Only(v => !v)}
+              style={{
+                padding:'2px 8px', borderRadius:5, cursor:'pointer',
+                fontFamily:mono, fontSize:9, fontWeight:700,
+                lineHeight:1.5, flexShrink:0,
+                background: obTB2Only ? 'rgba(56,184,242,.12)' : 'var(--surface2)',
+                color:      obTB2Only ? '#38b8f2' : 'var(--muted)',
+                border:`1px solid ${obTB2Only ? 'rgba(56,184,242,.4)' : 'var(--border)'}`,
+              }}>
+              2️⃣ {obTB2Only ? '2+ TB ✓' : '2+ TB Today'}
             </button>
             <button
               disabled={simRunning}
@@ -31458,6 +31676,18 @@ function OnBaseTab() {
                             <div style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer'}} onClick={() => openBatter(b)}>
                               <PlayerAvatar pid={b.batter_id} name={b.batter} size={22}/>
                               <span style={{color:'var(--text)'}}>{b.isTBSignal ? '★ ' : ''}{b.batter}</span>
+                              {b.isGoneYard && (
+                                <div style={{padding:'2px 6px',borderRadius:4,flexShrink:0,
+                                  background:'rgba(255,20,0,.25)',border:'1px solid rgba(255,20,0,.5)',
+                                  color:'#fff',fontFamily:"'DM Mono',monospace",
+                                  fontWeight:800,fontSize:9,letterSpacing:.5}}>💥</div>
+                              )}
+                              {b.is2Bag && (
+                                <div style={{padding:'2px 6px',borderRadius:4,flexShrink:0,
+                                  background:'rgba(56,184,242,.20)',border:'1px solid rgba(56,184,242,.4)',
+                                  color:'#38b8f2',fontFamily:"'DM Mono',monospace",
+                                  fontWeight:800,fontSize:9,letterSpacing:.5}}>2️⃣</div>
+                              )}
                               {fin && <span style={{fontSize:7,color:'var(--muted)',border:'1px solid var(--border)',borderRadius:3,padding:'1px 3px'}}>FINAL</span>}
                             </div>
                           </td>

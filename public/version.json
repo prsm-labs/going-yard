@@ -1,7 +1,7 @@
 {
   "version": "2026.07.11",
   "changelog": [
-    "Auto-generate update banner changelog from git commit message on every build"
+    "Fix Data tab mobile crashes: stop double-loading Power BI iframes and unmount on tab leave"
   ],
   "notifyUsers": true
 }

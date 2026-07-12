@@ -21,6 +21,10 @@ export default async function handler(req, res) {
     console.log(`[HRs] date=${today} total games=${games.length}`);
 
     const allHRs = [];
+    // Batters with 2+ total bases today who have NOT homered — "2-bagger" signal.
+    // Sourced from the same feed/live response already fetched below for HR
+    // detection (feedData.liveData.boxscore), so this adds zero extra API calls.
+    const allTwoBaggers = [];
 
     await Promise.allSettled(games.map(async (game) => {
       const awayAbbr = game.teams?.away?.team?.abbreviation || "???";
@@ -42,6 +46,33 @@ export default async function handler(req, res) {
         const feedData = await feedRes.json();
         const allPlays = feedData?.liveData?.plays?.allPlays || [];
         console.log(`[HRs] ${awayAbbr}@${homeAbbr} gamePk=${game.gamePk} plays=${allPlays.length}`);
+
+        // 2-bagger scan — boxscore batting lines already in this same response
+        const boxTeams = feedData?.liveData?.boxscore?.teams || {};
+        for (const side of ['away', 'home']) {
+          const teamBox = boxTeams[side];
+          const sideAbbr = side === 'away' ? awayAbbr : homeAbbr;
+          const players = teamBox?.players || {};
+          for (const key of Object.keys(players)) {
+            const p = players[key];
+            const bat = p?.stats?.batting || {};
+            const hits = parseInt(bat.hits || 0);
+            const doubles = parseInt(bat.doubles || 0);
+            const triples = parseInt(bat.triples || 0);
+            const homeRuns = parseInt(bat.homeRuns || 0);
+            const totalBases = hits + doubles + (triples * 2) + (homeRuns * 3);
+            if (totalBases >= 2 && homeRuns === 0) {
+              allTwoBaggers.push({
+                gamePk: game.gamePk,
+                gameId: `${awayAbbr} @ ${homeAbbr}`,
+                batterId: p?.person?.id,
+                batterName: p?.person?.fullName || 'Unknown',
+                batterTeam: sideAbbr,
+                totalBases, hits,
+              });
+            }
+          }
+        }
 
         // Log first few event types for debugging
         const events = allPlays.slice(0,5).map(p=>p.result?.event||p.result?.eventType||"?");
@@ -124,8 +155,12 @@ export default async function handler(req, res) {
     }));
 
     allHRs.sort((a, b) => b.chronoIndex - a.chronoIndex);
-    console.log(`[HRs] Returning ${allHRs.length} home runs`);
-    res.status(200).json({ date: today, homeruns: allHRs, total: allHRs.length });
+    console.log(`[HRs] Returning ${allHRs.length} home runs, ${allTwoBaggers.length} two-baggers`);
+    res.status(200).json({
+      date: today,
+      homeruns: allHRs, total: allHRs.length,
+      twoBaggers: allTwoBaggers, totalTwoBaggers: allTwoBaggers.length,
+    });
   } catch (err) {
     console.error('[HRs] Fatal:', err.message);
     res.status(500).json({ error: err.message, homeruns: [] });
