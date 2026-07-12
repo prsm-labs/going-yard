@@ -1,8 +1,9 @@
 {
   "version": "2026.07.12",
   "changelog": [
-    "Fix 2 TB Signal Rate card: hit rate of TB Signal flag",
-    "not occurrence rate across all batters"
+    "Add sticky header row + sticky batter name column to Barrel Lab",
+    "On Base",
+    "and Track Record tables"
   ],
   "notifyUsers": true
 }

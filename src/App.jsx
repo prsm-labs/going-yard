@@ -13915,7 +13915,7 @@ function YardPicksFeedTab() {
       {showYPHelp && <HelpSlideout title="🧾 Yard Picks Guide" onClose={()=>setShowYPHelp(false)} items={[
         ['What is Yard Picks?', "The Going Yard official daily picks feed — curated HR prop picks posted each morning by the PRISM Labs team. Sourced from the engine's top signals each day."],
         ['Pick cards', "Each card shows the batter, pitcher matchup, Yard Score, signal flags, odds, and the reasoning behind the pick. Newest picks appear at the top."],
-        ['🧮 Odds Calculator', "Tap the calculator button to open the Odds Calculator slideout. Enter odds in American or decimal format, set your bankroll or unit size, and calculate stake and payout."],
+        ['🧮 Odds Calculator', "Tap the calculator button to open the Odds Calculator slideout. Three modes: Manual (enter odds + stake for payout), Suggested (unit-fraction stake sized by signal strength), and Parlay (2–5 legs, straight parlay by default, with an optional Round Robin combo breakdown — suggested stakes are bankroll-capped so extreme odds never suggest betting more than your full bankroll). Enter odds in American or decimal format."],
         ['Load more', 'Picks load 25 at a time. Tap Load More at the bottom to fetch older picks from the archive.'],
         ['Refresh', 'Tap the refresh button to pull the latest picks without reloading the page.'],
       ]}/>}
@@ -15928,9 +15928,10 @@ function SimLabView({ data }) {
               }}
               onSauceFilter2={(enable)=>{
                 if(enable){
-                  // Sauce 2.0 — Tracker-backtested: 22.4% HR-game%, 45% of days hit 3+/10
-                  // Zone Fit + xwOBA + Pitcher Grade only — Boom/Sig/SimTB deliberately
-                  // excluded (leave-one-out test showed they diluted this combo, not helped it)
+                  // Sauce 2.0 — live tracker (7/12/26, 55 days, n=1,197): 19.1% HR rate alone;
+                  // 22.9% stacked with Key Matchup (n=616) vs 11.8% base. Zone Fit + xwOBA +
+                  // Pitcher Grade only — Boom/Sig/SimTB deliberately excluded (leave-one-out
+                  // test showed they diluted this combo, not helped it)
                   setMinZoneFit('2');
                   setMinXwoba('.360');
                   setSelPitcherGradesSim(new Set(['🎯 Target','💥 Hittable','🤔 Average']));
@@ -17660,7 +17661,7 @@ function CheatCodeButton({ onSauceFilter, onSauceFilter2 }) {
               {sauceOn ? '✔ SAUCE ON' : '⚡ ENABLE SAUCE FILTER'}
             </button>
             <button onClick={toggleSauce2}
-              title={sauce2On ? 'Disable Sauce 2.0' : 'Enable Sauce 2.0 — Zone Fit + xwOBA + Pitcher Grade (Tracker-backtested: 22.4% HR-game%, 45% of days hit 3+/10)'}
+              title={sauce2On ? 'Disable Sauce 2.0' : 'Enable Sauce 2.0 — Zone Fit + xwOBA + Pitcher Grade (Live tracker: 19.1% HR rate alone, 22.9% stacked with Key Matchup — see Track Record tab for current numbers)'}
               style={{
                 background: sauce2On ? 'rgba(56,184,242,.9)' : 'rgba(56,184,242,.12)',
                 border: '1px solid ' + (sauce2On ? 'var(--ice)' : 'rgba(56,184,242,.4)'),
@@ -17690,10 +17691,12 @@ function CheatCodeButton({ onSauceFilter, onSauceFilter2 }) {
               letterSpacing:.8,marginBottom:6}}>DATA FOUNDATION</div>
             <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',lineHeight:1.7}}>
               Every signal validated against 638,357 at-bats (2023-2026)
-              + 24,112 daily matchup rows (75 days, 2,016 HRs). Baseline HR rate:
-              8.36% per game. Scores are directionally correct &mdash; higher score
+              + the live in-season tracker: 22,909 daily matchup rows (55 days,
+              1,684 HRs), 14,220 with confirmed outcomes. Baseline HR rate:
+              11.8%. Scores are directionally correct &mdash; higher score
               = higher actual HR rate &mdash; but the scale overestimates by ~2.5x.
               Use relative ranking and signal stacking, not absolute numbers.
+              Current numbers always live on the Track Record tab.
             </div>
           </div>
 
@@ -17711,28 +17714,28 @@ function CheatCodeButton({ onSauceFilter, onSauceFilter2 }) {
             </div>
           </div>
 
-          {/* Proven numbers */}
+          {/* Proven numbers — live tracker, 7/12/26, 55 days, 14,220 confirmed-outcome matchups */}
           <Section emoji="📊" title="Numbers Worth Knowing" color="var(--accent2)">
-            <Stat val="21.3%" label="Key Matchup + Grade A"
-              sub="169 matchups, 36 HRs. Most reliable compound signal in 24k rows. Your daily anchor."/>
-            <Stat val="20.0%" label="KM + Moonshot + Sig 3+"
-              sub="140 matchups, 28 HRs. 2.7x lift. Consistent across 7 of 8 days tested."/>
-            <Stat val="13.2%" label="Sim TB ≥ 2.2"
-              sub="798 matchups, 105 HRs. 1.57x lift. One of the best individual signals."/>
-            <Stat val="13.4%" label="Sig ≥ 7"
-              sub="Only Sig 7+ produces real lift. Sig 1-6 is near baseline noise at scale."/>
-            <Stat val="15.0%" label="Boom ≥ 55"
-              sub="200 matchups. The real Boom threshold — below 55 adds minimal lift."/>
-            <Stat val="3.6%" label="A+ Grade + ⚠️ Tough pitcher"
-              sub="Below baseline. Grade alone does not overcome a tough arm."/>
+            <Stat val="22.9%" label="Sauce 2.0 + Key Matchup"
+              sub="616 matchups. Best-validated compound signal in the live tracker. Your daily anchor."/>
+            <Stat val="18.2%" label="KM + Moonshot + Sig 3+"
+              sub="424 matchups. Consistent stacked signal across 55 tracked days."/>
+            <Stat val="15.8%" label="Sim TB ≥ 2.2"
+              sub="869 matchups. One of the best individual signals."/>
+            <Stat val="18.0%" label="Sig ≥ 7"
+              sub="Only Sig 7+ produces real lift. Sig 1-6 is closer to baseline noise at scale."/>
+            <Stat val="17.4%" label="Boom ≥ 55"
+              sub="1,434 matchups. The real Boom threshold — below 55 adds minimal lift."/>
+            <Stat val="15.2%" label="A+ Grade + ⚠️ Tough pitcher"
+              sub="46 matchups. Grade alone doesn't fully overcome a tough arm — but no longer a hard fade at current sample size."/>
           </Section>
 
           {/* Grade reality */}
           <Section emoji="🎖️" title="Grade — What It Actually Means" color="#f5a623">
             <div style={{background:'rgba(245,166,35,.06)',border:'1px solid rgba(245,166,35,.2)',
               borderRadius:8,padding:'10px 14px',marginBottom:8}}>
-              {[['A+','14.4%','201 matchups'],['A','14.0%','1,055'],
-                ['B','10.9%','3,374'],['C','8.6%','5,963'],['D','6.7%','7,614']
+              {[['A+','18.8%','224 matchups'],['A','17.5%','709'],
+                ['B','12.8%','3,653'],['C','12.1%','4,169'],['D','9.8%','5,465']
               ].map(([g,r,n]) => (
                 <div key={g} style={{display:'flex',alignItems:'center',
                   gap:8,padding:'3px 0',borderBottom:'1px solid rgba(255,255,255,.04)'}}>
@@ -17746,30 +17749,31 @@ function CheatCodeButton({ onSauceFilter, onSauceFilter2 }) {
               ))}
             </div>
             <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',lineHeight:1.5}}>
-              Grades are monotonic across 18k rows. But pitcher grade still matters —
-              an A+ vs Tough pitcher (3.6%) is worse than a B vs Target (14.0%).
+              Grades are monotonic across 14k+ confirmed-outcome rows this season. But pitcher
+              grade still matters — an A+ vs Target pitcher (32.1%) is well clear of a B vs
+              Target (17.2%). See the Track Record tab for current numbers.
             </div>
           </Section>
 
-          {/* Sig */}
+          {/* Sig — live tracker, 55 days */}
           <Section emoji="⚡" title="Sig Score — The Real Story" color="#ffd700">
-            <Row label="Sig 0" value="3.7%" color="var(--muted)" col="⚡ SIG"
-              sub="Below base — no meaningful signals firing"/>
-            <Row label="Sig 1–3" value="5.7–8.2%" color="var(--muted)" col="⚡ SIG"
-              sub="Approaching base rate. Not strong enough alone."/>
-            <Row label="Sig 4–5" value="9.3–9.4%" color="#f5a623" col="⚡ SIG"
-              sub="Doubles the base rate. This is the real floor for actionable plays."/>
-            <Row label="Sig 6–7" value="10.5–11.3%" color="#ffd700" col="⚡ SIG"
+            <Row label="Sig 0" value="9.3%" color="var(--muted)" col="⚡ SIG"
+              sub="Below base (11.8%) — no meaningful signals firing"/>
+            <Row label="Sig 1–3" value="13.0%" color="var(--muted)" col="⚡ SIG"
+              sub="Slightly above base. Not strong enough alone."/>
+            <Row label="Sig 4–5" value="13.8%" color="#f5a623" col="⚡ SIG"
+              sub="This is the real floor for actionable plays."/>
+            <Row label="Sig 6–7" value="16.3%" color="#ffd700" col="⚡ SIG"
               sub="Strong signal. Set minimum Sig filter to 4."/>
           </Section>
 
-          {/* Zone Fit */}
+          {/* Zone Fit — live tracker, 55 days */}
           <Section emoji="🎯" title="Zone Fit — The Sweet Spot" color="var(--ice)">
-            <Row label="Zone Fit 4–6" value="12.5% HR rate" color="var(--ice)" col="ZONEFIT"
-              sub="The confirmed sweet spot across 18k rows."/>
-            <Row label="Zone Fit < 2" value="4.4% HR rate" color="var(--accent)"
+            <Row label="Zone Fit 4–6" value="16.2% HR rate" color="var(--ice)" col="ZONEFIT"
+              sub="The confirmed sweet spot, live tracker (n=1,693)."/>
+            <Row label="Zone Fit < 2" value="8.7% HR rate" color="var(--accent)"
               sub="Below base — pitcher doesn't throw to this batter's damage zone."/>
-            <Row label="Zone Fit > 8" value="4.1% HR rate" color="var(--accent)"
+            <Row label="Zone Fit > 8" value="8.8% HR rate" color="var(--accent)"
               sub="Overcorrects — extreme zone fit drops back below base. Don't chase the highest number."/>
           </Section>
 
@@ -17789,11 +17793,11 @@ function CheatCodeButton({ onSauceFilter, onSauceFilter2 }) {
               {[
                 ['1','Filter Sim TB ≥ 1.5 — cuts low-ceiling noise immediately'],
                 ['2','Filter P.Grade to 🎯 Target + 💥 Hittable (+ 🤔 Average)'],
-                ['3','Grade A in what remains — A outperforms A+ at scale (14.3% vs 13.5%)'],
+                ['3','Grade A/A+ in what remains — both now outperform B/C/D at scale (18.8%/17.5% vs 12.8%/12.1%)'],
                 ['4','Key Matchup flag + Sig ≥ 4 (lineup confirmation optional)'],
                 ['5','Zone Fit 2–8 + Boom ≥ 50 + Form Moonshot or Gap'],
-                ['✺','KM + Grade A = 21.3% HR rate — 2.5x lift, 75 days validated'],
-                ['⚡','Enable Sauce Filter at top of this panel to apply all at once'],
+                ['✺','Sauce 2.0 + KM = 22.9% HR rate — 1.9x lift, live tracker, 55 days validated'],
+                ['⚡','Enable Sauce Filter or 🧪 Sauce 2.0 at top of this panel to apply at once'],
               ].map(([n,txt]) => (
                 <div key={n} style={{display:'flex',gap:8,alignItems:'baseline'}}>
                   <span style={{color:'var(--accent2)',fontWeight:700,
@@ -17804,19 +17808,24 @@ function CheatCodeButton({ onSauceFilter, onSauceFilter2 }) {
             </div>
           </Section>
 
-          {/* Fade */}
+          {/* Fade — live tracker, 55 days, unless noted */}
           <Section emoji="❌" title="Fade These" color="var(--accent)">
-            <Fade label="A+ vs ⚠️ Tough or ‼️ Elite pitcher"
-              sub="A+ + Tough = 3.6% — below base rate. Grade doesn't overcome a tough arm."/>
-            <Fade label="3+ days rest"
-              sub="4 days off = 7.42% HR rate. Timing groove breaks. Confirmed in 638k rows."/>
+            <Fade label="Zone Fit below 2"
+              sub="8.7% — below base rate. Pitcher doesn't throw to this batter's damage zone."/>
             <Fade label="Zone Fit above 8"
-              sub="Overcorrects — drops to 4.1%. Sweet spot is 4–6, not highest."/>
+              sub="Overcorrects — drops to 8.8%. Sweet spot is 4–6, not highest."/>
             <Fade label="Recent EV below 88 mph"
-              sub="6.75% — below base. Batter is cold."/>
+              sub="9.2% — below base. Batter is cold."/>
+            <Fade label="3+ days rest"
+              sub="4 days off = 7.42% HR rate. Timing groove breaks. Confirmed in 638k historical at-bats."/>
             <Fade label="LHB vs LHP without strong BvP to offset"
-              sub="-0.626%/PA confirmed platoon penalty. Needs offsetting signals."/>
+              sub="-0.626%/PA confirmed platoon penalty. Needs offsetting signals. From 638k historical at-bats."/>
           </Section>
+          <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:-8,marginBottom:16,fontStyle:'italic'}}>
+            Note: A+ Grade vs Tough/Elite pitcher no longer belongs on this list — live tracker
+            now shows 17.7% (n=79), above the 11.8% base rate. Small sample; watch the Track
+            Record tab as it grows rather than treating this as settled either way.
+          </div>
 
           {/* Form */}
           <Section emoji="🔥" title="Form Class — What Each Means" color="var(--accent2)">
@@ -17884,7 +17893,7 @@ function CheatCodeButton({ onSauceFilter, onSauceFilter2 }) {
             borderTop:'1px solid var(--border)',paddingTop:12}}>
             ⚡ The Sauce is a living model &mdash; updated as the season sample grows.<br/>
             <span style={{color:'rgba(255,255,255,.2)',fontSize:7,marginTop:4,display:'block'}}>
-              v8 &middot; 24,112 matchup rows &middot; 75 days &middot; 8.36% base rate &middot; 2026
+              v9 &middot; 22,909 matchup rows &middot; 55 days &middot; 11.8% base rate &middot; 2026
             </span>
           </div>
 
@@ -24214,10 +24223,10 @@ function MatchupEngineTab() {
       ['📋 All Matchups', "Every scheduled confirmed batter with full stats, grades, and Yard Score V2. Horizontally scrollable. Sort any column, filter by pitcher grade, batter grade, confirmed status, handedness, and more. CSV export available."],
       ['🎯 Long Shot', "Higher-odds plays — lower-grade batters facing hittable or target pitchers. Good for prop diversification and finding undervalued names."],
       ['📜 BvP History', "Head-to-head career at-bat history between a specific batter and pitcher. See results by pitch type, contact quality, and outcomes."],
-      ['🧮 Odds Calculator', "Slideout calculator for HR prop bets. Manual mode: enter your odds and stake for payout. Suggested mode: the engine recommends a unit-fraction stake based on signal strength. Supports multiple currencies and saves named presets."],
+      ['🧮 Odds Calculator', "Slideout calculator for HR, hits, and TB prop bets. Manual mode: enter your odds and stake for payout. Suggested mode: the engine recommends a unit-fraction stake based on signal strength. Parlay mode: 2–5 legs, straight parlay plus an optional Round Robin combo breakdown, with bankroll-capped suggested stakes. Supports multiple currencies."],
       ['Yard Score 🎯', "Going Yard's HR probability score (0–99). Higher = stronger alignment of contact quality, matchup, park, weather, and recent form. Not a guarantee — a signal composite."],
       ['Pitcher Grades', "🎯 Target = most favorable to homer off · 💥 Hittable = solid spot · 🤔 Average = neutral · ⚠️ Tough = difficult · ‼️ Elite = avoid. Based on HR/9, wOBA allowed, and zone vulnerability."],
-      ['Batter Grades', "A+ = 6–8 signal flags (highest HR rate) · A = 4–5 · B = 2–3 · C = 1 · D = 0. Signals include LA lock, bat speed peak, pitch convergence, platoon match, close calls, and zone fit."],
+      ['Batter Grades', "A+ = 6–8 signal flags (live tracker: 18.8% HR rate) · A = 4–5 (17.5%) · B = 2–3 (12.8%) · C = 1 (12.1%) · D = 0 (9.8%). Signals include LA lock, bat speed peak, pitch convergence, platoon match, close calls, and zone fit."],
     ]} onClose={()=>setShowKMHelp(false)}/>}
     <div style={{display:'flex',flexDirection:'column',gap:4,marginBottom:14}}>
       {/* Row 1: matchup boards */}
@@ -27057,9 +27066,9 @@ function NotificationBell() {
 function LegendButton() {
   const [open, setOpen] = useState(false);
   const tabs = [
-    { tab:'📡 Live',          items:['⚡ At Bat — current batter','👀 On Deck','⛳ In the Hole','✅ Lineup confirmed','💫 Liftoff — high HR probability','📋 Lineups sub-tab','📺 Gameday sub-tab'] },
-    { tab:'⚡ Key Matchups',  items:['💥 Gone Yard today','💎 Diamond — Tier 1 Lock pick','⏳ Due — AB count since last HR exceeds normal rate','🔥 Hot Bat — 3+ HRs last 7 days','🤕 Injured / IL','🟢 Disciplined — low chase rate, high BB%','🔴 Chase Risk — chasing pitches, fade signal'] },
-    { tab:'🧠 Sim Lab',       items:['⚡ The Sauce — tap for the full HR model cheat sheet','💥 Gone Yard filter','💎 Diamond filter','⏳ Due filter','🔥 Hot Bat filter','🤕 Injured filter','📊 Grade filters A+/A/B/C/D'] },
+    { tab:'📡 Live',          items:['⚡ At Bat — current batter','👀 On Deck','⛳ In the Hole','✅ Lineup confirmed','💫 Liftoff — high HR probability','📺 Gameday sub-tab','🥎 Bat Tracking sub-tab — live bat speed/EV/LA','⚡ Live Sim sub-tab — Monte Carlo vs live game state','🎮 Live Games sub-tab — score ticker','📋 Lineups sub-tab','🔥 Themes sub-tab — real-time HR pattern clustering, activates at 3+ HRs today'] },
+    { tab:'⚡ Key Matchups',  items:['💥 Gone Yard today','2️⃣ 2+ total bases today (no HR) — mutually exclusive with 💥','💎 Diamond — Tier 1 Lock pick','⏳ Due — AB count since last HR exceeds normal rate','🔥 Hot Bat — 3+ HRs last 7 days','🤕 Injured / IL','🟢 Disciplined — low chase rate, high BB%','🔴 Chase Risk — chasing pitches, fade signal'] },
+    { tab:'📋 All Matchups',  items:['⚡ The Sauce — tap for the full HR model cheat sheet, includes 🧪 Sauce 2.0 filter toggle','💥 Gone Yard filter','2️⃣ 2+ TB Today filter — batter reached 2+ total bases today without a HR','💎 Diamond filter','⏳ Due filter','🔥 Hot Bat filter','🎯 Weak Spot filter — batter in pitcher\'s historically weak lineup slot','🤕 Injured filter','🎯 My Picks filter','📊 Grade filters A+/A/B/C/D','Numeric threshold filters for every score column (Yard, Sig, Boom, Zone Fit, xwOBA, etc.)'] },
     { tab:'Grades',           items:['A+ = 6–8 flags · highest HR rate','A  = 4–5 flags','B  = 2–3 flags','C  = 1 flag','D  = 0 flags','🔒 Tier 1: A+ + Target/Hittable + SimTB ≥ 2.0','Grade hidden for injured/IL players'] },
     { tab:'Pitcher Grades',   items:['🎯 Target — softest matchup, highest batter HR rate','💥 Hittable — green light','🤔 Average — play carefully','⚠️ Tough — fade unless A+ batter','‼️ Elite — avoid, especially on Fridays'] },
     { tab:'Weather',          items:['✅ Wind Out — boosts HR','⚠️ Wind In — suppresses HR','🌡️ 70–75°F = peak HR temp (+9.2% lift)','❄️ Below 65°F = hard fade','☀️ Sunny/Clear = favorable','🌧️ Rain Risk = watch for postponements'] },
@@ -27080,13 +27089,13 @@ function LegendButton() {
       'SwStr% — swinging strike rate. Red ≥20% (fade, contact risk) · Orange 14–20% (watch) · Green <14% (disciplined hitter). Feeds the Whiff King Form Class.',
       'ISO (Isolated Power) — (Total Bases − Hits) / AB. Season-long power profile from MLB Stats API. Red ≥.300 · Orange ≥.250 · Amber ≥.180.',
       'Zone Fit — pitcher meatball rate × batter HR rate in meatball zone. Measures spatial pitch-location matchup. Red ≥8% · Orange ≥5% · Green ≥2%.',
-      'All five feed into 💥 Boom Score alongside Sig, Sim TB, and Engine Score.',
+      'xwOBA, Zone Fit, and SwStr% feed directly into 💥 Boom Score alongside Sig and Sim TB. ISO and wOBA are used elsewhere in the engine (gHR, live display) but no longer inside Boom — xwOBA replaced ISO there in June 2026.',
     ] },
     { tab:'🎯 Scores',          items:[
       '⚡ Sig Score (0–14) — HR signal stack. Every flag adds points: exit velocity, launch angle, barrel quality, pitcher grade, park, weather, platoon, lineup slot. Most directly validated score — built from 430k PAs. Red ≥10 · Orange ≥7 · Green ≥4.',
-      '💥 Boom Score (0–99) — weighted composite of five independent axes: Sig + Zone Fit + ISO + Sim TB + Engine Score. No single axis dominates. Tells you when multiple systems agree. Red ≥70 · Orange ≥50 · Green ≥30.',
-      'gHR (0–99) — HR probability index. Combines Sig, Zone Fit, ISO, HR Intent, and xwOBA contact quality into a single number. xwOBA above .320 adds bonus points — rewards elite, luck-neutral contact. Red ≥70 · Orange ≥50.',
-      '⚡️ PS Score (0–99) — Perfect Storm Score. A gated multiplier system (not linear). Bad gates crush the whole score. Lineup slot gates apply first, then scores three independent phases: Batter Mechanics (25pts) + Pitcher Vulnerability (15pts) + Pitch Convergence (25pts, the core: does the pitcher\'s vulnerable pitch match this batter\'s damage zone?) + Environment (25pts) + Game Theory (5pts). Purple ≥90 (beyond reasonable doubt) · Red ≥75 · Orange ≥60.',
+      '💥 Boom Score (0–99) — weighted composite: ZoneFit 24% (non-linear, peaks ZF 5–6) + Sig 26% + SimTB 18% + xwOBA 20% (replaced ISO), plus additive signals — Barrel Spike, Count Discipline, Bat Speed Tier, LA Locked, SwStr% penalty, Pull×Park Fit, Zone Edges, Pitcher Weak Slot. No single axis dominates. Tells you when multiple systems agree. Red ≥70 · Orange ≥50 · Green ≥30.',
+      'gHR (0–99) — HR probability index. Combines recent flag count, recent ISO, HR intent (pulled barrels/FBs, bat speed, zone aggression), wOBA blend, and pulled-contact bonuses. Zone Fit deliberately excluded — it already carries full weight inside Boom Score, so including it here would double-count. Red ≥70 · Orange ≥50.',
+      '⚡️ PS Score (0–99) — Perfect Storm Score. A gated multiplier system (not linear). Bad gates crush the whole score. Lineup slot + health/slump gates apply first, then scores four phases: Batter Mechanics (25pts) + Pitcher Vulnerability (20pts) + Pitch Convergence (25pts, the core: does the pitcher\'s vulnerable pitch match this batter\'s damage zone?) + Environment (25pts) + Game Theory (5pts). Purple ≥90 (beyond reasonable doubt) · Red ≥75 · Orange ≥60.',
       'Sig and Boom update live when lineups confirm. PS Score gate recalculates live using confirmed batting order slot.',
       '🔥 Convergence Zone: when Boom ≥50 AND PS ≥40 simultaneously, both scoring systems agree — the batter has a strong HR profile AND favorable situational factors. This overlap is rare and the highest-confidence signal in the app.',
     ] },
@@ -27116,6 +27125,31 @@ function LegendButton() {
       'xwOBA ≥.380 → +up to 8pts (EV×LA expected value, luck-neutral contact quality)',
       'wOBA ≥.370 = elite actual production · SwStr% ≥20% = contact risk signal',
       'Data: 2024–26 at-bat log · 12,965 HRs · 430,587 PAs · base rate 3.0%'
+    ] },
+    { tab:'🛢️ Daily Barrel',   items:[
+      'Monte Carlo HR simulation — 10,000 simulated plate appearances per matchup, run client-side.',
+      'TrueHRScore (0–100) — normalized-within-matchup HR probability from the sim.',
+      'MatchupScore (0–100) — pitcher-adjusted vulnerability score for this specific batter/pitcher pairing.',
+      '★ Barrel Signal — TrueHRScore ≥75 AND MatchupScore ≥60 AND simulated HR% ≥12%. Strict flag, live tracker: 16.9% HR rate.',
+      '🎲 Longshot — TrueHRScore ≤55, MatchupScore ≥65, Sim TB ≥1.2, non-elite pitcher. Mutually exclusive with Barrel Signal by construction.',
+      '💥 Gone Yard / 2️⃣ 2+ TB Today badges and filters — same definitions as everywhere else in the app.',
+      '🟢 Weak Spot row highlight — batter sitting in the opposing pitcher\'s historically weak lineup slot.',
+    ] },
+    { tab:'🔵 On Base',        items:[
+      'Monte Carlo simulation targeting 2+ total bases per game (broader outcome than HR alone) — 10,000 simulated PAs per matchup.',
+      'OnBaseScore (0–100) — normalized-within-matchup contact-quality score.',
+      'MatchupScore (0–100) — pitcher-adjusted vulnerability, same concept as Barrel Lab\'s.',
+      'SimTB2% — simulated probability of reaching 2+ total bases in the game.',
+      '★ TB Signal — OnBaseScore ≥75 AND MatchupScore ≥60 AND SimTB2% ≥30%. Very new signal — live tracker: 38.0% hit rate, still a small sample.',
+      'Same 💥 / 2️⃣ / 🟢 Weak Spot badges and filters as Barrel Lab.',
+    ] },
+    { tab:'📋 Track Record',   items:[
+      'The self-auditing page — merges the daily All Matchups, Barrel Lab, and On Base exports against actual box-score outcomes, every day, automatically.',
+      'Filter buttons: HRs Only, ★ Barrel Signal Only, Key Matchup Only, 🟢 Weak Spot Only, 📍 Close Call Only, 🍯 Sauce 2.0 Only, 2️⃣ 2-Bagger (Non-HR) Only, 🎯 TB Signal Only, 🎲 Sim TB ≥2.0 Only.',
+      'Hit-rate cards at the top of the page recompute live from real outcomes as each day\'s data comes in — the same numbers cited in the Sauce panel and this Legend, always current.',
+      'Column groups are color-coded: Matchup Engine (red) · Barrel Lab (blue) · Box Score (green).',
+      'For batters who went yard, the pitcher shown/graded is the ACTUAL pitcher who allowed the HR (with an SP/RP badge) — not just the pre-game probable starter.',
+      '⬇ CSV exports the currently filtered/sorted view.',
     ] },
   ];
   return <>
@@ -27972,9 +28006,9 @@ function TrackRecordTab() {
                     </td>
                     <td className="sticky-batter" style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
                       color:'var(--text)', fontWeight:600, whiteSpace:'nowrap', cursor:'pointer',
-                      background: r.isLongshot && r.wentYard ? 'rgba(167,139,250,.12)'
-                        : r.brlSignal ? 'rgba(232,65,26,.08)'
-                        : r.wentYard ? 'rgba(39,201,122,.08)'
+                      background: r.isLongshot && r.wentYard ? '#1f2133'
+                        : r.brlSignal ? '#1f1718'
+                        : r.wentYard ? '#0f2220'
                         : 'var(--surface)'}}
                       onClick={() => openAtBatSlide({pid:r.batterId, name:r.batter, team:r.team})}>
                       {r.batter}
@@ -30089,9 +30123,11 @@ function HomeTab() {
         ['🔗 Pairs', 'Two-batter combos sharing favorable conditions — same park, pitcher, or contact trend. Curated to 2–3 top pairs per category.'],
         ['🎰 Sim', 'Monte Carlo simulator — runs up to 10,000 game simulations using each batter\'s Yard Score, pitcher grade, park & wind factors. Shows top 5 HR candidates by simulation frequency.'],
         ['🔮 Crystal Ball', 'The engine\'s three picks: The Chosen (elite stack), Dark Horse (under the radar), Wild Card (spike signal).'],
-        ['🎯 Pitcher Grades', '🎯 Target = easiest to homer off · 💥 Hittable = solid spot · 🤔 Average = neutral · ⚠️ Tough = difficult · ‼️ Elite = avoid. Tap any pitcher name to open their slideout.'],
-        ['📊 Batter Grades', 'A+ = 6–8 signals (highest HR rate ~15%) · A = 4–5 · B = 2–3 · C = 1 · D = 0. Signals include LA lock, bat speed peak, pitch convergence, handedness match, and close call streaks.'],
-        ['Dive Deeper', 'Use the → All Matchups button to go deeper on any batter\'s full matchup data.'],
+        ['🛢️ Daily Barrel', 'Monte Carlo HR simulation (10,000 PAs per matchup). TrueHRScore + MatchupScore per batter, ★ Barrel Signal flag for the strictest matchups, 🎲 Longshot flag for undervalued plays. Live tracker: Barrel Signal hits at 16.9% HR rate.'],
+        ['🔵 On Base', 'A parallel Monte Carlo engine targeting 2+ total bases per game — the hits/TB prop market, not just HRs. OnBaseScore + MatchupScore + SimTB2%, with its own ★ TB Signal flag. Very new — early hit rate is promising but the sample is still small.'],
+        ['🎯 Pitcher Grades', '🎯 Target = easiest to homer off · 💥 Hittable = solid spot · 🤔 Average = neutral · ⚠️ Tough = difficult · ‼️ Elite = avoid. Grading is now hand-specific (vs LHB / vs RHB splits) — tap any pitcher name to open their slideout.'],
+        ['📊 Batter Grades', 'A+ = 6–8 signals (live tracker: 18.8% HR rate) · A = 4–5 (17.5%) · B = 2–3 (12.8%) · C = 1 (12.1%) · D = 0 (9.8%). Signals include LA lock, bat speed peak, pitch convergence, handedness match, and close call streaks.'],
+        ['Dive Deeper', 'Use the → All Matchups button to go deeper on any batter\'s full matchup data, or open Track Record to see every signal\'s live, current hit rate.'],
       ]} onClose={()=>setShowHelp(false)}/>}
 
       {/* Sub-nav */}
@@ -30958,7 +30994,7 @@ function BarrelLabTab() {
                             style={{padding:'4px 6px',textAlign:col.align,whiteSpace:'nowrap',
                               cursor:'pointer',userSelect:'none',
                               color: active ? 'var(--accent)' : 'var(--muted)',
-                              background: isBatterCol ? 'var(--surface2)' : (active ? 'rgba(255,153,0,.06)' : 'transparent'),
+                              background: isBatterCol ? 'var(--surface2)' : (active ? '#212320' : 'var(--surface2)'),
                             }}>
                             {col.h}{active ? (sortDir==='desc' ? ' ▼' : ' ▲') : ''}
                           </th>
@@ -30979,7 +31015,7 @@ function BarrelLabTab() {
                           <td style={{padding:'4px 6px',color:'var(--muted)'}}>{liveSlot(parseInt(b.batter_id||0), b.lineup_slot) || '—'}</td>
                           {!selGame && <td style={{padding:'4px 6px',color:'var(--muted)',fontFamily:mono,fontSize:8}}>{b.batting_team||'—'}</td>}
                           <td className="sticky-batter" style={{padding:'4px 6px',whiteSpace:'nowrap',
-                            background: b.isWeakSlot ? 'rgba(255,214,10,.14)' : b.isBarrelSignal ? 'rgba(255,153,0,.04)' : 'var(--surface)'}}>
+                            background: b.isWeakSlot ? '#2f2e16' : b.isBarrelSignal ? '#171817' : 'var(--surface)'}}>
                             <div style={{display:'flex',alignItems:'center',gap:6}}>
                               <div style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer',flex:1}} onClick={() => openBatter(b)}>
                                 <PlayerAvatar pid={b.batter_id} name={b.batter} size={22}/>
@@ -31696,7 +31732,7 @@ function OnBaseTab() {
                             style={{padding:'4px 6px',textAlign:col.align||'right',whiteSpace:'nowrap',
                               cursor:'pointer',userSelect:'none',
                               color: active ? '#38b8f2' : 'var(--muted)',
-                              background: isBatterCol ? 'var(--surface2)' : (active ? 'rgba(56,184,242,.06)' : 'transparent'),
+                              background: isBatterCol ? 'var(--surface2)' : (active ? '#0f1a21' : 'var(--surface2)'),
                             }}>
                             {col.h}{active ? (sortDir==='desc' ? ' ▼' : ' ▲') : ''}
                           </th>
@@ -31717,7 +31753,7 @@ function OnBaseTab() {
                           <td style={{padding:'4px 6px',color:'var(--muted)'}}>{liveSlot(parseInt(b.batter_id||0), b.lineup_slot) || '—'}</td>
                           {!selGame && <td style={{padding:'4px 6px',color:'var(--muted)',fontFamily:mono,fontSize:8}}>{b.batting_team||'—'}</td>}
                           <td className="sticky-batter" style={{padding:'4px 6px',whiteSpace:'nowrap',
-                            background: b.isWeakSlot ? 'rgba(255,214,10,.14)' : b.isTBSignal ? 'rgba(56,184,242,.04)' : 'var(--surface)'}}>
+                            background: b.isWeakSlot ? '#2f2e16' : b.isTBSignal ? '#0f1a21' : 'var(--surface)'}}>
                             <div style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer'}} onClick={() => openBatter(b)}>
                               <PlayerAvatar pid={b.batter_id} name={b.batter} size={22}/>
                               <span style={{color:'var(--text)'}}>{b.isTBSignal ? '★ ' : ''}{b.batter}</span>
@@ -31848,11 +31884,12 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
         const sig    = (typeof sigCache !== 'undefined' ? sigCache.current[String(pid)] : null) ?? SIG_CACHE_GLOBAL[String(pid)] ?? (parseFloat(r.weighted_flag_score||0)*4.6);
         const isTarget = (r._pgLabel||'').includes('Target');
         // ── Sauce composite HR score ──────────────────────────────────────
-        // Calibrated from 17,340 matchups:
-        // Sig: Sig7=18.6% HR, Sig6=13.7%, Sig4=12.7%, Sig0=8.1%
-        // SimTB: ≥2.0=17.5% HR, ≥1.5=14.8%, <1.0=8.75%
-        // Grade: A+=15.5%, A=16.1%, B=12.3%, C=9.7%, D=8.3%
-        // Target pitcher: +21% lift for A+ batters
+        // Point-bonus thresholds below are unchanged since first calibrated.
+        // Live tracker refresh (7/12/26, 14,220 confirmed-outcome matchups):
+        // Sig: Sig7+=18.0% HR, Sig6-7=16.3%, Sig4-5=13.8%, Sig0=9.3%
+        // SimTB: ≥2.0=15.0% HR, ≥1.5=~13-14%, <1.0=~9%
+        // Grade: A+=18.8%, A=17.5%, B=12.8%, C=12.1%, D=9.8%
+        // Target pitcher: A+ + Target = 32.1% HR (n=28)
         const sigBonus   = sig>=6?8 : sig>=4?4 : sig>=2?1 : 0;
         const simBonus   = simTB>=2.0?6 : simTB>=1.5?3 : simTB>=1.0?1 : 0;
         const gradeBonus = ['A+','A'].includes(grade)?5 : grade==='B'?2 : 0;
