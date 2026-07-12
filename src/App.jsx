@@ -27553,12 +27553,13 @@ function TrackRecordTab() {
     </div>
   );
 
-  const SortTh = ({ col, label, title, color, style: s }) => (
+  const SortTh = ({ col, label, title, color, style: s, className }) => (
     <th onClick={() => {
       if (sortCol === col) setSortDir(d => -d);
       else { setSortCol(col); setSortDir(-1); }
     }}
     title={title}
+    className={className}
     style={{
       padding:'3px 6px', cursor:'pointer', userSelect:'none',
       fontFamily:mono, fontSize:8, fontWeight:700,
@@ -27877,7 +27878,7 @@ function TrackRecordTab() {
           No batters match current filters.
         </div>
       ) : (
-        <div style={{padding:'0 14px', overflowX:'auto'}}>
+        <div className="tw" style={{padding:'0 14px', overflowX:'auto'}}>
           <div style={{display:'flex', gap:6, marginBottom:4, minWidth:900}}>
             <div style={{flex:1}}>
               <GroupBar label="Matchup Engine" open={showMatchup}
@@ -27899,7 +27900,7 @@ function TrackRecordTab() {
                   color:'var(--muted)'}}>#</th>
                 <th style={{padding:'3px 6px', fontFamily:mono, fontSize:8,
                   color:'var(--muted)'}}>Result</th>
-                <SortTh col="batter"  label="Batter"/>
+                <SortTh col="batter"  label="Batter" className="sticky-batter"/>
                 <SortTh col="team"    label="Team"/>
                 <SortTh col="lineupSlot" label="Slot"/>
                 <SortTh col="pitcher" label="Pitcher"/>
@@ -27969,8 +27970,12 @@ function TrackRecordTab() {
                           : <span style={{color:'var(--muted)'}}>—</span>
                       }
                     </td>
-                    <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
-                      color:'var(--text)', fontWeight:600, whiteSpace:'nowrap', cursor:'pointer'}}
+                    <td className="sticky-batter" style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
+                      color:'var(--text)', fontWeight:600, whiteSpace:'nowrap', cursor:'pointer',
+                      background: r.isLongshot && r.wentYard ? 'rgba(167,139,250,.12)'
+                        : r.brlSignal ? 'rgba(232,65,26,.08)'
+                        : r.wentYard ? 'rgba(39,201,122,.08)'
+                        : 'var(--surface)'}}
                       onClick={() => openAtBatSlide({pid:r.batterId, name:r.batter, team:r.team})}>
                       {r.batter}
                     </td>
@@ -30939,19 +30944,21 @@ function BarrelLabTab() {
           {/* Shared table renderer */}
           {(() => {
             const renderTable = (rows) => (
-              <div style={{overflowX:'auto'}}>
+              <div className="tw" style={{overflowX:'auto'}}>
                 <table style={{width:'100%',borderCollapse:'collapse',fontFamily:mono,fontSize:9}}>
                   <thead>
                     <tr style={{borderBottom:'1px solid var(--border)'}}>
                       {visibleCols.map(col => {
                         const active = sortCol === col.key;
+                        const isBatterCol = col.key === 'batter';
                         return (
                           <th key={col.key}
+                            className={isBatterCol ? 'sticky-batter' : undefined}
                             onClick={() => toggleSort(col.key)}
                             style={{padding:'4px 6px',textAlign:col.align,whiteSpace:'nowrap',
                               cursor:'pointer',userSelect:'none',
                               color: active ? 'var(--accent)' : 'var(--muted)',
-                              background: active ? 'rgba(255,153,0,.06)' : 'transparent',
+                              background: isBatterCol ? 'var(--surface2)' : (active ? 'rgba(255,153,0,.06)' : 'transparent'),
                             }}>
                             {col.h}{active ? (sortDir==='desc' ? ' ▼' : ' ▲') : ''}
                           </th>
@@ -30971,7 +30978,8 @@ function BarrelLabTab() {
                         }}>
                           <td style={{padding:'4px 6px',color:'var(--muted)'}}>{liveSlot(parseInt(b.batter_id||0), b.lineup_slot) || '—'}</td>
                           {!selGame && <td style={{padding:'4px 6px',color:'var(--muted)',fontFamily:mono,fontSize:8}}>{b.batting_team||'—'}</td>}
-                          <td style={{padding:'4px 6px',whiteSpace:'nowrap'}}>
+                          <td className="sticky-batter" style={{padding:'4px 6px',whiteSpace:'nowrap',
+                            background: b.isWeakSlot ? 'rgba(255,214,10,.14)' : b.isBarrelSignal ? 'rgba(255,153,0,.04)' : 'var(--surface)'}}>
                             <div style={{display:'flex',alignItems:'center',gap:6}}>
                               <div style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer',flex:1}} onClick={() => openBatter(b)}>
                                 <PlayerAvatar pid={b.batter_id} name={b.batter} size={22}/>
@@ -31674,19 +31682,21 @@ function OnBaseTab() {
           {/* Table */}
           {(() => {
             const renderTable = (rows) => (
-              <div style={{overflowX:'auto'}}>
+              <div className="tw" style={{overflowX:'auto'}}>
                 <table style={{width:'100%',borderCollapse:'collapse',fontFamily:mono,fontSize:9}}>
                   <thead>
                     <tr style={{borderBottom:'1px solid var(--border)'}}>
                       {visibleCols.map(col => {
                         const active = sortCol === col.key;
+                        const isBatterCol = col.key === 'batter';
                         return (
                           <th key={col.key}
+                            className={isBatterCol ? 'sticky-batter' : undefined}
                             onClick={() => toggleSort(col.key)}
                             style={{padding:'4px 6px',textAlign:col.align||'right',whiteSpace:'nowrap',
                               cursor:'pointer',userSelect:'none',
                               color: active ? '#38b8f2' : 'var(--muted)',
-                              background: active ? 'rgba(56,184,242,.06)' : 'transparent',
+                              background: isBatterCol ? 'var(--surface2)' : (active ? 'rgba(56,184,242,.06)' : 'transparent'),
                             }}>
                             {col.h}{active ? (sortDir==='desc' ? ' ▼' : ' ▲') : ''}
                           </th>
@@ -31706,7 +31716,8 @@ function OnBaseTab() {
                         }}>
                           <td style={{padding:'4px 6px',color:'var(--muted)'}}>{liveSlot(parseInt(b.batter_id||0), b.lineup_slot) || '—'}</td>
                           {!selGame && <td style={{padding:'4px 6px',color:'var(--muted)',fontFamily:mono,fontSize:8}}>{b.batting_team||'—'}</td>}
-                          <td style={{padding:'4px 6px',whiteSpace:'nowrap'}}>
+                          <td className="sticky-batter" style={{padding:'4px 6px',whiteSpace:'nowrap',
+                            background: b.isWeakSlot ? 'rgba(255,214,10,.14)' : b.isTBSignal ? 'rgba(56,184,242,.04)' : 'var(--surface)'}}>
                             <div style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer'}} onClick={() => openBatter(b)}>
                               <PlayerAvatar pid={b.batter_id} name={b.batter} size={22}/>
                               <span style={{color:'var(--text)'}}>{b.isTBSignal ? '★ ' : ''}{b.batter}</span>

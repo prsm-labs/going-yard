@@ -1,8 +1,8 @@
 {
-  "version": "2026.07.11",
+  "version": "2026.07.12",
   "changelog": [
-    "Fix Data tab mobile crashes",
-    "add 2-Bagger (Non-HR) live signal + Sim TB retroactive validation in Track   Record"
+    "Fix 2 TB Signal Rate card: hit rate of TB Signal flag",
+    "not occurrence rate across all batters"
   ],
   "notifyUsers": true
 }
