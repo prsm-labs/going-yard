@@ -1,7 +1,8 @@
 {
   "version": "2026.07.11",
   "changelog": [
-    "Fix Data tab mobile crashes: stop double-loading Power BI iframes and unmount on tab leave"
+    "Fix Data tab mobile crashes",
+    "add 2-Bagger (Non-HR) live signal + Sim TB retroactive validation in Track   Record"
   ],
   "notifyUsers": true
 }

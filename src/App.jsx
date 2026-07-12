@@ -27258,6 +27258,7 @@ function TrackRecordTab() {
   const [showOnlyCC,     setShowOnlyCC]     = useState(false);
   const [showOnlySauce2, setShowOnlySauce2] = useState(false);
   const [showOnly2Bagger, setShowOnly2Bagger] = useState(false);
+  const [showOnlyTBSignal, setShowOnlyTBSignal] = useState(false);
   const [showOnlySimTB2, setShowOnlySimTB2] = useState(false);
   const [teamFilter,     setTeamFilter]     = useState('ALL');
 
@@ -27272,22 +27273,25 @@ function TrackRecordTab() {
     async function loadTrackRecord() {
       setLoading(true);
       try {
-        const [amRes, blRes, idRes, hrRes] = await Promise.all([
+        const [amRes, blRes, idRes, hrRes, obRes] = await Promise.all([
           fetch('/data/track-record-matchups.csv'),
           fetch('/data/track-record-barrel.csv'),
           fetch('/data/player_id.csv'),
           fetch('/data/track-record-hr.csv'),
+          fetch('/data/track-record-onbase.csv'),
         ]);
 
         const amText = await amRes.text();
         const blText = blRes.ok ? await blRes.text() : '';
         const idText = idRes.ok ? await idRes.text() : '';
         const hrText = hrRes.ok ? await hrRes.text() : '';
+        const obText = obRes.ok ? await obRes.text() : '';
 
         const amRows = parseCSV(amText);
         const blRows = blText ? parseCSV(blText) : [];
         const idRows = idText ? parseCSV(idText) : [];
         const hrRows = hrText ? parseCSV(hrText) : [];
+        const obRows = obText ? parseCSV(obText) : [];
 
         // Build Barrel Lab lookup: { 'YYYY-MM-DD_battername': row }
         const blLookup = {};
@@ -27295,6 +27299,18 @@ function TrackRecordTab() {
           const date = normDate(r.export_date || '');
           const name = (r.Player || r.Batter || '').trim().toLowerCase();
           if (date && name) blLookup[`${date}_${name}`] = r;
+        });
+
+        // Build OnBase Tab lookup: { 'YYYY-MM-DD_battername': row }
+        // TB Signal (onBaseScore>=75 && matchupScore>=60 && simTB2Pct>=30, the
+        // OnBase tab's own strict flag) is encoded as 1/0 in the CSV, not YES/NO.
+        // Source data only goes back to whenever gy_csv.py's OnBase export first
+        // ran (July 9, 2026) — expect thin sample sizes for a while.
+        const obLookup = {};
+        obRows.forEach(r => {
+          const date = normDate(r.export_date || '');
+          const name = (r.Player || '').trim().toLowerCase();
+          if (date && name) obLookup[`${date}_${name}`] = r;
         });
 
         // Build HR Tracker lookup: { 'YYYY-MM-DD_battername': [{pitcher, hrNum, ...}] }
@@ -27339,6 +27355,8 @@ function TrackRecordTab() {
           const date  = normDate(r.export_date || '');
           const name  = (r.Batter || '').trim().toLowerCase();
           const blRow = blLookup[`${date}_${name}`] || {};
+          const obRow = obLookup[`${date}_${name}`] || {};
+          const tbSignal = (obRow['TB Signal']||'').toString().trim() === '1';
           const pitcherNameRaw = r['vs Pitcher'] || blRow['Pitcher'] || '';
           const batterId  = resolveId(r.Batter, r.Team);
           const pitcherId = resolveId(pitcherNameRaw, '');
@@ -27415,6 +27433,7 @@ function TrackRecordTab() {
             // by design (excludes HR) to match the 2️⃣ badge's display parity
             // with 💥 — do not use is2Bagger to judge signal predictive power.
             hitTB2: parseInt(r['TB'] || 0) >= 2,
+            tbSignal,
             trueHR, matchup, simHRPct, brlSignal, isLongshot,
             pulledBrl: parseFloat(blRow['PulledBrl%'] || 0),
             brlBIP:    parseFloat(blRow['Brl/BIP%']   || 0),
@@ -27466,6 +27485,7 @@ function TrackRecordTab() {
     if (showOnlyCC)     rows = rows.filter(r => r.closeCalls > 0);
     if (showOnlySauce2) rows = rows.filter(r => r.isSauce2);
     if (showOnly2Bagger) rows = rows.filter(r => r.is2Bagger);
+    if (showOnlyTBSignal) rows = rows.filter(r => r.tbSignal);
     if (showOnlySimTB2) rows = rows.filter(r => r.simTB >= 2.0);
     if (search) {
       const q = search.toLowerCase();
@@ -27481,7 +27501,7 @@ function TrackRecordTab() {
       }
       return sortDir * ((av||0) - (bv||0));
     });
-  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, showOnlyWeakSlot, showOnlyCC, showOnlySauce2, showOnly2Bagger, showOnlySimTB2, search, sortCol, sortDir]);
+  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, showOnlyWeakSlot, showOnlyCC, showOnlySauce2, showOnly2Bagger, showOnlyTBSignal, showOnlySimTB2, search, sortCol, sortDir]);
 
   const summary = useMemo(() => {
     const hrs          = dateRows.filter(r => r.wentYard);
@@ -27496,6 +27516,11 @@ function TrackRecordTab() {
     const sauce2       = dateRows.filter(r => r.isSauce2);
     const sauce2Hits    = sauce2.filter(r => r.wentYard);
     const twoBaggers    = dateRows.filter(r => r.is2Bagger);
+    // TB Signal (OnBase tab's own flag) hit rate — denominator is the FLAGGED
+    // group, not all batters, same shape as Sauce 2.0/Weak Spot/Barrel Signal.
+    // Source data only exists from July 9, 2026 onward — expect a thin sample.
+    const tbSignals     = dateRows.filter(r => r.tbSignal);
+    const tbSignalHits  = tbSignals.filter(r => r.hitTB2);
     const simTB2        = dateRows.filter(r => r.simTB >= 2.0);
     const simTB2Hits    = simTB2.filter(r => r.hitTB2);
     const topYS        = [...dateRows].sort((a,b) => b.yardScore - a.yardScore)[0];
@@ -27504,7 +27529,7 @@ function TrackRecordTab() {
     const biggestUpset = [...dateRows.filter(r => r.wentYard)]
       .sort((a,b) => a.yardScore - b.yardScore)[0];
     return { hrs, signals, signalHits, keyMatchups, kmHits,
-             longshots, lsHits, weakSlots, weakSlotHits, sauce2, sauce2Hits, twoBaggers, simTB2, simTB2Hits, topYS, biggestMiss, biggestUpset };
+             longshots, lsHits, weakSlots, weakSlotHits, sauce2, sauce2Hits, twoBaggers, tbSignals, tbSignalHits, simTB2, simTB2Hits, topYS, biggestMiss, biggestUpset };
   }, [dateRows]);
 
   const GroupBar = ({ label, open, onToggle, color }) => (
@@ -27651,11 +27676,11 @@ function TrackRecordTab() {
             color:'#34d399'
           },
           {
-            label:'2-BAGGER (NON-HR) RATE',
-            value: dateRows.length
-              ? `${((summary.twoBaggers.length/dateRows.length)*100).toFixed(0)}%`
+            label:'2 TB SIGNAL RATE',
+            value: summary.tbSignals.length
+              ? `${((summary.tbSignalHits.length/summary.tbSignals.length)*100).toFixed(0)}%`
               : '—',
-            sub: `${summary.twoBaggers.length}/${dateRows.length}`,
+            sub: `${summary.tbSignalHits.length}/${summary.tbSignals.length}`,
             color:'#38b8f2'
           },
           {
@@ -27783,6 +27808,15 @@ function TrackRecordTab() {
           2️⃣ 2-Bagger (Non-HR) Only
         </button>
 
+        <button onClick={() => setShowOnlyTBSignal(v=>!v)}
+          style={{padding:'4px 10px', borderRadius:6, border:'none',
+            cursor:'pointer', fontFamily:mono, fontSize:9, fontWeight:700,
+            background: showOnlyTBSignal ? 'rgba(56,184,242,.15)' : 'var(--surface2)',
+            color:       showOnlyTBSignal ? '#38b8f2' : 'var(--muted)',
+            border: `1px solid ${showOnlyTBSignal ? 'rgba(56,184,242,.4)' : 'var(--border)'}` }}>
+          🎯 TB Signal Only
+        </button>
+
         <button onClick={() => setShowOnlySimTB2(v=>!v)}
           style={{padding:'4px 10px', borderRadius:6, border:'none',
             cursor:'pointer', fontFamily:mono, fontSize:9, fontWeight:700,
@@ -27798,7 +27832,7 @@ function TrackRecordTab() {
             const headers = ['Date','Batter','Team','Hand','Lineup Slot',
               'Pre-Game Pitcher','Went Yard Vs','SP/RP','Pitcher Grade',
               'Yard Score','Boom','Sig','Grade','gHR','Zone Fit','Sim TB','xwOBA','Flags',
-              'Is Key Matchup','Weak Spot','Sauce 2.0','2-Bagger (Non-HR)','Hit 2+ TB (Any)',
+              'Is Key Matchup','Weak Spot','Sauce 2.0','2-Bagger (Non-HR)','Hit 2+ TB (Any)','TB Signal',
               'TrueHR','Matchup','SimHR%','Barrel Signal','Longshot',
               'PulledBrl%','Brl/BIP','HR/FB','FB%','HH%',
               'Went Yard','HR','AB','H','TB','RBI','BB','K','Avg EV','Launch Angle',
@@ -27813,7 +27847,7 @@ function TrackRecordTab() {
                 (r.wentYard && r.actualPitcher && !r.actualPitcherIsSP) ? '' : r.pitcherGrade,
                 r.yardScore || '', r.boom || '', r.sig || '', r.grade || '', r.ghr || '',
                 r.zoneFit || '', r.simTB || '', r.xwoba || '', r.flags || '',
-                r.isKeyMatchup ? 'YES' : '', r.isWeakSlot ? 'YES' : '', r.isSauce2 ? 'YES' : '', r.is2Bagger ? 'YES' : '', r.hitTB2 ? 'YES' : '',
+                r.isKeyMatchup ? 'YES' : '', r.isWeakSlot ? 'YES' : '', r.isSauce2 ? 'YES' : '', r.is2Bagger ? 'YES' : '', r.hitTB2 ? 'YES' : '', r.tbSignal ? 'YES' : '',
                 r.trueHR || '', r.matchup || '', r.simHRPct || '',
                 r.brlSignal ? 'YES' : '', r.isLongshot ? 'YES' : '',
                 r.pulledBrl || '', r.brlBIP || '', r.hrFB || '', r.fb || '', r.hh || '',
