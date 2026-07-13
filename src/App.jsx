@@ -10079,7 +10079,7 @@ function GamedayTab() {
     try {
       const r = await fetch(
         `https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${date}` +
-        `&hydrate=probablePitcher,linescore,decisions,team&gameType=R`
+        `&hydrate=probablePitcher,linescore,decisions,team&gameType=R,A`
       );
       const d = await r.json();
       setGames(d.dates?.[0]?.games || []);
@@ -30226,27 +30226,43 @@ function AllStarWeekTab() {
                     Round {r.round} — {r.type} ({r.numBatters} batters)
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', gap: 8 }}>
-                    {(r.batters || []).map((b, i) => (
-                      <div key={i} style={{
-                        display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
-                        background: b.winner ? 'rgba(39,201,122,.08)' : 'var(--surface)',
-                        border: `1px solid ${b.winner ? 'rgba(39,201,122,.4)' : 'var(--border)'}`,
-                        borderRadius: 8,
-                      }}>
-                        <PlayerAvatar pid={b.player?.id} name={b.player?.fullName} size={26} />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{
-                            fontFamily: osw, fontWeight: 700, fontSize: 11, color: b.winner ? '#27c97a' : 'var(--text)',
-                            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                    {(r.batters || []).map((b, i) => {
+                      const pid = b.player?.id;
+                      const cp = pid ? getCachedPlayer(pid) : null;
+                      const bestSwing = b.topDerbyHitData;
+                      const hasBestSwing = bestSwing && (bestSwing.launchSpeed > 0 || bestSwing.totalDistance > 0);
+                      return (
+                        <div key={i} onClick={() => pid && openAtBatSlide({
+                            pid, name: b.player?.fullName,
+                            team: cp?.team || GLOBAL_PLAYER_TEAM_MAP[pid]?.team || '',
+                          })}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
+                            background: b.winner ? 'rgba(39,201,122,.08)' : 'var(--surface)',
+                            border: `1px solid ${b.winner ? 'rgba(39,201,122,.4)' : 'var(--border)'}`,
+                            borderRadius: 8, cursor: pid ? 'pointer' : 'default',
                           }}>
-                            {b.winner && '👑 '}{b.player?.fullName || 'TBD'}
-                          </div>
-                          <div style={{ fontFamily: mono, fontSize: 9, color: 'var(--muted)' }}>
-                            {b.complete ? `${b.total ?? 0} HR` : b.started ? 'Batting…' : 'Waiting'}
+                          <PlayerAvatar pid={pid} name={b.player?.fullName} size={26} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{
+                              fontFamily: osw, fontWeight: 700, fontSize: 11, color: b.winner ? '#27c97a' : 'var(--text)',
+                              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                            }}>
+                              {b.winner && '👑 '}{b.player?.fullName || 'TBD'}
+                            </div>
+                            <div style={{ fontFamily: mono, fontSize: 9, color: 'var(--muted)' }}>
+                              {b.complete ? `${b.numHomeRuns ?? 0} HR` : b.started ? 'Batting…' : 'Waiting'}
+                              {hasBestSwing && ` · Best: ${bestSwing.launchSpeed}mph, ${Math.round(bestSwing.totalDistance)}ft`}
+                            </div>
+                            {cp && (
+                              <div style={{ fontFamily: mono, fontSize: 8, color: 'var(--muted)', opacity: .75, marginTop: 1 }}>
+                                Season: {cp.avgEV ? `${cp.avgEV} EV` : ''}{cp.barrel ? ` · ${cp.barrel}% Brl` : ''}{cp.hr ? ` · ${cp.hr} HR` : ''}{cp.xwoba ? ` · ${cp.xwoba} xwOBA` : ''}
+                              </div>
+                            )}
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               ))}
@@ -30293,18 +30309,23 @@ function AllStarWeekTab() {
                 {asg?.teams?.[side]?.name || (side === 'away' ? 'Away' : 'Home')} ({rosters[side].length})
               </div>
               {rosters[side].length === 0 && <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)' }}>Roster not yet posted.</div>}
-              {rosters[side].map(p => (
-                <div key={p.id} onClick={() => openAtBatSlide({ pid: p.id, name: p.name, team: '' })}
+              {rosters[side].map(p => {
+                const realTeam = TEAM_ID_TO_ABBR[p.parentTeamId] || '';
+                return (
+                <div key={p.id} onClick={() => openAtBatSlide({ pid: p.id, name: p.name, team: realTeam })}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 8, padding: '6px 4px', cursor: 'pointer',
                     borderBottom: '1px solid rgba(255,255,255,.04)',
                   }}>
                   <PlayerAvatar pid={p.id} name={p.name} size={24} />
                   <span style={{ fontFamily: mono, fontSize: 9, color: 'var(--muted)', width: 26 }}>{p.pos}</span>
-                  <span style={{ fontFamily: osw, fontWeight: 600, fontSize: 12, flex: 1 }}>{p.name}</span>
+                  <span style={{ fontFamily: osw, fontWeight: 600, fontSize: 12 }}>{p.name}</span>
+                  {realTeam && <span style={{ fontFamily: mono, fontSize: 8, color: 'var(--muted)', opacity: .7 }}>{realTeam}</span>}
+                  <span style={{ flex: 1 }} />
                   {p.battingOrder && <span style={{ fontFamily: mono, fontSize: 9, color: 'var(--muted)' }}>#{p.battingOrder}</span>}
                 </div>
-              ))}
+                );
+              })}
             </div>
           ))}
         </div>
@@ -30336,6 +30357,42 @@ function AllStarWeekTab() {
                 {historyData.asg.venue.name} · {allStarFmtDate(historyData.asg.gameDate)} · {historyData.asg.status}
               </div>
               {historyData.asg.description && <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)', marginTop: 6 }}>{historyData.asg.description}</div>}
+              {historyData.asg.detail && (historyData.asg.detail.attendance || historyData.asg.detail.durationMinutes) && (
+                <div style={{ fontFamily: mono, fontSize: 9, color: 'var(--muted)', marginTop: 6 }}>
+                  {historyData.asg.detail.attendance ? `Attendance: ${historyData.asg.detail.attendance.toLocaleString()}` : ''}
+                  {historyData.asg.detail.durationMinutes ? ` · Duration: ${historyData.asg.detail.durationMinutes} min` : ''}
+                </div>
+              )}
+              {historyData.asg.detail?.innings?.length > 0 && (
+                <div style={{ marginTop: 10, overflowX: 'auto' }}>
+                  <table style={{ borderCollapse: 'collapse', fontFamily: mono, fontSize: 9 }}>
+                    <thead><tr>
+                      <td style={{ padding: '2px 6px', color: 'var(--muted)' }}></td>
+                      {historyData.asg.detail.innings.map(inn => <td key={inn.num} style={{ padding: '2px 6px', textAlign: 'center', color: 'var(--muted)' }}>{inn.num}</td>)}
+                      <td style={{ padding: '2px 6px', textAlign: 'center', color: 'var(--accent)', fontWeight: 700 }}>R</td>
+                    </tr></thead>
+                    <tbody>
+                      {['away', 'home'].map(side => (
+                        <tr key={side}>
+                          <td style={{ padding: '2px 6px', color: 'var(--muted)' }}>{historyData.asg.teams[side]?.name?.split(' ')[0] || side}</td>
+                          {historyData.asg.detail.innings.map(inn => <td key={inn.num} style={{ padding: '2px 6px', textAlign: 'center' }}>{inn[side]?.runs ?? '—'}</td>)}
+                          <td style={{ padding: '2px 6px', textAlign: 'center', fontWeight: 700 }}>{historyData.asg.detail.teamTotals?.[side]?.runs ?? '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {historyData.asg.detail?.hrLog?.length > 0 && (
+                <div style={{ marginTop: 10 }}>
+                  <div style={{ fontFamily: osw, fontWeight: 700, fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', marginBottom: 4 }}>💥 Home Runs</div>
+                  {historyData.asg.detail.hrLog.map((h, i) => (
+                    <div key={i} style={{ fontFamily: mono, fontSize: 10, marginBottom: 2 }}>
+                      {h.batterName} — Inn {h.inning}{h.rbi > 1 ? ` (${h.rbi}-run)` : ''}
+                    </div>
+                  ))}
+                </div>
+              )}
               {historyData.derby && (
                 <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
                   <div style={{ fontFamily: osw, fontWeight: 700, fontSize: 12, color: 'var(--accent)' }}>🥊 {historyData.derby.name}</div>
@@ -30345,9 +30402,9 @@ function AllStarWeekTab() {
                   })}
                 </div>
               )}
-              {!historyData.derby && historyYear !== new Date().getFullYear() && (
+              {!historyData.derby && (
                 <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)', fontFamily: mono, fontSize: 9, color: 'var(--muted)' }}>
-                  🥊 Derby bracket not available for past years — MLB's own live pointer only ever resolves the current year's event, not historical ones.
+                  🥊 No Derby bracket found for {historyYear} — either no Derby was held that year, or the historical archive lookup didn't find a match.
                 </div>
               )}
             </div>
@@ -33152,7 +33209,6 @@ export default function App() {
     {key:"home",       label:"🏡 Home"},
     {key:"homeruns",   label:"💥 HR Tracker"},
     {key:"live",       label:"📡 Live"},
-    {key:"allstarweek",label:"⭐ All-Star Week"},
     {key:"matchup",    label:"📋 Scouting"},
     {key:"stats",      label:"📊 Splits"},
     {key:"powerbi",    label:"🤓 Data"},
@@ -33161,6 +33217,7 @@ export default function App() {
     {key:"_sep1",      label:"|", sep:true},
     {key:"statcast",   label:"📡 Statcast"},
     {key:"mlbscores",  label:"⚾ MLB"},
+    {key:"allstarweek",label:"⭐ All-Star Week"},
     {key:"yardpicks",  label:"🧾 Yard Picks"},
     {key:"trackrecord",label:"📋 Track Record"},
     {key:"links",      label:"🔗 Links"},
