@@ -47,8 +47,12 @@ export default async function handler(req, res) {
         const allPlays = feedData?.liveData?.plays?.allPlays || [];
         console.log(`[HRs] ${awayAbbr}@${homeAbbr} gamePk=${game.gamePk} plays=${allPlays.length}`);
 
-        // 2-bagger scan — boxscore batting lines already in this same response
+        // 2-bagger scan — boxscore batting lines already in this same response.
+        // Also builds seasonHRByBatter: batterId → season HR total AS OF this
+        // specific game (boxscore's own seasonStats snapshot, not "current/today"
+        // like PLAYER_DATA_CACHE on the client — correct for past dates too).
         const boxTeams = feedData?.liveData?.boxscore?.teams || {};
+        const seasonHRByBatter = {};
         for (const side of ['away', 'home']) {
           const teamBox = boxTeams[side];
           const sideAbbr = side === 'away' ? awayAbbr : homeAbbr;
@@ -70,6 +74,10 @@ export default async function handler(req, res) {
                 batterTeam: sideAbbr,
                 totalBases, hits,
               });
+            }
+            const seasonHR = p?.seasonStats?.batting?.homeRuns;
+            if (p?.person?.id != null && seasonHR != null) {
+              seasonHRByBatter[p.person.id] = parseInt(seasonHR) || 0;
             }
           }
         }
@@ -143,6 +151,11 @@ export default async function handler(req, res) {
             launchAngle: la,
             pitchType:   pitch,
             description: desc,
+            // Season HR total as of THIS game's boxscore snapshot — correct for
+            // any date (unlike the client's PLAYER_DATA_CACHE, which only ever
+            // reflects "current/today"). null if MLB didn't return seasonStats
+            // for this batter; client falls back to its old approximation then.
+            seasonHR:    batter?.id != null ? (seasonHRByBatter[batter.id] ?? null) : null,
             atBatIndex:  about.atBatIndex  || 0,
             chronoIndex,
             timeET,

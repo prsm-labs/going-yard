@@ -11501,6 +11501,12 @@ async function fetchVideoLinks(hrs) {
         return playbacks.find(p => (p.url||'').includes('mlb-cuts-diamond'))?.url || null;
       };
 
+      // Tracks matched HRs by exact play (gamePk_atBatIndex), not by batterId —
+      // a batterId-level skip in PASS 2 (fixed July 12 2026) was silently
+      // blocking a batter's 2nd/3rd HR of the day from ever getting a video
+      // once their 1st HR was matched in PASS 1. matchBatter()'s own shift()
+      // queue already stops re-matching a batter once ALL their HRs are
+      // resolved, so no batter-level check is needed here at all.
       const matched = new Set();
       items.forEach(item => {
         const playbacks = item.playbacks || [];
@@ -11508,13 +11514,17 @@ async function fetchVideoLinks(hrs) {
         if (!broadcastUrl) return;
         const h = matchBatter(item);
         if (!h) return;
-        const gk = String(h.gamePk||''), idx = h.atBatIndex??h.playIndex, bid = String(h.batterId||'');
+        const gk = String(h.gamePk||''), idx = h.atBatIndex??h.playIndex;
+        // Exact-play key only — no batterId-level fallback (removed July 12
+        // 2026). That fallback was ambiguous for multi-HR batters: it always
+        // pointed at whichever HR was matched most recently, so a HR whose own
+        // clip genuinely isn't published yet would silently show a *different*
+        // HR's video as a "duplicate" instead of just showing no icon.
         if (idx != null) VIDEO_LINK_CACHE[`${gk}_${idx}`] = broadcastUrl;
-        if (bid)         VIDEO_LINK_CACHE[`${gk}_${bid}`] = broadcastUrl;
-        matched.add(bid);
+        matched.add(`${gk}_${idx}`);
       });
 
-      // PASS 2: fallback to any clip for unmatched batters — still prefer MP4 over .m3u8
+      // PASS 2: fallback to any clip for unmatched HRs — still prefer MP4 over .m3u8
       items.forEach(item => {
         const playbacks = item.playbacks || [];
         const anyUrl = getBroadcastUrl(playbacks)
@@ -11522,11 +11532,10 @@ async function fetchVideoLinks(hrs) {
                     || playbacks[0]?.url;
         if (!anyUrl) return;
         const h = matchBatter(item);
-        if (!h || matched.has(String(h.batterId||''))) return;
-        const gk = String(h.gamePk||''), idx = h.atBatIndex??h.playIndex, bid = String(h.batterId||'');
+        if (!h) return;
+        const gk = String(h.gamePk||''), idx = h.atBatIndex??h.playIndex;
         if (idx != null) VIDEO_LINK_CACHE[`${gk}_${idx}`] = anyUrl;
-        if (bid)         VIDEO_LINK_CACHE[`${gk}_${bid}`] = anyUrl;
-        matched.add(bid);
+        matched.add(`${gk}_${idx}`);
       });
 
       const found = matched.size;
@@ -12184,11 +12193,18 @@ function HRTrackerTab() {
                 const distC = (hr.distance||0)>=440?"dng":(hr.distance||0)>=420?"hot":(hr.distance||0)>=400?"warm":"avg";
                 const cachedHR = getCachedPlayer(hr.batterId)?.hr || 0;
                 const todayNum = hrRankMap[`${hr.batterId}_${hr.gamePk}_${hr.atBatIndex||hr.playIndex||hr.plateAppearance||0}`] || 1;
-                const seasonNum = cachedHR > 0 ? cachedHR + todayNum : todayNum;
-                const videoUrl = VIDEO_LINK_CACHE[`${hr.gamePk}_${hr.atBatIndex}`]
-                  || VIDEO_LINK_CACHE[`${hr.gamePk}_${hr.batterId}`]
-                  || VIDEO_LINK_CACHE[hr.playId]
-                  || VIDEO_LINK_CACHE[hr.uuid];
+                // Prefer hr.seasonHR — the boxscore's own season-to-date snapshot
+                // as of THIS game, correct for any date. cachedHR is always
+                // "current/today" regardless of which date is selected, so the
+                // old cachedHR+todayNum math was wrong for any past date viewed
+                // via the date picker. Fall back to it only if the API didn't
+                // return seasonHR (older cached HR_DATA, or MLB omitted it).
+                const seasonNum = hr.seasonHR != null ? hr.seasonHR
+                  : (cachedHR > 0 ? cachedHR + todayNum : todayNum);
+                // Exact-play key only (no batterId-level fallback) — guarantees
+                // a shown video is always for THIS specific HR, never a
+                // duplicate borrowed from another HR by the same batter today.
+                const videoUrl = VIDEO_LINK_CACHE[`${hr.gamePk}_${hr.atBatIndex}`];
                 return <tr key={i} style={{height:26}}>
                 <td style={{padding:"1px 3px"}}><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,color:i<3?"var(--accent)":"var(--muted)"}}>{sorted.length - i}</span></td>
                 <td style={{padding:"1px 3px",whiteSpace:"nowrap"}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:"var(--text)",whiteSpace:"nowrap"}}>{hr.timeET&&hr.timeET!==""?hr.timeET:`I${hr.inning}`}</span></td>
@@ -32714,6 +32730,11 @@ export default function App() {
   const [tab, setTab] = useState("home");
   const [newVersionAvailable, setNewVersionAvailable] = useState(false);
   const [newVersionChangelog, setNewVersionChangelog] = useState([]);
+  // Dismiss is session-only — a ref (not state) so the 12-min poll's stale
+  // closure still sees it. localStorage's gy_build_time is untouched on
+  // dismiss, so the next full app open re-checks and re-shows the banner
+  // if the user still hasn't actually refreshed onto the new build.
+  const versionDismissedRef = useRef(false);
   const [showPicksSlideout, setShowPicksSlideout] = useState(false);
   const [appTeamSlide, setAppTeamSlide] = useState(null); // universal team slideout
   const [appTeamStats, setAppTeamStats] = useState(null);
@@ -32795,6 +32816,7 @@ export default function App() {
           return;
         }
         if (live && live !== local) {
+          if (versionDismissedRef.current) return; // user dismissed this session — don't re-nag until next full app open
           // New version detected — fetch changelog and show banner
           try {
             const vr    = await fetch('/version.json', { cache: 'no-store' });
@@ -32901,20 +32923,37 @@ export default function App() {
               </span>
             )}
           </div>
-          <button
-            onClick={() => {
-              localStorage.setItem('gy_build_time','');
-              window.location.reload(true);
-            }}
-            style={{
-              background:'#fff', color:'#ff4020', border:'none',
-              borderRadius:6, padding:'6px 14px', cursor:'pointer',
-              fontFamily:"'Oswald',sans-serif", fontWeight:700,
-              fontSize:11, letterSpacing:.5, textTransform:'uppercase',
-              flexShrink:0,
-            }}>
-            Refresh Now
-          </button>
+          <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
+            <button
+              onClick={() => {
+                localStorage.setItem('gy_build_time','');
+                window.location.reload(true);
+              }}
+              style={{
+                background:'#fff', color:'#ff4020', border:'none',
+                borderRadius:6, padding:'6px 14px', cursor:'pointer',
+                fontFamily:"'Oswald',sans-serif", fontWeight:700,
+                fontSize:11, letterSpacing:.5, textTransform:'uppercase',
+                flexShrink:0,
+              }}>
+              Refresh Now
+            </button>
+            <button
+              onClick={() => {
+                versionDismissedRef.current = true;
+                setNewVersionAvailable(false);
+              }}
+              title="Dismiss — will ask again next time you open the app if you still haven't updated"
+              style={{
+                background:'transparent', color:'#fff', border:'1px solid rgba(255,255,255,.5)',
+                borderRadius:6, padding:'6px 10px', cursor:'pointer',
+                fontFamily:"'Oswald',sans-serif", fontWeight:700,
+                fontSize:11, letterSpacing:.5,
+                flexShrink:0, lineHeight:1,
+              }}>
+              ✕
+            </button>
+          </div>
         </div>
       )}
       <div className="app-inner">

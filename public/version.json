@@ -1,9 +1,7 @@
 {
   "version": "2026.07.12",
   "changelog": [
-    "Add sticky header row + sticky batter name column to Barrel Lab",
-    "On Base",
-    "and Track Record tables"
+    "Daily data update 2026-07-12"
   ],
   "notifyUsers": true
 }
