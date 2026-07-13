@@ -30088,6 +30088,279 @@ function SimTab({ data }) {
   );
 }
 
+// ── All-Star Week — Overview, HR Derby, Game, Rosters, History ─────────────
+// Fully year-agnostic: no hardcoded years/venues/gamePks anywhere below — all
+// discovery happens server-side in api/allstar.js. See that file's header
+// comment for the HR Derby's undocumented-but-stable discovery chain.
+function allStarFmtDate(iso) {
+  if (!iso) return '';
+  try {
+    return new Date(iso).toLocaleDateString('en-US', {
+      timeZone: 'America/New_York', weekday: 'short', month: 'short',
+      day: 'numeric', hour: 'numeric', minute: '2-digit',
+    });
+  } catch (e) { return iso; }
+}
+
+function AllStarWeekTab() {
+  const [sub, setSub] = useState('overview');
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [historyYear, setHistoryYear] = useState(new Date().getFullYear() - 1);
+  const [historyData, setHistoryData] = useState(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
+
+  const load = React.useCallback(async () => {
+    try {
+      const res = await fetch('/api/allstar');
+      const d = await res.json();
+      setData(d);
+    } catch (e) {
+      setError(e.message);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  // Live Derby polling — only while the Derby has actually started and isn't
+  // done yet. "Preview" = not started, "Final" = done — neither needs polling.
+  const derbyState = data?.derby?.status?.state || '';
+  const derbyIsLive = !!derbyState && derbyState !== 'Final' && derbyState !== 'Preview';
+  useEffect(() => {
+    if (!derbyIsLive) return;
+    const id = setInterval(async () => {
+      try {
+        const res = await fetch('/api/allstar?derbyOnly=1');
+        const d = await res.json();
+        if (d.derby) setData(prev => prev ? { ...prev, derby: d.derby } : prev);
+      } catch (e) {}
+    }, 15000);
+    return () => clearInterval(id);
+  }, [derbyIsLive]);
+
+  const loadHistory = async (yr) => {
+    setHistoryLoading(true);
+    setHistoryData(null);
+    try {
+      const res = await fetch(`/api/allstar?season=${yr}`);
+      const d = await res.json();
+      setHistoryData(d);
+    } catch (e) {}
+    setHistoryLoading(false);
+  };
+
+  const stBtn = key => ({
+    padding: '5px 12px', borderRadius: 6, cursor: 'pointer', border: 'none',
+    fontFamily: osw, fontWeight: 700, fontSize: 10, letterSpacing: .5,
+    textTransform: 'uppercase',
+    background: sub === key ? 'var(--accent)' : 'var(--surface2)',
+    color: sub === key ? 'white' : 'var(--muted)',
+  });
+
+  if (loading) return <div style={{ padding: 20, fontFamily: mono, color: 'var(--muted)' }}>Loading All-Star Week…</div>;
+  if (error) return <div style={{ padding: 20, fontFamily: mono, color: 'var(--accent)' }}>Error: {error}</div>;
+
+  const asg = data?.asg;
+  const derby = data?.derby;
+  const rosters = data?.rosters || { away: [], home: [] };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
+        <button style={stBtn('overview')} onClick={() => setSub('overview')}>Overview</button>
+        <button style={stBtn('derby')} onClick={() => setSub('derby')}>🥊 HR Derby</button>
+        <button style={stBtn('game')} onClick={() => setSub('game')}>⭐ All-Star Game</button>
+        <button style={stBtn('rosters')} onClick={() => setSub('rosters')}>👥 Rosters</button>
+        <button style={stBtn('history')} onClick={() => setSub('history')}>📋 History</button>
+      </div>
+
+      {sub === 'overview' && (
+        <div>
+          <div style={{ fontFamily: osw, fontWeight: 800, fontSize: 20, marginBottom: 4 }}>
+            {data?.season} MLB All-Star Week
+          </div>
+          <div style={{ fontFamily: mono, fontSize: 11, color: 'var(--muted)', marginBottom: 16 }}>
+            {asg?.venue?.name || 'Venue TBD'}
+          </div>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ flex: '1 1 260px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 16 }}>
+              <div style={{ fontFamily: osw, fontWeight: 700, fontSize: 13, color: 'var(--accent)', marginBottom: 6 }}>🥊 Home Run Derby</div>
+              {derby ? <>
+                <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)' }}>{allStarFmtDate(derby.eventDate)}</div>
+                <div style={{ fontFamily: mono, fontSize: 11, marginTop: 4, color: derbyIsLive ? '#27c97a' : 'var(--text)' }}>
+                  {derbyIsLive ? '🔴 LIVE — ' : ''}{derby.status?.state || 'Scheduled'}
+                </div>
+              </> : <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)' }}>Derby data unavailable</div>}
+            </div>
+            <div style={{ flex: '1 1 260px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 16 }}>
+              <div style={{ fontFamily: osw, fontWeight: 700, fontSize: 13, color: 'var(--ice)', marginBottom: 6 }}>⭐ All-Star Game</div>
+              {asg ? <>
+                <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)' }}>{allStarFmtDate(asg.gameDate)}</div>
+                <div style={{ fontFamily: mono, fontSize: 11, marginTop: 4 }}>
+                  {asg.teams.away.name} {asg.teams.away.score ?? ''} @ {asg.teams.home.name} {asg.teams.home.score ?? ''}
+                </div>
+                <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>{asg.status}</div>
+              </> : <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)' }}>Game data unavailable</div>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {sub === 'derby' && (
+        <div>
+          {!derby ? <div style={{ fontFamily: mono, color: 'var(--muted)' }}>Derby data unavailable — MLB may not have published this year's bracket yet, or the undocumented endpoint this relies on has changed. Check back closer to Derby night.</div> :
+            <>
+              <div style={{ fontFamily: osw, fontWeight: 800, fontSize: 16, marginBottom: 4 }}>{derby.name}</div>
+              <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)', marginBottom: 4 }}>{derby.venue?.name} · {allStarFmtDate(derby.eventDate)}</div>
+              <div style={{ fontFamily: mono, fontSize: 11, color: derbyIsLive ? '#27c97a' : 'var(--accent)', marginBottom: 16 }}>
+                {derbyIsLive ? '🔴 LIVE — ' : ''}{derby.status?.state}
+                {derby.status?.currentRound ? ` · Round ${derby.status.currentRound}` : ''}
+                {derbyIsLive && derby.status?.swingsRemaining != null ? ` · ${derby.status.swingsRemaining} swings left` : ''}
+              </div>
+              {(derby.rounds || []).map(r => (
+                <div key={r.round} style={{ marginBottom: 20 }}>
+                  <div style={{ fontFamily: osw, fontWeight: 700, fontSize: 12, color: 'var(--muted)', textTransform: 'uppercase', marginBottom: 8 }}>
+                    Round {r.round} — {r.type} ({r.numBatters} batters)
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', gap: 8 }}>
+                    {(r.batters || []).map((b, i) => (
+                      <div key={i} style={{
+                        display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
+                        background: b.winner ? 'rgba(39,201,122,.08)' : 'var(--surface)',
+                        border: `1px solid ${b.winner ? 'rgba(39,201,122,.4)' : 'var(--border)'}`,
+                        borderRadius: 8,
+                      }}>
+                        <PlayerAvatar pid={b.player?.id} name={b.player?.fullName} size={26} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{
+                            fontFamily: osw, fontWeight: 700, fontSize: 11, color: b.winner ? '#27c97a' : 'var(--text)',
+                            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                          }}>
+                            {b.winner && '👑 '}{b.player?.fullName || 'TBD'}
+                          </div>
+                          <div style={{ fontFamily: mono, fontSize: 9, color: 'var(--muted)' }}>
+                            {b.complete ? `${b.total ?? 0} HR` : b.started ? 'Batting…' : 'Waiting'}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </>}
+        </div>
+      )}
+
+      {sub === 'game' && (
+        <div>
+          {!asg ? <div style={{ fontFamily: mono, color: 'var(--muted)' }}>Game data unavailable.</div> :
+            <>
+              <div style={{ fontFamily: osw, fontWeight: 800, fontSize: 16, marginBottom: 8 }}>
+                {asg.teams.away.name} @ {asg.teams.home.name}
+              </div>
+              <div style={{ display: 'flex', gap: 20, alignItems: 'center', marginBottom: 12 }}>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)' }}>{asg.teams.away.name}</div>
+                  <div style={{ fontFamily: osw, fontWeight: 800, fontSize: 28, color: asg.isWinner.away ? '#27c97a' : 'var(--text)' }}>
+                    {asg.teams.away.score ?? '–'}
+                  </div>
+                </div>
+                <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)' }}>at</div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)' }}>{asg.teams.home.name}</div>
+                  <div style={{ fontFamily: osw, fontWeight: 800, fontSize: 28, color: asg.isWinner.home ? '#27c97a' : 'var(--text)' }}>
+                    {asg.teams.home.score ?? '–'}
+                  </div>
+                </div>
+              </div>
+              <div style={{ fontFamily: mono, fontSize: 11, color: 'var(--muted)' }}>{asg.status} · {asg.venue.name} · {allStarFmtDate(asg.gameDate)}</div>
+              {asg.description && <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)', marginTop: 6 }}>{asg.description}</div>}
+              <div style={{ marginTop: 16, fontFamily: mono, fontSize: 10, color: 'var(--muted)' }}>
+                For live play-by-play and Statcast detail, check the 📡 Live → Gameday tab or 💥 HR Tracker — both already pick up this game automatically since it's a real gamePk.
+              </div>
+            </>}
+        </div>
+      )}
+
+      {sub === 'rosters' && (
+        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+          {['away', 'home'].map(side => (
+            <div key={side} style={{ flex: '1 1 300px' }}>
+              <div style={{ fontFamily: osw, fontWeight: 700, fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>
+                {asg?.teams?.[side]?.name || (side === 'away' ? 'Away' : 'Home')} ({rosters[side].length})
+              </div>
+              {rosters[side].length === 0 && <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)' }}>Roster not yet posted.</div>}
+              {rosters[side].map(p => (
+                <div key={p.id} onClick={() => openAtBatSlide({ pid: p.id, name: p.name, team: '' })}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8, padding: '6px 4px', cursor: 'pointer',
+                    borderBottom: '1px solid rgba(255,255,255,.04)',
+                  }}>
+                  <PlayerAvatar pid={p.id} name={p.name} size={24} />
+                  <span style={{ fontFamily: mono, fontSize: 9, color: 'var(--muted)', width: 26 }}>{p.pos}</span>
+                  <span style={{ fontFamily: osw, fontWeight: 600, fontSize: 12, flex: 1 }}>{p.name}</span>
+                  {p.battingOrder && <span style={{ fontFamily: mono, fontSize: 9, color: 'var(--muted)' }}>#{p.battingOrder}</span>}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {sub === 'history' && (
+        <div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16 }}>
+            <input type="number" value={historyYear} onChange={e => setHistoryYear(parseInt(e.target.value) || historyYear)}
+              style={{
+                width: 80, padding: '5px 8px', background: 'var(--surface2)', border: '1px solid var(--border)',
+                borderRadius: 6, color: 'var(--text)', fontFamily: mono, fontSize: 11,
+              }} />
+            <button onClick={() => loadHistory(historyYear)}
+              style={{
+                padding: '5px 12px', borderRadius: 6, cursor: 'pointer', border: '1px solid var(--border)',
+                background: 'var(--surface2)', color: 'var(--muted)', fontFamily: mono, fontSize: 11,
+              }}>
+              Load
+            </button>
+          </div>
+          {historyLoading && <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)' }}>Loading…</div>}
+          {historyData?.asg && (
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 16 }}>
+              <div style={{ fontFamily: osw, fontWeight: 700, fontSize: 14, marginBottom: 6 }}>
+                {historyData.asg.teams.away.name} {historyData.asg.teams.away.score} @ {historyData.asg.teams.home.name} {historyData.asg.teams.home.score}
+              </div>
+              <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)' }}>
+                {historyData.asg.venue.name} · {allStarFmtDate(historyData.asg.gameDate)} · {historyData.asg.status}
+              </div>
+              {historyData.asg.description && <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)', marginTop: 6 }}>{historyData.asg.description}</div>}
+              {historyData.derby && (
+                <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+                  <div style={{ fontFamily: osw, fontWeight: 700, fontSize: 12, color: 'var(--accent)' }}>🥊 {historyData.derby.name}</div>
+                  {(historyData.derby.rounds || []).slice(-1).map(r => {
+                    const winner = (r.batters || []).find(b => b.winner);
+                    return winner ? <div key="w" style={{ fontFamily: mono, fontSize: 11, marginTop: 4 }}>👑 Champion: {winner.player?.fullName}</div> : null;
+                  })}
+                </div>
+              )}
+              {!historyData.derby && historyYear !== new Date().getFullYear() && (
+                <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)', fontFamily: mono, fontSize: 9, color: 'var(--muted)' }}>
+                  🥊 Derby bracket not available for past years — MLB's own live pointer only ever resolves the current year's event, not historical ones.
+                </div>
+              )}
+            </div>
+          )}
+          {!historyLoading && historyData && !historyData.asg && (
+            <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)' }}>No All-Star Game found for {historyYear}.</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── HomeTab — landing page with sub-nav: Cheat Sheet, Streaks, Close Calls, Pairs, Crystal Ball ──
 function HomeTab() {
   const [sub, setSub] = React.useState('cheatsheet');
@@ -32879,6 +33152,7 @@ export default function App() {
     {key:"home",       label:"🏡 Home"},
     {key:"homeruns",   label:"💥 HR Tracker"},
     {key:"live",       label:"📡 Live"},
+    {key:"allstarweek",label:"⭐ All-Star Week"},
     {key:"matchup",    label:"📋 Scouting"},
     {key:"stats",      label:"📊 Splits"},
     {key:"powerbi",    label:"🤓 Data"},
@@ -33024,6 +33298,7 @@ export default function App() {
         <div style={{display:tab==="weather"?"block":"none"}}><WeatherTab/></div>
         <div style={{display:tab==="stats"?"block":"none"}}><StatsTab/></div>
         {tab==="live"     && <LiveTab/>}
+        {tab==="allstarweek" && <AllStarWeekTab/>}
         {tab==="picks"    && <MyPicksTab/>}
         {tab==="crystal"  && <CrystalBallTab/>}
         {tab==="links"    && <LinksTab/>}
