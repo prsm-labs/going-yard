@@ -603,6 +603,20 @@ const getPitcherScore = (pitcherForm) => {
 
 const ini = (n) => n?.split(" ").map(p => p[0]).join("").toUpperCase().slice(0, 2) || "?";
 
+// lastNameOf — surname extraction that keeps suffixes attached (Jr., Sr., II,
+// III, IV). Plain `.split(' ').pop()` truncates "Bobby Witt Jr." to just "Jr."
+// — found and fixed July 13, 2026 across every display/matching site in this
+// file that previously used that pattern on a person's name.
+const SURNAME_SUFFIXES = new Set(['jr','jr.','sr','sr.','ii','iii','iv']);
+const lastNameOf = (fullName) => {
+  const parts = (fullName||'').trim().split(/\s+/).filter(Boolean);
+  if (parts.length < 2) return parts[0] || '';
+  if (parts.length >= 3 && SURNAME_SUFFIXES.has(parts[parts.length-1].toLowerCase().replace(/\.$/,''))) {
+    return `${parts[parts.length-2]} ${parts[parts.length-1]}`;
+  }
+  return parts[parts.length-1];
+};
+
 // PlayerAvatar — MLB headshot with initials fallback
 // Uses MLB's public CDN: no auth, served by player ID
 function PlayerAvatar({ pid, name, size=32, border='1.5px solid var(--border)', style={} }) {
@@ -5244,7 +5258,7 @@ async function fetchRealPitcher(game, side) {
     if (!teamId) return base;
     const rRes = await fetch(`https://statsapi.mlb.com/api/v1/teams/${teamId}/roster?rosterType=active&season=2026`);
     const rData = await rRes.json();
-    const ln = name.split(" ").pop().toLowerCase();
+    const ln = lastNameOf(name).toLowerCase();
     const rp = (rData.roster||[]).find(r => r.person?.fullName?.toLowerCase().includes(ln) && r.position?.code==="1");
     if (!rp?.person?.id) return base;
     const pid = rp.person.id;
@@ -7185,7 +7199,7 @@ function LineupsView({ date }) {
                               <span key={pi} style={{fontFamily:"'DM Mono',monospace",fontSize:7,
                                 color: LINEUP_STATUS[p.id]?.status==='confirmed'?'#27c97a':'var(--muted)',
                                 whiteSpace:'nowrap'}}>
-                                {pi+1}. {(p.fullName||'').split(' ').pop()}
+                                {pi+1}. {lastNameOf(p.fullName)}
                               </span>
                             ))}
                             {side.lineup.length===0 && (
@@ -9547,7 +9561,10 @@ function BatTrackingTab({ games, date, isToday }) {
     }));
 
     // Populate LIVE_CC_MAP — close calls from today's live at-bats
-    allPAs.forEach(pa => {
+    // Guarded on isToday: this tab can also browse past dates, and LIVE_CC_MAP
+    // is shared app-wide (read by SimLabView's Close Call filter/badge) — a
+    // historical date view must never seed it with non-today plays.
+    if (isToday) allPAs.forEach(pa => {
       if (!pa.batterId) return;
       const ev = pa.ev||0, la = pa.la||0, dist = pa.dist||0;
       if (ev >= 98 && la >= 18 && la <= 35 && dist >= 350 && !pa.isHR) {
@@ -9556,6 +9573,7 @@ function BatTrackingTab({ games, date, isToday }) {
         const already = LIVE_CC_MAP[key].plays.some(p => p.pa===pa.pa && p.gamePk===pa.gamePk);
         if (!already) {
           LIVE_CC_MAP[key].count++;
+          _CC_VER++;
           LIVE_CC_MAP[key].plays.push({pa:pa.pa,gamePk:pa.gamePk,ev,la,dist,
             inning:pa.inning,half:pa.half,result:pa.result});
         }
@@ -10883,22 +10901,22 @@ function GamedayTab() {
                   <span style={{fontFamily:mono,fontSize:9,color:'rgba(255,255,255,.25)',minWidth:12,textAlign:'right'}}>{rhe.h}</span>
                   <span style={{fontFamily:mono,fontSize:9,color:rhe.e>0?'var(--accent)':'rgba(255,255,255,.2)',minWidth:12,textAlign:'right'}}>{rhe.e}</span>
                 </>}
-                {abs === 'Preview' && <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{team?.probablePitcher?.fullName?.split(' ').pop()||'TBD'}</span>}
+                {abs === 'Preview' && <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{team?.probablePitcher?.fullName ? lastNameOf(team.probablePitcher.fullName) : 'TBD'}</span>}
               </div>
             ))}
             {/* Decisions */}
             {abs==='Final' && g.decisions && (
               <div style={{marginTop:6,paddingTop:6,borderTop:'1px solid rgba(255,255,255,.05)',display:'flex',gap:10}}>
-                {g.decisions.winner && <span style={{fontFamily:mono,fontSize:8,color:'#27c97a'}}>W: {g.decisions.winner.fullName?.split(' ').pop()}</span>}
-                {g.decisions.loser  && <span style={{fontFamily:mono,fontSize:8,color:'var(--accent)'}}>L: {g.decisions.loser.fullName?.split(' ').pop()}</span>}
-                {g.decisions.save   && <span style={{fontFamily:mono,fontSize:8,color:'var(--accent2)'}}>S: {g.decisions.save.fullName?.split(' ').pop()}</span>}
+                {g.decisions.winner && <span style={{fontFamily:mono,fontSize:8,color:'#27c97a'}}>W: {lastNameOf(g.decisions.winner.fullName)}</span>}
+                {g.decisions.loser  && <span style={{fontFamily:mono,fontSize:8,color:'var(--accent)'}}>L: {lastNameOf(g.decisions.loser.fullName)}</span>}
+                {g.decisions.save   && <span style={{fontFamily:mono,fontSize:8,color:'var(--accent2)'}}>S: {lastNameOf(g.decisions.save.fullName)}</span>}
               </div>
             )}
             {abs==='Preview' && (aw?.probablePitcher||hm?.probablePitcher) && (
               <div style={{marginTop:5,paddingTop:5,borderTop:'1px solid rgba(255,255,255,.05)',display:'flex',justifyContent:'space-between'}}>
-                <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>{aw?.probablePitcher?.fullName?.split(' ').pop()||'TBD'}</span>
+                <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>{aw?.probablePitcher?.fullName ? lastNameOf(aw.probablePitcher.fullName) : 'TBD'}</span>
                 <span style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.2)'}}>vs</span>
-                <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>{hm?.probablePitcher?.fullName?.split(' ').pop()||'TBD'}</span>
+                <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>{hm?.probablePitcher?.fullName ? lastNameOf(hm.probablePitcher.fullName) : 'TBD'}</span>
               </div>
             )}
 
@@ -10917,7 +10935,7 @@ function GamedayTab() {
               const pitcherIds = gLive.teams?.[pitchingSide]?.pitchers || [];
               const curPitchId = pitcherIds[pitcherIds.length - 1];
               const pitcherPl  = curPitchId ? gLive.teams?.[pitchingSide]?.players?.[`ID${curPitchId}`] : null;
-              const pitcherName= (pitcherPl?.person?.fullName || '—').split(' ').pop();
+              const pitcherName= lastNameOf(pitcherPl?.person?.fullName || '—');
               const pitcherIP  = pitcherPl?.stats?.pitching?.inningsPitched ?? '—';
               const pitcherERA = pitcherPl?.seasonStats?.pitching?.era ?? '—';
 
@@ -10927,7 +10945,7 @@ function GamedayTab() {
               const gInHole = gLive.inTheHoleId     || null;
               const gOuts   = ls.outs ?? null;
               const batPl   = gCurBat ? gLive.teams?.[battingSide]?.players?.[`ID${gCurBat}`] : null;
-              const batName = (batPl?.person?.fullName || '—').split(' ').pop();
+              const batName = lastNameOf(batPl?.person?.fullName || '—');
               const batSt   = batPl?.stats?.batting || {};
               const batOPS  = batPl?.seasonStats?.batting?.ops ?? '—';
 
@@ -10987,7 +11005,7 @@ function GamedayTab() {
                             const p = gLive.teams?.[s]?.players?.[`ID${id}`];
                             if (p?.person?.fullName) { fullName = p.person.fullName; break; }
                           }
-                          const lastName = fullName ? fullName.split(' ').pop() : '—';
+                          const lastName = fullName ? lastNameOf(fullName) : '—';
                           return (
                             <div key={id} style={{flex:1,textAlign:'center',minWidth:0}}>
                               <PlayerAvatar pid={id} name={fullName} size={26}/>
@@ -11084,8 +11102,8 @@ async function fetchHROdds(force = false) {
 
         // Fuzzy fallback — last name match
         if (!pid) {
-          const last = norm.split(' ').pop();
-          pid = Object.entries(nameMap).find(([n]) => n.split(' ').pop() === last &&
+          const last = lastNameOf(norm);
+          pid = Object.entries(nameMap).find(([n]) => lastNameOf(n) === last &&
             norm.split(' ')[0]?.[0] === n.split(' ')[0]?.[0])?.[1];
         }
 
@@ -11145,6 +11163,8 @@ const ROTO_NEWS_BY_NAME = {};
 // Live close call accumulator — populated by background poll during active games
 // keyed by batter_id (string) → { count, plays: [{ev,la,dist,inning,half,result,ts}] }
 const LIVE_CC_MAP = {};
+let LIVE_CC_MAP_DATE = ''; // ET date this map's data belongs to — reset guard, same pattern as HR_DATA_DATE
+let _CC_VER = 0; // bumped whenever LIVE_CC_MAP gains a new close call — poll this for reactivity
 // Module-level sig cache — populated by MatchupEngineTab, read by CheatSheetTab/HomeTab
 const SIG_CACHE_GLOBAL = {};
 
@@ -11152,6 +11172,17 @@ const SIG_CACHE_GLOBAL = {};
 // Uses LIVE_GAMES_CACHE (populated by fetchGames at app startup) to know which games are live
 async function pollLiveCloseCalls() {
   try {
+    // Reset on a new ET day — LIVE_CC_MAP has no natural expiry otherwise, so a
+    // batter's close-call count could silently carry over from a prior day and
+    // get mislabeled as "today's" close calls (this map, unlike HR_DATA, never
+    // had a date guard until this fix).
+    const _today = _etTodayYMD();
+    if (LIVE_CC_MAP_DATE && LIVE_CC_MAP_DATE !== _today) {
+      Object.keys(LIVE_CC_MAP).forEach(k => delete LIVE_CC_MAP[k]);
+      _CC_VER++;
+    }
+    LIVE_CC_MAP_DATE = _today;
+
     // Poll ALL today's games — Live AND Final — so close calls accumulate throughout the day
     // PlayByPlay for Final games is cached/static, minimal extra load
     const todayGames = (LIVE_GAMES_CACHE || []).filter(g =>
@@ -11181,6 +11212,7 @@ async function pollLiveCloseCalls() {
             const already = LIVE_CC_MAP[key].plays.some(p => p.pa===pa && p.gamePk===g.gamePk);
             if (!already) {
               LIVE_CC_MAP[key].count++;
+              _CC_VER++;
               LIVE_CC_MAP[key].plays.push({ pa, gamePk:g.gamePk, ev, la, dist,
                 inning: play.about?.inning, half: play.about?.halfInning,
                 result: play.result?.event });
@@ -15645,6 +15677,12 @@ function SimLabView({ data }) {
   const [lineupOnly, setLineupOnly]   = useState(false);
   const [slBatterHand, setSlBatterHand]   = useState('ALL');
   const [weakSpotOnly, setWeakSpotOnly] = useState(false);
+  const [closeCallOnly, setCloseCallOnly] = useState(false);
+  const [ccVer, setCcVer] = useState(_CC_VER);
+  useEffect(() => {
+    const id = setInterval(() => { if (_CC_VER !== ccVer) setCcVer(_CC_VER); }, 5000);
+    return () => clearInterval(id);
+  }, [ccVer]);
   const sigCache       = useRef({}); // caches _trackerSig per batter_id after first render
   // Sync to module-level so CheatSheetTab can read without prop drilling
   const syncSigCache = React.useCallback(() => {
@@ -15847,6 +15885,7 @@ function SimLabView({ data }) {
       .filter(r => !minOdds   || (() => { const d = HR_ODDS_MAP[String(parseInt(r.batter_id)||0)]; return d?.implied && (d.implied * 100) >= parseFloat(minOdds); })())
       .filter(r => !simSearch || (r.batter||'').toLowerCase().includes(simSearch.toLowerCase()))
       .filter(r => !weakSpotOnly || (()=>{ const _ls=liveSlot(r.batter_id,r.lineup_slot); return _ls>0&&(r.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(_ls); })())
+      .filter(r => !closeCallOnly || (LIVE_CC_MAP[String(parseInt(r.batter_id)||0)]?.count||0) > 0)
       .filter(r => !minZoneEdge || (parseInt(r._zoneEdges)||parseInt(DAILY_PICKS_CACHE[String(parseInt(r.batter_id)||0)]?._zoneEdges)||0) >= parseInt(minZoneEdge));
     const mul = sortDir === 'desc' ? -1 : 1;
     const sorted = [...filtered].sort((a, b) => {
@@ -15872,7 +15911,7 @@ function SimLabView({ data }) {
       return mul * ((parseFloat(a[sortBy]) || 0) - (parseFloat(b[sortBy]) || 0));
     });
     return sorted;
-  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterTB2Sim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, selPositionsSim, filterKeyMatchup, minYard, maxYard, minSig, maxSig, minSimTB, minOdds, minBoom, minBrl, minZoneFit, maxZoneFit, minZoneEdge, minXwoba, minL7EV, maxL7EV, minHitPct, minL7Iso, selHRUpside, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal, slotMin, slotMax, weakSpotOnly]);
+  }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterTB2Sim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, selPositionsSim, filterKeyMatchup, minYard, maxYard, minSig, maxSig, minSimTB, minOdds, minBoom, minBrl, minZoneFit, maxZoneFit, minZoneEdge, minXwoba, minL7EV, maxL7EV, minHitPct, minL7Iso, selHRUpside, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal, slotMin, slotMax, weakSpotOnly, closeCallOnly, ccVer]);
 
   // Reset row cap when filters/sort change so user always sees top results
   useEffect(() => { setDisplayLimit(150); }, [sortBy, sortDir, selMatchups, lineupOnly, simActiveOnly, simSearch, filterKeyMatchup, slotMin, slotMax]);
@@ -15990,7 +16029,7 @@ function SimLabView({ data }) {
             <div style={{display:'flex',gap:4,alignItems:'center',marginLeft:'auto',flexWrap:'wrap'}}>
               {(()=>{
                 const activeCount=[filterGoneYardSim,filterTB2Sim,filterDueSim,filterDiamondSim,simPicksOnly,
-                  simActiveOnly,simInjuredOnly,simHotOnly,filterKeyMatchup,lineupOnly,weakSpotOnly,
+                  simActiveOnly,simInjuredOnly,simHotOnly,filterKeyMatchup,lineupOnly,weakSpotOnly,closeCallOnly,
                   slBatterHand!=='ALL',slPitcherHand!=='ALL',slFormFilter.size>0,slHideFinal,
                   !!minYard,!!maxYard,!!minSig,!!maxSig,!!minSimTB,!!minOdds,
                   !!minBoom,!!minBrl,!!minZoneFit,!!maxZoneFit,!!minZoneEdge,!!minXwoba,!!minL7EV,!!maxL7EV,
@@ -16021,7 +16060,7 @@ function SimLabView({ data }) {
                 setSimActiveOnly(true); setSimInjuredOnly(false); setSimHotOnly(false);
                 setLineupOnly(false); setFilterGoneYardSim(false); setFilterDueSim(false);
                 setFilterDiamondSim(false); setSimPicksOnly(false); setFilterKeyMatchup(false);
-                setWeakSpotOnly(false);
+                setWeakSpotOnly(false); setCloseCallOnly(false);
                 setMinYard(''); setMaxYard(''); setMinSig(''); setMaxSig('');
                 setMinSimTB('0.01'); setMinOdds(''); setMinBoom(''); setMinBrl('');
                 setMinZoneFit(''); setMaxZoneFit(''); setMinZoneEdge(''); setMinXwoba(''); setMinL7EV(''); setMaxL7EV('');
@@ -16076,7 +16115,7 @@ function SimLabView({ data }) {
                   <button onClick={()=>{
                     setFilterGoneYardSim(false);setFilterDueSim(false);setFilterDiamondSim(false);
                     setSimPicksOnly(false);setSimActiveOnly(false);setSimInjuredOnly(false);
-                    setSimHotOnly(false);setFilterKeyMatchup(false);setLineupOnly(false);setWeakSpotOnly(false);
+                    setSimHotOnly(false);setFilterKeyMatchup(false);setLineupOnly(false);setWeakSpotOnly(false);setCloseCallOnly(false);
                     setSlBatterHand('ALL');setSlPitcherHand('ALL');setSlFormFilter(new Set());
                     setSlHideFinal(false);setSelBatterGradesSim(new Set());setSelPositionsSim(new Set());
                     setMinYard('');setMaxYard('');setMinSig('');setMaxSig('');
@@ -16108,6 +16147,7 @@ function SimLabView({ data }) {
                     [()=>setFilterDiamondSim(v=>!v),  filterDiamondSim,  '#ffcc00',        '💎 Diamond'],
                     [()=>setFilterKeyMatchup(v=>!v),  filterKeyMatchup,  '#ffd700',        '🔑 Key Matchup'],
                     [()=>setWeakSpotOnly(v=>!v),      weakSpotOnly,      '#a78bfa',        '🟢 Weak Spot'],
+                    [()=>setCloseCallOnly(v=>!v),     closeCallOnly,     '#f5a623',        '📍 Live Close Call'],
                     [()=>setSlHideFinal(v=>!v),       slHideFinal,       '#ff6b6b',        '🚫 Hide Final Games'],
                   ].map(([fn,active,col,label])=>(
                     <button key={label} onClick={fn}
@@ -16453,6 +16493,7 @@ function SimLabView({ data }) {
 
                     { label: 'L7 ISO',   key: 'l7_iso' },
                     { label: 'L7💥',     key: 'recent_hr_count' },
+                    { label: '📍 Live CC', key: null, colKey:'_liveCC', title:'Live Close Call — today\'s in-game near-miss(es), CC EV≥103 shows 3.06x HR lift this season' },
                     { label: '🚨 CC',    key: 'so_close_count', colKey:'so_close_count' },
                     { label: 'ZoneFit',  key: 'zone_fit' },
                     { label: 'WkSpt',    key: null, title: "Pitcher Weak Slot" },
@@ -16729,6 +16770,15 @@ function SimLabView({ data }) {
                       <td style={{textAlign:'right',padding:'3px 6px',fontFamily:"'DM Mono',monospace",fontSize:10,
                         color:(parseFloat(b.recent_avg_ev)||0)>=103?'#ff4020':(parseFloat(b.recent_avg_ev)||0)>=97?'#f5a623':'var(--muted)'}}>
                         {(parseFloat(b.recent_avg_ev)||0)>0?(parseFloat(b.recent_avg_ev)||0).toFixed(1):'—'}
+                        {/* Hypothesis flag (July 13, 2026 calibration): Grade C/D batters with */}
+                        {/* elevated Recent EV (>=88mph) — 35% of all matched HRs came from this */}
+                        {/* exact profile, and none of the existing compound signals catch it. */}
+                        {/* Display-only, not wired to any filter/score — validate against the */}
+                        {/* tracker before treating as a confirmed signal. */}
+                        {(b.grade === 'C' || b.grade === 'D') && (parseFloat(b.recent_avg_ev)||0) >= 88 && (
+                          <span title="Grade C/D + Recent EV ≥88mph — profile behind 35% of all HRs the model scored low on this season (2026 midseason calibration)"
+                            style={{marginLeft:3,fontSize:8,color:'#f5a623'}}>⚡</span>
+                        )}
                       </td>
                       <td style={{textAlign:'right',padding:'3px 6px',fontFamily:"'DM Mono',monospace",fontSize:10}}>
                         {(()=>{
@@ -16767,6 +16817,22 @@ function SimLabView({ data }) {
                           const n = parseInt(b.recent_hr_count||0);
                           const col = n>=3?'#ff4020':n>=1?'#f5a623':'rgba(255,255,255,.2)';
                           return <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,color:col}}>{n>0?n:'—'}</span>;
+                        })()}
+                      </td>
+                      {/* 📍 Live CC — today's in-game close calls (LIVE_CC_MAP, distinct from so_close_count above) */}
+                      <td style={{textAlign:'center',padding:'2px 4px',verticalAlign:'middle'}}>
+                        {(() => {
+                          const lcc = LIVE_CC_MAP[String(parseInt(b.batter_id)||0)];
+                          const n = lcc?.count || 0;
+                          if (!n) return <span style={{color:'rgba(255,255,255,.15)',fontSize:8}}>—</span>;
+                          const maxEV = Math.max(...lcc.plays.map(p=>p.ev||0));
+                          const col = maxEV>=103?'#ff4020':'#f5a623';
+                          return (
+                            <span title={`${n} live close call${n!==1?'s':''} today · Max EV: ${maxEV.toFixed(1)}`}
+                              style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:11,color:col,cursor:'default'}}>
+                              📍{n}
+                            </span>
+                          );
                         })()}
                       </td>
                       {/* 🚨 CC — yesterday's close calls */}
@@ -22495,7 +22561,7 @@ function BvPDeepDiveTab() {
                   background:'rgba(255,215,0,.04)',borderBottom:'1px solid var(--border)',
                   borderLeft:'1px solid rgba(255,215,0,.15)',textAlign:'center',whiteSpace:'nowrap'}}
                   colSpan={4}>
-                  ↓ vs {pitcher?.name?.split(' ').pop()||'pitcher'} (direct history)
+                  ↓ vs {pitcher?.name ? lastNameOf(pitcher.name) : 'pitcher'} (direct history)
                 </th>
               </tr>
               <tr>
@@ -30878,12 +30944,18 @@ function BarrelLabTab() {
     // Pass 2: normalize within each pitcher matchup group
     const withNormalized = normalizeWithinMatchup(withRaw);
     // Pass 3: barrel signal uses normalized trueHRScore
+    // Calibration correction (July 13, 2026 midseason analysis): Barrel Signal
+    // batters this season hit at 15.6% actual vs 23.2% SimHR%-implied (n=199) —
+    // a measured 0.67x ratio. Applied only to the GATE check below, not the
+    // displayed SimHR% column, since the calibration was measured on the
+    // flagged subset specifically, not the general population.
+    const SIM_HR_SUPPRESSION = 0.67;
     return withNormalized.map(r => ({
       ...r,
       isBarrelSignal:
         r.trueHRScore  >= 75 &&
         r.matchupScore >= 60 &&
-        r.simHRPct     != null && r.simHRPct >= 12.0,
+        r.simHRPct     != null && (r.simHRPct * SIM_HR_SUPPRESSION) >= 12.0,
       isLongshot: isLongshotBatter(r, r.trueHRScore, r.matchupScore),
       isWeakSlot: (() => {
         const _ls = liveSlot(parseInt(r.batter_id||0), r.lineup_slot);
