@@ -16487,6 +16487,8 @@ function SimLabView({ data }) {
                     { label: 'Sim TB',   key: 'sim_tb' },
                     { label: 'L7 EV',    key: 'recent_avg_ev' },
                     { label: 'BS Δ',     key: 'bat_speed_vs_baseline' },
+                    { label: 'Chase%',   key: 'recent_chase_pct', title: 'Batter Mechanics (2026-07-13) — % of PAs with a chase (swing outside zone) at any point. Display-only, not fed into any score yet.' },
+                    { label: 'AttAngle', key: 'recent_avg_attack_angle', title: 'Batter Mechanics — avg bat attack angle at contact (swing plane), distinct from Launch Angle (ball flight). Display-only, not fed into any score yet.' },
                     { label: 'HH%',      key: 'recent_hh_pct' },
                     { label: 'Brl%',     key: 'recent_barrel_pct' },
                     { label: 'FB%',      key: 'recent_fb_pct' },
@@ -16504,6 +16506,7 @@ function SimLabView({ data }) {
                     { label: 'HR Odds',  key: 'hr_odds_implied' },
                   ].map(col => (
                     <th key={col.colKey||col.key||String(col.label)}
+                      title={col.title || ''}
                       onClick={() => handleSort(col.key)}
                       style={{
                         textAlign: col.colKey==='_yard'?'center': col.label === 'Batter' || col.label === 'vs Pitcher' ? 'left' : 'center',
@@ -16788,6 +16791,15 @@ function SimLabView({ data }) {
                           const col=d>=1.5?'#27c97a':d>=0.5?'#a8d8a8':d<=-1.5?'#ff4020':d<=-0.5?'#f5a623':'var(--muted)';
                           return <span style={{color:col,fontWeight:700}}>{arrow}{d>=0?'+':''}{d.toFixed(1)}</span>;
                         })()}
+                      </td>
+                      {/* Chase% / Attack Angle — batter mechanics (2026-07-13), display-only, not fed into any score */}
+                      <td style={{textAlign:'right',padding:'3px 6px',fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--muted)'}}
+                        title="Chase% — % of PAs with a chase (swing outside zone) at any point. Display-only.">
+                        {b.recent_chase_pct != null && b.recent_chase_pct !== '' ? parseFloat(b.recent_chase_pct).toFixed(1)+'%' : '—'}
+                      </td>
+                      <td style={{textAlign:'right',padding:'3px 6px',fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--muted)'}}
+                        title="Attack Angle — avg bat angle at contact (swing plane), distinct from Launch Angle. Display-only.">
+                        {b.recent_avg_attack_angle != null && b.recent_avg_attack_angle !== '' ? parseFloat(b.recent_avg_attack_angle).toFixed(1)+'°' : '—'}
                       </td>
                       <td style={{textAlign:'right',padding:'3px 6px',fontFamily:"'DM Mono',monospace",fontSize:10,
                         color:(parseFloat(b.recent_hh_pct)||0)>=40?'#ff4020':(parseFloat(b.recent_hh_pct)||0)>=30?'#f5a623':'var(--muted)'}}>
@@ -30286,52 +30298,76 @@ function AllStarWeekTab() {
                 {derby.status?.currentRound ? ` · Round ${derby.status.currentRound}` : ''}
                 {derbyIsLive && derby.status?.swingsRemaining != null ? ` · ${derby.status.swingsRemaining} swings left` : ''}
               </div>
-              {(derby.rounds || []).map(r => (
-                <div key={r.round} style={{ marginBottom: 20 }}>
-                  <div style={{ fontFamily: osw, fontWeight: 700, fontSize: 12, color: 'var(--muted)', textTransform: 'uppercase', marginBottom: 8 }}>
-                    Round {r.round} — {r.type} ({r.numBatters} batters)
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', gap: 8 }}>
-                    {(r.batters || []).map((b, i) => {
-                      const pid = b.player?.id;
-                      const cp = pid ? getCachedPlayer(pid) : null;
-                      const bestSwing = b.topDerbyHitData;
-                      const hasBestSwing = bestSwing && (bestSwing.launchSpeed > 0 || bestSwing.totalDistance > 0);
-                      return (
-                        <div key={i} onClick={() => pid && openAtBatSlide({
-                            pid, name: b.player?.fullName,
-                            team: cp?.team || GLOBAL_PLAYER_TEAM_MAP[pid]?.team || '',
-                          })}
-                          style={{
-                            display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
-                            background: b.winner ? 'rgba(39,201,122,.08)' : 'var(--surface)',
-                            border: `1px solid ${b.winner ? 'rgba(39,201,122,.4)' : 'var(--border)'}`,
-                            borderRadius: 8, cursor: pid ? 'pointer' : 'default',
-                          }}>
-                          <PlayerAvatar pid={pid} name={b.player?.fullName} size={26} />
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{
-                              fontFamily: osw, fontWeight: 700, fontSize: 11, color: b.winner ? '#27c97a' : 'var(--text)',
-                              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                            }}>
-                              {b.winner && '👑 '}{b.player?.fullName || 'TBD'}
-                            </div>
-                            <div style={{ fontFamily: mono, fontSize: 9, color: 'var(--muted)' }}>
-                              {b.complete ? `${b.numHomeRuns ?? 0} HR` : b.started ? 'Batting…' : 'Waiting'}
-                              {hasBestSwing && ` · Best: ${bestSwing.launchSpeed}mph, ${Math.round(bestSwing.totalDistance)}ft`}
-                            </div>
-                            {cp && (
-                              <div style={{ fontFamily: mono, fontSize: 8, color: 'var(--muted)', opacity: .75, marginTop: 1 }}>
-                                Season: {cp.avgEV ? `${cp.avgEV} EV` : ''}{cp.barrel ? ` · ${cp.barrel}% Brl` : ''}{cp.hr ? ` · ${cp.hr} HR` : ''}{cp.xwoba ? ` · ${cp.xwoba} xwOBA` : ''}
-                              </div>
-                            )}
-                          </div>
+              {(() => {
+                // Shared batter-card renderer — Pool rounds (Round 1) list batters
+                // directly under `r.batters`; Bracket rounds (Round 2+) use
+                // `r.matchups[].topSeed`/`bottomSeed` instead (confirmed live,
+                // 2026-07-14 All-Star Derby: round.batters is absent entirely on
+                // Bracket-type rounds — this is why Round 2/3 rendered empty before).
+                const DerbyBatterCard = (b, key) => {
+                  const pid = b?.player?.id;
+                  const cp = pid ? getCachedPlayer(pid) : null;
+                  const bestSwing = b?.topDerbyHitData;
+                  const hasBestSwing = bestSwing && (bestSwing.launchSpeed > 0 || bestSwing.totalDistance > 0);
+                  return (
+                    <div key={key} onClick={() => pid && openAtBatSlide({
+                        pid, name: b.player?.fullName,
+                        team: cp?.team || GLOBAL_PLAYER_TEAM_MAP[pid]?.team || '',
+                      })}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
+                        background: b.winner ? 'rgba(39,201,122,.08)' : 'var(--surface)',
+                        border: `1px solid ${b.winner ? 'rgba(39,201,122,.4)' : 'var(--border)'}`,
+                        borderRadius: 8, cursor: pid ? 'pointer' : 'default',
+                      }}>
+                      <PlayerAvatar pid={pid} name={b.player?.fullName} size={26} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{
+                          fontFamily: osw, fontWeight: 700, fontSize: 11, color: b.winner ? '#27c97a' : 'var(--text)',
+                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                        }}>
+                          {b.winner && '👑 '}{b.player?.fullName || 'TBD'}
                         </div>
-                      );
-                    })}
+                        <div style={{ fontFamily: mono, fontSize: 9, color: 'var(--muted)' }}>
+                          {b.complete ? `${b.numHomeRuns ?? 0} HR` : b.started ? 'Batting…' : 'Waiting'}
+                          {hasBestSwing && ` · Best: ${bestSwing.launchSpeed}mph, ${Math.round(bestSwing.totalDistance)}ft`}
+                        </div>
+                        {cp && (
+                          <div style={{ fontFamily: mono, fontSize: 8, color: 'var(--muted)', opacity: .75, marginTop: 1 }}>
+                            Season: {cp.avgEV ? `${cp.avgEV} EV` : ''}{cp.barrel ? ` · ${cp.barrel}% Brl` : ''}{cp.hr ? ` · ${cp.hr} HR` : ''}{cp.xwoba ? ` · ${cp.xwoba} xwOBA` : ''}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                };
+                return (derby.rounds || []).map(r => (
+                  <div key={r.round} style={{ marginBottom: 20 }}>
+                    <div style={{ fontFamily: osw, fontWeight: 700, fontSize: 12, color: 'var(--muted)', textTransform: 'uppercase', marginBottom: 8 }}>
+                      Round {r.round} — {r.type} ({r.numBatters} batters)
+                    </div>
+                    {Array.isArray(r.batters) && r.batters.length > 0 && (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', gap: 8 }}>
+                        {r.batters.map((b, i) => DerbyBatterCard(b, i))}
+                      </div>
+                    )}
+                    {Array.isArray(r.matchups) && r.matchups.length > 0 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {r.matchups.map((m, mi) => (
+                          <div key={mi} style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 8, alignItems: 'center' }}>
+                            {DerbyBatterCard(m.topSeed, `${mi}-top`)}
+                            <div style={{ fontFamily: osw, fontWeight: 700, fontSize: 10, color: 'var(--muted)' }}>VS</div>
+                            {DerbyBatterCard(m.bottomSeed, `${mi}-bottom`)}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {!(Array.isArray(r.batters) && r.batters.length) && !(Array.isArray(r.matchups) && r.matchups.length) && (
+                      <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)' }}>Matchups not yet set.</div>
+                    )}
                   </div>
-                </div>
-              ))}
+                ));
+              })()}
             </>}
         </div>
       )}
@@ -30463,7 +30499,11 @@ function AllStarWeekTab() {
                 <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
                   <div style={{ fontFamily: osw, fontWeight: 700, fontSize: 12, color: 'var(--accent)' }}>🥊 {historyData.derby.name}</div>
                   {(historyData.derby.rounds || []).slice(-1).map(r => {
-                    const winner = (r.batters || []).find(b => b.winner);
+                    // Finals round is always Bracket-type (matchups, not batters) —
+                    // r.batters is only ever populated on the Round 1 Pool round,
+                    // so the champion has to be found via topSeed/bottomSeed here.
+                    const matchupSides = (r.matchups || []).flatMap(m => [m.topSeed, m.bottomSeed]);
+                    const winner = (r.batters || []).find(b => b.winner) || matchupSides.find(b => b?.winner);
                     return winner ? <div key="w" style={{ fontFamily: mono, fontSize: 11, marginTop: 4 }}>👑 Champion: {winner.player?.fullName}</div> : null;
                   })}
                 </div>
