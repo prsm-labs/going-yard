@@ -18498,7 +18498,7 @@ function BvPMachinePanel() {
           <div style={{fontSize:10,color:'var(--accent2)',fontFamily:"'DM Mono',monospace",
             textTransform:'uppercase',letterSpacing:.8,marginBottom:6}}>Batter</div>
           <input value={bSel ? bSel.name : bQuery}
-            onChange={e=>{ setBSel(null); setBQuery(e.target.value); }}
+            onChange={e=>{ setBSel(null); setBQuery(e.target.value); setBvp(null); setGrade(null); }}
             placeholder="Search batter name…"
             style={{width:'100%',padding:'8px 11px',borderRadius:7,border:'1px solid var(--border)',
               background:'var(--surface2)',color:'var(--text)',fontFamily:"'DM Mono',monospace",fontSize:12}}/>
@@ -18519,7 +18519,7 @@ function BvPMachinePanel() {
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
             <span style={{fontSize:10,color:'var(--accent2)',fontFamily:"'DM Mono',monospace",
               textTransform:'uppercase',letterSpacing:.8}}>Pitcher</span>
-            <button onClick={()=>{ setPTeamMode(m=>!m); setPSel(null); setPTeamSel(''); }}
+            <button onClick={()=>{ setPTeamMode(m=>!m); setPSel(null); setPTeamSel(''); setBvp(null); setGrade(null); }}
               style={{padding:'2px 8px',borderRadius:5,cursor:'pointer',fontSize:9,
                 border:'1px solid var(--border)',background:'transparent',color:'var(--muted)',
                 fontFamily:"'DM Mono',monospace"}}>
@@ -18528,7 +18528,7 @@ function BvPMachinePanel() {
           </div>
           {!pTeamMode ? <>
             <input value={pSel ? pSel.name : pQuery}
-              onChange={e=>{ setPSel(null); setPQuery(e.target.value); }}
+              onChange={e=>{ setPSel(null); setPQuery(e.target.value); setBvp(null); setGrade(null); }}
               placeholder="Search pitcher name…"
               style={{width:'100%',padding:'8px 11px',borderRadius:7,border:'1px solid var(--border)',
                 background:'var(--surface2)',color:'var(--text)',fontFamily:"'DM Mono',monospace",fontSize:12}}/>
@@ -18542,7 +18542,7 @@ function BvPMachinePanel() {
               </div>
             )}
           </> : (
-            <select value={pTeamSel} onChange={e=>setPTeamSel(e.target.value)}
+            <select value={pTeamSel} onChange={e=>{ setPTeamSel(e.target.value); setBvp(null); }}
               style={{width:'100%',padding:'8px 11px',borderRadius:7,border:'1px solid var(--border)',
                 background:'var(--surface2)',color:'var(--text)',fontFamily:"'DM Mono',monospace",fontSize:12}}>
               <option value="">Select a team…</option>
@@ -18579,7 +18579,7 @@ function BvPMachinePanel() {
         </div>
       )}
 
-      {!bvpLoading && bvp && !pTeamMode && (
+      {!bvpLoading && bvp && !pTeamMode && bSel && pSel && (
         <div style={{marginTop:16}}>
           {bvp.pa === 0
             ? <div style={{padding:'20px',textAlign:'center',color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:12}}>
@@ -18597,7 +18597,7 @@ function BvPMachinePanel() {
         </div>
       )}
 
-      {!bvpLoading && bvp && pTeamMode && (
+      {!bvpLoading && bvp && pTeamMode && bSel && pTeamSel && (
         <div style={{marginTop:16}}>
           {bvp.pa === 0
             ? <div style={{padding:'20px',textAlign:'center',color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:12}}>
