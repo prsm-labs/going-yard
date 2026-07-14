@@ -38,9 +38,36 @@ self.onmessage = function(e) {
     // Pitcher-specific rate is the actual observed HR rate this pitcher
     // allows to this batter's handedness — more predictive than batter alone.
     const hrRate = parseFloat(r.recent_hr_rate || 0) / 100;
-    const batterHRperFB = fbPct > 0.01
+    const rawBatterHRperFB = fbPct > 0.01
       ? Math.min(0.35, hrRate / fbPct)
       : 0.10;
+
+    // ── ISO-anchored floor (2026-07-14 validation fix) ───────────────────
+    // recent_hr_rate is a raw L7 rate that's literally 0 for most batters
+    // most weeks (confirmed: 85% of all daily_picks.csv rows have
+    // recent_hr_rate === 0) -- the line above then computes batterHRperFB
+    // as a hard, deterministic ZERO for any of them, which the simulation
+    // then can never overcome across all 10,000 runs. Real tracker check
+    // (2,820 matched batter-days, 2026-07-14): batters landing at a literal
+    // 0% SimHR still hit at a real 6.9% rate, not far below the ~9.4% rate
+    // for batters whose recent window happened to have a nonzero HR. This
+    // floor uses the batter's season-blended ISO (recent_iso — a real
+    // 20/30/50 season/L15/L7 blend, never a hard zero for anyone with
+    // playing time) as a backstop, via an empirical ISO -> game-level HR
+    // rate mapping derived directly from 23,923 real 2026 season batter-days
+    // (all-matchups-season-2026.csv). Converted to a per-FB rate assuming
+    // ~4 PAs/game, same avgPAs anchor used later in this function.
+    const isoVal = parseFloat(r.recent_iso || 0);
+    const isoGameHRrate =
+      isoVal >= 0.32 ? 0.097 :
+      isoVal >= 0.28 ? 0.095 :
+      isoVal >= 0.24 ? 0.095 :
+      isoVal >= 0.20 ? 0.103 :
+      isoVal >= 0.16 ? 0.111 :
+      isoVal >= 0.12 ? 0.084 :
+      isoVal >= 0.08 ? 0.053 : 0.041;
+    const isoFloorHRperFB = fbPct > 0.01 ? Math.min(0.35, (isoGameHRrate / 4.0) / fbPct) : 0;
+    const batterHRperFB = Math.max(rawBatterHRperFB, isoFloorHRperFB);
 
     const bHand = (r.batter_hand || '').toUpperCase();
     const pitcherHRpct = parseFloat(
@@ -135,9 +162,21 @@ self.onmessage = function(e) {
       : (bHand !== pHand ? 1.08 : 0.94);
 
     // ── Adjusted HR/FB% ──────────────────────────────────────────────────
-    const adjHRperFB = Math.min(0.45,
-      hrPerFB * parkFactor * windMult * pitcherMult * platoonMult * brlSuppressor
-    );
+    // Diminishing-returns taper (2026-07-14 validation fix) replacing the old
+    // flat 0.45 ceiling — same pattern as taperGHR() elsewhere in this app.
+    // Real tracker check (2,820 matched batter-days): the flat cap let
+    // multiplier-stacking cases (hot batter x hitter's park x tailwind x weak
+    // pitcher, all compounding in the same direction) predict ~30% game-level
+    // HR probability in the top tier when the real rate there was ~11%.
+    // Tapering above 0.20 brought the Brier score from 0.0905 to 0.0843 on
+    // that same tracker sample (still short of a trivial always-predict-
+    // base-rate baseline of 0.0805 -- flagging honestly, not claiming this
+    // is now well-calibrated, just meaningfully less overconfident).
+    const rawHRperFB = hrPerFB * parkFactor * windMult * pitcherMult * platoonMult * brlSuppressor;
+    const TAPER_CAP = 0.20;
+    const adjHRperFB = rawHRperFB <= TAPER_CAP
+      ? rawHRperFB
+      : TAPER_CAP + Math.sqrt(rawHRperFB - TAPER_CAP) * 0.15;
 
     // ── PA count variance by lineup slot ────────────────────────────────
     const slot   = parseInt(r.lineup_slot || 5);
