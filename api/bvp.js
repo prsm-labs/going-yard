@@ -75,12 +75,39 @@ async function fetchBvTeam(batterId, teamId) {
                   avg:'—', obp:'—', slg:'—', byPitcher: [], _debug: '' };
 
   try {
-    const url = `https://statsapi.mlb.com/api/v1/people/${bid}/stats` +
-      `?stats=vsTeam5Y&opposingTeamId=${tid}&group=hitting&sportId=1&gameType=R`;
-    const r = await fetch(url, { headers: H, signal: AbortSignal.timeout(7000) });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const d = await r.json();
-    const splits = d.stats?.[0]?.splits || [];
+    // vsTeam5Y is unreliable on MLB's side — confirmed empty for real players
+    // with genuine multi-season history vs the opponent (e.g. Schwarber vs
+    // NYY: 85 real career PA back to 2017, vsTeam5Y returns zero splits even
+    // with an explicit season param). vsPlayer5Y (specific-pitcher mode)
+    // doesn't have this problem. Try vsTeam5Y first (true recent-years-only
+    // window when it works); if empty, fall back to full-career vsTeam
+    // (confirmed same per-split shape) rather than reporting false "no
+    // history." aggregateSplits() below is shared by both attempts.
+    const splits5y = await (async () => {
+      const url = `https://statsapi.mlb.com/api/v1/people/${bid}/stats` +
+        `?stats=vsTeam5Y&opposingTeamId=${tid}&group=hitting&sportId=1&gameType=R`;
+      const r = await fetch(url, { headers: H, signal: AbortSignal.timeout(7000) });
+      if (!r.ok) return [];
+      const d = await r.json();
+      return d.stats?.[0]?.splits || [];
+    })();
+
+    let splits = splits5y, rangeUsed = '5y';
+    if (!splits.length) {
+      const urlCareer = `https://statsapi.mlb.com/api/v1/people/${bid}/stats` +
+        `?stats=vsTeam&opposingTeamId=${tid}&group=hitting&sportId=1&gameType=R`;
+      const rc = await fetch(urlCareer, { headers: H, signal: AbortSignal.timeout(7000) });
+      if (rc.ok) {
+        const dc = await rc.json();
+        // vsTeam response has two blocks: vsTeamTotal (single aggregate row)
+        // and vsTeam (per-pitcher-per-season splits) — we want the latter,
+        // same shape as vsTeam5Y's splits.
+        const vt = (dc.stats || []).find(b => b.type?.displayName === 'vsTeam');
+        splits = vt?.splits || [];
+        rangeUsed = 'career';
+      }
+    }
+
     if (!splits.length) { CACHE[k] = { data: EMPTY, ts: Date.now() }; return EMPTY; }
 
     let ab=0,h=0,hr=0,b2=0,b3=0,bb=0,ko=0,sb=0,tb=0;
@@ -103,7 +130,7 @@ async function fetchBvTeam(batterId, teamId) {
     const obp = (ab+bb)>0 ? ((h+bb)/(ab+bb)).toFixed(3).replace(/^0/,'') : '.000';
     const slg = ab>0 ? (tb/ab).toFixed(3).replace(/^0/,'') : '.000';
     const data = { pa, ab, h, hr, b2, b3, b1: Math.max(0,h-hr-b2-b3), bb, k:ko, sb,
-                    avg, obp, slg, byPitcher: byPitcher.sort((a,b)=>b.pa-a.pa) };
+                    avg, obp, slg, byPitcher: byPitcher.sort((a,b)=>b.pa-a.pa), rangeUsed };
     CACHE[k] = { data, ts: Date.now() };
     return data;
   } catch(e) {

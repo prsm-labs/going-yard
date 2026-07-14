@@ -18604,6 +18604,12 @@ function BvPMachinePanel() {
                 No recorded plate appearances for {bSel.name} vs {pTeamSel} pitchers in this window.
               </div>
             : <>
+              {bvp.rangeUsed === 'career' && (
+                <div style={{fontSize:10,color:'#f5a623',fontFamily:"'DM Mono',monospace",marginBottom:10,
+                  padding:'5px 9px',background:'rgba(245,166,35,.08)',borderRadius:5,border:'1px solid rgba(245,166,35,.25)'}}>
+                  ⓘ Recent-years data unavailable for this pairing — showing full career instead.
+                </div>
+              )}
               <div style={{display:'flex',gap:16,flexWrap:'wrap',fontFamily:"'DM Mono',monospace",fontSize:12,marginBottom:14}}>
                 {[['PA',bvp.pa],['AB',bvp.ab],['H',bvp.h],['HR',bvp.hr],['BB',bvp.bb],['K',bvp.k],
                   ['AVG',bvp.avg],['OBP',bvp.obp],['SLG',bvp.slg]].map(([label,val])=>(
