@@ -18012,6 +18012,7 @@ function BvPHistoryTab({ data }) {
   const [bvpInjuredOnly, setBvpInjuredOnly] = useState(false);
   const [minPA, setMinPA]         = useState(1);
   const [search, setSearch]       = useState('');
+  const [bvpMode, setBvpMode]     = useState('slate'); // 'slate' (today's matchups) | 'machine' (any batter/pitcher)
 
   // Re-check PROBABLE_PITCHER_MAP after live games load (it populates async after fetchGames)
   const [ppMapVer, setPPMapVer] = useState(0);
@@ -18182,6 +18183,29 @@ function BvPHistoryTab({ data }) {
 
   return (
     <div>
+      {/* Mode toggle — today's slate (default) vs BvP Machine (any batter/pitcher, free pick) */}
+      <div style={{display:'flex',gap:6,marginBottom:12}}>
+        <button onClick={()=>setBvpMode('slate')}
+          style={{padding:'5px 12px',borderRadius:6,cursor:'pointer',
+            border:`1px solid ${bvpMode==='slate'?'var(--ice)':'var(--border)'}`,
+            background:bvpMode==='slate'?'rgba(56,184,242,.14)':'transparent',
+            color:bvpMode==='slate'?'var(--ice)':'var(--muted)',
+            fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:bvpMode==='slate'?700:400}}>
+          📅 Today's Matchups
+        </button>
+        <button onClick={()=>setBvpMode('machine')}
+          style={{padding:'5px 12px',borderRadius:6,cursor:'pointer',
+            border:`1px solid ${bvpMode==='machine'?'#a78bfa':'var(--border)'}`,
+            background:bvpMode==='machine'?'rgba(167,139,250,.14)':'transparent',
+            color:bvpMode==='machine'?'#a78bfa':'var(--muted)',
+            fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:bvpMode==='machine'?700:400}}>
+          🥊 BvP Machine
+        </button>
+      </div>
+
+      {bvpMode === 'machine' && <BvPMachinePanel/>}
+
+      {bvpMode === 'slate' && <>
       {/* Controls */}
       <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
         <HandFilter mode="batter" value={bvpBatterHand} onChange={setBvpBatterHand}/>
@@ -18321,6 +18345,333 @@ function BvPHistoryTab({ data }) {
             </table>
           </div>
       }
+      </>}
+    </div>
+  );
+}
+
+// ── BvP Machine ──────────────────────────────────────────────────────────────
+// Free-form batter-vs-pitcher (or batter-vs-team) lookup, independent of
+// today's slate. Left: batter search, team auto-fills from the pick. Right:
+// either a specific pitcher (search) or "any pitcher on this team" (dropdown).
+// Data: api/bvp.js (vsPlayer5Y / vsTeam5Y — recent-years window, not full
+// career) via api/player-search.js for the name lookups.
+
+const BVPM_TEAMS = [
+  ['AZ',109],['ATL',144],['BAL',110],['BOS',111],['CHC',112],['CWS',145],
+  ['CIN',113],['CLE',114],['COL',115],['DET',116],['HOU',117],['KC',118],
+  ['LAA',108],['LAD',119],['MIA',146],['MIL',158],['MIN',142],['NYM',121],
+  ['NYY',147],['ATH',133],['PHI',143],['PIT',134],['SD',135],['SEA',136],
+  ['SF',137],['STL',138],['TB',139],['TEX',140],['TOR',141],['WSH',120],
+];
+
+// Simple standalone batter quality tier — NOT the engine's Grade/Boom stack.
+// Used only to give the BvP Machine's cold matchup grade a batter-side input
+// when there's no daily_picks.csv row to read from (arbitrary pairing).
+function bvpmBatterTier(avg, obp, slg, hr, pa) {
+  const ops = (parseFloat(obp)||0) + (parseFloat(slg)||0);
+  if (!pa || pa < 20) return { mult: 1.00, label: 'Limited sample' };
+  if (ops >= .850) return { mult: 1.22, label: 'Elite bat' };
+  if (ops >= .780) return { mult: 1.10, label: 'Above-average bat' };
+  if (ops >= .700) return { mult: 1.00, label: 'League-average bat' };
+  if (ops >= .630) return { mult: 0.90, label: 'Below-average bat' };
+  return { mult: 0.80, label: 'Weak bat' };
+}
+
+function BvPMachinePanel() {
+  const [bQuery, setBQuery]     = useState('');
+  const [bResults, setBResults] = useState([]);
+  const [bSel, setBSel]         = useState(null); // {id,name,team,teamId,bats}
+  const [pTeamMode, setPTeamMode] = useState(false); // false=specific pitcher, true=whole team
+  const [pQuery, setPQuery]     = useState('');
+  const [pResults, setPResults] = useState([]);
+  const [pSel, setPSel]         = useState(null); // {id,name,team,teamId,throws}
+  const [pTeamSel, setPTeamSel] = useState('');   // team abbr for team-only mode
+  const [range, setRange]       = useState('5y'); // '5y' | 'career'
+  const [bvp, setBvp]           = useState(null);
+  const [bvpLoading, setBvpLoading] = useState(false);
+  const [grade, setGrade]       = useState(null);
+  const [gradeLoading, setGradeLoading] = useState(false);
+
+  // Debounced search — batter
+  useEffect(() => {
+    if (bQuery.trim().length < 2) { setBResults([]); return; }
+    const t = setTimeout(() => {
+      fetch(`/api/player-search?q=${encodeURIComponent(bQuery.trim())}&type=batter`)
+        .then(r => r.json()).then(d => setBResults(d.results||[])).catch(()=>setBResults([]));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [bQuery]);
+
+  // Debounced search — pitcher
+  useEffect(() => {
+    if (pTeamMode || pQuery.trim().length < 2) { setPResults([]); return; }
+    const t = setTimeout(() => {
+      fetch(`/api/player-search?q=${encodeURIComponent(pQuery.trim())}&type=pitcher`)
+        .then(r => r.json()).then(d => setPResults(d.results||[])).catch(()=>setPResults([]));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [pQuery, pTeamMode]);
+
+  // Fetch BvP once both sides are picked
+  useEffect(() => {
+    setBvp(null);
+    if (!bSel) return;
+    if (!pTeamMode && !pSel) return;
+    if (pTeamMode && !pTeamSel) return;
+    setBvpLoading(true);
+    const url = pTeamMode
+      ? `/api/bvp?batter=${bSel.id}&teamId=${BVPM_TEAMS.find(t=>t[0]===pTeamSel)?.[1]}`
+      : `/api/bvp?batter=${bSel.id}&pitcher=${pSel.id}&range=${range}`;
+    fetch(url).then(r=>r.json()).then(d=>{ setBvp(d); setBvpLoading(false); })
+      .catch(()=>{ setBvp(null); setBvpLoading(false); });
+  }, [bSel, pSel, pTeamMode, pTeamSel, range]);
+
+  // Standalone cold matchup grade — only meaningful for a specific pitcher
+  // (a whole-team fallback has no single pitcher grade to compute).
+  useEffect(() => {
+    setGrade(null);
+    if (!bSel || pTeamMode || !pSel) return;
+    setGradeLoading(true);
+    Promise.all([
+      fetch(`/api/pitcher?pid=${pSel.id}&year=2026`).then(r=>r.json()).catch(()=>null),
+      fetch(`https://statsapi.mlb.com/api/v1/people/${bSel.id}/stats?stats=season&group=hitting&season=2026&sportId=1`)
+        .then(r=>r.json()).catch(()=>null),
+    ]).then(([pData, bData]) => {
+      const ps = pData?.stats || {};
+      const pGrade = gradePitcher(ps.era, ps.k9, ps.whip, ps.bb9, ps.hr9, ps.avg, ps.obp, ps.ip);
+      const pMult = pitcherGradeMult(pGrade.label);
+
+      const bs = bData?.stats?.[0]?.splits?.[0]?.stat || {};
+      const bTier = bvpmBatterTier(bs.avg, bs.obp, bs.slg, bs.homeRuns, bs.plateAppearances);
+
+      const bHand = bSel.bats === 'S' ? null : bSel.bats; // switch hitters — no fixed platoon read
+      const pHand = pSel.throws || null;
+      const platoonMult = (bHand && pHand) ? (bHand !== pHand ? 1.08 : 0.94) : 1.00;
+
+      // Small BvP-sample nudge — capped weight so a handful of ABs can't swing the grade much.
+      let bvpMult = 1.00, bvpNote = 'No BvP sample';
+      if (bvp && bvp.pa >= 8) {
+        const bvpOps = (parseFloat(bvp.obp)||0) + (parseFloat(bvp.slg)||0);
+        const w = Math.min(0.15, bvp.pa / 200);
+        bvpMult = 1 + ((bvpOps - .700) / .700) * w;
+        bvpNote = `${bvp.pa} PA sample factored in at ${(w*100).toFixed(0)}% weight`;
+      } else if (bvp) {
+        bvpNote = `Sample too thin (${bvp.pa||0} PA) — not factored in`;
+      }
+
+      const raw = 50 * pMult * bTier.mult * platoonMult * bvpMult;
+      const score = Math.max(0, Math.min(100, Math.round(raw)));
+      setGrade({
+        score, pGrade: pGrade.label, pColor: pGrade.color, bTier: bTier.label,
+        platoonLabel: !bHand||!pHand ? 'Unknown/switch — neutral' : (bHand!==pHand ? 'Favorable (cross-hand)' : 'Unfavorable (same-hand)'),
+        bvpNote,
+      });
+      setGradeLoading(false);
+    }).catch(()=>setGradeLoading(false));
+  }, [bSel, pSel, pTeamMode, bvp]);
+
+  const PickerResults = ({ results, onPick, roleLabel }) => results.length === 0 ? null : (
+    <div style={{marginTop:4,border:'1px solid var(--border)',borderRadius:7,overflow:'hidden',maxHeight:200,overflowY:'auto'}}>
+      {results.map(r => (
+        <div key={r.id} onClick={()=>onPick(r)}
+          style={{padding:'6px 10px',cursor:'pointer',display:'flex',justifyContent:'space-between',
+            alignItems:'center',borderBottom:'1px solid var(--border)',fontFamily:"'DM Mono',monospace",fontSize:11}}
+          onMouseEnter={e=>e.currentTarget.style.background='var(--surface2)'}
+          onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+          <span>{r.name}</span>
+          <span style={{color:'var(--muted)',fontSize:9}}>{r.team||'—'} · {r.pos}</span>
+        </div>
+      ))}
+    </div>
+  );
+
+  return (
+    <div>
+      <div style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginBottom:12,
+        padding:'6px 10px',background:'rgba(167,139,250,.08)',borderRadius:6,border:'1px solid rgba(167,139,250,.2)'}}>
+        🥊 Pick any batter and any pitcher (or a whole pitching staff) — not limited to today's games. History defaults to the last 5 seasons.
+      </div>
+      <div style={{display:'flex',gap:16,flexWrap:'wrap'}}>
+        {/* Batter side */}
+        <div style={{flex:'1 1 280px',minWidth:240}}>
+          <div style={{fontSize:10,color:'var(--accent2)',fontFamily:"'DM Mono',monospace",
+            textTransform:'uppercase',letterSpacing:.8,marginBottom:6}}>Batter</div>
+          <input value={bSel ? bSel.name : bQuery}
+            onChange={e=>{ setBSel(null); setBQuery(e.target.value); }}
+            placeholder="Search batter name…"
+            style={{width:'100%',padding:'8px 11px',borderRadius:7,border:'1px solid var(--border)',
+              background:'var(--surface2)',color:'var(--text)',fontFamily:"'DM Mono',monospace",fontSize:12}}/>
+          {!bSel && <PickerResults results={bResults} onPick={r=>{ setBSel(r); setBResults([]); }}/>}
+          {bSel && (
+            <div style={{marginTop:6,display:'flex',alignItems:'center',gap:6}}>
+              <span style={{padding:'3px 9px',borderRadius:6,background:'rgba(56,184,242,.12)',
+                border:'1px solid rgba(56,184,242,.3)',color:'var(--ice)',fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:700}}>
+                {bSel.team || '—'}
+              </span>
+              <span style={{fontSize:10,color:'var(--muted)'}}>Team auto-detected from player</span>
+            </div>
+          )}
+        </div>
+
+        {/* Pitcher side */}
+        <div style={{flex:'1 1 280px',minWidth:240}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+            <span style={{fontSize:10,color:'var(--accent2)',fontFamily:"'DM Mono',monospace",
+              textTransform:'uppercase',letterSpacing:.8}}>Pitcher</span>
+            <button onClick={()=>{ setPTeamMode(m=>!m); setPSel(null); setPTeamSel(''); }}
+              style={{padding:'2px 8px',borderRadius:5,cursor:'pointer',fontSize:9,
+                border:'1px solid var(--border)',background:'transparent',color:'var(--muted)',
+                fontFamily:"'DM Mono',monospace"}}>
+              {pTeamMode ? '↩ Pick specific pitcher' : 'Or pick a whole team →'}
+            </button>
+          </div>
+          {!pTeamMode ? <>
+            <input value={pSel ? pSel.name : pQuery}
+              onChange={e=>{ setPSel(null); setPQuery(e.target.value); }}
+              placeholder="Search pitcher name…"
+              style={{width:'100%',padding:'8px 11px',borderRadius:7,border:'1px solid var(--border)',
+                background:'var(--surface2)',color:'var(--text)',fontFamily:"'DM Mono',monospace",fontSize:12}}/>
+            {!pSel && <PickerResults results={pResults} onPick={r=>{ setPSel(r); setPResults([]); }}/>}
+            {pSel && (
+              <div style={{marginTop:6}}>
+                <span style={{padding:'3px 9px',borderRadius:6,background:'rgba(255,128,32,.12)',
+                  border:'1px solid rgba(255,128,32,.3)',color:'#ff8020',fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:700}}>
+                  {pSel.team || '—'} · {pSel.throws}HP
+                </span>
+              </div>
+            )}
+          </> : (
+            <select value={pTeamSel} onChange={e=>setPTeamSel(e.target.value)}
+              style={{width:'100%',padding:'8px 11px',borderRadius:7,border:'1px solid var(--border)',
+                background:'var(--surface2)',color:'var(--text)',fontFamily:"'DM Mono',monospace",fontSize:12}}>
+              <option value="">Select a team…</option>
+              {BVPM_TEAMS.map(([abbr])=><option key={abbr} value={abbr}>{abbr}</option>)}
+            </select>
+          )}
+        </div>
+      </div>
+
+      {!pTeamMode && bSel && pSel && (
+        <div style={{marginTop:12,display:'flex',gap:6}}>
+          <button onClick={()=>setRange('5y')}
+            style={{padding:'3px 10px',borderRadius:5,cursor:'pointer',fontSize:10,
+              border:`1px solid ${range==='5y'?'var(--ice)':'var(--border)'}`,
+              background:range==='5y'?'rgba(56,184,242,.14)':'transparent',
+              color:range==='5y'?'var(--ice)':'var(--muted)',fontFamily:"'DM Mono',monospace",fontWeight:range==='5y'?700:400}}>
+            Last 5 seasons
+          </button>
+          <button onClick={()=>setRange('career')}
+            style={{padding:'3px 10px',borderRadius:5,cursor:'pointer',fontSize:10,
+              border:`1px solid ${range==='career'?'var(--ice)':'var(--border)'}`,
+              background:range==='career'?'rgba(56,184,242,.14)':'transparent',
+              color:range==='career'?'var(--ice)':'var(--muted)',fontFamily:"'DM Mono',monospace",fontWeight:range==='career'?700:400}}>
+            Full career
+          </button>
+        </div>
+      )}
+
+      {/* Results */}
+      {bvpLoading && (
+        <div style={{marginTop:20,display:'flex',alignItems:'center',gap:8,color:'var(--muted)',
+          fontFamily:"'DM Mono',monospace",fontSize:11}}>
+          <div className="sp" style={{width:14,height:14,borderWidth:2}}/> Loading history…
+        </div>
+      )}
+
+      {!bvpLoading && bvp && !pTeamMode && (
+        <div style={{marginTop:16}}>
+          {bvp.pa === 0
+            ? <div style={{padding:'20px',textAlign:'center',color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:12}}>
+                No recorded plate appearances for {bSel.name} vs {pSel.name} in this window.
+              </div>
+            : <div style={{display:'flex',gap:16,flexWrap:'wrap',fontFamily:"'DM Mono',monospace",fontSize:12}}>
+                {[['PA',bvp.pa],['AB',bvp.ab],['H',bvp.h],['HR',bvp.hr],['2B',bvp.b2],['3B',bvp.b3],
+                  ['BB',bvp.bb],['K',bvp.k],['AVG',bvp.avg],['OBP',bvp.obp],['SLG',bvp.slg]].map(([label,val])=>(
+                  <div key={label} style={{textAlign:'center'}}>
+                    <div style={{fontSize:9,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.6}}>{label}</div>
+                    <div style={{fontSize:16,fontWeight:700,color: label==='HR'&&val>0 ? 'var(--accent)' : 'var(--text)'}}>{val}</div>
+                  </div>
+                ))}
+              </div>}
+        </div>
+      )}
+
+      {!bvpLoading && bvp && pTeamMode && (
+        <div style={{marginTop:16}}>
+          {bvp.pa === 0
+            ? <div style={{padding:'20px',textAlign:'center',color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:12}}>
+                No recorded plate appearances for {bSel.name} vs {pTeamSel} pitchers in this window.
+              </div>
+            : <>
+              <div style={{display:'flex',gap:16,flexWrap:'wrap',fontFamily:"'DM Mono',monospace",fontSize:12,marginBottom:14}}>
+                {[['PA',bvp.pa],['AB',bvp.ab],['H',bvp.h],['HR',bvp.hr],['BB',bvp.bb],['K',bvp.k],
+                  ['AVG',bvp.avg],['OBP',bvp.obp],['SLG',bvp.slg]].map(([label,val])=>(
+                  <div key={label} style={{textAlign:'center'}}>
+                    <div style={{fontSize:9,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.6}}>{label}</div>
+                    <div style={{fontSize:16,fontWeight:700,color: label==='HR'&&val>0 ? 'var(--accent)' : 'var(--text)'}}>{val}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginBottom:6,textTransform:'uppercase',letterSpacing:.6}}>
+                By pitcher faced
+              </div>
+              <div className="tw" style={{maxHeight:220,overflowY:'auto'}}>
+                <table style={{width:'100%',borderCollapse:'collapse',fontFamily:"'DM Mono',monospace",fontSize:11}}>
+                  <thead><tr style={{background:'var(--surface2)'}}>
+                    {['Pitcher','PA','AB','H','HR','AVG','SLG'].map(h=>(
+                      <th key={h} style={{padding:'5px 8px',textAlign:h==='Pitcher'?'left':'right',
+                        fontSize:9,color:'var(--muted)',textTransform:'uppercase'}}>{h}</th>
+                    ))}
+                  </tr></thead>
+                  <tbody>
+                    {bvp.byPitcher.map(p=>(
+                      <tr key={p.pitcherId} style={{borderBottom:'1px solid rgba(30,45,58,.4)'}}>
+                        <td style={{padding:'5px 8px'}}>{p.pitcherName}</td>
+                        <td style={{padding:'5px 8px',textAlign:'right'}}>{p.pa}</td>
+                        <td style={{padding:'5px 8px',textAlign:'right'}}>{p.ab}</td>
+                        <td style={{padding:'5px 8px',textAlign:'right'}}>{p.h}</td>
+                        <td style={{padding:'5px 8px',textAlign:'right',color:p.hr>0?'var(--accent)':'inherit',fontWeight:p.hr>0?700:400}}>{p.hr}</td>
+                        <td style={{padding:'5px 8px',textAlign:'right'}}>{p.avg}</td>
+                        <td style={{padding:'5px 8px',textAlign:'right'}}>{p.slg}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>}
+        </div>
+      )}
+
+      {/* Standalone matchup grade — specific pitcher only */}
+      {!pTeamMode && bSel && pSel && (
+        <div style={{marginTop:20,padding:'12px 14px',borderRadius:8,
+          background:'rgba(167,139,250,.06)',border:'1px solid rgba(167,139,250,.25)'}}>
+          <div style={{fontSize:10,color:'#a78bfa',fontFamily:"'DM Mono',monospace",
+            textTransform:'uppercase',letterSpacing:.8,marginBottom:8}}>
+            🧪 Cold Matchup Grade — standalone, not the live Yard Score engine
+          </div>
+          {gradeLoading && <div style={{color:'var(--muted)',fontSize:11,fontFamily:"'DM Mono',monospace"}}>Computing…</div>}
+          {!gradeLoading && grade && (
+            <div>
+              <div style={{fontSize:28,fontWeight:800,fontFamily:"'Oswald',sans-serif",
+                color: grade.score>=65?'#27c97a':grade.score>=45?'var(--text)':'#ff6b6b'}}>
+                {grade.score}<span style={{fontSize:14,color:'var(--muted)'}}>/100</span>
+              </div>
+              <div style={{fontSize:11,fontFamily:"'DM Mono',monospace",color:'var(--muted)',lineHeight:1.7}}>
+                Pitcher grade: <span style={{color:grade.pColor,fontWeight:700}}>{grade.pGrade}</span> (2026 season stats)<br/>
+                Batter tier: <span style={{color:'var(--text)'}}>{grade.bTier}</span> (2026 season stats)<br/>
+                Platoon: <span style={{color:'var(--text)'}}>{grade.platoonLabel}</span><br/>
+                BvP sample: <span style={{color:'var(--text)'}}>{grade.bvpNote}</span>
+              </div>
+              <div style={{fontSize:9,color:'var(--muted)',marginTop:8,fontStyle:'italic'}}>
+                No park, weather, lineup slot, or pitch-arsenal data — this is a simplified season-stats-only
+                grade for arbitrary/historical pairings, not validated against the tracker.
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
