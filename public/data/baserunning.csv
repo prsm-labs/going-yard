@@ -417,6 +417,7 @@ player_id,name,team,stolen_bases,caught_stealing,sb_pct,sb_opportunities
 663743,Nick Fortes,TB,0,0,0.0,0
 686765,Nick Sogard,BOS,0,0,0.0,0
 695238,Will Wagner,SD,0,0,0.0,0
+668952,Ryan Kreidler,MIN,0,3,0.0,0
 687221,Dalton Rushing,LAD,0,0,0.0,0
 670623,Isaac Paredes,HOU,0,0,0.0,0
 682626,Francisco Alvarez,NYM,0,0,0.0,0
@@ -434,7 +435,6 @@ player_id,name,team,stolen_bases,caught_stealing,sb_pct,sb_opportunities
 676724,Jared Young,NYM,0,0,0.0,0
 694212,Samuel Basallo,BAL,0,0,0.0,0
 545341,Randal Grichuk,CWS,0,0,0.0,0
-668952,Ryan Kreidler,MIN,0,3,0.0,0
 663993,Nathaniel Lowe,CIN,0,0,0.0,0
 676369,Nelson Velázquez,STL,0,0,0.0,0
 665861,Sebastián Rivero,LAA,0,0,0.0,0
@@ -479,14 +479,15 @@ player_id,name,team,stolen_bases,caught_stealing,sb_pct,sb_opportunities
 700932,Kyle Manzardo,CLE,0,0,0.0,0
 695020,Tanner Murray,CWS,0,0,0.0,0
 702176,Alan Roden,MIN,0,0,0.0,0
-624585,Jorge Soler,LAA,0,0,0.0,0
 672284,Jarred Kelenic,TEX,0,1,0.0,0
 681351,Logan O'Hoppe,LAA,0,0,0.0,0
 668901,Mark Vientos,NYM,0,0,0.0,0
+624585,Jorge Soler,LAA,0,0,0.0,0
 624428,Adam Frazier,LAA,0,0,0.0,0
 521692,Salvador Perez,KC,0,0,0.0,0
 553993,Eugenio Suárez,CIN,0,1,0.0,0
 679529,Spencer Torkelson,DET,0,1,0.0,0
+668942,Josh Rojas,KC,0,0,0.0,0
 542303,Marcell Ozuna,PIT,0,0,0.0,0
 691019,Kyle Teel,CWS,0,0,0.0,0
 681807,David Fry,CLE,0,0,0.0,0
@@ -520,7 +521,6 @@ player_id,name,team,stolen_bases,caught_stealing,sb_pct,sb_opportunities
 656555,Rhys Hoskins,CLE,0,0,0.0,0
 682877,Juan Brito,CLE,0,0,0.0,0
 666464,Jerar Encarnacion,SF,0,0,0.0,0
-668942,Josh Rojas,KC,0,0,0.0,0
 676572,Eric Wagaman,NYM,0,0,0.0,0
 623168,Tyler Heineman,LAA,0,0,0.0,0
 669087,Sam Huff,BAL,0,0,0.0,0
