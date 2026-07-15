@@ -31131,11 +31131,43 @@ function groupC_FormRecency(r) {
   return (formScore * 0.70 + recentHRScore * 0.30);
 }
 
+// Attack angle + chase rate — confirmed standalone HR correlations from the
+// July 14 2026 investigation (full backfilled AB log, same-PA basis):
+// Attack Angle +0.081 (bell curve, peak 10-20°, comparable to ISO's +0.079),
+// Is Chase -0.064 (chasing predicts weaker contact). Kept as its own group
+// rather than folded into Zone Fit — Zone Fit is a per-zone spatial-outcome
+// metric (batter zone-outcome rates vs pitcher zone-usage rates); these are
+// whole-swing mechanics with no zone-conditioned data yet. Merging them into
+// Zone Fit would recreate the exact shared-variance problem the June 2026
+// Sig-in-Boom fix was built to remove — better to keep every axis genuinely
+// independent.
+//
+// recent_avg_attack_angle / recent_chase_pct are not yet populated in
+// daily_picks.csv as of this write (pipeline needs a fresh run — All-Star
+// break). Both default to a neutral midpoint (50) when absent, so this group
+// contributes a uniform, non-discriminating constant until real data lands —
+// a uniform constant can't change relative ranking, so this ships safely
+// inert and activates automatically once the engine starts emitting the field.
+function groupD_Mechanics(r) {
+  const aa = parseFloat(r.recent_avg_attack_angle);
+  const attackAngleScore = Number.isFinite(aa)
+    ? Math.max(0, 100 - Math.abs(aa - 15) * 4)
+    : 50;
+
+  const chase = parseFloat(r.recent_chase_pct);
+  const chaseScore = Number.isFinite(chase)
+    ? Math.max(0, Math.min(100, 100 - chase * 2))
+    : 50;
+
+  return attackAngleScore * 0.60 + chaseScore * 0.40;
+}
+
 function computeTrueHRScore(r) {
   const A = groupA_ContactQuality(r);
   const B = groupB_MatchupVulnerability(r);
   const C = groupC_FormRecency(r);
-  return Math.round(Math.min(100, Math.max(0, A * 0.40 + B * 0.35 + C * 0.25)));
+  const D = groupD_Mechanics(r);
+  return Math.round(Math.min(100, Math.max(0, A * 0.36 + B * 0.32 + C * 0.22 + D * 0.10)));
 }
 
 function computeMatchupScore(r) {
