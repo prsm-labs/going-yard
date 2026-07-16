@@ -1,2 +1,17 @@
 Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitcher ID (Away),Game ID,Venue ID,Venue Name,Day of Week,Day Abbr,Series Game #,Games in Series,Series Position,Day Context
-2026-07-14,08:00 PM,National League All-Stars,American League All-Stars,650911,656302,823443,2681,Citizens Bank Park,Tuesday,Tue,,,Unknown,⚠️ Weakest Day
+2026-07-16,07:10 PM,PHI,NYM,605400.0,681035.0,823440,2681,Citizens Bank Park,Thursday,Thu,1.0,3.0,Opener,✅ Best Day (getaway)
+2026-07-17,01:35 PM,BOS,TB,,643377.0,824766,3,Fenway Park,,,,,,
+2026-07-17,07:10 PM,BOS,TB,,,824737,3,Fenway Park,,,,,,
+2026-07-17,07:05 PM,NYY,LAD,,,823524,3313,Yankee Stadium,,,,,,
+2026-07-17,07:10 PM,CLE,PIT,668909.0,683003.0,824414,5,Progressive Field,,,,,,
+2026-07-17,07:15 PM,ATL,TEX,519242.0,,824901,4705,Truist Park,,,,,,
+2026-07-17,07:15 PM,TOR,CWS,693686.0,641743.0,822789,14,Rogers Centre,,,,,,
+2026-07-17,07:40 PM,MIL,MIA,,,823766,32,American Family Field,,,,,,
+2026-07-17,08:05 PM,CHC,MIN,607067.0,,824655,17,Wrigley Field,,,,,,
+2026-07-17,08:10 PM,HOU,BAL,,,824170,2392,Daikin Park,,,,,,
+2026-07-17,08:10 PM,KC,SD,607625.0,650633.0,824090,7,Kauffman Stadium,,,,,,
+2026-07-17,08:40 PM,COL,CIN,,663903.0,824332,19,Coors Field,,,,,,
+2026-07-17,09:38 PM,LAA,DET,,675512.0,824009,1,Angel Stadium,,,,,,
+2026-07-17,09:40 PM,ATH,WSH,,,824981,2529,Sutter Health Park,,,,,,
+2026-07-17,09:40 PM,AZ,STL,,,825060,15,Chase Field,,,,,,
+2026-07-17,10:10 PM,SEA,SF,,694738.0,823115,680,T-Mobile Park,,,,,,
