@@ -14758,6 +14758,101 @@ function getZoneFit(r) {
   return season;
 }
 
+// ── Plate IQ — batter's ability to navigate modern upper-zone pitching ───────
+// Display-only, additive. Does NOT feed Yard Score/Boom/TrueHRScore/MatchupScore.
+//
+// PROMPT_PlateIQ_Grade.md's original formula had three bugs, found and fixed
+// during investigation (July 15-16, 2026) before this was built:
+//   1. recent_chase_pct is percent-scale (20-80) in daily_picks.csv, not the
+//      decimal (0.15-0.35) the original formula assumed — the chase component
+//      clamped to 0 for every real batter as written.
+//   2. la_stddev's assumed elite/poor range (5°/20°) was checked against real
+//      data: min=13°, median=27°, max=44° — most of the field scored 0 on
+//      this component too. Rescaled to 10°(elite)/32°(poor), a defensible
+//      middle ground given no established external reference range exists —
+//      flagged for recalibration once real HR-outcome validation is possible.
+//   3. The final `score/weight * 100` had a stray ×100 — score is already a
+//      0-100 weighted average once divided by weight actually-used, so this
+//      inflated every result ~100x. Confirmed directly: 41 of 41 populated
+//      batters hit the A+ (>=80) threshold under the buggy formula. Removed.
+//
+// Season-level validation (does high Plate IQ predict fewer false positives
+// on high Yard Score batters?) is BLOCKED as of this build — the season
+// export file predates the July 13 engine fields, so there's no historical
+// data yet to test against. Two of the six inputs (chase%, attack angle) do
+// have independent same-PA correlation evidence from the July 13-14
+// calibration investigation (Attack Angle +0.081, Chase -0.064 — both
+// comparable in magnitude to ISO's +0.079). The combined formula itself is
+// unvalidated. Revisit once the season file accumulates rows with these
+// fields — see CLAUDE.md.
+function computePlateIQ(r) {
+  let score = 0, weight = 0;
+
+  // ── Discipline ────────────────────────────────────────────────────
+  const chase = parseFloat(r?.recent_chase_pct);
+  if (!isNaN(chase) && chase > 0) {
+    // FIXED: percent scale (15%=100, 35%+=0), was decimal in the original
+    score  += Math.max(0, Math.min(100, (35 - chase) / 20 * 100)) * 0.22;
+    weight += 0.22;
+  }
+  const zSwing = parseFloat(r?.recent_zone_swing_pct);
+  if (!isNaN(zSwing) && zSwing > 0) {
+    // 80%+=100, 50%=0 — already percent-scale in the source data, unchanged
+    score  += Math.max(0, Math.min(100, (zSwing - 50) / 30 * 100)) * 0.18;
+    weight += 0.18;
+  }
+
+  // ── Swing plane versatility ───────────────────────────────────────
+  const atk = parseFloat(r?.recent_avg_attack_angle);
+  if (!isNaN(atk) && atk !== 0) {
+    // Bell curve: peak at 15°, penalise steep/flat (exploitable upper-zone hole)
+    score  += Math.max(0, 100 - Math.abs(atk - 15) * 5) * 0.20;
+    weight += 0.20;
+  }
+  const laStd = parseFloat(r?.la_stddev);
+  if (!isNaN(laStd) && laStd > 0) {
+    // FIXED: rescaled to real observed range (10°=100, 32°+=0), was 5-20
+    score  += Math.max(0, Math.min(100, (32 - laStd) / 22 * 100)) * 0.15;
+    weight += 0.15;
+  }
+
+  // ── K avoidance ───────────────────────────────────────────────────
+  const swStr = parseFloat(r?.season_swstr_pct); // field name confirmed — swstr_pct doesn't exist
+  if (!isNaN(swStr) && swStr > 0) {
+    score  += Math.max(0, Math.min(100, (18 - swStr) / 13 * 100)) * 0.15;
+    weight += 0.15;
+  }
+  const kPct = parseFloat(r?.recent_k_pct);
+  if (!isNaN(kPct) && kPct > 0) {
+    score  += Math.max(0, Math.min(100, (35 - kPct) / 25 * 100)) * 0.10;
+    weight += 0.10;
+  }
+
+  if (weight < 0.20) return null; // not enough data
+  return Math.round(score / weight); // FIXED — no stray ×100
+}
+
+function plateIQGrade(score) {
+  if (score == null) return null;
+  if (score >= 80) return { label:'A+', color:'#27c97a' };
+  if (score >= 68) return { label:'A',  color:'#38b8f2' };
+  if (score >= 56) return { label:'B',  color:'#f5a623' };
+  if (score >= 44) return { label:'C',  color:'#ff8020' };
+  if (score >= 32) return { label:'D',  color:'#ff4020' };
+  return                   { label:'F',  color:'#a855f7' };
+}
+
+// Zone attack risk — low-IQ batter facing a pitcher who elevates more than
+// most. Threshold picked from the real 2026 distribution (matchup_engine.py
+// computes pitcher_upper_zone_pct from 504 qualifying pitchers this season:
+// mean 5.4%, median 4.8%, max 21.7%). The originally-proposed >50% threshold
+// is unreachable by any pitcher in the league — >10 approximates the real p90.
+function plateIQZoneRisk(r, plateIQScore) {
+  if (plateIQScore == null || plateIQScore >= 44) return false; // C or above — not "low IQ"
+  const upperZone = parseFloat(r?.pitcher_upper_zone_pct);
+  return !isNaN(upperZone) && upperZone > 10;
+}
+
 // ── Boom Score — final composite HR probability (0–99) ───────────────────────
 // Combines 5 independent signal axes. Each measures something different:
 // ── HPE Helper: gHR Taper ────────────────────────────────────────────────────
@@ -16393,7 +16488,8 @@ function SimLabView({ data }) {
                 'Sim H','Sim 2B','Sim BB','Sim K','Sim TB','Sim RBI',
                 'Wind','Temp','Condition',
                 'AB','H','HR','R','TB','RBI','BB','K','Avg EV','Launch Angle',
-                'Live Close Calls','Live CC Max EV','Live CC Max Dist'];
+                'Live Close Calls','Live CC Max EV','Live CC Max Dist',
+                'Plate IQ','IQ Grade','Zone Risk'];
               const rows = slate.map(b => {
                 const bid = parseInt(b.batter_id) || 0;
                 const gy  = HR_DATA.some(h => h.batterId === bid ||
@@ -16443,6 +16539,10 @@ function SimLabView({ data }) {
                   (()=>{ const lv=slateLiveCache[String(bid)]; const cc=lv?.closeCalls||(lv?._ccFallback?.count)||0; return cc||''; })(),
                   (()=>{ const lv=slateLiveCache[String(bid)]; const ev=lv?.ccMaxEV||(lv?._ccFallback?.maxEV)||0; return ev>0?parseFloat(ev).toFixed(1):''; })(),
                   (()=>{ const lv=slateLiveCache[String(bid)]; const d=lv?.ccMaxDist||(lv?._ccFallback?.maxDist)||0; return d>0?d:''; })(),
+                  // Plate IQ — display-only, does not affect Yard Score
+                  (()=>{ const _piq=computePlateIQ(b); return _piq ?? ''; })(),
+                  (()=>{ const _g=plateIQGrade(computePlateIQ(b)); return _g?.label||''; })(),
+                  (()=>{ const _piq=computePlateIQ(b); return plateIQZoneRisk(b,_piq)?'YES':''; })(),
                 ].map(esc).join(',');
               });
               const csv = bom + headers.map(esc).join(',') + '\n' + rows.join('\n');
@@ -16489,6 +16589,7 @@ function SimLabView({ data }) {
                     { label: 'BS Δ',     key: 'bat_speed_vs_baseline' },
                     { label: 'Chase%',   key: 'recent_chase_pct', title: 'Batter Mechanics (2026-07-13) — % of PAs with a chase (swing outside zone) at any point. Display-only, not fed into any score yet.' },
                     { label: 'AttAngle', key: 'recent_avg_attack_angle', title: 'Batter Mechanics — avg bat attack angle at contact (swing plane), distinct from Launch Angle (ball flight). Display-only, not fed into any score yet.' },
+                    { label: 'IQ',       key: '_plateIQ', colKey: '_plateIQ', title: 'Plate IQ — ability to navigate modern upper-zone pitching (discipline, swing plane versatility, K avoidance). Display-only, does not affect Yard Score.' },
                     { label: 'HH%',      key: 'recent_hh_pct' },
                     { label: 'Brl%',     key: 'recent_barrel_pct' },
                     { label: 'FB%',      key: 'recent_fb_pct' },
@@ -16800,6 +16901,20 @@ function SimLabView({ data }) {
                       <td style={{textAlign:'right',padding:'3px 6px',fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--muted)'}}
                         title="Attack Angle — avg bat angle at contact (swing plane), distinct from Launch Angle. Display-only.">
                         {b.recent_avg_attack_angle != null && b.recent_avg_attack_angle !== '' ? parseFloat(b.recent_avg_attack_angle).toFixed(1)+'°' : '—'}
+                      </td>
+                      <td style={{textAlign:'right',padding:'3px 6px'}}>
+                        {(()=>{
+                          const _piq = computePlateIQ(b);
+                          b._plateIQ = _piq ?? -1; // mutation-during-render, same pattern as _yard_yv2 — lets column sort by key
+                          const _g   = plateIQGrade(_piq);
+                          const _zr  = plateIQZoneRisk(b, _piq);
+                          return _g
+                            ? <span title={`Plate IQ: ${_piq}/100${_zr ? ' ⚠ Low IQ + elevated pitcher — swing hole risk' : ''} — display-only, does not affect Yard Score.`}
+                                style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,color:_g.color,opacity:_zr?1:0.85}}>
+                                {_g.label}{_zr && ' ⚠'}
+                              </span>
+                            : <span style={{color:'var(--muted)'}}>—</span>;
+                        })()}
                       </td>
                       <td style={{textAlign:'right',padding:'3px 6px',fontFamily:"'DM Mono',monospace",fontSize:10,
                         color:(parseFloat(b.recent_hh_pct)||0)>=40?'#ff4020':(parseFloat(b.recent_hh_pct)||0)>=30?'#f5a623':'var(--muted)'}}>
@@ -31229,6 +31344,7 @@ function BarrelLabTab() {
   const [blPicksOnly,      setBlPicksOnly]      = useState(false);
   const [blGoneYardOnly,   setBlGoneYardOnly]   = useState(false);
   const [blTB2Only,        setBlTB2Only]        = useState(false);
+  const [blHighIQOnly,     setBlHighIQOnly]     = useState(false);
 
   useEffect(() => {
     const unsub    = subscribeLineup(v => setLineupVer(v));
@@ -31379,25 +31495,32 @@ function BarrelLabTab() {
     // displayed SimHR% column, since the calibration was measured on the
     // flagged subset specifically, not the general population.
     const SIM_HR_SUPPRESSION = 0.67;
-    return withNormalized.map(r => ({
-      ...r,
-      isBarrelSignal:
-        r.trueHRScore  >= 75 &&
-        r.matchupScore >= 60 &&
-        r.simHRPct     != null && (r.simHRPct * SIM_HR_SUPPRESSION) >= 12.0,
-      isLongshot: isLongshotBatter(r, r.trueHRScore, r.matchupScore),
-      isWeakSlot: (() => {
-        const _ls = liveSlot(parseInt(r.batter_id||0), r.lineup_slot);
-        return _ls > 0 && (r.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(_ls);
-      })(),
-    }))
+    return withNormalized.map(r => {
+      const _plateIQ = computePlateIQ(r);
+      return {
+        ...r,
+        isBarrelSignal:
+          r.trueHRScore  >= 75 &&
+          r.matchupScore >= 60 &&
+          r.simHRPct     != null && (r.simHRPct * SIM_HR_SUPPRESSION) >= 12.0,
+        isLongshot: isLongshotBatter(r, r.trueHRScore, r.matchupScore),
+        isWeakSlot: (() => {
+          const _ls = liveSlot(parseInt(r.batter_id||0), r.lineup_slot);
+          return _ls > 0 && (r.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(_ls);
+        })(),
+        plateIQ:        _plateIQ,
+        plateIQGrade:   plateIQGrade(_plateIQ),
+        zoneAttackRisk: plateIQZoneRisk(r, _plateIQ),
+      };
+    })
     .filter(r => !blHideFinal    || !FINAL_GAME_IDS.has(String(r.game_id)))
     .filter(r => !blLongshotOnly || r.isLongshot)
     .filter(r => !blPicksOnly    || picks[String(parseInt(r.batter_id)||0)])
     .filter(r => !blGoneYardOnly || isGoneYardBL(r))
     .filter(r => !blTB2Only || is2BagBL(r))
+    .filter(r => !blHighIQOnly || (r.plateIQ != null && r.plateIQ >= 56))
     .sort((a, b) => b.trueHRScore - a.trueHRScore);
-  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, blPicksOnly, picks, blGoneYardOnly, blTB2Only, hrVer, finalVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, blPicksOnly, picks, blGoneYardOnly, blTB2Only, blHighIQOnly, hrVer, finalVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Color threshold helpers
   const clr = (v, g1, g2, y1, y2) => {
@@ -31455,6 +31578,7 @@ function BarrelLabTab() {
     { h:'Slot',       key:'lineup_slot',               acc: b => liveSlot(parseInt(b.batter_id||0), b.lineup_slot)||99,                              align:'left',  allOnly: false },
     { h:'Team',      key:'batting_team',               acc: b => (b.batting_team||'').toLowerCase(),                       align:'left',  allOnly: true  },
     { h:'Player',    key:'batter',                     acc: b => (b.batter||'').toLowerCase(),                            align:'left',  allOnly: false },
+    { h:'IQ',        key:'plateIQ',                    acc: b => b.plateIQ ?? -1,                                         align:'right' },
     { h:'TrueHR',    key:'trueHRScore',                acc: b => b.trueHRScore||0,                                        align:'right' },
     { h:'Matchup',   key:'matchupScore',               acc: b => b.matchupScore||0,                                       align:'right' },
     { h:'ZF',        key:'zone_fit',                   acc: b => parseFloat(b.zone_fit||0),                               align:'right' },
@@ -31635,6 +31759,19 @@ function BarrelLabTab() {
               2️⃣ {blTB2Only ? '2+ TB ✓' : '2+ TB Today'}
             </button>
             <button
+              onClick={() => setBlHighIQOnly(v => !v)}
+              title="Plate IQ — display-only, does not affect TrueHRScore. See Legend for details."
+              style={{
+                padding:'2px 8px', borderRadius:5, cursor:'pointer',
+                fontFamily:"'DM Mono',monospace", fontSize:9, fontWeight:700,
+                lineHeight:1.5, flexShrink:0,
+                background: blHighIQOnly ? 'rgba(56,184,242,.12)' : 'var(--surface2)',
+                color:      blHighIQOnly ? '#38b8f2' : 'var(--muted)',
+                border:`1px solid ${blHighIQOnly ? 'rgba(56,184,242,.4)' : 'var(--border)'}`,
+              }}>
+              🧠 {blHighIQOnly ? 'High IQ Only' : 'Plate IQ'}
+            </button>
+            <button
               disabled={simRunning}
               onClick={async () => {
                 await loadTodayLineups();
@@ -31659,7 +31796,7 @@ function BarrelLabTab() {
                 const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
                 const f1 = v => (v != null && v !== '' && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(1) : '';
                 const f3 = v => (v != null && v !== '' && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(3) : '';
-                const hdrs = ['Slot','Team','Player','Pitcher','Grade','TrueHR','Matchup','ZF','Form (gHR)','SimHR%','ISO','xwOBA','PulledBrl%','Brl/BIP%','HR/FB%','FB%','HH%','LA°','Barrel Signal'];
+                const hdrs = ['Slot','Team','Player','Pitcher','Grade','TrueHR','Matchup','ZF','Form (gHR)','SimHR%','ISO','xwOBA','PulledBrl%','Brl/BIP%','HR/FB%','FB%','HH%','LA°','Barrel Signal','Plate IQ','IQ Grade','Zone Risk'];
                 const csvRows = [hdrs.map(esc).join(',')];
                 rows.forEach(b => {
                   csvRows.push([
@@ -31682,6 +31819,9 @@ function BarrelLabTab() {
                     esc(f1(b.recent_hh_pct)),
                     esc(f1(b.la_mean_l15||b.recent_avg_la)),
                     esc(b.isBarrelSignal ? '1' : '0'),
+                    esc(b.plateIQ != null ? b.plateIQ : ''),
+                    esc(b.plateIQGrade?.label || ''),
+                    esc(b.zoneAttackRisk ? '1' : '0'),
                   ].join(','));
                 });
                 const a = document.createElement('a');
@@ -31727,6 +31867,17 @@ function BarrelLabTab() {
               {gameRows.filter(r => r.isLongshot).length}
             </div>
             <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:4}}>Low profile, good spot</div>
+          </div>
+          <div style={{flex:'1 1 120px',background:'var(--surface2)',borderRadius:8,
+            padding:'10px 14px',border:'1px solid var(--border)'}}
+            title="Plate IQ — display-only, does not affect TrueHRScore">
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:4}}>
+              HIGH PLATE IQ
+            </div>
+            <div style={{fontFamily:osw,fontSize:22,fontWeight:700,color:'#38b8f2',lineHeight:1}}>
+              {gameRows.filter(r => r.plateIQ != null && r.plateIQ >= 56).length}
+            </div>
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:4}}>Navigates modern pitching</div>
           </div>
         </div>
       )}
@@ -31886,6 +32037,16 @@ function BarrelLabTab() {
                                 {fin && <span style={{fontSize:7,color:'var(--muted)',border:'1px solid var(--border)',borderRadius:3,padding:'1px 3px'}}>FINAL</span>}
                               </div>
                             </div>
+                          </td>
+                          <td style={{padding:'4px 6px',textAlign:'right'}}>
+                            {b.plateIQGrade
+                              ? <span
+                                  title={`Plate IQ: ${b.plateIQ}/100${b.zoneAttackRisk ? ' ⚠ Low IQ + elevated pitcher — swing hole risk' : ''} — display-only, does not affect TrueHRScore.`}
+                                  style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,
+                                    color:b.plateIQGrade.color, opacity:b.zoneAttackRisk?1:0.85}}>
+                                  {b.plateIQGrade.label}{b.zoneAttackRisk && ' ⚠'}
+                                </span>
+                              : <span style={{color:'var(--muted)'}}>—</span>}
                           </td>
                           <td style={{padding:'4px 6px',textAlign:'right',color:trueClr(b.trueHRScore),fontWeight:600}}>{b.trueHRScore}</td>
                           <td style={{padding:'4px 6px',textAlign:'right',color:matchupClr(b.matchupScore)}}>{b.matchupScore}</td>
