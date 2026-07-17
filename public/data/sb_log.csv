@@ -2267,3 +2267,5 @@ game_id,game_date,runner_id,runner_name,pitcher_id,pitcher_name,stolen_base,caug
 823842,2026-07-12,690984,Petey Halpin,669199,Lake Bachar,1,0,2B,8,top,top
 823925,2026-07-12,814439,Ryan Waldschmidt,592779,Brock Stewart,1,0,2B,7,top,top
 824491,2026-07-12,691718,Pete Crow-Armstrong,671096,Andrew Abbott,1,0,2B,1,top,top
+823440,2026-07-16,701807,Carson Benge,605400,Aaron Nola,1,0,2B,2,top,top
+823440,2026-07-16,656941,Kyle Schwarber,548384,Brooks Raley,0,1,3B,6,bottom,bottom
