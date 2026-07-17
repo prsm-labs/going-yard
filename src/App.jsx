@@ -32197,6 +32197,7 @@ function OnBaseTab() {
   const [obPicksOnly,      setObPicksOnly]      = useState(false);
   const [obGoneYardOnly,   setObGoneYardOnly]   = useState(false);
   const [obTB2Only,        setObTB2Only]        = useState(false);
+  const [obHighIQOnly,     setObHighIQOnly]     = useState(false);
   const [hrVer, setHrVer] = useState(_HR_VER||0);
 
   useEffect(() => {
@@ -32321,25 +32322,32 @@ function OnBaseTab() {
     const withNormalized = normalizeWithinMatchup(withRaw)
       .map(r => ({ ...r, onBaseScore: r.trueHRScore }));
 
-    return withNormalized.map(r => ({
-      ...r,
-      isTBSignal:
-        r.onBaseScore  >= 75 &&
-        r.matchupScore >= 60 &&
-        r.simTB2Pct != null && r.simTB2Pct >= 30.0,
-      isWeakSlot: (() => {
-        const _ls = liveSlot(parseInt(r.batter_id||0), r.lineup_slot);
-        return _ls > 0 && (r.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(_ls);
-      })(),
-      isGoneYard: isGoneYardOB(r),
-      is2Bag: !isGoneYardOB(r) && is2BagOB(r),
-    }))
+    return withNormalized.map(r => {
+      const _plateIQ = computePlateIQ(r);
+      return {
+        ...r,
+        isTBSignal:
+          r.onBaseScore  >= 75 &&
+          r.matchupScore >= 60 &&
+          r.simTB2Pct != null && r.simTB2Pct >= 30.0,
+        isWeakSlot: (() => {
+          const _ls = liveSlot(parseInt(r.batter_id||0), r.lineup_slot);
+          return _ls > 0 && (r.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(_ls);
+        })(),
+        isGoneYard: isGoneYardOB(r),
+        is2Bag: !isGoneYardOB(r) && is2BagOB(r),
+        plateIQ:        _plateIQ,
+        plateIQGrade:   plateIQGrade(_plateIQ),
+        zoneAttackRisk: plateIQZoneRisk(r, _plateIQ),
+      };
+    })
     .filter(r => !obHideFinal || !FINAL_GAME_IDS.has(String(r.game_id)))
     .filter(r => !obPicksOnly || picks[String(parseInt(r.batter_id)||0)])
     .filter(r => !obGoneYardOnly || isGoneYardOB(r))
     .filter(r => !obTB2Only || is2BagOB(r))
+    .filter(r => !obHighIQOnly || (r.plateIQ != null && r.plateIQ >= 56))
     .sort((a, b) => b.onBaseScore - a.onBaseScore);
-  }, [eligibleBatters, simResults, obHideFinal, obPicksOnly, obGoneYardOnly, obTB2Only, picks, finalVer, hrVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [eligibleBatters, simResults, obHideFinal, obPicksOnly, obGoneYardOnly, obTB2Only, obHighIQOnly, picks, finalVer, hrVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const byTeam = useMemo(() => {
     const teams = {};
@@ -32388,6 +32396,7 @@ function OnBaseTab() {
     { h:'Slot',      key:'lineup_slot',     acc: b => liveSlot(parseInt(b.batter_id||0), b.lineup_slot)||99,            align:'left',  allOnly:false },
     { h:'Team',      key:'batting_team',    acc: b => (b.batting_team||'').toLowerCase(),        align:'left',  allOnly:true  },
     { h:'Player',    key:'batter',          acc: b => (b.batter||'').toLowerCase(),              align:'left',  allOnly:false },
+    { h:'IQ',        key:'plateIQ',         acc: b => b.plateIQ ?? -1,                           align:'right' },
     { h:'OnBase',    key:'onBaseScore',     acc: b => b.onBaseScore||0,                          align:'right' },
     { h:'Matchup',   key:'matchupScore',    acc: b => b.matchupScore||0,                         align:'right' },
     { h:'ZF',        key:'zone_fit',        acc: b => parseFloat(b.zone_fit||0),                 align:'right' },
@@ -32553,6 +32562,19 @@ function OnBaseTab() {
               2️⃣ {obTB2Only ? '2+ TB ✓' : '2+ TB Today'}
             </button>
             <button
+              onClick={() => setObHighIQOnly(v => !v)}
+              title="Plate IQ — display-only, does not affect OnBaseScore. See Legend for details."
+              style={{
+                padding:'2px 8px', borderRadius:5, cursor:'pointer',
+                fontFamily:mono, fontSize:9, fontWeight:700,
+                lineHeight:1.5, flexShrink:0,
+                background: obHighIQOnly ? 'rgba(56,184,242,.12)' : 'var(--surface2)',
+                color:      obHighIQOnly ? '#38b8f2' : 'var(--muted)',
+                border:`1px solid ${obHighIQOnly ? 'rgba(56,184,242,.4)' : 'var(--border)'}`,
+              }}>
+              🧠 {obHighIQOnly ? 'High IQ Only' : 'Plate IQ'}
+            </button>
+            <button
               disabled={simRunning}
               onClick={async () => {
                 await loadTodayLineups();
@@ -32575,7 +32597,7 @@ function OnBaseTab() {
                 const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
                 const f1 = v => (v != null && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(1) : '';
                 const f3 = v => (v != null && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(3) : '';
-                const hdrs = ['Slot','Team','Player','Pitcher','Grade','OnBaseScore','Matchup','ZF','G2TB%','SimTB2%','AVG','SLG','ISO','xwOBA','XBH%','HH%','SimTB','LA°','TB Signal'];
+                const hdrs = ['Slot','Team','Player','Pitcher','Grade','OnBaseScore','Matchup','ZF','G2TB%','SimTB2%','AVG','SLG','ISO','xwOBA','XBH%','HH%','SimTB','LA°','TB Signal','Plate IQ','IQ Grade','Zone Risk'];
                 const csvRows = [hdrs.map(esc).join(',')];
                 rows.forEach(b => {
                   csvRows.push([
@@ -32598,6 +32620,9 @@ function OnBaseTab() {
                     esc(f1(b.sim_tb)),
                     esc(f1(b.la_mean_l15||b.recent_avg_la)),
                     esc(b.isTBSignal ? '1' : '0'),
+                    esc(b.plateIQ != null ? b.plateIQ : ''),
+                    esc(b.plateIQGrade?.label || ''),
+                    esc(b.zoneAttackRisk ? '1' : '0'),
                   ].join(','));
                 });
                 const a = document.createElement('a');
@@ -32633,6 +32658,17 @@ function OnBaseTab() {
               <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:4}}>{sub}</div>
             </div>
           ))}
+          <div style={{flex:'1 1 120px',background:'var(--surface2)',borderRadius:8,
+            padding:'10px 14px',border:'1px solid var(--border)'}}
+            title="Plate IQ — display-only, does not affect OnBaseScore">
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:4}}>
+              HIGH PLATE IQ
+            </div>
+            <div style={{fontFamily:osw,fontSize:22,fontWeight:700,color:'#38b8f2',lineHeight:1}}>
+              {gameRows.filter(r => r.plateIQ != null && r.plateIQ >= 56).length}
+            </div>
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:4}}>Navigates modern pitching</div>
+          </div>
         </div>
       )}
 
@@ -32779,6 +32815,16 @@ function OnBaseTab() {
                               )}
                               {fin && <span style={{fontSize:7,color:'var(--muted)',border:'1px solid var(--border)',borderRadius:3,padding:'1px 3px'}}>FINAL</span>}
                             </div>
+                          </td>
+                          <td style={{padding:'4px 6px',textAlign:'right'}}>
+                            {b.plateIQGrade
+                              ? <span
+                                  title={`Plate IQ: ${b.plateIQ}/100${b.zoneAttackRisk ? ' ⚠ Low IQ + elevated pitcher — swing hole risk' : ''} — display-only, does not affect OnBaseScore.`}
+                                  style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,
+                                    color:b.plateIQGrade.color, opacity:b.zoneAttackRisk?1:0.85}}>
+                                  {b.plateIQGrade.label}{b.zoneAttackRisk && ' ⚠'}
+                                </span>
+                              : <span style={{color:'var(--muted)'}}>—</span>}
                           </td>
                           <td style={{padding:'4px 6px',textAlign:'right',color:obsClr(b.onBaseScore),fontWeight:600}}>{b.onBaseScore}</td>
                           <td style={{padding:'4px 6px',textAlign:'right',color:mscClr(b.matchupScore)}}>{b.matchupScore}</td>
