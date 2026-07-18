@@ -4251,6 +4251,7 @@ async function loadDailyPicks() {
     if (!res.ok) return;
     const text = await res.text();
     const rows = parseCSVText(text);
+    DAILY_PICKS_ROWS.length = 0;
     rows.forEach(r => {
       // Build game_id → teams map from ALL rows (before per-batter dedup)
       const rawGid = String(r.game_id || '').trim();
@@ -4265,7 +4266,8 @@ async function loadDailyPicks() {
       const bid = rawBid.includes('.') ? String(parseInt(rawBid)) : rawBid;
       // Only store first row per batter — recent stats are same across all matchup rows
       if (bid && bid !== 'NaN' && !DAILY_PICKS_CACHE[bid]) DAILY_PICKS_CACHE[bid] = { ...r, _gid: gid };
-
+      // Every row, doubleheader duplicates included — see DAILY_PICKS_ROWS comment above.
+      if (bid && bid !== 'NaN' && gid && gid !== 'NaN') DAILY_PICKS_ROWS.push({ ...r, _gid: gid });
     });
     // Populate key matchup batter set — ONLY batters in daily_summary.csv (Key Matchups tab)
     // daily_picks has ALL batters; daily_summary has only the engine's top picks shown in Key Matchups
@@ -11607,7 +11609,17 @@ async function fetchVideoLinks(hrs) {
 
 let HR_LAST_FETCH = 0;
 const SEEN_HR_IDS = new Set();
-const DAILY_PICKS_CACHE = {}; // keyed by batter_id string
+const DAILY_PICKS_CACHE = {}; // keyed by batter_id string — first row per batter only (see DAILY_PICKS_ROWS below for doubleheaders)
+// Raw, unduplicated daily_picks.csv rows — one entry per (batter_id, game_id).
+// FIXED 2026-07-18: DAILY_PICKS_CACHE intentionally keeps only the first row
+// per batter (dozens of call sites look a player up by pid alone with no
+// game context, e.g. player slideouts — that's correct for a normal single-
+// game day). On a doubleheader day a batter has two real, distinct rows
+// (different game_id/pitcher/scores) — the cache silently discards the
+// second one. BarrelLabTab/OnBaseTab need every row (they filter by game_id
+// via the selected game), so they read this array instead — populated
+// alongside DAILY_PICKS_CACHE in loadDailyPicks(), same fetch, no extra cost.
+const DAILY_PICKS_ROWS = [];
 
 // ── Pitcher name resolver ─────────────────────────────────────────────────────
 // daily_picks.csv sometimes has "Unknown (694346...)" when the engine couldn't
@@ -31394,7 +31406,16 @@ function BarrelLabTab() {
   }, [lineupVer]);
 
   const eligibleBatters = useMemo(() => {
-    const base = Object.values(DAILY_PICKS_CACHE || {}).filter(r => {
+    // FIXED 2026-07-18: was Object.values(DAILY_PICKS_CACHE) — that cache
+    // only ever keeps the FIRST daily_picks.csv row per batter_id (dozens of
+    // other call sites look a player up by pid alone with no game context,
+    // which is correct on a normal single-game day). On a doubleheader day
+    // a batter has two real rows (different game_id/pitcher/scores); the
+    // cache silently discarded the second game's row entirely, so selecting
+    // that game here always showed zero batters — not a live/timing issue,
+    // the data was never in the cache to begin with. DAILY_PICKS_ROWS keeps
+    // every row, so both games' batters are present and filterable by game_id.
+    const base = DAILY_PICKS_ROWS.filter(r => {
       if (!isBarrelLabEligible(r)) return false;
       const bid = String(r.batter_id || '').split('.')[0];
       // Always exclude injured players — same INJURY_MAP used by All Matchups 🤕
@@ -32264,7 +32285,10 @@ function OnBaseTab() {
   }, [lineupVer]);
 
   const eligibleBatters = useMemo(() => {
-    const base = Object.values(DAILY_PICKS_CACHE || {}).filter(r => {
+    // FIXED 2026-07-18: was Object.values(DAILY_PICKS_CACHE) — same
+    // doubleheader gap as BarrelLabTab (see its eligibleBatters comment for
+    // the full explanation). DAILY_PICKS_ROWS preserves every game's row.
+    const base = DAILY_PICKS_ROWS.filter(r => {
       if (!isBarrelLabEligible(r)) return false;
       const bid = String(r.batter_id || '').split('.')[0];
       if (INJURY_MAP[bid]) return false;

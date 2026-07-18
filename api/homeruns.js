@@ -86,6 +86,12 @@ export default async function handler(req, res) {
         const events = allPlays.slice(0,5).map(p=>p.result?.event||p.result?.eventType||"?");
         console.log(`[HRs] Sample events: ${events.join(", ")}`);
 
+        // Collected per-game, then re-numbered below before merging into
+        // allHRs — a batter with 2+ HRs in this game needs each one stamped
+        // with its own sequential season total, not all of them stamped with
+        // seasonHRByBatter's single current snapshot value (see below).
+        const gameHRs = [];
+
         for (const play of allPlays) {
           const event = (play.result?.event || "").toLowerCase();
           const eventType = (play.result?.eventType || "").toLowerCase();
@@ -133,7 +139,7 @@ export default async function handler(req, res) {
           }
           console.log(`[HRs] ✅ ${batter?.fullName} (${isTop?awayAbbr:homeAbbr}) inn=${about.inning} rbi=${rbi} ev=${ev} dist=${dist} pitch=${pitch}`);
 
-          allHRs.push({
+          gameHRs.push({
             gamePk: game.gamePk,
             gameId: `${awayAbbr} @ ${homeAbbr}`,
             awayAbbr, homeAbbr,
@@ -151,17 +157,42 @@ export default async function handler(req, res) {
             launchAngle: la,
             pitchType:   pitch,
             description: desc,
-            // Season HR total as of THIS game's boxscore snapshot — correct for
-            // any date (unlike the client's PLAYER_DATA_CACHE, which only ever
-            // reflects "current/today"). null if MLB didn't return seasonStats
-            // for this batter; client falls back to its old approximation then.
-            seasonHR:    batter?.id != null ? (seasonHRByBatter[batter.id] ?? null) : null,
+            // seasonHR assigned below, after all of this game's HRs are known —
+            // see the per-batter re-numbering pass.
+            seasonHR:    null,
             atBatIndex:  about.atBatIndex  || 0,
             chronoIndex,
             timeET,
             time24,
           });
         }
+
+        // Assign correct sequential season HR# per batter within this game.
+        // FIXED 2026-07-18: seasonHRByBatter[id] is the batter's CURRENT
+        // season total as of this fetch — it already reflects every HR that
+        // batter has hit today up to and including the most recent one. A
+        // batter with 2+ HRs in the same game was getting that single
+        // current value stamped on every one of their HR rows (confirmed
+        // bug: Francisco Alvarez's 10th and 11th HR both showed "11").
+        // Sorting each batter's HRs chronologically and counting backward
+        // from the current total gives each one its correct number (10,
+        // then 11) regardless of how many have happened by fetch time.
+        const byBatter = {};
+        for (const hr of gameHRs) {
+          if (hr.batterId == null) continue;
+          if (!byBatter[hr.batterId]) byBatter[hr.batterId] = [];
+          byBatter[hr.batterId].push(hr);
+        }
+        for (const bid of Object.keys(byBatter)) {
+          const group = byBatter[bid].sort((a, b) => a.chronoIndex - b.chronoIndex);
+          const currentTotal = seasonHRByBatter[bid];
+          if (currentTotal == null) continue; // no seasonStats — leave null, client falls back
+          group.forEach((hr, idx) => {
+            hr.seasonHR = currentTotal - (group.length - 1 - idx);
+          });
+        }
+
+        allHRs.push(...gameHRs);
       } catch(e) {
         console.error(`[HRs] Game ${game.gamePk} failed:`, e.message);
       }

@@ -1,8 +1,9 @@
 {
   "version": "2026.07.18",
-  "bundleFile": "index-DRFtBtTW.js",
+  "bundleFile": "index-DzE5_PyR.js",
   "changelog": [
-    "Daily data update 2026-07-18"
+    "Fix injury detection gaps (Judge/Stanton)",
+    "switch Close Calls to rolling L7 window"
   ],
   "notifyUsers": true
 }
