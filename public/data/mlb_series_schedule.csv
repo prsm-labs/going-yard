@@ -1,6 +1,6 @@
 Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitcher ID (Away),Game ID,Venue ID,Venue Name,Day of Week,Day Abbr,Series Game #,Games in Series,Series Position,Day Context
 2026-07-18,01:10 PM,CLE,PIT,668909,683003.0,824414,5,Progressive Field,Saturday,Sat,1,3,Opener,✅ Strong (hittable pitchers)
-2026-07-18,07:10 PM,CLE,PIT,671106,,824412,5,Progressive Field,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
+2026-07-18,07:10 PM,CLE,PIT,671106,682254.0,824412,5,Progressive Field,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
 2026-07-18,02:20 PM,CHC,MIN,571510,671737.0,824657,17,Wrigley Field,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
 2026-07-18,03:05 PM,PHI,NYM,666200,640455.0,823441,2681,Citizens Bank Park,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
 2026-07-18,03:07 PM,TOR,CWS,669456,663436.0,822790,14,Rogers Centre,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
@@ -12,7 +12,7 @@ Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitc
 2026-07-18,04:10 PM,ATL,TEX,702566,669022.0,824899,4705,Truist Park,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
 2026-07-18,04:10 PM,MIL,MIA,675660,676974.0,823763,32,American Family Field,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
 2026-07-18,08:08 PM,SEA,SF,693433,657277.0,823116,680,T-Mobile Park,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
-2026-07-18,08:08 PM,NYY,LAD,677960,686218.0,823523,3313,Yankee Stadium,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
+2026-07-18,08:08 PM,NYY,LAD,677960,686218.0,823523,3313,Yankee Stadium,Sunday,Sun,2,3,Middle,~ Neutral (check pitcher)
 2026-07-18,10:05 PM,ATH,WSH,669372,641793.0,824979,2529,Sutter Health Park,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
 2026-07-18,10:07 PM,LAA,DET,680570,669373.0,824008,1,Angel Stadium,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
 2026-07-19,12:15 PM,TOR,CWS,702056,680732.0,822786,14,Rogers Centre,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
