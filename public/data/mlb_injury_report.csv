@@ -1,781 +1,268 @@
-Team,Batter ID,Player Name,Position,Injury Description,Expected Return,Severity
-ATH,675961,Alika Williams,SS,Active,,⚪
-ATH,669620,Brady Basso,P,Active,,⚪
-ATH,666126,Carlos Cortes,RF,Active,,⚪
-ATH,687515,Colby Thomas,RF,Active,,⚪
-ATH,622268,Donovan Walton,3B,Active,,⚪
-ATH,665660,Elvis Alvarado,P,Active,,⚪
-ATH,695611,Gage Jump,P,Active,,⚪
-ATH,703607,Henry Bolte,CF,Active,,⚪
-ATH,663687,Hogan Harris,P,Active,,⚪
-ATH,669372,J.T. Ginn,P,Active,,⚪
-ATH,678022,Jack Perkins,P,Active,,⚪
-ATH,682052,Jacob Lopez,P,Active,,⚪
-ATH,805779,Jacob Wilson,SS,Active,,⚪
-ATH,643446,Jeff McNeil,2B,Active,,⚪
-ATH,605488,Jeffrey Springs,P,Active,,⚪
-ATH,641680,Jonah Heim,C,Active,,⚪
-ATH,660761,José Suarez,P,Active,,⚪
-ATH,811965,Joshua Kuroda-Grauer,SS,Active,,⚪
-ATH,686993,Justin Sterner,P,Active,,⚪
-ATH,671732,Lawrence Butler,RF,Active,,⚪
-ATH,665622,Luis Medina,P,Active,,⚪
-ATH,643410,Mark Leiter Jr.,P,Active,,⚪
-ATH,669127,Shea Langeliers,C,Active,,⚪
-ATH,695720,Tommy White,3B,Active,,⚪
-ATH,691016,Tyler Soderstrom,LF,Active,,⚪
-ATH,814305,Yunior Tur,P,Active,,⚪
-ATL,663586,Austin Riley,3B,Active,,⚪
-ATL,676551,Brewer Hicklen,CF,Active,,⚪
-ATL,693821,Bryce Elder,P,Active,,⚪
-ATL,519242,Chris Sale,P,Active,,⚪
-ATL,664849,Danny Young,P,Active,,⚪
-ATL,800311,Didier Fuentes,P,Active,,⚪
-ATL,642086,Dominic Smith,DH,Active,,⚪
-ATL,686948,Drake Baldwin,C,Active,,⚪
-ATL,689266,Dylan Dodd,P,Active,,⚪
-ATL,669276,Dylan Lee,P,Active,,⚪
-ATL,642201,Eli White,RF,Active,,⚪
-ATL,656550,Grant Holmes,P,Active,,⚪
-ATL,702275,JR Ritchie,P,Active,,⚪
-ATL,805347,Jim Jarvis,SS,Active,,⚪
-ATL,663698,Joey Bart,C,Active,,⚪
-ATL,622761,Jorge Mateo,SS,Active,,⚪
-ATL,571657,Kyle Farmer,DH,Active,,⚪
-ATL,621566,Matt Olson,1B,Active,,⚪
-ATL,643289,Mauricio Dubón,LF,Active,,⚪
-ATL,671739,Michael Harris II,CF,Active,,⚪
-ATL,702566,Owen Murphy,P,Active,,⚪
-ATL,645277,Ozzie Albies,2B,Active,,⚪
-ATL,628452,Raisel Iglesias,P,Active,,⚪
-ATL,625643,Reynaldo López,P,Active,,⚪
-ATL,641755,Tyler Kinley,P,Active,,⚪
-ATL,682989,Victor Mederos,P,Active,,⚪
-AZ,694297,Brandon Pfaadt,P,Active,,⚪
-AZ,805299,Brandyn Garcia,P,Active,,⚪
-AZ,682998,Corbin Carroll,RF,Active,,⚪
-AZ,686753,Drey Jameson,P,Active,,⚪
-AZ,593958,Eduardo Rodriguez,P,Active,,⚪
-AZ,672515,Gabriel Moreno,C,Active,,⚪
-AZ,672695,Geraldo Perdomo,SS,Active,,⚪
-AZ,545121,Ildemaro Vargas,1B,Active,,⚪
-AZ,543510,James McCann,C,Active,,⚪
-AZ,642528,Jonathan Loáisiga,P,Active,,⚪
-AZ,678489,Jorge Barrosa,CF,Active,,⚪
-AZ,666661,Juan Morillo,P,Active,,⚪
-AZ,606466,Ketel Marte,2B,Active,,⚪
-AZ,656464,Kevin Ginkel,P,Active,,⚪
-AZ,666971,Lourdes Gurriel Jr.,LF,Active,,⚪
-AZ,596146,Max Kepler,LF,Active,,⚪
-AZ,518876,Merrill Kelly,P,Active,,⚪
-AZ,683352,Mitch Bratt,P,Active,,⚪
-AZ,571448,Nolan Arenado,3B,Active,,⚪
-AZ,623149,Paul Sewald,P,Active,,⚪
-AZ,691769,Philip Abner,P,Active,,⚪
-AZ,657044,Ryan Thompson,P,Active,,⚪
-AZ,814439,Ryan Waldschmidt,CF,Active,,⚪
-AZ,664199,Taylor Clarke,P,Active,,⚪
-AZ,694374,Tim Tawa,LF,Active,,⚪
-AZ,682988,Tyler Locklear,1B,Active,,⚪
-BAL,668939,Adley Rutschman,C,Active,,⚪
-BAL,544150,Albert Suárez,P,Active,,⚪
-BAL,552640,Andrew Kittredge,P,Active,,⚪
-BAL,689296,Anthony Nunez,P,Active,,⚪
-BAL,687064,Brandon Young,P,Active,,⚪
-BAL,676742,Cam Sanders,P,Active,,⚪
-BAL,687952,Christian Encarnacion-Strand,1B,Active,,⚪
-BAL,691723,Coby Mayo,3B,Active,,⚪
-BAL,681297,Colton Cowser,CF,Active,,⚪
-BAL,665152,Dean Kremer,P,Active,,⚪
-BAL,687637,Dylan Beavers,RF,Active,,⚪
-BAL,664991,Grant Wolfram,P,Active,,⚪
-BAL,683002,Gunnar Henderson,SS,Active,,⚪
-BAL,702616,Jackson Holliday,2B,Active,,⚪
-BAL,669236,Jeremiah Jackson,2B,Active,,⚪
-BAL,680694,Kyle Bradish,P,Active,,⚪
-BAL,665750,Leody Taveras,CF,Active,,⚪
-BAL,624413,Pete Alonso,1B,Active,,⚪
-BAL,670329,Rico Garcia,P,Active,,⚪
-BAL,694212,Samuel Basallo,C,Active,,⚪
-BAL,669358,Shane Baz,P,Active,,⚪
-BAL,621493,Taylor Ward,LF,Active,,⚪
-BAL,669432,Trevor Rogers,P,Active,,⚪
-BAL,641933,Tyler O'Neill,RF,Active,,⚪
-BAL,669330,Tyler Wells,P,Active,,⚪
-BAL,666974,Yennier Cano,P,Active,,⚪
-BOS,687941,Alec Gamboa,P,Active,,⚪
-BOS,655316,Andruw Monasterio,SS,Active,,⚪
-BOS,678011,Anthony Seigler,2B,Active,,⚪
-BOS,547973,Aroldis Chapman,P,Active,,⚪
-BOS,678394,Brayan Bello,P,Active,,⚪
-BOS,702332,Caleb Durbin,3B,Active,,⚪
-BOS,665966,Carlos Narváez,C,Active,,⚪
-BOS,678882,Ceddanne Rafaela,CF,Active,,⚪
-BOS,657136,Connor Wong,C,Active,,⚪
-BOS,700842,Eduardo Rivera,P,Active,,⚪
-BOS,676477,Garrett Whitlock,P,Active,,⚪
-BOS,669711,Greg Weissert,P,Active,,⚪
-BOS,663330,Jahmai Jones,OF,Active,,⚪
-BOS,687562,Jake Bennett,P,Active,,⚪
-BOS,680776,Jarren Duran,LF,Active,,⚪
-BOS,663558,Jovani Morán,P,Active,,⚪
-BOS,686580,Justin Slaten,P,Active,,⚪
-BOS,807799,Masataka Yoshida,DH,Active,,⚪
-BOS,663776,Patrick Sandoval,P,Active,,⚪
-BOS,801139,Payton Tolle,P,Active,,⚪
-BOS,663853,Romy Gonzalez,DH,Active,,⚪
-BOS,670245,Ryan Watson,P,Active,,⚪
-BOS,543243,Sonny Gray,P,Active,,⚪
-BOS,691907,Tsung-Che Cheng,SS,Active,,⚪
-BOS,594027,Tyron Guerrero,P,Active,,⚪
-BOS,575929,Willson Contreras,1B,Active,,⚪
-BOS,677800,Wilyer Abreu,RF,Active,,⚪
-CHC,608324,Alex Bregman,3B,Active,,⚪
-CHC,573204,Caleb Thielbar,P,Active,,⚪
-CHC,608348,Carson Kelly,C,Active,,⚪
-CHC,607067,Colin Rea,P,Active,,⚪
-CHC,621020,Dansby Swanson,SS,Active,,⚪
-CHC,656849,David Peterson,P,Active,,⚪
-CHC,519141,Drew Pomeranz,P,Active,,⚪
-CHC,668970,Gavin Hollowell,P,Active,,⚪
-CHC,664023,Ian Happ,LF,Active,,⚪
-CHC,657097,Jacob Webb,P,Active,,⚪
-CHC,665871,Javier Assad,P,Active,,⚪
-CHC,681909,Justin Dean,CF,Active,,⚪
-CHC,682634,Kevin Alcántara,DH,Active,,⚪
-CHC,571510,Matthew Boyd,P,Active,,⚪
-CHC,683737,Michael Busch,1B,Active,,⚪
-CHC,624424,Michael Conforto,DH,Active,,⚪
-CHC,665804,Miguel Amaya,C,Active,,⚪
-CHC,663538,Nico Hoerner,2B,Active,,⚪
-CHC,699393,Pedro Ramírez,2B,Active,,⚪
-CHC,691718,Pete Crow-Armstrong,CF,Active,,⚪
-CHC,664208,Phil Maton,P,Active,,⚪
-CHC,669020,Ryan Rolison,P,Active,,⚪
-CHC,673548,Seiya Suzuki,RF,Active,,⚪
-CHC,684007,Shota Imanaga,P,Active,,⚪
-CHC,663423,Trent Thornton,P,Active,,⚪
-CHC,621053,Tyler Ferguson,P,Active,,⚪
-CIN,671096,Andrew Abbott,P,Active,,⚪
-CIN,663903,Brady Singer,P,Active,,⚪
-CIN,656271,Brock Burke,P,Active,,⚪
-CIN,657571,Caleb Ferguson,P,Active,,⚪
-CIN,695505,Chase Burns,P,Active,,⚪
-CIN,695534,Chase Petty,P,Active,,⚪
-CIN,667472,Dane Myers,CF,Active,,⚪
-CIN,695490,Edwin Arroyo,2B,Active,,⚪
-CIN,682829,Elly De La Cruz,SS,Active,,⚪
-CIN,641941,Emilio Pagán,P,Active,,⚪
-CIN,553993,Eugenio Suárez,DH,Active,,⚪
-CIN,668881,Hunter Greene,P,Active,,⚪
-CIN,668709,JJ Bleday,LF,Active,,⚪
-CIN,624431,Jose Trevino,C,Active,,⚪
-CIN,670062,Julian Garcia,P,Active,,⚪
-CIN,663647,Ke'Bryan Hayes,3B,Active,,⚪
-CIN,663993,Nathaniel Lowe,DH,Active,,⚪
-CIN,682622,Noelvi Marte,RF,Active,,⚪
-CIN,572955,Pierce Johnson,P,Active,,⚪
-CIN,695076,Rhett Lowder,P,Active,,⚪
-CIN,701398,Sal Stewart,1B,Active,,⚪
-CIN,594580,Sam Moll,P,Active,,⚪
-CIN,668715,Spencer Steer,1B,Active,,⚪
-CIN,670770,TJ Friedl,CF,Active,,⚪
-CIN,622088,Tejay Antone,P,Active,,⚪
-CIN,663886,Tyler Stephenson,C,Active,,⚪
-CLE,595978,Austin Hedges,C,Active,,⚪
-CLE,677587,Brayan Rocchio,SS,Active,,⚪
-CLE,671922,Cade Smith,P,Active,,⚪
-CLE,800050,Chase DeLauter,RF,Active,,⚪
-CLE,676051,Codi Heuer,P,Active,,⚪
-CLE,670059,Colin Holderman,P,Active,,⚪
-CLE,682177,Daniel Schneemann,CF,Active,,⚪
-CLE,681807,David Fry,RF,Active,,⚪
-CLE,681870,Erik Sabrowski,P,Active,,⚪
-CLE,680916,Franco Aleman,P,Active,,⚪
-CLE,672356,Gabriel Arias,SS,Active,,⚪
-CLE,668909,Gavin Williams,P,Active,,⚪
-CLE,683769,Hunter Gaddis,P,Active,,⚪
-CLE,676282,Joey Cantillo,P,Active,,⚪
-CLE,696135,Kahlil Watson,RF,Active,,⚪
-CLE,700932,Kyle Manzardo,1B,Active,,⚪
-CLE,670036,Matt Festa,P,Active,,⚪
-CLE,800048,Parker Messick,P,Active,,⚪
-CLE,672275,Patrick Bailey,C,Active,,⚪
-CLE,690984,Petey Halpin,CF,Active,,⚪
-CLE,656555,Rhys Hoskins,1B,Active,,⚪
-CLE,542888,Shawn Armstrong,P,Active,,⚪
-CLE,677944,Slade Cecconi,P,Active,,⚪
-CLE,680757,Steven Kwan,CF,Active,,⚪
-CLE,676440,Tanner Bibee,P,Active,,⚪
-CLE,683953,Travis Bazzana,2B,Active,,⚪
-COL,622608,Antonio Senzatela,P,Active,,⚪
-COL,690924,Braxton Fulford,DH,Active,,⚪
-COL,657514,Brennan Bernardino,P,Active,,⚪
-COL,664954,Brett Sullivan,C,Active,,⚪
-COL,694249,Cole Carrigg,CF,Active,,⚪
-COL,666397,Edouard Julien,2B,Active,,⚪
-COL,678662,Ezequiel Tovar,SS,Active,,⚪
-COL,687312,Gabriel Hughes,P,Active,,⚪
-COL,696100,Hunter Goodman,C,Active,,⚪
-COL,664983,Jake McCarthy,CF,Active,,⚪
-COL,676105,Jeff Criswell,P,Active,,⚪
-COL,623474,Jimmy Herget,P,Active,,⚪
-COL,605447,Jordan Romano,P,Active,,⚪
-COL,675848,Juan Mejia,P,Active,,⚪
-COL,607536,Kyle Freeland,P,Active,,⚪
-COL,691720,Kyle Karros,3B,Active,,⚪
-COL,547179,Michael Lorenzen,P,Active,,⚪
-COL,666160,Mickey Moniak,LF,Active,,⚪
-COL,663372,Ryan Feltner,P,Active,,⚪
-COL,681198,TJ Rumfield,1B,Active,,⚪
-COL,685299,Tanner Gordon,P,Active,,⚪
-COL,687859,Troy Johnston,RF,Active,,⚪
-COL,671289,Tyler Freeman,RF,Active,,⚪
-COL,680767,Victor Vodnik,P,Active,,⚪
-COL,650489,Willi Castro,2B,Active,,⚪
-COL,688642,Zach Agnos,P,Active,,⚪
-CWS,643217,Andrew Benintendi,DH,Active,,⚪
-CWS,641743,Anthony Kay,P,Active,,⚪
-CWS,695731,Braden Montgomery,RF,Active,,⚪
-CWS,663542,Bryan Hudson,P,Active,,⚪
-CWS,805367,Chase Meidroth,2B,Active,,⚪
-CWS,669684,Chris Murphy,P,Active,,⚪
-CWS,695657,Colson Montgomery,SS,Active,,⚪
-CWS,663436,Davis Martin,P,Active,,⚪
-CWS,691011,Drew Romo,C,Active,,⚪
-CWS,607200,Erick Fedde,P,Active,,⚪
-CWS,691799,Grant Taylor,P,Active,,⚪
-CWS,663855,Jordan Hicks,P,Active,,⚪
-CWS,678577,Junior Perez,CF,Active,,⚪
-CWS,691019,Kyle Teel,C,Active,,⚪
-CWS,682668,Luisangel Acuña,SS,Active,,⚪
-CWS,678246,Miguel Vargas,3B,Active,,⚪
-CWS,808959,Munetaka Murakami,1B,Active,,⚪
-CWS,702273,Noah Schultz,P,Active,,⚪
-CWS,545341,Randal Grichuk,DH,Active,,⚪
-CWS,803011,Sam Antonacci,LF,Active,,⚪
-CWS,680732,Sean Burke,P,Active,,⚪
-CWS,656794,Sean Newcomb,P,Active,,⚪
-CWS,622554,Seranthony Domínguez,P,Active,,⚪
-CWS,670950,Trevor Richards,P,Active,,⚪
-CWS,671976,Tristan Peters,CF,Active,,⚪
-CWS,805326,Tyler Schweitzer,P,Active,,⚪
-DET,689225,Beau Brieske,P,Active,,⚪
-DET,701162,Ben Malgeri,CF,Active,,⚪
-DET,669724,Brenan Hanifee,P,Active,,⚪
-DET,663554,Casey Mize,P,Active,,⚪
-DET,690993,Colt Keith,3B,Active,,⚪
-DET,693307,Dillon Dingler,C,Active,,⚪
-DET,623454,Drew Anderson,P,Active,,⚪
-DET,805427,Drew Sommers,P,Active,,⚪
-DET,680664,Eduardo Valencia,C,Active,,⚪
-DET,701678,Hao-Yu Lee,2B,Active,,⚪
-DET,656427,Jack Flaherty,P,Active,,⚪
-DET,621097,Jacob Waguespack,P,Active,,⚪
-DET,668670,Jake Rogers,C,Active,,⚪
-DET,681546,James Outman,CF,Active,,⚪
-DET,672456,Keider Montero,P,Active,,⚪
-DET,445276,Kenley Jansen,P,Active,,⚪
-DET,681481,Kerry Carpenter,RF,Active,,⚪
-DET,805808,Kevin McGonigle,SS,Active,,⚪
-DET,640448,Kyle Finnegan,P,Active,,⚪
-DET,663837,Matt Vierling,CF,Active,,⚪
-DET,682985,Riley Greene,LF,Active,,⚪
-DET,679529,Spencer Torkelson,1B,Active,,⚪
-DET,669373,Tarik Skubal,P,Active,,⚪
-DET,675512,Troy Melton,P,Active,,⚪
-DET,663947,Tyler Holton,P,Active,,⚪
-DET,656716,Zach McKinstry,2B,Active,,⚪
-HOU,805123,AJ Blubaugh,P,Active,,⚪
-HOU,650556,Bryan Abreu,P,Active,,⚪
-HOU,687911,Bryan King,P,Active,,⚪
-HOU,701358,Cam Smith,RF,Active,,⚪
-HOU,543877,Christian Vázquez,C,Active,,⚪
-HOU,572233,Christian Walker,1B,Active,,⚪
-HOU,664299,Cristian Javier,P,Active,,⚪
-HOU,660853,Enyel De Los Santos,P,Active,,⚪
-HOU,686613,Hunter Brown,P,Active,,⚪
-HOU,670623,Isaac Paredes,3B,Active,,⚪
-HOU,665161,Jeremy Peña,SS,Active,,⚪
-HOU,514888,Jose Altuve,2B,Active,,⚪
-HOU,623352,Josh Hader,P,Active,,⚪
-HOU,678906,Kai-Wei Teng,P,Active,,⚪
-HOU,664774,LaMonte Wade Jr.,LF,Active,,⚪
-HOU,828599,Lucas Spence,OF,Active,,⚪
-HOU,663878,Nate Pearson,P,Active,,⚪
-HOU,669397,Nick Allen,SS,Active,,⚪
-HOU,663567,Peter Lambert,P,Active,,⚪
-HOU,681293,Spencer Arrighetti,P,Active,,⚪
-HOU,595345,Steven Okert,P,Active,,⚪
-HOU,837227,Tatsuya Imai,P,Active,,⚪
-HOU,666211,Taylor Trammell,CF,Active,,⚪
-HOU,673237,Yainer Diaz,C,Active,,⚪
-HOU,670541,Yordan Alvarez,DH,Active,,⚪
-HOU,701305,Zach Dezenzo,LF,Active,,⚪
-KC,656638,Alex Lange,P,Active,,⚪
-KC,694360,Beck Way,P,Active,,⚪
-KC,677951,Bobby Witt Jr.,SS,Active,,⚪
-KC,695600,Carter Jensen,C,Active,,⚪
-KC,663738,Daniel Lynch IV,P,Active,,⚪
-KC,669212,Eli Morgan,P,Active,,⚪
-KC,686555,Isaac Collins,LF,Active,,⚪
-KC,695506,Jac Caglianone,RF,Active,,⚪
-KC,670167,John Schreiber,P,Active,,⚪
-KC,668942,Josh Rojas,3B,Active,,⚪
-KC,657041,Lane Thomas,CF,Active,,⚪
-KC,668674,Lucas Erceg,P,Active,,⚪
-KC,679883,Luinder Avila,P,Active,,⚪
-KC,571912,Luke Maile,C,Active,,⚪
-KC,621381,Matt Strahm,P,Active,,⚪
-KC,686681,Michael Massey,2B,Active,,⚪
-KC,608379,Michael Wacha,P,Active,,⚪
-KC,679845,Nick Loftin,3B,Active,,⚪
-KC,702070,Noah Cameron,P,Active,,⚪
-KC,677976,Randy Dobnak,P,Active,,⚪
-KC,521692,Salvador Perez,C,Active,,⚪
-KC,607625,Seth Lugo,P,Active,,⚪
-KC,516782,Starling Marte,RF,Active,,⚪
-KC,674444,Steven Cruz,P,Active,,⚪
-KC,686475,Tyler Tolbert,2B,Active,,⚪
-KC,686469,Vinnie Pasquantino,1B,Active,,⚪
-LAA,608718,Brent Suter,P,Active,,⚪
-LAA,681217,Chase Silseth,P,Active,,⚪
-LAA,694203,Denzer Guzman,3B,Active,,⚪
-LAA,680570,Grayson Rodriguez,P,Active,,⚪
-LAA,666176,Jo Adell,RF,Active,,⚪
-LAA,624585,Jorge Soler,DH,Active,,⚪
-LAA,820862,José Fermin,P,Active,,⚪
-LAA,642350,Jose Siri,CF,Active,,⚪
-LAA,667755,José Soriano,P,Active,,⚪
-LAA,666139,Josh Lowe,LF,Active,,⚪
-LAA,489446,Kirby Yates,P,Active,,⚪
-LAA,681351,Logan O'Hoppe,C,Active,,⚪
-LAA,545361,Mike Trout,CF,Active,,⚪
-LAA,815083,Mitch Farris,P,Active,,⚪
-LAA,694384,Nolan Schanuel,1B,Active,,⚪
-LAA,672724,Oswald Peraza,2B,Active,,⚪
-LAA,672282,Reid Detmers,P,Active,,⚪
-LAA,696270,Ryan Johnson,P,Active,,⚪
-LAA,666171,Ryan Zeferjahn,P,Active,,⚪
-LAA,696147,Sam Bachman,P,Active,,⚪
-LAA,696519,Samy Natera Jr.,P,Active,,⚪
-LAA,623168,Tyler Heineman,C,Active,,⚪
-LAA,687093,Vaughn Grissom,2B,Active,,⚪
-LAA,685133,Wade Meckler,LF,Active,,⚪
-LAA,700712,Walbert Ureña,P,Active,,⚪
-LAA,687263,Zach Neto,SS,Active,,⚪
-LAD,669743,Alex Call,LF,Active,,⚪
-LAD,690976,Alex Freeland,2B,Active,,⚪
-LAD,681911,Alex Vesia,P,Active,,⚪
-LAD,681624,Andy Pages,CF,Active,,⚪
-LAD,592779,Brock Stewart,P,Active,,⚪
-LAD,687221,Dalton Rushing,C,Active,,⚪
-LAD,683618,Edgardo Henriquez,P,Active,,⚪
-LAD,672613,Eliezer Alfonzo,C,Active,,⚪
-LAD,686218,Emmet Sheehan,P,Active,,⚪
-LAD,641778,Eric Lauer,P,Active,,⚪
-LAD,623465,Evan Phillips,P,Active,,⚪
-LAD,518692,Freddie Freeman,1B,Active,,⚪
-LAD,676263,Jack Dreyer,P,Active,,⚪
-LAD,680736,Justin Wrobleski,P,Active,,⚪
-LAD,663656,Kyle Tucker,RF,Active,,⚪
-LAD,689017,Landon Knack,P,Active,,⚪
-LAD,571970,Max Muncy,3B,Active,,⚪
-LAD,500743,Miguel Rojas,SS,Active,,⚪
-LAD,605141,Mookie Betts,SS,Active,,⚪
-LAD,808963,Roki Sasaki,P,Active,,⚪
-LAD,660271,Shohei Ohtani,TWP,Active,,⚪
-LAD,656945,Tanner Scott,P,Active,,⚪
-LAD,606192,Teoscar Hernández,LF,Active,,⚪
-LAD,669242,Tommy Edman,LF,Active,,⚪
-LAD,694361,Will Klein,P,Active,,⚪
-LAD,808967,Yoshinobu Yamamoto,P,Active,,⚪
-MIA,640459,Brian Navarreto,C,Active,,⚪
-MIA,806188,Cade Gibson,P,Active,,⚪
-MIA,676534,Calvin Faucher,P,Active,,⚪
-MIA,690978,Dax Fulton,P,Active,,⚪
-MIA,665923,Esteury Ruiz,RF,Active,,⚪
-MIA,691587,Eury Pérez,P,Active,,⚪
-MIA,665052,Griffin Conine,LF,Active,,⚪
-MIA,681715,Heriberto Hernández,LF,Active,,⚪
-MIA,805300,Jakob Marsee,CF,Active,,⚪
-MIA,676083,Janson Junk,P,Active,,⚪
-MIA,691594,Javier Sanoja,3B,Active,,⚪
-MIA,691788,Joe Mack,C,Active,,⚪
-MIA,669065,Kyle Stowers,LF,Active,,⚪
-MIA,669199,Lake Bachar,P,Active,,⚪
-MIA,677870,Leo Jiménez,3B,Active,,⚪
-MIA,689414,Liam Hicks,C,Active,,⚪
-MIA,676974,Max Meyer,P,Active,,⚪
-MIA,656848,Michael Petersen,P,Active,,⚪
-MIA,672640,Otto Lopez,SS,Active,,⚪
-MIA,664126,Pete Fairbanks,P,Active,,⚪
-MIA,677956,Rece Hinds,RF,Active,,⚪
-MIA,687473,Ryan Gusto,P,Active,,⚪
-MIA,645261,Sandy Alcantara,P,Active,,⚪
-MIA,663969,Tyler Phillips,P,Active,,⚪
-MIA,676604,Tyler Zuber,P,Active,,⚪
-MIA,669364,Xavier Edwards,2B,Active,,⚪
-MIL,676879,Aaron Ashby,P,Active,,⚪
-MIL,682842,Abner Uribe,P,Active,,⚪
-MIL,683734,Andrew Vaughn,1B,Active,,⚪
-MIL,669699,Braden Shewmake,SS,Active,,⚪
-MIL,687075,Brandon Sproat,P,Active,,⚪
-MIL,668930,Brice Turang,2B,Active,,⚪
-MIL,669060,Bryse Wilson,P,Active,,⚪
-MIL,694477,Chad Patrick,P,Active,,⚪
-MIL,592885,Christian Yelich,DH,Active,,⚪
-MIL,806198,Cooper Pratt,SS,Active,,⚪
-MIL,684974,Craig Yoho,P,Active,,⚪
-MIL,669003,Garrett Mitchell,CF,Active,,⚪
-MIL,596142,Gary Sánchez,C,Active,,⚪
-MIL,681982,Grant Anderson,P,Active,,⚪
-MIL,694192,Jackson Chourio,LF,Active,,⚪
-MIL,694819,Jacob Misiorowski,P,Active,,⚪
-MIL,641343,Jake Bauers,1B,Active,,⚪
-MIL,687401,Joey Ortiz,SS,Active,,⚪
-MIL,621121,Lance McCullers Jr.,P,Active,,⚪
-MIL,701656,Logan Henderson,P,Active,,⚪
-MIL,800325,Luis Lara,CF,Active,,⚪
-MIL,688107,Robert Gasser,P,Active,,⚪
-MIL,686217,Sal Frelick,RF,Active,,⚪
-MIL,675660,Shane Drohan,P,Active,,⚪
-MIL,656730,Trevor Megill,P,Active,,⚪
-MIL,661388,William Contreras,C,Active,,⚪
-MIN,702176,Alan Roden,LF,Active,,⚪
-MIN,656577,Alex Jackson,C,Active,,⚪
-MIN,702193,Andrew Morris,P,Active,,⚪
-MIN,668885,Austin Martin,RF,Active,,⚪
-MIN,641927,Bailey Ober,P,Active,,⚪
-MIN,686797,Brooks Lee,SS,Active,,⚪
-MIN,657746,Joe Ryan,P,Active,,⚪
-MIN,605137,Josh Bell,DH,Active,,⚪
-MIN,696070,Kendry Rojas,P,Active,,⚪
-MIN,665019,Kody Clemens,1B,Active,,⚪
-MIN,681892,Kody Funderburk,P,Active,,⚪
-MIN,807712,Luke Keaschall,2B,Active,,⚪
-MIN,702474,Mike Paredes,P,Active,,⚪
-MIN,668904,Royce Lewis,3B,Active,,⚪
-MIN,680777,Ryan Jeffers,C,Active,,⚪
-MIN,668952,Ryan Kreidler,CF,Active,,⚪
-MIN,671737,Taj Bradley,P,Active,,⚪
-MIN,573124,Taylor Rogers,P,Active,,⚪
-MIN,667297,Tommy Nance,P,Active,,⚪
-MIN,701519,Travis Adams,P,Active,,⚪
-MIN,663616,Trevor Larnach,LF,Active,,⚪
-MIN,656484,Tristan Gray,SS,Active,,⚪
-MIN,605170,Victor Caratini,C,Active,,⚪
-MIN,808970,Woo-Suk Go,P,Active,,⚪
-MIN,672782,Yoendrys Gómez,P,Active,,⚪
-MIN,805673,Zebby Matthews,P,Active,,⚪
-NYM,805999,A.J. Ewing,CF,Active,,⚪
-NYM,621345,A.J. Minter,P,Active,,⚪
-NYM,666182,Bo Bichette,SS,Active,,⚪
-NYM,683146,Brett Baty,3B,Active,,⚪
-NYM,548384,Brooks Raley,P,Active,,⚪
-NYM,701807,Carson Benge,RF,Active,,⚪
-NYM,681035,Christian Scott,P,Active,,⚪
-NYM,672335,Cionel Pérez,P,Active,,⚪
-NYM,642207,Devin Williams,P,Active,,⚪
-NYM,676572,Eric Wagaman,1B,Active,,⚪
-NYM,682626,Francisco Alvarez,C,Active,,⚪
-NYM,596019,Francisco Lindor,SS,Active,,⚪
-NYM,642547,Freddy Peralta,P,Active,,⚪
-NYM,623211,Huascar Brazobán,P,Active,,⚪
-NYM,676724,Jared Young,1B,Active,,⚪
-NYM,593871,Jorge Polanco,DH,Active,,⚪
-NYM,665742,Juan Soto,LF,Active,,⚪
-NYM,673540,Kodai Senga,P,Active,,⚪
-NYM,620443,Luis Torrens,C,Active,,⚪
-NYM,596133,Luke Weaver,P,Active,,⚪
-NYM,543760,Marcus Semien,2B,Active,,⚪
-NYM,690997,Nolan McLean,P,Active,,⚪
-NYM,640455,Sean Manaea,P,Active,,⚪
-NYM,621438,Tyrone Taylor,CF,Active,,⚪
-NYM,675540,Xzavion Curry,P,Active,,⚪
-NYM,804267,Zach Thornton,P,Active,,⚪
-NYY,645305,Ali Sánchez,C,Active,,⚪
-NYY,642708,Amed Rosario,3B,Active,,⚪
-NYY,683409,Angel Chivilli,P,Active,,⚪
-NYY,683011,Anthony Volpe,SS,Active,,⚪
-NYY,669224,Austin Wells,C,Active,,⚪
-NYY,700250,Ben Rice,1B,Active,,⚪
-NYY,687396,Brent Headrick,P,Active,,⚪
-NYY,693645,Cam Schlittler,P,Active,,⚪
-NYY,666808,Camilo Doval,P,Active,,⚪
-NYY,641355,Cody Bellinger,LF,Active,,⚪
-NYY,670280,David Bednar,P,Active,,⚪
-NYY,518585,Fernando Cruz,P,Active,,⚪
-NYY,543037,Gerrit Cole,P,Active,,⚪
-NYY,656234,Jake Bird,P,Active,,⚪
-NYY,691176,Jasson Domínguez,RF,Active,,⚪
-NYY,665862,Jazz Chisholm Jr.,2B,Active,,⚪
-NYY,676609,José Caballero,SS,Active,,⚪
-NYY,680474,Max Schuemann,SS,Active,,⚪
-NYY,621112,Paul Blackburn,P,Active,,⚪
-NYY,502671,Paul Goldschmidt,1B,Active,,⚪
-NYY,641857,Ryan McMahon,3B,Active,,⚪
-NYY,677960,Ryan Weathers,P,Active,,⚪
-NYY,642232,Ryan Yarbrough,P,Active,,⚪
-NYY,657612,Tim Hill,P,Active,,⚪
-NYY,663757,Trent Grisham,CF,Active,,⚪
-NYY,701542,Will Warren,P,Active,,⚪
-PHI,605400,Aaron Nola,P,Active,,⚪
-PHI,660604,Alan Rangel,P,Active,,⚪
-PHI,664761,Alec Bohm,3B,Active,,⚪
-PHI,669016,Brandon Marsh,LF,Active,,⚪
-PHI,547180,Bryce Harper,1B,Active,,⚪
-PHI,681082,Bryson Stott,2B,Active,,⚪
-PHI,663767,Chase Shugart,P,Active,,⚪
-PHI,650911,Cristopher Sánchez,P,Active,,⚪
-PHI,656537,Derek Hill,RF,Active,,⚪
-PHI,624641,Edmundo Sosa,2B,Active,,⚪
-PHI,687282,Gabriel Rincones Jr.,RF,Active,,⚪
-PHI,596117,Garrett Stubbs,C,Active,,⚪
-PHI,592663,J.T. Realmuto,C,Active,,⚪
-PHI,666200,Jesús Luzardo,P,Active,,⚪
-PHI,661395,Jhoan Duran,P,Active,,⚪
-PHI,680742,Jonathan Bowlan,P,Active,,⚪
-PHI,621237,José Alvarado,P,Active,,⚪
-PHI,702222,Justin Crawford,CF,Active,,⚪
-PHI,656941,Kyle Schwarber,DH,Active,,⚪
-PHI,676661,Max Lazar,P,Active,,⚪
-PHI,689147,Orion Kerkering,P,Active,,⚪
-PHI,665561,Rafael Marchán,C,Active,,⚪
-PHI,686751,Seth Johnson,P,Active,,⚪
-PHI,641835,Tim Mayza,P,Active,,⚪
-PHI,607208,Trea Turner,SS,Active,,⚪
-PHI,554430,Zack Wheeler,P,Active,,⚪
-PIT,695257,Billy Cook,RF,Active,,⚪
-PIT,685126,Brandon Eisert,P,Active,,⚪
-PIT,664040,Brandon Lowe,2B,Active,,⚪
-PIT,677952,Braxton Ashcraft,P,Active,,⚪
-PIT,668804,Bryan Reynolds,LF,Active,,⚪
-PIT,696149,Bubba Chandler,P,Active,,⚪
-PIT,669387,Carmen Mlodzinski,P,Active,,⚪
-PIT,642701,Dennis Santana,P,Active,,⚪
-PIT,699013,Esmerlyn Valdez,RF,Active,,⚪
-PIT,642397,Gregory Soto,P,Active,,⚪
-PIT,680779,Henry Davis,C,Active,,⚪
-PIT,676755,Isaac Mattson,P,Active,,⚪
-PIT,694378,Jacob Gonzalez,1B,Active,,⚪
-PIT,663968,Jake Mangum,CF,Active,,⚪
-PIT,683003,Jared Jones,P,Active,,⚪
-PIT,669707,Jared Triolo,SS,Active,,⚪
-PIT,542303,Marcell Ozuna,DH,Active,,⚪
-PIT,682254,Mason Montgomery,P,Active,,⚪
-PIT,656605,Mitch Keller,P,Active,,⚪
-PIT,693304,Nick Gonzales,3B,Active,,⚪
-PIT,694973,Paul Skenes,P,Active,,⚪
-PIT,804668,Rafael Flores Jr.,C,Active,,⚪
-PIT,656811,Ryan O'Hearn,RF,Active,,⚪
-PIT,682997,Tyler Callihan,LF,Active,,⚪
-PIT,670990,Yohan Ramírez,P,Active,,⚪
-SD,670970,Adrian Morejon,P,Active,,⚪
-SD,699134,Bradgley Rodriguez,P,Active,,⚪
-SD,665487,Fernando Tatis Jr.,RF,Active,,⚪
-SD,666023,Freddy Fermin,C,Active,,⚪
-SD,657757,Gavin Sheets,1B,Active,,⚪
-SD,608566,Germán Márquez,P,Active,,⚪
-SD,656288,Griffin Canning,P,Active,,⚪
-SD,676664,JP Sears,P,Active,,⚪
-SD,701538,Jackson Merrill,CF,Active,,⚪
-SD,630105,Jake Cronenworth,2B,Active,,⚪
-SD,687749,Jase Bowen,RF,Active,,⚪
-SD,666745,Jhony Brito,P,Active,,⚪
-SD,606996,Kyle Hart,P,Active,,⚪
-SD,669134,Luis Campusano,C,Active,,⚪
-SD,650859,Luis Rengifo,3B,Active,,⚪
-SD,592518,Manny Machado,3B,Active,,⚪
-SD,695243,Mason Miller,P,Active,,⚪
-SD,663362,Matt Waldron,P,Active,,⚪
-SD,650633,Michael King,P,Active,,⚪
-SD,609280,Miguel Andujar,DH,Active,,⚪
-SD,676760,Ron Marinaccio,P,Active,,⚪
-SD,823550,Sung-Mun Song,2B,Active,,⚪
-SD,664034,Ty France,1B,Active,,⚪
-SD,621111,Walker Buehler,P,Active,,⚪
-SD,593428,Xander Bogaerts,SS,Active,,⚪
-SD,673513,Yuki Matsui,P,Active,,⚪
-SEA,662253,Andrés Muñoz,P,Active,,⚪
-SEA,693433,Bryan Woo,P,Active,,⚪
-SEA,682243,Bryce Miller,P,Active,,⚪
-SEA,671083,Buddy Kennedy,1B,Active,,⚪
-SEA,663728,Cal Raleigh,C,Active,,⚪
-SEA,677961,Cole Wilcox,P,Active,,⚪
-SEA,702284,Cole Young,2B,Active,,⚪
-SEA,806068,Colt Emerson,SS,Active,,⚪
-SEA,686527,Dominic Canzone,DH,Active,,⚪
-SEA,660825,Eduard Bazardo,P,Active,,⚪
-SEA,676106,Emerson Hancock,P,Active,,⚪
-SEA,642100,Gabe Speier,P,Active,,⚪
-SEA,669923,George Kirby,P,Active,,⚪
-SEA,641487,J.P. Crawford,SS,Active,,⚪
-SEA,678606,José A. Ferrer,P,Active,,⚪
-SEA,647304,Josh Naylor,1B,Active,,⚪
-SEA,669302,Logan Gilbert,P,Active,,⚪
-SEA,622491,Luis Castillo,P,Active,,⚪
-SEA,670042,Luke Raley,RF,Active,,⚪
-SEA,621074,Michael Rucker,P,Active,,⚪
-SEA,670156,Miles Mastrobuoni,3B,Active,,⚪
-SEA,641598,Mitch Garver,C,Active,,⚪
-SEA,689546,Nick Davila,P,Active,,⚪
-SEA,668227,Randy Arozarena,LF,Active,,⚪
-SEA,645302,Victor Robles,RF,Active,,⚪
-SEA,642215,Weston Wilson,3B,Active,,⚪
-SF,605288,Adrian Houser,P,Active,,⚪
-SF,805811,Bryce Eldridge,DH,Active,,⚪
-SF,668873,Caleb Kilian,P,Active,,⚪
-SF,669477,Casey Schmitt,LF,Active,,⚪
-SF,683766,Christian Koss,2B,Active,,⚪
-SF,691740,Daniel Susac,C,Active,,⚪
-SF,701852,Drew Cavanaugh,C,Active,,⚪
-SF,687551,Drew Gilbert,CF,Active,,⚪
-SF,681916,Dylan Smith,P,Active,,⚪
-SF,669062,Erik Miller,P,Active,,⚪
-SF,687529,Grant McCray,CF,Active,,⚪
-SF,671218,Heliot Ramos,LF,Active,,⚪
-SF,664141,JT Brubaker,P,Active,,⚪
-SF,671345,Jason Foley,P,Active,,⚪
-SF,683679,Jesus Rodriguez,C,Active,,⚪
-SF,808982,Jung Hoo Lee,RF,Active,,⚪
-SF,676775,Keaton Winn,P,Active,,⚪
-SF,694738,Landen Roupp,P,Active,,⚪
-SF,657277,Logan Webb,P,Active,,⚪
-SF,650333,Luis Arraez,2B,Active,,⚪
-SF,646240,Rafael Devers,1B,Active,,⚪
-SF,592662,Robbie Ray,P,Active,,⚪
-SF,656529,Sam Hentges,P,Active,,⚪
-SF,686790,Trevor McDonald,P,Active,,⚪
-SF,641816,Tyler Mahle,P,Active,,⚪
-SF,642715,Willy Adames,SS,Active,,⚪
-STL,676475,Alec Burleson,1B,Active,,⚪
-STL,669467,Andre Pallante,P,Active,,⚪
-STL,691458,Blaze Jordan,3B,Active,,⚪
-STL,663494,Bryan Torres,LF,Active,,⚪
-STL,669160,Dustin May,P,Active,,⚪
-STL,666277,George Soriano,P,Active,,⚪
-STL,700669,Gordon Graceffo,P,Active,,⚪
-STL,671056,Iván Herrera,DH,Active,,⚪
-STL,802139,JJ Wetherholt,2B,Active,,⚪
-STL,699625,Jimmy Crooks,C,Active,,⚪
-STL,691023,Jordan Walker,RF,Active,,⚪
-STL,665877,José Fermín,LF,Active,,⚪
-STL,677865,Justin Bruihl,P,Active,,⚪
-STL,681517,Kyle Leahy,P,Active,,⚪
-STL,663457,Lars Nootbaar,LF,Active,,⚪
-STL,703725,Luis Gastelum,P,Active,,⚪
-STL,691026,Masyn Winn,SS,Active,,⚪
-STL,694335,Matt Svanson,P,Active,,⚪
-STL,669461,Matthew Liberatore,P,Active,,⚪
-STL,700241,Michael McGreevy,P,Active,,⚪
-STL,701675,Nathan Church,LF,Active,,⚪
-STL,676369,Nelson Velázquez,LF,Active,,⚪
-STL,686780,Pedro Pagés,C,Active,,⚪
-STL,676617,Riley O'Brien,P,Active,,⚪
-STL,592773,Ryne Stanek,P,Active,,⚪
-STL,656240,Scott Blewett,P,Active,,⚪
-TB,810938,Ben Williamson,2B,Active,,⚪
-TB,641329,Bryan Baker,P,Active,,⚪
-TB,592155,Cam Booser,P,Active,,⚪
-TB,668984,Casey Legumina,P,Active,,⚪
-TB,656775,Cedric Mullins,CF,Active,,⚪
-TB,802415,Chandler Simpson,LF,Active,,⚪
-TB,688297,Chris Roycroft,P,Active,,⚪
-TB,642121,Cole Sulser,P,Active,,⚪
-TB,518886,Craig Kimbrel,P,Active,,⚪
-TB,656876,Drew Rasmussen,P,Active,,⚪
-TB,664076,Garrett Cleavinger,P,Active,,⚪
-TB,643377,Griffin Jax,P,Active,,⚪
-TB,676439,Hunter Feduccia,C,Active,,⚪
-TB,693855,Ian Seymour,P,Active,,⚪
-TB,666018,Jonathan Aranda,1B,Active,,⚪
-TB,676356,Jonny DeLuca,RF,Active,,⚪
-TB,691406,Junior Caminero,3B,Active,,⚪
-TB,687330,Kevin Kelly,P,Active,,⚪
-TB,669438,Mason Englert,P,Active,,⚪
-TB,663743,Nick Fortes,C,Active,,⚪
-TB,607259,Nick Martinez,P,Active,,⚪
-TB,680700,Richie Palacios,2B,Active,,⚪
-TB,668723,Ryan Vilade,RF,Active,,⚪
-TB,663556,Shane McClanahan,P,Active,,⚪
-TB,670764,Taylor Walls,SS,Active,,⚪
-TB,683748,Victor Mesa Jr.,RF,Active,,⚪
-TB,650490,Yandy Díaz,DH,Active,,⚪
-TEX,696030,Alejandro Osuna,LF,Active,,⚪
-TEX,687239,Ben Peoples,P,Active,,⚪
-TEX,607043,Brandon Nimmo,RF,Active,,⚪
-TEX,615698,Cal Quantrill,P,Active,,⚪
-TEX,695508,Cam Cauley,SS,Active,,⚪
-TEX,668390,Cole Winn,P,Active,,⚪
-TEX,553869,Elias Díaz,C,Active,,⚪
-TEX,693713,Emiliano Teodo,P,Active,,⚪
-TEX,694497,Evan Carter,CF,Active,,⚪
-TEX,677649,Ezequiel Duran,SS,Active,,⚪
-TEX,686560,Gavin Collyer,P,Active,,⚪
-TEX,656641,Jacob Latz,P,Active,,⚪
-TEX,594798,Jacob deGrom,P,Active,,⚪
-TEX,669394,Jake Burger,1B,Active,,⚪
-TEX,592626,Joc Pederson,DH,Active,,⚪
-TEX,673962,Josh Jung,3B,Active,,⚪
-TEX,679822,Justin Foscue,2B,Active,,⚪
-TEX,677958,Kumar Rocker,P,Active,,⚪
-TEX,543309,Kyle Higashioka,C,Active,,⚪
-TEX,669022,MacKenzie Gore,P,Active,,⚪
-TEX,543135,Nathan Eovaldi,P,Active,,⚪
-TEX,670032,Nicky Lopez,2B,Active,,⚪
-TEX,682608,Peyton Gray,P,Active,,⚪
-TEX,695239,Robby Ahlstrom,P,Active,,⚪
-TEX,641302,Tyler Alexander,P,Active,,⚪
-TEX,694671,Wyatt Langford,LF,Active,,⚪
-TOR,671936,Adam Macko,P,Active,,⚪
-TOR,672386,Alejandro Kirk,C,Active,,⚪
-TOR,665926,Andrés Giménez,SS,Active,,⚪
-TOR,678218,Brandon Valenzuela,C,Active,,⚪
-TOR,680755,Braydon Fisher,P,Active,,⚪
-TOR,669310,CJ Van Eyk,P,Active,,⚪
-TOR,662139,Daulton Varsho,CF,Active,,⚪
-TOR,656302,Dylan Cease,P,Active,,⚪
-TOR,676391,Ernie Clement,2B,Active,,⚪
-TOR,543807,George Springer,DH,Active,,⚪
-TOR,656546,Jeff Hoffman,P,Active,,⚪
-TOR,682729,Jonatan Clase,LF,Active,,⚪
-TOR,672960,Kazuma Okamoto,3B,Active,,⚪
-TOR,592332,Kevin Gausman,P,Active,,⚪
-TOR,686973,Louis Varland,P,Active,,⚪
-TOR,649966,Luis Urías,2B,Active,,⚪
-TOR,689254,Mason Fluharty,P,Active,,⚪
-TOR,664702,Myles Straw,RF,Active,,⚪
-TOR,664770,Nathan Lukes,RF,Active,,⚪
-TOR,571578,Patrick Corbin,P,Active,,⚪
-TOR,815873,Sean Keys,DH,Active,,⚪
-TOR,669456,Shane Bieber,P,Active,,⚪
-TOR,693686,Spencer Miles,P,Active,,⚪
-TOR,702056,Trey Yesavage,P,Active,,⚪
-TOR,643511,Tyler Rogers,P,Active,,⚪
-TOR,665489,Vladimir Guerrero Jr.,1B,Active,,⚪
-WSH,665953,Andrés Chaparro,1B,Active,,⚪
-WSH,674841,Andrew Alvarez,P,Active,,⚪
-WSH,682928,CJ Abrams,SS,Active,,⚪
-WSH,676917,Cade Cavalli,P,Active,,⚪
-WSH,687223,Carson Palmquist,P,Active,,⚪
-WSH,690925,Clayton Beeter,P,Active,,⚪
-WSH,678554,Curtis Mead,3B,Active,,⚪
-WSH,695734,Daylen Lile,LF,Active,,⚪
-WSH,686611,Dylan Crews,RF,Active,,⚪
-WSH,656492,Foster Griffin,P,Active,,⚪
-WSH,695670,Harry Ford,C,Active,,⚪
-WSH,696285,Jacob Young,CF,Active,,⚪
-WSH,695578,James Wood,RF,Active,,⚪
-WSH,678391,Jorbit Vivas,3B,Active,,⚪
-WSH,677588,José Tena,DH,Active,,⚪
-WSH,664875,Justin Lawrence,P,Active,,⚪
-WSH,660688,Keibert Ruiz,C,Active,,⚪
-WSH,671277,Luis García Jr.,1B,Active,,⚪
-WSH,668820,Max Kranick,P,Active,,⚪
-WSH,683083,Nasim Nuñez,2B,Active,,⚪
-WSH,687377,Orlando Ribalta,P,Active,,⚪
-WSH,676571,PJ Poulin,P,Active,,⚪
-WSH,683000,Riley Cornelio,P,Active,,⚪
-WSH,676680,Tom Cosgrove,P,Active,,⚪
-WSH,641793,Zack Littell,P,Active,,⚪
+Team,Batter ID,Player Name,Position,Injury Description,Expected Return,Severity,Status
+ATH,667670,Brent Rooker,DH,Bone bruise in left knee.,,🟢,Injured 60-Day
+ATH,621139,Brooks Kriske,P,Right shoulder impingement,,⚪,Injured 60-Day
+ATH,672016,Denzel Clarke,CF,Mid foot bone bruise in right foot.,,🟢,Injured 60-Day
+ATH,680684,Gunnar Hoglund,P,Sprained right knee.,,🟡,Injured 60-Day
+ATH,622663,Luis Severino,P,Right shoulder strain.,,🟡,Injured 60-Day
+ATH,701762,Nick Kurtz,1B,Right thumb capsule sprain.,,🟡,Injured 10-Day
+ATH,680869,Zack Gelof,3B,Right knee laceration.,,⚪,Injured 10-Day
+ATL,700363,AJ Smith-Shawver,P,Right elbow reconstruction,,⚪,Injured 60-Day
+ATL,673490,Ha-Seong Kim,SS,Right middle finger inflammation.,,🟡,Injured 10-Day
+ATL,641729,Joe Jiménez,P,Injured 60-Day,,⚪,Injured 60-Day
+ATL,666214,Joey Wentz,P,Right knee ACL tear.,,🔴,Injured 60-Day
+ATL,527048,Martín Pérez,P,Left forearm contusion.,,🟢,Injured 15-Day
+ATL,573262,Mike Yastrzemski,LF,Left elbow inflammation.,,🟡,Injured 10-Day
+ATL,663158,Robert Suarez,P,Right forearm tightness.,,🟢,Injured 15-Day
+ATL,660670,Ronald Acuña Jr.,RF,Strained left hamstring.,,🟡,Injured 10-Day
+ATL,669221,Sean Murphy,C,Fractured left middle finger.,,🔴,Injured 60-Day
+ATL,680885,Spencer Schwellenbach,P,Injured 60-Day,,⚪,Injured 60-Day
+ATL,675911,Spencer Strider,P,Right elbow inflammation.,,🟡,Injured 60-Day
+AZ,640462,A.J. Puk,P,Left ulnar collateral ligament surgery recovery.,,🔴,Injured 60-Day
+AZ,685314,Andrew Saalfrank,P,Left labrum repair surgery.,,🔴,Injured 60-Day
+AZ,686796,Blake Walston,P,Left UCL surgery,,🔴,Injured 60-Day
+AZ,669203,Corbin Burnes,P,Right ulnar collateral ligament surgery recovery.,,🔴,Injured 60-Day
+AZ,691441,Cristian Mena,P,Right shoulder strain,,🟡,Injured 60-Day
+AZ,691783,Jordan Lawlar,LF,Right hamstring strain,,🟡,Injured 10-Day
+AZ,679885,Justin Martinez,P,Recovery from right ulnar collateral ligament surgery.,,🔴,Injured 60-Day
+AZ,647336,Michael Soroka,P,Left glute strain,,🟡,Injured 15-Day
+AZ,669194,Ryne Nelson,P,Strained right elbow.,,🟡,Injured 60-Day
+AZ,694371,Tommy Troy,LF,Sprained right AC joint.,,🟡,Injured 10-Day
+AZ,668678,Zac Gallen,P,Right elbow inflammation.,,🟡,Injured 15-Day
+BAL,677942,Blaze Alexander,3B,Left hand fracture.,,🔴,Injured 10-Day
+BAL,605135,Chris Bassitt,P,Low back discomfort.,,⚪,Injured 60-Day
+BAL,681882,Colin Selby,P,Right shoulder inflammation.,,🟡,Injured 60-Day
+BAL,642585,Félix Bautista,P,Right shoulder surgery.,,🔴,Injured 60-Day
+BAL,676059,Jordan Westburg,3B,Right elbow UCL sprain.,,🟡,Injured 60-Day
+BAL,669211,Keegan Akin,P,Left elbow discomfort,,⚪,Injured 60-Day
+BAL,664854,Ryan Helsley,P,Right elbow discomfort.,,⚪,Injured 15-Day
+BAL,663624,Ryan Mountcastle,1B,Left foot fracture,,🔴,Injured 60-Day
+BAL,621107,Zach Eflin,P,Right elbow discomfort.,,⚪,Injured 60-Day
+BOS,813349,Connelly Early,P,Left elbow inflammation.,,🟡,Injured 15-Day
+BOS,676979,Garrett Crochet,P,Left shoulder inflammation.,,🟡,Injured 60-Day
+BOS,643396,Isiah Kiner-Falefa,2B,Left forearm inflammation,,🟡,Injured 10-Day
+BOS,670912,Johan Oviedo,P,Right elbow strain..,,🟡,Injured 60-Day
+BOS,676710,Kutter Crawford,P,Right wrist surgery,,🔴,Injured 60-Day
+BOS,691785,Marcelo Mayer,2B,Bone stress reaction to the left ulna.,,⚪,Injured 10-Day
+BOS,624133,Ranger Suarez,P,Left groin strain.,,🟡,Injured 15-Day
+BOS,701350,Roman Anthony,LF,Injured 60-Day,,⚪,Injured 60-Day
+BOS,656557,Tanner Houck,P,Injured 60-Day,,⚪,Injured 60-Day
+BOS,596115,Trevor Story,SS,Sports hernia.,,⚪,Injured 60-Day
+BOS,671213,Triston Casas,1B,Recovery from left patellar tendon repair,,⚪,Injured 60-Day
+CHC,676962,Ben Brown,P,Neck strain.,,🟡,Injured 15-Day
+CHC,690990,Cade Horton,P,Right forearm strain.,,🟡,Injured 60-Day
+CHC,694037,Daniel Palencia,P,Right elbow inflammation.,,🟡,Injured 15-Day
+CHC,665795,Edward Cabrera,P,Left hamstring strain.,,🟡,Injured 15-Day
+CHC,681799,Ethan Roberts,P,right forearm inflammation,,🟡,Injured 15-Day
+CHC,571948,Hoby Milner,P,Appendicitis,,⚪,Injured 15-Day
+CHC,640451,Hunter Harvey,P,Right triceps inflammation.,,🟡,Injured 60-Day
+CHC,592791,Jameson Taillon,P,Strained left hamstring.,,🟡,Injured 15-Day
+CHC,657006,Justin Steele,P,Left elbow injury,,⚪,Injured 60-Day
+CHC,807713,Matt Shaw,RF,left-hand sprain,,🟡,Injured 10-Day
+CHC,687863,Porter Hodge,P,Right elbow strain,,🟡,Injured 60-Day
+CHC,702303,Riley Martin,P,Left elbow inflammation.,,🟡,Injured 60-Day
+CHC,571946,Shelby Miller,P,Right Elbow UCL Injury,,⚪,Injured 60-Day
+CHC,592122,Tyler Austin,1B,Right knee surgery.,,🔴,Injured 60-Day
+CIN,694362,Blake Dunn,CF,Right elbow sprain.,,🟡,Injured 10-Day
+CIN,682227,Brandon Williamson,P,Left shoulder fatigue.,,⚪,Injured 60-Day
+CIN,668933,Graham Ashcraft,P,Right forearm UCL sprain.,,🟡,Injured 60-Day
+CIN,680574,Matt McLain,2B,Left calf strain.,,🟡,Injured 10-Day
+CIN,666157,Nick Lodolo,P,Blister left index finger.,,⚪,Injured 15-Day
+CIN,663574,Tony Santillan,P,Left oblique strain.,,🟡,Injured 15-Day
+CLE,682657,Angel Martínez,LF,Left foot non-displaced fracture.,,🔴,Injured 10-Day
+CLE,608070,José Ramírez,3B,Left hamate fracture.,,🔴,Injured 10-Day
+CLE,682120,Tim Herrin,P,Left elbow contusion.,,🟢,Injured 15-Day
+COL,680604,Blas Castaño,P,Right pectoral strain.,,🟡,Injured 15-Day
+COL,686668,Brenton Doyle,CF,Left oblique contusion.,,🟢,Injured 10-Day
+COL,801403,Chase Dollander,P,Right elbow strain.,,🟡,Injured 60-Day
+COL,677955,Jaden Hill,P,Right shoulder tendonitis.,,⚪,Injured 15-Day
+COL,500779,Jose Quintana,P,Left elbow sprain.,,🟡,Injured 60-Day
+COL,592178,Kris Bryant,DH,Lumbar degenerative disk disease.,,⚪,Injured 60-Day
+COL,685326,McCade Brown,P,Right shoulder inflammation.,,🟡,Injured 60-Day
+COL,701487,Pierson Ohl,P,Injured 60-Day,,⚪,Injured 60-Day
+COL,678020,Seth Halvorsen,P,Right shoulder inflammation.,,🟡,Injured 15-Day
+COL,608372,Tomoyuki Sugano,P,Back spasms.,,⚪,Injured 15-Day
+COL,700327,Welinton Herrera,P,Left elbow inflammation.,,🟡,Injured 60-Day
+CWS,669720,Austin Hays,LF,Left calf strain.,,🟡,Injured 60-Day
+CWS,681460,Brooks Baldwin,LF,Right elbow sprain,,🟡,Injured 60-Day
+CWS,689672,Drew Thorpe,P,Recovery from Tommy John surgery.,,🔴,Injured 60-Day
+CWS,677592,Everson Pereira,RF,Concussion.,,⚪,Injured 7-Day
+CWS,673929,Jordan Leasure,P,Right flexor strain.,,🟡,Injured 60-Day
+CWS,681066,Ky Bush,P,Injured 60-Day,,⚪,Injured 60-Day
+CWS,678024,Mike Vasil,P,Tommy John surgery recovery.,,🔴,Injured 60-Day
+CWS,672860,Prelander Berroa,P,Tommy John surgery recovery,,🔴,Injured 60-Day
+CWS,695020,Tanner Murray,LF,Left shoulder dislocation.,,⚪,Injured 60-Day
+CWS,656457,Tyler Gilbert,P,Left shoulder impingement.,,⚪,Injured 15-Day
+DET,690544,Bailey Horn,P,Left elbow arthroscopy recovery,,⚪,Injured 60-Day
+DET,676428,Brant Hurter,P,Lumbar spine inflammation.,,🟡,Injured 60-Day
+DET,572143,Burch Smith,P,Right shoulder inflammation.,,🟡,Injured 60-Day
+DET,650402,Gleyber Torres,2B,Left oblique strain.,,🟡,Injured 10-Day
+DET,695549,Jackson Jobe,P,Recovering from Tommy John surgery,,🔴,Injured 60-Day
+DET,595879,Javier Báez,SS,Right ankle sprain.,,🟡,Injured 60-Day
+DET,434378,Justin Verlander,P,Left hip inflammation.,,🟡,Injured 60-Day
+DET,678009,Parker Meadows,CF,Left radius fracture.,,🔴,Injured 60-Day
+DET,681857,Reese Olson,P,Right Shoulder Labral Repair,,⚪,Injured 60-Day
+DET,700242,Trey Sweeney,SS,Right shoulder strain,,🟡,Injured 60-Day
+DET,672761,Wenceel Pérez,RF,Left orbital fracture.,,🔴,Injured 60-Day
+DET,676684,Will Vest,P,Right posterior elbow inflammation.,,🟡,Injured 15-Day
+HOU,656986,Bennett Sousa,P,Left elbow inflammation.,,🟡,Injured 60-Day
+HOU,687888,Brandon Walter,P,Left elbow surgery recovery,,🔴,Injured 60-Day
+HOU,694728,Brice Matthews,CF,Left knee sprain.,,🟡,Injured 10-Day
+HOU,621043,Carlos Correa,SS,Left ankle tendon injury.,,⚪,Injured 60-Day
+HOU,669713,Hayden Wesneski,P,Recovery from right elbow surgery,,🔴,Injured 60-Day
+HOU,681347,Mike Burrows,P,Right elbow neuritis.,,⚪,Injured 15-Day
+HOU,669854,Ronel Blanco,P,Right elbow surgery recovery,,🔴,Injured 60-Day
+KC,679525,Alec Marsh,P,Right shoulder impingement.,,⚪,Injured 60-Day
+KC,608032,Carlos Estévez,P,Left foot contusion.,,🟢,Injured 60-Day
+KC,666142,Cole Ragans,P,Left elbow impingement.,,⚪,Injured 60-Day
+KC,657756,Connor Seabold,P,Right lat strain.,,🟡,Injured 15-Day
+KC,663704,James McArthur,P,Right elbow inflammation.,,🟡,Injured 60-Day
+KC,663697,Jonathan India,2B,Left shoulder subluxation.,,⚪,Injured 60-Day
+KC,663460,Kris Bubic,P,Left elbow soreness.,,🟡,Injured 60-Day
+KC,664728,Kyle Isbel,CF,Left plantar fasciitis.,,⚪,Injured 10-Day
+KC,672580,Maikel Garcia,3B,Left hand muscle strain.,,🟡,Injured 10-Day
+KC,683232,Nick Mears,P,Right shoulder impingement.,,⚪,Injured 60-Day
+LAA,624428,Adam Frazier,2B,Right elbow inflammation.,,🟡,Injured 10-Day
+LAA,543685,Anthony Rendon,3B,Left hip labrum surgery.,,🔴,Injured 60-Day
+LAA,690829,Ben Joyce,P,Right shoulder inflammation.,,🟡,Injured 60-Day
+LAA,672569,Gustavo Campero,C,Right hand fracture.,,🔴,Injured 10-Day
+LAA,686799,Jack Kochanowicz,P,Right elbow inflammation.,,🟡,Injured 60-Day
+LAA,596112,Robert Stephenson,P,Right elbow inflammation.,,🟡,Injured 60-Day
+LAA,665861,Sebastián Rivero,C,Left hamate fracture.,,🔴,Injured 10-Day
+LAA,518595,Travis d'Arnaud,C,Right foot plantar fasciitis.,,⚪,Injured 60-Day
+LAA,660162,Yoán Moncada,3B,Right knee inflammation.,,🟡,Injured 60-Day
+LAA,579328,Yusei Kikuchi,P,Left shoulder inflammation.,,🟡,Injured 60-Day
+LAD,676508,Ben Casparius,P,Right shoulder inflammation,,🟡,Injured 60-Day
+LAD,605483,Blake Snell,P,Left elbow loose bodies,,⚪,Injured 60-Day
+LAD,595014,Blake Treinen,P,Right elbow inflammation.,,🟡,Injured 15-Day
+LAD,676272,Bobby Miller,P,Right shoulder soreness.,,🟡,Injured 60-Day
+LAD,660813,Brusdar Graterol,P,Injured 60-Day,,⚪,Injured 60-Day
+LAD,621242,Edwin Díaz,P,Right elbow loose bodies.,,⚪,Injured 60-Day
+LAD,571771,Enrique Hernández,1B,Left oblique strain.,,🟡,Injured 10-Day
+LAD,694813,Gavin Stone,P,Right shoulder inflammation.,,🟡,Injured 60-Day
+LAD,664776,Jake Cousins,P,Injured 60-Day,,⚪,Injured 60-Day
+LAD,607192,Tyler Glasnow,P,Low back spasms.,,⚪,Injured 60-Day
+LAD,669257,Will Smith,C,Neck inflammation.,,🟡,Injured 10-Day
+MIA,800049,Adam Mazur,P,Right elbow surgery.,,🔴,Injured 60-Day
+MIA,677053,Andrew Nardi,P,Left rib cage stress reaction.,,⚪,Injured 60-Day
+MIA,669622,Anthony Bender,P,Right shin stress reaction.,,⚪,Injured 15-Day
+MIA,667463,John King,P,Left lateral ankle sprain.,,🟡,Injured 15-Day
+MIA,694795,Josh Ekness,P,Right calf strain.,,🟡,Injured 60-Day
+MIA,683357,Owen Caissie,RF,Right calf strain.,,🟡,Injured 10-Day
+MIA,702281,Robby Snelling,P,Injured 60-Day,,⚪,Injured 60-Day
+MIA,678692,Ronny Henriquez,P,Right elbow surgery.,,🔴,Injured 60-Day
+MIA,687531,William Kempner,P,Right elbow sprain.,,🟡,Injured 15-Day
+MIL,672582,Angel Zerpa,P,Left forearm tightness.,,🟢,Injured 60-Day
+MIL,663604,Brandon Lockridge,LF,Right knee laceration and contusion.,,🟢,Injured 60-Day
+MIL,605540,Brandon Woodruff,P,Right shoulder inflammation.,,🟡,Injured 60-Day
+MIL,702153,Brian Fitzpatrick,P,Left elbow injury,,⚪,Injured 60-Day
+MIL,669084,DL Hall,P,Left pectoral strain.,,🟡,Injured 15-Day
+MIL,666152,David Hamilton,3B,Strained left hamstring.,,🟡,Injured 10-Day
+MIL,669270,Joel Kuhnel,P,Right shoulder impingement.,,⚪,Injured 15-Day
+MIL,690986,Kyle Harrison,P,Left forearm tightness.,,🟢,Injured 15-Day
+MIL,682990,Quinn Priester,P,Right thoracic outlet syndrome,,⚪,Injured 60-Day
+MIL,642239,Rob Zastryzny,P,Left trapezius strain.,,🟡,Injured 60-Day
+MIN,607455,Anthony Banda,P,Left lat strain.,,🟡,Injured 60-Day
+MIN,621439,Byron Buxton,CF,Right hip strain.,,🟡,Injured 10-Day
+MIN,663485,Cole Sands,P,Right forearm strain.,,🟡,Injured 15-Day
+MIN,687570,Connor Prielipp,P,Left middle finger blister.,,⚪,Injured 15-Day
+MIN,701581,David Festa,P,Right shoulder impingement.,,⚪,Injured 60-Day
+MIN,670183,Garrett Acton,P,Right shoulder strain,,🟡,Injured 60-Day
+MIN,694397,Marco Raya,P,Right shoulder impingement.,,⚪,Injured 15-Day
+MIN,690953,Mick Abel,P,Right elbow inflammation.,,🟡,Injured 60-Day
+MIN,641154,Pablo López,P,Tommy John surgery.,,🔴,Injured 60-Day
+NYM,681810,Austin Warren,P,Right forearm strain.,,🟡,Injured 15-Day
+NYM,605280,Clay Holmes,P,Right fibula fracture.,,🔴,Injured 60-Day
+NYM,673380,Dedniel Núñez,P,Tommy John surgery recovery.,,🔴,Injured 60-Day
+NYM,663795,Justin Hagenman,P,Rib Fracture,,🔴,Injured 60-Day
+NYM,673357,Luis Robert Jr.,CF,Lumbar spine disc herniation.,,⚪,Injured 60-Day
+NYM,668901,Mark Vientos,1B,Right hand fracture.,,🔴,Injured 10-Day
+NYM,657585,Reed Garrett,P,Injured 60-Day,,⚪,Injured 60-Day
+NYM,656731,Tylor Megill,P,Right elbow sprain.,,🟡,Injured 60-Day
+NYY,592450,Aaron Judge,RF,Right rib stress fracture,,🔴,Injured 10-Day
+NYY,607074,Carlos Rodón,P,Left elbow inflammation,,🟡,Injured 15-Day
+NYY,657376,Clarke Schmidt,P,Right forearm tightness.,,🟢,Injured 60-Day
+NYY,519317,Giancarlo Stanton,DH,Right calf strain.,,🟡,Injured 10-Day
+NYY,608331,Max Fried,P,Left elbow bone bruise.,,🟢,Injured 15-Day
+PHI,666969,Adolis García,RF,Right latissimus dorsi tear,,🔴,Injured 60-Day
+PHI,641745,Brad Keller,P,Right elbow UCL tear.,,🔴,Injured 15-Day
+PHI,679032,Johan Rojas,CF,Right elbow UCL repair.,,⚪,Injured 60-Day
+PHI,642152,Lou Trivino III,P,Right thoracic muscle spasm.,,⚪,Injured 15-Day
+PHI,621383,Tanner Banks,P,Left forearm strain.,,🟡,Injured 15-Day
+PIT,606965,Chris Devenski,P,Injured 60-Day,,⚪,Injured 60-Day
+PIT,682848,Endy Rodríguez,C,Left glute strain.,,🟡,Injured 10-Day
+PIT,681895,Evan Sisk,P,Left elbow inflammation.,,🟡,Injured 15-Day
+PIT,804606,Konnor Griffin,SS,Left ring finger sagittal back injury.,,⚪,Injured 60-Day
+PIT,665833,Oneil Cruz,CF,Left hand fourth and fifth metacarpal non-displaced fractures.,,🔴,Injured 10-Day
+PIT,687462,Spencer Horwitz,1B,Left hamstring strain.,,🟡,Injured 10-Day
+PIT,696062,Wilber Dotel,P,Right lat muscle strain.,,🟡,Injured 15-Day
+SD,663773,Bryan Hoeing,P,Torn right elbow flexor tendon.,,⚪,Injured 60-Day
+SD,688158,David Morgan,P,Left knee inflammation.,,🟡,Injured 15-Day
+SD,592094,Jason Adam,P,Right shoulder strain,,🟡,Injured 15-Day
+SD,669093,Jeremiah Estrada,P,Right knee inflammation,,🟡,Injured 15-Day
+SD,605397,Joe Musgrove,P,Injured 60-Day,,⚪,Injured 60-Day
+SD,608337,Lucas Giolito,P,Right elbow inflammation.,,🟡,Injured 15-Day
+SD,601713,Nick Pivetta,P,Right elbow inflammation.,,🟡,Injured 60-Day
+SD,657656,Ramón Laureano,LF,Injured 60-Day,,⚪,Injured 60-Day
+SD,681190,Randy Vásquez,P,Right ankle contusion.,,🟢,Injured 15-Day
+SD,669392,Samad Taylor,LF,Right oblique strain.,,🟡,Injured 10-Day
+SEA,680977,Brendan Donovan,3B,Left groin muscle strain.,,🟡,Injured 10-Day
+SEA,672841,Carlos Vargas,P,Right lat strain.,,🟡,Injured 60-Day
+SEA,681867,Cooper Criswell,P,Right shoulder strain.,,🟡,Injured 60-Day
+SEA,677594,Julio Rodríguez,CF,Concussion,,⚪,Injured 7-Day
+SEA,688138,Logan Evans,P,Recovery from torn UCL in right arm.,,⚪,Injured 60-Day
+SEA,666374,Matt Brash,P,Right lat strain.,,🟡,Injured 15-Day
+SEA,608701,Rob Refsnyder,DH,Right knee inflammation.,,🟡,Injured 10-Day
+SEA,669717,Will Wilson,3B,Left thumb fracture.,,🔴,Injured 60-Day
+SF,664056,Harrison Bader,CF,Left plantar fasciitis,,⚪,Injured 10-Day
+SF,806185,Hayden Birdsong,P,Tommy John surgery.,,🔴,Injured 60-Day
+SF,666711,Joel Peguero,P,Left hamstring strain,,🟡,Injured 60-Day
+SF,813841,Jonah Cox,CF,Left oblique strain.,,🟡,Injured 10-Day
+SF,676130,José Buttó,P,Right arm fatigue,,⚪,Injured 60-Day
+SF,656305,Matt Chapman,3B,Abdominal strain.,,🟡,Injured 10-Day
+SF,657424,Matt Gage,P,Left elbow strain.,,🟡,Injured 15-Day
+SF,678495,Randy Rodríguez,P,Injured 60-Day,,⚪,Injured 60-Day
+SF,592858,Rowan Wick,P,Recovery from Tommy John surgery.,,🔴,Injured 60-Day
+SF,682674,Victor Bericoto,RF,Left oblique strain.,,🟡,Injured 10-Day
+STL,668941,JoJo Romero,P,Injured 15-Day,,⚪,Injured 15-Day
+STL,691008,Max Rajcic,P,Right elbow soreness.,,🟡,Injured 60-Day
+STL,602104,Ramón Urías,3B,Right elbow lateral epicondylitis.,,⚪,Injured 60-Day
+TB,670955,Edwin Uceta,P,Right shoulder impingement,,⚪,Injured 60-Day
+TB,666158,Gavin Lux,LF,Right shoulder impingement,,⚪,Injured 60-Day
+TB,641584,Jake Fraley,RF,Hernia.,,⚪,Injured 10-Day
+TB,669947,Jesse Scholtens,P,Right wrist sprain.,,🟡,Injured 15-Day
+TB,669169,Jonathan Heasley,P,Injured 60-Day,,⚪,Injured 60-Day
+TB,655889,Manuel Rodríguez,P,Injured 60-Day,,⚪,Injured 60-Day
+TB,686752,Ryan Pepiot,P,Right hip inflammation,,🟡,Injured 60-Day
+TB,571927,Steven Matz,P,Left ankle sprain,,🟡,Injured 15-Day
+TB,621051,Steven Wilson,P,Lumbar disc inflammation,,🟡,Injured 60-Day
+TEX,691945,Carter Baumler,P,Right intercostal strain.,,🟡,Injured 60-Day
+TEX,455119,Chris Martin,P,Right shoulder impingement.,,⚪,Injured 15-Day
+TEX,674003,Cody Bradford,P,Left elbow surgery rehab.,,🔴,Injured 60-Day
+TEX,683227,Cody Freeman,3B,Herniated disc,,⚪,Injured 10-Day
+TEX,608369,Corey Seager,SS,Lower back inflammation.,,🟡,Injured 10-Day
+TEX,643376,Danny Jansen,C,Right forearm strain,,🟡,Injured 10-Day
+TEX,683004,Jack Leiter,P,Right ankle posterior impingement.,,⚪,Injured 15-Day
+TEX,596001,Jakob Junis,P,Left hip impingement.,,⚪,Injured 15-Day
+TEX,656222,Jalen Beeks,P,Low back spasms.,,⚪,Injured 10-Day
+TEX,656756,Jordan Montgomery,P,Recovering from Tommy John surgery,,🔴,Injured 60-Day
+TEX,680737,Michael Helman,CF,Right finger fracture,,🔴,Injured 60-Day
+TEX,676395,Robert Garcia,P,Injured 60-Day,,⚪,Injured 60-Day
+TOR,680718,Addison Barger,RF,Right elbow inflammation.,,🟡,Injured 10-Day
+TOR,623993,Anthony Santander,RF,Left shoulder labral tear.,,🔴,Injured 60-Day
+TOR,670102,Bowden Francis,P,Right elbow surgery.,,🔴,Injured 60-Day
+TOR,664074,Cody Ponce,P,Right knee ACL sprain.,,🟡,Injured 60-Day
+TOR,660821,Jesús Sánchez,RF,Right ankle sprain,,🟡,Injured 10-Day
+TOR,573009,Joe Mantiply,P,Left knee inflammation.,,🟡,Injured 60-Day
+TOR,621244,José Berríos,P,Right elbow stress fracture.,,🔴,Injured 60-Day
+TOR,672820,Lenyn Sosa,2B,Right wrist contusion.,,🟢,Injured 10-Day
+TOR,453286,Max Scherzer,P,Back spasms.,,⚪,Injured 15-Day
+TOR,554340,Yimi García,P,Right elbow ulnar nerve and AC joint surgery.,,🔴,Injured 60-Day
+WSH,695418,Brad Lord,P,Left side tightness.,,🟢,Injured 15-Day
+WSH,687792,DJ Herz,P,Injured 60-Day,,⚪,Injured 60-Day
+WSH,686452,Drew Millas,C,Left index finger fracture.,,🔴,Injured 10-Day
+WSH,663623,Jake Irvin,P,Right shoulder strain.,,🟡,Injured 60-Day
+WSH,680686,Josiah Gray,P,Right flexor strain.,,🟡,Injured 60-Day
+WSH,686610,Ken Waldichuk,P,Left forearm tightness.,,🟢,Injured 60-Day
+WSH,680730,Mitchell Parker,P,Left elbow inflammation.,,🟡,Injured 60-Day
+WSH,663992,Richard Lovelady,P,Left triceps strain.,,🟡,Injured 15-Day
+WSH,592866,Trevor Williams,P,Injured 60-Day,,⚪,Injured 60-Day
