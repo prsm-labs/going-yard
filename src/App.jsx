@@ -11407,28 +11407,54 @@ async function fetchInjuries() {
     } catch(e4) { console.warn('[Injuries] RotoWire RSS failed:', e4.message); }
 
     // ── Cross-check against mlb_injury_report.csv from the pipeline ────────────
+    // FIXED 2026-07-18: this used to only ever CLEAR entries — it never added
+    // any, so it was purely a safety net for the transactions/supplement/
+    // RotoWire sources above. Two confirmed gaps in those sources (Aaron
+    // Judge, Giancarlo Stanton case): (1) a real IL placement older than the
+    // 60-day transaction lookback silently falls off the primary source with
+    // no activation ever needed to explain its absence — Stanton's April 28
+    // placement aged out by mid-July; (2) MLB's transaction log can carry a
+    // misleading "activated ... from the injured list" entry tied to the
+    // All-Star Game roster (transacting party "American League All-Stars",
+    // not the player's real team) that incorrectly cancels out a genuine,
+    // still-active placement — Judge's case, July 13. mlb_injury_report.csv
+    // is now generated from the live 40-man roster status (fixed same day —
+    // was silently pulling the wrong roster type and returning zero real
+    // injuries) and doesn't age out or get fooled by transaction-log quirks,
+    // so it now ADDS missing entries too, not just clears stale ones.
     try {
       const cr = await fetch('/data/mlb_injury_report.csv');
       if (cr.ok) {
         const text = await cr.text();
-        const lines = text.replace(/^\uFEFF/, '').trim().split('\n');
-        const headers = lines[0].split(',').map(h => h.replace(/^"|"$/g, '').trim());
-        const bidIdx = headers.findIndex(h => h.toLowerCase().includes('batter id') || h.toLowerCase().includes('playerid') || h === 'Batter ID');
-        const descIdx = headers.findIndex(h => h.toLowerCase().includes('injury description') || h.toLowerCase().includes('description'));
-        if (bidIdx >= 0 && descIdx >= 0) {
-          let cleared = 0;
-          for (const line of lines.slice(1)) {
-            if (!line.trim()) continue;
-            const cols = line.split(',').map(c => c.replace(/^"|"$/g, '').trim());
-            const bid  = cols[bidIdx];
-            const desc = (cols[descIdx] || '').toLowerCase();
-            if (bid && desc === 'active' && INJURY_MAP[bid]) {
-              delete INJURY_MAP[bid];
-              cleared++;
-            }
+        const rows = parseCSVText(text);
+        let added = 0, cleared = 0;
+        for (const row of rows) {
+          const bid    = String(row['Batter ID'] || '').trim();
+          const desc   = (row['Injury Description'] || '').toLowerCase();
+          const status = (row['Status'] || row['Injury Description'] || '').toLowerCase();
+          if (!bid) continue;
+          if (desc === 'active') {
+            // Legacy clearing path — the fixed script no longer emits Active
+            // rows at all, but keep this as a harmless safety net in case an
+            // older-schema CSV is ever served (e.g. mid-deploy).
+            if (INJURY_MAP[bid]) { delete INJURY_MAP[bid]; cleared++; }
+            continue;
           }
-          if (cleared > 0) console.log(`[Injuries] ${cleared} player(s) cleared by mlb_injury_report.csv (pipeline says Active)`);
+          if (!INJURY_MAP[bid]) {
+            const isDTD = status.includes('day-to-day');
+            INJURY_MAP[bid] = {
+              date:      new Date().toISOString().slice(0,10),
+              emoji:     isDTD ? '🤕' : status.includes('60') ? '🚫' : '🤕',
+              label:     isDTD ? 'Day-To-Day' : status.includes('60') ? '60-Day IL' : status.includes('15') ? '15-Day IL' : '10-Day IL',
+              fullDesc:  `${row['Status'] || ''}${row['Injury Description'] ? ' — ' + row['Injury Description'] : ''}`,
+              shortDesc: row['Injury Description'] || '',
+              team:      row['Team'] || '',
+            };
+            added++;
+          }
         }
+        if (added > 0)   console.log(`[Injuries] +${added} from mlb_injury_report.csv (live 40-man roster status — catches long IL stints + All-Star-week transaction gaps)`);
+        if (cleared > 0) console.log(`[Injuries] ${cleared} player(s) cleared by mlb_injury_report.csv (pipeline says Active)`);
       }
     } catch(e2) { /* pipeline CSV not available — skip cross-check */ }
 
@@ -16962,14 +16988,14 @@ function SimLabView({ data }) {
                           );
                         })()}
                       </td>
-                      {/* 🚨 CC — yesterday's close calls */}
+                      {/* 🚨 CC — close calls in the last 7 days (rolling window) */}
                       <td style={{textAlign:'center',padding:'2px 4px',verticalAlign:'middle'}}>
                         {(() => {
                           const cc = parseInt(b.so_close_count||0);
                           if (!cc) return <span style={{color:'rgba(255,255,255,.15)',fontSize:8}}>—</span>;
                           const col = cc>=3?'#ff4020':cc>=2?'#f5a623':'var(--muted)';
                           return (
-                            <span title={`${cc} close call${cc!==1?'s':''} yesterday · Max EV: ${b.so_close_max_ev||'—'} · Max Dist: ${b.so_close_max_dist||'—'}ft`}
+                            <span title={`${cc} close call${cc!==1?'s':''} in the last 7 days · Max EV: ${b.so_close_max_ev||'—'} · Max Dist: ${b.so_close_max_dist||'—'}ft`}
                               style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:11,
                                 color:col,cursor:'default'}}>
                               {cc}
@@ -21915,7 +21941,7 @@ function SoCloseTab({ data }) {
       <div style={{marginBottom:10,background:'rgba(251,191,36,.06)',borderRadius:6,
         border:'1px solid rgba(251,191,36,.2)',padding:'7px 12px',
         fontFamily:mono,fontSize:8,color:'var(--muted)',lineHeight:1.7}}>
-        <span style={{color:'#fbbf24',fontWeight:700}}>{rows.length} batters</span> had ≥2 near-HR events yesterday and are playing today ·
+        <span style={{color:'#fbbf24',fontWeight:700}}>{rows.length} batters</span> had ≥2 near-HR events in the last 7 days and are playing today ·
         Excludes yesterday HRs unless 3+ close calls (<span style={{color:'#ff8020'}}>🔥 on a tear</span>) ·
         Click any row to expand recent ABs
       </div>
@@ -21923,7 +21949,7 @@ function SoCloseTab({ data }) {
       {/* ── Table ─────────────────────────────────────────────────────────── */}
       {rows.length === 0 ? (
         <div style={{textAlign:'center',padding:40,color:'var(--muted)',fontFamily:mono,fontSize:11}}>
-          No Close Calls data yet — run the engine with yesterday's at-bat log
+          No Close Calls data yet — run the engine to populate the last 7 days of at-bat data
         </div>
       ) : (
         <div style={{overflowX:'auto'}}>
@@ -22029,7 +22055,7 @@ function SoCloseTab({ data }) {
                         <span style={{fontFamily:osw,fontWeight:700,fontSize:12}}>{r.name}</span>
                         <span style={{fontFamily:mono,fontSize:9,color:'var(--accent2)'}}>{r.team}</span>
                         <span style={{fontFamily:mono,fontSize:7,color:'var(--muted)',marginLeft:'auto'}}>
-                          {r.count} close call{r.count!==1?'s':''} yesterday
+                          {r.count} close call{r.count!==1?'s':''} in the last 7 days
                         </span>
                       </div>
                       <InjuryBanner pid={r.pid} style={{margin:'4px 0'}}/>
@@ -22088,7 +22114,7 @@ const PAIR_TYPES = [
     id: 'close_call_combo',
     label: '🤏 Close Call Combo',
     color: '#fbbf24', bg: 'rgba(251,191,36,.08)', border: 'rgba(251,191,36,.25)',
-    desc: 'Both had 2+ near-HR events yesterday — deep fly outs that nearly left the yard',
+    desc: 'Both had 2+ near-HR events in the last 7 days — deep fly outs that nearly left the yard',
     qualify: b => parseInt(b.so_close_count||0) >= 2,
     sameGame: false, maxPairs: 2,
   },
@@ -33278,7 +33304,7 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
               name={r.name} team={r.team}
               stat={r.count}
               statLabel="near-misses"
-              sub="yesterday"
+              sub="L7"
               pitcher={r.pitcher} pgLabel={r.pgLabel}/>
           ))}
         </Section>
