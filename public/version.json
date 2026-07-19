@@ -1,8 +1,8 @@
 {
   "version": "2026.07.18",
-  "bundleFile": "index-D6Wabgqd.js",
+  "bundleFile": "index-Bgi1fz7l.js",
   "changelog": [
-    "Daily data update 2026-07-18"
+    "Fix sort/filter breaking on doubleheader days in Barrel Lab/On Base All Games view"
   ],
   "notifyUsers": true
 }

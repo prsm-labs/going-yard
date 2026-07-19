@@ -3129,7 +3129,7 @@ function AtBatSlideIn() {
         const la7   = parseFloat(dp3.recent_avg_la)||0;
         const fb7   = parseFloat(dp3.recent_fb_pct)||0;
         const pbPct = parseFloat(dp3.recent_pulled_barrel_pct)||0;
-        const zf    = parseFloat(dp3.zone_fit)||0;
+        const zf    = getZoneFit(dp3);
         const ph    = (dp3.pitcher_hand||'').toUpperCase()[0];
         const bh    = (dp3.batter_hand||'').toUpperCase()[0];
         const pBrl  = parseFloat(dp3.pitcher_barrel_pct_allowed)||0;
@@ -14790,6 +14790,15 @@ function shrinkageAdjBarrelSpike(r) {
 // zone_fit came back 0. Null-safe: zone_fit_season is 0 until the pipeline
 // runs Part 1, in which case this behaves identically to reading zone_fit alone.
 function getZoneFit(r) {
+  // Prefer zone_fit_spatial (pitcher zone-location distribution x batter
+  // zone-location HR rate) — validated 2026-07-18: +3.94pp gap, monotonic
+  // across all 6 tiers, n=90,053 joined PAs. Cleaner and better-powered
+  // than the meatball-zone-only zone_fit below (whose own tier table is
+  // non-monotonic and inverts at its top tier in the same validation).
+  // See CLAUDE.md for the full gate. Falls back through zone_fit_season ->
+  // zone_fit -> 0 for rows the pipeline hasn't populated it for yet.
+  const spatial = parseFloat(r?.zone_fit_spatial);
+  if (!isNaN(spatial) && spatial > 0) return spatial;
   const recent = parseFloat(r?.zone_fit || 0);
   if (recent > 0) return recent;
   const season = parseFloat(r?.zone_fit_season || 0);
@@ -14986,7 +14995,7 @@ function computeHRUpside(b) {
   const la7     = parseFloat(b.recent_avg_la)||0;
   const fb7     = parseFloat(b.recent_fb_pct)||0;
   const pbPct   = parseFloat(b.recent_pulled_barrel_pct)||0;
-  const zf      = parseFloat(b.zone_fit)||0;
+  const zf      = getZoneFit(b);
   const ph      = (b.pitcher_hand||'').toUpperCase()[0];
   const bh      = (b.batter_hand||'').toUpperCase()[0];
   const pBarrel = parseFloat(b.pitcher_barrel_pct_allowed)||0;
@@ -17084,7 +17093,7 @@ function SimLabView({ data }) {
                     const la7    = parseFloat(b.recent_avg_la)||0;
                     const fb7    = parseFloat(b.recent_fb_pct)||0;
                     const pbPct  = parseFloat(b.recent_pulled_barrel_pct)||0;
-                    const zf     = parseFloat(b.zone_fit)||0;
+                    const zf     = getZoneFit(b);
                     const ph     = (b.pitcher_hand||'').toUpperCase()[0];
                     const bh     = (b.batter_hand||'').toUpperCase()[0];
                     const pBrl   = parseFloat(b.pitcher_barrel_pct_allowed)||0;
@@ -25603,7 +25612,7 @@ function MatchupEngineTab() {
                 {(()=>{
                   const ev7=parseFloat(b.recent_avg_ev)||0,brlPct=parseFloat(b.recent_barrel_pct)||0;
                   const la7=parseFloat(b.recent_avg_la)||0,fb7=parseFloat(b.recent_fb_pct)||0;
-                  const pbPct=parseFloat(b.recent_pulled_barrel_pct)||0,zf=parseFloat(b.zone_fit)||0;
+                  const pbPct=parseFloat(b.recent_pulled_barrel_pct)||0,zf=getZoneFit(b);
                   const ph=(b.pitcher_hand||'').toUpperCase()[0],bh=(b.batter_hand||'').toUpperCase()[0];
                   const pBarrel=parseFloat(b.pitcher_barrel_pct_allowed)||0;
                   const hrFact=parseInt(b.hr_factor)||0;
@@ -28980,7 +28989,7 @@ function CrystalBallTab() {
       const la   = parseFloat(r.recent_avg_la||0);
       const bsDelta   = parseFloat(r.bat_speed_vs_baseline||0);
       const closeCall = parseInt(r.so_close_count||0);
-      const zf   = parseFloat(r.zone_fit||0);
+      const zf   = getZoneFit(r);
       if (yard < 10 || ev < 82) return;
       const effGrade = computeEffectiveGrade(r.grade||'D', pg);
       const name = (r.batter&&!/^\d+$/.test(r.batter))
