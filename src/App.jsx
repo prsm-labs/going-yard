@@ -31962,7 +31962,13 @@ function BarrelLabTab() {
           </div>
           <div style={{display:'flex',gap:8,overflowX:'auto',paddingBottom:8,marginBottom:16}}>
             {(!selGame ? flatSorted : scoredBatters.filter(b => String(b.game_id) === String(selGame.gamePk || selGame.game_id || ''))).slice(0,5).map(b => (
-              <div key={b._bid} style={{
+              // FIXED 2026-07-18: key was b._bid alone — on a doubleheader day
+              // the "All Games" flat view mixes both games' rows for the same
+              // batter (same batter_id, different game_id), so two rows shared
+              // one key. React silently reuses the wrong DOM node for one of
+              // them, which is why sort/filter appeared to "stop working" —
+              // only on the All Games view, never a single selected game.
+              <div key={`${b._bid}_${b.game_id}`} style={{
                 minWidth:200,flex:'0 0 auto',
                 background:'var(--surface2)',borderRadius:8,padding:'10px 12px',
                 border:`1px solid ${b.isBarrelSignal ? 'var(--accent)' : 'var(--border)'}`,
@@ -32052,7 +32058,7 @@ function BarrelLabTab() {
                     {rows.map((b) => {
                       const fin = isFinal(b.game_id);
                       return (
-                        <tr key={b._bid} style={{
+                        <tr key={`${b._bid}_${b.game_id}`} style={{
                           borderBottom:'1px solid rgba(255,255,255,.04)',
                           opacity: fin ? 0.5 : 1,
                           background: b.isWeakSlot ? 'rgba(255,214,10,.14)' : b.isBarrelSignal ? 'rgba(255,153,0,.04)' : 'transparent',
@@ -32755,7 +32761,9 @@ function OnBaseTab() {
           </div>
           <div style={{display:'flex',gap:8,overflowX:'auto',paddingBottom:8,marginBottom:16}}>
             {(!selGame ? flatSorted : onbaseScored.filter(b => String(b.game_id) === String(selGame.gamePk || selGame.game_id || ''))).slice(0,5).map(b => (
-              <div key={b._bid} style={{
+              // FIXED 2026-07-18: key was b._bid alone — see BarrelLabTab's
+              // identical comment for the full doubleheader explanation.
+              <div key={`${b._bid}_${b.game_id}`} style={{
                 minWidth:200,flex:'0 0 auto',
                 background:'var(--surface2)',borderRadius:8,padding:'10px 12px',
                 border:`1px solid ${b.isTBSignal ? 'rgba(56,184,242,.6)' : 'var(--border)'}`,
@@ -32839,7 +32847,7 @@ function OnBaseTab() {
                     {rows.map((b) => {
                       const fin = isFinal(b.game_id);
                       return (
-                        <tr key={b._bid} style={{
+                        <tr key={`${b._bid}_${b.game_id}`} style={{
                           borderBottom:'1px solid rgba(255,255,255,.04)',
                           opacity: fin ? 0.5 : 1,
                           background: b.isWeakSlot ? 'rgba(255,214,10,.14)' : b.isTBSignal ? 'rgba(56,184,242,.04)' : 'transparent',
