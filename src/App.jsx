@@ -27913,7 +27913,7 @@ function TrackRecordTab() {
   const [showOnly2Bagger, setShowOnly2Bagger] = useState(false);
   const [showOnlyTBSignal, setShowOnlyTBSignal] = useState(false);
   const [showOnlySimTB2, setShowOnlySimTB2] = useState(false);
-  const [showOnlyZoneRisk, setShowOnlyZoneRisk] = useState(false);
+  const [showOnlyHighIQ, setShowOnlyHighIQ] = useState(false);
   const [teamFilter,     setTeamFilter]     = useState('ALL');
 
   const [showMatchup,  setShowMatchup]  = useState(true);
@@ -28152,7 +28152,7 @@ function TrackRecordTab() {
     if (showOnly2Bagger) rows = rows.filter(r => r.is2Bagger);
     if (showOnlyTBSignal) rows = rows.filter(r => r.tbSignal);
     if (showOnlySimTB2) rows = rows.filter(r => r.simTB >= 2.0);
-    if (showOnlyZoneRisk) rows = rows.filter(r => r.zoneAttackRisk);
+    if (showOnlyHighIQ) rows = rows.filter(r => r.plateIQ != null && r.plateIQ >= 56);
     if (search) {
       const q = search.toLowerCase();
       rows = rows.filter(r =>
@@ -28167,7 +28167,7 @@ function TrackRecordTab() {
       }
       return sortDir * ((av||0) - (bv||0));
     });
-  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, showOnlyWeakSlot, showOnlyCC, showOnlySauce2, showOnly2Bagger, showOnlyTBSignal, showOnlySimTB2, showOnlyZoneRisk, search, sortCol, sortDir]);
+  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, showOnlyWeakSlot, showOnlyCC, showOnlySauce2, showOnly2Bagger, showOnlyTBSignal, showOnlySimTB2, showOnlyHighIQ, search, sortCol, sortDir]);
 
   const summary = useMemo(() => {
     const hrs          = dateRows.filter(r => r.wentYard);
@@ -28189,16 +28189,14 @@ function TrackRecordTab() {
     const tbSignalHits  = tbSignals.filter(r => r.hitTB2);
     const simTB2        = dateRows.filter(r => r.simTB >= 2.0);
     const simTB2Hits    = simTB2.filter(r => r.hitTB2);
-    // Plate IQ Zone Risk (low IQ + facing an elevator pitcher) — a speculative
-    // vulnerability flag, not a boost signal. Tracking whether flagged batters
-    // actually underperform (lower HR rate) is how this gets validated, same
-    // "flag first, confirm via tracker later" pattern as every other signal.
-    const zoneRiskFlags = dateRows.filter(r => r.zoneAttackRisk);
-    const zoneRiskHits  = zoneRiskFlags.filter(r => r.wentYard);
-    const iqRated       = dateRows.filter(r => r.plateIQ != null);
-    const avgPlateIQ    = iqRated.length
-      ? Math.round(iqRated.reduce((s,r) => s + r.plateIQ, 0) / iqRated.length)
-      : null;
+    // High Plate IQ (B grade or above, plateIQ>=56 — same threshold BarrelLabTab/
+    // OnBaseTab's own "High IQ Only" filter uses) — how well do the batters this
+    // signal calls disciplined actually perform, not just how the risk flag on
+    // the OTHER end does. HR rate and 2+TB rate (hitTB2 — any way, HR included)
+    // are the two outcomes that actually matter here.
+    const highIQBatters  = dateRows.filter(r => r.plateIQ != null && r.plateIQ >= 56);
+    const highIQHRHits   = highIQBatters.filter(r => r.wentYard);
+    const highIQTB2Hits  = highIQBatters.filter(r => r.hitTB2);
     const topYS        = [...dateRows].sort((a,b) => b.yardScore - a.yardScore)[0];
     const biggestMiss   = [...dateRows.filter(r => !r.wentYard)]
       .sort((a,b) => b.yardScore - a.yardScore)[0];
@@ -28206,7 +28204,7 @@ function TrackRecordTab() {
       .sort((a,b) => a.yardScore - b.yardScore)[0];
     return { hrs, signals, signalHits, keyMatchups, kmHits,
              longshots, lsHits, weakSlots, weakSlotHits, sauce2, sauce2Hits, twoBaggers, tbSignals, tbSignalHits, simTB2, simTB2Hits,
-             zoneRiskFlags, zoneRiskHits, avgPlateIQ, topYS, biggestMiss, biggestUpset };
+             highIQBatters, highIQHRHits, highIQTB2Hits, topYS, biggestMiss, biggestUpset };
   }, [dateRows]);
 
   const GroupBar = ({ label, open, onToggle, color }) => (
@@ -28311,7 +28309,6 @@ function TrackRecordTab() {
       <div style={{padding:'10px 14px', display:'flex', gap:8,
         overflowX:'auto', WebkitOverflowScrolling:'touch'}}>
         {[
-          { label:'BATTERS SCORED', value: dateRows.length,       color:'var(--text)' },
           { label:'ACTUAL HRs',     value: summary.hrs.length,    color:'var(--accent)' },
           {
             label:'KEY MATCHUP HIT RATE',
@@ -28370,17 +28367,20 @@ function TrackRecordTab() {
             color:'#a78bfa'
           },
           {
-            label:'AVG PLATE IQ',
-            value: summary.avgPlateIQ != null ? summary.avgPlateIQ : '—',
+            label:'HIGH IQ HR RATE',
+            value: summary.highIQBatters.length
+              ? `${((summary.highIQHRHits.length/summary.highIQBatters.length)*100).toFixed(0)}%`
+              : '—',
+            sub: `${summary.highIQHRHits.length}/${summary.highIQBatters.length}`,
             color:'#38b8f2'
           },
           {
-            label:'ZONE RISK HR RATE',
-            value: summary.zoneRiskFlags.length
-              ? `${((summary.zoneRiskHits.length/summary.zoneRiskFlags.length)*100).toFixed(0)}%`
+            label:'HIGH IQ 2+TB RATE',
+            value: summary.highIQBatters.length
+              ? `${((summary.highIQTB2Hits.length/summary.highIQBatters.length)*100).toFixed(0)}%`
               : '—',
-            sub: `${summary.zoneRiskHits.length}/${summary.zoneRiskFlags.length}`,
-            color:'#a855f7'
+            sub: `${summary.highIQTB2Hits.length}/${summary.highIQBatters.length}`,
+            color:'#38b8f2'
           },
         ].map(card => (
           <div key={card.label} style={{
@@ -28517,14 +28517,14 @@ function TrackRecordTab() {
           🎲 Sim TB ≥2.0 Only
         </button>
 
-        <button onClick={() => setShowOnlyZoneRisk(v=>!v)}
-          title="Plate IQ < 44 (C or below) facing a pitcher who elevates more than the league average — a speculative swing-hole vulnerability flag, display-only."
+        <button onClick={() => setShowOnlyHighIQ(v=>!v)}
+          title="Plate IQ >= 56 (B grade or above) — same threshold as Barrel Lab/On Base's High IQ filter. Display-only, does not affect Yard Score."
           style={{padding:'4px 10px', borderRadius:6, border:'none',
             cursor:'pointer', fontFamily:mono, fontSize:9, fontWeight:700,
-            background: showOnlyZoneRisk ? 'rgba(168,85,247,.15)' : 'var(--surface2)',
-            color:       showOnlyZoneRisk ? '#a855f7' : 'var(--muted)',
-            border: `1px solid ${showOnlyZoneRisk ? 'rgba(168,85,247,.4)' : 'var(--border)'}` }}>
-          🧠 Zone Risk Only
+            background: showOnlyHighIQ ? 'rgba(56,184,242,.15)' : 'var(--surface2)',
+            color:       showOnlyHighIQ ? '#38b8f2' : 'var(--muted)',
+            border: `1px solid ${showOnlyHighIQ ? 'rgba(56,184,242,.4)' : 'var(--border)'}` }}>
+          🧠 {showOnlyHighIQ ? 'High IQ Only' : 'Plate IQ'}
         </button>
 
         <button id="track-record-csv-trigger" onClick={() => {

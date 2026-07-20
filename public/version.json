@@ -1,8 +1,9 @@
 {
-  "version": "2026.07.18",
-  "bundleFile": "index-Bgi1fz7l.js",
+  "version": "2026.07.20",
+  "bundleFile": "index-RcJoG-dg.js",
   "changelog": [
-    "Fix sort/filter breaking on doubleheader days in Barrel Lab/On Base All Games view"
+    "Fix Live Close Calls false-positive on real HRs",
+    "add Plate IQ grades to Track Record"
   ],
   "notifyUsers": true
 }
