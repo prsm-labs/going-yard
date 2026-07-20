@@ -30,6 +30,7 @@ AZ,647336,Michael Soroka,P,Left glute strain,,🟡,Injured 15-Day
 AZ,669194,Ryne Nelson,P,Strained right elbow.,,🟡,Injured 60-Day
 AZ,694371,Tommy Troy,LF,Sprained right AC joint.,,🟡,Injured 10-Day
 AZ,668678,Zac Gallen,P,Right elbow inflammation.,,🟡,Injured 15-Day
+BAL,668939,Adley Rutschman,C,Left wrist inflammation.,,🟡,Injured 10-Day
 BAL,677942,Blaze Alexander,3B,Left hand fracture.,,🔴,Injured 10-Day
 BAL,605135,Chris Bassitt,P,Low back discomfort.,,⚪,Injured 60-Day
 BAL,681882,Colin Selby,P,Right shoulder inflammation.,,🟡,Injured 60-Day
@@ -82,7 +83,6 @@ COL,500779,Jose Quintana,P,Left elbow sprain.,,🟡,Injured 60-Day
 COL,592178,Kris Bryant,DH,Lumbar degenerative disk disease.,,⚪,Injured 60-Day
 COL,685326,McCade Brown,P,Right shoulder inflammation.,,🟡,Injured 60-Day
 COL,701487,Pierson Ohl,P,Injured 60-Day,,⚪,Injured 60-Day
-COL,678020,Seth Halvorsen,P,Right shoulder inflammation.,,🟡,Injured 15-Day
 COL,700327,Welinton Herrera,P,Left elbow inflammation.,,🟡,Injured 60-Day
 CWS,669720,Austin Hays,LF,Left calf strain.,,🟡,Injured 60-Day
 CWS,681460,Brooks Baldwin,LF,Right elbow sprain,,🟡,Injured 60-Day
@@ -106,13 +106,11 @@ DET,681857,Reese Olson,P,Right Shoulder Labral Repair,,⚪,Injured 60-Day
 DET,700242,Trey Sweeney,SS,Right shoulder strain,,🟡,Injured 60-Day
 DET,672761,Wenceel Pérez,RF,Left orbital fracture.,,🔴,Injured 60-Day
 DET,676684,Will Vest,P,Right posterior elbow inflammation.,,🟡,Injured 60-Day
-HOU,656986,Bennett Sousa,P,Left elbow inflammation.,,🟡,Injured 60-Day
 HOU,687888,Brandon Walter,P,Left elbow surgery recovery,,🔴,Injured 60-Day
 HOU,694728,Brice Matthews,CF,Left knee sprain.,,🟡,Injured 10-Day
 HOU,621043,Carlos Correa,SS,Left ankle tendon injury.,,⚪,Injured 60-Day
 HOU,669713,Hayden Wesneski,P,Recovery from right elbow surgery,,🔴,Injured 60-Day
 HOU,681347,Mike Burrows,P,Right elbow neuritis.,,⚪,Injured 15-Day
-HOU,669854,Ronel Blanco,P,Right elbow surgery recovery,,🔴,Injured 60-Day
 KC,679525,Alec Marsh,P,Right shoulder impingement.,,⚪,Injured 60-Day
 KC,608032,Carlos Estévez,P,Left foot contusion.,,🟢,Injured 60-Day
 KC,666142,Cole Ragans,P,Left elbow impingement.,,⚪,Injured 60-Day
@@ -176,11 +174,10 @@ NYM,681810,Austin Warren,P,Right forearm strain.,,🟡,Injured 15-Day
 NYM,605280,Clay Holmes,P,Right fibula fracture.,,🔴,Injured 60-Day
 NYM,673380,Dedniel Núñez,P,Tommy John surgery recovery.,,🔴,Injured 60-Day
 NYM,663795,Justin Hagenman,P,Rib Fracture,,🔴,Injured 60-Day
-NYM,673357,Luis Robert Jr.,CF,Lumbar spine disc herniation.,,⚪,Injured 60-Day
 NYM,668901,Mark Vientos,1B,Right hand fracture.,,🔴,Injured 10-Day
 NYM,657585,Reed Garrett,P,Injured 60-Day,,⚪,Injured 60-Day
 NYM,656731,Tylor Megill,P,Right elbow sprain.,,🟡,Injured 60-Day
-NYY,592450,Aaron Judge,RF,Right rib stress fracture,,🔴,Injured 10-Day
+NYY,592450,Aaron Judge,RF,Right rib stress fracture.,,🔴,Injured 60-Day
 NYY,607074,Carlos Rodón,P,Left elbow inflammation,,🟡,Injured 15-Day
 NYY,657376,Clarke Schmidt,P,Right forearm tightness.,,🟢,Injured 60-Day
 NYY,519317,Giancarlo Stanton,DH,Right calf strain.,,🟡,Injured 10-Day
