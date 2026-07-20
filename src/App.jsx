@@ -11203,7 +11203,13 @@ async function pollLiveCloseCalls() {
           const ev = hd.launchSpeed || 0;
           const la = hd.launchAngle || 0;
           const dist = hd.totalDistance || 0;
-          const isHR = (play.result?.event||'').toLowerCase() === 'home_run';
+          // FIXED 2026-07-20: play.result.event is "Home Run" (space), not
+          // "home_run" (underscore) — that underscore form only exists on
+          // the separate eventType field. This comparison never matched,
+          // so every real HR clearing the EV/LA/dist thresholds below (true
+          // for nearly all HRs) was counted as a close call instead of
+          // excluded. Same bug, same fix as api/boxscore.js.
+          const isHR = (play.result?.event||'').toLowerCase() === 'home run';
           const batterId = play.matchup?.batter?.id;
           if (!batterId) return;
           // Close call criteria
@@ -27907,6 +27913,7 @@ function TrackRecordTab() {
   const [showOnly2Bagger, setShowOnly2Bagger] = useState(false);
   const [showOnlyTBSignal, setShowOnlyTBSignal] = useState(false);
   const [showOnlySimTB2, setShowOnlySimTB2] = useState(false);
+  const [showOnlyZoneRisk, setShowOnlyZoneRisk] = useState(false);
   const [teamFilter,     setTeamFilter]     = useState('ALL');
 
   const [showMatchup,  setShowMatchup]  = useState(true);
@@ -28041,6 +28048,15 @@ function TrackRecordTab() {
             ? blRow['Longshot'].toString().toLowerCase() === 'true'
             : (trueHR > 0 && trueHR <= 55 && matchup >= 65 && simTB >= 1.2);
 
+          // Plate IQ — read the value SimLabView already computed and exported
+          // (App.jsx's own CSV export, not gy_csv.py enrichment) rather than
+          // recomputing: keeps Track Record's number identical to what was
+          // shown live in All Matchups that day. Display-only everywhere in
+          // this app — does not feed Yard Score/Boom/TrueHRScore anywhere.
+          const _piqRaw = r['Plate IQ'];
+          const plateIQ = (_piqRaw !== undefined && _piqRaw !== '' && !isNaN(parseFloat(_piqRaw)))
+            ? parseFloat(_piqRaw) : null;
+
           return {
             date,
             batter:       r['Batter']         || '',
@@ -28082,6 +28098,8 @@ function TrackRecordTab() {
             hitTB2: parseInt(r['TB'] || 0) >= 2,
             tbSignal,
             trueHR, matchup, simHRPct, brlSignal, isLongshot,
+            plateIQ, plateIQGrade: plateIQGrade(plateIQ),
+            zoneAttackRisk: (r['Zone Risk']||'').toString().trim().toUpperCase() === 'YES',
             pulledBrl: parseFloat(blRow['PulledBrl%'] || 0),
             brlBIP:    parseFloat(blRow['Brl/BIP%']   || 0),
             hrFB:      parseFloat(blRow['HR/FB%']      || 0),
@@ -28134,6 +28152,7 @@ function TrackRecordTab() {
     if (showOnly2Bagger) rows = rows.filter(r => r.is2Bagger);
     if (showOnlyTBSignal) rows = rows.filter(r => r.tbSignal);
     if (showOnlySimTB2) rows = rows.filter(r => r.simTB >= 2.0);
+    if (showOnlyZoneRisk) rows = rows.filter(r => r.zoneAttackRisk);
     if (search) {
       const q = search.toLowerCase();
       rows = rows.filter(r =>
@@ -28148,7 +28167,7 @@ function TrackRecordTab() {
       }
       return sortDir * ((av||0) - (bv||0));
     });
-  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, showOnlyWeakSlot, showOnlyCC, showOnlySauce2, showOnly2Bagger, showOnlyTBSignal, showOnlySimTB2, search, sortCol, sortDir]);
+  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, showOnlyWeakSlot, showOnlyCC, showOnlySauce2, showOnly2Bagger, showOnlyTBSignal, showOnlySimTB2, showOnlyZoneRisk, search, sortCol, sortDir]);
 
   const summary = useMemo(() => {
     const hrs          = dateRows.filter(r => r.wentYard);
@@ -28170,13 +28189,24 @@ function TrackRecordTab() {
     const tbSignalHits  = tbSignals.filter(r => r.hitTB2);
     const simTB2        = dateRows.filter(r => r.simTB >= 2.0);
     const simTB2Hits    = simTB2.filter(r => r.hitTB2);
+    // Plate IQ Zone Risk (low IQ + facing an elevator pitcher) — a speculative
+    // vulnerability flag, not a boost signal. Tracking whether flagged batters
+    // actually underperform (lower HR rate) is how this gets validated, same
+    // "flag first, confirm via tracker later" pattern as every other signal.
+    const zoneRiskFlags = dateRows.filter(r => r.zoneAttackRisk);
+    const zoneRiskHits  = zoneRiskFlags.filter(r => r.wentYard);
+    const iqRated       = dateRows.filter(r => r.plateIQ != null);
+    const avgPlateIQ    = iqRated.length
+      ? Math.round(iqRated.reduce((s,r) => s + r.plateIQ, 0) / iqRated.length)
+      : null;
     const topYS        = [...dateRows].sort((a,b) => b.yardScore - a.yardScore)[0];
     const biggestMiss   = [...dateRows.filter(r => !r.wentYard)]
       .sort((a,b) => b.yardScore - a.yardScore)[0];
     const biggestUpset = [...dateRows.filter(r => r.wentYard)]
       .sort((a,b) => a.yardScore - b.yardScore)[0];
     return { hrs, signals, signalHits, keyMatchups, kmHits,
-             longshots, lsHits, weakSlots, weakSlotHits, sauce2, sauce2Hits, twoBaggers, tbSignals, tbSignalHits, simTB2, simTB2Hits, topYS, biggestMiss, biggestUpset };
+             longshots, lsHits, weakSlots, weakSlotHits, sauce2, sauce2Hits, twoBaggers, tbSignals, tbSignalHits, simTB2, simTB2Hits,
+             zoneRiskFlags, zoneRiskHits, avgPlateIQ, topYS, biggestMiss, biggestUpset };
   }, [dateRows]);
 
   const GroupBar = ({ label, open, onToggle, color }) => (
@@ -28339,6 +28369,19 @@ function TrackRecordTab() {
             sub: `${summary.simTB2Hits.length}/${summary.simTB2.length}`,
             color:'#a78bfa'
           },
+          {
+            label:'AVG PLATE IQ',
+            value: summary.avgPlateIQ != null ? summary.avgPlateIQ : '—',
+            color:'#38b8f2'
+          },
+          {
+            label:'ZONE RISK HR RATE',
+            value: summary.zoneRiskFlags.length
+              ? `${((summary.zoneRiskHits.length/summary.zoneRiskFlags.length)*100).toFixed(0)}%`
+              : '—',
+            sub: `${summary.zoneRiskHits.length}/${summary.zoneRiskFlags.length}`,
+            color:'#a855f7'
+          },
         ].map(card => (
           <div key={card.label} style={{
             background:'var(--surface2)', border:'1px solid var(--border)',
@@ -28474,6 +28517,16 @@ function TrackRecordTab() {
           🎲 Sim TB ≥2.0 Only
         </button>
 
+        <button onClick={() => setShowOnlyZoneRisk(v=>!v)}
+          title="Plate IQ < 44 (C or below) facing a pitcher who elevates more than the league average — a speculative swing-hole vulnerability flag, display-only."
+          style={{padding:'4px 10px', borderRadius:6, border:'none',
+            cursor:'pointer', fontFamily:mono, fontSize:9, fontWeight:700,
+            background: showOnlyZoneRisk ? 'rgba(168,85,247,.15)' : 'var(--surface2)',
+            color:       showOnlyZoneRisk ? '#a855f7' : 'var(--muted)',
+            border: `1px solid ${showOnlyZoneRisk ? 'rgba(168,85,247,.4)' : 'var(--border)'}` }}>
+          🧠 Zone Risk Only
+        </button>
+
         <button id="track-record-csv-trigger" onClick={() => {
             if (!filteredRows.length) return;
             const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
@@ -28483,6 +28536,7 @@ function TrackRecordTab() {
               'Is Key Matchup','Weak Spot','Sauce 2.0','2-Bagger (Non-HR)','Hit 2+ TB (Any)','TB Signal',
               'TrueHR','Matchup','SimHR%','Barrel Signal','Longshot',
               'PulledBrl%','Brl/BIP','HR/FB','FB%','HH%',
+              'Plate IQ','IQ Grade','Zone Risk',
               'Went Yard','HR','AB','H','TB','RBI','BB','K','Avg EV','Launch Angle',
               'Live Close Calls','Live CC Max EV','Live CC Max Dist'];
             const csvRows = [headers.map(esc).join(',')];
@@ -28499,6 +28553,7 @@ function TrackRecordTab() {
                 r.trueHR || '', r.matchup || '', r.simHRPct || '',
                 r.brlSignal ? 'YES' : '', r.isLongshot ? 'YES' : '',
                 r.pulledBrl || '', r.brlBIP || '', r.hrFB || '', r.fb || '', r.hh || '',
+                r.plateIQ != null ? r.plateIQ : '', r.plateIQGrade?.label || '', r.zoneAttackRisk ? 'YES' : '',
                 r.wentYard ? 'YES' : '', r.actualHR || 0, r.actualAB || 0, r.actualH || 0,
                 r.actualTB || 0, r.actualRBI || 0, r.actualBB || 0, r.actualK || 0,
                 r.actualEV || '', r.actualLA || '',
@@ -28578,6 +28633,7 @@ function TrackRecordTab() {
                   <SortTh col="hh"        label="HH%" color="#38b8f2"/>
                   <SortTh col="brlSignal" label="Signal" color="#38b8f2"/>
                   <SortTh col="isLongshot" label="Longshot" color="#38b8f2"/>
+                  <SortTh col="plateIQ" label="IQ" color="#38b8f2" title="Plate IQ — display-only, does not affect Yard Score. See Legend for details."/>
                 </>}
 
                 {showBoxScore && <>
@@ -28704,6 +28760,15 @@ function TrackRecordTab() {
                       </td>
                       <td style={{padding:'3px 6px', textAlign:'center'}}>
                         {r.isLongshot && <span style={{color:'#a78bfa'}}>🎲</span>}
+                      </td>
+                      <td style={{padding:'3px 6px', textAlign:'center'}}>
+                        {r.plateIQGrade
+                          ? <span title={`Plate IQ: ${r.plateIQ}/100${r.zoneAttackRisk ? ' ⚠ Low IQ + elevated pitcher — swing hole risk' : ''} — display-only, does not affect Yard Score.`}
+                              style={{fontFamily:mono, fontSize:9, fontWeight:800,
+                                color:r.plateIQGrade.color, opacity:r.zoneAttackRisk?1:0.85}}>
+                              {r.plateIQGrade.label}{r.zoneAttackRisk && ' ⚠'}
+                            </span>
+                          : '—'}
                       </td>
                     </>}
 

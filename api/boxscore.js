@@ -121,7 +121,17 @@ export default async function handler(req, res) {
         const result     = play.result?.event || play.result?.description || null;
         const inning     = play.about?.inning      || null;
         const halfInning = play.about?.halfInning   || null;
-        const isHR       = (play.result?.event || '').toLowerCase() === 'home_run';
+        // FIXED 2026-07-20: play.result.event is "Home Run" (space, title
+        // case) -- the underscore form "home_run" only exists on the
+        // separate play.result.eventType field. Comparing event against
+        // 'home_run' with an underscore never matched anything, so isHR was
+        // always false -- every real HR that also cleared the close-call
+        // thresholds (ev>=98, la 18-35, dist>=350 -- true for nearly all
+        // HRs) was being counted as a close call instead of excluded.
+        // Checking both fields, matching the already-correct pattern in
+        // api/homeruns.js's own HR detection.
+        const isHR       = (play.result?.event || '').toLowerCase() === 'home run'
+                         || (play.result?.eventType || '').toLowerCase() === 'home_run';
         const isK        = (play.result?.event || '').toLowerCase().includes('strikeout');
         if (isK && pc) pc.strikeouts++;
         if (isK) sc.strikeouts++;
