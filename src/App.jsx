@@ -26699,6 +26699,21 @@ function WeatherGameCard({ g, wd }) {
 
   if (!display && !wd.isDome) return null;
 
+  // Peak rain chance across the game's realistic ~3hr window (2026-07-21) —
+  // display.rainChance above is a single hour's point forecast. Confirmed
+  // against rotogrinders.com/weather/mlb as a reference that a single-hour
+  // snapshot badly understates rain risk when a storm arrives mid-game
+  // (LAD@PHI 6:40pm showed 5-21% at the first-pitch hour here vs
+  // rotogrinders' 92%, which tracked this same hourly array's 89% peak a
+  // couple hours later). Uses wd.hourly (already fetched, no extra request).
+  const peakRain = (() => {
+    if (!gtSlot || !wd.hourly) return null;
+    const idx = wd.hourly.indexOf(gtSlot);
+    if (idx < 0) return null;
+    const win = wd.hourly.slice(idx, idx + 4);
+    return win.length ? Math.max(...win.map(h => h.rainChance || 0)) : null;
+  })();
+
   // Build 5-hour strip from game time
   const strip = gameHour!==null
     ? (wd.hourly||[]).filter(h=>h.hour>=gameHour).slice(0,5)
@@ -26791,6 +26806,12 @@ function WeatherGameCard({ g, wd }) {
             </div>
             <div style={{fontSize:10,color:'#38b8f2',fontFamily:"'DM Mono',monospace"}}>
               {(display.rainChance||0)>0 ? `🌧 ${display.rainChance}%` : ''}
+              {peakRain!=null && peakRain > (display.rainChance||0) + 10 && (
+                <span style={{color:'#f5a623'}}
+                  title="Peak rain chance across the game's ~3hr window — a storm arriving after first pitch would show up here even if it's calm right now.">
+                  {' '}→{peakRain}% peak
+                </span>
+              )}
             </div>
             <div style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
               💧{display.humidity}%
@@ -27754,6 +27775,7 @@ function LegendButton() {
       '⭐⭐ / ⭐ Hand Match — batter\'s handedness exploits the opposing pitcher\'s weakness. ⭐⭐ (full): platoon advantage + pitcher genuinely weak vs that hand (elevated HR/HH/Barrel% allowed) + batter historically strong vs that hand. ⭐ (partial): cross-handed with strong pitch-mix fit (ps_convergence ≥8) even when the pitcher\'s overall vs-hand rates aren\'t clearly weak yet — e.g. a LHB who crushes fastballs matched against a fastball-heavy RHP.',
       '💥 Gone Yard / 2️⃣ 2+ TB Today badges and filters — same definitions as everywhere else in the app.',
       '🟢 Weak Spot row highlight — batter sitting in the opposing pitcher\'s historically weak lineup slot.',
+      '🟣 Rain Watch / ⚠️ Rain Risk row highlight — game-time precipitation caution (🟣 ≥70%, ⚠️ ≥80% or thunder in the forecast). Uses the peak rain chance across the game\'s ~3hr window, not just the first-pitch hour — a storm arriving mid-game still means real rain risk (delay/postponement, wet-grip contact effects).',
     ] },
     { tab:'🔵 On Base',        items:[
       'Monte Carlo simulation targeting 2+ total bases per game (broader outcome than HR alone) — 10,000 simulated PAs per matchup.',
@@ -27761,7 +27783,7 @@ function LegendButton() {
       'MatchupScore (0–100) — pitcher-adjusted vulnerability, same concept as Barrel Lab\'s.',
       'SimTB2% — simulated probability of reaching 2+ total bases in the game.',
       '★ TB Signal — OnBaseScore ≥75 AND MatchupScore ≥60 AND SimTB2% ≥30%. Very new signal — live tracker: 38.0% hit rate, still a small sample.',
-      'Same 💥 / 2️⃣ / 🟢 Weak Spot / ⭐⭐ Hand Match badges and filters as Barrel Lab.',
+      'Same 💥 / 2️⃣ / 🟢 Weak Spot / ⭐⭐ Hand Match / 🟣 Rain Watch badges and filters as Barrel Lab.',
     ] },
     { tab:'📋 Track Record',   items:[
       'The self-auditing page — merges the daily All Matchups, Barrel Lab, and On Base exports against actual box-score outcomes, every day, automatically.',
@@ -31457,6 +31479,46 @@ function getHandMatchTier(r) {
   return null;
 }
 
+// ── DOME_TEAMS — dome / retractable-roof home venues ─────────────────────────
+// mlb_weather_report.py has NO dome awareness at all (confirmed via direct
+// grep — zero references to "dome" anywhere in that file): it fetches and
+// reports real outdoor forecast weather for every park regardless of roof
+// status. Confirmed live (2026-07-21): TOR showed chance_of_rain_peak=71
+// (would trigger the caution badge below) while rotogrinders.com/weather/mlb
+// correctly shows TOR as a dome game with no weather stats at all — Rogers
+// Centre's roof makes the forecast irrelevant to the actual game. Mirrors
+// weather.js's own STADIUMS dome:true list (the app's existing canonical
+// source, already used for the Game Day tab's "🏟️ Retractable/Dome" display)
+// so this stays consistent with what the rest of the app already treats as
+// weather-irrelevant. Checked against r.home_team (not batting_team) — the
+// VENUE determines dome status, so an away batter visiting a dome park is
+// just as weather-irrelevant as the home team's own batters.
+const DOME_TEAMS = new Set(['HOU','SEA','TEX','TOR','TB','MIA','MIL','AZ','ARI']);
+
+// ── getRainRiskTier — game-time precipitation caution for Barrel Lab / On Base ──
+// Uses chance_of_rain_peak (2026-07-21 fix — max rain% across the game's
+// ~3hr window, not just the first-pitch hour) when the engine has populated
+// it, falling back to the old single-hour chance_of_rain otherwise. Both
+// already flow into daily_picks.csv today — chance_of_rain_peak needs one
+// more matchup_engine.py run before it's populated; until then this reads
+// the less-accurate single-hour value, same as before, just labeled honestly.
+// Thunder in the condition text escalates straight to 'warning' regardless
+// of the raw percentage — a thunderstorm risk (delay/postponement, or wet
+// grip affecting contact) is a real caution even at a moderate rain%.
+function getRainRiskPct(r) {
+  const peak = r.chance_of_rain_peak;
+  if (peak !== undefined && peak !== '' && !isNaN(parseFloat(peak))) return parseFloat(peak);
+  return parseFloat(r.chance_of_rain || 0);
+}
+function getRainRiskTier(r) {
+  if (DOME_TEAMS.has((r.home_team || '').toUpperCase())) return null;
+  const pct = getRainRiskPct(r);
+  const thunder = /thunder/i.test(r.condition || '');
+  if (pct >= 80 || thunder) return 'warning';
+  if (pct >= 70) return 'caution';
+  return null;
+}
+
 // ── WeatherStrip — brief per-game weather reference for Barrel Lab / On Base ──
 // Neither tab showed weather anywhere before this (confirmed absent via grep).
 // Sourced directly from daily_picks.csv's own weather columns (temp_f,
@@ -31483,7 +31545,13 @@ function WeatherStrip({ rows }) {
           temp: parseFloat(r.temp_f || 0),
           windMph: parseFloat(r.wind_speed_mph || 0),
           windEffect: (r.wind_effect || '').replace(/[↙↖↘⬅⬇↗⬆️]/g, '').trim(),
-          rain: parseInt(r.chance_of_rain || 0),
+          // chance_of_rain_peak (2026-07-21 fix) — max rain% across the
+          // game's ~3hr window, not just the first-pitch hour. Falls back
+          // to the old single-hour chance_of_rain until the next
+          // matchup_engine.py run populates the new column.
+          rain: (r.chance_of_rain_peak !== undefined && r.chance_of_rain_peak !== '' && !isNaN(parseFloat(r.chance_of_rain_peak)))
+            ? parseInt(r.chance_of_rain_peak)
+            : parseInt(r.chance_of_rain || 0),
           hrf,
         };
       }
@@ -31541,6 +31609,7 @@ function BarrelLabTab() {
   const [blGoneYardOnly,   setBlGoneYardOnly]   = useState(false);
   const [blTB2Only,        setBlTB2Only]        = useState(false);
   const [blHighIQOnly,     setBlHighIQOnly]     = useState(false);
+  const [blHandMatchOnly,  setBlHandMatchOnly]  = useState(false);
 
   useEffect(() => {
     const unsub    = subscribeLineup(v => setLineupVer(v));
@@ -31725,6 +31794,8 @@ function BarrelLabTab() {
           r.simHRPct     != null && (r.simHRPct * SIM_HR_SUPPRESSION) >= 12.0,
         isLongshot: isLongshotBatter(r, r.trueHRScore, r.matchupScore),
         handMatchTier: getHandMatchTier(r),
+        rainRiskTier: getRainRiskTier(r),
+        rainRiskPct:  getRainRiskPct(r),
         isWeakSlot: (() => {
           const _ls = liveSlot(parseInt(r.batter_id||0), r.lineup_slot);
           return _ls > 0 && (r.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(_ls);
@@ -31740,8 +31811,9 @@ function BarrelLabTab() {
     .filter(r => !blGoneYardOnly || isGoneYardBL(r))
     .filter(r => !blTB2Only || is2BagBL(r))
     .filter(r => !blHighIQOnly || (r.plateIQ != null && r.plateIQ >= 56))
+    .filter(r => !blHandMatchOnly || r.handMatchTier)
     .sort((a, b) => b.trueHRScore - a.trueHRScore);
-  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, blPicksOnly, picks, blGoneYardOnly, blTB2Only, blHighIQOnly, hrVer, finalVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, blPicksOnly, picks, blGoneYardOnly, blTB2Only, blHighIQOnly, blHandMatchOnly, hrVer, finalVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Color threshold helpers
   const clr = (v, g1, g2, y1, y2) => {
@@ -32006,6 +32078,19 @@ function BarrelLabTab() {
               🧠 {blHighIQOnly ? 'High IQ Only' : 'Plate IQ'}
             </button>
             <button
+              onClick={() => setBlHandMatchOnly(v => !v)}
+              title="Batter's handedness exploits the opposing pitcher's weakness (⭐⭐ full or ⭐ partial). See Legend for details."
+              style={{
+                padding:'2px 8px', borderRadius:5, cursor:'pointer',
+                fontFamily:"'DM Mono',monospace", fontSize:9, fontWeight:700,
+                lineHeight:1.5, flexShrink:0,
+                background: blHandMatchOnly ? 'rgba(251,191,36,.12)' : 'var(--surface2)',
+                color:      blHandMatchOnly ? '#fbbf24' : 'var(--muted)',
+                border:`1px solid ${blHandMatchOnly ? 'rgba(251,191,36,.4)' : 'var(--border)'}`,
+              }}>
+              ⭐ {blHandMatchOnly ? 'Hand Match Only' : 'Hand Match'}
+            </button>
+            <button
               disabled={simRunning}
               onClick={async () => {
                 await loadTodayLineups();
@@ -32160,8 +32245,8 @@ function BarrelLabTab() {
               <div key={`${b._bid}_${b.game_id}`} style={{
                 minWidth:200,flex:'0 0 auto',
                 background:'var(--surface2)',borderRadius:8,padding:'10px 12px',
-                border:`1px solid ${b.isBarrelSignal ? 'var(--accent)' : 'var(--border)'}`,
-                borderLeft:`3px solid ${b.isBarrelSignal ? 'var(--accent)' : 'var(--border)'}`,
+                border:`1px solid ${b.isBarrelSignal ? 'var(--accent)' : b.rainRiskTier==='warning' ? '#a78bfa' : 'var(--border)'}`,
+                borderLeft:`3px solid ${b.isBarrelSignal ? 'var(--accent)' : b.rainRiskTier==='warning' ? '#a78bfa' : 'var(--border)'}`,
                 opacity: isFinal(b.game_id) ? 0.5 : 1,
               }}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
@@ -32203,6 +32288,13 @@ function BarrelLabTab() {
                   <div style={{fontFamily:mono,fontSize:8,color:'#fbbf24',marginBottom:4,
                     opacity:b.handMatchTier==='full'?1:.75}}>
                     {b.handMatchTier==='full' ? '⭐⭐ Hand Match' : '⭐ Partial Hand Match'}
+                  </div>
+                )}
+                {b.rainRiskTier && (
+                  <div title={`~${Math.round(b.rainRiskPct)}% chance during the game window${/thunder/i.test(b.condition||'')?' with thunder in the forecast':''}. Games can be delayed/postponed, and wet grip can affect contact.`}
+                    style={{fontFamily:mono,fontSize:8,color:'#a78bfa',marginBottom:4,
+                    fontWeight:b.rainRiskTier==='warning'?700:400}}>
+                    {b.rainRiskTier==='warning' ? `⚠️ Rain Risk (${Math.round(b.rainRiskPct)}%)` : `🌧 Rain Watch (${Math.round(b.rainRiskPct)}%)`}
                   </div>
                 )}
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px 10px',fontFamily:mono,fontSize:8}}>
@@ -32259,7 +32351,7 @@ function BarrelLabTab() {
                         <tr key={`${b._bid}_${b.game_id}`} style={{
                           borderBottom:'1px solid rgba(255,255,255,.04)',
                           opacity: fin ? 0.5 : 1,
-                          background: b.isWeakSlot ? 'rgba(255,214,10,.14)' : b.isBarrelSignal ? 'rgba(255,153,0,.04)' : 'transparent',
+                          background: b.isWeakSlot ? 'rgba(255,214,10,.14)' : b.isBarrelSignal ? 'rgba(255,153,0,.04)' : b.rainRiskTier ? 'rgba(167,139,250,.12)' : 'transparent',
                         }}>
                           <td style={{padding:'4px 6px',color:'var(--muted)'}}>{liveSlot(parseInt(b.batter_id||0), b.lineup_slot) || '—'}</td>
                           {!selGame && <td style={{padding:'4px 6px',color:'var(--muted)',fontFamily:mono,fontSize:8}}>{b.batting_team||'—'}</td>}
@@ -32268,33 +32360,38 @@ function BarrelLabTab() {
                             <td style={{padding:'4px 6px',color:pgCol(_g),fontFamily:mono,fontSize:8,whiteSpace:'nowrap'}}>{_g || '—'}</td>
                           ); })()}
                           <td className="sticky-batter" style={{padding:'4px 6px',whiteSpace:'nowrap',
-                            background: b.isWeakSlot ? '#2f2e16' : b.isBarrelSignal ? '#171817' : 'var(--surface)'}}>
+                            background: b.isWeakSlot ? '#2f2e16' : b.isBarrelSignal ? '#171817' : b.rainRiskTier ? '#211a2e' : 'var(--surface)'}}>
                             <div style={{display:'flex',alignItems:'center',gap:6}}>
                               <div style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer',flex:1}} onClick={() => openBatter(b)}>
                                 <PlayerAvatar pid={b.batter_id} name={b.batter} size={22}/>
                                 <span style={{color:'var(--text)'}}>
-                                  {b.isBarrelSignal && <span style={{color:'var(--accent)',marginRight:2,fontWeight:900,fontSize:9}}>★</span>}
-                                  {b.isLongshot && <span style={{color:'#a78bfa',marginRight:2,fontWeight:900,fontSize:9}}>🎲</span>}
+                                  {b.isBarrelSignal && <span title="Barrel Signal — TrueHRScore ≥75, MatchupScore ≥60, simulated HR% ≥12%." style={{color:'var(--accent)',marginRight:2,fontWeight:900,fontSize:7}}>★</span>}
+                                  {b.isLongshot && <span title="Longshot — TrueHRScore ≤55, MatchupScore ≥65, Sim TB ≥1.2, non-elite pitcher." style={{color:'#a78bfa',marginRight:2,fontWeight:900,fontSize:7}}>🎲</span>}
                                   {b.handMatchTier && <span
                                     title={b.handMatchTier==='full'
                                       ? `Hand Match — ${b.pitcher||'this pitcher'} (${(b.pitcher_hand||'?').charAt(0)}HP) is genuinely weak vs ${b.batter_hand||'?'}HB, and ${b.batter} has hit that hand well. Platoon + weakness compound.`
                                       : `Partial Hand Match — cross-handed matchup with strong arsenal fit (ps_convergence=${fmt(b.ps_convergence,1)}${b.ps_conv_pitch ? ', best pitch: '+b.ps_conv_pitch : ''}) even though the pitcher's overall vs-hand rates aren't clearly weak yet.`}
-                                    style={{color:'#fbbf24',marginRight:2,fontWeight:900,fontSize:9,opacity:b.handMatchTier==='full'?1:.6}}>
+                                    style={{color:'#fbbf24',marginRight:2,fontWeight:900,fontSize:7,opacity:b.handMatchTier==='full'?1:.6}}>
                                     {b.handMatchTier==='full' ? '⭐⭐' : '⭐'}
                                   </span>}
+                                  {b.rainRiskTier==='warning' && <span
+                                    title={`Rain risk — ~${Math.round(b.rainRiskPct)}% chance during the game window${/thunder/i.test(b.condition||'')?' with thunder in the forecast':''}. Games can be delayed/postponed, and wet grip can affect contact.`}
+                                    style={{marginRight:2,fontSize:7}}>⚠️</span>}
                                   {b.batter}
                                 </span>
                                 {isGoneYardToday(parseInt(b.batter_id)||0, b.batter) && (
-                                  <div style={{padding:'2px 6px',borderRadius:4,flexShrink:0,
+                                  <div title="Gone Yard Today — this batter has already homered today."
+                                    style={{padding:'2px 6px',borderRadius:4,flexShrink:0,
                                     background:'rgba(255,20,0,.25)',border:'1px solid rgba(255,20,0,.5)',
                                     color:'#fff',fontFamily:"'DM Mono',monospace",
-                                    fontWeight:800,fontSize:9,letterSpacing:.5}}>💥</div>
+                                    fontWeight:800,fontSize:7,letterSpacing:.5}}>💥</div>
                                 )}
                                 {!isGoneYardToday(parseInt(b.batter_id)||0, b.batter) && is2BagToday(parseInt(b.batter_id)||0, b.batter) && (
-                                  <div style={{padding:'2px 6px',borderRadius:4,flexShrink:0,
+                                  <div title="2+ TB Today — this batter has already reached 2+ total bases today (without a HR)."
+                                    style={{padding:'2px 6px',borderRadius:4,flexShrink:0,
                                     background:'rgba(56,184,242,.20)',border:'1px solid rgba(56,184,242,.4)',
                                     color:'#38b8f2',fontFamily:"'DM Mono',monospace",
-                                    fontWeight:800,fontSize:9,letterSpacing:.5}}>2️⃣</div>
+                                    fontWeight:800,fontSize:7,letterSpacing:.5}}>2️⃣</div>
                                 )}
                                 {fin && <span style={{fontSize:7,color:'var(--muted)',border:'1px solid var(--border)',borderRadius:3,padding:'1px 3px'}}>FINAL</span>}
                               </div>
@@ -32460,6 +32557,7 @@ function OnBaseTab() {
   const [obGoneYardOnly,   setObGoneYardOnly]   = useState(false);
   const [obTB2Only,        setObTB2Only]        = useState(false);
   const [obHighIQOnly,     setObHighIQOnly]     = useState(false);
+  const [obHandMatchOnly,  setObHandMatchOnly]  = useState(false);
   const [hrVer, setHrVer] = useState(_HR_VER||0);
 
   useEffect(() => {
@@ -32596,6 +32694,8 @@ function OnBaseTab() {
           r.matchupScore >= 60 &&
           r.simTB2Pct != null && r.simTB2Pct >= 30.0,
         handMatchTier: getHandMatchTier(r),
+        rainRiskTier: getRainRiskTier(r),
+        rainRiskPct:  getRainRiskPct(r),
         isWeakSlot: (() => {
           const _ls = liveSlot(parseInt(r.batter_id||0), r.lineup_slot);
           return _ls > 0 && (r.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(_ls);
@@ -32612,8 +32712,9 @@ function OnBaseTab() {
     .filter(r => !obGoneYardOnly || isGoneYardOB(r))
     .filter(r => !obTB2Only || is2BagOB(r))
     .filter(r => !obHighIQOnly || (r.plateIQ != null && r.plateIQ >= 56))
+    .filter(r => !obHandMatchOnly || r.handMatchTier)
     .sort((a, b) => b.onBaseScore - a.onBaseScore);
-  }, [eligibleBatters, simResults, obHideFinal, obPicksOnly, obGoneYardOnly, obTB2Only, obHighIQOnly, picks, finalVer, hrVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [eligibleBatters, simResults, obHideFinal, obPicksOnly, obGoneYardOnly, obTB2Only, obHighIQOnly, obHandMatchOnly, picks, finalVer, hrVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const byTeam = useMemo(() => {
     const teams = {};
@@ -32851,6 +32952,19 @@ function OnBaseTab() {
               🧠 {obHighIQOnly ? 'High IQ Only' : 'Plate IQ'}
             </button>
             <button
+              onClick={() => setObHandMatchOnly(v => !v)}
+              title="Batter's handedness exploits the opposing pitcher's weakness (⭐⭐ full or ⭐ partial). See Legend for details."
+              style={{
+                padding:'2px 8px', borderRadius:5, cursor:'pointer',
+                fontFamily:mono, fontSize:9, fontWeight:700,
+                lineHeight:1.5, flexShrink:0,
+                background: obHandMatchOnly ? 'rgba(251,191,36,.12)' : 'var(--surface2)',
+                color:      obHandMatchOnly ? '#fbbf24' : 'var(--muted)',
+                border:`1px solid ${obHandMatchOnly ? 'rgba(251,191,36,.4)' : 'var(--border)'}`,
+              }}>
+              ⭐ {obHandMatchOnly ? 'Hand Match Only' : 'Hand Match'}
+            </button>
+            <button
               disabled={simRunning}
               onClick={async () => {
                 await loadTodayLineups();
@@ -32988,8 +33102,8 @@ function OnBaseTab() {
               <div key={`${b._bid}_${b.game_id}`} style={{
                 minWidth:200,flex:'0 0 auto',
                 background:'var(--surface2)',borderRadius:8,padding:'10px 12px',
-                border:`1px solid ${b.isTBSignal ? 'rgba(56,184,242,.6)' : 'var(--border)'}`,
-                borderLeft:`3px solid ${b.isTBSignal ? '#38b8f2' : 'var(--border)'}`,
+                border:`1px solid ${b.isTBSignal ? 'rgba(56,184,242,.6)' : b.rainRiskTier==='warning' ? '#a78bfa' : 'var(--border)'}`,
+                borderLeft:`3px solid ${b.isTBSignal ? '#38b8f2' : b.rainRiskTier==='warning' ? '#a78bfa' : 'var(--border)'}`,
                 opacity: isFinal(b.game_id) ? 0.5 : 1,
               }}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
@@ -33025,6 +33139,13 @@ function OnBaseTab() {
                   <div style={{fontFamily:mono,fontSize:8,color:'#fbbf24',marginBottom:6,
                     opacity:b.handMatchTier==='full'?1:.75}}>
                     {b.handMatchTier==='full' ? '⭐⭐ Hand Match' : '⭐ Partial Hand Match'}
+                  </div>
+                )}
+                {b.rainRiskTier && (
+                  <div title={`~${Math.round(b.rainRiskPct)}% chance during the game window${/thunder/i.test(b.condition||'')?' with thunder in the forecast':''}. Games can be delayed/postponed, and wet grip can affect contact.`}
+                    style={{fontFamily:mono,fontSize:8,color:'#a78bfa',marginBottom:6,
+                    fontWeight:b.rainRiskTier==='warning'?700:400}}>
+                    {b.rainRiskTier==='warning' ? `⚠️ Rain Risk (${Math.round(b.rainRiskPct)}%)` : `🌧 Rain Watch (${Math.round(b.rainRiskPct)}%)`}
                   </div>
                 )}
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px 10px',fontFamily:mono,fontSize:8}}>
@@ -33081,7 +33202,7 @@ function OnBaseTab() {
                         <tr key={`${b._bid}_${b.game_id}`} style={{
                           borderBottom:'1px solid rgba(255,255,255,.04)',
                           opacity: fin ? 0.5 : 1,
-                          background: b.isWeakSlot ? 'rgba(255,214,10,.14)' : b.isTBSignal ? 'rgba(56,184,242,.04)' : 'transparent',
+                          background: b.isWeakSlot ? 'rgba(255,214,10,.14)' : b.isTBSignal ? 'rgba(56,184,242,.04)' : b.rainRiskTier ? 'rgba(167,139,250,.12)' : 'transparent',
                         }}>
                           <td style={{padding:'4px 6px',color:'var(--muted)'}}>{liveSlot(parseInt(b.batter_id||0), b.lineup_slot) || '—'}</td>
                           {!selGame && <td style={{padding:'4px 6px',color:'var(--muted)',fontFamily:mono,fontSize:8}}>{b.batting_team||'—'}</td>}
@@ -33090,31 +33211,36 @@ function OnBaseTab() {
                             <td style={{padding:'4px 6px',color:pgCol(_g),fontFamily:mono,fontSize:8,whiteSpace:'nowrap'}}>{_g || '—'}</td>
                           ); })()}
                           <td className="sticky-batter" style={{padding:'4px 6px',whiteSpace:'nowrap',
-                            background: b.isWeakSlot ? '#2f2e16' : b.isTBSignal ? '#0f1a21' : 'var(--surface)'}}>
+                            background: b.isWeakSlot ? '#2f2e16' : b.isTBSignal ? '#0f1a21' : b.rainRiskTier ? '#211a2e' : 'var(--surface)'}}>
                             <div style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer'}} onClick={() => openBatter(b)}>
                               <PlayerAvatar pid={b.batter_id} name={b.batter} size={22}/>
                               <span style={{color:'var(--text)'}}>
-                                {b.isTBSignal && <span style={{color:'#38b8f2',marginRight:2,fontWeight:900,fontSize:9}}>★</span>}
+                                {b.isTBSignal && <span title="TB Signal — OnBaseScore ≥75, MatchupScore ≥60, SimTB2% ≥30%." style={{color:'#38b8f2',marginRight:2,fontWeight:900,fontSize:7}}>★</span>}
                                 {b.handMatchTier && <span
                                   title={b.handMatchTier==='full'
                                     ? `Hand Match — ${b.pitcher||'this pitcher'} (${(b.pitcher_hand||'?').charAt(0)}HP) is genuinely weak vs ${b.batter_hand||'?'}HB, and ${b.batter} has hit that hand well. Platoon + weakness compound.`
                                     : `Partial Hand Match — cross-handed matchup with strong arsenal fit (ps_convergence=${fmt(b.ps_convergence,1)}${b.ps_conv_pitch ? ', best pitch: '+b.ps_conv_pitch : ''}) even though the pitcher's overall vs-hand rates aren't clearly weak yet.`}
-                                  style={{color:'#fbbf24',marginRight:2,fontWeight:900,fontSize:9,opacity:b.handMatchTier==='full'?1:.6}}>
+                                  style={{color:'#fbbf24',marginRight:2,fontWeight:900,fontSize:7,opacity:b.handMatchTier==='full'?1:.6}}>
                                   {b.handMatchTier==='full' ? '⭐⭐' : '⭐'}
                                 </span>}
+                                {b.rainRiskTier==='warning' && <span
+                                  title={`Rain risk — ~${Math.round(b.rainRiskPct)}% chance during the game window${/thunder/i.test(b.condition||'')?' with thunder in the forecast':''}. Games can be delayed/postponed, and wet grip can affect contact.`}
+                                  style={{marginRight:2,fontSize:7}}>⚠️</span>}
                                 {b.batter}
                               </span>
                               {b.isGoneYard && (
-                                <div style={{padding:'2px 6px',borderRadius:4,flexShrink:0,
+                                <div title="Gone Yard Today — this batter has already homered today."
+                                  style={{padding:'2px 6px',borderRadius:4,flexShrink:0,
                                   background:'rgba(255,20,0,.25)',border:'1px solid rgba(255,20,0,.5)',
                                   color:'#fff',fontFamily:"'DM Mono',monospace",
-                                  fontWeight:800,fontSize:9,letterSpacing:.5}}>💥</div>
+                                  fontWeight:800,fontSize:7,letterSpacing:.5}}>💥</div>
                               )}
                               {b.is2Bag && (
-                                <div style={{padding:'2px 6px',borderRadius:4,flexShrink:0,
+                                <div title="2+ TB Today — this batter has already reached 2+ total bases today (without a HR)."
+                                  style={{padding:'2px 6px',borderRadius:4,flexShrink:0,
                                   background:'rgba(56,184,242,.20)',border:'1px solid rgba(56,184,242,.4)',
                                   color:'#38b8f2',fontFamily:"'DM Mono',monospace",
-                                  fontWeight:800,fontSize:9,letterSpacing:.5}}>2️⃣</div>
+                                  fontWeight:800,fontSize:7,letterSpacing:.5}}>2️⃣</div>
                               )}
                               {fin && <span style={{fontSize:7,color:'var(--muted)',border:'1px solid var(--border)',borderRadius:3,padding:'1px 3px'}}>FINAL</span>}
                             </div>
