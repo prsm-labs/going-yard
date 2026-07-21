@@ -58,9 +58,9 @@ CHC,665795,Edward Cabrera,P,Left hamstring strain.,,🟡,Injured 15-Day
 CHC,681799,Ethan Roberts,P,right forearm inflammation,,🟡,Injured 15-Day
 CHC,571948,Hoby Milner,P,Appendicitis,,⚪,Injured 15-Day
 CHC,640451,Hunter Harvey,P,Right triceps inflammation.,,🟡,Injured 60-Day
-CHC,592791,Jameson Taillon,P,Strained left hamstring.,,🟡,Injured 15-Day
 CHC,657006,Justin Steele,P,Left elbow injury,,⚪,Injured 60-Day
 CHC,807713,Matt Shaw,RF,left-hand sprain,,🟡,Injured 10-Day
+CHC,664208,Phil Maton,P,Right knee tendinitis.,,⚪,Injured 15-Day
 CHC,687863,Porter Hodge,P,Right elbow strain,,🟡,Injured 60-Day
 CHC,702303,Riley Martin,P,Left elbow inflammation.,,🟡,Injured 60-Day
 CHC,571946,Shelby Miller,P,Right Elbow UCL Injury,,⚪,Injured 60-Day
@@ -97,7 +97,6 @@ CWS,656457,Tyler Gilbert,P,Left shoulder impingement.,,⚪,Injured 15-Day
 DET,690544,Bailey Horn,P,Left elbow arthroscopy recovery,,⚪,Injured 60-Day
 DET,676428,Brant Hurter,P,Lumbar spine inflammation.,,🟡,Injured 60-Day
 DET,572143,Burch Smith,P,Right shoulder inflammation.,,🟡,Injured 60-Day
-DET,650402,Gleyber Torres,2B,Left oblique strain.,,🟡,Injured 10-Day
 DET,695549,Jackson Jobe,P,Recovering from Tommy John surgery,,🔴,Injured 60-Day
 DET,595879,Javier Báez,SS,Right ankle sprain.,,🟡,Injured 60-Day
 DET,434378,Justin Verlander,P,Left hip inflammation.,,🟡,Injured 60-Day
@@ -147,6 +146,7 @@ MIA,677053,Andrew Nardi,P,Left rib cage stress reaction.,,⚪,Injured 60-Day
 MIA,669622,Anthony Bender,P,Right shin stress reaction.,,⚪,Injured 15-Day
 MIA,667463,John King,P,Left lateral ankle sprain.,,🟡,Injured 15-Day
 MIA,694795,Josh Ekness,P,Right calf strain.,,🟡,Injured 60-Day
+MIA,676974,Max Meyer,P,Neck strain.,,🟡,Injured 15-Day
 MIA,683357,Owen Caissie,RF,Right calf strain.,,🟡,Injured 10-Day
 MIA,702281,Robby Snelling,P,Injured 60-Day,,⚪,Injured 60-Day
 MIA,678692,Ronny Henriquez,P,Right elbow surgery.,,🔴,Injured 60-Day
@@ -199,6 +199,7 @@ SD,592094,Jason Adam,P,Right shoulder strain,,🟡,Injured 15-Day
 SD,669093,Jeremiah Estrada,P,Right knee inflammation,,🟡,Injured 15-Day
 SD,605397,Joe Musgrove,P,Injured 60-Day,,⚪,Injured 60-Day
 SD,608337,Lucas Giolito,P,Right elbow inflammation.,,🟡,Injured 15-Day
+SD,609280,Miguel Andujar,DH,Right wrist fracture.,,🔴,Injured 10-Day
 SD,601713,Nick Pivetta,P,Right elbow inflammation.,,🟡,Injured 60-Day
 SD,657656,Ramón Laureano,LF,Injured 60-Day,,⚪,Injured 60-Day
 SD,669392,Samad Taylor,LF,Right oblique strain.,,🟡,Injured 10-Day
