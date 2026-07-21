@@ -27751,6 +27751,7 @@ function LegendButton() {
       'MatchupScore (0–100) — pitcher-adjusted vulnerability score for this specific batter/pitcher pairing.',
       '★ Barrel Signal — TrueHRScore ≥75 AND MatchupScore ≥60 AND simulated HR% ≥12%. Strict flag, live tracker: 16.9% HR rate.',
       '🎲 Longshot — TrueHRScore ≤55, MatchupScore ≥65, Sim TB ≥1.2, non-elite pitcher. Mutually exclusive with Barrel Signal by construction.',
+      '⭐⭐ / ⭐ Hand Match — batter\'s handedness exploits the opposing pitcher\'s weakness. ⭐⭐ (full): platoon advantage + pitcher genuinely weak vs that hand (elevated HR/HH/Barrel% allowed) + batter historically strong vs that hand. ⭐ (partial): cross-handed with strong pitch-mix fit (ps_convergence ≥8) even when the pitcher\'s overall vs-hand rates aren\'t clearly weak yet — e.g. a LHB who crushes fastballs matched against a fastball-heavy RHP.',
       '💥 Gone Yard / 2️⃣ 2+ TB Today badges and filters — same definitions as everywhere else in the app.',
       '🟢 Weak Spot row highlight — batter sitting in the opposing pitcher\'s historically weak lineup slot.',
     ] },
@@ -27760,7 +27761,7 @@ function LegendButton() {
       'MatchupScore (0–100) — pitcher-adjusted vulnerability, same concept as Barrel Lab\'s.',
       'SimTB2% — simulated probability of reaching 2+ total bases in the game.',
       '★ TB Signal — OnBaseScore ≥75 AND MatchupScore ≥60 AND SimTB2% ≥30%. Very new signal — live tracker: 38.0% hit rate, still a small sample.',
-      'Same 💥 / 2️⃣ / 🟢 Weak Spot badges and filters as Barrel Lab.',
+      'Same 💥 / 2️⃣ / 🟢 Weak Spot / ⭐⭐ Hand Match badges and filters as Barrel Lab.',
     ] },
     { tab:'📋 Track Record',   items:[
       'The self-auditing page — merges the daily All Matchups, Barrel Lab, and On Base exports against actual box-score outcomes, every day, automatically.',
@@ -31433,6 +31434,89 @@ function isLongshotBatter(r, trueHRScore, matchupScore) {
   return true;
 }
 
+// ── getHandMatchTier — "batter's hand exploits pitcher's hand weakness" ──────
+// Two-tier compound signal, e.g. Matt Olson (L) vs a fastball-heavy RHP who's
+// genuinely worse against LHB. Both source fields are engine-computed and
+// already exported to daily_picks.csv (matchup_engine.py ~line 3107-3320) —
+// no pipeline change needed.
+//   'full'    — hand_match_flag: platoon advantage (opposite-handed) AND the
+//               pitcher is genuinely weak vs this batter's hand (HR% >= 7%,
+//               HH% >= 44%, or Barrel% >= 10% allowed to that hand) AND the
+//               batter has hit that hand well historically (HR rate >= 6%).
+//   'partial' — platoon_adv_flag alone is too broad to badge on its own
+//               (~46% of all matchups are simply cross-handed) — folds in
+//               ps_convergence (the arsenal-weighted batter-vs-this-pitcher's-
+//               actual-pitch-mix score, by hand — the same "crushes fastball-
+//               heavy RHPs" signal PS Score's Phase 2C already computes) at
+//               >=8, which cuts the partial pool to ~8% of matchups: a real
+//               pitch-mix fit even when the pitcher's aggregate vs-hand rates
+//               aren't clearly bad yet.
+function getHandMatchTier(r) {
+  if (parseInt(r.hand_match_flag || 0) === 1) return 'full';
+  if (parseInt(r.platoon_adv_flag || 0) === 1 && parseFloat(r.ps_convergence || 0) >= 8) return 'partial';
+  return null;
+}
+
+// ── WeatherStrip — brief per-game weather reference for Barrel Lab / On Base ──
+// Neither tab showed weather anywhere before this (confirmed absent via grep).
+// Sourced directly from daily_picks.csv's own weather columns (temp_f,
+// wind_speed_mph, wind_effect, chance_of_rain, hr_factor_int) — the exact
+// values the engine already used to compute ps_score_v2 for these same rows,
+// so what's shown here always matches what fed the matchup scores. No live
+// per-team API call needed (that's what weather.js/WeatherGameCard is for on
+// the Game Day tab — this is a read of already-loaded batter rows).
+// hr_factor_int is the Phase 3 fix's pure integer park factor (100=neutral);
+// falls back to hr_factor*100 if a pipeline run predates that column.
+function WeatherStrip({ rows }) {
+  const games = React.useMemo(() => {
+    const byGid = {};
+    (rows || []).forEach(r => {
+      const gid = String(r.game_id || '');
+      if (!gid) return;
+      if (!byGid[gid]) {
+        const hrfRaw = r.hr_factor_int;
+        const hrf = (hrfRaw !== undefined && hrfRaw !== '' && !isNaN(parseFloat(hrfRaw)))
+          ? Math.round(parseFloat(hrfRaw))
+          : Math.round((parseFloat(r.hr_factor) || 1) * 100);
+        byGid[gid] = {
+          gid, teams: new Set(),
+          temp: parseFloat(r.temp_f || 0),
+          windMph: parseFloat(r.wind_speed_mph || 0),
+          windEffect: (r.wind_effect || '').replace(/[↙↖↘⬅⬇↗⬆️]/g, '').trim(),
+          rain: parseInt(r.chance_of_rain || 0),
+          hrf,
+        };
+      }
+      if (r.batting_team) byGid[gid].teams.add(r.batting_team);
+    });
+    return Object.values(byGid)
+      .map(g => ({ ...g, label: Array.from(g.teams).join('@') || '—' }))
+      .sort((a, b) => b.hrf - a.hrf);
+  }, [rows]);
+
+  if (!games.length) return null;
+
+  const hrfColor  = v => v >= 110 ? '#ff4020' : v >= 103 ? '#f5a623' : v <= 95 ? '#38b8f2' : 'var(--muted)';
+  const rainColor = v => v >= 50 ? '#38b8f2' : v >= 25 ? '#f5a623' : 'var(--muted)';
+
+  return (
+    <div style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:8,marginBottom:12}}>
+      {games.map(g => (
+        <div key={g.gid}
+          title={`${g.label} — ${g.temp ? g.temp.toFixed(0)+'°F' : '?'} · ${g.windEffect || 'calm'}${g.windMph ? ' '+g.windMph.toFixed(0)+'mph' : ''} · ${g.rain}% rain chance · HR factor ${g.hrf}`}
+          style={{flexShrink:0,padding:'4px 8px',borderRadius:6,background:'var(--surface2)',
+            border:'1px solid var(--border)',fontFamily:"'DM Mono',monospace",fontSize:8,whiteSpace:'nowrap'}}>
+          <span style={{color:'var(--text)',fontWeight:700}}>{g.label}</span>
+          {g.temp > 0 && <span style={{marginLeft:6,color:'var(--muted)'}}>{g.temp.toFixed(0)}°</span>}
+          {g.windEffect && <span style={{marginLeft:6,color:'var(--muted)'}}>{g.windEffect}</span>}
+          <span style={{marginLeft:6,color:rainColor(g.rain)}}>☔{g.rain}%</span>
+          <span style={{marginLeft:6,color:hrfColor(g.hrf),fontWeight:700}}>HRF {g.hrf}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function BarrelLabTab() {
   const mono = "'DM Mono',monospace";
   const osw  = "'Oswald',sans-serif";
@@ -31610,12 +31694,27 @@ function BarrelLabTab() {
     // Pass 2: normalize within each pitcher matchup group
     const withNormalized = normalizeWithinMatchup(withRaw);
     // Pass 3: barrel signal uses normalized trueHRScore
-    // Calibration correction (July 13, 2026 midseason analysis): Barrel Signal
-    // batters this season hit at 15.6% actual vs 23.2% SimHR%-implied (n=199) —
-    // a measured 0.67x ratio. Applied only to the GATE check below, not the
-    // displayed SimHR% column, since the calibration was measured on the
-    // flagged subset specifically, not the general population.
-    const SIM_HR_SUPPRESSION = 0.67;
+    // REVERTED (2026-07-21): the July 13 0.67x suppression below was
+    // calibrated against SimHR% as it was computed BEFORE the July 14
+    // barrelWorker.js fix (ISO-anchored floor for recent_hr_rate=0 cases +
+    // a diminishing-returns taper capping adjHRperFB at 0.20, replacing the
+    // old flat 0.45 ceiling). That July 14 fix already directly corrects
+    // the same overconfidence the 0.67x factor was invented to paper over —
+    // it compressed the real distribution's max from 52% (pre-fix) to 35%
+    // (post-fix, see barrel-lab-season-2026.csv 7/16-7/20). Stacking the
+    // old gate-level suppression on top of the new, already-corrected
+    // SimHR% double-counts the correction and over-rejects good candidates.
+    // Confirmed via tracker (post-All-Star-break, 7/16-7/20, n=214 batters
+    // clearing the TrueHR>=75 & Matchup>=60 score gates, joined to real
+    // Gone-Yard outcomes): current 0.67x gate → n=61, 8.2% hit rate (no
+    // lift over the 8.7% base rate — this is the "extremely poor" Barrel
+    // Signal rate reported this week). Raw simHRPct>=12.0 with NO
+    // suppression → n=141, 18.4% hit rate (2.1x lift, best of the options
+    // tested — 0.85x also tested at n=117/15.4%, monotonically worse as
+    // suppression increases). Reverting to 1.0 restores the gate to what
+    // it was checking for before July 13, now against a SimHR% that's
+    // actually been fixed at the source instead of patched at the gate.
+    const SIM_HR_SUPPRESSION = 1.0;
     return withNormalized.map(r => {
       const _plateIQ = computePlateIQ(r);
       return {
@@ -31625,6 +31724,7 @@ function BarrelLabTab() {
           r.matchupScore >= 60 &&
           r.simHRPct     != null && (r.simHRPct * SIM_HR_SUPPRESSION) >= 12.0,
         isLongshot: isLongshotBatter(r, r.trueHRScore, r.matchupScore),
+        handMatchTier: getHandMatchTier(r),
         isWeakSlot: (() => {
           const _ls = liveSlot(parseInt(r.batter_id||0), r.lineup_slot);
           return _ls > 0 && (r.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(_ls);
@@ -31660,6 +31760,12 @@ function BarrelLabTab() {
   const pbrlClr     = v => clr(v, 10, null, 6, null);
   const brlBipClr   = v => clr(v, 12, null, 7, null);
   const fmt         = (v, d=1) => v != null && !isNaN(parseFloat(v)) ? parseFloat(v).toFixed(d) : '—';
+  // Opposing pitcher grade color — same convention as SoCloseTab's pgCol.
+  // Uses the hand-specific grade (getHandSpecificGrade), matching what
+  // actually feeds TrueHRScore/MatchupScore via pitcherGradeMult(), not
+  // the hand-agnostic overall label — see Ben Rice case study (July 8-9).
+  const pgCol = g => !g ? 'var(--muted)' : g.includes('Target') ? '#27c97a' : g.includes('Hittable') ? '#60d360'
+    : g.includes('Elite') ? '#ff4020' : g.includes('Tough') ? '#f5a623' : 'var(--muted)';
 
   // Group by team for lineup boards
   const byTeam = useMemo(() => {
@@ -31699,6 +31805,13 @@ function BarrelLabTab() {
     { h:'Slot',       key:'lineup_slot',               acc: b => liveSlot(parseInt(b.batter_id||0), b.lineup_slot)||99,                              align:'left',  allOnly: false },
     { h:'Team',      key:'batting_team',               acc: b => (b.batting_team||'').toLowerCase(),                       align:'left',  allOnly: true  },
     { h:'Player',    key:'batter',                     acc: b => (b.batter||'').toLowerCase(),                            align:'left',  allOnly: false },
+    // Opposing pitcher + hand-specific grade — was computed (b.pitcher,
+    // getHandSpecificGrade) but never rendered in the default "All Games"
+    // flat table, only in the per-team header when a single game is
+    // selected. allOnly:true matches Team's own behavior — redundant once
+    // that header is already showing it.
+    { h:'Pitcher',   key:'pitcher',                    acc: b => (b.pitcher||'').toLowerCase(),                            align:'left',  allOnly: true  },
+    { h:'P.Grade',   key:'pgrade',                     acc: b => pitcherGradeMult(getHandSpecificGrade(b)),                align:'left',  allOnly: true  },
     { h:'IQ',        key:'plateIQ',                    acc: b => b.plateIQ ?? -1,                                         align:'right' },
     { h:'TrueHR',    key:'trueHRScore',                acc: b => b.trueHRScore||0,                                        align:'right' },
     { h:'Matchup',   key:'matchupScore',               acc: b => b.matchupScore||0,                                       align:'right' },
@@ -32029,6 +32142,8 @@ function BarrelLabTab() {
 
       {!simRunning && scoredBatters.length > 0 && (
         <>
+          <WeatherStrip rows={gameRows}/>
+
           {/* Top Reads — top 5 by TrueHR (signals first in all-games view) */}
           <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',
             textTransform:'uppercase',letterSpacing:.8,marginBottom:6}}>
@@ -32059,6 +32174,9 @@ function BarrelLabTab() {
                       <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>
                         {b.batting_team} · {b.batter_hand}v{(b.pitcher_hand||'').charAt(0)}
                       </div>
+                      <div style={{fontFamily:mono,fontSize:7,color:pgCol(getHandSpecificGrade(b)),whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                        vs {b.pitcher||'?'} · {getHandSpecificGrade(b) || '—'}
+                      </div>
                     </div>
                   </div>
                   <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:4,flexShrink:0,marginLeft:6}}>
@@ -32079,6 +32197,12 @@ function BarrelLabTab() {
                   <div style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'#a78bfa',
                     letterSpacing:.6,textTransform:'uppercase',marginBottom:4}}>
                     🎲 Longshot
+                  </div>
+                )}
+                {b.handMatchTier && (
+                  <div style={{fontFamily:mono,fontSize:8,color:'#fbbf24',marginBottom:4,
+                    opacity:b.handMatchTier==='full'?1:.75}}>
+                    {b.handMatchTier==='full' ? '⭐⭐ Hand Match' : '⭐ Partial Hand Match'}
                   </div>
                 )}
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px 10px',fontFamily:mono,fontSize:8}}>
@@ -32139,6 +32263,10 @@ function BarrelLabTab() {
                         }}>
                           <td style={{padding:'4px 6px',color:'var(--muted)'}}>{liveSlot(parseInt(b.batter_id||0), b.lineup_slot) || '—'}</td>
                           {!selGame && <td style={{padding:'4px 6px',color:'var(--muted)',fontFamily:mono,fontSize:8}}>{b.batting_team||'—'}</td>}
+                          {!selGame && <td style={{padding:'4px 6px',color:'var(--muted)',fontFamily:mono,fontSize:8,whiteSpace:'nowrap'}}>{b.pitcher||'—'}</td>}
+                          {!selGame && (() => { const _g = getHandSpecificGrade(b); return (
+                            <td style={{padding:'4px 6px',color:pgCol(_g),fontFamily:mono,fontSize:8,whiteSpace:'nowrap'}}>{_g || '—'}</td>
+                          ); })()}
                           <td className="sticky-batter" style={{padding:'4px 6px',whiteSpace:'nowrap',
                             background: b.isWeakSlot ? '#2f2e16' : b.isBarrelSignal ? '#171817' : 'var(--surface)'}}>
                             <div style={{display:'flex',alignItems:'center',gap:6}}>
@@ -32147,6 +32275,13 @@ function BarrelLabTab() {
                                 <span style={{color:'var(--text)'}}>
                                   {b.isBarrelSignal && <span style={{color:'var(--accent)',marginRight:2,fontWeight:900,fontSize:9}}>★</span>}
                                   {b.isLongshot && <span style={{color:'#a78bfa',marginRight:2,fontWeight:900,fontSize:9}}>🎲</span>}
+                                  {b.handMatchTier && <span
+                                    title={b.handMatchTier==='full'
+                                      ? `Hand Match — ${b.pitcher||'this pitcher'} (${(b.pitcher_hand||'?').charAt(0)}HP) is genuinely weak vs ${b.batter_hand||'?'}HB, and ${b.batter} has hit that hand well. Platoon + weakness compound.`
+                                      : `Partial Hand Match — cross-handed matchup with strong arsenal fit (ps_convergence=${fmt(b.ps_convergence,1)}${b.ps_conv_pitch ? ', best pitch: '+b.ps_conv_pitch : ''}) even though the pitcher's overall vs-hand rates aren't clearly weak yet.`}
+                                    style={{color:'#fbbf24',marginRight:2,fontWeight:900,fontSize:9,opacity:b.handMatchTier==='full'?1:.6}}>
+                                    {b.handMatchTier==='full' ? '⭐⭐' : '⭐'}
+                                  </span>}
                                   {b.batter}
                                 </span>
                                 {isGoneYardToday(parseInt(b.batter_id)||0, b.batter) && (
@@ -32460,6 +32595,7 @@ function OnBaseTab() {
           r.onBaseScore  >= 75 &&
           r.matchupScore >= 60 &&
           r.simTB2Pct != null && r.simTB2Pct >= 30.0,
+        handMatchTier: getHandMatchTier(r),
         isWeakSlot: (() => {
           const _ls = liveSlot(parseInt(r.batter_id||0), r.lineup_slot);
           return _ls > 0 && (r.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(_ls);
@@ -32521,11 +32657,21 @@ function OnBaseTab() {
   const slgClr  = v => v == null ? 'var(--muted)' : v >= 0.550 ? '#27c97a' : v >= 0.450 ? '#f5a623' : v < 0.300 ? '#ff6b6b' : 'var(--text)';
   const zfClr   = v => v == null ? 'var(--muted)' : v >= 7 ? '#27c97a' : v >= 4 ? '#f5a623' : 'var(--text)';
   const fmt     = (v, d=1) => v != null && !isNaN(parseFloat(v)) ? parseFloat(v).toFixed(d) : '—';
+  // Opposing pitcher grade color — mirrors BarrelLabTab's pgCol, uses the
+  // hand-specific grade that actually feeds onbase_groupB/computeOnBaseMatchupScore
+  // via pitcherGradeMult(), not the hand-agnostic overall label.
+  const pgCol = g => !g ? 'var(--muted)' : g.includes('Target') ? '#27c97a' : g.includes('Hittable') ? '#60d360'
+    : g.includes('Elite') ? '#ff4020' : g.includes('Tough') ? '#f5a623' : 'var(--muted)';
 
   const COLS = [
     { h:'Slot',      key:'lineup_slot',     acc: b => liveSlot(parseInt(b.batter_id||0), b.lineup_slot)||99,            align:'left',  allOnly:false },
     { h:'Team',      key:'batting_team',    acc: b => (b.batting_team||'').toLowerCase(),        align:'left',  allOnly:true  },
     { h:'Player',    key:'batter',          acc: b => (b.batter||'').toLowerCase(),              align:'left',  allOnly:false },
+    // Opposing pitcher + hand-specific grade — same rationale as BarrelLabTab's
+    // Pitcher/P.Grade columns: was computed but never shown in the default
+    // "All Games" flat table.
+    { h:'Pitcher',   key:'pitcher',         acc: b => (b.pitcher||'').toLowerCase(),             align:'left',  allOnly:true  },
+    { h:'P.Grade',   key:'pgrade',          acc: b => pitcherGradeMult(getHandSpecificGrade(b)),  align:'left',  allOnly:true  },
     { h:'IQ',        key:'plateIQ',         acc: b => b.plateIQ ?? -1,                           align:'right' },
     { h:'OnBase',    key:'onBaseScore',     acc: b => b.onBaseScore||0,                          align:'right' },
     { h:'Matchup',   key:'matchupScore',    acc: b => b.matchupScore||0,                         align:'right' },
@@ -32828,6 +32974,8 @@ function OnBaseTab() {
 
       {!simRunning && onbaseScored.length > 0 && (
         <>
+          <WeatherStrip rows={gameRows}/>
+
           {/* Top Reads */}
           <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',
             textTransform:'uppercase',letterSpacing:.8,marginBottom:6}}>
@@ -32854,6 +33002,9 @@ function OnBaseTab() {
                       <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>
                         {b.batting_team} · {b.batter_hand}v{(b.pitcher_hand||'').charAt(0)}
                       </div>
+                      <div style={{fontFamily:mono,fontSize:7,color:pgCol(getHandSpecificGrade(b)),whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                        vs {b.pitcher||'?'} · {getHandSpecificGrade(b) || '—'}
+                      </div>
                     </div>
                   </div>
                   <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:4,flexShrink:0,marginLeft:6}}>
@@ -32868,6 +33019,12 @@ function OnBaseTab() {
                 {b.isTBSignal && (
                   <div style={{fontFamily:mono,fontSize:8,color:'#38b8f2',marginBottom:6}}>
                     ★ TB Signal
+                  </div>
+                )}
+                {b.handMatchTier && (
+                  <div style={{fontFamily:mono,fontSize:8,color:'#fbbf24',marginBottom:6,
+                    opacity:b.handMatchTier==='full'?1:.75}}>
+                    {b.handMatchTier==='full' ? '⭐⭐ Hand Match' : '⭐ Partial Hand Match'}
                   </div>
                 )}
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px 10px',fontFamily:mono,fontSize:8}}>
@@ -32928,11 +33085,25 @@ function OnBaseTab() {
                         }}>
                           <td style={{padding:'4px 6px',color:'var(--muted)'}}>{liveSlot(parseInt(b.batter_id||0), b.lineup_slot) || '—'}</td>
                           {!selGame && <td style={{padding:'4px 6px',color:'var(--muted)',fontFamily:mono,fontSize:8}}>{b.batting_team||'—'}</td>}
+                          {!selGame && <td style={{padding:'4px 6px',color:'var(--muted)',fontFamily:mono,fontSize:8,whiteSpace:'nowrap'}}>{b.pitcher||'—'}</td>}
+                          {!selGame && (() => { const _g = getHandSpecificGrade(b); return (
+                            <td style={{padding:'4px 6px',color:pgCol(_g),fontFamily:mono,fontSize:8,whiteSpace:'nowrap'}}>{_g || '—'}</td>
+                          ); })()}
                           <td className="sticky-batter" style={{padding:'4px 6px',whiteSpace:'nowrap',
                             background: b.isWeakSlot ? '#2f2e16' : b.isTBSignal ? '#0f1a21' : 'var(--surface)'}}>
                             <div style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer'}} onClick={() => openBatter(b)}>
                               <PlayerAvatar pid={b.batter_id} name={b.batter} size={22}/>
-                              <span style={{color:'var(--text)'}}>{b.isTBSignal ? '★ ' : ''}{b.batter}</span>
+                              <span style={{color:'var(--text)'}}>
+                                {b.isTBSignal && <span style={{color:'#38b8f2',marginRight:2,fontWeight:900,fontSize:9}}>★</span>}
+                                {b.handMatchTier && <span
+                                  title={b.handMatchTier==='full'
+                                    ? `Hand Match — ${b.pitcher||'this pitcher'} (${(b.pitcher_hand||'?').charAt(0)}HP) is genuinely weak vs ${b.batter_hand||'?'}HB, and ${b.batter} has hit that hand well. Platoon + weakness compound.`
+                                    : `Partial Hand Match — cross-handed matchup with strong arsenal fit (ps_convergence=${fmt(b.ps_convergence,1)}${b.ps_conv_pitch ? ', best pitch: '+b.ps_conv_pitch : ''}) even though the pitcher's overall vs-hand rates aren't clearly weak yet.`}
+                                  style={{color:'#fbbf24',marginRight:2,fontWeight:900,fontSize:9,opacity:b.handMatchTier==='full'?1:.6}}>
+                                  {b.handMatchTier==='full' ? '⭐⭐' : '⭐'}
+                                </span>}
+                                {b.batter}
+                              </span>
                               {b.isGoneYard && (
                                 <div style={{padding:'2px 6px',borderRadius:4,flexShrink:0,
                                   background:'rgba(255,20,0,.25)',border:'1px solid rgba(255,20,0,.5)',

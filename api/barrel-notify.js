@@ -87,13 +87,19 @@ function serverMatchupScore(r) {
 }
 
 // sim_tb >= 1.5 is the server-safe proxy for SimHRRate% >= 12%
-// NOTE (July 13, 2026 calibration): the client-side gate (App.jsx BarrelLabTab)
-// now applies a measured 0.67x suppression to SimHR% before this same 12.0
-// threshold check, because Barrel Signal batters this season hit 15.6% actual
-// vs 23.2% sim-implied (n=199). This server-side sim_tb proxy was NOT
-// separately measured against actual outcomes, so it is left unchanged here
-// rather than guessing an equivalent adjustment — the two gates may now
-// diverge slightly until sim_tb's own accuracy is checked against the tracker.
+// NOTE (July 21, 2026): the client-side gate (App.jsx BarrelLabTab) briefly
+// applied a 0.67x suppression to SimHR% (July 13-21) before this same 12.0
+// threshold check, but that suppression was reverted July 21 — it stacked
+// on top of the July 14 barrelWorker.js fix (ISO floor + taper) which
+// already corrected the same overconfidence at the source, and the two
+// together over-rejected good candidates (confirmed: post-All-Star-break
+// tracker showed 8.2% hit rate with the stacked suppression vs 18.4% with
+// it removed, n=61 vs n=141). The client gate is back to a plain
+// simHRPct>=12.0 check, matching this server-side sim_tb>=1.5 proxy's own
+// intent. This proxy was never separately measured against actual outcomes
+// and is left unchanged here rather than guessing an adjustment — the two
+// gates may still diverge slightly until sim_tb's own accuracy is checked
+// against the tracker.
 function isBarrelSignal(r, trueHRScore, matchupScore) {
   return trueHRScore >= 75 && matchupScore >= 60
     && parseFloat(r.sim_tb || 0) >= 1.5;
