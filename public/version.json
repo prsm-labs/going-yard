@@ -1,9 +1,8 @@
 {
-  "version": "2026.07.20",
-  "bundleFile": "index-RcJoG-dg.js",
+  "version": "2026.07.22",
+  "bundleFile": "index-B_8bjgg6.js",
   "changelog": [
-    "Fix Live Close Calls false-positive on real HRs",
-    "add Plate IQ grades to Track Record"
+    "Add live Ball Carry tracker + Game/Batter/Pitcher ID plumbing"
   ],
   "notifyUsers": true
 }

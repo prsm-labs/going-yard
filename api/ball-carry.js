@@ -13,6 +13,23 @@
 // classifying) — this is what stops a high-altitude park like Coors
 // from reading as "juiced" on every single game purely from altitude.
 //
+// Direction (added 2026-07-22): also corrects for batted-ball direction
+// (Pull/Center/Oppo). Validated against the full 2026 AB log: Center
+// contact carries ~14-17ft farther than Pull or Oppo at the same EV+LA
+// (pure backspin vs. sidespin bleed-off from bat-ball collision angle)
+// — a real, physically-explicable effect. Without this term, a game's
+// small quality-contact sample (3-10 balls) landing unusually
+// center-heavy or pull/oppo-heavy by chance produces a false
+// DEAD/JUICED verdict unrelated to the ball. Confirmed this flips the
+// verdict on 68/1,168 games (5.8%) in the season-to-date validation —
+// a real, not cosmetic, correction. Direction is derived from
+// hitData.coordinates (MLB Gameday x/y landing spot) + the batter's
+// handedness (matchup.batSide.code) — both already in the live feed,
+// no extra API call needed. The coordinate-to-angle conversion was
+// empirically fit against 321 real batted balls cross-referenced
+// against the AB log's own Spray Angle (MAE 1.08 degrees) rather than
+// assumed from a public formula.
+//
 // CARRY_COEFFS / PARK_CARRY_BASELINE / thresholds below are a
 // periodically-refreshed SNAPSHOT (validated against the full 2026
 // season AB log, 2026-07-22 — see output/ball_carry_research/ and
@@ -20,26 +37,55 @@
 // ball_carry_tracker.py and update these constants by hand if the
 // printed reference values drift meaningfully as the season progresses.
 
-const CARRY_COEFFS = [-428.26623, 4.91685, 20.61916, -0.00624, -0.35935, 0.02836];
-// [intercept, EV, LA, EV^2, LA^2, EV*LA]
+const CARRY_COEFFS = [
+  -365.51703, 3.86136, 20.47412, -0.0009, -0.35831, 0.02915, -13.72599, -11.96359,
+];
+// [intercept, EV, LA, EV^2, LA^2, EV*LA, is_pull, is_oppo] — is_pull/is_oppo
+// are relative to Center (the implicit baseline when both are 0).
+
+// Direction band: Spray Angle (post-conversion, see sprayAngleFromCoords)
+// empirically centers on ~90 in the 2026 AB log (RHB mean 95.8, LHB mean
+// 81.7). +/-10 deg around 90 = "Center"; outside that band, which side
+// counts as "Pull" depends on batter hand.
+const CENTER_LO = 80, CENTER_HI = 100;
 
 // Home park -> that park's own seasonal mean carry deviation (ft), used
-// to park/altitude-adjust before classifying. Snapshot from 2026-07-22.
+// to park/altitude-adjust before classifying. Snapshot from 2026-07-22
+// (direction-corrected model).
 const PARK_CARRY_BASELINE = {
-  COL: 20.18, KC: 12.73, TEX: 11.59, ATH: 11.36, MIL: 9.61, AZ: 9.33,
-  TB: 8.67, SF: 8.56, MIA: 8.37, DET: 7.46, TOR: 7.37, ATL: 7.22,
-  PHI: 6.32, WSH: 6.16, STL: 4.70, BOS: 3.82, LAD: 3.80, SEA: 3.36,
-  MIN: 3.36, PIT: 3.29, CHC: 1.89, BAL: 1.46, NYY: 0.82, HOU: 0.81,
-  CIN: 0.24, CLE: 0.13, SD: -1.86, NYM: -1.95, CWS: -2.18, LAA: -2.23,
+  COL: 19.99, KC: 12.37, ATH: 11.04, TEX: 10.96, MIL: 9.46, AZ: 8.96,
+  TB: 8.81, SF: 8.55, MIA: 8.13, DET: 7.17, ATL: 6.81, TOR: 6.74,
+  PHI: 6.00, WSH: 5.90, STL: 4.48, LAD: 4.11, MIN: 3.66, BOS: 3.35,
+  PIT: 2.99, SEA: 2.81, CHC: 2.46, BAL: 1.60, HOU: 1.07, NYY: 0.62,
+  CLE: 0.45, CIN: 0.45, NYM: -1.23, SD: -1.60, CWS: -1.86, LAA: -2.43,
 };
 
-const DEAD_THRESHOLD_FT   = -12.1; // park-adjusted deviation <= this -> DEAD
-const JUICED_THRESHOLD_FT = 11.9;  // park-adjusted deviation >= this -> JUICED
+const DEAD_THRESHOLD_FT   = -11.8; // park-adjusted deviation <= this -> DEAD
+const JUICED_THRESHOLD_FT = 11.7;  // park-adjusted deviation >= this -> JUICED
 const MIN_BALLS_LIVE = 3;          // fewer than this -> not enough data yet
 
-function expectedCarry(ev, la) {
+function expectedCarry(ev, la, isPull, isOppo) {
   const c = CARRY_COEFFS;
-  return c[0] + c[1]*ev + c[2]*la + c[3]*ev*ev + c[4]*la*la + c[5]*ev*la;
+  return c[0] + c[1]*ev + c[2]*la + c[3]*ev*ev + c[4]*la*la + c[5]*ev*la
+       + c[6]*(isPull?1:0) + c[7]*(isOppo?1:0);
+}
+
+// MLB Gameday coordX/coordY (hitData.coordinates) -> Spray Angle, matching
+// the AB log's own precomputed Spray Angle convention. Empirically fit
+// 2026-07-22 against 321 real batted balls (coordinates cross-referenced
+// to the AB log by Play ID = `${gamePk}_${atBatIndex+1}`): MAE 1.08 deg.
+function sprayAngleFromCoords(coordX, coordY) {
+  const angleRaw = Math.atan2(coordX - 125, 203.5 - coordY) * (180 / Math.PI);
+  return -1.0754 * angleRaw + 90.1427;
+}
+
+// Pull / Center / Oppo from Spray Angle + batter handedness. Returns
+// 'Center' (neutral, zero adjustment) when inputs are missing.
+function classifyDirection(sprayAngle, batHand) {
+  if (sprayAngle == null || (batHand !== 'L' && batHand !== 'R')) return 'Center';
+  if (sprayAngle >= CENTER_LO && sprayAngle <= CENTER_HI) return 'Center';
+  if (batHand === 'R') return sprayAngle > CENTER_HI ? 'Pull' : 'Oppo';
+  return sprayAngle < CENTER_LO ? 'Pull' : 'Oppo';
 }
 
 export default async function handler(req, res) {
@@ -80,13 +126,22 @@ export default async function handler(req, res) {
       if (ev < 95 || la == null || la < 15 || la > 40 || dist < 200) continue;
       if (!['fly_ball', 'line_drive'].includes(traj)) continue;
 
-      const exp_dist = expectedCarry(ev, la);
+      const batHand = play.matchup?.batSide?.code || null;
+      const coords = hd.coordinates || {};
+      const sprayAngle = (coords.coordX != null && coords.coordY != null)
+        ? sprayAngleFromCoords(coords.coordX, coords.coordY) : null;
+      const direction = classifyDirection(sprayAngle, batHand);
+      const isPull = direction === 'Pull';
+      const isOppo = direction === 'Oppo';
+
+      const exp_dist = expectedCarry(ev, la, isPull, isOppo);
       balls.push({
         batter:    play.matchup?.batter?.fullName || '?',
         inning:    play.about?.inning || 0,
         ev, la, dist,
         exp_dist:  Math.round(exp_dist * 10) / 10,
         deviation: Math.round((dist - exp_dist) * 10) / 10,
+        direction,
         isHR:      play.result?.event === 'Home Run',
       });
     }

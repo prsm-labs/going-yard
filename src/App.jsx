@@ -7769,8 +7769,9 @@ function LiveThemesTab() {
 // Physics: with EV+LA held fixed, a ball's carry distance is predictable.
 // Actual distance deviating from that EV/LA-implied expectation is the
 // ball itself (COR/drag), not the swing. Deliberately does NOT weight
-// temperature/wind into the verdict (too noisy mid-game); elevation is
-// handled via each park's own seasonal baseline (server-side, see
+// temperature/wind into the verdict (too noisy mid-game); elevation and
+// batted-ball direction (Pull/Center/Oppo — Center carries ~14-17ft
+// farther at matched EV+LA) are both handled server-side (see
 // api/ball-carry.js). Weather shown below is context only.
 const CARRY_VERDICT_STYLE = {
   JUICED: { color: '#ff8020', label: '🔴 Ball carrying HOT',  bg: 'rgba(255,128,32,.08)'  },
@@ -7857,6 +7858,7 @@ function BallCarryCard({ game }) {
                   <span>Inn {b.inning}</span>
                   <span>{b.ev}mph / {b.la}°</span>
                   <span>{b.dist}ft (exp {b.exp_dist}ft)</span>
+                  {b.direction && <span style={{ opacity: 0.7 }}>{b.direction}</span>}
                   <span style={{ color: b.deviation >= 0 ? '#27c97a' : '#ff6b6b', fontWeight: 700 }}>
                     {b.deviation >= 0 ? '+' : ''}{b.deviation}ft
                   </span>
@@ -7880,6 +7882,7 @@ function BallCarryTab({ games }) {
         ['What is this?', 'Per-game "dead ball / juiced ball" detector. Holds Exit Velocity and Launch Angle fixed and compares actual batted-ball distance against what the physics says it should be — a ball flying meaningfully farther or shorter than EV+LA predict is a ball-construction signal, not a swing signal.'],
         ['What it does NOT use', 'Temperature and wind are NOT part of the verdict — weather shifts throughout a game and is too noisy at single-game granularity. They’re shown next to each card as context only.'],
         ['Elevation / park', 'Each park’s own seasonal average carry deviation is subtracted before classifying, so a high-altitude park (Coors) doesn’t read as "juiced" on every single game just from being at altitude.'],
+        ['Direction (Pull/Center/Oppo)', 'Also corrects for where the ball was hit. Center-field contact carries ~14-17ft farther than pulled or opposite-field contact at the same EV+LA (pure backspin vs. sidespin bleed-off) — a real physical effect, not noise. Without this, a handful of unusually center-heavy or pull-heavy balls in one game could fake a DEAD/JUICED reading. Shown per-ball in the expanded list below.'],
         ['Minimum sample', 'Needs at least 3 quality batted balls (EV≥95mph, LA 15–40°, fly ball/line drive) before showing a verdict.'],
       ]} onClose={() => setShowHelp(false)}/>}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
