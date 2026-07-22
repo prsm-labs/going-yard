@@ -27013,9 +27013,14 @@ function WindStreakField({ cfDir, windDeg, windSpeed, windDir, size=170 }) {
         </marker>
       </defs>
       <path d={outline} fill="#16324f" stroke="rgba(255,255,255,.25)" strokeWidth="1.5"/>
-      {/* Streak particles — clipped to the field outline, rotated to the true wind-relative angle */}
+      {/* Streak particles — clipped to the field outline, rotated to the true wind-relative angle.
+          Particles' own unrotated motion (translateY, top→bottom) already points "down" — i.e.
+          180° in the arrow's 0°=up convention below — so the group rotation needs a -180°
+          correction, or the streaks travel exactly opposite the arrow (confirmed bug: without
+          this offset, at streakAngle=0 the arrow points up but the un-corrected streaks still
+          fall straight down, 180° backwards). */}
       <g clipPath={`url(#${uid}c)`}>
-        <g transform={`rotate(${streakAngle} ${cx} ${cy})`}>
+        <g transform={`rotate(${streakAngle - 180} ${cx} ${cy})`}>
           {particles.map((p, i) => (
             <line key={i} x1={p.x} y1={-10} x2={p.x} y2={-10 + p.len}
               stroke="rgba(255,255,255,.85)" strokeWidth="1.4" strokeLinecap="round"
@@ -27075,49 +27080,33 @@ function LocationPopupContent({ g, w, display, hrScore }) {
     );
   }
 
-  // Hourly wind-trend strip — next 4 hourly slots from game time, small
-  // up/down arrow + mph per hour, same spirit as doinksports' hourly row.
-  const gameHour = parseGameHour(g.gameTime);
-  const trendHours = (gameHour != null && w.hourly)
-    ? w.hourly.filter(h => h.hour >= gameHour).slice(0, 4)
-    : [];
-
+  // Compact, roughly-square card (feedback 2026-07-22: the taller stacked
+  // layout with an hourly trend strip read as "one big rectangle" — dropped
+  // the trend strip and put the wind field beside the stats instead of
+  // above them, closer to a 4:3 shape at popup scale).
   return (
-    <div style={{fontFamily:mono, fontSize:11, minWidth:210, color:'#e2e8f0'}}>
+    <div style={{fontFamily:mono, fontSize:10, width:225, color:'#e2e8f0'}}>
       <TeamRow/>
-      <div style={{opacity:.7, marginBottom:6}}>{w.stadium}</div>
+      <div style={{opacity:.6, fontSize:9, marginBottom:6}}>{w.stadium}</div>
 
-      {trendHours.length > 0 && (
-        <div style={{display:'flex',gap:8,marginBottom:6,paddingBottom:5,borderBottom:'1px solid rgba(255,255,255,.1)'}}>
-          {trendHours.map((h, i) => {
-            const prevSpeed = i === 0 ? (display?.windSpeed ?? h.windSpeed) : trendHours[i-1].windSpeed;
-            const rising = h.windSpeed > prevSpeed;
-            return (
-              <div key={h.hour} style={{textAlign:'center',fontSize:9}}>
-                <div style={{opacity:.6}}>{fmtHour12(h.hour)}</div>
-                <div style={{color: rising ? '#ff8020' : '#38b8f2'}}>{rising ? '↑' : '↓'} {h.windSpeed}</div>
-              </div>
-            );
-          })}
+      <div style={{display:'flex', gap:8, alignItems:'flex-start'}}>
+        {display && (
+          <WindStreakField cfDir={w.cfDir} windDeg={display.windDeg} windSpeed={display.windSpeed} windDir={display.windDir} size={98}/>
+        )}
+        <div style={{flex:1, display:'flex', flexDirection:'column', gap:5, paddingTop:2}}>
+          {display && windBadge(display.windDir, display.windLabel)}
+          {display && (
+            <div style={{fontSize:9, lineHeight:1.7}}>
+              <div>{Math.round(display.temp)}°F · 💧{display.humidity ?? '—'}%</div>
+              <div>☔ {display.rainChance || 0}% rain</div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
-      {display && (
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:4,marginBottom:6,fontSize:9}}>
-          <div><div style={{opacity:.55}}>WIND</div><div style={{fontWeight:700}}>{display.windSpeed} mph</div></div>
-          <div><div style={{opacity:.55}}>TEMP</div><div style={{fontWeight:700}}>{Math.round(display.temp)}°F</div></div>
-          <div><div style={{opacity:.55}}>HUMIDITY</div><div style={{fontWeight:700}}>{display.humidity ?? '—'}%</div></div>
-        </div>
-      )}
-
-      {display && (
-        <div style={{display:'flex',flexDirection:'column',alignItems:'center',marginBottom:6}}>
-          <WindStreakField cfDir={w.cfDir} windDeg={display.windDeg} windSpeed={display.windSpeed} windDir={display.windDir} size={150}/>
-          <div style={{marginTop:2}}>{windBadge(display.windDir, display.windLabel)}</div>
-        </div>
-      )}
-
-      <div>☔ {display?.rainChance || 0}% rain · HR Env: {Math.round(hrScore)} · Park Factor: {w.parkFactorHR}</div>
+      <div style={{marginTop:6, paddingTop:5, borderTop:'1px solid rgba(255,255,255,.12)', fontSize:9, opacity:.85}}>
+        HR Env: {Math.round(hrScore)} · Park Factor: {w.parkFactorHR}
+      </div>
     </div>
   );
 }
@@ -27141,6 +27130,22 @@ function LocationMapTab({ games, weather }) {
       subdomains: 'abcd', maxZoom: 19,
     }).addTo(map);
     mapRef.current = map;
+    // Leaflet's default .leaflet-popup-content-wrapper/-tip are hardcoded
+    // white in leaflet.css — override once, globally, to match the app's
+    // dark theme instead of every popup showing a white card with light
+    // grey text.
+    if (!document.getElementById('gy-leaflet-dark-popup')) {
+      const popupStyle = document.createElement('style');
+      popupStyle.id = 'gy-leaflet-dark-popup';
+      popupStyle.textContent = `
+        .leaflet-popup-content-wrapper { background:#0f1720; color:#e2e8f0; border-radius:10px; box-shadow:0 4px 18px rgba(0,0,0,.5); }
+        .leaflet-popup-tip { background:#0f1720; box-shadow:none; }
+        .leaflet-popup-content { margin:10px 12px; }
+        .leaflet-popup-close-button { color:#94a3b8 !important; }
+        .leaflet-popup-close-button:hover { color:#e2e8f0 !important; }
+      `;
+      document.head.appendChild(popupStyle);
+    }
     setTimeout(() => map.invalidateSize(), 150); // guards against 0-size container on first mount
     return () => { map.remove(); mapRef.current = null; };
   }, []);
