@@ -147,6 +147,7 @@ export default async function handler(req, res) {
             batterId:    batter?.id,
             batterTeam:  isTop ? awayAbbr : homeAbbr,
             pitcherName: pitcher?.fullName || "Unknown",
+            pitcherId:   pitcher?.id,
             pitcherTeam: isTop ? homeAbbr  : awayAbbr,
             inning:      about.inning      || 0,
             halfInning:  about.halfInning  || "top",

@@ -7765,6 +7765,138 @@ function LiveThemesTab() {
   );
 }
 
+// ── Ball Carry — "Juiced or Dead?" live per-game tracker ──────────────────
+// Physics: with EV+LA held fixed, a ball's carry distance is predictable.
+// Actual distance deviating from that EV/LA-implied expectation is the
+// ball itself (COR/drag), not the swing. Deliberately does NOT weight
+// temperature/wind into the verdict (too noisy mid-game); elevation is
+// handled via each park's own seasonal baseline (server-side, see
+// api/ball-carry.js). Weather shown below is context only.
+const CARRY_VERDICT_STYLE = {
+  JUICED: { color: '#ff8020', label: '🔴 Ball carrying HOT',  bg: 'rgba(255,128,32,.08)'  },
+  DEAD:   { color: '#38b8f2', label: '🔵 Ball carrying DEAD', bg: 'rgba(56,184,242,.08)'   },
+  NORMAL: { color: '#27c97a', label: '✅ Ball carrying normal', bg: 'rgba(39,201,122,.06)' },
+};
+
+function BallCarryCard({ game }) {
+  const [data, setData]       = useState(null);
+  const [weather, setWeather] = useState(null);
+  const [expanded, setExpanded] = useState(false);
+  const gamePk = game.gamePk || game.id;
+
+  useEffect(() => {
+    let mounted = true;
+    async function poll() {
+      try {
+        const r = await fetch(`/api/ball-carry?gamePk=${gamePk}`);
+        const d = await r.json();
+        if (mounted) setData(d);
+      } catch (e) { /* silent — retry next interval */ }
+    }
+    poll();
+    const iv = setInterval(poll, 3 * 60 * 1000); // every 3 min, matches PROMPT_BallCarryTracker.md spec
+    return () => { mounted = false; clearInterval(iv); };
+  }, [gamePk]);
+
+  useEffect(() => {
+    let mounted = true;
+    const team = game.home?.abbr;
+    if (team && team !== '???') {
+      fetchWeather(team, game.gameTime).then(d => { if (mounted) setWeather(d); });
+    }
+    return () => { mounted = false; };
+  }, [game.home?.abbr, game.gameTime]);
+
+  const label = `${game.away?.abbr || '?'} @ ${game.home?.abbr || '?'}`;
+  const style = data?.verdict ? CARRY_VERDICT_STYLE[data.verdict] : null;
+  const wCur = weather?.current;
+
+  return (
+    <div style={{
+      border: `1px solid ${style ? style.color + '40' : 'var(--border)'}`,
+      background: style ? style.bg : 'var(--surface2)',
+      borderRadius: 10, padding: '10px 14px', marginBottom: 8,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 13 }}>{label}</span>
+          {game.status === 'Live' && <span style={{ fontSize: 9, color: '#e8411a', fontFamily: "'DM Mono',monospace", fontWeight: 700 }}>🔴 {game.inning || 'LIVE'}</span>}
+          {game.status === 'Final' && <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>FINAL</span>}
+        </div>
+        {/* Weather context ONLY — never feeds the verdict, see header note */}
+        {weather?.isDome
+          ? <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>🏟️ Dome</span>
+          : wCur && <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>
+              {wCur.temp != null ? `${Math.round(wCur.temp)}°F` : ''}{wCur.windLabel ? ` · ${wCur.windLabel}` : ''}
+            </span>}
+      </div>
+
+      {!data || data.status === 'insufficient_data' ? (
+        <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)', marginTop: 6 }}>
+          ⚾ Tracking… {data?.n != null ? `(${data.n}/3 quality batted balls so far)` : ''}
+        </div>
+      ) : (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
+            <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 11, fontWeight: 700, color: style?.color }}>{style?.label}</span>
+            <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)' }}>
+              park-adj {data.park_adj_deviation >= 0 ? '+' : ''}{data.park_adj_deviation}ft · raw {data.avg_deviation >= 0 ? '+' : ''}{data.avg_deviation}ft · n={data.n}
+            </span>
+            <button onClick={() => setExpanded(v => !v)}
+              style={{ marginLeft: 'auto', fontSize: 9, fontFamily: "'DM Mono',monospace", color: 'var(--muted)',
+                background: 'transparent', border: '1px solid var(--border)', borderRadius: 5, padding: '2px 8px', cursor: 'pointer' }}>
+              {expanded ? '▲ Hide balls' : '▼ Show balls'}
+            </button>
+          </div>
+          {expanded && (
+            <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 6 }}>
+              {data.balls.map((b, i) => (
+                <div key={i} style={{ display: 'flex', gap: 10, fontFamily: "'DM Mono',monospace", fontSize: 9,
+                  color: 'var(--muted)', padding: '2px 0' }}>
+                  <span style={{ width: 110, color: 'var(--text)', flexShrink: 0 }}>{b.batter}{b.isHR ? ' 💥' : ''}</span>
+                  <span>Inn {b.inning}</span>
+                  <span>{b.ev}mph / {b.la}°</span>
+                  <span>{b.dist}ft (exp {b.exp_dist}ft)</span>
+                  <span style={{ color: b.deviation >= 0 ? '#27c97a' : '#ff6b6b', fontWeight: 700 }}>
+                    {b.deviation >= 0 ? '+' : ''}{b.deviation}ft
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function BallCarryTab({ games }) {
+  const [showHelp, setShowHelp] = useState(false);
+  const started = (games || []).filter(g => g.status === 'Live' || g.status === 'Final');
+
+  return (
+    <div>
+      {showHelp && <HelpSlideout title="⚾ Ball Carry Guide" items={[
+        ['What is this?', 'Per-game "dead ball / juiced ball" detector. Holds Exit Velocity and Launch Angle fixed and compares actual batted-ball distance against what the physics says it should be — a ball flying meaningfully farther or shorter than EV+LA predict is a ball-construction signal, not a swing signal.'],
+        ['What it does NOT use', 'Temperature and wind are NOT part of the verdict — weather shifts throughout a game and is too noisy at single-game granularity. They’re shown next to each card as context only.'],
+        ['Elevation / park', 'Each park’s own seasonal average carry deviation is subtracted before classifying, so a high-altitude park (Coors) doesn’t read as "juiced" on every single game just from being at altitude.'],
+        ['Minimum sample', 'Needs at least 3 quality batted balls (EV≥95mph, LA 15–40°, fly ball/line drive) before showing a verdict.'],
+      ]} onClose={() => setShowHelp(false)}/>}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 14 }}>⚾ Ball Carry — Juiced or Dead?</span>
+        <HelpBtn onClick={() => setShowHelp(v => !v)}/>
+      </div>
+      {started.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 40, fontFamily: "'DM Mono',monospace", fontSize: 11, color: 'var(--muted)' }}>
+          No games in progress yet today — check back once first pitch happens.
+        </div>
+      ) : (
+        started.map(g => <BallCarryCard key={g.id} game={g}/>)
+      )}
+    </div>
+  );
+}
+
 function LiveTab() {
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -7879,11 +8011,12 @@ function LiveTab() {
       ['🎮 Live Games', "Score ticker for all today's games with live updates. Use the date picker to browse past game scores."],
       ['📋 Lineups', "Today's confirmed and projected batting orders for every team. Green = confirmed, yellow = projected. Tap any batter to open their stat slideout."],
       ['🔥 Themes', "Live HR pattern detection. Activates when 3+ home runs land today. Detects score clusters among batters who have gone yard and surfaces confirmed lineup matches with similar profiles — organized into cluster tables that update as more HRs land throughout the day."],
+      ['⚾ Ball Carry', "Per-game dead ball / juiced ball detector. Compares actual batted-ball distance against what EV+LA physics predict, park/elevation-adjusted. Does not use weather in the verdict — shown as context only."],
       ['📺 Watch button', "Opens MLB.tv for the selected game in a new tab. The ▾ arrow next to it reveals an embedded stream (best-effort, game dependent)."],
     ]} onClose={()=>setShowLiveHelp(false)}/>}
     <div style={{display:'flex',gap:5,marginBottom:12,alignItems:'center',flexWrap:'wrap',rowGap:6}}>
       <div style={{display:'flex',gap:4,padding:'3px',background:'var(--surface)',borderRadius:8,border:'1px solid var(--border)',flexWrap:'wrap',rowGap:4}}>
-      {[['gameday','Gameday'],['battracking','Bat Tracking'],['simlive','Live Sim'],['games','Live Games'],['lineups','Lineups'],['themes','Themes']].map(([key,label])=>(
+      {[['gameday','Gameday'],['battracking','Bat Tracking'],['simlive','Live Sim'],['games','Live Games'],['lineups','Lineups'],['themes','Themes'],['ballcarry','Ball Carry']].map(([key,label])=>(
         <button key={key} onClick={()=>setLiveView(key)}
           style={{padding:'5px 9px',borderRadius:6,cursor:'pointer',border:'none',
             fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,letterSpacing:.5,
@@ -7902,6 +8035,7 @@ function LiveTab() {
   {liveView==='lineups' && <LineupsView date={liveDate}/>}
   {liveView==='gameday' && <GamedayTab date={liveDate}/>}
   {liveView==='themes' && <LiveThemesTab/>}
+  {liveView==='ballcarry' && <BallCarryTab games={games}/>}
 
   {liveView==='games' && <>
 
@@ -12106,7 +12240,8 @@ function HRTrackerTab() {
   const exportHRCsv = () => {
     const dq = String.fromCharCode(34);
     const esc = v => dq + String(v==null?'':v).replace(new RegExp(dq,'g'), dq+dq) + dq;
-    const headers = ['Time','Team','Batter','HR#','Type','RBI','Inn','Angle','EV','Dist','Pitch','Pitcher','Game'];
+    const headers = ['Time','Team','Batter','HR#','Type','RBI','Inn','Angle','EV','Dist','Pitch','Pitcher','Game',
+      'Game ID','Batter ID','Pitcher ID'];
     const rows = sorted.map(h=>[
       h.timeET||'', h.batterTeam||'', h.batterName||'',
       hrRankMap[h.batterId+'_'+h.gamePk+'_'+(h.atBatIndex||h.playIndex||h.plateAppearance||0)]||'',
@@ -12114,7 +12249,9 @@ function HRTrackerTab() {
       (h.halfInning==='top'?'T':'B')+(h.inning||''),
       h.launchAngle||'', h.exitVelo||'', h.distance||'',
       h.pitchType||'', h.pitcherName||'',
-      (h.awayAbbr||'')+' @ '+(h.homeAbbr||'')
+      (h.awayAbbr||'')+' @ '+(h.homeAbbr||''),
+      // Hidden data-plumbing columns (not shown in-app) — join keys for Track Record / ball carry
+      h.gamePk||'', h.batterId||'', h.pitcherId||''
     ].map(esc).join(","));
     const csv = "\uFEFF" + headers.join(",") + "\n" + rows.join("\n");
     const a = document.createElement("a");
@@ -16545,7 +16682,8 @@ function SimLabView({ data }) {
                 'Wind','Temp','Condition',
                 'AB','H','HR','R','TB','RBI','BB','K','Avg EV','Launch Angle',
                 'Live Close Calls','Live CC Max EV','Live CC Max Dist',
-                'Plate IQ','IQ Grade','Zone Risk'];
+                'Plate IQ','IQ Grade','Zone Risk',
+                'Game ID','Batter ID','Pitcher ID'];
               const rows = slate.map(b => {
                 const bid = parseInt(b.batter_id) || 0;
                 const gy  = HR_DATA.some(h => h.batterId === bid ||
@@ -16599,6 +16737,8 @@ function SimLabView({ data }) {
                   (()=>{ const _piq=computePlateIQ(b); return _piq ?? ''; })(),
                   (()=>{ const _g=plateIQGrade(computePlateIQ(b)); return _g?.label||''; })(),
                   (()=>{ const _piq=computePlateIQ(b); return plateIQZoneRisk(b,_piq)?'YES':''; })(),
+                  // Hidden data-plumbing columns (not shown in-app) — join keys for Track Record / ball carry
+                  b.game_id || '', bid || '', parseInt(b.pitcher_id)||'',
                 ].map(esc).join(',');
               });
               const csv = bom + headers.map(esc).join(',') + '\n' + rows.join('\n');
@@ -24714,7 +24854,8 @@ function MatchupEngineTab() {
       'Recent FB%','Recent LA','BvP EV','BvP Barrel%','BvP FB%','BvP LA',
       'Sim H','Sim 2B','Sim BB','Sim K','Sim TB','Sim RBI',
       'Wind','Temp','Condition',
-      'AB','H','HR','R','TB','RBI','BB','K','Avg EV','Launch Angle'];
+      'AB','H','HR','R','TB','RBI','BB','K','Avg EV','Launch Angle',
+      'Game ID','Batter ID','Pitcher ID'];
     const esc = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
     const rows = activeData.map(b => {
       const bid = parseInt(b.batter_id) || 0;
@@ -24793,6 +24934,8 @@ function MatchupEngineTab() {
           if (_flg===7) s-=2; else if (_flg===1) s-=1;
           return Math.min(14, Math.max(0,s)); // cap at 14
         })(),
+        // Hidden data-plumbing columns (not shown in-app) — join keys for Track Record / ball carry
+        b.game_id || '', bid || '', parseInt(b.pitcher_id)||'',
       ].map(esc).join(',');
     });
     const csv = bom + headers.map(esc).join(',') + String.fromCharCode(10) + rows.join(String.fromCharCode(10));
@@ -28175,7 +28318,8 @@ function LegendButton() {
     ] },
     { tab:'📋 Track Record',   items:[
       'The self-auditing page — merges the daily All Matchups, Barrel Lab, and On Base exports against actual box-score outcomes, every day, automatically.',
-      'Filter buttons: HRs Only, ★ Barrel Signal Only, Key Matchup Only, 🟢 Weak Spot Only, 📍 Close Call Only, 🍯 Sauce 2.0 Only, 2️⃣ 2-Bagger (Non-HR) Only, 🎯 TB Signal Only, 🎲 Sim TB ≥2.0 Only, 🧠 Plate IQ Only, ⭐ Hand Match Only.',
+      'Filter buttons: HRs Only, ★ Barrel Signal Only, Key Matchup Only, 🟢 Weak Spot Only, 📍 Close Call Only, 🍯 Sauce 2.0 Only, 2️⃣ 2-Bagger (Non-HR) Only, 🎯 TB Signal Only, 🎲 Sim TB ≥2.0 Only, 🧠 Plate IQ Only, ⭐ Hand Match Only, 🔴 Juiced Ball Only, 🔵 Dead Ball Only.',
+      '⚾ Ball Carry column/filter: dead-ball / juiced-ball verdict for that game, joined by date+team from the Ball Carry tracker (Live tab). Park/elevation-adjusted, deliberately NOT weather-adjusted — see the Live tab\'s ⚾ Ball Carry guide.',
       'Hit-rate cards at the top of the page recompute live from real outcomes as each day\'s data comes in — the same numbers cited in the Sauce panel and this Legend, always current.',
       'Column groups are color-coded: Matchup Engine (red) · Barrel Lab (blue) · Box Score (green).',
       'For batters who went yard, the pitcher shown/graded is the ACTUAL pitcher who allowed the HR (with an SP/RP badge) — not just the pre-game probable starter.',
@@ -28326,6 +28470,7 @@ function TrackRecordTab() {
   const [showOnlySimTB2, setShowOnlySimTB2] = useState(false);
   const [showOnlyHighIQ, setShowOnlyHighIQ] = useState(false);
   const [showOnlyHandMatch, setShowOnlyHandMatch] = useState(false);
+  const [carryFilter,    setCarryFilter]    = useState(''); // '' | 'DEAD' | 'JUICED'
   const [teamFilter,     setTeamFilter]     = useState('ALL');
 
   const [showMatchup,  setShowMatchup]  = useState(true);
@@ -28339,12 +28484,13 @@ function TrackRecordTab() {
     async function loadTrackRecord() {
       setLoading(true);
       try {
-        const [amRes, blRes, idRes, hrRes, obRes] = await Promise.all([
+        const [amRes, blRes, idRes, hrRes, obRes, bcRes] = await Promise.all([
           fetch('/data/track-record-matchups.csv'),
           fetch('/data/track-record-barrel.csv'),
           fetch('/data/player_id.csv'),
           fetch('/data/track-record-hr.csv'),
           fetch('/data/track-record-onbase.csv'),
+          fetch('/data/track-record-ball-carry.csv'),
         ]);
 
         const amText = await amRes.text();
@@ -28352,12 +28498,32 @@ function TrackRecordTab() {
         const idText = idRes.ok ? await idRes.text() : '';
         const hrText = hrRes.ok ? await hrRes.text() : '';
         const obText = obRes.ok ? await obRes.text() : '';
+        const bcText = bcRes.ok ? await bcRes.text() : '';
 
         const amRows = parseCSV(amText);
         const blRows = blText ? parseCSV(blText) : [];
         const idRows = idText ? parseCSV(idText) : [];
         const hrRows = hrText ? parseCSV(hrText) : [];
         const obRows = obText ? parseCSV(obText) : [];
+        const bcRows = bcText ? parseCSV(bcText) : [];
+
+        // Ball carry lookup — keyed by date+team (matches EITHER the home or
+        // away team of that game), not Game ID, so it works uniformly for
+        // every historical export (none of which had a literal Game ID column
+        // before 2026-07-22) as well as going forward. See PROMPT_BallCarryTracker.md.
+        const carryLookup = {};
+        bcRows.forEach(r => {
+          const d = normDate(r.date || '');
+          if (!d) return;
+          const entry = {
+            verdict: (r.verdict || '').trim().toUpperCase(),
+            dev:     parseFloat(r.park_adj_deviation || 0),
+          };
+          const home = (r.home_team || '').trim().toUpperCase();
+          const away = (r.away_team || '').trim().toUpperCase();
+          if (home) carryLookup[`${d}_${home}`] = entry;
+          if (away) carryLookup[`${d}_${away}`] = entry;
+        });
 
         // Build Barrel Lab lookup: { 'YYYY-MM-DD_battername': row }
         const blLookup = {};
@@ -28422,6 +28588,7 @@ function TrackRecordTab() {
           const name  = (r.Batter || '').trim().toLowerCase();
           const blRow = blLookup[`${date}_${name}`] || {};
           const obRow = obLookup[`${date}_${name}`] || {};
+          const carryRow = carryLookup[`${date}_${(r.Team||'').trim().toUpperCase()}`] || null;
           const tbSignal = (obRow['TB Signal']||'').toString().trim() === '1';
           const pitcherNameRaw = r['vs Pitcher'] || blRow['Pitcher'] || '';
           const batterId  = resolveId(r.Batter, r.Team);
@@ -28537,6 +28704,10 @@ function TrackRecordTab() {
             closeCalls: parseInt(r['Live Close Calls'] || 0),
             ccMaxEV:    parseFloat(r['Live CC Max EV'] || 0),
             ccMaxDist:  parseFloat(r['Live CC Max Dist'] || 0),
+            // Ball carry (dead ball / juiced ball) — see PROMPT_BallCarryTracker.md,
+            // 2026-07-22. Park/elevation-adjusted; deliberately NOT weather-adjusted.
+            ballCarryVerdict: carryRow?.verdict || '',
+            ballCarryDev:     carryRow ? carryRow.dev : null,
           };
         });
 
@@ -28576,6 +28747,7 @@ function TrackRecordTab() {
     if (showOnlySimTB2) rows = rows.filter(r => r.simTB >= 2.0);
     if (showOnlyHighIQ) rows = rows.filter(r => r.plateIQ != null && r.plateIQ >= 56);
     if (showOnlyHandMatch) rows = rows.filter(r => r.isHandMatch);
+    if (carryFilter)    rows = rows.filter(r => r.ballCarryVerdict === carryFilter);
     if (search) {
       const q = search.toLowerCase();
       rows = rows.filter(r =>
@@ -28590,7 +28762,7 @@ function TrackRecordTab() {
       }
       return sortDir * ((av||0) - (bv||0));
     });
-  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, showOnlyWeakSlot, showOnlyCC, showOnlySauce2, showOnly2Bagger, showOnlyTBSignal, showOnlySimTB2, showOnlyHighIQ, showOnlyHandMatch, search, sortCol, sortDir]);
+  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, showOnlyWeakSlot, showOnlyCC, showOnlySauce2, showOnly2Bagger, showOnlyTBSignal, showOnlySimTB2, showOnlyHighIQ, showOnlyHandMatch, carryFilter, search, sortCol, sortDir]);
 
   const summary = useMemo(() => {
     const hrs          = dateRows.filter(r => r.wentYard);
@@ -28626,6 +28798,12 @@ function TrackRecordTab() {
     // to track here, same convention as Barrel Signal's own card.
     const handMatches    = dateRows.filter(r => r.isHandMatch);
     const handMatchHits  = handMatches.filter(r => r.wentYard);
+    // Ball carry (dead ball / juiced ball) — HR rate split, the direct
+    // validation question this whole feature exists to answer.
+    const deadGame       = dateRows.filter(r => r.ballCarryVerdict === 'DEAD');
+    const deadGameHits   = deadGame.filter(r => r.wentYard);
+    const juicedGame     = dateRows.filter(r => r.ballCarryVerdict === 'JUICED');
+    const juicedGameHits = juicedGame.filter(r => r.wentYard);
     const topYS        = [...dateRows].sort((a,b) => b.yardScore - a.yardScore)[0];
     const biggestMiss   = [...dateRows.filter(r => !r.wentYard)]
       .sort((a,b) => b.yardScore - a.yardScore)[0];
@@ -28633,7 +28811,8 @@ function TrackRecordTab() {
       .sort((a,b) => a.yardScore - b.yardScore)[0];
     return { hrs, signals, signalHits, keyMatchups, kmHits,
              longshots, lsHits, weakSlots, weakSlotHits, sauce2, sauce2Hits, twoBaggers, tbSignals, tbSignalHits, simTB2, simTB2Hits,
-             highIQBatters, highIQHRHits, highIQTB2Hits, handMatches, handMatchHits, topYS, biggestMiss, biggestUpset };
+             highIQBatters, highIQHRHits, highIQTB2Hits, handMatches, handMatchHits,
+             deadGame, deadGameHits, juicedGame, juicedGameHits, topYS, biggestMiss, biggestUpset };
   }, [dateRows]);
 
   const GroupBar = ({ label, open, onToggle, color }) => (
@@ -28819,6 +28998,22 @@ function TrackRecordTab() {
             sub: `${summary.handMatchHits.length}/${summary.handMatches.length}`,
             color:'#fbbf24'
           },
+          {
+            label:'🔴 JUICED-GAME HR RATE',
+            value: summary.juicedGame.length
+              ? `${((summary.juicedGameHits.length/summary.juicedGame.length)*100).toFixed(0)}%`
+              : '—',
+            sub: `${summary.juicedGameHits.length}/${summary.juicedGame.length}`,
+            color:'#ff8020'
+          },
+          {
+            label:'🔵 DEAD-GAME HR RATE',
+            value: summary.deadGame.length
+              ? `${((summary.deadGameHits.length/summary.deadGame.length)*100).toFixed(0)}%`
+              : '—',
+            sub: `${summary.deadGameHits.length}/${summary.deadGame.length}`,
+            color:'#38b8f2'
+          },
         ].map(card => (
           <div key={card.label} style={{
             background:'var(--surface2)', border:'1px solid var(--border)',
@@ -28974,6 +29169,24 @@ function TrackRecordTab() {
           ⭐ {showOnlyHandMatch ? 'Hand Match Only' : 'Hand Match'}
         </button>
 
+        <button onClick={() => setCarryFilter(v => v === 'JUICED' ? '' : 'JUICED')}
+          style={{padding:'4px 10px', borderRadius:6, border:'none',
+            cursor:'pointer', fontFamily:mono, fontSize:9, fontWeight:700,
+            background: carryFilter==='JUICED' ? 'rgba(255,128,32,.15)' : 'var(--surface2)',
+            color:       carryFilter==='JUICED' ? '#ff8020' : 'var(--muted)',
+            border: `1px solid ${carryFilter==='JUICED' ? 'rgba(255,128,32,.4)' : 'var(--border)'}` }}>
+          🔴 Juiced Ball Only
+        </button>
+
+        <button onClick={() => setCarryFilter(v => v === 'DEAD' ? '' : 'DEAD')}
+          style={{padding:'4px 10px', borderRadius:6, border:'none',
+            cursor:'pointer', fontFamily:mono, fontSize:9, fontWeight:700,
+            background: carryFilter==='DEAD' ? 'rgba(56,184,242,.15)' : 'var(--surface2)',
+            color:       carryFilter==='DEAD' ? '#38b8f2' : 'var(--muted)',
+            border: `1px solid ${carryFilter==='DEAD' ? 'rgba(56,184,242,.4)' : 'var(--border)'}` }}>
+          🔵 Dead Ball Only
+        </button>
+
         <button id="track-record-csv-trigger" onClick={() => {
             if (!filteredRows.length) return;
             const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
@@ -28985,7 +29198,7 @@ function TrackRecordTab() {
               'PulledBrl%','Brl/BIP','HR/FB','FB%','HH%',
               'Plate IQ','IQ Grade','Zone Risk','Hand Match',
               'Went Yard','HR','AB','H','TB','RBI','BB','K','Avg EV','Launch Angle',
-              'Live Close Calls','Live CC Max EV','Live CC Max Dist'];
+              'Live Close Calls','Live CC Max EV','Live CC Max Dist','Ball Carry'];
             const csvRows = [headers.map(esc).join(',')];
             filteredRows.forEach(r => {
               csvRows.push([
@@ -29004,7 +29217,7 @@ function TrackRecordTab() {
                 r.wentYard ? 'YES' : '', r.actualHR || 0, r.actualAB || 0, r.actualH || 0,
                 r.actualTB || 0, r.actualRBI || 0, r.actualBB || 0, r.actualK || 0,
                 r.actualEV || '', r.actualLA || '',
-                r.closeCalls || 0, r.ccMaxEV || '', r.ccMaxDist || '',
+                r.closeCalls || 0, r.ccMaxEV || '', r.ccMaxDist || '', r.ballCarryVerdict || '',
               ].map(esc).join(','));
             });
             const blob = new Blob(['﻿'+csvRows.join('\n')], {type:'text/csv;charset=utf-8;'});
@@ -29096,6 +29309,8 @@ function TrackRecordTab() {
                   <SortTh col="closeCalls" label="CC" color="#27c97a"/>
                   <SortTh col="ccMaxEV"   label="CC Max EV" color="#27c97a"/>
                   <SortTh col="ccMaxDist" label="CC Dist" color="#27c97a"/>
+                  <SortTh col="ballCarryVerdict" label="Ball Carry" color="#27c97a"
+                    title="Dead ball / juiced ball verdict for this game (park/elevation-adjusted, not weather-adjusted)"/>
                 </>}
               </tr>
             </thead>
@@ -29251,6 +29466,12 @@ function TrackRecordTab() {
                         textAlign:'center'}}>{r.ccMaxEV || '—'}</td>
                       <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
                         textAlign:'center'}}>{r.ccMaxDist || '—'}</td>
+                      <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
+                        textAlign:'center', fontWeight:700,
+                        color: r.ballCarryVerdict==='JUICED' ? '#ff8020' : r.ballCarryVerdict==='DEAD' ? '#38b8f2' : 'var(--muted)'}}
+                        title={r.ballCarryDev != null ? `park-adj deviation ${r.ballCarryDev>=0?'+':''}${r.ballCarryDev}ft` : ''}>
+                        {r.ballCarryVerdict==='JUICED' ? '🔴' : r.ballCarryVerdict==='DEAD' ? '🔵' : r.ballCarryVerdict==='NORMAL' ? '—' : ''}
+                      </td>
                     </>}
                   </tr>
                 );
@@ -32575,7 +32796,8 @@ function BarrelLabTab() {
                 const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
                 const f1 = v => (v != null && v !== '' && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(1) : '';
                 const f3 = v => (v != null && v !== '' && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(3) : '';
-                const hdrs = ['Slot','Team','Player','Pitcher','Grade','TrueHR','Matchup','ZF','Form (gHR)','SimHR%','ISO','xwOBA','PulledBrl%','Brl/BIP%','HR/FB%','FB%','HH%','LA°','Barrel Signal','Plate IQ','IQ Grade','Zone Risk','Hand Match'];
+                const hdrs = ['Slot','Team','Player','Pitcher','Grade','TrueHR','Matchup','ZF','Form (gHR)','SimHR%','ISO','xwOBA','PulledBrl%','Brl/BIP%','HR/FB%','FB%','HH%','LA°','Barrel Signal','Plate IQ','IQ Grade','Zone Risk','Hand Match',
+                  'Game ID','Batter ID','Pitcher ID'];
                 const csvRows = [hdrs.map(esc).join(',')];
                 rows.forEach(b => {
                   csvRows.push([
@@ -32602,6 +32824,8 @@ function BarrelLabTab() {
                     esc(b.plateIQGrade?.label || ''),
                     esc(b.zoneAttackRisk ? '1' : '0'),
                     esc(b.handMatchTier || ''),
+                    // Hidden data-plumbing columns (not shown in-app) — join keys for Track Record / ball carry
+                    esc(b.game_id||''), esc(parseInt(b.batter_id)||''), esc(parseInt(b.pitcher_id)||''),
                   ].join(','));
                 });
                 const a = document.createElement('a');
@@ -33451,7 +33675,8 @@ function OnBaseTab() {
                 const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
                 const f1 = v => (v != null && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(1) : '';
                 const f3 = v => (v != null && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(3) : '';
-                const hdrs = ['Slot','Team','Player','Pitcher','Grade','OnBaseScore','Matchup','ZF','G2TB%','SimTB2%','AVG','SLG','ISO','xwOBA','XBH%','HH%','SimTB','LA°','TB Signal','Plate IQ','IQ Grade','Zone Risk','Hand Match'];
+                const hdrs = ['Slot','Team','Player','Pitcher','Grade','OnBaseScore','Matchup','ZF','G2TB%','SimTB2%','AVG','SLG','ISO','xwOBA','XBH%','HH%','SimTB','LA°','TB Signal','Plate IQ','IQ Grade','Zone Risk','Hand Match',
+                  'Game ID','Batter ID','Pitcher ID'];
                 const csvRows = [hdrs.map(esc).join(',')];
                 rows.forEach(b => {
                   csvRows.push([
@@ -33478,6 +33703,8 @@ function OnBaseTab() {
                     esc(b.plateIQGrade?.label || ''),
                     esc(b.zoneAttackRisk ? '1' : '0'),
                     esc(b.handMatchTier || ''),
+                    // Hidden data-plumbing columns (not shown in-app) — join keys for Track Record / ball carry
+                    esc(b.game_id||''), esc(parseInt(b.batter_id)||''), esc(parseInt(b.pitcher_id)||''),
                   ].join(','));
                 });
                 const a = document.createElement('a');
