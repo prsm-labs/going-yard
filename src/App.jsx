@@ -31495,6 +31495,20 @@ function getHandMatchTier(r) {
 // just as weather-irrelevant as the home team's own batters.
 const DOME_TEAMS = new Set(['HOU','SEA','TEX','TOR','TB','MIA','MIL','AZ','ARI']);
 
+// ── isDomeGame — prefers the engine's own is_dome flag (2026-07-21,
+// mlb_weather_report.py DOME_TEAMS) once a pipeline run has populated it,
+// falling back to this file's own DOME_TEAMS list otherwise so dome
+// exclusion works immediately without waiting on a pipeline run. Checked
+// against r.home_team — the VENUE (not each batter's own team) determines
+// dome status, so an away batter visiting a dome park is just as
+// weather-irrelevant as the home team's own batters.
+function isDomeGame(r) {
+  if (r.is_dome !== undefined && r.is_dome !== '' && r.is_dome !== null) {
+    return r.is_dome === true || r.is_dome === 'True' || r.is_dome === 'true' || r.is_dome === 1 || r.is_dome === '1';
+  }
+  return DOME_TEAMS.has((r.home_team || '').toUpperCase());
+}
+
 // ── getRainRiskTier — game-time precipitation caution for Barrel Lab / On Base ──
 // Uses chance_of_rain_peak (2026-07-21 fix — max rain% across the game's
 // ~3hr window, not just the first-pitch hour) when the engine has populated
@@ -31511,7 +31525,7 @@ function getRainRiskPct(r) {
   return parseFloat(r.chance_of_rain || 0);
 }
 function getRainRiskTier(r) {
-  if (DOME_TEAMS.has((r.home_team || '').toUpperCase())) return null;
+  if (isDomeGame(r)) return null;
   const pct = getRainRiskPct(r);
   const thunder = /thunder/i.test(r.condition || '');
   if (pct >= 80 || thunder) return 'warning';
@@ -31553,6 +31567,11 @@ function WeatherStrip({ rows }) {
             ? parseInt(r.chance_of_rain_peak)
             : parseInt(r.chance_of_rain || 0),
           hrf,
+          // Dome games (2026-07-21) — temp/wind/rain are meaningless once
+          // the roof is closed, and the engine's forecast for them is real
+          // outdoor weather that doesn't apply. HR factor (park dimensions/
+          // elevation) is unaffected by roof status, so that still shows.
+          isDome: isDomeGame(r),
         };
       }
       if (r.batting_team) byGid[gid].teams.add(r.batting_team);
@@ -31571,13 +31590,19 @@ function WeatherStrip({ rows }) {
     <div style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:8,marginBottom:12}}>
       {games.map(g => (
         <div key={g.gid}
-          title={`${g.label} — ${g.temp ? g.temp.toFixed(0)+'°F' : '?'} · ${g.windEffect || 'calm'}${g.windMph ? ' '+g.windMph.toFixed(0)+'mph' : ''} · ${g.rain}% rain chance · HR factor ${g.hrf}`}
+          title={g.isDome
+            ? `${g.label} — 🏟️ Dome/retractable roof, forecast weather doesn't apply · HR factor ${g.hrf}`
+            : `${g.label} — ${g.temp ? g.temp.toFixed(0)+'°F' : '?'} · ${g.windEffect || 'calm'}${g.windMph ? ' '+g.windMph.toFixed(0)+'mph' : ''} · ${g.rain}% rain chance · HR factor ${g.hrf}`}
           style={{flexShrink:0,padding:'4px 8px',borderRadius:6,background:'var(--surface2)',
             border:'1px solid var(--border)',fontFamily:"'DM Mono',monospace",fontSize:8,whiteSpace:'nowrap'}}>
           <span style={{color:'var(--text)',fontWeight:700}}>{g.label}</span>
-          {g.temp > 0 && <span style={{marginLeft:6,color:'var(--muted)'}}>{g.temp.toFixed(0)}°</span>}
-          {g.windEffect && <span style={{marginLeft:6,color:'var(--muted)'}}>{g.windEffect}</span>}
-          <span style={{marginLeft:6,color:rainColor(g.rain)}}>☔{g.rain}%</span>
+          {g.isDome ? (
+            <span style={{marginLeft:6,color:'var(--muted)'}}>🏟️ Dome</span>
+          ) : (<>
+            {g.temp > 0 && <span style={{marginLeft:6,color:'var(--muted)'}}>{g.temp.toFixed(0)}°</span>}
+            {g.windEffect && <span style={{marginLeft:6,color:'var(--muted)'}}>{g.windEffect}</span>}
+            <span style={{marginLeft:6,color:rainColor(g.rain)}}>☔{g.rain}%</span>
+          </>)}
           <span style={{marginLeft:6,color:hrfColor(g.hrf),fontWeight:700}}>HRF {g.hrf}</span>
         </div>
       ))}
@@ -31610,6 +31635,7 @@ function BarrelLabTab() {
   const [blTB2Only,        setBlTB2Only]        = useState(false);
   const [blHighIQOnly,     setBlHighIQOnly]     = useState(false);
   const [blHandMatchOnly,  setBlHandMatchOnly]  = useState(false);
+  const [blBatterHand,     setBlBatterHand]     = useState('ALL');
 
   useEffect(() => {
     const unsub    = subscribeLineup(v => setLineupVer(v));
@@ -31812,8 +31838,9 @@ function BarrelLabTab() {
     .filter(r => !blTB2Only || is2BagBL(r))
     .filter(r => !blHighIQOnly || (r.plateIQ != null && r.plateIQ >= 56))
     .filter(r => !blHandMatchOnly || r.handMatchTier)
+    .filter(r => matchesHandFilter(r.batter_hand, blBatterHand))
     .sort((a, b) => b.trueHRScore - a.trueHRScore);
-  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, blPicksOnly, picks, blGoneYardOnly, blTB2Only, blHighIQOnly, blHandMatchOnly, hrVer, finalVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, blPicksOnly, picks, blGoneYardOnly, blTB2Only, blHighIQOnly, blHandMatchOnly, blBatterHand, hrVer, finalVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Color threshold helpers
   const clr = (v, g1, g2, y1, y2) => {
@@ -32090,6 +32117,7 @@ function BarrelLabTab() {
               }}>
               ⭐ {blHandMatchOnly ? 'Hand Match Only' : 'Hand Match'}
             </button>
+            <HandFilter mode="batter" value={blBatterHand} onChange={setBlBatterHand}/>
             <button
               disabled={simRunning}
               onClick={async () => {
@@ -32355,10 +32383,6 @@ function BarrelLabTab() {
                         }}>
                           <td style={{padding:'4px 6px',color:'var(--muted)'}}>{liveSlot(parseInt(b.batter_id||0), b.lineup_slot) || '—'}</td>
                           {!selGame && <td style={{padding:'4px 6px',color:'var(--muted)',fontFamily:mono,fontSize:8}}>{b.batting_team||'—'}</td>}
-                          {!selGame && <td style={{padding:'4px 6px',color:'var(--muted)',fontFamily:mono,fontSize:8,whiteSpace:'nowrap'}}>{b.pitcher||'—'}</td>}
-                          {!selGame && (() => { const _g = getHandSpecificGrade(b); return (
-                            <td style={{padding:'4px 6px',color:pgCol(_g),fontFamily:mono,fontSize:8,whiteSpace:'nowrap'}}>{_g || '—'}</td>
-                          ); })()}
                           <td className="sticky-batter" style={{padding:'4px 6px',whiteSpace:'nowrap',
                             background: b.isWeakSlot ? '#2f2e16' : b.isBarrelSignal ? '#171817' : b.rainRiskTier ? '#211a2e' : 'var(--surface)'}}>
                             <div style={{display:'flex',alignItems:'center',gap:6}}>
@@ -32397,6 +32421,10 @@ function BarrelLabTab() {
                               </div>
                             </div>
                           </td>
+                          {!selGame && <td style={{padding:'4px 6px',color:'var(--muted)',fontFamily:mono,fontSize:8,whiteSpace:'nowrap'}}>{b.pitcher||'—'}</td>}
+                          {!selGame && (() => { const _g = getHandSpecificGrade(b); return (
+                            <td style={{padding:'4px 6px',color:pgCol(_g),fontFamily:mono,fontSize:8,whiteSpace:'nowrap'}}>{_g || '—'}</td>
+                          ); })()}
                           <td style={{padding:'4px 6px',textAlign:'right'}}>
                             {b.plateIQGrade
                               ? <span
@@ -32558,6 +32586,7 @@ function OnBaseTab() {
   const [obTB2Only,        setObTB2Only]        = useState(false);
   const [obHighIQOnly,     setObHighIQOnly]     = useState(false);
   const [obHandMatchOnly,  setObHandMatchOnly]  = useState(false);
+  const [obBatterHand,     setObBatterHand]     = useState('ALL');
   const [hrVer, setHrVer] = useState(_HR_VER||0);
 
   useEffect(() => {
@@ -32713,8 +32742,9 @@ function OnBaseTab() {
     .filter(r => !obTB2Only || is2BagOB(r))
     .filter(r => !obHighIQOnly || (r.plateIQ != null && r.plateIQ >= 56))
     .filter(r => !obHandMatchOnly || r.handMatchTier)
+    .filter(r => matchesHandFilter(r.batter_hand, obBatterHand))
     .sort((a, b) => b.onBaseScore - a.onBaseScore);
-  }, [eligibleBatters, simResults, obHideFinal, obPicksOnly, obGoneYardOnly, obTB2Only, obHighIQOnly, obHandMatchOnly, picks, finalVer, hrVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [eligibleBatters, simResults, obHideFinal, obPicksOnly, obGoneYardOnly, obTB2Only, obHighIQOnly, obHandMatchOnly, obBatterHand, picks, finalVer, hrVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const byTeam = useMemo(() => {
     const teams = {};
@@ -32964,6 +32994,7 @@ function OnBaseTab() {
               }}>
               ⭐ {obHandMatchOnly ? 'Hand Match Only' : 'Hand Match'}
             </button>
+            <HandFilter mode="batter" value={obBatterHand} onChange={setObBatterHand}/>
             <button
               disabled={simRunning}
               onClick={async () => {
@@ -33206,10 +33237,6 @@ function OnBaseTab() {
                         }}>
                           <td style={{padding:'4px 6px',color:'var(--muted)'}}>{liveSlot(parseInt(b.batter_id||0), b.lineup_slot) || '—'}</td>
                           {!selGame && <td style={{padding:'4px 6px',color:'var(--muted)',fontFamily:mono,fontSize:8}}>{b.batting_team||'—'}</td>}
-                          {!selGame && <td style={{padding:'4px 6px',color:'var(--muted)',fontFamily:mono,fontSize:8,whiteSpace:'nowrap'}}>{b.pitcher||'—'}</td>}
-                          {!selGame && (() => { const _g = getHandSpecificGrade(b); return (
-                            <td style={{padding:'4px 6px',color:pgCol(_g),fontFamily:mono,fontSize:8,whiteSpace:'nowrap'}}>{_g || '—'}</td>
-                          ); })()}
                           <td className="sticky-batter" style={{padding:'4px 6px',whiteSpace:'nowrap',
                             background: b.isWeakSlot ? '#2f2e16' : b.isTBSignal ? '#0f1a21' : b.rainRiskTier ? '#211a2e' : 'var(--surface)'}}>
                             <div style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer'}} onClick={() => openBatter(b)}>
@@ -33245,6 +33272,10 @@ function OnBaseTab() {
                               {fin && <span style={{fontSize:7,color:'var(--muted)',border:'1px solid var(--border)',borderRadius:3,padding:'1px 3px'}}>FINAL</span>}
                             </div>
                           </td>
+                          {!selGame && <td style={{padding:'4px 6px',color:'var(--muted)',fontFamily:mono,fontSize:8,whiteSpace:'nowrap'}}>{b.pitcher||'—'}</td>}
+                          {!selGame && (() => { const _g = getHandSpecificGrade(b); return (
+                            <td style={{padding:'4px 6px',color:pgCol(_g),fontFamily:mono,fontSize:8,whiteSpace:'nowrap'}}>{_g || '—'}</td>
+                          ); })()}
                           <td style={{padding:'4px 6px',textAlign:'right'}}>
                             {b.plateIQGrade
                               ? <span
