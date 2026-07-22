@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import ReactDOM from "react-dom";
 import { UserButton, SignedIn, SignedOut, SignInButton, useAuth, useClerk } from "@clerk/clerk-react";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 
 // Global ref so non-React functions (setPick) can trigger cloud saves
 let _GLOBAL_GET_TOKEN = null;
@@ -26898,6 +26900,154 @@ function WeatherGameCard({ g, wd }) {
   );
 }
 
+// ── RADAR_FRAMES — IEM NEXRAD CONUS mosaic, oldest→newest (2026-07-21) ───────
+// Iowa Environmental Mesonet redistributes public-domain NOAA NEXRAD data via
+// a WMS service with AccessConstraints:None (confirmed via GetCapabilities) —
+// unlike RainViewer's free API, this has no personal/educational-use
+// restriction, so it's safe for an actively-used app. The "-mXXm" layer names
+// are pre-rendered snapshots from X minutes ago — requesting each one once
+// gives a real animation sequence with zero extra work (no WMS TIME
+// dimension juggling needed). Web Mercator projection (900913 = EPSG:3857)
+// matches Leaflet's default CRS directly.
+const RADAR_WMS_URL = 'https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0r.cgi';
+const RADAR_FRAMES = [
+  { layer: 'nexrad-n0r-900913-m50m', label: '-50m' },
+  { layer: 'nexrad-n0r-900913-m45m', label: '-45m' },
+  { layer: 'nexrad-n0r-900913-m40m', label: '-40m' },
+  { layer: 'nexrad-n0r-900913-m35m', label: '-35m' },
+  { layer: 'nexrad-n0r-900913-m30m', label: '-30m' },
+  { layer: 'nexrad-n0r-900913-m25m', label: '-25m' },
+  { layer: 'nexrad-n0r-900913-m20m', label: '-20m' },
+  { layer: 'nexrad-n0r-900913-m15m', label: '-15m' },
+  { layer: 'nexrad-n0r-900913-m10m', label: '-10m' },
+  { layer: 'nexrad-n0r-900913-m05m', label: '-5m' },
+  { layer: 'nexrad-n0r-900913',      label: 'Now' },
+];
+
+// ── LocationMapTab — national precipitation radar + today's matchup pins ────
+// Dark Leaflet map (CartoDB dark_all basemap, free/no-key) with the animated
+// NOAA radar mosaic overlaid and a marker at every team hosting a game today
+// (lat/lon now returned by /api/weather — see that file's 2026-07-21 change).
+// Hover a marker (desktop) or tap it (mobile, via Leaflet's default
+// bindPopup click behavior) for that game's temp/wind/rain/park data — reuses
+// the same weather.js payload WeatherGameCard already displays, no new fetch.
+// Pure Leaflet (imperative, via refs) rather than react-leaflet — this file
+// already has no React map-library dependency, and one library is enough.
+function LocationMapTab({ games, weather }) {
+  const mapDivRef   = useRef(null);
+  const mapRef      = useRef(null);
+  const radarLayerRef = useRef(null);
+  const markersRef  = useRef([]);
+  const [frameIdx, setFrameIdx] = useState(RADAR_FRAMES.length - 1); // start on "Now"
+  const [playing,  setPlaying]  = useState(true);
+
+  // Init map once
+  useEffect(() => {
+    if (mapRef.current || !mapDivRef.current) return;
+    const map = L.map(mapDivRef.current, {
+      center: [39.5, -98.0], zoom: 4, minZoom: 3, maxZoom: 9,
+    });
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+      subdomains: 'abcd', maxZoom: 19,
+    }).addTo(map);
+    mapRef.current = map;
+    setTimeout(() => map.invalidateSize(), 150); // guards against 0-size container on first mount
+    return () => { map.remove(); mapRef.current = null; };
+  }, []);
+
+  // Swap radar frame
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (radarLayerRef.current) map.removeLayer(radarLayerRef.current);
+    const layer = L.tileLayer.wms(RADAR_WMS_URL, {
+      layers: RADAR_FRAMES[frameIdx].layer, format: 'image/png',
+      transparent: true, opacity: 0.55,
+      attribution: 'Radar: Iowa Environmental Mesonet / NOAA NEXRAD',
+    }).addTo(map);
+    radarLayerRef.current = layer;
+  }, [frameIdx]);
+
+  // Animation loop
+  useEffect(() => {
+    if (!playing) return;
+    const id = setInterval(() => setFrameIdx(i => (i + 1) % RADAR_FRAMES.length), 700);
+    return () => clearInterval(id);
+  }, [playing]);
+
+  // Matchup markers — one per unique home team playing today
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    markersRef.current.forEach(m => map.removeLayer(m));
+    markersRef.current = [];
+
+    const seen = new Set();
+    (games || []).forEach(g => {
+      const homeAbbr = g.home?.abbr;
+      const w = weather[homeAbbr];
+      if (!homeAbbr || seen.has(homeAbbr) || !w || w.lat == null || w.lon == null) return;
+      seen.add(homeAbbr);
+
+      const gameHour = parseGameHour(g.gameTime);
+      const gtSlot   = gameHour != null ? (w.hourly || []).find(h => h.hour === gameHour) : null;
+      const display  = gtSlot || w.current;
+      const hrScore  = display?.hrEnvScore ?? 50;
+      const dotColor = hrScore >= 80 ? '#ff4020' : hrScore >= 60 ? '#f5a623' : hrScore >= 40 ? '#38b8f2' : '#60a0d0';
+
+      const icon = L.divIcon({
+        className: '',
+        html: `<div style="background:${dotColor};color:#fff;border-radius:50%;width:34px;height:34px;
+          display:flex;align-items:center;justify-content:center;font-family:'DM Mono',monospace;
+          font-weight:800;font-size:10px;border:2px solid rgba(255,255,255,.85);
+          box-shadow:0 0 8px rgba(0,0,0,.6);">${homeAbbr}</div>`,
+        iconSize: [34, 34], iconAnchor: [17, 17], popupAnchor: [0, -20],
+      });
+
+      const popupHtml = w.isDome
+        ? `<div style="font-family:'DM Mono',monospace;font-size:11px;min-width:150px;">
+             <b>${g.away?.abbr || '?'} @ ${homeAbbr}</b><br/>${w.stadium}<br/>
+             🏟️ Dome — weather N/A<br/>Park HR Factor: ${w.parkFactorHR}</div>`
+        : `<div style="font-family:'DM Mono',monospace;font-size:11px;min-width:170px;">
+             <b>${g.away?.abbr || '?'} @ ${homeAbbr}</b><br/>${w.stadium}<br/>
+             ${display ? `${Math.round(display.temp)}°F · ${display.windLabel || 'calm'}<br/>
+             ☔ ${display.rainChance || 0}% rain<br/>` : ''}
+             HR Env: ${Math.round(hrScore)} · Park Factor: ${w.parkFactorHR}
+           </div>`;
+
+      const marker = L.marker([w.lat, w.lon], { icon }).addTo(map).bindPopup(popupHtml);
+      marker.on('mouseover', () => marker.openPopup());
+      marker.on('mouseout',  () => marker.closePopup());
+      markersRef.current.push(marker);
+    });
+  }, [games, weather]);
+
+  return (
+    <div>
+      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10,flexWrap:'wrap'}}>
+        <button onClick={() => setPlaying(p => !p)}
+          style={{padding:'5px 12px',borderRadius:6,border:'1px solid var(--border)',
+            background:'var(--surface2)',color:'var(--text)',cursor:'pointer',
+            fontFamily:"'DM Mono',monospace",fontSize:11}}>
+          {playing ? '⏸ Pause' : '▶ Play'}
+        </button>
+        <input type="range" min={0} max={RADAR_FRAMES.length - 1} value={frameIdx}
+          onChange={e => { setPlaying(false); setFrameIdx(parseInt(e.target.value)); }}
+          style={{flex:'1 1 160px',minWidth:120,maxWidth:280}}/>
+        <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--muted)',minWidth:36}}>
+          {RADAR_FRAMES[frameIdx].label}
+        </span>
+        <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',opacity:.7}}>
+          Radar: NOAA NEXRAD via Iowa Environmental Mesonet
+        </span>
+      </div>
+      <div ref={mapDivRef} style={{height:560,borderRadius:10,overflow:'hidden',
+        border:'1px solid var(--border)',background:'#0a0e14'}}/>
+    </div>
+  );
+}
+
 function WeatherTab() {
   const [games,   setGames]   = useState([]);
   const [weather, setWeather] = useState({});
@@ -27013,8 +27163,9 @@ function WeatherTab() {
       </div>
 
       <div style={{display:'flex',gap:6,marginBottom:16,padding:'4px',background:'var(--surface)',borderRadius:9,border:'1px solid var(--border)',width:'fit-content'}}>
-        <button style={stBtn('weather')} onClick={()=>setSubTab('weather')}>🌤️ Game Day</button>
-        <button style={stBtn('parks')}   onClick={()=>setSubTab('parks')}>🏟️ Park Factors</button>
+        <button style={stBtn('weather')}  onClick={()=>setSubTab('weather')}>🌤️ Game Day</button>
+        <button style={stBtn('parks')}    onClick={()=>setSubTab('parks')}>🏟️ Park Factors</button>
+        <button style={stBtn('location')} onClick={()=>setSubTab('location')}>📍 Location</button>
       </div>
 
       {subTab==='weather' && (loading
@@ -27258,6 +27409,12 @@ function WeatherTab() {
           )}
         </div>
       )}
+
+      {subTab==='location' && (loading
+        ? <div className="lw"><div className="sp"/><div className="lt">Loading weather…</div></div>
+        : games.length===0
+        ? <div style={{padding:'60px 20px',textAlign:'center',color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:13}}>No games today.</div>
+        : <LocationMapTab games={games} weather={weather}/>)}
     </div>
   );
 }
@@ -27787,7 +27944,7 @@ function LegendButton() {
     ] },
     { tab:'📋 Track Record',   items:[
       'The self-auditing page — merges the daily All Matchups, Barrel Lab, and On Base exports against actual box-score outcomes, every day, automatically.',
-      'Filter buttons: HRs Only, ★ Barrel Signal Only, Key Matchup Only, 🟢 Weak Spot Only, 📍 Close Call Only, 🍯 Sauce 2.0 Only, 2️⃣ 2-Bagger (Non-HR) Only, 🎯 TB Signal Only, 🎲 Sim TB ≥2.0 Only.',
+      'Filter buttons: HRs Only, ★ Barrel Signal Only, Key Matchup Only, 🟢 Weak Spot Only, 📍 Close Call Only, 🍯 Sauce 2.0 Only, 2️⃣ 2-Bagger (Non-HR) Only, 🎯 TB Signal Only, 🎲 Sim TB ≥2.0 Only, 🧠 Plate IQ Only, ⭐ Hand Match Only.',
       'Hit-rate cards at the top of the page recompute live from real outcomes as each day\'s data comes in — the same numbers cited in the Sauce panel and this Legend, always current.',
       'Column groups are color-coded: Matchup Engine (red) · Barrel Lab (blue) · Box Score (green).',
       'For batters who went yard, the pitcher shown/graded is the ACTUAL pitcher who allowed the HR (with an SP/RP badge) — not just the pre-game probable starter.',
@@ -27937,6 +28094,7 @@ function TrackRecordTab() {
   const [showOnlyTBSignal, setShowOnlyTBSignal] = useState(false);
   const [showOnlySimTB2, setShowOnlySimTB2] = useState(false);
   const [showOnlyHighIQ, setShowOnlyHighIQ] = useState(false);
+  const [showOnlyHandMatch, setShowOnlyHandMatch] = useState(false);
   const [teamFilter,     setTeamFilter]     = useState('ALL');
 
   const [showMatchup,  setShowMatchup]  = useState(true);
@@ -28080,6 +28238,15 @@ function TrackRecordTab() {
           const plateIQ = (_piqRaw !== undefined && _piqRaw !== '' && !isNaN(parseFloat(_piqRaw)))
             ? parseFloat(_piqRaw) : null;
 
+          // Hand Match (⭐⭐/⭐ badge, added 2026-07-21) — exported from both
+          // Barrel Lab and On Base (same underlying engine fields, so either
+          // source agrees for a given batter+date); prefer Barrel Lab's since
+          // it's the longer-running export. Stored as the tier string itself
+          // ('full'/'partial'/blank), not a boolean, so the filter/card below
+          // can distinguish the two strengths if useful later.
+          const handMatchTier = (blRow['Hand Match'] || obRow['Hand Match'] || '').toString().trim().toLowerCase();
+          const isHandMatch = handMatchTier === 'full' || handMatchTier === 'partial';
+
           return {
             date,
             batter:       r['Batter']         || '',
@@ -28123,6 +28290,7 @@ function TrackRecordTab() {
             trueHR, matchup, simHRPct, brlSignal, isLongshot,
             plateIQ, plateIQGrade: plateIQGrade(plateIQ),
             zoneAttackRisk: (r['Zone Risk']||'').toString().trim().toUpperCase() === 'YES',
+            handMatchTier, isHandMatch,
             pulledBrl: parseFloat(blRow['PulledBrl%'] || 0),
             brlBIP:    parseFloat(blRow['Brl/BIP%']   || 0),
             hrFB:      parseFloat(blRow['HR/FB%']      || 0),
@@ -28176,6 +28344,7 @@ function TrackRecordTab() {
     if (showOnlyTBSignal) rows = rows.filter(r => r.tbSignal);
     if (showOnlySimTB2) rows = rows.filter(r => r.simTB >= 2.0);
     if (showOnlyHighIQ) rows = rows.filter(r => r.plateIQ != null && r.plateIQ >= 56);
+    if (showOnlyHandMatch) rows = rows.filter(r => r.isHandMatch);
     if (search) {
       const q = search.toLowerCase();
       rows = rows.filter(r =>
@@ -28190,7 +28359,7 @@ function TrackRecordTab() {
       }
       return sortDir * ((av||0) - (bv||0));
     });
-  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, showOnlyWeakSlot, showOnlyCC, showOnlySauce2, showOnly2Bagger, showOnlyTBSignal, showOnlySimTB2, showOnlyHighIQ, search, sortCol, sortDir]);
+  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, showOnlyWeakSlot, showOnlyCC, showOnlySauce2, showOnly2Bagger, showOnlyTBSignal, showOnlySimTB2, showOnlyHighIQ, showOnlyHandMatch, search, sortCol, sortDir]);
 
   const summary = useMemo(() => {
     const hrs          = dateRows.filter(r => r.wentYard);
@@ -28220,6 +28389,12 @@ function TrackRecordTab() {
     const highIQBatters  = dateRows.filter(r => r.plateIQ != null && r.plateIQ >= 56);
     const highIQHRHits   = highIQBatters.filter(r => r.wentYard);
     const highIQTB2Hits  = highIQBatters.filter(r => r.hitTB2);
+    // Hand Match (⭐⭐/⭐ badge, Barrel Lab + On Base) — the underlying
+    // engine flag is defined in HR-rate terms (pitcher-weak-to-hand/batter-
+    // strong-to-hand both use HR% thresholds), so HR is the natural outcome
+    // to track here, same convention as Barrel Signal's own card.
+    const handMatches    = dateRows.filter(r => r.isHandMatch);
+    const handMatchHits  = handMatches.filter(r => r.wentYard);
     const topYS        = [...dateRows].sort((a,b) => b.yardScore - a.yardScore)[0];
     const biggestMiss   = [...dateRows.filter(r => !r.wentYard)]
       .sort((a,b) => b.yardScore - a.yardScore)[0];
@@ -28227,7 +28402,7 @@ function TrackRecordTab() {
       .sort((a,b) => a.yardScore - b.yardScore)[0];
     return { hrs, signals, signalHits, keyMatchups, kmHits,
              longshots, lsHits, weakSlots, weakSlotHits, sauce2, sauce2Hits, twoBaggers, tbSignals, tbSignalHits, simTB2, simTB2Hits,
-             highIQBatters, highIQHRHits, highIQTB2Hits, topYS, biggestMiss, biggestUpset };
+             highIQBatters, highIQHRHits, highIQTB2Hits, handMatches, handMatchHits, topYS, biggestMiss, biggestUpset };
   }, [dateRows]);
 
   const GroupBar = ({ label, open, onToggle, color }) => (
@@ -28405,6 +28580,14 @@ function TrackRecordTab() {
             sub: `${summary.highIQTB2Hits.length}/${summary.highIQBatters.length}`,
             color:'#38b8f2'
           },
+          {
+            label:'HAND MATCH HR RATE',
+            value: summary.handMatches.length
+              ? `${((summary.handMatchHits.length/summary.handMatches.length)*100).toFixed(0)}%`
+              : '—',
+            sub: `${summary.handMatchHits.length}/${summary.handMatches.length}`,
+            color:'#fbbf24'
+          },
         ].map(card => (
           <div key={card.label} style={{
             background:'var(--surface2)', border:'1px solid var(--border)',
@@ -28550,6 +28733,16 @@ function TrackRecordTab() {
           🧠 {showOnlyHighIQ ? 'High IQ Only' : 'Plate IQ'}
         </button>
 
+        <button onClick={() => setShowOnlyHandMatch(v=>!v)}
+          title="Batter's handedness exploits the opposing pitcher's weakness (⭐⭐ full or ⭐ partial) — same flag as Barrel Lab/On Base's Hand Match filter. Display-only, does not affect Yard Score."
+          style={{padding:'4px 10px', borderRadius:6, border:'none',
+            cursor:'pointer', fontFamily:mono, fontSize:9, fontWeight:700,
+            background: showOnlyHandMatch ? 'rgba(251,191,36,.15)' : 'var(--surface2)',
+            color:       showOnlyHandMatch ? '#fbbf24' : 'var(--muted)',
+            border: `1px solid ${showOnlyHandMatch ? 'rgba(251,191,36,.4)' : 'var(--border)'}` }}>
+          ⭐ {showOnlyHandMatch ? 'Hand Match Only' : 'Hand Match'}
+        </button>
+
         <button id="track-record-csv-trigger" onClick={() => {
             if (!filteredRows.length) return;
             const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
@@ -28559,7 +28752,7 @@ function TrackRecordTab() {
               'Is Key Matchup','Weak Spot','Sauce 2.0','2-Bagger (Non-HR)','Hit 2+ TB (Any)','TB Signal',
               'TrueHR','Matchup','SimHR%','Barrel Signal','Longshot',
               'PulledBrl%','Brl/BIP','HR/FB','FB%','HH%',
-              'Plate IQ','IQ Grade','Zone Risk',
+              'Plate IQ','IQ Grade','Zone Risk','Hand Match',
               'Went Yard','HR','AB','H','TB','RBI','BB','K','Avg EV','Launch Angle',
               'Live Close Calls','Live CC Max EV','Live CC Max Dist'];
             const csvRows = [headers.map(esc).join(',')];
@@ -28576,7 +28769,7 @@ function TrackRecordTab() {
                 r.trueHR || '', r.matchup || '', r.simHRPct || '',
                 r.brlSignal ? 'YES' : '', r.isLongshot ? 'YES' : '',
                 r.pulledBrl || '', r.brlBIP || '', r.hrFB || '', r.fb || '', r.hh || '',
-                r.plateIQ != null ? r.plateIQ : '', r.plateIQGrade?.label || '', r.zoneAttackRisk ? 'YES' : '',
+                r.plateIQ != null ? r.plateIQ : '', r.plateIQGrade?.label || '', r.zoneAttackRisk ? 'YES' : '', r.handMatchTier || '',
                 r.wentYard ? 'YES' : '', r.actualHR || 0, r.actualAB || 0, r.actualH || 0,
                 r.actualTB || 0, r.actualRBI || 0, r.actualBB || 0, r.actualK || 0,
                 r.actualEV || '', r.actualLA || '',
@@ -28657,6 +28850,7 @@ function TrackRecordTab() {
                   <SortTh col="brlSignal" label="Signal" color="#38b8f2"/>
                   <SortTh col="isLongshot" label="Longshot" color="#38b8f2"/>
                   <SortTh col="plateIQ" label="IQ" color="#38b8f2" title="Plate IQ — display-only, does not affect Yard Score. See Legend for details."/>
+                  <SortTh col="handMatchTier" label="Hand" color="#38b8f2" title="Hand Match — batter's handedness exploits the opposing pitcher's weakness (full or partial). See Legend for details."/>
                 </>}
 
                 {showBoxScore && <>
@@ -28792,6 +28986,13 @@ function TrackRecordTab() {
                               {r.plateIQGrade.label}{r.zoneAttackRisk && ' ⚠'}
                             </span>
                           : '—'}
+                      </td>
+                      <td style={{padding:'3px 6px', textAlign:'center'}}>
+                        {r.handMatchTier && <span
+                          title={r.handMatchTier==='full' ? 'Hand Match (full)' : 'Partial Hand Match'}
+                          style={{color:'#fbbf24', opacity:r.handMatchTier==='full'?1:.6}}>
+                          {r.handMatchTier==='full' ? '⭐⭐' : '⭐'}
+                        </span>}
                       </td>
                     </>}
 
@@ -32143,7 +32344,7 @@ function BarrelLabTab() {
                 const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
                 const f1 = v => (v != null && v !== '' && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(1) : '';
                 const f3 = v => (v != null && v !== '' && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(3) : '';
-                const hdrs = ['Slot','Team','Player','Pitcher','Grade','TrueHR','Matchup','ZF','Form (gHR)','SimHR%','ISO','xwOBA','PulledBrl%','Brl/BIP%','HR/FB%','FB%','HH%','LA°','Barrel Signal','Plate IQ','IQ Grade','Zone Risk'];
+                const hdrs = ['Slot','Team','Player','Pitcher','Grade','TrueHR','Matchup','ZF','Form (gHR)','SimHR%','ISO','xwOBA','PulledBrl%','Brl/BIP%','HR/FB%','FB%','HH%','LA°','Barrel Signal','Plate IQ','IQ Grade','Zone Risk','Hand Match'];
                 const csvRows = [hdrs.map(esc).join(',')];
                 rows.forEach(b => {
                   csvRows.push([
@@ -32169,6 +32370,7 @@ function BarrelLabTab() {
                     esc(b.plateIQ != null ? b.plateIQ : ''),
                     esc(b.plateIQGrade?.label || ''),
                     esc(b.zoneAttackRisk ? '1' : '0'),
+                    esc(b.handMatchTier || ''),
                   ].join(','));
                 });
                 const a = document.createElement('a');
@@ -33018,7 +33220,7 @@ function OnBaseTab() {
                 const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
                 const f1 = v => (v != null && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(1) : '';
                 const f3 = v => (v != null && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(3) : '';
-                const hdrs = ['Slot','Team','Player','Pitcher','Grade','OnBaseScore','Matchup','ZF','G2TB%','SimTB2%','AVG','SLG','ISO','xwOBA','XBH%','HH%','SimTB','LA°','TB Signal','Plate IQ','IQ Grade','Zone Risk'];
+                const hdrs = ['Slot','Team','Player','Pitcher','Grade','OnBaseScore','Matchup','ZF','G2TB%','SimTB2%','AVG','SLG','ISO','xwOBA','XBH%','HH%','SimTB','LA°','TB Signal','Plate IQ','IQ Grade','Zone Risk','Hand Match'];
                 const csvRows = [hdrs.map(esc).join(',')];
                 rows.forEach(b => {
                   csvRows.push([
@@ -33044,6 +33246,7 @@ function OnBaseTab() {
                     esc(b.plateIQ != null ? b.plateIQ : ''),
                     esc(b.plateIQGrade?.label || ''),
                     esc(b.zoneAttackRisk ? '1' : '0'),
+                    esc(b.handMatchTier || ''),
                   ].join(','));
                 });
                 const a = document.createElement('a');

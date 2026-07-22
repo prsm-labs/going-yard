@@ -178,6 +178,7 @@ export default async function handler(req, res) {
       return res.status(200).json({
         team, stadium:stadium.name, cfDir:stadium.cfDir,
         parkFactorHR:pf.hr, isDome:true, current:null, hourly:[],
+        lat:stadium.lat, lon:stadium.lon, // Location map (2026-07-21) — venue marker position
       });
     }
 
@@ -262,6 +263,7 @@ export default async function handler(req, res) {
       team, stadium:stadium.name, cfDir:stadium.cfDir,
       parkFactorHR:pf.hr, isDome:false,
       current, hourly,
+      lat:stadium.lat, lon:stadium.lon, // Location map (2026-07-21) — venue marker position
     });
 
   } catch(e) {
