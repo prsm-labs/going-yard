@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import ReactDOM from "react-dom";
+import { createRoot } from "react-dom/client";
 import { UserButton, SignedIn, SignedOut, SignInButton, useAuth, useClerk } from "@clerk/clerk-react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -26933,6 +26934,194 @@ const RADAR_FRAMES = [
 // the same weather.js payload WeatherGameCard already displays, no new fetch.
 // Pure Leaflet (imperative, via refs) rather than react-leaflet — this file
 // already has no React map-library dependency, and one library is enough.
+// ── MLB team ID map — for team-logos.mlbstatic.com (already used elsewhere
+// in this file, e.g. GamedayTab's <img> tags, AppTeamSlideout) — duplicated
+// locally rather than importing a shared constant since none currently
+// exists at module scope (the rest of the file inlines this same map too).
+const LOC_ABBR_TO_ID = {LAA:108,AZ:109,BAL:110,BOS:111,CHC:112,CIN:113,CLE:114,COL:115,DET:116,HOU:117,KC:118,LAD:119,WSH:120,NYM:121,ATH:133,PIT:134,SD:135,SEA:136,SF:137,STL:138,TB:139,TEX:140,TOR:141,MIN:142,PHI:143,ATL:144,CWS:145,MIA:146,NYY:147,MIL:158};
+const locTeamLogo = abbr => LOC_ABBR_TO_ID[abbr] ? `https://www.mlbstatic.com/team-logos/${LOC_ABBR_TO_ID[abbr]}.svg` : null;
+
+// ── WindStreakField — animated wind-streak visualization (2026-07-22) ───────
+// Explicit reference: doinksports.com/research/mlb/weather-man — a stadium
+// silhouette with dozens of small streak particles blowing across the field
+// in the true wind direction, plus a bold directional arrow. Scope decision
+// (confirmed with user): ONE generic reusable ballpark outline rather than
+// real per-park geometry — meaningfully less work, still delivers the real
+// animated-particle look. CF is fixed at the top of the generic outline and
+// the wind angle is rotated relative to the park's real center-field azimuth
+// (cfDir), same convention as the pre-existing StadiumWindDiagram (Game Day
+// tab, untouched by this change) — so the DIRECTION shown is still accurate
+// to the specific stadium even though the outline shape itself is generic.
+// Animation approach: one shared CSS @keyframes rule (translateY loop,
+// injected into <head> once) drives every particle; the whole particle
+// layer is rotated via an SVG <g transform> to point that fixed axis at the
+// true wind-relative-to-field angle. Avoids needing a bespoke keyframe per
+// wind angle — the rotation does that work instead.
+let _windStreakStyleInjected = false;
+function WindStreakField({ cfDir, windDeg, windSpeed, windDir, size=170 }) {
+  const w = size, h = Math.round(size * 1.15);
+  const cx = w / 2, cy = h * 0.46;
+
+  useEffect(() => {
+    if (_windStreakStyleInjected) return;
+    _windStreakStyleInjected = true;
+    const styleTag = document.createElement('style');
+    styleTag.textContent = `
+      @keyframes gyWindStreak {
+        0%   { transform: translateY(-14px); opacity: 0; }
+        12%  { opacity: .9; }
+        85%  { opacity: .9; }
+        100% { transform: translateY(200px); opacity: 0; }
+      }
+    `;
+    document.head.appendChild(styleTag);
+  }, []);
+
+  // Generic ballpark silhouette — home plate point at bottom, curved
+  // outfield wall at top. Same outline reused for every park (scope
+  // decision above) — only the streak direction/speed differs per game.
+  const outline = `M ${cx} ${h*0.92}
+    L ${cx-w*0.34} ${h*0.55}
+    Q ${cx-w*0.38} ${h*0.08} ${cx} ${h*0.05}
+    Q ${cx+w*0.38} ${h*0.08} ${cx+w*0.34} ${h*0.55}
+    Z`;
+
+  const windRelField = ((windDeg - cfDir) + 360) % 360; // "from" angle, field-relative
+  const streakAngle  = (windRelField + 180) % 360;       // "toward" angle — particle travel direction
+  const wCol = WD_COLOR[windDir] || '#888';
+
+  const particles = useMemo(() => {
+    const n = 22;
+    const spd = windSpeed || 8;
+    return Array.from({ length: n }, () => ({
+      x: 12 + Math.random() * (w - 24),
+      len: 7 + Math.random() * 9,
+      dur: Math.max(0.6, 2.6 - spd / 10) * (0.75 + Math.random() * 0.5),
+      delay: -(Math.random() * 3),
+      op: 0.25 + Math.random() * 0.4,
+    }));
+  }, [w, windSpeed]);
+
+  const uid = `ws${Math.round(windDeg)}${Math.round(cfDir)}${size}`;
+
+  return (
+    <svg width={size} height={h} viewBox={`0 0 ${w} ${h}`} style={{display:'block'}}>
+      <defs>
+        <clipPath id={`${uid}c`}><path d={outline}/></clipPath>
+        <marker id={`${uid}h`} markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
+          <path d="M0,0 L6,3 L0,6 Z" fill={wCol}/>
+        </marker>
+      </defs>
+      <path d={outline} fill="#16324f" stroke="rgba(255,255,255,.25)" strokeWidth="1.5"/>
+      {/* Streak particles — clipped to the field outline, rotated to the true wind-relative angle */}
+      <g clipPath={`url(#${uid}c)`}>
+        <g transform={`rotate(${streakAngle} ${cx} ${cy})`}>
+          {particles.map((p, i) => (
+            <line key={i} x1={p.x} y1={-10} x2={p.x} y2={-10 + p.len}
+              stroke="rgba(255,255,255,.85)" strokeWidth="1.4" strokeLinecap="round"
+              opacity={p.op}
+              style={{ animation: `gyWindStreak ${p.dur}s linear infinite`, animationDelay: `${p.delay}s` }}/>
+          ))}
+        </g>
+      </g>
+      {/* Infield diamond */}
+      <polygon points={`${cx},${h*0.78} ${cx+w*0.09},${h*0.86} ${cx},${h*0.94} ${cx-w*0.09},${h*0.86}`}
+        fill="rgba(150,110,60,.7)" stroke="rgba(255,255,255,.3)" strokeWidth="0.75"/>
+      {/* CF label */}
+      <text x={cx} y={h*0.14} textAnchor="middle" fontSize="8" fill="rgba(255,255,255,.5)" fontFamily="monospace">CF</text>
+      {/* Directional wind vector arrow */}
+      {(() => {
+        const rad = (streakAngle - 90) * Math.PI / 180;
+        const len = w * 0.28;
+        const x2 = cx + len * Math.cos(rad), y2 = cy + len * Math.sin(rad);
+        const x1 = cx - len * 0.4 * Math.cos(rad), y1 = cy - len * 0.4 * Math.sin(rad);
+        return <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={wCol} strokeWidth="3" strokeLinecap="round" markerEnd={`url(#${uid}h)`}/>;
+      })()}
+    </svg>
+  );
+}
+
+// ── LocationPopupContent — doinksports-style matchup weather card (2026-07-22) ──
+// Team logos + hourly wind trend strip + WIND/FORECAST/HUMIDITY stat row +
+// the animated WindStreakField, roughly matching doinksports.com's
+// weather-man layout at popup scale. Mounted via createRoot() in
+// LocationMapTab — see that comment for why a plain HTML-string Leaflet
+// popup can't render this directly.
+function LocationPopupContent({ g, w, display, hrScore }) {
+  const mono = "'DM Mono',monospace";
+  const awayAbbr = g.away?.abbr || '?';
+  const homeAbbr = g.home?.abbr || '?';
+  const awayLogo = locTeamLogo(awayAbbr);
+  const homeLogo = locTeamLogo(homeAbbr);
+
+  const TeamRow = () => (
+    <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:2}}>
+      {awayLogo && <img src={awayLogo} alt={awayAbbr} style={{width:18,height:18,objectFit:'contain'}}/>}
+      <span style={{fontWeight:700}}>{awayAbbr}</span>
+      <span style={{opacity:.5}}>@</span>
+      {homeLogo && <img src={homeLogo} alt={homeAbbr} style={{width:18,height:18,objectFit:'contain'}}/>}
+      <span style={{fontWeight:700}}>{homeAbbr}</span>
+    </div>
+  );
+
+  if (w.isDome) {
+    return (
+      <div style={{fontFamily:mono, fontSize:11, minWidth:160, color:'#e2e8f0'}}>
+        <TeamRow/>
+        <div style={{opacity:.7, marginBottom:6}}>{w.stadium}</div>
+        <div>🏟️ Retractable/dome — weather N/A</div>
+        <div>Park HR Factor: {w.parkFactorHR}</div>
+      </div>
+    );
+  }
+
+  // Hourly wind-trend strip — next 4 hourly slots from game time, small
+  // up/down arrow + mph per hour, same spirit as doinksports' hourly row.
+  const gameHour = parseGameHour(g.gameTime);
+  const trendHours = (gameHour != null && w.hourly)
+    ? w.hourly.filter(h => h.hour >= gameHour).slice(0, 4)
+    : [];
+
+  return (
+    <div style={{fontFamily:mono, fontSize:11, minWidth:210, color:'#e2e8f0'}}>
+      <TeamRow/>
+      <div style={{opacity:.7, marginBottom:6}}>{w.stadium}</div>
+
+      {trendHours.length > 0 && (
+        <div style={{display:'flex',gap:8,marginBottom:6,paddingBottom:5,borderBottom:'1px solid rgba(255,255,255,.1)'}}>
+          {trendHours.map((h, i) => {
+            const prevSpeed = i === 0 ? (display?.windSpeed ?? h.windSpeed) : trendHours[i-1].windSpeed;
+            const rising = h.windSpeed > prevSpeed;
+            return (
+              <div key={h.hour} style={{textAlign:'center',fontSize:9}}>
+                <div style={{opacity:.6}}>{fmtHour12(h.hour)}</div>
+                <div style={{color: rising ? '#ff8020' : '#38b8f2'}}>{rising ? '↑' : '↓'} {h.windSpeed}</div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {display && (
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:4,marginBottom:6,fontSize:9}}>
+          <div><div style={{opacity:.55}}>WIND</div><div style={{fontWeight:700}}>{display.windSpeed} mph</div></div>
+          <div><div style={{opacity:.55}}>TEMP</div><div style={{fontWeight:700}}>{Math.round(display.temp)}°F</div></div>
+          <div><div style={{opacity:.55}}>HUMIDITY</div><div style={{fontWeight:700}}>{display.humidity ?? '—'}%</div></div>
+        </div>
+      )}
+
+      {display && (
+        <div style={{display:'flex',flexDirection:'column',alignItems:'center',marginBottom:6}}>
+          <WindStreakField cfDir={w.cfDir} windDeg={display.windDeg} windSpeed={display.windSpeed} windDir={display.windDir} size={150}/>
+          <div style={{marginTop:2}}>{windBadge(display.windDir, display.windLabel)}</div>
+        </div>
+      )}
+
+      <div>☔ {display?.rainChance || 0}% rain · HR Env: {Math.round(hrScore)} · Park Factor: {w.parkFactorHR}</div>
+    </div>
+  );
+}
+
 function LocationMapTab({ games, weather }) {
   const mapDivRef   = useRef(null);
   const mapRef      = useRef(null);
@@ -26976,11 +27165,28 @@ function LocationMapTab({ games, weather }) {
     return () => clearInterval(id);
   }, [playing]);
 
-  // Matchup markers — one per unique home team playing today
+  // Matchup markers — one per unique home team playing today. Popup content
+  // is a REAL React tree (StadiumWindDiagram + windBadge, the same pieces
+  // WeatherGameCard uses on the Game Day sub-tab), not an HTML string —
+  // Leaflet's bindPopup() accepts a raw DOM node, so each popup gets its own
+  // detached div + createRoot(), rendered once here and left mounted for
+  // Leaflet to show/hide on hover. Roots are unmounted alongside their
+  // marker whenever this effect re-runs or the tab unmounts.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    markersRef.current.forEach(m => map.removeLayer(m));
+    markersRef.current.forEach(({ marker, root }) => {
+      map.removeLayer(marker);
+      // Deferred, not synchronous: React StrictMode's dev-mode double-invoke
+      // of this effect (mount → cleanup → mount again) can catch a root's
+      // very first render still in flight when this cleanup runs, which
+      // throws "Attempted to synchronously unmount a root while React was
+      // already rendering" and silently breaks that marker's popup.
+      // setTimeout pushes the unmount to the next tick, after the in-flight
+      // render has committed — the standard fix for this createRoot +
+      // StrictMode interaction.
+      setTimeout(() => root.unmount(), 0);
+    });
     markersRef.current = [];
 
     const seen = new Set();
@@ -27002,24 +27208,44 @@ function LocationMapTab({ games, weather }) {
           display:flex;align-items:center;justify-content:center;font-family:'DM Mono',monospace;
           font-weight:800;font-size:10px;border:2px solid rgba(255,255,255,.85);
           box-shadow:0 0 8px rgba(0,0,0,.6);">${homeAbbr}</div>`,
-        iconSize: [34, 34], iconAnchor: [17, 17], popupAnchor: [0, -20],
+        // popupAnchor pushed further up than Leaflet's usual small offset —
+        // the popup now carries a full WindStreakField (~170px) and is tall
+        // enough that a tight anchor let its own tip overlap the marker's
+        // hit area. See the debounced open/close handling below for the
+        // other half of the fix (found via direct instrumentation: the
+        // popup was opening on mouseover then closing itself ~150ms later
+        // with zero mouseout log — the popup DOM covering the cursor was
+        // triggering a native mouseleave on the marker underneath it).
+        iconSize: [34, 34], iconAnchor: [17, 17], popupAnchor: [0, -22],
       });
 
-      const popupHtml = w.isDome
-        ? `<div style="font-family:'DM Mono',monospace;font-size:11px;min-width:150px;">
-             <b>${g.away?.abbr || '?'} @ ${homeAbbr}</b><br/>${w.stadium}<br/>
-             🏟️ Dome — weather N/A<br/>Park HR Factor: ${w.parkFactorHR}</div>`
-        : `<div style="font-family:'DM Mono',monospace;font-size:11px;min-width:170px;">
-             <b>${g.away?.abbr || '?'} @ ${homeAbbr}</b><br/>${w.stadium}<br/>
-             ${display ? `${Math.round(display.temp)}°F · ${display.windLabel || 'calm'}<br/>
-             ☔ ${display.rainChance || 0}% rain<br/>` : ''}
-             HR Env: ${Math.round(hrScore)} · Park Factor: ${w.parkFactorHR}
-           </div>`;
+      const popupDiv = document.createElement('div');
+      const root = createRoot(popupDiv);
+      root.render(<LocationPopupContent g={g} w={w} display={display} hrScore={hrScore}/>);
 
-      const marker = L.marker([w.lat, w.lon], { icon }).addTo(map).bindPopup(popupHtml);
-      marker.on('mouseover', () => marker.openPopup());
-      marker.on('mouseout',  () => marker.closePopup());
-      markersRef.current.push(marker);
+      const marker = L.marker([w.lat, w.lon], { icon }).addTo(map)
+        .bindPopup(popupDiv, { minWidth: 220, maxWidth: 280 });
+
+      // Debounced hover open/close, tracking BOTH the marker icon and the
+      // popup's own DOM once it's open — a tall popup sitting close to its
+      // marker can end up under the cursor itself, which fires a native
+      // mouseleave on the marker and closed the popup instantly (confirmed
+      // via direct instrumentation: opened at mouseover, gone ~150ms later,
+      // no explicit close call in between). Moving from the marker onto the
+      // popup content now counts as "still hovering" instead of a close.
+      let closeTimer = null;
+      const cancelClose = () => { if (closeTimer) { clearTimeout(closeTimer); closeTimer = null; } };
+      const open = () => { cancelClose(); marker.openPopup(); };
+      const scheduleClose = () => { cancelClose(); closeTimer = setTimeout(() => marker.closePopup(), 180); };
+      marker.on('mouseover', open);
+      marker.on('mouseout', scheduleClose);
+      marker.on('popupopen', () => {
+        const el = marker.getPopup()?.getElement?.();
+        if (!el) return;
+        el.addEventListener('mouseenter', cancelClose);
+        el.addEventListener('mouseleave', scheduleClose);
+      });
+      markersRef.current.push({ marker, root });
     });
   }, [games, weather]);
 
