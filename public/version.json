@@ -1,8 +1,8 @@
 {
   "version": "2026.07.22",
-  "bundleFile": "index-B_8bjgg6.js",
+  "bundleFile": "index-gPAOBd1V.js",
   "changelog": [
-    "Add live Ball Carry tracker + Game/Batter/Pitcher ID plumbing"
+    "Ball Carry: add pull/center/oppo direction correction"
   ],
   "notifyUsers": true
 }

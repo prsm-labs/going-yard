@@ -7778,6 +7778,12 @@ const CARRY_VERDICT_STYLE = {
   DEAD:   { color: '#38b8f2', label: '🔵 Ball carrying DEAD', bg: 'rgba(56,184,242,.08)'   },
   NORMAL: { color: '#27c97a', label: '✅ Ball carrying normal', bg: 'rgba(39,201,122,.06)' },
 };
+// A NORMAL verdict within this many ft of either threshold gets flagged
+// "Borderline" instead of reading as a flat, unremarkable normal day —
+// added 2026-07-22 after the ATH@AZ case (park-adj +9ft vs an +11.7ft
+// JUICED bar — a real near-miss, not a clean normal).
+const BORDERLINE_MARGIN_FT = 3;
+const CARRY_BORDERLINE_STYLE = { color: '#f5a623', label: '🟡 Borderline normal', bg: 'rgba(245,166,35,.08)' };
 
 function BallCarryCard({ game }) {
   const [data, setData]       = useState(null);
@@ -7809,7 +7815,14 @@ function BallCarryCard({ game }) {
   }, [game.home?.abbr, game.gameTime]);
 
   const label = `${game.away?.abbr || '?'} @ ${game.home?.abbr || '?'}`;
-  const style = data?.verdict ? CARRY_VERDICT_STYLE[data.verdict] : null;
+  const isBorderline = data?.verdict === 'NORMAL'
+    && data.dead_threshold_ft != null && data.juiced_threshold_ft != null
+    && Math.min(
+         Math.abs(data.park_adj_deviation - data.dead_threshold_ft),
+         Math.abs(data.park_adj_deviation - data.juiced_threshold_ft)
+       ) <= BORDERLINE_MARGIN_FT;
+  const style = isBorderline ? CARRY_BORDERLINE_STYLE
+    : data?.verdict ? CARRY_VERDICT_STYLE[data.verdict] : null;
   const wCur = weather?.current;
 
   return (
@@ -7840,8 +7853,11 @@ function BallCarryCard({ game }) {
         <>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
             <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 11, fontWeight: 700, color: style?.color }}>{style?.label}</span>
-            <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)' }}>
-              park-adj {data.park_adj_deviation >= 0 ? '+' : ''}{data.park_adj_deviation}ft · raw {data.avg_deviation >= 0 ? '+' : ''}{data.avg_deviation}ft · n={data.n}
+            <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)' }}
+              title={`raw average (before park adjustment): ${data.avg_deviation>=0?'+':''}${data.avg_deviation}ft. ${data.homeAbbr||'this park'}'s own season baseline: ${data.park_baseline_ft>=0?'+':''}${data.park_baseline_ft}ft — subtracted to get the park-adjusted number.`}>
+              park-adj {data.park_adj_deviation >= 0 ? '+' : ''}{data.park_adj_deviation}ft
+              {data.park_baseline_ft != null && ` (${data.homeAbbr||'park'} baseline ${data.park_baseline_ft >= 0 ? '+' : ''}${data.park_baseline_ft}ft)`}
+              {' '}· raw {data.avg_deviation >= 0 ? '+' : ''}{data.avg_deviation}ft · n={data.n}
             </span>
             <button onClick={() => setExpanded(v => !v)}
               style={{ marginLeft: 'auto', fontSize: 9, fontFamily: "'DM Mono',monospace", color: 'var(--muted)',
@@ -7881,7 +7897,8 @@ function BallCarryTab({ games }) {
       {showHelp && <HelpSlideout title="⚾ Ball Carry Guide" items={[
         ['What is this?', 'Per-game "dead ball / juiced ball" detector. Holds Exit Velocity and Launch Angle fixed and compares actual batted-ball distance against what the physics says it should be — a ball flying meaningfully farther or shorter than EV+LA predict is a ball-construction signal, not a swing signal.'],
         ['What it does NOT use', 'Temperature and wind are NOT part of the verdict — weather shifts throughout a game and is too noisy at single-game granularity. They’re shown next to each card as context only.'],
-        ['Elevation / park', 'Each park’s own seasonal average carry deviation is subtracted before classifying, so a high-altitude park (Coors) doesn’t read as "juiced" on every single game just from being at altitude.'],
+        ['Elevation / park', 'Each park’s own seasonal average carry deviation is subtracted before classifying — shown right on the card ("park baseline") so it’s never a hidden adjustment. This is why a hitter-friendly park (Coors, Arizona) can show a big raw number and still read NORMAL — the raw distance is only modestly above what that park normally allows.'],
+        ['🟡 Borderline normal', 'A NORMAL verdict within 3ft of the DEAD or JUICED line gets this instead of a flat green normal — a near-miss isn’t the same as an unremarkable day, and this keeps close calls visible instead of hidden inside "normal."'],
         ['Direction (Pull/Center/Oppo)', 'Also corrects for where the ball was hit. Center-field contact carries ~14-17ft farther than pulled or opposite-field contact at the same EV+LA (pure backspin vs. sidespin bleed-off) — a real physical effect, not noise. Without this, a handful of unusually center-heavy or pull-heavy balls in one game could fake a DEAD/JUICED reading. Shown per-ball in the expanded list below.'],
         ['Minimum sample', 'Needs at least 3 quality batted balls (EV≥95mph, LA 15–40°, fly ball/line drive) before showing a verdict.'],
       ]} onClose={() => setShowHelp(false)}/>}
@@ -28519,8 +28536,10 @@ function TrackRecordTab() {
           const d = normDate(r.date || '');
           if (!d) return;
           const entry = {
-            verdict: (r.verdict || '').trim().toUpperCase(),
-            dev:     parseFloat(r.park_adj_deviation || 0),
+            verdict:    (r.verdict || '').trim().toUpperCase(),
+            dev:        parseFloat(r.park_adj_deviation || 0),
+            deadThr:    r.dead_threshold_ft   != null && r.dead_threshold_ft   !== '' ? parseFloat(r.dead_threshold_ft)   : null,
+            juicedThr:  r.juiced_threshold_ft != null && r.juiced_threshold_ft !== '' ? parseFloat(r.juiced_threshold_ft) : null,
           };
           const home = (r.home_team || '').trim().toUpperCase();
           const away = (r.away_team || '').trim().toUpperCase();
@@ -28709,8 +28728,13 @@ function TrackRecordTab() {
             ccMaxDist:  parseFloat(r['Live CC Max Dist'] || 0),
             // Ball carry (dead ball / juiced ball) — see PROMPT_BallCarryTracker.md,
             // 2026-07-22. Park/elevation-adjusted; deliberately NOT weather-adjusted.
+            // isBorderlineCarry: NORMAL verdict within 3ft of either threshold —
+            // same BORDERLINE_MARGIN_FT convention as the live Ball Carry page.
             ballCarryVerdict: carryRow?.verdict || '',
             ballCarryDev:     carryRow ? carryRow.dev : null,
+            isBorderlineCarry: !!(carryRow && carryRow.verdict === 'NORMAL'
+              && carryRow.deadThr != null && carryRow.juicedThr != null
+              && Math.min(Math.abs(carryRow.dev - carryRow.deadThr), Math.abs(carryRow.dev - carryRow.juicedThr)) <= 3),
           };
         });
 
@@ -29471,9 +29495,9 @@ function TrackRecordTab() {
                         textAlign:'center'}}>{r.ccMaxDist || '—'}</td>
                       <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
                         textAlign:'center', fontWeight:700,
-                        color: r.ballCarryVerdict==='JUICED' ? '#ff8020' : r.ballCarryVerdict==='DEAD' ? '#38b8f2' : 'var(--muted)'}}
-                        title={r.ballCarryDev != null ? `park-adj deviation ${r.ballCarryDev>=0?'+':''}${r.ballCarryDev}ft` : ''}>
-                        {r.ballCarryVerdict==='JUICED' ? '🔴' : r.ballCarryVerdict==='DEAD' ? '🔵' : r.ballCarryVerdict==='NORMAL' ? '—' : ''}
+                        color: r.ballCarryVerdict==='JUICED' ? '#ff8020' : r.ballCarryVerdict==='DEAD' ? '#38b8f2' : r.isBorderlineCarry ? '#f5a623' : 'var(--muted)'}}
+                        title={r.ballCarryDev != null ? `park-adj deviation ${r.ballCarryDev>=0?'+':''}${r.ballCarryDev}ft${r.isBorderlineCarry?' — borderline (within 3ft of a threshold)':''}` : ''}>
+                        {r.ballCarryVerdict==='JUICED' ? '🔴' : r.ballCarryVerdict==='DEAD' ? '🔵' : r.isBorderlineCarry ? '🟡' : r.ballCarryVerdict==='NORMAL' ? '—' : ''}
                       </td>
                     </>}
                   </tr>

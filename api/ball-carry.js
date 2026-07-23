@@ -168,6 +168,10 @@ export default async function handler(req, res) {
       avg_deviation: Math.round(avg_dev * 10) / 10,
       park_baseline_ft: parkBaseline,
       park_adj_deviation: Math.round(park_adj * 10) / 10,
+      // Returned (not hardcoded client-side) so the UI can show margin-to-
+      // threshold without duplicating these constants in two places.
+      dead_threshold_ft: DEAD_THRESHOLD_FT,
+      juiced_threshold_ft: JUICED_THRESHOLD_FT,
       status: 'ok', verdict, balls,
     });
   } catch (e) {
