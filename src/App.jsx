@@ -2358,6 +2358,43 @@ function AtBatSlideIn() {
   const [zoneData,    setZoneData]    = useState(null);   // {bMap, pMap, edges}
   const [zoneLoad,    setZoneLoad]    = useState(false);
   const [zoneStat,    setZoneStat]    = useState('hr'); // 'hr' | 'barrel' | 'hardhit' | 'k'
+  const [dhIdx,       setDhIdx]       = useState(0); // doubleheader game selector — 0 = Game 1
+
+  // Doubleheader support: DAILY_PICKS_CACHE only ever keeps the FIRST
+  // daily_picks.csv row per batter_id (see its own comment) — on a
+  // doubleheader day a batter has 2 real rows (different game_id/pitcher/
+  // scores) and the second was silently discarded, so this slideout always
+  // showed the first game's matchup even when the batter was confirmed for
+  // a later game too (confirmed 2026-07-23, same root cause already fixed
+  // for BarrelLabTab/OnBaseTab on 2026-07-18 — see their own DAILY_PICKS_ROWS
+  // comments). DAILY_PICKS_ROWS keeps every row, so it's used here too.
+  const dpOptions = useMemo(() => {
+    if (!player?.pid) return [];
+    const rows = DAILY_PICKS_ROWS.filter(r => String(r.batter_id||'').split('.')[0] === String(player.pid));
+    if (rows.length <= 1) return rows;
+    // Sort by game time (earlier game = "Game 1") — falls back to original
+    // order if game_time isn't parseable.
+    const toMinutes = t => {
+      const m = /^(\d{1,2}):(\d{2})\s*([AP]M)/i.exec((t||'').trim());
+      if (!m) return null;
+      let h = parseInt(m[1]) % 12;
+      if (/PM/i.test(m[3])) h += 12;
+      return h * 60 + parseInt(m[2]);
+    };
+    return [...rows].sort((a, b) => {
+      const ma = toMinutes(a.game_time), mb = toMinutes(b.game_time);
+      if (ma == null || mb == null) return 0;
+      return ma - mb;
+    });
+  }, [player?.pid]);
+  // The single source of truth for this slideout's matchup data — reflects
+  // whichever game is selected via the Game 1/Game 2 toggle below. Falls
+  // back to the old single-entry cache so nothing breaks if DAILY_PICKS_ROWS
+  // is ever empty (e.g. before daily_picks.csv has loaded).
+  const dp = dpOptions[dhIdx] || DAILY_PICKS_CACHE[String(player?.pid)];
+
+  // Reset to Game 1 whenever a different player is opened.
+  useEffect(() => { setDhIdx(0); }, [player?.pid]);
 
   useEffect(() => {
     AB_SLIDE_LISTENER = setPlayer;
@@ -2413,10 +2450,10 @@ function AtBatSlideIn() {
 
     const season = new Date().getFullYear();
 
-    // Fetch BvP vs today's probable pitcher
-    // First try DAILY_PICKS_CACHE (has pitcher_id for all engine batters)
-    // Fall back to schedule API lookup by player's team if not found
-    const dp = DAILY_PICKS_CACHE[String(player.pid)];
+    // Fetch BvP vs today's probable pitcher — uses the component-level `dp`
+    // (already selected for the current doubleheader game, see dpOptions/dhIdx
+    // above), not a fresh single-entry cache lookup, so switching games
+    // re-fetches BvP against the correct opposing pitcher.
     let pitcherId   = dp?.pitcher_id ? String(dp.pitcher_id).split('.')[0] : null;
     let pitcherName = dp?.pitcher    || null;
 
@@ -2535,7 +2572,7 @@ function AtBatSlideIn() {
       })
       .catch(()=>setAtBats([]))
       .finally(()=>setLoading(false));
-  }, [player?.pid]);
+  }, [player?.pid, dhIdx]); // dhIdx: doubleheader game toggle re-fetches BvP against the correct game's pitcher
 
   if (!player) return null;
   const isOpen = !!player;
@@ -2617,7 +2654,7 @@ function AtBatSlideIn() {
       )}
       {/* Pitcher Weak Slot banner */}
       {(()=>{
-        const dp4 = DAILY_PICKS_CACHE[String(player?.pid)];
+        const dp4 = dp; // this row's own game — doubleheader-aware, see dpOptions/dhIdx above
         const slot = liveSlot(player?.pid, dp4?.lineup_slot);
         const isWeak = slot > 0 && (dp4?.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(slot);
         if (!isWeak) return null;
@@ -2688,9 +2725,29 @@ function AtBatSlideIn() {
       </div>
 
 
+      {/* Doubleheader toggle — only shown when this batter has 2 real matchup
+          rows today (2 different games, 2 different opposing pitchers). */}
+      {dpOptions.length > 1 && (
+        <div style={{display:'flex',gap:6,padding:'0 20px',marginBottom:8}}>
+          {dpOptions.map((o, i) => (
+            <button key={i} onClick={() => setDhIdx(i)}
+              style={{
+                padding:'4px 10px', borderRadius:6, cursor:'pointer',
+                fontFamily:"'DM Mono',monospace", fontSize:10, fontWeight:700,
+                border: i===dhIdx ? '1px solid var(--accent)' : '1px solid var(--border)',
+                background: i===dhIdx ? 'rgba(255,153,0,.12)' : 'transparent',
+                color: i===dhIdx ? 'var(--accent)' : 'var(--muted)',
+              }}
+              title={`vs ${o.pitcher||'?'} · ${o.game_time||''}`}>
+              Game {i+1}{o.game_time ? ` (${o.game_time})` : ''}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* ── Today's Matchup Card ────────────────────────────────────────── */}
-      {player?.pid && DAILY_PICKS_CACHE[String(player.pid)] && (
-        <MatchupCard dp={DAILY_PICKS_CACHE[String(player.pid)]}/>
+      {player?.pid && dp && (
+        <MatchupCard dp={dp}/>
       )}
 
       {/* H2H vs Today's Pitcher */}
@@ -2892,7 +2949,7 @@ function AtBatSlideIn() {
             if(zoneData) return; // already loaded
             const bid  = player?.pid;
             const ppid = bvpData?.pitcherId || (()=>{
-              const dp4 = DAILY_PICKS_CACHE[String(player?.pid)];
+              const dp4 = dp; // this row's own game — doubleheader-aware
               return dp4?.pitcher_id ? String(dp4.pitcher_id).split('.')[0] : null;
             })();
             if(!bid||!ppid){ setZoneData({}); return; }
@@ -3121,7 +3178,7 @@ function AtBatSlideIn() {
 
       {/* ── HR UPSIDE WITH H2H — enriched checklist, only available here ── */}
       {(()=>{
-        const dp3 = DAILY_PICKS_CACHE[String(player?.pid)];
+        const dp3 = dp; // this row's own game — doubleheader-aware
         if (!dp3) return null;
         const u = computeHRUpsideWithH2H(dp3, bvpData);
         const mono2 = "'DM Mono',monospace";
@@ -9877,11 +9934,13 @@ function BatTrackingTab({ games, date, isToday }) {
         <button onClick={()=>{
           const esc = v => '"' + String(v??'').replace(/"/g,'""') + '"';
           const headers = ['PA','Inning','Half','Batter','Team','Matchup','Result',
-            'Exit Velo','LA','Dist','Bat Speed','Pitch Velo','Is HR','Is Close Call'];
+            'Exit Velo','LA','Dist','Bat Speed','Pitch Velo','Is HR','Is Close Call',
+            'Game ID','Batter ID','Pitcher ID'];
           const rows = filtered.map(r => [
             r.pa, r.inning, r.half==='top'?'Top':'Bot', r.batter, r.team, r.matchup,
             r.result, r.ev??'', r.la??'', r.dist??'', r.batSpd??'', r.pitchV??'',
             r.isHR?'YES':'', isCloseCall(r)?'YES':'',
+            r.gamePk||'', r.batterId||'', r.pitcherId||'',
           ].map(esc).join(','));
           const csv = '\uFEFF' + headers.map(esc).join(',') + '\n' + rows.join('\n');
           const a = document.createElement('a');
@@ -16659,7 +16718,18 @@ function SimLabView({ data }) {
           <div style={{display:'none'}}>
           <button id="allmatches-csv-trigger" onClick={async () => {
               const slateGameIds = [...new Set(slate.map(r => r.game_id).filter(Boolean))];
+              // slateLiveCache: keyed by batter id ONLY — kept for the CC (close
+              // call) fallback merge below, which isn't game-scoped today.
               const slateLiveCache = {};
+              // slateLiveCacheByGame: keyed by `${batterId}_${gamePk}` — doubleheader-
+              // safe. On a normal day these two caches hold the same data; on a
+              // doubleheader day a batter has one entry per game here instead of the
+              // last-fetched game silently overwriting the other (confirmed
+              // 2026-07-23: this was causing a single real HR to get flagged
+              // 'Gone Yard=YES' on BOTH of that batter's matchup rows, and both
+              // rows' AB/H/HR/TB/etc. to read whichever game's boxscore was fetched
+              // last — see CLAUDE.md "Track Record doubleheader HR double-count fix").
+              const slateLiveCacheByGame = {};
 
               // ── Single source of truth: /api/boxscore proxy ──────────────────
               // All five post-game columns (Lineup Slot, In Weak Slot, CC x3) come
@@ -16670,14 +16740,20 @@ function SimLabView({ data }) {
                 try {
                   const result = await fetchLiveBatters(gid);
                   const batters = result?.batters || result || [];
-                  batters.forEach(bt => { if (bt.id) slateLiveCache[String(bt.id)] = bt; });
+                  batters.forEach(bt => {
+                    if (!bt.id) return;
+                    slateLiveCache[String(bt.id)] = bt;
+                    slateLiveCacheByGame[`${bt.id}_${gid}`] = bt;
+                  });
                 } catch(e) {}
               }));
 
-              // Build exportLineupMap from proxy's lineupSlot + pos fields (both already on each batter)
+              // Build exportLineupMap from proxy's lineupSlot + pos fields (both already
+              // on each batter) — keyed the same doubleheader-safe way, since a batter's
+              // lineup slot can differ between the two games of a doubleheader.
               const exportLineupMap = {};
-              Object.entries(slateLiveCache).forEach(([bid, bt]) => {
-                if (bt?.lineupSlot > 0) exportLineupMap[bid] = { slot: bt.lineupSlot, pos: bt.pos || '' };
+              Object.entries(slateLiveCacheByGame).forEach(([key, bt]) => {
+                if (bt?.lineupSlot > 0) exportLineupMap[key] = { slot: bt.lineupSlot, pos: bt.pos || '' };
               });
 
               // Merge LIVE_CC_MAP as in-session fallback for CC data
@@ -16706,14 +16782,20 @@ function SimLabView({ data }) {
                 'Game ID','Batter ID','Pitcher ID'];
               const rows = slate.map(b => {
                 const bid = parseInt(b.batter_id) || 0;
-                const gy  = HR_DATA.some(h => h.batterId === bid ||
-                  (b.batter && h.batterName && h.batterName?.toLowerCase() === b.batter?.toLowerCase()));
-                const lv  = slateGameIds.length > 0 ? (slateLiveCache[String(bid)] || null) : null;
+                // Game-scoped: on a doubleheader day this batter has 2 rows (one per
+                // opposing starter), and HR_DATA can contain events from either game
+                // of the SAME date — without the gamePk check, a HR in game 1 would
+                // flag BOTH rows YES even if the batter didn't play/homer in game 2.
+                const gy  = HR_DATA.some(h => b.game_id && String(h.gamePk) === String(b.game_id) &&
+                  (h.batterId === bid || (b.batter && h.batterName && h.batterName?.toLowerCase() === b.batter?.toLowerCase())));
+                const lv  = slateGameIds.length > 0
+                  ? (slateLiveCacheByGame[`${bid}_${b.game_id}`] || slateLiveCache[String(bid)] || null)
+                  : null;
                 const pitchCleanId = b.pitcher_id ? String(parseInt(b.pitcher_id)||b.pitcher_id) : '';
                 const pitcherGrade = simPitcherGrades.current[pitchCleanId] || '';
                 const isKM = isKeyMatchup(parseInt(b.batter_id)||0, b.batter) ? 'YES' : '';
                 // Lineup slot + position — from fresh boxscore API fetch (persists after games end, same as AB/H/HR)
-                const exportEntry = exportLineupMap[String(bid)] || null;
+                const exportEntry = exportLineupMap[`${bid}_${b.game_id}`] || null;
                 const exportSlot  = exportEntry?.slot || 0;
                 const exportPos   = exportEntry?.pos  || '';
                 const weakSlots  = (b.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean);
@@ -16749,10 +16831,11 @@ function SimLabView({ data }) {
                   lv?.avgEV>0?lv.avgEV.toFixed(1):'',
                   lv?.launchAngle>0?lv.launchAngle.toFixed(1):'',
                   // Live close calls — from /api/boxscore proxy (server-side, same persistence as AB/H/HR)
-                  // Falls back to LIVE_CC_MAP if proxy data unavailable
-                  (()=>{ const lv=slateLiveCache[String(bid)]; const cc=lv?.closeCalls||(lv?._ccFallback?.count)||0; return cc||''; })(),
-                  (()=>{ const lv=slateLiveCache[String(bid)]; const ev=lv?.ccMaxEV||(lv?._ccFallback?.maxEV)||0; return ev>0?parseFloat(ev).toFixed(1):''; })(),
-                  (()=>{ const lv=slateLiveCache[String(bid)]; const d=lv?.ccMaxDist||(lv?._ccFallback?.maxDist)||0; return d>0?d:''; })(),
+                  // Prefers this row's own game; falls back to the bare-batter-id
+                  // cache (which may carry the LIVE_CC_MAP fallback) if unavailable.
+                  (()=>{ const lv=slateLiveCacheByGame[`${bid}_${b.game_id}`]||slateLiveCache[String(bid)]; const cc=lv?.closeCalls||(lv?._ccFallback?.count)||0; return cc||''; })(),
+                  (()=>{ const lv=slateLiveCacheByGame[`${bid}_${b.game_id}`]||slateLiveCache[String(bid)]; const ev=lv?.ccMaxEV||(lv?._ccFallback?.maxEV)||0; return ev>0?parseFloat(ev).toFixed(1):''; })(),
+                  (()=>{ const lv=slateLiveCacheByGame[`${bid}_${b.game_id}`]||slateLiveCache[String(bid)]; const d=lv?.ccMaxDist||(lv?._ccFallback?.maxDist)||0; return d>0?d:''; })(),
                   // Plate IQ — display-only, does not affect Yard Score
                   (()=>{ const _piq=computePlateIQ(b); return _piq ?? ''; })(),
                   (()=>{ const _g=plateIQGrade(computePlateIQ(b)); return _g?.label||''; })(),
@@ -18614,11 +18697,14 @@ function BvPHistoryTab({ data }) {
           <button onClick={()=>{
             const dq = String.fromCharCode(34);
             const esc = v => dq+String(v==null?'':v).replace(new RegExp(dq,'g'),dq+dq)+dq;
-            const headers = ['Tm','Batter','Opp','Pitcher','Hand','PA','AB','H','HR','1B','2B','3B','BB','K','SB','AVG','OBP','SLG'];
+            // No Game ID here — this is a season-long BvP aggregate (spans every
+            // meeting between the two, not one game), so a per-row game doesn't
+            // apply. Batter/Pitcher ID still added as stable join keys.
+            const headers = ['Tm','Batter','Opp','Pitcher','Hand','PA','AB','H','HR','1B','2B','3B','BB','K','SB','AVG','OBP','SLG','Batter ID','Pitcher ID'];
             const rows2 = filtered.map(r=>[
               r.team, r.batter, r.opp, r.pitcher, r.pitcherHand+'HP',
               r.pa, r.ab, r.h, r.hr, r.b1, r.b2, r.b3, r.bb, r.k, r.sb,
-              r.avg, r.obp, r.slg
+              r.avg, r.obp, r.slg, r.batterId||'', r.pitcherId||''
             ].map(esc).join(','));
             const csv = '\uFEFF' + headers.join(',') + '\n' + rows2.join('\n');
             const a = document.createElement('a');
@@ -19385,7 +19471,10 @@ function BatterLeaderboard() {
           const teamLabel = teamFilter !== 'all' ? `-${teamFilter}` : '';
           const f3 = v => (v != null && v > 0) ? '.' + String(Math.round(v * 1000)).padStart(3, '0') : '';
           const f1 = v => (v != null && v > 0) ? v.toFixed(1) : '';
-          const hdrs = ['Batter','Team','PA','Avg EV','95+ EV','100+ EV','Brl%','HH%','FB%','GB%','Avg LA','BA','OBP','SLG','OPS','HR','L7 HR','H','XBH','K%','BB%','BSPD'];
+          // No Game ID — this is a season/L7/L14/L30 window aggregate (spans
+          // many games per row), so a per-row game doesn't apply. Batter ID
+          // still added as a stable join key.
+          const hdrs = ['Batter','Team','PA','Avg EV','95+ EV','100+ EV','Brl%','HH%','FB%','GB%','Avg LA','BA','OBP','SLG','OPS','HR','L7 HR','H','XBH','K%','BB%','BSPD','Batter ID'];
           const rows = [hdrs.map(esc).join(',')];
           // Export the current filtered+sorted view — ws() gives window-aware values
           filtered.forEach(p => {
@@ -19421,6 +19510,7 @@ function BatterLeaderboard() {
               esc(f1(ws(p,'kPct'))),
               esc(f1(ws(p,'bbPct'))),
               esc(bspdRaw > 0 ? bspdRaw.toFixed(1) : ''),
+              esc(pid||''),
             ].join(','));
           });
           const a = document.createElement('a');
@@ -22025,6 +22115,8 @@ function SoCloseTab({ data }) {
         const closeCount = parseInt(b.so_close_count||0);
         return {
           bid, pid,
+          gameId:    b.game_id || '',
+          pitcherId: parseInt(b.pitcher_id)||0,
           name:      b.batter || '',
           team:      b.batting_team || '',
           pitcher:   b.pitcher || '',
@@ -22079,11 +22171,12 @@ function SoCloseTab({ data }) {
 
   // ── Export ─────────────────────────────────────────────────────────────────
   const handleExport = () => {
-    const headers = ['Batter','Team','Pitcher','P.Grade','Yard','Close Calls','Max Dist(ft)','Max EV','L7 EV','Sim TB','ISO','On Tear','Near-Misses'];
+    const headers = ['Batter','Team','Pitcher','P.Grade','Yard','Close Calls','Max Dist(ft)','Max EV','L7 EV','Sim TB','ISO','On Tear','Near-Misses','Game ID','Batter ID','Pitcher ID'];
     const csvRows = rows.map(r => [
       r.name, r.team, r.pitcher, r.pgLabel, r._yard, r.count,
       r.max_dist, r.max_ev, r.rec_ev, r.sim_tb, r.iso,
-      r.on_tear?'YES':'', `"${r.reasons}"`
+      r.on_tear?'YES':'', `"${r.reasons}"`,
+      r.gameId||'', r.bid||'', r.pitcherId||'',
     ].join(','));
     const blob = new Blob([headers.join(',')+'\n'+csvRows.join('\n')], {type:'text/csv'});
     const url = URL.createObjectURL(blob);
@@ -28527,10 +28620,14 @@ function TrackRecordTab() {
         const obRows = obText ? parseCSV(obText) : [];
         const bcRows = bcText ? parseCSV(bcText) : [];
 
-        // Ball carry lookup — keyed by date+team (matches EITHER the home or
-        // away team of that game), not Game ID, so it works uniformly for
-        // every historical export (none of which had a literal Game ID column
-        // before 2026-07-22) as well as going forward. See PROMPT_BallCarryTracker.md.
+        // Ball carry lookup — keyed by Game ID (primary) with a date+team
+        // fallback for rows that predate Game ID being added to the export
+        // (before 2026-07-22). Game ID is the correct key: a date+team key
+        // collides on doubleheader days (2 games, same date+team) and the
+        // second game's verdict silently overwrote the first's for every
+        // batter on that team that day — confirmed 2026-07-23, see CLAUDE.md
+        // "Ball Carry live/offline divergence fix". Game ID disambiguates
+        // the two games cleanly.
         const carryLookup = {};
         bcRows.forEach(r => {
           const d = normDate(r.date || '');
@@ -28541,6 +28638,8 @@ function TrackRecordTab() {
             deadThr:    r.dead_threshold_ft   != null && r.dead_threshold_ft   !== '' ? parseFloat(r.dead_threshold_ft)   : null,
             juicedThr:  r.juiced_threshold_ft != null && r.juiced_threshold_ft !== '' ? parseFloat(r.juiced_threshold_ft) : null,
           };
+          const gid = (r['Game ID'] || '').toString().trim();
+          if (gid) carryLookup[`gid_${gid}`] = entry;
           const home = (r.home_team || '').trim().toUpperCase();
           const away = (r.away_team || '').trim().toUpperCase();
           if (home) carryLookup[`${d}_${home}`] = entry;
@@ -28610,7 +28709,8 @@ function TrackRecordTab() {
           const name  = (r.Batter || '').trim().toLowerCase();
           const blRow = blLookup[`${date}_${name}`] || {};
           const obRow = obLookup[`${date}_${name}`] || {};
-          const carryRow = carryLookup[`${date}_${(r.Team||'').trim().toUpperCase()}`] || null;
+          const carryRow = carryLookup[`gid_${(r['Game ID']||'').toString().trim()}`]
+            || carryLookup[`${date}_${(r.Team||'').trim().toUpperCase()}`] || null;
           const tbSignal = (obRow['TB Signal']||'').toString().trim() === '1';
           const pitcherNameRaw = r['vs Pitcher'] || blRow['Pitcher'] || '';
           const batterId  = resolveId(r.Batter, r.Team);
@@ -28671,6 +28771,7 @@ function TrackRecordTab() {
             date,
             batter:       r['Batter']         || '',
             batterId, pitcherId,
+            gameId:       r['Game ID']        || '',
             team:         r['Team']           || '',
             hand:         r['Hand']           || '',
             pitcher:      r['vs Pitcher']     || blRow['Pitcher'] || '',
@@ -28793,6 +28894,13 @@ function TrackRecordTab() {
 
   const summary = useMemo(() => {
     const hrs          = dateRows.filter(r => r.wentYard);
+    // Real total HR count (sums the per-row HR field — correctly 2+ for a
+    // multi-HR game) vs. hrs.length above (a headcount of batter-appearances
+    // that went yard at least once — undercounts multi-HR games by design,
+    // since it's one row per batter regardless of how many they hit). See
+    // CLAUDE.md "Track Record ACTUAL HRs card" session log — the two numbers
+    // measure different things on purpose; kept both rather than picking one.
+    const totalHR      = dateRows.reduce((s, r) => s + (r.actualHR || 0), 0);
     const signals      = dateRows.filter(r => r.brlSignal);
     const signalHits   = signals.filter(r => r.wentYard);
     const keyMatchups  = dateRows.filter(r => r.isKeyMatchup);
@@ -28836,7 +28944,7 @@ function TrackRecordTab() {
       .sort((a,b) => b.yardScore - a.yardScore)[0];
     const biggestUpset = [...dateRows.filter(r => r.wentYard)]
       .sort((a,b) => a.yardScore - b.yardScore)[0];
-    return { hrs, signals, signalHits, keyMatchups, kmHits,
+    return { hrs, totalHR, signals, signalHits, keyMatchups, kmHits,
              longshots, lsHits, weakSlots, weakSlotHits, sauce2, sauce2Hits, twoBaggers, tbSignals, tbSignalHits, simTB2, simTB2Hits,
              highIQBatters, highIQHRHits, highIQTB2Hits, handMatches, handMatchHits,
              deadGame, deadGameHits, juicedGame, juicedGameHits, topYS, biggestMiss, biggestUpset };
@@ -28915,7 +29023,7 @@ function TrackRecordTab() {
       </select>
 
       <span style={{fontFamily:mono, fontSize:9, color:'var(--muted)'}}>
-        {dateRows.length} batters scored · {summary.hrs.length} HRs
+        {dateRows.length} batters scored · {summary.totalHR} HRs
       </span>
     </div>
 
@@ -28944,7 +29052,12 @@ function TrackRecordTab() {
       <div style={{padding:'10px 14px', display:'flex', gap:8,
         overflowX:'auto', WebkitOverflowScrolling:'touch'}}>
         {[
-          { label:'ACTUAL HRs',     value: summary.hrs.length,    color:'var(--accent)' },
+          // Two distinct, deliberately separate numbers — see the 'totalHR'
+          // comment in the summary useMemo above. "Batters Who Went Yard" is
+          // a headcount (one per batter-appearance, even on a 2-HR game);
+          // "Total HRs" sums the actual per-row HR count.
+          { label:'BATTERS WHO WENT YARD', value: summary.hrs.length,  color:'var(--accent)' },
+          { label:'TOTAL HRs',       value: summary.totalHR,      color:'var(--accent)' },
           {
             label:'KEY MATCHUP HIT RATE',
             value: summary.keyMatchups.length
@@ -29225,7 +29338,8 @@ function TrackRecordTab() {
               'PulledBrl%','Brl/BIP','HR/FB','FB%','HH%',
               'Plate IQ','IQ Grade','Zone Risk','Hand Match',
               'Went Yard','HR','AB','H','TB','RBI','BB','K','Avg EV','Launch Angle',
-              'Live Close Calls','Live CC Max EV','Live CC Max Dist','Ball Carry'];
+              'Live Close Calls','Live CC Max EV','Live CC Max Dist','Ball Carry',
+              'Game ID','Batter ID','Pitcher ID'];
             const csvRows = [headers.map(esc).join(',')];
             filteredRows.forEach(r => {
               csvRows.push([
@@ -29245,6 +29359,7 @@ function TrackRecordTab() {
                 r.actualTB || 0, r.actualRBI || 0, r.actualBB || 0, r.actualK || 0,
                 r.actualEV || '', r.actualLA || '',
                 r.closeCalls || 0, r.ccMaxEV || '', r.ccMaxDist || '', r.ballCarryVerdict || '',
+                r.gameId || '', r.batterId || '', r.pitcherId || '',
               ].map(esc).join(','));
             });
             const blob = new Blob(['﻿'+csvRows.join('\n')], {type:'text/csv;charset=utf-8;'});
@@ -32554,7 +32669,7 @@ function BarrelLabTab() {
       : scoredBatters;
     toGroup.forEach(b => {
       const t = b.batting_team || '?';
-      if (!teams[t]) teams[t] = { batters:[], pitcher: b.pitcher, pitcherHand: b.pitcher_hand, pgLabel: b._pgLabel || '', pitcherGB: parseFloat(b.gb_pct_p || b.pitcher_gb_pct || 45) };
+      if (!teams[t]) teams[t] = { batters:[], pitcher: b.pitcher, pitcherId: b.pitcher_id, pitcherHand: b.pitcher_hand, pgLabel: b._pgLabel || '', pitcherGB: parseFloat(b.gb_pct_p || b.pitcher_gb_pct || 45) };
       teams[t].batters.push(b);
     });
     return teams;
@@ -32972,7 +33087,9 @@ function BarrelLabTab() {
                         {b.batting_team} · {b.batter_hand}v{(b.pitcher_hand||'').charAt(0)}
                       </div>
                       <div style={{fontFamily:mono,fontSize:7,color:pgCol(getHandSpecificGrade(b)),whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                        vs {b.pitcher||'?'} · {getHandSpecificGrade(b) || '—'}
+                        vs <span
+                          onClick={e=>{e.stopPropagation(); if(b.pitcher_id) openPitcherSlide({pid:parseInt(b.pitcher_id)||0,name:b.pitcher,team:'',hand:b.pitcher_hand||'',pitchMix:[]});}}
+                          style={{cursor:'pointer',textDecoration:'underline dotted'}}>{b.pitcher||'?'}</span> · {getHandSpecificGrade(b) || '—'}
                       </div>
                     </div>
                   </div>
@@ -33105,7 +33222,8 @@ function BarrelLabTab() {
                               </div>
                             </div>
                           </td>
-                          {!selGame && <td style={{padding:'4px 6px',color:'var(--muted)',fontFamily:mono,fontSize:8,whiteSpace:'nowrap'}}>{b.pitcher||'—'}</td>}
+                          {!selGame && <td style={{padding:'4px 6px',color:'var(--muted)',fontFamily:mono,fontSize:8,whiteSpace:'nowrap',cursor:b.pitcher_id?'pointer':'default',textDecoration:b.pitcher_id?'underline dotted':'none'}}
+                            onClick={()=>{ if(b.pitcher_id) openPitcherSlide({pid:parseInt(b.pitcher_id)||0,name:b.pitcher,team:'',hand:b.pitcher_hand||'',pitchMix:[]}); }}>{b.pitcher||'—'}</td>}
                           {!selGame && (() => { const _g = getHandSpecificGrade(b); return (
                             <td style={{padding:'4px 6px',color:pgCol(_g),fontFamily:mono,fontSize:8,whiteSpace:'nowrap'}}>{_g || '—'}</td>
                           ); })()}
@@ -33157,11 +33275,13 @@ function BarrelLabTab() {
             }
 
             // Per-game view — grouped by team
-            return Object.entries(byTeam).map(([team, {batters:tBatters, pitcher, pitcherHand, pgLabel, pitcherGB}]) => (
+            return Object.entries(byTeam).map(([team, {batters:tBatters, pitcher, pitcherId, pitcherHand, pgLabel, pitcherGB}]) => (
               <div key={team} style={{marginBottom:20}}>
                 <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',
                   textTransform:'uppercase',letterSpacing:.8,marginBottom:4}}>
-                  {team} hitters vs {pitcher || '?'} ({(pitcherHand||'').charAt(0)})
+                  {team} hitters vs <span
+                    onClick={()=>{ if(pitcherId) openPitcherSlide({pid:parseInt(pitcherId)||0,name:pitcher,team:'',hand:pitcherHand||'',pitchMix:[]}); }}
+                    style={{cursor: pitcherId ? 'pointer' : 'default', textDecoration: pitcherId ? 'underline dotted' : 'none'}}>{pitcher || '?'}</span> ({(pitcherHand||'').charAt(0)})
                   {' · '}<span style={{color: pgLabel.includes('Elite')||pgLabel.includes('Tough') ? '#ff6b6b' : pgLabel.includes('Target')||pgLabel.includes('Hittable') ? '#27c97a' : 'var(--muted)'}}>{pgLabel}</span>
                   {pitcherGB > 50 && (
                     <span style={{color:'#f5a623',marginLeft:8}}>
@@ -33437,7 +33557,7 @@ function OnBaseTab() {
       : onbaseScored;
     toGroup.forEach(b => {
       const t = b.batting_team || '?';
-      if (!teams[t]) teams[t] = { batters:[], pitcher: b.pitcher, pitcherHand: b.pitcher_hand, pgLabel: b._pgLabel || '' };
+      if (!teams[t]) teams[t] = { batters:[], pitcher: b.pitcher, pitcherId: b.pitcher_id, pitcherHand: b.pitcher_hand, pgLabel: b._pgLabel || '' };
       teams[t].batters.push(b);
     });
     return teams;
@@ -33836,7 +33956,9 @@ function OnBaseTab() {
                         {b.batting_team} · {b.batter_hand}v{(b.pitcher_hand||'').charAt(0)}
                       </div>
                       <div style={{fontFamily:mono,fontSize:7,color:pgCol(getHandSpecificGrade(b)),whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                        vs {b.pitcher||'?'} · {getHandSpecificGrade(b) || '—'}
+                        vs <span
+                          onClick={e=>{e.stopPropagation(); if(b.pitcher_id) openPitcherSlide({pid:parseInt(b.pitcher_id)||0,name:b.pitcher,team:'',hand:b.pitcher_hand||'',pitchMix:[]});}}
+                          style={{cursor:'pointer',textDecoration:'underline dotted'}}>{b.pitcher||'?'}</span> · {getHandSpecificGrade(b) || '—'}
                       </div>
                     </div>
                   </div>
@@ -33960,7 +34082,8 @@ function OnBaseTab() {
                               {fin && <span style={{fontSize:7,color:'var(--muted)',border:'1px solid var(--border)',borderRadius:3,padding:'1px 3px'}}>FINAL</span>}
                             </div>
                           </td>
-                          {!selGame && <td style={{padding:'4px 6px',color:'var(--muted)',fontFamily:mono,fontSize:8,whiteSpace:'nowrap'}}>{b.pitcher||'—'}</td>}
+                          {!selGame && <td style={{padding:'4px 6px',color:'var(--muted)',fontFamily:mono,fontSize:8,whiteSpace:'nowrap',cursor:b.pitcher_id?'pointer':'default',textDecoration:b.pitcher_id?'underline dotted':'none'}}
+                            onClick={()=>{ if(b.pitcher_id) openPitcherSlide({pid:parseInt(b.pitcher_id)||0,name:b.pitcher,team:'',hand:b.pitcher_hand||'',pitchMix:[]}); }}>{b.pitcher||'—'}</td>}
                           {!selGame && (() => { const _g = getHandSpecificGrade(b); return (
                             <td style={{padding:'4px 6px',color:pgCol(_g),fontFamily:mono,fontSize:8,whiteSpace:'nowrap'}}>{_g || '—'}</td>
                           ); })()}
@@ -34010,11 +34133,13 @@ function OnBaseTab() {
               );
             }
 
-            return Object.entries(byTeam).map(([team, {batters:tBatters, pitcher, pitcherHand, pgLabel}]) => (
+            return Object.entries(byTeam).map(([team, {batters:tBatters, pitcher, pitcherId, pitcherHand, pgLabel}]) => (
               <div key={team} style={{marginBottom:20}}>
                 <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',
                   textTransform:'uppercase',letterSpacing:.8,marginBottom:4}}>
-                  {team} hitters vs {pitcher || '?'} ({(pitcherHand||'').charAt(0)})
+                  {team} hitters vs <span
+                    onClick={()=>{ if(pitcherId) openPitcherSlide({pid:parseInt(pitcherId)||0,name:pitcher,team:'',hand:pitcherHand||'',pitchMix:[]}); }}
+                    style={{cursor: pitcherId ? 'pointer' : 'default', textDecoration: pitcherId ? 'underline dotted' : 'none'}}>{pitcher || '?'}</span> ({(pitcherHand||'').charAt(0)})
                   {' · '}<span style={{color: pgLabel.includes('Elite')||pgLabel.includes('Tough') ? '#ff6b6b' : pgLabel.includes('Target')||pgLabel.includes('Hittable') ? '#27c97a' : 'var(--muted)'}}>{pgLabel}</span>
                 </div>
                 {renderTable(sortBatters(tBatters))}

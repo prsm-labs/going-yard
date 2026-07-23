@@ -31,14 +31,29 @@
 // assumed from a public formula.
 //
 // CARRY_COEFFS / PARK_CARRY_BASELINE / thresholds below are a
-// periodically-refreshed SNAPSHOT (validated against the full 2026
-// season AB log, 2026-07-22 — see output/ball_carry_research/ and
-// output/ball_carry_by_game.csv). They are NOT auto-generated — re-run
+// periodically-refreshed SNAPSHOT. They are NOT auto-generated — re-run
 // ball_carry_tracker.py and update these constants by hand if the
 // printed reference values drift meaningfully as the season progresses.
+// Refreshed 2026-07-23 (see CLAUDE.md "Ball Carry live/offline divergence
+// fix" session log): coefficients refit fresh against the current AB log
+// (barely moved from the 07-22 snapshot — <0.2ft expected-distance effect
+// at typical EV/LA); park baselines pulled from today's
+// output/ball_carry_by_game.csv.
+//
+// Known residual (not fixable here): even with the quality-ball filter
+// now matching ball_carry_tracker.py exactly (same balls get selected),
+// this endpoint's real-time hitData.totalDistance runs ~1-2ft long vs.
+// the finalized Statcast Hit Distance that eventually lands in the AB
+// log for the SAME batted ball (confirmed 2026-07-23, cross-checked
+// ball-by-ball on a real game) — an inherent live-estimate-vs-final-
+// reconciled-data gap, not a bug. On a genuinely borderline game (park-
+// adj deviation within ~3ft of a threshold) this can still occasionally
+// disagree with the offline verdict; it will no longer disagree because
+// of counting a different SET of balls, which was the dominant failure
+// mode before this fix.
 
 const CARRY_COEFFS = [
-  -365.51703, 3.86136, 20.47412, -0.0009, -0.35831, 0.02915, -13.72599, -11.96359,
+  -365.71759, 3.86423, 20.45814, -0.00091, -0.35807, 0.02922, -13.70602, -11.8523,
 ];
 // [intercept, EV, LA, EV^2, LA^2, EV*LA, is_pull, is_oppo] — is_pull/is_oppo
 // are relative to Center (the implicit baseline when both are 0).
@@ -50,14 +65,13 @@ const CARRY_COEFFS = [
 const CENTER_LO = 80, CENTER_HI = 100;
 
 // Home park -> that park's own seasonal mean carry deviation (ft), used
-// to park/altitude-adjust before classifying. Snapshot from 2026-07-22
-// (direction-corrected model).
+// to park/altitude-adjust before classifying. Refreshed 2026-07-23.
 const PARK_CARRY_BASELINE = {
-  COL: 19.99, KC: 12.37, ATH: 11.04, TEX: 10.96, MIL: 9.46, AZ: 8.96,
-  TB: 8.81, SF: 8.55, MIA: 8.13, DET: 7.17, ATL: 6.81, TOR: 6.74,
-  PHI: 6.00, WSH: 5.90, STL: 4.48, LAD: 4.11, MIN: 3.66, BOS: 3.35,
-  PIT: 2.99, SEA: 2.81, CHC: 2.46, BAL: 1.60, HOU: 1.07, NYY: 0.62,
-  CLE: 0.45, CIN: 0.45, NYM: -1.23, SD: -1.60, CWS: -1.86, LAA: -2.43,
+  COL: 19.73, KC: 12.24, ATH: 11.02, TEX: 10.82, MIL: 9.19, AZ: 9.13,
+  TB: 8.81, SF: 8.53, MIA: 8.12, DET: 7.15, TOR: 6.93, ATL: 6.77,
+  PHI: 6.02, WSH: 5.89, STL: 4.45, LAD: 4.08, MIN: 3.65, BOS: 3.06,
+  PIT: 2.97, SEA: 2.48, CHC: 2.26, BAL: 1.58, HOU: 1.37, NYY: 0.57,
+  CLE: 0.57, CIN: 0.43, NYM: -1.25, SD: -1.61, CWS: -1.86, LAA: -2.44,
 };
 
 const DEAD_THRESHOLD_FT   = -11.8; // park-adjusted deviation <= this -> DEAD
@@ -119,12 +133,18 @@ export default async function handler(req, res) {
       const ev   = parseFloat(hd.launchSpeed || 0);
       const la   = hd.launchAngle;
       const dist = parseFloat(hd.totalDistance || 0);
-      const traj = hd.trajectory || '';
 
-      // Quality contact only — same filter as the historical model's
-      // per-game aggregation (EV>=95, LA 15-40, dist>=200, fly ball/line drive)
-      if (ev < 95 || la == null || la < 15 || la > 40 || dist < 200) continue;
-      if (!['fly_ball', 'line_drive'].includes(traj)) continue;
+      // Quality contact only — must match ball_carry_tracker.py's actual
+      // per-game aggregation filter EXACTLY (EV>=95, LA 15-35, dist>=150,
+      // no trajectory filter — confirmed 2026-07-23 these two filters had
+      // drifted apart: this endpoint was using LA<=40/dist>=200/trajectory-
+      // required, none of which match the offline script it's supposed to
+      // mirror. That mismatch caused real verdict flips on borderline games
+      // — e.g. CHC@DET 2026-07-21 read DEAD offline (7 balls, LA<=35) but
+      // NORMAL here (8 balls, a 39° fly ball only admitted under the old
+      // LA<=40 cutoff). See CLAUDE.md "Ball Carry live/offline divergence
+      // fix" session log.
+      if (ev < 95 || la == null || la < 15 || la > 35 || dist < 150) continue;
 
       const batHand = play.matchup?.batSide?.code || null;
       const coords = hd.coordinates || {};
