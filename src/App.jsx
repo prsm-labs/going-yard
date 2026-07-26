@@ -28416,7 +28416,7 @@ function LegendButton() {
       'MatchupScore (0–100) — pitcher-adjusted vulnerability score for this specific batter/pitcher pairing.',
       '★ Barrel Signal — TrueHRScore ≥75 AND MatchupScore ≥60 AND simulated HR% ≥12%. Strict flag, live tracker: 16.9% HR rate.',
       '🎲 Longshot — TrueHRScore ≤55, MatchupScore ≥65, Sim TB ≥1.2, non-elite pitcher. Mutually exclusive with Barrel Signal by construction.',
-      '⭐⭐ / ⭐ Hand Match — batter\'s handedness exploits the opposing pitcher\'s weakness. ⭐⭐ (full): platoon advantage + pitcher genuinely weak vs that hand (elevated HR/HH/Barrel% allowed) + batter historically strong vs that hand. ⭐ (partial): cross-handed with strong pitch-mix fit (ps_convergence ≥8) even when the pitcher\'s overall vs-hand rates aren\'t clearly weak yet — e.g. a LHB who crushes fastballs matched against a fastball-heavy RHP.',
+      '⭐⭐⭐ / ⭐⭐ / ⭐ Hand Match — batter\'s handedness exploits the opposing pitcher\'s weakness. ⭐⭐ (full): platoon advantage + pitcher genuinely weak vs that hand (elevated HR/HH/Barrel% allowed) + batter historically strong vs that hand. ⭐ (partial): cross-handed with strong pitch-mix fit (ps_convergence ≥8) even when the pitcher\'s overall vs-hand rates aren\'t clearly weak yet — e.g. a LHB who crushes fastballs matched against a fastball-heavy RHP. ⭐⭐⭐ (elite): the "diamond in the rough" tier — full\'s aggregate weakness AND partial\'s pitch-mix fit AND an elite vs-hand HR rate (≥10%) all at once. Very rare (~6 of 1,450 matchups on a typical slate).',
       '💥 Gone Yard / 2️⃣ 2+ TB Today badges and filters — same definitions as everywhere else in the app.',
       '🟢 Weak Spot row highlight — batter sitting in the opposing pitcher\'s historically weak lineup slot.',
       '🟣 Rain Watch / ⚠️ Rain Risk row highlight — game-time precipitation caution (🟣 ≥70%, ⚠️ ≥80% or thunder in the forecast). Uses the peak rain chance across the game\'s ~3hr window, not just the first-pitch hour — a storm arriving mid-game still means real rain risk (delay/postponement, wet-grip contact effects).',
@@ -28427,7 +28427,7 @@ function LegendButton() {
       'MatchupScore (0–100) — pitcher-adjusted vulnerability, same concept as Barrel Lab\'s.',
       'SimTB2% — simulated probability of reaching 2+ total bases in the game.',
       '★ TB Signal — OnBaseScore ≥75 AND MatchupScore ≥60 AND SimTB2% ≥30%. Very new signal — live tracker: 38.0% hit rate, still a small sample.',
-      'Same 💥 / 2️⃣ / 🟢 Weak Spot / ⭐⭐ Hand Match / 🟣 Rain Watch badges and filters as Barrel Lab.',
+      'Same 💥 / 2️⃣ / 🟢 Weak Spot / ⭐⭐⭐ Hand Match / 🟣 Rain Watch badges and filters as Barrel Lab.',
     ] },
     { tab:'📋 Track Record',   items:[
       'The self-auditing page — merges the daily All Matchups, Barrel Lab, and On Base exports against actual box-score outcomes, every day, automatically.',
@@ -28584,6 +28584,7 @@ function TrackRecordTab() {
   const [showOnlyHighIQ, setShowOnlyHighIQ] = useState(false);
   const [showOnlyHandMatch, setShowOnlyHandMatch] = useState(false);
   const [carryFilter,    setCarryFilter]    = useState(''); // '' | 'DEAD' | 'JUICED'
+  const [xhrFilter,      setXhrFilter]      = useState(''); // '' | 'DEAD' | 'JUICED'
   const [teamFilter,     setTeamFilter]     = useState('ALL');
 
   const [showMatchup,  setShowMatchup]  = useState(true);
@@ -28597,13 +28598,14 @@ function TrackRecordTab() {
     async function loadTrackRecord() {
       setLoading(true);
       try {
-        const [amRes, blRes, idRes, hrRes, obRes, bcRes] = await Promise.all([
+        const [amRes, blRes, idRes, hrRes, obRes, bcRes, xhrRes] = await Promise.all([
           fetch('/data/track-record-matchups.csv'),
           fetch('/data/track-record-barrel.csv'),
           fetch('/data/player_id.csv'),
           fetch('/data/track-record-hr.csv'),
           fetch('/data/track-record-onbase.csv'),
           fetch('/data/track-record-ball-carry.csv'),
+          fetch('/data/track-record-xhr.csv'),
         ]);
 
         const amText = await amRes.text();
@@ -28612,6 +28614,7 @@ function TrackRecordTab() {
         const hrText = hrRes.ok ? await hrRes.text() : '';
         const obText = obRes.ok ? await obRes.text() : '';
         const bcText = bcRes.ok ? await bcRes.text() : '';
+        const xhrText = xhrRes.ok ? await xhrRes.text() : '';
 
         const amRows = parseCSV(amText);
         const blRows = blText ? parseCSV(blText) : [];
@@ -28619,6 +28622,25 @@ function TrackRecordTab() {
         const hrRows = hrText ? parseCSV(hrText) : [];
         const obRows = obText ? parseCSV(obText) : [];
         const bcRows = bcText ? parseCSV(bcText) : [];
+        const xhrRows = xhrText ? parseCSV(xhrText) : [];
+
+        // xHR conversion lookup — keyed by Game ID only (this file has no
+        // pre-Game-ID history to fall back for; it didn't exist before
+        // 2026-07-25 — see CLAUDE.md "xHR Conversion Tracker" session log).
+        // Distinct signal from Ball Carry above: Ball Carry asks "did the
+        // ball fly as far as EV/LA implies"; xHR asks "did as many of these
+        // balls actually clear the fence as EV/LA/direction history says
+        // should have" — a more direct dead/juiced-ball diagnostic.
+        const xhrLookup = {};
+        xhrRows.forEach(r => {
+          const gid = (r['Game ID'] || '').toString().trim();
+          if (!gid) return;
+          xhrLookup[gid] = {
+            verdict: (r.verdict || '').trim().toUpperCase(),
+            z:       r.z    != null && r.z    !== '' ? parseFloat(r.z)    : null,
+            diff:    r.diff != null && r.diff !== '' ? parseFloat(r.diff) : null,
+          };
+        });
 
         // Ball carry lookup — keyed by Game ID (primary) with a date+team
         // fallback for rows that predate Game ID being added to the export
@@ -28711,6 +28733,7 @@ function TrackRecordTab() {
           const obRow = obLookup[`${date}_${name}`] || {};
           const carryRow = carryLookup[`gid_${(r['Game ID']||'').toString().trim()}`]
             || carryLookup[`${date}_${(r.Team||'').trim().toUpperCase()}`] || null;
+          const xhrRow = xhrLookup[(r['Game ID']||'').toString().trim()] || null;
           const tbSignal = (obRow['TB Signal']||'').toString().trim() === '1';
           const pitcherNameRaw = r['vs Pitcher'] || blRow['Pitcher'] || '';
           const batterId  = resolveId(r.Batter, r.Team);
@@ -28836,6 +28859,14 @@ function TrackRecordTab() {
             isBorderlineCarry: !!(carryRow && carryRow.verdict === 'NORMAL'
               && carryRow.deadThr != null && carryRow.juicedThr != null
               && Math.min(Math.abs(carryRow.dev - carryRow.deadThr), Math.abs(carryRow.dev - carryRow.juicedThr)) <= 3),
+            // xHR conversion (expected-vs-actual HR count, z-score based) —
+            // see CLAUDE.md "xHR Conversion Tracker" session log, 2026-07-25.
+            // Distinct from Ball Carry above — this is outcome-probability-
+            // based (did enough of these balls actually leave the park),
+            // not distance-based.
+            xhrVerdict: xhrRow?.verdict || '',
+            xhrZ:       xhrRow ? xhrRow.z    : null,
+            xhrDiff:    xhrRow ? xhrRow.diff : null,
           };
         });
 
@@ -28876,6 +28907,7 @@ function TrackRecordTab() {
     if (showOnlyHighIQ) rows = rows.filter(r => r.plateIQ != null && r.plateIQ >= 56);
     if (showOnlyHandMatch) rows = rows.filter(r => r.isHandMatch);
     if (carryFilter)    rows = rows.filter(r => r.ballCarryVerdict === carryFilter);
+    if (xhrFilter)       rows = rows.filter(r => r.xhrVerdict === xhrFilter);
     if (search) {
       const q = search.toLowerCase();
       rows = rows.filter(r =>
@@ -28890,7 +28922,7 @@ function TrackRecordTab() {
       }
       return sortDir * ((av||0) - (bv||0));
     });
-  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, showOnlyWeakSlot, showOnlyCC, showOnlySauce2, showOnly2Bagger, showOnlyTBSignal, showOnlySimTB2, showOnlyHighIQ, showOnlyHandMatch, carryFilter, search, sortCol, sortDir]);
+  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, showOnlyWeakSlot, showOnlyCC, showOnlySauce2, showOnly2Bagger, showOnlyTBSignal, showOnlySimTB2, showOnlyHighIQ, showOnlyHandMatch, carryFilter, xhrFilter, search, sortCol, sortDir]);
 
   const summary = useMemo(() => {
     const hrs          = dateRows.filter(r => r.wentYard);
@@ -28939,6 +28971,12 @@ function TrackRecordTab() {
     const deadGameHits   = deadGame.filter(r => r.wentYard);
     const juicedGame     = dateRows.filter(r => r.ballCarryVerdict === 'JUICED');
     const juicedGameHits = juicedGame.filter(r => r.wentYard);
+    // xHR conversion (dead/juiced diagnostic v2, 2026-07-25) — same HR-rate
+    // split convention as Ball Carry above, distinct underlying signal.
+    const xhrDead        = dateRows.filter(r => r.xhrVerdict === 'DEAD');
+    const xhrDeadHits    = xhrDead.filter(r => r.wentYard);
+    const xhrJuiced      = dateRows.filter(r => r.xhrVerdict === 'JUICED');
+    const xhrJuicedHits  = xhrJuiced.filter(r => r.wentYard);
     const topYS        = [...dateRows].sort((a,b) => b.yardScore - a.yardScore)[0];
     const biggestMiss   = [...dateRows.filter(r => !r.wentYard)]
       .sort((a,b) => b.yardScore - a.yardScore)[0];
@@ -28947,7 +28985,8 @@ function TrackRecordTab() {
     return { hrs, totalHR, signals, signalHits, keyMatchups, kmHits,
              longshots, lsHits, weakSlots, weakSlotHits, sauce2, sauce2Hits, twoBaggers, tbSignals, tbSignalHits, simTB2, simTB2Hits,
              highIQBatters, highIQHRHits, highIQTB2Hits, handMatches, handMatchHits,
-             deadGame, deadGameHits, juicedGame, juicedGameHits, topYS, biggestMiss, biggestUpset };
+             deadGame, deadGameHits, juicedGame, juicedGameHits,
+             xhrDead, xhrDeadHits, xhrJuiced, xhrJuicedHits, topYS, biggestMiss, biggestUpset };
   }, [dateRows]);
 
   const GroupBar = ({ label, open, onToggle, color }) => (
@@ -29154,6 +29193,22 @@ function TrackRecordTab() {
             sub: `${summary.deadGameHits.length}/${summary.deadGame.length}`,
             color:'#38b8f2'
           },
+          {
+            label:'⬆️ xHR JUICED HR RATE',
+            value: summary.xhrJuiced.length
+              ? `${((summary.xhrJuicedHits.length/summary.xhrJuiced.length)*100).toFixed(0)}%`
+              : '—',
+            sub: `${summary.xhrJuicedHits.length}/${summary.xhrJuiced.length}`,
+            color:'#a78bfa'
+          },
+          {
+            label:'⬇️ xHR DEAD HR RATE',
+            value: summary.xhrDead.length
+              ? `${((summary.xhrDeadHits.length/summary.xhrDead.length)*100).toFixed(0)}%`
+              : '—',
+            sub: `${summary.xhrDeadHits.length}/${summary.xhrDead.length}`,
+            color:'#f472b6'
+          },
         ].map(card => (
           <div key={card.label} style={{
             background:'var(--surface2)', border:'1px solid var(--border)',
@@ -29300,7 +29355,7 @@ function TrackRecordTab() {
         </button>
 
         <button onClick={() => setShowOnlyHandMatch(v=>!v)}
-          title="Batter's handedness exploits the opposing pitcher's weakness (⭐⭐ full or ⭐ partial) — same flag as Barrel Lab/On Base's Hand Match filter. Display-only, does not affect Yard Score."
+          title="Batter's handedness exploits the opposing pitcher's weakness (⭐⭐⭐ elite, ⭐⭐ full, or ⭐ partial) — same flag as Barrel Lab/On Base's Hand Match filter. Display-only, does not affect Yard Score."
           style={{padding:'4px 10px', borderRadius:6, border:'none',
             cursor:'pointer', fontFamily:mono, fontSize:9, fontWeight:700,
             background: showOnlyHandMatch ? 'rgba(251,191,36,.15)' : 'var(--surface2)',
@@ -29327,6 +29382,26 @@ function TrackRecordTab() {
           🔵 Dead Ball Only
         </button>
 
+        <button onClick={() => setXhrFilter(v => v === 'JUICED' ? '' : 'JUICED')}
+          title="xHR conversion (expected-vs-actual HR count) — distinct from Ball Carry above"
+          style={{padding:'4px 10px', borderRadius:6, border:'none',
+            cursor:'pointer', fontFamily:mono, fontSize:9, fontWeight:700,
+            background: xhrFilter==='JUICED' ? 'rgba(167,139,250,.15)' : 'var(--surface2)',
+            color:       xhrFilter==='JUICED' ? '#a78bfa' : 'var(--muted)',
+            border: `1px solid ${xhrFilter==='JUICED' ? 'rgba(167,139,250,.4)' : 'var(--border)'}` }}>
+          ⬆️ xHR Juiced Only
+        </button>
+
+        <button onClick={() => setXhrFilter(v => v === 'DEAD' ? '' : 'DEAD')}
+          title="xHR conversion (expected-vs-actual HR count) — distinct from Ball Carry above"
+          style={{padding:'4px 10px', borderRadius:6, border:'none',
+            cursor:'pointer', fontFamily:mono, fontSize:9, fontWeight:700,
+            background: xhrFilter==='DEAD' ? 'rgba(244,114,182,.15)' : 'var(--surface2)',
+            color:       xhrFilter==='DEAD' ? '#f472b6' : 'var(--muted)',
+            border: `1px solid ${xhrFilter==='DEAD' ? 'rgba(244,114,182,.4)' : 'var(--border)'}` }}>
+          ⬇️ xHR Dead Only
+        </button>
+
         <button id="track-record-csv-trigger" onClick={() => {
             if (!filteredRows.length) return;
             const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
@@ -29338,7 +29413,7 @@ function TrackRecordTab() {
               'PulledBrl%','Brl/BIP','HR/FB','FB%','HH%',
               'Plate IQ','IQ Grade','Zone Risk','Hand Match',
               'Went Yard','HR','AB','H','TB','RBI','BB','K','Avg EV','Launch Angle',
-              'Live Close Calls','Live CC Max EV','Live CC Max Dist','Ball Carry',
+              'Live Close Calls','Live CC Max EV','Live CC Max Dist','Ball Carry','xHR Verdict',
               'Game ID','Batter ID','Pitcher ID'];
             const csvRows = [headers.map(esc).join(',')];
             filteredRows.forEach(r => {
@@ -29358,7 +29433,7 @@ function TrackRecordTab() {
                 r.wentYard ? 'YES' : '', r.actualHR || 0, r.actualAB || 0, r.actualH || 0,
                 r.actualTB || 0, r.actualRBI || 0, r.actualBB || 0, r.actualK || 0,
                 r.actualEV || '', r.actualLA || '',
-                r.closeCalls || 0, r.ccMaxEV || '', r.ccMaxDist || '', r.ballCarryVerdict || '',
+                r.closeCalls || 0, r.ccMaxEV || '', r.ccMaxDist || '', r.ballCarryVerdict || '', r.xhrVerdict || '',
                 r.gameId || '', r.batterId || '', r.pitcherId || '',
               ].map(esc).join(','));
             });
@@ -29436,7 +29511,7 @@ function TrackRecordTab() {
                   <SortTh col="brlSignal" label="Signal" color="#38b8f2"/>
                   <SortTh col="isLongshot" label="Longshot" color="#38b8f2"/>
                   <SortTh col="plateIQ" label="IQ" color="#38b8f2" title="Plate IQ — display-only, does not affect Yard Score. See Legend for details."/>
-                  <SortTh col="handMatchTier" label="Hand" color="#38b8f2" title="Hand Match — batter's handedness exploits the opposing pitcher's weakness (full or partial). See Legend for details."/>
+                  <SortTh col="handMatchTier" label="Hand" color="#38b8f2" title="Hand Match — batter's handedness exploits the opposing pitcher's weakness (elite, full, or partial). See Legend for details."/>
                 </>}
 
                 {showBoxScore && <>
@@ -29453,6 +29528,8 @@ function TrackRecordTab() {
                   <SortTh col="ccMaxDist" label="CC Dist" color="#27c97a"/>
                   <SortTh col="ballCarryVerdict" label="Ball Carry" color="#27c97a"
                     title="Dead ball / juiced ball verdict for this game (park/elevation-adjusted, not weather-adjusted)"/>
+                  <SortTh col="xhrVerdict" label="xHR" color="#27c97a"
+                    title="xHR conversion verdict — did as many of this game's batted balls actually clear the fence as EV/LA/direction history predicts (z-score based, distinct from Ball Carry)"/>
                 </>}
               </tr>
             </thead>
@@ -29577,9 +29654,9 @@ function TrackRecordTab() {
                       </td>
                       <td style={{padding:'3px 6px', textAlign:'center'}}>
                         {r.handMatchTier && <span
-                          title={r.handMatchTier==='full' ? 'Hand Match (full)' : 'Partial Hand Match'}
-                          style={{color:'#fbbf24', opacity:r.handMatchTier==='full'?1:.6}}>
-                          {r.handMatchTier==='full' ? '⭐⭐' : '⭐'}
+                          title={r.handMatchTier==='elite' ? 'Hand Match (elite)' : r.handMatchTier==='full' ? 'Hand Match (full)' : 'Partial Hand Match'}
+                          style={{color:'#fbbf24', opacity:r.handMatchTier==='partial'?.6:1}}>
+                          {r.handMatchTier==='elite' ? '⭐⭐⭐' : r.handMatchTier==='full' ? '⭐⭐' : '⭐'}
                         </span>}
                       </td>
                     </>}
@@ -29613,6 +29690,12 @@ function TrackRecordTab() {
                         color: r.ballCarryVerdict==='JUICED' ? '#ff8020' : r.ballCarryVerdict==='DEAD' ? '#38b8f2' : r.isBorderlineCarry ? '#f5a623' : 'var(--muted)'}}
                         title={r.ballCarryDev != null ? `park-adj deviation ${r.ballCarryDev>=0?'+':''}${r.ballCarryDev}ft${r.isBorderlineCarry?' — borderline (within 3ft of a threshold)':''}` : ''}>
                         {r.ballCarryVerdict==='JUICED' ? '🔴' : r.ballCarryVerdict==='DEAD' ? '🔵' : r.isBorderlineCarry ? '🟡' : r.ballCarryVerdict==='NORMAL' ? '—' : ''}
+                      </td>
+                      <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
+                        textAlign:'center', fontWeight:700,
+                        color: r.xhrVerdict==='JUICED' ? '#a78bfa' : r.xhrVerdict==='DEAD' ? '#f472b6' : 'var(--muted)'}}
+                        title={r.xhrZ != null ? `z=${r.xhrZ>=0?'+':''}${r.xhrZ} (actual ${r.xhrDiff>=0?'+':''}${r.xhrDiff} HR vs. expected)` : ''}>
+                        {r.xhrVerdict==='JUICED' ? '⬆️' : r.xhrVerdict==='DEAD' ? '⬇️' : r.xhrVerdict==='NORMAL' ? '—' : ''}
                       </td>
                     </>}
                   </tr>
@@ -32252,14 +32335,20 @@ function isLongshotBatter(r, trueHRScore, matchupScore) {
 }
 
 // ── getHandMatchTier — "batter's hand exploits pitcher's hand weakness" ──────
-// Two-tier compound signal, e.g. Matt Olson (L) vs a fastball-heavy RHP who's
-// genuinely worse against LHB. Both source fields are engine-computed and
-// already exported to daily_picks.csv (matchup_engine.py ~line 3107-3320) —
-// no pipeline change needed.
+// Three-tier compound signal, e.g. Matt Olson (L) vs a fastball-heavy RHP
+// who's genuinely worse against LHB. All source fields are engine-computed
+// and already exported to daily_picks.csv (matchup_engine.py ~line
+// 3107-3320) — no pipeline change needed. 'full' and 'partial' are
+// validated against manual research (confirmed independently by the user
+// and colleagues to track the strongest matchups) — do not change their
+// definitions without re-validating. Added 2026-07-25.
 //   'full'    — hand_match_flag: platoon advantage (opposite-handed) AND the
 //               pitcher is genuinely weak vs this batter's hand (HR% >= 7%,
 //               HH% >= 44%, or Barrel% >= 10% allowed to that hand) AND the
 //               batter has hit that hand well historically (HR rate >= 6%).
+//               This is the AGGREGATE vs-hand signal — pooled across every
+//               pitch type the pitcher throws, same signal family as Sig's
+//               "vs-Hand" window. It does NOT check pitch-mix fit.
 //   'partial' — platoon_adv_flag alone is too broad to badge on its own
 //               (~46% of all matchups are simply cross-handed) — folds in
 //               ps_convergence (the arsenal-weighted batter-vs-this-pitcher's-
@@ -32267,8 +32356,24 @@ function isLongshotBatter(r, trueHRScore, matchupScore) {
 //               heavy RHPs" signal PS Score's Phase 2C already computes) at
 //               >=8, which cuts the partial pool to ~8% of matchups: a real
 //               pitch-mix fit even when the pitcher's aggregate vs-hand rates
-//               aren't clearly bad yet.
+//               aren't clearly bad yet. This is the FINER pitch-mix-aware
+//               signal — genuinely different from 'full's aggregate check.
+//   'elite'   — the "diamond in the rough" tier: requires 'full's aggregate
+//               vulnerability check AND 'partial's pitch-mix fit check
+//               (ps_convergence >= 8) AND an elite vs-hand power bar
+//               (vs_hand_hr_rate >= 10%) all at once. Validated against
+//               today's live slate (2026-07-25): 27 batters clear 'full'
+//               alone, only 6 clear the full elite stack — a genuinely rare
+//               top tier, not a diluted badge. An ISO-based gate
+//               (vs_hand_iso >= .250) was tested and rejected: 25 of 27
+//               full-tier batters already clear it (power is already baked
+//               into 'full's own HR-rate requirement), so it barely narrows
+//               the pool further. vs_hand_hr_rate >= 10% was the more
+//               discriminating cut (7 of 27 clear it at that bar).
 function getHandMatchTier(r) {
+  if (parseInt(r.hand_match_flag || 0) === 1
+    && parseFloat(r.ps_convergence || 0) >= 8
+    && parseFloat(r.vs_hand_hr_rate || 0) >= 10) return 'elite';
   if (parseInt(r.hand_match_flag || 0) === 1) return 'full';
   if (parseInt(r.platoon_adv_flag || 0) === 1 && parseFloat(r.ps_convergence || 0) >= 8) return 'partial';
   return null;
@@ -33115,8 +33220,8 @@ function BarrelLabTab() {
                 )}
                 {b.handMatchTier && (
                   <div style={{fontFamily:mono,fontSize:8,color:'#fbbf24',marginBottom:4,
-                    opacity:b.handMatchTier==='full'?1:.75}}>
-                    {b.handMatchTier==='full' ? '⭐⭐ Hand Match' : '⭐ Partial Hand Match'}
+                    opacity:b.handMatchTier==='partial'?.75:1}}>
+                    {b.handMatchTier==='elite' ? '⭐⭐⭐ Elite Hand Match' : b.handMatchTier==='full' ? '⭐⭐ Hand Match' : '⭐ Partial Hand Match'}
                   </div>
                 )}
                 {b.rainRiskTier && (
@@ -33193,11 +33298,13 @@ function BarrelLabTab() {
                                   {b.isBarrelSignal && <span title="Barrel Signal — TrueHRScore ≥75, MatchupScore ≥60, simulated HR% ≥12%." style={{color:'var(--accent)',marginRight:2,fontWeight:900,fontSize:7}}>★</span>}
                                   {b.isLongshot && <span title="Longshot — TrueHRScore ≤55, MatchupScore ≥65, Sim TB ≥1.2, non-elite pitcher." style={{color:'#a78bfa',marginRight:2,fontWeight:900,fontSize:7}}>🎲</span>}
                                   {b.handMatchTier && <span
-                                    title={b.handMatchTier==='full'
+                                    title={b.handMatchTier==='elite'
+                                      ? `Elite Hand Match — ${b.pitcher||'this pitcher'} (${(b.pitcher_hand||'?').charAt(0)}HP) is genuinely weak vs ${b.batter_hand||'?'}HB, ${b.batter} has strong arsenal fit (ps_convergence=${fmt(b.ps_convergence,1)}${b.ps_conv_pitch ? ', best pitch: '+b.ps_conv_pitch : ''}), AND an elite ${fmt(b.vs_hand_hr_rate,1)}% HR rate vs that hand. Diamond in the rough.`
+                                      : b.handMatchTier==='full'
                                       ? `Hand Match — ${b.pitcher||'this pitcher'} (${(b.pitcher_hand||'?').charAt(0)}HP) is genuinely weak vs ${b.batter_hand||'?'}HB, and ${b.batter} has hit that hand well. Platoon + weakness compound.`
                                       : `Partial Hand Match — cross-handed matchup with strong arsenal fit (ps_convergence=${fmt(b.ps_convergence,1)}${b.ps_conv_pitch ? ', best pitch: '+b.ps_conv_pitch : ''}) even though the pitcher's overall vs-hand rates aren't clearly weak yet.`}
-                                    style={{color:'#fbbf24',marginRight:2,fontWeight:900,fontSize:7,opacity:b.handMatchTier==='full'?1:.6}}>
-                                    {b.handMatchTier==='full' ? '⭐⭐' : '⭐'}
+                                    style={{color:'#fbbf24',marginRight:2,fontWeight:900,fontSize:7,opacity:b.handMatchTier==='partial'?.6:1}}>
+                                    {b.handMatchTier==='elite' ? '⭐⭐⭐' : b.handMatchTier==='full' ? '⭐⭐' : '⭐'}
                                   </span>}
                                   {b.rainRiskTier==='warning' && <span
                                     title={`Rain risk — ~${Math.round(b.rainRiskPct)}% chance during the game window${/thunder/i.test(b.condition||'')?' with thunder in the forecast':''}. Games can be delayed/postponed, and wet grip can affect contact.`}
@@ -33978,8 +34085,8 @@ function OnBaseTab() {
                 )}
                 {b.handMatchTier && (
                   <div style={{fontFamily:mono,fontSize:8,color:'#fbbf24',marginBottom:6,
-                    opacity:b.handMatchTier==='full'?1:.75}}>
-                    {b.handMatchTier==='full' ? '⭐⭐ Hand Match' : '⭐ Partial Hand Match'}
+                    opacity:b.handMatchTier==='partial'?.75:1}}>
+                    {b.handMatchTier==='elite' ? '⭐⭐⭐ Elite Hand Match' : b.handMatchTier==='full' ? '⭐⭐ Hand Match' : '⭐ Partial Hand Match'}
                   </div>
                 )}
                 {b.rainRiskTier && (
@@ -34054,11 +34161,13 @@ function OnBaseTab() {
                               <span style={{color:'var(--text)'}}>
                                 {b.isTBSignal && <span title="TB Signal — OnBaseScore ≥75, MatchupScore ≥60, SimTB2% ≥30%." style={{color:'#38b8f2',marginRight:2,fontWeight:900,fontSize:7}}>★</span>}
                                 {b.handMatchTier && <span
-                                  title={b.handMatchTier==='full'
+                                  title={b.handMatchTier==='elite'
+                                    ? `Elite Hand Match — ${b.pitcher||'this pitcher'} (${(b.pitcher_hand||'?').charAt(0)}HP) is genuinely weak vs ${b.batter_hand||'?'}HB, ${b.batter} has strong arsenal fit (ps_convergence=${fmt(b.ps_convergence,1)}${b.ps_conv_pitch ? ', best pitch: '+b.ps_conv_pitch : ''}), AND an elite ${fmt(b.vs_hand_hr_rate,1)}% HR rate vs that hand. Diamond in the rough.`
+                                    : b.handMatchTier==='full'
                                     ? `Hand Match — ${b.pitcher||'this pitcher'} (${(b.pitcher_hand||'?').charAt(0)}HP) is genuinely weak vs ${b.batter_hand||'?'}HB, and ${b.batter} has hit that hand well. Platoon + weakness compound.`
                                     : `Partial Hand Match — cross-handed matchup with strong arsenal fit (ps_convergence=${fmt(b.ps_convergence,1)}${b.ps_conv_pitch ? ', best pitch: '+b.ps_conv_pitch : ''}) even though the pitcher's overall vs-hand rates aren't clearly weak yet.`}
-                                  style={{color:'#fbbf24',marginRight:2,fontWeight:900,fontSize:7,opacity:b.handMatchTier==='full'?1:.6}}>
-                                  {b.handMatchTier==='full' ? '⭐⭐' : '⭐'}
+                                  style={{color:'#fbbf24',marginRight:2,fontWeight:900,fontSize:7,opacity:b.handMatchTier==='partial'?.6:1}}>
+                                  {b.handMatchTier==='elite' ? '⭐⭐⭐' : b.handMatchTier==='full' ? '⭐⭐' : '⭐'}
                                 </span>}
                                 {b.rainRiskTier==='warning' && <span
                                   title={`Rain risk — ~${Math.round(b.rainRiskPct)}% chance during the game window${/thunder/i.test(b.condition||'')?' with thunder in the forecast':''}. Games can be delayed/postponed, and wet grip can affect contact.`}
