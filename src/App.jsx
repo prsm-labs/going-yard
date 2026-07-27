@@ -33246,6 +33246,43 @@ function BarrelLabTab() {
         );
       })()}
 
+      {/* Pre-Game Expected HRs — slate-wide ΣSimHR% aggregate (2026-07-26). Sums
+          gameRows (the SAME unfiltered-by-toggle population Signal Board's own
+          boxes use — respects selGame scoping, ignores blHideFinal/blLongshotOnly/
+          etc, since those are display filters, not population definitions).
+          Companion to the Live tab's ⬆️⬇️ xHR Conversion page, which shows the
+          LIVE actual-vs-expected number once games start — this is the pre-game
+          half of that comparison. Held back until the Tier 1/2 shrinkage fix to
+          barrelWorker.js's recent_hr_rate/recent_iso inputs was validated: a
+          full-season AB-log reconstruction (no-leakage rolling windows, same
+          method as the June 29 YV2 backtest) showed shrinkage improves daily MAE
+          season-wide (5.95->5.42) and the pre-All-Star-break baseline calibration
+          (1.089x->1.002x); a per-batter comparison of 7/25's Barrel Lab inputs
+          against those same batters' own season norms confirmed nothing pre-game
+          was actually inflated that day (SimHR% itself was flat, 8.49% vs a
+          typical 8.44%) — that day's shortfall was pure in-game variance
+          (hard-hit%/barrel% came in low), not a predictable model flaw. See
+          CLAUDE.md "Dead Ball Investigation -> Barrel Lab Shrinkage Fix" for
+          the full investigation. */}
+      {gameRows.length > 0 && (
+        <div style={{background:'var(--surface2)',borderRadius:10,border:'1px solid var(--border)',
+          padding:'12px 16px',marginBottom:12}}>
+          <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',
+            letterSpacing:.8,marginBottom:4}}>
+            {!selGame ? 'PRE-GAME EXPECTED HRs — TODAY\'S SLATE' : 'PRE-GAME EXPECTED HRs — THIS GAME'}
+          </div>
+          <div style={{display:'flex',alignItems:'baseline',gap:10,flexWrap:'wrap'}}>
+            <span style={{fontFamily:osw,fontSize:26,fontWeight:700,color:'var(--accent)',lineHeight:1}}
+              title="Sum of SimHR% (Monte Carlo HR probability) across every scored batter — a pre-game aggregate, not a guarantee. Compare against the Live tab's xHR Conversion page once games start for the running actual count.">
+              {(gameRows.reduce((s,b) => s + (b.simHRPct != null ? b.simHRPct/100 : 0), 0)).toFixed(1)}
+            </span>
+            <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>
+              across {gameRows.length} scored batter{gameRows.length===1?'':'s'}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Signal Board — always shown */}
       {scoredBatters.length > 0 && (
         <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}>
