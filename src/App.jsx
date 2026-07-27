@@ -33264,24 +33264,51 @@ function BarrelLabTab() {
           (hard-hit%/barrel% came in low), not a predictable model flaw. See
           CLAUDE.md "Dead Ball Investigation -> Barrel Lab Shrinkage Fix" for
           the full investigation. */}
-      {gameRows.length > 0 && (
-        <div style={{background:'var(--surface2)',borderRadius:10,border:'1px solid var(--border)',
-          padding:'12px 16px',marginBottom:12}}>
-          <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',
-            letterSpacing:.8,marginBottom:4}}>
-            {!selGame ? 'PRE-GAME EXPECTED HRs — TODAY\'S SLATE' : 'PRE-GAME EXPECTED HRs — THIS GAME'}
+      {gameRows.length > 0 && (() => {
+        // Lineup-confirmation-aware (2026-07-27 fix): gameRows is every ELIGIBLE
+        // batter (10+ recent PA), most of whom won't actually get a PA today —
+        // a typical day has ~250-300 confirmed starters across a full slate, not
+        // 300+. Summing the whole eligible pool overstates the real expected
+        // total. Once lineups start posting (same lineupReady signal the status
+        // dot above already uses), switch the headline number to CONFIRMED
+        // batters only — the same LINEUP_STATUS check used everywhere else in
+        // this app (e.g. the confirmedOnly toggle right above). Before any
+        // lineups post, there's no confirmed subset to fall back to, so the
+        // full eligible pool is shown but explicitly labeled provisional rather
+        // than presented as a real estimate.
+        // Weather/park factor are NOT a missing input here — hr_factor and
+        // wind_effect are already wired into each batter's own SimHR% inside
+        // barrelWorker.js (see that file's header comment), so the aggregate
+        // already reflects today's actual conditions to whatever extent the
+        // underlying model does; the real gap was always which BATTERS get
+        // counted, not which conditions.
+        const lineupReady   = Object.keys(LINEUP_STATUS).length > 0;
+        const confirmedRows = gameRows.filter(b =>
+          LINEUP_STATUS[String(b.batter_id || '').split('.')[0]]?.status === 'confirmed');
+        const useConfirmed  = lineupReady && confirmedRows.length > 0;
+        const expRows       = useConfirmed ? confirmedRows : gameRows;
+        const expTotal      = expRows.reduce((s,b) => s + (b.simHRPct != null ? b.simHRPct/100 : 0), 0);
+        return (
+          <div style={{background:'var(--surface2)',borderRadius:10,border:'1px solid var(--border)',
+            padding:'12px 16px',marginBottom:12}}>
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',
+              letterSpacing:.8,marginBottom:4}}>
+              {!selGame ? 'PRE-GAME EXPECTED HRs — TODAY\'S SLATE' : 'PRE-GAME EXPECTED HRs — THIS GAME'}
+            </div>
+            <div style={{display:'flex',alignItems:'baseline',gap:10,flexWrap:'wrap'}}>
+              <span style={{fontFamily:osw,fontSize:26,fontWeight:700,color:'var(--accent)',lineHeight:1}}
+                title="Sum of SimHR% (Monte Carlo HR probability) across today's batters — a pre-game aggregate, not a guarantee. Weather and park factor are already baked into each batter's own SimHR%. Compare against the Live tab's xHR Conversion page once games start for the running actual count.">
+                {expTotal.toFixed(1)}
+              </span>
+              <span style={{fontFamily:mono,fontSize:9,color: useConfirmed ? 'var(--muted)' : '#f5a623'}}>
+                {useConfirmed
+                  ? `confirmed lineups — ${confirmedRows.length} of ${gameRows.length} eligible batters`
+                  : `provisional — lineups not posted yet (${gameRows.length} eligible, 10+ recent PA)`}
+              </span>
+            </div>
           </div>
-          <div style={{display:'flex',alignItems:'baseline',gap:10,flexWrap:'wrap'}}>
-            <span style={{fontFamily:osw,fontSize:26,fontWeight:700,color:'var(--accent)',lineHeight:1}}
-              title="Sum of SimHR% (Monte Carlo HR probability) across every scored batter — a pre-game aggregate, not a guarantee. Compare against the Live tab's xHR Conversion page once games start for the running actual count.">
-              {(gameRows.reduce((s,b) => s + (b.simHRPct != null ? b.simHRPct/100 : 0), 0)).toFixed(1)}
-            </span>
-            <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>
-              across {gameRows.length} scored batter{gameRows.length===1?'':'s'}
-            </span>
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Signal Board — always shown */}
       {scoredBatters.length > 0 && (
@@ -35430,10 +35457,20 @@ export default function App() {
         }
         if (live && live !== local) {
           if (versionDismissedRef.current) return; // user dismissed this session — don't re-nag until next full app open
-          // New version detected — fetch changelog and show banner
+          // New deploy detected via SHA (fires on every push, including
+          // routine data-only ones from mlbdata_aggregate.py — see
+          // api/version.js's header comment for why SHA is used again as of
+          // 2026-07-27). Fetch version.json (static, CDN-fresh) to find out
+          // whether it's actually worth telling the user about.
           try {
             const vr    = await fetch('/version.json', { cache: 'no-store' });
             const vdata = await vr.json();
+            // notifyUsers===false means the latest resolvable commit was a
+            // routine "Daily data update" push with nothing real to show —
+            // deliberately do NOT update localStorage here, so the next poll
+            // keeps comparing against the same old baseline until a real,
+            // describable change actually lands.
+            if (vdata.notifyUsers === false) return;
             if (vdata.changelog) setNewVersionChangelog(vdata.changelog);
           } catch(_) {}
           setNewVersionAvailable(true);
