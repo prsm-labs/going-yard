@@ -34,15 +34,40 @@ self.onmessage = function(e) {
       ? parseFloat(r.ld_pct) / 100
       : Math.max(0, (1 - fbPct - gbPct) * 0.72);
 
+    // ── Shrinkage-blend the raw L7 HR rate (2026-07-26 fix) ───────────────
+    // recent_hr_rate is an unshrunk 7-day rate — with a thin sample (e.g.
+    // right after a multi-day schedule gap like the All-Star break) a
+    // single lucky/unlucky AB can swing it far from the batter's real
+    // level, and since batterHRperFB below is a MAX (a floor, not a
+    // blend), an inflated raw rate is never pulled back down — only ever
+    // pushed up further. Confirmed live 2026-07-26: recent_iso showed a
+    // real +5-13% jump for ~10 days right after the All-Star break
+    // (7/17-7/22) vs the pre-break baseline, and Barrel Lab's own
+    // SUM(SimHR%)-vs-actual-HR ratio drifted from 0.97x (pre-break) to
+    // 1.30x (7/21-7/25) — the same unshrunk-thin-window pathology the
+    // June 29 YV2 research already documented for gHR, just hitting the
+    // whole league at once (a schedule gap) instead of one hot player.
+    // Same k=150 shrinkage constant already validated there. vs_hand_hr_rate
+    // is a season-length, hand-specific rate — stable across any schedule
+    // gap since it isn't a rolling recent window — used as the shrinkage
+    // anchor. Both recent_pa and vs_hand_hr_rate are already real,
+    // populated daily_picks.csv fields; no engine change needed for this.
+    const l7Pa = parseFloat(r.recent_pa || 0);
+    const vsHandHRpct = parseFloat(r.vs_hand_hr_rate || 0) / 100;
+    const shrinkAlpha = l7Pa > 0 ? l7Pa / (l7Pa + 150) : 0;
+
     // HR/FB% — blend batter tendency with pitcher HR rate allowed by hand.
     // Pitcher-specific rate is the actual observed HR rate this pitcher
     // allows to this batter's handedness — more predictive than batter alone.
-    const hrRate = parseFloat(r.recent_hr_rate || 0) / 100;
+    const hrRate = vsHandHRpct * (1 - shrinkAlpha) + (parseFloat(r.recent_hr_rate || 0) / 100) * shrinkAlpha;
     const rawBatterHRperFB = fbPct > 0.01
       ? Math.min(0.35, hrRate / fbPct)
       : 0.10;
 
-    // ── ISO-anchored floor (2026-07-14 validation fix) ───────────────────
+    // ── ISO-anchored floor (2026-07-14 validation fix; 2026-07-26: prefers
+    // recent_iso_yv2, the same k=150 shrinkage-blended ISO used above,
+    // falling back to the old unshrunk recent_iso for any row generated
+    // before this field existed) ──────────────────────────────────────────
     // recent_hr_rate is a raw L7 rate that's literally 0 for most batters
     // most weeks (confirmed: 85% of all daily_picks.csv rows have
     // recent_hr_rate === 0) -- the line above then computes batterHRperFB
@@ -51,13 +76,13 @@ self.onmessage = function(e) {
     // (2,820 matched batter-days, 2026-07-14): batters landing at a literal
     // 0% SimHR still hit at a real 6.9% rate, not far below the ~9.4% rate
     // for batters whose recent window happened to have a nonzero HR. This
-    // floor uses the batter's season-blended ISO (recent_iso — a real
-    // 20/30/50 season/L15/L7 blend, never a hard zero for anyone with
+    // floor uses the batter's season-blended ISO (recent_iso_yv2 — a real
+    // sample-size-aware shrinkage blend, never a hard zero for anyone with
     // playing time) as a backstop, via an empirical ISO -> game-level HR
     // rate mapping derived directly from 23,923 real 2026 season batter-days
     // (all-matchups-season-2026.csv). Converted to a per-FB rate assuming
     // ~4 PAs/game, same avgPAs anchor used later in this function.
-    const isoVal = parseFloat(r.recent_iso || 0);
+    const isoVal = parseFloat(r.recent_iso_yv2 || r.recent_iso || 0);
     const isoGameHRrate =
       isoVal >= 0.32 ? 0.097 :
       isoVal >= 0.28 ? 0.095 :

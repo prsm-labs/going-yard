@@ -21,10 +21,26 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const OUT_PATH = join(__dirname, '..', 'public', 'version.json');
 const ASSETS_DIR = join(__dirname, '..', 'dist', 'assets');
 
+// mlbdata_aggregate.py auto-commits every night with this exact, predictable
+// message ("Daily data update {date}", see mlbdata_aggregate.py's git
+// commit step) — it only ever touches public/data/, never src/, so it can't
+// be what changed bundleFile. But since the pipeline runs nightly, it's
+// very often the LATEST commit at build time regardless of what real code
+// change actually caused bundleFile to differ — so `git log -1` alone
+// nearly always shows this generic message instead of the change that's
+// actually worth telling the user about. Fixed 2026-07-26.
+const DATA_UPDATE_RE = /^Daily data update \d{4}-\d{2}-\d{2}$/;
+
 function buildChangelog() {
   try {
-    const subject = execSync('git log -1 --pretty=%s', { encoding: 'utf-8' }).trim();
-    if (!subject) throw new Error('empty commit subject');
+    // Walk back through recent commit subjects and use the first one that
+    // isn't a routine data-update commit, so the banner's text describes
+    // the real change that fired it, not whatever nightly refresh happened
+    // to land most recently.
+    const log = execSync('git log -20 --pretty=%s', { encoding: 'utf-8' });
+    const subjects = log.split('\n').map(s => s.trim()).filter(Boolean);
+    if (!subjects.length) throw new Error('no commit subjects found');
+    const subject = subjects.find(s => !DATA_UPDATE_RE.test(s)) || subjects[0];
     // Split multi-clause commit messages ("A, B, fix C") into separate
     // changelog bullets — the banner only shows the first 2.
     const parts = subject.split(/,\s+|;\s+/).map(s => s.trim()).filter(Boolean);

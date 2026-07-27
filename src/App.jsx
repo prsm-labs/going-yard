@@ -7974,6 +7974,160 @@ function BallCarryTab({ games }) {
   );
 }
 
+// ── xHR Conversion — "is HR conversion running hot or cold?" live tracker ──
+// Live counterpart to xhr_conversion_tracker.py (the offline/batch version
+// already feeding Track Record's "xHR" column). Different question from
+// Ball Carry: Ball Carry holds EV+LA fixed and checks whether a ball's
+// *distance* matches physics; this checks whether the actual OUTCOME
+// (did it clear the fence) matches what a logistic model trained on every
+// batted ball this season says it should, given EV+LA+direction. Built
+// 2026-07-26 alongside a shrinkage fix to Barrel Lab's Monte Carlo — see
+// api/xhr-conversion.js header comment for the model/coefficients.
+const XHR_VERDICT_STYLE = {
+  JUICED: { color: '#a78bfa', label: '⬆️ HR conversion running HOT',  bg: 'rgba(167,139,250,.08)' },
+  DEAD:   { color: '#f472b6', label: '⬇️ HR conversion running COLD', bg: 'rgba(244,114,182,.08)' },
+  NORMAL: { color: '#27c97a', label: '✅ HR conversion normal',        bg: 'rgba(39,201,122,.06)'  },
+};
+
+function XhrConversionCard({ game, onData }) {
+  const [data, setData] = useState(null);
+  const [expanded, setExpanded] = useState(false);
+  const gamePk = game.gamePk || game.id;
+
+  useEffect(() => {
+    let mounted = true;
+    async function poll() {
+      try {
+        const r = await fetch(`/api/xhr-conversion?gamePk=${gamePk}`);
+        const d = await r.json();
+        if (mounted) { setData(d); onData && onData(gamePk, d); }
+      } catch (e) { /* silent — retry next interval */ }
+    }
+    poll();
+    const iv = setInterval(poll, 3 * 60 * 1000); // same 3-min cadence as Ball Carry
+    return () => { mounted = false; clearInterval(iv); };
+  }, [gamePk]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const label = `${game.away?.abbr || '?'} @ ${game.home?.abbr || '?'}`;
+  const style = data?.verdict ? XHR_VERDICT_STYLE[data.verdict] : null;
+
+  return (
+    <div style={{
+      border: `1px solid ${style ? style.color + '40' : 'var(--border)'}`,
+      background: style ? style.bg : 'var(--surface2)',
+      borderRadius: 10, padding: '10px 14px', marginBottom: 8,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 13 }}>{label}</span>
+        {game.status === 'Live' && <span style={{ fontSize: 9, color: '#e8411a', fontFamily: "'DM Mono',monospace", fontWeight: 700 }}>🔴 {game.inning || 'LIVE'}</span>}
+        {game.status === 'Final' && <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>FINAL</span>}
+      </div>
+
+      {!data || data.status === 'insufficient_data' ? (
+        <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)', marginTop: 6 }}>
+          ⚾ Tracking… {data?.n != null ? `(${data.n}/5 batted balls so far)` : ''}
+        </div>
+      ) : (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
+            <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 11, fontWeight: 700, color: style?.color }}>{style?.label}</span>
+            <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)' }}
+              title={`z-score = (actual - expected) / standard error. |z|>=${data.z_threshold} triggers a DEAD/JUICED verdict (~95% confidence).`}>
+              actual {data.actual_hr} vs expected {data.expected_hr} (z={data.z >= 0 ? '+' : ''}{data.z}) · n={data.n}
+            </span>
+            <button onClick={() => setExpanded(v => !v)}
+              style={{ marginLeft: 'auto', fontSize: 9, fontFamily: "'DM Mono',monospace", color: 'var(--muted)',
+                background: 'transparent', border: '1px solid var(--border)', borderRadius: 5, padding: '2px 8px', cursor: 'pointer' }}>
+              {expanded ? '▲ Hide balls' : '▼ Show balls'}
+            </button>
+          </div>
+          {expanded && (
+            <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 6 }}>
+              {data.balls.map((b, i) => (
+                <div key={i} style={{ display: 'flex', gap: 10, fontFamily: "'DM Mono',monospace", fontSize: 9,
+                  color: 'var(--muted)', padding: '2px 0' }}>
+                  <span style={{ width: 110, color: 'var(--text)', flexShrink: 0 }}>{b.batter}{b.isHR ? ' 💥' : ''}</span>
+                  <span>Inn {b.inning}</span>
+                  <span>{b.ev}mph / {b.la}°</span>
+                  {b.direction && <span style={{ opacity: 0.7 }}>{b.direction}</span>}
+                  <span style={{ color: b.isHR ? '#a78bfa' : 'var(--muted)', fontWeight: b.isHR ? 700 : 400 }}>
+                    xHR {(b.xhr_prob * 100).toFixed(0)}%
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function XhrConversionTab({ games }) {
+  const [showHelp, setShowHelp] = useState(false);
+  const [results, setResults] = useState({}); // gamePk -> latest /api/xhr-conversion response
+  const started = (games || []).filter(g => g.status === 'Live' || g.status === 'Final');
+
+  // No separate day-level API call — reuses whatever each card has already
+  // fetched for its own per-game display, pooled here client-side.
+  const handleData = useCallback((gamePk, d) => {
+    setResults(prev => ({ ...prev, [gamePk]: d }));
+  }, []);
+
+  const valid = Object.values(results).filter(d => d.status === 'ok');
+  const dayActual   = valid.reduce((s, d) => s + d.actual_hr, 0);
+  const dayExpected = valid.reduce((s, d) => s + d.expected_hr, 0);
+  const dayVar       = valid.reduce((s, d) => s + (d.se || 0) * (d.se || 0), 0);
+  const daySe = Math.sqrt(dayVar);
+  const dayZ  = daySe > 0 ? (dayActual - dayExpected) / daySe : 0;
+  const dayVerdict = valid.length
+    ? (dayZ <= -2 ? 'DEAD' : dayZ >= 2 ? 'JUICED' : 'NORMAL')
+    : null;
+  const dayStyle = dayVerdict ? XHR_VERDICT_STYLE[dayVerdict] : null;
+
+  return (
+    <div>
+      {showHelp && <HelpSlideout title="⬆️⬇️ xHR Conversion Guide" items={[
+        ['What is this?', 'Live "is HR conversion running hot or cold" tracker. A logistic regression fit on every real batted ball this season (Exit Velocity, Launch Angle, direction) predicts each ball\'s probability of clearing the fence — summed across a game or the whole slate, that gives an expected HR count directly comparable to the actual count.'],
+        ['How is this different from Ball Carry?', 'Ball Carry holds EV+LA fixed and checks whether a ball\'s DISTANCE matches physics. This checks whether the OUTCOME (did it clear the fence) matches what the model expects given EV+LA+direction — a more direct read on "is HR conversion behaving normally today" specifically.'],
+        ['Today\'s Slate card', 'Pools every game\'s already-fetched data client-side — no extra API calls. Uses the same z-score methodology (Poisson-binomial variance) as the per-game cards and the offline Track Record "xHR" column, just computed live from whatever has happened so far today.'],
+        ['Minimum sample', 'Needs at least 5 batted balls with recorded contact before a per-game verdict shows (the offline Track Record table uses 10 — a smaller live threshold trades some precision for showing something sooner).'],
+      ]} onClose={() => setShowHelp(false)}/>}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 14 }}>⬆️⬇️ xHR Conversion — Hot or Cold?</span>
+        <HelpBtn onClick={() => setShowHelp(v => !v)}/>
+      </div>
+
+      {valid.length > 0 && (
+        <div style={{
+          border: `1px solid ${dayStyle ? dayStyle.color + '40' : 'var(--border)'}`,
+          background: dayStyle ? dayStyle.bg : 'var(--surface2)',
+          borderRadius: 10, padding: '10px 14px', marginBottom: 12,
+        }}>
+          <div style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 12, letterSpacing: .5,
+            textTransform: 'uppercase', color: 'var(--text)', marginBottom: 4 }}>
+            Today's Slate
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 11, fontWeight: 700, color: dayStyle?.color }}>{dayStyle?.label}</span>
+            <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)' }}>
+              actual {dayActual} vs expected {dayExpected.toFixed(1)} (z={dayZ >= 0 ? '+' : ''}{dayZ.toFixed(2)}) · {valid.length} game{valid.length===1?'':'s'} reporting
+            </span>
+          </div>
+        </div>
+      )}
+
+      {started.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 40, fontFamily: "'DM Mono',monospace", fontSize: 11, color: 'var(--muted)' }}>
+          No games in progress yet today — check back once first pitch happens.
+        </div>
+      ) : (
+        started.map(g => <XhrConversionCard key={g.id} game={g} onData={handleData}/>)
+      )}
+    </div>
+  );
+}
+
 function LiveTab() {
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -8089,11 +8243,12 @@ function LiveTab() {
       ['📋 Lineups', "Today's confirmed and projected batting orders for every team. Green = confirmed, yellow = projected. Tap any batter to open their stat slideout."],
       ['🔥 Themes', "Live HR pattern detection. Activates when 3+ home runs land today. Detects score clusters among batters who have gone yard and surfaces confirmed lineup matches with similar profiles — organized into cluster tables that update as more HRs land throughout the day."],
       ['⚾ Ball Carry', "Per-game dead ball / juiced ball detector. Compares actual batted-ball distance against what EV+LA physics predict, park/elevation-adjusted. Does not use weather in the verdict — shown as context only."],
+      ['⬆️⬇️ xHR Conversion', "Live version of Track Record's xHR column. A logistic model predicts each batted ball's HR probability from EV+LA+direction; summed per game and across the whole slate (Today's Slate card), compared against actual HRs via a z-score. Different question from Ball Carry — this checks whether the ball actually left the yard as often as expected, not whether it carried as far as physics predicts."],
       ['📺 Watch button', "Opens MLB.tv for the selected game in a new tab. The ▾ arrow next to it reveals an embedded stream (best-effort, game dependent)."],
     ]} onClose={()=>setShowLiveHelp(false)}/>}
     <div style={{display:'flex',gap:5,marginBottom:12,alignItems:'center',flexWrap:'wrap',rowGap:6}}>
       <div style={{display:'flex',gap:4,padding:'3px',background:'var(--surface)',borderRadius:8,border:'1px solid var(--border)',flexWrap:'wrap',rowGap:4}}>
-      {[['gameday','Gameday'],['battracking','Bat Tracking'],['simlive','Live Sim'],['games','Live Games'],['lineups','Lineups'],['themes','Themes'],['ballcarry','Ball Carry']].map(([key,label])=>(
+      {[['gameday','Gameday'],['battracking','Bat Tracking'],['simlive','Live Sim'],['games','Live Games'],['lineups','Lineups'],['themes','Themes'],['ballcarry','Ball Carry'],['xhr','xHR']].map(([key,label])=>(
         <button key={key} onClick={()=>setLiveView(key)}
           style={{padding:'5px 9px',borderRadius:6,cursor:'pointer',border:'none',
             fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,letterSpacing:.5,
@@ -8113,6 +8268,7 @@ function LiveTab() {
   {liveView==='gameday' && <GamedayTab date={liveDate}/>}
   {liveView==='themes' && <LiveThemesTab/>}
   {liveView==='ballcarry' && <BallCarryTab games={games}/>}
+  {liveView==='xhr' && <XhrConversionTab games={games}/>}
 
   {liveView==='games' && <>
 
