@@ -7,7 +7,7 @@ Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitc
 2026-07-27,07:10 PM,CIN,CLE,695505.0,677944.0,824490,2602,Great American Ball Park,Monday,Mon,1,3,Opener,~ Solid
 2026-07-27,07:10 PM,NYM,ATL,804267.0,527048.0,823597,3289,Citi Field,Monday,Mon,1,3,Opener,~ Solid
 2026-07-27,07:40 PM,CWS,NYY,702273.0,608331.0,824570,4,Rate Field,Monday,Mon,1,4,Opener,~ Solid
-2026-07-27,07:45 PM,STL,CHC,,656849.0,823025,2889,Busch Stadium,Monday,Mon,1,4,Opener,~ Solid
+2026-07-27,07:45 PM,STL,CHC,669461.0,656849.0,823025,2889,Busch Stadium,Monday,Mon,1,4,Opener,~ Solid
 2026-07-27,09:38 PM,LAA,HOU,700712.0,837227.0,824001,1,Angel Stadium,Monday,Mon,1,3,Opener,~ Solid
 2026-07-27,09:40 PM,ATH,BOS,678022.0,801139.0,824977,2529,Sutter Health Park,Monday,Mon,1,4,Opener,~ Solid
 2026-07-27,09:45 PM,SF,MIL,641816.0,687075.0,823195,2395,Oracle Park,Monday,Mon,1,3,Opener,~ Solid
@@ -25,4 +25,4 @@ Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitc
 2026-07-28,09:40 PM,ATH,BOS,695611.0,687562.0,824976,2529,Sutter Health Park,Tuesday,Tue,2,4,Middle,⚠️ Weakest Day
 2026-07-28,09:40 PM,SD,COL,650633.0,547179.0,823275,2680,Petco Park,Tuesday,Tue,1,2,Opener,⚠️ Weakest Day
 2026-07-28,09:45 PM,SF,MIL,694738.0,701656.0,823193,2395,Oracle Park,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
-2026-07-28,10:10 PM,LAD,SEA,,,823923,22,UNIQLO Field at Dodger Stadium,Tuesday,Tue,1,3,Opener,⚠️ Weakest Day
+2026-07-28,10:10 PM,LAD,SEA,,622491.0,823923,22,UNIQLO Field at Dodger Stadium,Tuesday,Tue,1,3,Opener,⚠️ Weakest Day
