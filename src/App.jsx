@@ -32642,9 +32642,15 @@ function FilterPanel({ toggles, pitcherGrades, onPitcherGradesChange }) {
         ⚙ Filters{activeCount>0 ? ` (${activeCount})` : ''}
       </button>
       {open && (
-        <div style={{position:'absolute',top:'calc(100% + 4px)',left:0,zIndex:80,
+        // right:0 (not left:0) — this button typically sits mid-to-right in
+        // its row, so anchoring the panel's LEFT edge here ran it off the
+        // right side of the viewport on mobile (confirmed via screenshot,
+        // 2026-07-27: "Longshot"/"Day Late"/"My Picks" etc all cut off).
+        // Anchoring the RIGHT edge instead makes the panel grow leftward,
+        // which stays on-screen regardless of where the button sits.
+        <div style={{position:'absolute',top:'calc(100% + 4px)',right:0,zIndex:80,
           background:'var(--surface)',border:'1px solid var(--border)',borderRadius:8,
-          padding:10,minWidth:230,maxHeight:'60vh',overflowY:'auto',
+          padding:10,minWidth:230,maxWidth:'min(280px, calc(100vw - 24px))',maxHeight:'60vh',overflowY:'auto',
           boxShadow:'0 4px 16px rgba(0,0,0,.4)',display:'flex',flexDirection:'column',gap:6}}>
           {toggles.map(t => (
             <label key={t.key} style={{display:'flex',alignItems:'center',gap:7,cursor:'pointer',
@@ -33288,17 +33294,52 @@ function BarrelLabTab() {
                 {confirmedOnly ? '✅ Confirmed only' : '👁 All batters'}
               </button>
             )}
+            <button
+              onClick={() => setBlLongshotOnly(v => !v)}
+              style={{
+                padding:'2px 8px', borderRadius:5, cursor:'pointer',
+                fontFamily:"'DM Mono',monospace", fontSize:9, fontWeight:700,
+                lineHeight:1.5, flexShrink:0,
+                background: blLongshotOnly ? 'rgba(167,139,250,.12)' : 'var(--surface2)',
+                color:      blLongshotOnly ? '#a78bfa' : 'var(--muted)',
+                border:`1px solid ${blLongshotOnly ? 'rgba(167,139,250,.4)' : 'var(--border)'}`,
+              }}>
+              {blLongshotOnly ? '🎲 Longshots Only' : '🎲 Longshot'}
+            </button>
+            <button
+              onClick={() => setBlHighIQOnly(v => !v)}
+              title="Plate IQ — display-only, does not affect TrueHRScore. See Legend for details."
+              style={{
+                padding:'2px 8px', borderRadius:5, cursor:'pointer',
+                fontFamily:"'DM Mono',monospace", fontSize:9, fontWeight:700,
+                lineHeight:1.5, flexShrink:0,
+                background: blHighIQOnly ? 'rgba(56,184,242,.12)' : 'var(--surface2)',
+                color:      blHighIQOnly ? '#38b8f2' : 'var(--muted)',
+                border:`1px solid ${blHighIQOnly ? 'rgba(56,184,242,.4)' : 'var(--border)'}`,
+              }}>
+              🧠 {blHighIQOnly ? 'High IQ Only' : 'Plate IQ'}
+            </button>
+            <button
+              onClick={() => setBlHandMatchOnly(v => !v)}
+              title="Batter's handedness exploits the opposing pitcher's weakness (⭐⭐ full or ⭐ partial). See Legend for details."
+              style={{
+                padding:'2px 8px', borderRadius:5, cursor:'pointer',
+                fontFamily:"'DM Mono',monospace", fontSize:9, fontWeight:700,
+                lineHeight:1.5, flexShrink:0,
+                background: blHandMatchOnly ? 'rgba(251,191,36,.12)' : 'var(--surface2)',
+                color:      blHandMatchOnly ? '#fbbf24' : 'var(--muted)',
+                border:`1px solid ${blHandMatchOnly ? 'rgba(251,191,36,.4)' : 'var(--border)'}`,
+              }}>
+              ⭐ {blHandMatchOnly ? 'Hand Match Only' : 'Hand Match'}
+            </button>
             <FilterPanel
               toggles={[
                 {key:'hideFinal', label:'🚫 Hide Final',        active:blHideFinal,     color:'#ff6b6b', onToggle:()=>setBlHideFinal(v=>!v)},
-                {key:'longshot',  label:'🎲 Longshot',          active:blLongshotOnly,  color:'#a78bfa', onToggle:()=>setBlLongshotOnly(v=>!v)},
                 {key:'chalk',     label:'💪🏽 Chalk',             active:blChalkOnly,     color:'#f5c542', onToggle:()=>setBlChalkOnly(v=>!v)},
                 {key:'daylate',   label:'🗓️ Day Late',          active:blDayLateOnly,   color:'#22c1c3', onToggle:()=>setBlDayLateOnly(v=>!v)},
                 {key:'picks',     label:'🎯 My Picks',          active:blPicksOnly,     color:'var(--accent2)', onToggle:()=>setBlPicksOnly(v=>!v)},
                 {key:'goneyard',  label:'💥 Gone Yard Today',   active:blGoneYardOnly,  color:'var(--accent)', onToggle:()=>setBlGoneYardOnly(v=>!v)},
                 {key:'tb2',       label:'2️⃣ 2+ TB Today',       active:blTB2Only,       color:'#38b8f2', onToggle:()=>setBlTB2Only(v=>!v)},
-                {key:'plateiq',   label:'🧠 High Plate IQ',      active:blHighIQOnly,    color:'#38b8f2', onToggle:()=>setBlHighIQOnly(v=>!v)},
-                {key:'handmatch', label:'⭐ Hand Match',         active:blHandMatchOnly, color:'#fbbf24', onToggle:()=>setBlHandMatchOnly(v=>!v)},
               ]}
               pitcherGrades={blPitcherGrades}
               onPitcherGradesChange={setBlPitcherGrades}
@@ -34234,17 +34275,52 @@ function OnBaseTab() {
                 {confirmedOnly ? '✅ Confirmed only' : '👁 All batters'}
               </button>
             )}
+            <button
+              onClick={() => setObLongshotOnly(v => !v)}
+              style={{
+                padding:'2px 8px', borderRadius:5, cursor:'pointer',
+                fontFamily:mono, fontSize:9, fontWeight:700,
+                lineHeight:1.5, flexShrink:0,
+                background: obLongshotOnly ? 'rgba(167,139,250,.12)' : 'var(--surface2)',
+                color:      obLongshotOnly ? '#a78bfa' : 'var(--muted)',
+                border:`1px solid ${obLongshotOnly ? 'rgba(167,139,250,.4)' : 'var(--border)'}`,
+              }}>
+              {obLongshotOnly ? '🎲 Longshots Only' : '🎲 Longshot'}
+            </button>
+            <button
+              onClick={() => setObHighIQOnly(v => !v)}
+              title="Plate IQ — display-only, does not affect OnBaseScore. See Legend for details."
+              style={{
+                padding:'2px 8px', borderRadius:5, cursor:'pointer',
+                fontFamily:mono, fontSize:9, fontWeight:700,
+                lineHeight:1.5, flexShrink:0,
+                background: obHighIQOnly ? 'rgba(56,184,242,.12)' : 'var(--surface2)',
+                color:      obHighIQOnly ? '#38b8f2' : 'var(--muted)',
+                border:`1px solid ${obHighIQOnly ? 'rgba(56,184,242,.4)' : 'var(--border)'}`,
+              }}>
+              🧠 {obHighIQOnly ? 'High IQ Only' : 'Plate IQ'}
+            </button>
+            <button
+              onClick={() => setObHandMatchOnly(v => !v)}
+              title="Batter's handedness exploits the opposing pitcher's weakness (⭐⭐ full or ⭐ partial). See Legend for details."
+              style={{
+                padding:'2px 8px', borderRadius:5, cursor:'pointer',
+                fontFamily:mono, fontSize:9, fontWeight:700,
+                lineHeight:1.5, flexShrink:0,
+                background: obHandMatchOnly ? 'rgba(251,191,36,.12)' : 'var(--surface2)',
+                color:      obHandMatchOnly ? '#fbbf24' : 'var(--muted)',
+                border:`1px solid ${obHandMatchOnly ? 'rgba(251,191,36,.4)' : 'var(--border)'}`,
+              }}>
+              ⭐ {obHandMatchOnly ? 'Hand Match Only' : 'Hand Match'}
+            </button>
             <FilterPanel
               toggles={[
                 {key:'hideFinal', label:'🚫 Hide Final',        active:obHideFinal,     color:'#ff6b6b', onToggle:()=>setObHideFinal(v=>!v)},
-                {key:'longshot',  label:'🎲 Longshot',          active:obLongshotOnly,  color:'#a78bfa', onToggle:()=>setObLongshotOnly(v=>!v)},
                 {key:'chalk',     label:'💪🏽 Chalk',             active:obChalkOnly,     color:'#f5c542', onToggle:()=>setObChalkOnly(v=>!v)},
                 {key:'daylate',   label:'🗓️ Day Late',          active:obDayLateOnly,   color:'#22c1c3', onToggle:()=>setObDayLateOnly(v=>!v)},
                 {key:'picks',     label:'🎯 My Picks',          active:obPicksOnly,     color:'var(--accent2)', onToggle:()=>setObPicksOnly(v=>!v)},
                 {key:'goneyard',  label:'💥 Gone Yard Today',   active:obGoneYardOnly,  color:'var(--accent)', onToggle:()=>setObGoneYardOnly(v=>!v)},
                 {key:'tb2',       label:'2️⃣ 2+ TB Today',       active:obTB2Only,       color:'#38b8f2', onToggle:()=>setObTB2Only(v=>!v)},
-                {key:'plateiq',   label:'🧠 High Plate IQ',      active:obHighIQOnly,    color:'#38b8f2', onToggle:()=>setObHighIQOnly(v=>!v)},
-                {key:'handmatch', label:'⭐ Hand Match',         active:obHandMatchOnly, color:'#fbbf24', onToggle:()=>setObHandMatchOnly(v=>!v)},
               ]}
               pitcherGrades={obPitcherGrades}
               onPitcherGradesChange={setObPitcherGrades}
