@@ -28572,10 +28572,13 @@ function LegendButton() {
       'MatchupScore (0–100) — pitcher-adjusted vulnerability score for this specific batter/pitcher pairing.',
       '★ Barrel Signal — TrueHRScore ≥75 AND MatchupScore ≥60 AND simulated HR% ≥12%. Strict flag, live tracker: 16.9% HR rate.',
       '🎲 Longshot — TrueHRScore ≤55, MatchupScore ≥65, Sim TB ≥1.2, non-elite pitcher. Mutually exclusive with Barrel Signal by construction.',
+      '💪🏽 Chalk — the obvious, established pick. Batter\'s own season letter Grade is A/A+ AND today\'s Pitcher Grade is Target/Hittable/Average (not Tough/Elite). Deliberately uses the season-long Grade rather than TrueHR/MatchupScore, which already blend in today\'s matchup — this is the mirror-opposite of Longshot (proven bat + soft spot, vs. unproven bat + soft spot). ~14 of 1,146 batters on a typical slate.',
+      '🗓️ Day Late — was a real ★ Barrel Signal on BOTH of the last 2 real game days, with no HR on either day, and today\'s matchup isn\'t an outright Elite-pitcher mismatch. Backward-looking, unlike Chalk/Longshot. Added 2026-07-27 after testing several looser definitions (a single close call, or close calls plus Barrel Signal) that all tested too rare — Live Close Calls are genuinely sparse events, so requiring Barrel Signal twice in a row turned out to be the version with a real, usable population (~8 of 1,146 on a typical slate). Requires 2 real days of Track Record data — shows nothing on the first day or two of a fresh season.',
       '⭐⭐⭐ / ⭐⭐ / ⭐ Hand Match — batter\'s handedness exploits the opposing pitcher\'s weakness. ⭐⭐ (full): platoon advantage + pitcher genuinely weak vs that hand (elevated HR/HH/Barrel% allowed) + batter historically strong vs that hand. ⭐ (partial): cross-handed with strong pitch-mix fit (ps_convergence ≥8) even when the pitcher\'s overall vs-hand rates aren\'t clearly weak yet — e.g. a LHB who crushes fastballs matched against a fastball-heavy RHP. ⭐⭐⭐ (elite): the "diamond in the rough" tier — full\'s aggregate weakness AND partial\'s pitch-mix fit AND an elite vs-hand HR rate (≥10%) all at once. Very rare (~6 of 1,450 matchups on a typical slate).',
       '💥 Gone Yard / 2️⃣ 2+ TB Today badges and filters — same definitions as everywhere else in the app.',
       '🟢 Weak Spot row highlight — batter sitting in the opposing pitcher\'s historically weak lineup slot.',
       '🟣 Rain Watch / ⚠️ Rain Risk row highlight — game-time precipitation caution (🟣 ≥70%, ⚠️ ≥80% or thunder in the forecast). Uses the peak rain chance across the game\'s ~3hr window, not just the first-pitch hour — a storm arriving mid-game still means real rain risk (delay/postponement, wet-grip contact effects).',
+      '⚙ Filters panel — consolidates every checkbox toggle (Hide Final, Longshot, Chalk, Day Late, My Picks, Gone Yard, 2+TB, Plate IQ, Hand Match) plus a Pitcher Grade multi-select into one dropdown, added 2026-07-27 once adding Chalk/Day Late would have pushed the old flat button row past what fits on a phone screen.',
     ] },
     { tab:'🔵 On Base',        items:[
       'Monte Carlo simulation targeting 2+ total bases per game (broader outcome than HR alone) — 10,000 simulated PAs per matchup.',
@@ -28583,7 +28586,7 @@ function LegendButton() {
       'MatchupScore (0–100) — pitcher-adjusted vulnerability, same concept as Barrel Lab\'s.',
       'SimTB2% — simulated probability of reaching 2+ total bases in the game.',
       '★ TB Signal — OnBaseScore ≥75 AND MatchupScore ≥60 AND SimTB2% ≥30%. Very new signal — live tracker: 38.0% hit rate, still a small sample.',
-      'Same 💥 / 2️⃣ / 🟢 Weak Spot / ⭐⭐⭐ Hand Match / 🟣 Rain Watch badges and filters as Barrel Lab.',
+      'Same 🎲 Longshot / 💪🏽 Chalk / 🗓️ Day Late / 💥 Gone Yard / 2️⃣ 2+ TB / 🟢 Weak Spot / ⭐⭐⭐ Hand Match / 🟣 Rain Watch / ⚙ Filters panel badges and filters as Barrel Lab — Longshot was added here for the first time 2026-07-27 (previously Barrel Lab only).',
     ] },
     { tab:'📋 Track Record',   items:[
       'The self-auditing page — merges the daily All Matchups, Barrel Lab, and On Base exports against actual box-score outcomes, every day, automatically.',
@@ -32490,6 +32493,193 @@ function isLongshotBatter(r, trueHRScore, matchupScore) {
   return true;
 }
 
+// ── isChalkBatter — "the obvious, safe, well-supported pick" ─────────────────
+// Mirror-opposite of Longshot: an established, season-proven power hitter
+// (not today's blended matchup score) getting a genuinely soft matchup today.
+// Uses the batter's own letter Grade (r.grade — A+/A/B/C/D, matchup_engine.py
+// compute_grade(), already on every row, never previously read in this tab)
+// rather than TrueHR/MatchupScore, which already blend in today's matchup —
+// using those instead would make Chalk largely redundant with Barrel Signal.
+// Added 2026-07-27. Validated against the live slate: 14 of 1,146 batters.
+function isChalkBatter(r) {
+  const grade = (r.grade || '').toUpperCase();
+  if (grade !== 'A' && grade !== 'A+') return false; // not an established elite bat
+  const pg = (r.pitcher_grade_label || r._pgLabel || '').toLowerCase();
+  if (pg.includes('elite') || pg.includes('tough')) return false; // matchup not soft enough
+  return true;
+}
+
+// ── Day Late — "was almost perfect for the matchup, more than once, and
+// didn't convert" ─────────────────────────────────────────────────────────
+// Genuinely different question from Chalk/Longshot: those look at TODAY's
+// inputs only. Day Late looks BACKWARD — was this batter a real ★ Barrel
+// Signal on BOTH of the last 2 real game days (TrueHR>=75, Matchup>=60,
+// SimHR%>=12 — repeating twice, not once), and did they NOT actually hit a
+// HR on either of those days (if they did, they already converted — no
+// longer "due"). Today's matchup only needs to not be an outright Elite
+// mismatch, same floor Longshot already uses.
+//
+// Design history (2026-07-27, see CLAUDE.md for the full back-and-forth):
+// the first candidate used "1+ close call in the last 2 days" as the
+// backward-looking signal, alongside Barrel Signal. Tested against real
+// data and rejected — Live Close Calls are rare enough that ANY close-call
+// requirement (even just 1, combined with Barrel Signal) collapsed to 1-5
+// qualifying batters leaguewide over a real 2-day window; requiring 2+
+// close calls collapsed to 0-1. The engine's broader so_close_count field
+// was tested too (in an earlier, unrelated design pass) and found too LOOSE
+// in the opposite direction (167-221 batters at >=1/>=2). "Barrel Signal on
+// BOTH of the last 2 days" replaced the close-call requirement entirely —
+// it's a real, literal "almost perfect twice in a row" and tested at a
+// healthy 8 of 1,146 today (18 in the raw 2-day window before today's
+// matchup gate), vs 1 for the close-call-based version.
+//
+// Data doesn't exist client-side for this — daily_picks.csv only ever
+// reflects TODAY. Reuses track-record-barrel.csv / track-record-matchups.csv
+// (same files TrackRecordTab already fetches, same parseCSV() parser),
+// fetched fresh here since Barrel Lab/On Base don't otherwise load them.
+let DAY_LATE_LOOKUP = null;      // Set of lowercased batter names that qualify
+let DAY_LATE_LOOKUP_DATE = '';   // ET date this lookup was built for (cache guard)
+let _DAY_LATE_VER = 0;           // bumped when the lookup (re)loads — same poll pattern as _HR_VER
+
+async function loadDayLateLookup(force = false) {
+  const todayET = getETDateStr();
+  if (!force && DAY_LATE_LOOKUP && DAY_LATE_LOOKUP_DATE === todayET) return DAY_LATE_LOOKUP;
+  try {
+    const [blText, amText] = await Promise.all([
+      fetch('/data/track-record-barrel.csv').then(r => r.text()),
+      fetch('/data/track-record-matchups.csv').then(r => r.text()),
+    ]);
+    const blRows = parseCSV(blText);
+    const amRows = parseCSV(amText);
+
+    // Most recent 2 real dates present in the file — not hardcoded
+    // "yesterday"/"day before", so this stays correct across schedule gaps
+    // (All-Star break, postponements) the same way the engine's own
+    // rolling windows already do.
+    const dateSet = new Set(blRows.map(r => r.export_date).filter(Boolean));
+    const parsedDates = Array.from(dateSet)
+      .map(d => ({ raw: d, dt: new Date(d) }))
+      .filter(x => !isNaN(x.dt.getTime()));
+    parsedDates.sort((a, b) => b.dt - a.dt);
+    const recent2 = parsedDates.slice(0, 2).map(x => x.raw);
+
+    if (recent2.length < 2) {
+      DAY_LATE_LOOKUP = new Set(); DAY_LATE_LOOKUP_DATE = todayET; _DAY_LATE_VER++;
+      return DAY_LATE_LOOKUP;
+    }
+
+    const barrelSignalDatesByName = {}; // name -> Set of qualifying dates
+    blRows.forEach(r => {
+      if (!recent2.includes(r.export_date)) return;
+      if (String(r['Barrel Signal']) !== '1') return;
+      const name = (r.Player || '').trim().toLowerCase();
+      if (!name) return;
+      (barrelSignalDatesByName[name] ||= new Set()).add(r.export_date);
+    });
+
+    const wentYardNames = new Set();
+    amRows.forEach(r => {
+      if (!recent2.includes(r.export_date)) return;
+      if ((r['Gone Yard'] || '').trim().toUpperCase() !== 'YES') return;
+      const name = (r.Batter || '').trim().toLowerCase();
+      if (name) wentYardNames.add(name);
+    });
+
+    const qualifying = new Set();
+    Object.entries(barrelSignalDatesByName).forEach(([name, dates]) => {
+      if (dates.size >= 2 && !wentYardNames.has(name)) qualifying.add(name);
+    });
+
+    DAY_LATE_LOOKUP = qualifying;
+    DAY_LATE_LOOKUP_DATE = todayET;
+    _DAY_LATE_VER++;
+    return qualifying;
+  } catch (e) {
+    console.warn('[DayLate] lookup failed:', e.message);
+    DAY_LATE_LOOKUP = new Set(); DAY_LATE_LOOKUP_DATE = todayET; _DAY_LATE_VER++;
+    return DAY_LATE_LOOKUP;
+  }
+}
+
+function isDayLateBatter(r) {
+  if (!DAY_LATE_LOOKUP) return false; // lookup hasn't loaded yet this session
+  const name = (r.batter || '').trim().toLowerCase();
+  if (!name || !DAY_LATE_LOOKUP.has(name)) return false;
+  const pg = (r.pitcher_grade_label || r._pgLabel || '').toLowerCase();
+  if (pg.includes('elite')) return false; // today's matchup not even close to favorable
+  return true;
+}
+
+// ── FilterPanel — shared consolidated filter dropdown (Barrel Lab + On Base) ─
+// Replaces a flat, ever-growing row of individual toggle buttons with one
+// "Filters ▾" button + a checkbox panel, plus a Pitcher Grade multi-select.
+// Added 2026-07-27 specifically because adding Chalk + Day Late as two more
+// individual buttons would have pushed both tabs past what fits on a phone
+// screen (Barrel Lab was already at 7 buttons + a hand dropdown).
+const PITCHER_GRADE_OPTIONS = ['🎯 Target', '💥 Hittable', '🤔 Average', '⚠️ Tough', '‼️ Elite'];
+
+function FilterPanel({ toggles, pitcherGrades, onPitcherGradesChange }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const onClick = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, [open]);
+
+  const activeCount = toggles.filter(t => t.active).length + (pitcherGrades.size > 0 ? 1 : 0);
+  const monoFont = "'DM Mono',monospace";
+
+  return (
+    <div ref={ref} style={{position:'relative',flexShrink:0}}>
+      <button onClick={() => setOpen(v => !v)}
+        style={{padding:'2px 8px',borderRadius:5,cursor:'pointer',
+          fontFamily:monoFont,fontSize:9,fontWeight:700,lineHeight:1.5,flexShrink:0,
+          background: activeCount>0 ? 'rgba(56,184,242,.12)' : 'var(--surface2)',
+          color:      activeCount>0 ? '#38b8f2' : 'var(--muted)',
+          border:`1px solid ${activeCount>0 ? 'rgba(56,184,242,.4)' : 'var(--border)'}`}}>
+        ⚙ Filters{activeCount>0 ? ` (${activeCount})` : ''}
+      </button>
+      {open && (
+        <div style={{position:'absolute',top:'calc(100% + 4px)',left:0,zIndex:80,
+          background:'var(--surface)',border:'1px solid var(--border)',borderRadius:8,
+          padding:10,minWidth:230,maxHeight:'60vh',overflowY:'auto',
+          boxShadow:'0 4px 16px rgba(0,0,0,.4)',display:'flex',flexDirection:'column',gap:6}}>
+          {toggles.map(t => (
+            <label key={t.key} style={{display:'flex',alignItems:'center',gap:7,cursor:'pointer',
+              fontFamily:monoFont,fontSize:10,fontWeight:700,
+              color: t.active ? (t.color||'#38b8f2') : 'var(--muted)'}}>
+              <input type="checkbox" checked={t.active} onChange={t.onToggle}
+                style={{accentColor:t.color||'#38b8f2'}}/>
+              {t.label}
+            </label>
+          ))}
+          <div style={{borderTop:'1px solid var(--border)',marginTop:2,paddingTop:6}}>
+            <div style={{fontFamily:monoFont,fontSize:8,color:'var(--muted)',
+              textTransform:'uppercase',letterSpacing:.6,marginBottom:5}}>
+              Pitcher Grade
+            </div>
+            {PITCHER_GRADE_OPTIONS.map(g => (
+              <label key={g} style={{display:'flex',alignItems:'center',gap:7,cursor:'pointer',
+                fontFamily:monoFont,fontSize:10,marginBottom:3,
+                color: pitcherGrades.has(g) ? 'var(--text)' : 'var(--muted)'}}>
+                <input type="checkbox" checked={pitcherGrades.has(g)}
+                  onChange={() => {
+                    const next = new Set(pitcherGrades);
+                    if (next.has(g)) next.delete(g); else next.add(g);
+                    onPitcherGradesChange(next);
+                  }}/>
+                {g}
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── getHandMatchTier — "batter's hand exploits pitcher's hand weakness" ──────
 // Three-tier compound signal, e.g. Matt Olson (L) vs a fastball-heavy RHP
 // who's genuinely worse against LHB. All source fields are engine-computed
@@ -32686,12 +32876,16 @@ function BarrelLabTab() {
   const [liveGamesVersion, setLiveGamesVersion] = useState(LIVE_GAMES_CACHE.length);
   const [blHideFinal,      setBlHideFinal]      = useState(false);
   const [blLongshotOnly,   setBlLongshotOnly]   = useState(false);
+  const [blChalkOnly,      setBlChalkOnly]      = useState(false);
+  const [blDayLateOnly,    setBlDayLateOnly]    = useState(false);
   const [blPicksOnly,      setBlPicksOnly]      = useState(false);
   const [blGoneYardOnly,   setBlGoneYardOnly]   = useState(false);
   const [blTB2Only,        setBlTB2Only]        = useState(false);
   const [blHighIQOnly,     setBlHighIQOnly]     = useState(false);
   const [blHandMatchOnly,  setBlHandMatchOnly]  = useState(false);
   const [blBatterHand,     setBlBatterHand]     = useState('ALL');
+  const [blPitcherGrades,  setBlPitcherGrades]  = useState(() => new Set());
+  const [dayLateVer,       setDayLateVer]       = useState(0);
 
   useEffect(() => {
     const unsub    = subscribeLineup(v => setLineupVer(v));
@@ -32701,8 +32895,10 @@ function BarrelLabTab() {
     const liveId   = setInterval(() => setLiveGamesVersion(LIVE_GAMES_CACHE.length), 15000);
     // One-shot lineup fetch on mount — no auto-poll (sim is manual after this)
     loadTodayLineups();
-    return () => { unsub(); unsubInj(); clearInterval(finId); clearInterval(hrId); clearInterval(liveId); };
-  }, [hrVer]);
+    loadDayLateLookup();
+    const dayLateId = setInterval(() => { if (_DAY_LATE_VER !== dayLateVer) setDayLateVer(_DAY_LATE_VER); }, 5000);
+    return () => { unsub(); unsubInj(); clearInterval(finId); clearInterval(hrId); clearInterval(liveId); clearInterval(dayLateId); };
+  }, [hrVer, dayLateVer]);
 
   // Auto-switch to confirmed-only once lineups first post.
   // Fires one time only — permanently disabled once the user manually
@@ -32875,6 +33071,8 @@ function BarrelLabTab() {
           r.matchupScore >= 60 &&
           r.simHRPct     != null && (r.simHRPct * SIM_HR_SUPPRESSION) >= 12.0,
         isLongshot: isLongshotBatter(r, r.trueHRScore, r.matchupScore),
+        isChalk:    isChalkBatter(r),
+        isDayLate:  isDayLateBatter(r),
         handMatchTier: getHandMatchTier(r),
         rainRiskTier: getRainRiskTier(r),
         rainRiskPct:  getRainRiskPct(r),
@@ -32889,14 +33087,17 @@ function BarrelLabTab() {
     })
     .filter(r => !blHideFinal    || !FINAL_GAME_IDS.has(String(r.game_id)))
     .filter(r => !blLongshotOnly || r.isLongshot)
+    .filter(r => !blChalkOnly    || r.isChalk)
+    .filter(r => !blDayLateOnly  || r.isDayLate)
     .filter(r => !blPicksOnly    || picks[String(parseInt(r.batter_id)||0)])
     .filter(r => !blGoneYardOnly || isGoneYardBL(r))
     .filter(r => !blTB2Only || is2BagBL(r))
     .filter(r => !blHighIQOnly || (r.plateIQ != null && r.plateIQ >= 56))
     .filter(r => !blHandMatchOnly || r.handMatchTier)
+    .filter(r => blPitcherGrades.size === 0 || blPitcherGrades.has((r.pitcher_grade_label||r._pgLabel||'').trim()))
     .filter(r => matchesHandFilter(r.batter_hand, blBatterHand))
     .sort((a, b) => b.trueHRScore - a.trueHRScore);
-  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, blPicksOnly, picks, blGoneYardOnly, blTB2Only, blHighIQOnly, blHandMatchOnly, blBatterHand, hrVer, finalVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, blChalkOnly, blDayLateOnly, blPicksOnly, picks, blGoneYardOnly, blTB2Only, blHighIQOnly, blHandMatchOnly, blBatterHand, blPitcherGrades, hrVer, finalVer, dayLateVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Color threshold helpers
   const clr = (v, g1, g2, y1, y2) => {
@@ -33087,92 +33288,21 @@ function BarrelLabTab() {
                 {confirmedOnly ? '✅ Confirmed only' : '👁 All batters'}
               </button>
             )}
-            <button
-              onClick={() => setBlHideFinal(v => !v)}
-              style={{
-                padding:'2px 8px', borderRadius:5, cursor:'pointer',
-                fontFamily:"'DM Mono',monospace", fontSize:9, fontWeight:700,
-                lineHeight:1.5, flexShrink:0,
-                background: blHideFinal ? 'rgba(255,107,107,.12)' : 'var(--surface2)',
-                color:       blHideFinal ? '#ff6b6b' : 'var(--muted)',
-                border:`1px solid ${blHideFinal ? 'rgba(255,107,107,.4)' : 'var(--border)'}`,
-              }}>
-              {blHideFinal ? '✓ Hiding Final' : '🚫 Hide Final'}
-            </button>
-            <button
-              onClick={() => setBlLongshotOnly(v => !v)}
-              style={{
-                padding:'2px 8px', borderRadius:5, cursor:'pointer',
-                fontFamily:"'DM Mono',monospace", fontSize:9, fontWeight:700,
-                lineHeight:1.5, flexShrink:0,
-                background: blLongshotOnly ? 'rgba(167,139,250,.12)' : 'var(--surface2)',
-                color:      blLongshotOnly ? '#a78bfa' : 'var(--muted)',
-                border:`1px solid ${blLongshotOnly ? 'rgba(167,139,250,.4)' : 'var(--border)'}`,
-              }}>
-              {blLongshotOnly ? '🎲 Longshots Only' : '🎲 Longshot'}
-            </button>
-            <button
-              onClick={() => setBlPicksOnly(v => !v)}
-              style={{
-                padding:'2px 8px', borderRadius:5, cursor:'pointer',
-                fontFamily:"'DM Mono',monospace", fontSize:9, fontWeight:700,
-                lineHeight:1.5, flexShrink:0,
-                background: blPicksOnly ? 'rgba(245,166,35,.12)' : 'var(--surface2)',
-                color:      blPicksOnly ? 'var(--accent2)' : 'var(--muted)',
-                border:`1px solid ${blPicksOnly ? 'rgba(245,166,35,.4)' : 'var(--border)'}`,
-              }}>
-              🎯 {blPicksOnly ? 'My Picks ✓' : 'My Picks'}
-            </button>
-            <button
-              onClick={() => setBlGoneYardOnly(v => !v)}
-              style={{
-                padding:'2px 8px', borderRadius:5, cursor:'pointer',
-                fontFamily:"'DM Mono',monospace", fontSize:9, fontWeight:700,
-                lineHeight:1.5, flexShrink:0,
-                background: blGoneYardOnly ? 'rgba(232,65,26,.12)' : 'var(--surface2)',
-                color:      blGoneYardOnly ? 'var(--accent)' : 'var(--muted)',
-                border:`1px solid ${blGoneYardOnly ? 'rgba(232,65,26,.4)' : 'var(--border)'}`,
-              }}>
-              💥 {blGoneYardOnly ? 'Gone Yard ✓' : 'Gone Yard Today'}
-            </button>
-            <button
-              onClick={() => setBlTB2Only(v => !v)}
-              style={{
-                padding:'2px 8px', borderRadius:5, cursor:'pointer',
-                fontFamily:"'DM Mono',monospace", fontSize:9, fontWeight:700,
-                lineHeight:1.5, flexShrink:0,
-                background: blTB2Only ? 'rgba(56,184,242,.12)' : 'var(--surface2)',
-                color:      blTB2Only ? '#38b8f2' : 'var(--muted)',
-                border:`1px solid ${blTB2Only ? 'rgba(56,184,242,.4)' : 'var(--border)'}`,
-              }}>
-              2️⃣ {blTB2Only ? '2+ TB ✓' : '2+ TB Today'}
-            </button>
-            <button
-              onClick={() => setBlHighIQOnly(v => !v)}
-              title="Plate IQ — display-only, does not affect TrueHRScore. See Legend for details."
-              style={{
-                padding:'2px 8px', borderRadius:5, cursor:'pointer',
-                fontFamily:"'DM Mono',monospace", fontSize:9, fontWeight:700,
-                lineHeight:1.5, flexShrink:0,
-                background: blHighIQOnly ? 'rgba(56,184,242,.12)' : 'var(--surface2)',
-                color:      blHighIQOnly ? '#38b8f2' : 'var(--muted)',
-                border:`1px solid ${blHighIQOnly ? 'rgba(56,184,242,.4)' : 'var(--border)'}`,
-              }}>
-              🧠 {blHighIQOnly ? 'High IQ Only' : 'Plate IQ'}
-            </button>
-            <button
-              onClick={() => setBlHandMatchOnly(v => !v)}
-              title="Batter's handedness exploits the opposing pitcher's weakness (⭐⭐ full or ⭐ partial). See Legend for details."
-              style={{
-                padding:'2px 8px', borderRadius:5, cursor:'pointer',
-                fontFamily:"'DM Mono',monospace", fontSize:9, fontWeight:700,
-                lineHeight:1.5, flexShrink:0,
-                background: blHandMatchOnly ? 'rgba(251,191,36,.12)' : 'var(--surface2)',
-                color:      blHandMatchOnly ? '#fbbf24' : 'var(--muted)',
-                border:`1px solid ${blHandMatchOnly ? 'rgba(251,191,36,.4)' : 'var(--border)'}`,
-              }}>
-              ⭐ {blHandMatchOnly ? 'Hand Match Only' : 'Hand Match'}
-            </button>
+            <FilterPanel
+              toggles={[
+                {key:'hideFinal', label:'🚫 Hide Final',        active:blHideFinal,     color:'#ff6b6b', onToggle:()=>setBlHideFinal(v=>!v)},
+                {key:'longshot',  label:'🎲 Longshot',          active:blLongshotOnly,  color:'#a78bfa', onToggle:()=>setBlLongshotOnly(v=>!v)},
+                {key:'chalk',     label:'💪🏽 Chalk',             active:blChalkOnly,     color:'#f5c542', onToggle:()=>setBlChalkOnly(v=>!v)},
+                {key:'daylate',   label:'🗓️ Day Late',          active:blDayLateOnly,   color:'#22c1c3', onToggle:()=>setBlDayLateOnly(v=>!v)},
+                {key:'picks',     label:'🎯 My Picks',          active:blPicksOnly,     color:'var(--accent2)', onToggle:()=>setBlPicksOnly(v=>!v)},
+                {key:'goneyard',  label:'💥 Gone Yard Today',   active:blGoneYardOnly,  color:'var(--accent)', onToggle:()=>setBlGoneYardOnly(v=>!v)},
+                {key:'tb2',       label:'2️⃣ 2+ TB Today',       active:blTB2Only,       color:'#38b8f2', onToggle:()=>setBlTB2Only(v=>!v)},
+                {key:'plateiq',   label:'🧠 High Plate IQ',      active:blHighIQOnly,    color:'#38b8f2', onToggle:()=>setBlHighIQOnly(v=>!v)},
+                {key:'handmatch', label:'⭐ Hand Match',         active:blHandMatchOnly, color:'#fbbf24', onToggle:()=>setBlHandMatchOnly(v=>!v)},
+              ]}
+              pitcherGrades={blPitcherGrades}
+              onPitcherGradesChange={setBlPitcherGrades}
+            />
             <HandFilter mode="batter" value={blBatterHand} onChange={setBlBatterHand}/>
             <button
               disabled={simRunning}
@@ -33199,7 +33329,7 @@ function BarrelLabTab() {
                 const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
                 const f1 = v => (v != null && v !== '' && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(1) : '';
                 const f3 = v => (v != null && v !== '' && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(3) : '';
-                const hdrs = ['Slot','Team','Player','Pitcher','Grade','TrueHR','Matchup','ZF','Form (gHR)','SimHR%','ISO','xwOBA','PulledBrl%','Brl/BIP%','HR/FB%','FB%','HH%','LA°','Barrel Signal','Plate IQ','IQ Grade','Zone Risk','Hand Match',
+                const hdrs = ['Slot','Team','Player','Pitcher','Grade','TrueHR','Matchup','ZF','Form (gHR)','SimHR%','ISO','xwOBA','PulledBrl%','Brl/BIP%','HR/FB%','FB%','HH%','LA°','Barrel Signal','Plate IQ','IQ Grade','Zone Risk','Hand Match','Longshot','Chalk','Day Late',
                   'Game ID','Batter ID','Pitcher ID'];
                 const csvRows = [hdrs.map(esc).join(',')];
                 rows.forEach(b => {
@@ -33227,6 +33357,9 @@ function BarrelLabTab() {
                     esc(b.plateIQGrade?.label || ''),
                     esc(b.zoneAttackRisk ? '1' : '0'),
                     esc(b.handMatchTier || ''),
+                    esc(b.isLongshot ? '1' : '0'),
+                    esc(b.isChalk ? '1' : '0'),
+                    esc(b.isDayLate ? '1' : '0'),
                     // Hidden data-plumbing columns (not shown in-app) — join keys for Track Record / ball carry
                     esc(b.game_id||''), esc(parseInt(b.batter_id)||''), esc(parseInt(b.pitcher_id)||''),
                   ].join(','));
@@ -33341,6 +33474,28 @@ function BarrelLabTab() {
           </div>
           <div style={{flex:'1 1 120px',background:'var(--surface2)',borderRadius:8,
             padding:'10px 14px',border:'1px solid var(--border)'}}
+            title="Chalk — established A/A+ batter (season Grade) facing a genuinely soft matchup today (Target/Hittable/Average, not Tough/Elite).">
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:4}}>
+              CHALK
+            </div>
+            <div style={{fontFamily:osw,fontSize:22,fontWeight:700,color:'#f5c542',lineHeight:1}}>
+              {gameRows.filter(r => r.isChalk).length}
+            </div>
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:4}}>Proven bat, soft spot</div>
+          </div>
+          <div style={{flex:'1 1 120px',background:'var(--surface2)',borderRadius:8,
+            padding:'10px 14px',border:'1px solid var(--border)'}}
+            title="Day Late — a real ★ Barrel Signal on BOTH of the last 2 real game days, no HR either day, today's matchup not an outright Elite mismatch.">
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:4}}>
+              DAY LATE
+            </div>
+            <div style={{fontFamily:osw,fontSize:22,fontWeight:700,color:'#22c1c3',lineHeight:1}}>
+              {gameRows.filter(r => r.isDayLate).length}
+            </div>
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:4}}>Primed twice, still due</div>
+          </div>
+          <div style={{flex:'1 1 120px',background:'var(--surface2)',borderRadius:8,
+            padding:'10px 14px',border:'1px solid var(--border)'}}
             title="Plate IQ — display-only, does not affect TrueHRScore">
             <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:4}}>
               HIGH PLATE IQ
@@ -33438,6 +33593,18 @@ function BarrelLabTab() {
                     🎲 Longshot
                   </div>
                 )}
+                {b.isChalk && (
+                  <div style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'#f5c542',
+                    letterSpacing:.6,textTransform:'uppercase',marginBottom:4}}>
+                    💪🏽 Chalk
+                  </div>
+                )}
+                {b.isDayLate && (
+                  <div style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'#22c1c3',
+                    letterSpacing:.6,textTransform:'uppercase',marginBottom:4}}>
+                    🗓️ Day Late
+                  </div>
+                )}
                 {b.handMatchTier && (
                   <div style={{fontFamily:mono,fontSize:8,color:'#fbbf24',marginBottom:4,
                     opacity:b.handMatchTier==='partial'?.75:1}}>
@@ -33517,6 +33684,8 @@ function BarrelLabTab() {
                                 <span style={{color:'var(--text)'}}>
                                   {b.isBarrelSignal && <span title="Barrel Signal — TrueHRScore ≥75, MatchupScore ≥60, simulated HR% ≥12%." style={{color:'var(--accent)',marginRight:2,fontWeight:900,fontSize:7}}>★</span>}
                                   {b.isLongshot && <span title="Longshot — TrueHRScore ≤55, MatchupScore ≥65, Sim TB ≥1.2, non-elite pitcher." style={{color:'#a78bfa',marginRight:2,fontWeight:900,fontSize:7}}>🎲</span>}
+                                  {b.isChalk && <span title="Chalk — established A/A+ batter (season Grade) facing a genuinely soft matchup today (Target/Hittable/Average)." style={{color:'#f5c542',marginRight:2,fontWeight:900,fontSize:7}}>💪🏽</span>}
+                                  {b.isDayLate && <span title="Day Late — a real ★ Barrel Signal on BOTH of the last 2 real game days, no HR either day, today's matchup not an outright Elite mismatch." style={{color:'#22c1c3',marginRight:2,fontWeight:900,fontSize:7}}>🗓️</span>}
                                   {b.handMatchTier && <span
                                     title={b.handMatchTier==='elite'
                                       ? `Elite Hand Match — ${b.pitcher||'this pitcher'} (${(b.pitcher_hand||'?').charAt(0)}HP) is genuinely weak vs ${b.batter_hand||'?'}HB, ${b.batter} has strong arsenal fit (ps_convergence=${fmt(b.ps_convergence,1)}${b.ps_conv_pitch ? ', best pitch: '+b.ps_conv_pitch : ''}), AND an elite ${fmt(b.vs_hand_hr_rate,1)}% HR rate vs that hand. Diamond in the rough.`
@@ -33712,13 +33881,18 @@ function OnBaseTab() {
   const [simTrigger,       setSimTrigger]       = useState(0);
   const [liveGamesVersion, setLiveGamesVersion] = useState(LIVE_GAMES_CACHE.length);
   const [obHideFinal,      setObHideFinal]      = useState(false);
+  const [obLongshotOnly,   setObLongshotOnly]   = useState(false);
+  const [obChalkOnly,      setObChalkOnly]      = useState(false);
+  const [obDayLateOnly,    setObDayLateOnly]    = useState(false);
   const [obPicksOnly,      setObPicksOnly]      = useState(false);
   const [obGoneYardOnly,   setObGoneYardOnly]   = useState(false);
   const [obTB2Only,        setObTB2Only]        = useState(false);
   const [obHighIQOnly,     setObHighIQOnly]     = useState(false);
   const [obHandMatchOnly,  setObHandMatchOnly]  = useState(false);
   const [obBatterHand,     setObBatterHand]     = useState('ALL');
+  const [obPitcherGrades,  setObPitcherGrades]  = useState(() => new Set());
   const [hrVer, setHrVer] = useState(_HR_VER||0);
+  const [dayLateVer,       setDayLateVer]       = useState(0);
 
   useEffect(() => {
     const unsub    = subscribeLineup(v => setLineupVer(v));
@@ -33727,7 +33901,9 @@ function OnBaseTab() {
     const liveId   = setInterval(() => setLiveGamesVersion(LIVE_GAMES_CACHE.length), 15000);
     const hrId     = setInterval(() => { if (_HR_VER !== hrVer) setHrVer(_HR_VER); }, 5000);
     loadTodayLineups();
-    return () => { unsub(); unsubInj(); clearInterval(finId); clearInterval(liveId); clearInterval(hrId); };
+    loadDayLateLookup();
+    const dayLateId = setInterval(() => { if (_DAY_LATE_VER !== dayLateVer) setDayLateVer(_DAY_LATE_VER); }, 5000);
+    return () => { unsub(); unsubInj(); clearInterval(finId); clearInterval(liveId); clearInterval(hrId); clearInterval(dayLateId); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // "Gone Yard Today" / "2+ TB Today" checks — same HR_DATA/TB2_DATA pattern
@@ -33853,6 +34029,9 @@ function OnBaseTab() {
           r.onBaseScore  >= 75 &&
           r.matchupScore >= 60 &&
           r.simTB2Pct != null && r.simTB2Pct >= 30.0,
+        isLongshot: isLongshotBatter(r, r.onBaseScore, r.matchupScore),
+        isChalk:    isChalkBatter(r),
+        isDayLate:  isDayLateBatter(r),
         handMatchTier: getHandMatchTier(r),
         rainRiskTier: getRainRiskTier(r),
         rainRiskPct:  getRainRiskPct(r),
@@ -33868,14 +34047,18 @@ function OnBaseTab() {
       };
     })
     .filter(r => !obHideFinal || !FINAL_GAME_IDS.has(String(r.game_id)))
+    .filter(r => !obLongshotOnly || r.isLongshot)
+    .filter(r => !obChalkOnly    || r.isChalk)
+    .filter(r => !obDayLateOnly  || r.isDayLate)
     .filter(r => !obPicksOnly || picks[String(parseInt(r.batter_id)||0)])
     .filter(r => !obGoneYardOnly || isGoneYardOB(r))
     .filter(r => !obTB2Only || is2BagOB(r))
     .filter(r => !obHighIQOnly || (r.plateIQ != null && r.plateIQ >= 56))
     .filter(r => !obHandMatchOnly || r.handMatchTier)
+    .filter(r => obPitcherGrades.size === 0 || obPitcherGrades.has((r.pitcher_grade_label||r._pgLabel||'').trim()))
     .filter(r => matchesHandFilter(r.batter_hand, obBatterHand))
     .sort((a, b) => b.onBaseScore - a.onBaseScore);
-  }, [eligibleBatters, simResults, obHideFinal, obPicksOnly, obGoneYardOnly, obTB2Only, obHighIQOnly, obHandMatchOnly, obBatterHand, picks, finalVer, hrVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [eligibleBatters, simResults, obHideFinal, obLongshotOnly, obChalkOnly, obDayLateOnly, obPicksOnly, obGoneYardOnly, obTB2Only, obHighIQOnly, obHandMatchOnly, obBatterHand, obPitcherGrades, picks, finalVer, hrVer, dayLateVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const byTeam = useMemo(() => {
     const teams = {};
@@ -34051,80 +34234,21 @@ function OnBaseTab() {
                 {confirmedOnly ? '✅ Confirmed only' : '👁 All batters'}
               </button>
             )}
-            <button
-              onClick={() => setObHideFinal(v => !v)}
-              style={{
-                padding:'2px 8px', borderRadius:5, cursor:'pointer',
-                fontFamily:mono, fontSize:9, fontWeight:700,
-                lineHeight:1.5, flexShrink:0,
-                background: obHideFinal ? 'rgba(255,107,107,.12)' : 'var(--surface2)',
-                color:       obHideFinal ? '#ff6b6b' : 'var(--muted)',
-                border:`1px solid ${obHideFinal ? 'rgba(255,107,107,.4)' : 'var(--border)'}`,
-              }}>
-              {obHideFinal ? '✓ Hiding Final' : '🚫 Hide Final'}
-            </button>
-            <button
-              onClick={() => setObPicksOnly(v => !v)}
-              style={{
-                padding:'2px 8px', borderRadius:5, cursor:'pointer',
-                fontFamily:mono, fontSize:9, fontWeight:700,
-                lineHeight:1.5, flexShrink:0,
-                background: obPicksOnly ? 'rgba(245,166,35,.12)' : 'var(--surface2)',
-                color:      obPicksOnly ? 'var(--accent2)' : 'var(--muted)',
-                border:`1px solid ${obPicksOnly ? 'rgba(245,166,35,.4)' : 'var(--border)'}`,
-              }}>
-              🎯 {obPicksOnly ? 'My Picks ✓' : 'My Picks'}
-            </button>
-            <button
-              onClick={() => setObGoneYardOnly(v => !v)}
-              style={{
-                padding:'2px 8px', borderRadius:5, cursor:'pointer',
-                fontFamily:mono, fontSize:9, fontWeight:700,
-                lineHeight:1.5, flexShrink:0,
-                background: obGoneYardOnly ? 'rgba(232,65,26,.12)' : 'var(--surface2)',
-                color:      obGoneYardOnly ? 'var(--accent)' : 'var(--muted)',
-                border:`1px solid ${obGoneYardOnly ? 'rgba(232,65,26,.4)' : 'var(--border)'}`,
-              }}>
-              💥 {obGoneYardOnly ? 'Gone Yard ✓' : 'Gone Yard Today'}
-            </button>
-            <button
-              onClick={() => setObTB2Only(v => !v)}
-              style={{
-                padding:'2px 8px', borderRadius:5, cursor:'pointer',
-                fontFamily:mono, fontSize:9, fontWeight:700,
-                lineHeight:1.5, flexShrink:0,
-                background: obTB2Only ? 'rgba(56,184,242,.12)' : 'var(--surface2)',
-                color:      obTB2Only ? '#38b8f2' : 'var(--muted)',
-                border:`1px solid ${obTB2Only ? 'rgba(56,184,242,.4)' : 'var(--border)'}`,
-              }}>
-              2️⃣ {obTB2Only ? '2+ TB ✓' : '2+ TB Today'}
-            </button>
-            <button
-              onClick={() => setObHighIQOnly(v => !v)}
-              title="Plate IQ — display-only, does not affect OnBaseScore. See Legend for details."
-              style={{
-                padding:'2px 8px', borderRadius:5, cursor:'pointer',
-                fontFamily:mono, fontSize:9, fontWeight:700,
-                lineHeight:1.5, flexShrink:0,
-                background: obHighIQOnly ? 'rgba(56,184,242,.12)' : 'var(--surface2)',
-                color:      obHighIQOnly ? '#38b8f2' : 'var(--muted)',
-                border:`1px solid ${obHighIQOnly ? 'rgba(56,184,242,.4)' : 'var(--border)'}`,
-              }}>
-              🧠 {obHighIQOnly ? 'High IQ Only' : 'Plate IQ'}
-            </button>
-            <button
-              onClick={() => setObHandMatchOnly(v => !v)}
-              title="Batter's handedness exploits the opposing pitcher's weakness (⭐⭐ full or ⭐ partial). See Legend for details."
-              style={{
-                padding:'2px 8px', borderRadius:5, cursor:'pointer',
-                fontFamily:mono, fontSize:9, fontWeight:700,
-                lineHeight:1.5, flexShrink:0,
-                background: obHandMatchOnly ? 'rgba(251,191,36,.12)' : 'var(--surface2)',
-                color:      obHandMatchOnly ? '#fbbf24' : 'var(--muted)',
-                border:`1px solid ${obHandMatchOnly ? 'rgba(251,191,36,.4)' : 'var(--border)'}`,
-              }}>
-              ⭐ {obHandMatchOnly ? 'Hand Match Only' : 'Hand Match'}
-            </button>
+            <FilterPanel
+              toggles={[
+                {key:'hideFinal', label:'🚫 Hide Final',        active:obHideFinal,     color:'#ff6b6b', onToggle:()=>setObHideFinal(v=>!v)},
+                {key:'longshot',  label:'🎲 Longshot',          active:obLongshotOnly,  color:'#a78bfa', onToggle:()=>setObLongshotOnly(v=>!v)},
+                {key:'chalk',     label:'💪🏽 Chalk',             active:obChalkOnly,     color:'#f5c542', onToggle:()=>setObChalkOnly(v=>!v)},
+                {key:'daylate',   label:'🗓️ Day Late',          active:obDayLateOnly,   color:'#22c1c3', onToggle:()=>setObDayLateOnly(v=>!v)},
+                {key:'picks',     label:'🎯 My Picks',          active:obPicksOnly,     color:'var(--accent2)', onToggle:()=>setObPicksOnly(v=>!v)},
+                {key:'goneyard',  label:'💥 Gone Yard Today',   active:obGoneYardOnly,  color:'var(--accent)', onToggle:()=>setObGoneYardOnly(v=>!v)},
+                {key:'tb2',       label:'2️⃣ 2+ TB Today',       active:obTB2Only,       color:'#38b8f2', onToggle:()=>setObTB2Only(v=>!v)},
+                {key:'plateiq',   label:'🧠 High Plate IQ',      active:obHighIQOnly,    color:'#38b8f2', onToggle:()=>setObHighIQOnly(v=>!v)},
+                {key:'handmatch', label:'⭐ Hand Match',         active:obHandMatchOnly, color:'#fbbf24', onToggle:()=>setObHandMatchOnly(v=>!v)},
+              ]}
+              pitcherGrades={obPitcherGrades}
+              onPitcherGradesChange={setObPitcherGrades}
+            />
             <HandFilter mode="batter" value={obBatterHand} onChange={setObBatterHand}/>
             <button
               disabled={simRunning}
@@ -34149,7 +34273,7 @@ function OnBaseTab() {
                 const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
                 const f1 = v => (v != null && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(1) : '';
                 const f3 = v => (v != null && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(3) : '';
-                const hdrs = ['Slot','Team','Player','Pitcher','Grade','OnBaseScore','Matchup','ZF','G2TB%','SimTB2%','AVG','SLG','ISO','xwOBA','XBH%','HH%','SimTB','LA°','TB Signal','Plate IQ','IQ Grade','Zone Risk','Hand Match',
+                const hdrs = ['Slot','Team','Player','Pitcher','Grade','OnBaseScore','Matchup','ZF','G2TB%','SimTB2%','AVG','SLG','ISO','xwOBA','XBH%','HH%','SimTB','LA°','TB Signal','Plate IQ','IQ Grade','Zone Risk','Hand Match','Longshot','Chalk','Day Late',
                   'Game ID','Batter ID','Pitcher ID'];
                 const csvRows = [hdrs.map(esc).join(',')];
                 rows.forEach(b => {
@@ -34177,6 +34301,9 @@ function OnBaseTab() {
                     esc(b.plateIQGrade?.label || ''),
                     esc(b.zoneAttackRisk ? '1' : '0'),
                     esc(b.handMatchTier || ''),
+                    esc(b.isLongshot ? '1' : '0'),
+                    esc(b.isChalk ? '1' : '0'),
+                    esc(b.isDayLate ? '1' : '0'),
                     // Hidden data-plumbing columns (not shown in-app) — join keys for Track Record / ball carry
                     esc(b.game_id||''), esc(parseInt(b.batter_id)||''), esc(parseInt(b.pitcher_id)||''),
                   ].join(','));
@@ -34214,6 +34341,38 @@ function OnBaseTab() {
               <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:4}}>{sub}</div>
             </div>
           ))}
+          <div style={{flex:'1 1 120px',background:'var(--surface2)',borderRadius:8,
+            padding:'10px 14px',border:'1px solid var(--border)'}}>
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:4}}>
+              LONGSHOTS
+            </div>
+            <div style={{fontFamily:osw,fontSize:22,fontWeight:700,color:'#a78bfa',lineHeight:1}}>
+              {gameRows.filter(r => r.isLongshot).length}
+            </div>
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:4}}>Low profile, good spot</div>
+          </div>
+          <div style={{flex:'1 1 120px',background:'var(--surface2)',borderRadius:8,
+            padding:'10px 14px',border:'1px solid var(--border)'}}
+            title="Chalk — established A/A+ batter (season Grade) facing a genuinely soft matchup today (Target/Hittable/Average, not Tough/Elite).">
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:4}}>
+              CHALK
+            </div>
+            <div style={{fontFamily:osw,fontSize:22,fontWeight:700,color:'#f5c542',lineHeight:1}}>
+              {gameRows.filter(r => r.isChalk).length}
+            </div>
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:4}}>Proven bat, soft spot</div>
+          </div>
+          <div style={{flex:'1 1 120px',background:'var(--surface2)',borderRadius:8,
+            padding:'10px 14px',border:'1px solid var(--border)'}}
+            title="Day Late — a real ★ Barrel Signal on BOTH of the last 2 real game days, no HR either day, today's matchup not an outright Elite mismatch.">
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:4}}>
+              DAY LATE
+            </div>
+            <div style={{fontFamily:osw,fontSize:22,fontWeight:700,color:'#22c1c3',lineHeight:1}}>
+              {gameRows.filter(r => r.isDayLate).length}
+            </div>
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:4}}>Primed twice, still due</div>
+          </div>
           <div style={{flex:'1 1 120px',background:'var(--surface2)',borderRadius:8,
             padding:'10px 14px',border:'1px solid var(--border)'}}
             title="Plate IQ — display-only, does not affect OnBaseScore">
@@ -34303,6 +34462,24 @@ function OnBaseTab() {
                     ★ TB Signal
                   </div>
                 )}
+                {b.isLongshot && (
+                  <div style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'#a78bfa',
+                    letterSpacing:.6,textTransform:'uppercase',marginBottom:6}}>
+                    🎲 Longshot
+                  </div>
+                )}
+                {b.isChalk && (
+                  <div style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'#f5c542',
+                    letterSpacing:.6,textTransform:'uppercase',marginBottom:6}}>
+                    💪🏽 Chalk
+                  </div>
+                )}
+                {b.isDayLate && (
+                  <div style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'#22c1c3',
+                    letterSpacing:.6,textTransform:'uppercase',marginBottom:6}}>
+                    🗓️ Day Late
+                  </div>
+                )}
                 {b.handMatchTier && (
                   <div style={{fontFamily:mono,fontSize:8,color:'#fbbf24',marginBottom:6,
                     opacity:b.handMatchTier==='partial'?.75:1}}>
@@ -34380,6 +34557,9 @@ function OnBaseTab() {
                               <PlayerAvatar pid={b.batter_id} name={b.batter} size={22}/>
                               <span style={{color:'var(--text)'}}>
                                 {b.isTBSignal && <span title="TB Signal — OnBaseScore ≥75, MatchupScore ≥60, SimTB2% ≥30%." style={{color:'#38b8f2',marginRight:2,fontWeight:900,fontSize:7}}>★</span>}
+                                {b.isLongshot && <span title="Longshot — OnBaseScore ≤55, MatchupScore ≥65, Sim TB ≥1.2, non-elite pitcher." style={{color:'#a78bfa',marginRight:2,fontWeight:900,fontSize:7}}>🎲</span>}
+                                {b.isChalk && <span title="Chalk — established A/A+ batter (season Grade) facing a genuinely soft matchup today." style={{color:'#f5c542',marginRight:2,fontWeight:900,fontSize:7}}>💪🏽</span>}
+                                {b.isDayLate && <span title="Day Late — a real ★ Barrel Signal on BOTH of the last 2 real game days, no HR either day, today's matchup not an outright Elite mismatch." style={{color:'#22c1c3',marginRight:2,fontWeight:900,fontSize:7}}>🗓️</span>}
                                 {b.handMatchTier && <span
                                   title={b.handMatchTier==='elite'
                                     ? `Elite Hand Match — ${b.pitcher||'this pitcher'} (${(b.pitcher_hand||'?').charAt(0)}HP) is genuinely weak vs ${b.batter_hand||'?'}HB, ${b.batter} has strong arsenal fit (ps_convergence=${fmt(b.ps_convergence,1)}${b.ps_conv_pitch ? ', best pitch: '+b.ps_conv_pitch : ''}), AND an elite ${fmt(b.vs_hand_hr_rate,1)}% HR rate vs that hand. Diamond in the rough.`
