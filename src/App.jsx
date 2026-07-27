@@ -28572,7 +28572,7 @@ function LegendButton() {
       'MatchupScore (0–100) — pitcher-adjusted vulnerability score for this specific batter/pitcher pairing.',
       '★ Barrel Signal — TrueHRScore ≥75 AND MatchupScore ≥60 AND simulated HR% ≥12%. Strict flag, live tracker: 16.9% HR rate.',
       '🎲 Longshot — TrueHRScore ≤55, MatchupScore ≥65, Sim TB ≥1.2, non-elite pitcher. Mutually exclusive with Barrel Signal by construction.',
-      '💪🏽 Chalk — the obvious, established pick. Batter\'s own season letter Grade is A/A+ AND today\'s Pitcher Grade is Target/Hittable/Average (not Tough/Elite). Deliberately uses the season-long Grade rather than TrueHR/MatchupScore, which already blend in today\'s matchup — this is the mirror-opposite of Longshot (proven bat + soft spot, vs. unproven bat + soft spot). ~14 of 1,146 batters on a typical slate.',
+      '💪🏽 Chalk — the obvious, established pick. Real season HR leader (season HR ≥18 AND season ISO ≥.220 — actual MLB stats from player data, not the matchup-day Grade field) AND today\'s Pitcher Grade is Target/Hittable/Average (not Tough/Elite). Corrected 2026-07-27: the original version used the batter\'s letter Grade (A/A+), which is actually a today\'s-matchup flag score (same weighting as Sig — Recent form/vs-Hand/BvP/Hist-Hand), not a season power ranking — it was flagging low-power bench bats as "Chalk." This is the mirror-opposite of Longshot (proven bat + soft spot, vs. unproven bat + soft spot). ~17 of 1,146 batters on a typical slate.',
       '🗓️ Day Late — was a real ★ Barrel Signal on BOTH of the last 2 real game days, with no HR on either day, and today\'s matchup isn\'t an outright Elite-pitcher mismatch. Backward-looking, unlike Chalk/Longshot. Added 2026-07-27 after testing several looser definitions (a single close call, or close calls plus Barrel Signal) that all tested too rare — Live Close Calls are genuinely sparse events, so requiring Barrel Signal twice in a row turned out to be the version with a real, usable population (~8 of 1,146 on a typical slate). Requires 2 real days of Track Record data — shows nothing on the first day or two of a fresh season.',
       '⭐⭐⭐ / ⭐⭐ / ⭐ Hand Match — batter\'s handedness exploits the opposing pitcher\'s weakness. ⭐⭐ (full): platoon advantage + pitcher genuinely weak vs that hand (elevated HR/HH/Barrel% allowed) + batter historically strong vs that hand. ⭐ (partial): cross-handed with strong pitch-mix fit (ps_convergence ≥8) even when the pitcher\'s overall vs-hand rates aren\'t clearly weak yet — e.g. a LHB who crushes fastballs matched against a fastball-heavy RHP. ⭐⭐⭐ (elite): the "diamond in the rough" tier — full\'s aggregate weakness AND partial\'s pitch-mix fit AND an elite vs-hand HR rate (≥10%) all at once. Very rare (~6 of 1,450 matchups on a typical slate).',
       '💥 Gone Yard / 2️⃣ 2+ TB Today badges and filters — same definitions as everywhere else in the app.',
@@ -32496,14 +32496,33 @@ function isLongshotBatter(r, trueHRScore, matchupScore) {
 // ── isChalkBatter — "the obvious, safe, well-supported pick" ─────────────────
 // Mirror-opposite of Longshot: an established, season-proven power hitter
 // (not today's blended matchup score) getting a genuinely soft matchup today.
-// Uses the batter's own letter Grade (r.grade — A+/A/B/C/D, matchup_engine.py
-// compute_grade(), already on every row, never previously read in this tab)
-// rather than TrueHR/MatchupScore, which already blend in today's matchup —
-// using those instead would make Chalk largely redundant with Barrel Signal.
-// Added 2026-07-27. Validated against the live slate: 14 of 1,146 batters.
+//
+// CORRECTED 2026-07-27 — the original version (r.grade, A+/A/B/C/D from
+// matchup_engine.py compute_grade()) was wrong. compute_grade() is a
+// today's-matchup flag grade (Recent form 40% / vs-Handedness 35% / BvP 15%
+// / Hist-Handedness 10% — literally Sig's own weighting, letter-graded) —
+// NOT a season power ranking, despite the name suggesting one. Confirmed
+// live: Max Kepler (2 HR, .159 ISO), Kevin McGonigle (9 HR, .137 ISO),
+// Patrick Wisdom (1 HR, .098 ISO), and Jimmy Crooks (3 HR, .156 ISO) were
+// all showing as Chalk under the old definition — none of them anywhere
+// near a real season power hitter. Replaced with actual season stats from
+// PLAYER_DATA_CACHE (players.json, real MLB season totals — same source
+// HR Tracker's season-HR display already uses): HR>=18 AND ISO(=SLG-AVG)
+// >=0.220. Thresholds set from the real 2026 top-50 season HR leaderboard
+// (25th place: 21 HR / .235 ISO; 50th: 17 HR / .246 ISO; top-50 ISO range
+// .174-.320) — the ISO floor alone naturally excludes high-AB "compiled
+// counting stats" hitters within that HR range (e.g. Gunnar Henderson 18 HR
+// but .181 ISO, Ozzie Albies 17 HR but .174 ISO) without needing a separate
+// AB/HR check. Validated against the live slate: 17 of 1,146 batters,
+// all real established sluggers (Schwarber, Devers, Soto, Trout, Harper,
+// etc.) — a defensible, corrected list.
 function isChalkBatter(r) {
-  const grade = (r.grade || '').toUpperCase();
-  if (grade !== 'A' && grade !== 'A+') return false; // not an established elite bat
+  const p = getCachedPlayer(r.batter_id);
+  if (!p) return false; // player season data not loaded yet, or genuinely unknown
+  const seasonHR  = p.hr || 0;
+  const seasonISO = (p.slg || 0) - (p.avg || 0);
+  if (seasonHR < 18) return false;    // not a real season HR-leader-tier bat
+  if (seasonISO < 0.220) return false; // real power density, not just compiled volume
   const pg = (r.pitcher_grade_label || r._pgLabel || '').toLowerCase();
   if (pg.includes('elite') || pg.includes('tough')) return false; // matchup not soft enough
   return true;
@@ -32892,6 +32911,7 @@ function BarrelLabTab() {
   const [blBatterHand,     setBlBatterHand]     = useState('ALL');
   const [blPitcherGrades,  setBlPitcherGrades]  = useState(() => new Set());
   const [dayLateVer,       setDayLateVer]       = useState(0);
+  const [playerVer,        setPlayerVer]        = useState(0); // tracks PLAYER_CACHE_DATE — Chalk needs real season HR/ISO from getCachedPlayer()
 
   useEffect(() => {
     const unsub    = subscribeLineup(v => setLineupVer(v));
@@ -32903,7 +32923,21 @@ function BarrelLabTab() {
     loadTodayLineups();
     loadDayLateLookup();
     const dayLateId = setInterval(() => { if (_DAY_LATE_VER !== dayLateVer) setDayLateVer(_DAY_LATE_VER); }, 5000);
-    return () => { unsub(); unsubInj(); clearInterval(finId); clearInterval(hrId); clearInterval(liveId); clearInterval(dayLateId); };
+    // PLAYER_DATA_CACHE is populated by the app-level fetchPlayers() on
+    // startup — usually already done by the time this tab's Monte Carlo sim
+    // finishes, but poll anyway so Chalk badges don't get stuck blank on a
+    // slow/cold load. Bumps playerVer once when the cache first becomes
+    // ready, not on every tick — PLAYER_CACHE_DATE only ever changes on a
+    // fresh players fetch, so a single stale-check per tick against the
+    // component's own last-seen value is enough.
+    let lastSeenPlayerDate = PLAYER_CACHE_DATE;
+    const playerId = setInterval(() => {
+      if (PLAYER_CACHE_DATE && PLAYER_CACHE_DATE !== lastSeenPlayerDate) {
+        lastSeenPlayerDate = PLAYER_CACHE_DATE;
+        setPlayerVer(v => v+1);
+      }
+    }, 3000);
+    return () => { unsub(); unsubInj(); clearInterval(finId); clearInterval(hrId); clearInterval(liveId); clearInterval(dayLateId); clearInterval(playerId); };
   }, [hrVer, dayLateVer]);
 
   // Auto-switch to confirmed-only once lineups first post.
@@ -33103,7 +33137,7 @@ function BarrelLabTab() {
     .filter(r => blPitcherGrades.size === 0 || blPitcherGrades.has((r.pitcher_grade_label||r._pgLabel||'').trim()))
     .filter(r => matchesHandFilter(r.batter_hand, blBatterHand))
     .sort((a, b) => b.trueHRScore - a.trueHRScore);
-  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, blChalkOnly, blDayLateOnly, blPicksOnly, picks, blGoneYardOnly, blTB2Only, blHighIQOnly, blHandMatchOnly, blBatterHand, blPitcherGrades, hrVer, finalVer, dayLateVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, blChalkOnly, blDayLateOnly, blPicksOnly, picks, blGoneYardOnly, blTB2Only, blHighIQOnly, blHandMatchOnly, blBatterHand, blPitcherGrades, hrVer, finalVer, dayLateVer, playerVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Color threshold helpers
   const clr = (v, g1, g2, y1, y2) => {
@@ -33515,7 +33549,7 @@ function BarrelLabTab() {
           </div>
           <div style={{flex:'1 1 120px',background:'var(--surface2)',borderRadius:8,
             padding:'10px 14px',border:'1px solid var(--border)'}}
-            title="Chalk — established A/A+ batter (season Grade) facing a genuinely soft matchup today (Target/Hittable/Average, not Tough/Elite).">
+            title="Chalk — real season HR leader (>=18 HR, >=.220 ISO) facing a genuinely soft matchup today (Target/Hittable/Average, not Tough/Elite).">
             <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:4}}>
               CHALK
             </div>
@@ -33725,7 +33759,7 @@ function BarrelLabTab() {
                                 <span style={{color:'var(--text)'}}>
                                   {b.isBarrelSignal && <span title="Barrel Signal — TrueHRScore ≥75, MatchupScore ≥60, simulated HR% ≥12%." style={{color:'var(--accent)',marginRight:2,fontWeight:900,fontSize:7}}>★</span>}
                                   {b.isLongshot && <span title="Longshot — TrueHRScore ≤55, MatchupScore ≥65, Sim TB ≥1.2, non-elite pitcher." style={{color:'#a78bfa',marginRight:2,fontWeight:900,fontSize:7}}>🎲</span>}
-                                  {b.isChalk && <span title="Chalk — established A/A+ batter (season Grade) facing a genuinely soft matchup today (Target/Hittable/Average)." style={{color:'#f5c542',marginRight:2,fontWeight:900,fontSize:7}}>💪🏽</span>}
+                                  {b.isChalk && <span title="Chalk — real season HR leader (>=18 HR, >=.220 ISO) facing a genuinely soft matchup today (Target/Hittable/Average)." style={{color:'#f5c542',marginRight:2,fontWeight:900,fontSize:7}}>💪🏽</span>}
                                   {b.isDayLate && <span title="Day Late — a real ★ Barrel Signal on BOTH of the last 2 real game days, no HR either day, today's matchup not an outright Elite mismatch." style={{color:'#22c1c3',marginRight:2,fontWeight:900,fontSize:7}}>🗓️</span>}
                                   {b.handMatchTier && <span
                                     title={b.handMatchTier==='elite'
@@ -33934,6 +33968,7 @@ function OnBaseTab() {
   const [obPitcherGrades,  setObPitcherGrades]  = useState(() => new Set());
   const [hrVer, setHrVer] = useState(_HR_VER||0);
   const [dayLateVer,       setDayLateVer]       = useState(0);
+  const [playerVer,        setPlayerVer]        = useState(0); // tracks PLAYER_CACHE_DATE — Chalk needs real season HR/ISO from getCachedPlayer()
 
   useEffect(() => {
     const unsub    = subscribeLineup(v => setLineupVer(v));
@@ -33944,7 +33979,14 @@ function OnBaseTab() {
     loadTodayLineups();
     loadDayLateLookup();
     const dayLateId = setInterval(() => { if (_DAY_LATE_VER !== dayLateVer) setDayLateVer(_DAY_LATE_VER); }, 5000);
-    return () => { unsub(); unsubInj(); clearInterval(finId); clearInterval(liveId); clearInterval(hrId); clearInterval(dayLateId); };
+    let lastSeenPlayerDate = PLAYER_CACHE_DATE;
+    const playerId = setInterval(() => {
+      if (PLAYER_CACHE_DATE && PLAYER_CACHE_DATE !== lastSeenPlayerDate) {
+        lastSeenPlayerDate = PLAYER_CACHE_DATE;
+        setPlayerVer(v => v+1);
+      }
+    }, 3000);
+    return () => { unsub(); unsubInj(); clearInterval(finId); clearInterval(liveId); clearInterval(hrId); clearInterval(dayLateId); clearInterval(playerId); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // "Gone Yard Today" / "2+ TB Today" checks — same HR_DATA/TB2_DATA pattern
@@ -34099,7 +34141,7 @@ function OnBaseTab() {
     .filter(r => obPitcherGrades.size === 0 || obPitcherGrades.has((r.pitcher_grade_label||r._pgLabel||'').trim()))
     .filter(r => matchesHandFilter(r.batter_hand, obBatterHand))
     .sort((a, b) => b.onBaseScore - a.onBaseScore);
-  }, [eligibleBatters, simResults, obHideFinal, obLongshotOnly, obChalkOnly, obDayLateOnly, obPicksOnly, obGoneYardOnly, obTB2Only, obHighIQOnly, obHandMatchOnly, obBatterHand, obPitcherGrades, picks, finalVer, hrVer, dayLateVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [eligibleBatters, simResults, obHideFinal, obLongshotOnly, obChalkOnly, obDayLateOnly, obPicksOnly, obGoneYardOnly, obTB2Only, obHighIQOnly, obHandMatchOnly, obBatterHand, obPitcherGrades, picks, finalVer, hrVer, dayLateVer, playerVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const byTeam = useMemo(() => {
     const teams = {};
@@ -34429,7 +34471,7 @@ function OnBaseTab() {
           </div>
           <div style={{flex:'1 1 120px',background:'var(--surface2)',borderRadius:8,
             padding:'10px 14px',border:'1px solid var(--border)'}}
-            title="Chalk — established A/A+ batter (season Grade) facing a genuinely soft matchup today (Target/Hittable/Average, not Tough/Elite).">
+            title="Chalk — real season HR leader (>=18 HR, >=.220 ISO) facing a genuinely soft matchup today (Target/Hittable/Average, not Tough/Elite).">
             <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:4}}>
               CHALK
             </div>
@@ -34634,7 +34676,7 @@ function OnBaseTab() {
                               <span style={{color:'var(--text)'}}>
                                 {b.isTBSignal && <span title="TB Signal — OnBaseScore ≥75, MatchupScore ≥60, SimTB2% ≥30%." style={{color:'#38b8f2',marginRight:2,fontWeight:900,fontSize:7}}>★</span>}
                                 {b.isLongshot && <span title="Longshot — OnBaseScore ≤55, MatchupScore ≥65, Sim TB ≥1.2, non-elite pitcher." style={{color:'#a78bfa',marginRight:2,fontWeight:900,fontSize:7}}>🎲</span>}
-                                {b.isChalk && <span title="Chalk — established A/A+ batter (season Grade) facing a genuinely soft matchup today." style={{color:'#f5c542',marginRight:2,fontWeight:900,fontSize:7}}>💪🏽</span>}
+                                {b.isChalk && <span title="Chalk — real season HR leader (>=18 HR, >=.220 ISO) facing a genuinely soft matchup today." style={{color:'#f5c542',marginRight:2,fontWeight:900,fontSize:7}}>💪🏽</span>}
                                 {b.isDayLate && <span title="Day Late — a real ★ Barrel Signal on BOTH of the last 2 real game days, no HR either day, today's matchup not an outright Elite mismatch." style={{color:'#22c1c3',marginRight:2,fontWeight:900,fontSize:7}}>🗓️</span>}
                                 {b.handMatchTier && <span
                                   title={b.handMatchTier==='elite'
