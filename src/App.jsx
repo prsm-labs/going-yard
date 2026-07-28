@@ -3673,6 +3673,20 @@ function PitcherSlideIn() {
         </div>
       )}
 
+      {/* Opposing Batters Today — Arsenal Fit (2026-07-28) — see
+          PROMPT_PitcherFirstArsenalFit.md. This is the panel a researcher
+          actually reaches by clicking a pitcher's name from Barrel Lab, On
+          Base, Track Record, etc. (openPitcherSlide -> PitcherSlideIn). The
+          small PitcherCard badge (App.jsx, ~4 narrow call sites) has its own
+          copy of this section too, but this is the one users actually see. */}
+      <div style={{padding:'14px 20px',borderBottom:'1px solid var(--border)'}}>
+        <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+          textTransform:'uppercase',letterSpacing:1,marginBottom:10}}>
+          Opposing Batters Today — Arsenal Fit
+        </div>
+        <OpposingBatterTable pitcherId={pitcher.pid}/>
+      </div>
+
       {/* HR Allowed Chart */}
       <div style={{padding:'0 20px'}}>
         <Last7HRAllowedChart pitcherId={pitcher?.pid}/>
