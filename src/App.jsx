@@ -14900,7 +14900,18 @@ function OpposingBatterTable({ pitcherId }) {
               <tr key={bid} style={{borderBottom:'1px solid rgba(255,255,255,.04)'}}>
                 <td style={{padding:'3px 6px',cursor:'pointer',color:'var(--accent2)',fontWeight:700}}
                   title="Click for full batter detail"
-                  onClick={()=>openAtBatSlide({pid:bid, name:r.batter||'', team:r.batting_team||''})}>
+                  onClick={()=>{
+                    // Close any open PitcherSlideIn first (openPitcherSlide(null) ->
+                    // setPitcher(null)) — this table is most commonly reached from
+                    // inside PitcherSlideIn, which shares AtBatSlideIn's exact
+                    // z-index (900/901, App.jsx:2583/2590 vs :3555-3559) and mounts
+                    // LATER in the DOM (App.jsx:36172-36173) — without this, the
+                    // still-open pitcher panel always paints over the newly-opened
+                    // batter panel, making it invisible and unclickable. Harmless
+                    // no-op when no pitcher slideout is open (e.g. from PitcherCard).
+                    openPitcherSlide(null);
+                    openAtBatSlide({pid:bid, name:r.batter||'', team:r.batting_team||''});
+                  }}>
                   {r.batter||'—'} <span style={{color:'var(--muted)',fontWeight:400,fontSize:8}}>{r.batter_hand||''}</span>
                 </td>
                 <td style={{textAlign:'center',padding:'3px 6px',color:'#fbbf24'}}>{stars}</td>
