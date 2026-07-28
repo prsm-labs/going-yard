@@ -3493,6 +3493,26 @@ function PitcherSlideIn() {
   const [gameLog, setGameLog] = useState([]);
   const [loading, setLoading] = useState(false);
   const [battedBall, setBattedBall] = useState(null);
+  // vs-hand toggle (2026-07-28) — see PROMPT-less design discussion in
+  // CLAUDE.md "Pitcher weakness by hand" session. 'ALL' = overall (unchanged
+  // default), 'L'/'R' = vs LHB / vs RHB. handSplits comes from api/pitcher.js
+  // (statSplits/sitCodes=vl,vr — same MLB endpoint the engine's own
+  // fetch_pitcher_hand_splits() already uses for hand-specific grading), so
+  // it works for ANY pitcher, not just today's probable starters.
+  const [statHand, setStatHand] = useState('ALL');
+  const [handSplits, setHandSplits] = useState(null);
+
+  // Today's daily_picks.csv row for this pitcher, if he's a probable starter
+  // today — unlocks the engine's own AB-log-derived batted-ball-quality-by-
+  // hand fields (Barrel%/HH%/FB%/HR% allowed vs L/R) and hand-specific grade,
+  // on top of the always-available live statSplits stat line. null for any
+  // pitcher not on today's slate (reliever, historical, etc.) — falls back
+  // gracefully, nothing breaks. Hook called unconditionally (before the
+  // `if (!pitcher) return null` below) per Rules of Hooks — pitcher?.pid
+  // already handles the null case.
+  const dpRow = useMemo(() => Object.values(DAILY_PICKS_CACHE).find(
+    r => String(parseInt(r.pitcher_id)||0) === String(parseInt(pitcher?.pid)||0)
+  ), [pitcher?.pid]);
 
   useEffect(() => {
     PITCHER_SLIDE_LISTENER = setPitcher;
@@ -3502,6 +3522,7 @@ function PitcherSlideIn() {
   useEffect(() => {
     if (!pitcher?.pid && !pitcher?.name) return;
     setStats(null); setGameLog([]); setLoading(true); setBattedBall(null); setPitchMix([]);
+    setHandSplits(null); setStatHand('ALL');
 
     // Fetch season stats + pitch mix via existing pitcher API
     const fetchAll = async () => {
@@ -3515,6 +3536,7 @@ function PitcherSlideIn() {
           setStats(d.stats || {});
           setPitchMix(d.pitchMix || []);
           if (d.battedBall) setBattedBall(d.battedBall);
+          if (d.handSplits) setHandSplits(d.handSplits);
         }
       } catch(e) {}
 
@@ -3547,6 +3569,23 @@ function PitcherSlideIn() {
   const activePitchMix = pitchMix.length > 0 ? pitchMix : (pitcher.pitchMix || []);
   const hand = pitcher.hand || stats?.hand || 'R';
 
+  const activeStats = statHand === 'ALL' ? stats : (handSplits?.[statHand==='L'?'vsL':'vsR'] || null);
+
+  const activeBattedBall = statHand === 'ALL' ? battedBall : (dpRow ? {
+    barrelPct: parseFloat(dpRow[`pitcher_barrel_pct_vs_${statHand}`]) || null,
+    hhPct:     parseFloat(dpRow[`pitcher_hh_pct_vs_${statHand}`])     || null,
+    fbPct:     parseFloat(dpRow[`pitcher_fb_pct_vs_${statHand}`])     || null,
+    hrPct:     parseFloat(dpRow[`pitcher_hr_pct_vs_${statHand}`])     || null,
+  } : null);
+
+  const activePgLabel = (() => {
+    if (statHand !== 'ALL' && dpRow) {
+      const vsLabel = dpRow[statHand==='L' ? 'pitcher_grade_label_vsL' : 'pitcher_grade_label_vsR'];
+      if (vsLabel) return vsLabel;
+    }
+    return pitcher.pgLabel || Object.values(DAILY_PICKS_CACHE).find(r=>String(r.pitcher_id||'').split('.')[0]===String(pitcher.pid||''))?._pgLabel || '';
+  })();
+
   return <>
     <div onClick={()=>setPitcher(null)} style={{
       position:'fixed',inset:0,background:'rgba(0,0,0,.55)',zIndex:900,
@@ -3569,12 +3608,14 @@ function PitcherSlideIn() {
             <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:18,letterSpacing:1}}>{pitcher.name}</span>
             <SavantLink pid={pitcher.pid} type="pitcher"/>
             <MLBNewsLink pid={pitcher.pid}/>
-            {/* Going Yard Pitcher Grade */}
+            {/* Going Yard Pitcher Grade — swaps to the hand-specific grade
+                (dpRow.pitcher_grade_label_vsL/vsR) when the vs-hand toggle
+                below is set and today's daily_picks.csv row has it. */}
             {(()=>{
-              const pgLabel = pitcher.pgLabel || Object.values(DAILY_PICKS_CACHE).find(r=>String(r.pitcher_id||'').split('.')[0]===String(pitcher.pid||''))?._pgLabel || '';
+              const pgLabel = activePgLabel;
               const col = pgLabel.includes('Target')?'#27c97a':pgLabel.includes('Hittable')?'#f5a623':pgLabel.includes('Tough')||pgLabel.includes('Elite')?'var(--accent)':'var(--muted)';
               return pgLabel ? (
-                <span title={`Going Yard Pitcher Grade: ${pgLabel}`}
+                <span title={`Going Yard Pitcher Grade${statHand!=='ALL'?` (vs ${statHand==='L'?'LHB':'RHB'})`:''}: ${pgLabel}`}
                   style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,
                     color:col,padding:'2px 6px',borderRadius:4,
                     background:`${col}18`,border:`1px solid ${col}40`,
@@ -3597,47 +3638,79 @@ function PitcherSlideIn() {
           fontFamily:"'DM Mono',monospace",fontSize:11}}>✕ Close</button>
       </div>
 
-      {/* Season Stats */}
+      {/* Season Stats — vs-hand toggle (2026-07-28) swaps this AND the Batted
+          Ball section below via the shared statHand state, so one small
+          control drives both blocks instead of adding a second toggle. */}
       <div style={{padding:'14px 20px',borderBottom:'1px solid var(--border)'}}>
-        <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
-          textTransform:'uppercase',letterSpacing:1,marginBottom:10}}>Season Stats — 2026</div>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',
+          flexWrap:'wrap',gap:6,marginBottom:10}}>
+          <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+            textTransform:'uppercase',letterSpacing:1}}>
+            Season Stats — 2026{statHand!=='ALL' && ` (vs ${statHand==='L'?'LHB':'RHB'})`}
+          </div>
+          <HandFilter mode="batter" value={statHand} onChange={setStatHand}/>
+        </div>
         {loading && !stats
           ? <div style={{fontSize:11,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>Loading…</div>
-          : <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
-            {[
-              {label:'ERA',  val:stats?.era,   color: parseFloat(stats?.era)<=3?'#27c97a':parseFloat(stats?.era)>=4.5?'var(--accent)':'var(--text)'},
-              {label:'WHIP', val:stats?.whip,  color: parseFloat(stats?.whip)<=1.1?'#27c97a':parseFloat(stats?.whip)>=1.4?'var(--accent)':'var(--text)'},
-              {label:'K/9',  val:stats?.k9,    color: parseFloat(stats?.k9)>=10?'#27c97a':'var(--text)'},
-              {label:'BB/9', val:stats?.bb9,   color: parseFloat(stats?.bb9)<=2.5?'#27c97a':parseFloat(stats?.bb9)>=4?'var(--accent)':'var(--text)'},
-              {label:'HR/9', val:stats?.hr9,   color: parseFloat(stats?.hr9)>=1.5?'var(--accent)':'var(--text)'},
-              {label:'HR',   val:stats?.hr>0?stats.hr:null, color: (stats?.hr||0)>=15?'var(--accent)':(stats?.hr||0)>=8?'#ff8020':'var(--text)'},
-              {label:'FB Vel', val:(()=>{ const fb = activePitchMix.find(px=>px.code==='FF'||px.code==='SI'||px.name?.includes('Fastball')); return fb?.velo>0?parseFloat(fb.velo).toFixed(1):null; })(), color:'var(--text)'},
-            ].filter(s=>s.val&&s.val!=='—'&&s.val!=='0'&&s.val!==0).map(s=>(
-              <div key={s.label} style={{background:'var(--surface2)',border:'1px solid var(--border)',
-                borderRadius:8,padding:'8px 12px',minWidth:64,textAlign:'center'}}>
-                <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
-                  textTransform:'uppercase',letterSpacing:1,marginBottom:4}}>{s.label}</div>
-                <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:17,color:s.color}}>
-                  {s.val}
+          : statHand!=='ALL' && !activeStats
+          ? <div style={{fontSize:11,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
+              No {statHand==='L'?'vs-LHB':'vs-RHB'} split available for this pitcher.
+            </div>
+          : <>
+            <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
+              {[
+                {label:'ERA',  val:activeStats?.era,   color: parseFloat(activeStats?.era)<=3?'#27c97a':parseFloat(activeStats?.era)>=4.5?'var(--accent)':'var(--text)'},
+                {label:'WHIP', val:activeStats?.whip,  color: parseFloat(activeStats?.whip)<=1.1?'#27c97a':parseFloat(activeStats?.whip)>=1.4?'var(--accent)':'var(--text)'},
+                {label:'K/9',  val:activeStats?.k9,    color: parseFloat(activeStats?.k9)>=10?'#27c97a':'var(--text)'},
+                {label:'BB/9', val:activeStats?.bb9,   color: parseFloat(activeStats?.bb9)<=2.5?'#27c97a':parseFloat(activeStats?.bb9)>=4?'var(--accent)':'var(--text)'},
+                {label:'HR/9', val:activeStats?.hr9,   color: parseFloat(activeStats?.hr9)>=1.5?'var(--accent)':'var(--text)'},
+                {label:'HR',   val:activeStats?.hr>0?activeStats.hr:null, color: (activeStats?.hr||0)>=15?'var(--accent)':(activeStats?.hr||0)>=8?'#ff8020':'var(--text)'},
+                {label:'FB Vel', val:(()=>{ const fb = activePitchMix.find(px=>px.code==='FF'||px.code==='SI'||px.name?.includes('Fastball')); return fb?.velo>0?parseFloat(fb.velo).toFixed(1):null; })(), color:'var(--text)'},
+              ].filter(s=>s.val&&s.val!=='—'&&s.val!=='0'&&s.val!==0).map(s=>(
+                <div key={s.label} style={{background:'var(--surface2)',border:'1px solid var(--border)',
+                  borderRadius:8,padding:'8px 12px',minWidth:64,textAlign:'center'}}>
+                  <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+                    textTransform:'uppercase',letterSpacing:1,marginBottom:4}}>{s.label}</div>
+                  <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:17,color:s.color}}>
+                    {s.val}
+                  </div>
                 </div>
+              ))}
+            </div>
+            {/* "N of M HRs to this hand" — the exact insight that motivated this
+                feature (e.g. "8 of 10 HRs allowed were to LHB"). Only shown when
+                toggled to a specific hand and both counts are real numbers. */}
+            {statHand!=='ALL' && activeStats?.hr > 0 && stats?.hr > 0 && (
+              <div style={{marginTop:8,fontSize:10,fontFamily:"'DM Mono',monospace",
+                color: (activeStats.hr / stats.hr) >= 0.65 ? 'var(--accent)' : 'var(--muted)'}}>
+                {activeStats.hr} of {stats.hr} HRs allowed this season → vs {statHand==='L'?'LHB':'RHB'}
               </div>
-            ))}
-          </div>
+            )}
+          </>
         }
       </div>
 
-      {/* Batted Ball Stats (opponent) */}
-      {battedBall && (battedBall.gbPct || battedBall.fbPct || battedBall.hhPct) && (
+      {/* Batted Ball Stats (opponent) — Overall uses the Savant leaderboard
+          aggregate (battedBall); vs-hand uses the engine's own AB-log-derived
+          pitcher_*_vs_L/vs_R fields from today's daily_picks.csv row (dpRow),
+          when this pitcher is today's probable starter. No GB%/LD% by-hand
+          field exists engine-side, so those two cells simply won't appear in
+          vs-hand mode — same graceful "hide what's missing" pattern already
+          used by the filter below. */}
+      {activeBattedBall && (activeBattedBall.gbPct || activeBattedBall.fbPct || activeBattedBall.hhPct || activeBattedBall.barrelPct || activeBattedBall.hrPct) && (
         <div style={{padding:'14px 20px',borderBottom:'1px solid var(--border)'}}>
           <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
-            textTransform:'uppercase',letterSpacing:1,marginBottom:10}}>Opponent Batted Ball — Allowed</div>
+            textTransform:'uppercase',letterSpacing:1,marginBottom:10}}>
+            Opponent Batted Ball — Allowed{statHand!=='ALL' && ` (vs ${statHand==='L'?'LHB':'RHB'})`}
+          </div>
           <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
             {[
-              {label:'GB%',   val:battedBall.gbPct,   color: battedBall.gbPct>=50?'#27c97a':battedBall.gbPct>=44?'var(--accent2)':'var(--text)', tip:'Ground ball % allowed — higher is better for pitcher'},
-              {label:'FB%',   val:battedBall.fbPct,   color: battedBall.fbPct>=40?'var(--accent)':battedBall.fbPct>=35?'#ff8020':'var(--text)', tip:'Fly ball % allowed — lower is better'},
-              {label:'LD%',   val:battedBall.ldPct,   color: battedBall.ldPct>=24?'var(--accent)':'var(--text)', tip:'Line drive % allowed — lower is better'},
-              {label:'HH%',   val:battedBall.hhPct,   color: battedBall.hhPct>=42?'var(--accent)':battedBall.hhPct<=36?'#27c97a':'var(--text)', tip:'Hard hit % allowed — lower is better'},
-              {label:'Barrel%',val:battedBall.barrelPct, color: battedBall.barrelPct>=9?'var(--accent)':battedBall.barrelPct<=5?'#27c97a':'var(--text)', tip:'Barrel % allowed — lower is better'},
+              {label:'GB%',   val:activeBattedBall.gbPct,   color: activeBattedBall.gbPct>=50?'#27c97a':activeBattedBall.gbPct>=44?'var(--accent2)':'var(--text)', tip:'Ground ball % allowed — higher is better for pitcher'},
+              {label:'FB%',   val:activeBattedBall.fbPct,   color: activeBattedBall.fbPct>=40?'var(--accent)':activeBattedBall.fbPct>=35?'#ff8020':'var(--text)', tip:'Fly ball % allowed — lower is better'},
+              {label:'LD%',   val:activeBattedBall.ldPct,   color: activeBattedBall.ldPct>=24?'var(--accent)':'var(--text)', tip:'Line drive % allowed — lower is better'},
+              {label:'HH%',   val:activeBattedBall.hhPct,   color: activeBattedBall.hhPct>=42?'var(--accent)':activeBattedBall.hhPct<=36?'#27c97a':'var(--text)', tip:'Hard hit % allowed — lower is better'},
+              {label:'Barrel%',val:activeBattedBall.barrelPct, color: activeBattedBall.barrelPct>=9?'var(--accent)':activeBattedBall.barrelPct<=5?'#27c97a':'var(--text)', tip:'Barrel % allowed — lower is better'},
+              {label:'HR%',   val:activeBattedBall.hrPct,   color: activeBattedBall.hrPct>=6?'var(--accent)':activeBattedBall.hrPct<=3?'#27c97a':'var(--text)', tip:'HR per PA allowed vs this hand — lower is better'},
             ].filter(s=>s.val!=null&&s.val>0).map(s=>(
               <div key={s.label} title={s.tip} style={{background:'var(--surface2)',border:'1px solid var(--border)',
                 borderRadius:8,padding:'8px 12px',minWidth:64,textAlign:'center'}}>
@@ -14835,7 +14908,13 @@ const MIN_BVP_PA_TRUST = 8;
 // for this exact problem (App.jsx:32458) — reused verbatim, not reinvented:
 // confirmed-in-today's-lineup batters always pass; everyone else needs
 // recent_pa>=10 AND season_pa>=30 to be considered active enough to include.
-const OPPOSING_BATTERS_TOP_N = 3;
+//
+// Population (top N by Fit) is fixed once selected — clicking a column header
+// only re-orders the display of these same N rows, it does not re-pick a
+// different N by whatever column is clicked. Keeps the shortlist itself
+// stable (it's a curated "best arsenal fits," not a moving target) while
+// still letting a researcher compare those candidates from other angles.
+const OPPOSING_BATTERS_TOP_N = 5;
 
 function getOpposingBatters(pitcherId) {
   const pid = String(parseInt(pitcherId) || 0);
@@ -14860,10 +14939,63 @@ function getOpposingBatters(pitcherId) {
   return rows.slice(0, OPPOSING_BATTERS_TOP_N);
 }
 
+const OB_HAND_MATCH_RANK = { elite: 3, full: 2, partial: 1 };
+
+// Column defs + sort-value accessors (2026-07-28, added alongside sortable
+// headers). bvp_fb_pct was already computed/exported by evaluate_flags()
+// ("bvp" label) — same season-vs-arsenal+hand window as ISO/EV/Barrel%/HR,
+// just never displayed here before.
+const OB_COLS = [
+  { key:'batter', label:'Batter', align:'left',   title:'' },
+  { key:'hm',     label:'HM',     align:'center', title:'Hand Match tier' },
+  { key:'l7iso',  label:'L7 ISO', align:'right',  title:"Recent 7-day ISO" },
+  { key:'l7ev',   label:'L7 EV',  align:'right',  title:"Recent 7-day avg exit velocity" },
+  { key:'pa',     label:'PA',     align:'right',  title:`Season PAs vs this pitcher's pitch mix + handedness — dimmed columns need ${MIN_BVP_PA_TRUST}+` },
+  { key:'iso',    label:'ISO',    align:'right',  title:"Season ISO vs this pitcher's pitch mix + handedness" },
+  { key:'ev',     label:'EV',     align:'right',  title:"Season avg EV vs this pitcher's pitch mix + handedness" },
+  { key:'brl',    label:'Brl%',   align:'right',  title:"Season Barrel% vs this pitcher's pitch mix + handedness" },
+  { key:'fb',     label:'FB%',    align:'right',  title:"Season Fly Ball% vs this pitcher's pitch mix + handedness" },
+  { key:'hr',     label:'HR',     align:'right',  title:"Season HR count vs this pitcher's pitch mix + handedness" },
+  { key:'fit',    label:'Fit',    align:'right',  title:"Arsenal-weighted pitch convergence — engine's own sample-size-discounted fit score" },
+];
+function obSortValue(r, key) {
+  switch (key) {
+    case 'batter': return (r.batter||'').toLowerCase();
+    case 'hm':     return OB_HAND_MATCH_RANK[getHandMatchTier(r)] || 0;
+    case 'l7iso':  return parseFloat(r.recent_iso)||0;
+    case 'l7ev':   return parseFloat(r.recent_avg_ev)||0;
+    case 'pa':     return parseInt(r.bvp_pa)||0;
+    case 'iso':    return parseFloat(r.bvp_iso)||0;
+    case 'ev':     return parseFloat(r.bvp_avg_ev)||0;
+    case 'brl':    return parseFloat(r.bvp_barrel_pct)||0;
+    case 'fb':     return parseFloat(r.bvp_fb_pct)||0;
+    case 'hr':     return parseInt(r.bvp_hr_count)||0;
+    case 'fit':    return parseFloat(r.ps_convergence)||0;
+    default:       return 0;
+  }
+}
+
 function OpposingBatterTable({ pitcherId }) {
-  const rows = useMemo(() => getOpposingBatters(pitcherId), [pitcherId]);
+  const baseRows = useMemo(() => getOpposingBatters(pitcherId), [pitcherId]);
+  const [sortCol, setSortCol] = useState('fit');
+  const [sortDir, setSortDir] = useState('desc');
   const mono = "'DM Mono',monospace";
-  if (!rows.length) {
+
+  const rows = useMemo(() => {
+    return [...baseRows].sort((a, b) => {
+      const va = obSortValue(a, sortCol), vb = obSortValue(b, sortCol);
+      if (va < vb) return sortDir==='asc' ? -1 : 1;
+      if (va > vb) return sortDir==='asc' ? 1 : -1;
+      return 0;
+    });
+  }, [baseRows, sortCol, sortDir]);
+
+  const handleSort = (key) => {
+    if (key === sortCol) setSortDir(d => d==='asc' ? 'desc' : 'asc');
+    else { setSortCol(key); setSortDir('desc'); }
+  };
+
+  if (!baseRows.length) {
     return (
       <div style={{marginTop:6,fontSize:10,color:'var(--muted)',fontFamily:mono}}>
         No pre-game matchup data — not today's probable starter.
@@ -14872,19 +15004,17 @@ function OpposingBatterTable({ pitcherId }) {
   }
   return (
     <div style={{marginTop:6,overflowX:'auto'}}>
-      <table style={{width:'100%',borderCollapse:'collapse',fontFamily:mono,fontSize:9,minWidth:580}}>
+      <table style={{width:'100%',borderCollapse:'collapse',fontFamily:mono,fontSize:9,minWidth:640}}>
         <thead>
           <tr style={{borderBottom:'1px solid var(--border)'}}>
-            <th style={{textAlign:'left',padding:'3px 6px',color:'var(--muted)'}}>Batter</th>
-            <th style={{textAlign:'center',padding:'3px 6px',color:'var(--muted)'}} title="Hand Match tier">HM</th>
-            <th style={{textAlign:'right',padding:'3px 6px',color:'var(--muted)'}} title="Recent 7-day ISO">L7 ISO</th>
-            <th style={{textAlign:'right',padding:'3px 6px',color:'var(--muted)'}} title="Recent 7-day avg exit velocity">L7 EV</th>
-            <th style={{textAlign:'right',padding:'3px 6px',color:'var(--muted)'}} title={`Season PAs vs this pitcher's pitch mix + handedness — dimmed columns need ${MIN_BVP_PA_TRUST}+`}>PA</th>
-            <th style={{textAlign:'right',padding:'3px 6px',color:'var(--muted)'}} title="Season ISO vs this pitcher's pitch mix + handedness">ISO</th>
-            <th style={{textAlign:'right',padding:'3px 6px',color:'var(--muted)'}} title="Season avg EV vs this pitcher's pitch mix + handedness">EV</th>
-            <th style={{textAlign:'right',padding:'3px 6px',color:'var(--muted)'}} title="Season Barrel% vs this pitcher's pitch mix + handedness">Brl%</th>
-            <th style={{textAlign:'right',padding:'3px 6px',color:'var(--muted)'}} title="Season HR count vs this pitcher's pitch mix + handedness">HR</th>
-            <th style={{textAlign:'right',padding:'3px 6px',color:'var(--muted)'}} title="Arsenal-weighted pitch convergence — engine's own sample-size-discounted fit score">Fit</th>
+            {OB_COLS.map(c => (
+              <th key={c.key} onClick={()=>handleSort(c.key)}
+                style={{textAlign:c.align,padding:'3px 6px',cursor:'pointer',userSelect:'none',
+                  color:sortCol===c.key?'var(--accent2)':'var(--muted)',whiteSpace:'nowrap'}}
+                title={c.title}>
+                {c.label}{sortCol===c.key ? (sortDir==='asc'?' ▲':' ▼') : ''}
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody>
@@ -14924,6 +15054,7 @@ function OpposingBatterTable({ pitcherId }) {
                 <td style={dimStyle}>{numOr(r.bvp_iso,3)}</td>
                 <td style={dimStyle}>{numOr(r.bvp_avg_ev,1)}</td>
                 <td style={dimStyle}>{numOr(r.bvp_barrel_pct,1)}</td>
+                <td style={dimStyle}>{numOr(r.bvp_fb_pct,1)}</td>
                 <td style={dimStyle}>{parseInt(r.bvp_hr_count)||0}</td>
                 <td style={{textAlign:'right',padding:'3px 6px',color:'var(--accent2)',fontWeight:700}}
                   title={r.ps_conv_pitch ? `Best-fit pitch: ${r.ps_conv_pitch}` : ''}>
@@ -14936,9 +15067,9 @@ function OpposingBatterTable({ pitcherId }) {
       </table>
       <div style={{marginTop:4,fontSize:8,color:'var(--muted)',fontFamily:mono}}>
         Top {OPPOSING_BATTERS_TOP_N} eligible batters (confirmed in today's lineup, or recent+season
-        activity above the bench-player threshold), sorted by Fit (arsenal-weighted,
-        sample-size-discounted). * = fewer than {MIN_BVP_PA_TRUST} season PAs vs this arsenal+hand —
-        dimmed columns are reference only, not reliable yet. Click a name for full detail.
+        activity above the bench-player threshold) by Fit. Click any column header to re-sort this
+        shortlist. * = fewer than {MIN_BVP_PA_TRUST} season PAs vs this arsenal+hand — dimmed columns
+        are reference only, not reliable yet. Click a name for full detail.
       </div>
     </div>
   );

@@ -3,6 +3,34 @@
 // Pitch arsenal: MLB Stats API pitchArsenal endpoint (reliable, no Savant needed)
 // Batted ball: Savant custom leaderboard (optional, best-effort)
 
+// Shared mapper for a single MLB Stats API pitching stat leaf object —
+// same shape whether it comes from stats=season or a statSplits vl/vr split.
+// Added 2026-07-28 so the vs-LHB/vs-RHB split (below) returns objects the
+// client can run through the exact same color-threshold logic as the
+// existing overall `stats` object, with zero special-casing on that side.
+function mapPitchingStat(s, hand) {
+  if (!s) return null;
+  return {
+    era:   s.era               || '—',
+    whip:  s.whip              || '—',
+    ip:    s.inningsPitched    || '0',
+    k9:    s.strikeoutsPer9Inn || '—',
+    bb9:   s.walksPer9Inn      || '—',
+    hr9:   s.homeRunsPer9      || '—',
+    hr:    s.homeRuns          || 0,
+    hits:  s.hits              || 0,
+    avg:   s.avg               || '—',
+    obp:   s.obp               || '—',
+    wins:  s.wins              || 0,
+    losses:s.losses            || 0,
+    so:    s.strikeOuts        || 0,
+    bb:    s.baseOnBalls       || 0,
+    kPct:  s.strikeoutPercentage || '—',
+    bbPct: s.walkPercentage    || '—',
+    hand,
+  };
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET');
@@ -26,13 +54,23 @@ export default async function handler(req, res) {
     }
     if (!pitcherId) return res.status(200).json({ found: false, pitchMix: [], stats: {} });
 
-    // ── Step 2: Season stats + pitch arsenal in parallel ────────
+    // ── Step 2: Season stats + pitch arsenal + vs-hand splits in parallel ──
     let stats = {}, hand = 'R', pitchMix = [], battedBall = {};
+    let handSplits = { vsL: null, vsR: null };
 
-    const [rPeople, rStats, rArsenal] = await Promise.allSettled([
+    const [rPeople, rStats, rArsenal, rSplits] = await Promise.allSettled([
       fetch(`https://statsapi.mlb.com/api/v1/people/${pitcherId}`, { headers: H }),
       fetch(`https://statsapi.mlb.com/api/v1/people/${pitcherId}/stats?stats=season&group=pitching&season=${year}&sportId=1`, { headers: H }),
       fetch(`https://statsapi.mlb.com/api/v1/people/${pitcherId}/stats?stats=pitchArsenal&season=${year}&sportId=1`, { headers: H }),
+      // vs-LHB/vs-RHB split — same statSplits/sitCodes=vl,vr endpoint the
+      // engine's fetch_pitcher_hand_splits() already uses (matchup_engine.py)
+      // for hand-specific grading. Added 2026-07-28 to power a vs-hand toggle
+      // in PitcherSlideIn. Works for ANY pitcher (not just today's probable
+      // starters), unlike the AB-log-derived pitcher_*_vs_R/vs_L fields in
+      // daily_picks.csv. Note (known from the July 2026 Ben Rice case study):
+      // this endpoint sometimes omits `era` in the split leaf object — WHIP,
+      // HR/9, K/9, BB/9, and raw HR count come through reliably regardless.
+      fetch(`https://statsapi.mlb.com/api/v1/people/${pitcherId}/stats?stats=statSplits&group=pitching&sitCodes=vl,vr&season=${year}&sportId=1`, { headers: H }),
     ]);
 
     // Handedness
@@ -51,25 +89,21 @@ export default async function handler(req, res) {
           if (r2.ok) { const d2 = await r2.json(); s = d2.stats?.[0]?.splits?.[0]?.stat; }
         } catch(e) {}
       }
-      if (s) stats = {
-        era:   s.era               || '—',
-        whip:  s.whip              || '—',
-        ip:    s.inningsPitched    || '0',
-        k9:    s.strikeoutsPer9Inn || '—',
-        bb9:   s.walksPer9Inn      || '—',
-        hr9:   s.homeRunsPer9      || '—',
-        hr:    s.homeRuns          || 0,
-        hits:  s.hits              || 0,
-        avg:   s.avg               || '—',
-        obp:   s.obp               || '—',
-        wins:  s.wins              || 0,
-        losses:s.losses            || 0,
-        so:    s.strikeOuts        || 0,
-        bb:    s.baseOnBalls       || 0,
-        kPct:  s.strikeoutPercentage || '—',
-        bbPct: s.walkPercentage    || '—',
-        hand,
-      };
+      const mapped = mapPitchingStat(s, hand);
+      if (mapped) stats = mapped;
+    }
+
+    // vs-LHB / vs-RHB splits
+    if (rSplits.status === 'fulfilled' && rSplits.value.ok) {
+      try {
+        const d = await rSplits.value.json();
+        for (const split of (d.stats?.[0]?.splits || [])) {
+          const code = split.split?.code || '';
+          const mapped = mapPitchingStat(split.stat, hand);
+          if (code === 'vl') handSplits.vsL = mapped;
+          else if (code === 'vr') handSplits.vsR = mapped;
+        }
+      } catch (e) {}
     }
 
     // Pitch arsenal from MLB Stats API — much more reliable than Savant CSV
@@ -119,7 +153,7 @@ export default async function handler(req, res) {
 
     console.log(`[Pitcher] ${pitcherId} ERA:${stats.era} K/9:${stats.k9} Pitches:${pitchMix.length} GB%:${battedBall.gbPct}`);
 
-    return res.status(200).json({ found: true, pid: pitcherId, pitchMix, battedBall, stats });
+    return res.status(200).json({ found: true, pid: pitcherId, pitchMix, battedBall, stats, handSplits });
 
   } catch(err) {
     console.error('[Pitcher] Fatal:', err.message);
