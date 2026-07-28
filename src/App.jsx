@@ -14793,10 +14793,121 @@ function gradePitcher(era, k9, whip, bb9, hr9, avg, obp, ip = 999) {
   return              { label:'🎯 Target',  color:'#38b8f2', bg:'rgba(56,184,242,.08)',   desc:'ERA > 5.00 / WHIP > 1.45' };
 }
 
+// ── Pitcher-First Arsenal Fit (2026-07-28) ──────────────────────────────
+// See PROMPT_PitcherFirstArsenalFit.md. Answers "given THIS pitcher's actual
+// arsenal + handedness, which of today's opposing batters fits it best" —
+// reuses DAILY_PICKS_ROWS (already loaded, one row per batter-vs-probable-
+// starter matchup) and fields the engine already computes (bvp_* = Sig's
+// "BvP" window, which despite its name is season stats filtered to pitch-mix
+// x handedness, not literal same-pitcher history — see CLAUDE.md). No new
+// fetch. Only new engine field is bvp_iso, which evaluate_flags() already
+// computed for the "bvp" label and simply wasn't exported until this change.
+//
+// MIN_BVP_PA_TRUST mirrors the engine's own MIN_PA_BVP_RATED (8 PA) — the
+// threshold matchup_engine.py already uses to decide when bvp_* rate stats
+// are meaningful. Used here to visually de-emphasize (never hide) thin-sample
+// BvP stats, so a batter with 1-2 PA and a lucky HR/XBH can't read as more
+// dangerous than a batter with a real, consistent sample.
+const MIN_BVP_PA_TRUST = 8;
+
+function getOpposingBatters(pitcherId) {
+  const pid = String(parseInt(pitcherId) || 0);
+  if (!pid || pid === '0') return [];
+  const seen = new Set();
+  const rows = [];
+  for (const r of DAILY_PICKS_ROWS) {
+    if (String(parseInt(r.pitcher_id) || 0) !== pid) continue;
+    const bid = String(parseInt(r.batter_id) || 0);
+    if (!bid || bid === '0' || seen.has(bid)) continue;
+    seen.add(bid);
+    rows.push(r);
+  }
+  // Default sort: ps_convergence desc — the engine's own arsenal-weighted,
+  // sample-size-discounted fit score (compute_pitch_convergence() in
+  // matchup_engine.py: full trust >=5 PA, discounted 2-4 PA, falls back to
+  // vs-hand aggregate <2 PA). This — not bvp_iso — is what actually protects
+  // the ranking itself from small-sample noise; bvp_iso is a raw, un-shrunk
+  // metric shown for context and needs its own display-level guard (below).
+  rows.sort((a, b) => (parseFloat(b.ps_convergence)||0) - (parseFloat(a.ps_convergence)||0));
+  return rows;
+}
+
+function OpposingBatterTable({ pitcherId }) {
+  const rows = useMemo(() => getOpposingBatters(pitcherId), [pitcherId]);
+  const mono = "'DM Mono',monospace";
+  if (!rows.length) {
+    return (
+      <div style={{marginTop:6,fontSize:10,color:'var(--muted)',fontFamily:mono}}>
+        No pre-game matchup data — not today's probable starter.
+      </div>
+    );
+  }
+  return (
+    <div style={{marginTop:6,overflowX:'auto'}}>
+      <table style={{width:'100%',borderCollapse:'collapse',fontFamily:mono,fontSize:9,minWidth:580}}>
+        <thead>
+          <tr style={{borderBottom:'1px solid var(--border)'}}>
+            <th style={{textAlign:'left',padding:'3px 6px',color:'var(--muted)'}}>Batter</th>
+            <th style={{textAlign:'center',padding:'3px 6px',color:'var(--muted)'}} title="Hand Match tier">HM</th>
+            <th style={{textAlign:'right',padding:'3px 6px',color:'var(--muted)'}} title="Recent 7-day ISO">L7 ISO</th>
+            <th style={{textAlign:'right',padding:'3px 6px',color:'var(--muted)'}} title="Recent 7-day avg exit velocity">L7 EV</th>
+            <th style={{textAlign:'right',padding:'3px 6px',color:'var(--muted)'}} title={`Season PAs vs this pitcher's pitch mix + handedness — dimmed columns need ${MIN_BVP_PA_TRUST}+`}>PA</th>
+            <th style={{textAlign:'right',padding:'3px 6px',color:'var(--muted)'}} title="Season ISO vs this pitcher's pitch mix + handedness">ISO</th>
+            <th style={{textAlign:'right',padding:'3px 6px',color:'var(--muted)'}} title="Season avg EV vs this pitcher's pitch mix + handedness">EV</th>
+            <th style={{textAlign:'right',padding:'3px 6px',color:'var(--muted)'}} title="Season Barrel% vs this pitcher's pitch mix + handedness">Brl%</th>
+            <th style={{textAlign:'right',padding:'3px 6px',color:'var(--muted)'}} title="Season HR count vs this pitcher's pitch mix + handedness">HR</th>
+            <th style={{textAlign:'right',padding:'3px 6px',color:'var(--muted)'}} title="Arsenal-weighted pitch convergence — engine's own sample-size-discounted fit score">Fit</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(r => {
+            const bid   = String(parseInt(r.batter_id)||0);
+            const bvpPA = parseInt(r.bvp_pa)||0;
+            const thin  = bvpPA < MIN_BVP_PA_TRUST;
+            const tier  = getHandMatchTier(r);
+            const stars = tier==='elite' ? '⭐⭐⭐' : tier==='full' ? '⭐⭐' : tier==='partial' ? '⭐' : '';
+            const numOr = (v, d) => (v!=null && v!=='' && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(d) : '—';
+            const dimStyle = {textAlign:'right',padding:'3px 6px',opacity:thin?0.5:1,color:thin?'var(--muted)':'var(--text)'};
+            return (
+              <tr key={bid} style={{borderBottom:'1px solid rgba(255,255,255,.04)'}}>
+                <td style={{padding:'3px 6px',cursor:'pointer',color:'var(--text)'}}
+                  onClick={()=>openAtBatSlide({pid:bid, name:r.batter||'', team:r.batting_team||''})}>
+                  {r.batter||'—'} <span style={{color:'var(--muted)',fontSize:8}}>{r.batter_hand||''}</span>
+                </td>
+                <td style={{textAlign:'center',padding:'3px 6px',color:'#fbbf24'}}>{stars}</td>
+                <td style={{textAlign:'right',padding:'3px 6px'}}>{numOr(r.recent_iso,3)}</td>
+                <td style={{textAlign:'right',padding:'3px 6px'}}>{numOr(r.recent_avg_ev,1)}</td>
+                <td style={{textAlign:'right',padding:'3px 6px',color:thin?'var(--muted)':'var(--text)'}}
+                  title={thin ? `Small sample (${bvpPA} PA) — the dimmed columns in this row are for reference only, not reliable until ${MIN_BVP_PA_TRUST}+ PA` : `${bvpPA} PA`}>
+                  {bvpPA}{thin?'*':''}
+                </td>
+                <td style={dimStyle}>{numOr(r.bvp_iso,3)}</td>
+                <td style={dimStyle}>{numOr(r.bvp_avg_ev,1)}</td>
+                <td style={dimStyle}>{numOr(r.bvp_barrel_pct,1)}</td>
+                <td style={dimStyle}>{parseInt(r.bvp_hr_count)||0}</td>
+                <td style={{textAlign:'right',padding:'3px 6px',color:'var(--accent2)',fontWeight:700}}
+                  title={r.ps_conv_pitch ? `Best-fit pitch: ${r.ps_conv_pitch}` : ''}>
+                  {numOr(r.ps_convergence,1)}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <div style={{marginTop:4,fontSize:8,color:'var(--muted)',fontFamily:mono}}>
+        * = fewer than {MIN_BVP_PA_TRUST} season PAs vs this arsenal+hand — dimmed columns are reference
+        only, not reliable yet. Sorted by Fit (arsenal-weighted, sample-size-discounted). Click a name
+        for full detail.
+      </div>
+    </div>
+  );
+}
+
 function PitcherCard({ pitcherId, pitcherName, onGrade }) {
   const [stats, setStats]     = useState(null);
   const [open, setOpen]       = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showRoster, setShowRoster] = useState(false);
 
   const gradeStats = (era, k9, whip, bb9, hr9, avg, obp, ip) =>
     gradePitcher(era, k9, whip, bb9, hr9, avg, obp, ip);
@@ -14915,6 +15026,16 @@ function PitcherCard({ pitcherId, pitcherName, onGrade }) {
                 {stats.avg && stats.avg!=='--' && <span>AVG {stats.avg}</span>}
                 {stats.obp && stats.obp!=='--' && <span>OBP {stats.obp}</span>}
                 {stats.hr > 0 && <span>{stats.hr} HR allowed</span>}
+              </div>
+
+              <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid var(--border)'}}>
+                <button onClick={()=>setShowRoster(s=>!s)}
+                  style={{background:'none',border:'none',cursor:'pointer',padding:0,
+                    color:'var(--accent2)',fontFamily:"'DM Mono',monospace",fontSize:10,
+                    fontWeight:700,letterSpacing:.3}}>
+                  {showRoster ? '▲ Hide' : '▼'} Opposing Batters Today
+                </button>
+                {showRoster && <OpposingBatterTable pitcherId={pitcherId}/>}
               </div>
             </div>
           )}
