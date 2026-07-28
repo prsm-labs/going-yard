@@ -35175,12 +35175,9 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
   const osw  = "'Oswald',sans-serif";
   const [gData,    setGData]    = useState({batters:{},pitchers:{}});
   const [cacheVer, setCacheVer] = useState(0);
-  const [zoneSplits, setZoneSplits] = useState(null); // zone_splits.json cache
 
   useEffect(() => {
     loadGameSplitsData().then(d => setGData(d));
-    // Preload zone_splits.json for Zone Matchups section — one fetch, no per-batter API calls
-    fetch('/data/zone_splits.json').then(r=>r.ok?r.json():null).then(d=>{ if(d) setZoneSplits(d); }).catch(()=>{});
     const id = setInterval(() => {
       if (Object.keys(DAILY_PICKS_CACHE||{}).length > 0) {
         setCacheVer(v => v + 1);
@@ -35194,6 +35191,103 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
   useEffect(() => {
     if (data && data.length > 0) setCacheVer(v => v + 1);
   }, [data]);
+
+  // ── Top Starting Pitchers to Attack (2026-07-28) — replaces Zone Matchups.
+  // Zone overlap had a documented +0.051 tracker correlation with HR outcome
+  // (Validated Signal Stack, CLAUDE.md) — one of the weakest signals tracked,
+  // confirming the "not much correlation to home runs" read that prompted
+  // this swap. Ranked by season HR/9, weighted to TODAY's actual opposing
+  // lineup by batter hand (not just the pitcher's overall grade letter) —
+  // per the user's explicit framing: "pitchers who give up the most home
+  // runs, whether to a specific hand or in general."
+  //
+  // No hand-specific HR-rate-allowed field exists in daily_picks.csv despite
+  // being declared in matchup_engine.py's col_order (pitcher_hr_pct_vs_R/L
+  // never actually gets computed into the live CSV — confirmed by checking
+  // the real file header before building this, not assumed from the code).
+  // The only reliable source is the live hand-split fetch already built
+  // earlier today for PitcherSlideIn (api/pitcher.js's handSplits, which
+  // already includes hr9/hr per hand) — reused here rather than duplicated.
+  const pitcherStatsCacheRef = React.useRef({}); // pid -> {hr9,hr,vsL:{hr9,hr}|null,vsR:{hr9,hr}|null} | 'loading' | 'error'
+  const [pitcherAttackVer, setPitcherAttackVer] = useState(0);
+  useEffect(() => {
+    const pids = [...new Set(Object.values(DAILY_PICKS_CACHE||{})
+      .map(r => String(parseInt(r.pitcher_id)||0)).filter(p => p && p !== '0'))];
+    const toFetch = pids.filter(pid => !pitcherStatsCacheRef.current[pid]);
+    if (!toFetch.length) return;
+    toFetch.forEach(pid => { pitcherStatsCacheRef.current[pid] = 'loading'; });
+    Promise.all(toFetch.map(pid =>
+      fetch(`/api/pitcher?pid=${pid}&year=2026`).then(r=>r.json()).then(d => {
+        const hs = d?.handSplits || {};
+        const mapSplit = s => (s && s.hr9!=null && s.hr9!=='—') ? { hr9: parseFloat(s.hr9)||null, hr: parseInt(s.hr)||0 } : null;
+        pitcherStatsCacheRef.current[pid] = {
+          hr9: (d?.stats?.hr9 && d.stats.hr9!=='—') ? parseFloat(d.stats.hr9) : null,
+          hr:  parseInt(d?.stats?.hr) || 0,
+          vsL: mapSplit(hs.vsL),
+          vsR: mapSplit(hs.vsR),
+        };
+      }).catch(() => { pitcherStatsCacheRef.current[pid] = 'error'; })
+    )).then(() => setPitcherAttackVer(v => v + 1));
+  }, [cacheVer]);
+
+  const top5Attack = React.useMemo(() => {
+    const byPitcher = {};
+    Object.values(DAILY_PICKS_CACHE||{}).forEach(r => {
+      const pid = String(parseInt(r.pitcher_id)||0);
+      if (!pid || pid === '0' || !r.pitcher) return;
+      if (!isActiveBatter(r)) return; // same eligibility gate Zone Matchups used, for the hand-mix average
+      if (!byPitcher[pid]) byPitcher[pid] = {
+        pid, name: r.pitcher, team: r.pitcher_team || '',
+        oppTeam: r.batting_team || '', batterHands: [],
+      };
+      byPitcher[pid].batterHands.push((r.batter_hand||'R').toUpperCase()[0]);
+    });
+    return Object.values(byPitcher).map(p => {
+      const stats = pitcherStatsCacheRef.current[p.pid];
+      if (!stats || stats === 'loading' || stats === 'error') return null;
+      const perBatter = p.batterHands.map(h => {
+        const split = h === 'L' ? stats.vsL : stats.vsR;
+        return (split && split.hr9 != null) ? split.hr9 : stats.hr9;
+      }).filter(v => v != null);
+      const expHr9 = perBatter.length
+        ? perBatter.reduce((a,b)=>a+b,0) / perBatter.length
+        : stats.hr9;
+      if (expHr9 == null) return null;
+      return { ...p, expHr9, totalHr: stats.hr };
+    }).filter(Boolean)
+      .sort((a,b) => b.expHr9 - a.expHr9)
+      .slice(0, 5);
+  }, [cacheVer, pitcherAttackVer]);
+
+  // Opener detection — only for the final top-5 (not all probable starters,
+  // to keep the added fetch count small). No MLB field flags "this is an
+  // opener" (confirmed by checking the live schedule/probablePitcher feed) —
+  // inferred instead from whether his last few real starts (gamesStarted=1)
+  // averaged under ~2.5 IP. This can only flag the starter-of-record as
+  // LIKELY an opener; it cannot identify who the actual bulk-innings pitcher
+  // will be — that's not reliably known pre-game for bullpen games.
+  const openerCacheRef = React.useRef({}); // pid -> {isOpener, avgIp}
+  const [openerVer, setOpenerVer] = useState(0);
+  const top5AttackPids = top5Attack.map(p => p.pid).join(',');
+  useEffect(() => {
+    const toFetch = top5Attack.map(p => p.pid).filter(pid => openerCacheRef.current[pid] === undefined);
+    if (!toFetch.length) return;
+    toFetch.forEach(pid => { openerCacheRef.current[pid] = 'loading'; });
+    Promise.all(toFetch.map(pid =>
+      fetch(`https://statsapi.mlb.com/api/v1/people/${pid}/stats?stats=gameLog&group=pitching&season=2026&sportId=1&limit=5`)
+        .then(r=>r.json()).then(d => {
+          const starts = (d.stats?.[0]?.splits||[]).filter(g => parseInt(g.stat?.gamesStarted||0) === 1);
+          if (!starts.length) { openerCacheRef.current[pid] = { isOpener: false }; return; }
+          // MLB's "5.2" innings notation means 5 AND TWO-THIRDS, not 5.2 decimal.
+          const ips = starts.map(g => {
+            const [whole, frac] = String(g.stat?.inningsPitched||'0').split('.');
+            return parseFloat(whole||0) + (frac ? parseInt(frac)/3 : 0);
+          });
+          const avgIp = ips.reduce((a,b)=>a+b,0) / ips.length;
+          openerCacheRef.current[pid] = { isOpener: avgIp < 2.5, avgIp: parseFloat(avgIp.toFixed(1)) };
+        }).catch(() => { openerCacheRef.current[pid] = { isOpener: false }; })
+    )).then(() => setOpenerVer(v => v + 1));
+  }, [top5AttackPids]);
 
   // ── Top 5 HR: high yard score + hittable/target pitcher + high ISO ──────────
   const top5HR = React.useMemo(() => {
@@ -35352,72 +35446,15 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
       .slice(0, 5);
   }, [cacheVer]);
 
-  // ── Top 5 Zone Matchups: highest zone overlap score vs today's pitcher ──────
-  // Score = sum of (pitcher_usage_pct × batter_hr_rate) across all edge zones
-  // Edge zone = pitcher usage ≥8% AND (batter HR%≥8 OR Barrel%≥12 OR HH%≥50)
-  // Ranked by total zone score — no API calls, all from zone_splits.json
-  const top5Zone = React.useMemo(() => {
-    if (!zoneSplits) return [];
-    const bMap = zoneSplits.batters  || {};
-    const pMap = zoneSplits.pitchers || {};
-    const CORE_ZONES = [1,2,3,4,5,6,7,8,9];
-    const seen = new Set();
-    return Object.values(DAILY_PICKS_CACHE||{})
-      .filter(r => {
-        const bid = String(r.batter_id||'').split('.')[0];
-        if (!bid||seen.has(bid)||!r.batter||!r.game_id) return false;
-        seen.add(bid);
-        if (INJURY_MAP?.[String(bid)] && !LINEUP_STATUS?.[parseInt(bid)||0]) return false;
-        if (!isActiveBatter(r)) return false;
-        return true;
-      })
-      .map(r => {
-        const bid  = String(r.batter_id||'').split('.')[0];
-        const ppid = String(r.pitcher_id||'').split('.')[0];
-        const bZones = bMap[bid]  || {};
-        const pZones = pMap[ppid] || {};
-        if (!Object.keys(bZones).length || !Object.keys(pZones).length) return null;
-        let zoneScore = 0;
-        const edges = [];
-        CORE_ZONES.forEach(zn => {
-          const bz = bZones[zn] || bZones[String(zn)];
-          const pz = pZones[zn] || pZones[String(zn)];
-          if (!bz || !pz) return;
-          const usage = pz.usage_pct   ?? 0;
-          const bHR   = bz.hr_rate     ?? 0;
-          const bBrl  = bz.barrel_rate ?? 0;
-          const bHH   = bz.hh_rate     ?? 0;
-          if (usage < 8) return;
-          if (bHR >= 8 || bBrl >= 12 || bHH >= 50) {
-            zoneScore += (usage / 100) * bHR;
-            edges.push({ zone: zn, usage: parseFloat(usage.toFixed(1)), bHR: parseFloat(bHR.toFixed(1)), bBrl: parseFloat(bBrl.toFixed(1)) });
-          }
-        });
-        if (edges.length === 0) return null;
-        edges.sort((a,b) => b.bHR - a.bHR);
-        const name = (r.batter && !/^\d+$/.test(r.batter))
-          ? r.batter
-          : getCachedPlayer(parseInt(bid)||0)?.name || r.batter || bid;
-        return {
-          id: bid, name,
-          team: r.batting_team || '',
-          pitcher: r.pitcher || '',
-          pgLabel: r._pgLabel || '',
-          zoneScore: parseFloat(zoneScore.toFixed(2)),
-          edgeCount: edges.length,
-          topEdge: edges[0],
-          edges,
-        };
-      })
-      .filter(Boolean)
-      .filter((r,i,arr) => arr.findIndex(x=>x.id===r.id)===i)
-      .sort((a,b) => b.zoneScore - a.zoneScore)
-      .slice(0, 5);
-  }, [zoneSplits, cacheVer]);
-
   const pgEmoji = l => l?.includes('Target')?'🎯':l?.includes('Hittable')?'💥':l?.includes('Elite')?'‼️':l?.includes('Tough')?'⚠️':'🤔';
 
-  const Card = ({rank, pid, name, team, stat, statLabel, sub, pitcher, pgLabel}) => (
+  // isPitcher (2026-07-28): the card is normally batter-primary (name click
+  // opens the batter slideout, "vs {pitcher}" sub-line). Top Starting
+  // Pitchers to Attack needed the opposite — pitcher-primary, name click
+  // opens the pitcher slideout, no "vs" sub-line (the sub line carries HR
+  // count / opponent / opener flag instead via the existing `sub` prop).
+  // Backward compatible — the 4 existing batter sections don't pass it.
+  const Card = ({rank, pid, name, team, stat, statLabel, sub, pitcher, pgLabel, isPitcher}) => (
     <div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 10px',
       background:'var(--surface)',border:'1px solid var(--border)',borderRadius:8,
       borderLeft:'3px solid var(--accent)'}}>
@@ -35425,7 +35462,9 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
       <PlayerAvatar pid={parseInt(pid)||0} name={name} size={28}/>
       <div style={{flex:1,minWidth:0}}>
         <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:2}}>
-          <span onClick={()=>openAtBatSlide({pid:parseInt(pid)||0,name,team})}
+          <span onClick={()=> isPitcher
+              ? openPitcherSlide({pid:parseInt(pid)||0,name,team,hand:'',pitchMix:[]})
+              : openAtBatSlide({pid:parseInt(pid)||0,name,team})}
             style={{fontFamily:osw,fontWeight:800,fontSize:11,color:'var(--text)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',cursor:'pointer'}}>{name}</span>
           <span style={{fontFamily:mono,fontSize:8,color:'var(--accent2)',flexShrink:0}}>{team}</span>
         </div>
@@ -35489,7 +35528,7 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
             ...top5Hit.map((r,i)=>['Hit Rate',      i+1, r.name, r.team, r.h_game_pct+'%', 'Hit rate '+r.h_game+'/'+r.games+' g', r.pitcher, r.pgLabel]),
             ...top5Close.map((r,i)=>['Close Calls',  i+1, r.name, r.team, r.count, 'near-misses', r.pitcher, r.pgLabel]),
             ...top5EV.map((r,i)=>[ 'Avg Exit Velo', i+1, r.name, r.team, r.ev.toFixed(1), 'avg EV (L7)', r.pitcher, r.pgLabel]),
-            ...top5Zone.map((r,i)=>['Zone Matchups', i+1, r.name, r.team, r.zoneScore.toFixed(2), `${r.edgeCount} edge zones`, r.pitcher, r.pgLabel]),
+            ...top5Attack.map((p,i)=>['Top Pitcher to Attack', i+1, p.name, p.team, p.expHr9.toFixed(1), 'exp. HR/9 today', '', '']),
           ];
           const csv = rows.map(r=>r.map(v=>String(v||'').includes(',')?`"${v}"`:v).join(',')).join('\n');
           const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='cheat-sheet.csv'; a.click();
@@ -35574,22 +35613,23 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
           ))}
         </Section>
 
-        <Section emoji="🎯" title="Zone Matchups" color="#22d3ee">
+        <Section emoji="🎯" title="Top Starting Pitchers to Attack" color="#ff4020">
           <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',marginBottom:6,
-            padding:'3px 6px',background:'rgba(34,211,238,.06)',borderRadius:4,
-            letterSpacing:.3}}>Pitcher zone usage &#215; batter HR rate &#8212; hot zones today</div>
-          {!zoneSplits
-            ?<div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',padding:12}}>Loading zone data&#8230;</div>
-            :top5Zone.length===0
-            ?<div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',padding:12}}>No zone overlap data &#8212; run build_zone_splits.py</div>
-            :top5Zone.map((r,i)=>(
-            <Card key={r.id} rank={i+1} pid={r.id}
-              name={r.name} team={r.team}
-              stat={r.zoneScore.toFixed(1)}
-              statLabel="zone score"
-              sub={`${r.edgeCount} edge${r.edgeCount!==1?'s':''} \u00b7 Z${r.topEdge.zone} ${r.topEdge.bHR.toFixed(0)}% HR`}
-              pitcher={r.pitcher} pgLabel={r.pgLabel}/>
-          ))}
+            padding:'3px 6px',background:'rgba(255,64,32,.06)',borderRadius:4,
+            letterSpacing:.3}}>Season HR/9, weighted to today's actual opposing lineup by hand</div>
+          {top5Attack.length===0
+            ?<div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',padding:12}}>Loading pitcher HR data&#8230;</div>
+            :top5Attack.map((p,i)=>{
+              const opener = openerCacheRef.current[p.pid];
+              return (
+                <Card key={p.pid} rank={i+1} pid={p.pid} isPitcher
+                  name={p.name} team={p.team}
+                  stat={p.expHr9.toFixed(1)}
+                  statLabel="exp. HR/9 today"
+                  sub={`${p.totalHr} HR allowed 2026 · vs ${p.oppTeam}${opener&&opener.isOpener ? ` · possible opener (${opener.avgIp} IP/start)` : ''}`}
+                  pgLabel=""/>
+              );
+          })}
         </Section>
 
       </div>
