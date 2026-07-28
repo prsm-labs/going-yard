@@ -35555,6 +35555,25 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
           ))}
         </Section>
 
+        <Section emoji="🎯" title="Top Starting Pitchers to Attack" color="#ff4020">
+          <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',marginBottom:6,
+            padding:'3px 6px',background:'rgba(255,64,32,.06)',borderRadius:4,
+            letterSpacing:.3}}>Season HR/9, weighted to today's actual opposing lineup by hand</div>
+          {top5Attack.length===0
+            ?<div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',padding:12}}>Loading pitcher HR data&#8230;</div>
+            :top5Attack.map((p,i)=>{
+              const opener = openerCacheRef.current[p.pid];
+              return (
+                <Card key={p.pid} rank={i+1} pid={p.pid} isPitcher
+                  name={p.name} team={p.team}
+                  stat={p.expHr9.toFixed(1)}
+                  statLabel="exp. HR/9 today"
+                  sub={`${p.totalHr} HR allowed 2026 · vs ${p.oppTeam}${opener&&opener.isOpener ? ` · possible opener (${opener.avgIp} IP/start)` : ''}`}
+                  pgLabel=""/>
+              );
+          })}
+        </Section>
+
         <Section emoji="🎯" title="2+ Bases" color="#f5a623">
           <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',marginBottom:6,
             padding:'3px 6px',background:'rgba(245,166,35,.06)',borderRadius:4,
@@ -35611,25 +35630,6 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
               sub={r.hh>0?`${r.hh} HH`:''}
               pitcher={r.pitcher} pgLabel={r.pgLabel}/>
           ))}
-        </Section>
-
-        <Section emoji="🎯" title="Top Starting Pitchers to Attack" color="#ff4020">
-          <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',marginBottom:6,
-            padding:'3px 6px',background:'rgba(255,64,32,.06)',borderRadius:4,
-            letterSpacing:.3}}>Season HR/9, weighted to today's actual opposing lineup by hand</div>
-          {top5Attack.length===0
-            ?<div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',padding:12}}>Loading pitcher HR data&#8230;</div>
-            :top5Attack.map((p,i)=>{
-              const opener = openerCacheRef.current[p.pid];
-              return (
-                <Card key={p.pid} rank={i+1} pid={p.pid} isPitcher
-                  name={p.name} team={p.team}
-                  stat={p.expHr9.toFixed(1)}
-                  statLabel="exp. HR/9 today"
-                  sub={`${p.totalHr} HR allowed 2026 · vs ${p.oppTeam}${opener&&opener.isOpener ? ` · possible opener (${opener.avgIp} IP/start)` : ''}`}
-                  pgLabel=""/>
-              );
-          })}
         </Section>
 
       </div>
