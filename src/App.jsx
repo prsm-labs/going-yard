@@ -15030,13 +15030,28 @@ const OPPOSING_BATTERS_TOP_N = 5;
 function getOpposingBatters(pitcherId) {
   const pid = String(parseInt(pitcherId) || 0);
   if (!pid || pid === '0') return [];
+  const candidates = DAILY_PICKS_ROWS.filter(r => String(parseInt(r.pitcher_id) || 0) === pid);
+  // FIXED 2026-07-28: isBarrelLabEligible(r) always falls back to a season/
+  // recent-PA threshold when a specific batter isn't confirmed — it has no
+  // concept of "the lineup for this game IS already posted, he's just not
+  // in it." Real case: Tommy Troy showed up in Bubba Chandler's Arsenal Fit
+  // list via the fallback even though 4 other AZ batters were genuinely
+  // confirmed that day and Troy wasn't one of them — the fallback doesn't
+  // distinguish "lineup unknown yet" from "lineup known, this guy's not in
+  // it." Once ANY batter in this pitcher's game is confirmed, the lineup is
+  // known — require confirmed for everyone, drop the fallback for that game
+  // entirely. Before lineups post (no one confirmed yet), fall back to the
+  // broader isBarrelLabEligible pool as before, same provisional-pool
+  // philosophy already used by the Pre-Game Expected HRs card.
+  const lineupKnownForGame = candidates.some(r =>
+    LINEUP_STATUS[String(parseInt(r.batter_id) || 0)]?.status === 'confirmed');
   const seen = new Set();
   const rows = [];
-  for (const r of DAILY_PICKS_ROWS) {
-    if (String(parseInt(r.pitcher_id) || 0) !== pid) continue;
-    if (!isBarrelLabEligible(r)) continue;
+  for (const r of candidates) {
     const bid = String(parseInt(r.batter_id) || 0);
     if (!bid || bid === '0' || seen.has(bid)) continue;
+    const confirmed = LINEUP_STATUS[bid]?.status === 'confirmed';
+    if (lineupKnownForGame ? !confirmed : !isBarrelLabEligible(r)) continue;
     seen.add(bid);
     rows.push(r);
   }
