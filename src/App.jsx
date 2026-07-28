@@ -14824,6 +14824,19 @@ function gradePitcher(era, k9, whip, bb9, hr9, avg, obp, ip = 999) {
 // dangerous than a batter with a real, consistent sample.
 const MIN_BVP_PA_TRUST = 8;
 
+// Top-N shown + eligibility gate added 2026-07-28 after real-world testing:
+// daily_picks.csv has one row per rostered batter the engine COULD compute a
+// matchup for — including bench/inactive/limited-PA players, not just today's
+// real starting 9. Unfiltered, this pulled in the opposing team's entire
+// roster (e.g. 8 AZ batters for one PIT pitcher) and let stale-data players
+// like a barely-playing veteran (thin recent_pa, thin season_pa, not in
+// today's confirmed lineup) sit alongside genuine active regulars.
+// isBarrelLabEligible(r) is the SAME gate BarrelLabTab/OnBaseTab already use
+// for this exact problem (App.jsx:32458) — reused verbatim, not reinvented:
+// confirmed-in-today's-lineup batters always pass; everyone else needs
+// recent_pa>=10 AND season_pa>=30 to be considered active enough to include.
+const OPPOSING_BATTERS_TOP_N = 3;
+
 function getOpposingBatters(pitcherId) {
   const pid = String(parseInt(pitcherId) || 0);
   if (!pid || pid === '0') return [];
@@ -14831,19 +14844,20 @@ function getOpposingBatters(pitcherId) {
   const rows = [];
   for (const r of DAILY_PICKS_ROWS) {
     if (String(parseInt(r.pitcher_id) || 0) !== pid) continue;
+    if (!isBarrelLabEligible(r)) continue;
     const bid = String(parseInt(r.batter_id) || 0);
     if (!bid || bid === '0' || seen.has(bid)) continue;
     seen.add(bid);
     rows.push(r);
   }
-  // Default sort: ps_convergence desc — the engine's own arsenal-weighted,
+  // Sort by ps_convergence desc — the engine's own arsenal-weighted,
   // sample-size-discounted fit score (compute_pitch_convergence() in
   // matchup_engine.py: full trust >=5 PA, discounted 2-4 PA, falls back to
   // vs-hand aggregate <2 PA). This — not bvp_iso — is what actually protects
   // the ranking itself from small-sample noise; bvp_iso is a raw, un-shrunk
   // metric shown for context and needs its own display-level guard (below).
   rows.sort((a, b) => (parseFloat(b.ps_convergence)||0) - (parseFloat(a.ps_convergence)||0));
-  return rows;
+  return rows.slice(0, OPPOSING_BATTERS_TOP_N);
 }
 
 function OpposingBatterTable({ pitcherId }) {
@@ -14884,9 +14898,10 @@ function OpposingBatterTable({ pitcherId }) {
             const dimStyle = {textAlign:'right',padding:'3px 6px',opacity:thin?0.5:1,color:thin?'var(--muted)':'var(--text)'};
             return (
               <tr key={bid} style={{borderBottom:'1px solid rgba(255,255,255,.04)'}}>
-                <td style={{padding:'3px 6px',cursor:'pointer',color:'var(--text)'}}
+                <td style={{padding:'3px 6px',cursor:'pointer',color:'var(--accent2)',fontWeight:700}}
+                  title="Click for full batter detail"
                   onClick={()=>openAtBatSlide({pid:bid, name:r.batter||'', team:r.batting_team||''})}>
-                  {r.batter||'—'} <span style={{color:'var(--muted)',fontSize:8}}>{r.batter_hand||''}</span>
+                  {r.batter||'—'} <span style={{color:'var(--muted)',fontWeight:400,fontSize:8}}>{r.batter_hand||''}</span>
                 </td>
                 <td style={{textAlign:'center',padding:'3px 6px',color:'#fbbf24'}}>{stars}</td>
                 <td style={{textAlign:'right',padding:'3px 6px'}}>{numOr(r.recent_iso,3)}</td>
@@ -14909,9 +14924,10 @@ function OpposingBatterTable({ pitcherId }) {
         </tbody>
       </table>
       <div style={{marginTop:4,fontSize:8,color:'var(--muted)',fontFamily:mono}}>
-        * = fewer than {MIN_BVP_PA_TRUST} season PAs vs this arsenal+hand — dimmed columns are reference
-        only, not reliable yet. Sorted by Fit (arsenal-weighted, sample-size-discounted). Click a name
-        for full detail.
+        Top {OPPOSING_BATTERS_TOP_N} eligible batters (confirmed in today's lineup, or recent+season
+        activity above the bench-player threshold), sorted by Fit (arsenal-weighted,
+        sample-size-discounted). * = fewer than {MIN_BVP_PA_TRUST} season PAs vs this arsenal+hand —
+        dimmed columns are reference only, not reliable yet. Click a name for full detail.
       </div>
     </div>
   );
