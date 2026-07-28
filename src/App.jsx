@@ -22954,7 +22954,80 @@ function SoCloseTab({ data }) {
 // All computation in-browser from DAILY_PICKS_CACHE — no extra data needed.
 // ══════════════════════════════════════════════════════════════════════════════
 
+// PAIR_TYPES ordering (2026-07-28): matchup-driven categories first — each
+// batter's pairing depends on WHO they're facing today (arsenal fit, hand
+// match, pitcher grade, weak lineup slot), not just a shared raw stat.
+// Generic batter-strength categories (Barrel Bros, ISO Surge, Close Call
+// Combo) come after — still real, validated signals (pulled barrel% is
+// documented elsewhere as the single most HR-predictive subset of barrels),
+// just not opponent-specific, so demoted rather than removed.
 const PAIR_TYPES = [
+  {
+    id: 'arsenal_twins',
+    label: '🎯 Arsenal Twins',
+    color: '#fbbf24', bg: 'rgba(251,191,36,.08)', border: 'rgba(251,191,36,.25)',
+    desc: "Both with a real Hand Match tier (full/elite) or Fit ≥8 with a genuine BvP sample vs their OWN pitcher today — arsenal fit, not a shared stat",
+    qualify: b => {
+      const tier = getHandMatchTier(b);
+      if (tier === 'elite' || tier === 'full') return true;
+      return parseFloat(b.ps_convergence||0) >= 8 && parseInt(b.bvp_pa||0) >= MIN_BVP_PA_TRUST;
+    },
+    sameGame: false, maxPairs: 3,
+  },
+  {
+    id: 'sauce2_duo',
+    label: '🍯 Sauce 2.0 Duo',
+    color: '#34d399', bg: 'rgba(52,211,153,.08)', border: 'rgba(52,211,153,.25)',
+    desc: 'Both clear Sauce 2.0 (Zone Fit ≥2, xwOBA ≥.360, Hittable-or-better pitcher) — the best-validated filter in the tracker (19-23% HR rate)',
+    qualify: b => {
+      const zf = getZoneFit(b);
+      const xwoba = parseFloat(b.season_xwoba||0);
+      const grade = (b._pgLabel || b.pitcher_grade_label || '').toLowerCase();
+      const hittableOrBetter = !!grade && !grade.includes('elite') && !grade.includes('tough');
+      return zf >= 2 && xwoba >= 0.360 && hittableOrBetter;
+    },
+    sameGame: false, maxPairs: 3,
+  },
+  {
+    id: 'matchup_score_duo',
+    label: '⚔️ Matchup Score Duo',
+    color: '#ff6b6b', bg: 'rgba(255,107,107,.08)', border: 'rgba(255,107,107,.25)',
+    // Not the full Barrel Signal gate (that needs Barrel Lab's Monte Carlo
+    // worker, not run in this tab) — computeMatchupScore() is the real,
+    // self-contained half of it (Zone Fit + PS Score + platoon-adjusted
+    // hand performance, weighted by pitcher grade), used honestly on its
+    // own rather than faking the simulated half.
+    desc: 'Both with Matchup Score ≥70 — Zone Fit + PS Score + hand performance, weighted by pitcher grade (the deterministic half of Barrel Signal)',
+    qualify: b => computeMatchupScore(b) >= 70,
+    sameGame: false, maxPairs: 3,
+  },
+  {
+    id: 'weak_spot_twins',
+    label: '🟡 Weak Spot Twins',
+    color: '#ffd60a', bg: 'rgba(255,214,10,.08)', border: 'rgba(255,214,10,.25)',
+    desc: "Both sitting in their own opposing pitcher's historically weak lineup slot",
+    qualify: b => {
+      const ls = liveSlot(parseInt(b.batter_id||0), b.lineup_slot);
+      return ls > 0 && (b.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(ls);
+    },
+    sameGame: false, maxPairs: 2,
+  },
+  {
+    id: 'same_game_heat',
+    label: '🔥 Same Game Heat',
+    color: '#ff8020', bg: 'rgba(255,128,32,.08)', border: 'rgba(255,128,32,.25)',
+    // REVISED 2026-07-28: was just HH%/FB% with no pitcher context. Now
+    // requires the shared pitcher to actually grade Hittable-or-better —
+    // "hot bats exploiting a real weakness together," not just "hot bats
+    // that happen to be in the same building."
+    desc: 'Same park + conditions, both HH% ≥32% and FB% ≥28%, facing a Hittable-or-better pitcher',
+    qualify: b => {
+      const grade = (b._pgLabel || b.pitcher_grade_label || '').toLowerCase();
+      const hittableOrBetter = !!grade && !grade.includes('elite') && !grade.includes('tough');
+      return parseFloat(b.recent_hh_pct||0) >= 32 && parseFloat(b.recent_fb_pct||0) >= 28 && hittableOrBetter;
+    },
+    sameGame: true, maxPairs: 2,
+  },
   {
     id: 'barrel_bros',
     label: '🛢️ Barrel Bros',
@@ -22970,14 +23043,6 @@ const PAIR_TYPES = [
     desc: 'Both with L7 ISO ≥.220 — genuine power surge in the last 7 days, not a season mirage',
     qualify: b => parseFloat(b.l7_iso||b.recent_iso||0) >= 0.220,
     sameGame: false, maxPairs: 3,
-  },
-  {
-    id: 'same_game_heat',
-    label: '🔥 Same Game Heat',
-    color: '#ff8020', bg: 'rgba(255,128,32,.08)', border: 'rgba(255,128,32,.25)',
-    desc: 'Same park + conditions, both HH% ≥32% and FB% ≥28% — hot bats sharing the same environment',
-    qualify: b => parseFloat(b.recent_hh_pct||0) >= 32 && parseFloat(b.recent_fb_pct||0) >= 28,
-    sameGame: true, maxPairs: 2,
   },
   {
     id: 'close_call_combo',
@@ -23040,12 +23105,18 @@ function pairScore(a, b) {
   const pbA = parseFloat(a.recent_pulled_barrel_pct||0), pbB = parseFloat(b.recent_pulled_barrel_pct||0);
   const scA = parseInt(a.so_close_count||0), scB = parseInt(b.so_close_count||0);
   const isoA = parseFloat(a.l7_iso||a.recent_iso||0), isoB = parseFloat(b.l7_iso||b.recent_iso||0);
+  // Arsenal-fit bonus (2026-07-28) — ps_convergence rewards a pair where
+  // BOTH batters genuinely fit their own pitcher's arsenal today, not just
+  // raw batter strength. Ranks every category (not just Arsenal Twins)
+  // slightly toward "good matchup" over "good batter in a vacuum."
+  const convA = parseFloat(a.ps_convergence||0), convB = parseFloat(b.ps_convergence||0);
   return (yA + yB) * 0.5
        + (psA + psB) * 0.20
        + Math.max(bsA,0) * 3 + Math.max(bsB,0) * 3
        + (pbA + pbB) * 1.5    // pulled barrel bonus
        + (scA + scB) * 2      // close calls yesterday bonus
-       + (isoA + isoB) * 8;   // L7 ISO bonus
+       + (isoA + isoB) * 8    // L7 ISO bonus
+       + (convA + convB) * 1.2; // arsenal-fit bonus
 }
 
 function PairsTab({ data }) {
