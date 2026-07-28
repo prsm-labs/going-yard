@@ -2358,10 +2358,18 @@ function AtBatSlideIn() {
   const [zoneData,    setZoneData]    = useState(null);   // {bMap, pMap, edges}
   const [zoneLoad,    setZoneLoad]    = useState(false);
   const [zoneStat,    setZoneStat]    = useState('hr'); // 'hr' | 'barrel' | 'hardhit' | 'k'
-  // vs-LHP/vs-RHP toggle (2026-07-28) — batter-side mirror of PitcherSlideIn's
-  // vs-LHB/vs-RHB toggle. 'ALL' = the existing hand-agnostic Statcast Profile
-  // (unchanged default). battingSplits comes from the new api/batter-splits.js
-  // (statSplits/sitCodes=vl,vr, same MLB endpoint pattern as the pitcher side).
+  // Statcast Profile split toggle (2026-07-28, extended same day with Home/
+  // Away) — 'ALL' | 'L' | 'R' | 'HOME' | 'AWAY'. 'ALL' = the existing hand-
+  // agnostic Statcast Profile (unchanged default). One 5-way selector, not
+  // two separate toggle rows — a batter's home/away split is a genuinely
+  // different lens from vs-hand, not a combinable cross of the two, so
+  // they're mutually exclusive rather than stacked (per the same-day design
+  // conversation: 2 controls is fine, don't let the slideout turn into a
+  // settings panel). battingSplits comes from api/batter-splits.js
+  // (statSplits — sitCodes=vl,vr for hand, sitCodes=h,a for home/away, same
+  // MLB endpoint family). Real gotcha caught before shipping: "sitCodes=h,r"
+  // is NOT home/road — 'r' resolves to "Batting Right" (a platoon code
+  // reusing the same letter); the real away-games code is 'a'.
   const [battingHand, setBattingHand] = useState('ALL');
   const [battingSplits, setBattingSplits] = useState(null);
   const [battingSplitsLoading, setBattingSplitsLoading] = useState(false);
@@ -2459,13 +2467,18 @@ function AtBatSlideIn() {
 
     const season = new Date().getFullYear();
 
-    // vs-LHP/vs-RHP splits — fetched immediately on open (not gated behind
-    // the toggle) so switching hands is instant once it resolves, same
-    // pattern as PitcherSlideIn's handSplits fetch.
+    // vs-LHP/vs-RHP + Home/Away splits — fetched immediately on open (not
+    // gated behind the toggle) so switching views is instant once it
+    // resolves, same pattern as PitcherSlideIn's handSplits fetch. Both
+    // split families merged into one battingSplits object (vsL/vsR/home/
+    // away) so the render logic below has a single lookup, not two.
     setBattingSplitsLoading(true);
     fetch(`/api/batter-splits?pid=${player.pid}&year=${season}`)
       .then(r => r.json())
-      .then(d => { if (d?.handSplits) setBattingSplits(d.handSplits); })
+      .then(d => { if (d?.handSplits || d?.homeAwaySplits) setBattingSplits({
+        vsL: d.handSplits?.vsL || null, vsR: d.handSplits?.vsR || null,
+        HOME: d.homeAwaySplits?.home || null, AWAY: d.homeAwaySplits?.away || null,
+      }); })
       .catch(() => {})
       .finally(() => setBattingSplitsLoading(false));
 
@@ -2708,28 +2721,45 @@ function AtBatSlideIn() {
         </div>
       )}
 
-      {/* Statcast Profile — vs-hand toggle (2026-07-28), batter-side mirror of
-          PitcherSlideIn's vs-LHB/vs-RHB toggle (same HandFilter component,
-          same "one toggle swaps the existing block" pattern — no new section
-          added). 'ALL' keeps today's default unchanged. vs LHP/RHP swaps to
-          the live api/batter-splits.js split (avg/obp/slg/HR — traditional
-          box-score stats, works for any batter any date) and layers in the
-          engine's own Statcast-quality bonus (avgEV/Barrel%/HardHit%/FB%,
-          from daily_picks.csv's vs_hand_* fields) ONLY when the toggled hand
-          matches today's actual opposing pitcher's hand — those engine fields
-          only ever cover the one hand relevant to today's matchup, same
-          asymmetry already accepted on the pitcher-side build. */}
+      {/* Statcast Profile — 5-way split toggle (2026-07-28, extended same day
+          with Home/Away on top of the original vs-LHP/vs-RHP), batter-side
+          mirror of PitcherSlideIn's vs-hand toggle — same "one control swaps
+          the existing block" pattern, no new section added. 'ALL' keeps the
+          original default unchanged. vs LHP/RHP/Home/Away all swap to the
+          live api/batter-splits.js split (avg/obp/slg/HR — traditional
+          box-score stats, works for any batter any date). The vs-hand modes
+          additionally layer in the engine's own Statcast-quality bonus
+          (avgEV/Barrel%/HardHit%/FB%, from daily_picks.csv's vs_hand_*
+          fields) ONLY when the toggled hand matches today's actual opposing
+          pitcher's hand; Home/Away has no equivalent engine field so it only
+          ever shows the traditional line, honestly, no bonus chips. */}
       <div style={{padding:"14px 20px",borderBottom:"1px solid var(--border)"}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',
           flexWrap:'wrap',gap:6,marginBottom:10}}>
           <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",
             textTransform:"uppercase",letterSpacing:1}}>
-            Statcast Profile — 2026 Season{battingHand!=='ALL' && ` (vs ${battingHand==='L'?'LHP':'RHP'})`}
+            Statcast Profile — 2026 Season{battingHand!=='ALL' && ` (${
+              battingHand==='L'?'vs LHP':battingHand==='R'?'vs RHP':battingHand==='HOME'?'Home':'Away'
+            })`}
           </div>
-          <HandFilter mode="pitcher" value={battingHand} onChange={setBattingHand}/>
+          <div style={{display:'flex',alignItems:'center',gap:3,flexWrap:'wrap'}}>
+            {[['ALL','All'],['L','vs L'],['R','vs R'],['HOME','Home'],['AWAY','Away']].map(([key,lbl]) => (
+              <button key={key} onClick={()=>setBattingHand(key)}
+                style={{padding:'2px 7px',borderRadius:5,cursor:'pointer',
+                  border:`1px solid ${battingHand===key?'var(--accent2)':'var(--border)'}`,
+                  background:battingHand===key?'rgba(56,184,242,.15)':'transparent',
+                  color:battingHand===key?'var(--accent2)':'var(--muted)',
+                  fontFamily:"'DM Mono',monospace",fontSize:9,fontWeight:battingHand===key?700:400}}>
+                {lbl}
+              </button>
+            ))}
+          </div>
         </div>
         {(() => {
-          const split = battingHand === 'ALL' ? null : battingSplits?.[battingHand==='L'?'vsL':'vsR'];
+          // 'L'/'R' map to battingSplits.vsL/vsR; 'HOME'/'AWAY' map to
+          // battingSplits.HOME/AWAY directly — one merged object, one lookup.
+          const splitKey = battingHand==='L' ? 'vsL' : battingHand==='R' ? 'vsR' : battingHand;
+          const split = battingHand === 'ALL' ? null : battingSplits?.[splitKey];
           if (battingHand === 'ALL' && !player.avgEV && !player.obp) {
             return (
               <div style={{fontSize:11,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>
@@ -2743,12 +2773,16 @@ function AtBatSlideIn() {
           if (battingHand !== 'ALL' && !split) {
             return (
               <div style={{fontSize:11,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>
-                No {battingHand==='L'?'vs-LHP':'vs-RHP'} split available for this batter.
+                No {battingHand==='L'?'vs-LHP':battingHand==='R'?'vs-RHP':battingHand==='HOME'?'home':'away'} split available for this batter.
               </div>
             );
           }
 
-          const bonusEligible = battingHand !== 'ALL' && dp?.pitcher_hand === battingHand;
+          // Statcast-quality bonus (avgEV/Barrel%/HardHit%/FB%) only applies
+          // to the vs-hand modes — there's no equivalent "vs_home"/"vs_away"
+          // engine field, so Home/Away only ever shows the traditional
+          // avg/obp/slg/HR line from the live split, honestly, no bonus.
+          const bonusEligible = (battingHand === 'L' || battingHand === 'R') && dp?.pitcher_hand === battingHand;
           const numOrNull = v => (v!=null && v!=='' && v!=='—') ? parseFloat(v) : null;
           const row = battingHand === 'ALL' ? player : {
             avg: numOrNull(split.avg), obp: numOrNull(split.obp), slg: numOrNull(split.slg),
@@ -2786,13 +2820,15 @@ function AtBatSlideIn() {
                 </div>
               ))}
             </div>
-            {/* "N of M HRs this season -> vs LHP/RHP" — same literal insight
-                the H2H/PowerBI research this session was built to surface,
-                mirrored here for the batter's own platoon split. */}
+            {/* "N of M HRs this season -> vs LHP/RHP/Home/Away" — same literal
+                insight the H2H/PowerBI research this session was built to
+                surface, mirrored here for the batter's own splits. */}
             {battingHand!=='ALL' && split?.hr > 0 && player.hr > 0 && (
               <div style={{marginTop:8,fontSize:10,fontFamily:"'DM Mono',monospace",
                 color: (split.hr / player.hr) >= 0.65 ? 'var(--accent)' : 'var(--muted)'}}>
-                {split.hr} of {player.hr} HRs this season → vs {battingHand==='L'?'LHP':'RHP'}
+                {split.hr} of {player.hr} HRs this season → {
+                  battingHand==='L' ? 'vs LHP' : battingHand==='R' ? 'vs RHP' : battingHand==='HOME' ? 'at Home' : 'on the Road'
+                }
               </div>
             )}
           </>;
@@ -15051,7 +15087,18 @@ function obSortValue(r, key) {
 }
 
 function OpposingBatterTable({ pitcherId }) {
-  const baseRows = useMemo(() => getOpposingBatters(pitcherId), [pitcherId]);
+  // FIXED 2026-07-28: baseRows only ever depended on [pitcherId] — since
+  // isBarrelLabEligible(r) (called inside getOpposingBatters) checks
+  // LINEUP_STATUS[bid]?.status === 'confirmed' internally, the eligible-
+  // batter list was computed once (often before lineups post, since the
+  // pitcher slideout is commonly opened early) and never recomputed when
+  // lineups actually confirmed later — unlike every other lineup-aware tab
+  // in this app (BarrelLabTab, OnBaseTab, etc.), which all subscribe to
+  // LINEUP_VERSION via subscribeLineup() for exactly this reason. Added the
+  // same subscription here and included lineupVer in the memo's deps.
+  const [lineupVer, setLineupVer] = useState(LINEUP_VERSION || 0);
+  useEffect(() => { const unsub = subscribeLineup(v => setLineupVer(v)); return unsub; }, []);
+  const baseRows = useMemo(() => getOpposingBatters(pitcherId), [pitcherId, lineupVer]);
   const [sortCol, setSortCol] = useState('fit');
   const [sortDir, setSortDir] = useState('desc');
   const mono = "'DM Mono',monospace";
@@ -33484,6 +33531,14 @@ function BarrelLabTab() {
       const _plateIQ = computePlateIQ(r);
       return {
         ...r,
+        // FIXED 2026-07-28: daily_picks.csv can have "Unknown (694346...)"
+        // for a pitcher not yet resolved when the engine last ran. Every
+        // render site in this tab reads b.pitcher directly off this row
+        // object, so resolving it ONCE here (rather than at each of the
+        // ~5 render sites individually) means the whole tab picks up the
+        // real name automatically once PROBABLE_PITCHER_MAP/lineups
+        // resolve it live — previously stuck showing "Unknown" forever.
+        pitcher: resolvePitcherName(r.pitcher, r.batting_team, r.pitcher_id),
         isBarrelSignal:
           r.trueHRScore  >= 75 &&
           r.matchupScore >= 60 &&
@@ -34486,6 +34541,10 @@ function OnBaseTab() {
       const _plateIQ = computePlateIQ(r);
       return {
         ...r,
+        // FIXED 2026-07-28: same fix as BarrelLabTab's scoredBatters — see
+        // that comment for the full explanation. Resolved once here so
+        // every render site in this tab picks it up automatically.
+        pitcher: resolvePitcherName(r.pitcher, r.batting_team, r.pitcher_id),
         isTBSignal:
           r.onBaseScore  >= 75 &&
           r.matchupScore >= 60 &&
