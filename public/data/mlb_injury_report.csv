@@ -99,7 +99,6 @@ DET,676428,Brant Hurter,P,Lumbar spine inflammation.,,🟡,Injured 60-Day
 DET,572143,Burch Smith,P,Right shoulder inflammation.,,🟡,Injured 60-Day
 DET,656427,Jack Flaherty,P,Right flexor inflammation.,,🟡,Injured 15-Day
 DET,695549,Jackson Jobe,P,Recovering from Tommy John surgery,,🔴,Injured 60-Day
-DET,595879,Javier Báez,SS,Right ankle sprain.,,🟡,Injured 60-Day
 DET,434378,Justin Verlander,P,Left hip inflammation.,,🟡,Injured 60-Day
 DET,681481,Kerry Carpenter,RF,Left foot plantar fasciitis,,⚪,Injured 10-Day
 DET,678009,Parker Meadows,CF,Left radius fracture.,,🔴,Injured 60-Day
@@ -114,6 +113,7 @@ HOU,669713,Hayden Wesneski,P,Recovery from right elbow surgery,,🔴,Injured 60-
 HOU,681347,Mike Burrows,P,Right elbow neuritis.,,⚪,Injured 15-Day
 HOU,681293,Spencer Arrighetti,P,Right foot nerve irritation,,⚪,Injured 15-Day
 KC,679525,Alec Marsh,P,Right shoulder impingement.,,⚪,Injured 60-Day
+KC,694360,Beck Way,P,Low back spasms/tightness.,,🟢,Injured 15-Day
 KC,677951,Bobby Witt Jr.,SS,Low back tightness.,,🟢,Injured 10-Day
 KC,608032,Carlos Estévez,P,Left foot contusion.,,🟢,Injured 60-Day
 KC,666142,Cole Ragans,P,Left elbow impingement.,,⚪,Injured 60-Day
@@ -165,6 +165,7 @@ MIL,682990,Quinn Priester,P,Right thoracic outlet syndrome,,⚪,Injured 60-Day
 MIL,642239,Rob Zastryzny,P,Left trapezius strain.,,🟡,Injured 60-Day
 MIL,686217,Sal Frelick,RF,Right shoulder strain.,,🟡,Injured 10-Day
 MIN,607455,Anthony Banda,P,Left lat strain.,,🟡,Injured 60-Day
+MIN,663485,Cole Sands,P,Right elbow strain.,,🟡,Injured 15-Day
 MIN,701581,David Festa,P,Right shoulder impingement.,,⚪,Injured 60-Day
 MIN,670183,Garrett Acton,P,Right shoulder strain,,🟡,Injured 60-Day
 MIN,690953,Mick Abel,P,Right elbow inflammation.,,🟡,Injured 60-Day
@@ -185,7 +186,6 @@ NYY,641355,Cody Bellinger,LF,Left hamstring strain.,,🟡,Injured 10-Day
 NYY,519317,Giancarlo Stanton,DH,Right calf strain.,,🟡,Injured 10-Day
 PHI,666969,Adolis García,RF,Right latissimus dorsi tear,,🔴,Injured 60-Day
 PHI,641745,Brad Keller,P,Right elbow UCL tear.,,🔴,Injured 60-Day
-PHI,596117,Garrett Stubbs,C,Left wrist inflammation.,,🟡,Injured 10-Day
 PHI,679032,Johan Rojas,CF,Right elbow UCL repair.,,⚪,Injured 60-Day
 PHI,642152,Lou Trivino III,P,Right thoracic muscle spasm.,,⚪,Injured 15-Day
 PHI,665561,Rafael Marchán,C,Left knee patellar tendinitis,,⚪,Injured 10-Day
