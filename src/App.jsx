@@ -2358,6 +2358,13 @@ function AtBatSlideIn() {
   const [zoneData,    setZoneData]    = useState(null);   // {bMap, pMap, edges}
   const [zoneLoad,    setZoneLoad]    = useState(false);
   const [zoneStat,    setZoneStat]    = useState('hr'); // 'hr' | 'barrel' | 'hardhit' | 'k'
+  // vs-LHP/vs-RHP toggle (2026-07-28) — batter-side mirror of PitcherSlideIn's
+  // vs-LHB/vs-RHB toggle. 'ALL' = the existing hand-agnostic Statcast Profile
+  // (unchanged default). battingSplits comes from the new api/batter-splits.js
+  // (statSplits/sitCodes=vl,vr, same MLB endpoint pattern as the pitcher side).
+  const [battingHand, setBattingHand] = useState('ALL');
+  const [battingSplits, setBattingSplits] = useState(null);
+  const [battingSplitsLoading, setBattingSplitsLoading] = useState(false);
   const [dhIdx,       setDhIdx]       = useState(0); // doubleheader game selector — 0 = Game 1
 
   // Doubleheader support: DAILY_PICKS_CACHE only ever keeps the FIRST
@@ -2447,8 +2454,20 @@ function AtBatSlideIn() {
     setBvpData(null);
     setLoading(true);
     setAtBats([]);
+    setBattingHand('ALL');
+    setBattingSplits(null);
 
     const season = new Date().getFullYear();
+
+    // vs-LHP/vs-RHP splits — fetched immediately on open (not gated behind
+    // the toggle) so switching hands is instant once it resolves, same
+    // pattern as PitcherSlideIn's handSplits fetch.
+    setBattingSplitsLoading(true);
+    fetch(`/api/batter-splits?pid=${player.pid}&year=${season}`)
+      .then(r => r.json())
+      .then(d => { if (d?.handSplits) setBattingSplits(d.handSplits); })
+      .catch(() => {})
+      .finally(() => setBattingSplitsLoading(false));
 
     // Fetch BvP vs today's probable pitcher — uses the component-level `dp`
     // (already selected for the current doubleheader game, see dpOptions/dhIdx
@@ -2689,39 +2708,95 @@ function AtBatSlideIn() {
         </div>
       )}
 
-      {/* Statcast Profile */}
+      {/* Statcast Profile — vs-hand toggle (2026-07-28), batter-side mirror of
+          PitcherSlideIn's vs-LHB/vs-RHB toggle (same HandFilter component,
+          same "one toggle swaps the existing block" pattern — no new section
+          added). 'ALL' keeps today's default unchanged. vs LHP/RHP swaps to
+          the live api/batter-splits.js split (avg/obp/slg/HR — traditional
+          box-score stats, works for any batter any date) and layers in the
+          engine's own Statcast-quality bonus (avgEV/Barrel%/HardHit%/FB%,
+          from daily_picks.csv's vs_hand_* fields) ONLY when the toggled hand
+          matches today's actual opposing pitcher's hand — those engine fields
+          only ever cover the one hand relevant to today's matchup, same
+          asymmetry already accepted on the pitcher-side build. */}
       <div style={{padding:"14px 20px",borderBottom:"1px solid var(--border)"}}>
-        <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>Statcast Profile — 2026 Season</div>
-        {!player.avgEV && !player.obp ? (
-          <div style={{fontSize:11,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>
-            Loading stats… if this persists, visit the Batters tab first to prime the cache.
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',
+          flexWrap:'wrap',gap:6,marginBottom:10}}>
+          <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",
+            textTransform:"uppercase",letterSpacing:1}}>
+            Statcast Profile — 2026 Season{battingHand!=='ALL' && ` (vs ${battingHand==='L'?'LHP':'RHP'})`}
           </div>
-        ) : (
-        <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-          {[
-            {label:"Avg EV",   val:player.avgEV,        suffix:"",   color: player.avgEV>=92?"var(--accent)":player.avgEV>=88?"#ff8020":"var(--text)"},
-            {label:"Barrel%",  val:player.barrel,       suffix:"%",  color: player.barrel>=12?"#ff4020":player.barrel>=8?"#ff8020":player.barrel>=5?"#f5a623":"var(--text)"},
-            {label:"HardHit%", val:player.hardHit,      suffix:"%",  color: player.hardHit>=50?"#ff4020":player.hardHit>=42?"#ff8020":"var(--text)"},
-            {label:"FB%",      val:player.flyBall,      suffix:"%",  color:"var(--text)"},
-            {label:"GB%",      val:player.gbPct,        suffix:"%",  color:"var(--muted)"},
-            {label:"Launch°",  val:player.launchAngle,  suffix:"°",  color: player.launchAngle>=20&&player.launchAngle<=35?"var(--green)":"var(--text)"},
-            {label:"BA",       val:player.avg,          suffix:"",   fmt: v=>v>0?'.'+String(Math.round(v*1000)).padStart(3,'0'):'—', color: player.avg>=0.300?"var(--accent)":player.avg>=0.260?"#ff8020":"var(--text)"},
-            {label:"OBP",      val:player.obp,          suffix:"",   fmt: v=>v>0?'.'+String(Math.round(v*1000)).padStart(3,'0'):'—', color: player.obp>=0.370?"var(--accent)":player.obp>=0.330?"#ff8020":"var(--text)"},
-            {label:"SLG",      val:player.slg,          suffix:"",   fmt: v=>v>0?'.'+String(Math.round(v*1000)).padStart(3,'0'):'—', color: player.slg>=0.500?"var(--accent)":player.slg>=0.420?"#ff8020":"var(--text)"},
-            {label:"xwOBA",    val:player.xwoba,        suffix:"",   fmt: v=>v>0?v.toFixed(3):'—', color: player.xwoba>=0.380?"var(--accent)":player.xwoba>=0.320?"#ff8020":"var(--text)"},
-            {label:"Chase%",   val:player.oSwing,       suffix:"%",  color: player.oSwing<=20?"var(--green)":player.oSwing>=30?"#ff8020":"var(--text)"},
-            {label:"K%",       val:player.kPct,         suffix:"%",  color: player.kPct>=28?"var(--ice)":"var(--muted)"},
-            {label:"BB%",      val:player.bbPct,        suffix:"%",  color: player.bbPct>=12?"#27c97a":"var(--muted)"},
-          ].filter(s => s.val != null && s.val > 0).map(s=>(
-            <div key={s.label} style={{background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8,padding:"8px 12px",minWidth:64,textAlign:"center"}}>
-              <div style={{fontSize:8,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>{s.label}</div>
-              <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:17,color:s.color}}>
-                {s.fmt ? s.fmt(s.val) : (typeof s.val==="number" ? s.val.toFixed(1) : s.val)}{s.fmt ? '' : s.suffix}
-              </div>
-            </div>
-          ))}
+          <HandFilter mode="pitcher" value={battingHand} onChange={setBattingHand}/>
         </div>
-        )}
+        {(() => {
+          const split = battingHand === 'ALL' ? null : battingSplits?.[battingHand==='L'?'vsL':'vsR'];
+          if (battingHand === 'ALL' && !player.avgEV && !player.obp) {
+            return (
+              <div style={{fontSize:11,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>
+                Loading stats… if this persists, visit the Batters tab first to prime the cache.
+              </div>
+            );
+          }
+          if (battingHand !== 'ALL' && battingSplitsLoading && !battingSplits) {
+            return <div style={{fontSize:11,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>Loading…</div>;
+          }
+          if (battingHand !== 'ALL' && !split) {
+            return (
+              <div style={{fontSize:11,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>
+                No {battingHand==='L'?'vs-LHP':'vs-RHP'} split available for this batter.
+              </div>
+            );
+          }
+
+          const bonusEligible = battingHand !== 'ALL' && dp?.pitcher_hand === battingHand;
+          const numOrNull = v => (v!=null && v!=='' && v!=='—') ? parseFloat(v) : null;
+          const row = battingHand === 'ALL' ? player : {
+            avg: numOrNull(split.avg), obp: numOrNull(split.obp), slg: numOrNull(split.slg),
+            xwoba: null,
+            avgEV:   bonusEligible ? numOrNull(dp.vs_hand_avg_ev)     : null,
+            barrel:  bonusEligible ? numOrNull(dp.vs_hand_barrel_pct) : null,
+            hardHit: bonusEligible ? numOrNull(dp.vs_hand_hh_pct)     : null,
+            flyBall: bonusEligible ? numOrNull(dp.vs_hand_fb_pct)     : null,
+            gbPct: null, launchAngle: null, oSwing: null, kPct: null, bbPct: null,
+          };
+
+          return <>
+            <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+              {[
+                {label:"Avg EV",   val:row.avgEV,        suffix:"",   color: row.avgEV>=92?"var(--accent)":row.avgEV>=88?"#ff8020":"var(--text)"},
+                {label:"Barrel%",  val:row.barrel,       suffix:"%",  color: row.barrel>=12?"#ff4020":row.barrel>=8?"#ff8020":row.barrel>=5?"#f5a623":"var(--text)"},
+                {label:"HardHit%", val:row.hardHit,      suffix:"%",  color: row.hardHit>=50?"#ff4020":row.hardHit>=42?"#ff8020":"var(--text)"},
+                {label:"FB%",      val:row.flyBall,      suffix:"%",  color:"var(--text)"},
+                {label:"GB%",      val:row.gbPct,        suffix:"%",  color:"var(--muted)"},
+                {label:"Launch°",  val:row.launchAngle,  suffix:"°",  color: row.launchAngle>=20&&row.launchAngle<=35?"var(--green)":"var(--text)"},
+                {label:"BA",       val:row.avg,          suffix:"",   fmt: v=>v>0?'.'+String(Math.round(v*1000)).padStart(3,'0'):'—', color: row.avg>=0.300?"var(--accent)":row.avg>=0.260?"#ff8020":"var(--text)"},
+                {label:"OBP",      val:row.obp,          suffix:"",   fmt: v=>v>0?'.'+String(Math.round(v*1000)).padStart(3,'0'):'—', color: row.obp>=0.370?"var(--accent)":row.obp>=0.330?"#ff8020":"var(--text)"},
+                {label:"SLG",      val:row.slg,          suffix:"",   fmt: v=>v>0?'.'+String(Math.round(v*1000)).padStart(3,'0'):'—', color: row.slg>=0.500?"var(--accent)":row.slg>=0.420?"#ff8020":"var(--text)"},
+                {label:"xwOBA",    val:row.xwoba,        suffix:"",   fmt: v=>v>0?v.toFixed(3):'—', color: row.xwoba>=0.380?"var(--accent)":row.xwoba>=0.320?"#ff8020":"var(--text)"},
+                {label:"Chase%",   val:row.oSwing,       suffix:"%",  color: row.oSwing<=20?"var(--green)":row.oSwing>=30?"#ff8020":"var(--text)"},
+                {label:"K%",       val:row.kPct,         suffix:"%",  color: row.kPct>=28?"var(--ice)":"var(--muted)"},
+                {label:"BB%",      val:row.bbPct,        suffix:"%",  color: row.bbPct>=12?"#27c97a":"var(--muted)"},
+                {label:"HR",       val:battingHand!=='ALL' ? split.hr : null, suffix:"", color:"var(--text)"},
+              ].filter(s => s.val != null && s.val > 0).map(s=>(
+                <div key={s.label} style={{background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8,padding:"8px 12px",minWidth:64,textAlign:"center"}}>
+                  <div style={{fontSize:8,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>{s.label}</div>
+                  <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:17,color:s.color}}>
+                    {s.fmt ? s.fmt(s.val) : (typeof s.val==="number" ? s.val.toFixed(1) : s.val)}{s.fmt ? '' : s.suffix}
+                  </div>
+                </div>
+              ))}
+            </div>
+            {/* "N of M HRs this season -> vs LHP/RHP" — same literal insight
+                the H2H/PowerBI research this session was built to surface,
+                mirrored here for the batter's own platoon split. */}
+            {battingHand!=='ALL' && split?.hr > 0 && player.hr > 0 && (
+              <div style={{marginTop:8,fontSize:10,fontFamily:"'DM Mono',monospace",
+                color: (split.hr / player.hr) >= 0.65 ? 'var(--accent)' : 'var(--muted)'}}>
+                {split.hr} of {player.hr} HRs this season → vs {battingHand==='L'?'LHP':'RHP'}
+              </div>
+            )}
+          </>;
+        })()}
       </div>
 
 
@@ -2761,7 +2836,7 @@ function AtBatSlideIn() {
               H2H vs <span
                 onClick={()=>{ if(bvpData?.pitcherId) openPitcherSlide({pid:parseInt(bvpData.pitcherId)||0,name:bvpData.pitcherName||"Today's Pitcher",team:'',hand:bvpData?.pitcherHand||'',pitchMix:[]}); }}
                 style={{color:'var(--accent2)',cursor:bvpData?.pitcherId?'pointer':'default',textDecoration:bvpData?.pitcherId?'underline':'none',textDecorationStyle:'dotted'}}>
-                {bvpData?.pitcherName || "Today's Pitcher"}
+                {bvpData?.pitcherName || "Today's Pitcher"}{bvpData?.pitcherHand && ` (${bvpData.pitcherHand})`}
               </span>
             </div>
             {/* H2H Grade badge — only shown with meaningful sample */}
