@@ -33194,7 +33194,18 @@ function WeatherStrip({ rows }) {
           ? Math.round(parseFloat(hrfRaw))
           : Math.round((parseFloat(r.hr_factor) || 1) * 100);
         byGid[gid] = {
-          gid, teams: new Set(),
+          gid,
+          // FIXED 2026-07-28: label used to be built from a Set of
+          // batting_team values seen across whichever rows survived the
+          // current filter/sort — Sets preserve INSERTION order, so the
+          // label flipped (CIN@CLE vs CLE@CIN) whenever the row order
+          // changed, and collapsed to a single team name whenever a filter
+          // happened to leave zero batters from the other side. home_team/
+          // away_team are stable per-game fields on every row regardless of
+          // which batters are currently filtered in, so the label no longer
+          // depends on row order or which subset of batters is visible.
+          away: r.away_team || '',
+          home: r.home_team || '',
           temp: parseFloat(r.temp_f || 0),
           windMph: parseFloat(r.wind_speed_mph || 0),
           windEffect: (r.wind_effect || '').replace(/[↙↖↘⬅⬇↗⬆️]/g, '').trim(),
@@ -33213,10 +33224,9 @@ function WeatherStrip({ rows }) {
           isDome: isDomeGame(r),
         };
       }
-      if (r.batting_team) byGid[gid].teams.add(r.batting_team);
     });
     return Object.values(byGid)
-      .map(g => ({ ...g, label: Array.from(g.teams).join('@') || '—' }))
+      .map(g => ({ ...g, label: (g.away && g.home) ? `${g.away}@${g.home}` : (g.away || g.home || '—') }))
       .sort((a, b) => b.hrf - a.hrf);
   }, [rows]);
 
