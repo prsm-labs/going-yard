@@ -1,8 +1,10 @@
 {
-  "version": "2026.07.23",
-  "bundleFile": "index-DCCPfslf.js",
+  "version": "2026.07.29",
+  "bundleFile": "index-cDUQj-Ze.js",
   "changelog": [
-    "Daily data update 2026-07-23"
+    "Upgrade Pairs page: add matchup-driven categories",
+    "revise Same Game Heat",
+    "arsenal-fit scoring bonus"
   ],
   "notifyUsers": true
 }
