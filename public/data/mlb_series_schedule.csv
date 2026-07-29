@@ -5,8 +5,8 @@ Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitc
 2026-07-29,01:10 PM,DET,BAL,669373.0,669432.0,824242,2394,Comerica Park,Wednesday,Wed,3,3,Finale,~ Neutral
 2026-07-29,01:10 PM,NYM,ATL,640455.0,700363.0,823596,3289,Citi Field,Wednesday,Wed,2,3,Middle,~ Neutral
 2026-07-29,07:10 PM,NYM,ATL,681035.0,519242.0,823598,3289,Citi Field,Wednesday,Wed,3,3,Finale,~ Neutral
-2026-07-29,03:45 PM,SF,MIL,657277.0,675660.0,823192,2395,Oracle Park,Wednesday,Wed,3,3,Finale,~ Neutral
-2026-07-29,04:10 PM,SD,COL,,687312.0,823273,2680,Petco Park,Wednesday,Wed,2,2,Finale,~ Neutral
+2026-07-29,03:45 PM,SF,MIL,657277.0,623381.0,823192,2395,Oracle Park,Wednesday,Wed,3,3,Finale,~ Neutral
+2026-07-29,04:10 PM,SD,COL,606996.0,687312.0,823273,2680,Petco Park,Wednesday,Wed,2,2,Finale,~ Neutral
 2026-07-29,06:40 PM,TB,TEX,668984.0,669022.0,822947,12,Tropicana Field,Wednesday,Wed,2,3,Middle,~ Neutral
 2026-07-29,07:10 PM,CIN,CLE,663903.0,676282.0,824487,2602,Great American Ball Park,Wednesday,Wed,3,3,Finale,~ Neutral
 2026-07-29,07:40 PM,MIN,KC,657746.0,677976.0,823677,3312,Target Field,Wednesday,Wed,2,3,Middle,~ Neutral
@@ -20,8 +20,8 @@ Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitc
 2026-07-30,02:10 PM,CWS,NYY,680732.0,677960.0,824568,4,Rate Field,Thursday,Thu,4,4,Finale,✅ Best Day (getaway)
 2026-07-30,02:15 PM,STL,CHC,669467.0,684007.0,823023,2889,Busch Stadium,Thursday,Thu,4,4,Finale,✅ Best Day (getaway)
 2026-07-30,07:10 PM,CIN,PIT,695076.0,,824488,2602,Great American Ball Park,Thursday,Thu,1,4,Opener,✅ Best Day (getaway)
-2026-07-30,07:10 PM,NYM,MIA,690997.0,,823595,3289,Citi Field,Thursday,Thu,1,4,Opener,✅ Best Day (getaway)
-2026-07-30,07:15 PM,ATL,WSH,,,824894,4705,Truist Park,Thursday,Thu,1,4,Opener,✅ Best Day (getaway)
+2026-07-30,07:10 PM,NYM,MIA,690997.0,691587.0,823595,3289,Citi Field,Thursday,Thu,1,4,Opener,✅ Best Day (getaway)
+2026-07-30,07:15 PM,ATL,WSH,656550.0,,824894,4705,Truist Park,Thursday,Thu,1,4,Opener,✅ Best Day (getaway)
 2026-07-30,09:40 PM,ATH,BOS,,543243.0,824974,2529,Sutter Health Park,Thursday,Thu,4,4,Finale,✅ Best Day (getaway)
 2026-07-30,09:40 PM,SD,SF,,,823271,2680,Petco Park,Thursday,Thu,1,4,Opener,✅ Best Day (getaway)
 2026-07-30,10:10 PM,LAD,SEA,808963.0,682243.0,823921,22,UNIQLO Field at Dodger Stadium,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
