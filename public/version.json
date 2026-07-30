@@ -1,8 +1,11 @@
 {
   "version": "2026.07.30",
-  "bundleFile": "index-C5CWQDNZ.js",
+  "bundleFile": "index-C38KA--3.js",
   "changelog": [
-    "Add Arsenal Fit column section to Barrel Lab and On Base tables"
+    "Add min-value text filters (L7 ISO",
+    "ISO",
+    "L7 EV",
+    "EV) to Barrel Lab and On Base filter panels"
   ],
   "notifyUsers": true
 }

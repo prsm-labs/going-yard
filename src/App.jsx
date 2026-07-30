@@ -7938,7 +7938,11 @@ function BallCarryCard({ game }) {
           {game.status === 'Live' && <span style={{ fontSize: 9, color: '#e8411a', fontFamily: "'DM Mono',monospace", fontWeight: 700 }}>🔴 {game.inning || 'LIVE'}</span>}
           {game.status === 'Final' && <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>FINAL</span>}
         </div>
-        {/* Weather context ONLY — never feeds the verdict, see header note */}
+        {/* Wind is still context-only (too noisy at single-game granularity — see
+            header note). Temperature is NOT context-only anymore (2026-07-30):
+            gameData.weather.temp now feeds a small density correction into the
+            verdict itself (data.temp_adj_ft below) — the wCur temp shown here is
+            the separate live weather.js fetch, kept for the wind label alongside it. */}
         {weather?.isDome
           ? <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>🏟️ Dome</span>
           : wCur && <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>
@@ -7955,10 +7959,12 @@ function BallCarryCard({ game }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
             <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 11, fontWeight: 700, color: style?.color }}>{style?.label}</span>
             <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)' }}
-              title={`raw average (before park adjustment): ${data.avg_deviation>=0?'+':''}${data.avg_deviation}ft. ${data.homeAbbr||'this park'}'s own season baseline: ${data.park_baseline_ft>=0?'+':''}${data.park_baseline_ft}ft — subtracted to get the park-adjusted number.`}>
+              title={`raw average (before park adjustment): ${data.avg_deviation>=0?'+':''}${data.avg_deviation}ft. ${data.homeAbbr||'this park'}'s own season baseline: ${data.park_baseline_ft>=0?'+':''}${data.park_baseline_ft}ft — subtracted to get the park-adjusted number. Game temp ${data.game_temp_f!=null?data.game_temp_f+'°F':'unknown'} already folded into each ball's expected distance (${data.temp_adj_ft>=0?'+':''}${data.temp_adj_ft??0}ft/ball) before averaging — literature-approximate correction, not fit against Going Yard's own data (no persisted historical weather log exists yet). ${data.z!=null?`z-score: ${data.z>=0?'+':''}${data.z} (need |z|>=${data.z_threshold} for DEAD/JUICED — scales with this game's own ${data.n} balls via se=±${data.se}ft, not a fixed number, so a thin sample needs a much bigger raw deviation to count as a real signal vs noise).`:''}`}>
               park-adj {data.park_adj_deviation >= 0 ? '+' : ''}{data.park_adj_deviation}ft
               {data.park_baseline_ft != null && ` (${data.homeAbbr||'park'} baseline ${data.park_baseline_ft >= 0 ? '+' : ''}${data.park_baseline_ft}ft)`}
               {' '}· raw {data.avg_deviation >= 0 ? '+' : ''}{data.avg_deviation}ft · n={data.n}
+              {data.z != null && ` · z=${data.z >= 0 ? '+' : ''}${data.z}`}
+              {data.game_temp_f != null && ` · ${data.game_temp_f}°F`}
             </span>
             <button onClick={() => setExpanded(v => !v)}
               style={{ marginLeft: 'auto', fontSize: 9, fontFamily: "'DM Mono',monospace", color: 'var(--muted)',
@@ -7970,7 +7976,9 @@ function BallCarryCard({ game }) {
             <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 6 }}>
               {data.balls.map((b, i) => (
                 <div key={i} style={{ display: 'flex', gap: 10, fontFamily: "'DM Mono',monospace", fontSize: 9,
-                  color: 'var(--muted)', padding: '2px 0' }}>
+                  color: 'var(--muted)', padding: '2px 0',
+                  background: b.is_outlier ? 'rgba(167,139,250,.08)' : 'transparent',
+                  borderRadius: 4 }}>
                   <span style={{ width: 110, color: 'var(--text)', flexShrink: 0 }}>{b.batter}{b.isHR ? ' 💥' : ''}</span>
                   <span>Inn {b.inning}</span>
                   <span>{b.ev}mph / {b.la}°</span>
@@ -7979,6 +7987,12 @@ function BallCarryCard({ game }) {
                   <span style={{ color: b.deviation >= 0 ? '#27c97a' : '#ff6b6b', fontWeight: 700 }}>
                     {b.deviation >= 0 ? '+' : ''}{b.deviation}ft
                   </span>
+                  {b.is_outlier && (
+                    <span title={`Individual-ball outlier — |deviation| ≥ 25ft. Doesn't move the game verdict on its own (that needs several balls to mean anything), but this specific ball carried meaningfully differently than its own EV/LA/temp/direction predicted.`}
+                      style={{ color: '#a78bfa', fontWeight: 700 }}>
+                      ⚡ outlier
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
@@ -7997,11 +8011,14 @@ function BallCarryTab({ games }) {
     <div>
       {showHelp && <HelpSlideout title="⚾ Ball Carry Guide" items={[
         ['What is this?', 'Per-game "dead ball / juiced ball" detector. Holds Exit Velocity and Launch Angle fixed and compares actual batted-ball distance against what the physics says it should be — a ball flying meaningfully farther or shorter than EV+LA predict is a ball-construction signal, not a swing signal.'],
-        ['What it does NOT use', 'Temperature and wind are NOT part of the verdict — weather shifts throughout a game and is too noisy at single-game granularity. They’re shown next to each card as context only.'],
+        ['Temperature (2026-07-30)', 'Game-time temperature (from the same live feed, no extra fetch) now folds a small density correction into each ball’s expected distance before averaging — cold/dense air no longer reads as falsely DEAD, hot/thin air no longer reads as falsely JUICED. Honestly caveated: this correction is a physics-literature approximation, not fit against Going Yard’s own data (there’s no persisted historical per-game weather log to fit it against yet) — unlike the EV/LA/direction terms, which are.'],
+        ['What it still does NOT use', 'Wind is still context-only, not part of the verdict — it’s shown next to each card but too noisy at single-game granularity to correct for cleanly the way temperature can be.'],
         ['Elevation / park', 'Each park’s own seasonal average carry deviation is subtracted before classifying — shown right on the card ("park baseline") so it’s never a hidden adjustment. This is why a hitter-friendly park (Coors, Arizona) can show a big raw number and still read NORMAL — the raw distance is only modestly above what that park normally allows.'],
         ['🟡 Borderline normal', 'A NORMAL verdict within 3ft of the DEAD or JUICED line gets this instead of a flat green normal — a near-miss isn’t the same as an unremarkable day, and this keeps close calls visible instead of hidden inside "normal."'],
         ['Direction (Pull/Center/Oppo)', 'Also corrects for where the ball was hit. Center-field contact carries ~14-17ft farther than pulled or opposite-field contact at the same EV+LA (pure backspin vs. sidespin bleed-off) — a real physical effect, not noise. Without this, a handful of unusually center-heavy or pull-heavy balls in one game could fake a DEAD/JUICED reading. Shown per-ball in the expanded list below.'],
-        ['Minimum sample', 'Needs at least 3 quality batted balls (EV≥95mph, LA 15–40°, fly ball/line drive) before showing a verdict.'],
+        ['⚡ Outlier balls', 'Any single ball whose actual distance deviates 25+ft from what EV/LA/temp/direction predict gets flagged individually in the expanded ball list, even on a day the overall game verdict stays NORMAL — a real 103mph flyout that died well short of expected is worth seeing on its own, not just averaged away into a game total that needs several balls to mean anything.'],
+        ['z-score verdict (2026-07-30)', 'DEAD/JUICED now requires a real per-game z-score (|z|≥2, ~95% confidence) instead of a fixed +/-ft cutoff — a game with only 3-5 balls needs a much bigger raw deviation to count as a real signal than a game with 15+, since the standard error shrinks as sample size grows. The "dead/juiced threshold" ft numbers on the card are that game\'s own z=2 line, not a fixed number — they\'ll differ game to game.'],
+        ['Minimum sample', 'Needs at least 3 quality batted balls (EV≥95mph, LA 15–35°, dist≥150ft) before showing a verdict — even then, the z-score above accounts for how thin that sample is.'],
       ]} onClose={() => setShowHelp(false)}/>}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
         <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 14 }}>⚾ Ball Carry — Juiced or Dead?</span>
@@ -11538,6 +11555,84 @@ const LIVE_GAMES_CACHE = [];
 // Maps playerId (number) → 'atbat' | 'ondeck' | 'inhole' — updated by fetchLiveBatters
 const LIVE_AB_STATUS_CACHE = {};
 let _notifyNewHR = null; // callback set by useHRNotifications hook
+
+// ── Ball State Adjustment (live-only, 2026-07-30) ───────────────────────────
+// Purely additive/visual badge for Barrel Lab + On Base — surfaces a
+// currently-live game's Ball Carry / xHR Conversion verdict (DEAD/JUICED)
+// next to any batter playing in that game. Explicitly NEVER touches Yard
+// Score, Boom, PS Score, TrueHRScore, MatchupScore, SimHR%, OnBaseScore, or
+// SimTB2% — this is a read-only client-side lookup rendered as a badge, not
+// a multiplier or input to any scoring function. Pre-game rows are
+// unaffected by construction: a game only ever appears in BALL_STATE_CACHE
+// once it's genuinely 'Live' (see startBallStatePolling below) and has
+// produced a confident verdict from the live endpoints — there is no path
+// for this to influence anything before or independent of live play.
+const BALL_STATE_CACHE = {}; // gamePk (string) -> { carryVerdict, carryZ, xhrVerdict, xhrZ, updated }
+let _BALL_STATE_VER = 0;
+let _ballStatePollActive = false;
+
+async function pollBallState() {
+  const liveGames = (LIVE_GAMES_CACHE || []).filter(g => g.status === 'Live');
+  if (!liveGames.length) return;
+  await Promise.all(liveGames.map(async (g) => {
+    const gamePk = String(g.gamePk || g.id || '');
+    if (!gamePk) return;
+    try {
+      const [carryD, xhrD] = await Promise.all([
+        fetch(`/api/ball-carry?gamePk=${gamePk}`).then(r => r.json()).catch(() => null),
+        fetch(`/api/xhr-conversion?gamePk=${gamePk}`).then(r => r.json()).catch(() => null),
+      ]);
+      BALL_STATE_CACHE[gamePk] = {
+        carryVerdict: carryD?.status === 'ok' ? carryD.verdict : null,
+        carryZ:       carryD?.status === 'ok' ? carryD.z : null,
+        xhrVerdict:   xhrD?.status === 'ok' ? xhrD.verdict : null,
+        xhrZ:         xhrD?.status === 'ok' ? xhrD.z : null,
+      };
+      _BALL_STATE_VER++;
+    } catch (_) { /* leave prior cached value in place, retry next cycle */ }
+  }));
+}
+
+// Idempotent — safe to call from both BarrelLabTab and OnBaseTab; the
+// interval only ever gets created once regardless of how many tabs call it.
+// Same 3-min cadence as the Live tab's own BallCarryCard/XhrConversionCard.
+function startBallStatePolling() {
+  if (_ballStatePollActive) return;
+  _ballStatePollActive = true;
+  pollBallState();
+  setInterval(pollBallState, 3 * 60 * 1000);
+}
+
+// { icon, label, color, tooltip } or null. Fires when EITHER diagnostic is
+// confidently DEAD/JUICED for the batter's game (both being unavailable/
+// NORMAL/not-yet-live returns null). Tooltip discloses whether one or both
+// signals agree, rather than silently picking one — same "don't overstate
+// confidence" discipline as every other unvalidated-but-real signal in
+// this app (Recent EV false-negative flag, Longshot, etc).
+function getBallStateBadge(gameId) {
+  const state = BALL_STATE_CACHE[String(gameId || '')];
+  if (!state) return null;
+  const carryHit = state.carryVerdict === 'DEAD' || state.carryVerdict === 'JUICED';
+  const xhrHit   = state.xhrVerdict   === 'DEAD' || state.xhrVerdict   === 'JUICED';
+  if (!carryHit && !xhrHit) return null;
+  // If both fire but disagree (rare — different physics questions), Ball
+  // Carry wins the badge shown (distance-based, the more direct "ball
+  // itself" signal) but the tooltip states the disagreement plainly.
+  const primary = carryHit ? state.carryVerdict : state.xhrVerdict;
+  const bothAgree = carryHit && xhrHit && state.carryVerdict === state.xhrVerdict;
+  const bothDisagree = carryHit && xhrHit && state.carryVerdict !== state.xhrVerdict;
+  const isJuiced = primary === 'JUICED';
+  const parts = [];
+  if (carryHit) parts.push(`Ball Carry: ${state.carryVerdict}${state.carryZ!=null?` (z=${state.carryZ>=0?'+':''}${state.carryZ})`:''}`);
+  if (xhrHit)   parts.push(`xHR Conversion: ${state.xhrVerdict}${state.xhrZ!=null?` (z=${state.xhrZ>=0?'+':''}${state.xhrZ})`:''}`);
+  return {
+    icon: isJuiced ? '🔴' : '🔵',
+    label: isJuiced ? 'Juiced Ball' : 'Dead Ball',
+    color: isJuiced ? '#ff8020' : '#38b8f2',
+    tooltip: `Live-only ball state signal — does not affect any score. ${parts.join(' · ')}.`
+      + (bothAgree ? ' Both live diagnostics agree.' : bothDisagree ? ' The two live diagnostics disagree — shown with lower confidence.' : ' Based on one of the two live diagnostics (the other is NORMAL or not yet reporting).'),
+  };
+}
 
 // Global navigation — lets notifications route to tabs/views without prop drilling
 let _GLOBAL_NAV = null; // { setTab, setLiveView } — set by App on mount
@@ -27897,6 +27992,7 @@ function LegendButton() {
       '💥 Gone Yard / 2️⃣ 2+ TB Today badges and filters — same definitions as everywhere else in the app.',
       '🟢 Weak Spot row highlight — batter sitting in the opposing pitcher\'s historically weak lineup slot.',
       '🟣 Rain Watch / ⚠️ Rain Risk row highlight — game-time precipitation caution (🟣 ≥70%, ⚠️ ≥80% or thunder in the forecast). Uses the peak rain chance across the game\'s ~3hr window, not just the first-pitch hour — a storm arriving mid-game still means real rain risk (delay/postponement, wet-grip contact effects).',
+      '🔴/🔵 Ball State Adjustment badge (2026-07-30) — live-only, display-only. Once a batter\'s game is actually in progress, shows a 🔴 Juiced Ball / 🔵 Dead Ball badge if the Live tab\'s ⚾ Ball Carry or ⬆️⬇️ xHR Conversion diagnostic has a confident (z-score) DEAD/JUICED read for that game. Tooltip discloses which of the two diagnostics fired and whether they agree. This never touches TrueHRScore, MatchupScore, SimHR%, or any other score — it\'s a badge, not an input.',
       '⚙ Filters panel — consolidates every checkbox toggle (Hide Final, Longshot, Chalk, Day Late, My Picks, Gone Yard, 2+TB, Plate IQ, Hand Match) plus a Pitcher Grade multi-select into one dropdown, added 2026-07-27 once adding Chalk/Day Late would have pushed the old flat button row past what fits on a phone screen.',
     ] },
     { tab:'🔵 On Base',        items:[
@@ -27905,7 +28001,7 @@ function LegendButton() {
       'MatchupScore (0–100) — pitcher-adjusted vulnerability, same concept as Barrel Lab\'s.',
       'SimTB2% — simulated probability of reaching 2+ total bases in the game.',
       '★ TB Signal — OnBaseScore ≥75 AND MatchupScore ≥60 AND SimTB2% ≥30%. Very new signal — live tracker: 38.0% hit rate, still a small sample.',
-      'Same 🎲 Longshot / 💪🏽 Chalk / 🗓️ Day Late / 💥 Gone Yard / 2️⃣ 2+ TB / 🟢 Weak Spot / ⭐⭐⭐ Hand Match / 🟣 Rain Watch / ⚙ Filters panel badges and filters as Barrel Lab — Longshot was added here for the first time 2026-07-27 (previously Barrel Lab only).',
+      'Same 🎲 Longshot / 💪🏽 Chalk / 🗓️ Day Late / 💥 Gone Yard / 2️⃣ 2+ TB / 🟢 Weak Spot / ⭐⭐⭐ Hand Match / 🟣 Rain Watch / 🔴🔵 Ball State Adjustment / ⚙ Filters panel badges and filters as Barrel Lab — Longshot was added here for the first time 2026-07-27 (previously Barrel Lab only).',
     ] },
     { tab:'📋 Track Record',   items:[
       'The self-auditing page — merges the daily All Matchups, Barrel Lab, and On Base exports against actual box-score outcomes, every day, automatically.',
@@ -32272,6 +32368,7 @@ function BarrelLabTab() {
   const [blMinEv,    setBlMinEv]    = useState('');
   const [dayLateVer,       setDayLateVer]       = useState(0);
   const [playerVer,        setPlayerVer]        = useState(0); // tracks PLAYER_CACHE_DATE — Chalk needs real season HR/ISO from getCachedPlayer()
+  const [ballStateVer,     setBallStateVer]     = useState(0); // tracks _BALL_STATE_VER — live-only Ball Carry/xHR badge, display-only, never touches scoring
 
   useEffect(() => {
     const unsub    = subscribeLineup(v => setLineupVer(v));
@@ -32297,8 +32394,13 @@ function BarrelLabTab() {
         setPlayerVer(v => v+1);
       }
     }, 3000);
-    return () => { unsub(); unsubInj(); clearInterval(finId); clearInterval(hrId); clearInterval(liveId); clearInterval(dayLateId); clearInterval(playerId); };
-  }, [hrVer, dayLateVer]);
+    // Ball State Adjustment (2026-07-30) — starts the shared live-only
+    // Ball Carry/xHR poller (idempotent, safe to also be started by
+    // OnBaseTab) and watches its version counter for badge refreshes.
+    startBallStatePolling();
+    const ballStateId = setInterval(() => { if (_BALL_STATE_VER !== ballStateVer) setBallStateVer(_BALL_STATE_VER); }, 5000);
+    return () => { unsub(); unsubInj(); clearInterval(finId); clearInterval(hrId); clearInterval(liveId); clearInterval(dayLateId); clearInterval(playerId); clearInterval(ballStateId); };
+  }, [hrVer, dayLateVer, ballStateVer]);
 
   // Auto-switch to confirmed-only once lineups first post.
   // Fires one time only — permanently disabled once the user manually
@@ -32481,6 +32583,10 @@ function BarrelLabTab() {
         isLongshot: isLongshotBatter(r, r.trueHRScore, r.matchupScore),
         isChalk:    isChalkBatter(r),
         isDayLate:  isDayLateBatter(r),
+        // Ball State Adjustment (2026-07-30) — display-only, see
+        // getBallStateBadge's own comment block for the "never touches
+        // scoring" guarantee. null on any non-live/no-signal game.
+        ballStateBadge: getBallStateBadge(r.game_id),
         handMatchTier: getHandMatchTier(r),
         rainRiskTier: getRainRiskTier(r),
         rainRiskPct:  getRainRiskPct(r),
@@ -32509,7 +32615,7 @@ function BarrelLabTab() {
     .filter(r => blMinL7Ev  === '' || parseFloat(r.recent_avg_ev||0) >= parseFloat(blMinL7Ev))
     .filter(r => blMinEv    === '' || parseFloat(r.bvp_avg_ev||0)    >= parseFloat(blMinEv))
     .sort((a, b) => b.trueHRScore - a.trueHRScore);
-  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, blChalkOnly, blDayLateOnly, blPicksOnly, picks, blGoneYardOnly, blTB2Only, blHighIQOnly, blHandMatchOnly, blBatterHand, blPitcherGrades, blMinL7Iso, blMinIso, blMinL7Ev, blMinEv, hrVer, finalVer, dayLateVer, playerVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, blChalkOnly, blDayLateOnly, blPicksOnly, picks, blGoneYardOnly, blTB2Only, blHighIQOnly, blHandMatchOnly, blBatterHand, blPitcherGrades, blMinL7Iso, blMinIso, blMinL7Ev, blMinEv, hrVer, finalVer, dayLateVer, playerVer, ballStateVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Color threshold helpers
   const clr = (v, g1, g2, y1, y2) => {
@@ -33095,6 +33201,13 @@ function BarrelLabTab() {
                     {b.rainRiskTier==='warning' ? `⚠️ Rain Risk (${Math.round(b.rainRiskPct)}%)` : `🌧 Rain Watch (${Math.round(b.rainRiskPct)}%)`}
                   </div>
                 )}
+                {b.ballStateBadge && (
+                  <div title={b.ballStateBadge.tooltip}
+                    style={{fontFamily:mono,fontSize:8,fontWeight:700,color:b.ballStateBadge.color,
+                    letterSpacing:.6,textTransform:'uppercase',marginBottom:4}}>
+                    {b.ballStateBadge.icon} {b.ballStateBadge.label} (Live)
+                  </div>
+                )}
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px 10px',fontFamily:mono,fontSize:8}}>
                   {[
                     ['BARRELSCORE', b.trueHRScore, trueClr(b.trueHRScore)],
@@ -33192,6 +33305,13 @@ function BarrelLabTab() {
                                     background:'rgba(56,184,242,.20)',border:'1px solid rgba(56,184,242,.4)',
                                     color:'#38b8f2',fontFamily:"'DM Mono',monospace",
                                     fontWeight:800,fontSize:7,letterSpacing:.5}}>2️⃣</div>
+                                )}
+                                {b.ballStateBadge && (
+                                  <div title={b.ballStateBadge.tooltip}
+                                    style={{padding:'2px 6px',borderRadius:4,flexShrink:0,
+                                    background:`${b.ballStateBadge.color}33`,border:`1px solid ${b.ballStateBadge.color}80`,
+                                    color:b.ballStateBadge.color,fontFamily:"'DM Mono',monospace",
+                                    fontWeight:800,fontSize:7,letterSpacing:.5}}>{b.ballStateBadge.icon}</div>
                                 )}
                                 {fin && <span style={{fontSize:7,color:'var(--muted)',border:'1px solid var(--border)',borderRadius:3,padding:'1px 3px'}}>FINAL</span>}
                               </div>
@@ -33394,6 +33514,7 @@ function OnBaseTab() {
   const [hrVer, setHrVer] = useState(_HR_VER||0);
   const [dayLateVer,       setDayLateVer]       = useState(0);
   const [playerVer,        setPlayerVer]        = useState(0); // tracks PLAYER_CACHE_DATE — Chalk needs real season HR/ISO from getCachedPlayer()
+  const [ballStateVer,     setBallStateVer]     = useState(0); // tracks _BALL_STATE_VER — live-only Ball Carry/xHR badge, display-only, never touches scoring
 
   useEffect(() => {
     const unsub    = subscribeLineup(v => setLineupVer(v));
@@ -33411,8 +33532,12 @@ function OnBaseTab() {
         setPlayerVer(v => v+1);
       }
     }, 3000);
-    return () => { unsub(); unsubInj(); clearInterval(finId); clearInterval(liveId); clearInterval(hrId); clearInterval(dayLateId); clearInterval(playerId); };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    // Ball State Adjustment (2026-07-30) — see BarrelLabTab's identical block
+    // for the full explanation; idempotent, safe for both tabs to start it.
+    startBallStatePolling();
+    const ballStateId = setInterval(() => { if (_BALL_STATE_VER !== ballStateVer) setBallStateVer(_BALL_STATE_VER); }, 5000);
+    return () => { unsub(); unsubInj(); clearInterval(finId); clearInterval(liveId); clearInterval(hrId); clearInterval(dayLateId); clearInterval(playerId); clearInterval(ballStateId); };
+  }, [ballStateVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // "Gone Yard Today" / "2+ TB Today" checks — same HR_DATA/TB2_DATA pattern
   // as Barrel Lab's isGoneYardBL/is2BagBL. hrVer (polled every 5s from
@@ -33544,6 +33669,10 @@ function OnBaseTab() {
         isLongshot: isLongshotBatter(r, r.onBaseScore, r.matchupScore),
         isChalk:    isChalkBatter(r),
         isDayLate:  isDayLateBatter(r),
+        // Ball State Adjustment (2026-07-30) — display-only, see
+        // getBallStateBadge's own comment block for the "never touches
+        // scoring" guarantee. null on any non-live/no-signal game.
+        ballStateBadge: getBallStateBadge(r.game_id),
         handMatchTier: getHandMatchTier(r),
         rainRiskTier: getRainRiskTier(r),
         rainRiskPct:  getRainRiskPct(r),
@@ -33574,7 +33703,7 @@ function OnBaseTab() {
     .filter(r => obMinL7Ev  === '' || parseFloat(r.recent_avg_ev||0) >= parseFloat(obMinL7Ev))
     .filter(r => obMinEv    === '' || parseFloat(r.bvp_avg_ev||0)    >= parseFloat(obMinEv))
     .sort((a, b) => b.onBaseScore - a.onBaseScore);
-  }, [eligibleBatters, simResults, obHideFinal, obLongshotOnly, obChalkOnly, obDayLateOnly, obPicksOnly, obGoneYardOnly, obTB2Only, obHighIQOnly, obHandMatchOnly, obBatterHand, obPitcherGrades, obMinL7Iso, obMinIso, obMinL7Ev, obMinEv, picks, finalVer, hrVer, dayLateVer, playerVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [eligibleBatters, simResults, obHideFinal, obLongshotOnly, obChalkOnly, obDayLateOnly, obPicksOnly, obGoneYardOnly, obTB2Only, obHighIQOnly, obHandMatchOnly, obBatterHand, obPitcherGrades, obMinL7Iso, obMinIso, obMinL7Ev, obMinEv, picks, finalVer, hrVer, dayLateVer, playerVer, ballStateVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const byTeam = useMemo(() => {
     const teams = {};
@@ -34070,6 +34199,13 @@ function OnBaseTab() {
                     {b.rainRiskTier==='warning' ? `⚠️ Rain Risk (${Math.round(b.rainRiskPct)}%)` : `🌧 Rain Watch (${Math.round(b.rainRiskPct)}%)`}
                   </div>
                 )}
+                {b.ballStateBadge && (
+                  <div title={b.ballStateBadge.tooltip}
+                    style={{fontFamily:mono,fontSize:8,fontWeight:700,color:b.ballStateBadge.color,
+                    letterSpacing:.6,textTransform:'uppercase',marginBottom:6}}>
+                    {b.ballStateBadge.icon} {b.ballStateBadge.label} (Live)
+                  </div>
+                )}
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px 10px',fontFamily:mono,fontSize:8}}>
                   {[
                     ['ONBASESCORE', b.onBaseScore, obsClr(b.onBaseScore)],
@@ -34166,6 +34302,13 @@ function OnBaseTab() {
                                   background:'rgba(56,184,242,.20)',border:'1px solid rgba(56,184,242,.4)',
                                   color:'#38b8f2',fontFamily:"'DM Mono',monospace",
                                   fontWeight:800,fontSize:7,letterSpacing:.5}}>2️⃣</div>
+                              )}
+                              {b.ballStateBadge && (
+                                <div title={b.ballStateBadge.tooltip}
+                                  style={{padding:'2px 6px',borderRadius:4,flexShrink:0,
+                                  background:`${b.ballStateBadge.color}33`,border:`1px solid ${b.ballStateBadge.color}80`,
+                                  color:b.ballStateBadge.color,fontFamily:"'DM Mono',monospace",
+                                  fontWeight:800,fontSize:7,letterSpacing:.5}}>{b.ballStateBadge.icon}</div>
                               )}
                               {fin && <span style={{fontSize:7,color:'var(--muted)',border:'1px solid var(--border)',borderRadius:3,padding:'1px 3px'}}>FINAL</span>}
                             </div>
