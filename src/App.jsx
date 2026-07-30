@@ -3679,6 +3679,15 @@ function PitcherSlideIn() {
                 </span>
               ) : null;
             })()}
+            {isPitcherRP(stats?.gs) && (
+              <span title="Season-classified as a reliever (0 games started) — today's start is very likely an opener/bulk-game situation. Display-only warning; doesn't affect any score."
+                style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,
+                  color:'#f5a623',padding:'2px 6px',borderRadius:4,
+                  background:'rgba(245,166,35,.12)',border:'1px solid rgba(245,166,35,.35)',
+                  flexShrink:0,cursor:'default'}}>
+                RP
+              </span>
+            )}
           </div>
           <div style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
             {pitcher.team && <span style={{color:'var(--accent2)',fontWeight:700}}>{pitcher.team}</span>}
@@ -14701,6 +14710,20 @@ function getHandSpecificGrade(r) {
   return r?.pitcher_grade_label_vsR || overall;
 }
 
+// ── isPitcherRP — season-role RP badge (2026-07-29) ─────────────────────
+// Display-only warning that today's probable "starter" is season-classified
+// as a reliever (0 games started), i.e. very likely an opener/bulk-game
+// situation — same convention PitcherLeaderboard already uses on the Splits
+// page (p.gs > 0 ? 'SP' : 'RP'). Never feeds any score/grade formula.
+// Guards against showing "RP" for every pitcher before the engine has ever
+// populated pitcher_games_started (undefined/null/'' must read as "unknown",
+// not "0 starts") — only a genuinely present, parsed value of exactly 0 counts.
+function isPitcherRP(gamesStarted) {
+  if (gamesStarted === undefined || gamesStarted === null || gamesStarted === '') return false;
+  const gs = parseInt(gamesStarted);
+  return !isNaN(gs) && gs === 0;
+}
+
 // ── shrinkageAdjBarrelSpike — shrinks recent_barrel_spike toward 0 for thin samples ──
 // Confirmed audit finding: 62.6% of established batters show a negative
 // recent_barrel_spike purely from small-sample statistics (P(0 barrels in
@@ -17338,6 +17361,11 @@ function SimLabView({ data }) {
                       onClick={e=>{ e.stopPropagation(); openPitcherSlide({pid:parseInt(b.pitcher_id)||0, name:b.pitcher, team:b.pitcher_team||'', hand:b.pitcher_hand, pitchMix:[]}); }}>
                       <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 13, color: 'var(--text)' }}>{resolvePitcherName(b.pitcher, b.batting_team, b.pitcher_id)}</span>
                       <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", fontWeight: 400 }}>{b.pitcher_hand}HP</span>
+                      {isPitcherRP(b.pitcher_games_started) && (
+                        <span title="Season-classified as a reliever (0 games started) — likely an opener/bulk-game situation"
+                          style={{fontSize:9,fontWeight:700,color:'#f5a623',padding:'1px 5px',borderRadius:3,
+                            background:'rgba(245,166,35,.12)',border:'1px solid rgba(245,166,35,.35)',fontFamily:"'DM Mono',monospace"}}>RP</span>
+                      )}
                       <span style={{ fontSize: 11, color: 'var(--ice)', fontFamily:"'DM Mono',monospace", fontWeight:700, marginLeft:'auto' }}>› Stats</span>
                     </div>
 
@@ -17439,7 +17467,7 @@ function SimLabView({ data }) {
                             <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 12, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{b.batter}</span>
                           </div>
                         </td>
-                        <td style={{ textAlign: 'left' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)' }}>{resolvePitcherName(b.pitcher, b.batting_team, b.pitcher_id)}</span></td>
+                        <td style={{ textAlign: 'left' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)' }}>{resolvePitcherName(b.pitcher, b.batting_team, b.pitcher_id)}</span>{isPitcherRP(b.pitcher_games_started) && <span title="Season-classified as a reliever — likely an opener/bulk-game situation" style={{fontSize:8,fontWeight:700,color:'#f5a623',marginLeft:4,padding:'0 4px',borderRadius:3,background:'rgba(245,166,35,.12)',border:'1px solid rgba(245,166,35,.35)',fontFamily:"'DM Mono',monospace"}}>RP</span>}</td>
                         <td style={{textAlign:'center',padding:'2px 4px'}}>
                           <PSBadge score={b._ps ?? getPS(b)}/>
                         </td>
@@ -32480,7 +32508,7 @@ function BarrelLabTab() {
       : scoredBatters;
     toGroup.forEach(b => {
       const t = b.batting_team || '?';
-      if (!teams[t]) teams[t] = { batters:[], pitcher: b.pitcher, pitcherId: b.pitcher_id, pitcherHand: b.pitcher_hand, pgLabel: b._pgLabel || '', pitcherGB: parseFloat(b.gb_pct_p || b.pitcher_gb_pct || 45) };
+      if (!teams[t]) teams[t] = { batters:[], pitcher: b.pitcher, pitcherId: b.pitcher_id, pitcherHand: b.pitcher_hand, pgLabel: b._pgLabel || '', pitcherGB: parseFloat(b.gb_pct_p || b.pitcher_gb_pct || 45), pitcherGS: b.pitcher_games_started };
       teams[t].batters.push(b);
     });
     return teams;
@@ -32953,7 +32981,7 @@ function BarrelLabTab() {
                       <div style={{fontFamily:mono,fontSize:7,color:pgCol(getHandSpecificGrade(b)),whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
                         vs <span
                           onClick={e=>{e.stopPropagation(); if(b.pitcher_id) openPitcherSlide({pid:parseInt(b.pitcher_id)||0,name:b.pitcher,team:'',hand:b.pitcher_hand||'',pitchMix:[]});}}
-                          style={{cursor:'pointer',textDecoration:'underline dotted'}}>{b.pitcher||'?'}</span> · {getHandSpecificGrade(b) || '—'}
+                          style={{cursor:'pointer',textDecoration:'underline dotted'}}>{b.pitcher||'?'}</span>{isPitcherRP(b.pitcher_games_started) && <span title="Season-classified as a reliever — likely an opener/bulk-game situation" style={{fontSize:8,fontWeight:700,color:'#f5a623',marginLeft:3,marginRight:2,padding:'0 4px',borderRadius:3,background:'rgba(245,166,35,.12)',border:'1px solid rgba(245,166,35,.35)'}}>RP</span>} · {getHandSpecificGrade(b) || '—'}
                       </div>
                     </div>
                   </div>
@@ -33103,7 +33131,7 @@ function BarrelLabTab() {
                             </div>
                           </td>
                           {!selGame && <td style={{padding:'4px 6px',color:'var(--muted)',fontFamily:mono,fontSize:8,whiteSpace:'nowrap',cursor:b.pitcher_id?'pointer':'default',textDecoration:b.pitcher_id?'underline dotted':'none'}}
-                            onClick={()=>{ if(b.pitcher_id) openPitcherSlide({pid:parseInt(b.pitcher_id)||0,name:b.pitcher,team:'',hand:b.pitcher_hand||'',pitchMix:[]}); }}>{b.pitcher||'—'}</td>}
+                            onClick={()=>{ if(b.pitcher_id) openPitcherSlide({pid:parseInt(b.pitcher_id)||0,name:b.pitcher,team:'',hand:b.pitcher_hand||'',pitchMix:[]}); }}>{b.pitcher||'—'}{isPitcherRP(b.pitcher_games_started) && <span title="Season-classified as a reliever — likely an opener/bulk-game situation" style={{fontSize:7,fontWeight:700,color:'#f5a623',marginLeft:3,padding:'0 3px',borderRadius:3,background:'rgba(245,166,35,.12)',border:'1px solid rgba(245,166,35,.35)'}}>RP</span>}</td>}
                           {!selGame && (() => { const _g = getHandSpecificGrade(b); return (
                             <td style={{padding:'4px 6px',color:pgCol(_g),fontFamily:mono,fontSize:8,whiteSpace:'nowrap'}}>{_g || '—'}</td>
                           ); })()}
@@ -33155,13 +33183,14 @@ function BarrelLabTab() {
             }
 
             // Per-game view — grouped by team
-            return Object.entries(byTeam).map(([team, {batters:tBatters, pitcher, pitcherId, pitcherHand, pgLabel, pitcherGB}]) => (
+            return Object.entries(byTeam).map(([team, {batters:tBatters, pitcher, pitcherId, pitcherHand, pgLabel, pitcherGB, pitcherGS}]) => (
               <div key={team} style={{marginBottom:20}}>
                 <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',
                   textTransform:'uppercase',letterSpacing:.8,marginBottom:4}}>
                   {team} hitters vs <span
                     onClick={()=>{ if(pitcherId) openPitcherSlide({pid:parseInt(pitcherId)||0,name:pitcher,team:'',hand:pitcherHand||'',pitchMix:[]}); }}
                     style={{cursor: pitcherId ? 'pointer' : 'default', textDecoration: pitcherId ? 'underline dotted' : 'none'}}>{pitcher || '?'}</span> ({(pitcherHand||'').charAt(0)})
+                  {isPitcherRP(pitcherGS) && <span title="Season-classified as a reliever — likely an opener/bulk-game situation" style={{fontSize:8,fontWeight:700,color:'#f5a623',marginLeft:5,padding:'0 4px',borderRadius:3,background:'rgba(245,166,35,.12)',border:'1px solid rgba(245,166,35,.35)'}}>RP</span>}
                   {' · '}<span style={{color: pgLabel.includes('Elite')||pgLabel.includes('Tough') ? '#ff6b6b' : pgLabel.includes('Target')||pgLabel.includes('Hittable') ? '#27c97a' : 'var(--muted)'}}>{pgLabel}</span>
                   {pitcherGB > 50 && (
                     <span style={{color:'#f5a623',marginLeft:8}}>
@@ -33463,7 +33492,7 @@ function OnBaseTab() {
       : onbaseScored;
     toGroup.forEach(b => {
       const t = b.batting_team || '?';
-      if (!teams[t]) teams[t] = { batters:[], pitcher: b.pitcher, pitcherId: b.pitcher_id, pitcherHand: b.pitcher_hand, pgLabel: b._pgLabel || '' };
+      if (!teams[t]) teams[t] = { batters:[], pitcher: b.pitcher, pitcherId: b.pitcher_id, pitcherHand: b.pitcher_hand, pgLabel: b._pgLabel || '', pitcherGS: b.pitcher_games_started };
       teams[t].batters.push(b);
     });
     return teams;
@@ -33875,7 +33904,7 @@ function OnBaseTab() {
                       <div style={{fontFamily:mono,fontSize:7,color:pgCol(getHandSpecificGrade(b)),whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
                         vs <span
                           onClick={e=>{e.stopPropagation(); if(b.pitcher_id) openPitcherSlide({pid:parseInt(b.pitcher_id)||0,name:b.pitcher,team:'',hand:b.pitcher_hand||'',pitchMix:[]});}}
-                          style={{cursor:'pointer',textDecoration:'underline dotted'}}>{b.pitcher||'?'}</span> · {getHandSpecificGrade(b) || '—'}
+                          style={{cursor:'pointer',textDecoration:'underline dotted'}}>{b.pitcher||'?'}</span>{isPitcherRP(b.pitcher_games_started) && <span title="Season-classified as a reliever — likely an opener/bulk-game situation" style={{fontSize:8,fontWeight:700,color:'#f5a623',marginLeft:3,marginRight:2,padding:'0 4px',borderRadius:3,background:'rgba(245,166,35,.12)',border:'1px solid rgba(245,166,35,.35)'}}>RP</span>} · {getHandSpecificGrade(b) || '—'}
                       </div>
                     </div>
                   </div>
@@ -34023,7 +34052,7 @@ function OnBaseTab() {
                             </div>
                           </td>
                           {!selGame && <td style={{padding:'4px 6px',color:'var(--muted)',fontFamily:mono,fontSize:8,whiteSpace:'nowrap',cursor:b.pitcher_id?'pointer':'default',textDecoration:b.pitcher_id?'underline dotted':'none'}}
-                            onClick={()=>{ if(b.pitcher_id) openPitcherSlide({pid:parseInt(b.pitcher_id)||0,name:b.pitcher,team:'',hand:b.pitcher_hand||'',pitchMix:[]}); }}>{b.pitcher||'—'}</td>}
+                            onClick={()=>{ if(b.pitcher_id) openPitcherSlide({pid:parseInt(b.pitcher_id)||0,name:b.pitcher,team:'',hand:b.pitcher_hand||'',pitchMix:[]}); }}>{b.pitcher||'—'}{isPitcherRP(b.pitcher_games_started) && <span title="Season-classified as a reliever — likely an opener/bulk-game situation" style={{fontSize:7,fontWeight:700,color:'#f5a623',marginLeft:3,padding:'0 3px',borderRadius:3,background:'rgba(245,166,35,.12)',border:'1px solid rgba(245,166,35,.35)'}}>RP</span>}</td>}
                           {!selGame && (() => { const _g = getHandSpecificGrade(b); return (
                             <td style={{padding:'4px 6px',color:pgCol(_g),fontFamily:mono,fontSize:8,whiteSpace:'nowrap'}}>{_g || '—'}</td>
                           ); })()}
@@ -34073,13 +34102,14 @@ function OnBaseTab() {
               );
             }
 
-            return Object.entries(byTeam).map(([team, {batters:tBatters, pitcher, pitcherId, pitcherHand, pgLabel}]) => (
+            return Object.entries(byTeam).map(([team, {batters:tBatters, pitcher, pitcherId, pitcherHand, pgLabel, pitcherGS}]) => (
               <div key={team} style={{marginBottom:20}}>
                 <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',
                   textTransform:'uppercase',letterSpacing:.8,marginBottom:4}}>
                   {team} hitters vs <span
                     onClick={()=>{ if(pitcherId) openPitcherSlide({pid:parseInt(pitcherId)||0,name:pitcher,team:'',hand:pitcherHand||'',pitchMix:[]}); }}
                     style={{cursor: pitcherId ? 'pointer' : 'default', textDecoration: pitcherId ? 'underline dotted' : 'none'}}>{pitcher || '?'}</span> ({(pitcherHand||'').charAt(0)})
+                  {isPitcherRP(pitcherGS) && <span title="Season-classified as a reliever — likely an opener/bulk-game situation" style={{fontSize:8,fontWeight:700,color:'#f5a623',marginLeft:5,padding:'0 4px',borderRadius:3,background:'rgba(245,166,35,.12)',border:'1px solid rgba(245,166,35,.35)'}}>RP</span>}
                   {' · '}<span style={{color: pgLabel.includes('Elite')||pgLabel.includes('Tough') ? '#ff6b6b' : pgLabel.includes('Target')||pgLabel.includes('Hittable') ? '#27c97a' : 'var(--muted)'}}>{pgLabel}</span>
                 </div>
                 {renderTable(sortBatters(tBatters))}

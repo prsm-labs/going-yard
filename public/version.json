@@ -1,10 +1,10 @@
 {
   "version": "2026.07.29",
-  "bundleFile": "index-cDUQj-Ze.js",
+  "bundleFile": "index-DYEbZsYZ.js",
   "changelog": [
-    "Upgrade Pairs page: add matchup-driven categories",
-    "revise Same Game Heat",
-    "arsenal-fit scoring bonus"
+    "Remove confirmed-dead code (5 orphaned tabs",
+    "stale helpers",
+    "sample-data fallbacks) and the Watch   dropdown/embedded-stream feature"
   ],
   "notifyUsers": true
 }

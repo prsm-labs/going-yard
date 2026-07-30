@@ -27,6 +27,7 @@ function mapPitchingStat(s, hand) {
     bb:    s.baseOnBalls       || 0,
     kPct:  s.strikeoutPercentage || '—',
     bbPct: s.walkPercentage    || '—',
+    gs:    parseInt(s.gamesStarted || 0),
     hand,
   };
 }
