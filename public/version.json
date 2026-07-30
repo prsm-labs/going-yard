@@ -1,10 +1,11 @@
 {
-  "version": "2026.07.29",
-  "bundleFile": "index-DYEbZsYZ.js",
+  "version": "2026.07.30",
+  "bundleFile": "index-D3_OyUEZ.js",
   "changelog": [
-    "Remove confirmed-dead code (5 orphaned tabs",
-    "stale helpers",
-    "sample-data fallbacks) and the Watch   dropdown/embedded-stream feature"
+    "Add RP (season-classified reliever) badge to Pitcher Slideout",
+    "All Matchups",
+    "Barrel Lab",
+    "and On Base"
   ],
   "notifyUsers": true
 }

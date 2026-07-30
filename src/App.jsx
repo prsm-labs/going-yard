@@ -32559,6 +32559,30 @@ function BarrelLabTab() {
     { h:'FB%',       key:'recent_fb_pct',              acc: b => parseFloat(b.recent_fb_pct||0),                          align:'right' },
     { h:'HH%',       key:'recent_hh_pct',              acc: b => parseFloat(b.recent_hh_pct||0),                          align:'right' },
     { h:'LA°',       key:'la',                         acc: b => parseFloat(b.la_mean_l15||b.recent_avg_la||0),           align:'right' },
+    // ── Arsenal Fit section (2026-07-30) — same 8 fields already shown in
+    // OpposingBatterTable (Pitcher Slideout's "Opposing Batters Today"),
+    // sourced from data already present on every row: recent_iso/recent_avg_ev
+    // (batter's own general L7 form) and the bvp_* fields (season vs THIS
+    // pitcher's pitch mix + handedness — see evaluate_flags()/"bvp" label).
+    // Tinted + divider-bordered as a group since 'ISO' and 'FB%' otherwise
+    // collide in label with this tab's own recent_iso/recent_fb_pct columns
+    // above — same numbers exist under both names for different windows.
+    { h:'L7 ISO', key:'af_l7iso', acc: b => parseFloat(b.recent_iso||0),      align:'right', color:'#818cf8', divider:true,
+      title:"Arsenal Fit — batter's own recent 7-day ISO (not pitcher-specific)" },
+    { h:'L7 EV',  key:'af_l7ev',  acc: b => parseFloat(b.recent_avg_ev||0),   align:'right', color:'#818cf8',
+      title:"Arsenal Fit — batter's own recent 7-day avg exit velocity (not pitcher-specific)" },
+    { h:'PA',     key:'af_pa',    acc: b => parseInt(b.bvp_pa||0),            align:'right', color:'#818cf8',
+      title:`Arsenal Fit — season PAs vs this pitcher's pitch mix + handedness — dimmed below ${MIN_BVP_PA_TRUST}` },
+    { h:'ISO',    key:'af_iso',   acc: b => parseFloat(b.bvp_iso||0),         align:'right', color:'#818cf8',
+      title:"Arsenal Fit — season ISO vs this pitcher's pitch mix + handedness" },
+    { h:'EV',     key:'af_ev',    acc: b => parseFloat(b.bvp_avg_ev||0),      align:'right', color:'#818cf8',
+      title:"Arsenal Fit — season avg EV vs this pitcher's pitch mix + handedness" },
+    { h:'BRL%',   key:'af_brl',   acc: b => parseFloat(b.bvp_barrel_pct||0),  align:'right', color:'#818cf8',
+      title:"Arsenal Fit — season Barrel% vs this pitcher's pitch mix + handedness" },
+    { h:'FB%',    key:'af_fb',    acc: b => parseFloat(b.bvp_fb_pct||0),      align:'right', color:'#818cf8',
+      title:"Arsenal Fit — season Fly Ball% vs this pitcher's pitch mix + handedness" },
+    { h:'HR',     key:'af_hr',    acc: b => parseInt(b.bvp_hr_count||0),      align:'right', color:'#818cf8',
+      title:"Arsenal Fit — season HR count vs this pitcher's pitch mix + handedness" },
   ];
 
   const toggleSort = (key) => {
@@ -33065,10 +33089,12 @@ function BarrelLabTab() {
                           <th key={col.key}
                             className={isBatterCol ? 'sticky-batter' : undefined}
                             onClick={() => toggleSort(col.key)}
+                            title={col.title || ''}
                             style={{padding:'4px 6px',textAlign:col.align,whiteSpace:'nowrap',
                               cursor:'pointer',userSelect:'none',
-                              color: active ? 'var(--accent)' : 'var(--muted)',
+                              color: col.color || (active ? 'var(--accent)' : 'var(--muted)'),
                               background: isBatterCol ? 'var(--surface2)' : (active ? '#212320' : 'var(--surface2)'),
+                              borderLeft: col.divider ? '2px solid #818cf8' : undefined,
                             }}>
                             {col.h}{active ? (sortDir==='desc' ? ' ▼' : ' ▲') : ''}
                           </th>
@@ -33158,6 +33184,21 @@ function BarrelLabTab() {
                           <td style={{padding:'4px 6px',textAlign:'right'}}>{fmt(b.recent_fb_pct,1)}%</td>
                           <td style={{padding:'4px 6px',textAlign:'right'}}>{fmt(b.recent_hh_pct,1)}%</td>
                           <td style={{padding:'4px 6px',textAlign:'right'}}>{fmt(b.la_mean_l15||b.recent_avg_la,1)}°</td>
+                          {(() => {
+                            const bvpPA = parseInt(b.bvp_pa)||0;
+                            const thin  = bvpPA < MIN_BVP_PA_TRUST;
+                            const dim   = {padding:'4px 6px',textAlign:'right',opacity:thin?0.5:1,color:thin?'var(--muted)':'var(--text)'};
+                            return (<>
+                              <td style={{padding:'4px 6px',textAlign:'right',borderLeft:'2px solid #818cf8'}}>{fmt(b.recent_iso,3)}</td>
+                              <td style={{padding:'4px 6px',textAlign:'right'}}>{fmt(b.recent_avg_ev,1)}</td>
+                              <td style={dim} title={thin ? `Small sample (${bvpPA} PA vs this arsenal+hand) — reference only, not reliable until ${MIN_BVP_PA_TRUST}+ PA` : `${bvpPA} PA`}>{bvpPA}{thin?'*':''}</td>
+                              <td style={dim}>{fmt(b.bvp_iso,3)}</td>
+                              <td style={dim}>{fmt(b.bvp_avg_ev,1)}</td>
+                              <td style={dim}>{fmt(b.bvp_barrel_pct,1)}</td>
+                              <td style={dim}>{fmt(b.bvp_fb_pct,1)}</td>
+                              <td style={dim}>{parseInt(b.bvp_hr_count)||0}</td>
+                            </>);
+                          })()}
                           <td style={{padding:'4px 6px',textAlign:'right'}} onClick={e => e.stopPropagation()}>
                             <PickButton pid={b.batter_id} name={b.batter} team={b.batting_team||''}/>
                           </td>
@@ -33556,6 +33597,26 @@ function OnBaseTab() {
     { h:'HH%',       key:'hh_pct',          acc: b => parseFloat(b.hh_pct||0),                   align:'right' },
     { h:'SimTB',     key:'sim_tb',          acc: b => parseFloat(b.sim_tb||0),                   align:'right' },
     { h:'LA°',       key:'la',              acc: b => parseFloat(b.la_mean_l15||b.recent_avg_la||0), align:'right' },
+    // ── Arsenal Fit section (2026-07-30) — see BarrelLabTab's identical
+    // block for the full rationale. 'ISO' doesn't collide with anything in
+    // this tab's own COLS (unlike BarrelLabTab), but kept the same tinted/
+    // divider treatment for visual consistency between the two tabs.
+    { h:'L7 ISO', key:'af_l7iso', acc: b => parseFloat(b.recent_iso||0),      align:'right', color:'#818cf8', divider:true,
+      title:"Arsenal Fit — batter's own recent 7-day ISO (not pitcher-specific)" },
+    { h:'L7 EV',  key:'af_l7ev',  acc: b => parseFloat(b.recent_avg_ev||0),   align:'right', color:'#818cf8',
+      title:"Arsenal Fit — batter's own recent 7-day avg exit velocity (not pitcher-specific)" },
+    { h:'PA',     key:'af_pa',    acc: b => parseInt(b.bvp_pa||0),            align:'right', color:'#818cf8',
+      title:`Arsenal Fit — season PAs vs this pitcher's pitch mix + handedness — dimmed below ${MIN_BVP_PA_TRUST}` },
+    { h:'ISO',    key:'af_iso',   acc: b => parseFloat(b.bvp_iso||0),         align:'right', color:'#818cf8',
+      title:"Arsenal Fit — season ISO vs this pitcher's pitch mix + handedness" },
+    { h:'EV',     key:'af_ev',    acc: b => parseFloat(b.bvp_avg_ev||0),      align:'right', color:'#818cf8',
+      title:"Arsenal Fit — season avg EV vs this pitcher's pitch mix + handedness" },
+    { h:'BRL%',   key:'af_brl',   acc: b => parseFloat(b.bvp_barrel_pct||0),  align:'right', color:'#818cf8',
+      title:"Arsenal Fit — season Barrel% vs this pitcher's pitch mix + handedness" },
+    { h:'FB%',    key:'af_fb',    acc: b => parseFloat(b.bvp_fb_pct||0),      align:'right', color:'#818cf8',
+      title:"Arsenal Fit — season Fly Ball% vs this pitcher's pitch mix + handedness" },
+    { h:'HR',     key:'af_hr',    acc: b => parseInt(b.bvp_hr_count||0),      align:'right', color:'#818cf8',
+      title:"Arsenal Fit — season HR count vs this pitcher's pitch mix + handedness" },
   ];
 
   const toggleSort = (key) => {
@@ -33988,10 +34049,12 @@ function OnBaseTab() {
                           <th key={col.key}
                             className={isBatterCol ? 'sticky-batter' : undefined}
                             onClick={() => toggleSort(col.key)}
+                            title={col.title || ''}
                             style={{padding:'4px 6px',textAlign:col.align||'right',whiteSpace:'nowrap',
                               cursor:'pointer',userSelect:'none',
-                              color: active ? '#38b8f2' : 'var(--muted)',
+                              color: col.color || (active ? '#38b8f2' : 'var(--muted)'),
                               background: isBatterCol ? 'var(--surface2)' : (active ? '#0f1a21' : 'var(--surface2)'),
+                              borderLeft: col.divider ? '2px solid #818cf8' : undefined,
                             }}>
                             {col.h}{active ? (sortDir==='desc' ? ' ▼' : ' ▲') : ''}
                           </th>
@@ -34079,6 +34142,21 @@ function OnBaseTab() {
                           <td style={{padding:'4px 6px',textAlign:'right'}}>{fmt(b.hh_pct,1)}%</td>
                           <td style={{padding:'4px 6px',textAlign:'right'}}>{fmt(b.sim_tb,2)}</td>
                           <td style={{padding:'4px 6px',textAlign:'right'}}>{fmt(b.la_mean_l15||b.recent_avg_la,1)}°</td>
+                          {(() => {
+                            const bvpPA = parseInt(b.bvp_pa)||0;
+                            const thin  = bvpPA < MIN_BVP_PA_TRUST;
+                            const dim   = {padding:'4px 6px',textAlign:'right',opacity:thin?0.5:1,color:thin?'var(--muted)':'var(--text)'};
+                            return (<>
+                              <td style={{padding:'4px 6px',textAlign:'right',borderLeft:'2px solid #818cf8'}}>{fmt(b.recent_iso,3)}</td>
+                              <td style={{padding:'4px 6px',textAlign:'right'}}>{fmt(b.recent_avg_ev,1)}</td>
+                              <td style={dim} title={thin ? `Small sample (${bvpPA} PA vs this arsenal+hand) — reference only, not reliable until ${MIN_BVP_PA_TRUST}+ PA` : `${bvpPA} PA`}>{bvpPA}{thin?'*':''}</td>
+                              <td style={dim}>{fmt(b.bvp_iso,3)}</td>
+                              <td style={dim}>{fmt(b.bvp_avg_ev,1)}</td>
+                              <td style={dim}>{fmt(b.bvp_barrel_pct,1)}</td>
+                              <td style={dim}>{fmt(b.bvp_fb_pct,1)}</td>
+                              <td style={dim}>{parseInt(b.bvp_hr_count)||0}</td>
+                            </>);
+                          })()}
                           <td style={{padding:'4px 6px',textAlign:'right'}} onClick={e => e.stopPropagation()}>
                             <PickButton pid={b.batter_id} name={b.batter} team={b.batting_team||''}/>
                           </td>
