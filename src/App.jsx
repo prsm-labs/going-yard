@@ -31956,7 +31956,7 @@ function isDayLateBatter(r) {
 // screen (Barrel Lab was already at 7 buttons + a hand dropdown).
 const PITCHER_GRADE_OPTIONS = ['🎯 Target', '💥 Hittable', '🤔 Average', '⚠️ Tough', '‼️ Elite'];
 
-function FilterPanel({ toggles, pitcherGrades, onPitcherGradesChange }) {
+function FilterPanel({ toggles, pitcherGrades, onPitcherGradesChange, minFilters }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   useEffect(() => {
@@ -31966,7 +31966,11 @@ function FilterPanel({ toggles, pitcherGrades, onPitcherGradesChange }) {
     return () => document.removeEventListener('mousedown', onClick);
   }, [open]);
 
-  const activeCount = toggles.filter(t => t.active).length + (pitcherGrades.size > 0 ? 1 : 0);
+  // minFilters (2026-07-30) — optional array of {key,label,value,onChange,step,placeholder}
+  // min-value text-box filters (Arsenal Fit L7 ISO/ISO/L7 EV/EV). Optional so FilterPanel
+  // stays backward-compatible with any future caller that doesn't need them.
+  const activeMinCount = (minFilters||[]).filter(f => f.value !== '' && f.value != null).length;
+  const activeCount = toggles.filter(t => t.active).length + (pitcherGrades.size > 0 ? 1 : 0) + activeMinCount;
   const monoFont = "'DM Mono',monospace";
 
   return (
@@ -32018,6 +32022,25 @@ function FilterPanel({ toggles, pitcherGrades, onPitcherGradesChange }) {
               </label>
             ))}
           </div>
+          {minFilters && minFilters.length > 0 && (
+            <div style={{borderTop:'1px solid var(--border)',marginTop:2,paddingTop:6}}>
+              <div style={{fontFamily:monoFont,fontSize:8,color:'var(--muted)',
+                textTransform:'uppercase',letterSpacing:.6,marginBottom:5}}>
+                Min Value
+              </div>
+              {minFilters.map(f => (
+                <label key={f.key} style={{display:'flex',alignItems:'center',justifyContent:'space-between',
+                  gap:7,marginBottom:4,fontFamily:monoFont,fontSize:10,
+                  color: (f.value!==''&&f.value!=null) ? '#818cf8' : 'var(--muted)'}}>
+                  {f.label}
+                  <input type="number" inputMode="decimal" step={f.step||'any'} value={f.value}
+                    placeholder={f.placeholder||'—'} onChange={e => f.onChange(e.target.value)}
+                    style={{width:64,padding:'2px 5px',borderRadius:4,fontFamily:monoFont,fontSize:10,
+                      background:'var(--surface2)',border:'1px solid var(--border)',color:'var(--text)'}}/>
+                </label>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -32239,6 +32262,14 @@ function BarrelLabTab() {
   const [blHandMatchOnly,  setBlHandMatchOnly]  = useState(false);
   const [blBatterHand,     setBlBatterHand]     = useState('ALL');
   const [blPitcherGrades,  setBlPitcherGrades]  = useState(() => new Set());
+  // Arsenal Fit min-value filters (2026-07-30) — plain text (number) boxes in the Filters
+  // popup, empty string = no filter. L7 ISO/L7 EV read recent_iso/recent_avg_ev (batter's own
+  // general recent form); ISO/EV read bvp_iso/bvp_avg_ev (season vs this pitcher's pitch mix +
+  // handedness) — same field mapping as the Arsenal Fit table columns.
+  const [blMinL7Iso, setBlMinL7Iso] = useState('');
+  const [blMinIso,   setBlMinIso]   = useState('');
+  const [blMinL7Ev,  setBlMinL7Ev]  = useState('');
+  const [blMinEv,    setBlMinEv]    = useState('');
   const [dayLateVer,       setDayLateVer]       = useState(0);
   const [playerVer,        setPlayerVer]        = useState(0); // tracks PLAYER_CACHE_DATE — Chalk needs real season HR/ISO from getCachedPlayer()
 
@@ -32473,8 +32504,12 @@ function BarrelLabTab() {
     .filter(r => !blHandMatchOnly || r.handMatchTier)
     .filter(r => blPitcherGrades.size === 0 || blPitcherGrades.has((r.pitcher_grade_label||r._pgLabel||'').trim()))
     .filter(r => matchesHandFilter(r.batter_hand, blBatterHand))
+    .filter(r => blMinL7Iso === '' || parseFloat(r.recent_iso||0)   >= parseFloat(blMinL7Iso))
+    .filter(r => blMinIso   === '' || parseFloat(r.bvp_iso||0)      >= parseFloat(blMinIso))
+    .filter(r => blMinL7Ev  === '' || parseFloat(r.recent_avg_ev||0) >= parseFloat(blMinL7Ev))
+    .filter(r => blMinEv    === '' || parseFloat(r.bvp_avg_ev||0)    >= parseFloat(blMinEv))
     .sort((a, b) => b.trueHRScore - a.trueHRScore);
-  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, blChalkOnly, blDayLateOnly, blPicksOnly, picks, blGoneYardOnly, blTB2Only, blHighIQOnly, blHandMatchOnly, blBatterHand, blPitcherGrades, hrVer, finalVer, dayLateVer, playerVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, blChalkOnly, blDayLateOnly, blPicksOnly, picks, blGoneYardOnly, blTB2Only, blHighIQOnly, blHandMatchOnly, blBatterHand, blPitcherGrades, blMinL7Iso, blMinIso, blMinL7Ev, blMinEv, hrVer, finalVer, dayLateVer, playerVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Color threshold helpers
   const clr = (v, g1, g2, y1, y2) => {
@@ -32738,6 +32773,12 @@ function BarrelLabTab() {
               ]}
               pitcherGrades={blPitcherGrades}
               onPitcherGradesChange={setBlPitcherGrades}
+              minFilters={[
+                {key:'l7iso', label:'L7 ISO', value:blMinL7Iso, onChange:setBlMinL7Iso, step:'0.001'},
+                {key:'iso',   label:'ISO',    value:blMinIso,   onChange:setBlMinIso,   step:'0.001'},
+                {key:'l7ev',  label:'L7 EV',  value:blMinL7Ev,  onChange:setBlMinL7Ev,  step:'0.1'},
+                {key:'ev',    label:'EV',     value:blMinEv,    onChange:setBlMinEv,    step:'0.1'},
+              ]}
             />
             <HandFilter mode="batter" value={blBatterHand} onChange={setBlBatterHand}/>
             <button
@@ -33345,6 +33386,11 @@ function OnBaseTab() {
   const [obHandMatchOnly,  setObHandMatchOnly]  = useState(false);
   const [obBatterHand,     setObBatterHand]     = useState('ALL');
   const [obPitcherGrades,  setObPitcherGrades]  = useState(() => new Set());
+  // Arsenal Fit min-value filters (2026-07-30) — same as BarrelLabTab's identical block.
+  const [obMinL7Iso, setObMinL7Iso] = useState('');
+  const [obMinIso,   setObMinIso]   = useState('');
+  const [obMinL7Ev,  setObMinL7Ev]  = useState('');
+  const [obMinEv,    setObMinEv]    = useState('');
   const [hrVer, setHrVer] = useState(_HR_VER||0);
   const [dayLateVer,       setDayLateVer]       = useState(0);
   const [playerVer,        setPlayerVer]        = useState(0); // tracks PLAYER_CACHE_DATE — Chalk needs real season HR/ISO from getCachedPlayer()
@@ -33523,8 +33569,12 @@ function OnBaseTab() {
     .filter(r => !obHandMatchOnly || r.handMatchTier)
     .filter(r => obPitcherGrades.size === 0 || obPitcherGrades.has((r.pitcher_grade_label||r._pgLabel||'').trim()))
     .filter(r => matchesHandFilter(r.batter_hand, obBatterHand))
+    .filter(r => obMinL7Iso === '' || parseFloat(r.recent_iso||0)   >= parseFloat(obMinL7Iso))
+    .filter(r => obMinIso   === '' || parseFloat(r.bvp_iso||0)      >= parseFloat(obMinIso))
+    .filter(r => obMinL7Ev  === '' || parseFloat(r.recent_avg_ev||0) >= parseFloat(obMinL7Ev))
+    .filter(r => obMinEv    === '' || parseFloat(r.bvp_avg_ev||0)    >= parseFloat(obMinEv))
     .sort((a, b) => b.onBaseScore - a.onBaseScore);
-  }, [eligibleBatters, simResults, obHideFinal, obLongshotOnly, obChalkOnly, obDayLateOnly, obPicksOnly, obGoneYardOnly, obTB2Only, obHighIQOnly, obHandMatchOnly, obBatterHand, obPitcherGrades, picks, finalVer, hrVer, dayLateVer, playerVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [eligibleBatters, simResults, obHideFinal, obLongshotOnly, obChalkOnly, obDayLateOnly, obPicksOnly, obGoneYardOnly, obTB2Only, obHighIQOnly, obHandMatchOnly, obBatterHand, obPitcherGrades, obMinL7Iso, obMinIso, obMinL7Ev, obMinEv, picks, finalVer, hrVer, dayLateVer, playerVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const byTeam = useMemo(() => {
     const teams = {};
@@ -33769,6 +33819,12 @@ function OnBaseTab() {
               ]}
               pitcherGrades={obPitcherGrades}
               onPitcherGradesChange={setObPitcherGrades}
+              minFilters={[
+                {key:'l7iso', label:'L7 ISO', value:obMinL7Iso, onChange:setObMinL7Iso, step:'0.001'},
+                {key:'iso',   label:'ISO',    value:obMinIso,   onChange:setObMinIso,   step:'0.001'},
+                {key:'l7ev',  label:'L7 EV',  value:obMinL7Ev,  onChange:setObMinL7Ev,  step:'0.1'},
+                {key:'ev',    label:'EV',     value:obMinEv,    onChange:setObMinEv,    step:'0.1'},
+              ]}
             />
             <HandFilter mode="batter" value={obBatterHand} onChange={setObBatterHand}/>
             <button

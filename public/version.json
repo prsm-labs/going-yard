@@ -1,11 +1,8 @@
 {
   "version": "2026.07.30",
-  "bundleFile": "index-D3_OyUEZ.js",
+  "bundleFile": "index-C5CWQDNZ.js",
   "changelog": [
-    "Add RP (season-classified reliever) badge to Pitcher Slideout",
-    "All Matchups",
-    "Barrel Lab",
-    "and On Base"
+    "Add Arsenal Fit column section to Barrel Lab and On Base tables"
   ],
   "notifyUsers": true
 }
