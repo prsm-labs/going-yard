@@ -1,11 +1,12 @@
 {
   "version": "2026.07.30",
-  "bundleFile": "index-C38KA--3.js",
+  "bundleFile": "index-Cg-ZxkuG.js",
   "changelog": [
-    "Add min-value text filters (L7 ISO",
-    "ISO",
-    "L7 EV",
-    "EV) to Barrel Lab and On Base filter panels"
+    "Ball Carry/xHR: temp correction",
+    "outlier badges",
+    "rolling-baseline hand-off",
+    "real z-score verdicts",
+    "live Ball State badge"
   ],
   "notifyUsers": true
 }

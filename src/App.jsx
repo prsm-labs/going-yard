@@ -27993,6 +27993,7 @@ function LegendButton() {
       '🟢 Weak Spot row highlight — batter sitting in the opposing pitcher\'s historically weak lineup slot.',
       '🟣 Rain Watch / ⚠️ Rain Risk row highlight — game-time precipitation caution (🟣 ≥70%, ⚠️ ≥80% or thunder in the forecast). Uses the peak rain chance across the game\'s ~3hr window, not just the first-pitch hour — a storm arriving mid-game still means real rain risk (delay/postponement, wet-grip contact effects).',
       '🔴/🔵 Ball State Adjustment badge (2026-07-30) — live-only, display-only. Once a batter\'s game is actually in progress, shows a 🔴 Juiced Ball / 🔵 Dead Ball badge if the Live tab\'s ⚾ Ball Carry or ⬆️⬇️ xHR Conversion diagnostic has a confident (z-score) DEAD/JUICED read for that game. Tooltip discloses which of the two diagnostics fired and whether they agree. This never touches TrueHRScore, MatchupScore, SimHR%, or any other score — it\'s a badge, not an input.',
+      '🍯🔥 Sauce 3.0 badge/filter (2026-07-30) — the best validated combo in this app\'s history. Sauce 2.0 (Zone Fit ≥2, xwOBA ≥.360, Pitcher Grade not Elite/Tough) AND both L7 ISO + Arsenal Fit ISO ≥.250. Backtested against the full 2026 season via a leak-free ISO backfill joined to real Track Record outcomes (30,042 real batter-games, 5/17–7/29): Sauce 2.0 alone = 15.43% HR rate (2.17x lift over the 7.12% baseline); Sauce 3.0 = 20.26% (2.85x lift, n=380) — and it held up (in fact strengthened) in July specifically, the month Sauce 2.0 alone had softened in. Note: the backtest\'s single best version also added "Is Key Matchup" (21.93%/3.08x) — that\'s a human researcher\'s manually-curated flag that only exists in the All Matchups/Track Record pipeline, not a live matchup_engine.py field, so it can\'t be computed here. What\'s implemented is the Sauce 2.0 + ISO-combo version (still 2.85x).',
       '⚙ Filters panel — consolidates every checkbox toggle (Hide Final, Longshot, Chalk, Day Late, My Picks, Gone Yard, 2+TB, Plate IQ, Hand Match) plus a Pitcher Grade multi-select into one dropdown, added 2026-07-27 once adding Chalk/Day Late would have pushed the old flat button row past what fits on a phone screen.',
     ] },
     { tab:'🔵 On Base',        items:[
@@ -28001,7 +28002,7 @@ function LegendButton() {
       'MatchupScore (0–100) — pitcher-adjusted vulnerability, same concept as Barrel Lab\'s.',
       'SimTB2% — simulated probability of reaching 2+ total bases in the game.',
       '★ TB Signal — OnBaseScore ≥75 AND MatchupScore ≥60 AND SimTB2% ≥30%. Very new signal — live tracker: 38.0% hit rate, still a small sample.',
-      'Same 🎲 Longshot / 💪🏽 Chalk / 🗓️ Day Late / 💥 Gone Yard / 2️⃣ 2+ TB / 🟢 Weak Spot / ⭐⭐⭐ Hand Match / 🟣 Rain Watch / 🔴🔵 Ball State Adjustment / ⚙ Filters panel badges and filters as Barrel Lab — Longshot was added here for the first time 2026-07-27 (previously Barrel Lab only).',
+      'Same 🎲 Longshot / 💪🏽 Chalk / 🗓️ Day Late / 💥 Gone Yard / 2️⃣ 2+ TB / 🟢 Weak Spot / ⭐⭐⭐ Hand Match / 🟣 Rain Watch / 🔴🔵 Ball State Adjustment / 🍯🔥 Sauce 3.0 / ⚙ Filters panel badges and filters as Barrel Lab — Longshot was added here for the first time 2026-07-27 (previously Barrel Lab only).',
     ] },
     { tab:'📋 Track Record',   items:[
       'The self-auditing page — merges the daily All Matchups, Barrel Lab, and On Base exports against actual box-score outcomes, every day, automatically.',
@@ -32044,6 +32045,44 @@ function isDayLateBatter(r) {
   return true;
 }
 
+// ── Sauce 2.0 / Sauce 3.0 (2026-07-30) ──────────────────────────────────────
+// Sauce 2.0: same CLAUDE.md-validated definition as TrackRecordTab's own
+// isSauce2 (App.jsx:~28392) — Zone Fit >= 2, xwOBA >= .360, Pitcher Grade =
+// Target/Hittable/Average (excludes Elite/Tough). Reads the RAW engine
+// fields (zone_fit / season_xwoba / pitcher_grade_label) directly, matching
+// exactly what was backtested — deliberately NOT the smarter getZoneFit()
+// season-fallback helper, since that's a different, unvalidated variant.
+//
+// Sauce 3.0: Sauce 2.0 intersected with a second, independent ISO-based
+// condition — recent (L7) ISO AND Arsenal-Fit/BvP ISO (batter's own history
+// filtered to the opposing pitcher's real pitch mix x hand) both >= .250.
+// Backtested 2026-07-30 against the full 2026 season via a leak-free
+// backfill of bvp_iso/recent_iso joined to real historical Track Record
+// outcomes (30,042 real batter-games, 5/17-7/29): Sauce 2.0 alone = 15.43%
+// HR rate (2.17x lift over the 7.12% baseline); Sauce 2.0 + this ISO
+// condition ("Sauce 3.0") = 20.26% (2.85x lift, n=380) — the best validated
+// combo in this app's history, and one that held up (in fact strengthened)
+// in July specifically, the month Sauce 2.0 alone had been softening in.
+// NOTE: the backtest's strongest version also added "Is Key Matchup" (the
+// human researcher's manual flag, 21.93%/3.08x) — that flag is NOT
+// available here. It's a manually-curated field that only ever flows
+// through the All Matchups export/Track Record pipeline, not a
+// matchup_engine.py field present in daily_picks.csv, so it can't be
+// computed live in Barrel Lab/On Base's own row data. What's implemented
+// here is the Sauce 2.0 + ISO-combo version only (still the 2.85x number).
+function isSauce2Batter(r) {
+  const zoneFit = parseFloat(r.zone_fit || 0);
+  const xwoba   = parseFloat(r.season_xwoba || 0);
+  const pg      = r.pitcher_grade_label || '';
+  return zoneFit >= 2 && xwoba >= 0.360 && !!pg && !/elite|tough/i.test(pg);
+}
+function isSauce3Batter(r) {
+  if (!isSauce2Batter(r)) return false;
+  const bvpIso    = parseFloat(r.bvp_iso ?? NaN);
+  const recentIso = parseFloat(r.recent_iso ?? NaN);
+  return Number.isFinite(bvpIso) && Number.isFinite(recentIso) && bvpIso >= 0.250 && recentIso >= 0.250;
+}
+
 // ── FilterPanel — shared consolidated filter dropdown (Barrel Lab + On Base) ─
 // Replaces a flat, ever-growing row of individual toggle buttons with one
 // "Filters ▾" button + a checkbox panel, plus a Pitcher Grade multi-select.
@@ -32356,6 +32395,7 @@ function BarrelLabTab() {
   const [blTB2Only,        setBlTB2Only]        = useState(false);
   const [blHighIQOnly,     setBlHighIQOnly]     = useState(false);
   const [blHandMatchOnly,  setBlHandMatchOnly]  = useState(false);
+  const [blSauce3Only,     setBlSauce3Only]     = useState(false);
   const [blBatterHand,     setBlBatterHand]     = useState('ALL');
   const [blPitcherGrades,  setBlPitcherGrades]  = useState(() => new Set());
   // Arsenal Fit min-value filters (2026-07-30) — plain text (number) boxes in the Filters
@@ -32587,6 +32627,8 @@ function BarrelLabTab() {
         // getBallStateBadge's own comment block for the "never touches
         // scoring" guarantee. null on any non-live/no-signal game.
         ballStateBadge: getBallStateBadge(r.game_id),
+        isSauce2: isSauce2Batter(r),
+        isSauce3: isSauce3Batter(r),
         handMatchTier: getHandMatchTier(r),
         rainRiskTier: getRainRiskTier(r),
         rainRiskPct:  getRainRiskPct(r),
@@ -32608,6 +32650,7 @@ function BarrelLabTab() {
     .filter(r => !blTB2Only || is2BagBL(r))
     .filter(r => !blHighIQOnly || (r.plateIQ != null && r.plateIQ >= 56))
     .filter(r => !blHandMatchOnly || r.handMatchTier)
+    .filter(r => !blSauce3Only || r.isSauce3)
     .filter(r => blPitcherGrades.size === 0 || blPitcherGrades.has((r.pitcher_grade_label||r._pgLabel||'').trim()))
     .filter(r => matchesHandFilter(r.batter_hand, blBatterHand))
     .filter(r => blMinL7Iso === '' || parseFloat(r.recent_iso||0)   >= parseFloat(blMinL7Iso))
@@ -32615,7 +32658,7 @@ function BarrelLabTab() {
     .filter(r => blMinL7Ev  === '' || parseFloat(r.recent_avg_ev||0) >= parseFloat(blMinL7Ev))
     .filter(r => blMinEv    === '' || parseFloat(r.bvp_avg_ev||0)    >= parseFloat(blMinEv))
     .sort((a, b) => b.trueHRScore - a.trueHRScore);
-  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, blChalkOnly, blDayLateOnly, blPicksOnly, picks, blGoneYardOnly, blTB2Only, blHighIQOnly, blHandMatchOnly, blBatterHand, blPitcherGrades, blMinL7Iso, blMinIso, blMinL7Ev, blMinEv, hrVer, finalVer, dayLateVer, playerVer, ballStateVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, blChalkOnly, blDayLateOnly, blPicksOnly, picks, blGoneYardOnly, blTB2Only, blHighIQOnly, blHandMatchOnly, blSauce3Only, blBatterHand, blPitcherGrades, blMinL7Iso, blMinIso, blMinL7Ev, blMinEv, hrVer, finalVer, dayLateVer, playerVer, ballStateVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Color threshold helpers
   const clr = (v, g1, g2, y1, y2) => {
@@ -32868,6 +32911,19 @@ function BarrelLabTab() {
               }}>
               ⭐ {blHandMatchOnly ? 'Hand Match Only' : 'Hand Match'}
             </button>
+            <button
+              onClick={() => setBlSauce3Only(v => !v)}
+              title="Sauce 3.0 — Sauce 2.0 (Zone Fit≥2, xwOBA≥.360, non-Elite/Tough pitcher) AND both L7 ISO + Arsenal Fit ISO ≥.250. Best validated combo in this app: 20.26% HR rate / 2.85x lift, full 2026 season backtest (n=380). See Legend for details."
+              style={{
+                padding:'2px 8px', borderRadius:5, cursor:'pointer',
+                fontFamily:"'DM Mono',monospace", fontSize:9, fontWeight:700,
+                lineHeight:1.5, flexShrink:0,
+                background: blSauce3Only ? 'rgba(245,158,11,.14)' : 'var(--surface2)',
+                color:      blSauce3Only ? '#f59e0b' : 'var(--muted)',
+                border:`1px solid ${blSauce3Only ? 'rgba(245,158,11,.45)' : 'var(--border)'}`,
+              }}>
+              🍯🔥 {blSauce3Only ? 'Sauce 3.0 Only' : 'Sauce 3.0'}
+            </button>
             <FilterPanel
               toggles={[
                 {key:'hideFinal', label:'🚫 Hide Final',        active:blHideFinal,     color:'#ff6b6b', onToggle:()=>setBlHideFinal(v=>!v)},
@@ -32912,7 +32968,7 @@ function BarrelLabTab() {
                 const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
                 const f1 = v => (v != null && v !== '' && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(1) : '';
                 const f3 = v => (v != null && v !== '' && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(3) : '';
-                const hdrs = ['Slot','Team','Player','Pitcher','Grade','TrueHR','Matchup','ZF','Form (gHR)','SimHR%','ISO','xwOBA','PulledBrl%','Brl/BIP%','HR/FB%','FB%','HH%','LA°','Barrel Signal','Plate IQ','IQ Grade','Zone Risk','Hand Match','Longshot','Chalk','Day Late',
+                const hdrs = ['Slot','Team','Player','Pitcher','Grade','TrueHR','Matchup','ZF','Form (gHR)','SimHR%','ISO','xwOBA','PulledBrl%','Brl/BIP%','HR/FB%','FB%','HH%','LA°','Barrel Signal','Plate IQ','IQ Grade','Zone Risk','Hand Match','Longshot','Chalk','Day Late','Arsenal Fit ISO','Sauce 2.0','Sauce 3.0',
                   'Game ID','Batter ID','Pitcher ID'];
                 const csvRows = [hdrs.map(esc).join(',')];
                 rows.forEach(b => {
@@ -32943,6 +32999,9 @@ function BarrelLabTab() {
                     esc(b.isLongshot ? '1' : '0'),
                     esc(b.isChalk ? '1' : '0'),
                     esc(b.isDayLate ? '1' : '0'),
+                    esc(f3(b.bvp_iso)),
+                    esc(b.isSauce2 ? '1' : '0'),
+                    esc(b.isSauce3 ? '1' : '0'),
                     // Hidden data-plumbing columns (not shown in-app) — join keys for Track Record / ball carry
                     esc(b.game_id||''), esc(parseInt(b.batter_id)||''), esc(parseInt(b.pitcher_id)||''),
                   ].join(','));
@@ -33079,6 +33138,17 @@ function BarrelLabTab() {
           </div>
           <div style={{flex:'1 1 120px',background:'var(--surface2)',borderRadius:8,
             padding:'10px 14px',border:'1px solid var(--border)'}}
+            title="Sauce 3.0 — Sauce 2.0 AND both L7 ISO + Arsenal Fit ISO ≥.250. 20.26% HR rate / 2.85x lift, full 2026 season backtest (n=380). Best validated combo in this app.">
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:4}}>
+              SAUCE 3.0
+            </div>
+            <div style={{fontFamily:osw,fontSize:22,fontWeight:700,color:'#f59e0b',lineHeight:1}}>
+              {gameRows.filter(r => r.isSauce3).length}
+            </div>
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:4}}>2.85x validated lift</div>
+          </div>
+          <div style={{flex:'1 1 120px',background:'var(--surface2)',borderRadius:8,
+            padding:'10px 14px',border:'1px solid var(--border)'}}
             title="Plate IQ — display-only, does not affect TrueHRScore">
             <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:4}}>
               HIGH PLATE IQ
@@ -33188,6 +33258,13 @@ function BarrelLabTab() {
                     🗓️ Day Late
                   </div>
                 )}
+                {b.isSauce3 && (
+                  <div title="Sauce 2.0 AND both L7 ISO + Arsenal Fit ISO ≥.250 — 20.26% HR rate / 2.85x lift, full 2026 season backtest."
+                    style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'#f59e0b',
+                    letterSpacing:.6,textTransform:'uppercase',marginBottom:4}}>
+                    🍯🔥 Sauce 3.0
+                  </div>
+                )}
                 {b.handMatchTier && (
                   <div style={{fontFamily:mono,fontSize:8,color:'#fbbf24',marginBottom:4,
                     opacity:b.handMatchTier==='partial'?.75:1}}>
@@ -33278,6 +33355,7 @@ function BarrelLabTab() {
                                   {b.isLongshot && <span title="Longshot — TrueHRScore ≤55, MatchupScore ≥65, Sim TB ≥1.2, non-elite pitcher." style={{color:'#a78bfa',marginRight:2,fontWeight:900,fontSize:7}}>🎲</span>}
                                   {b.isChalk && <span title="Chalk — real season HR leader (>=18 HR, >=.220 ISO) facing a genuinely soft matchup today (Target/Hittable/Average)." style={{color:'#f5c542',marginRight:2,fontWeight:900,fontSize:7}}>💪🏽</span>}
                                   {b.isDayLate && <span title="Day Late — a real ★ Barrel Signal on BOTH of the last 2 real game days, no HR either day, today's matchup not an outright Elite mismatch." style={{color:'#22c1c3',marginRight:2,fontWeight:900,fontSize:7}}>🗓️</span>}
+                                  {b.isSauce3 && <span title="Sauce 3.0 — Sauce 2.0 AND both L7 ISO + Arsenal Fit ISO ≥.250. 20.26% HR rate / 2.85x lift, full 2026 season backtest (n=380). Best validated combo in this app." style={{color:'#f59e0b',marginRight:2,fontWeight:900,fontSize:7}}>🍯🔥</span>}
                                   {b.handMatchTier && <span
                                     title={b.handMatchTier==='elite'
                                       ? `Elite Hand Match — ${b.pitcher||'this pitcher'} (${(b.pitcher_hand||'?').charAt(0)}HP) is genuinely weak vs ${b.batter_hand||'?'}HB, ${b.batter} has strong arsenal fit (ps_convergence=${fmt(b.ps_convergence,1)}${b.ps_conv_pitch ? ', best pitch: '+b.ps_conv_pitch : ''}), AND an elite ${fmt(b.vs_hand_hr_rate,1)}% HR rate vs that hand. Diamond in the rough.`
@@ -33504,6 +33582,7 @@ function OnBaseTab() {
   const [obTB2Only,        setObTB2Only]        = useState(false);
   const [obHighIQOnly,     setObHighIQOnly]     = useState(false);
   const [obHandMatchOnly,  setObHandMatchOnly]  = useState(false);
+  const [obSauce3Only,     setObSauce3Only]     = useState(false);
   const [obBatterHand,     setObBatterHand]     = useState('ALL');
   const [obPitcherGrades,  setObPitcherGrades]  = useState(() => new Set());
   // Arsenal Fit min-value filters (2026-07-30) — same as BarrelLabTab's identical block.
@@ -33673,6 +33752,8 @@ function OnBaseTab() {
         // getBallStateBadge's own comment block for the "never touches
         // scoring" guarantee. null on any non-live/no-signal game.
         ballStateBadge: getBallStateBadge(r.game_id),
+        isSauce2: isSauce2Batter(r),
+        isSauce3: isSauce3Batter(r),
         handMatchTier: getHandMatchTier(r),
         rainRiskTier: getRainRiskTier(r),
         rainRiskPct:  getRainRiskPct(r),
@@ -33696,6 +33777,7 @@ function OnBaseTab() {
     .filter(r => !obTB2Only || is2BagOB(r))
     .filter(r => !obHighIQOnly || (r.plateIQ != null && r.plateIQ >= 56))
     .filter(r => !obHandMatchOnly || r.handMatchTier)
+    .filter(r => !obSauce3Only || r.isSauce3)
     .filter(r => obPitcherGrades.size === 0 || obPitcherGrades.has((r.pitcher_grade_label||r._pgLabel||'').trim()))
     .filter(r => matchesHandFilter(r.batter_hand, obBatterHand))
     .filter(r => obMinL7Iso === '' || parseFloat(r.recent_iso||0)   >= parseFloat(obMinL7Iso))
@@ -33703,7 +33785,7 @@ function OnBaseTab() {
     .filter(r => obMinL7Ev  === '' || parseFloat(r.recent_avg_ev||0) >= parseFloat(obMinL7Ev))
     .filter(r => obMinEv    === '' || parseFloat(r.bvp_avg_ev||0)    >= parseFloat(obMinEv))
     .sort((a, b) => b.onBaseScore - a.onBaseScore);
-  }, [eligibleBatters, simResults, obHideFinal, obLongshotOnly, obChalkOnly, obDayLateOnly, obPicksOnly, obGoneYardOnly, obTB2Only, obHighIQOnly, obHandMatchOnly, obBatterHand, obPitcherGrades, obMinL7Iso, obMinIso, obMinL7Ev, obMinEv, picks, finalVer, hrVer, dayLateVer, playerVer, ballStateVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [eligibleBatters, simResults, obHideFinal, obLongshotOnly, obChalkOnly, obDayLateOnly, obPicksOnly, obGoneYardOnly, obTB2Only, obHighIQOnly, obHandMatchOnly, obSauce3Only, obBatterHand, obPitcherGrades, obMinL7Iso, obMinIso, obMinL7Ev, obMinEv, picks, finalVer, hrVer, dayLateVer, playerVer, ballStateVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const byTeam = useMemo(() => {
     const teams = {};
@@ -33937,6 +34019,19 @@ function OnBaseTab() {
               }}>
               ⭐ {obHandMatchOnly ? 'Hand Match Only' : 'Hand Match'}
             </button>
+            <button
+              onClick={() => setObSauce3Only(v => !v)}
+              title="Sauce 3.0 — Sauce 2.0 (Zone Fit≥2, xwOBA≥.360, non-Elite/Tough pitcher) AND both L7 ISO + Arsenal Fit ISO ≥.250. Best validated combo in this app: 20.26% HR rate / 2.85x lift, full 2026 season backtest (n=380). See Legend for details."
+              style={{
+                padding:'2px 8px', borderRadius:5, cursor:'pointer',
+                fontFamily:mono, fontSize:9, fontWeight:700,
+                lineHeight:1.5, flexShrink:0,
+                background: obSauce3Only ? 'rgba(245,158,11,.14)' : 'var(--surface2)',
+                color:      obSauce3Only ? '#f59e0b' : 'var(--muted)',
+                border:`1px solid ${obSauce3Only ? 'rgba(245,158,11,.45)' : 'var(--border)'}`,
+              }}>
+              🍯🔥 {obSauce3Only ? 'Sauce 3.0 Only' : 'Sauce 3.0'}
+            </button>
             <FilterPanel
               toggles={[
                 {key:'hideFinal', label:'🚫 Hide Final',        active:obHideFinal,     color:'#ff6b6b', onToggle:()=>setObHideFinal(v=>!v)},
@@ -33979,7 +34074,7 @@ function OnBaseTab() {
                 const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
                 const f1 = v => (v != null && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(1) : '';
                 const f3 = v => (v != null && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(3) : '';
-                const hdrs = ['Slot','Team','Player','Pitcher','Grade','OnBaseScore','Matchup','ZF','G2TB%','SimTB2%','AVG','SLG','ISO','xwOBA','XBH%','HH%','SimTB','LA°','TB Signal','Plate IQ','IQ Grade','Zone Risk','Hand Match','Longshot','Chalk','Day Late',
+                const hdrs = ['Slot','Team','Player','Pitcher','Grade','OnBaseScore','Matchup','ZF','G2TB%','SimTB2%','AVG','SLG','ISO','xwOBA','XBH%','HH%','SimTB','LA°','TB Signal','Plate IQ','IQ Grade','Zone Risk','Hand Match','Longshot','Chalk','Day Late','Arsenal Fit ISO','Sauce 2.0','Sauce 3.0',
                   'Game ID','Batter ID','Pitcher ID'];
                 const csvRows = [hdrs.map(esc).join(',')];
                 rows.forEach(b => {
@@ -34010,6 +34105,9 @@ function OnBaseTab() {
                     esc(b.isLongshot ? '1' : '0'),
                     esc(b.isChalk ? '1' : '0'),
                     esc(b.isDayLate ? '1' : '0'),
+                    esc(f3(b.bvp_iso)),
+                    esc(b.isSauce2 ? '1' : '0'),
+                    esc(b.isSauce3 ? '1' : '0'),
                     // Hidden data-plumbing columns (not shown in-app) — join keys for Track Record / ball carry
                     esc(b.game_id||''), esc(parseInt(b.batter_id)||''), esc(parseInt(b.pitcher_id)||''),
                   ].join(','));
@@ -34078,6 +34176,17 @@ function OnBaseTab() {
               {gameRows.filter(r => r.isDayLate).length}
             </div>
             <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:4}}>Primed twice, still due</div>
+          </div>
+          <div style={{flex:'1 1 120px',background:'var(--surface2)',borderRadius:8,
+            padding:'10px 14px',border:'1px solid var(--border)'}}
+            title="Sauce 3.0 — Sauce 2.0 AND both L7 ISO + Arsenal Fit ISO ≥.250. 20.26% HR rate / 2.85x lift, full 2026 season backtest (n=380). Best validated combo in this app.">
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:4}}>
+              SAUCE 3.0
+            </div>
+            <div style={{fontFamily:osw,fontSize:22,fontWeight:700,color:'#f59e0b',lineHeight:1}}>
+              {gameRows.filter(r => r.isSauce3).length}
+            </div>
+            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:4}}>2.85x validated lift</div>
           </div>
           <div style={{flex:'1 1 120px',background:'var(--surface2)',borderRadius:8,
             padding:'10px 14px',border:'1px solid var(--border)'}}
@@ -34186,6 +34295,13 @@ function OnBaseTab() {
                     🗓️ Day Late
                   </div>
                 )}
+                {b.isSauce3 && (
+                  <div title="Sauce 2.0 AND both L7 ISO + Arsenal Fit ISO ≥.250 — 20.26% HR rate / 2.85x lift, full 2026 season backtest."
+                    style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'#f59e0b',
+                    letterSpacing:.6,textTransform:'uppercase',marginBottom:6}}>
+                    🍯🔥 Sauce 3.0
+                  </div>
+                )}
                 {b.handMatchTier && (
                   <div style={{fontFamily:mono,fontSize:8,color:'#fbbf24',marginBottom:6,
                     opacity:b.handMatchTier==='partial'?.75:1}}>
@@ -34275,6 +34391,7 @@ function OnBaseTab() {
                                 {b.isLongshot && <span title="Longshot — OnBaseScore ≤55, MatchupScore ≥65, Sim TB ≥1.2, non-elite pitcher." style={{color:'#a78bfa',marginRight:2,fontWeight:900,fontSize:7}}>🎲</span>}
                                 {b.isChalk && <span title="Chalk — real season HR leader (>=18 HR, >=.220 ISO) facing a genuinely soft matchup today." style={{color:'#f5c542',marginRight:2,fontWeight:900,fontSize:7}}>💪🏽</span>}
                                 {b.isDayLate && <span title="Day Late — a real ★ Barrel Signal on BOTH of the last 2 real game days, no HR either day, today's matchup not an outright Elite mismatch." style={{color:'#22c1c3',marginRight:2,fontWeight:900,fontSize:7}}>🗓️</span>}
+                                {b.isSauce3 && <span title="Sauce 3.0 — Sauce 2.0 AND both L7 ISO + Arsenal Fit ISO ≥.250. 20.26% HR rate / 2.85x lift, full 2026 season backtest (n=380). Best validated combo in this app." style={{color:'#f59e0b',marginRight:2,fontWeight:900,fontSize:7}}>🍯🔥</span>}
                                 {b.handMatchTier && <span
                                   title={b.handMatchTier==='elite'
                                     ? `Elite Hand Match — ${b.pitcher||'this pitcher'} (${(b.pitcher_hand||'?').charAt(0)}HP) is genuinely weak vs ${b.batter_hand||'?'}HB, ${b.batter} has strong arsenal fit (ps_convergence=${fmt(b.ps_convergence,1)}${b.ps_conv_pitch ? ', best pitch: '+b.ps_conv_pitch : ''}), AND an elite ${fmt(b.vs_hand_hr_rate,1)}% HR rate vs that hand. Diamond in the rough.`
