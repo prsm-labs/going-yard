@@ -75,7 +75,6 @@ CIN,668715,Spencer Steer,1B,Right wrist sprain,,🟡,Injured 10-Day
 CIN,663574,Tony Santillan,P,Left oblique strain.,,🟡,Injured 15-Day
 CLE,542888,Shawn Armstrong,P,Left calf strain.,,🟡,Injured 15-Day
 COL,680604,Blas Castaño,P,Right pectoral strain.,,🟡,Injured 15-Day
-COL,686668,Brenton Doyle,CF,Left oblique contusion.,,🟢,Injured 10-Day
 COL,801403,Chase Dollander,P,Right elbow strain.,,🟡,Injured 60-Day
 COL,677955,Jaden Hill,P,Right shoulder tendonitis.,,⚪,Injured 15-Day
 COL,676105,Jeff Criswell,P,Right shoulder strain.,,🟡,Injured 15-Day
@@ -170,6 +169,7 @@ MIN,690953,Mick Abel,P,Right elbow inflammation.,,🟡,Injured 60-Day
 MIN,702474,Mike Paredes,P,Left oblique strain.,,🟡,Injured 15-Day
 MIN,641154,Pablo López,P,Tommy John surgery.,,🔴,Injured 60-Day
 NYM,681810,Austin Warren,P,Right forearm strain.,,🟡,Injured 15-Day
+NYM,672335,Cionel Pérez,P,Left forearm strain.,,🟡,Injured 15-Day
 NYM,605280,Clay Holmes,P,Right fibula fracture.,,🔴,Injured 60-Day
 NYM,673380,Dedniel Núñez,P,Tommy John surgery recovery.,,🔴,Injured 60-Day
 NYM,665742,Juan Soto,LF,Left calf strain,,🟡,Injured 10-Day
@@ -231,12 +231,12 @@ TB,641584,Jake Fraley,RF,Hernia.,,⚪,Injured 10-Day
 TB,669169,Jonathan Heasley,P,Injured 60-Day,,⚪,Injured 60-Day
 TB,655889,Manuel Rodríguez,P,Injured 60-Day,,⚪,Injured 60-Day
 TB,686752,Ryan Pepiot,P,Right hip inflammation,,🟡,Injured 60-Day
+TB,663556,Shane McClanahan,P,Left mid-back tightness.,,🟢,Injured 15-Day
 TB,621051,Steven Wilson,P,Lumbar disc inflammation,,🟡,Injured 60-Day
 TEX,691945,Carter Baumler,P,Right intercostal strain.,,🟡,Injured 60-Day
 TEX,455119,Chris Martin,P,Right shoulder impingement.,,⚪,Injured 15-Day
 TEX,674003,Cody Bradford,P,Left elbow surgery rehab.,,🔴,Injured 60-Day
 TEX,683227,Cody Freeman,3B,Herniated disc,,⚪,Injured 10-Day
-TEX,608369,Corey Seager,SS,Lower back inflammation.,,🟡,Injured 10-Day
 TEX,643376,Danny Jansen,C,Right forearm strain,,🟡,Injured 60-Day
 TEX,683004,Jack Leiter,P,Right ankle posterior impingement.,,⚪,Injured 15-Day
 TEX,596001,Jakob Junis,P,Left adductor strain.,,🟡,Injured 15-Day
@@ -251,7 +251,6 @@ TOR,680718,Addison Barger,RF,Right elbow inflammation.,,🟡,Injured 60-Day
 TOR,623993,Anthony Santander,RF,Left shoulder labral tear.,,🔴,Injured 60-Day
 TOR,670102,Bowden Francis,P,Right elbow surgery.,,🔴,Injured 60-Day
 TOR,664074,Cody Ponce,P,Right knee ACL sprain.,,🟡,Injured 60-Day
-TOR,660821,Jesús Sánchez,RF,Right ankle sprain,,🟡,Injured 10-Day
 TOR,573009,Joe Mantiply,P,Left knee inflammation.,,🟡,Injured 60-Day
 TOR,682729,Jonatan Clase,LF,Left plantar fasciitis.,,⚪,Injured 10-Day
 TOR,621244,José Berríos,P,Right elbow stress fracture.,,🔴,Injured 60-Day
