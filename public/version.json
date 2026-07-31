@@ -1,11 +1,9 @@
 {
   "version": "2026.07.31",
-  "bundleFile": "index-BBlWbWkX.js",
+  "bundleFile": "index-Tzs8BKo3.js",
   "changelog": [
-    "Add Sauce 3.0 to Track Record: filter",
-    "hit-rate card",
-    "CSV export",
-    "real backfilled ISO data"
+    "Fix Sauce 3.0 data loss in Track Record: repair the season-of-truth file",
+    "not just the derived copy"
   ],
   "notifyUsers": true
 }

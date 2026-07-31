@@ -32141,12 +32141,30 @@ const PITCHER_GRADE_OPTIONS = ['🎯 Target', '💥 Hittable', '🤔 Average', '
 
 function FilterPanel({ toggles, pitcherGrades, onPitcherGradesChange, minFilters }) {
   const [open, setOpen] = useState(false);
+  const [panelPos, setPanelPos] = useState({ top: 0, left: 0 });
   const ref = useRef(null);
+  const btnRef = useRef(null);
   useEffect(() => {
     if (!open) return;
     const onClick = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
     document.addEventListener('mousedown', onClick);
     return () => document.removeEventListener('mousedown', onClick);
+  }, [open]);
+  // Position via measured button rect, not CSS left:0/right:0 — 2026-07-27's
+  // right:0 fix only solved the button-near-right-edge case (panel ran off
+  // the right on mobile). This row uses flexWrap, so the button can land
+  // anywhere after wrapping — with the button near the LEFT edge instead,
+  // a fixed-width panel growing leftward from right:0 ran off the LEFT edge
+  // instead (confirmed via screenshot, 2026-07-31: "Hide Final" etc. flush
+  // against x=0, clipped). Measuring the button's real position and
+  // clamping within the viewport handles both cases, and any future one.
+  React.useLayoutEffect(() => {
+    if (!open || !btnRef.current) return;
+    const rect = btnRef.current.getBoundingClientRect();
+    const panelW = Math.min(280, window.innerWidth - 16);
+    let left = rect.right - panelW; // default: right-align to button
+    left = Math.max(8, Math.min(left, window.innerWidth - panelW - 8));
+    setPanelPos({ top: rect.bottom + 4, left });
   }, [open]);
 
   // minFilters (2026-07-30) — optional array of {key,label,value,onChange,step,placeholder}
@@ -32158,7 +32176,7 @@ function FilterPanel({ toggles, pitcherGrades, onPitcherGradesChange, minFilters
 
   return (
     <div ref={ref} style={{position:'relative',flexShrink:0}}>
-      <button onClick={() => setOpen(v => !v)}
+      <button ref={btnRef} onClick={() => setOpen(v => !v)}
         style={{padding:'2px 8px',borderRadius:5,cursor:'pointer',
           fontFamily:monoFont,fontSize:9,fontWeight:700,lineHeight:1.5,flexShrink:0,
           background: activeCount>0 ? 'rgba(56,184,242,.12)' : 'var(--surface2)',
@@ -32167,15 +32185,12 @@ function FilterPanel({ toggles, pitcherGrades, onPitcherGradesChange, minFilters
         ⚙ Filters{activeCount>0 ? ` (${activeCount})` : ''}
       </button>
       {open && (
-        // right:0 (not left:0) — this button typically sits mid-to-right in
-        // its row, so anchoring the panel's LEFT edge here ran it off the
-        // right side of the viewport on mobile (confirmed via screenshot,
-        // 2026-07-27: "Longshot"/"Day Late"/"My Picks" etc all cut off).
-        // Anchoring the RIGHT edge instead makes the panel grow leftward,
-        // which stays on-screen regardless of where the button sits.
-        <div style={{position:'absolute',top:'calc(100% + 4px)',right:0,zIndex:80,
+        // position:fixed + measured/clamped left (see useLayoutEffect above) —
+        // escapes the flexWrap row entirely so wherever the button lands, the
+        // panel always stays within [8px, viewportWidth-8px].
+        <div style={{position:'fixed',top:panelPos.top,left:panelPos.left,zIndex:80,
           background:'var(--surface)',border:'1px solid var(--border)',borderRadius:8,
-          padding:10,minWidth:230,maxWidth:'min(280px, calc(100vw - 24px))',maxHeight:'60vh',overflowY:'auto',
+          padding:10,minWidth:230,maxWidth:'min(280px, calc(100vw - 16px))',maxHeight:'60vh',overflowY:'auto',
           boxShadow:'0 4px 16px rgba(0,0,0,.4)',display:'flex',flexDirection:'column',gap:6}}>
           {toggles.map(t => (
             <label key={t.key} style={{display:'flex',alignItems:'center',gap:7,cursor:'pointer',
