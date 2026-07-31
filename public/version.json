@@ -1,12 +1,8 @@
 {
-  "version": "2026.07.30",
-  "bundleFile": "index-Cg-ZxkuG.js",
+  "version": "2026.07.31",
+  "bundleFile": "index-CmrbmLHs.js",
   "changelog": [
-    "Ball Carry/xHR: temp correction",
-    "outlier badges",
-    "rolling-baseline hand-off",
-    "real z-score verdicts",
-    "live Ball State badge"
+    "Add Sauce 3.0 (Sauce 2.0 + ISO-combo) badge/filter to Barrel Lab and On Base"
   ],
   "notifyUsers": true
 }

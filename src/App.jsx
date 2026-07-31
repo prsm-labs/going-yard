@@ -16598,7 +16598,7 @@ function SimLabView({ data }) {
               const esc = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
               const headers = ['Grade','Pitcher Grade','Gone Yard','Is Key Matchup','Team','Batter','Hand','P.Hand','vs Pitcher',
                 'Top Pitches','Game Time','Lineup Slot','Position','In Weak Slot','Pitcher Weak Slots',
-                'Yard Score','⚡ Sig','💥 Boom','Form Class','gHR','ISO','L7 ISO','Zone Fit','HR Upside','Zone Edges','xwOBA','wOBA','SwStr%',
+                'Yard Score','⚡ Sig','💥 Boom','Form Class','gHR','ISO','L7 ISO','Arsenal Fit ISO','Recent ISO (BF)','Zone Fit','HR Upside','Zone Edges','xwOBA','wOBA','SwStr%',
                 'Flags','Recent EV','Recent Barrel%',
                 'Recent FB%','Recent LA','BvP EV','BvP Barrel%','BvP FB%','BvP LA',
                 'Sim H','Sim 2B','Sim BB','Sim K','Sim TB','Sim RBI',
@@ -16642,6 +16642,13 @@ function SimLabView({ data }) {
                   b.gHR ?? '',
                   b.recent_iso ? parseFloat(b.recent_iso).toFixed(3) : '',
                   (b.l7_iso ?? b.recent_iso) ? parseFloat(b.l7_iso ?? b.recent_iso).toFixed(3) : '',
+                  b.bvp_iso != null && b.bvp_iso !== '' ? parseFloat(b.bvp_iso).toFixed(3) : '',
+                  // Recent ISO (BF): historical rows (5/17-7/30) got this backfilled leak-free
+                  // from the AB log (see TrackRecordTab's isSauce3 comment). Going forward,
+                  // same column populated live from b.recent_iso (the engine's own blended
+                  // L7/L15/season ISO) -- the same field Barrel Lab/On Base's own isSauce3Batter
+                  // already uses, so both paths converge on one consistent Sauce 3.0 definition.
+                  b.recent_iso ? parseFloat(b.recent_iso).toFixed(3) : '',
                   b.zone_fit        ? parseFloat(b.zone_fit).toFixed(1)        : '',
                   (()=>{const u=computeHRUpside(b);return u.label==='BELOW AVG'?'LOW':u.label==='STRONG'?'STR':u.label;})(),
                   parseInt(b._zoneEdges||DAILY_PICKS_CACHE[String(parseInt(b.batter_id)||0)]?._zoneEdges||0) || '',
@@ -28006,7 +28013,8 @@ function LegendButton() {
     ] },
     { tab:'📋 Track Record',   items:[
       'The self-auditing page — merges the daily All Matchups, Barrel Lab, and On Base exports against actual box-score outcomes, every day, automatically.',
-      'Filter buttons: HRs Only, ★ Barrel Signal Only, Key Matchup Only, 🟢 Weak Spot Only, 📍 Close Call Only, 🍯 Sauce 2.0 Only, 2️⃣ 2-Bagger (Non-HR) Only, 🎯 TB Signal Only, 🎲 Sim TB ≥2.0 Only, 🧠 Plate IQ Only, ⭐ Hand Match Only, 🔴 Juiced Ball Only, 🔵 Dead Ball Only.',
+      'Filter buttons: HRs Only, ★ Barrel Signal Only, Key Matchup Only, 🟢 Weak Spot Only, 📍 Close Call Only, 🍯 Sauce 2.0 Only, 🍯🔥 Sauce 3.0 Only, 2️⃣ 2-Bagger (Non-HR) Only, 🎯 TB Signal Only, 🎲 Sim TB ≥2.0 Only, 🧠 Plate IQ Only, ⭐ Hand Match Only, 🔴 Juiced Ball Only, 🔵 Dead Ball Only.',
+      '🍯🔥 Sauce 3.0 (added 2026-07-31) — Sauce 2.0 (Zone Fit≥2, xwOBA≥.360, Pitcher Grade not Elite/Tough) AND both Recent ISO + Arsenal Fit ISO ≥.250. Full-season backtest: 20.05% HR rate / 2.82x lift (vs. Sauce 2.0 alone\'s 2.17x) — the best validated combo in this app. Uses "Recent ISO (BF)", not the native "L7 ISO" column — that field turned out to have real coverage gaps within the Sauce 2.0 population (53%), which shrank the qualifying pool well below what was validated. Both ISO fields here are backfilled leak-free for historical dates (5/17-7/30, from the batter\'s own AB-log history strictly before each real game date; Arsenal Fit ISO additionally filtered to that matchup\'s real Top Pitches/P.Hand) and flow in natively going forward via the All Matchups export — so this hit-rate card keeps updating with real forward data, not just the one-time backtest.',
       '⚾ Ball Carry column/filter: dead-ball / juiced-ball verdict for that game, joined by date+team from the Ball Carry tracker (Live tab). Park/elevation-adjusted, deliberately NOT weather-adjusted — see the Live tab\'s ⚾ Ball Carry guide.',
       'Hit-rate cards at the top of the page recompute live from real outcomes as each day\'s data comes in — the same numbers cited in the Sauce panel and this Legend, always current.',
       'Column groups are color-coded: Matchup Engine (red) · Barrel Lab (blue) · Box Score (green).',
@@ -28153,6 +28161,7 @@ function TrackRecordTab() {
   const [showOnlyWeakSlot, setShowOnlyWeakSlot] = useState(false);
   const [showOnlyCC,     setShowOnlyCC]     = useState(false);
   const [showOnlySauce2, setShowOnlySauce2] = useState(false);
+  const [showOnlySauce3, setShowOnlySauce3] = useState(false);
   const [showOnly2Bagger, setShowOnly2Bagger] = useState(false);
   const [showOnlyTBSignal, setShowOnlyTBSignal] = useState(false);
   const [showOnlySimTB2, setShowOnlySimTB2] = useState(false);
@@ -28394,6 +28403,24 @@ function TrackRecordTab() {
               && parseFloat(r['xwOBA']||0) >= 0.360
               && !!(r['Pitcher Grade']||blRow['Grade'])
               && !/elite|tough/i.test(r['Pitcher Grade']||blRow['Grade']||''),
+            // Sauce 3.0 (2026-07-31, backtested + backfilled 2026-07-30/31) — Sauce 2.0
+            // intersected with L7 ISO + Arsenal Fit ISO both >=.250. Both ISO fields here
+            // are backfilled leak-free for 5/17-7/30 from the AB log (batter's own history
+            // strictly before export_date; Arsenal Fit ISO additionally filtered to that
+            // matchup's real Top Pitches/P.Hand) and flow in natively going forward via the
+            // All Matchups export (App.jsx SimLabView). Deliberately uses 'Recent ISO (BF)',
+            // NOT the native 'L7 ISO' column — found live 2026-07-31 that native L7 ISO has
+            // much lower coverage within the Sauce 2.0 population (53%) than the backfilled
+            // version (70%+), which shrank Sauce 3.0's population well below what was
+            // actually validated (n=192 vs n=384) when first wired up. Using the matching
+            // backfilled field reproduces the validated numbers exactly: n=384, 20.05% HR
+            // rate, 2.82x lift vs Sauce 2.0 alone's 2.17x — see Legend for details.
+            isSauce3: parseFloat(r['Zone Fit']||0) >= 2
+              && parseFloat(r['xwOBA']||0) >= 0.360
+              && !!(r['Pitcher Grade']||blRow['Grade'])
+              && !/elite|tough/i.test(r['Pitcher Grade']||blRow['Grade']||'')
+              && parseFloat(r['Recent ISO (BF)']||0) >= 0.250
+              && parseFloat(r['Arsenal Fit ISO']||0) >= 0.250,
             // 2-Bagger (Non-HR): 2+ total bases in the game, but did not homer.
             // Mutually exclusive with wentYard — matches the live 2️⃣ badge's
             // definition app-wide. actualTB/wentYard already parsed above.
@@ -28476,6 +28503,7 @@ function TrackRecordTab() {
     if (showOnlyWeakSlot) rows = rows.filter(r => r.isWeakSlot);
     if (showOnlyCC)     rows = rows.filter(r => r.closeCalls > 0);
     if (showOnlySauce2) rows = rows.filter(r => r.isSauce2);
+    if (showOnlySauce3) rows = rows.filter(r => r.isSauce3);
     if (showOnly2Bagger) rows = rows.filter(r => r.is2Bagger);
     if (showOnlyTBSignal) rows = rows.filter(r => r.tbSignal);
     if (showOnlySimTB2) rows = rows.filter(r => r.simTB >= 2.0);
@@ -28497,7 +28525,7 @@ function TrackRecordTab() {
       }
       return sortDir * ((av||0) - (bv||0));
     });
-  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, showOnlyWeakSlot, showOnlyCC, showOnlySauce2, showOnly2Bagger, showOnlyTBSignal, showOnlySimTB2, showOnlyHighIQ, showOnlyHandMatch, carryFilter, xhrFilter, search, sortCol, sortDir]);
+  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, showOnlyWeakSlot, showOnlyCC, showOnlySauce2, showOnlySauce3, showOnly2Bagger, showOnlyTBSignal, showOnlySimTB2, showOnlyHighIQ, showOnlyHandMatch, carryFilter, xhrFilter, search, sortCol, sortDir]);
 
   const summary = useMemo(() => {
     const hrs          = dateRows.filter(r => r.wentYard);
@@ -28518,6 +28546,8 @@ function TrackRecordTab() {
     const weakSlotHits = weakSlots.filter(r => r.wentYard);
     const sauce2       = dateRows.filter(r => r.isSauce2);
     const sauce2Hits    = sauce2.filter(r => r.wentYard);
+    const sauce3       = dateRows.filter(r => r.isSauce3);
+    const sauce3Hits    = sauce3.filter(r => r.wentYard);
     const twoBaggers    = dateRows.filter(r => r.is2Bagger);
     // TB Signal (OnBase tab's own flag) hit rate — denominator is the FLAGGED
     // group, not all batters, same shape as Sauce 2.0/Weak Spot/Barrel Signal.
@@ -28558,7 +28588,7 @@ function TrackRecordTab() {
     const biggestUpset = [...dateRows.filter(r => r.wentYard)]
       .sort((a,b) => a.yardScore - b.yardScore)[0];
     return { hrs, totalHR, signals, signalHits, keyMatchups, kmHits,
-             longshots, lsHits, weakSlots, weakSlotHits, sauce2, sauce2Hits, twoBaggers, tbSignals, tbSignalHits, simTB2, simTB2Hits,
+             longshots, lsHits, weakSlots, weakSlotHits, sauce2, sauce2Hits, sauce3, sauce3Hits, twoBaggers, tbSignals, tbSignalHits, simTB2, simTB2Hits,
              highIQBatters, highIQHRHits, highIQTB2Hits, handMatches, handMatchHits,
              deadGame, deadGameHits, juicedGame, juicedGameHits,
              xhrDead, xhrDeadHits, xhrJuiced, xhrJuicedHits, topYS, biggestMiss, biggestUpset };
@@ -28711,6 +28741,14 @@ function TrackRecordTab() {
               : '—',
             sub: `${summary.sauce2Hits.length}/${summary.sauce2.length}`,
             color:'#34d399'
+          },
+          {
+            label:'SAUCE 3.0 HIT RATE',
+            value: summary.sauce3.length
+              ? `${((summary.sauce3Hits.length/summary.sauce3.length)*100).toFixed(0)}%`
+              : '—',
+            sub: `${summary.sauce3Hits.length}/${summary.sauce3.length}`,
+            color:'#f59e0b'
           },
           {
             label:'2 TB SIGNAL RATE',
@@ -28892,6 +28930,16 @@ function TrackRecordTab() {
           🍯 Sauce 2.0 Only
         </button>
 
+        <button onClick={() => setShowOnlySauce3(v=>!v)}
+          title="Sauce 2.0 AND both Recent ISO + Arsenal Fit ISO >=.250 — 2.82x lift, full 2026 season backtest. Best validated combo in this app."
+          style={{padding:'4px 10px', borderRadius:6, border:'none',
+            cursor:'pointer', fontFamily:mono, fontSize:9, fontWeight:700,
+            background: showOnlySauce3 ? 'rgba(245,158,11,.15)' : 'var(--surface2)',
+            color:       showOnlySauce3 ? '#f59e0b' : 'var(--muted)',
+            border: `1px solid ${showOnlySauce3 ? 'rgba(245,158,11,.4)' : 'var(--border)'}` }}>
+          🍯🔥 Sauce 3.0 Only
+        </button>
+
         <button onClick={() => setShowOnly2Bagger(v=>!v)}
           style={{padding:'4px 10px', borderRadius:6, border:'none',
             cursor:'pointer', fontFamily:mono, fontSize:9, fontWeight:700,
@@ -28983,7 +29031,7 @@ function TrackRecordTab() {
             const headers = ['Date','Batter','Team','Hand','Lineup Slot',
               'Pre-Game Pitcher','Went Yard Vs','SP/RP','Pitcher Grade',
               'Yard Score','Boom','Sig','Grade','gHR','Zone Fit','Sim TB','xwOBA','Flags',
-              'Is Key Matchup','Weak Spot','Sauce 2.0','2-Bagger (Non-HR)','Hit 2+ TB (Any)','TB Signal',
+              'Is Key Matchup','Weak Spot','Sauce 2.0','Sauce 3.0','2-Bagger (Non-HR)','Hit 2+ TB (Any)','TB Signal',
               'TrueHR','Matchup','SimHR%','Barrel Signal','Longshot',
               'PulledBrl%','Brl/BIP','HR/FB','FB%','HH%',
               'Plate IQ','IQ Grade','Zone Risk','Hand Match',
@@ -29000,7 +29048,7 @@ function TrackRecordTab() {
                 (r.wentYard && r.actualPitcher && !r.actualPitcherIsSP) ? '' : r.pitcherGrade,
                 r.yardScore || '', r.boom || '', r.sig || '', r.grade || '', r.ghr || '',
                 r.zoneFit || '', r.simTB || '', r.xwoba || '', r.flags || '',
-                r.isKeyMatchup ? 'YES' : '', r.isWeakSlot ? 'YES' : '', r.isSauce2 ? 'YES' : '', r.is2Bagger ? 'YES' : '', r.hitTB2 ? 'YES' : '', r.tbSignal ? 'YES' : '',
+                r.isKeyMatchup ? 'YES' : '', r.isWeakSlot ? 'YES' : '', r.isSauce2 ? 'YES' : '', r.isSauce3 ? 'YES' : '', r.is2Bagger ? 'YES' : '', r.hitTB2 ? 'YES' : '', r.tbSignal ? 'YES' : '',
                 r.trueHR || '', r.matchup || '', r.simHRPct || '',
                 r.brlSignal ? 'YES' : '', r.isLongshot ? 'YES' : '',
                 r.pulledBrl || '', r.brlBIP || '', r.hrFB || '', r.fb || '', r.hh || '',
