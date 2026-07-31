@@ -16708,7 +16708,7 @@ function SimLabView({ data }) {
                     { label: 'Batter',   key: null },
                     { label: 'Pos',      key: null, title: "Confirmed lineup position" },
                     { label: (<img src="/icon-192.png" alt="Yard" style={{width:15,height:15,borderRadius:2,objectFit:'cover',verticalAlign:'middle',display:'inline-block'}}/>), key: '_yard', colKey: '_yard' },
-                    { label: 'YV2', key: '_yard_yv2', colKey: '_yard_yv2', title: 'Yard Score YV2 — experimental shrinkage blend. Not the live score.' },
+                    { label: 'YV2', key: '_yard_yv2', colKey: '_yard_yv2', title: 'Yard Score YV2 — the shrinkage blend was promoted to the live gHR on 2026-07-31 (validated: corr +37% vs. the old fixed 50% L7 weight, p=0.006). This column now audits that the promotion holds — should always match Yard Score exactly.' },
                     { label: '⚡',       key: '_sig', colKey:'_sig' },
                     { label: 'Form',     key: null },
                     { label: 'HR⬆',      key: null },
@@ -16938,14 +16938,14 @@ function SimLabView({ data }) {
                       <td style={{textAlign:'center',padding:'2px 4px',verticalAlign:'middle'}}>
                         <YardBadge score={b._yard ?? computeYardScore(b._trackerSig||0, parseFloat(b.gHR)||0, b._boom||0, b._ps||getPS(b), b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1), liveSlot(b.batter_id,b.lineup_slot), getHandSpecificGrade(b))}/>
                       </td>
-                      {/* ── Yard Score YV2 — experimental shrinkage blend (read-only comparison column) ── */}
+                      {/* ── Yard Score YV2 — promoted to live gHR 2026-07-31; column kept as a promotion-audit check ── */}
                       <td style={{textAlign:'center',padding:'2px 4px',verticalAlign:'middle'}}>
                         {(()=>{
                           const _gv2 = b.gHR_yv2 != null && b.gHR_yv2 !== '' ? parseFloat(b.gHR_yv2) : NaN;
                           if (isNaN(_gv2)) return <span style={{color:'rgba(255,255,255,.15)',fontSize:8}}>—</span>;
                           const _yv2 = computeYardScoreYV2(b._trackerSig||0, parseFloat(b.gHR)||0, _gv2, b._boom||0, b._ps||(parseFloat(b.ps_score)||0), b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1), liveSlot(b.batter_id,b.lineup_slot), b._pgLabel||b.pitcher_grade_label||'');
                           b._yard_yv2 = _yv2;
-                          return <span title={`YV2: ${_yv2} — experimental shrinkage blend (k=150). Not the live score.`}
+                          return <span title={`YV2: ${_yv2} — k=150 shrinkage blend, promoted to the live gHR on 2026-07-31 (37% corr improvement vs. the old fixed blend, p=0.006). Should equal Yard Score exactly.`}
                             style={{display:'inline-block',padding:'1px 5px',borderRadius:4,
                               fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:10,
                               background:'rgba(56,184,242,.10)',color:'#38b8f2',

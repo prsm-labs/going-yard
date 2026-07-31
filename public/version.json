@@ -1,8 +1,11 @@
 {
   "version": "2026.07.31",
-  "bundleFile": "index-CmrbmLHs.js",
+  "bundleFile": "index-BBlWbWkX.js",
   "changelog": [
-    "Add Sauce 3.0 (Sauce 2.0 + ISO-combo) badge/filter to Barrel Lab and On Base"
+    "Add Sauce 3.0 to Track Record: filter",
+    "hit-rate card",
+    "CSV export",
+    "real backfilled ISO data"
   ],
   "notifyUsers": true
 }
