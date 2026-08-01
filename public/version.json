@@ -1,8 +1,8 @@
 {
   "version": "2026.08.01",
-  "bundleFile": "index-DylDMBGK.js",
+  "bundleFile": "index-CskBolcF.js",
   "changelog": [
-    "Fix mobile Filters-dropdown positioning (Barrel Lab/On Base) and regenerate game splits after a 3-day AB-log gap"
+    "Replace All Matchups' Deep Dive view with an Arsenal Fit table"
   ],
   "notifyUsers": true
 }

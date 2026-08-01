@@ -17284,7 +17284,9 @@ function SimLabView({ data }) {
                         }}>
                         {pitcherDisplay}{b.pitcher_hand ? <span style={{ fontSize: 8, color: 'var(--muted)' }}> ({b.pitcher_hand})</span> : null}
                       </td>
-                      <td style={{ textAlign: 'center', padding: '3px 6px' }}>{pgEmoji(pgLabel)}</td>
+                      <td style={{ textAlign: 'center', padding: '3px 6px' }}>
+                        {pgLabel.includes('Target')?'🎯':pgLabel.includes('Hittable')?'💥':pgLabel.includes('Elite')?'‼️':pgLabel.includes('Tough')?'⚠️':pgLabel?'🤔':''}
+                      </td>
                       <td style={{ textAlign: 'center', padding: '3px 6px', color: '#fbbf24' }}>{stars}</td>
                       <td style={{ textAlign: 'right', padding: '3px 6px' }}>{numOr(b.recent_iso, 3)}</td>
                       <td style={{ textAlign: 'right', padding: '3px 6px' }}>{numOr(b.recent_avg_ev, 1)}</td>
