@@ -17327,6 +17327,39 @@ function SimLabView({ data }) {
             })}
           </div>
 
+          {/* Lineup filter status + toggle — same pattern as Barrel Lab/On
+              Base. Reuses SimLabView's own pre-existing lineupOnly/
+              setLineupOnly state (already wired into `slate`'s own filter
+              chain via `.filter(r => !lineupOnly || isConfirmed(r))`), so
+              this is UI-only — no new filtering logic needed. */}
+          {(() => {
+            const lineupCount = Object.keys(LINEUP_STATUS).length;
+            const lineupReady = lineupCount > 0;
+            return (
+              <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 9, color: 'var(--muted)',
+                marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+                  background: lineupReady ? '#27c97a' : '#f5a623' }}/>
+                {lineupReady
+                  ? `${arsenalFitRows.length} batters · lineups confirmed`
+                  : `Lineups pending · ${arsenalFitRows.length} batters (10+ recent PA)`
+                }
+                {lineupReady && (
+                  <button onClick={() => setLineupOnly(v => !v)}
+                    style={{
+                      background: lineupOnly ? 'rgba(39,201,122,.12)' : 'var(--surface2)',
+                      border: `1px solid ${lineupOnly ? 'rgba(39,201,122,.4)' : 'var(--border)'}`,
+                      color: lineupOnly ? '#27c97a' : 'var(--muted)',
+                      borderRadius: 5, padding: '2px 8px', fontSize: 9, cursor: 'pointer',
+                      fontFamily: "'DM Mono',monospace", lineHeight: 1.5, flexShrink: 0,
+                    }}>
+                    {lineupOnly ? '✅ Confirmed only' : '👁 All batters'}
+                  </button>
+                )}
+              </div>
+            );
+          })()}
+
           {/* Filter row — same set as Barrel Lab/On Base's FilterPanel.
               Hide Final/My Picks/Gone Yard Today/2+ TB Today/Pitcher Grade
               reuse Slate Rankings' own existing state (see the comment on

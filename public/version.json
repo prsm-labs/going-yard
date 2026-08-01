@@ -1,8 +1,8 @@
 {
   "version": "2026.08.01",
-  "bundleFile": "index-DtXvAimc.js",
+  "bundleFile": "index-rUbiUt4a.js",
   "changelog": [
-    "Add matchup card row + Barrel Lab/On Base-style filters to Arsenal Fit"
+    "Add My Picks [+] button to Arsenal Fit table"
   ],
   "notifyUsers": true
 }
