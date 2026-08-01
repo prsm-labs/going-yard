@@ -1,8 +1,8 @@
 {
   "version": "2026.08.01",
-  "bundleFile": "index-D25yS6sS.js",
+  "bundleFile": "index-DtXvAimc.js",
   "changelog": [
-    "Fix Arsenal Fit crash: pgEmoji was locally scoped to a different component"
+    "Add matchup card row + Barrel Lab/On Base-style filters to Arsenal Fit"
   ],
   "notifyUsers": true
 }

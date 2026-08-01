@@ -14348,6 +14348,7 @@ function afPitcherDisplay(r) {
   return resolved;
 }
 const ARSENAL_FIT_COLS = [
+  { key:null,      label:'+',        align:'center', title:'Add to My Picks' },
   { key:'batter',  label:'Batter',   align:'left',   title:'' },
   { key:'pitcher', label:'Pitcher',  align:'left',   title:'Opposing probable starter' },
   { key:'pgrade',  label:'P.Grade',  align:'center', title:'Pitcher grade (hand-specific)' },
@@ -16052,6 +16053,7 @@ function SimLabView({ data }) {
   // Arsenal Fit's own sort — independent of Slate Rankings' sortBy/sortDir
   // since the column sets don't overlap.
   const handleAfSort = key => {
+    if (!key) return;
     if (key === afSortBy) setAfSortDir(d => d === 'desc' ? 'asc' : 'desc');
     else { setAfSortBy(key); setAfSortDir('desc'); }
   };
@@ -17379,10 +17381,10 @@ function SimLabView({ data }) {
                       title={col.title || ''}
                       style={{
                         textAlign: col.align, whiteSpace: 'nowrap', fontSize: 9, lineHeight: 1.2,
-                        padding: '5px 6px', cursor: 'pointer', userSelect: 'none',
-                        color: afSortBy === col.key ? 'var(--accent)' : 'var(--muted)',
+                        padding: '5px 6px', cursor: col.key ? 'pointer' : 'default', userSelect: 'none',
+                        color: col.key && afSortBy === col.key ? 'var(--accent)' : 'var(--muted)',
                       }}>
-                      {col.label}{afSortBy === col.key ? (afSortDir === 'desc' ? ' ▼' : ' ▲') : ''}
+                      {col.label}{col.key && afSortBy === col.key ? (afSortDir === 'desc' ? ' ▼' : ' ▲') : ''}
                     </th>
                   ))}
                 </tr>
@@ -17399,6 +17401,9 @@ function SimLabView({ data }) {
                   const pgLabel = b._pgLabel || b.pitcher_grade_label || '';
                   return (
                     <tr key={`${b.batter_id}-${i}`} className="dr">
+                      <td style={{ textAlign: 'center', padding: '3px 4px' }} onClick={e => e.stopPropagation()}>
+                        <PickButton pid={parseInt(b.batter_id) || 0} name={b.batter} team={b.batting_team}/>
+                      </td>
                       <td className="sticky-batter" style={{ padding: '3px 6px', maxWidth: 170 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 5, overflow: 'hidden', cursor: 'pointer' }}
                           onClick={() => openAtBatSlide({ pid: parseInt(b.batter_id) || 0, name: b.batter, team: b.batting_team })}>
