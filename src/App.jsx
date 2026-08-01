@@ -14328,6 +14328,59 @@ function obSortValue(r, key) {
   }
 }
 
+// ── Arsenal Fit — slate-wide table (2026-08-01) ─────────────────────────────
+// Same underlying engine fields as OB_COLS/OpposingBatterTable above (built
+// 2026-07-28 for the per-pitcher slideout view), extended to a standalone
+// page covering every matchup on the slate at once — replaces the old
+// "Deep Dive" view inside SimLabView (All Matchups). Reuses SimLabView's own
+// `slate` array as its row source, so it automatically respects whatever
+// date (today/tomorrow) and matchup-dropdown selection is already active —
+// no separate data fetch or global cache needed.
+function afPitcherDisplay(r) {
+  const resolved = resolvePitcherName(r.pitcher, r.batting_team, r.pitcher_id);
+  // resolvePitcherName() already resolves "Unknown (id)" via the player cache
+  // when an ID is present, and via PROBABLE_PITCHER_MAP (populated live from
+  // fetchGames()'s probable-pitcher-by-team data) when there's no ID at all
+  // but the team's probable starter is known. This is the final fallback for
+  // when NEITHER resolves — show a clean placeholder instead of leaking the
+  // raw "Unknown (694346...)" string into the table.
+  if (!resolved || resolved === '—' || /^unknown/i.test(String(resolved).trim())) return 'N/A';
+  return resolved;
+}
+const ARSENAL_FIT_COLS = [
+  { key:'batter',  label:'Batter',   align:'left',   title:'' },
+  { key:'pitcher', label:'Pitcher',  align:'left',   title:'Opposing probable starter' },
+  { key:'pgrade',  label:'P.Grade',  align:'center', title:'Pitcher grade (hand-specific)' },
+  { key:'hm',      label:'HM',       align:'center', title:'Hand Match tier — ⭐⭐⭐ elite / ⭐⭐ full / ⭐ partial' },
+  { key:'l7iso',   label:'L7 ISO',   align:'right',  title:'Recent 7-day ISO' },
+  { key:'l7ev',    label:'L7 EV',    align:'right',  title:'Recent 7-day avg exit velocity' },
+  { key:'pa',      label:'PA',       align:'right',  title:`Season PAs vs this pitcher's pitch mix + handedness — dimmed columns need ${MIN_BVP_PA_TRUST}+` },
+  { key:'iso',     label:'ISO',      align:'right',  title:"Season ISO vs this pitcher's pitch mix + handedness" },
+  { key:'ev',      label:'EV',       align:'right',  title:"Season avg EV vs this pitcher's pitch mix + handedness" },
+  { key:'brl',     label:'Brl%',     align:'right',  title:"Season Barrel% vs this pitcher's pitch mix + handedness" },
+  { key:'fb',      label:'FB%',      align:'right',  title:"Season Fly Ball% vs this pitcher's pitch mix + handedness" },
+  { key:'hr',      label:'HR',       align:'right',  title:"Season HR count vs this pitcher's pitch mix + handedness" },
+  { key:'fit',     label:'Fit',      align:'right',  title:"Arsenal-weighted pitch convergence — engine's own sample-size-discounted fit score" },
+];
+function afSortValue(r, key) {
+  switch (key) {
+    case 'batter':  return (r.batter||'').toLowerCase();
+    case 'pitcher': return afPitcherDisplay(r).toLowerCase();
+    case 'pgrade':  return r._pgLabel || r.pitcher_grade_label || '';
+    case 'hm':      return OB_HAND_MATCH_RANK[getHandMatchTier(r)] || 0;
+    case 'l7iso':   return parseFloat(r.recent_iso)||0;
+    case 'l7ev':    return parseFloat(r.recent_avg_ev)||0;
+    case 'pa':      return parseInt(r.bvp_pa)||0;
+    case 'iso':     return parseFloat(r.bvp_iso)||0;
+    case 'ev':      return parseFloat(r.bvp_avg_ev)||0;
+    case 'brl':     return parseFloat(r.bvp_barrel_pct)||0;
+    case 'fb':      return parseFloat(r.bvp_fb_pct)||0;
+    case 'hr':      return parseInt(r.bvp_hr_count)||0;
+    case 'fit':     return parseFloat(r.ps_convergence)||0;
+    default:        return 0;
+  }
+}
+
 function OpposingBatterTable({ pitcherId }) {
   // FIXED 2026-07-28: baseRows only ever depended on [pitcherId] — since
   // isBarrelLabEligible(r) (called inside getOpposingBatters) checks
@@ -15849,7 +15902,9 @@ function SimLabView({ data }) {
   const picks = usePicks();
   const [lineupVer, setLineupVer] = useState(LINEUP_VERSION);
   useEffect(() => { const unsub = subscribeLineup(v => setLineupVer(v)); return unsub; }, []);
-  const [view, setView]             = useState('slate');    // 'slate' | 'deepdive' | 'props'
+  const [view, setView]             = useState('slate');    // 'slate' | 'arsenalfit' | 'props'
+  const [afSortBy, setAfSortBy]     = useState('fit');       // Arsenal Fit table's own independent sort
+  const [afSortDir, setAfSortDir]   = useState('desc');
   const [selBatter, setSelBatter]   = useState(null);
   const [sortBy, setSortBy]         = useState('_yard');
   const [sortDir, setSortDir]       = useState('desc');
@@ -15961,6 +16016,13 @@ function SimLabView({ data }) {
     userSorted.current = true; // user took control — don't auto-re-sort
     if (key === sortBy) setSortDir(d => d === 'desc' ? 'asc' : 'desc');
     else { setSortBy(key); setSortDir('desc'); }
+  };
+
+  // Arsenal Fit's own sort — independent of Slate Rankings' sortBy/sortDir
+  // since the column sets don't overlap.
+  const handleAfSort = key => {
+    if (key === afSortBy) setAfSortDir(d => d === 'desc' ? 'asc' : 'desc');
+    else { setAfSortBy(key); setAfSortDir('desc'); }
   };
 
   // Build matchup list from data sorted by start time
@@ -16107,6 +16169,18 @@ function SimLabView({ data }) {
     return sorted;
   }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterTB2Sim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, selPositionsSim, filterKeyMatchup, minYard, maxYard, minSig, maxSig, minSimTB, minOdds, minBoom, minBrl, minZoneFit, maxZoneFit, minZoneEdge, minXwoba, minL7EV, maxL7EV, minHitPct, minL7Iso, selHRUpside, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal, slotMin, slotMax, weakSpotOnly, closeCallOnly, ccVer]);
 
+  // Arsenal Fit — reuses `slate` (already respects the date toggle via the
+  // `data` prop + the matchup dropdown/all other Slate Rankings filters via
+  // selMatchups etc.), re-sorted independently by afSortBy/afSortDir.
+  const arsenalFitRows = useMemo(() => {
+    return [...slate].sort((a, b) => {
+      const va = afSortValue(a, afSortBy), vb = afSortValue(b, afSortBy);
+      if (va < vb) return afSortDir === 'asc' ? -1 : 1;
+      if (va > vb) return afSortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [slate, afSortBy, afSortDir]);
+
   // Reset row cap when filters/sort change so user always sees top results
   useEffect(() => { setDisplayLimit(150); }, [sortBy, sortDir, selMatchups, lineupOnly, simActiveOnly, simSearch, filterKeyMatchup, slotMin, slotMax]);
 
@@ -16154,7 +16228,7 @@ function SimLabView({ data }) {
       <div style={{ display: 'flex', gap: 6, marginBottom: 16, alignItems:'center' }}>
         <div style={{ display: 'flex', gap: 4, padding: '3px', background: 'var(--surface)', borderRadius: 8, border: '1px solid var(--border)' }}>
           <button style={vBtn('slate', '📊 Slate')} onClick={() => setView('slate')}>📊 Slate Rankings</button>
-          <button style={vBtn('deepdive', '🔬')} onClick={() => setView('deepdive')}>🔬 Deep Dive</button>
+          <button style={vBtn('arsenalfit', '💪🏽')} onClick={() => setView('arsenalfit')}>💪🏽 Arsenal Fit</button>
         </div>
         <CheatCodeButton
               onSauceFilter={(enable)=>{
@@ -17153,336 +17227,96 @@ function SimLabView({ data }) {
         </div>
       )}
 
-      {/* ── DEEP DIVE ── */}
-      {view === 'deepdive' && (
+      {/* ── ARSENAL FIT ── */}
+      {view === 'arsenalfit' && (
         <div>
-          {selBatter && (() => {
-            const b = selBatter;
-            const hrP = pctRaw(b.proj_hr_adj);
-            const hitP = pctRaw(b.proj_hit_prob);
-            const xbhP = pctRaw(b.proj_xbh_prob);
-            const tb = parseFloat(b.sim_tb) || 0;
-            const gc = GRADE_CFG[computeEffectiveGrade(b.grade, b._pgLabel || '')] || GRADE_CFG['D'];
-            const _effGradeSimLab = computeEffectiveGrade(b.grade, b._pgLabel || '');
-            const inSlump = b.in_slump === 'True' || b.in_slump === true;
-            const isDiamond = b.is_diamond === 'True' || b.is_diamond === true;
-            const hf = parseFloat(b.hr_factor) || 1.0;
-
-            return (
-              <div>
-                {/* Header card */}
-                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 16px', marginBottom: 14, borderLeft: `3px solid ${gc.color}` }}>
-                  {/* HR Upside full checklist card in Deep Dive */}
-                  {(()=>{
-                    const ev7    = parseFloat(b.recent_avg_ev)||0;
-                    const brlPct = parseFloat(b.recent_barrel_pct)||0;
-                    const la7    = parseFloat(b.recent_avg_la)||0;
-                    const fb7    = parseFloat(b.recent_fb_pct)||0;
-                    const pbPct  = parseFloat(b.recent_pulled_barrel_pct)||0;
-                    const zf     = getZoneFit(b);
-                    const ph     = (b.pitcher_hand||'').toUpperCase()[0];
-                    const bh     = (b.batter_hand||'').toUpperCase()[0];
-                    const pBrl   = parseFloat(b.pitcher_barrel_pct_allowed)||0;
-                    const hrFact = parseFloat(b.hr_factor)||100;
-                    const windOk = b.wind_effect && b.wind_effect!=='N/A' &&
-                                   (b.wind_effect.includes('Out')||b.wind_effect.includes('Help')||b.wind_effect.includes('Boost'));
-                    const platoon = (ph==='L'&&(bh==='R'||bh==='S'))||(ph==='R'&&(bh==='L'||bh==='S'));
-                    const checks = [
-                      {label:'Barrel% 8%+',   ok:brlPct>=8,                val:`${brlPct.toFixed(1)}%`,   tip:'Elite barrel rate — hard contact at optimal angle'},
-                      {label:'EV 92+ mph',    ok:ev7>=92,                  val:`${ev7.toFixed(1)}`,        tip:'Exit velocity above HR threshold'},
-                      {label:'LA 22-32°',     ok:la7>=22&&la7<=32,         val:la7>0?`${la7.toFixed(1)}°`:'—', tip:'Optimal HR launch angle window'},
-                      {label:'Pull FB%',      ok:pbPct>=6||fb7>=35,        val:pbPct>0?`↙${pbPct.toFixed(0)}%`:`FB${fb7.toFixed(0)}%`, tip:'Pull-side flyball tendency'},
-                      {label:'LA Locked',     ok:b.la_locked===true||b.la_locked==='True', val:(b.la_locked===true||b.la_locked==='True')?`${la7.toFixed(1)}°`:'—', tip:'Launch angle tight + centered in HR zone (stddev<8°)'},
-
-                      {label:'Zone Fit 70%+', ok:zf>=70,                   val:`${zf.toFixed(0)}%`,        tip:'Pitcher throws to batter power zones'},
-                      {label:'Platoon Adv',   ok:platoon,                  val:platoon?'✓':'—',            tip:'Favorable handedness matchup'},
-                      {label:'P Gives Brls',  ok:pBrl>=6,                  val:pBrl>0?`${pBrl.toFixed(1)}%`:'—', tip:'Pitcher allows barrels regularly'},
-                      {label:'Park / Wind',   ok:hrFact>=105||windOk,      val:(()=>{const hf=parseFloat(b.hr_factor);if(!hf||hf<=0)return windOk?'✓':'—';const d=Math.round(hf-100);return d>0?`+${d}%`:d===0?'Neutral':`${d}%`;})(), tip:'Park factor or wind favors HRs'},
-                      // Zone overlap — pitcher usage ≥8% in batter hot zones
-                      ...(parseInt(b._zoneEdges||DAILY_PICKS_CACHE[String(b.batter_id)]?._zoneEdges||0)>0 ? [{
-                        label:'Zone Edges',
-                        ok: parseInt(b._zoneEdges||DAILY_PICKS_CACHE[String(b.batter_id)]?._zoneEdges||0) >= 2,
-                        val: `${parseInt(b._zoneEdges||DAILY_PICKS_CACHE[String(b.batter_id)]?._zoneEdges||0)} edge${parseInt(b._zoneEdges||DAILY_PICKS_CACHE[String(b.batter_id)]?._zoneEdges||0)!==1?'s':''}`,
-                        tip: 'Pitcher throws to zones where batter has elevated HR%/Barrel%/HH% — zone overlap signal'
-                      }] : []),
-                      // Pitcher weak slot — confirmed lineup in pitcher historically weak batting slot
-                      ...(b.pitcher_weak_slots ? [{
-                        label:'Weak Slot',
-                        ok: (()=>{const _ls=liveSlot(parseInt(b.batter_id)||0,b.lineup_slot);return _ls>0&&(b.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(_ls);})(),
-                        val: (()=>{const _ls=liveSlot(parseInt(b.batter_id)||0,b.lineup_slot);const inWeak=_ls>0&&(b.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(_ls);return inWeak?`Slot ${_ls} ✓`:`Slots ${b.pitcher_weak_slots}`;})(),
-                        tip: `Pitcher historically allows elevated HR rate in certain batting slots — weak slots: ${b.pitcher_weak_slots||'—'}`
-                      }] : []),
-                    ];
-                    const lit = checks.filter(ch=>ch.ok).length;
-                    const label = lit>=6?'ELITE':lit>=4?'STRONG':lit>=2?'GOOD':'BELOW AVG';
-                    const uColor = lit>=7?'#ff4020':lit>=5?'#f5a623':lit>=3?'#27c97a':'var(--muted)';
-                    return(
-                      <div style={{background:'var(--surface)',border:`1px solid ${uColor}33`,
-                        borderRadius:9,padding:'12px 14px',marginBottom:12}}>
-                        {/* Header row */}
-                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-                          <span style={{fontFamily:"'DM Mono',monospace",fontSize:8,
-                            color:'var(--muted)',textTransform:'uppercase',letterSpacing:1}}>
-                            HR CHECKLIST
-                          </span>
-                          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:12,
-                            color:uColor,letterSpacing:.5}}>
-                            {label} · {lit}/{checks.length}
-                          </span>
+          <div style={{ marginBottom: 10, fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>
+            Season performance vs each opposing pitcher's real arsenal (top pitch types) + handedness —
+            same engine fields as the Arsenal Fit table inside each pitcher's slideout, expanded to every
+            matchup on the slate. Respects the date toggle and matchup dropdown above. Dimmed BvP columns
+            mean a small sample (under {MIN_BVP_PA_TRUST} PA) — reference only, not yet reliable.
+          </div>
+          <div className="tw">
+            <table>
+              <thead>
+                <tr>
+                  {ARSENAL_FIT_COLS.map(col => (
+                    <th key={col.key} className={col.key === 'batter' ? 'sticky-batter' : undefined}
+                      onClick={() => handleAfSort(col.key)}
+                      title={col.title || ''}
+                      style={{
+                        textAlign: col.align, whiteSpace: 'nowrap', fontSize: 9, lineHeight: 1.2,
+                        padding: '5px 6px', cursor: 'pointer', userSelect: 'none',
+                        color: afSortBy === col.key ? 'var(--accent)' : 'var(--muted)',
+                      }}>
+                      {col.label}{afSortBy === col.key ? (afSortDir === 'desc' ? ' ▼' : ' ▲') : ''}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {arsenalFitRows.slice(0, displayLimit).map((b, i) => {
+                  const bvpPA = parseInt(b.bvp_pa) || 0;
+                  const thin = bvpPA < MIN_BVP_PA_TRUST;
+                  const tier = getHandMatchTier(b);
+                  const stars = tier === 'elite' ? '⭐⭐⭐' : tier === 'full' ? '⭐⭐' : tier === 'partial' ? '⭐' : '';
+                  const numOr = (v, d) => (v != null && v !== '' && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(d) : '—';
+                  const dimStyle = { textAlign: 'right', padding: '3px 6px', opacity: thin ? 0.5 : 1, color: thin ? 'var(--muted)' : 'var(--text)' };
+                  const pitcherDisplay = afPitcherDisplay(b);
+                  const pgLabel = b._pgLabel || b.pitcher_grade_label || '';
+                  return (
+                    <tr key={`${b.batter_id}-${i}`} className="dr">
+                      <td className="sticky-batter" style={{ padding: '3px 6px', maxWidth: 170 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, overflow: 'hidden', cursor: 'pointer' }}
+                          onClick={() => openAtBatSlide({ pid: parseInt(b.batter_id) || 0, name: b.batter, team: b.batting_team })}>
+                          <PlayerAvatar pid={parseInt(b.batter_id) || 0} name={b.batter} size={22}/>
+                          <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 8, fontWeight: 700, color: 'var(--accent2)', flexShrink: 0 }}>{b.batting_team}</span>
+                          <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.batter}</span>
+                          <span style={{ fontSize: 8, color: 'var(--muted)', flexShrink: 0 }}>{b.batter_hand}</span>
                         </div>
-                        {/* 2-column grid of conditions */}
-                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'5px 14px'}}>
-                          {checks.map(ch=>(
-                            <div key={ch.label} title={ch.tip}
-                              style={{display:'flex',alignItems:'center',gap:6,padding:'3px 0',
-                                borderBottom:'1px solid rgba(255,255,255,.04)'}}>
-                              <span style={{fontSize:11,flexShrink:0,
-                                color:ch.ok?'#27c97a':'rgba(255,255,255,.15)'}}>
-                                {ch.ok?'✅':'○'}
-                              </span>
-                              <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,flex:1,
-                                color:ch.ok?'var(--text)':'var(--muted)',fontWeight:ch.ok?600:400}}>
-                                {ch.label}
-                              </span>
-                              <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,flexShrink:0,
-                                fontWeight:ch.ok?700:400,
-                                color:ch.ok?'#27c97a':'rgba(255,255,255,.2)'}}>
-                                {ch.val}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })()}
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                        <PlayerAvatar pid={parseInt(b.batter_id)||0} name={b.batter} size={40}/>
-                        <span
-                          onClick={()=>openAtBatSlide({pid:parseInt(b.batter_id)||0,name:b.batter,team:b.batting_team})}
-                          style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 22,
-                            color: 'var(--text)', cursor: 'pointer',
-                            borderBottom: '1px dotted rgba(255,255,255,.25)' }}
-                          title="Open batter slideout">
-                          {b.batter}
-                        </span>
-                        <SavantLink pid={parseInt(b.batter_id)||0} type="batter"/>
-                        {!INJURY_MAP[String(parseInt(b.batter_id)||0)] && <span title={`Effective Grade: ${_effGradeSimLab} (Batter: ${b.grade||'?'} × Pitcher context)`} style={{ padding: '3px 9px', borderRadius: 6, fontSize: 11, fontFamily: "'Oswald',sans-serif", fontWeight: 800, background: gc.bg, color: gc.color, border: `1px solid ${gc.border}` }}>{_effGradeSimLab}</span>}
-                        <InjuryBadge pid={parseInt(b.batter_id)||0} name={b.batter}/>
-                        <PickButton pid={parseInt(b.batter_id)||0} name={b.batter} team={b.batting_team}/>
-                        {isDiamond && <span style={{ padding: '2px 8px', borderRadius: 5, fontSize: 10, fontWeight: 700, background: 'rgba(255,204,0,.15)', color: '#ffcc00', border: '1px solid rgba(255,204,0,.35)' }}>💎 Diamond Pick</span>}
-                        {inSlump && <span style={{ padding: '2px 7px', borderRadius: 5, fontSize: 9, fontFamily: "'DM Mono',monospace", background: 'rgba(56,184,242,.1)', border: '1px solid rgba(56,184,242,.3)', color: 'var(--ice)' }}>📉 SLUMP</span>}
-                      </div>
-                      <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
-                        <span style={{ color: 'var(--accent2)', fontWeight: 700 }}>{b.batting_team}</span> · {b.batter_hand}HB
-                        <span style={{ marginLeft: 10 }}>vs <strong style={{ color: 'var(--text)' }}>{b.pitcher}</strong> ({b.pitcher_hand}HP)</span>
-                        <span style={{ marginLeft: 10, color: 'var(--accent2)' }}>{b.away_team || ''} @ {b.home_team || ''}</span>
-                        <span style={{ marginLeft: 10 }}>{b.game_time}</span>
-                      </div>
-                      {/* Injury banner — always visible, key for mobile */}
-                      <InjuryBanner pid={parseInt(b.batter_id)||0} style={{marginTop:8,marginBottom:0}}/>
-                      <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)', marginTop: 3 }}>
-                        {b.top_pitches && <span>Arsenal: <strong style={{ color: 'var(--text)' }}>{b.top_pitches}</strong> · </span>}
-                        {b.wind_effect && <span>{b.wind_effect} · </span>}
-                        {b.temp_f && <span>{parseFloat(b.temp_f).toFixed(0)}°F · </span>}
-                        {b.condition && <span>{b.condition} · </span>}
-                        <span style={{ color: hf > 1.05 ? '#ff8020' : hf < 0.95 ? 'var(--ice)' : 'var(--muted)' }}>
-                          Park: {hf > 1.05 ? '📈 HR-friendly' : hf < 0.95 ? '📉 HR-suppressor' : '— Neutral'}
-                        </span>
-                      </div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 36, color: hrP >= 10 ? '#ff4020' : hrP >= 6 ? '#ff8020' : 'var(--text)', lineHeight: 1 }}>
-                        {hrP.toFixed(1)}%
-                      </div>
-                      <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 9, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 1 }}>HR PROB</div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Outcome probabilities */}
-                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 16px', marginBottom: 14 }}>
-                  <div style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>Outcome Probabilities</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {[
-                      { label: 'Home Run', value: b.proj_hr_adj, max: 20, color: '#ff4020' },
-                      { label: 'Hit (any)',  value: b.proj_hit_prob, max: 50, color: '#27c97a' },
-                      { label: 'XBH (2B/3B/HR)', value: b.proj_xbh_prob, max: 30, color: '#f5a623' },
-                    ].map(row => (
-                      <div key={row.label} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)', minWidth: 100 }}>{row.label}</span>
-                        <ProbBar value={row.value} max={row.max} color={row.color} />
-                      </div>
-                    ))}
-                    <div style={{ display: 'flex', gap: 12, marginTop: 4, flexWrap: 'wrap' }}>
-                      {[
-                        { label: 'Exp. TB',  val: tb.toFixed(2), color: tb >= 1.5 ? '#ff8020' : 'var(--text)' },
-                        { label: 'Exp. RBI', val: parseFloat(b.proj_avg_rbi)>0 ? parseFloat(b.proj_avg_rbi).toFixed(2) : '—', color: 'var(--text)' },
-                        { label: 'Sim H',    val: num(b.sim_h),   color: 'var(--text)' },
-                        { label: 'Sim HR',   val: num(b.sim_hr_adj || b.sim_hr), color: parseFloat(b.sim_hr_adj||0) >= 0.15 ? 'var(--accent)' : 'var(--text)' },
-                        { label: 'Sim BB',   val: num(b.sim_bb),  color: 'var(--text)' },
-                        { label: 'Sim K',    val: num(b.sim_k),   color: 'var(--text)' },
-                      ].map(s => (
-                        <div key={s.label} style={{ textAlign: 'center', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 7, padding: '6px 12px' }}>
-                          <div style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 15, color: s.color, lineHeight: 1 }}>{s.val}</div>
-                          <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 8, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: .5, marginTop: 3 }}>{s.label}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Three signal cards + pitcher grade */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: 10, marginBottom: 14 }}>
-                  {/* Recent form */}
-                  <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 12px' }}>
-                    <div style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>📅 Recent Form (L7)</div>
-                    {[
-                      ['Avg EV', b.recent_avg_ev, ' mph', parseFloat(b.recent_avg_ev) >= 95 ? '#ff4020' : parseFloat(b.recent_avg_ev) >= 90 ? '#f5a623' : 'var(--text)'],
-                      ['Barrel%', b.recent_barrel_pct, '%', parseFloat(b.recent_barrel_pct) >= 10 ? '#ff4020' : parseFloat(b.recent_barrel_pct) >= 5 ? '#f5a623' : 'var(--text)'],
-                      ['HH%',    b.recent_hh_pct,    '%', 'var(--text)'],
-                      ['FB%',    b.recent_fb_pct,    '%', 'var(--text)'],
-                      ['Avg LA', b.recent_avg_la,    '°', 'var(--text)'],
-                    ].map(([lbl, val, unit, col]) => val && parseFloat(val) > 0 ? (
-                      <div key={lbl} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-                        <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>{lbl}</span>
-                        <span style={{ fontSize: 11, fontFamily: "'Oswald',sans-serif", fontWeight: 700, color: col }}>{parseFloat(val).toFixed(1)}{unit}</span>
-                      </div>
-                    ) : null)}
-                    <div style={{ marginTop: 5, fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>
-                      {b.recent_pa} PA · {b.recent_hr_count || 0} HR · {parseInt(b.recent_flag_count) || 0} flags
-                    </div>
-                  </div>
-
-                  {/* BvP */}
-                  <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 12px' }}>
-                    <div style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>⚔️ BvP ({b.bvp_pa} PA)</div>
-                    {[
-                      ['Avg EV', b.bvp_avg_ev, ' mph', parseFloat(b.bvp_avg_ev) >= 95 ? '#ff4020' : parseFloat(b.bvp_avg_ev) >= 90 ? '#f5a623' : 'var(--text)'],
-                      ['Barrel%', b.bvp_barrel_pct, '%', parseFloat(b.bvp_barrel_pct) >= 10 ? '#ff4020' : parseFloat(b.bvp_barrel_pct) >= 5 ? '#f5a623' : 'var(--text)'],
-                      ['HH%',    b.bvp_hh_pct,    '%', 'var(--text)'],
-                      ['FB%',    b.bvp_fb_pct,    '%', 'var(--text)'],
-                      ['Avg LA', b.bvp_avg_la,    '°', 'var(--text)'],
-                    ].map(([lbl, val, unit, col]) => val && parseFloat(val) > 0 ? (
-                      <div key={lbl} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-                        <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>{lbl}</span>
-                        <span style={{ fontSize: 11, fontFamily: "'Oswald',sans-serif", fontWeight: 700, color: col }}>{parseFloat(val).toFixed(1)}{unit}</span>
-                      </div>
-                    ) : null)}
-                    <div style={{ marginTop: 5, fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>
-                      {b.bvp_hr_count || 0} HR in sample · {parseInt(b.bvp_flag_count) || 0} flags
-                    </div>
-                  </div>
-
-                  {/* Pitcher vulnerability */}
-                  <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 12px' }}>
-                    <div style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>🎯 Pitcher Vuln.</div>
-                    {[
-                      ['Barrel Allowed', b.pitcher_barrel_pct_allowed, '%', parseFloat(b.pitcher_barrel_pct_allowed) >= 10 ? '#ff4020' : parseFloat(b.pitcher_barrel_pct_allowed) >= 6 ? '#f5a623' : 'var(--text)'],
-                      ['HH Allowed',     b.pitcher_hh_pct_allowed,    '%', parseFloat(b.pitcher_hh_pct_allowed) >= 45 ? '#ff4020' : 'var(--text)'],
-                      ['FB Allowed',     b.pitcher_fb_pct_allowed,    '%', 'var(--text)'],
-                      ['💣 Zone%',       b.pitcher_meatball_pct,      '%', parseFloat(b.pitcher_meatball_pct) >= 60 ? '#ff4020' : parseFloat(b.pitcher_meatball_pct) >= 55 ? '#f5a623' : 'var(--muted)'],
-                    ].map(([lbl, val, unit, col]) => val && parseFloat(val) > 0 ? (
-                      <div key={lbl} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-                        <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>{lbl}</span>
-                        <span style={{ fontSize: 11, fontFamily: "'Oswald',sans-serif", fontWeight: 700, color: col }}>{parseFloat(val).toFixed(1)}{unit}</span>
-                      </div>
-                    ) : null)}
-                    {/* Meatball matchup score */}
-                    {b.meatball_matchup_score && parseFloat(b.meatball_matchup_score) > 0 && (() => {
-                      const ms = parseFloat(b.meatball_matchup_score);
-                      const display = (ms * 100).toFixed(1);
-                      // Higher = better matchup. Color scale: green=weak, orange=solid, red=elite
-                      const col = ms >= 0.15 ? '#ff4020' : ms >= 0.08 ? '#f5a623' : '#27c97a';
-                      const label = ms >= 0.15 ? '🔥 Elite' : ms >= 0.08 ? '⚡ Solid' : '✓ Mild';
-                      return (
-                        <div style={{ marginTop: 5, paddingTop: 5, borderTop: '1px solid rgba(255,255,255,.06)' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>💣 Meatball Matchup</span>
-                            <span style={{ fontSize: 11, fontFamily: "'Oswald',sans-serif", fontWeight: 700, color: col }}>{display} <span style={{ fontSize: 8 }}>{label}</span></span>
-                          </div>
-                          <div style={{ fontSize: 8, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", marginTop: 2 }}>
-                            0–7 mild · 8–14 solid · 15–25 elite
-                          </div>
-                        </div>
-                      );
-                    })()}
-                    {b.pitcher_pa_faced && <div style={{ marginTop: 5, fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>{b.pitcher_pa_faced} PA faced this season</div>}
-                    {/* Bullpen HR Rank */}
-                    {b.bullpen_hr_rank && parseInt(b.bullpen_hr_rank) > 0 && (() => {
-                      const rank = parseInt(b.bullpen_hr_rank);
-                      const col = rank <= 10 ? '#27c97a' : rank <= 20 ? '#f5a623' : '#ff4020';
-                      const label = rank <= 10 ? '💥 Soft Pen' : rank <= 20 ? '— Avg Pen' : '🔒 Tough Pen';
-                      return (
-                        <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid rgba(255,255,255,.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>Opp. Bullpen HR Rank</span>
-                          <span style={{ fontSize: 11, fontFamily: "'Oswald',sans-serif", fontWeight: 700, color: col }}>#{rank}/30 <span style={{ fontSize: 8 }}>{label}</span></span>
-                        </div>
-                      );
-                    })()}
-                    {/* Discipline flag */}
-                    {b.discipline_flag && b.discipline_flag.trim() && (() => {
-                      const flag  = String(b.discipline_flag);
-                      const score = b.discipline_score ? parseFloat(b.discipline_score).toFixed(0) : null;
-                      const chase = b.recent_chase_k_pct || b.season_chase_k_pct;
-                      const bb    = b.recent_bb_pct || b.season_bb_pct;
-                      const col   = flag.includes('Chase Risk') ? '#ff4020'
-                                  : flag.includes('Watch')       ? '#f5a623'
-                                  : flag.includes('Disciplined') ? '#27c97a'
-                                  : 'var(--muted)';
-                      return (
-                        <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid rgba(255,255,255,.06)' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                            <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>Plate Discipline</span>
-                            <span style={{ fontSize: 10, fontFamily: "'DM Mono',monospace", fontWeight: 700, color: col,
-                              padding: '1px 6px', borderRadius: 4, background: `${col}18`, border: `1px solid ${col}40` }}>
-                              {flag}
-                            </span>
-                          </div>
-                          <div style={{ display: 'flex', gap: 10 }}>
-                            {chase != null && <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 8, color: 'var(--muted)' }}>
-                              Chase K: <span style={{ color: parseFloat(chase) > 15 ? '#ff4020' : 'var(--text)' }}>{parseFloat(chase).toFixed(1)}%</span>
-                            </span>}
-                            {bb != null && <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 8, color: 'var(--muted)' }}>
-                              BB%: <span style={{ color: parseFloat(bb) > 8 ? '#27c97a' : 'var(--text)' }}>{parseFloat(bb).toFixed(1)}%</span>
-                            </span>}
-                            {score && <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 8, color: 'var(--muted)' }}>
-                              Score: <span style={{ color: 'var(--text)' }}>{score}/100</span>
-                            </span>}
-                          </div>
-                        </div>
-                      );
-                    })()}
-                  </div>
-
-                  {/* Pitcher grade card — same card as shown in Lineups tab */}
-                  <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 12px' }}>
-                    <div style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>⚾ Pitcher Grade</div>
-                    <div style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', marginBottom:4 }}
-                      onClick={e=>{ e.stopPropagation(); openPitcherSlide({pid:parseInt(b.pitcher_id)||0, name:b.pitcher, team:b.pitcher_team||'', hand:b.pitcher_hand, pitchMix:[]}); }}>
-                      <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 13, color: 'var(--text)' }}>{resolvePitcherName(b.pitcher, b.batting_team, b.pitcher_id)}</span>
-                      <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace", fontWeight: 400 }}>{b.pitcher_hand}HP</span>
-                      {isPitcherRP(b.pitcher_games_started) && (
-                        <span title="Season-classified as a reliever (0 games started) — likely an opener/bulk-game situation"
-                          style={{fontSize:9,fontWeight:700,color:'#f5a623',padding:'1px 5px',borderRadius:3,
-                            background:'rgba(245,166,35,.12)',border:'1px solid rgba(245,166,35,.35)',fontFamily:"'DM Mono',monospace"}}>RP</span>
-                      )}
-                      <span style={{ fontSize: 11, color: 'var(--ice)', fontFamily:"'DM Mono',monospace", fontWeight:700, marginLeft:'auto' }}>› Stats</span>
-                    </div>
-
-                    <PitcherCard pitcherId={b.pitcher_id} pitcherName={b.pitcher} onGrade={()=>{}}/>
-                  </div>
-                </div>
-
-
-
-                {/* Recent At-Bats */}
-                {b.batter_id && <><Last7HRChart batterId={parseInt(b.batter_id)}/><RecentGameLog batterId={parseInt(b.batter_id)}/></>}
-
+                      </td>
+                      <td style={{ padding: '3px 6px', textAlign: 'left', whiteSpace: 'nowrap',
+                          cursor: pitcherDisplay !== 'N/A' ? 'pointer' : 'default',
+                          color: pitcherDisplay === 'N/A' ? 'var(--muted)' : 'var(--accent2)' }}
+                        onClick={() => {
+                          if (pitcherDisplay === 'N/A') return;
+                          openPitcherSlide({ pid: parseInt(b.pitcher_id) || 0, name: pitcherDisplay, team: b.pitcher_team || '', hand: b.pitcher_hand || '', pitchMix: [] });
+                        }}>
+                        {pitcherDisplay}{b.pitcher_hand ? <span style={{ fontSize: 8, color: 'var(--muted)' }}> ({b.pitcher_hand})</span> : null}
+                      </td>
+                      <td style={{ textAlign: 'center', padding: '3px 6px' }}>{pgEmoji(pgLabel)}</td>
+                      <td style={{ textAlign: 'center', padding: '3px 6px', color: '#fbbf24' }}>{stars}</td>
+                      <td style={{ textAlign: 'right', padding: '3px 6px' }}>{numOr(b.recent_iso, 3)}</td>
+                      <td style={{ textAlign: 'right', padding: '3px 6px' }}>{numOr(b.recent_avg_ev, 1)}</td>
+                      <td style={{ textAlign: 'right', padding: '3px 6px', color: thin ? 'var(--muted)' : 'var(--text)' }}
+                        title={thin ? `Small sample (${bvpPA} PA) — dimmed columns in this row are reference only, not reliable until ${MIN_BVP_PA_TRUST}+ PA` : `${bvpPA} PA`}>
+                        {bvpPA}{thin ? '*' : ''}
+                      </td>
+                      <td style={dimStyle}>{numOr(b.bvp_iso, 3)}</td>
+                      <td style={dimStyle}>{numOr(b.bvp_avg_ev, 1)}</td>
+                      <td style={dimStyle}>{numOr(b.bvp_barrel_pct, 1)}</td>
+                      <td style={dimStyle}>{numOr(b.bvp_fb_pct, 1)}</td>
+                      <td style={dimStyle}>{parseInt(b.bvp_hr_count) || 0}</td>
+                      <td style={{ textAlign: 'right', padding: '3px 6px', color: 'var(--accent2)', fontWeight: 700 }}
+                        title={b.ps_conv_pitch ? `Best-fit pitch: ${b.ps_conv_pitch}` : ''}>
+                        {numOr(b.ps_convergence, 1)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {arsenalFitRows.length > displayLimit && (
+              <div style={{ textAlign: 'center', padding: '12px 0' }}>
+                <button onClick={() => setDisplayLimit(v => v + 150)}
+                  style={{ fontFamily: "'DM Mono',monospace", fontSize: 9, padding: '6px 16px',
+                    borderRadius: 6, border: '1px solid var(--border)', background: 'rgba(255,255,255,.05)',
+                    color: 'var(--muted)', cursor: 'pointer', letterSpacing: .5 }}>
+                  Show more ({arsenalFitRows.length - displayLimit} remaining)
+                </button>
               </div>
-            );
-          })()}
+            )}
+          </div>
         </div>
       )}
 
