@@ -15905,6 +15905,37 @@ function SimLabView({ data }) {
   const [view, setView]             = useState('slate');    // 'slate' | 'arsenalfit' | 'props'
   const [afSortBy, setAfSortBy]     = useState('fit');       // Arsenal Fit table's own independent sort
   const [afSortDir, setAfSortDir]   = useState('desc');
+  // Arsenal Fit filters (2026-08-01) — same set as Barrel Lab/On Base's
+  // FilterPanel. Hide Final/My Picks/Gone Yard Today/2+ TB Today/Pitcher
+  // Grade/matchup selection deliberately REUSE the existing Slate Rankings
+  // state below (slHideFinal, simPicksOnly, filterGoneYardSim, filterTB2Sim,
+  // selPitcherGradesSim, selMatchups) rather than duplicating it — same
+  // underlying `slate` data, so keeping one shared filter state means
+  // toggling e.g. Hide Final behaves consistently across both views. Only
+  // Chalk/Day Late/Sauce 3.0/Hand Match/min-ISO-EV are genuinely new here —
+  // Slate Rankings never had these (they're Barrel Lab/On Base additions).
+  const [afChalkOnly,     setAfChalkOnly]     = useState(false);
+  const [afDayLateOnly,   setAfDayLateOnly]   = useState(false);
+  const [afSauce3Only,    setAfSauce3Only]    = useState(false);
+  const [afHandMatchOnly, setAfHandMatchOnly] = useState(false);
+  const [afMinL7Iso, setAfMinL7Iso] = useState('');
+  const [afMinIso,   setAfMinIso]   = useState('');
+  const [afMinL7Ev,  setAfMinL7Ev]  = useState('');
+  const [afMinEv,    setAfMinEv]    = useState('');
+  const [afDayLateVer, setAfDayLateVer] = useState(0); // tracks _DAY_LATE_VER
+  const [afPlayerVer,  setAfPlayerVer]  = useState(0); // tracks PLAYER_CACHE_DATE (Chalk needs getCachedPlayer())
+  useEffect(() => {
+    loadDayLateLookup();
+    const dayLateId = setInterval(() => { if (_DAY_LATE_VER !== afDayLateVer) setAfDayLateVer(_DAY_LATE_VER); }, 5000);
+    let lastSeenPlayerDate = PLAYER_CACHE_DATE;
+    const playerId = setInterval(() => {
+      if (PLAYER_CACHE_DATE && PLAYER_CACHE_DATE !== lastSeenPlayerDate) {
+        lastSeenPlayerDate = PLAYER_CACHE_DATE;
+        setAfPlayerVer(v => v + 1);
+      }
+    }, 3000);
+    return () => { clearInterval(dayLateId); clearInterval(playerId); };
+  }, [afDayLateVer]);
   const [selBatter, setSelBatter]   = useState(null);
   const [sortBy, setSortBy]         = useState('_yard');
   const [sortDir, setSortDir]       = useState('desc');
@@ -16170,16 +16201,36 @@ function SimLabView({ data }) {
   }, [data, sortBy, sortDir, selMatchups, lineupOnly, filterGoneYardSim, filterTB2Sim, filterDueSim, filterDiamondSim, simPicksOnly, simActiveOnly, simInjuredOnly, simHotOnly, selPitcherGradesSim, selBatterGradesSim, selPositionsSim, filterKeyMatchup, minYard, maxYard, minSig, maxSig, minSimTB, minOdds, minBoom, minBrl, minZoneFit, maxZoneFit, minZoneEdge, minXwoba, minL7EV, maxL7EV, minHitPct, minL7Iso, selHRUpside, simSearch, lineupVer, slBatterHand, slPitcherHand, slFormFilter, slHideFinal, slotMin, slotMax, weakSpotOnly, closeCallOnly, ccVer]);
 
   // Arsenal Fit — reuses `slate` (already respects the date toggle via the
-  // `data` prop + the matchup dropdown/all other Slate Rankings filters via
-  // selMatchups etc.), re-sorted independently by afSortBy/afSortDir.
+  // `data` prop + the matchup dropdown/Hide Final/My Picks/Gone Yard/2+TB/
+  // Pitcher Grade via selMatchups/slHideFinal/simPicksOnly/filterGoneYardSim/
+  // filterTB2Sim/selPitcherGradesSim), layers on the Barrel-Lab/On-Base-style
+  // Chalk/Day Late/Sauce 3.0/Hand Match/min-ISO-EV filters, then re-sorts
+  // independently by afSortBy/afSortDir.
   const arsenalFitRows = useMemo(() => {
-    return [...slate].sort((a, b) => {
+    const withFlags = slate.map(r => ({
+      ...r,
+      isChalk:       isChalkBatter(r),
+      isDayLate:     isDayLateBatter(r),
+      isSauce2:      isSauce2Batter(r),
+      isSauce3:      isSauce3Batter(r),
+      handMatchTier: getHandMatchTier(r),
+    }));
+    const filtered = withFlags
+      .filter(r => !afChalkOnly     || r.isChalk)
+      .filter(r => !afDayLateOnly   || r.isDayLate)
+      .filter(r => !afSauce3Only    || r.isSauce3)
+      .filter(r => !afHandMatchOnly || r.handMatchTier)
+      .filter(r => afMinL7Iso === '' || parseFloat(r.recent_iso||0)    >= parseFloat(afMinL7Iso))
+      .filter(r => afMinIso   === '' || parseFloat(r.bvp_iso||0)       >= parseFloat(afMinIso))
+      .filter(r => afMinL7Ev  === '' || parseFloat(r.recent_avg_ev||0) >= parseFloat(afMinL7Ev))
+      .filter(r => afMinEv    === '' || parseFloat(r.bvp_avg_ev||0)    >= parseFloat(afMinEv));
+    return filtered.sort((a, b) => {
       const va = afSortValue(a, afSortBy), vb = afSortValue(b, afSortBy);
       if (va < vb) return afSortDir === 'asc' ? -1 : 1;
       if (va > vb) return afSortDir === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [slate, afSortBy, afSortDir]);
+  }, [slate, afSortBy, afSortDir, afChalkOnly, afDayLateOnly, afSauce3Only, afHandMatchOnly, afMinL7Iso, afMinIso, afMinL7Ev, afMinEv, afDayLateVer, afPlayerVer]);
 
   // Reset row cap when filters/sort change so user always sees top results
   useEffect(() => { setDisplayLimit(150); }, [sortBy, sortDir, selMatchups, lineupOnly, simActiveOnly, simSearch, filterKeyMatchup, slotMin, slotMax]);
@@ -17233,9 +17284,91 @@ function SimLabView({ data }) {
           <div style={{ marginBottom: 10, fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>
             Season performance vs each opposing pitcher's real arsenal (top pitch types) + handedness —
             same engine fields as the Arsenal Fit table inside each pitcher's slideout, expanded to every
-            matchup on the slate. Respects the date toggle and matchup dropdown above. Dimmed BvP columns
-            mean a small sample (under {MIN_BVP_PA_TRUST} PA) — reference only, not yet reliable.
+            matchup on the slate. Respects the date toggle above. Dimmed BvP columns mean a small sample
+            (under {MIN_BVP_PA_TRUST} PA) — reference only, not yet reliable.
           </div>
+
+          {/* Matchup card row — same pattern as Barrel Lab/On Base's game
+              slate, wired to the SAME selMatchups state Slate Rankings/the
+              old matchup dropdown already use, so switching games here stays
+              in sync with the rest of this tab. */}
+          <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 6, marginBottom: 10 }}>
+            <button onClick={() => setSelMatchups(new Set())}
+              style={{ minWidth: 90, flex: '0 0 auto', padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
+                border: `1px solid ${selMatchups.size === 0 ? 'var(--accent)' : 'var(--border)'}`,
+                background: selMatchups.size === 0 ? 'rgba(255,153,0,.10)' : 'var(--surface2)',
+                textAlign: 'center' }}>
+              <div style={{ fontFamily: "'Oswald',sans-serif", fontSize: 11, fontWeight: 700,
+                color: selMatchups.size === 0 ? 'var(--accent)' : 'var(--text)', letterSpacing: .6 }}>
+                ALL GAMES
+              </div>
+            </button>
+            {matchupList.map(m => {
+              const sel = selMatchups.size === 1 && selMatchups.has(m.id);
+              const fin = FINAL_GAME_IDS.has(String(m.id));
+              return (
+                <button key={m.id} onClick={() => setSelMatchups(new Set([m.id]))}
+                  style={{ minWidth: 110, flex: '0 0 auto', padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
+                    border: `1px solid ${sel ? 'var(--accent)' : 'var(--border)'}`,
+                    background: sel ? 'rgba(255,153,0,.10)' : 'var(--surface2)',
+                    textAlign: 'center', opacity: fin ? 0.55 : 1 }}>
+                  <div style={{ fontFamily: "'Oswald',sans-serif", fontSize: 11, fontWeight: 700,
+                    color: sel ? 'var(--accent)' : 'var(--text)', letterSpacing: .6 }}>
+                    {m.away} @ {m.home}
+                  </div>
+                  <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 8,
+                    color: sel ? 'rgba(255,153,0,.7)' : 'var(--muted)', marginTop: 2 }}>
+                    {fin ? 'FINAL' : (m.time || '')}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Filter row — same set as Barrel Lab/On Base's FilterPanel.
+              Hide Final/My Picks/Gone Yard Today/2+ TB Today/Pitcher Grade
+              reuse Slate Rankings' own existing state (see the comment on
+              afChalkOnly etc. above) — only Chalk/Day Late/Sauce 3.0/Hand
+              Match/min-ISO-EV are new to this view. */}
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
+            <button onClick={() => setAfHandMatchOnly(v => !v)}
+              title="Batter's handedness exploits the opposing pitcher's weakness (⭐⭐⭐ elite / ⭐⭐ full / ⭐ partial)."
+              style={{ padding: '2px 8px', borderRadius: 5, cursor: 'pointer', fontFamily: "'DM Mono',monospace",
+                fontSize: 9, fontWeight: 700, lineHeight: 1.5, flexShrink: 0,
+                background: afHandMatchOnly ? 'rgba(251,191,36,.12)' : 'var(--surface2)',
+                color: afHandMatchOnly ? '#fbbf24' : 'var(--muted)',
+                border: `1px solid ${afHandMatchOnly ? 'rgba(251,191,36,.4)' : 'var(--border)'}` }}>
+              ⭐ {afHandMatchOnly ? 'Hand Match Only' : 'Hand Match'}
+            </button>
+            <button onClick={() => setAfSauce3Only(v => !v)}
+              title="Sauce 3.0 — Sauce 2.0 (Zone Fit≥2, xwOBA≥.360, non-Elite/Tough pitcher) AND both L7 ISO + Arsenal Fit ISO ≥.250. Best validated combo in this app: 20.26% HR rate / 2.85x lift, full 2026 season backtest (n=380)."
+              style={{ padding: '2px 8px', borderRadius: 5, cursor: 'pointer', fontFamily: "'DM Mono',monospace",
+                fontSize: 9, fontWeight: 700, lineHeight: 1.5, flexShrink: 0,
+                background: afSauce3Only ? 'rgba(245,158,11,.14)' : 'var(--surface2)',
+                color: afSauce3Only ? '#f59e0b' : 'var(--muted)',
+                border: `1px solid ${afSauce3Only ? 'rgba(245,158,11,.45)' : 'var(--border)'}` }}>
+              🍯🔥 {afSauce3Only ? 'Sauce 3.0 Only' : 'Sauce 3.0'}
+            </button>
+            <FilterPanel
+              toggles={[
+                { key: 'hideFinal', label: '🚫 Hide Final',      active: slHideFinal,      color: '#ff6b6b',    onToggle: () => setSlHideFinal(v => !v) },
+                { key: 'chalk',     label: '💪🏽 Chalk',           active: afChalkOnly,      color: '#f5c542',    onToggle: () => setAfChalkOnly(v => !v) },
+                { key: 'daylate',   label: '🗓️ Day Late',        active: afDayLateOnly,    color: '#22c1c3',    onToggle: () => setAfDayLateOnly(v => !v) },
+                { key: 'picks',     label: '🎯 My Picks',        active: simPicksOnly,     color: 'var(--accent2)', onToggle: () => setSimPicksOnly(v => !v) },
+                { key: 'goneyard',  label: '💥 Gone Yard Today', active: filterGoneYardSim, color: 'var(--accent)', onToggle: () => setFilterGoneYardSim(v => !v) },
+                { key: 'tb2',       label: '2️⃣ 2+ TB Today',     active: filterTB2Sim,     color: '#38b8f2',    onToggle: () => setFilterTB2Sim(v => !v) },
+              ]}
+              pitcherGrades={selPitcherGradesSim}
+              onPitcherGradesChange={setSelPitcherGradesSim}
+              minFilters={[
+                { key: 'l7iso', label: 'L7 ISO', value: afMinL7Iso, onChange: setAfMinL7Iso, step: '0.001' },
+                { key: 'iso',   label: 'ISO',    value: afMinIso,   onChange: setAfMinIso,   step: '0.001' },
+                { key: 'l7ev',  label: 'L7 EV',  value: afMinL7Ev,  onChange: setAfMinL7Ev,  step: '0.1' },
+                { key: 'ev',    label: 'EV',     value: afMinEv,    onChange: setAfMinEv,    step: '0.1' },
+              ]}
+            />
+          </div>
+
           <div className="tw">
             <table>
               <thead>

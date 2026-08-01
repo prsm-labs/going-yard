@@ -1,8 +1,8 @@
 {
   "version": "2026.08.01",
-  "bundleFile": "index-CskBolcF.js",
+  "bundleFile": "index-D25yS6sS.js",
   "changelog": [
-    "Replace All Matchups' Deep Dive view with an Arsenal Fit table"
+    "Fix Arsenal Fit crash: pgEmoji was locally scoped to a different component"
   ],
   "notifyUsers": true
 }
