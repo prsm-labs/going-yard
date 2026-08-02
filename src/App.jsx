@@ -15917,6 +15917,7 @@ function SimLabView({ data }) {
   // Slate Rankings never had these (they're Barrel Lab/On Base additions).
   const [afChalkOnly,     setAfChalkOnly]     = useState(false);
   const [afDayLateOnly,   setAfDayLateOnly]   = useState(false);
+  const [afYoungGunsOnly, setAfYoungGunsOnly] = useState(false);
   const [afSauce3Only,    setAfSauce3Only]    = useState(false);
   const [afSauce25Only,   setAfSauce25Only]   = useState(false);
   const [afHandMatchOnly, setAfHandMatchOnly] = useState(false);
@@ -16214,6 +16215,7 @@ function SimLabView({ data }) {
       ...r,
       isChalk:       isChalkBatter(r),
       isDayLate:     isDayLateBatter(r),
+      isYoungGun:    isYoungGunBatter(r),
       isSauce2:      isSauce2Batter(r),
       isSauce3:      isSauce3Batter(r),
       isSauce25:     isSauce25Batter(r),
@@ -16222,6 +16224,7 @@ function SimLabView({ data }) {
     const filtered = withFlags
       .filter(r => !afChalkOnly     || r.isChalk)
       .filter(r => !afDayLateOnly   || r.isDayLate)
+      .filter(r => !afYoungGunsOnly || r.isYoungGun)
       .filter(r => !afSauce3Only    || r.isSauce3)
       .filter(r => !afSauce25Only   || r.isSauce25)
       .filter(r => !afHandMatchOnly || r.handMatchTier)
@@ -16235,7 +16238,7 @@ function SimLabView({ data }) {
       if (va > vb) return afSortDir === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [slate, afSortBy, afSortDir, afChalkOnly, afDayLateOnly, afSauce3Only, afSauce25Only, afHandMatchOnly, afMinL7Iso, afMinIso, afMinL7Ev, afMinEv, afDayLateVer, afPlayerVer]);
+  }, [slate, afSortBy, afSortDir, afChalkOnly, afDayLateOnly, afYoungGunsOnly, afSauce3Only, afSauce25Only, afHandMatchOnly, afMinL7Iso, afMinIso, afMinL7Ev, afMinEv, afDayLateVer, afPlayerVer]);
 
   // Reset row cap when filters/sort change so user always sees top results
   useEffect(() => { setDisplayLimit(150); }, [sortBy, sortDir, selMatchups, lineupOnly, simActiveOnly, simSearch, filterKeyMatchup, slotMin, slotMax]);
@@ -17392,6 +17395,7 @@ function SimLabView({ data }) {
                 { key: 'hideFinal', label: '🚫 Hide Final',      active: slHideFinal,      color: '#ff6b6b',    onToggle: () => setSlHideFinal(v => !v) },
                 { key: 'chalk',     label: '💪🏽 Chalk',           active: afChalkOnly,      color: '#f5c542',    onToggle: () => setAfChalkOnly(v => !v) },
                 { key: 'daylate',   label: '🗓️ Day Late',        active: afDayLateOnly,    color: '#22c1c3',    onToggle: () => setAfDayLateOnly(v => !v) },
+                { key: 'younggun',  label: '🌱 Young Guns',      active: afYoungGunsOnly,  color: '#4ade80',    onToggle: () => setAfYoungGunsOnly(v => !v) },
                 { key: 'sauce3',    label: '🍯🔥 Sauce 3.0',      active: afSauce3Only,     color: '#f59e0b',    onToggle: () => setAfSauce3Only(v => !v) },
                 { key: 'picks',     label: '🎯 My Picks',        active: simPicksOnly,     color: 'var(--accent2)', onToggle: () => setSimPicksOnly(v => !v) },
                 { key: 'goneyard',  label: '💥 Gone Yard Today', active: filterGoneYardSim, color: 'var(--accent)', onToggle: () => setFilterGoneYardSim(v => !v) },
@@ -28013,7 +28017,8 @@ function LegendButton() {
       '🔴/🔵 Ball State Adjustment badge (2026-07-30) — live-only, display-only. Once a batter\'s game is actually in progress, shows a 🔴 Juiced Ball / 🔵 Dead Ball badge if the Live tab\'s ⚾ Ball Carry or ⬆️⬇️ xHR Conversion diagnostic has a confident (z-score) DEAD/JUICED read for that game. Tooltip discloses which of the two diagnostics fired and whether they agree. This never touches TrueHRScore, MatchupScore, SimHR%, or any other score — it\'s a badge, not an input.',
       '🍯🔥 Sauce 3.0 badge/filter (2026-07-30) — the best validated combo in this app\'s history. Sauce 2.0 (Zone Fit ≥2, xwOBA ≥.360, Pitcher Grade not Elite/Tough) AND both L7 ISO + Arsenal Fit ISO ≥.250. Backtested against the full 2026 season via a leak-free ISO backfill joined to real Track Record outcomes (30,042 real batter-games, 5/17–7/29): Sauce 2.0 alone = 15.43% HR rate (2.17x lift over the 7.12% baseline); Sauce 3.0 = 20.26% (2.85x lift, n=380) — and it held up (in fact strengthened) in July specifically, the month Sauce 2.0 alone had softened in. Note: the backtest\'s single best version also added "Is Key Matchup" (21.93%/3.08x) — that\'s a human researcher\'s manually-curated flag that only exists in the All Matchups/Track Record pipeline, not a live matchup_engine.py field, so it can\'t be computed here. What\'s implemented is the Sauce 2.0 + ISO-combo version (still 2.85x). Its standalone quick-access button moved into the ⚙ Filters panel 2026-08-02 (badge/card/CSV column unchanged) once Sauce 2.5 took over the "most exposed" slot.',
       '🥫 Sauce 2.5 badge/filter (2026-08-02) — a deliberately looser middle tier, built after checking whether 2.0/3.0\'s thresholds were cutting off too much real signal. Confirmed: 80.5% of HRs hit in same-handed "unfavorable" platoon matchups this season had xwOBA below Sauce 2.0\'s own .360 bar, and 87.8% failed at least one of Sauce 3.0\'s ISO≥.250 gates — not unique to unfavorable matchups either (77.7% true across ALL HRs this season). Same Zone Fit≥2/non-Elite-Tough gate as 2.0/3.0, relaxed to xwOBA≥.330 and both L7/Arsenal Fit ISO≥.220: 18.24% HR rate / 2.57x lift, full 2026 season backtest (n=899) — nearly matches Sauce 3.0\'s 2.74x while more than doubling the flagged population and season-HR recall (7.4% vs 3.5%). Now the standalone, most-exposed "Sauce" quick filter across Barrel Lab, On Base, Arsenal Fit, and Track Record.',
-      '⚙ Filters panel — consolidates every checkbox toggle (Hide Final, Longshot, Chalk, Day Late, Sauce 3.0, My Picks, Gone Yard, 2+TB, Plate IQ, Hand Match) plus a Pitcher Grade multi-select into one dropdown, added 2026-07-27 once adding Chalk/Day Late would have pushed the old flat button row past what fits on a phone screen.',
+      '🌱 Young Guns badge/filter (2026-08-02) — season PA <100. Deliberately NOT a hot signal like Chalk/Sauce/Barrel Signal, and shows no elevated-odds framing anywhere — a same-day research pass across the full 2026 season found the opposite: batters with <20 career PA entering a game homer LESS often per game than established batters (7.9% vs 11.5%, leak-free). This filter exists purely to make thin-history batters easy to FIND (TrueHRScore/MatchupScore have little to work with on a small sample, so they can get buried under established bats in the default sort) — the badge shows the plain season PA count, not a score. One real, data-confirmed wrinkle from that same research: rookie HRs skew notably more toward four-seam fastballs (40.8% vs 34.2% for established HRs), consistent with pitchers not yet having a scouting report on them. Threshold set to include real named examples from a live slate: Max Clark (0 PA), Eduardo Valencia (24 PA), Spencer Jones (98 PA).',
+      '⚙ Filters panel — consolidates every checkbox toggle (Hide Final, Longshot, Chalk, Day Late, Young Guns, Sauce 3.0, My Picks, Gone Yard, 2+TB, Plate IQ, Hand Match) plus a Pitcher Grade multi-select into one dropdown, added 2026-07-27 once adding Chalk/Day Late would have pushed the old flat button row past what fits on a phone screen.',
     ] },
     { tab:'🔵 On Base',        items:[
       'Monte Carlo simulation targeting 2+ total bases per game (broader outcome than HR alone) — 10,000 simulated PAs per matchup.',
@@ -28021,7 +28026,7 @@ function LegendButton() {
       'MatchupScore (0–100) — pitcher-adjusted vulnerability, same concept as Barrel Lab\'s.',
       'SimTB2% — simulated probability of reaching 2+ total bases in the game.',
       '★ TB Signal — OnBaseScore ≥75 AND MatchupScore ≥60 AND SimTB2% ≥30%. Very new signal — live tracker: 38.0% hit rate, still a small sample.',
-      'Same 🎲 Longshot / 💪🏽 Chalk / 🗓️ Day Late / 💥 Gone Yard / 2️⃣ 2+ TB / 🟢 Weak Spot / ⭐⭐⭐ Hand Match / 🟣 Rain Watch / 🔴🔵 Ball State Adjustment / 🥫 Sauce 2.5 / 🍯🔥 Sauce 3.0 / ⚙ Filters panel badges and filters as Barrel Lab — Longshot was added here for the first time 2026-07-27 (previously Barrel Lab only); Sauce 2.5 added 2026-08-02 as the new standalone-exposed Sauce tier, and Sauce 3.0\'s own quick button moved into the panel the same day.',
+      'Same 🎲 Longshot / 💪🏽 Chalk / 🗓️ Day Late / 🌱 Young Guns / 💥 Gone Yard / 2️⃣ 2+ TB / 🟢 Weak Spot / ⭐⭐⭐ Hand Match / 🟣 Rain Watch / 🔴🔵 Ball State Adjustment / 🥫 Sauce 2.5 / 🍯🔥 Sauce 3.0 / ⚙ Filters panel badges and filters as Barrel Lab — Longshot was added here for the first time 2026-07-27 (previously Barrel Lab only); Sauce 2.5 added 2026-08-02 as the new standalone-exposed Sauce tier, Sauce 3.0\'s own quick button moved into the panel the same day, and Young Guns added the same day as a discovery filter (thin-history batters, not a hot signal).',
     ] },
     { tab:'📋 Track Record',   items:[
       'The self-auditing page — merges the daily All Matchups, Barrel Lab, and On Base exports against actual box-score outcomes, every day, automatically.',
@@ -31977,6 +31982,34 @@ function isLongshotBatter(r, trueHRScore, matchupScore) {
 // AB/HR check. Validated against the live slate: 17 of 1,146 batters,
 // all real established sluggers (Schwarber, Devers, Soto, Trout, Harper,
 // etc.) — a defensible, corrected list.
+// ── Young Guns — thin/no season track record, discovery filter (2026-08-02) ─
+// Explicitly NOT a "hot" signal like Chalk/Sauce/Barrel Signal — deliberately
+// no badge implying elevated odds. Built after a same-day research pass
+// confirmed the opposite: batters with <20 career PA entering a game hit HRs
+// LESS often per game than established batters (7.9% vs 11.5%, full 2026
+// season, leak-free). This filter exists purely so these batters are easy to
+// FIND (they can get buried under established bats in the default sort, and
+// TrueHRScore/MatchupScore have little to work with on a thin sample) — not
+// because the engine thinks they're more likely to go deep. The one real,
+// data-confirmed wrinkle from that same research pass: rookie HRs skew
+// notably more toward four-seam fastballs (40.8% vs 34.2% for established
+// HRs) — consistent with pitchers not yet having a scouting report — which is
+// why the row/card display shows the plain season PA count rather than any
+// score, so a researcher can judge for themselves rather than the app
+// implying a lift that the data doesn't support.
+// Threshold: season_pa < 100. Validated against the real 2026-08-02 slate
+// against the three examples the user named directly: Max Clark (0 PA, true
+// debut), Eduardo Valencia (24 PA), Spencer Jones (98 PA — deliberately set
+// the bar just above him, not the tighter <30/<50 that would have excluded
+// him). season_pa is already a live field on every row in Barrel Lab/On
+// Base/Arsenal Fit (isBarrelLabEligible already reads it) — by the time a row
+// reaches these tabs it's already gated to either an established regular or
+// someone confirmed in today's real lineup, so no extra "are they actually
+// playing" check is needed here.
+function isYoungGunBatter(r) {
+  return parseFloat(r.season_pa ?? 999) < 100;
+}
+
 function isChalkBatter(r) {
   const p = getCachedPlayer(r.batter_id);
   if (!p) return false; // player season data not loaded yet, or genuinely unknown
@@ -32485,6 +32518,7 @@ function BarrelLabTab() {
   const [blLongshotOnly,   setBlLongshotOnly]   = useState(false);
   const [blChalkOnly,      setBlChalkOnly]      = useState(false);
   const [blDayLateOnly,    setBlDayLateOnly]    = useState(false);
+  const [blYoungGunsOnly,  setBlYoungGunsOnly]  = useState(false);
   const [blPicksOnly,      setBlPicksOnly]      = useState(false);
   const [blGoneYardOnly,   setBlGoneYardOnly]   = useState(false);
   const [blTB2Only,        setBlTB2Only]        = useState(false);
@@ -32719,6 +32753,7 @@ function BarrelLabTab() {
         isLongshot: isLongshotBatter(r, r.trueHRScore, r.matchupScore),
         isChalk:    isChalkBatter(r),
         isDayLate:  isDayLateBatter(r),
+        isYoungGun: isYoungGunBatter(r),
         // Ball State Adjustment (2026-07-30) — display-only, see
         // getBallStateBadge's own comment block for the "never touches
         // scoring" guarantee. null on any non-live/no-signal game.
@@ -32742,6 +32777,7 @@ function BarrelLabTab() {
     .filter(r => !blLongshotOnly || r.isLongshot)
     .filter(r => !blChalkOnly    || r.isChalk)
     .filter(r => !blDayLateOnly  || r.isDayLate)
+    .filter(r => !blYoungGunsOnly || r.isYoungGun)
     .filter(r => !blPicksOnly    || picks[String(parseInt(r.batter_id)||0)])
     .filter(r => !blGoneYardOnly || isGoneYardBL(r))
     .filter(r => !blTB2Only || is2BagBL(r))
@@ -32756,7 +32792,7 @@ function BarrelLabTab() {
     .filter(r => blMinL7Ev  === '' || parseFloat(r.recent_avg_ev||0) >= parseFloat(blMinL7Ev))
     .filter(r => blMinEv    === '' || parseFloat(r.bvp_avg_ev||0)    >= parseFloat(blMinEv))
     .sort((a, b) => b.trueHRScore - a.trueHRScore);
-  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, blChalkOnly, blDayLateOnly, blPicksOnly, picks, blGoneYardOnly, blTB2Only, blHighIQOnly, blHandMatchOnly, blSauce3Only, blSauce25Only, blBatterHand, blPitcherGrades, blMinL7Iso, blMinIso, blMinL7Ev, blMinEv, hrVer, finalVer, dayLateVer, playerVer, ballStateVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, blChalkOnly, blDayLateOnly, blYoungGunsOnly, blPicksOnly, picks, blGoneYardOnly, blTB2Only, blHighIQOnly, blHandMatchOnly, blSauce3Only, blSauce25Only, blBatterHand, blPitcherGrades, blMinL7Iso, blMinIso, blMinL7Ev, blMinEv, hrVer, finalVer, dayLateVer, playerVer, ballStateVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Color threshold helpers
   const clr = (v, g1, g2, y1, y2) => {
@@ -33027,6 +33063,7 @@ function BarrelLabTab() {
                 {key:'hideFinal', label:'🚫 Hide Final',        active:blHideFinal,     color:'#ff6b6b', onToggle:()=>setBlHideFinal(v=>!v)},
                 {key:'chalk',     label:'💪🏽 Chalk',             active:blChalkOnly,     color:'#f5c542', onToggle:()=>setBlChalkOnly(v=>!v)},
                 {key:'daylate',   label:'🗓️ Day Late',          active:blDayLateOnly,   color:'#22c1c3', onToggle:()=>setBlDayLateOnly(v=>!v)},
+                {key:'younggun',  label:'🌱 Young Guns',        active:blYoungGunsOnly, color:'#4ade80', onToggle:()=>setBlYoungGunsOnly(v=>!v)},
                 {key:'sauce3',    label:'🍯🔥 Sauce 3.0',        active:blSauce3Only,    color:'#f59e0b', onToggle:()=>setBlSauce3Only(v=>!v)},
                 {key:'picks',     label:'🎯 My Picks',          active:blPicksOnly,     color:'var(--accent2)', onToggle:()=>setBlPicksOnly(v=>!v)},
                 {key:'goneyard',  label:'💥 Gone Yard Today',   active:blGoneYardOnly,  color:'var(--accent)', onToggle:()=>setBlGoneYardOnly(v=>!v)},
@@ -33067,7 +33104,7 @@ function BarrelLabTab() {
                 const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
                 const f1 = v => (v != null && v !== '' && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(1) : '';
                 const f3 = v => (v != null && v !== '' && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(3) : '';
-                const hdrs = ['Slot','Team','Player','Pitcher','Grade','TrueHR','Matchup','ZF','Form (gHR)','SimHR%','ISO','xwOBA','PulledBrl%','Brl/BIP%','HR/FB%','FB%','HH%','LA°','Barrel Signal','Plate IQ','IQ Grade','Zone Risk','Hand Match','Longshot','Chalk','Day Late','Arsenal Fit ISO','Sauce 2.0','Sauce 2.5','Sauce 3.0',
+                const hdrs = ['Slot','Team','Player','Pitcher','Grade','TrueHR','Matchup','ZF','Form (gHR)','SimHR%','ISO','xwOBA','PulledBrl%','Brl/BIP%','HR/FB%','FB%','HH%','LA°','Barrel Signal','Plate IQ','IQ Grade','Zone Risk','Hand Match','Longshot','Chalk','Day Late','Young Gun','Season PA','Arsenal Fit ISO','Sauce 2.0','Sauce 2.5','Sauce 3.0',
                   'Game ID','Batter ID','Pitcher ID'];
                 const csvRows = [hdrs.map(esc).join(',')];
                 rows.forEach(b => {
@@ -33098,6 +33135,8 @@ function BarrelLabTab() {
                     esc(b.isLongshot ? '1' : '0'),
                     esc(b.isChalk ? '1' : '0'),
                     esc(b.isDayLate ? '1' : '0'),
+                    esc(b.isYoungGun ? '1' : '0'),
+                    esc(parseInt(b.season_pa||0)),
                     esc(f3(b.bvp_iso)),
                     esc(b.isSauce2 ? '1' : '0'),
                     esc(b.isSauce25 ? '1' : '0'),
@@ -33369,6 +33408,13 @@ function BarrelLabTab() {
                     🗓️ Day Late
                   </div>
                 )}
+                {b.isYoungGun && (
+                  <div title="Thin/no season track record (<100 PA) — discovery filter, NOT a hot signal. Rookie HRs skew toward fastballs (pitchers haven't scouted them yet), but as a group these batters homer LESS often per game than established ones (7.9% vs 11.5%, full 2026 season)."
+                    style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'#4ade80',
+                    letterSpacing:.6,textTransform:'uppercase',marginBottom:4}}>
+                    🌱 Young Gun ({parseInt(b.season_pa||0)} PA)
+                  </div>
+                )}
                 {b.isSauce3 && (
                   <div title="Sauce 2.0 AND both L7 ISO + Arsenal Fit ISO ≥.250 — 20.26% HR rate / 2.85x lift, full 2026 season backtest."
                     style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'#f59e0b',
@@ -33473,6 +33519,7 @@ function BarrelLabTab() {
                                   {b.isLongshot && <span title="Longshot — TrueHRScore ≤55, MatchupScore ≥65, Sim TB ≥1.2, non-elite pitcher." style={{color:'#a78bfa',marginRight:2,fontWeight:900,fontSize:7}}>🎲</span>}
                                   {b.isChalk && <span title="Chalk — real season HR leader (>=18 HR, >=.220 ISO) facing a genuinely soft matchup today (Target/Hittable/Average)." style={{color:'#f5c542',marginRight:2,fontWeight:900,fontSize:7}}>💪🏽</span>}
                                   {b.isDayLate && <span title="Day Late — a real ★ Barrel Signal on BOTH of the last 2 real game days, no HR either day, today's matchup not an outright Elite mismatch." style={{color:'#22c1c3',marginRight:2,fontWeight:900,fontSize:7}}>🗓️</span>}
+                                  {b.isYoungGun && <span title={`Young Gun — ${parseInt(b.season_pa||0)} season PA. Discovery filter, not a hot signal — thin-history batters homer LESS often per game on average (7.9% vs 11.5%).`} style={{color:'#4ade80',marginRight:2,fontWeight:900,fontSize:7}}>🌱</span>}
                                   {b.isSauce3 && <span title="Sauce 3.0 — Sauce 2.0 AND both L7 ISO + Arsenal Fit ISO ≥.250. 20.26% HR rate / 2.85x lift, full 2026 season backtest (n=380). Best validated combo in this app." style={{color:'#f59e0b',marginRight:2,fontWeight:900,fontSize:7}}>🍯🔥</span>}
                                   {b.isSauce25 && <span title="Sauce 2.5 — relaxed xwOBA≥.330, both ISO≥.220. 18.24% HR rate / 2.57x lift, full 2026 season backtest (n=899)." style={{color:'#eab308',marginRight:2,fontWeight:900,fontSize:7}}>🥫</span>}
                                   {b.handMatchTier && <span
@@ -33696,6 +33743,7 @@ function OnBaseTab() {
   const [obLongshotOnly,   setObLongshotOnly]   = useState(false);
   const [obChalkOnly,      setObChalkOnly]      = useState(false);
   const [obDayLateOnly,    setObDayLateOnly]    = useState(false);
+  const [obYoungGunsOnly,  setObYoungGunsOnly]  = useState(false);
   const [obPicksOnly,      setObPicksOnly]      = useState(false);
   const [obGoneYardOnly,   setObGoneYardOnly]   = useState(false);
   const [obTB2Only,        setObTB2Only]        = useState(false);
@@ -33868,6 +33916,7 @@ function OnBaseTab() {
         isLongshot: isLongshotBatter(r, r.onBaseScore, r.matchupScore),
         isChalk:    isChalkBatter(r),
         isDayLate:  isDayLateBatter(r),
+        isYoungGun: isYoungGunBatter(r),
         // Ball State Adjustment (2026-07-30) — display-only, see
         // getBallStateBadge's own comment block for the "never touches
         // scoring" guarantee. null on any non-live/no-signal game.
@@ -33893,6 +33942,7 @@ function OnBaseTab() {
     .filter(r => !obLongshotOnly || r.isLongshot)
     .filter(r => !obChalkOnly    || r.isChalk)
     .filter(r => !obDayLateOnly  || r.isDayLate)
+    .filter(r => !obYoungGunsOnly || r.isYoungGun)
     .filter(r => !obPicksOnly || picks[String(parseInt(r.batter_id)||0)])
     .filter(r => !obGoneYardOnly || isGoneYardOB(r))
     .filter(r => !obTB2Only || is2BagOB(r))
@@ -33907,7 +33957,7 @@ function OnBaseTab() {
     .filter(r => obMinL7Ev  === '' || parseFloat(r.recent_avg_ev||0) >= parseFloat(obMinL7Ev))
     .filter(r => obMinEv    === '' || parseFloat(r.bvp_avg_ev||0)    >= parseFloat(obMinEv))
     .sort((a, b) => b.onBaseScore - a.onBaseScore);
-  }, [eligibleBatters, simResults, obHideFinal, obLongshotOnly, obChalkOnly, obDayLateOnly, obPicksOnly, obGoneYardOnly, obTB2Only, obHighIQOnly, obHandMatchOnly, obSauce3Only, obSauce25Only, obBatterHand, obPitcherGrades, obMinL7Iso, obMinIso, obMinL7Ev, obMinEv, picks, finalVer, hrVer, dayLateVer, playerVer, ballStateVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [eligibleBatters, simResults, obHideFinal, obLongshotOnly, obChalkOnly, obDayLateOnly, obYoungGunsOnly, obPicksOnly, obGoneYardOnly, obTB2Only, obHighIQOnly, obHandMatchOnly, obSauce3Only, obSauce25Only, obBatterHand, obPitcherGrades, obMinL7Iso, obMinIso, obMinL7Ev, obMinEv, picks, finalVer, hrVer, dayLateVer, playerVer, ballStateVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const byTeam = useMemo(() => {
     const teams = {};
@@ -34159,6 +34209,7 @@ function OnBaseTab() {
                 {key:'hideFinal', label:'🚫 Hide Final',        active:obHideFinal,     color:'#ff6b6b', onToggle:()=>setObHideFinal(v=>!v)},
                 {key:'chalk',     label:'💪🏽 Chalk',             active:obChalkOnly,     color:'#f5c542', onToggle:()=>setObChalkOnly(v=>!v)},
                 {key:'daylate',   label:'🗓️ Day Late',          active:obDayLateOnly,   color:'#22c1c3', onToggle:()=>setObDayLateOnly(v=>!v)},
+                {key:'younggun',  label:'🌱 Young Guns',        active:obYoungGunsOnly, color:'#4ade80', onToggle:()=>setObYoungGunsOnly(v=>!v)},
                 {key:'sauce3',    label:'🍯🔥 Sauce 3.0',        active:obSauce3Only,    color:'#f59e0b', onToggle:()=>setObSauce3Only(v=>!v)},
                 {key:'picks',     label:'🎯 My Picks',          active:obPicksOnly,     color:'var(--accent2)', onToggle:()=>setObPicksOnly(v=>!v)},
                 {key:'goneyard',  label:'💥 Gone Yard Today',   active:obGoneYardOnly,  color:'var(--accent)', onToggle:()=>setObGoneYardOnly(v=>!v)},
@@ -34228,6 +34279,8 @@ function OnBaseTab() {
                     esc(b.isLongshot ? '1' : '0'),
                     esc(b.isChalk ? '1' : '0'),
                     esc(b.isDayLate ? '1' : '0'),
+                    esc(b.isYoungGun ? '1' : '0'),
+                    esc(parseInt(b.season_pa||0)),
                     esc(f3(b.bvp_iso)),
                     esc(b.isSauce2 ? '1' : '0'),
                     esc(b.isSauce25 ? '1' : '0'),
@@ -34430,6 +34483,13 @@ function OnBaseTab() {
                     🗓️ Day Late
                   </div>
                 )}
+                {b.isYoungGun && (
+                  <div title="Thin/no season track record (<100 PA) — discovery filter, NOT a hot signal. Rookie HRs skew toward fastballs (pitchers haven't scouted them yet), but as a group these batters homer LESS often per game than established ones (7.9% vs 11.5%, full 2026 season)."
+                    style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'#4ade80',
+                    letterSpacing:.6,textTransform:'uppercase',marginBottom:6}}>
+                    🌱 Young Gun ({parseInt(b.season_pa||0)} PA)
+                  </div>
+                )}
                 {b.isSauce3 && (
                   <div title="Sauce 2.0 AND both L7 ISO + Arsenal Fit ISO ≥.250 — 20.26% HR rate / 2.85x lift, full 2026 season backtest."
                     style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'#f59e0b',
@@ -34533,6 +34593,7 @@ function OnBaseTab() {
                                 {b.isLongshot && <span title="Longshot — OnBaseScore ≤55, MatchupScore ≥65, Sim TB ≥1.2, non-elite pitcher." style={{color:'#a78bfa',marginRight:2,fontWeight:900,fontSize:7}}>🎲</span>}
                                 {b.isChalk && <span title="Chalk — real season HR leader (>=18 HR, >=.220 ISO) facing a genuinely soft matchup today." style={{color:'#f5c542',marginRight:2,fontWeight:900,fontSize:7}}>💪🏽</span>}
                                 {b.isDayLate && <span title="Day Late — a real ★ Barrel Signal on BOTH of the last 2 real game days, no HR either day, today's matchup not an outright Elite mismatch." style={{color:'#22c1c3',marginRight:2,fontWeight:900,fontSize:7}}>🗓️</span>}
+                                {b.isYoungGun && <span title={`Young Gun — ${parseInt(b.season_pa||0)} season PA. Discovery filter, not a hot signal — thin-history batters homer LESS often per game on average (7.9% vs 11.5%).`} style={{color:'#4ade80',marginRight:2,fontWeight:900,fontSize:7}}>🌱</span>}
                                 {b.isSauce3 && <span title="Sauce 3.0 — Sauce 2.0 AND both L7 ISO + Arsenal Fit ISO ≥.250. 20.26% HR rate / 2.85x lift, full 2026 season backtest (n=380). Best validated combo in this app." style={{color:'#f59e0b',marginRight:2,fontWeight:900,fontSize:7}}>🍯🔥</span>}
                                 {b.isSauce25 && <span title="Sauce 2.5 — relaxed xwOBA≥.330, both ISO≥.220. 18.24% HR rate / 2.57x lift, full 2026 season backtest (n=899)." style={{color:'#eab308',marginRight:2,fontWeight:900,fontSize:7}}>🥫</span>}
                                 {b.handMatchTier && <span
