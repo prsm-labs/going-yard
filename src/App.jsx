@@ -28020,7 +28020,8 @@ function LegendButton() {
     ] },
     { tab:'📋 Track Record',   items:[
       'The self-auditing page — merges the daily All Matchups, Barrel Lab, and On Base exports against actual box-score outcomes, every day, automatically.',
-      'Filter buttons: HRs Only, ★ Barrel Signal Only, Key Matchup Only, 🟢 Weak Spot Only, 📍 Close Call Only, 🍯 Sauce 2.0 Only, 🍯🔥 Sauce 3.0 Only, 2️⃣ 2-Bagger (Non-HR) Only, 🎯 TB Signal Only, 🎲 Sim TB ≥2.0 Only, 🧠 Plate IQ Only, ⭐ Hand Match Only, 🔴 Juiced Ball Only, 🔵 Dead Ball Only.',
+      '✅ HRs Only, ★ Barrel Signal Only, and 🍯🔥 Sauce 3.0 Only stay as standalone quick-access buttons. Everything else — 🔑 Key Matchup, 🟢 Weak Spot, 📍 Close Call, 🍯 Sauce 2.0, 🗓️ Day Late, 2️⃣ 2-Bagger (Non-HR), 🎯 TB Signal, 🎲 Sim TB ≥2.0, 🧠 High Plate IQ, ⭐ Hand Match, 🔴/🔵 Ball Carry Juiced/Dead, ⬆️/⬇️ xHR Juiced/Dead, plus a Pitcher Grade multi-select — moved into the ⚙ Filters dropdown 2026-08-02 once the flat button row grew past what fits on a phone screen, same consolidation Barrel Lab/On Base/Arsenal Fit already went through.',
+      '🗓️ Day Late filter/card (added 2026-08-02, alongside the FilterPanel consolidation) — same definition as Barrel Lab/On Base\'s Day Late badge (★ Barrel Signal on both of the last 2 real game days, no HR either day, today\'s pitcher not Elite), reimplemented against Track Record\'s own historical row data so it works on any past date, not just today\'s live slate.',
       '🍯🔥 Sauce 3.0 (added 2026-07-31) — Sauce 2.0 (Zone Fit≥2, xwOBA≥.360, Pitcher Grade not Elite/Tough) AND both Recent ISO + Arsenal Fit ISO ≥.250. Full-season backtest: 20.05% HR rate / 2.82x lift (vs. Sauce 2.0 alone\'s 2.17x) — the best validated combo in this app. Uses "Recent ISO (BF)", not the native "L7 ISO" column — that field turned out to have real coverage gaps within the Sauce 2.0 population (53%), which shrank the qualifying pool well below what was validated. Both ISO fields here are backfilled leak-free for historical dates (5/17-7/30, from the batter\'s own AB-log history strictly before each real game date; Arsenal Fit ISO additionally filtered to that matchup\'s real Top Pitches/P.Hand) and flow in natively going forward via the All Matchups export — so this hit-rate card keeps updating with real forward data, not just the one-time backtest.',
       '⚾ Ball Carry column/filter: dead-ball / juiced-ball verdict for that game, joined by date+team from the Ball Carry tracker (Live tab). Park/elevation-adjusted, deliberately NOT weather-adjusted — see the Live tab\'s ⚾ Ball Carry guide.',
       'Hit-rate cards at the top of the page recompute live from real outcomes as each day\'s data comes in — the same numbers cited in the Sauce panel and this Legend, always current.',
@@ -28174,9 +28175,15 @@ function TrackRecordTab() {
   const [showOnlySimTB2, setShowOnlySimTB2] = useState(false);
   const [showOnlyHighIQ, setShowOnlyHighIQ] = useState(false);
   const [showOnlyHandMatch, setShowOnlyHandMatch] = useState(false);
+  const [showOnlyDayLate, setShowOnlyDayLate] = useState(false);
   const [carryFilter,    setCarryFilter]    = useState(''); // '' | 'DEAD' | 'JUICED'
   const [xhrFilter,      setXhrFilter]      = useState(''); // '' | 'DEAD' | 'JUICED'
   const [teamFilter,     setTeamFilter]     = useState('ALL');
+  // Pitcher Grade multi-select — new here (2026-08-02), same PITCHER_GRADE_OPTIONS
+  // Set-of-strings pattern Barrel Lab/On Base/Arsenal Fit already use, required by
+  // FilterPanel's props signature and genuinely useful on its own (Track Record
+  // already carries r.pitcherGrade on every row).
+  const [selPitcherGradesTR, setSelPitcherGradesTR] = useState(() => new Set());
 
   const [showMatchup,  setShowMatchup]  = useState(true);
   const [showBarrel,   setShowBarrel]   = useState(true);
@@ -28198,6 +28205,15 @@ function TrackRecordTab() {
           fetch('/data/track-record-ball-carry.csv'),
           fetch('/data/track-record-xhr.csv'),
         ]);
+        // DAY_LATE_LOOKUP (2026-08-02) — Track Record loads its full row set
+        // ONCE per mount (see setAllRows below, [] deps — unlike Barrel
+        // Lab/On Base/Arsenal Fit, which live-poll and recompute isDayLate
+        // every 5s via a *_DAY_LATE_VER counter). Awaiting here instead of
+        // polling guarantees the module-level lookup is populated before
+        // isDayLate is computed on every row below, with no extra
+        // infrastructure — the lookup itself is cached per ET date, so this
+        // is a cheap no-op on every tab that already loaded it this session.
+        await loadDayLateLookup();
 
         const amText = await amRes.text();
         const blText = blRes.ok ? await blRes.text() : '';
@@ -28428,6 +28444,18 @@ function TrackRecordTab() {
               && !/elite|tough/i.test(r['Pitcher Grade']||blRow['Grade']||'')
               && parseFloat(r['Recent ISO (BF)']||0) >= 0.250
               && parseFloat(r['Arsenal Fit ISO']||0) >= 0.250,
+            // Day Late (2026-08-02) — same DAY_LATE_LOOKUP module-level cache
+            // Barrel Lab/On Base/Arsenal Fit already populate via
+            // loadDayLateLookup() (awaited once above, before this .map()
+            // runs). isDayLateBatter() itself expects r.batter/
+            // r.pitcher_grade_label — incompatible with this row's bracket-
+            // notation CSV field names, so the same check is reimplemented
+            // inline here, matching isSauce2/isSauce3's own established
+            // precedent of recomputing against Track Record's own field
+            // names rather than calling the shared helper directly.
+            isDayLate: !!(DAY_LATE_LOOKUP
+              && DAY_LATE_LOOKUP.has((r['Batter']||'').trim().toLowerCase())
+              && !/elite/i.test(r['Pitcher Grade']||blRow['Grade']||'')),
             // 2-Bagger (Non-HR): 2+ total bases in the game, but did not homer.
             // Mutually exclusive with wentYard — matches the live 2️⃣ badge's
             // definition app-wide. actualTB/wentYard already parsed above.
@@ -28516,8 +28544,10 @@ function TrackRecordTab() {
     if (showOnlySimTB2) rows = rows.filter(r => r.simTB >= 2.0);
     if (showOnlyHighIQ) rows = rows.filter(r => r.plateIQ != null && r.plateIQ >= 56);
     if (showOnlyHandMatch) rows = rows.filter(r => r.isHandMatch);
+    if (showOnlyDayLate) rows = rows.filter(r => r.isDayLate);
     if (carryFilter)    rows = rows.filter(r => r.ballCarryVerdict === carryFilter);
     if (xhrFilter)       rows = rows.filter(r => r.xhrVerdict === xhrFilter);
+    if (selPitcherGradesTR.size > 0) rows = rows.filter(r => selPitcherGradesTR.has((r.pitcherGrade||'').trim()));
     if (search) {
       const q = search.toLowerCase();
       rows = rows.filter(r =>
@@ -28532,7 +28562,7 @@ function TrackRecordTab() {
       }
       return sortDir * ((av||0) - (bv||0));
     });
-  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, showOnlyWeakSlot, showOnlyCC, showOnlySauce2, showOnlySauce3, showOnly2Bagger, showOnlyTBSignal, showOnlySimTB2, showOnlyHighIQ, showOnlyHandMatch, carryFilter, xhrFilter, search, sortCol, sortDir]);
+  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, showOnlyWeakSlot, showOnlyCC, showOnlySauce2, showOnlySauce3, showOnly2Bagger, showOnlyTBSignal, showOnlySimTB2, showOnlyHighIQ, showOnlyHandMatch, showOnlyDayLate, carryFilter, xhrFilter, selPitcherGradesTR, search, sortCol, sortDir]);
 
   const summary = useMemo(() => {
     const hrs          = dateRows.filter(r => r.wentYard);
@@ -28577,6 +28607,12 @@ function TrackRecordTab() {
     // to track here, same convention as Barrel Signal's own card.
     const handMatches    = dateRows.filter(r => r.isHandMatch);
     const handMatchHits  = handMatches.filter(r => r.wentYard);
+    // Day Late (🗓️, 2026-08-02) — Barrel Signal on both of the 2 most recent
+    // real game days with no Gone Yard either day, today's pitcher not
+    // Elite. Same "was flagged, did it hit" hit-rate shape as every other
+    // signal card here.
+    const dayLate        = dateRows.filter(r => r.isDayLate);
+    const dayLateHits    = dayLate.filter(r => r.wentYard);
     // Ball carry (dead ball / juiced ball) — HR rate split, the direct
     // validation question this whole feature exists to answer.
     const deadGame       = dateRows.filter(r => r.ballCarryVerdict === 'DEAD');
@@ -28596,7 +28632,7 @@ function TrackRecordTab() {
       .sort((a,b) => a.yardScore - b.yardScore)[0];
     return { hrs, totalHR, signals, signalHits, keyMatchups, kmHits,
              longshots, lsHits, weakSlots, weakSlotHits, sauce2, sauce2Hits, sauce3, sauce3Hits, twoBaggers, tbSignals, tbSignalHits, simTB2, simTB2Hits,
-             highIQBatters, highIQHRHits, highIQTB2Hits, handMatches, handMatchHits,
+             highIQBatters, highIQHRHits, highIQTB2Hits, handMatches, handMatchHits, dayLate, dayLateHits,
              deadGame, deadGameHits, juicedGame, juicedGameHits,
              xhrDead, xhrDeadHits, xhrJuiced, xhrJuicedHits, topYS, biggestMiss, biggestUpset };
   }, [dateRows]);
@@ -28798,6 +28834,14 @@ function TrackRecordTab() {
             color:'#fbbf24'
           },
           {
+            label:'🗓️ DAY LATE HIT RATE',
+            value: summary.dayLate.length
+              ? `${((summary.dayLateHits.length/summary.dayLate.length)*100).toFixed(0)}%`
+              : '—',
+            sub: `${summary.dayLateHits.length}/${summary.dayLate.length}`,
+            color:'#22c1c3'
+          },
+          {
             label:'🔴 JUICED-GAME HR RATE',
             value: summary.juicedGame.length
               ? `${((summary.juicedGameHits.length/summary.juicedGame.length)*100).toFixed(0)}%`
@@ -28901,42 +28945,6 @@ function TrackRecordTab() {
           ★ Barrel Signal Only
         </button>
 
-        <button onClick={() => setShowOnlyKM(v=>!v)}
-          style={{padding:'4px 10px', borderRadius:6, border:'none',
-            cursor:'pointer', fontFamily:mono, fontSize:9, fontWeight:700,
-            background: showOnlyKM ? 'rgba(56,184,242,.15)' : 'var(--surface2)',
-            color:       showOnlyKM ? '#38b8f2' : 'var(--muted)',
-            border: `1px solid ${showOnlyKM ? 'rgba(56,184,242,.4)' : 'var(--border)'}` }}>
-          🔑 Key Matchup Only
-        </button>
-
-        <button onClick={() => setShowOnlyWeakSlot(v=>!v)}
-          style={{padding:'4px 10px', borderRadius:6, border:'none',
-            cursor:'pointer', fontFamily:mono, fontSize:9, fontWeight:700,
-            background: showOnlyWeakSlot ? 'rgba(255,214,10,.15)' : 'var(--surface2)',
-            color:       showOnlyWeakSlot ? '#ffd60a' : 'var(--muted)',
-            border: `1px solid ${showOnlyWeakSlot ? 'rgba(255,214,10,.4)' : 'var(--border)'}` }}>
-          🟢 Weak Spot Only
-        </button>
-
-        <button onClick={() => setShowOnlyCC(v=>!v)}
-          style={{padding:'4px 10px', borderRadius:6, border:'none',
-            cursor:'pointer', fontFamily:mono, fontSize:9, fontWeight:700,
-            background: showOnlyCC ? 'rgba(245,166,35,.15)' : 'var(--surface2)',
-            color:       showOnlyCC ? '#f5a623' : 'var(--muted)',
-            border: `1px solid ${showOnlyCC ? 'rgba(245,166,35,.4)' : 'var(--border)'}` }}>
-          📍 Close Call Only
-        </button>
-
-        <button onClick={() => setShowOnlySauce2(v=>!v)}
-          style={{padding:'4px 10px', borderRadius:6, border:'none',
-            cursor:'pointer', fontFamily:mono, fontSize:9, fontWeight:700,
-            background: showOnlySauce2 ? 'rgba(52,211,153,.15)' : 'var(--surface2)',
-            color:       showOnlySauce2 ? '#34d399' : 'var(--muted)',
-            border: `1px solid ${showOnlySauce2 ? 'rgba(52,211,153,.4)' : 'var(--border)'}` }}>
-          🍯 Sauce 2.0 Only
-        </button>
-
         <button onClick={() => setShowOnlySauce3(v=>!v)}
           title="Sauce 2.0 AND both Recent ISO + Arsenal Fit ISO >=.250 — 2.82x lift, full 2026 season backtest. Best validated combo in this app."
           style={{padding:'4px 10px', borderRadius:6, border:'none',
@@ -28947,90 +28955,36 @@ function TrackRecordTab() {
           🍯🔥 Sauce 3.0 Only
         </button>
 
-        <button onClick={() => setShowOnly2Bagger(v=>!v)}
-          style={{padding:'4px 10px', borderRadius:6, border:'none',
-            cursor:'pointer', fontFamily:mono, fontSize:9, fontWeight:700,
-            background: showOnly2Bagger ? 'rgba(56,184,242,.15)' : 'var(--surface2)',
-            color:       showOnly2Bagger ? '#38b8f2' : 'var(--muted)',
-            border: `1px solid ${showOnly2Bagger ? 'rgba(56,184,242,.4)' : 'var(--border)'}` }}>
-          2️⃣ 2-Bagger (Non-HR) Only
-        </button>
-
-        <button onClick={() => setShowOnlyTBSignal(v=>!v)}
-          style={{padding:'4px 10px', borderRadius:6, border:'none',
-            cursor:'pointer', fontFamily:mono, fontSize:9, fontWeight:700,
-            background: showOnlyTBSignal ? 'rgba(56,184,242,.15)' : 'var(--surface2)',
-            color:       showOnlyTBSignal ? '#38b8f2' : 'var(--muted)',
-            border: `1px solid ${showOnlyTBSignal ? 'rgba(56,184,242,.4)' : 'var(--border)'}` }}>
-          🎯 TB Signal Only
-        </button>
-
-        <button onClick={() => setShowOnlySimTB2(v=>!v)}
-          style={{padding:'4px 10px', borderRadius:6, border:'none',
-            cursor:'pointer', fontFamily:mono, fontSize:9, fontWeight:700,
-            background: showOnlySimTB2 ? 'rgba(167,139,250,.15)' : 'var(--surface2)',
-            color:       showOnlySimTB2 ? '#a78bfa' : 'var(--muted)',
-            border: `1px solid ${showOnlySimTB2 ? 'rgba(167,139,250,.4)' : 'var(--border)'}` }}>
-          🎲 Sim TB ≥2.0 Only
-        </button>
-
-        <button onClick={() => setShowOnlyHighIQ(v=>!v)}
-          title="Plate IQ >= 56 (B grade or above) — same threshold as Barrel Lab/On Base's High IQ filter. Display-only, does not affect Yard Score."
-          style={{padding:'4px 10px', borderRadius:6, border:'none',
-            cursor:'pointer', fontFamily:mono, fontSize:9, fontWeight:700,
-            background: showOnlyHighIQ ? 'rgba(56,184,242,.15)' : 'var(--surface2)',
-            color:       showOnlyHighIQ ? '#38b8f2' : 'var(--muted)',
-            border: `1px solid ${showOnlyHighIQ ? 'rgba(56,184,242,.4)' : 'var(--border)'}` }}>
-          🧠 {showOnlyHighIQ ? 'High IQ Only' : 'Plate IQ'}
-        </button>
-
-        <button onClick={() => setShowOnlyHandMatch(v=>!v)}
-          title="Batter's handedness exploits the opposing pitcher's weakness (⭐⭐⭐ elite, ⭐⭐ full, or ⭐ partial) — same flag as Barrel Lab/On Base's Hand Match filter. Display-only, does not affect Yard Score."
-          style={{padding:'4px 10px', borderRadius:6, border:'none',
-            cursor:'pointer', fontFamily:mono, fontSize:9, fontWeight:700,
-            background: showOnlyHandMatch ? 'rgba(251,191,36,.15)' : 'var(--surface2)',
-            color:       showOnlyHandMatch ? '#fbbf24' : 'var(--muted)',
-            border: `1px solid ${showOnlyHandMatch ? 'rgba(251,191,36,.4)' : 'var(--border)'}` }}>
-          ⭐ {showOnlyHandMatch ? 'Hand Match Only' : 'Hand Match'}
-        </button>
-
-        <button onClick={() => setCarryFilter(v => v === 'JUICED' ? '' : 'JUICED')}
-          style={{padding:'4px 10px', borderRadius:6, border:'none',
-            cursor:'pointer', fontFamily:mono, fontSize:9, fontWeight:700,
-            background: carryFilter==='JUICED' ? 'rgba(255,128,32,.15)' : 'var(--surface2)',
-            color:       carryFilter==='JUICED' ? '#ff8020' : 'var(--muted)',
-            border: `1px solid ${carryFilter==='JUICED' ? 'rgba(255,128,32,.4)' : 'var(--border)'}` }}>
-          🔴 Juiced Ball Only
-        </button>
-
-        <button onClick={() => setCarryFilter(v => v === 'DEAD' ? '' : 'DEAD')}
-          style={{padding:'4px 10px', borderRadius:6, border:'none',
-            cursor:'pointer', fontFamily:mono, fontSize:9, fontWeight:700,
-            background: carryFilter==='DEAD' ? 'rgba(56,184,242,.15)' : 'var(--surface2)',
-            color:       carryFilter==='DEAD' ? '#38b8f2' : 'var(--muted)',
-            border: `1px solid ${carryFilter==='DEAD' ? 'rgba(56,184,242,.4)' : 'var(--border)'}` }}>
-          🔵 Dead Ball Only
-        </button>
-
-        <button onClick={() => setXhrFilter(v => v === 'JUICED' ? '' : 'JUICED')}
-          title="xHR conversion (expected-vs-actual HR count) — distinct from Ball Carry above"
-          style={{padding:'4px 10px', borderRadius:6, border:'none',
-            cursor:'pointer', fontFamily:mono, fontSize:9, fontWeight:700,
-            background: xhrFilter==='JUICED' ? 'rgba(167,139,250,.15)' : 'var(--surface2)',
-            color:       xhrFilter==='JUICED' ? '#a78bfa' : 'var(--muted)',
-            border: `1px solid ${xhrFilter==='JUICED' ? 'rgba(167,139,250,.4)' : 'var(--border)'}` }}>
-          ⬆️ xHR Juiced Only
-        </button>
-
-        <button onClick={() => setXhrFilter(v => v === 'DEAD' ? '' : 'DEAD')}
-          title="xHR conversion (expected-vs-actual HR count) — distinct from Ball Carry above"
-          style={{padding:'4px 10px', borderRadius:6, border:'none',
-            cursor:'pointer', fontFamily:mono, fontSize:9, fontWeight:700,
-            background: xhrFilter==='DEAD' ? 'rgba(244,114,182,.15)' : 'var(--surface2)',
-            color:       xhrFilter==='DEAD' ? '#f472b6' : 'var(--muted)',
-            border: `1px solid ${xhrFilter==='DEAD' ? 'rgba(244,114,182,.4)' : 'var(--border)'}` }}>
-          ⬇️ xHR Dead Only
-        </button>
+        {/* Filters consolidated into a dropdown panel 2026-08-02 — the
+            standalone-button row had grown to 16 buttons (14 boolean/3-state
+            toggles + the 3 kept above), same overcrowding Barrel Lab/On Base
+            hit on 2026-07-27. HRs/Barrel Signal/Sauce 3.0 stay standalone as
+            the most-used quick filters (mirrors Barrel Lab's own
+            Longshot/Plate IQ/Hand Match precedent); everything else —
+            including the new Day Late filter — moved in here. Pitcher Grade
+            multi-select is new to Track Record (FilterPanel requires the
+            prop; Track Record already carries r.pitcherGrade on every row,
+            so it's a real, working filter here too, not just a placeholder). */}
+        <FilterPanel
+          toggles={[
+            { key:'km',    label:'🔑 Key Matchup Only',    active:showOnlyKM,       onToggle:()=>setShowOnlyKM(v=>!v),       color:'#38b8f2' },
+            { key:'ws',    label:'🟢 Weak Spot Only',       active:showOnlyWeakSlot, onToggle:()=>setShowOnlyWeakSlot(v=>!v), color:'#ffd60a' },
+            { key:'cc',    label:'📍 Close Call Only',      active:showOnlyCC,       onToggle:()=>setShowOnlyCC(v=>!v),       color:'#f5a623' },
+            { key:'s2',    label:'🍯 Sauce 2.0 Only',       active:showOnlySauce2,   onToggle:()=>setShowOnlySauce2(v=>!v),   color:'#34d399' },
+            { key:'dl',    label:'🗓️ Day Late Only',        active:showOnlyDayLate,  onToggle:()=>setShowOnlyDayLate(v=>!v),  color:'#22c1c3' },
+            { key:'2b',    label:'2️⃣ 2-Bagger (Non-HR) Only', active:showOnly2Bagger, onToggle:()=>setShowOnly2Bagger(v=>!v), color:'#38b8f2' },
+            { key:'tbs',   label:'🎯 TB Signal Only',       active:showOnlyTBSignal, onToggle:()=>setShowOnlyTBSignal(v=>!v), color:'#38b8f2' },
+            { key:'stb2',  label:'🎲 Sim TB ≥2.0 Only',     active:showOnlySimTB2,   onToggle:()=>setShowOnlySimTB2(v=>!v),   color:'#a78bfa' },
+            { key:'iq',    label:'🧠 High Plate IQ Only',   active:showOnlyHighIQ,   onToggle:()=>setShowOnlyHighIQ(v=>!v),   color:'#38b8f2' },
+            { key:'hm',    label:'⭐ Hand Match Only',      active:showOnlyHandMatch,onToggle:()=>setShowOnlyHandMatch(v=>!v),color:'#fbbf24' },
+            { key:'cj',    label:'🔴 Juiced Ball Only',     active:carryFilter==='JUICED', onToggle:()=>setCarryFilter(v=>v==='JUICED'?'':'JUICED'), color:'#ff8020' },
+            { key:'cd',    label:'🔵 Dead Ball Only',       active:carryFilter==='DEAD',   onToggle:()=>setCarryFilter(v=>v==='DEAD'?'':'DEAD'),     color:'#38b8f2' },
+            { key:'xj',    label:'⬆️ xHR Juiced Only',      active:xhrFilter==='JUICED',   onToggle:()=>setXhrFilter(v=>v==='JUICED'?'':'JUICED'),   color:'#a78bfa' },
+            { key:'xd',    label:'⬇️ xHR Dead Only',        active:xhrFilter==='DEAD',     onToggle:()=>setXhrFilter(v=>v==='DEAD'?'':'DEAD'),       color:'#f472b6' },
+          ]}
+          pitcherGrades={selPitcherGradesTR}
+          onPitcherGradesChange={setSelPitcherGradesTR}
+        />
 
         <button id="track-record-csv-trigger" onClick={() => {
             if (!filteredRows.length) return;
@@ -29038,7 +28992,7 @@ function TrackRecordTab() {
             const headers = ['Date','Batter','Team','Hand','Lineup Slot',
               'Pre-Game Pitcher','Went Yard Vs','SP/RP','Pitcher Grade',
               'Yard Score','Boom','Sig','Grade','gHR','Zone Fit','Sim TB','xwOBA','Flags',
-              'Is Key Matchup','Weak Spot','Sauce 2.0','Sauce 3.0','2-Bagger (Non-HR)','Hit 2+ TB (Any)','TB Signal',
+              'Is Key Matchup','Weak Spot','Sauce 2.0','Sauce 3.0','Day Late','2-Bagger (Non-HR)','Hit 2+ TB (Any)','TB Signal',
               'TrueHR','Matchup','SimHR%','Barrel Signal','Longshot',
               'PulledBrl%','Brl/BIP','HR/FB','FB%','HH%',
               'Plate IQ','IQ Grade','Zone Risk','Hand Match',
@@ -29055,7 +29009,7 @@ function TrackRecordTab() {
                 (r.wentYard && r.actualPitcher && !r.actualPitcherIsSP) ? '' : r.pitcherGrade,
                 r.yardScore || '', r.boom || '', r.sig || '', r.grade || '', r.ghr || '',
                 r.zoneFit || '', r.simTB || '', r.xwoba || '', r.flags || '',
-                r.isKeyMatchup ? 'YES' : '', r.isWeakSlot ? 'YES' : '', r.isSauce2 ? 'YES' : '', r.isSauce3 ? 'YES' : '', r.is2Bagger ? 'YES' : '', r.hitTB2 ? 'YES' : '', r.tbSignal ? 'YES' : '',
+                r.isKeyMatchup ? 'YES' : '', r.isWeakSlot ? 'YES' : '', r.isSauce2 ? 'YES' : '', r.isSauce3 ? 'YES' : '', r.isDayLate ? 'YES' : '', r.is2Bagger ? 'YES' : '', r.hitTB2 ? 'YES' : '', r.tbSignal ? 'YES' : '',
                 r.trueHR || '', r.matchup || '', r.simHRPct || '',
                 r.brlSignal ? 'YES' : '', r.isLongshot ? 'YES' : '',
                 r.pulledBrl || '', r.brlBIP || '', r.hrFB || '', r.fb || '', r.hh || '',
@@ -32171,7 +32125,20 @@ function FilterPanel({ toggles, pitcherGrades, onPitcherGradesChange, minFilters
     const panelW = Math.min(280, window.innerWidth - 16);
     let left = rect.right - panelW; // default: right-align to button
     left = Math.max(8, Math.min(left, window.innerWidth - panelW - 8));
-    setPanelPos({ top: rect.bottom + 4, left });
+    // Vertical clamp (2026-08-02) — top was previously always rect.bottom+4,
+    // unclamped. A Filters button sitting in the lower half of a long page
+    // (Track Record's stat-card-heavy layout, or any scrolled state on
+    // Arsenal Fit) could push the panel's bottom edge past the viewport —
+    // position:fixed doesn't scroll with the page, so that part would be
+    // genuinely inaccessible, not just visually clipped. The panel itself is
+    // CSS-capped at maxHeight:'60vh', so clamping top to always leave that
+    // much room below is a guaranteed-safe bound regardless of how many
+    // toggles/minFilters a given caller passes in — no need to measure the
+    // actual rendered panel height.
+    const panelMaxH = window.innerHeight * 0.6;
+    let top = rect.bottom + 4;
+    top = Math.max(8, Math.min(top, window.innerHeight - panelMaxH - 8));
+    setPanelPos({ top, left });
   }, [open]);
 
   // minFilters (2026-07-30) — optional array of {key,label,value,onChange,step,placeholder}
