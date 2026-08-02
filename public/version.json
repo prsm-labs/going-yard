@@ -1,8 +1,8 @@
 {
   "version": "2026.08.02",
-  "bundleFile": "index-X9K9LtHA.js",
+  "bundleFile": "index-CHoG6Lh0.js",
   "changelog": [
-    "Add lineup confirmed/all-batters status + toggle to Arsenal Fit"
+    "Update version.json to match latest build"
   ],
   "notifyUsers": true
 }
