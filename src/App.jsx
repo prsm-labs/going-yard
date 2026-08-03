@@ -28139,6 +28139,7 @@ function LegendButton() {
       'Column groups are color-coded: Matchup Engine (red) · Barrel Lab (blue) · Box Score (green).',
       'For batters who went yard, the pitcher shown/graded is the ACTUAL pitcher who allowed the HR (with an SP/RP badge) — not just the pre-game probable starter.',
       '⬇ CSV exports the currently filtered/sorted view.',
+      '2025 / 2026 year selector (added 2026-08-03) — 2025 is a one-time backfill reconstructed leak-free from the full-season 2025 AB log (MLB_AB_LOG_2025.csv), used to check how the same filter thresholds would have held up in a different season\'s play style. Populated for 2025: ISO, Zone Fit (exact engine formula), wOBA (a proxy for xwOBA — no exit-velocity-based xStats in the 2025 log), Pitcher Grade (a rolling AB-log-derived proxy for ERA/K9/BB9/HR9/WHIP/AVG/OBP — earned-run splits aren\'t in the log, so RA9-via-RBI substitutes for ERA), Arsenal Fit ISO (filtered to that game\'s opposing starter\'s season top-2 pitch types — a categorical/structural simplification, not point-in-time — + hand), Sauce 2.0/2.5/3.0, real HR events, Live Close Calls, and fresh-fit Ball Carry/xHR dead-juiced verdicts. NOT reconstructable and intentionally blank for 2025: Yard Score/Boom/Sig/gHR/PS Score (composite formulas needing many engine-only inputs) and every Monte-Carlo-dependent signal (Barrel Signal, TB Signal, Hand Match, Day Late, Longshot, Plate IQ, Sim TB — these need Barrel Lab/On Base\'s live per-pitcher-arsenal simulation, not just AB-log data). Date selector: ◀/▶ arrows step through the dates that year actually has data for; clicking the date opens the native calendar (its min/max span both seasons, so picking a 2025 date while viewing 2026 auto-switches the year).',
     ] },
   ];
   return <>
@@ -28304,18 +28305,39 @@ function TrackRecordTab() {
   const [sortCol, setSortCol] = useState('yardScore');
   const [sortDir, setSortDir] = useState(-1);
 
-  useEffect(() => {
-    async function loadTrackRecord() {
-      setLoading(true);
+  // Year selector (2026-08-03) — 2025 is a backfilled reconstruction from
+  // MLB_AB_LOG_2025.csv (leak-free ISO/Zone Fit/wOBA-proxy/Pitcher-Grade-
+  // proxy/Arsenal Fit ISO/HR outcomes/Close Calls/Ball Carry/xHR), used to
+  // validate how the same filter thresholds would have performed in 2025's
+  // play style. Composite engine scores (Yard Score/Boom/Sig/gHR/PS Score)
+  // and Monte-Carlo-dependent signals (Barrel Signal/TB Signal/Hand Match/
+  // Day Late/Longshot/Plate IQ/Sim TB) are NOT reconstructable from the AB
+  // log alone and are intentionally blank for 2025 rows — see the loaded
+  // CSVs' own header comment in the 2025 backfill script for the full
+  // scope breakdown. Each year's parsed rows are cached in yearCache after
+  // first load so toggling back and forth doesn't re-fetch.
+  const AVAILABLE_YEARS = [2025, 2026];
+  const [selectedYear, setSelectedYear] = useState(2026);
+  const [yearCache,    setYearCache]    = useState({});
+  const pendingSelDateRef = useRef(null); // set when the native calendar picks a date in the OTHER year — applied once that year's data finishes loading
+
+  async function loadTrackRecordForYear(year) {
+      // 2025 files are a one-time backfill (see CLAUDE.md "2025 Track Record
+      // Backfill" session log) — same filenames with a '-2025' suffix, same
+      // schema as the live 2026 files so this parsing logic needs zero
+      // per-year branching below. track-record-onbase-2025.csv does not
+      // exist (TB Signal is Monte-Carlo-dependent, out of 2025 scope) — the
+      // existing obRes.ok fallback already handles a 404 gracefully.
+      const suf = year === 2025 ? '-2025' : '';
       try {
         const [amRes, blRes, idRes, hrRes, obRes, bcRes, xhrRes] = await Promise.all([
-          fetch('/data/track-record-matchups.csv'),
-          fetch('/data/track-record-barrel.csv'),
+          fetch(`/data/track-record-matchups${suf}.csv`),
+          fetch(`/data/track-record-barrel${suf}.csv`),
           fetch('/data/player_id.csv'),
-          fetch('/data/track-record-hr.csv'),
-          fetch('/data/track-record-onbase.csv'),
-          fetch('/data/track-record-ball-carry.csv'),
-          fetch('/data/track-record-xhr.csv'),
+          fetch(`/data/track-record-hr${suf}.csv`),
+          fetch(`/data/track-record-onbase${suf}.csv`),
+          fetch(`/data/track-record-ball-carry${suf}.csv`),
+          fetch(`/data/track-record-xhr${suf}.csv`),
         ]);
         // DAY_LATE_LOOKUP (2026-08-02) — Track Record loads its full row set
         // ONCE per mount (see setAllRows below, [] deps — unlike Barrel
@@ -28633,17 +28655,61 @@ function TrackRecordTab() {
           };
         });
 
-        setAllRows(unified);
         const dates = [...new Set(unified.map(r => r.date))].sort().reverse();
-        setAvailableDates(dates);
-        setSelDate(dates[0] || '');
+        return { rows: unified, dates };
       } catch(e) {
         console.error('[TrackRecord] load error:', e);
+        return { rows: [], dates: [] };
+      }
+  }
+
+  // Loads on mount (2026) and whenever selectedYear changes; caches each
+  // year's parsed rows in yearCache so switching back and forth after the
+  // first load of each year is instant (no re-fetch/re-parse).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const cached = yearCache[selectedYear];
+      if (cached) {
+        setAllRows(cached.rows);
+        setAvailableDates(cached.dates);
+        // Apply a pending cross-year date pick from the native calendar
+        // (see the date-input onChange handler below), snapping to the
+        // nearest date this year actually has data for if the exact pick
+        // isn't available; otherwise keep the current selDate if it's
+        // still valid for this (cached) year, else default to newest.
+        const want = pendingSelDateRef.current;
+        pendingSelDateRef.current = null;
+        if (want) {
+          setSelDate(cached.dates.includes(want) ? want
+            : (cached.dates.reduce((best, d) => (best == null
+                || Math.abs(new Date(d) - new Date(want)) < Math.abs(new Date(best) - new Date(want)))
+                ? d : best, null) || ''));
+        } else if (!cached.dates.includes(selDate)) {
+          setSelDate(cached.dates[0] || '');
+        }
+        return;
+      }
+      setLoading(true);
+      const result = await loadTrackRecordForYear(selectedYear);
+      if (cancelled) return;
+      setYearCache(c => ({ ...c, [selectedYear]: result }));
+      setAllRows(result.rows);
+      setAvailableDates(result.dates);
+      const want = pendingSelDateRef.current;
+      pendingSelDateRef.current = null;
+      if (want) {
+        setSelDate(result.dates.includes(want) ? want
+          : (result.dates.reduce((best, d) => (best == null
+              || Math.abs(new Date(d) - new Date(want)) < Math.abs(new Date(best) - new Date(want)))
+              ? d : best, null) || ''));
+      } else {
+        setSelDate(result.dates[0] || '');
       }
       setLoading(false);
-    }
-    loadTrackRecord();
-  }, []);
+    })();
+    return () => { cancelled = true; };
+  }, [selectedYear]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { setTeamFilter('ALL'); }, [selDate]);
 
@@ -28826,22 +28892,86 @@ function TrackRecordTab() {
         📋 TRACK RECORD
       </div>
 
-      <select
-        value={selDate}
-        onChange={e => setSelDate(e.target.value)}
-        style={{fontFamily:mono, fontSize:10,
+      {(() => {
+        // Date selector (2026-08-03) — HR-Tracker-style: ◀/▶ arrows step
+        // through the actual dates this year HAS data for (not raw
+        // calendar days — Track Record data only exists for specific
+        // pipeline-run/backfill dates, so stepping by calendar day could
+        // land on a blank one). Clicking the date opens the browser's own
+        // native calendar (min/max deliberately span BOTH seasons, not
+        // just the active year, so a user can jump straight from a 2026
+        // date to a 2025 one within that one calendar — satisfies "select
+        // the year within the calendar" without a second custom picker);
+        // picking a date in the other year auto-switches selectedYear via
+        // pendingSelDateRef, applied once that year's data finishes
+        // loading (see the useEffect above). Picking a date this year
+        // doesn't have data for snaps to the nearest date that does.
+        const sortedAsc = [...availableDates].sort();
+        const idx = selDate ? sortedAsc.indexOf(selDate) : -1;
+        const atOldest = sortedAsc.length === 0 || idx <= 0;
+        const atNewest = sortedAsc.length === 0 || idx >= sortedAsc.length - 1;
+        const nearestInList = (list, want) => list.reduce((best, d) =>
+          (best == null || Math.abs(new Date(d) - new Date(want)) < Math.abs(new Date(best) - new Date(want))) ? d : best,
+          null);
+        const arrowStyle = disabled => ({
+          padding:'5px 9px', borderRadius:6, border:'1px solid var(--border)',
           background:'var(--surface2)', color:'var(--text)',
-          border:'1px solid var(--border)', borderRadius:6,
-          padding:'5px 10px', cursor:'pointer'}}>
-        {availableDates.map(d => (
-          <option key={d} value={d}>{d}</option>
-        ))}
-      </select>
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          fontFamily:mono, fontSize:12, opacity: disabled ? 0.4 : 1,
+        });
+        return <div style={{display:'flex', alignItems:'center', gap:4, flexWrap:'wrap'}}>
+          <button onClick={() => !atOldest && setSelDate(sortedAsc[idx-1])}
+            disabled={atOldest} style={arrowStyle(atOldest)}>◀</button>
+          <input type="date" value={selDate}
+            min="2025-03-01" max={getETDateStr()}
+            onChange={e => {
+              const v = e.target.value;
+              if (!v) return;
+              const pickedYear = parseInt(v.slice(0,4));
+              if (pickedYear !== selectedYear && AVAILABLE_YEARS.includes(pickedYear)) {
+                pendingSelDateRef.current = v;
+                setSelectedYear(pickedYear);
+                return;
+              }
+              setSelDate(availableDates.includes(v) ? v : (nearestInList(sortedAsc, v) || v));
+            }}
+            style={{fontFamily:mono, fontSize:11, background:'var(--surface2)',
+              color:'var(--text)', border:'1px solid var(--border)', borderRadius:6,
+              padding:'5px 9px', cursor:'pointer'}}/>
+          <button onClick={() => !atNewest && setSelDate(sortedAsc[idx+1])}
+            disabled={atNewest} style={arrowStyle(atNewest)}>▶</button>
+          <div style={{display:'flex', gap:3, marginLeft:4}}>
+            {AVAILABLE_YEARS.map(y => (
+              <button key={y} onClick={() => setSelectedYear(y)}
+                title={y === 2025 ? '2025 season (backfilled from the AB log — core stats + Sauce family only, see Legend)' : '2026 season (live)'}
+                style={{padding:'5px 10px', borderRadius:6,
+                  border:'1px solid '+(selectedYear===y ? 'var(--accent)' : 'var(--border)'),
+                  background: selectedYear===y ? 'rgba(232,65,26,.15)' : 'var(--surface2)',
+                  color: selectedYear===y ? 'var(--accent)' : 'var(--muted)',
+                  fontFamily:mono, fontSize:10, fontWeight:700, cursor:'pointer'}}>
+                {y}
+              </button>
+            ))}
+          </div>
+        </div>;
+      })()}
 
       <span style={{fontFamily:mono, fontSize:9, color:'var(--muted)'}}>
         {dateRows.length} batters scored · {summary.totalHR} HRs
       </span>
     </div>
+
+    {selectedYear === 2025 && (
+      <div style={{margin:'8px 14px 0', padding:'8px 12px', borderRadius:8,
+        background:'rgba(245,198,66,.08)', border:'1px solid rgba(245,198,66,.3)',
+        fontFamily:mono, fontSize:9, color:'var(--muted)', lineHeight:1.5}}>
+        📋 <b style={{color:'#f5c542'}}>2025 backfill</b> — reconstructed leak-free from the AB log.
+        ISO, Zone Fit, wOBA (proxy for xwOBA), Pitcher Grade (rolling AB-log proxy), Arsenal Fit ISO,
+        Sauce 2.0/2.5/3.0, HR outcomes, Close Calls, Ball Carry/xHR are populated. Yard Score/Boom/Sig/gHR/PS Score
+        and Monte-Carlo-dependent signals (Barrel Signal, TB Signal, Hand Match, Day Late, Longshot, Plate IQ, Sim TB)
+        are not reconstructable from the AB log alone and are intentionally blank.
+      </div>
+    )}
 
     {loading && (
       <div style={{textAlign:'center', padding:40,
@@ -28858,8 +28988,9 @@ function TrackRecordTab() {
           📋 No track record data yet
         </div>
         <div style={{fontFamily:mono, fontSize:10, color:'var(--muted)'}}>
-          Data populates after the first pipeline run copies
-          all-matchups-season-2026.csv to public/data/
+          {selectedYear === 2025
+            ? 'The 2025 backfill CSVs aren\'t in public/data/ yet.'
+            : 'Data populates after the first pipeline run copies all-matchups-season-2026.csv to public/data/'}
         </div>
       </div>
     )}
