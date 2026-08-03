@@ -1,8 +1,8 @@
 {
   "version": "2026.08.03",
-  "bundleFile": "index-B9hwImPu.js",
+  "bundleFile": "index-BDHvSTlF.js",
   "changelog": [
-    "Add 2025 Track Record backfill + year/date selector redesign"
+    "Suppress redundant Sauce 2.5 badge when a batter already clears Sauce 3.0"
   ],
   "notifyUsers": true
 }

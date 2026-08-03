@@ -2319,6 +2319,52 @@ function AtBatSlideIn() {
   const [battingSplitsLoading, setBattingSplitsLoading] = useState(false);
   const [dhIdx,       setDhIdx]       = useState(0); // doubleheader game selector — 0 = Game 1
 
+  // Scouting Note (2026-08-04) — collapsed, opt-in section, same pattern as
+  // the H2H per-game log right below it (never eagerly fetched, only on
+  // expand). api/batter-scouting-note.js does all the number-crunching
+  // itself (live batted-ball pull, pitch-mix filtering, day/night split)
+  // and only asks Claude to phrase the already-verified numbers into 2-4
+  // sentences — see that file's header comment for why nothing here lets
+  // the LLM compute or invent a stat. Reset whenever a different
+  // player/game is opened so a stale note from the last batter never shows.
+  const [scoutNoteOpen,    setScoutNoteOpen]    = useState(false);
+  const [scoutNoteLoading, setScoutNoteLoading] = useState(false);
+  const [scoutNoteData,    setScoutNoteData]    = useState(null); // {note, stats, insufficientData, cached} | null
+  const [scoutNoteError,   setScoutNoteError]   = useState(null);
+  useEffect(() => {
+    setScoutNoteOpen(false); setScoutNoteData(null); setScoutNoteError(null); setScoutNoteLoading(false);
+  }, [player?.pid, dhIdx]);
+
+  async function loadScoutingNote(dpRow) {
+    if (!player?.pid || !dpRow?.pitcher_id) return;
+    setScoutNoteLoading(true); setScoutNoteError(null);
+    try {
+      const res = await fetch('/api/batter-scouting-note', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          batterId: player.pid, pitcherId: parseInt(dpRow.pitcher_id) || 0,
+          batterName: player.name, pitcherName: dpRow.pitcher,
+          batterHand: dpRow.batter_hand || '', pitcherHand: dpRow.pitcher_hand || '',
+          pitcherGrade: getHandSpecificGrade(dpRow),
+          // 2026-08-03 same-day follow-up — gameId lets the endpoint resolve
+          // TODAY's real day/night (was hardcoded "night", wrong on day-game
+          // days); isHomeToday is trivial here (a plain string comparison)
+          // so it's resolved client-side rather than making the endpoint
+          // re-derive it from team IDs.
+          gameId: dpRow.game_id || null,
+          isHomeToday: !!(dpRow.batting_team && dpRow.home_team && dpRow.batting_team === dpRow.home_team),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setScoutNoteError(data?.error || 'Failed to generate'); return; }
+      setScoutNoteData(data);
+    } catch (e) {
+      setScoutNoteError(e.message || 'Failed to generate');
+    } finally {
+      setScoutNoteLoading(false);
+    }
+  }
+
   // Doubleheader support: DAILY_PICKS_CACHE only ever keeps the FIRST
   // daily_picks.csv row per batter_id (see its own comment) — on a
   // doubleheader day a batter has 2 real rows (different game_id/pitcher/
@@ -2989,6 +3035,53 @@ function AtBatSlideIn() {
           ) : (
             <div style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--muted)"}}>
               No career H2H history vs this pitcher
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── SCOUTING NOTE — collapsed, opt-in, lazy-generated on expand ── */}
+      {dp?.pitcher_id && (
+        <div style={{borderBottom:'1px solid var(--border)', padding:'10px 0'}}>
+          <button
+            onClick={() => {
+              const next = !scoutNoteOpen;
+              setScoutNoteOpen(next);
+              if (next && !scoutNoteData && !scoutNoteLoading && !scoutNoteError) loadScoutingNote(dp);
+            }}
+            style={{display:'flex',alignItems:'center',gap:5,padding:'4px 10px',
+              borderRadius:6,cursor:'pointer',border:'1px solid var(--border)',
+              background:'var(--surface2)',color:'var(--muted)',
+              fontFamily:"'DM Mono',monospace",fontSize:9}}>
+            {scoutNoteLoading
+              ? <><div className="sp" style={{width:9,height:9,borderWidth:1.5}}/> Generating scouting note…</>
+              : <>{scoutNoteOpen?'▴':'▾'} {scoutNoteOpen?'Hide':'Show'} 📝 Scouting Note</>}
+          </button>
+
+          {scoutNoteOpen && !scoutNoteLoading && (
+            <div style={{marginTop:8,padding:'10px 12px',borderRadius:8,
+              background:'var(--surface2)',border:'1px solid var(--border)'}}>
+              {scoutNoteError && (
+                <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'#ff6b6b'}}>
+                  Couldn't generate a note: {scoutNoteError}
+                </div>
+              )}
+              {!scoutNoteError && scoutNoteData?.insufficientData && (
+                <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)'}}>
+                  Not enough recent real contact on record to say anything meaningful yet.
+                </div>
+              )}
+              {!scoutNoteError && scoutNoteData?.note && (
+                <>
+                  <div style={{fontFamily:"'Oswald',sans-serif",fontSize:12,color:'var(--text)',lineHeight:1.5}}>
+                    {scoutNoteData.note}
+                  </div>
+                  <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--muted)',marginTop:6}}>
+                    Based on last {scoutNoteData.stats?.l10BBE ?? '—'} real batted-ball events vs {dp.pitcher}'s arsenal
+                    {scoutNoteData.cached ? ' · cached from earlier today' : ' · generated just now'}
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -17145,7 +17238,15 @@ function SimLabView({ data }) {
                       <td className="sticky-batter" style={{ textAlign: 'left', maxWidth: 180 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 5, overflow: 'hidden' }}>
                           <PlayerAvatar pid={parseInt(b.batter_id)||0} name={b.batter} size={22}/>
-                          <span style={{fontFamily:"'DM Mono',monospace",fontSize:8,fontWeight:700,color:'var(--accent2)',whiteSpace:'nowrap',flexShrink:0}}>{b.batting_team}</span>
+                          {/* getTeam() (2026-08-03) — daily_picks.csv's batting_team is a fixed
+                              server-side value that can lag a real trade for weeks (the player_id
+                              chain that feeds it was found badly broken same day); getTeam() prefers
+                              the live, app-startup-refreshed 30-team roster map (GLOBAL_PLAYER_TEAM_MAP,
+                              6hr TTL) and only falls back to this stale value if that live map has
+                              nothing for this player. Today-only tab — Track Record's own Team column
+                              deliberately does NOT get this treatment, since it's a historical/dated
+                              view where the team AT THAT DATE is correct, not the current one. */}
+                          <span style={{fontFamily:"'DM Mono',monospace",fontSize:8,fontWeight:700,color:'var(--accent2)',whiteSpace:'nowrap',flexShrink:0}}>{getTeam(parseInt(b.batter_id)||0, b.batting_team)}</span>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 3, overflow: 'hidden', cursor:'pointer', minWidth:0 }}
                             onClick={e=>{e.stopPropagation();const cp=getCachedPlayer(parseInt(b.batter_id)||0)||{};openAtBatSlide({pid:parseInt(b.batter_id)||0,name:b.batter,team:b.batting_team,avgEV:cp.avgEV,barrel:cp.barrel,hardHit:cp.hardHit,flyBall:cp.flyBall,hr:cp.hr,avg:cp.avg,obp:cp.obp,slg:cp.slg,xwoba:cp.xwoba,kPct:cp.kPct,bbPct:cp.bbPct,launchAngle:cp.launchAngle});}}>
                             <span style={{ fontFamily:"'Oswald',sans-serif", fontWeight:700, fontSize:11, whiteSpace:'nowrap',
@@ -17549,7 +17650,8 @@ function SimLabView({ data }) {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 5, overflow: 'hidden', cursor: 'pointer' }}
                           onClick={() => openAtBatSlide({ pid: parseInt(b.batter_id) || 0, name: b.batter, team: b.batting_team })}>
                           <PlayerAvatar pid={parseInt(b.batter_id) || 0} name={b.batter} size={22}/>
-                          <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 8, fontWeight: 700, color: 'var(--accent2)', flexShrink: 0 }}>{b.batting_team}</span>
+                          {/* getTeam() (2026-08-03) — see BarrelLabTab's identical comment above */}
+                          <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 8, fontWeight: 700, color: 'var(--accent2)', flexShrink: 0 }}>{getTeam(parseInt(b.batter_id) || 0, b.batting_team)}</span>
                           <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.batter}</span>
                           <span style={{ fontSize: 8, color: 'var(--muted)', flexShrink: 0 }}>{b.batter_hand}</span>
                         </div>
@@ -17680,7 +17782,8 @@ function SimLabView({ data }) {
                         <td className="sticky-batter" style={{ textAlign: 'left', maxWidth: 180 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 5, overflow: 'hidden' }}>
                             <PlayerAvatar pid={parseInt(b.batter_id)||0} name={b.batter} size={24}/>
-                            <span style={{fontFamily:"'DM Mono',monospace",fontSize:8,fontWeight:700,color:'var(--accent2)',whiteSpace:'nowrap',flexShrink:0}}>{b.batting_team}</span>
+                            {/* getTeam() (2026-08-03) — see BarrelLabTab's identical comment above */}
+                            <span style={{fontFamily:"'DM Mono',monospace",fontSize:8,fontWeight:700,color:'var(--accent2)',whiteSpace:'nowrap',flexShrink:0}}>{getTeam(parseInt(b.batter_id)||0, b.batting_team)}</span>
                             <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 12, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{b.batter}</span>
                           </div>
                         </td>
@@ -33597,8 +33700,9 @@ function BarrelLabTab() {
                       <div style={{fontFamily:osw,fontWeight:700,fontSize:13,color:'var(--text)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
                         {b.batter}
                       </div>
+                      {/* getTeam() (2026-08-03) — see BarrelLabTab main-table comment above */}
                       <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>
-                        {b.batting_team} · {b.batter_hand}v{(b.pitcher_hand||'').charAt(0)}
+                        {getTeam(parseInt(b.batter_id)||0, b.batting_team)} · {b.batter_hand}v{(b.pitcher_hand||'').charAt(0)}
                       </div>
                       <div style={{fontFamily:mono,fontSize:7,color:pgCol(getHandSpecificGrade(b)),whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
                         vs <span
@@ -34672,8 +34776,9 @@ function OnBaseTab() {
                       <div style={{fontFamily:osw,fontWeight:700,fontSize:13,color:'var(--text)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
                         {b.batter}
                       </div>
+                      {/* getTeam() (2026-08-03) — see BarrelLabTab main-table comment above */}
                       <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>
-                        {b.batting_team} · {b.batter_hand}v{(b.pitcher_hand||'').charAt(0)}
+                        {getTeam(parseInt(b.batter_id)||0, b.batting_team)} · {b.batter_hand}v{(b.pitcher_hand||'').charAt(0)}
                       </div>
                       <div style={{fontFamily:mono,fontSize:7,color:pgCol(getHandSpecificGrade(b)),whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
                         vs <span
