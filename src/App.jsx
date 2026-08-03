@@ -33653,7 +33653,7 @@ function BarrelLabTab() {
                     🍯🔥 Sauce 3.0
                   </div>
                 )}
-                {b.isSauce25 && (
+                {b.isSauce25 && !b.isSauce3 && (
                   <div title="Sauce 2.5 — relaxed xwOBA≥.330, both ISO≥.220 — 18.24% HR rate / 2.57x lift, full 2026 season backtest."
                     style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'#eab308',
                     letterSpacing:.6,textTransform:'uppercase',marginBottom:4}}>
@@ -33752,7 +33752,7 @@ function BarrelLabTab() {
                                   {b.isDayLate && <span title="Day Late — a real ★ Barrel Signal on BOTH of the last 2 real game days, no HR either day, today's matchup not an outright Elite mismatch." style={{color:'#22c1c3',marginRight:2,fontWeight:900,fontSize:7}}>🗓️</span>}
                                   {b.isYoungGun && <span title={`Young Gun — ${parseInt(b.season_pa||0)} season PA. Discovery filter, not a hot signal — thin-history batters homer LESS often per game on average (7.9% vs 11.5%).`} style={{color:'#4ade80',marginRight:2,fontWeight:900,fontSize:7}}>🌱</span>}
                                   {b.isSauce3 && <span title="Sauce 3.0 — Sauce 2.0 AND both L7 ISO + Arsenal Fit ISO ≥.250. 20.26% HR rate / 2.85x lift, full 2026 season backtest (n=380). Best validated combo in this app." style={{color:'#f59e0b',marginRight:2,fontWeight:900,fontSize:7}}>🍯🔥</span>}
-                                  {b.isSauce25 && <span title="Sauce 2.5 — relaxed xwOBA≥.330, both ISO≥.220. 18.24% HR rate / 2.57x lift, full 2026 season backtest (n=899)." style={{color:'#eab308',marginRight:2,fontWeight:900,fontSize:7}}>🥫</span>}
+                                  {b.isSauce25 && !b.isSauce3 && <span title="Sauce 2.5 — relaxed xwOBA≥.330, both ISO≥.220. 18.24% HR rate / 2.57x lift, full 2026 season backtest (n=899)." style={{color:'#eab308',marginRight:2,fontWeight:900,fontSize:7}}>🥫</span>}
                                   {b.handMatchTier && <span
                                     title={b.handMatchTier==='elite'
                                       ? `Elite Hand Match — ${b.pitcher||'this pitcher'} (${(b.pitcher_hand||'?').charAt(0)}HP) is genuinely weak vs ${b.batter_hand||'?'}HB, ${b.batter} has strong arsenal fit (ps_convergence=${fmt(b.ps_convergence,1)}${b.ps_conv_pitch ? ', best pitch: '+b.ps_conv_pitch : ''}), AND an elite ${fmt(b.vs_hand_hr_rate,1)}% HR rate vs that hand. Diamond in the rough.`
@@ -34728,7 +34728,7 @@ function OnBaseTab() {
                     🍯🔥 Sauce 3.0
                   </div>
                 )}
-                {b.isSauce25 && (
+                {b.isSauce25 && !b.isSauce3 && (
                   <div title="Sauce 2.5 — relaxed xwOBA≥.330, both ISO≥.220 — 18.24% HR rate / 2.57x lift, full 2026 season backtest."
                     style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'#eab308',
                     letterSpacing:.6,textTransform:'uppercase',marginBottom:6}}>
@@ -34826,7 +34826,7 @@ function OnBaseTab() {
                                 {b.isDayLate && <span title="Day Late — a real ★ Barrel Signal on BOTH of the last 2 real game days, no HR either day, today's matchup not an outright Elite mismatch." style={{color:'#22c1c3',marginRight:2,fontWeight:900,fontSize:7}}>🗓️</span>}
                                 {b.isYoungGun && <span title={`Young Gun — ${parseInt(b.season_pa||0)} season PA. Discovery filter, not a hot signal — thin-history batters homer LESS often per game on average (7.9% vs 11.5%).`} style={{color:'#4ade80',marginRight:2,fontWeight:900,fontSize:7}}>🌱</span>}
                                 {b.isSauce3 && <span title="Sauce 3.0 — Sauce 2.0 AND both L7 ISO + Arsenal Fit ISO ≥.250. 20.26% HR rate / 2.85x lift, full 2026 season backtest (n=380). Best validated combo in this app." style={{color:'#f59e0b',marginRight:2,fontWeight:900,fontSize:7}}>🍯🔥</span>}
-                                {b.isSauce25 && <span title="Sauce 2.5 — relaxed xwOBA≥.330, both ISO≥.220. 18.24% HR rate / 2.57x lift, full 2026 season backtest (n=899)." style={{color:'#eab308',marginRight:2,fontWeight:900,fontSize:7}}>🥫</span>}
+                                {b.isSauce25 && !b.isSauce3 && <span title="Sauce 2.5 — relaxed xwOBA≥.330, both ISO≥.220. 18.24% HR rate / 2.57x lift, full 2026 season backtest (n=899)." style={{color:'#eab308',marginRight:2,fontWeight:900,fontSize:7}}>🥫</span>}
                                 {b.handMatchTier && <span
                                   title={b.handMatchTier==='elite'
                                     ? `Elite Hand Match — ${b.pitcher||'this pitcher'} (${(b.pitcher_hand||'?').charAt(0)}HP) is genuinely weak vs ${b.batter_hand||'?'}HB, ${b.batter} has strong arsenal fit (ps_convergence=${fmt(b.ps_convergence,1)}${b.ps_conv_pitch ? ', best pitch: '+b.ps_conv_pitch : ''}), AND an elite ${fmt(b.vs_hand_hr_rate,1)}% HR rate vs that hand. Diamond in the rough.`

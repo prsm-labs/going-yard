@@ -1,8 +1,8 @@
 {
   "version": "2026.08.03",
-  "bundleFile": "index-DTeq1XmS.js",
+  "bundleFile": "index-B9hwImPu.js",
   "changelog": [
-    "Update version.json to match latest build"
+    "Add 2025 Track Record backfill + year/date selector redesign"
   ],
   "notifyUsers": true
 }
