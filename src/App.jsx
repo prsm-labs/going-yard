@@ -9293,6 +9293,105 @@ function LiveAtBatViewer({ gamePk }) {
   );
 }
 
+// ── pitchResultColor — Bat Tracking visual overhaul (2026-08-02) ────────────
+// Colors by PITCH RESULT category (strike/foul=red, ball=green, in play=blue),
+// per the reference mockups — replaces the old by-pitch-TYPE coloring. Reads
+// the pitch's own `result`/`desc` text (MLB PBP's details.description), not
+// Savant's call_name — confirmed live that Savant's call_name for a genuine
+// foul ball is "Strike" (not "Foul"), so MLB's own description text is the
+// reliable field to categorize on here.
+function pitchResultColor(desc) {
+  const d = (desc || '').toLowerCase();
+  if (d.includes('in play')) return '#38b8f2'; // blue
+  if (d.includes('foul') || d.includes('strike') || d.includes('bunt')) return '#ff4d4d'; // red — foul, called/swinging strike, missed/foul bunt (a missed bunt attempt is a strike with no "strike"/"foul" in its own text)
+  if (d.includes('ball') || d.includes('hit by pitch') || d.includes('pitchout')) return '#27c97a'; // green
+  return '#8899a6';
+}
+
+// ── BattedBallField — field diagram + real Statcast batted-ball stats ───────
+// New 2026-08-02, matching the user's reference mockup. Home plate is the
+// origin; hcX/hcY are Savant's own hc_x_ft/hc_y_ft (verified live: for a real
+// HR, sqrt(hcX^2+hcY^2) landed within 1ft of the real hit_distance, confirming
+// home-plate-origin / hcY-toward-CF / hcX-lateral is the right read of these
+// fields — not assumed, checked against real data before building this).
+// xba and hrBallparks are REAL Savant fields (never fabricated/approximated)
+// — render '—' when Savant's play-id match misses for that specific pitch.
+function BattedBallField({ r }) {
+  const mono = "'DM Mono',monospace";
+  const osw  = "'Oswald',sans-serif";
+  const W = 190, H = 190;
+  const cx = W / 2, cy = H - 14;
+  const maxDist = 480; // ft -- scales the field so a 480ft blast reaches the wall
+  // fieldR is the RADIUS at maxDist, not a raw x-offset. Foul lines run at 45°
+  // off the CF line, so their endpoints are cx +/- fieldR*sin(45), cy -
+  // fieldR*cos(45) -- fixed 2026-08-02 after a manual geometry trace caught
+  // the original version using fieldR directly as an x-offset (cx-fieldR*0.98),
+  // which put both foul-line endpoints off the 190px canvas entirely.
+  const fieldR = 126;
+  const foulDX = fieldR * Math.SQRT1_2, foulDY = fieldR * Math.SQRT1_2;
+  const hasCoords = r.hcX != null && r.hcY != null;
+  const px = hasCoords ? cx + (r.hcX / maxDist) * fieldR : null;
+  const py = hasCoords ? cy - (r.hcY / maxDist) * fieldR : null;
+  const evColor = r.ev == null ? 'var(--muted)' : r.ev >= 103 ? '#ff4020' : r.ev >= 95 ? '#ff8020' : r.ev >= 90 ? '#ffc840' : 'var(--text)';
+  return (
+    <div style={{display:'flex',gap:12,flexShrink:0,background:'rgba(0,0,0,.4)',
+      borderRadius:6,border:'1px solid var(--border)',padding:10}}>
+      <svg width={W} height={H} style={{flexShrink:0}}>
+        {/* Outfield boundary (fan) */}
+        <path d={`M ${cx-foulDX} ${cy-foulDY} A ${fieldR} ${fieldR} 0 0 1 ${cx+foulDX} ${cy-foulDY} L ${cx} ${cy} Z`}
+          fill="#3f5a45" stroke="#6b7d63" strokeWidth="1"/>
+        {/* Infield dirt diamond */}
+        <path d={`M ${cx} ${cy} L ${cx-38} ${cy-38} L ${cx} ${cy-76} L ${cx+38} ${cy-38} Z`}
+          fill="#8a7355" stroke="#6b7d63" strokeWidth="0.75" opacity="0.9"/>
+        {/* Infield grass diamond (inner) */}
+        <path d={`M ${cx} ${cy-14} L ${cx-22} ${cy-38} L ${cx} ${cy-62} L ${cx+22} ${cy-38} Z`}
+          fill="#3f5a45" opacity="0.85"/>
+        {/* Foul lines */}
+        <line x1={cx} y1={cy} x2={cx-foulDX} y2={cy-foulDY} stroke="rgba(255,255,255,.5)" strokeWidth="1"/>
+        <line x1={cx} y1={cy} x2={cx+foulDX} y2={cy-foulDY} stroke="rgba(255,255,255,.5)" strokeWidth="1"/>
+        {/* Bases */}
+        {[[cx-38,cy-38],[cx,cy-76],[cx+38,cy-38]].map(([bx,by],i) => (
+          <rect key={i} x={bx-3} y={by-3} width={6} height={6} fill="#e8e4d8" stroke="#333" strokeWidth="0.5" transform={`rotate(45 ${bx} ${by})`}/>
+        ))}
+        {/* Pitcher's mound */}
+        <circle cx={cx} cy={cy-26} r={4} fill="#8a7355" stroke="#6b7d63" strokeWidth="0.5"/>
+        {/* Home plate */}
+        <polygon points={`${cx-5},${cy+4} ${cx+5},${cy+4} ${cx+5},${cy-1} ${cx},${cy-5} ${cx-5},${cy-1}`}
+          fill="#e8e4d8" stroke="#333" strokeWidth="0.5"/>
+        {/* Trajectory + landing spot */}
+        {hasCoords && <>
+          <path d={`M ${cx} ${cy} Q ${(cx+px)/2} ${Math.min(cy,py)-24} ${px} ${py}`}
+            fill="none" stroke="rgba(255,255,255,.55)" strokeWidth="1.25" strokeDasharray="2,2"/>
+          <circle cx={px} cy={py} r={5} fill="#fff" stroke="#c0392b" strokeWidth="1"/>
+          <circle cx={px} cy={py} r={5} fill="none" stroke="#c0392b" strokeWidth="0.5" strokeDasharray="1,1"/>
+        </>}
+      </svg>
+      <div style={{display:'flex',flexDirection:'column',gap:6,justifyContent:'center',minWidth:76}}>
+        <div>
+          <div style={{fontFamily:osw,fontWeight:800,fontSize:15,color:evColor}}>{r.ev!=null?r.ev.toFixed(1):'—'}</div>
+          <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)'}}>exit velocity</div>
+        </div>
+        <div>
+          <div style={{fontFamily:osw,fontWeight:800,fontSize:15}}>{r.la!=null?r.la.toFixed(0)+'°':'—'}</div>
+          <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)'}}>launch angle</div>
+        </div>
+        <div>
+          <div style={{fontFamily:osw,fontWeight:800,fontSize:15}}>{r.dist>0?r.dist+'ft':'—'}</div>
+          <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)'}}>distance</div>
+        </div>
+        <div>
+          <div style={{fontFamily:osw,fontWeight:800,fontSize:15}}>{r.xba!=null?r.xba.toFixed(3).replace(/^0/,''):'—'}</div>
+          <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)'}}>xBA</div>
+        </div>
+        <div>
+          <div style={{fontFamily:osw,fontWeight:800,fontSize:15,color:r.hrBallparks>=30?'var(--accent)':undefined}}>{r.hrBallparks!=null?`${r.hrBallparks}/30`:'—'}</div>
+          <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)'}}>HR ballparks</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function BatTrackingTab({ games, date, isToday }) {
   const mono  = "'DM Mono',monospace";
   const osw   = "'Oswald',sans-serif";
@@ -9336,15 +9435,18 @@ function BatTrackingTab({ games, date, isToday }) {
     const allPAs = [];
     await Promise.allSettled(targets.map(async g => {
       try {
-        // Fetch play-by-play + Savant bat speed in parallel
+        // Fetch play-by-play + Savant per-pitch data in parallel. Savant's gf
+        // endpoint (2026-08-02 expansion) carries real xba/HR-ballparks/hit
+        // coordinates/barrel/spin-rate that MLB's own PBP doesn't expose —
+        // see api/savant.js's header comment for what was verified live.
         const [pbpRes, savantRes] = await Promise.allSettled([
           fetch(`https://statsapi.mlb.com/api/v1/game/${g.gamePk}/playByPlay`).then(r=>r.json()),
-          fetch(`/api/savant?game_pk=${g.gamePk}`).then(r=>r.json()).catch(()=>({bat_speeds:{}})),
+          fetch(`/api/savant?game_pk=${g.gamePk}`).then(r=>r.json()).catch(()=>({plays:{}})),
         ]);
 
         const d = pbpRes.status === 'fulfilled' ? pbpRes.value : {};
         const savant = savantRes.status === 'fulfilled' ? savantRes.value : {};
-        const batSpeedMap = savant.bat_speeds || {};
+        const savantMap = savant.plays || {};
         const plays = d?.allPlays || [];
         const _dbg = {
           gamePk: g.gamePk,
@@ -9353,7 +9455,7 @@ function BatTrackingTab({ games, date, isToday }) {
           totalPlays: plays.length,
           complete: plays.filter(p=>p.about?.isComplete).length,
           hasResult: plays.filter(p=>p.result?.event).length,
-          savantBatSpeeds: Object.keys(batSpeedMap).length,
+          savantBatSpeeds: Object.keys(savantMap).length,
           rawKeys: Object.keys(pbpRes.status === 'fulfilled' ? (pbpRes.value||{}) : {}),
         };
         console.log('[BatTracking]', _dbg);
@@ -9379,7 +9481,7 @@ function BatTrackingTab({ games, date, isToday }) {
             }
             return null;
           })();
-          const savantData = savantPlayId ? batSpeedMap[savantPlayId] : null;
+          const savantData = savantPlayId ? savantMap[savantPlayId] : null;
           const batSpd = savantData?.bat_speed != null
             ? Number(savantData.bat_speed)
             : (() => {
@@ -9400,6 +9502,10 @@ function BatTrackingTab({ games, date, isToday }) {
             matchup:  `${awayAbbr} @ ${homeAbbr}`,
             batterId: batter?.id,
             batter:   batter?.fullName || '—',
+            // Batter hand — from MLB's own PBP (matchup.batSide.code), not
+            // Savant's 'stand' field, so silhouette selection doesn't depend
+            // on the Savant proxy matching this specific play successfully.
+            hand:     (play.matchup?.batSide?.code || '').toUpperCase() || null,
             pitcherId: pitcher?.id || null,
             pitcherName: pitcher?.fullName || null,
             team,
@@ -9411,6 +9517,15 @@ function BatTrackingTab({ games, date, isToday }) {
             pitchV: pitchVelo != null ? Math.round(pitchVelo*10)/10 : null,
             pitchCode: lastPitch?.details?.type?.code || null,
             isHR: result === 'home_run',
+            // Real Savant fields (2026-08-02) — batted-ball card data. null
+            // when Savant's play-id match misses (not every play resolves) —
+            // rendered as '—' downstream, never fabricated.
+            xba:        savantData?.xba ?? null,
+            hrBallparks: savantData?.hr_ballparks ?? null,
+            hcX:        savantData?.hc_x_ft ?? null,
+            hcY:        savantData?.hc_y_ft ?? null,
+            isBarrel:   savantData?.is_barrel ?? false,
+            spinRate:   savantData?.spin_rate ?? null,
             // Store pitch sequence for the zone detail panel
             pitches: events.filter(e => e.isPitch).map((e, pi) => ({
               num:   pi + 1,
@@ -9723,11 +9838,6 @@ function BatTrackingTab({ games, date, isToday }) {
                 const laGood  = r.la!=null && r.la>=18 && r.la<=35;
                 const isRecent = i < 5;
                 const isSel   = selPlay && selPlay.gamePk===r.gamePk && selPlay.pa===r.pa;
-                const pitchC  = code => ({
-                  'FF':'#E84040','SI':'#E87040','FC':'#E8B040',
-                  'SL':'#40B8E8','CU':'#4060E8','KC':'#4080E8',
-                  'CH':'#40E880','FS':'#80E840','EP':'#C040E8',
-                }[code] || '#8899a6');
                 return (
                   <React.Fragment key={`${r.gamePk}-${r.pa}`}>
                     <tr
@@ -9799,55 +9909,56 @@ function BatTrackingTab({ games, date, isToday }) {
                       </td>
 
                     </tr>
-                    {/* ── Expanded pitch zone detail ── */}
+                    {/* ── Expanded pitch zone detail (redesigned 2026-08-02) ── */}
                     {isSel && (
                       <tr style={{background:'rgba(255,255,255,.04)'}}>
                         <td colSpan={10} style={{padding:'12px 16px',
                           borderBottom:'1px solid var(--border)'}}>
                           <div style={{display:'flex',gap:16,alignItems:'flex-start',flexWrap:'wrap'}}>
-                            {/* Pitch zone SVG — 9-box strike zone grid */}
+                            {/* Strike zone card — batter silhouette on the correct side by
+                                hand (LHB=left, RHB=right, matching the reference mockups),
+                                grid on the opposite side, pitches colored by RESULT category
+                                (red=strike/foul, green=ball, blue=in play) via pitchResultColor. */}
                             {r.pitches.length > 0 && (() => {
                               const sz = { top: r.pitches[0]?.szTop||3.5, bot: r.pitches[0]?.szBot||1.5 };
-                              const W=140, H=160, padL=20, padR=14, padT=14, padB=28;
-                              const zoneW = W - padL - padR;
-                              const zoneH = H - padT - padB;
-                              // Map pitch coords — clamp so dots stay inside SVG
-                              const toX = px => Math.max(4, Math.min(W-4, padL + (Math.max(-1.5,Math.min(1.5,px??0)) + 1.5) / 3.0 * zoneW));
-                              const toY = pz => Math.max(4, Math.min(H-4, padT + (1 - (Math.max(sz.bot-0.5, Math.min(sz.top+0.5, pz??sz.bot)) - sz.bot) / (sz.top - sz.bot)) * zoneH));
-                              // Strike zone box corners
-                              const szX = padL, szY = padT, szW = zoneW, szH = zoneH;
-                              // 9-box grid cell size
-                              const cellW = szW / 3, cellH = szH / 3;
+                              const isLHB = r.hand === 'L';
+                              const W=210, H=170, gridW=112, gridH=124, padT=16, padB=30;
+                              const gridX = isLHB ? W-gridW-16 : 16; // grid sits away from the batter
+                              const silX  = isLHB ? 6 : W-66;
+                              const toX = px => Math.max(gridX+4, Math.min(gridX+gridW-4, gridX + (Math.max(-1.5,Math.min(1.5,px??0)) + 1.5) / 3.0 * gridW));
+                              const toY = pz => Math.max(padT+4, Math.min(padT+gridH-4, padT + (1 - (Math.max(sz.bot-0.5, Math.min(sz.top+0.5, pz??sz.bot)) - sz.bot) / (sz.top - sz.bot)) * gridH));
+                              const cellW = gridW/3, cellH = gridH/3;
                               return (
                                 <svg width={W} height={H} style={{flexShrink:0,
                                   background:'rgba(0,0,0,.4)',borderRadius:6,
                                   border:'1px solid var(--border)'}}>
-                                  {/* Outer strike zone */}
-                                  <rect x={szX} y={szY} width={szW} height={szH}
+                                  {/* Batter silhouette — real cutout PNGs extracted from the
+                                      user's reference mockups (2026-08-02), transparent bg */}
+                                  <image href={isLHB?'/images/silhouette-lhb.png':'/images/silhouette-rhb.png'}
+                                    x={silX} y={10} width={60} height={H-26}
+                                    opacity={0.6} preserveAspectRatio="xMidYMid meet"/>
+                                  <rect x={gridX} y={padT} width={gridW} height={gridH}
                                     fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.25)" strokeWidth="1.5"/>
-                                  {/* 9-box internal grid lines */}
                                   {[1,2].map(i => (
                                     <React.Fragment key={i}>
-                                      <line x1={szX+cellW*i} y1={szY} x2={szX+cellW*i} y2={szY+szH}
+                                      <line x1={gridX+cellW*i} y1={padT} x2={gridX+cellW*i} y2={padT+gridH}
                                         stroke="rgba(255,255,255,.12)" strokeWidth="0.75"/>
-                                      <line x1={szX} y1={szY+cellH*i} x2={szX+szW} y2={szY+cellH*i}
+                                      <line x1={gridX} y1={padT+cellH*i} x2={gridX+gridW} y2={padT+cellH*i}
                                         stroke="rgba(255,255,255,.12)" strokeWidth="0.75"/>
                                     </React.Fragment>
                                   ))}
-                                  {/* Home plate */}
-                                  <polygon points={`${padL+zoneW/2-8},${H-padB+6} ${padL+zoneW/2+8},${H-padB+6} ${padL+zoneW/2+10},${H-padB+12} ${padL+zoneW/2},${H-padB+16} ${padL+zoneW/2-10},${H-padB+12}`}
+                                  <polygon points={`${gridX+gridW/2-8},${H-padB+6} ${gridX+gridW/2+8},${H-padB+6} ${gridX+gridW/2+10},${H-padB+12} ${gridX+gridW/2},${H-padB+16} ${gridX+gridW/2-10},${H-padB+12}`}
                                     fill="rgba(255,255,255,.2)" stroke="rgba(255,255,255,.4)" strokeWidth="0.5"/>
-                                  {/* Pitches — drawn in order so last is on top */}
                                   {r.pitches.map((p, pi) => {
                                     const x = toX(p.pX);
                                     const y = toY(p.pZ);
-                                    const col = pitchC(p.code);
+                                    const col = pitchResultColor(p.result);
                                     const isLast = pi === r.pitches.length - 1;
                                     return (
                                       <g key={pi}>
                                         <circle cx={x} cy={y} r={isLast?10:9}
                                           fill={col} stroke="rgba(0,0,0,.4)" strokeWidth="1"
-                                          opacity={isLast?1:0.8}/>
+                                          opacity={isLast?1:0.85}/>
                                         <text x={x} y={y+4} textAnchor="middle"
                                           fontSize="8" fontWeight="800"
                                           fill="white" fontFamily="monospace">{p.num}</text>
@@ -9857,11 +9968,13 @@ function BatTrackingTab({ games, date, isToday }) {
                                 </svg>
                               );
                             })()}
-                            {/* Pitch sequence */}
-                            <div style={{flex:1,minWidth:140}}>
+                            {/* Pitch sequence — result text primary, pitch type + velo
+                                secondary (matches the reference mockup's own ordering) */}
+                            <div style={{flex:1,minWidth:150}}>
                               <div style={{fontFamily:osw,fontWeight:700,fontSize:12,
                                 marginBottom:6,color:'var(--text)'}}>
                                 {r.batter}
+                                {r.hand && <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)',fontWeight:400}}> ({r.hand}HB)</span>}
                                 <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)',
                                   marginLeft:8,fontWeight:400}}>
                                   vs {r.pitcherName || r.pitchCode || '—'}
@@ -9872,45 +9985,32 @@ function BatTrackingTab({ games, date, isToday }) {
                                 {[...r.pitches].reverse().map((p,pi) => (
                                   <div key={pi} style={{display:'flex',alignItems:'center',gap:8}}>
                                     <div style={{width:20,height:20,borderRadius:'50%',
-                                      background:pitchC(p.code),flexShrink:0,
+                                      background:pitchResultColor(p.result),flexShrink:0,
                                       display:'flex',alignItems:'center',justifyContent:'center',
                                       fontSize:9,fontWeight:700,fontFamily:mono,color:'white'}}>
                                       {p.num}
                                     </div>
                                     <div>
                                       <div style={{fontFamily:osw,fontSize:11,fontWeight:600,color:'var(--text)'}}>
-                                        {p.desc || p.code}
+                                        {p.result || p.desc || p.code}
                                       </div>
                                       <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>
-                                        {p.result}{p.velo ? ` · ${p.velo.toFixed(1)} mph` : ''}
+                                        {p.desc}{p.velo ? ` · ${p.velo.toFixed(1)} mph` : ''}
                                       </div>
                                     </div>
                                   </div>
                                 ))}
                               </div>
-                              {/* Hit data if available */}
-                              {(r.ev || r.la || r.dist) && (
-                                <div style={{display:'flex',gap:12,marginTop:8,
-                                  paddingTop:8,borderTop:'1px solid rgba(255,255,255,.06)'}}>
-                                  {r.ev && <div>
-                                    <div style={{fontFamily:osw,fontWeight:800,fontSize:13,color:evColor}}>{r.ev.toFixed(1)}</div>
-                                    <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)'}}>EV mph</div>
-                                  </div>}
-                                  {r.la!=null && <div>
-                                    <div style={{fontFamily:osw,fontWeight:800,fontSize:13}}>{r.la.toFixed(0)}°</div>
-                                    <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)'}}>LA</div>
-                                  </div>}
-                                  {r.dist>0 && <div>
-                                    <div style={{fontFamily:osw,fontWeight:800,fontSize:13}}>{r.dist}ft</div>
-                                    <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)'}}>Dist</div>
-                                  </div>}
-                                  {r.batSpd && <div>
-                                    <div style={{fontFamily:osw,fontWeight:800,fontSize:13,color:'#ffd700'}}>{r.batSpd.toFixed(1)}</div>
-                                    <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)'}}>Bat Spd</div>
-                                  </div>}
+                              {r.batSpd != null && (
+                                <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid rgba(255,255,255,.06)'}}>
+                                  <span style={{fontFamily:osw,fontWeight:800,fontSize:13,color:'#ffd700'}}>{r.batSpd.toFixed(1)}</span>
+                                  <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginLeft:5}}>mph bat speed</span>
                                 </div>
                               )}
                             </div>
+                            {/* Batted-ball result card — only for a real ball in play,
+                                so a K/BB/HBP PA doesn't render an empty field diagram */}
+                            {(r.ev != null || r.dist > 0) && <BattedBallField r={r}/>}
                           </div>
                         </td>
                       </tr>
