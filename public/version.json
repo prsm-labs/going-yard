@@ -1,8 +1,8 @@
 {
   "version": "2026.08.04",
-  "bundleFile": "index-ZW2Rwt6s.js",
+  "bundleFile": "index-3ut5Au0S.js",
   "changelog": [
-    "Add Bullpen Pen tiers to the in-app Legend"
+    "Add Bullpen Tier filter to FilterPanel across Barrel Lab/On Base/Arsenal Fit/Track Record"
   ],
   "notifyUsers": true
 }

@@ -16173,6 +16173,7 @@ function SimLabView({ data }) {
   const [afSauce3Only,    setAfSauce3Only]    = useState(false);
   const [afSauce25Only,   setAfSauce25Only]   = useState(false);
   const [afBullpenTiers,  setAfBullpenTiers]  = useState(() => new Set());
+  const [afAvoidOnly,     setAfAvoidOnly]     = useState(false);
   const [afHandMatchOnly, setAfHandMatchOnly] = useState(false);
   const [afMinL7Iso, setAfMinL7Iso] = useState('');
   const [afMinIso,   setAfMinIso]   = useState('');
@@ -16472,6 +16473,7 @@ function SimLabView({ data }) {
       isSauce2:      isSauce2Batter(r),
       isSauce3:      isSauce3Batter(r),
       isSauce25:     isSauce25Batter(r),
+      isAvoid:       isAvoidBatter(r),
       handMatchTier: getHandMatchTier(r),
     }));
     const filtered = withFlags
@@ -16481,6 +16483,7 @@ function SimLabView({ data }) {
       .filter(r => !afSauce3Only    || r.isSauce3)
       .filter(r => !afSauce25Only   || r.isSauce25)
       .filter(r => afBullpenTiers.size === 0 || afBullpenTiers.has(bullpenTierLabel(r.bullpen_hr_rank)))
+      .filter(r => !afAvoidOnly     || r.isAvoid)
       .filter(r => !afHandMatchOnly || r.handMatchTier)
       .filter(r => afMinL7Iso === '' || parseFloat(r.recent_iso||0)    >= parseFloat(afMinL7Iso))
       .filter(r => afMinIso   === '' || parseFloat(r.bvp_iso||0)       >= parseFloat(afMinIso))
@@ -16492,7 +16495,7 @@ function SimLabView({ data }) {
       if (va > vb) return afSortDir === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [slate, afSortBy, afSortDir, afChalkOnly, afDayLateOnly, afYoungGunsOnly, afSauce3Only, afSauce25Only, afBullpenTiers, afHandMatchOnly, afMinL7Iso, afMinIso, afMinL7Ev, afMinEv, afDayLateVer, afPlayerVer]);
+  }, [slate, afSortBy, afSortDir, afChalkOnly, afDayLateOnly, afYoungGunsOnly, afSauce3Only, afSauce25Only, afBullpenTiers, afAvoidOnly, afHandMatchOnly, afMinL7Iso, afMinIso, afMinL7Ev, afMinEv, afDayLateVer, afPlayerVer]);
 
   // Reset row cap when filters/sort change so user always sees top results
   useEffect(() => { setDisplayLimit(150); }, [sortBy, sortDir, selMatchups, lineupOnly, simActiveOnly, simSearch, filterKeyMatchup, slotMin, slotMax]);
@@ -17663,6 +17666,9 @@ function SimLabView({ data }) {
                 { key: 'daylate',   label: '🗓️ Day Late',        active: afDayLateOnly,    color: '#22c1c3',    onToggle: () => setAfDayLateOnly(v => !v) },
                 { key: 'younggun',  label: '🌱 Young Guns',      active: afYoungGunsOnly,  color: '#4ade80',    onToggle: () => setAfYoungGunsOnly(v => !v) },
                 { key: 'sauce3',    label: '🍯🔥 Sauce 3.0',      active: afSauce3Only,     color: '#f59e0b',    onToggle: () => setAfSauce3Only(v => !v) },
+                { key: 'avoid',     label: '🚫 Avoid List',      active: afAvoidOnly,      color: '#ff6b6b',
+                  title: "Avoid List — Sim H<=0.6 AND SwStr%>=19% AND (same-hand OR Tough/Elite pitcher). Full-season backtest: 58-61% miss rate vs 42.6% baseline, 1.4x lift. Filter-only, no badge.",
+                  onToggle: () => setAfAvoidOnly(v => !v) },
                 { key: 'picks',     label: '🎯 My Picks',        active: simPicksOnly,     color: 'var(--accent2)', onToggle: () => setSimPicksOnly(v => !v) },
                 { key: 'goneyard',  label: '💥 Gone Yard Today', active: filterGoneYardSim, color: 'var(--accent)', onToggle: () => setFilterGoneYardSim(v => !v) },
                 { key: 'tb2',       label: '2️⃣ 2+ TB Today',     active: filterTB2Sim,     color: '#38b8f2',    onToggle: () => setFilterTB2Sim(v => !v) },
@@ -28464,6 +28470,7 @@ function TrackRecordTab() {
   const [showOnlyHitSignal, setShowOnlyHitSignal] = useState(false);
   const [showOnlySecretSauce, setShowOnlySecretSauce] = useState(false);
   const [selBullpenTiers, setSelBullpenTiers] = useState(() => new Set());
+  const [showOnlyAvoid, setShowOnlyAvoid] = useState(false);
   const [showOnly2Bagger, setShowOnly2Bagger] = useState(false);
   const [showOnlyTBSignal, setShowOnlyTBSignal] = useState(false);
   const [showOnlySimTB2, setShowOnlySimTB2] = useState(false);
@@ -28804,6 +28811,15 @@ function TrackRecordTab() {
               && parseFloat(r['Sim H']||0) >= 1.0
               && Number.isFinite(parseFloat(r['SwStr%']))
               && parseFloat(r['SwStr%']) <= 15,
+            // Avoid List (2026-08-04) — mirror of Hit Signal, see isAvoidBatter()'s
+            // own comment for the full backtest (58-61% miss rate vs 42.6%
+            // baseline, 1.4x lift). Reimplemented against this row's bracket-
+            // notation CSV field names, same precedent as isSauce2/isHitSignal.
+            isAvoid: parseFloat(r['Sim H']||0) <= 0.6
+              && Number.isFinite(parseFloat(r['SwStr%']))
+              && parseFloat(r['SwStr%']) >= 19
+              && ((r['Hand']||'').trim().charAt(0).toUpperCase() === (r['P.Hand']||'').trim().charAt(0).toUpperCase()
+                  || /elite|tough/i.test(r['Pitcher Grade']||blRow['Grade']||'')),
             // Day Late (2026-08-02) — same DAY_LATE_LOOKUP module-level cache
             // Barrel Lab/On Base/Arsenal Fit already populate via
             // loadDayLateLookup() (awaited once above, before this .map()
@@ -28960,6 +28976,7 @@ function TrackRecordTab() {
     if (xhrFilter)       rows = rows.filter(r => r.xhrVerdict === xhrFilter);
     if (selPitcherGradesTR.size > 0) rows = rows.filter(r => selPitcherGradesTR.has((r.pitcherGrade||'').trim()));
     if (selBullpenTiers.size > 0) rows = rows.filter(r => selBullpenTiers.has(bullpenTierLabel(r.bullpenRank)));
+    if (showOnlyAvoid) rows = rows.filter(r => r.isAvoid);
     if (search) {
       const q = search.toLowerCase();
       rows = rows.filter(r =>
@@ -28974,7 +28991,7 @@ function TrackRecordTab() {
       }
       return sortDir * ((av||0) - (bv||0));
     });
-  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, showOnlyWeakSlot, showOnlyCC, showOnlySauce2, showOnlySauce3, showOnlySauce25, showOnlyHitSignal, showOnlySecretSauce, showOnly2Bagger, showOnlyTBSignal, showOnlySimTB2, showOnlyHighIQ, showOnlyHandMatch, showOnlyDayLate, carryFilter, xhrFilter, selPitcherGradesTR, selBullpenTiers, search, sortCol, sortDir]);
+  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, showOnlyWeakSlot, showOnlyCC, showOnlySauce2, showOnlySauce3, showOnlySauce25, showOnlyHitSignal, showOnlySecretSauce, showOnlyAvoid, showOnly2Bagger, showOnlyTBSignal, showOnlySimTB2, showOnlyHighIQ, showOnlyHandMatch, showOnlyDayLate, carryFilter, xhrFilter, selPitcherGradesTR, selBullpenTiers, search, sortCol, sortDir]);
 
   const summary = useMemo(() => {
     const hrs          = dateRows.filter(r => r.wentYard);
@@ -29008,6 +29025,11 @@ function TrackRecordTab() {
     const hitSignalHits  = hitSignal.filter(r => r.hitAny);
     const secretSauce    = dateRows.filter(r => r.isSecretSauce);
     const secretSauceHits = secretSauce.filter(r => r.hitAny);
+    // Avoid List (2026-08-04) — mirror image of Hit Signal. Success here is
+    // the OPPOSITE of hitAny — a "hit" for this list is the batter actually
+    // going hitless, so the summary card counts !r.hitAny, not r.hitAny.
+    const avoidList      = dateRows.filter(r => r.isAvoid);
+    const avoidListMisses = avoidList.filter(r => !r.hitAny);
     const twoBaggers    = dateRows.filter(r => r.is2Bagger);
     // TB Signal (OnBase tab's own flag) hit rate — denominator is the FLAGGED
     // group, not all batters, same shape as Sauce 2.0/Weak Spot/Barrel Signal.
@@ -29054,7 +29076,7 @@ function TrackRecordTab() {
     const biggestUpset = [...dateRows.filter(r => r.wentYard)]
       .sort((a,b) => a.yardScore - b.yardScore)[0];
     return { hrs, totalHR, signals, signalHits, keyMatchups, kmHits,
-             longshots, lsHits, weakSlots, weakSlotHits, sauce2, sauce2Hits, sauce3, sauce3Hits, sauce25, sauce25Hits, hitSignal, hitSignalHits, secretSauce, secretSauceHits, twoBaggers, tbSignals, tbSignalHits, simTB2, simTB2Hits,
+             longshots, lsHits, weakSlots, weakSlotHits, sauce2, sauce2Hits, sauce3, sauce3Hits, sauce25, sauce25Hits, hitSignal, hitSignalHits, secretSauce, secretSauceHits, avoidList, avoidListMisses, twoBaggers, tbSignals, tbSignalHits, simTB2, simTB2Hits,
              highIQBatters, highIQHRHits, highIQTB2Hits, handMatches, handMatchHits, dayLate, dayLateHits,
              deadGame, deadGameHits, juicedGame, juicedGameHits,
              xhrDead, xhrDeadHits, xhrJuiced, xhrJuicedHits, topYS, biggestMiss, biggestUpset };
@@ -29306,6 +29328,14 @@ function TrackRecordTab() {
             color:'#c084fc'
           },
           {
+            label:'🚫 AVOID LIST MISS RATE',
+            value: summary.avoidList.length
+              ? `${((summary.avoidListMisses.length/summary.avoidList.length)*100).toFixed(0)}%`
+              : '—',
+            sub: `${summary.avoidListMisses.length}/${summary.avoidList.length}`,
+            color:'#ff6b6b'
+          },
+          {
             label:'2 TB SIGNAL RATE',
             value: summary.tbSignals.length
               ? `${((summary.tbSignalHits.length/summary.tbSignals.length)*100).toFixed(0)}%`
@@ -29491,6 +29521,8 @@ function TrackRecordTab() {
               title:"Hit Signal — Sim H>=1.0 AND SwStr%<=15%. Full-season backtest: 64.1% any-hit rate, 1.12x lift, n=2,933, stable train/test." },
             { key:'secsauce', label:'🤫 Secret Sauce Only',  active:showOnlySecretSauce, onToggle:()=>setShowOnlySecretSauce(v=>!v), color:'#c084fc',
               title:"Secret Sauce — Sauce 2.5 + Hit Signal. 75.6% any-hit rate / 1.32x in the backtest, but n=90 with a large train/test swing — a promising lead, NOT confirmed." },
+            { key:'avoid', label:'🚫 Avoid List Only',       active:showOnlyAvoid,    onToggle:()=>setShowOnlyAvoid(v=>!v),    color:'#ff6b6b',
+              title:"Avoid List — Sim H<=0.6 AND SwStr%>=19% AND (same-hand OR Tough/Elite pitcher). Full-season backtest: 58-61% miss rate vs 42.6% baseline, 1.4x lift, validated cleanly train/test." },
             { key:'dl',    label:'🗓️ Day Late Only',        active:showOnlyDayLate,  onToggle:()=>setShowOnlyDayLate(v=>!v),  color:'#22c1c3' },
             { key:'2b',    label:'2️⃣ 2-Bagger (Non-HR) Only', active:showOnly2Bagger, onToggle:()=>setShowOnly2Bagger(v=>!v), color:'#38b8f2' },
             { key:'tbs',   label:'🎯 TB Signal Only',       active:showOnlyTBSignal, onToggle:()=>setShowOnlyTBSignal(v=>!v), color:'#38b8f2' },
@@ -29514,7 +29546,7 @@ function TrackRecordTab() {
             const headers = ['Date','Batter','Team','Hand','Lineup Slot',
               'Pre-Game Pitcher','Went Yard Vs','SP/RP','Pitcher Grade',
               'Yard Score','Boom','Sig','Grade','gHR','Zone Fit','Sim TB','xwOBA','Flags',
-              'Is Key Matchup','Weak Spot','Bullpen HR Rank','Sauce 2.0','Sauce 2.5','Sauce 3.0','Hit Signal','Secret Sauce','Day Late','2-Bagger (Non-HR)','Hit 2+ TB (Any)','TB Signal',
+              'Is Key Matchup','Weak Spot','Bullpen HR Rank','Sauce 2.0','Sauce 2.5','Sauce 3.0','Hit Signal','Secret Sauce','Avoid List','Day Late','2-Bagger (Non-HR)','Hit 2+ TB (Any)','TB Signal',
               'TrueHR','Matchup','SimHR%','Barrel Signal','Longshot',
               'PulledBrl%','Brl/BIP','HR/FB','FB%','HH%',
               'Plate IQ','IQ Grade','Zone Risk','Hand Match',
@@ -29531,7 +29563,7 @@ function TrackRecordTab() {
                 (r.wentYard && r.actualPitcher && !r.actualPitcherIsSP) ? '' : r.pitcherGrade,
                 r.yardScore || '', r.boom || '', r.sig || '', r.grade || '', r.ghr || '',
                 r.zoneFit || '', r.simTB || '', r.xwoba || '', r.flags || '',
-                r.isKeyMatchup ? 'YES' : '', r.isWeakSlot ? 'YES' : '', r.bullpenRank || '', r.isSauce2 ? 'YES' : '', r.isSauce25 ? 'YES' : '', r.isSauce3 ? 'YES' : '', r.isHitSignal ? 'YES' : '', r.isSecretSauce ? 'YES' : '', r.isDayLate ? 'YES' : '', r.is2Bagger ? 'YES' : '', r.hitTB2 ? 'YES' : '', r.tbSignal ? 'YES' : '',
+                r.isKeyMatchup ? 'YES' : '', r.isWeakSlot ? 'YES' : '', r.bullpenRank || '', r.isSauce2 ? 'YES' : '', r.isSauce25 ? 'YES' : '', r.isSauce3 ? 'YES' : '', r.isHitSignal ? 'YES' : '', r.isSecretSauce ? 'YES' : '', r.isAvoid ? 'YES' : '', r.isDayLate ? 'YES' : '', r.is2Bagger ? 'YES' : '', r.hitTB2 ? 'YES' : '', r.tbSignal ? 'YES' : '',
                 r.trueHR || '', r.matchup || '', r.simHRPct || '',
                 r.brlSignal ? 'YES' : '', r.isLongshot ? 'YES' : '',
                 r.pulledBrl || '', r.brlBIP || '', r.hrFB || '', r.fb || '', r.hh || '',
@@ -32174,6 +32206,7 @@ function HomeTab() {
         ['🔮 Crystal Ball', 'The engine\'s three picks: The Chosen (elite stack), Dark Horse (under the radar), Wild Card (spike signal).'],
         ['🛢️ Daily Barrel', 'Monte Carlo HR simulation (10,000 PAs per matchup). TrueHRScore + MatchupScore per batter, ★ Barrel Signal flag for the strictest matchups, 🎲 Longshot flag for undervalued plays. Live tracker: Barrel Signal hits at 16.9% HR rate.'],
         ['🔵 On Base', 'A parallel Monte Carlo engine targeting 2+ total bases per game — the hits/TB prop market, not just HRs. OnBaseScore + MatchupScore + SimTB2%, with its own ★ TB Signal flag. Very new — early hit rate is promising but the sample is still small.'],
+        ['🚫 Avoid List', 'The mirror image of Hit Signal — batters least likely to record a hit tonight (cold Sim H, real whiff risk, tough matchup, or unfavorable platoon). Full-season backtest: 58-61% miss rate vs. a 42.6% baseline, 1.4x lift, validated cleanly train/test. No badges — this list only exists here and as a filter in the usual tables.'],
         ['🎯 Pitcher Grades', '🎯 Target = easiest to homer off · 💥 Hittable = solid spot · 🤔 Average = neutral · ⚠️ Tough = difficult · ‼️ Elite = avoid. Grading is now hand-specific (vs LHB / vs RHB splits) — tap any pitcher name to open their slideout.'],
         ['📊 Batter Grades', 'A+ = 6–8 signals (live tracker: 18.8% HR rate) · A = 4–5 (17.5%) · B = 2–3 (12.8%) · C = 1 (12.1%) · D = 0 (9.8%). Signals include LA lock, bat speed peak, pitch convergence, handedness match, and close call streaks.'],
         ['Dive Deeper', 'Use the → All Matchups button to go deeper on any batter\'s full matchup data, or open Track Record to see every signal\'s live, current hit rate.'],
@@ -32189,6 +32222,7 @@ function HomeTab() {
         <button style={stBtn('crystal')}    onClick={()=>setSub('crystal')}>🔮</button>
         <button data-subtab="barrellab" style={stBtn('barrellab')} onClick={()=>setSub('barrellab')}>🛢️ Daily Barrel</button>
         <button data-subtab="onbase"    style={stBtn('onbase')}    onClick={()=>setSub('onbase')}>🔵 On Base</button>
+        <button data-subtab="avoid"     style={stBtn('avoid')}     onClick={()=>setSub('avoid')}>🚫 Avoid</button>
         <HelpBtn2/>
         {/* Refresh — visible when on cheat sheet */}
         {sub==='cheatsheet' && (
@@ -32219,6 +32253,7 @@ function HomeTab() {
       {sub==='crystal'    && <CrystalBallTab embedded/>}
       {sub==='barrellab'  && <BarrelLabTab/>}
       {sub==='onbase'     && <OnBaseTab/>}
+      {sub==='avoid'      && <AvoidListTab/>}
     </div>
   );
 }
@@ -32727,6 +32762,35 @@ function isSecretSauceBatter(r) {
   return isSauce25Batter(r) && isHitSignalBatter(r);
 }
 
+// ── Avoid List (2026-08-04) — the mirror image of Hit Signal: batters LEAST
+// likely to record a hit tonight, be it a cold sim, a real whiff problem, a
+// tough matchup, or an unfavorable platoon. Full 2026 season backtest
+// (19,616 real batter-games, leak-free, base "no hit" rate 42.6%):
+// Sim H (r=-0.103) and SwStr% (r=+0.071) are the cleanest mirror of the Hit
+// Signal correlations; Pitcher Grade (Elite/Tough 46-49% miss vs Target/
+// Hittable 37-40%) and same-hand platoon (44.8% vs 40.8%) are the strongest
+// secondary factors. Best validated combo — Sim H<=0.6 AND SwStr%>=19% AND
+// (same-hand OR Tough/Elite pitcher) — n=753 train/307 test, 58.0%/60.6%
+// miss rate, 1.37x/1.41x lift, and it got slightly STRONGER on held-out
+// data, not weaker (about as clean a validation as this project has). Also
+// checked lineup slot (1-9 -> "gets pulled early") as a 4th gate: it's a
+// real, independent signal alone (later slot = more misses, 1.14x, and a
+// real AB-count relationship: slot 7-9 batters average 2.95 AB vs 3.74 for
+// slot 1-2) but didn't strengthen this specific combo when added, so it's
+// surfaced as a visible reason column in the Avoid List table instead of
+// baked into the gate. Filter-only everywhere except the dedicated Avoid
+// List tab (Scouting) — no badges, per explicit instruction.
+function isAvoidBatter(r) {
+  const simH  = parseFloat(r.sim_h || 0);
+  const swstr = parseFloat(r.season_swstr_pct ?? NaN);
+  if (!(simH <= 0.6 && Number.isFinite(swstr) && swstr >= 19)) return false;
+  const bHand = (r.batter_hand || '').trim().charAt(0).toUpperCase();
+  const pHand = (r.pitcher_hand || '').trim().charAt(0).toUpperCase();
+  const sameHand   = !!bHand && !!pHand && bHand === pHand;
+  const toughElite = /elite|tough/i.test(r.pitcher_grade_label || '');
+  return sameHand || toughElite;
+}
+
 // ── FilterPanel — shared consolidated filter dropdown (Barrel Lab + On Base) ─
 // Replaces a flat, ever-growing row of individual toggle buttons with one
 // "Filters ▾" button + a checkbox panel, plus a Pitcher Grade multi-select.
@@ -33067,6 +33131,233 @@ function WeatherStrip({ rows }) {
   );
 }
 
+// ── Avoid List Tab (2026-08-04) — deterministic, no Monte Carlo sim needed
+// (unlike Barrel Lab/On Base): isAvoidBatter() is a pure gate on already-
+// computed daily_picks.csv fields, so this tab is a lean filter+sort+table,
+// no simRunning/simResults/Web Worker machinery. See isAvoidBatter()'s own
+// comment for the full backtest.
+function AvoidListTab() {
+  const mono = "'DM Mono',monospace";
+  const osw  = "'Oswald',sans-serif";
+  const [selGame,       setSelGame]       = useState('all');
+  const [lineupVer,     setLineupVer]     = useState(LINEUP_VERSION || 0);
+  const [finalVer,      setFinalVer]      = useState(0);
+  const [confirmedOnly, setConfirmedOnly] = useState(false);
+  const userSetConfirmed = useRef(false);
+  const [injuryVer,     setInjuryVer]     = useState(0);
+  const [hideFinal,     setHideFinal]     = useState(false);
+  const [sortCol,       setSortCol]       = useState('simH');
+  const [sortDir,       setSortDir]       = useState('asc'); // lowest Sim H = coldest bat, first by default
+
+  useEffect(() => {
+    const unsub    = subscribeLineup(v => setLineupVer(v));
+    const unsubInj = subscribeInjuries(() => setInjuryVer(v => v + 1));
+    const finId    = setInterval(() => setFinalVer(FINAL_GAME_IDS.size), 30000);
+    loadTodayLineups();
+    return () => { unsub(); unsubInj(); clearInterval(finId); };
+  }, []);
+
+  // Auto-switch to confirmed-only once lineups first post — same one-shot,
+  // user-override pattern as Barrel Lab/On Base. Doubly important here per
+  // explicit request: an "avoid" call is far more actionable (and far more
+  // wrong to get loud about) against a batter who isn't even confirmed to play.
+  useEffect(() => {
+    if (userSetConfirmed.current) return;
+    if (lineupVer > 0 && Object.keys(LINEUP_STATUS).length > 0) setConfirmedOnly(true);
+  }, [lineupVer]);
+
+  const eligibleBatters = useMemo(() => {
+    const base = DAILY_PICKS_ROWS.filter(r => {
+      if (!isBarrelLabEligible(r)) return false;
+      const bid = String(r.batter_id || '').split('.')[0];
+      if (INJURY_MAP[bid]) return false;
+      return true;
+    });
+    if (confirmedOnly) {
+      return base.filter(r => {
+        const bid = String(r.batter_id || '').split('.')[0];
+        return LINEUP_STATUS[bid]?.status === 'confirmed';
+      });
+    }
+    return base;
+  }, [lineupVer, confirmedOnly, injuryVer]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const gameOptions = useMemo(() => {
+    const seen = new Map();
+    eligibleBatters.forEach(r => {
+      if (!r.game_id || seen.has(r.game_id)) return;
+      seen.set(r.game_id, `${r.away_team || '?'} @ ${r.home_team || '?'}`);
+    });
+    return Array.from(seen.entries()).map(([value, label]) => ({ value, label }));
+  }, [eligibleBatters]);
+
+  const confirmedCount = useMemo(() =>
+    eligibleBatters.filter(r => LINEUP_STATUS[String(r.batter_id||'').split('.')[0]]?.status === 'confirmed').length,
+    [eligibleBatters, lineupVer]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const rows = useMemo(() => {
+    let base = eligibleBatters;
+    if (selGame !== 'all') base = base.filter(r => String(r.game_id) === selGame);
+    if (hideFinal) base = base.filter(r => !FINAL_GAME_IDS.has(String(r.game_id)));
+    return base
+      .filter(isAvoidBatter)
+      .map(r => {
+        const bHand = (r.batter_hand || '').trim().charAt(0).toUpperCase();
+        const pHand = (r.pitcher_hand || '').trim().charAt(0).toUpperCase();
+        return {
+          ...r,
+          pitcher:    resolvePitcherName(r.pitcher, r.batting_team, r.pitcher_id),
+          simH:       parseFloat(r.sim_h || 0),
+          swstr:      parseFloat(r.season_swstr_pct || 0),
+          sameHand:   !!bHand && !!pHand && bHand === pHand,
+          toughElite: /elite|tough/i.test(r.pitcher_grade_label || ''),
+          slot:       liveSlot(parseInt(r.batter_id) || 0, r.lineup_slot),
+          l7iso:      parseFloat(r.recent_iso || 0),
+          recentEv:   parseFloat(r.recent_avg_ev || 0),
+          bullpenTier: bullpenTierLabel(r.bullpen_hr_rank),
+        };
+      })
+      .sort((a, b) => {
+        const va = a[sortCol], vb = b[sortCol];
+        if (va < vb) return sortDir === 'asc' ? -1 : 1;
+        if (va > vb) return sortDir === 'asc' ? 1 : -1;
+        return 0;
+      });
+  }, [eligibleBatters, selGame, hideFinal, sortCol, sortDir]);
+
+  const AVOID_COLS = [
+    { key:'batter',     label:'Batter',   align:'left'   },
+    { key:'pitcher',    label:'Pitcher',  align:'left'   },
+    { key:'simH',       label:'Sim H',    align:'right', title:'Simulated hit count — the single strongest cold-bat predictor (r=-0.10)' },
+    { key:'swstr',      label:'SwStr%',   align:'right', title:'Season swinging-strike rate — real contact-risk signal for this outcome' },
+    { key:'sameHand',   label:'Platoon',  align:'center', title:'Same-hand matchup (unfavorable) vs cross-hand' },
+    { key:'slot',       label:'Slot',     align:'center', title:'Lineup slot — later slots average fewer AB (2.95 for 7-9 vs 3.74 for 1-2) and a real "gets pulled early" effect' },
+    { key:'l7iso',      label:'L7 ISO',   align:'right', title:'Recent 7-day ISO — trend-line/slump context (weak standalone signal, shown for context)' },
+    { key:'recentEv',   label:'L7 EV',    align:'right', title:'Recent 7-day avg exit velocity — trend-line/slump context' },
+    { key:'bullpenTier',label:'Pen',      align:'center', title:'Opposing bullpen HR/9 tier — context only' },
+  ];
+
+  const toggleSort = key => {
+    if (sortCol === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortCol(key); setSortDir(key === 'batter' || key === 'pitcher' ? 'asc' : 'desc'); }
+  };
+
+  return (
+    <div>
+      <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:8}}>
+        <span style={{fontFamily:osw,fontWeight:800,fontSize:14,color:'#ff6b6b'}}>🚫 Avoid List</span>
+        <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>
+          {rows.length} flagged
+          {' · '}
+          {confirmedCount > 0 || Object.keys(LINEUP_STATUS).length > 0
+            ? `${confirmedCount} confirmed`
+            : 'lineups pending'}
+        </span>
+        <select value={selGame} onChange={e => setSelGame(e.target.value)}
+          style={{padding:'3px 8px',borderRadius:5,fontFamily:mono,fontSize:9,
+            background:'var(--surface2)',border:'1px solid var(--border)',color:'var(--text)'}}>
+          <option value="all">All Games</option>
+          {gameOptions.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
+        </select>
+        <button onClick={() => setConfirmedOnly(v => { userSetConfirmed.current = true; return !v; })}
+          style={{padding:'2px 8px',borderRadius:5,cursor:'pointer',fontFamily:mono,fontSize:9,fontWeight:700,
+            background: confirmedOnly ? 'rgba(39,201,122,.12)' : 'var(--surface2)',
+            color: confirmedOnly ? '#27c97a' : 'var(--muted)',
+            border:`1px solid ${confirmedOnly ? 'rgba(39,201,122,.4)' : 'var(--border)'}`}}>
+          {confirmedOnly ? '✅ Confirmed only' : '👁 All eligible'}
+        </button>
+        <button onClick={() => setHideFinal(v => !v)}
+          style={{padding:'2px 8px',borderRadius:5,cursor:'pointer',fontFamily:mono,fontSize:9,fontWeight:700,
+            background: hideFinal ? 'rgba(255,107,107,.12)' : 'var(--surface2)',
+            color: hideFinal ? '#ff6b6b' : 'var(--muted)',
+            border:`1px solid ${hideFinal ? 'rgba(255,107,107,.4)' : 'var(--border)'}`}}>
+          🚫 Hide Final
+        </button>
+        <button id="avoid-csv-trigger" onClick={() => {
+            if (!rows.length) return;
+            const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
+            const hdrs = ['Batter','Team','Pitcher','P.Grade','Sim H','SwStr%','Platoon','Lineup Slot','L7 ISO','L7 EV','Bullpen Tier','Game ID','Batter ID','Pitcher ID'];
+            const csvRows = [hdrs.map(esc).join(',')];
+            rows.forEach(r => {
+              csvRows.push([
+                esc(r.batter||''), esc(r.batting_team||''), esc(r.pitcher||''), esc(r._pgLabel||r.pitcher_grade_label||''),
+                esc(r.simH.toFixed(2)), esc(r.swstr.toFixed(1)),
+                esc(r.sameHand ? 'Same' : 'Cross'), esc(r.slot||''),
+                esc(r.l7iso.toFixed(3)), esc(r.recentEv.toFixed(1)), esc(r.bullpenTier||''),
+                esc(r.game_id||''), esc(parseInt(r.batter_id)||''), esc(parseInt(r.pitcher_id)||''),
+              ].map(esc).join(','));
+            });
+            const a = document.createElement('a');
+            const d = getETDateStr();
+            a.href = URL.createObjectURL(new Blob(['﻿'+csvRows.join('\n')],{type:'text/csv;charset=utf-8;'}));
+            a.download = `avoid-list-${d}.csv`;
+            a.click();
+          }}
+          style={{background:'var(--surface2)',border:'1px solid var(--border)',
+            color:'var(--text)',borderRadius:5,padding:'2px 8px',fontSize:9,
+            cursor:'pointer',fontFamily:mono,lineHeight:1.5,flexShrink:0}}>
+          ⬇ CSV
+        </button>
+      </div>
+
+      {rows.length === 0 ? (
+        <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)',padding:'20px 14px'}}>
+          No batters currently flagged for this slate/filter combo.
+        </div>
+      ) : (
+        <div className="tw">
+          <table style={{width:'100%',borderCollapse:'collapse'}}>
+            <thead>
+              <tr>
+                {AVOID_COLS.map(col => (
+                  <th key={col.key} title={col.title} onClick={() => toggleSort(col.key)}
+                    className={col.key==='batter' ? 'sticky-batter' : undefined}
+                    style={{padding:'4px 6px',textAlign:col.align,cursor:'pointer',
+                      fontFamily:mono,fontSize:9,color: sortCol===col.key ? '#ff6b6b' : 'var(--muted)',
+                      whiteSpace:'nowrap',background: col.key==='batter' ? 'var(--surface2)' : undefined}}>
+                    {col.label}{sortCol===col.key ? (sortDir==='asc'?' ▲':' ▼') : ''}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r,i) => (
+                <tr key={i} style={{borderTop:'1px solid var(--border)',
+                  opacity: FINAL_GAME_IDS.has(String(r.game_id)) ? 0.5 : 1}}>
+                  <td className="sticky-batter" style={{padding:'4px 6px',background:'var(--surface)'}}>
+                    <span onClick={() => { openPitcherSlide(null); openAtBatSlide({pid:r.batter_id,name:r.batter,team:r.batting_team||''}); }}
+                      style={{color:'var(--accent2)',fontWeight:700,cursor:'pointer',
+                        textDecoration:'underline',textDecorationStyle:'dotted'}}>
+                      {r.batter}
+                    </span>
+                    {FINAL_GAME_IDS.has(String(r.game_id)) && <span style={{marginLeft:4,fontSize:8,color:'var(--muted)'}}>FINAL</span>}
+                  </td>
+                  <td style={{padding:'4px 6px'}}>
+                    <span onClick={() => openPitcherSlide({pid:r.pitcher_id,name:r.pitcher,team:'',hand:r.pitcher_hand})}
+                      style={{color:'var(--accent2)',fontWeight:700,cursor:'pointer',
+                        textDecoration:'underline',textDecorationStyle:'dotted'}}>
+                      {r.pitcher}
+                    </span>
+                    <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginLeft:4}}>{r._pgLabel||r.pitcher_grade_label||''}</span>
+                  </td>
+                  <td style={{padding:'4px 6px',textAlign:'right',fontFamily:mono,fontSize:10,color:'#ff6b6b',fontWeight:700}}>{r.simH.toFixed(2)}</td>
+                  <td style={{padding:'4px 6px',textAlign:'right',fontFamily:mono,fontSize:10}}>{r.swstr.toFixed(1)}%</td>
+                  <td style={{padding:'4px 6px',textAlign:'center',fontFamily:mono,fontSize:9,
+                    color: r.sameHand ? '#ff6b6b' : 'var(--muted)'}}>{r.sameHand ? 'Same' : 'Cross'}</td>
+                  <td style={{padding:'4px 6px',textAlign:'center',fontFamily:mono,fontSize:10}}>{r.slot||'—'}</td>
+                  <td style={{padding:'4px 6px',textAlign:'right',fontFamily:mono,fontSize:10}}>{r.l7iso ? r.l7iso.toFixed(3) : '—'}</td>
+                  <td style={{padding:'4px 6px',textAlign:'right',fontFamily:mono,fontSize:10}}>{r.recentEv ? r.recentEv.toFixed(1) : '—'}</td>
+                  <td style={{padding:'4px 6px',textAlign:'center',fontFamily:mono,fontSize:10}}>{r.bullpenTier ? r.bullpenTier.split(' ')[0] : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function BarrelLabTab() {
   const mono = "'DM Mono',monospace";
   const osw  = "'Oswald',sans-serif";
@@ -33100,6 +33391,7 @@ function BarrelLabTab() {
   const [blHitSignalOnly,  setBlHitSignalOnly]  = useState(false);
   const [blSecretSauceOnly,setBlSecretSauceOnly]= useState(false);
   const [blBullpenTiers,   setBlBullpenTiers]   = useState(() => new Set());
+  const [blAvoidOnly,      setBlAvoidOnly]      = useState(false);
   const [blBatterHand,     setBlBatterHand]     = useState('ALL');
   const [blPitcherGrades,  setBlPitcherGrades]  = useState(() => new Set());
   // Arsenal Fit min-value filters (2026-07-30) — plain text (number) boxes in the Filters
@@ -33337,6 +33629,7 @@ function BarrelLabTab() {
         isSauce25: isSauce25Batter(r),
         isHitSignal: isHitSignalBatter(r),
         isSecretSauce: isSecretSauceBatter(r),
+        isAvoid: isAvoidBatter(r),
         handMatchTier: getHandMatchTier(r),
         rainRiskTier: getRainRiskTier(r),
         rainRiskPct:  getRainRiskPct(r),
@@ -33365,13 +33658,14 @@ function BarrelLabTab() {
     .filter(r => !blSecretSauceOnly || r.isSecretSauce)
     .filter(r => blPitcherGrades.size === 0 || blPitcherGrades.has((r.pitcher_grade_label||r._pgLabel||'').trim()))
     .filter(r => blBullpenTiers.size === 0 || blBullpenTiers.has(bullpenTierLabel(r.bullpen_hr_rank)))
+    .filter(r => !blAvoidOnly || r.isAvoid)
     .filter(r => matchesHandFilter(r.batter_hand, blBatterHand))
     .filter(r => blMinL7Iso === '' || parseFloat(r.recent_iso||0)   >= parseFloat(blMinL7Iso))
     .filter(r => blMinIso   === '' || parseFloat(r.bvp_iso||0)      >= parseFloat(blMinIso))
     .filter(r => blMinL7Ev  === '' || parseFloat(r.recent_avg_ev||0) >= parseFloat(blMinL7Ev))
     .filter(r => blMinEv    === '' || parseFloat(r.bvp_avg_ev||0)    >= parseFloat(blMinEv))
     .sort((a, b) => b.trueHRScore - a.trueHRScore);
-  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, blChalkOnly, blDayLateOnly, blYoungGunsOnly, blPicksOnly, picks, blGoneYardOnly, blTB2Only, blHighIQOnly, blHandMatchOnly, blSauce3Only, blSauce25Only, blHitSignalOnly, blSecretSauceOnly, blBullpenTiers, blBatterHand, blPitcherGrades, blMinL7Iso, blMinIso, blMinL7Ev, blMinEv, hrVer, finalVer, dayLateVer, playerVer, ballStateVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, blChalkOnly, blDayLateOnly, blYoungGunsOnly, blPicksOnly, picks, blGoneYardOnly, blTB2Only, blHighIQOnly, blHandMatchOnly, blSauce3Only, blSauce25Only, blHitSignalOnly, blSecretSauceOnly, blBullpenTiers, blAvoidOnly, blBatterHand, blPitcherGrades, blMinL7Iso, blMinIso, blMinL7Ev, blMinEv, hrVer, finalVer, dayLateVer, playerVer, ballStateVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Color threshold helpers
   const clr = (v, g1, g2, y1, y2) => {
@@ -33663,6 +33957,9 @@ function BarrelLabTab() {
                 {key:'secretsauce', label:'🤫 Secret Sauce',    active:blSecretSauceOnly, color:'#c084fc',
                   title:"Secret Sauce — Sauce 2.5 + Hit Signal stacked. 75.6% hit rate / 1.32x in the full-season backtest, but n=90 with a large train/test swing (70.6% -> 82.1%) — a promising lead, NOT a confirmed signal. Dropdown-only, no badge, on purpose.",
                   onToggle:()=>setBlSecretSauceOnly(v=>!v)},
+                {key:'avoid',     label:'🚫 Avoid List',        active:blAvoidOnly,     color:'#ff6b6b',
+                  title:"Avoid List — Sim H<=0.6 AND SwStr%>=19% AND (same-hand OR Tough/Elite pitcher). Full-season backtest: 58-61% miss rate vs 42.6% baseline, 1.4x lift, validated cleanly train/test. Filter-only, no badge.",
+                  onToggle:()=>setBlAvoidOnly(v=>!v)},
                 {key:'picks',     label:'🎯 My Picks',          active:blPicksOnly,     color:'var(--accent2)', onToggle:()=>setBlPicksOnly(v=>!v)},
                 {key:'goneyard',  label:'💥 Gone Yard Today',   active:blGoneYardOnly,  color:'var(--accent)', onToggle:()=>setBlGoneYardOnly(v=>!v)},
                 {key:'tb2',       label:'2️⃣ 2+ TB Today',       active:blTB2Only,       color:'#38b8f2', onToggle:()=>setBlTB2Only(v=>!v)},
@@ -33704,7 +34001,7 @@ function BarrelLabTab() {
                 const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
                 const f1 = v => (v != null && v !== '' && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(1) : '';
                 const f3 = v => (v != null && v !== '' && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(3) : '';
-                const hdrs = ['Slot','Team','Player','Pitcher','Grade','TrueHR','Matchup','ZF','Form (gHR)','SimHR%','ISO','xwOBA','PulledBrl%','Brl/BIP%','HR/FB%','FB%','HH%','LA°','Barrel Signal','Plate IQ','IQ Grade','Zone Risk','Hand Match','Longshot','Chalk','Day Late','Young Gun','Season PA','Arsenal Fit ISO','Arsenal Blast%','Bullpen HR Rank','Sauce 2.0','Sauce 2.5','Sauce 3.0','Hit Signal','Secret Sauce',
+                const hdrs = ['Slot','Team','Player','Pitcher','Grade','TrueHR','Matchup','ZF','Form (gHR)','SimHR%','ISO','xwOBA','PulledBrl%','Brl/BIP%','HR/FB%','FB%','HH%','LA°','Barrel Signal','Plate IQ','IQ Grade','Zone Risk','Hand Match','Longshot','Chalk','Day Late','Young Gun','Season PA','Arsenal Fit ISO','Arsenal Blast%','Bullpen HR Rank','Sauce 2.0','Sauce 2.5','Sauce 3.0','Hit Signal','Secret Sauce','Avoid List',
                   'Game ID','Batter ID','Pitcher ID'];
                 const csvRows = [hdrs.map(esc).join(',')];
                 rows.forEach(b => {
@@ -33745,6 +34042,7 @@ function BarrelLabTab() {
                     esc(b.isSauce3 ? '1' : '0'),
                     esc(b.isHitSignal ? '1' : '0'),
                     esc(b.isSecretSauce ? '1' : '0'),
+                    esc(b.isAvoid ? '1' : '0'),
                     // Hidden data-plumbing columns (not shown in-app) — join keys for Track Record / ball carry
                     esc(b.game_id||''), esc(parseInt(b.batter_id)||''), esc(parseInt(b.pitcher_id)||''),
                   ].join(','));
@@ -34367,6 +34665,7 @@ function OnBaseTab() {
   const [obHitSignalOnly,  setObHitSignalOnly]  = useState(false);
   const [obSecretSauceOnly,setObSecretSauceOnly]= useState(false);
   const [obBullpenTiers,   setObBullpenTiers]   = useState(() => new Set());
+  const [obAvoidOnly,      setObAvoidOnly]      = useState(false);
   const [obBatterHand,     setObBatterHand]     = useState('ALL');
   const [obPitcherGrades,  setObPitcherGrades]  = useState(() => new Set());
   // Arsenal Fit min-value filters (2026-07-30) — same as BarrelLabTab's identical block.
@@ -34542,6 +34841,7 @@ function OnBaseTab() {
         isSauce25: isSauce25Batter(r),
         isHitSignal: isHitSignalBatter(r),
         isSecretSauce: isSecretSauceBatter(r),
+        isAvoid: isAvoidBatter(r),
         handMatchTier: getHandMatchTier(r),
         rainRiskTier: getRainRiskTier(r),
         rainRiskPct:  getRainRiskPct(r),
@@ -34572,13 +34872,14 @@ function OnBaseTab() {
     .filter(r => !obSecretSauceOnly || r.isSecretSauce)
     .filter(r => obPitcherGrades.size === 0 || obPitcherGrades.has((r.pitcher_grade_label||r._pgLabel||'').trim()))
     .filter(r => obBullpenTiers.size === 0 || obBullpenTiers.has(bullpenTierLabel(r.bullpen_hr_rank)))
+    .filter(r => !obAvoidOnly || r.isAvoid)
     .filter(r => matchesHandFilter(r.batter_hand, obBatterHand))
     .filter(r => obMinL7Iso === '' || parseFloat(r.recent_iso||0)   >= parseFloat(obMinL7Iso))
     .filter(r => obMinIso   === '' || parseFloat(r.bvp_iso||0)      >= parseFloat(obMinIso))
     .filter(r => obMinL7Ev  === '' || parseFloat(r.recent_avg_ev||0) >= parseFloat(obMinL7Ev))
     .filter(r => obMinEv    === '' || parseFloat(r.bvp_avg_ev||0)    >= parseFloat(obMinEv))
     .sort((a, b) => b.onBaseScore - a.onBaseScore);
-  }, [eligibleBatters, simResults, obHideFinal, obLongshotOnly, obChalkOnly, obDayLateOnly, obYoungGunsOnly, obPicksOnly, obGoneYardOnly, obTB2Only, obHighIQOnly, obHandMatchOnly, obSauce3Only, obSauce25Only, obHitSignalOnly, obSecretSauceOnly, obBullpenTiers, obBatterHand, obPitcherGrades, obMinL7Iso, obMinIso, obMinL7Ev, obMinEv, picks, finalVer, hrVer, dayLateVer, playerVer, ballStateVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [eligibleBatters, simResults, obHideFinal, obLongshotOnly, obChalkOnly, obDayLateOnly, obYoungGunsOnly, obPicksOnly, obGoneYardOnly, obTB2Only, obHighIQOnly, obHandMatchOnly, obSauce3Only, obSauce25Only, obHitSignalOnly, obSecretSauceOnly, obBullpenTiers, obAvoidOnly, obBatterHand, obPitcherGrades, obMinL7Iso, obMinIso, obMinL7Ev, obMinEv, picks, finalVer, hrVer, dayLateVer, playerVer, ballStateVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const byTeam = useMemo(() => {
     const teams = {};
@@ -34851,6 +35152,9 @@ function OnBaseTab() {
                 {key:'secretsauce', label:'🤫 Secret Sauce',    active:obSecretSauceOnly, color:'#c084fc',
                   title:"Secret Sauce — Sauce 2.5 + Hit Signal stacked. 75.6% hit rate / 1.32x in the full-season backtest, but n=90 with a large train/test swing (70.6% -> 82.1%) — a promising lead, NOT a confirmed signal. Dropdown-only, no badge, on purpose.",
                   onToggle:()=>setObSecretSauceOnly(v=>!v)},
+                {key:'avoid',     label:'🚫 Avoid List',        active:obAvoidOnly,     color:'#ff6b6b',
+                  title:"Avoid List — Sim H<=0.6 AND SwStr%>=19% AND (same-hand OR Tough/Elite pitcher). Full-season backtest: 58-61% miss rate vs 42.6% baseline, 1.4x lift, validated cleanly train/test. Filter-only, no badge.",
+                  onToggle:()=>setObAvoidOnly(v=>!v)},
                 {key:'picks',     label:'🎯 My Picks',          active:obPicksOnly,     color:'var(--accent2)', onToggle:()=>setObPicksOnly(v=>!v)},
                 {key:'goneyard',  label:'💥 Gone Yard Today',   active:obGoneYardOnly,  color:'var(--accent)', onToggle:()=>setObGoneYardOnly(v=>!v)},
                 {key:'tb2',       label:'2️⃣ 2+ TB Today',       active:obTB2Only,       color:'#38b8f2', onToggle:()=>setObTB2Only(v=>!v)},
@@ -34890,7 +35194,7 @@ function OnBaseTab() {
                 const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
                 const f1 = v => (v != null && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(1) : '';
                 const f3 = v => (v != null && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(3) : '';
-                const hdrs = ['Slot','Team','Player','Pitcher','Grade','OnBaseScore','Matchup','ZF','G2TB%','SimTB2%','AVG','SLG','ISO','xwOBA','XBH%','HH%','SimTB','LA°','TB Signal','Plate IQ','IQ Grade','Zone Risk','Hand Match','Longshot','Chalk','Day Late','Young Gun','Season PA','Arsenal Fit ISO','Arsenal Blast%','Bullpen HR Rank','Sauce 2.0','Sauce 2.5','Sauce 3.0','Hit Signal','Secret Sauce',
+                const hdrs = ['Slot','Team','Player','Pitcher','Grade','OnBaseScore','Matchup','ZF','G2TB%','SimTB2%','AVG','SLG','ISO','xwOBA','XBH%','HH%','SimTB','LA°','TB Signal','Plate IQ','IQ Grade','Zone Risk','Hand Match','Longshot','Chalk','Day Late','Young Gun','Season PA','Arsenal Fit ISO','Arsenal Blast%','Bullpen HR Rank','Sauce 2.0','Sauce 2.5','Sauce 3.0','Hit Signal','Secret Sauce','Avoid List',
                   'Game ID','Batter ID','Pitcher ID'];
                 const csvRows = [hdrs.map(esc).join(',')];
                 rows.forEach(b => {
@@ -34931,6 +35235,7 @@ function OnBaseTab() {
                     esc(b.isSauce3 ? '1' : '0'),
                     esc(b.isHitSignal ? '1' : '0'),
                     esc(b.isSecretSauce ? '1' : '0'),
+                    esc(b.isAvoid ? '1' : '0'),
                     // Hidden data-plumbing columns (not shown in-app) — join keys for Track Record / ball carry
                     esc(b.game_id||''), esc(parseInt(b.batter_id)||''), esc(parseInt(b.pitcher_id)||''),
                   ].join(','));
