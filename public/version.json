@@ -1,9 +1,8 @@
 {
   "version": "2026.08.04",
-  "bundleFile": "index-BFXNxjr6.js",
+  "bundleFile": "index-BYGDA5kR.js",
   "changelog": [
-    "Add Hit Signal + Secret Sauce: \"any hit\" filters",
-    "no badges"
+    "Surface Bullpen HR Rank everywhere - was invisible in one badge"
   ],
   "notifyUsers": true
 }
