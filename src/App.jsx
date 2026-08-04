@@ -23541,6 +23541,22 @@ function YardBotFloat() {
   const GRADE_COLORS = {'A+':'#ff4020','A':'#f5a623','B+':'#27c97a','B':'#38b8f2','C+':'var(--muted)','C':'var(--muted)','D':'var(--muted)'};
   const QUICK_PROMPTS = ['3 legger HR play vs top pitching targets','safe 2 leg strikeout parlay','best solo HR plays today','top SB candidates today','walk prop targets today'];
 
+  // Barrel Lab quick-pass (2026-08-04) — matchupScore/trueHR/sauce/bullpenTier/
+  // handMatch pulled straight from the same deterministic functions Barrel
+  // Lab itself uses (computeMatchupScore/computeTrueHRScore/isSauce2Batter/
+  // isSauce25Batter/isSauce3Batter/bullpenTierInfo/getHandMatchTier — all
+  // module-scope, called on the raw daily_picks.csv row exactly like Barrel
+  // Lab's own scoring pass does). trueHR is the RAW composite (0-100) — NOT
+  // the pool-normalized 0-99 value shown in the Barrel Lab UI column, which
+  // requires normalizing against every eligible batter in that specific game
+  // (normalizeWithinMatchup()); duplicating that here would mean normalizing
+  // against whatever subset of batters happened to make this top-50-by-Yard-
+  // Score cut, not the real per-game pool — so it's exposed as a directional
+  // raw number instead, with the SYSTEM_PROMPT explicit about the caveat.
+  // Full Barrel Signal (★) additionally requires a live Monte Carlo
+  // SimHR%>=12 leg (barrelWorker.js) that isn't run here — matchupScore/
+  // trueHR are the two deterministic legs only, not a "Barrel Signal
+  // confirmed" claim.
   const buildSlateSummary = () => Object.values(DAILY_PICKS_CACHE||{})
     .sort((a,b)=>(parseFloat(b._yard||0))-(parseFloat(a._yard||0))).slice(0,50)
     .map(r=>{
@@ -23548,11 +23564,15 @@ function YardBotFloat() {
       const ls=liveSlot(parseInt(bid),r.lineup_slot);
       const ze=parseInt(r._zoneEdges||DAILY_PICKS_CACHE[bid]?._zoneEdges||0);
       const inWeak=ls>0&&(r.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(ls);
+      const sauce=isSauce3Batter(r)?'3.0':isSauce25Batter(r)?'2.5':isSauce2Batter(r)?'2.0':null;
+      const bpTier=(bullpenTierInfo(parseInt(r.bullpen_hr_rank))||{}).label||null;
       return {name:r.batter||'',team:r.batting_team||'',grade:r.grade||'',pg:r._pgLabel||'',
         yard:parseFloat(r._yard||0).toFixed(1),boom:parseInt(r._boom||0),
         sig:parseFloat(r.weighted_flag_score||0).toFixed(1),form:r._formClass||'',
         simTB:parseFloat(r.sim_tb||0).toFixed(2),ev:parseFloat(r.recent_avg_ev||0).toFixed(1),
-        pitcher:r.pitcher||'',zoneEdges:ze,weakSlot:inWeak,slot:ls||0};
+        pitcher:r.pitcher||'',zoneEdges:ze,weakSlot:inWeak,slot:ls||0,
+        matchupScore:computeMatchupScore(r),trueHR:computeTrueHRScore(r),
+        sauce,bullpenTier:bpTier,handMatch:getHandMatchTier(r)};
     }).filter(r=>r.name);
 
   const buildScheduleContext = () => LIVE_GAMES_CACHE
@@ -23652,6 +23672,10 @@ function YardBotFloat() {
   const SYSTEM_PROMPT = `You are Yard Bot, an MLB analyst for the Going Yard app covering HR, K, SB, and walk props.
 You have today's top 50 batters by Yard Score, the live schedule, HR leaders, weather, K matchups, SB candidates, and walk targets.
 HR SCORING: Yard Score=HR prob, Boom=contact quality 0-99, Pitcher Grade (Target=easiest to Elite=hardest), Form (Moonshot=peak, Whiff=bad), zoneEdges=higher is better, weakSlot=pitcher historically weak at this batting order slot.
+BARREL LAB SIGNALS (deterministic legs — no live Monte Carlo sim available here): matchupScore 0-100 is the real Barrel Lab formula (Zone Fit + PS Score + platoon-adjusted hand performance, weighted by pitcher grade/GB rate) — use it directly, it's an exact match. trueHR 0-100 is a RAW composite (contact quality + matchup vulnerability + recent form + mechanics) — it is NOT the pool-normalized 0-99 score shown in the app's own Barrel Lab column, so treat it as directional context, never state it as "the Barrel Lab score." A real ★ Barrel Signal also requires a live Monte Carlo SimHR%>=12 leg that isn't computed here — never claim "Barrel Signal confirmed"; cite matchupScore/trueHR as supporting evidence instead, worded as such.
+SAUCE TIERS: sauce field is "2.0"/"2.5"/"3.0" (highest qualifying tier only, null = none) — Going Yard's best-validated filters, full-season leak-free backtest: Sauce 2.0 ~2.2x lift (~16% HR rate), Sauce 2.5 ~2.6x (~18%), Sauce 3.0 ~2.8x (~20%) against an ~8-12% base rate. Higher tier = stronger, more validated signal — lean on this when picking.
+BULLPEN TIER: bullpenTier is "Soft Pen" (opposing bullpen ranks 1-10 by HR/9 allowed, most homer-prone, favorable for the batter), "Avg Pen" (11-20), "Tough Pen" (21-30, unfavorable), or null if unranked.
+HAND MATCH: handMatch is "elite"/"full"/"partial"/null — the batter's handedness specifically exploits this pitcher's real weakness (platoon + arsenal fit combined). "elite" is rare and the strongest version; "partial" is the weakest real signal.
 WEATHER: hr_factor >110 = hitter friendly, <90 = pitcher friendly. Wind effect describes direction vs CF. Dome=weather irrelevant. Temp>78F helps HRs.
 K PROPS: high oppKPct (batter K%) + high swStr (pitcher SwStr%) = strong K matchup. Both >28%/14% is elite compound.
 SB PROPS: higher seasonSB = more prolific stealer. Slots 1-2 get most SB opportunities.

@@ -1,8 +1,8 @@
 {
   "version": "2026.08.04",
-  "bundleFile": "index-3ut5Au0S.js",
+  "bundleFile": "index-D3YTur6P.js",
   "changelog": [
-    "Add Bullpen Tier filter to FilterPanel across Barrel Lab/On Base/Arsenal Fit/Track Record"
+    "Add Avoid List: new Scouting tab + no-hit filter across Barrel Lab/On Base/Arsenal Fit/Track Record"
   ],
   "notifyUsers": true
 }
