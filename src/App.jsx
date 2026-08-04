@@ -8788,12 +8788,40 @@ const VIDEO_LINK_CACHE = {}; // gamePk_atBatIndex → savant video URL
 // Polls /feed/live every 3s. Stores NOTHING — ephemeral display only.
 function LiveAtBatViewer({ gamePk }) {
   const [state, setState] = React.useState(null);
-  const [flash, setFlash] = React.useState(null);
   const [expanded, setExpanded] = React.useState(false); // collapsed by default
   const pollRef = React.useRef(null);
   const lastAbRef = React.useRef(null);
+  // 2026-08-04 — batted-ball visual overhaul. savantMapRef holds the latest
+  // /api/savant?game_pk= response (real xba/HR-ballparks/hc_x_ft/hc_y_ft,
+  // same source BatTrackingTab's row detail already uses — see api/savant.js).
+  // Polled on its own slower interval since it's supplementary (MLB's own
+  // feed/live already gives real-time EV/LA/distance with zero Savant
+  // dependency; Savant only supplies xBA/HR-ballparks/trajectory coords,
+  // which can lag a few seconds behind the pitch itself).
+  const savantMapRef = React.useRef({});
+  // Tracks which at-bat's ball-flight animation has already played, so the
+  // 3s feed poll doesn't replay it every cycle while the result stays on
+  // screen. Only marked "consumed" once real trajectory coords are in hand
+  // (see poll() below) — if Savant hasn't caught up yet on the first poll
+  // after contact, the animation stays eligible until it does.
+  const hitAnimatedForRef = React.useRef(null);
   const mono = "'DM Mono',monospace";
   const osw  = "'Oswald',sans-serif";
+
+  React.useEffect(() => {
+    if (!gamePk) { savantMapRef.current = {}; return; }
+    let cancelled = false;
+    const pollSavant = async () => {
+      try {
+        const r = await fetch(`/api/savant?game_pk=${gamePk}`);
+        const d = await r.json();
+        if (!cancelled) savantMapRef.current = d.plays || {};
+      } catch(_) {}
+    };
+    pollSavant();
+    const iv = setInterval(pollSavant, 8000);
+    return () => { cancelled = true; clearInterval(iv); };
+  }, [gamePk]);
 
   React.useEffect(() => {
     if (!gamePk) { setState(null); return; }
@@ -8826,45 +8854,69 @@ function LiveAtBatViewer({ gamePk }) {
         const pitches = events.filter(e => e.isPitch);
         const last    = events[events.length - 1] || {};
 
-        // Detect new at-bat → flash result of completed play
         const abKey = `${gamePk}_${about.atBatIndex}`;
-        if (lastAbRef.current && lastAbRef.current !== abKey) {
-          const prev = lastAbRef.current;
-          // result from the play that just ended is in last event of previous play
-          // We flash the stored state result
-          if (state?.result) {
-            const isHR  = state.result.toLowerCase().includes('home_run') || state.result.toLowerCase().includes('home run');
-            const isBIP = ['single','double','triple','home_run','field_out','flyout','lineout','groundout','error']
-              .some(k => state.result.toLowerCase().includes(k));
-            setFlash({ result: state.result, isHR, isBIP });
-            setTimeout(() => setFlash(null), 4000);
-          }
-        }
         lastAbRef.current = abKey;
 
-        // Build pitch dots for current at-bat only
+        // Build pitch dots for current at-bat only. Colored by RESULT
+        // category (pitchResultColor — red=strike/foul, green=ball,
+        // blue=in play), matching BatTrackingTab's 2026-08-02 convention
+        // exactly rather than the old by-call-code scheme.
         const dots = pitches.map((e, i) => {
           const pd     = e.pitchData || {};
           const coords = pd.coordinates || {};
           const call   = e.details?.call?.code || '';
           const type   = e.details?.type?.description || '';
-          // B=ball, C=called strike, S=swing, X=in play, F=foul, *=hit by pitch
-          const isBall   = call === 'B' || call === '*B';
-          const isStrike = ['C','S','F','T','L','O','Q'].includes(call);
-          const isInPlay = call === 'X';
-          const col = isInPlay ? '#60a5fa' : isStrike ? '#ef4444' : isBall ? '#22c55e' : '#94a3b8';
+          const desc   = e.details?.description || type;
           return {
             pX:   coords.pX   ?? null,
             pZ:   coords.pZ   ?? null,
             szTop: pd.strikeZoneTop    ?? 3.5,
             szBot: pd.strikeZoneBottom ?? 1.5,
             velo: pd.startSpeed ?? null,
-            type, call, col,
+            type, call,
+            col:  pitchResultColor(desc),
             num:  i + 1,
-            isBall, isStrike, isInPlay,
-            desc: e.details?.description || type,
+            isInPlay: call === 'X',
+            desc,
           };
         });
+
+        // Real batted-ball data for the current/just-completed play — EV/LA/
+        // distance come straight from MLB's own feed (no Savant dependency,
+        // available the instant the ball is put in play); xBA/HR-ballparks/
+        // trajectory coords (hcX/hcY) come from the separately-polled Savant
+        // gf endpoint and may arrive a few seconds later — same null-safe
+        // "show — until real, never fabricate" pattern as BattedBallField.
+        const hitData = cp.hitData || last?.hitData || {};
+        const hitInfo = (hitData.launchSpeed != null || hitData.totalDistance != null) ? {
+          ev:   hitData.launchSpeed   != null ? Math.round(hitData.launchSpeed*10)/10   : null,
+          la:   hitData.launchAngle   != null ? Math.round(hitData.launchAngle*10)/10   : null,
+          dist: hitData.totalDistance != null ? Math.round(hitData.totalDistance)       : null,
+        } : null;
+        const savantPlayId = (() => {
+          for (let ei = events.length - 1; ei >= 0; ei--) {
+            const pid = events[ei].playId ?? events[ei].details?.playId ?? events[ei].details?.event_uuid;
+            if (pid) return pid;
+          }
+          return null;
+        })();
+        const savantData = savantPlayId ? savantMapRef.current[savantPlayId] : null;
+        const hit = hitInfo ? {
+          ...hitInfo,
+          xba:         savantData?.xba ?? null,
+          hrBallparks: savantData?.hr_ballparks ?? null,
+          hcX:         savantData?.hc_x_ft ?? null,
+          hcY:         savantData?.hc_y_ft ?? null,
+        } : null;
+        const hasTrajectory = hit && hit.hcX != null && hit.hcY != null;
+        // Only "consume" the once-per-at-bat animation token once real
+        // trajectory coords are actually in hand — if Savant hasn't matched
+        // this play yet, stay eligible so the animation still fires once it does.
+        let justHit = false;
+        if (hasTrajectory && hitAnimatedForRef.current !== abKey) {
+          justHit = true;
+          hitAnimatedForRef.current = abKey;
+        }
 
         setState({
           status:    'live',
@@ -8884,6 +8936,7 @@ function LiveAtBatViewer({ gamePk }) {
           dots,
           lastPitch: dots[dots.length - 1] || null,
           result:    cp.result?.event || null,
+          hit, justHit,
           isMidInning: about.halfInning !== lastAbRef._prevHalf,
           // Today's game stats pulled from boxscore in the live feed
           batterStats:  (() => {
@@ -8980,9 +9033,6 @@ function LiveAtBatViewer({ gamePk }) {
   // Going Yard watermark color
   const WM = 'rgba(232,65,26,.35)';
 
-  const isFlashHR  = flash?.isHR;
-  const isFlashBIP = flash?.isBIP && !flash?.isHR;
-
   // ── Inning between-half view ──────────────────────────────────────────────
   const InningCard = () => (
     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',
@@ -9008,188 +9058,105 @@ function LiveAtBatViewer({ gamePk }) {
     </div>
   );
 
-  // ── Field view — ball in play / flash result ──────────────────────────────
-  const FieldView = ({ result }) => {
-    const clean = (result||'').toLowerCase().replace(/_/g,' ');
-    const isHR  = clean.includes('home run');
-    const bg    = isHR
-      ? 'linear-gradient(160deg,#1a1a0a 0%,#2d2500 100%)'
-      : 'linear-gradient(160deg,#0a1a0f 0%,#0d2015 100%)';
-    const label = isHR ? '💥 HOME RUN!' : clean.replace(/\b\w/g,c=>c.toUpperCase());
-    const col   = isHR ? '#fbbf24' : '#60a5fa';
-    return (
-      <div style={{borderRadius:10,overflow:'hidden',border:'1px solid rgba(255,255,255,.1)',
-        background:bg,position:'relative',marginBottom:10}}>
-        <svg width={FW} height={FH} viewBox={`0 0 ${FW} ${FH}`}
-          style={{display:'block',maxWidth:'100%',height:'auto'}}>
-          {/* Sky gradient */}
-          <defs>
-            <radialGradient id="grass" cx="50%" cy="80%" r="90%">
-              <stop offset="0%" stopColor="#1a4a20"/>
-              <stop offset="100%" stopColor="#0d2810"/>
-            </radialGradient>
-            <radialGradient id="infield" cx="50%" cy="60%" r="50%">
-              <stop offset="0%" stopColor="#8B6914"/>
-              <stop offset="100%" stopColor="#5a4010"/>
-            </radialGradient>
-          </defs>
-          {/* Outfield grass */}
-          <rect width={FW} height={FH} fill="url(#grass)"/>
-          {/* Foul lines */}
-          <line x1={FW/2} y1={FH*0.75} x2={FW*0.04} y2={FH*0.05} stroke="rgba(255,255,200,.4)" strokeWidth="1"/>
-          <line x1={FW/2} y1={FH*0.75} x2={FW*0.96} y2={FH*0.05} stroke="rgba(255,255,200,.4)" strokeWidth="1"/>
-          {/* Warning track arc */}
-          <path d={`M ${FW*.06} ${FH*.1} Q ${FW/2} ${FH*-.15} ${FW*.94} ${FH*.1}`}
-            fill="none" stroke="rgba(180,140,60,.4)" strokeWidth="8"/>
-          {/* Infield dirt */}
-          <ellipse cx={FW/2} cy={FH*0.68} rx={FW*0.22} ry={FH*0.22} fill="url(#infield)"/>
-          {/* Pitcher mound */}
-          <ellipse cx={FW/2} cy={FH*0.56} rx={10} ry={7} fill="#9a7a30" opacity=".8"/>
-          {/* Bases */}
-          {[
-            [FW/2, FH*0.40],  // 2nd
-            [FW*0.63, FH*0.58], // 1st
-            [FW*0.37, FH*0.58], // 3rd
-            [FW/2, FH*0.75],  // home
-          ].map(([x,y],i) => (
-            <rect key={i} x={x-5} y={y-5} width={10} height={10}
-              fill="white" opacity={i===3?0.9:0.8} transform={`rotate(45,${x},${y})`}/>
-          ))}
-          {/* Result label */}
-          <text x={FW/2} y={FH*0.25} textAnchor="middle"
-            style={{fontFamily:osw,fontWeight:800,fontSize:18,fill:col,
-              filter:'drop-shadow(0 2px 4px rgba(0,0,0,.8))'}}>
-            {label}
-          </text>
-          {/* Going Yard watermark — logo + two-tone text */}
-          <image href="/icon-192.png" x={FW-86} y={FH-26} width={20} height={20}
-            opacity={0.55} preserveAspectRatio="xMidYMid meet"/>
-          <text x={FW-64} y={FH-13} textAnchor="start"
-            style={{fontFamily:osw,fontWeight:800,fontSize:9,letterSpacing:.5}}>
-            <tspan fill="rgba(232,65,26,.65)">GOING</tspan>
-            <tspan fill="rgba(255,255,255,.4)"> YARD</tspan>
-          </text>
-        </svg>
-      </div>
-    );
-  };
-
-  // ── Pitch zone view ───────────────────────────────────────────────────────
+  // ── Pitch zone view — batter silhouette on the correct side by hand, grid
+  // on the opposite side (2026-08-04, matches BatTrackingTab's 2026-08-02
+  // row-detail geometry exactly, scaled for this card — same silhouette
+  // PNGs, same layout logic). Count/outs live in the header bar above
+  // already, so they're not duplicated inside this SVG.
   const PitchZone = () => {
+    const isLHB = state.batSide === 'L';
     const szT  = state.lastPitch?.szTop  ?? 3.5;
     const szB  = state.lastPitch?.szBot  ?? 1.5;
-    const PW = 190, PH = 170;
-    const zW = 90, zH = 108;
-    const zX = (PW - zW) / 2;
-    const zY = 14;
-    const cellW = zW/3, cellH = zH/3;
-
-    const toSvgX = pX => zX + ((pX + 1.8) / 3.6) * zW;
-    const toSvgY = pZ => {
-      const norm = (pZ - szB) / (szT - szB);
-      return zY + (1 - norm) * zH;
+    const W=210, H=170, gridW=112, gridH=124, padT=16, padB=30;
+    const gridX = isLHB ? W-gridW-16 : 16;
+    const silX  = isLHB ? 6 : W-66;
+    const cellW = gridW/3, cellH = gridH/3;
+    const toX = pX => Math.max(gridX+4, Math.min(gridX+gridW-4, gridX + (Math.max(-1.8,Math.min(1.8,pX??0)) + 1.8) / 3.6 * gridW));
+    const toY = pZ => {
+      const norm = (Math.max(szB-0.5, Math.min(szT+0.5, pZ??szB)) - szB) / (szT - szB);
+      return Math.max(padT+4, Math.min(padT+gridH-4, padT + (1 - norm) * gridH));
     };
 
     return (
-      <div style={{borderRadius:10,overflow:'hidden',border:'1px solid rgba(255,255,255,.08)',
-        background:'linear-gradient(160deg,#0d1f12 0%,#091409 100%)',
-        marginBottom:10,display:'flex',alignItems:'center',justifyContent:'center'}}>
-        <svg width={PW} height={PH} viewBox={`0 0 ${PW} ${PH}`}
-          style={{display:'block',maxWidth:'100%',height:'auto'}}>
-          <defs>
-            <radialGradient id="turf2" cx="50%" cy="60%" r="70%">
-              <stop offset="0%" stopColor="#1a3d1f"/>
-              <stop offset="100%" stopColor="#0a1a0e"/>
-            </radialGradient>
-          </defs>
-          <rect width={PW} height={PH} fill="url(#turf2)"/>
+      <svg width={W} height={H} style={{flexShrink:0,
+        background:'rgba(0,0,0,.4)',borderRadius:10,
+        border:'1px solid rgba(255,255,255,.08)'}}>
+        {/* Batter silhouette — same cutout PNGs as BatTrackingTab */}
+        <image href={isLHB?'/images/silhouette-lhb.png':'/images/silhouette-rhb.png'}
+          x={silX} y={10} width={60} height={H-26}
+          opacity={0.6} preserveAspectRatio="xMidYMid meet"/>
+        <rect x={gridX} y={padT} width={gridW} height={gridH}
+          fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.25)" strokeWidth="1.5"/>
+        {[1,2].map(i => (
+          <React.Fragment key={i}>
+            <line x1={gridX+cellW*i} y1={padT} x2={gridX+cellW*i} y2={padT+gridH}
+              stroke="rgba(255,255,255,.12)" strokeWidth="0.75"/>
+            <line x1={gridX} y1={padT+cellH*i} x2={gridX+gridW} y2={padT+cellH*i}
+              stroke="rgba(255,255,255,.12)" strokeWidth="0.75"/>
+          </React.Fragment>
+        ))}
+        <polygon points={`${gridX+gridW/2-8},${H-padB+6} ${gridX+gridW/2+8},${H-padB+6} ${gridX+gridW/2+10},${H-padB+12} ${gridX+gridW/2},${H-padB+16} ${gridX+gridW/2-10},${H-padB+12}`}
+          fill="rgba(255,255,255,.2)" stroke="rgba(255,255,255,.4)" strokeWidth="0.5"/>
 
-          {/* Strike zone */}
-          <rect x={zX} y={zY} width={zW} height={zH}
-            fill="rgba(255,255,255,.03)" stroke="rgba(255,255,255,.4)"
-            strokeWidth="1.5" rx="2"/>
-          {[1,2].map(i => (<g key={i}>
-            <line x1={zX+cellW*i} y1={zY} x2={zX+cellW*i} y2={zY+zH}
-              stroke="rgba(255,255,255,.15)" strokeWidth=".5"/>
-            <line x1={zX} y1={zY+cellH*i} x2={zX+zW} y2={zY+cellH*i}
-              stroke="rgba(255,255,255,.15)" strokeWidth=".5"/>
-          </g>))}
+        {/* Pitch dots */}
+        {state.dots.map((dot, i) => {
+          if (dot.pX == null || dot.pZ == null) return null;
+          const x = toX(dot.pX), y = toY(dot.pZ);
+          const isLast = i === state.dots.length - 1;
+          return (
+            <g key={i}>
+              {isLast && <circle cx={x} cy={y} r={13} fill={dot.col} opacity=".15"/>}
+              <circle cx={x} cy={y} r={isLast?10:9}
+                fill={dot.col} stroke="rgba(0,0,0,.4)" strokeWidth="1" opacity={isLast?1:0.85}/>
+              <text x={x} y={y+4} textAnchor="middle" fontSize="8" fontWeight="800"
+                fill="white" fontFamily="monospace">{dot.num}</text>
+            </g>
+          );
+        })}
 
-          {/* Home plate */}
-          <polygon
-            points={`${PW/2-6},${zY+zH+7} ${PW/2+6},${zY+zH+7} ${PW/2+8},${zY+zH+12} ${PW/2},${zY+zH+15} ${PW/2-8},${zY+zH+12}`}
-            fill="rgba(255,255,255,.6)"/>
-
-          {/* Pitch dots */}
-          {state.dots.map((dot, i) => {
-            if (dot.pX == null || dot.pZ == null) return null;
-            const cx = toSvgX(dot.pX);
-            const cy = toSvgY(dot.pZ);
-            const isLast = i === state.dots.length - 1;
-            return (
-              <g key={i}>
-                {isLast && <circle cx={cx} cy={cy} r={12} fill={dot.col} opacity=".12"/>}
-                <circle cx={cx} cy={cy} r={isLast?8:6}
-                  fill={dot.col} opacity={isLast?1:0.6}
-                  stroke="rgba(0,0,0,.5)" strokeWidth="1"/>
-                <text x={cx} y={cy+1} textAnchor="middle" dominantBaseline="middle"
-                  style={{fontSize:isLast?8:7,fontFamily:mono,fill:'white',
-                    fontWeight:700,pointerEvents:'none'}}>
-                  {dot.num}
-                </text>
-              </g>
-            );
-          })}
-
-          {/* Count — left of zone as traditional B-S */}
-          <text x={zX-6} y={zY+zH/2-8} textAnchor="end"
-            style={{fontFamily:osw,fontWeight:800,fontSize:22,fill:'white'}}>
-            {state.balls}-{state.strikes}
-          </text>
-          <text x={zX-6} y={zY+zH/2+6} textAnchor="end"
-            style={{fontFamily:mono,fontSize:7,fill:'rgba(255,255,255,.35)',letterSpacing:.3}}>
-            count
-          </text>
-
-          {/* Outs — right of zone */}
-          {[0,1,2].map(i=>(
-            <rect key={i} x={zX+zW+8} y={zY+10+i*18} width={10} height={10}
-              rx={1} transform={`rotate(45,${zX+zW+13},${zY+15+i*18})`}
-              fill={i<state.outs?'rgba(255,255,255,.7)':'rgba(255,255,255,.12)'}
-              stroke="rgba(255,255,255,.25)" strokeWidth="1"/>
-          ))}
-          <text x={zX+zW+13} y={zY+68} textAnchor="middle"
-            style={{fontFamily:mono,fontSize:6,fill:'rgba(255,255,255,.3)'}}>
-            outs
-          </text>
-
-          {/* Pitch label */}
-          {state.lastPitch && (
-            <text x={PW/2} y={PH-22} textAnchor="middle"
-              style={{fontFamily:mono,fontSize:8,fill:'rgba(255,255,255,.5)',letterSpacing:.3}}>
-              {state.lastPitch.type}{state.lastPitch.velo?` · ${state.lastPitch.velo.toFixed(0)} mph`:''}
-            </text>
-          )}
-
-          {/* Watermark — centered at very bottom, always fully inside SVG */}
-          <image href="/icon-192.png"
-            x={PW/2 - 36} y={PH-14}
-            width={12} height={12}
-            opacity={0.45} preserveAspectRatio="xMidYMid meet"/>
-          <text x={PW/2 - 22} y={PH-5} textAnchor="start"
-            style={{fontFamily:osw,fontWeight:800,fontSize:7,letterSpacing:.5}}>
-            <tspan fill="rgba(232,65,26,.6)">GOING</tspan>
-            <tspan fill="rgba(255,255,255,.3)"> YARD</tspan>
-          </text>
-        </svg>
-      </div>
+        {/* Watermark — centered at very bottom, always fully inside SVG */}
+        <image href="/icon-192.png"
+          x={W/2 - 36} y={H-14}
+          width={12} height={12}
+          opacity={0.45} preserveAspectRatio="xMidYMid meet"/>
+        <text x={W/2 - 22} y={H-5} textAnchor="start"
+          style={{fontFamily:osw,fontWeight:800,fontSize:7,letterSpacing:.5}}>
+          <tspan fill="rgba(232,65,26,.6)">GOING</tspan>
+          <tspan fill="rgba(255,255,255,.3)"> YARD</tspan>
+        </text>
+      </svg>
     );
   };
 
+  // ── Pitch sequence list — mirrors BatTrackingTab's row-detail list exactly:
+  // numbered circle colored by pitchResultColor, result text primary, pitch
+  // type + velo secondary, most-recent pitch on top.
+  const PitchList = () => (
+    <div style={{flex:1,minWidth:150}}>
+      <div style={{display:'flex',flexDirection:'column',gap:4}}>
+        {[...state.dots].reverse().map((dot,i) => (
+          <div key={i} style={{display:'flex',alignItems:'center',gap:8}}>
+            <div style={{width:20,height:20,borderRadius:'50%',
+              background:dot.col,flexShrink:0,
+              display:'flex',alignItems:'center',justifyContent:'center',
+              fontSize:9,fontWeight:700,fontFamily:mono,color:'white'}}>
+              {dot.num}
+            </div>
+            <div>
+              <div style={{fontFamily:osw,fontSize:11,fontWeight:600,color:'rgba(255,255,255,.85)'}}>
+                {dot.desc || dot.type}
+              </div>
+              <div style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.4)'}}>
+                {dot.type}{dot.velo ? ` · ${dot.velo.toFixed(1)} mph` : ''}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
   // ── Main render ───────────────────────────────────────────────────────────
-  const showField = flash?.isBIP;
-
   return (
     <div style={{marginBottom:12,borderRadius:10,overflow:'hidden',
       border:'1px solid rgba(255,255,255,.08)',
@@ -9367,17 +9334,24 @@ function LiveAtBatViewer({ gamePk }) {
         </svg>
       </div>
 
-      {/* Main graphic */}
-      <div style={{padding:'8px 10px 4px'}}>
-        {showField
-          ? <FieldView result={flash.result}/>
-          : <PitchZone/>
-        }
-        {/* Last pitch description */}
-        {state.lastPitch?.desc && !showField && (
-          <div style={{fontFamily:mono,fontSize:9,color:'rgba(255,255,255,.45)',
-            textAlign:'center',marginBottom:6,letterSpacing:.3}}>
-            {state.lastPitch.desc}
+      {/* Main graphic — strike zone + pitch sequence + batted-ball result,
+          side by side (2026-08-04, matches the reference mockup's 3-panel
+          layout). The batted-ball panel only appears once a real ball is
+          in play for this at-bat; BattedBallField's `animate` prop fires
+          the ball-flight animation once, the first poll real trajectory
+          coords are available for this specific play. */}
+      <div style={{padding:'8px 10px 10px'}}>
+        {state.dots.length === 0 ? (
+          <div style={{fontFamily:mono,fontSize:9,color:'rgba(255,255,255,.35)',
+            textAlign:'center',padding:'20px 0'}}>
+            Waiting for first pitch…
+          </div>
+        ) : (
+          <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'flex-start'}}>
+            <PitchZone/>
+            <PitchList/>
+            {state.hit && (state.hit.ev != null || state.hit.dist > 0) &&
+              <BattedBallField r={state.hit} animate={state.justHit}/>}
           </div>
         )}
       </div>
@@ -9409,7 +9383,15 @@ function pitchResultColor(desc) {
 // fields — not assumed, checked against real data before building this).
 // xba and hrBallparks are REAL Savant fields (never fabricated/approximated)
 // — render '—' when Savant's play-id match misses for that specific pitch.
-function BattedBallField({ r }) {
+// `animate` (default false, 2026-08-04) plays a one-shot ball-flight
+// animation along the same quadratic path as the static dashed trajectory
+// line, from home plate to the real landing spot — used by LiveAtBatViewer
+// when a live batted ball's trajectory coords first resolve. Every existing
+// call site (BatTrackingTab's row detail) omits the prop, so it stays
+// exactly the static rendering it's always been — this is purely additive.
+// Respects prefers-reduced-motion (skips straight to the landing dot, which
+// is already drawn statically regardless of `animate`).
+function BattedBallField({ r, animate=false }) {
   const mono = "'DM Mono',monospace";
   const osw  = "'Oswald',sans-serif";
   const W = 190, H = 190;
@@ -9425,6 +9407,10 @@ function BattedBallField({ r }) {
   const hasCoords = r.hcX != null && r.hcY != null;
   const px = hasCoords ? cx + (r.hcX / maxDist) * fieldR : null;
   const py = hasCoords ? cy - (r.hcY / maxDist) * fieldR : null;
+  const trajD = hasCoords ? `M ${cx} ${cy} Q ${(cx+px)/2} ${Math.min(cy,py)-24} ${px} ${py}` : null;
+  const reduceMotion = typeof window !== 'undefined' && window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const shouldAnimate = animate && hasCoords && !reduceMotion;
   const evColor = r.ev == null ? 'var(--muted)' : r.ev >= 103 ? '#ff4020' : r.ev >= 95 ? '#ff8020' : r.ev >= 90 ? '#ffc840' : 'var(--text)';
   return (
     <div style={{display:'flex',gap:12,flexShrink:0,background:'rgba(0,0,0,.4)',
@@ -9453,11 +9439,22 @@ function BattedBallField({ r }) {
           fill="#e8e4d8" stroke="#333" strokeWidth="0.5"/>
         {/* Trajectory + landing spot */}
         {hasCoords && <>
-          <path d={`M ${cx} ${cy} Q ${(cx+px)/2} ${Math.min(cy,py)-24} ${px} ${py}`}
+          <path d={trajD}
             fill="none" stroke="rgba(255,255,255,.55)" strokeWidth="1.25" strokeDasharray="2,2"/>
           <circle cx={px} cy={py} r={5} fill="#fff" stroke="#c0392b" strokeWidth="1"/>
           <circle cx={px} cy={py} r={5} fill="none" stroke="#c0392b" strokeWidth="0.5" strokeDasharray="1,1"/>
         </>}
+        {/* Ball-flight animation — home plate to the real landing spot along
+            the same curve as the dashed trajectory line above, freezing on
+            arrival with a small landing "bounce". Plays once per mount. */}
+        {shouldAnimate && (
+          <circle r={4.5} fill="#fff" stroke="#1a1a1a" strokeWidth="1"
+            style={{filter:'drop-shadow(0 1px 2px rgba(0,0,0,.6))'}}>
+            <animateMotion path={trajD} dur="0.85s" begin="0s" fill="freeze"/>
+            <animate attributeName="r" values="4.5;4.5;7;4.5" keyTimes="0;0.82;0.9;1"
+              dur="0.85s" begin="0s" fill="freeze"/>
+          </circle>
+        )}
       </svg>
       <div style={{display:'flex',flexDirection:'column',gap:6,justifyContent:'center',minWidth:76}}>
         <div>
