@@ -1,8 +1,9 @@
 {
-  "version": "2026.08.03",
-  "bundleFile": "index-CF3un_OF.js",
+  "version": "2026.08.04",
+  "bundleFile": "index-BFXNxjr6.js",
   "changelog": [
-    "Live At-Bat: 3-panel bat-tracking overhaul + ball-flight animation"
+    "Add Hit Signal + Secret Sauce: \"any hit\" filters",
+    "no badges"
   ],
   "notifyUsers": true
 }

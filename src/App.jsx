@@ -14500,6 +14500,7 @@ const OB_COLS = [
   { key:'fb',     label:'FB%',    align:'right',  title:"Season Fly Ball% vs this pitcher's pitch mix + handedness" },
   { key:'hr',     label:'HR',     align:'right',  title:"Season HR count vs this pitcher's pitch mix + handedness" },
   { key:'blast',  label:'Blast%', align:'right',  title:"Arsenal Blast% — home-brewed swing-quality composite (bat speed + attack-angle optimality) vs this pitcher's arsenal. Not a Statcast/MLB stat, not wired into any score — context only. See CLAUDE.md for the validation." },
+  { key:'pen',    label:'Pen',    align:'center', title:"Bullpen HR/9 rank (1-30, rank 1 = most home-run-prone) for the team behind this pitcher — late-game upside if the starter gets pulled. Fixed 2026-07-30." },
   { key:'fit',    label:'Fit',    align:'right',  title:"Arsenal-weighted pitch convergence — engine's own sample-size-discounted fit score" },
 ];
 function obSortValue(r, key) {
@@ -14515,6 +14516,10 @@ function obSortValue(r, key) {
     case 'fb':     return parseFloat(r.bvp_fb_pct)||0;
     case 'hr':     return parseInt(r.bvp_hr_count)||0;
     case 'blast':  return getArsenalBlastPct(r) ?? -1;
+    // Sorted so "most home-run-prone" (rank 1) comes first on desc sort —
+    // invert the rank (31-rank) so a bigger sort value = softer pitching to
+    // exploit, consistent with every other column here (bigger = better for the batter).
+    case 'pen':    return parseInt(r.bullpen_hr_rank)>0 ? 31 - parseInt(r.bullpen_hr_rank) : -1;
     case 'fit':    return parseFloat(r.ps_convergence)||0;
     default:       return 0;
   }
@@ -14554,6 +14559,7 @@ const ARSENAL_FIT_COLS = [
   { key:'fb',      label:'FB%',      align:'right',  title:"Season Fly Ball% vs this pitcher's pitch mix + handedness" },
   { key:'hr',      label:'HR',       align:'right',  title:"Season HR count vs this pitcher's pitch mix + handedness" },
   { key:'blast',   label:'Blast%',   align:'right',  title:"Arsenal Blast% — home-brewed swing-quality composite (bat speed + attack-angle optimality) vs this pitcher's arsenal. Not a Statcast/MLB stat, not wired into any score — context only. See CLAUDE.md for the validation." },
+  { key:'pen',     label:'Pen',      align:'center', title:"Bullpen HR/9 rank (1-30, rank 1 = most home-run-prone) for the team behind this pitcher — late-game upside if the starter gets pulled. Fixed 2026-07-30." },
   { key:'fit',     label:'Fit',      align:'right',  title:"Arsenal-weighted pitch convergence — engine's own sample-size-discounted fit score" },
 ];
 function afSortValue(r, key) {
@@ -14571,6 +14577,7 @@ function afSortValue(r, key) {
     case 'fb':      return parseFloat(r.bvp_fb_pct)||0;
     case 'hr':      return parseInt(r.bvp_hr_count)||0;
     case 'blast':   return getArsenalBlastPct(r) ?? -1;
+    case 'pen':     return parseInt(r.bullpen_hr_rank)>0 ? 31 - parseInt(r.bullpen_hr_rank) : -1;
     case 'fit':     return parseFloat(r.ps_convergence)||0;
     default:        return 0;
   }
@@ -14670,6 +14677,11 @@ function OpposingBatterTable({ pitcherId }) {
                 <td style={dimStyle}>{parseInt(r.bvp_hr_count)||0}</td>
                 <td style={dimStyle} title="Arsenal Blast% — home-brewed swing-quality composite, context only, not a real stat or a scoring input">
                   {(() => { const bp = getArsenalBlastPct(r); return bp==null ? '—' : bp; })()}
+                </td>
+                <td style={{textAlign:'center',padding:'3px 6px'}}>
+                  {(() => { const bp = bullpenTierInfo(r.bullpen_hr_rank); return bp
+                    ? <span style={{color:bp.color}} title={`${bp.label} #${parseInt(r.bullpen_hr_rank)}/30`}>{bp.short}</span>
+                    : '—'; })()}
                 </td>
                 <td style={{textAlign:'right',padding:'3px 6px',color:'var(--accent2)',fontWeight:700}}
                   title={r.ps_conv_pitch ? `Best-fit pitch: ${r.ps_conv_pitch}` : ''}>
@@ -16979,6 +16991,7 @@ function SimLabView({ data }) {
                 'AB','H','HR','R','TB','RBI','BB','K','Avg EV','Launch Angle',
                 'Live Close Calls','Live CC Max EV','Live CC Max Dist',
                 'Plate IQ','IQ Grade','Zone Risk',
+                'Bullpen HR Rank','Bullpen HR9','Bullpen WHIP',
                 'Game ID','Batter ID','Pitcher ID'];
               const rows = slate.map(b => {
                 const bid = parseInt(b.batter_id) || 0;
@@ -17047,6 +17060,9 @@ function SimLabView({ data }) {
                   (()=>{ const _piq=computePlateIQ(b); return _piq ?? ''; })(),
                   (()=>{ const _g=plateIQGrade(computePlateIQ(b)); return _g?.label||''; })(),
                   (()=>{ const _piq=computePlateIQ(b); return plateIQZoneRisk(b,_piq)?'YES':''; })(),
+                  parseInt(b.bullpen_hr_rank)>0 ? parseInt(b.bullpen_hr_rank) : '',
+                  b.bullpen_hr9 !== undefined && b.bullpen_hr9 !== null && b.bullpen_hr9 !== '' ? parseFloat(b.bullpen_hr9).toFixed(2) : '',
+                  b.bullpen_whip !== undefined && b.bullpen_whip !== null && b.bullpen_whip !== '' ? parseFloat(b.bullpen_whip).toFixed(2) : '',
                   // Hidden data-plumbing columns (not shown in-app) — join keys for Track Record / ball carry
                   b.game_id || '', bid || '', parseInt(b.pitcher_id)||'',
                 ].map(esc).join(',');
@@ -17729,6 +17745,11 @@ function SimLabView({ data }) {
                       <td style={dimStyle}>{parseInt(b.bvp_hr_count) || 0}</td>
                       <td style={dimStyle} title="Arsenal Blast% — home-brewed swing-quality composite, context only, not a real stat or a scoring input">
                         {(() => { const bp = getArsenalBlastPct(b); return bp==null ? '—' : bp; })()}
+                      </td>
+                      <td style={{textAlign:'center',padding:'3px 6px'}}>
+                        {(() => { const bp = bullpenTierInfo(b.bullpen_hr_rank); return bp
+                          ? <span style={{color:bp.color}} title={`${bp.label} #${parseInt(b.bullpen_hr_rank)}/30`}>{bp.short}</span>
+                          : '—'; })()}
                       </td>
                       <td style={{ textAlign: 'right', padding: '3px 6px', color: 'var(--accent2)', fontWeight: 700 }}
                         title={b.ps_conv_pitch ? `Best-fit pitch: ${b.ps_conv_pitch}` : ''}>
@@ -25823,15 +25844,13 @@ function MatchupEngineTab() {
                     </div>;
                   })()}
                   {/* Bullpen HR Rank */}
-                  {b.bullpen_hr_rank && parseInt(b.bullpen_hr_rank) > 0 && (() => {
-                    const rank = parseInt(b.bullpen_hr_rank);
-                    const col = rank <= 10 ? '#27c97a' : rank <= 20 ? '#f5a623' : '#ff4020';
-                    const label = rank <= 10 ? '💥 Soft Pen' : rank <= 20 ? '⚾ Avg Pen' : '🔒 Tough Pen';
-                    const borderCol = rank <= 10 ? 'rgba(39,201,122,.3)' : rank <= 20 ? 'rgba(245,166,35,.3)' : 'rgba(255,64,32,.3)';
+                  {(() => {
+                    const bp = bullpenTierInfo(b.bullpen_hr_rank);
+                    if (!bp) return null;
                     return <div style={{padding:'3px 10px',borderRadius:6,fontSize:10,
-                      background:'rgba(255,255,255,.04)',border:`1px solid ${borderCol}`,
-                      fontFamily:"'DM Mono',monospace",color:col}}>
-                      {label} #{rank}/30
+                      background:'rgba(255,255,255,.04)',border:`1px solid ${bp.border}`,
+                      fontFamily:"'DM Mono',monospace",color:bp.color}}>
+                      {bp.short} {bp.label} #{parseInt(b.bullpen_hr_rank)}/30
                     </div>;
                   })()}
                   {/* Lineup weak spot */}
@@ -28703,6 +28722,11 @@ function TrackRecordTab() {
             pitcherGrade: r['Pitcher Grade']  || blRow['Grade'] || '',
             ghr:          parseFloat(r['gHR'] || 0),
             zoneFit:      parseFloat(r['Zone Fit'] || 0),
+            // Bullpen HR/9 rank (2026-08-04) — new All Matchups export column,
+            // so this reads '—' until the season file accumulates dates past
+            // whenever the user's next pipeline run lands, same forward-only
+            // gap every other newly-added CSV column has hit here before.
+            bullpenRank:  parseInt(r['Bullpen HR Rank']) > 0 ? parseInt(r['Bullpen HR Rank']) : null,
             simTB,
             xwoba:        parseFloat(r['xwOBA'] || 0),
             flags:        parseInt(r['Flags'] || 0),
@@ -29480,7 +29504,7 @@ function TrackRecordTab() {
             const headers = ['Date','Batter','Team','Hand','Lineup Slot',
               'Pre-Game Pitcher','Went Yard Vs','SP/RP','Pitcher Grade',
               'Yard Score','Boom','Sig','Grade','gHR','Zone Fit','Sim TB','xwOBA','Flags',
-              'Is Key Matchup','Weak Spot','Sauce 2.0','Sauce 2.5','Sauce 3.0','Hit Signal','Secret Sauce','Day Late','2-Bagger (Non-HR)','Hit 2+ TB (Any)','TB Signal',
+              'Is Key Matchup','Weak Spot','Bullpen HR Rank','Sauce 2.0','Sauce 2.5','Sauce 3.0','Hit Signal','Secret Sauce','Day Late','2-Bagger (Non-HR)','Hit 2+ TB (Any)','TB Signal',
               'TrueHR','Matchup','SimHR%','Barrel Signal','Longshot',
               'PulledBrl%','Brl/BIP','HR/FB','FB%','HH%',
               'Plate IQ','IQ Grade','Zone Risk','Hand Match',
@@ -29497,7 +29521,7 @@ function TrackRecordTab() {
                 (r.wentYard && r.actualPitcher && !r.actualPitcherIsSP) ? '' : r.pitcherGrade,
                 r.yardScore || '', r.boom || '', r.sig || '', r.grade || '', r.ghr || '',
                 r.zoneFit || '', r.simTB || '', r.xwoba || '', r.flags || '',
-                r.isKeyMatchup ? 'YES' : '', r.isWeakSlot ? 'YES' : '', r.isSauce2 ? 'YES' : '', r.isSauce25 ? 'YES' : '', r.isSauce3 ? 'YES' : '', r.isHitSignal ? 'YES' : '', r.isSecretSauce ? 'YES' : '', r.isDayLate ? 'YES' : '', r.is2Bagger ? 'YES' : '', r.hitTB2 ? 'YES' : '', r.tbSignal ? 'YES' : '',
+                r.isKeyMatchup ? 'YES' : '', r.isWeakSlot ? 'YES' : '', r.bullpenRank || '', r.isSauce2 ? 'YES' : '', r.isSauce25 ? 'YES' : '', r.isSauce3 ? 'YES' : '', r.isHitSignal ? 'YES' : '', r.isSecretSauce ? 'YES' : '', r.isDayLate ? 'YES' : '', r.is2Bagger ? 'YES' : '', r.hitTB2 ? 'YES' : '', r.tbSignal ? 'YES' : '',
                 r.trueHR || '', r.matchup || '', r.simHRPct || '',
                 r.brlSignal ? 'YES' : '', r.isLongshot ? 'YES' : '',
                 r.pulledBrl || '', r.brlBIP || '', r.hrFB || '', r.fb || '', r.hh || '',
@@ -29569,6 +29593,7 @@ function TrackRecordTab() {
                   <SortTh col="flags"    label="Flags" color="#e8411a"/>
                   <SortTh col="isKeyMatchup" label="KM" color="#e8411a"/>
                   <SortTh col="isWeakSlot" label="Weak Spot" color="#e8411a"/>
+                  <SortTh col="bullpenRank" label="Pen" color="#e8411a"/>
                 </>}
 
                 {showBarrel && <>
@@ -29689,6 +29714,11 @@ function TrackRecordTab() {
                         textAlign:'center'}}>{r.isKeyMatchup ? '🔑' : ''}</td>
                       <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
                         textAlign:'center'}} title={r.isWeakSlot ? `Slot ${r.lineupSlot} — pitcher weak slots: ${r.weakSlots||'—'}` : ''}>{r.isWeakSlot ? '🟢' : ''}</td>
+                      <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9, textAlign:'center'}}>
+                        {(() => { const bp = bullpenTierInfo(r.bullpenRank); return bp
+                          ? <span style={{color:bp.color}} title={`${bp.label} #${r.bullpenRank}/30`}>{bp.short}</span>
+                          : '—'; })()}
+                      </td>
                     </>}
 
                     {showBarrel && <>
@@ -32647,6 +32677,23 @@ function isSauce25Batter(r) {
 // Filter-only by design (no badge/Signal Board box) — deliberately lower-
 // profile than Barrel/TB Signal until it accumulates its own forward Track
 // Record validation.
+// ── bullpenTierInfo (2026-08-04) — shared tier/color for the opposing team's
+// bullpen HR/9 rank (1-30, rank 1 = most home-run-prone). Field already
+// computed engine-side (fetch_bullpen_stats(), fixed 2026-07-30) and already
+// nudges Sig by a small +-0.10/0.12 modifier there — this was, until now,
+// only ever surfaced as a single inline pill badge on the Key Matchups tab
+// (MatchupEngineTab), invisible everywhere else. Same rank<=10/<=20/else
+// tiering that badge already used, extracted here so every new display site
+// (Arsenal Fit, Barrel Lab, On Base, Track Record) stays consistent instead
+// of re-deriving its own copy of the same three-way ternary.
+function bullpenTierInfo(rank) {
+  const r = parseInt(rank);
+  if (!r || r <= 0) return null;
+  if (r <= 10) return { label:'Soft Pen',  short:'💥', color:'#27c97a', border:'rgba(39,201,122,.3)' };
+  if (r <= 20) return { label:'Avg Pen',   short:'⚾', color:'#f5a623', border:'rgba(245,166,35,.3)' };
+  return          { label:'Tough Pen', short:'🔒', color:'#ff4020', border:'rgba(255,64,32,.3)' };
+}
+
 function isHitSignalBatter(r) {
   const simH  = parseFloat(r.sim_h || 0);
   const swstr = parseFloat(r.season_swstr_pct ?? NaN);
@@ -33394,6 +33441,13 @@ function BarrelLabTab() {
     // See getArsenalBlastPct()'s own comment for the full validation.
     { h:'Blast%', key:'af_blast', acc: b => getArsenalBlastPct(b) ?? -1,      align:'right', color:'#818cf8',
       title:"Arsenal Blast% — home-brewed swing-quality composite (bat speed + attack-angle optimality) vs this pitcher's arsenal. Not a real stat, not a scoring input — context only." },
+    // 2026-08-04 — opposing team's bullpen HR/9 rank (1-30, rank 1 = most
+    // home-run-prone), late-game upside if this pitcher gets pulled. Engine
+    // field fixed 2026-07-30 (fetch_bullpen_stats()); already nudges Sig by
+    // a small +-0.10/0.12 modifier there, but was never shown anywhere until
+    // now — see bullpenTierInfo()'s own comment for the fuller context.
+    { h:'Pen',    key:'af_pen',   acc: b => parseInt(b.bullpen_hr_rank)>0 ? 31-parseInt(b.bullpen_hr_rank) : -1, align:'center', color:'#818cf8',
+      title:"Bullpen HR/9 rank for the team behind this pitcher — late-game upside if the starter gets pulled." },
   ];
 
   const toggleSort = (key) => {
@@ -33603,7 +33657,7 @@ function BarrelLabTab() {
                 const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
                 const f1 = v => (v != null && v !== '' && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(1) : '';
                 const f3 = v => (v != null && v !== '' && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(3) : '';
-                const hdrs = ['Slot','Team','Player','Pitcher','Grade','TrueHR','Matchup','ZF','Form (gHR)','SimHR%','ISO','xwOBA','PulledBrl%','Brl/BIP%','HR/FB%','FB%','HH%','LA°','Barrel Signal','Plate IQ','IQ Grade','Zone Risk','Hand Match','Longshot','Chalk','Day Late','Young Gun','Season PA','Arsenal Fit ISO','Arsenal Blast%','Sauce 2.0','Sauce 2.5','Sauce 3.0','Hit Signal','Secret Sauce',
+                const hdrs = ['Slot','Team','Player','Pitcher','Grade','TrueHR','Matchup','ZF','Form (gHR)','SimHR%','ISO','xwOBA','PulledBrl%','Brl/BIP%','HR/FB%','FB%','HH%','LA°','Barrel Signal','Plate IQ','IQ Grade','Zone Risk','Hand Match','Longshot','Chalk','Day Late','Young Gun','Season PA','Arsenal Fit ISO','Arsenal Blast%','Bullpen HR Rank','Sauce 2.0','Sauce 2.5','Sauce 3.0','Hit Signal','Secret Sauce',
                   'Game ID','Batter ID','Pitcher ID'];
                 const csvRows = [hdrs.map(esc).join(',')];
                 rows.forEach(b => {
@@ -33638,6 +33692,7 @@ function BarrelLabTab() {
                     esc(parseInt(b.season_pa||0)),
                     esc(f3(b.bvp_iso)),
                     esc((() => { const bp = getArsenalBlastPct(b); return bp==null ? '' : bp; })()),
+                    esc(parseInt(b.bullpen_hr_rank)>0 ? parseInt(b.bullpen_hr_rank) : ''),
                     esc(b.isSauce2 ? '1' : '0'),
                     esc(b.isSauce25 ? '1' : '0'),
                     esc(b.isSauce3 ? '1' : '0'),
@@ -34108,6 +34163,11 @@ function BarrelLabTab() {
                               <td style={dim} title="Arsenal Blast% — home-brewed swing-quality composite, context only, not a real stat or a scoring input">
                                 {(() => { const bp = getArsenalBlastPct(b); return bp==null ? '—' : bp; })()}
                               </td>
+                              <td style={{padding:'4px 6px',textAlign:'center'}}>
+                                {(() => { const bp = bullpenTierInfo(b.bullpen_hr_rank); return bp
+                                  ? <span style={{color:bp.color}} title={`${bp.label} #${parseInt(b.bullpen_hr_rank)}/30`}>{bp.short}</span>
+                                  : '—'; })()}
+                              </td>
                             </>);
                           })()}
                           <td style={{padding:'4px 6px',textAlign:'right'}} onClick={e => e.stopPropagation()}>
@@ -34568,6 +34628,13 @@ function OnBaseTab() {
     // See getArsenalBlastPct()'s own comment for the full validation.
     { h:'Blast%', key:'af_blast', acc: b => getArsenalBlastPct(b) ?? -1,      align:'right', color:'#818cf8',
       title:"Arsenal Blast% — home-brewed swing-quality composite (bat speed + attack-angle optimality) vs this pitcher's arsenal. Not a real stat, not a scoring input — context only." },
+    // 2026-08-04 — opposing team's bullpen HR/9 rank (1-30, rank 1 = most
+    // home-run-prone), late-game upside if this pitcher gets pulled. Engine
+    // field fixed 2026-07-30 (fetch_bullpen_stats()); already nudges Sig by
+    // a small +-0.10/0.12 modifier there, but was never shown anywhere until
+    // now — see bullpenTierInfo()'s own comment for the fuller context.
+    { h:'Pen',    key:'af_pen',   acc: b => parseInt(b.bullpen_hr_rank)>0 ? 31-parseInt(b.bullpen_hr_rank) : -1, align:'center', color:'#818cf8',
+      title:"Bullpen HR/9 rank for the team behind this pitcher — late-game upside if the starter gets pulled." },
   ];
 
   const toggleSort = (key) => {
@@ -34772,7 +34839,7 @@ function OnBaseTab() {
                 const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
                 const f1 = v => (v != null && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(1) : '';
                 const f3 = v => (v != null && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(3) : '';
-                const hdrs = ['Slot','Team','Player','Pitcher','Grade','OnBaseScore','Matchup','ZF','G2TB%','SimTB2%','AVG','SLG','ISO','xwOBA','XBH%','HH%','SimTB','LA°','TB Signal','Plate IQ','IQ Grade','Zone Risk','Hand Match','Longshot','Chalk','Day Late','Young Gun','Season PA','Arsenal Fit ISO','Arsenal Blast%','Sauce 2.0','Sauce 2.5','Sauce 3.0','Hit Signal','Secret Sauce',
+                const hdrs = ['Slot','Team','Player','Pitcher','Grade','OnBaseScore','Matchup','ZF','G2TB%','SimTB2%','AVG','SLG','ISO','xwOBA','XBH%','HH%','SimTB','LA°','TB Signal','Plate IQ','IQ Grade','Zone Risk','Hand Match','Longshot','Chalk','Day Late','Young Gun','Season PA','Arsenal Fit ISO','Arsenal Blast%','Bullpen HR Rank','Sauce 2.0','Sauce 2.5','Sauce 3.0','Hit Signal','Secret Sauce',
                   'Game ID','Batter ID','Pitcher ID'];
                 const csvRows = [hdrs.map(esc).join(',')];
                 rows.forEach(b => {
@@ -34807,6 +34874,7 @@ function OnBaseTab() {
                     esc(parseInt(b.season_pa||0)),
                     esc(f3(b.bvp_iso)),
                     esc((() => { const bp = getArsenalBlastPct(b); return bp==null ? '' : bp; })()),
+                    esc(parseInt(b.bullpen_hr_rank)>0 ? parseInt(b.bullpen_hr_rank) : ''),
                     esc(b.isSauce2 ? '1' : '0'),
                     esc(b.isSauce25 ? '1' : '0'),
                     esc(b.isSauce3 ? '1' : '0'),
@@ -35205,6 +35273,11 @@ function OnBaseTab() {
                               <td style={dim}>{parseInt(b.bvp_hr_count)||0}</td>
                               <td style={dim} title="Arsenal Blast% — home-brewed swing-quality composite, context only, not a real stat or a scoring input">
                                 {(() => { const bp = getArsenalBlastPct(b); return bp==null ? '—' : bp; })()}
+                              </td>
+                              <td style={{padding:'4px 6px',textAlign:'center'}}>
+                                {(() => { const bp = bullpenTierInfo(b.bullpen_hr_rank); return bp
+                                  ? <span style={{color:bp.color}} title={`${bp.label} #${parseInt(b.bullpen_hr_rank)}/30`}>{bp.short}</span>
+                                  : '—'; })()}
                               </td>
                             </>);
                           })()}
