@@ -16172,6 +16172,7 @@ function SimLabView({ data }) {
   const [afYoungGunsOnly, setAfYoungGunsOnly] = useState(false);
   const [afSauce3Only,    setAfSauce3Only]    = useState(false);
   const [afSauce25Only,   setAfSauce25Only]   = useState(false);
+  const [afBullpenTiers,  setAfBullpenTiers]  = useState(() => new Set());
   const [afHandMatchOnly, setAfHandMatchOnly] = useState(false);
   const [afMinL7Iso, setAfMinL7Iso] = useState('');
   const [afMinIso,   setAfMinIso]   = useState('');
@@ -16479,6 +16480,7 @@ function SimLabView({ data }) {
       .filter(r => !afYoungGunsOnly || r.isYoungGun)
       .filter(r => !afSauce3Only    || r.isSauce3)
       .filter(r => !afSauce25Only   || r.isSauce25)
+      .filter(r => afBullpenTiers.size === 0 || afBullpenTiers.has(bullpenTierLabel(r.bullpen_hr_rank)))
       .filter(r => !afHandMatchOnly || r.handMatchTier)
       .filter(r => afMinL7Iso === '' || parseFloat(r.recent_iso||0)    >= parseFloat(afMinL7Iso))
       .filter(r => afMinIso   === '' || parseFloat(r.bvp_iso||0)       >= parseFloat(afMinIso))
@@ -16490,7 +16492,7 @@ function SimLabView({ data }) {
       if (va > vb) return afSortDir === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [slate, afSortBy, afSortDir, afChalkOnly, afDayLateOnly, afYoungGunsOnly, afSauce3Only, afSauce25Only, afHandMatchOnly, afMinL7Iso, afMinIso, afMinL7Ev, afMinEv, afDayLateVer, afPlayerVer]);
+  }, [slate, afSortBy, afSortDir, afChalkOnly, afDayLateOnly, afYoungGunsOnly, afSauce3Only, afSauce25Only, afBullpenTiers, afHandMatchOnly, afMinL7Iso, afMinIso, afMinL7Ev, afMinEv, afDayLateVer, afPlayerVer]);
 
   // Reset row cap when filters/sort change so user always sees top results
   useEffect(() => { setDisplayLimit(150); }, [sortBy, sortDir, selMatchups, lineupOnly, simActiveOnly, simSearch, filterKeyMatchup, slotMin, slotMax]);
@@ -17667,6 +17669,8 @@ function SimLabView({ data }) {
               ]}
               pitcherGrades={selPitcherGradesSim}
               onPitcherGradesChange={setSelPitcherGradesSim}
+              bullpenTiers={afBullpenTiers}
+              onBullpenTiersChange={setAfBullpenTiers}
               minFilters={[
                 { key: 'l7iso', label: 'L7 ISO', value: afMinL7Iso, onChange: setAfMinL7Iso, step: '0.001' },
                 { key: 'iso',   label: 'ISO',    value: afMinIso,   onChange: setAfMinIso,   step: '0.001' },
@@ -28459,6 +28463,7 @@ function TrackRecordTab() {
   const [showOnlySauce25, setShowOnlySauce25] = useState(false);
   const [showOnlyHitSignal, setShowOnlyHitSignal] = useState(false);
   const [showOnlySecretSauce, setShowOnlySecretSauce] = useState(false);
+  const [selBullpenTiers, setSelBullpenTiers] = useState(() => new Set());
   const [showOnly2Bagger, setShowOnly2Bagger] = useState(false);
   const [showOnlyTBSignal, setShowOnlyTBSignal] = useState(false);
   const [showOnlySimTB2, setShowOnlySimTB2] = useState(false);
@@ -28954,6 +28959,7 @@ function TrackRecordTab() {
     if (carryFilter)    rows = rows.filter(r => r.ballCarryVerdict === carryFilter);
     if (xhrFilter)       rows = rows.filter(r => r.xhrVerdict === xhrFilter);
     if (selPitcherGradesTR.size > 0) rows = rows.filter(r => selPitcherGradesTR.has((r.pitcherGrade||'').trim()));
+    if (selBullpenTiers.size > 0) rows = rows.filter(r => selBullpenTiers.has(bullpenTierLabel(r.bullpenRank)));
     if (search) {
       const q = search.toLowerCase();
       rows = rows.filter(r =>
@@ -28968,7 +28974,7 @@ function TrackRecordTab() {
       }
       return sortDir * ((av||0) - (bv||0));
     });
-  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, showOnlyWeakSlot, showOnlyCC, showOnlySauce2, showOnlySauce3, showOnlySauce25, showOnlyHitSignal, showOnlySecretSauce, showOnly2Bagger, showOnlyTBSignal, showOnlySimTB2, showOnlyHighIQ, showOnlyHandMatch, showOnlyDayLate, carryFilter, xhrFilter, selPitcherGradesTR, search, sortCol, sortDir]);
+  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, showOnlyWeakSlot, showOnlyCC, showOnlySauce2, showOnlySauce3, showOnlySauce25, showOnlyHitSignal, showOnlySecretSauce, showOnly2Bagger, showOnlyTBSignal, showOnlySimTB2, showOnlyHighIQ, showOnlyHandMatch, showOnlyDayLate, carryFilter, xhrFilter, selPitcherGradesTR, selBullpenTiers, search, sortCol, sortDir]);
 
   const summary = useMemo(() => {
     const hrs          = dateRows.filter(r => r.wentYard);
@@ -29498,6 +29504,8 @@ function TrackRecordTab() {
           ]}
           pitcherGrades={selPitcherGradesTR}
           onPitcherGradesChange={setSelPitcherGradesTR}
+          bullpenTiers={selBullpenTiers}
+          onBullpenTiersChange={setSelBullpenTiers}
         />
 
         <button id="track-record-csv-trigger" onClick={() => {
@@ -32695,6 +32703,12 @@ function bullpenTierInfo(rank) {
   if (r <= 20) return { label:'Avg Pen',   short:'⚾', color:'#f5a623', border:'rgba(245,166,35,.3)' };
   return          { label:'Tough Pen', short:'🔒', color:'#ff4020', border:'rgba(255,64,32,.3)' };
 }
+// Matches BULLPEN_TIER_OPTIONS' exact checkbox label strings, so the
+// Bullpen Tier filter (FilterPanel) can compare directly against a Set.
+function bullpenTierLabel(rank) {
+  const bp = bullpenTierInfo(rank);
+  return bp ? `${bp.short} ${bp.label}` : null;
+}
 
 function isHitSignalBatter(r) {
   const simH  = parseFloat(r.sim_h || 0);
@@ -32720,8 +32734,13 @@ function isSecretSauceBatter(r) {
 // individual buttons would have pushed both tabs past what fits on a phone
 // screen (Barrel Lab was already at 7 buttons + a hand dropdown).
 const PITCHER_GRADE_OPTIONS = ['🎯 Target', '💥 Hittable', '🤔 Average', '⚠️ Tough', '‼️ Elite'];
+// Bullpen Tier options (2026-08-04) — same 3 tiers as bullpenTierInfo(), used
+// as a second optional multi-select in FilterPanel, same Set-based on/off
+// mechanism as Pitcher Grade above. Labels match exactly what each row's
+// filter check builds via `${bp.short} ${bp.label}`.
+const BULLPEN_TIER_OPTIONS = ['💥 Soft Pen', '⚾ Avg Pen', '🔒 Tough Pen'];
 
-function FilterPanel({ toggles, pitcherGrades, onPitcherGradesChange, minFilters }) {
+function FilterPanel({ toggles, pitcherGrades, onPitcherGradesChange, bullpenTiers, onBullpenTiersChange, minFilters }) {
   const [open, setOpen] = useState(false);
   const [panelPos, setPanelPos] = useState({ top: 0, left: 0 });
   const ref = useRef(null);
@@ -32766,7 +32785,8 @@ function FilterPanel({ toggles, pitcherGrades, onPitcherGradesChange, minFilters
   // min-value text-box filters (Arsenal Fit L7 ISO/ISO/L7 EV/EV). Optional so FilterPanel
   // stays backward-compatible with any future caller that doesn't need them.
   const activeMinCount = (minFilters||[]).filter(f => f.value !== '' && f.value != null).length;
-  const activeCount = toggles.filter(t => t.active).length + (pitcherGrades.size > 0 ? 1 : 0) + activeMinCount;
+  const activeCount = toggles.filter(t => t.active).length + (pitcherGrades.size > 0 ? 1 : 0)
+    + (bullpenTiers && bullpenTiers.size > 0 ? 1 : 0) + activeMinCount;
   const monoFont = "'DM Mono',monospace";
 
   return (
@@ -32815,6 +32835,27 @@ function FilterPanel({ toggles, pitcherGrades, onPitcherGradesChange, minFilters
               </label>
             ))}
           </div>
+          {bullpenTiers && onBullpenTiersChange && (
+            <div style={{borderTop:'1px solid var(--border)',marginTop:2,paddingTop:6}}>
+              <div style={{fontFamily:monoFont,fontSize:8,color:'var(--muted)',
+                textTransform:'uppercase',letterSpacing:.6,marginBottom:5}}>
+                Bullpen Tier
+              </div>
+              {BULLPEN_TIER_OPTIONS.map(t => (
+                <label key={t} style={{display:'flex',alignItems:'center',gap:7,cursor:'pointer',
+                  fontFamily:monoFont,fontSize:10,marginBottom:3,
+                  color: bullpenTiers.has(t) ? 'var(--text)' : 'var(--muted)'}}>
+                  <input type="checkbox" checked={bullpenTiers.has(t)}
+                    onChange={() => {
+                      const next = new Set(bullpenTiers);
+                      if (next.has(t)) next.delete(t); else next.add(t);
+                      onBullpenTiersChange(next);
+                    }}/>
+                  {t}
+                </label>
+              ))}
+            </div>
+          )}
           {minFilters && minFilters.length > 0 && (
             <div style={{borderTop:'1px solid var(--border)',marginTop:2,paddingTop:6}}>
               <div style={{fontFamily:monoFont,fontSize:8,color:'var(--muted)',
@@ -33058,6 +33099,7 @@ function BarrelLabTab() {
   const [blSauce25Only,    setBlSauce25Only]    = useState(false);
   const [blHitSignalOnly,  setBlHitSignalOnly]  = useState(false);
   const [blSecretSauceOnly,setBlSecretSauceOnly]= useState(false);
+  const [blBullpenTiers,   setBlBullpenTiers]   = useState(() => new Set());
   const [blBatterHand,     setBlBatterHand]     = useState('ALL');
   const [blPitcherGrades,  setBlPitcherGrades]  = useState(() => new Set());
   // Arsenal Fit min-value filters (2026-07-30) — plain text (number) boxes in the Filters
@@ -33322,13 +33364,14 @@ function BarrelLabTab() {
     .filter(r => !blHitSignalOnly   || r.isHitSignal)
     .filter(r => !blSecretSauceOnly || r.isSecretSauce)
     .filter(r => blPitcherGrades.size === 0 || blPitcherGrades.has((r.pitcher_grade_label||r._pgLabel||'').trim()))
+    .filter(r => blBullpenTiers.size === 0 || blBullpenTiers.has(bullpenTierLabel(r.bullpen_hr_rank)))
     .filter(r => matchesHandFilter(r.batter_hand, blBatterHand))
     .filter(r => blMinL7Iso === '' || parseFloat(r.recent_iso||0)   >= parseFloat(blMinL7Iso))
     .filter(r => blMinIso   === '' || parseFloat(r.bvp_iso||0)      >= parseFloat(blMinIso))
     .filter(r => blMinL7Ev  === '' || parseFloat(r.recent_avg_ev||0) >= parseFloat(blMinL7Ev))
     .filter(r => blMinEv    === '' || parseFloat(r.bvp_avg_ev||0)    >= parseFloat(blMinEv))
     .sort((a, b) => b.trueHRScore - a.trueHRScore);
-  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, blChalkOnly, blDayLateOnly, blYoungGunsOnly, blPicksOnly, picks, blGoneYardOnly, blTB2Only, blHighIQOnly, blHandMatchOnly, blSauce3Only, blSauce25Only, blHitSignalOnly, blSecretSauceOnly, blBatterHand, blPitcherGrades, blMinL7Iso, blMinIso, blMinL7Ev, blMinEv, hrVer, finalVer, dayLateVer, playerVer, ballStateVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, blChalkOnly, blDayLateOnly, blYoungGunsOnly, blPicksOnly, picks, blGoneYardOnly, blTB2Only, blHighIQOnly, blHandMatchOnly, blSauce3Only, blSauce25Only, blHitSignalOnly, blSecretSauceOnly, blBullpenTiers, blBatterHand, blPitcherGrades, blMinL7Iso, blMinIso, blMinL7Ev, blMinEv, hrVer, finalVer, dayLateVer, playerVer, ballStateVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Color threshold helpers
   const clr = (v, g1, g2, y1, y2) => {
@@ -33626,6 +33669,8 @@ function BarrelLabTab() {
               ]}
               pitcherGrades={blPitcherGrades}
               onPitcherGradesChange={setBlPitcherGrades}
+              bullpenTiers={blBullpenTiers}
+              onBullpenTiersChange={setBlBullpenTiers}
               minFilters={[
                 {key:'l7iso', label:'L7 ISO', value:blMinL7Iso, onChange:setBlMinL7Iso, step:'0.001'},
                 {key:'iso',   label:'ISO',    value:blMinIso,   onChange:setBlMinIso,   step:'0.001'},
@@ -34321,6 +34366,7 @@ function OnBaseTab() {
   const [obSauce25Only,    setObSauce25Only]    = useState(false);
   const [obHitSignalOnly,  setObHitSignalOnly]  = useState(false);
   const [obSecretSauceOnly,setObSecretSauceOnly]= useState(false);
+  const [obBullpenTiers,   setObBullpenTiers]   = useState(() => new Set());
   const [obBatterHand,     setObBatterHand]     = useState('ALL');
   const [obPitcherGrades,  setObPitcherGrades]  = useState(() => new Set());
   // Arsenal Fit min-value filters (2026-07-30) — same as BarrelLabTab's identical block.
@@ -34525,13 +34571,14 @@ function OnBaseTab() {
     .filter(r => !obHitSignalOnly   || r.isHitSignal)
     .filter(r => !obSecretSauceOnly || r.isSecretSauce)
     .filter(r => obPitcherGrades.size === 0 || obPitcherGrades.has((r.pitcher_grade_label||r._pgLabel||'').trim()))
+    .filter(r => obBullpenTiers.size === 0 || obBullpenTiers.has(bullpenTierLabel(r.bullpen_hr_rank)))
     .filter(r => matchesHandFilter(r.batter_hand, obBatterHand))
     .filter(r => obMinL7Iso === '' || parseFloat(r.recent_iso||0)   >= parseFloat(obMinL7Iso))
     .filter(r => obMinIso   === '' || parseFloat(r.bvp_iso||0)      >= parseFloat(obMinIso))
     .filter(r => obMinL7Ev  === '' || parseFloat(r.recent_avg_ev||0) >= parseFloat(obMinL7Ev))
     .filter(r => obMinEv    === '' || parseFloat(r.bvp_avg_ev||0)    >= parseFloat(obMinEv))
     .sort((a, b) => b.onBaseScore - a.onBaseScore);
-  }, [eligibleBatters, simResults, obHideFinal, obLongshotOnly, obChalkOnly, obDayLateOnly, obYoungGunsOnly, obPicksOnly, obGoneYardOnly, obTB2Only, obHighIQOnly, obHandMatchOnly, obSauce3Only, obSauce25Only, obHitSignalOnly, obSecretSauceOnly, obBatterHand, obPitcherGrades, obMinL7Iso, obMinIso, obMinL7Ev, obMinEv, picks, finalVer, hrVer, dayLateVer, playerVer, ballStateVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [eligibleBatters, simResults, obHideFinal, obLongshotOnly, obChalkOnly, obDayLateOnly, obYoungGunsOnly, obPicksOnly, obGoneYardOnly, obTB2Only, obHighIQOnly, obHandMatchOnly, obSauce3Only, obSauce25Only, obHitSignalOnly, obSecretSauceOnly, obBullpenTiers, obBatterHand, obPitcherGrades, obMinL7Iso, obMinIso, obMinL7Ev, obMinEv, picks, finalVer, hrVer, dayLateVer, playerVer, ballStateVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const byTeam = useMemo(() => {
     const teams = {};
@@ -34810,6 +34857,8 @@ function OnBaseTab() {
               ]}
               pitcherGrades={obPitcherGrades}
               onPitcherGradesChange={setObPitcherGrades}
+              bullpenTiers={obBullpenTiers}
+              onBullpenTiersChange={setObBullpenTiers}
               minFilters={[
                 {key:'l7iso', label:'L7 ISO', value:obMinL7Iso, onChange:setObMinL7Iso, step:'0.001'},
                 {key:'iso',   label:'ISO',    value:obMinIso,   onChange:setObMinIso,   step:'0.001'},
