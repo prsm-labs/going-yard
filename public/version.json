@@ -1,8 +1,11 @@
 {
   "version": "2026.08.04",
-  "bundleFile": "index-D3YTur6P.js",
+  "bundleFile": "index-D9BG21oP.js",
   "changelog": [
-    "Add Avoid List: new Scouting tab + no-hit filter across Barrel Lab/On Base/Arsenal Fit/Track Record"
+    "Yard Bot quick pass: matchupScore/trueHR",
+    "Sauce tiers",
+    "Bullpen Rank",
+    "Hand Match"
   ],
   "notifyUsers": true
 }

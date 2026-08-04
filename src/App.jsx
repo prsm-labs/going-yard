@@ -30547,6 +30547,335 @@ function CrystalBallTab() {
   );
 }
 
+// ── Top 3 Tonight (2026-08-05) — deterministic "best 3 matchups today,"
+// with a real Claude-narrated Scouting Note per pick. NOT Crystal Ball's
+// random weighted draw — Crystal Ball is untouched and keeps its own fun/
+// random purpose; this reuses its card-flip visual only. Genesis: user asked
+// whether a real top-3-of-the-slate feature with real analysis (not random
+// tiers) was feasible without pre-pulling every batter's Scouting Note.
+//
+// Cost model, why this is cheap: SELECTION is 100% free — it's the exact
+// same computeTrueHRScore()/computeMatchupScore()/normalizeWithinMatchup()
+// functions Barrel Lab already runs client-side on data already loaded, no
+// network calls. Only the Scouting Note GENERATION costs anything (the
+// existing /api/batter-scouting-note endpoint — ~25 MLB API calls + 1
+// Anthropic call per batter, already cached 20hrs per batter-pitcher-date in
+// Redis) — and this only ever fires for the 3 currently-selected batters,
+// never the full slate. Re-selection is reactive on lineupVer (same
+// subscribeLineup() pattern as every other lineup-aware tab) — if the real
+// top 3 changes once lineups confirm, only the newly-added batter(s) trigger
+// a fresh Scouting Note call; anyone still in the top 3 hits the existing
+// cache. Worst case a handful of generations per day, never hundreds.
+//
+// Selection formula — pitcher/bullpen-weighted per the user's own framing
+// ("strongest likelihood... be the opposing pitcher and/or bullpen"):
+// trueHRScore (batter form, pool-normalized exactly like the real Barrel Lab
+// column) and matchupScore (pitcher/PS-Score/platoon-weighted) each 50%,
+// plus real bonuses (not invented weights) for an already-validated Sauce
+// tier and a favorable Bullpen Tier. Outright excludes Tough/Elite pitcher
+// matchups — same gate isLongshotBatter()/isChalkBatter() already use.
+const TOP3_RANKS = [
+  { name:'#1 Best Bet', emoji:'🥇', accentRgb:'255,215,0',
+    border:'rgba(255,215,0,0.5)', glow:'rgba(255,215,0,0.3)',
+    bg:'linear-gradient(160deg,rgba(255,215,0,0.12)0%,rgba(20,10,0,0.7)100%)',
+    tagBg:'rgba(255,215,0,0.1)', tagColor:'rgba(255,215,0,0.9)', tagBorder:'rgba(255,215,0,0.25)' },
+  { name:'#2', emoji:'🥈', accentRgb:'200,200,210',
+    border:'rgba(200,200,210,0.5)', glow:'rgba(200,200,210,0.22)',
+    bg:'linear-gradient(160deg,rgba(200,200,210,0.10)0%,rgba(15,15,18,0.7)100%)',
+    tagBg:'rgba(200,200,210,0.08)', tagColor:'rgba(210,210,220,0.9)', tagBorder:'rgba(200,200,210,0.22)' },
+  { name:'#3', emoji:'🥉', accentRgb:'205,127,50',
+    border:'rgba(205,127,50,0.5)', glow:'rgba(205,127,50,0.22)',
+    bg:'linear-gradient(160deg,rgba(205,127,50,0.10)0%,rgba(20,10,0,0.7)100%)',
+    tagBg:'rgba(205,127,50,0.08)', tagColor:'rgba(225,150,80,0.9)', tagBorder:'rgba(205,127,50,0.22)' },
+];
+
+function TopThreeTab() {
+  const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
+  const [lineupVer, setLineupVer] = useState(LINEUP_VERSION || 0);
+  const [injuryVer, setInjuryVer] = useState(0);
+  const [refreshTick, setRefreshTick] = useState(0);
+  const [flipped,  setFlipped]  = useState([false,false,false]);
+  const [notes,    setNotes]    = useState({}); // `${batterId}_${pitcherId}` -> {loading|data|error}
+  const [showHelp, setShowHelp] = useState(false);
+
+  useEffect(() => {
+    const unsub    = subscribeLineup(v => setLineupVer(v));
+    const unsubInj = subscribeInjuries(() => setInjuryVer(v => v + 1));
+    loadTodayLineups();
+    return () => { unsub(); unsubInj(); };
+  }, []);
+
+  const eligibleBatters = useMemo(() => {
+    return DAILY_PICKS_ROWS.filter(r => {
+      if (!isBarrelLabEligible(r)) return false;
+      const bid = String(r.batter_id || '').split('.')[0];
+      if (INJURY_MAP[bid]) return false;
+      const pg = (r.pitcher_grade_label || r._pgLabel || '').toLowerCase();
+      if (pg.includes('elite') || pg.includes('tough')) return false; // never an outright bad matchup
+      return true;
+    });
+  }, [lineupVer, injuryVer, refreshTick]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const top3 = useMemo(() => {
+    if (!eligibleBatters.length) return [];
+    const withRaw = eligibleBatters.map(r => ({
+      ...r,
+      _rawTrueHRScore: computeTrueHRScore(r),
+      matchupScore:    computeMatchupScore(r),
+    }));
+    const normalized = normalizeWithinMatchup(withRaw); // real pool-normalized trueHRScore, matches Barrel Lab exactly
+    const seen = new Set();
+    return normalized.map(r => {
+      const sauce   = isSauce3Batter(r) ? '3.0' : isSauce25Batter(r) ? '2.5' : isSauce2Batter(r) ? '2.0' : null;
+      const bpInfo  = bullpenTierInfo(parseInt(r.bullpen_hr_rank));
+      const bpBonus = bpInfo?.label === 'Soft Pen' ? 8 : bpInfo?.label === 'Tough Pen' ? -8 : 0;
+      const sauceBonus = sauce === '3.0' ? 10 : sauce === '2.5' ? 6 : sauce === '2.0' ? 3 : 0;
+      return {
+        ...r,
+        pitcher: resolvePitcherName(r.pitcher, r.batting_team, r.pitcher_id),
+        sauce, bullpenTier: bpInfo?.label || null,
+        selectionScore: r.trueHRScore * 0.5 + r.matchupScore * 0.5 + bpBonus + sauceBonus,
+      };
+    })
+    .sort((a,b) => b.selectionScore - a.selectionScore)
+    .filter(r => { // one card per batter — doubleheaders can produce two rows
+      const bid = String(r.batter_id || '');
+      if (seen.has(bid)) return false;
+      seen.add(bid); return true;
+    })
+    .slice(0, 3);
+  }, [eligibleBatters]);
+
+  // Reset the flip state whenever the actual 3 selected batters change (a
+  // new pick appearing should start face-down again) — never on every
+  // re-render, only when the real composition of top3 changes.
+  const top3Key = top3.map(r => r.batter_id).join(',');
+  useEffect(() => { setFlipped([false,false,false]); }, [top3Key]);
+
+  // Fetch a Scouting Note for each currently-selected batter, skipping any
+  // already in-flight/loaded for this exact batter-pitcher pair — this is
+  // what keeps re-selection free: a batter re-entering the top 3 (lineup
+  // churn that nets out to the same picks) never re-triggers a real call.
+  useEffect(() => {
+    top3.forEach(r => {
+      const bid = parseInt(r.batter_id) || 0;
+      const pid = parseInt(r.pitcher_id) || 0;
+      if (!bid || !pid) return;
+      const key = `${bid}_${pid}`;
+      setNotes(n => {
+        if (n[key]) return n;
+        fetch('/api/batter-scouting-note', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            batterId: bid, pitcherId: pid,
+            batterName: r.batter, pitcherName: r.pitcher,
+            batterHand: r.batter_hand || '', pitcherHand: r.pitcher_hand || '',
+            pitcherGrade: getHandSpecificGrade(r),
+            gameId: r.game_id || null,
+            isHomeToday: !!(r.batting_team && r.home_team && r.batting_team === r.home_team),
+          }),
+        }).then(res => res.json().then(data => ({ ok: res.ok, data })))
+          .then(({ ok, data }) => setNotes(n2 => ({ ...n2,
+            [key]: ok ? { loading:false, data } : { loading:false, error: data?.error || 'Failed to generate' } })))
+          .catch(e => setNotes(n2 => ({ ...n2, [key]: { loading:false, error: e.message || 'Failed to generate' } })));
+        return { ...n, [key]: { loading:true } };
+      });
+    });
+  }, [top3Key]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const flipCard = i => setFlipped(f => { const n=[...f]; n[i]=true; return n; });
+  const confirmedCount = eligibleBatters.filter(r =>
+    LINEUP_STATUS[String(r.batter_id||'').split('.')[0]]?.status === 'confirmed').length;
+
+  return (
+    <div style={{maxWidth:760,margin:'0 auto',padding:'24px 16px',
+      display:'flex',flexDirection:'column',alignItems:'center'}}>
+
+      <div style={{textAlign:'center',marginBottom:18,width:'100%',position:'relative'}}>
+        <div style={{fontFamily:osw,fontSize:24,fontWeight:900,letterSpacing:2,
+          color:'var(--text)',textTransform:'uppercase',marginBottom:4}}>
+          🎯 Top 3 Tonight
+        </div>
+        <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',letterSpacing:.5,marginBottom:6}}>
+          Ranked by real matchup strength — pitcher, bullpen &amp; form · updates when lineups confirm
+        </div>
+        <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>
+          {eligibleBatters.length} eligible · {confirmedCount > 0 || Object.keys(LINEUP_STATUS).length > 0 ? `${confirmedCount} confirmed` : 'lineups pending'}
+        </div>
+        <div style={{position:'absolute',top:0,right:0,display:'flex',gap:6}}>
+          <button onClick={()=>setRefreshTick(t=>t+1)} title="Re-check today's slate"
+            style={{padding:'4px 8px',borderRadius:6,cursor:'pointer',border:'1px solid var(--border)',
+              background:'var(--surface2)',color:'var(--muted)',fontFamily:mono,fontSize:10}}>
+            ↺
+          </button>
+          <HelpBtn onClick={()=>setShowHelp(true)}/>
+        </div>
+      </div>
+
+      {eligibleBatters.length === 0 && (
+        <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)',padding:'24px 14px',textAlign:'center'}}>
+          Loading today's slate… if nothing appears, tap ↺ above.
+        </div>
+      )}
+      {eligibleBatters.length > 0 && top3.length === 0 && (
+        <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)',padding:'24px 14px',textAlign:'center'}}>
+          No qualifying matchups today — every eligible batter is facing a Tough or Elite arm.
+        </div>
+      )}
+
+      {top3.length > 0 && (
+        <div style={{width:'100%',display:'flex',gap:14,
+          justifyContent:'flex-start',flexWrap:'nowrap',overflowX:'auto',
+          WebkitOverflowScrolling:'touch',paddingBottom:8,marginBottom:8,
+          scrollSnapType:'x mandatory'}}>
+          {top3.map((p, i) => {
+            const rank = TOP3_RANKS[i];
+            const isFlipped = flipped[i];
+            const key = `${parseInt(p.batter_id)||0}_${parseInt(p.pitcher_id)||0}`;
+            const noteState = notes[key];
+            return (
+              <div key={p.batter_id}
+                onClick={() => !isFlipped && flipCard(i)}
+                style={{width:225,height:420,flexShrink:0,scrollSnapAlign:'start',
+                  perspective:1000,cursor:isFlipped?'default':'pointer',position:'relative'}}>
+                <div style={{position:'absolute',inset:0,transformStyle:'preserve-3d',
+                  transition:'transform 0.65s cubic-bezier(0.4,0.2,0.2,1)',
+                  transform:isFlipped?'rotateY(180deg)':'rotateY(0deg)'}}>
+
+                  {/* ── CARD BACK (face-down) ── */}
+                  <div style={{position:'absolute',inset:0,backfaceVisibility:'hidden',
+                    borderRadius:12,overflow:'hidden',
+                    background:`linear-gradient(160deg,#0d1318 0%,rgba(${rank.accentRgb},.10) 50%,#0a1020 100%)`,
+                    border:`2px solid ${rank.border}`,
+                    boxShadow:`0 8px 32px rgba(0,0,0,0.6),0 0 20px ${rank.glow}`,
+                    display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:10}}>
+                    <div style={{fontSize:34}}>{rank.emoji}</div>
+                    <div style={{fontFamily:osw,fontSize:14,fontWeight:900,letterSpacing:2,
+                      color:`rgba(${rank.accentRgb},0.9)`,textTransform:'uppercase'}}>{rank.name}</div>
+                    <img src="/icon-192.png" alt="Going Yard"
+                      style={{width:44,height:44,borderRadius:10,opacity:.7,marginTop:6}}/>
+                    {!isFlipped && <div style={{position:'absolute',bottom:16,fontFamily:mono,
+                      fontSize:7,color:'rgba(255,255,255,0.25)',letterSpacing:1.5}}>TAP TO REVEAL</div>}
+                  </div>
+
+                  {/* ── CARD FRONT (analysis) ── */}
+                  <div style={{position:'absolute',inset:0,backfaceVisibility:'hidden',
+                    transform:'rotateY(180deg)',borderRadius:12,overflow:'hidden',
+                    background:rank.bg,border:`2px solid ${rank.border}`,
+                    boxShadow:`0 8px 32px rgba(0,0,0,0.6),0 0 20px ${rank.glow}`,
+                    display:'flex',flexDirection:'column',padding:'12px 11px',gap:6}}>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                      <div style={{display:'flex',alignItems:'center',gap:5}}>
+                        <span style={{fontSize:12}}>{rank.emoji}</span>
+                        <span style={{fontFamily:osw,fontSize:9,fontWeight:800,
+                          color:`rgba(${rank.accentRgb},0.9)`,letterSpacing:1}}>{rank.name}</span>
+                      </div>
+                      <div style={{display:'flex',alignItems:'center',gap:4}}>
+                        {LINEUP_STATUS[parseInt(p.batter_id)||0]?.status === 'confirmed' && (
+                          <span title="Confirmed in today's lineup" style={{fontSize:11}}>✅</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{display:'flex',alignItems:'center',gap:8}}>
+                      <PlayerAvatar pid={parseInt(p.batter_id)||0} size={34}/>
+                      <div style={{flex:1,minWidth:0,cursor:'pointer'}}
+                        onClick={e=>{e.stopPropagation();openPitcherSlide(null);
+                          openAtBatSlide({pid:parseInt(p.batter_id)||0,name:p.batter,team:p.batting_team||''});}}>
+                        <div style={{fontFamily:osw,fontSize:13,fontWeight:900,color:'var(--text)',
+                          lineHeight:1.2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',
+                          textDecoration:'underline',textDecorationColor:`rgba(${rank.accentRgb},0.4)`}}>
+                          {p.batter}
+                        </div>
+                        <div style={{fontFamily:mono,fontSize:7.5,color:'var(--muted)'}}>
+                          {p.batting_team}{p.batter_hand?` · ${p.batter_hand}HB`:''}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{fontFamily:mono,fontSize:7.5,color:'var(--muted)',cursor:'pointer'}}
+                      onClick={e=>{e.stopPropagation();openPitcherSlide(null);
+                        openPitcherSlide({pid:parseInt(p.pitcher_id)||0,name:p.pitcher,team:'',hand:p.pitcher_hand});}}>
+                      vs {p.pitcher} · {p._pgLabel || p.pitcher_grade_label || ''}
+                    </div>
+
+                    <div style={{display:'flex',flexWrap:'wrap',gap:3}}>
+                      <span style={{fontFamily:mono,fontSize:7,padding:'2px 5px',borderRadius:3,
+                        background:rank.tagBg,color:rank.tagColor,border:`1px solid ${rank.tagBorder}`}}>
+                        TrueHR {Math.round(p.trueHRScore)}
+                      </span>
+                      <span style={{fontFamily:mono,fontSize:7,padding:'2px 5px',borderRadius:3,
+                        background:rank.tagBg,color:rank.tagColor,border:`1px solid ${rank.tagBorder}`}}>
+                        Matchup {Math.round(p.matchupScore)}
+                      </span>
+                      {p.bullpenTier && <span style={{fontFamily:mono,fontSize:7,padding:'2px 5px',borderRadius:3,
+                        background:rank.tagBg,color:rank.tagColor,border:`1px solid ${rank.tagBorder}`}}>
+                        {p.bullpenTier}
+                      </span>}
+                      {p.sauce && <span style={{fontFamily:mono,fontSize:7,padding:'2px 5px',borderRadius:3,
+                        background:rank.tagBg,color:rank.tagColor,border:`1px solid ${rank.tagBorder}`}}>
+                        🍯 Sauce {p.sauce}
+                      </span>}
+                    </div>
+
+                    <div style={{flex:1,minHeight:0,marginTop:2,padding:'6px 7px',borderRadius:6,
+                      background:'rgba(0,0,0,.18)',overflowY:'auto'}}>
+                      <div style={{fontFamily:osw,fontSize:8,fontWeight:800,letterSpacing:.5,
+                        color:'var(--muted)',textTransform:'uppercase',marginBottom:4}}>📝 Analysis</div>
+                      {!noteState && (
+                        <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>Waiting to generate…</div>
+                      )}
+                      {noteState?.loading && (
+                        <div style={{display:'flex',alignItems:'center',gap:6,fontFamily:mono,fontSize:8,color:'var(--muted)'}}>
+                          <div className="sp" style={{width:9,height:9,borderWidth:1.5}}/> Generating…
+                        </div>
+                      )}
+                      {noteState?.error && (
+                        <div style={{fontFamily:mono,fontSize:8,color:'#ff6b6b'}}>Couldn't generate: {noteState.error}</div>
+                      )}
+                      {noteState?.data?.insufficientData && (
+                        <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>
+                          Not enough recent real contact on record to say anything meaningful yet.
+                        </div>
+                      )}
+                      {noteState?.data?.note && (
+                        <div style={{fontFamily:osw,fontSize:10,color:'var(--text)',lineHeight:1.4}}>
+                          {noteState.data.note}
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{display:'flex',justifyContent:'center'}}>
+                      <PickButton pid={parseInt(p.batter_id)||0} name={p.batter} team={p.batting_team||''}/>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div style={{fontFamily:mono,fontSize:7.5,color:'rgba(255,255,255,0.15)',
+        textAlign:'center',padding:'8px 0',letterSpacing:.4,lineHeight:1.8}}>
+        Real scores + AI-narrated analysis of real, verified stats. Not financial advice.
+      </div>
+
+      {showHelp && <HelpSlideout title="🎯 Top 3 Tonight Guide" onClose={()=>setShowHelp(false)} items={[
+        ['How it works', 'Deterministic — not random. Every eligible batter on today\'s slate (excluding anyone facing a Tough or Elite pitcher outright) is ranked by TrueHRScore (pool-normalized, the exact same formula Daily Barrel uses) and MatchupScore (pitcher/PS-Score/platoon-weighted), with bonuses for an already-validated Sauce tier and a favorable Bullpen Tier. The literal top 3 by that composite score are shown.'],
+        ['📝 The Analysis', 'A short, Claude-narrated note built from each batter\'s real last-10 batted-ball events, fly-ball rate by the pitcher\'s actual pitch mix, and recent at-bats matched to tonight\'s real day/night + home/away context — the same tool available on any batter\'s own slideout. Claude never invents a number; every stat in the note is pre-verified server-side first.'],
+        ['Updates automatically', 'Re-ranks itself the moment lineups shift enough to change who the real top 3 is. Only a newly-added pick triggers a fresh analysis — anyone still in the top 3 reuses the same 20-hour cache, so this never re-generates unnecessarily.'],
+        ['Not the same as Crystal Ball', 'Crystal Ball draws a random pick per tier for fun. This tab is the opposite — the literal best 3 matchups today, ranked, no randomness.'],
+      ]}/>}
+
+      <style>{`
+        @keyframes fadeUp { from{opacity:0;transform:translateY(10px);} to{opacity:1;transform:translateY(0);} }
+      `}</style>
+    </div>
+  );
+}
+
 async function loadGameSplitsData() {
   if (GAME_SPLITS_LOADED) return { batters: BATTER_GAME_SPLITS, pitchers: PITCHER_GAME_SPLITS };
   try {
@@ -32228,6 +32557,7 @@ function HomeTab() {
         ['🔗 Pairs', 'Two-batter combos sharing favorable conditions — same park, pitcher, or contact trend. Curated to 2–3 top pairs per category.'],
         ['🎰 Sim', 'Monte Carlo simulator — runs up to 10,000 game simulations using each batter\'s Yard Score, pitcher grade, park & wind factors. Shows top 5 HR candidates by simulation frequency.'],
         ['🔮 Crystal Ball', 'The engine\'s three picks: The Chosen (elite stack), Dark Horse (under the radar), Wild Card (spike signal).'],
+        ['🎯 Top 3 Tonight', 'The deterministic counterpart to Crystal Ball — no randomness. Real-ranks today\'s slate by TrueHRScore + MatchupScore (pitcher/bullpen-weighted) and shows the literal top 3, each with a real Claude-narrated Scouting Note built from verified recent batted-ball data. Re-ranks itself automatically once lineups confirm.'],
         ['🛢️ Daily Barrel', 'Monte Carlo HR simulation (10,000 PAs per matchup). TrueHRScore + MatchupScore per batter, ★ Barrel Signal flag for the strictest matchups, 🎲 Longshot flag for undervalued plays. Live tracker: Barrel Signal hits at 16.9% HR rate.'],
         ['🔵 On Base', 'A parallel Monte Carlo engine targeting 2+ total bases per game — the hits/TB prop market, not just HRs. OnBaseScore + MatchupScore + SimTB2%, with its own ★ TB Signal flag. Very new — early hit rate is promising but the sample is still small.'],
         ['🚫 Avoid List', 'The mirror image of Hit Signal — batters least likely to record a hit tonight (cold Sim H, real whiff risk, tough matchup, or unfavorable platoon). Full-season backtest: 58-61% miss rate vs. a 42.6% baseline, 1.4x lift, validated cleanly train/test. No badges — this list only exists here and as a filter in the usual tables.'],
@@ -32244,6 +32574,7 @@ function HomeTab() {
         <button style={stBtn('pairs')}      onClick={()=>setSub('pairs')}>🔗 Pairs</button>
         <button style={stBtn('sim')}        onClick={()=>setSub('sim')}>🎰 Sim</button>
         <button style={stBtn('crystal')}    onClick={()=>setSub('crystal')}>🔮</button>
+        <button style={stBtn('top3')}       onClick={()=>setSub('top3')}>🎯 Top 3</button>
         <button data-subtab="barrellab" style={stBtn('barrellab')} onClick={()=>setSub('barrellab')}>🛢️ Daily Barrel</button>
         <button data-subtab="onbase"    style={stBtn('onbase')}    onClick={()=>setSub('onbase')}>🔵 On Base</button>
         <button data-subtab="avoid"     style={stBtn('avoid')}     onClick={()=>setSub('avoid')}>🚫 Avoid</button>
@@ -32275,6 +32606,7 @@ function HomeTab() {
       {sub==='pairs'      && <PairsTab data={data}/>}
       {sub==='sim'        && <SimTab data={data}/>}
       {sub==='crystal'    && <CrystalBallTab embedded/>}
+      {sub==='top3'       && <TopThreeTab/>}
       {sub==='barrellab'  && <BarrelLabTab/>}
       {sub==='onbase'     && <OnBaseTab/>}
       {sub==='avoid'      && <AvoidListTab/>}
