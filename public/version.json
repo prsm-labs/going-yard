@@ -1,11 +1,8 @@
 {
   "version": "2026.08.04",
-  "bundleFile": "index-D9BG21oP.js",
+  "bundleFile": "index-CIbDp6EA.js",
   "changelog": [
-    "Yard Bot quick pass: matchupScore/trueHR",
-    "Sauce tiers",
-    "Bullpen Rank",
-    "Hand Match"
+    "Add Top 3 Tonight: deterministic top-3 matchups tab with real Claude-narrated Scouting Notes"
   ],
   "notifyUsers": true
 }

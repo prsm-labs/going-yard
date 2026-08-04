@@ -30657,11 +30657,19 @@ function TopThreeTab() {
   // what keeps re-selection free: a batter re-entering the top 3 (lineup
   // churn that nets out to the same picks) never re-triggers a real call.
   useEffect(() => {
-    top3.forEach(r => {
+    top3.forEach((r, i) => {
       const bid = parseInt(r.batter_id) || 0;
       const pid = parseInt(r.pitcher_id) || 0;
       if (!bid || !pid) return;
       const key = `${bid}_${pid}`;
+      // Tells the note why this batter was picked (2026-08-04) — the
+      // formula and the note are built from genuinely different data (season-
+      // length composite vs. last-10-real-batted-ball recency window), so
+      // they can legitimately disagree. Without this, the note has no idea
+      // it's describing a "top pick" and can't flag that tension when it
+      // exists — see buildPrompt()'s own comment in
+      // api/batter-scouting-note.js for the system-prompt half of this fix.
+      const selectionContext = `Ranked #${i+1} in tonight's Top 3 by a season-length matchup composite — TrueHRScore ${Math.round(r.trueHRScore)}/100, MatchupScore ${Math.round(r.matchupScore)}/100${r.bullpenTier ? `, opposing bullpen: ${r.bullpenTier}` : ''}${r.sauce ? `, Sauce ${r.sauce} tier` : ''}. This ranking is NOT based on the recent-form data below.`;
       setNotes(n => {
         if (n[key]) return n;
         fetch('/api/batter-scouting-note', {
@@ -30673,6 +30681,7 @@ function TopThreeTab() {
             pitcherGrade: getHandSpecificGrade(r),
             gameId: r.game_id || null,
             isHomeToday: !!(r.batting_team && r.home_team && r.batting_team === r.home_team),
+            selectionContext,
           }),
         }).then(res => res.json().then(data => ({ ok: res.ok, data })))
           .then(({ ok, data }) => setNotes(n2 => ({ ...n2,
@@ -30843,6 +30852,17 @@ function TopThreeTab() {
                           {noteState.data.note}
                         </div>
                       )}
+                      {/* Raw verified stats behind the note above (2026-08-04) — shown
+                          regardless of what the prose says, so a "sounds mixed" note
+                          can be checked against the real numbers directly instead of
+                          only trusting Claude's summary of them. */}
+                      {noteState?.data?.stats && (
+                        <div style={{marginTop:5,paddingTop:5,borderTop:'1px solid rgba(255,255,255,.08)',
+                          fontFamily:mono,fontSize:7,color:'var(--muted)',lineHeight:1.5}}
+                          title={`Based on the batter's last ${noteState.data.stats.l10BBE} real batted-ball events`}>
+                          L{noteState.data.stats.l10BBE}: {noteState.data.stats.barrelPct}% Barrel · {noteState.data.stats.fbPct}% FB · {noteState.data.stats.pullPct}% Pull · {noteState.data.stats.farBallCount} balls 350ft+
+                        </div>
+                      )}
                     </div>
 
                     <div style={{display:'flex',justifyContent:'center'}}>
@@ -30865,6 +30885,7 @@ function TopThreeTab() {
       {showHelp && <HelpSlideout title="🎯 Top 3 Tonight Guide" onClose={()=>setShowHelp(false)} items={[
         ['How it works', 'Deterministic — not random. Every eligible batter on today\'s slate (excluding anyone facing a Tough or Elite pitcher outright) is ranked by TrueHRScore (pool-normalized, the exact same formula Daily Barrel uses) and MatchupScore (pitcher/PS-Score/platoon-weighted), with bonuses for an already-validated Sauce tier and a favorable Bullpen Tier. The literal top 3 by that composite score are shown.'],
         ['📝 The Analysis', 'A short, Claude-narrated note built from each batter\'s real last-10 batted-ball events, fly-ball rate by the pitcher\'s actual pitch mix, and recent at-bats matched to tonight\'s real day/night + home/away context — the same tool available on any batter\'s own slideout. Claude never invents a number; every stat in the note is pre-verified server-side first.'],
+        ['When the score and note disagree', 'The ranking (TrueHRScore/MatchupScore) and the note are built from genuinely different data — season-length composite vs. the batter\'s last 10 real batted-ball events — so they can legitimately point different directions. Claude is told which batter it\'s describing and why it was ranked, and is explicitly instructed to name that tension rather than sound artificially bullish. The raw numbers (Barrel%/FB%/Pull%/350ft+ count) behind every note are also shown below it so you can check for yourself.'],
         ['Updates automatically', 'Re-ranks itself the moment lineups shift enough to change who the real top 3 is. Only a newly-added pick triggers a fresh analysis — anyone still in the top 3 reuses the same 20-hour cache, so this never re-generates unnecessarily.'],
         ['Not the same as Crystal Ball', 'Crystal Ball draws a random pick per tier for fun. This tab is the opposite — the literal best 3 matchups today, ranked, no randomness.'],
       ]}/>}

@@ -237,7 +237,7 @@ function computeStats(events, batterHand, pitcherHand, arsenal, todayContext) {
   };
 }
 
-function buildPrompt({ batterName, pitcherName, pitcherGrade, batterHand, pitcherHand, arsenal, stats }) {
+function buildPrompt({ batterName, pitcherName, pitcherGrade, batterHand, pitcherHand, arsenal, stats, selectionContext }) {
   const arsenalStr = arsenal.map(a => `${a.name} (${a.pct}%)`).join(', ');
   const byPitchStr = stats.byPitchFB.length
     ? stats.byPitchFB.map(p => `${p.fbPct}% FB rate vs ${p.pitch} (n=${p.n})`).join('; ')
@@ -251,12 +251,12 @@ function buildPrompt({ batterName, pitcherName, pitcherGrade, batterHand, pitche
     ? `${stats.mixContextDistances.length} recent at-bats vs this pitch mix in ${stats.mixContextLabel}, batted-ball distances: ${stats.mixContextDistances.join('ft, ')}ft`
     : `no recent at-bats vs this specific pitch mix on record (checked: ${stats.mixContextLabel})`;
 
-  const system = `You are writing a terse, factual scouting note for a baseball betting/DFS tool. You will be given a fixed set of real, pre-verified statistics. Write 2-4 sentences using ONLY the numbers provided below — never introduce, estimate, or infer any statistic not explicitly given, including the specific game context (day/night, home/away) the "at-bats vs this pitch mix" figure is drawn from — state exactly what's given, do not assume it's a night game or a home game unless the data says so. If a data point is marked unavailable, do not mention it or make one up. Be direct and concise, matchup-analyst tone, no hedging filler like "it's worth noting." Always mention the pitcher's grade for balance — do not write a purely bullish note about a batter facing a Tough or Elite pitcher without saying so.`;
+  const system = `You are writing a terse, factual scouting note for a baseball betting/DFS tool. You will be given a fixed set of real, pre-verified statistics. Write 2-4 sentences using ONLY the numbers provided below — never introduce, estimate, or infer any statistic not explicitly given, including the specific game context (day/night, home/away) the "at-bats vs this pitch mix" figure is drawn from — state exactly what's given, do not assume it's a night game or a home game unless the data says so. If a data point is marked unavailable, do not mention it or make one up. Be direct and concise, matchup-analyst tone, no hedging filler like "it's worth noting." Always mention the pitcher's grade for balance — do not write a purely bullish note about a batter facing a Tough or Elite pitcher without saying so.${selectionContext ? ` A "Selection context" line will also be given, explaining why this batter was picked (typically a season-length composite score, not today's recent form). If the recent batted-ball stats below don't clearly support that reasoning — e.g. a low/0% barrel rate, few long fly balls, a cold-looking recent stretch — say so plainly and name that tension directly (e.g. "ranked on season form, but recent contact has been quiet"). Do not write an artificially bullish note just because the batter was already selected as a pick — the note's job is to report what the recent data actually shows, even when that cuts against the selection.` : ''}`;
 
   const user = `Batter: ${batterName} (bats ${batterHand})
 Opposing pitcher: ${pitcherName} (throws ${pitcherHand}, grade: ${pitcherGrade || 'unknown'})
 Pitcher's real arsenal (>=8% usage): ${arsenalStr || 'unavailable'}
-
+${selectionContext ? `\nSelection context: ${selectionContext}\n` : ''}
 Batter's last ${stats.l10BBE} real batted-ball events: ${stats.barrelPct}% Barrel, ${stats.fbPct}% Fly Ball, ${stats.pullPct}% Pull, ${stats.farBallCount} balls hit 350ft+.
 Batter's fly-ball rate by pitch type (recent games, larger sample): ${byPitchStr}.
 Batter vs this exact pitch mix, matched to today's real game context: ${mixStr}.
@@ -269,12 +269,18 @@ Write the scouting note now.`;
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { batterId, pitcherId, batterName, pitcherName, batterHand, pitcherHand, pitcherGrade, gameId, isHomeToday } = req.body || {};
+  const { batterId, pitcherId, batterName, pitcherName, batterHand, pitcherHand, pitcherGrade, gameId, isHomeToday, selectionContext } = req.body || {};
   if (!batterId || !pitcherId) return res.status(400).json({ error: 'batterId and pitcherId required' });
 
   const season = new Date().getFullYear();
   const etDate = getETDateStr();
-  const cacheKey = `scoutnote:${batterId}:${pitcherId}:${etDate}`;
+  // 2026-08-04: selectionContext changes both the system prompt (adds the
+  // tension-naming instruction) and the user prompt (adds the "Selection
+  // context" line), so it must be part of the cache key — otherwise whichever
+  // caller (the plain batter-slideout note vs. Top 3 Tonight's tension-aware
+  // one) generates first for a given batter/pitcher/date silently poisons the
+  // cache for the other, serving back a note written under the wrong prompt.
+  const cacheKey = `scoutnote:${batterId}:${pitcherId}:${etDate}${selectionContext ? ':sel' : ''}`;
 
   let redis = null;
   if (process.env.UPSTASH_KV_REST_API_URL && process.env.UPSTASH_KV_REST_API_TOKEN) {
@@ -310,7 +316,7 @@ export default async function handler(req, res) {
       return res.status(200).json(thin); // not enough recent contact — don't force a writeup, don't cache a null result
     }
 
-    const { system, user } = buildPrompt({ batterName, pitcherName, pitcherGrade, batterHand, pitcherHand, arsenal, stats });
+    const { system, user } = buildPrompt({ batterName, pitcherName, pitcherGrade, batterHand, pitcherHand, arsenal, stats, selectionContext });
 
     const anthRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
