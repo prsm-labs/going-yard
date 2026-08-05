@@ -16343,6 +16343,12 @@ function SimLabView({ data }) {
     return list;
   }, [data]);
 
+  // Weather-based card coloring for the matchup card row below (2026-08-05)
+  // — built from `data` (unfiltered by game selection), same source
+  // matchupList itself uses, since the cards ARE the game selector and must
+  // all stay visible/colorable regardless of which one is currently chosen.
+  const gameWeatherMap = useMemo(() => buildGameWeatherMap(data), [data]);
+
   // Sort and filter the slate
   const SORT_OPTS = [
     { key: 'proj_hr_adj',  label: 'HR Prob%' },
@@ -17585,19 +17591,27 @@ function SimLabView({ data }) {
             {matchupList.map(m => {
               const sel = selMatchups.size === 1 && selMatchups.has(m.id);
               const fin = FINAL_GAME_IDS.has(String(m.id));
+              // Weather-based card coloring (2026-08-05) — the selected-state
+              // orange highlight always wins (selection needs to stay the
+              // clearest signal on the card); the weather tint only shows as
+              // the base background/border when NOT selected.
+              const wg = gameWeatherMap[m.id];
+              const wc = wg ? getWeatherCardColor(wg) : null;
               return (
                 <button key={m.id} onClick={() => setSelMatchups(new Set([m.id]))}
+                  title={wc ? `${wc.icon} ${wc.label}` : undefined}
                   style={{ minWidth: 110, flex: '0 0 auto', padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
-                    border: `1px solid ${sel ? 'var(--accent)' : 'var(--border)'}`,
-                    background: sel ? 'rgba(255,153,0,.10)' : 'var(--surface2)',
+                    border: `1px solid ${sel ? 'var(--accent)' : (wc ? wc.border : 'var(--border)')}`,
+                    background: sel ? 'rgba(255,153,0,.10)' : (wc ? wc.bg : 'var(--surface2)'),
                     textAlign: 'center', opacity: fin ? 0.55 : 1 }}>
                   <div style={{ fontFamily: "'Oswald',sans-serif", fontSize: 11, fontWeight: 700,
                     color: sel ? 'var(--accent)' : 'var(--text)', letterSpacing: .6 }}>
+                    {wc && !sel && <span style={{marginRight:4}}>{wc.icon}</span>}
                     {m.away} @ {m.home}
                   </div>
                   <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 8,
-                    color: sel ? 'rgba(255,153,0,.7)' : 'var(--muted)', marginTop: 2 }}>
-                    {fin ? 'FINAL' : (m.time || '')}
+                    color: sel ? 'rgba(255,153,0,.7)' : (wc ? wc.text : 'var(--muted)'), marginTop: 2 }}>
+                    {fin ? 'FINAL' : (wc && !sel ? wc.label : (m.time || ''))}
                   </div>
                 </button>
               );
@@ -33426,6 +33440,85 @@ function getRainRiskTier(r) {
   return null;
 }
 
+// ── buildGameWeatherMap — normalized per-game weather, shared by WeatherStrip
+// (Barrel Lab/On Base) and Arsenal Fit's own game-card row (2026-08-05) ──
+// Extracted out of WeatherStrip's own useMemo so both card UIs build the
+// identical per-game object from the same raw daily_picks.csv columns —
+// avoids a second, potentially-drifting copy of this extraction logic.
+function buildGameWeatherMap(rows) {
+  const byGid = {};
+  (rows || []).forEach(r => {
+    const gid = String(r.game_id || '');
+    if (!gid || byGid[gid]) return;
+    const hrfRaw = r.hr_factor_int;
+    const hrf = (hrfRaw !== undefined && hrfRaw !== '' && !isNaN(parseFloat(hrfRaw)))
+      ? Math.round(parseFloat(hrfRaw))
+      : Math.round((parseFloat(r.hr_factor) || 1) * 100);
+    byGid[gid] = {
+      gid,
+      // FIXED 2026-07-28: label used to be built from a Set of
+      // batting_team values seen across whichever rows survived the
+      // current filter/sort — Sets preserve INSERTION order, so the
+      // label flipped (CIN@CLE vs CLE@CIN) whenever the row order
+      // changed, and collapsed to a single team name whenever a filter
+      // happened to leave zero batters from the other side. home_team/
+      // away_team are stable per-game fields on every row regardless of
+      // which batters are currently filtered in, so the label no longer
+      // depends on row order or which subset of batters is visible.
+      away: r.away_team || '',
+      home: r.home_team || '',
+      temp: parseFloat(r.temp_f || 0),
+      windMph: parseFloat(r.wind_speed_mph || 0),
+      windEffect: (r.wind_effect || '').replace(/[↙↖↘⬅⬇↗⬆️]/g, '').trim(),
+      // getRainRiskPct() already handles the chance_of_rain_peak (2026-07-21
+      // fix) vs. single-hour chance_of_rain fallback — reused here rather
+      // than re-deriving the same fallback logic a second time.
+      rain: Math.round(getRainRiskPct(r)),
+      hrf,
+      // Dome games (2026-07-21) — temp/wind/rain are meaningless once
+      // the roof is closed, and the engine's forecast for them is real
+      // outdoor weather that doesn't apply. HR factor (park dimensions/
+      // elevation) is unaffected by roof status, so that still shows.
+      isDome: isDomeGame(r),
+    };
+  });
+  return byGid;
+}
+
+// ── Weather Card Coloring (2026-08-05) — shared classification for
+// WeatherStrip and Arsenal Fit's game-card row. Priority when a game
+// qualifies for more than one color (confirmed with user): Purple (rain/
+// postponement risk) > Green/Blue (double-digit-mph wind direction) > Red
+// (hot + hitter's park) > normal. Domes always render normal — reuses the
+// same isDomeGame() gate already established for weather-irrelevance
+// elsewhere (getRainRiskTier, WeatherStrip itself).
+//
+// No literal humidity input for "Red": WeatherAPI provides it, but
+// mlb_weather_report.py has never extracted it into daily_picks.csv — a
+// confirmed, still-open gap from the June 30, 2026 weather pipeline audit
+// (see CLAUDE.md). "Red" instead combines temp>=90F (the one temperature
+// threshold this project has actually validated against real outcomes —
+// 90F+ shows a real 1.18x HR-rate lift, every other range 50-89F is flat/
+// noisy) with a hitter-friendly park factor (hrf>=103, the same "amber"
+// cutoff WeatherStrip's own hrfColor() already uses for "hitter-friendly").
+const WEATHER_CARD_COLORS = {
+  purple: { bg: 'rgba(168,85,247,.16)', border: 'rgba(168,85,247,.55)', text: '#c084fc', icon: '☔', label: 'High Rain' },
+  green:  { bg: 'rgba(39,201,122,.16)', border: 'rgba(39,201,122,.55)', text: '#27c97a', icon: '💨', label: 'Wind Out 10+' },
+  blue:   { bg: 'rgba(56,184,242,.16)', border: 'rgba(56,184,242,.55)', text: '#38b8f2', icon: '🌬️', label: 'Wind In 10+' },
+  red:    { bg: 'rgba(255,64,32,.16)',  border: 'rgba(255,64,32,.55)',  text: '#ff4020', icon: '🔥', label: 'Hot + Hitter Park' },
+};
+
+function getWeatherCardColor(g) {
+  if (!g || g.isDome) return null;
+  if (g.rain >= 50) return WEATHER_CARD_COLORS.purple;
+  if (g.windMph >= 10) {
+    if (/\bOut\b/i.test(g.windEffect)) return WEATHER_CARD_COLORS.green;
+    if (/\bIn\b/i.test(g.windEffect))  return WEATHER_CARD_COLORS.blue;
+  }
+  if (g.temp >= 90 && g.hrf >= 103) return WEATHER_CARD_COLORS.red;
+  return null;
+}
+
 // ── WeatherStrip — brief per-game weather reference for Barrel Lab / On Base ──
 // Neither tab showed weather anywhere before this (confirmed absent via grep).
 // Sourced directly from daily_picks.csv's own weather columns (temp_f,
@@ -33438,47 +33531,7 @@ function getRainRiskTier(r) {
 // falls back to hr_factor*100 if a pipeline run predates that column.
 function WeatherStrip({ rows }) {
   const games = React.useMemo(() => {
-    const byGid = {};
-    (rows || []).forEach(r => {
-      const gid = String(r.game_id || '');
-      if (!gid) return;
-      if (!byGid[gid]) {
-        const hrfRaw = r.hr_factor_int;
-        const hrf = (hrfRaw !== undefined && hrfRaw !== '' && !isNaN(parseFloat(hrfRaw)))
-          ? Math.round(parseFloat(hrfRaw))
-          : Math.round((parseFloat(r.hr_factor) || 1) * 100);
-        byGid[gid] = {
-          gid,
-          // FIXED 2026-07-28: label used to be built from a Set of
-          // batting_team values seen across whichever rows survived the
-          // current filter/sort — Sets preserve INSERTION order, so the
-          // label flipped (CIN@CLE vs CLE@CIN) whenever the row order
-          // changed, and collapsed to a single team name whenever a filter
-          // happened to leave zero batters from the other side. home_team/
-          // away_team are stable per-game fields on every row regardless of
-          // which batters are currently filtered in, so the label no longer
-          // depends on row order or which subset of batters is visible.
-          away: r.away_team || '',
-          home: r.home_team || '',
-          temp: parseFloat(r.temp_f || 0),
-          windMph: parseFloat(r.wind_speed_mph || 0),
-          windEffect: (r.wind_effect || '').replace(/[↙↖↘⬅⬇↗⬆️]/g, '').trim(),
-          // chance_of_rain_peak (2026-07-21 fix) — max rain% across the
-          // game's ~3hr window, not just the first-pitch hour. Falls back
-          // to the old single-hour chance_of_rain until the next
-          // matchup_engine.py run populates the new column.
-          rain: (r.chance_of_rain_peak !== undefined && r.chance_of_rain_peak !== '' && !isNaN(parseFloat(r.chance_of_rain_peak)))
-            ? parseInt(r.chance_of_rain_peak)
-            : parseInt(r.chance_of_rain || 0),
-          hrf,
-          // Dome games (2026-07-21) — temp/wind/rain are meaningless once
-          // the roof is closed, and the engine's forecast for them is real
-          // outdoor weather that doesn't apply. HR factor (park dimensions/
-          // elevation) is unaffected by roof status, so that still shows.
-          isDome: isDomeGame(r),
-        };
-      }
-    });
+    const byGid = buildGameWeatherMap(rows);
     return Object.values(byGid)
       .map(g => ({ ...g, label: (g.away && g.home) ? `${g.away}@${g.home}` : (g.away || g.home || '—') }))
       .sort((a, b) => b.hrf - a.hrf);
@@ -33491,13 +33544,16 @@ function WeatherStrip({ rows }) {
 
   return (
     <div style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:8,marginBottom:12}}>
-      {games.map(g => (
+      {games.map(g => {
+        const wc = getWeatherCardColor(g);
+        return (
         <div key={g.gid}
           title={g.isDome
             ? `${g.label} — 🏟️ Dome/retractable roof, forecast weather doesn't apply · HR factor ${g.hrf}`
-            : `${g.label} — ${g.temp ? g.temp.toFixed(0)+'°F' : '?'} · ${g.windEffect || 'calm'}${g.windMph ? ' '+g.windMph.toFixed(0)+'mph' : ''} · ${g.rain}% rain chance · HR factor ${g.hrf}`}
-          style={{flexShrink:0,padding:'4px 8px',borderRadius:6,background:'var(--surface2)',
-            border:'1px solid var(--border)',fontFamily:"'DM Mono',monospace",fontSize:8,whiteSpace:'nowrap'}}>
+            : `${g.label} — ${g.temp ? g.temp.toFixed(0)+'°F' : '?'} · ${g.windEffect || 'calm'}${g.windMph ? ' '+g.windMph.toFixed(0)+'mph' : ''} · ${g.rain}% rain chance · HR factor ${g.hrf}${wc ? ' · '+wc.label : ''}`}
+          style={{flexShrink:0,padding:'4px 8px',borderRadius:6,background:wc ? wc.bg : 'var(--surface2)',
+            border:`1px solid ${wc ? wc.border : 'var(--border)'}`,fontFamily:"'DM Mono',monospace",fontSize:8,whiteSpace:'nowrap'}}>
+          {wc && <span style={{marginRight:4}}>{wc.icon}</span>}
           <span style={{color:'var(--text)',fontWeight:700}}>{g.label}</span>
           {g.isDome ? (
             <span style={{marginLeft:6,color:'var(--muted)'}}>🏟️ Dome</span>
@@ -33508,7 +33564,8 @@ function WeatherStrip({ rows }) {
           </>)}
           <span style={{marginLeft:6,color:hrfColor(g.hrf),fontWeight:700}}>HRF {g.hrf}</span>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

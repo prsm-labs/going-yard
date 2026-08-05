@@ -1,10 +1,10 @@
 {
   "version": "2026.08.05",
-  "bundleFile": "index-J6LOjgnH.js",
+  "bundleFile": "index-ixKTJDPU.js",
   "changelog": [
-    "Top 3 Tonight: reconcile formula vs. note disagreement",
-    "surface raw stats",
-    "fix cache key collision"
+    "Add Hide Avoid List filter to Arsenal Fit",
+    "Barrel Lab",
+    "On Base"
   ],
   "notifyUsers": true
 }
