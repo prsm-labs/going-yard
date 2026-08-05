@@ -16174,6 +16174,7 @@ function SimLabView({ data }) {
   const [afSauce25Only,   setAfSauce25Only]   = useState(false);
   const [afBullpenTiers,  setAfBullpenTiers]  = useState(() => new Set());
   const [afAvoidOnly,     setAfAvoidOnly]     = useState(false);
+  const [afHideAvoid,     setAfHideAvoid]     = useState(false);
   const [afHandMatchOnly, setAfHandMatchOnly] = useState(false);
   const [afMinL7Iso, setAfMinL7Iso] = useState('');
   const [afMinIso,   setAfMinIso]   = useState('');
@@ -16484,6 +16485,7 @@ function SimLabView({ data }) {
       .filter(r => !afSauce25Only   || r.isSauce25)
       .filter(r => afBullpenTiers.size === 0 || afBullpenTiers.has(bullpenTierLabel(r.bullpen_hr_rank)))
       .filter(r => !afAvoidOnly     || r.isAvoid)
+      .filter(r => !afHideAvoid     || !r.isAvoid)
       .filter(r => !afHandMatchOnly || r.handMatchTier)
       .filter(r => afMinL7Iso === '' || parseFloat(r.recent_iso||0)    >= parseFloat(afMinL7Iso))
       .filter(r => afMinIso   === '' || parseFloat(r.bvp_iso||0)       >= parseFloat(afMinIso))
@@ -16495,7 +16497,7 @@ function SimLabView({ data }) {
       if (va > vb) return afSortDir === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [slate, afSortBy, afSortDir, afChalkOnly, afDayLateOnly, afYoungGunsOnly, afSauce3Only, afSauce25Only, afBullpenTiers, afAvoidOnly, afHandMatchOnly, afMinL7Iso, afMinIso, afMinL7Ev, afMinEv, afDayLateVer, afPlayerVer]);
+  }, [slate, afSortBy, afSortDir, afChalkOnly, afDayLateOnly, afYoungGunsOnly, afSauce3Only, afSauce25Only, afBullpenTiers, afAvoidOnly, afHideAvoid, afHandMatchOnly, afMinL7Iso, afMinIso, afMinL7Ev, afMinEv, afDayLateVer, afPlayerVer]);
 
   // Reset row cap when filters/sort change so user always sees top results
   useEffect(() => { setDisplayLimit(150); }, [sortBy, sortDir, selMatchups, lineupOnly, simActiveOnly, simSearch, filterKeyMatchup, slotMin, slotMax]);
@@ -17669,6 +17671,9 @@ function SimLabView({ data }) {
                 { key: 'avoid',     label: '🚫 Avoid List',      active: afAvoidOnly,      color: '#ff6b6b',
                   title: "Avoid List — Sim H<=0.6 AND SwStr%>=19% AND (same-hand OR Tough/Elite pitcher). Full-season backtest: 58-61% miss rate vs 42.6% baseline, 1.4x lift. Filter-only, no badge.",
                   onToggle: () => setAfAvoidOnly(v => !v) },
+                { key: 'hideavoid', label: '🙈 Hide Avoid List', active: afHideAvoid,      color: '#ff6b6b',
+                  title: "Removes Avoid List batters from view entirely — the inverse of the Avoid List toggle above, for browsing the rest of the slate without them cluttering it.",
+                  onToggle: () => setAfHideAvoid(v => !v) },
                 { key: 'picks',     label: '🎯 My Picks',        active: simPicksOnly,     color: 'var(--accent2)', onToggle: () => setSimPicksOnly(v => !v) },
                 { key: 'goneyard',  label: '💥 Gone Yard Today', active: filterGoneYardSim, color: 'var(--accent)', onToggle: () => setFilterGoneYardSim(v => !v) },
                 { key: 'tb2',       label: '2️⃣ 2+ TB Today',     active: filterTB2Sim,     color: '#38b8f2',    onToggle: () => setFilterTB2Sim(v => !v) },
@@ -33769,6 +33774,7 @@ function BarrelLabTab() {
   const [blSecretSauceOnly,setBlSecretSauceOnly]= useState(false);
   const [blBullpenTiers,   setBlBullpenTiers]   = useState(() => new Set());
   const [blAvoidOnly,      setBlAvoidOnly]      = useState(false);
+  const [blHideAvoid,      setBlHideAvoid]      = useState(false);
   const [blBatterHand,     setBlBatterHand]     = useState('ALL');
   const [blPitcherGrades,  setBlPitcherGrades]  = useState(() => new Set());
   // Arsenal Fit min-value filters (2026-07-30) — plain text (number) boxes in the Filters
@@ -34036,13 +34042,14 @@ function BarrelLabTab() {
     .filter(r => blPitcherGrades.size === 0 || blPitcherGrades.has((r.pitcher_grade_label||r._pgLabel||'').trim()))
     .filter(r => blBullpenTiers.size === 0 || blBullpenTiers.has(bullpenTierLabel(r.bullpen_hr_rank)))
     .filter(r => !blAvoidOnly || r.isAvoid)
+    .filter(r => !blHideAvoid || !r.isAvoid)
     .filter(r => matchesHandFilter(r.batter_hand, blBatterHand))
     .filter(r => blMinL7Iso === '' || parseFloat(r.recent_iso||0)   >= parseFloat(blMinL7Iso))
     .filter(r => blMinIso   === '' || parseFloat(r.bvp_iso||0)      >= parseFloat(blMinIso))
     .filter(r => blMinL7Ev  === '' || parseFloat(r.recent_avg_ev||0) >= parseFloat(blMinL7Ev))
     .filter(r => blMinEv    === '' || parseFloat(r.bvp_avg_ev||0)    >= parseFloat(blMinEv))
     .sort((a, b) => b.trueHRScore - a.trueHRScore);
-  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, blChalkOnly, blDayLateOnly, blYoungGunsOnly, blPicksOnly, picks, blGoneYardOnly, blTB2Only, blHighIQOnly, blHandMatchOnly, blSauce3Only, blSauce25Only, blHitSignalOnly, blSecretSauceOnly, blBullpenTiers, blAvoidOnly, blBatterHand, blPitcherGrades, blMinL7Iso, blMinIso, blMinL7Ev, blMinEv, hrVer, finalVer, dayLateVer, playerVer, ballStateVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, blChalkOnly, blDayLateOnly, blYoungGunsOnly, blPicksOnly, picks, blGoneYardOnly, blTB2Only, blHighIQOnly, blHandMatchOnly, blSauce3Only, blSauce25Only, blHitSignalOnly, blSecretSauceOnly, blBullpenTiers, blAvoidOnly, blHideAvoid, blBatterHand, blPitcherGrades, blMinL7Iso, blMinIso, blMinL7Ev, blMinEv, hrVer, finalVer, dayLateVer, playerVer, ballStateVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Color threshold helpers
   const clr = (v, g1, g2, y1, y2) => {
@@ -34337,6 +34344,9 @@ function BarrelLabTab() {
                 {key:'avoid',     label:'🚫 Avoid List',        active:blAvoidOnly,     color:'#ff6b6b',
                   title:"Avoid List — Sim H<=0.6 AND SwStr%>=19% AND (same-hand OR Tough/Elite pitcher). Full-season backtest: 58-61% miss rate vs 42.6% baseline, 1.4x lift, validated cleanly train/test. Filter-only, no badge.",
                   onToggle:()=>setBlAvoidOnly(v=>!v)},
+                {key:'hideavoid', label:'🙈 Hide Avoid List',   active:blHideAvoid,     color:'#ff6b6b',
+                  title:"Removes Avoid List batters from view entirely — the inverse of the Avoid List toggle above, for browsing the rest of the slate without them cluttering it.",
+                  onToggle:()=>setBlHideAvoid(v=>!v)},
                 {key:'picks',     label:'🎯 My Picks',          active:blPicksOnly,     color:'var(--accent2)', onToggle:()=>setBlPicksOnly(v=>!v)},
                 {key:'goneyard',  label:'💥 Gone Yard Today',   active:blGoneYardOnly,  color:'var(--accent)', onToggle:()=>setBlGoneYardOnly(v=>!v)},
                 {key:'tb2',       label:'2️⃣ 2+ TB Today',       active:blTB2Only,       color:'#38b8f2', onToggle:()=>setBlTB2Only(v=>!v)},
@@ -35043,6 +35053,7 @@ function OnBaseTab() {
   const [obSecretSauceOnly,setObSecretSauceOnly]= useState(false);
   const [obBullpenTiers,   setObBullpenTiers]   = useState(() => new Set());
   const [obAvoidOnly,      setObAvoidOnly]      = useState(false);
+  const [obHideAvoid,      setObHideAvoid]      = useState(false);
   const [obBatterHand,     setObBatterHand]     = useState('ALL');
   const [obPitcherGrades,  setObPitcherGrades]  = useState(() => new Set());
   // Arsenal Fit min-value filters (2026-07-30) — same as BarrelLabTab's identical block.
@@ -35250,13 +35261,14 @@ function OnBaseTab() {
     .filter(r => obPitcherGrades.size === 0 || obPitcherGrades.has((r.pitcher_grade_label||r._pgLabel||'').trim()))
     .filter(r => obBullpenTiers.size === 0 || obBullpenTiers.has(bullpenTierLabel(r.bullpen_hr_rank)))
     .filter(r => !obAvoidOnly || r.isAvoid)
+    .filter(r => !obHideAvoid || !r.isAvoid)
     .filter(r => matchesHandFilter(r.batter_hand, obBatterHand))
     .filter(r => obMinL7Iso === '' || parseFloat(r.recent_iso||0)   >= parseFloat(obMinL7Iso))
     .filter(r => obMinIso   === '' || parseFloat(r.bvp_iso||0)      >= parseFloat(obMinIso))
     .filter(r => obMinL7Ev  === '' || parseFloat(r.recent_avg_ev||0) >= parseFloat(obMinL7Ev))
     .filter(r => obMinEv    === '' || parseFloat(r.bvp_avg_ev||0)    >= parseFloat(obMinEv))
     .sort((a, b) => b.onBaseScore - a.onBaseScore);
-  }, [eligibleBatters, simResults, obHideFinal, obLongshotOnly, obChalkOnly, obDayLateOnly, obYoungGunsOnly, obPicksOnly, obGoneYardOnly, obTB2Only, obHighIQOnly, obHandMatchOnly, obSauce3Only, obSauce25Only, obHitSignalOnly, obSecretSauceOnly, obBullpenTiers, obAvoidOnly, obBatterHand, obPitcherGrades, obMinL7Iso, obMinIso, obMinL7Ev, obMinEv, picks, finalVer, hrVer, dayLateVer, playerVer, ballStateVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [eligibleBatters, simResults, obHideFinal, obLongshotOnly, obChalkOnly, obDayLateOnly, obYoungGunsOnly, obPicksOnly, obGoneYardOnly, obTB2Only, obHighIQOnly, obHandMatchOnly, obSauce3Only, obSauce25Only, obHitSignalOnly, obSecretSauceOnly, obBullpenTiers, obAvoidOnly, obHideAvoid, obBatterHand, obPitcherGrades, obMinL7Iso, obMinIso, obMinL7Ev, obMinEv, picks, finalVer, hrVer, dayLateVer, playerVer, ballStateVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const byTeam = useMemo(() => {
     const teams = {};
@@ -35532,6 +35544,9 @@ function OnBaseTab() {
                 {key:'avoid',     label:'🚫 Avoid List',        active:obAvoidOnly,     color:'#ff6b6b',
                   title:"Avoid List — Sim H<=0.6 AND SwStr%>=19% AND (same-hand OR Tough/Elite pitcher). Full-season backtest: 58-61% miss rate vs 42.6% baseline, 1.4x lift, validated cleanly train/test. Filter-only, no badge.",
                   onToggle:()=>setObAvoidOnly(v=>!v)},
+                {key:'hideavoid', label:'🙈 Hide Avoid List',   active:obHideAvoid,     color:'#ff6b6b',
+                  title:"Removes Avoid List batters from view entirely — the inverse of the Avoid List toggle above, for browsing the rest of the slate without them cluttering it.",
+                  onToggle:()=>setObHideAvoid(v=>!v)},
                 {key:'picks',     label:'🎯 My Picks',          active:obPicksOnly,     color:'var(--accent2)', onToggle:()=>setObPicksOnly(v=>!v)},
                 {key:'goneyard',  label:'💥 Gone Yard Today',   active:obGoneYardOnly,  color:'var(--accent)', onToggle:()=>setObGoneYardOnly(v=>!v)},
                 {key:'tb2',       label:'2️⃣ 2+ TB Today',       active:obTB2Only,       color:'#38b8f2', onToggle:()=>setObTB2Only(v=>!v)},

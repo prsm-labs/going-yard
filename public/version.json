@@ -1,8 +1,10 @@
 {
-  "version": "2026.08.04",
-  "bundleFile": "index-CIbDp6EA.js",
+  "version": "2026.08.05",
+  "bundleFile": "index-J6LOjgnH.js",
   "changelog": [
-    "Add Top 3 Tonight: deterministic top-3 matchups tab with real Claude-narrated Scouting Notes"
+    "Top 3 Tonight: reconcile formula vs. note disagreement",
+    "surface raw stats",
+    "fix cache key collision"
   ],
   "notifyUsers": true
 }
