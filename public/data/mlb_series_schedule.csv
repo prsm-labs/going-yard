@@ -1,27 +1,27 @@
 Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitcher ID (Away),Game ID,Venue ID,Venue Name,Day of Week,Day Abbr,Series Game #,Games in Series,Series Position,Day Context
-2026-08-05,02:10 PM,HOU,TOR,686613.0,592791.0,824158,2392,Daikin Park,Wednesday,Wed,3,3,Finale,~ Neutral
-2026-08-05,02:20 PM,CHC,LAD,684007.0,641778.0,824646,17,Wrigley Field,Wednesday,Wed,3,3,Finale,~ Neutral
-2026-08-05,02:35 PM,TEX,SF,674003.0,687931.0,822866,5325,Globe Life Field,Wednesday,Wed,3,3,Finale,~ Neutral
-2026-08-05,03:10 PM,COL,TB,608372.0,607259.0,824322,19,Coors Field,Wednesday,Wed,3,3,Finale,~ Neutral
-2026-08-05,06:35 PM,BAL,LAA,669432.0,672282.0,824806,2,Oriole Park at Camden Yards,Wednesday,Wed,2,3,Middle,~ Neutral
-2026-08-05,06:40 PM,CLE,NYM,676440.0,681035.0,824402,5,Progressive Field,Wednesday,Wed,2,3,Middle,~ Neutral
-2026-08-05,06:40 PM,CIN,ATH,695076.0,682052.0,824482,2602,Great American Ball Park,Wednesday,Wed,2,3,Middle,~ Neutral
-2026-08-05,06:40 PM,PHI,WSH,691725.0,663623.0,823429,2681,Citizens Bank Park,Wednesday,Wed,3,4,Middle,~ Neutral
-2026-08-05,07:05 PM,NYY,STL,701542.0,669467.0,823516,3313,Yankee Stadium,Wednesday,Wed,3,3,Finale,~ Neutral
-2026-08-05,07:10 PM,BOS,CWS,543243.0,680732.0,824728,3,Fenway Park,Wednesday,Wed,2,3,Middle,~ Neutral
-2026-08-05,07:15 PM,ATL,MIA,693821.0,691587.0,824889,4705,Truist Park,Wednesday,Wed,2,3,Middle,~ Neutral
-2026-08-05,07:40 PM,KC,MIN,702070.0,665152.0,824082,7,Kauffman Stadium,Wednesday,Wed,2,3,Middle,~ Neutral
-2026-08-05,07:40 PM,MIL,PIT,690986.0,694973.0,823753,32,American Family Field,Wednesday,Wed,3,4,Middle,~ Neutral
-2026-08-05,09:40 PM,AZ,SD,683352.0,663554.0,825052,15,Chase Field,Wednesday,Wed,3,4,Middle,~ Neutral
-2026-08-05,09:40 PM,SEA,DET,693433.0,623454.0,823106,680,T-Mobile Park,Wednesday,Wed,2,3,Middle,~ Neutral
-2026-08-06,12:35 PM,BAL,LAA,687064.0,,824804,2,Oriole Park at Camden Yards,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
-2026-08-06,12:40 PM,CIN,ATH,668881.0,686930.0,824481,2602,Great American Ball Park,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
-2026-08-06,01:10 PM,CLE,NYM,656492.0,690997.0,824401,5,Progressive Field,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
-2026-08-06,02:10 PM,MIL,PIT,669160.0,677952.0,823754,32,American Family Field,Thursday,Thu,4,4,Finale,✅ Best Day (getaway)
-2026-08-06,02:20 PM,CHC,TOR,,656302.0,824664,17,Wrigley Field,Thursday,Thu,1,1,Single Game,✅ Best Day (getaway)
-2026-08-06,04:10 PM,SEA,DET,682243.0,664285.0,823105,680,T-Mobile Park,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
-2026-08-06,06:05 PM,PHI,WSH,650911.0,,823430,2681,Citizens Bank Park,Thursday,Thu,4,4,Finale,✅ Best Day (getaway)
-2026-08-06,07:10 PM,BOS,CWS,624133.0,622491.0,824729,3,Fenway Park,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
-2026-08-06,07:15 PM,ATL,MIA,527048.0,676083.0,824885,4705,Truist Park,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
-2026-08-06,07:40 PM,KC,MIN,608379.0,641927.0,824080,7,Kauffman Stadium,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
-2026-08-06,09:40 PM,AZ,SD,684442.0,621111.0,825053,15,Chase Field,Thursday,Thu,4,4,Finale,✅ Best Day (getaway)
+2026-08-05,02:10 PM,HOU,TOR,686613,592791.0,824158,2392,Daikin Park,Wednesday,Wed,3,3,Finale,~ Neutral
+2026-08-05,02:20 PM,CHC,LAD,684007,641778.0,824646,17,Wrigley Field,Wednesday,Wed,3,3,Finale,~ Neutral
+2026-08-05,02:35 PM,TEX,SF,674003,687931.0,822866,5325,Globe Life Field,Wednesday,Wed,3,3,Finale,~ Neutral
+2026-08-05,03:10 PM,COL,TB,608372,607259.0,824322,19,Coors Field,Wednesday,Wed,3,3,Finale,~ Neutral
+2026-08-05,06:35 PM,BAL,LAA,669432,672282.0,824806,2,Oriole Park at Camden Yards,Wednesday,Wed,2,3,Middle,~ Neutral
+2026-08-05,06:40 PM,CLE,NYM,676440,681035.0,824402,5,Progressive Field,Wednesday,Wed,2,3,Middle,~ Neutral
+2026-08-05,06:40 PM,CIN,ATH,695076,682052.0,824482,2602,Great American Ball Park,Wednesday,Wed,2,3,Middle,~ Neutral
+2026-08-05,06:40 PM,PHI,WSH,691725,663623.0,823429,2681,Citizens Bank Park,Wednesday,Wed,3,4,Middle,~ Neutral
+2026-08-05,07:05 PM,NYY,STL,701542,669467.0,823516,3313,Yankee Stadium,Wednesday,Wed,3,3,Finale,~ Neutral
+2026-08-05,07:10 PM,BOS,CWS,543243,680732.0,824728,3,Fenway Park,Wednesday,Wed,2,3,Middle,~ Neutral
+2026-08-05,07:15 PM,ATL,MIA,693821,691587.0,824889,4705,Truist Park,Wednesday,Wed,2,3,Middle,~ Neutral
+2026-08-05,07:40 PM,KC,MIN,702070,665152.0,824082,7,Kauffman Stadium,Wednesday,Wed,2,3,Middle,~ Neutral
+2026-08-05,07:40 PM,MIL,PIT,690986,694973.0,823753,32,American Family Field,Wednesday,Wed,3,4,Middle,~ Neutral
+2026-08-05,09:40 PM,AZ,SD,683352,663554.0,825052,15,Chase Field,Wednesday,Wed,3,4,Middle,~ Neutral
+2026-08-05,09:40 PM,SEA,DET,693433,623454.0,823106,680,T-Mobile Park,Wednesday,Wed,2,3,Middle,~ Neutral
+2026-08-06,12:35 PM,BAL,LAA,687064,,824804,2,Oriole Park at Camden Yards,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
+2026-08-06,12:40 PM,CIN,ATH,668881,686930.0,824481,2602,Great American Ball Park,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
+2026-08-06,01:10 PM,CLE,NYM,656492,690997.0,824401,5,Progressive Field,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
+2026-08-06,02:10 PM,MIL,PIT,669160,677952.0,823754,32,American Family Field,Thursday,Thu,4,4,Finale,✅ Best Day (getaway)
+2026-08-06,02:20 PM,CHC,TOR,656849,656302.0,824664,17,Wrigley Field,Thursday,Thu,1,1,Single Game,✅ Best Day (getaway)
+2026-08-06,04:10 PM,SEA,DET,682243,664285.0,823105,680,T-Mobile Park,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
+2026-08-06,06:05 PM,PHI,WSH,650911,,823430,2681,Citizens Bank Park,Thursday,Thu,4,4,Finale,✅ Best Day (getaway)
+2026-08-06,07:10 PM,BOS,CWS,624133,622491.0,824729,3,Fenway Park,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
+2026-08-06,07:15 PM,ATL,MIA,527048,676083.0,824885,4705,Truist Park,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
+2026-08-06,07:40 PM,KC,MIN,608379,641927.0,824080,7,Kauffman Stadium,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
+2026-08-06,09:40 PM,AZ,SD,684442,621111.0,825053,15,Chase Field,Thursday,Thu,4,4,Finale,✅ Best Day (getaway)
