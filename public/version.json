@@ -1,10 +1,10 @@
 {
-  "version": "2026.08.05",
-  "bundleFile": "index-ixKTJDPU.js",
+  "version": "2026.08.06",
+  "bundleFile": "index-tUVKINmF.js",
   "changelog": [
-    "Add Hide Avoid List filter to Arsenal Fit",
-    "Barrel Lab",
-    "On Base"
+    "Add weather/stadium-based card coloring to Barrel Lab",
+    "On Base",
+    "Arsenal Fit matchup cards"
   ],
   "notifyUsers": true
 }

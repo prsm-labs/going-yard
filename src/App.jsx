@@ -29037,92 +29037,91 @@ function TrackRecordTab() {
   }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, showOnlyWeakSlot, showOnlyCC, showOnlySauce2, showOnlySauce3, showOnlySauce25, showOnlyHitSignal, showOnlySecretSauce, showOnlyAvoid, showOnly2Bagger, showOnlyTBSignal, showOnlySimTB2, showOnlyHighIQ, showOnlyHandMatch, showOnlyDayLate, carryFilter, xhrFilter, selPitcherGradesTR, selBullpenTiers, search, sortCol, sortDir]);
 
   const summary = useMemo(() => {
-    const hrs          = dateRows.filter(r => r.wentYard);
+    // FIXED 2026-08-06: every card below used to compute off `dateRows`
+    // directly — every batter TRACKED that date, not just the ones who
+    // actually got a real at-bat. A batter scratched/DH'd out/benched after
+    // being pre-game flagged (Sauce 2.0, Barrel Signal, etc.) still has
+    // actualAB=0 and wentYard/hitAny=false by definition, so he silently
+    // dragged down every hit-rate/HR-rate card's denominator (and
+    // numerator, for the flag-membership counts) without ever having a
+    // real chance to hit. `played` gates every computation below to rows
+    // with a real recorded at-bat — the same AB>0 standard the original
+    // Aug 4 Avoid List backtest and every other leak-free validation this
+    // project has run already uses, just not previously applied here.
+    const played = dateRows.filter(r => r.actualAB > 0);
+    const hrs          = played.filter(r => r.wentYard);
     // Real total HR count (sums the per-row HR field — correctly 2+ for a
     // multi-HR game) vs. hrs.length above (a headcount of batter-appearances
     // that went yard at least once — undercounts multi-HR games by design,
     // since it's one row per batter regardless of how many they hit). See
     // CLAUDE.md "Track Record ACTUAL HRs card" session log — the two numbers
     // measure different things on purpose; kept both rather than picking one.
-    const totalHR      = dateRows.reduce((s, r) => s + (r.actualHR || 0), 0);
-    const signals      = dateRows.filter(r => r.brlSignal);
+    const totalHR      = played.reduce((s, r) => s + (r.actualHR || 0), 0);
+    const signals      = played.filter(r => r.brlSignal);
     const signalHits   = signals.filter(r => r.wentYard);
-    const keyMatchups  = dateRows.filter(r => r.isKeyMatchup);
+    const keyMatchups  = played.filter(r => r.isKeyMatchup);
     const kmHits       = keyMatchups.filter(r => r.wentYard);
-    const longshots    = dateRows.filter(r => r.isLongshot);
+    const longshots    = played.filter(r => r.isLongshot);
     const lsHits       = longshots.filter(r => r.wentYard);
-    const weakSlots    = dateRows.filter(r => r.isWeakSlot);
+    const weakSlots    = played.filter(r => r.isWeakSlot);
     const weakSlotHits = weakSlots.filter(r => r.wentYard);
-    const sauce2       = dateRows.filter(r => r.isSauce2);
+    const sauce2       = played.filter(r => r.isSauce2);
     const sauce2Hits    = sauce2.filter(r => r.wentYard);
-    const sauce3       = dateRows.filter(r => r.isSauce3);
+    const sauce3       = played.filter(r => r.isSauce3);
     const sauce3Hits    = sauce3.filter(r => r.wentYard);
-    const sauce25       = dateRows.filter(r => r.isSauce25);
+    const sauce25       = played.filter(r => r.isSauce25);
     const sauce25Hits    = sauce25.filter(r => r.wentYard);
     // Hit Signal / Secret Sauce (2026-08-04) — validated against hitAny
     // ("any hit" — single/double/triple/HR all count), NOT wentYard. This is
     // the whole point of the signal: everything else on this page tracks HR
     // or 2+TB; these two are the first to track the plain, most common
     // outcome (57.4% season base rate).
-    const hitSignal      = dateRows.filter(r => r.isHitSignal);
+    const hitSignal      = played.filter(r => r.isHitSignal);
     const hitSignalHits  = hitSignal.filter(r => r.hitAny);
-    const secretSauce    = dateRows.filter(r => r.isSecretSauce);
+    const secretSauce    = played.filter(r => r.isSecretSauce);
     const secretSauceHits = secretSauce.filter(r => r.hitAny);
     // Avoid List (2026-08-04) — mirror image of Hit Signal. Success here is
     // the OPPOSITE of hitAny — a "hit" for this list is the batter actually
     // going hitless, so the summary card counts !r.hitAny, not r.hitAny.
-    const avoidList      = dateRows.filter(r => r.isAvoid);
+    const avoidList      = played.filter(r => r.isAvoid);
     const avoidListMisses = avoidList.filter(r => !r.hitAny);
-    const twoBaggers    = dateRows.filter(r => r.is2Bagger);
+    const twoBaggers    = played.filter(r => r.is2Bagger);
     // TB Signal (OnBase tab's own flag) hit rate — denominator is the FLAGGED
     // group, not all batters, same shape as Sauce 2.0/Weak Spot/Barrel Signal.
     // Source data only exists from July 9, 2026 onward — expect a thin sample.
-    const tbSignals     = dateRows.filter(r => r.tbSignal);
+    const tbSignals     = played.filter(r => r.tbSignal);
     const tbSignalHits  = tbSignals.filter(r => r.hitTB2);
-    const simTB2        = dateRows.filter(r => r.simTB >= 2.0);
+    const simTB2        = played.filter(r => r.simTB >= 2.0);
     const simTB2Hits    = simTB2.filter(r => r.hitTB2);
     // High Plate IQ (B grade or above, plateIQ>=56 — same threshold BarrelLabTab/
     // OnBaseTab's own "High IQ Only" filter uses) — how well do the batters this
     // signal calls disciplined actually perform, not just how the risk flag on
     // the OTHER end does. HR rate and 2+TB rate (hitTB2 — any way, HR included)
     // are the two outcomes that actually matter here.
-    const highIQBatters  = dateRows.filter(r => r.plateIQ != null && r.plateIQ >= 56);
+    const highIQBatters  = played.filter(r => r.plateIQ != null && r.plateIQ >= 56);
     const highIQHRHits   = highIQBatters.filter(r => r.wentYard);
     const highIQTB2Hits  = highIQBatters.filter(r => r.hitTB2);
     // Hand Match (⭐⭐/⭐ badge, Barrel Lab + On Base) — the underlying
     // engine flag is defined in HR-rate terms (pitcher-weak-to-hand/batter-
     // strong-to-hand both use HR% thresholds), so HR is the natural outcome
     // to track here, same convention as Barrel Signal's own card.
-    const handMatches    = dateRows.filter(r => r.isHandMatch);
+    const handMatches    = played.filter(r => r.isHandMatch);
     const handMatchHits  = handMatches.filter(r => r.wentYard);
     // Day Late (🗓️, 2026-08-02) — Barrel Signal on both of the 2 most recent
     // real game days with no Gone Yard either day, today's pitcher not
     // Elite. Same "was flagged, did it hit" hit-rate shape as every other
     // signal card here.
-    const dayLate        = dateRows.filter(r => r.isDayLate);
+    const dayLate        = played.filter(r => r.isDayLate);
     const dayLateHits    = dayLate.filter(r => r.wentYard);
-    // Ball carry (dead ball / juiced ball) — HR rate split, the direct
-    // validation question this whole feature exists to answer.
-    const deadGame       = dateRows.filter(r => r.ballCarryVerdict === 'DEAD');
-    const deadGameHits   = deadGame.filter(r => r.wentYard);
-    const juicedGame     = dateRows.filter(r => r.ballCarryVerdict === 'JUICED');
-    const juicedGameHits = juicedGame.filter(r => r.wentYard);
-    // xHR conversion (dead/juiced diagnostic v2, 2026-07-25) — same HR-rate
-    // split convention as Ball Carry above, distinct underlying signal.
-    const xhrDead        = dateRows.filter(r => r.xhrVerdict === 'DEAD');
-    const xhrDeadHits    = xhrDead.filter(r => r.wentYard);
-    const xhrJuiced      = dateRows.filter(r => r.xhrVerdict === 'JUICED');
-    const xhrJuicedHits  = xhrJuiced.filter(r => r.wentYard);
-    const topYS        = [...dateRows].sort((a,b) => b.yardScore - a.yardScore)[0];
-    const biggestMiss   = [...dateRows.filter(r => !r.wentYard)]
+    const topYS        = [...played].sort((a,b) => b.yardScore - a.yardScore)[0];
+    const biggestMiss   = [...played.filter(r => !r.wentYard)]
       .sort((a,b) => b.yardScore - a.yardScore)[0];
-    const biggestUpset = [...dateRows.filter(r => r.wentYard)]
+    const biggestUpset = [...played.filter(r => r.wentYard)]
       .sort((a,b) => a.yardScore - b.yardScore)[0];
     return { hrs, totalHR, signals, signalHits, keyMatchups, kmHits,
              longshots, lsHits, weakSlots, weakSlotHits, sauce2, sauce2Hits, sauce3, sauce3Hits, sauce25, sauce25Hits, hitSignal, hitSignalHits, secretSauce, secretSauceHits, avoidList, avoidListMisses, twoBaggers, tbSignals, tbSignalHits, simTB2, simTB2Hits,
              highIQBatters, highIQHRHits, highIQTB2Hits, handMatches, handMatchHits, dayLate, dayLateHits,
-             deadGame, deadGameHits, juicedGame, juicedGameHits,
-             xhrDead, xhrDeadHits, xhrJuiced, xhrJuicedHits, topYS, biggestMiss, biggestUpset };
+             topYS, biggestMiss, biggestUpset };
   }, [dateRows]);
 
   const GroupBar = ({ label, open, onToggle, color }) => (
@@ -29425,38 +29424,6 @@ function TrackRecordTab() {
               : '—',
             sub: `${summary.dayLateHits.length}/${summary.dayLate.length}`,
             color:'#22c1c3'
-          },
-          {
-            label:'🔴 JUICED-GAME HR RATE',
-            value: summary.juicedGame.length
-              ? `${((summary.juicedGameHits.length/summary.juicedGame.length)*100).toFixed(0)}%`
-              : '—',
-            sub: `${summary.juicedGameHits.length}/${summary.juicedGame.length}`,
-            color:'#ff8020'
-          },
-          {
-            label:'🔵 DEAD-GAME HR RATE',
-            value: summary.deadGame.length
-              ? `${((summary.deadGameHits.length/summary.deadGame.length)*100).toFixed(0)}%`
-              : '—',
-            sub: `${summary.deadGameHits.length}/${summary.deadGame.length}`,
-            color:'#38b8f2'
-          },
-          {
-            label:'⬆️ xHR JUICED HR RATE',
-            value: summary.xhrJuiced.length
-              ? `${((summary.xhrJuicedHits.length/summary.xhrJuiced.length)*100).toFixed(0)}%`
-              : '—',
-            sub: `${summary.xhrJuicedHits.length}/${summary.xhrJuiced.length}`,
-            color:'#a78bfa'
-          },
-          {
-            label:'⬇️ xHR DEAD HR RATE',
-            value: summary.xhrDead.length
-              ? `${((summary.xhrDeadHits.length/summary.xhrDead.length)*100).toFixed(0)}%`
-              : '—',
-            sub: `${summary.xhrDeadHits.length}/${summary.xhrDead.length}`,
-            color:'#f472b6'
           },
         ].map(card => (
           <div key={card.label} style={{
