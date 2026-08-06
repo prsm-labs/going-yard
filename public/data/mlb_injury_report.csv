@@ -67,7 +67,7 @@ CHC,687863,Porter Hodge,P,Right elbow strain,,🟡,Injured 60-Day
 CHC,702303,Riley Martin,P,Left elbow inflammation.,,🟡,Injured 60-Day
 CHC,571946,Shelby Miller,P,Right Elbow UCL Injury,,⚪,Injured 60-Day
 CHC,592122,Tyler Austin,1B,Right knee surgery.,,🔴,Injured 60-Day
-CIN,694362,Blake Dunn,CF,Right elbow sprain.,,🟡,Injured 10-Day
+CIN,694362,Blake Dunn,CF,Right elbow sprain.,,🟡,Injured 60-Day
 CIN,682227,Brandon Williamson,P,Left shoulder fatigue.,,⚪,Injured 60-Day
 CIN,668933,Graham Ashcraft,P,Right forearm UCL sprain.,,🟡,Injured 60-Day
 CIN,668881,Hunter Greene,P,Right elbow soreness.,,🟡,Injured 15-Day
@@ -117,7 +117,7 @@ KC,666142,Cole Ragans,P,Left elbow impingement.,,⚪,Injured 60-Day
 KC,657756,Connor Seabold,P,Right lat strain.,,🟡,Injured 60-Day
 KC,663704,James McArthur,P,Right elbow inflammation.,,🟡,Injured 60-Day
 KC,663697,Jonathan India,2B,Left shoulder subluxation.,,⚪,Injured 60-Day
-KC,679883,Luinder Avila,P,Right forearm tightness.,,🟢,Injured 15-Day
+KC,679883,Luinder Avila,P,Right forearm tightness.,,🟢,Injured 60-Day
 KC,672580,Maikel Garcia,3B,Left hand muscle strain.,,🟡,Injured 10-Day
 KC,683232,Nick Mears,P,Right shoulder impingement.,,⚪,Injured 60-Day
 KC,663568,Stephen Kolek,P,Right flexor strain.,,🟡,Injured 60-Day
@@ -245,6 +245,7 @@ TOR,682729,Jonatan Clase,LF,Left plantar fasciitis.,,⚪,Injured 10-Day
 TOR,621244,José Berríos,P,Right elbow stress fracture.,,🔴,Injured 60-Day
 TOR,672820,Lenyn Sosa,2B,Right wrist contusion.,,🟢,Injured 60-Day
 TOR,571578,Patrick Corbin,P,Left teres major strain.,,🟡,Injured 60-Day
+TOR,681293,Spencer Arrighetti,P,Injured 15-Day,,⚪,Injured 15-Day
 TOR,702056,Trey Yesavage,P,Left knee inflammation.,,🟡,Injured 15-Day
 TOR,554340,Yimi García,P,Right elbow ulnar nerve and AC joint surgery.,,🔴,Injured 60-Day
 WSH,813349,Connelly Early,P,Injured 15-Day,,⚪,Injured 15-Day
