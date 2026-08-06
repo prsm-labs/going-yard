@@ -29290,163 +29290,187 @@ function TrackRecordTab() {
     {!loading && availableDates.length > 0 && <>
       <div style={{padding:'10px 14px', display:'flex', gap:8,
         overflowX:'auto', WebkitOverflowScrolling:'touch'}}>
-        {[
-          // Two distinct, deliberately separate numbers — see the 'totalHR'
-          // comment in the summary useMemo above. "Batters Who Went Yard" is
-          // a headcount (one per batter-appearance, even on a 2-HR game);
-          // "Total HRs" sums the actual per-row HR count.
-          { label:'BATTERS WHO WENT YARD', value: summary.hrs.length,  color:'var(--accent)' },
-          { label:'TOTAL HRs',       value: summary.totalHR,      color:'var(--accent)' },
-          {
-            label:'KEY MATCHUP HIT RATE',
-            value: summary.keyMatchups.length
-              ? `${((summary.kmHits.length/summary.keyMatchups.length)*100).toFixed(0)}%`
-              : '—',
-            sub: `${summary.kmHits.length}/${summary.keyMatchups.length}`,
-            color:'#38b8f2'
-          },
-          {
-            label:'BARREL SIGNAL HIT RATE',
-            value: summary.signals.length
-              ? `${((summary.signalHits.length/summary.signals.length)*100).toFixed(0)}%`
-              : '—',
-            sub: `${summary.signalHits.length}/${summary.signals.length}`,
-            color:'var(--accent)'
-          },
-          {
-            label:'LONGSHOT HIT RATE',
-            value: summary.longshots.length
-              ? `${((summary.lsHits.length/summary.longshots.length)*100).toFixed(0)}%`
-              : '—',
-            sub: `${summary.lsHits.length}/${summary.longshots.length}`,
-            color:'#a78bfa'
-          },
-          {
-            label:'WEAK SPOT HR RATE',
-            value: summary.weakSlots.length
-              ? `${((summary.weakSlotHits.length/summary.weakSlots.length)*100).toFixed(0)}%`
-              : '—',
-            sub: `${summary.weakSlotHits.length}/${summary.weakSlots.length}`,
-            color:'#ffd60a'
-          },
-          {
-            label:'SAUCE 2.0 HIT RATE',
-            value: summary.sauce2.length
-              ? `${((summary.sauce2Hits.length/summary.sauce2.length)*100).toFixed(0)}%`
-              : '—',
-            sub: `${summary.sauce2Hits.length}/${summary.sauce2.length}`,
-            color:'#34d399'
-          },
-          {
-            label:'SAUCE 3.0 HIT RATE',
-            value: summary.sauce3.length
-              ? `${((summary.sauce3Hits.length/summary.sauce3.length)*100).toFixed(0)}%`
-              : '—',
-            sub: `${summary.sauce3Hits.length}/${summary.sauce3.length}`,
-            color:'#f59e0b'
-          },
-          {
-            label:'🥫 SAUCE 2.5 HIT RATE',
-            value: summary.sauce25.length
-              ? `${((summary.sauce25Hits.length/summary.sauce25.length)*100).toFixed(0)}%`
-              : '—',
-            sub: `${summary.sauce25Hits.length}/${summary.sauce25.length}`,
-            color:'#eab308'
-          },
-          {
-            label:'⚾ HIT SIGNAL RATE',
-            value: summary.hitSignal.length
-              ? `${((summary.hitSignalHits.length/summary.hitSignal.length)*100).toFixed(0)}%`
-              : '—',
-            sub: `${summary.hitSignalHits.length}/${summary.hitSignal.length}`,
-            color:'#93c5fd'
-          },
-          {
-            label:'🤫 SECRET SAUCE RATE',
-            value: summary.secretSauce.length
-              ? `${((summary.secretSauceHits.length/summary.secretSauce.length)*100).toFixed(0)}%`
-              : '—',
-            sub: `${summary.secretSauceHits.length}/${summary.secretSauce.length}`,
-            color:'#c084fc'
-          },
-          {
-            label:'🚫 AVOID LIST MISS RATE',
-            value: summary.avoidList.length
-              ? `${((summary.avoidListMisses.length/summary.avoidList.length)*100).toFixed(0)}%`
-              : '—',
-            sub: `${summary.avoidListMisses.length}/${summary.avoidList.length}`,
-            color:'#ff6b6b'
-          },
-          {
-            label:'2 TB SIGNAL RATE',
-            value: summary.tbSignals.length
-              ? `${((summary.tbSignalHits.length/summary.tbSignals.length)*100).toFixed(0)}%`
-              : '—',
-            sub: `${summary.tbSignalHits.length}/${summary.tbSignals.length}`,
-            color:'#38b8f2'
-          },
-          {
-            label:'SIM TB ≥2.0 HIT RATE',
-            value: summary.simTB2.length
-              ? `${((summary.simTB2Hits.length/summary.simTB2.length)*100).toFixed(0)}%`
-              : '—',
-            sub: `${summary.simTB2Hits.length}/${summary.simTB2.length}`,
-            color:'#a78bfa'
-          },
-          {
-            label:'HIGH IQ HR RATE',
-            value: summary.highIQBatters.length
-              ? `${((summary.highIQHRHits.length/summary.highIQBatters.length)*100).toFixed(0)}%`
-              : '—',
-            sub: `${summary.highIQHRHits.length}/${summary.highIQBatters.length}`,
-            color:'#38b8f2'
-          },
-          {
-            label:'HIGH IQ 2+TB RATE',
-            value: summary.highIQBatters.length
-              ? `${((summary.highIQTB2Hits.length/summary.highIQBatters.length)*100).toFixed(0)}%`
-              : '—',
-            sub: `${summary.highIQTB2Hits.length}/${summary.highIQBatters.length}`,
-            color:'#38b8f2'
-          },
-          {
-            label:'HAND MATCH HR RATE',
-            value: summary.handMatches.length
-              ? `${((summary.handMatchHits.length/summary.handMatches.length)*100).toFixed(0)}%`
-              : '—',
-            sub: `${summary.handMatchHits.length}/${summary.handMatches.length}`,
-            color:'#fbbf24'
-          },
-          {
-            label:'🗓️ DAY LATE HIT RATE',
-            value: summary.dayLate.length
-              ? `${((summary.dayLateHits.length/summary.dayLate.length)*100).toFixed(0)}%`
-              : '—',
-            sub: `${summary.dayLateHits.length}/${summary.dayLate.length}`,
-            color:'#22c1c3'
-          },
-        ].map(card => (
-          <div key={card.label} style={{
-            background:'var(--surface2)', border:'1px solid var(--border)',
-            borderRadius:8, padding:'10px 14px', minWidth:120, flexShrink:0,
-          }}>
-            <div style={{fontFamily:"'Oswald',sans-serif", fontSize:8,
-              letterSpacing:.8, textTransform:'uppercase', color:'var(--muted)',
-              marginBottom:4}}>
-              {card.label}
+        {(() => {
+          // Stacked-by-3s layout (2026-08-06) — was one long flat row of 18
+          // full-size cards (label + big 24px number + sub-line each, ~120px
+          // wide), forcing a long horizontal scroll to see them all. Same 18
+          // stat definitions, unchanged values/colors — only the container
+          // and per-stat row markup changed: chunked into 6 bordered "stack"
+          // cards of 3 thin single-line rows each, so the same scroll
+          // distance now covers 3x the stats. Outer row is still the same
+          // horizontally-scrollable flex container as before.
+          const cards = [
+            // Two distinct, deliberately separate numbers — see the 'totalHR'
+            // comment in the summary useMemo above. "Batters Who Went Yard" is
+            // a headcount (one per batter-appearance, even on a 2-HR game);
+            // "Total HRs" sums the actual per-row HR count.
+            { label:'BATTERS WHO WENT YARD', value: summary.hrs.length,  color:'var(--accent)' },
+            { label:'TOTAL HRs',       value: summary.totalHR,      color:'var(--accent)' },
+            {
+              label:'KEY MATCHUP HIT RATE',
+              value: summary.keyMatchups.length
+                ? `${((summary.kmHits.length/summary.keyMatchups.length)*100).toFixed(0)}%`
+                : '—',
+              sub: `${summary.kmHits.length}/${summary.keyMatchups.length}`,
+              color:'#38b8f2'
+            },
+            {
+              label:'BARREL SIGNAL HIT RATE',
+              value: summary.signals.length
+                ? `${((summary.signalHits.length/summary.signals.length)*100).toFixed(0)}%`
+                : '—',
+              sub: `${summary.signalHits.length}/${summary.signals.length}`,
+              color:'var(--accent)'
+            },
+            {
+              label:'LONGSHOT HIT RATE',
+              value: summary.longshots.length
+                ? `${((summary.lsHits.length/summary.longshots.length)*100).toFixed(0)}%`
+                : '—',
+              sub: `${summary.lsHits.length}/${summary.longshots.length}`,
+              color:'#a78bfa'
+            },
+            {
+              label:'WEAK SPOT HR RATE',
+              value: summary.weakSlots.length
+                ? `${((summary.weakSlotHits.length/summary.weakSlots.length)*100).toFixed(0)}%`
+                : '—',
+              sub: `${summary.weakSlotHits.length}/${summary.weakSlots.length}`,
+              color:'#ffd60a'
+            },
+            {
+              label:'SAUCE 2.0 HIT RATE',
+              value: summary.sauce2.length
+                ? `${((summary.sauce2Hits.length/summary.sauce2.length)*100).toFixed(0)}%`
+                : '—',
+              sub: `${summary.sauce2Hits.length}/${summary.sauce2.length}`,
+              color:'#34d399'
+            },
+            {
+              label:'SAUCE 3.0 HIT RATE',
+              value: summary.sauce3.length
+                ? `${((summary.sauce3Hits.length/summary.sauce3.length)*100).toFixed(0)}%`
+                : '—',
+              sub: `${summary.sauce3Hits.length}/${summary.sauce3.length}`,
+              color:'#f59e0b'
+            },
+            {
+              label:'🥫 SAUCE 2.5 HIT RATE',
+              value: summary.sauce25.length
+                ? `${((summary.sauce25Hits.length/summary.sauce25.length)*100).toFixed(0)}%`
+                : '—',
+              sub: `${summary.sauce25Hits.length}/${summary.sauce25.length}`,
+              color:'#eab308'
+            },
+            {
+              label:'⚾ HIT SIGNAL RATE',
+              value: summary.hitSignal.length
+                ? `${((summary.hitSignalHits.length/summary.hitSignal.length)*100).toFixed(0)}%`
+                : '—',
+              sub: `${summary.hitSignalHits.length}/${summary.hitSignal.length}`,
+              color:'#93c5fd'
+            },
+            {
+              label:'🤫 SECRET SAUCE RATE',
+              value: summary.secretSauce.length
+                ? `${((summary.secretSauceHits.length/summary.secretSauce.length)*100).toFixed(0)}%`
+                : '—',
+              sub: `${summary.secretSauceHits.length}/${summary.secretSauce.length}`,
+              color:'#c084fc'
+            },
+            {
+              label:'🚫 AVOID LIST MISS RATE',
+              value: summary.avoidList.length
+                ? `${((summary.avoidListMisses.length/summary.avoidList.length)*100).toFixed(0)}%`
+                : '—',
+              sub: `${summary.avoidListMisses.length}/${summary.avoidList.length}`,
+              color:'#ff6b6b'
+            },
+            {
+              label:'2 TB SIGNAL RATE',
+              value: summary.tbSignals.length
+                ? `${((summary.tbSignalHits.length/summary.tbSignals.length)*100).toFixed(0)}%`
+                : '—',
+              sub: `${summary.tbSignalHits.length}/${summary.tbSignals.length}`,
+              color:'#38b8f2'
+            },
+            {
+              label:'SIM TB ≥2.0 HIT RATE',
+              value: summary.simTB2.length
+                ? `${((summary.simTB2Hits.length/summary.simTB2.length)*100).toFixed(0)}%`
+                : '—',
+              sub: `${summary.simTB2Hits.length}/${summary.simTB2.length}`,
+              color:'#a78bfa'
+            },
+            {
+              label:'HIGH IQ HR RATE',
+              value: summary.highIQBatters.length
+                ? `${((summary.highIQHRHits.length/summary.highIQBatters.length)*100).toFixed(0)}%`
+                : '—',
+              sub: `${summary.highIQHRHits.length}/${summary.highIQBatters.length}`,
+              color:'#38b8f2'
+            },
+            {
+              label:'HIGH IQ 2+TB RATE',
+              value: summary.highIQBatters.length
+                ? `${((summary.highIQTB2Hits.length/summary.highIQBatters.length)*100).toFixed(0)}%`
+                : '—',
+              sub: `${summary.highIQTB2Hits.length}/${summary.highIQBatters.length}`,
+              color:'#38b8f2'
+            },
+            {
+              label:'HAND MATCH HR RATE',
+              value: summary.handMatches.length
+                ? `${((summary.handMatchHits.length/summary.handMatches.length)*100).toFixed(0)}%`
+                : '—',
+              sub: `${summary.handMatchHits.length}/${summary.handMatches.length}`,
+              color:'#fbbf24'
+            },
+            {
+              label:'🗓️ DAY LATE HIT RATE',
+              value: summary.dayLate.length
+                ? `${((summary.dayLateHits.length/summary.dayLate.length)*100).toFixed(0)}%`
+                : '—',
+              sub: `${summary.dayLateHits.length}/${summary.dayLate.length}`,
+              color:'#22c1c3'
+            },
+          ];
+          const stacks = [];
+          for (let i = 0; i < cards.length; i += 3) stacks.push(cards.slice(i, i + 3));
+          return stacks.map((stack, si) => (
+            <div key={si} style={{
+              background:'var(--surface2)', border:'1px solid var(--border)',
+              borderRadius:8, padding:'2px 12px', minWidth:210, flexShrink:0,
+              display:'flex', flexDirection:'column',
+            }}>
+              {stack.map((card, ci) => (
+                <div key={card.label} style={{
+                  display:'flex', alignItems:'baseline', justifyContent:'space-between',
+                  gap:10, padding:'6px 0',
+                  borderTop: ci > 0 ? '1px solid var(--border)' : 'none',
+                }}>
+                  <div style={{fontFamily:"'Oswald',sans-serif", fontSize:7.5,
+                    letterSpacing:.5, textTransform:'uppercase', color:'var(--muted)',
+                    whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis',
+                    maxWidth:115}}>
+                    {card.label}
+                  </div>
+                  <div style={{display:'flex', alignItems:'baseline', gap:5, flexShrink:0}}>
+                    <span style={{fontFamily:"'Oswald',sans-serif", fontSize:15,
+                      fontWeight:800, color:card.color, lineHeight:1}}>
+                      {card.value}
+                    </span>
+                    {card.sub && (
+                      <span style={{fontFamily:mono, fontSize:7, color:'var(--muted)'}}>
+                        {card.sub}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
-            <div style={{fontFamily:"'Oswald',sans-serif", fontSize:24,
-              fontWeight:800, color:card.color, lineHeight:1}}>
-              {card.value}
-            </div>
-            {card.sub && (
-              <div style={{fontFamily:mono, fontSize:8, color:'var(--muted)',
-                marginTop:2}}>
-                {card.sub}
-              </div>
-            )}
-          </div>
-        ))}
+          ));
+        })()}
       </div>
 
       {summary.biggestUpset && (

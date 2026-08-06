@@ -1,10 +1,9 @@
 {
   "version": "2026.08.06",
-  "bundleFile": "index-tUVKINmF.js",
+  "bundleFile": "index-C8Va8Cgd.js",
   "changelog": [
-    "Add weather/stadium-based card coloring to Barrel Lab",
-    "On Base",
-    "Arsenal Fit matchup cards"
+    "Track Record: remove 4 unused Ball Carry/xHR verdict cards",
+    "fix AB=0 batters skewing every card's percentage"
   ],
   "notifyUsers": true
 }
