@@ -1,9 +1,9 @@
 {
   "version": "2026.08.06",
-  "bundleFile": "index-C8Va8Cgd.js",
+  "bundleFile": "index-B0mNz_rb.js",
   "changelog": [
-    "Track Record: remove 4 unused Ball Carry/xHR verdict cards",
-    "fix AB=0 batters skewing every card's percentage"
+    "Track Record: stack stat cards into groups of 3 (slimmer",
+    "still horizontally scrollable)"
   ],
   "notifyUsers": true
 }

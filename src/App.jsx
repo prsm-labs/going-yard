@@ -7979,6 +7979,14 @@ const CARRY_VERDICT_STYLE = {
 const BORDERLINE_MARGIN_FT = 3;
 const CARRY_BORDERLINE_STYLE = { color: '#f5a623', label: '🟡 Borderline normal', bg: 'rgba(245,166,35,.08)' };
 
+// Pitch-drag (2026-08-07) — a separate diagnostic, so deliberately kept
+// visually secondary to the batted-ball verdict above (no background tint
+// of its own, just a colored label) rather than competing for attention.
+// Reuses the same JUICED=orange/DEAD=blue convention as CARRY_VERDICT_STYLE
+// so the meaning stays consistent throughout the app; NORMAL stays muted
+// rather than green, since this signal is supplementary, not primary.
+const PITCH_DRAG_VERDICT_COLOR = { JUICED: '#ff8020', DEAD: '#38b8f2', NORMAL: 'var(--muted)' };
+
 function BallCarryCard({ game }) {
   const [data, setData]       = useState(null);
   const [weather, setWeather] = useState(null);
@@ -8046,6 +8054,22 @@ function BallCarryCard({ game }) {
       {!data || data.status === 'insufficient_data' ? (
         <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)', marginTop: 6 }}>
           ⚾ Tracking… {data?.n != null ? `(${data.n}/3 quality batted balls so far)` : ''}
+          {/* Pitch-drag (2026-08-07) converges much faster than batted balls
+              (available from pitch 1) — show it here even while the
+              batted-ball verdict itself is still "insufficient_data", since
+              that's the entire point of having a higher-sample-size early
+              read alongside the slower one. */}
+          {data?.pitchDrag?.status === 'ok' && (
+            <div style={{ marginTop: 4 }}
+              title={`Early pitch-drag read (separate signal, not the batted-ball verdict above) — ${data.pitchDrag.n_pitchers} pitchers, ${data.pitchDrag.n_pitches} four-seam fastballs tracked so far tonight. z=${data.pitchDrag.z>=0?'+':''}${data.pitchDrag.z} (need |z|>=2 for DEAD/JUICED). This can't tell real ball-to-ball variance apart from tracking-system calibration drift — treat as "tracked pitches are running hot/cold," not "the ball is different."`}>
+              <span style={{ color: PITCH_DRAG_VERDICT_COLOR[data.pitchDrag.verdict] || 'var(--muted)', fontWeight: 700 }}>
+                ⚡ Pitch Drag: {data.pitchDrag.verdict}
+              </span>
+              <span style={{ color: 'var(--muted)', marginLeft: 6 }}>
+                z={data.pitchDrag.z >= 0 ? '+' : ''}{data.pitchDrag.z} · {data.pitchDrag.n_pitchers} pitchers, {data.pitchDrag.n_pitches} pitches
+              </span>
+            </div>
+          )}
         </div>
       ) : (
         <>
@@ -8065,6 +8089,19 @@ function BallCarryCard({ game }) {
               {expanded ? '▲ Hide balls' : '▼ Show balls'}
             </button>
           </div>
+          {/* Pitch-drag (2026-08-07) — a separate, faster-converging diagnostic
+              shown alongside (never blended into) the batted-ball verdict above. */}
+          {data.pitchDrag?.status === 'ok' && (
+            <div style={{ marginTop: 4, fontFamily: "'DM Mono',monospace", fontSize: 10 }}
+              title={`Pitch-drag signal (separate from the batted-ball verdict above, derived from ${data.pitchDrag.n_pitches} four-seam fastballs across ${data.pitchDrag.n_pitchers} pitchers tonight, vs. each pitcher's own season-normal). z=${data.pitchDrag.z>=0?'+':''}${data.pitchDrag.z} (need |z|>=2 for DEAD/JUICED). Validated: converges within ~2 innings, correlates with real batted-ball carry (r=-0.23) — but can't distinguish real ball-to-ball variance from tracking-system calibration drift. "Tracked pitches running hot/cold," not "the ball is different."`}>
+              <span style={{ color: PITCH_DRAG_VERDICT_COLOR[data.pitchDrag.verdict] || 'var(--muted)', fontWeight: 700 }}>
+                ⚡ Pitch Drag: {data.pitchDrag.verdict}
+              </span>
+              <span style={{ color: 'var(--muted)', marginLeft: 6 }}>
+                z={data.pitchDrag.z >= 0 ? '+' : ''}{data.pitchDrag.z} · {data.pitchDrag.n_pitchers} pitchers, {data.pitchDrag.n_pitches} pitches
+              </span>
+            </div>
+          )}
           {expanded && (
             <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 6 }}>
               {data.balls.map((b, i) => (
@@ -8108,6 +8145,7 @@ function BallCarryTab({ games }) {
         ['What it still does NOT use', 'Wind is still context-only, not part of the verdict — it’s shown next to each card but too noisy at single-game granularity to correct for cleanly the way temperature can be.'],
         ['Elevation / park', 'Each park’s own seasonal average carry deviation is subtracted before classifying — shown right on the card ("park baseline") so it’s never a hidden adjustment. This is why a hitter-friendly park (Coors, Arizona) can show a big raw number and still read NORMAL — the raw distance is only modestly above what that park normally allows.'],
         ['🟡 Borderline normal', 'A NORMAL verdict within 3ft of the DEAD or JUICED line gets this instead of a flat green normal — a near-miss isn’t the same as an unremarkable day, and this keeps close calls visible instead of hidden inside "normal."'],
+        ['⚡ Pitch Drag (2026-08-07)', 'A SEPARATE diagnostic shown alongside the batted-ball verdict — derived from pitch trajectory data (not batted balls), which gives ~30-40x more data points per game. Available from pitch 1, so it shows a real reading well before enough batted balls exist for the verdict above. Validated: different pitchers in the same game show strongly correlated deviations from their own normal (not explained by park or weather — survives a fixed-dome control), and it correlates with real batted-ball carry that same game. Honest caveat: it can\'t tell real ball-to-ball manufacturing variance apart from tracking-system (Hawkeye/TrackMan) calibration drift — "tracked pitches running hot/cold," not "the ball is different." Never blended into the verdict above.'],
         ['Direction (Pull/Center/Oppo)', 'Also corrects for where the ball was hit. Center-field contact carries ~14-17ft farther than pulled or opposite-field contact at the same EV+LA (pure backspin vs. sidespin bleed-off) — a real physical effect, not noise. Without this, a handful of unusually center-heavy or pull-heavy balls in one game could fake a DEAD/JUICED reading. Shown per-ball in the expanded list below.'],
         ['⚡ Outlier balls', 'Any single ball whose actual distance deviates 25+ft from what EV/LA/temp/direction predict gets flagged individually in the expanded ball list, even on a day the overall game verdict stays NORMAL — a real 103mph flyout that died well short of expected is worth seeing on its own, not just averaged away into a game total that needs several balls to mean anything.'],
         ['z-score verdict (2026-07-30)', 'DEAD/JUICED now requires a real per-game z-score (|z|≥2, ~95% confidence) instead of a fixed +/-ft cutoff — a game with only 3-5 balls needs a much bigger raw deviation to count as a real signal than a game with 15+, since the standard error shrinks as sample size grows. The "dead/juiced threshold" ft numbers on the card are that game\'s own z=2 line, not a fixed number — they\'ll differ game to game.'],
@@ -11757,7 +11795,7 @@ let _notifyNewHR = null; // callback set by useHRNotifications hook
 // once it's genuinely 'Live' (see startBallStatePolling below) and has
 // produced a confident verdict from the live endpoints — there is no path
 // for this to influence anything before or independent of live play.
-const BALL_STATE_CACHE = {}; // gamePk (string) -> { carryVerdict, carryZ, xhrVerdict, xhrZ, updated }
+const BALL_STATE_CACHE = {}; // gamePk (string) -> { carryVerdict, carryZ, xhrVerdict, xhrZ, dragVerdict, dragZ, updated }
 let _BALL_STATE_VER = 0;
 let _ballStatePollActive = false;
 
@@ -11772,11 +11810,16 @@ async function pollBallState() {
         fetch(`/api/ball-carry?gamePk=${gamePk}`).then(r => r.json()).catch(() => null),
         fetch(`/api/xhr-conversion?gamePk=${gamePk}`).then(r => r.json()).catch(() => null),
       ]);
+      // Pitch-drag (2026-08-07) rides along on the same /api/ball-carry
+      // response fetched for carryD above — no extra request needed.
+      const dragD = carryD?.pitchDrag;
       BALL_STATE_CACHE[gamePk] = {
         carryVerdict: carryD?.status === 'ok' ? carryD.verdict : null,
         carryZ:       carryD?.status === 'ok' ? carryD.z : null,
         xhrVerdict:   xhrD?.status === 'ok' ? xhrD.verdict : null,
         xhrZ:         xhrD?.status === 'ok' ? xhrD.z : null,
+        dragVerdict:  dragD?.status === 'ok' ? dragD.verdict : null,
+        dragZ:        dragD?.status === 'ok' ? dragD.z : null,
       };
       _BALL_STATE_VER++;
     } catch (_) { /* leave prior cached value in place, retry next cycle */ }
@@ -11793,34 +11836,55 @@ function startBallStatePolling() {
   setInterval(pollBallState, 3 * 60 * 1000);
 }
 
-// { icon, label, color, tooltip } or null. Fires when EITHER diagnostic is
-// confidently DEAD/JUICED for the batter's game (both being unavailable/
-// NORMAL/not-yet-live returns null). Tooltip discloses whether one or both
-// signals agree, rather than silently picking one — same "don't overstate
-// confidence" discipline as every other unvalidated-but-real signal in
-// this app (Recent EV false-negative flag, Longshot, etc).
+// { icon, label, color, tooltip } or null. Fires when ANY of the (now 3,
+// added 2026-08-07: Ball Carry, xHR Conversion, Pitch Drag) live
+// diagnostics is confidently DEAD/JUICED for the batter's game (all being
+// unavailable/NORMAL/not-yet-reporting returns null). Priority order below
+// (Ball Carry, then xHR, then Pitch Drag) is used only to break a genuine
+// tie between disagreeing verdicts -- a real majority among the signals
+// that HAVE reported always wins first. Tooltip discloses exactly how many
+// of the 3 fired and whether they agree, rather than silently picking one
+// — same "don't overstate confidence" discipline as every other
+// unvalidated-but-real signal in this app (Recent EV false-negative flag,
+// Longshot, etc).
 function getBallStateBadge(gameId) {
   const state = BALL_STATE_CACHE[String(gameId || '')];
   if (!state) return null;
-  const carryHit = state.carryVerdict === 'DEAD' || state.carryVerdict === 'JUICED';
-  const xhrHit   = state.xhrVerdict   === 'DEAD' || state.xhrVerdict   === 'JUICED';
-  if (!carryHit && !xhrHit) return null;
-  // If both fire but disagree (rare — different physics questions), Ball
-  // Carry wins the badge shown (distance-based, the more direct "ball
-  // itself" signal) but the tooltip states the disagreement plainly.
-  const primary = carryHit ? state.carryVerdict : state.xhrVerdict;
-  const bothAgree = carryHit && xhrHit && state.carryVerdict === state.xhrVerdict;
-  const bothDisagree = carryHit && xhrHit && state.carryVerdict !== state.xhrVerdict;
+  const signals = [
+    { key: 'Ball Carry',     verdict: state.carryVerdict, z: state.carryZ },
+    { key: 'xHR Conversion', verdict: state.xhrVerdict,   z: state.xhrZ   },
+    { key: 'Pitch Drag',     verdict: state.dragVerdict,  z: state.dragZ  },
+  ].filter(s => s.verdict === 'DEAD' || s.verdict === 'JUICED');
+  if (!signals.length) return null;
+
+  const counts = {};
+  signals.forEach(s => { counts[s.verdict] = (counts[s.verdict] || 0) + 1; });
+  const maxCount = Math.max(...Object.values(counts));
+  const leaders = Object.keys(counts).filter(v => counts[v] === maxCount);
+  // A tie (leaders.length > 1) falls back to whichever fired signal has the
+  // highest priority — signals[] preserves the Ball Carry/xHR/Pitch Drag
+  // order from the array above even after filtering, so signals[0] is
+  // always the highest-priority one that actually fired.
+  const primary = leaders.length === 1 ? leaders[0] : signals[0].verdict;
   const isJuiced = primary === 'JUICED';
-  const parts = [];
-  if (carryHit) parts.push(`Ball Carry: ${state.carryVerdict}${state.carryZ!=null?` (z=${state.carryZ>=0?'+':''}${state.carryZ})`:''}`);
-  if (xhrHit)   parts.push(`xHR Conversion: ${state.xhrVerdict}${state.xhrZ!=null?` (z=${state.xhrZ>=0?'+':''}${state.xhrZ})`:''}`);
+
+  const parts = signals.map(s => `${s.key}: ${s.verdict}${s.z != null ? ` (z=${s.z >= 0 ? '+' : ''}${s.z})` : ''}`);
+  let confidenceNote;
+  if (signals.length === 1) {
+    confidenceNote = ' Based on 1 of 3 live diagnostics (the others are NORMAL or not yet reporting).';
+  } else if (leaders.length > 1) {
+    confidenceNote = ' The live diagnostics disagree — shown with lower confidence.';
+  } else if (maxCount === signals.length) {
+    confidenceNote = ` All ${signals.length} live diagnostics that have reported agree.`;
+  } else {
+    confidenceNote = ` Majority agree (${maxCount} of ${signals.length} that have reported) — shown with the outlier noted above.`;
+  }
+
   return {
     icon: isJuiced ? '🔴' : '🔵',
     label: isJuiced ? 'Juiced Ball' : 'Dead Ball',
     color: isJuiced ? '#ff8020' : '#38b8f2',
-    tooltip: `Live-only ball state signal — does not affect any score. ${parts.join(' · ')}.`
-      + (bothAgree ? ' Both live diagnostics agree.' : bothDisagree ? ' The two live diagnostics disagree — shown with lower confidence.' : ' Based on one of the two live diagnostics (the other is NORMAL or not yet reporting).'),
+    tooltip: `Live-only ball state signal — does not affect any score. ${parts.join(' · ')}.${confidenceNote}`,
   };
 }
 

@@ -66,6 +66,30 @@ import { join } from 'path';
 // disagree with the offline verdict; it will no longer disagree because
 // of counting a different SET of balls, which was the dominant failure
 // mode before this fix.
+//
+// Pitch-drag signal (added 2026-08-07) — a SEPARATE, supplementary
+// diagnostic derived from pitch TRAJECTORY data (not batted-ball data),
+// available from pitch 1 rather than needing MIN_BALLS_LIVE quality
+// batted balls to accumulate. Validated 2026-08-06 against the full 2026
+// AB log + a full-season Statcast pitch pull: different pitchers who
+// threw four-seam fastballs in the SAME game show strongly correlated
+// deviations from their own individual season-normal drag (split-half
+// r=0.86, survives a fixed-dome control [Tampa Bay only, r=0.78] — rules
+// out "it's just weather"), and correlates with this same game's real
+// batted-ball carry (r=-0.23, p<0.0001). Converges almost immediately:
+// the first 2 innings alone (median 23 pitches) gives essentially the
+// same correlation as a full game (r=-0.237 vs r=-0.232) — the whole
+// reason this is worth surfacing live rather than only offline. See
+// ball_carry_tracker.py's docstring for the full writeup, including the
+// honest caveat that this cannot distinguish real ball-to-ball
+// manufacturing variance from Hawkeye/TrackMan calibration drift.
+// Field names here use MLB's raw Gumbo convention (aX/aY/aZ/vX0/vY0/vZ0,
+// capitalized) — different casing from pybaseball/Savant's lowercase
+// columns the offline script uses, same physical quantities (confirmed
+// live 2026-08-06 against a real in-progress game's feed/live response).
+// Kept as a SEPARATE field on the response (pitchDrag: {...}), never
+// blended into verdict/park_adj_deviation/z above — same V1-untouched
+// discipline as every other formula addition in this project.
 
 const SNAPSHOT_CARRY_COEFFS = [
   -365.71759, 3.86423, 20.45814, -0.00091, -0.35807, 0.02922, -13.70602, -11.8523,
@@ -129,6 +153,94 @@ function loadRollingCoeffs() {
     } catch (_) { /* try next path */ }
   }
   return null;
+}
+
+// Pitch-drag rolling hand-off (2026-08-07) — written by ball_carry_tracker.py,
+// same dual-path / never-throw pattern as loadRollingCoeffs() above. Returns
+// null (pitch-drag section simply omitted from the response) if missing,
+// unreadable, or shaped unexpectedly.
+function loadPitchDragCoeffs() {
+  for (const p of [
+    join(process.cwd(), 'public', 'data', 'pitch-drag-coeffs.json'),
+    join(process.cwd(), 'going-yard', 'public', 'data', 'pitch-drag-coeffs.json'),
+  ]) {
+    try {
+      const raw = JSON.parse(readFileSync(p, 'utf-8'));
+      if (
+        Number.isFinite(raw.population_mean_cd_proxy) &&
+        Number.isFinite(raw.residual_sd) && raw.residual_sd > 0 &&
+        raw.pitcher_baseline && typeof raw.pitcher_baseline === 'object'
+      ) {
+        return raw;
+      }
+    } catch (_) { /* try next path */ }
+  }
+  return null;
+}
+
+const MIN_FF_PITCHES_LIVE     = 3;  // per pitcher, to count that pitcher's outing tonight
+const MIN_PITCHERS_LIVE       = 2;  // need >=2 distinct pitchers tonight for a game-level reading
+const PITCH_DRAG_Z_THRESHOLD  = 2.0;
+
+// Every FF (four-seam fastball) pitch's trajectory, grouped by the pitcher
+// who threw it (play.matchup.pitcher.id) — confirmed live 2026-08-06 that
+// this field, and playEvents[].pitchData.coordinates.{aX,aY,aZ,vX0,vY0,vZ0},
+// are both populated pitch-by-pitch in real time (tested against a genuinely
+// in-progress game, not just a completed one).
+function collectPitchDragByPitcher(plays) {
+  const byPitcher = new Map(); // pitcherId -> { sum, n }
+  for (const play of plays) {
+    const pitcherId = play.matchup?.pitcher?.id;
+    if (!pitcherId) continue;
+    for (const evt of (play.playEvents || [])) {
+      if (!evt.isPitch || evt.details?.type?.code !== 'FF') continue;
+      const c = evt.pitchData?.coordinates;
+      if (!c || !Number.isFinite(c.aY) || !Number.isFinite(c.vX0) ||
+          !Number.isFinite(c.vY0) || !Number.isFinite(c.vZ0)) continue;
+      const v0 = Math.sqrt(c.vX0 ** 2 + c.vY0 ** 2 + c.vZ0 ** 2);
+      if (!(v0 > 0)) continue;
+      const cdProxy = Math.abs(c.aY) / (v0 ** 2);
+      const cur = byPitcher.get(pitcherId) || { sum: 0, n: 0 };
+      cur.sum += cdProxy;
+      cur.n += 1;
+      byPitcher.set(pitcherId, cur);
+    }
+  }
+  return byPitcher;
+}
+
+// Turns per-pitcher tonight-vs-baseline deviations into a game-level
+// reading, mirroring ball_carry_tracker.py's compute_pitch_drag_signal()
+// exactly (unweighted mean of per-pitcher deviations, SE = residual_sd /
+// sqrt(n_pitchers)). Returns null if fewer than MIN_PITCHERS_LIVE pitchers
+// qualify yet — never a low-confidence guess.
+function computeLivePitchDrag(plays, dragCoeffs) {
+  if (!dragCoeffs) return null;
+  const byPitcher = collectPitchDragByPitcher(plays);
+  const deviations = [];
+  let totalPitches = 0;
+  for (const [pitcherId, { sum, n }] of byPitcher) {
+    if (n < MIN_FF_PITCHES_LIVE) continue;
+    const meanTonight = sum / n;
+    const base = dragCoeffs.pitcher_baseline[String(pitcherId)];
+    const baseline = base?.mean ?? dragCoeffs.population_mean_cd_proxy;
+    deviations.push(meanTonight - baseline);
+    totalPitches += n;
+  }
+  if (deviations.length < MIN_PITCHERS_LIVE) {
+    return { status: 'insufficient_data', n_pitchers: deviations.length, n_pitches: totalPitches };
+  }
+  const dev = deviations.reduce((s, d) => s + d, 0) / deviations.length;
+  const se  = dragCoeffs.residual_sd / Math.sqrt(deviations.length);
+  const z   = se > 0 ? dev / se : 0;
+  let verdict = 'NORMAL';
+  if (z <= -PITCH_DRAG_Z_THRESHOLD) verdict = 'DEAD';
+  if (z >=  PITCH_DRAG_Z_THRESHOLD) verdict = 'JUICED';
+  return {
+    status: 'ok', verdict,
+    dev: Number(dev.toFixed(8)), z: Number(z.toFixed(2)),
+    n_pitchers: deviations.length, n_pitches: totalPitches,
+  };
 }
 
 // Per-ball outlier flag (2026-07-30) — the `deviation` field below was
@@ -195,6 +307,7 @@ export default async function handler(req, res) {
     if (!gamePk) return res.status(400).json({ error: 'gamePk required' });
 
     const rolling = loadRollingCoeffs();
+    const dragCoeffs = loadPitchDragCoeffs();
     const coeffs        = rolling ? rolling.coeffs : SNAPSHOT_CARRY_COEFFS;
     const parkBaselines = rolling ? rolling.park_baseline_ft : SNAPSHOT_PARK_CARRY_BASELINE;
     const residualSdFt  = rolling ? rolling.residual_sd_ft : SNAPSHOT_RESIDUAL_SD_FT;
@@ -211,6 +324,11 @@ export default async function handler(req, res) {
     const awayAbbr = feed?.gameData?.teams?.away?.abbreviation || null;
     const venue    = feed?.gameData?.venue?.name || null;
     const plays = feed?.liveData?.plays?.allPlays || [];
+
+    // Independent of batted-ball data availability below -- pitches
+    // accumulate from pitch 1, so this can (and should) return a real
+    // reading well before MIN_BALLS_LIVE quality batted balls exist.
+    const pitchDrag = computeLivePitchDrag(plays, dragCoeffs);
 
     // Real game-time temp — "72" style string on outdoor AND dome games
     // (domes report their controlled interior temp, not a placeholder).
@@ -274,6 +392,7 @@ export default async function handler(req, res) {
         n: balls.length, status: 'insufficient_data',
         avg_deviation: null, park_adj_deviation: null, verdict: null, balls,
         coeffs_source: coeffsSource, coeffs_fitted_date: coeffsFittedDate,
+        pitchDrag,
       });
     }
 
@@ -320,6 +439,7 @@ export default async function handler(req, res) {
       // and when the rolling fit was last produced.
       coeffs_source: coeffsSource, coeffs_fitted_date: coeffsFittedDate,
       status: 'ok', verdict, balls,
+      pitchDrag,
     });
   } catch (e) {
     return res.status(500).json({ error: e.message });
