@@ -1,9 +1,8 @@
 {
-  "version": "2026.08.06",
-  "bundleFile": "index-B0mNz_rb.js",
+  "version": "2026.08.07",
+  "bundleFile": "index-CjhpkiBS.js",
   "changelog": [
-    "Track Record: stack stat cards into groups of 3 (slimmer",
-    "still horizontally scrollable)"
+    "Add pitch-drag signal to Ball Carry: offline (Track Record) + live card"
   ],
   "notifyUsers": true
 }

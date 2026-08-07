@@ -2331,16 +2331,30 @@ function AtBatSlideIn() {
   const [scoutNoteLoading, setScoutNoteLoading] = useState(false);
   const [scoutNoteData,    setScoutNoteData]    = useState(null); // {note, stats, insufficientData, cached} | null
   const [scoutNoteError,   setScoutNoteError]   = useState(null);
+  // Free-tier gate (2026-08-07): distinct from scoutNoteError — a 401 means
+  // "this would work fine, you just need to sign in" (today's Top 3 and
+  // anything already cached today are always free, checked server-side —
+  // see api/batter-scouting-note.js), not a real failure. Kept separate so
+  // the render can show a sign-in prompt instead of an error message.
+  const [scoutNoteLocked,  setScoutNoteLocked]  = useState(false);
   useEffect(() => {
-    setScoutNoteOpen(false); setScoutNoteData(null); setScoutNoteError(null); setScoutNoteLoading(false);
+    setScoutNoteOpen(false); setScoutNoteData(null); setScoutNoteError(null); setScoutNoteLoading(false); setScoutNoteLocked(false);
   }, [player?.pid, dhIdx]);
 
   async function loadScoutingNote(dpRow) {
     if (!player?.pid || !dpRow?.pitcher_id) return;
-    setScoutNoteLoading(true); setScoutNoteError(null);
+    setScoutNoteLoading(true); setScoutNoteError(null); setScoutNoteLocked(false);
     try {
+      // Attach a Clerk session token when signed in — same _GLOBAL_GET_TOKEN
+      // mechanism savePicksCloud()/loadPicksCloud() already use for Cloud
+      // picks sync. Absent when signed out; the server only actually needs
+      // it for a cache-miss request that isn't one of today's Top 3.
+      const headers = { 'Content-Type': 'application/json' };
+      if (_GLOBAL_GET_TOKEN) {
+        try { const t = await _GLOBAL_GET_TOKEN(); if (t) headers['Authorization'] = `Bearer ${t}`; } catch (_) { /* stay signed-out */ }
+      }
       const res = await fetch('/api/batter-scouting-note', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers,
         body: JSON.stringify({
           batterId: player.pid, pitcherId: parseInt(dpRow.pitcher_id) || 0,
           batterName: player.name, pitcherName: dpRow.pitcher,
@@ -2355,6 +2369,7 @@ function AtBatSlideIn() {
           isHomeToday: !!(dpRow.batting_team && dpRow.home_team && dpRow.batting_team === dpRow.home_team),
         }),
       });
+      if (res.status === 401) { setScoutNoteLocked(true); return; }
       const data = await res.json();
       if (!res.ok) { setScoutNoteError(data?.error || 'Failed to generate'); return; }
       setScoutNoteData(data);
@@ -3047,7 +3062,15 @@ function AtBatSlideIn() {
             onClick={() => {
               const next = !scoutNoteOpen;
               setScoutNoteOpen(next);
-              if (next && !scoutNoteData && !scoutNoteLoading && !scoutNoteError) loadScoutingNote(dp);
+              if (next && scoutNoteLocked) {
+                // Re-opening after a sign-in prompt always retries — the
+                // user likely just signed in via the SignInButton modal and
+                // this is their natural "try again" gesture.
+                setScoutNoteLocked(false);
+                loadScoutingNote(dp);
+              } else if (next && !scoutNoteData && !scoutNoteLoading && !scoutNoteError) {
+                loadScoutingNote(dp);
+              }
             }}
             style={{display:'flex',alignItems:'center',gap:5,padding:'4px 10px',
               borderRadius:6,cursor:'pointer',border:'1px solid var(--border)',
@@ -3061,17 +3084,35 @@ function AtBatSlideIn() {
           {scoutNoteOpen && !scoutNoteLoading && (
             <div style={{marginTop:8,padding:'10px 12px',borderRadius:8,
               background:'var(--surface2)',border:'1px solid var(--border)'}}>
-              {scoutNoteError && (
+              {scoutNoteLocked && (
+                <div style={{display:'flex',flexDirection:'column',gap:8,alignItems:'flex-start'}}>
+                  <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',lineHeight:1.5}}>
+                    🔒 Sign in to generate a Scouting Note for this matchup. Today's Top 3 picks
+                    and any note someone's already generated today are always free — no sign-in needed.
+                  </div>
+                  <SignInButton mode="modal">
+                    <button style={{padding:'5px 12px',borderRadius:6,border:'1px solid var(--border)',
+                        background:'var(--surface)',color:'var(--accent)',cursor:'pointer',
+                        fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,letterSpacing:.5}}>
+                      SIGN IN
+                    </button>
+                  </SignInButton>
+                  <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--muted)'}}>
+                    Signed in already? Close and reopen this section to try again.
+                  </div>
+                </div>
+              )}
+              {!scoutNoteLocked && scoutNoteError && (
                 <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'#ff6b6b'}}>
                   Couldn't generate a note: {scoutNoteError}
                 </div>
               )}
-              {!scoutNoteError && scoutNoteData?.insufficientData && (
+              {!scoutNoteLocked && !scoutNoteError && scoutNoteData?.insufficientData && (
                 <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)'}}>
                   Not enough recent real contact on record to say anything meaningful yet.
                 </div>
               )}
-              {!scoutNoteError && scoutNoteData?.note && (
+              {!scoutNoteLocked && !scoutNoteError && scoutNoteData?.note && (
                 <>
                   <div style={{fontFamily:"'Oswald',sans-serif",fontSize:12,color:'var(--text)',lineHeight:1.5}}>
                     {scoutNoteData.note}
@@ -30914,7 +30955,19 @@ function TopThreeTab() {
                         </div>
                       )}
                       {noteState?.error && (
-                        <div style={{fontFamily:mono,fontSize:8,color:'#ff6b6b'}}>Couldn't generate: {noteState.error}</div>
+                        // "sign_in_required" here would mean the server's
+                        // approximate Top-3 ranking (api/batter-scouting-note.js
+                        // isTodaysTop3(), 2026-08-07) disagreed with this
+                        // tab's own real ranking above — should be rare given
+                        // both use the same weights/bonuses, but a genuine
+                        // Top 3 card asking the user to "sign in" would be
+                        // confusing, so it gets a generic message instead of
+                        // the raw error code.
+                        <div style={{fontFamily:mono,fontSize:8,color:'#ff6b6b'}}>
+                          {noteState.error === 'sign_in_required'
+                            ? "Couldn't generate a note for this pick — try refreshing."
+                            : `Couldn't generate: ${noteState.error}`}
+                        </div>
                       )}
                       {noteState?.data?.insufficientData && (
                         <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>

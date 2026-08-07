@@ -45,8 +45,210 @@
 // Cached per {batterId}_{pitcherId}_{ET date} in the same Upstash Redis
 // instance already used for picks/push-subscription storage — one real
 // generation per matchup per day, not per slideout open.
+//
+// Free-tier gate (added 2026-08-07): every cache HIT stays free for anyone,
+// signed in or not — the note's already paid for. A cache MISS (a genuinely
+// new Anthropic call) is only free for today's real Top 3 Tonight picks;
+// everyone else must be signed in (Clerk — same auth already wired in for
+// Cloud picks sync, api/save-picks.js/api/get-picks.js). "Today's real Top
+// 3" is deliberately NOT trusted from the client (a client-asserted
+// isTop3:true flag would be trivially spoofable via devtools) — instead
+// this endpoint independently recomputes an approximate ranking server-side
+// from daily_picks.csv, reusing the exact serverTrueHRScore()/
+// serverMatchupScore() approximations already proven out in
+// api/barrel-notify.js for the same "read the CSV, score every batter,
+// don't trust the client" purpose. Won't be byte-identical to the client's
+// own (more precise, per-game-pool-normalized) Top 3 Tonight ranking, but
+// uses the same signals/weights and will overlap heavily in practice — and
+// fails CLOSED (treats a data-load failure as "not top 3", i.e. requires
+// sign-in) rather than open.
 
 import { Redis } from '@upstash/redis';
+import { verifyToken } from '@clerk/backend';
+import { readFileSync } from 'fs';
+import { join } from 'path';
+
+// Minimal dependency-free RFC4180-style CSV parser. api/barrel-notify.js
+// imports `{ parse } from 'csv-parse/sync'` for the same daily_picks.csv
+// read, but that package is NOT actually a dependency anywhere in this repo
+// (confirmed 2026-08-07: absent from package.json, node_modules, AND
+// package-lock.json) — a top-level import of a missing package crashes the
+// whole module at load time, before its own try/catch fallback ever runs.
+// Deliberately not inheriting that here; daily_picks.csv has 242+ columns
+// so a real quoted-field-aware parser is needed (column position shifts
+// with which fields are present), not a naive .split(',').
+function parseCsv(text) {
+  const rows = [];
+  let row = [], field = '', inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else inQuotes = false; }
+      else field += c;
+    } else if (c === '"') inQuotes = true;
+    else if (c === ',') { row.push(field); field = ''; }
+    else if (c === '\n' || c === '\r') {
+      if (c === '\r' && text[i + 1] === '\n') i++;
+      row.push(field); field = '';
+      if (row.length > 1 || row[0] !== '') rows.push(row);
+      row = [];
+    } else field += c;
+  }
+  if (field !== '' || row.length) { row.push(field); rows.push(row); }
+  if (!rows.length) return [];
+  const headers = rows[0];
+  return rows.slice(1).map(r => Object.fromEntries(headers.map((h, i) => [h, r[i] ?? ''])));
+}
+
+// ── serverTrueHRScore / serverMatchupScore ──────────────────────────────
+// Copied verbatim from api/barrel-notify.js (2026-07-08, still the live
+// approximation used there for Barrel Signal push detection) rather than
+// imported — every api/*.js file in this app is self-contained by existing
+// convention (see e.g. CARRY_COEFFS duplicated in api/ball-carry.js). If
+// barrel-notify.js's copy is ever recalibrated, this one should be updated
+// to match.
+function serverTrueHRScore(r) {
+  const la      = parseFloat(r.la_mean || r.la_mean_l15 || r.season_la_mean || 18);
+  const laStd   = parseFloat(r.la_std  || r.la_stddev   || 8);
+  const laDistScore    = Math.max(0, 1 - Math.abs(la - 19.5) / 15);
+  const laConsistency  = Math.max(0, 1 - (laStd - 5) / 12);
+  const sweetSpotScore = (laDistScore * 0.7 + laConsistency * 0.3) * 100;
+  const pbrl      = parseFloat(r.pbrl_pct || r.recent_pulled_barrel_pct || 0);
+  const pbrlScore = Math.min(100, pbrl * 8);
+  const hh        = parseFloat(r.hh_pct  || r.recent_hh_pct  || 0);
+  const hhScore   = Math.min(100, hh * 2.2);
+  const xwoba      = parseFloat(r.season_xwoba || 0);
+  const xwobaScore = Math.min(100, Math.max(0, (xwoba - 0.250) / 0.200 * 100));
+  const A = sweetSpotScore * 0.35 + pbrlScore * 0.30
+          + hhScore * 0.20 + xwobaScore * 0.15;
+
+  const zf       = parseFloat(r.zone_fit || 0);
+  const zfScore  = Math.min(100, zf * 13.5);
+  const grade    = (r.pitcher_grade_label || '').toLowerCase();
+  const gradeScore =
+    grade.includes('elite')    ? 15 :
+    grade.includes('tough')    ? 40 :
+    grade.includes('hittable') ? 82 :
+    grade.includes('target')   ? 92 :
+    grade.includes('average')  ? 62 : 60;
+  const seasonWoba  = parseFloat(r.season_xwoba  || 0.310);
+  const vsHandWoba  = parseFloat(r.vs_hand_woba   || seasonWoba);
+  const bHand       = (r.batter_hand  || '').toUpperCase();
+  const pHand       = (r.pitcher_hand || '').toUpperCase();
+  const platoonScore = Math.min(100, Math.max(0,
+    (vsHandWoba - 0.250) / 0.200 * 100));
+  const platoonMult  = bHand !== pHand ? 1.15 : 0.88;
+  const ps       = parseFloat(r.ps_score || 0);
+  const psScore  = Math.min(100, (ps / 25) * 100);
+  const pitcherGB    = parseFloat(r.gb_pct_p || r.pitcher_gb_pct || 45) / 100;
+  const gbSuppressor = pitcherGB > 0.55 ? 0.88 : pitcherGB < 0.35 ? 1.10 : 1.0;
+  const B = Math.min(100, Math.max(0,
+    (zfScore * 0.30 + gradeScore * 0.25 +
+     (platoonScore * platoonMult) * 0.25 + psScore * 0.20)
+    * gbSuppressor));
+
+  const ghr       = parseFloat(r.gHR || 0);
+  const ghrScore  = Math.min(100, ghr * 2.5);
+  const iso       = parseFloat(r.recent_iso || 0);
+  const isoScore  = Math.min(100, Math.max(0, (iso - 0.050) / 0.350 * 100));
+  const recentHR      = parseInt(r.recent_hr_count || 0);
+  const recentHRScore = Math.min(100, recentHR * 25);
+  const formScore     = (ghrScore * 1.5 + isoScore * 1.0) / 2.5;
+  const C = formScore * 0.70 + recentHRScore * 0.30;
+
+  return Math.round(Math.min(100, Math.max(0,
+    A * 0.40 + B * 0.35 + C * 0.25)));
+}
+
+function serverMatchupScore(r) {
+  const zf      = parseFloat(r.zone_fit || 0);
+  const zfScore = Math.min(100, zf * 13.5);
+  const ps      = parseFloat(r.ps_score || 0);
+  const psScore = Math.min(100, (ps / 25) * 100);
+  const seasonWoba = parseFloat(r.season_xwoba || 0.310);
+  const vsHandWoba = parseFloat(r.vs_hand_woba  || seasonWoba);
+  const bHand      = (r.batter_hand  || '').toUpperCase();
+  const pHand      = (r.pitcher_hand || '').toUpperCase();
+  const handScore  = Math.min(100, Math.max(0,
+    (vsHandWoba - 0.250) / 0.200 * 100));
+  const platoonMult = bHand !== pHand ? 1.12 : 0.90;
+  const grade    = (r.pitcher_grade_label || '').toLowerCase();
+  const gradeMult =
+    grade.includes('elite')    ? 0.55 :
+    grade.includes('tough')    ? 0.75 :
+    grade.includes('target')   ? 1.20 :
+    grade.includes('hittable') ? 1.10 : 1.0;
+  const pitcherGB = parseFloat(r.gb_pct_p || r.pitcher_gb_pct || 45) / 100;
+  const gbMult    = pitcherGB > 0.55 ? 0.88 : pitcherGB < 0.35 ? 1.10 : 1.0;
+  return Math.round(Math.min(100, Math.max(0,
+    (zfScore * 0.40 + psScore * 0.35 + (handScore * platoonMult) * 0.25)
+    * gradeMult * gbMult)));
+}
+
+// Sauce tier + Bullpen Tier bonuses — same thresholds/points as
+// isSauce2Batter/isSauce25Batter/isSauce3Batter and bullpenTierInfo() in
+// App.jsx (2026-07-30/08-02/08-04 sessions). Highest qualifying Sauce tier
+// only (never stacked), matching the app's own badge-precedence rule.
+function sauceBonus(r) {
+  const grade = (r.pitcher_grade_label || '').toLowerCase();
+  if (grade.includes('elite') || grade.includes('tough')) return 0; // already excluded upstream, defensive
+  const zf     = parseFloat(r.zone_fit || 0);
+  const xwoba  = parseFloat(r.season_xwoba || 0);
+  const recIso = parseFloat(r.recent_iso || 0);
+  const bvpIso = parseFloat(r.bvp_iso || 0);
+  if (zf >= 2 && xwoba >= 0.360 && recIso >= 0.250 && bvpIso >= 0.250) return 10; // Sauce 3.0
+  if (zf >= 2 && xwoba >= 0.330 && recIso >= 0.220 && bvpIso >= 0.220) return 6;  // Sauce 2.5
+  if (zf >= 2 && xwoba >= 0.360) return 3;                                        // Sauce 2.0
+  return 0;
+}
+function bullpenBonus(r) {
+  const rank = parseInt(r.bullpen_hr_rank || 0);
+  if (!rank) return 0;
+  if (rank <= 10) return 8;   // Soft Pen
+  if (rank >= 21) return -8;  // Tough Pen
+  return 0;
+}
+
+function loadDailyPicksRows() {
+  for (const p of [
+    join(process.cwd(), 'public', 'data', 'daily_picks.csv'),
+    join(process.cwd(), 'going-yard', 'public', 'data', 'daily_picks.csv'),
+  ]) {
+    try {
+      const rows = parseCsv(readFileSync(p, 'utf-8'));
+      if (rows.length) return rows;
+    } catch (_) { /* try next path */ }
+  }
+  return [];
+}
+
+// Independently recomputes an approximate "today's real Top 3 Tonight"
+// ranking server-side (never trusts a client-supplied flag — see header
+// comment). Fails CLOSED: any load/parse failure returns false (requires
+// sign-in) rather than silently handing out free generations.
+async function isTodaysTop3(batterId, pitcherId) {
+  try {
+    const rows = loadDailyPicksRows();
+    if (!rows.length) return false;
+    const bId = String(batterId), pId = String(pitcherId);
+    const scored = rows
+      .filter(r => r.batter_id && r.pitcher_id)
+      .filter(r => {
+        const grade = (r.pitcher_grade_label || '').toLowerCase();
+        return !grade.includes('elite') && !grade.includes('tough'); // outright excluded, matches TopThreeTab
+      })
+      .map(r => ({
+        batterId: String(parseInt(r.batter_id) || 0),
+        pitcherId: String(parseInt(r.pitcher_id) || 0),
+        score: serverTrueHRScore(r) * 0.5 + serverMatchupScore(r) * 0.5 + sauceBonus(r) + bullpenBonus(r),
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3);
+    return scored.some(s => s.batterId === bId && s.pitcherId === pId);
+  } catch (e) {
+    return false; // fail closed
+  }
+}
 
 const H = { 'User-Agent': 'Mozilla/5.0' };
 const MIN_BBE = 8;        // below this, decline to generate — too thin a sample to say anything
@@ -287,8 +489,30 @@ export default async function handler(req, res) {
     redis = new Redis({ url: process.env.UPSTASH_KV_REST_API_URL, token: process.env.UPSTASH_KV_REST_API_TOKEN });
     try {
       const cached = await redis.get(cacheKey);
-      if (cached) return res.status(200).json({ ...cached, cached: true });
+      if (cached) return res.status(200).json({ ...cached, cached: true }); // cache hits are ALWAYS free, no auth check
     } catch (e) { /* cache miss/unavailable — proceed to generate */ }
+  }
+
+  // Free-tier gate (2026-08-07) — cache miss = a genuinely new Anthropic
+  // call. Free without sign-in only for today's real Top 3 Tonight picks
+  // (recomputed server-side, see isTodaysTop3() above); everyone else needs
+  // a valid Clerk session token. Same verifyToken() pattern already used in
+  // api/save-picks.js for Cloud picks sync.
+  if (!(await isTodaysTop3(batterId, pitcherId))) {
+    const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+    let signedIn = false;
+    if (token) {
+      try {
+        const payload = await verifyToken(token, { secretKey: process.env.CLERK_SECRET_KEY });
+        signedIn = !!payload?.sub;
+      } catch (e) { signedIn = false; }
+    }
+    if (!signedIn) {
+      return res.status(401).json({
+        error: 'sign_in_required',
+        message: "Sign in to generate a Scouting Note for this matchup — today's Top 3 picks and any note someone's already generated today are always free.",
+      });
+    }
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
