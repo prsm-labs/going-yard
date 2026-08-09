@@ -2353,6 +2353,13 @@ function AtBatSlideIn() {
       if (_GLOBAL_GET_TOKEN) {
         try { const t = await _GLOBAL_GET_TOKEN(); if (t) headers['Authorization'] = `Bearer ${t}`; } catch (_) { /* stay signed-out */ }
       }
+      // Weather/park (2026-08-09) — reuses buildGameWeatherMap()'s exact
+      // extraction logic (temp_f/wind_speed_mph/wind_effect/hr_factor_int/
+      // isDomeGame/getRainRiskPct) rather than a second, potentially-
+      // drifting copy of that fallback logic; single-row call just to pull
+      // this one game's already-normalized values off the same
+      // daily_picks.csv fields WeatherStrip/Ball Carry already use.
+      const wx = Object.values(buildGameWeatherMap([dpRow]))[0] || null;
       const res = await fetch('/api/batter-scouting-note', {
         method: 'POST', headers,
         body: JSON.stringify({
@@ -2367,6 +2374,12 @@ function AtBatSlideIn() {
           // re-derive it from team IDs.
           gameId: dpRow.game_id || null,
           isHomeToday: !!(dpRow.batting_team && dpRow.home_team && dpRow.batting_team === dpRow.home_team),
+          tempF: wx && !wx.isDome ? Math.round(wx.temp) : null,
+          windMph: wx && !wx.isDome ? Math.round(wx.windMph) : null,
+          windEffect: wx && !wx.isDome ? wx.windEffect : null,
+          hrFactor: wx ? wx.hrf : null,
+          isDome: wx ? wx.isDome : false,
+          rainPct: wx && !wx.isDome ? wx.rain : null,
         }),
       });
       if (res.status === 401) { setScoutNoteLocked(true); return; }
@@ -31034,6 +31047,10 @@ function TopThreeTab() {
       const selectionContext = (contextFn ? contextFn(r, p) : '') + ' This ranking is NOT based on the recent-form data below.';
       setNotes(n => {
         if (n[key]) return n;
+        // Weather/park (2026-08-09) — same buildGameWeatherMap() reuse as
+        // AtBatSlideIn's own loadScoutingNote(), single-row call to pull
+        // this one game's already-normalized values.
+        const wx = Object.values(buildGameWeatherMap([r]))[0] || null;
         fetch('/api/batter-scouting-note', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -31043,6 +31060,12 @@ function TopThreeTab() {
             pitcherGrade: getHandSpecificGrade(r),
             gameId: r.game_id || null,
             isHomeToday: !!(r.batting_team && r.home_team && r.batting_team === r.home_team),
+            tempF: wx && !wx.isDome ? Math.round(wx.temp) : null,
+            windMph: wx && !wx.isDome ? Math.round(wx.windMph) : null,
+            windEffect: wx && !wx.isDome ? wx.windEffect : null,
+            hrFactor: wx ? wx.hrf : null,
+            isDome: wx ? wx.isDome : false,
+            rainPct: wx && !wx.isDome ? wx.rain : null,
             selectionContext,
           }),
         }).then(res => res.json().then(data => ({ ok: res.ok, data })))
@@ -35290,7 +35313,6 @@ function BarrelLabTab() {
                                   {b.isChalk && <span title="Chalk — real season HR leader (>=18 HR, >=.220 ISO) facing a genuinely soft matchup today (Target/Hittable/Average)." style={{color:'#f5c542',marginRight:2,fontWeight:900,fontSize:7}}>💪🏽</span>}
                                   {b.isDayLate && <span title="Day Late — a real ★ Barrel Signal on BOTH of the last 2 real game days, no HR either day, today's matchup not an outright Elite mismatch." style={{color:'#22c1c3',marginRight:2,fontWeight:900,fontSize:7}}>🗓️</span>}
                                   {b.isYoungGun && <span title={`Young Gun — ${parseInt(b.season_pa||0)} season PA. Discovery filter, not a hot signal — thin-history batters homer LESS often per game on average (7.9% vs 11.5%).`} style={{color:'#4ade80',marginRight:2,fontWeight:900,fontSize:7}}>🌱</span>}
-                                  {b.isMidTier && <span title="Not Young Gun/Chalk/Longshot -- the plain, unremarkable middle. Not an independently validated signal, just everyone else." style={{color:'#199e70',marginRight:2,fontWeight:900,fontSize:7}}>⬜</span>}
                                   {b.isSauce3 && <span title="Sauce 3.0 — Sauce 2.0 AND both L7 ISO + Arsenal Fit ISO ≥.250. 20.26% HR rate / 2.85x lift, full 2026 season backtest (n=380). Best validated combo in this app." style={{color:'#f59e0b',marginRight:2,fontWeight:900,fontSize:7}}>🍯🔥</span>}
                                   {b.isSauce25 && !b.isSauce3 && <span title="Sauce 2.5 — relaxed xwOBA≥.330, both ISO≥.220. 18.24% HR rate / 2.57x lift, full 2026 season backtest (n=899)." style={{color:'#eab308',marginRight:2,fontWeight:900,fontSize:7}}>🥫</span>}
                                   {b.handMatchTier && <span
@@ -36435,7 +36457,6 @@ function OnBaseTab() {
                                 {b.isChalk && <span title="Chalk — real season HR leader (>=18 HR, >=.220 ISO) facing a genuinely soft matchup today." style={{color:'#f5c542',marginRight:2,fontWeight:900,fontSize:7}}>💪🏽</span>}
                                 {b.isDayLate && <span title="Day Late — a real ★ Barrel Signal on BOTH of the last 2 real game days, no HR either day, today's matchup not an outright Elite mismatch." style={{color:'#22c1c3',marginRight:2,fontWeight:900,fontSize:7}}>🗓️</span>}
                                 {b.isYoungGun && <span title={`Young Gun — ${parseInt(b.season_pa||0)} season PA. Discovery filter, not a hot signal — thin-history batters homer LESS often per game on average (7.9% vs 11.5%).`} style={{color:'#4ade80',marginRight:2,fontWeight:900,fontSize:7}}>🌱</span>}
-                                {b.isMidTier && <span title="Not Young Gun/Chalk/Longshot -- the plain, unremarkable middle. Not an independently validated signal, just everyone else." style={{color:'#199e70',marginRight:2,fontWeight:900,fontSize:7}}>⬜</span>}
                                 {b.isSauce3 && <span title="Sauce 3.0 — Sauce 2.0 AND both L7 ISO + Arsenal Fit ISO ≥.250. 20.26% HR rate / 2.85x lift, full 2026 season backtest (n=380). Best validated combo in this app." style={{color:'#f59e0b',marginRight:2,fontWeight:900,fontSize:7}}>🍯🔥</span>}
                                 {b.isSauce25 && !b.isSauce3 && <span title="Sauce 2.5 — relaxed xwOBA≥.330, both ISO≥.220. 18.24% HR rate / 2.57x lift, full 2026 season backtest (n=899)." style={{color:'#eab308',marginRight:2,fontWeight:900,fontSize:7}}>🥫</span>}
                                 {b.handMatchTier && <span

@@ -20,6 +20,15 @@
 // filter — a batter with a thin same-context sample still gets a real
 // answer, just at a looser (and honestly-labeled) tier instead of silence.
 //
+// Weather/park factor (2026-08-09): user asked directly whether these were
+// factored in — they weren't (confirmed via grep, zero mentions anywhere in
+// this file before this date). Added as an OPTIONAL client-supplied field
+// (tempF/windMph/windEffect/hrFactor/isDome/rainPct), sourced from
+// daily_picks.csv's own pre-game forecast columns — no new server-side
+// fetch. Claude is instructed to only mention it when genuinely notable
+// (hot + hitter's park, strong wind out, or a dome making it irrelevant)
+// rather than padding every note with an unremarkable forecast.
+//
 // Data sources — all MLB Stats API, no Baseball Savant scraping needed:
 //   - schedule?gamePk={id}             → TODAY's real dayNight + home/away
 //     team IDs, for the one specific game this slideout is about (cheap —
@@ -439,7 +448,7 @@ function computeStats(events, batterHand, pitcherHand, arsenal, todayContext) {
   };
 }
 
-function buildPrompt({ batterName, pitcherName, pitcherGrade, batterHand, pitcherHand, arsenal, stats, selectionContext }) {
+function buildPrompt({ batterName, pitcherName, pitcherGrade, batterHand, pitcherHand, arsenal, stats, selectionContext, weather, dayNight }) {
   const arsenalStr = arsenal.map(a => `${a.name} (${a.pct}%)`).join(', ');
   const byPitchStr = stats.byPitchFB.length
     ? stats.byPitchFB.map(p => `${p.fbPct}% FB rate vs ${p.pitch} (n=${p.n})`).join('; ')
@@ -452,13 +461,30 @@ function buildPrompt({ batterName, pitcherName, pitcherGrade, batterHand, pitche
   const mixStr = stats.mixContextDistances.length
     ? `${stats.mixContextDistances.length} recent at-bats vs this pitch mix in ${stats.mixContextLabel}, batted-ball distances: ${stats.mixContextDistances.join('ft, ')}ft`
     : `no recent at-bats vs this specific pitch mix on record (checked: ${stats.mixContextLabel})`;
+  // Weather/park (2026-08-09) — client-supplied from daily_picks.csv's own
+  // pre-game forecast columns (temp_f/wind_speed_mph/wind_effect/
+  // hr_factor_int), the same fields WeatherStrip/Ball Carry/xHR Conversion
+  // already use — no new server-side fetch, no new data source. This is a
+  // PRE-GAME FORECAST snapshot from the last pipeline run, not a live
+  // reading — worded that way below rather than implying real-time weather.
+  const weatherStr = weather?.isDome
+    ? 'Dome/retractable roof — weather is not a factor.'
+    : (weather && weather.tempF != null)
+      ? `${weather.tempF}°F, wind ${weather.windEffect || 'calm'}${weather.windMph != null ? ` at ${weather.windMph}mph` : ''}, park HR factor ${weather.hrFactor ?? 100} (100=neutral)${weather.rainPct >= 40 ? `, ${weather.rainPct}% rain risk` : ''}.`
+      : null;
+  // Same day/night value the "at-bats vs this pitch mix" line above is
+  // matched against (see matchTieredContext()) — labeled explicitly rather
+  // than a generic "today" so the weather line can never contradict what
+  // the mix-context line already says about today's real game (e.g. a
+  // Sunday day-game slate must never read "tonight" anywhere in the note).
+  const dnLabel = dayNight === 'day' ? "today's day game" : dayNight === 'night' ? "today's night game" : "today's game";
 
-  const system = `You are writing a terse, factual scouting note for a baseball betting/DFS tool. You will be given a fixed set of real, pre-verified statistics. Write 2-4 sentences using ONLY the numbers provided below — never introduce, estimate, or infer any statistic not explicitly given, including the specific game context (day/night, home/away) the "at-bats vs this pitch mix" figure is drawn from — state exactly what's given, do not assume it's a night game or a home game unless the data says so. If a data point is marked unavailable, do not mention it or make one up. Be direct and concise, matchup-analyst tone, no hedging filler like "it's worth noting." Always mention the pitcher's grade for balance — do not write a purely bullish note about a batter facing a Tough or Elite pitcher without saying so.${selectionContext ? ` A "Selection context" line will also be given, explaining why this batter was picked (typically a season-length composite score, not today's recent form). If the recent batted-ball stats below don't clearly support that reasoning — e.g. a low/0% barrel rate, few long fly balls, a cold-looking recent stretch — say so plainly and name that tension directly (e.g. "ranked on season form, but recent contact has been quiet"). Do not write an artificially bullish note just because the batter was already selected as a pick — the note's job is to report what the recent data actually shows, even when that cuts against the selection.` : ''}`;
+  const system = `You are writing a terse, factual scouting note for a baseball betting/DFS tool. You will be given a fixed set of real, pre-verified statistics. Write 2-4 sentences using ONLY the numbers provided below — never introduce, estimate, or infer any statistic not explicitly given, including the specific game context (day/night, home/away) the "at-bats vs this pitch mix" figure is drawn from — state exactly what's given, do not assume it's a night game or a home game unless the data says so. If a data point is marked unavailable, do not mention it or make one up. Be direct and concise, matchup-analyst tone, no hedging filler like "it's worth noting." Always mention the pitcher's grade for balance — do not write a purely bullish note about a batter facing a Tough or Elite pitcher without saying so.${selectionContext ? ` A "Selection context" line will also be given, explaining why this batter was picked (typically a season-length composite score, not today's recent form). If the recent batted-ball stats below don't clearly support that reasoning — e.g. a low/0% barrel rate, few long fly balls, a cold-looking recent stretch — say so plainly and name that tension directly (e.g. "ranked on season form, but recent contact has been quiet"). Do not write an artificially bullish note just because the batter was already selected as a pick — the note's job is to report what the recent data actually shows, even when that cuts against the selection.` : ''}${weatherStr ? ` A "${dnLabel} conditions" line will also be given (a pre-game forecast, not a live reading) — only work it into the note when it's genuinely notable for a home run (e.g. hot temperature combined with a hitter-friendly park factor, a strong double-digit-mph wind blowing out, or a dome making weather irrelevant); skip it silently if conditions are unremarkable (mild temp, calm wind, a roughly neutral park factor near 100) rather than padding the note with a forced mention. If you reference this game at all, describe it exactly as "${dnLabel}" — never call it "tonight" unless that literal phrase was given, and never contradict the day/night context already established by the "at-bats vs this pitch mix" data above. Never state a wind direction, temperature, or park factor other than exactly what's given.` : ''}`;
 
   const user = `Batter: ${batterName} (bats ${batterHand})
 Opposing pitcher: ${pitcherName} (throws ${pitcherHand}, grade: ${pitcherGrade || 'unknown'})
 Pitcher's real arsenal (>=8% usage): ${arsenalStr || 'unavailable'}
-${selectionContext ? `\nSelection context: ${selectionContext}\n` : ''}
+${selectionContext ? `\nSelection context: ${selectionContext}\n` : ''}${weatherStr ? `\n${dnLabel[0].toUpperCase()}${dnLabel.slice(1)} conditions (pre-game forecast, not a live reading): ${weatherStr}\n` : ''}
 Batter's last ${stats.l10BBE} real batted-ball events: ${stats.barrelPct}% Barrel, ${stats.fbPct}% Fly Ball, ${stats.pullPct}% Pull, ${stats.farBallCount} balls hit 350ft+.
 Batter's fly-ball rate by pitch type (recent games, larger sample): ${byPitchStr}.
 Batter vs this exact pitch mix, matched to today's real game context: ${mixStr}.
@@ -471,7 +497,8 @@ Write the scouting note now.`;
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { batterId, pitcherId, batterName, pitcherName, batterHand, pitcherHand, pitcherGrade, gameId, isHomeToday, selectionContext } = req.body || {};
+  const { batterId, pitcherId, batterName, pitcherName, batterHand, pitcherHand, pitcherGrade, gameId, isHomeToday, selectionContext,
+    tempF, windMph, windEffect, hrFactor, isDome, rainPct } = req.body || {};
   if (!batterId || !pitcherId) return res.status(400).json({ error: 'batterId and pitcherId required' });
 
   const season = new Date().getFullYear();
@@ -540,7 +567,11 @@ export default async function handler(req, res) {
       return res.status(200).json(thin); // not enough recent contact — don't force a writeup, don't cache a null result
     }
 
-    const { system, user } = buildPrompt({ batterName, pitcherName, pitcherGrade, batterHand, pitcherHand, arsenal, stats, selectionContext });
+    const weather = (tempF != null || isDome === true)
+      ? { tempF: tempF ?? null, windMph: windMph ?? null, windEffect: windEffect || null,
+          hrFactor: hrFactor ?? null, isDome: !!isDome, rainPct: rainPct ?? null }
+      : null;
+    const { system, user } = buildPrompt({ batterName, pitcherName, pitcherGrade, batterHand, pitcherHand, arsenal, stats, selectionContext, weather, dayNight: todayContext.dayNight });
 
     const anthRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',

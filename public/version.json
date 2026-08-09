@@ -1,8 +1,8 @@
 {
   "version": "2026.08.09",
-  "bundleFile": "index-mSN0vvCD.js",
+  "bundleFile": "index-CpqGkQ28.js",
   "changelog": [
-    "Loosen Chalk threshold: HR>=19 OR AB/HR<21 (was HR>=18 AND ISO>=.220)"
+    "Rework Top 3 Tonight into Top 4 Tonight: one real pick per HR-distribution tier"
   ],
   "notifyUsers": true
 }
