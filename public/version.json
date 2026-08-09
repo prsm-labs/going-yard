@@ -1,8 +1,9 @@
 {
   "version": "2026.08.09",
-  "bundleFile": "index-CpqGkQ28.js",
+  "bundleFile": "index-DCog1AqG.js",
   "changelog": [
-    "Rework Top 3 Tonight into Top 4 Tonight: one real pick per HR-distribution tier"
+    "Add weather/park factor to Scouting Notes",
+    "remove redundant Mid-Tier name badge"
   ],
   "notifyUsers": true
 }

@@ -17820,7 +17820,7 @@ function SimLabView({ data }) {
                 { key: 'daylate',   label: '🗓️ Day Late',        active: afDayLateOnly,    color: '#22c1c3',    onToggle: () => setAfDayLateOnly(v => !v) },
                 { key: 'younggun',  label: '🌱 Young Guns',      active: afYoungGunsOnly,  color: '#4ade80',    onToggle: () => setAfYoungGunsOnly(v => !v) },
                 { key: 'longshot',  label: '🎲 Longshot',        active: afLongshotOnly,   color: '#a78bfa',    onToggle: () => setAfLongshotOnly(v => !v) },
-                { key: 'midtier',   label: '⬜ Mid-Tier',         active: afMidTierOnly,    color: '#199e70',    onToggle: () => setAfMidTierOnly(v => !v) },
+                { key: 'midtier',   label: '🔵 Mid-Tier',         active: afMidTierOnly,    color: '#199e70',    onToggle: () => setAfMidTierOnly(v => !v) },
                 { key: 'sauce3',    label: '🍯🔥 Sauce 3.0',      active: afSauce3Only,     color: '#f59e0b',    onToggle: () => setAfSauce3Only(v => !v) },
                 { key: 'avoid',     label: '🚫 Avoid List',      active: afAvoidOnly,      color: '#ff6b6b',
                   title: "Avoid List — Sim H<=0.6 AND SwStr%>=19% AND (same-hand OR Tough/Elite pitcher). Full-season backtest: 58-61% miss rate vs 42.6% baseline, 1.4x lift. Filter-only, no badge.",
@@ -29214,7 +29214,7 @@ function TrackRecordTab() {
     const buckets = [
       { key: 'yg',  label: 'Young Gun', emoji: '🌱',  color: '#3987e5' },
       { key: 'ch',  label: 'Chalk',     emoji: '💪🏽', color: '#d95926' },
-      { key: 'mid', label: 'Mid-Tier',  emoji: '⬜',  color: '#199e70' },
+      { key: 'mid', label: 'Mid-Tier',  emoji: '🔵',  color: '#199e70' },
       { key: 'ls',  label: 'Longshot',  emoji: '🎲',  color: '#c98500' },
     ].map(b => ({
       ...b,
@@ -29828,7 +29828,7 @@ function TrackRecordTab() {
             { key:'dl',    label:'🗓️ Day Late Only',        active:showOnlyDayLate,  onToggle:()=>setShowOnlyDayLate(v=>!v),  color:'#22c1c3' },
             { key:'yg',    label:'🌱 Young Gun Only',       active:showOnlyYoungGun, onToggle:()=>setShowOnlyYoungGun(v=>!v), color:'#4ade80' },
             { key:'chk',   label:'💪🏽 Chalk Only',          active:showOnlyChalk,    onToggle:()=>setShowOnlyChalk(v=>!v),    color:'#f5c542' },
-            { key:'mt',    label:'⬜ Mid-Tier Only',        active:showOnlyMidTier,  onToggle:()=>setShowOnlyMidTier(v=>!v),  color:'#199e70',
+            { key:'mt',    label:'🔵 Mid-Tier Only',        active:showOnlyMidTier,  onToggle:()=>setShowOnlyMidTier(v=>!v),  color:'#199e70',
               title:"Mid-Tier — not Young Gun, Chalk, or Longshot. Not an independently validated signal, just everyone else (the plain, unremarkable middle — ~78% of all real HRs per the Daily HR Distribution panel)." },
             { key:'ls',    label:'🎲 Longshot Only',        active:showOnlyLongshotTR, onToggle:()=>setShowOnlyLongshotTR(v=>!v), color:'#a78bfa' },
             { key:'2b',    label:'2️⃣ 2-Bagger (Non-HR) Only', active:showOnly2Bagger, onToggle:()=>setShowOnly2Bagger(v=>!v), color:'#38b8f2' },
@@ -29961,7 +29961,7 @@ function TrackRecordTab() {
                   <SortTh col="isLongshot" label="Longshot" color="#38b8f2"/>
                   <SortTh col="isYoungGun" label="🌱" color="#38b8f2" title="Young Gun — <100 season PA. Discovery filter, not a hot signal."/>
                   <SortTh col="isChalk" label="💪🏽" color="#38b8f2" title="Chalk — real season HR leader (>=18 HR, >=.220 ISO) facing a genuinely soft matchup."/>
-                  <SortTh col="isMidTier" label="⬜" color="#38b8f2" title="Mid-Tier — not Young Gun, Chalk, or Longshot. Not an independently validated signal, just everyone else."/>
+                  <SortTh col="isMidTier" label="🔵" color="#38b8f2" title="Mid-Tier — not Young Gun, Chalk, or Longshot. Not an independently validated signal, just everyone else."/>
                   <SortTh col="plateIQ" label="IQ" color="#38b8f2" title="Plate IQ — display-only, does not affect Yard Score. See Legend for details."/>
                   <SortTh col="handMatchTier" label="Hand" color="#38b8f2" title="Hand Match — batter's handedness exploits the opposing pitcher's weakness (elite, full, or partial). See Legend for details."/>
                 </>}
@@ -30107,7 +30107,7 @@ function TrackRecordTab() {
                         {r.isChalk && <span style={{color:'#f5c542'}}>💪🏽</span>}
                       </td>
                       <td style={{padding:'3px 6px', textAlign:'center'}}>
-                        {r.isMidTier && <span title="Not Young Gun, Chalk, or Longshot — not an independently validated signal, just everyone else." style={{color:'#199e70'}}>⬜</span>}
+                        {r.isMidTier && <span title="Not Young Gun, Chalk, or Longshot — not an independently validated signal, just everyone else." style={{color:'#199e70'}}>🔵</span>}
                       </td>
                       <td style={{padding:'3px 6px', textAlign:'center'}}>
                         {r.plateIQGrade
@@ -30900,7 +30900,7 @@ const TOP4_TIER_CARDS = [
     border:'rgba(245,197,66,0.5)', glow:'rgba(245,197,66,0.25)',
     bg:'linear-gradient(160deg,rgba(245,197,66,0.12)0%,rgba(20,16,0,0.7)100%)',
     tagBg:'rgba(245,197,66,0.1)', tagColor:'rgba(250,215,110,0.9)', tagBorder:'rgba(245,197,66,0.25)' },
-  { key:'midTier', name:'⬜ Mid-Tier', emoji:'⬜', accentRgb:'25,158,112',
+  { key:'midTier', name:'🔵 Mid-Tier', emoji:'🔵', accentRgb:'25,158,112',
     border:'rgba(25,158,112,0.5)', glow:'rgba(25,158,112,0.25)',
     bg:'linear-gradient(160deg,rgba(25,158,112,0.12)0%,rgba(6,16,13,0.7)100%)',
     tagBg:'rgba(25,158,112,0.1)', tagColor:'rgba(75,205,165,0.9)', tagBorder:'rgba(25,158,112,0.25)' },
@@ -30927,8 +30927,13 @@ function TopThreeTab() {
   }, []);
 
   const eligibleBatters = useMemo(() => {
-    return DAILY_PICKS_ROWS.filter(r => {
-      if (!isBarrelLabEligible(r)) return false;
+    // filterLineupAwareEligible (2026-08-09) — replaces the raw
+    // isBarrelLabEligible(r) single-row check, which couldn't tell "this
+    // batter is scratched from an already-posted lineup" from "lineups
+    // haven't posted yet" and let scratched batters through via the PA
+    // fallback (confirmed live — Seiya Suzuki, CHC, not in today's posted
+    // lineup, was still showing as a real pick).
+    return filterLineupAwareEligible(DAILY_PICKS_ROWS).filter(r => {
       const bid = String(r.batter_id || '').split('.')[0];
       if (INJURY_MAP[bid]) return false;
       const pg = (r.pitcher_grade_label || r._pgLabel || '').toLowerCase();
@@ -31022,11 +31027,15 @@ function TopThreeTab() {
   // what keeps re-selection free: a batter re-entering a tier slot (lineup
   // churn that nets out to the same picks) never re-triggers a real call.
   useEffect(() => {
+    // "today's" not "tonight's" (2026-08-09, same fix class as the Scouting
+    // Note weather line below) — this text feeds selectionContext, which
+    // Claude reads verbatim, so a hardcoded "tonight" would be wrong on any
+    // day-game slate (Sundays especially) exactly like the weather wording was.
     const TIER_CONTEXT = {
-      youngGun: r => `Selected as tonight's 🌱 Young Gun pick — thin/no season track record (<100 season PA), the top-graded matchup among today's real Young Gun batters by TrueHRScore ${Math.round(r.trueHRScore)}/100 and MatchupScore ${Math.round(r.matchupScore)}/100${r.bullpenTier ? `, opposing bullpen: ${r.bullpenTier}` : ''}${r.sauce ? `, Sauce ${r.sauce} tier` : ''}. This is a discovery pick, not a hot-streak signal — thin-history batters have historically homered LESS often per game than established regulars.`,
-      chalk: r => `Selected as tonight's 💪🏽 Chalk pick — a real established season power bat (19+ season HR, or a season AB/HR under 21) facing a soft-enough matchup, the top-graded among today's real Chalk batters by TrueHRScore ${Math.round(r.trueHRScore)}/100 and MatchupScore ${Math.round(r.matchupScore)}/100${r.bullpenTier ? `, opposing bullpen: ${r.bullpenTier}` : ''}${r.sauce ? `, Sauce ${r.sauce} tier` : ''}.`,
-      midTier: (r, p) => `Selected as tonight's ⬜ Mid-Tier pick — not Young Gun, Chalk, or Longshot${p.isoFallback ? ' (no batter cleared both ISO bars today, so this is the top-graded Mid-Tier batter overall instead)' : ', additionally required L7 ISO and Arsenal Fit ISO both above .190 — the one tier where a real backtest showed that combination adds signal on top of the composite score'}, the top-graded among qualifying batters by TrueHRScore ${Math.round(r.trueHRScore)}/100 and MatchupScore ${Math.round(r.matchupScore)}/100${r.bullpenTier ? `, opposing bullpen: ${r.bullpenTier}` : ''}${r.sauce ? `, Sauce ${r.sauce} tier` : ''}.`,
-      longshot: r => `Selected as tonight's 🎲 Longshot pick — TrueHRScore≤55 with MatchupScore≥65 and Sim TB≥1.2 (a profile the model itself may be undervaluing), the top-graded among today's real Longshot batters by TrueHRScore ${Math.round(r.trueHRScore)}/100 and MatchupScore ${Math.round(r.matchupScore)}/100${r.bullpenTier ? `, opposing bullpen: ${r.bullpenTier}` : ''}${r.sauce ? `, Sauce ${r.sauce} tier` : ''}.`,
+      youngGun: r => `Selected as today's 🌱 Young Gun pick — thin/no season track record (<100 season PA), the top-graded matchup among today's real Young Gun batters by TrueHRScore ${Math.round(r.trueHRScore)}/100 and MatchupScore ${Math.round(r.matchupScore)}/100${r.bullpenTier ? `, opposing bullpen: ${r.bullpenTier}` : ''}${r.sauce ? `, Sauce ${r.sauce} tier` : ''}. This is a discovery pick, not a hot-streak signal — thin-history batters have historically homered LESS often per game than established regulars.`,
+      chalk: r => `Selected as today's 💪🏽 Chalk pick — a real established season power bat (19+ season HR, or a season AB/HR under 21) facing a soft-enough matchup, the top-graded among today's real Chalk batters by TrueHRScore ${Math.round(r.trueHRScore)}/100 and MatchupScore ${Math.round(r.matchupScore)}/100${r.bullpenTier ? `, opposing bullpen: ${r.bullpenTier}` : ''}${r.sauce ? `, Sauce ${r.sauce} tier` : ''}.`,
+      midTier: (r, p) => `Selected as today's 🔵 Mid-Tier pick — not Young Gun, Chalk, or Longshot${p.isoFallback ? ' (no batter cleared both ISO bars today, so this is the top-graded Mid-Tier batter overall instead)' : ', additionally required L7 ISO and Arsenal Fit ISO both above .190 — the one tier where a real backtest showed that combination adds signal on top of the composite score'}, the top-graded among qualifying batters by TrueHRScore ${Math.round(r.trueHRScore)}/100 and MatchupScore ${Math.round(r.matchupScore)}/100${r.bullpenTier ? `, opposing bullpen: ${r.bullpenTier}` : ''}${r.sauce ? `, Sauce ${r.sauce} tier` : ''}.`,
+      longshot: r => `Selected as today's 🎲 Longshot pick — TrueHRScore≤55 with MatchupScore≥65 and Sim TB≥1.2 (a profile the model itself may be undervaluing), the top-graded among today's real Longshot batters by TrueHRScore ${Math.round(r.trueHRScore)}/100 and MatchupScore ${Math.round(r.matchupScore)}/100${r.bullpenTier ? `, opposing bullpen: ${r.bullpenTier}` : ''}${r.sauce ? `, Sauce ${r.sauce} tier` : ''}.`,
     };
     top3.forEach(p => {
       const r = p.batter;
@@ -31258,7 +31267,7 @@ function TopThreeTab() {
                       {noteState?.error && (
                         // "sign_in_required" here would mean the server's
                         // approximate Top-4 ranking (api/batter-scouting-note.js
-                        // isTodaysTop3(), 2026-08-07) disagreed with this
+                        // isTodaysTop4(), 2026-08-07, reworked 2026-08-09) disagreed with this
                         // tab's own real per-tier ranking above — should be
                         // rare given both use the same weights/bonuses, but a
                         // genuine Top 4 card asking the user to "sign in"
@@ -33130,6 +33139,39 @@ function isBarrelLabEligible(r) {
   return recentPA >= 10 && seasonPA >= 30;
 }
 
+// ── filterLineupAwareEligible (2026-08-09) — real bug found via a live
+// screenshot: isBarrelLabEligible(r) has no way to tell "this batter's game
+// has a posted lineup and he's confirmed NOT in it" apart from "lineups
+// haven't posted for this game yet" — a single-row check can only ever ask
+// about ITS OWN batter's confirmed status, never "has this GAME's lineup
+// posted at all." So a batter genuinely scratched from an already-posted
+// lineup (Seiya Suzuki, CHC, confirmed example) still passed the PA-based
+// pre-confirmation fallback and showed up as a real pick in Top 4 Tonight.
+// Same root cause already found and fixed once for one specific caller
+// (getOpposingBatters(), 2026-07-28, via its own inline lineupKnownForGame
+// check) — but Barrel Lab/On Base/Arsenal Fit/Top 4 Tonight all call
+// isBarrelLabEligible(r) directly as a raw single-row filter, so all four
+// had the identical bug. This extracts that same two-pass pattern into one
+// shared helper (build the set of games with ANY confirmed batter first,
+// then require confirmation for every batter in those specific games,
+// falling back to the PA gate only for games with no posted lineup yet) so
+// all 4 call sites can share one fix instead of four separate copies.
+function filterLineupAwareEligible(rows) {
+  const knownGames = new Set();
+  rows.forEach(r => {
+    const bid = String(r.batter_id || '').split('.')[0];
+    if (LINEUP_STATUS[bid]?.status === 'confirmed') knownGames.add(String(r.game_id || ''));
+  });
+  return rows.filter(r => {
+    const gid = String(r.game_id || '');
+    if (knownGames.has(gid)) {
+      const bid = String(r.batter_id || '').split('.')[0];
+      return LINEUP_STATUS[bid]?.status === 'confirmed';
+    }
+    return isBarrelLabEligible(r);
+  });
+}
+
 function groupA_ContactQuality(r) {
   const la    = parseFloat(r.la_mean_l15 || r.recent_avg_la || 18);
   const laStd = parseFloat(r.la_stddev || 8);
@@ -34034,8 +34076,10 @@ function AvoidListTab() {
   }, [lineupVer]);
 
   const eligibleBatters = useMemo(() => {
-    const base = DAILY_PICKS_ROWS.filter(r => {
-      if (!isBarrelLabEligible(r)) return false;
+    // filterLineupAwareEligible (2026-08-09) — see its own comment; fixes a
+    // real bug where a batter scratched from an already-posted lineup still
+    // showed up via the raw isBarrelLabEligible(r) PA-based fallback.
+    const base = filterLineupAwareEligible(DAILY_PICKS_ROWS).filter(r => {
       const bid = String(r.batter_id || '').split('.')[0];
       if (INJURY_MAP[bid]) return false;
       return true;
@@ -34327,8 +34371,10 @@ function BarrelLabTab() {
     // that game here always showed zero batters — not a live/timing issue,
     // the data was never in the cache to begin with. DAILY_PICKS_ROWS keeps
     // every row, so both games' batters are present and filterable by game_id.
-    const base = DAILY_PICKS_ROWS.filter(r => {
-      if (!isBarrelLabEligible(r)) return false;
+    // filterLineupAwareEligible (2026-08-09) — see its own comment; fixes a
+    // real bug where a batter scratched from an already-posted lineup still
+    // showed up via the raw isBarrelLabEligible(r) PA-based fallback.
+    const base = filterLineupAwareEligible(DAILY_PICKS_ROWS).filter(r => {
       const bid = String(r.batter_id || '').split('.')[0];
       // Always exclude injured players — same INJURY_MAP used by All Matchups 🤕
       // fetchInjuries() auto-clears players confirmed in today's lineup, so a recovered
@@ -34828,7 +34874,7 @@ function BarrelLabTab() {
                 {key:'chalk',     label:'💪🏽 Chalk',             active:blChalkOnly,     color:'#f5c542', onToggle:()=>setBlChalkOnly(v=>!v)},
                 {key:'daylate',   label:'🗓️ Day Late',          active:blDayLateOnly,   color:'#22c1c3', onToggle:()=>setBlDayLateOnly(v=>!v)},
                 {key:'younggun',  label:'🌱 Young Guns',        active:blYoungGunsOnly, color:'#4ade80', onToggle:()=>setBlYoungGunsOnly(v=>!v)},
-                {key:'midtier',   label:'⬜ Mid-Tier',           active:blMidTierOnly,   color:'#199e70', onToggle:()=>setBlMidTierOnly(v=>!v)},
+                {key:'midtier',   label:'🔵 Mid-Tier',           active:blMidTierOnly,   color:'#199e70', onToggle:()=>setBlMidTierOnly(v=>!v)},
                 {key:'sauce3',    label:'🍯🔥 Sauce 3.0',        active:blSauce3Only,    color:'#f59e0b', onToggle:()=>setBlSauce3Only(v=>!v)},
                 {key:'hitsignal', label:'⚾ Hit Signal',        active:blHitSignalOnly, color:'#93c5fd',
                   title:"Hit Signal — Sim H>=1.0 AND SwStr%<=15%. Full-season backtest: 64.1% hit rate (any hit), 1.12x lift, n=2,933, stable train/test (64.2%/63.8%). Filter-only, no badge — still accumulating its own Track Record validation.",
@@ -35205,7 +35251,7 @@ function BarrelLabTab() {
                   <div title="Not Young Gun, Chalk, or Longshot — the plain, unremarkable-on-paper middle. NOT an independently validated signal (it has no threshold of its own, it's just everyone else) — added so the real daily HR split (Track Record's Daily HR Distribution panel: ~78% of all HRs, not the special tiers) has a filterable counterpart here."
                     style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'#199e70',
                     letterSpacing:.6,textTransform:'uppercase',marginBottom:4}}>
-                    ⬜ Mid-Tier
+                    🔵 Mid-Tier
                   </div>
                 )}
                 {b.isSauce3 && (
@@ -35624,8 +35670,10 @@ function OnBaseTab() {
     // FIXED 2026-07-18: was Object.values(DAILY_PICKS_CACHE) — same
     // doubleheader gap as BarrelLabTab (see its eligibleBatters comment for
     // the full explanation). DAILY_PICKS_ROWS preserves every game's row.
-    const base = DAILY_PICKS_ROWS.filter(r => {
-      if (!isBarrelLabEligible(r)) return false;
+    // filterLineupAwareEligible (2026-08-09) — see its own comment; fixes a
+    // real bug where a batter scratched from an already-posted lineup still
+    // showed up via the raw isBarrelLabEligible(r) PA-based fallback.
+    const base = filterLineupAwareEligible(DAILY_PICKS_ROWS).filter(r => {
       const bid = String(r.batter_id || '').split('.')[0];
       if (INJURY_MAP[bid]) return false;
       return true;
@@ -36044,7 +36092,7 @@ function OnBaseTab() {
                 {key:'chalk',     label:'💪🏽 Chalk',             active:obChalkOnly,     color:'#f5c542', onToggle:()=>setObChalkOnly(v=>!v)},
                 {key:'daylate',   label:'🗓️ Day Late',          active:obDayLateOnly,   color:'#22c1c3', onToggle:()=>setObDayLateOnly(v=>!v)},
                 {key:'younggun',  label:'🌱 Young Guns',        active:obYoungGunsOnly, color:'#4ade80', onToggle:()=>setObYoungGunsOnly(v=>!v)},
-                {key:'midtier',   label:'⬜ Mid-Tier',           active:obMidTierOnly,   color:'#199e70', onToggle:()=>setObMidTierOnly(v=>!v)},
+                {key:'midtier',   label:'🔵 Mid-Tier',           active:obMidTierOnly,   color:'#199e70', onToggle:()=>setObMidTierOnly(v=>!v)},
                 {key:'sauce3',    label:'🍯🔥 Sauce 3.0',        active:obSauce3Only,    color:'#f59e0b', onToggle:()=>setObSauce3Only(v=>!v)},
                 {key:'hitsignal', label:'⚾ Hit Signal',        active:obHitSignalOnly, color:'#93c5fd',
                   title:"Hit Signal — Sim H>=1.0 AND SwStr%<=15%. Full-season backtest: 64.1% hit rate (any hit), 1.12x lift, n=2,933, stable train/test (64.2%/63.8%). Filter-only, no badge — still accumulating its own Track Record validation.",
@@ -36350,7 +36398,7 @@ function OnBaseTab() {
                   <div title="Not Young Gun, Chalk, or Longshot — the plain, unremarkable-on-paper middle. NOT an independently validated signal (it has no threshold of its own, it's just everyone else) — added so the real daily HR split (Track Record's Daily HR Distribution panel: ~78% of all HRs, not the special tiers) has a filterable counterpart here."
                     style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'#199e70',
                     letterSpacing:.6,textTransform:'uppercase',marginBottom:6}}>
-                    ⬜ Mid-Tier
+                    🔵 Mid-Tier
                   </div>
                 )}
                 {b.isSauce3 && (

@@ -231,29 +231,126 @@ function loadDailyPicksRows() {
   return [];
 }
 
-// Independently recomputes an approximate "today's real Top 3 Tonight"
-// ranking server-side (never trusts a client-supplied flag — see header
-// comment). Fails CLOSED: any load/parse failure returns false (requires
-// sign-in) rather than silently handing out free generations.
-async function isTodaysTop3(batterId, pitcherId) {
+// players.json (2026-08-09) — needed for the Chalk check below, which
+// (like App.jsx's own isChalkBatter()) needs real season HR/AB, not
+// anything in daily_picks.csv. Same dual-path pattern as
+// loadDailyPicksRows().
+function loadPlayersMap() {
+  for (const p of [
+    join(process.cwd(), 'public', 'data', 'players.json'),
+    join(process.cwd(), 'going-yard', 'public', 'data', 'players.json'),
+  ]) {
+    try {
+      const raw = JSON.parse(readFileSync(p, 'utf-8'));
+      const arr = Array.isArray(raw) ? raw : (raw.players || []);
+      if (!arr.length) continue;
+      const map = {};
+      arr.forEach(pl => { if (pl.pid) map[String(pl.pid)] = pl; });
+      return map;
+    } catch (_) { /* try next path */ }
+  }
+  return {};
+}
+
+// Tier checks (2026-08-09) — server-side ports of App.jsx's isYoungGunBatter/
+// isChalkBatter/isLongshotBatter, kept in exact sync with those definitions
+// (same thresholds, same field names) since this endpoint's whole job is to
+// answer "is this the same batter/pitcher pair the client's Top 4 Tonight
+// would really pick" — a stale copy here would silently re-break the free
+// tier the same way the old literal-top-3 version already did (see below).
+function serverIsYoungGun(r) {
+  return parseFloat(r.season_pa ?? 999) < 100;
+}
+function serverIsChalk(r, playersMap) {
+  const p = playersMap[String(parseInt(r.batter_id) || 0)];
+  if (!p) return false;
+  const seasonPA = p.pa || p.ab || 0;
+  if (seasonPA < 100) return false;
+  const seasonHR = p.hr || 0;
+  const abPerHR = (p.abPerHR && p.abPerHR < 99)
+    ? p.abPerHR
+    : (seasonHR > 0 ? seasonPA / seasonHR : null);
+  if (!(seasonHR >= 19 || (abPerHR != null && abPerHR < 21))) return false;
+  const grade = (r.pitcher_grade_label || '').toLowerCase();
+  return !(grade.includes('elite') || grade.includes('tough'));
+}
+function serverIsLongshot(r, trueHR, matchup) {
+  if (trueHR > 55) return false;
+  if (matchup < 65) return false;
+  if (parseFloat(r.sim_tb || 0) < 1.2) return false;
+  const grade = (r.pitcher_grade_label || '').toLowerCase();
+  return !grade.includes('elite');
+}
+
+// Independently recomputes today's real Top 4 Tonight selection server-side
+// (never trusts a client-supplied flag — see header comment). Fails CLOSED:
+// any load/parse failure returns false (requires sign-in) rather than
+// silently handing out free generations.
+//
+// REWORK 2026-08-09: this used to just take the literal top 3 by raw
+// composite score across the whole slate — correct when Top 3 Tonight was a
+// simple ranked list, but never updated when the client moved to "one real
+// pick per tier" (2026-08-09 rework). Two structural problems with the old
+// version, confirmed live: (1) a strict top-N cutoff can never reliably
+// contain a real Longshot pick, since Longshot requires TrueHR≤55 by
+// definition while a raw top-N list is always dominated by 90+ scores: (2)
+// it only ever returned 3 slots for what's now 4 real distinct picks. Both
+// meant the server would say "no" (require sign-in) for real, legitimate Top
+// 4 picks — exactly the "Couldn't generate a note" failures seen live.
+// Fixed by porting the client's actual tier-bucketing + Mid-Tier ISO gate +
+// sequential-dedup selection here, using the same serverTrueHRScore()/
+// serverMatchupScore() this file already computes.
+async function isTodaysTop4(batterId, pitcherId) {
   try {
     const rows = loadDailyPicksRows();
     if (!rows.length) return false;
+    const playersMap = loadPlayersMap();
     const bId = String(batterId), pId = String(pitcherId);
-    const scored = rows
+
+    const eligible = rows
       .filter(r => r.batter_id && r.pitcher_id)
       .filter(r => {
         const grade = (r.pitcher_grade_label || '').toLowerCase();
         return !grade.includes('elite') && !grade.includes('tough'); // outright excluded, matches TopThreeTab
       })
-      .map(r => ({
-        batterId: String(parseInt(r.batter_id) || 0),
-        pitcherId: String(parseInt(r.pitcher_id) || 0),
-        score: serverTrueHRScore(r) * 0.5 + serverMatchupScore(r) * 0.5 + sauceBonus(r) + bullpenBonus(r),
-      }))
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 3);
-    return scored.some(s => s.batterId === bId && s.pitcherId === pId);
+      .map(r => {
+        const trueHR  = serverTrueHRScore(r);
+        const matchup = serverMatchupScore(r);
+        return {
+          batterId: String(parseInt(r.batter_id) || 0),
+          pitcherId: String(parseInt(r.pitcher_id) || 0),
+          score: trueHR * 0.5 + matchup * 0.5 + sauceBonus(r) + bullpenBonus(r),
+          isYoungGun: serverIsYoungGun(r),
+          isChalk: serverIsChalk(r, playersMap),
+          isLongshot: serverIsLongshot(r, trueHR, matchup),
+          recentIso: parseFloat(r.recent_iso || 0),
+          bvpIso: parseFloat(r.bvp_iso || 0),
+        };
+      });
+
+    const byScore = arr => arr.slice().sort((a, b) => b.score - a.score);
+    const youngGunPool = byScore(eligible.filter(r => r.isYoungGun));
+    const chalkPool    = byScore(eligible.filter(r => r.isChalk));
+    const longshotPool = byScore(eligible.filter(r => r.isLongshot));
+    const midTierPool  = byScore(eligible.filter(r => !r.isLongshot && !r.isChalk && !r.isYoungGun));
+    const midTierIsoQualified = midTierPool.filter(r => r.recentIso > 0.190 && r.bvpIso > 0.190);
+
+    // Same sequential dedup as the client (Young Gun→Chalk→Mid-Tier→
+    // Longshot) — the 4 tiers aren't mutually exclusive by construction, so
+    // a batter already claimed by an earlier tier is excluded from later
+    // pools, matching TopThreeTab's own selectFrom() exactly.
+    const pickedIds = new Set();
+    const selectFrom = pool => {
+      for (const cand of pool) {
+        if (!pickedIds.has(cand.batterId)) { pickedIds.add(cand.batterId); return cand; }
+      }
+      return null;
+    };
+    const picks = [selectFrom(youngGunPool), selectFrom(chalkPool)];
+    picks.push(selectFrom(midTierIsoQualified) || selectFrom(midTierPool));
+    picks.push(selectFrom(longshotPool));
+
+    return picks.filter(Boolean).some(p => p.batterId === bId && p.pitcherId === pId);
   } catch (e) {
     return false; // fail closed
   }
@@ -520,12 +617,12 @@ export default async function handler(req, res) {
     } catch (e) { /* cache miss/unavailable — proceed to generate */ }
   }
 
-  // Free-tier gate (2026-08-07) — cache miss = a genuinely new Anthropic
-  // call. Free without sign-in only for today's real Top 3 Tonight picks
-  // (recomputed server-side, see isTodaysTop3() above); everyone else needs
-  // a valid Clerk session token. Same verifyToken() pattern already used in
-  // api/save-picks.js for Cloud picks sync.
-  if (!(await isTodaysTop3(batterId, pitcherId))) {
+  // Free-tier gate (2026-08-07, reworked 2026-08-09) — cache miss = a
+  // genuinely new Anthropic call. Free without sign-in only for today's real
+  // Top 4 Tonight picks (recomputed server-side, see isTodaysTop4() above);
+  // everyone else needs a valid Clerk session token. Same verifyToken()
+  // pattern already used in api/save-picks.js for Cloud picks sync.
+  if (!(await isTodaysTop4(batterId, pitcherId))) {
     const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
     let signedIn = false;
     if (token) {
