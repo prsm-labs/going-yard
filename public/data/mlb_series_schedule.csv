@@ -1,20 +1,5 @@
 Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitcher ID (Away),Game ID,Venue ID,Venue Name,Day of Week,Day Abbr,Series Game #,Games in Series,Series Position,Day Context
-2026-08-08,03:05 PM,NYY,ATL,543037.0,519242.0,823514,3313,Yankee Stadium,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
-2026-08-08,04:10 PM,BOS,ATH,687562.0,695611.0,824726,3,Fenway Park,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
-2026-08-08,04:10 PM,MIA,LAA,645261.0,700712.0,823834,4169,loanDepot park,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
-2026-08-08,06:05 PM,PHI,TOR,605400.0,453286.0,823426,2681,Citizens Bank Park,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
-2026-08-08,06:40 PM,PIT,NYM,696149.0,476594.0,823348,31,PNC Park,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
-2026-08-08,06:45 PM,WSH,CIN,674841.0,695505.0,822701,3309,Nationals Park,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
-2026-08-08,07:10 PM,KC,CHC,607625.0,605280.0,824079,7,Kauffman Stadium,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
-2026-08-08,07:10 PM,MIL,MIN,688107.0,671737.0,823752,32,American Family Field,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
-2026-08-08,07:15 PM,SD,HOU,650633.0,663567.0,823267,2680,Petco Park,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
-2026-08-08,07:15 PM,SF,DET,694738.0,695549.0,823188,2395,Oracle Park,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
-2026-08-08,07:15 PM,STL,COL,669461.0,607536.0,823021,2889,Busch Stadium,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
-2026-08-08,07:15 PM,TEX,BAL,594798.0,680694.0,822864,5325,Globe Life Field,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
-2026-08-08,07:15 PM,CWS,CLE,641743.0,668909.0,824565,4,Rate Field,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
-2026-08-08,08:10 PM,AZ,LAD,694297.0,808967.0,825049,15,Chase Field,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
-2026-08-08,09:50 PM,SEA,TB,669923.0,643377.0,823102,680,T-Mobile Park,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
-2026-08-09,12:15 PM,WSH,CIN,,663903.0,822700,3309,Nationals Park,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
+2026-08-09,12:15 PM,WSH,CIN,695418.0,663903.0,822700,3309,Nationals Park,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
 2026-08-09,01:35 PM,BOS,ATH,,669372.0,824724,3,Fenway Park,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
 2026-08-09,01:35 PM,PIT,NYM,683003.0,640455.0,823345,31,PNC Park,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
 2026-08-09,01:35 PM,PHI,TOR,666200.0,669456.0,823425,2681,Citizens Bank Park,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
@@ -28,4 +13,14 @@ Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitc
 2026-08-09,04:05 PM,SF,DET,657277.0,675512.0,823190,2395,Oracle Park,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
 2026-08-09,04:10 PM,AZ,LAD,593958.0,680736.0,825050,15,Chase Field,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
 2026-08-09,04:10 PM,SEA,TB,676106.0,,823104,680,T-Mobile Park,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-08-09,08:20 PM,SD,HOU,,,823268,2680,Petco Park,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
+2026-08-09,08:20 PM,SD,HOU,,664299.0,823268,2680,Petco Park,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
+2026-08-10,07:07 PM,TOR,BOS,,543243.0,822780,14,Rogers Centre,Monday,Mon,1,4,Opener,~ Solid
+2026-08-10,07:15 PM,ATL,NYM,,681035.0,824887,4705,Truist Park,Monday,Mon,1,3,Opener,~ Solid
+2026-08-10,07:40 PM,MIN,BAL,,,823675,3312,Target Field,Monday,Mon,1,3,Opener,~ Solid
+2026-08-10,07:45 PM,STL,PHI,690928.0,,823018,2889,Busch Stadium,Monday,Mon,1,3,Opener,~ Solid
+2026-08-10,09:38 PM,LAA,TEX,,,823998,1,Angel Stadium,Monday,Mon,1,4,Opener,~ Solid
+2026-08-10,09:40 PM,AZ,COL,,,825048,15,Chase Field,Monday,Mon,1,3,Opener,~ Solid
+2026-08-10,09:40 PM,ATH,TB,,,824969,2529,Sutter Health Park,Monday,Mon,1,3,Opener,~ Solid
+2026-08-10,09:40 PM,SD,MIL,,,823265,2680,Petco Park,Monday,Mon,1,3,Opener,~ Solid
+2026-08-10,09:45 PM,SF,HOU,,,823189,2395,Oracle Park,Monday,Mon,1,3,Opener,~ Solid
+2026-08-10,10:10 PM,LAD,KC,669373.0,,823918,22,UNIQLO Field at Dodger Stadium,Monday,Mon,1,3,Opener,~ Solid
