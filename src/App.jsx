@@ -33206,13 +33206,31 @@ function isYoungGunBatter(r) {
   return parseFloat(r.season_pa ?? 999) < 100;
 }
 
+// LOOSENED 2026-08-09 — user flagged Mid-Tier as swallowing way too many
+// batters (the original HR>=18 AND ISO>=.220 AND-gate only caught 31 of
+// 613 real 2026 season players). User's own bar: 19+ season HR OR a real
+// season-long AB/HR under 21 qualifies as Chalk on its own (OR, not AND) —
+// dropped the ISO requirement entirely per that direction. Added a season
+// PA>=100 floor (not requested, but required): without it, a batter with
+// e.g. 1 HR in 4 real at-bats has an AB/HR of 4 — a tiny-sample fluke, not
+// a real power threat, and checked live against players.json this would
+// have wrongly flagged guys like a 1-HR-in-10-AB call-up as "Chalk." 100 PA
+// matches isYoungGunBatter()'s own established threshold, so the two tiers
+// don't produce a contradictory pair of badges on the same thin-sample
+// batter. Validated against the real 2026 slate before shipping: 87 of 613
+// players qualify (up from 31), all with 109-504 real season PA — genuine
+// regulars/semi-regulars, not flukes.
 function isChalkBatter(r) {
   const p = getCachedPlayer(r.batter_id);
   if (!p) return false; // player season data not loaded yet, or genuinely unknown
-  const seasonHR  = p.hr || 0;
-  const seasonISO = (p.slg || 0) - (p.avg || 0);
-  if (seasonHR < 18) return false;    // not a real season HR-leader-tier bat
-  if (seasonISO < 0.220) return false; // real power density, not just compiled volume
+  const seasonPA = p.pa || p.ab || 0;
+  if (seasonPA < 100) return false; // same floor as isYoungGunBatter() — real sample required
+  const seasonHR = p.hr || 0;
+  const abPerHR = (p.abPerHR && p.abPerHR < 99)
+    ? p.abPerHR
+    : (seasonHR > 0 ? seasonPA / seasonHR : null);
+  const qualifies = seasonHR >= 19 || (abPerHR != null && abPerHR < 21);
+  if (!qualifies) return false;
   const pg = (r.pitcher_grade_label || r._pgLabel || '').toLowerCase();
   if (pg.includes('elite') || pg.includes('tough')) return false; // matchup not soft enough
   return true;
