@@ -28498,6 +28498,7 @@ function LegendButton() {
       'The self-auditing page — merges the daily All Matchups, Barrel Lab, and On Base exports against actual box-score outcomes, every day, automatically.',
       '✅ HRs Only, ★ Barrel Signal Only, and 🥫 Sauce 2.5 Only stay as standalone quick-access buttons. Everything else — 🔑 Key Matchup, 🟢 Weak Spot, 📍 Close Call, 🍯 Sauce 2.0, 🍯🔥 Sauce 3.0, 🗓️ Day Late, 2️⃣ 2-Bagger (Non-HR), 🎯 TB Signal, 🎲 Sim TB ≥2.0, 🧠 High Plate IQ, ⭐ Hand Match, 🔴/🔵 Ball Carry Juiced/Dead, ⬆️/⬇️ xHR Juiced/Dead, plus a Pitcher Grade multi-select — moved into the ⚙ Filters dropdown 2026-08-02 once the flat button row grew past what fits on a phone screen, same consolidation Barrel Lab/On Base/Arsenal Fit already went through. Sauce 3.0\'s own quick button moved into the panel that same day, once Sauce 2.5 took over the standalone slot.',
       '🗓️ Day Late filter/card (added 2026-08-02, alongside the FilterPanel consolidation) — same definition as Barrel Lab/On Base\'s Day Late badge (★ Barrel Signal on both of the last 2 real game days, no HR either day, today\'s pitcher not Elite), reimplemented against Track Record\'s own historical row data so it works on any past date, not just today\'s live slate.',
+      '🏆 Top 4 Pick filter/column/card (added 2026-08-09, prompted by a real day — 8/9 — where 3 of the 4 live picks, Burleson/Conine/Ortiz, went yard) — reconstructs which batter WOULD have been each tier\'s real Top 4 Tonight pick (Young Gun/Chalk/Mid-Tier/Longshot, one each) using the exact same selection algorithm the live tab uses: TrueHR×0.5 + MatchupScore×0.5 + Sauce/Bullpen bonuses, ranked within each tier, with Mid-Tier additionally gated by L7 ISO + Arsenal Fit ISO both >.190 (falling back to the plain top-graded Mid-Tier batter if nobody clears it). A batter already picked for an earlier tier is excluded from later ones, same dedup as the live tab. Top 4 Tonight itself has no CSV export of its own — reconstructed here from already-exported columns instead, the same "backfill from what\'s already in the export" approach used for Sauce 2.5/3.0. Genuinely LIMITED to dates where Young Gun/Chalk are both real-populated (checked live 2026-08-09: that\'s 8/2 onward, not the full season) — dates before that are skipped entirely rather than silently mislabeled (a real bug caught in testing: on those older dates, blank Young Gun/Chalk data would have defaulted every batter into Mid-Tier). Real 8/9 (the actual live 3-of-4 hit) isn\'t in this reconstruction yet — it lands once that night\'s export pipeline runs. Card is HONEST about how thin this still is: at first build, 7 real dates / 27 picks / 1 hit (3.7%, vs 11.4% baseline) — well within normal noise at that sample size (n=27 vs a base rate implying ~3 expected hits), not yet a real read either way. The "🏆 tier-emoji" combo in the table cell shows which specific tier that date\'s pick represents.',
       '🍯🔥 Sauce 3.0 (added 2026-07-31) — Sauce 2.0 (Zone Fit≥2, xwOBA≥.360, Pitcher Grade not Elite/Tough) AND both Recent ISO + Arsenal Fit ISO ≥.250. Full-season backtest: 20.05% HR rate / 2.82x lift (vs. Sauce 2.0 alone\'s 2.17x) — the best validated combo in this app. Uses "Recent ISO (BF)", not the native "L7 ISO" column — that field turned out to have real coverage gaps within the Sauce 2.0 population (53%), which shrank the qualifying pool well below what was validated. Both ISO fields here are backfilled leak-free for historical dates (5/17-7/30, from the batter\'s own AB-log history strictly before each real game date; Arsenal Fit ISO additionally filtered to that matchup\'s real Top Pitches/P.Hand) and flow in natively going forward via the All Matchups export — so this hit-rate card keeps updating with real forward data, not just the one-time backtest.',
       '🥫 Sauce 2.5 (added 2026-08-02) — same Zone Fit≥2/non-Elite-Tough gate as Sauce 2.0/3.0, relaxed to xwOBA≥.330 and both Recent ISO (BF)/Arsenal Fit ISO ≥.220. Full-season backtest: 18.24% HR rate / 2.57x lift (n=899) — nearly matches Sauce 3.0\'s 2.74x while more than doubling the flagged population and season-HR recall (7.4% vs 3.5%). Built after confirming Sauce 2.0/3.0\'s thresholds were excluding most real HRs even in favorable-form scenarios (80.5% of HRs hit in same-hand "unfavorable" matchups had xwOBA below Sauce 2.0\'s own bar).',
       '⚾ Ball Carry column/filter: dead-ball / juiced-ball verdict for that game, joined by date+team from the Ball Carry tracker (Live tab). Park/elevation-adjusted, deliberately NOT weather-adjusted — see the Live tab\'s ⚾ Ball Carry guide.',
@@ -28670,6 +28671,7 @@ function TrackRecordTab() {
   const [showOnlyChalk,    setShowOnlyChalk]    = useState(false);
   const [showOnlyMidTier,  setShowOnlyMidTier]  = useState(false);
   const [showOnlyLongshotTR, setShowOnlyLongshotTR] = useState(false);
+  const [showOnlyTop4Pick, setShowOnlyTop4Pick] = useState(false);
   const [carryFilter,    setCarryFilter]    = useState(''); // '' | 'DEAD' | 'JUICED'
   const [xhrFilter,      setXhrFilter]      = useState(''); // '' | 'DEAD' | 'JUICED'
   const [teamFilter,     setTeamFilter]     = useState('ALL');
@@ -29070,6 +29072,12 @@ function TrackRecordTab() {
             hitTB2: parseInt(r['TB'] || 0) >= 2,
             tbSignal,
             trueHR, matchup, simHRPct, brlSignal, isLongshot, isYoungGun, isChalk, isMidTier, seasonPA,
+            // Raw L7 ISO / Arsenal Fit ISO (2026-08-09) — for the Top 4 Pick
+            // reconstruction below, which needs to match Top 4 Tonight's own
+            // LIVE Mid-Tier gate exactly (recent_iso/bvp_iso, native fields,
+            // NOT the 'Recent ISO (BF)' backfilled substitute Sauce 3.0 uses
+            // for better historical coverage — different goal here).
+            l7IsoRaw: parseFloat(r['L7 ISO']||0), afIsoRaw: parseFloat(r['Arsenal Fit ISO']||0),
             plateIQ, plateIQGrade: plateIQGrade(plateIQ),
             zoneAttackRisk: (r['Zone Risk']||'').toString().trim().toUpperCase() === 'YES',
             handMatchTier, isHandMatch,
@@ -29110,6 +29118,91 @@ function TrackRecordTab() {
             xhrZ:       xhrRow ? xhrRow.z    : null,
             xhrDiff:    xhrRow ? xhrRow.diff : null,
           };
+        });
+
+        // ── Top 4 Pick reconstruction (2026-08-09) — user asked to track
+        // Top 4 Tonight's real picks in Track Record after a real day (8/9)
+        // where 3 of the 4 live picks (Burleson/Conine/Ortiz) went yard.
+        // Top 4 Tonight itself has no CSV export of its own (it's a same-day
+        // computed view, nothing logs its picks historically) — but every
+        // ingredient its selection formula needs (TrueHR, Matchup, tier
+        // flags, Sauce tier, Bullpen rank, L7/Arsenal Fit ISO) is ALREADY in
+        // this export, so this reconstructs which batter WOULD have been
+        // each tier's real pick per date, using the identical selection
+        // algorithm (tier-bucketed by score, Mid-Tier's L7 ISO/Arsenal Fit
+        // ISO >.190 gate + fallback, sequential Young Gun→Chalk→Mid-Tier→
+        // Longshot dedup) already live in TopThreeTab/isTodaysTop4(). Same
+        // reconstruct-from-already-exported-columns pattern already used
+        // for the Sauce 3.0/2.5 backfills — NOT the full season, though:
+        // Young Gun/Chalk are only genuinely populated from 2026-08-02
+        // onward (confirmed live, checked directly before shipping — a
+        // first pass wrongly assumed 5/17+ coverage), so the per-date gate
+        // below skips any date where those fields aren't real. 8/9 itself
+        // (the actual live 3-of-4 hit that prompted this) isn't in this
+        // reconstruction yet either — it lands once that night's export
+        // pipeline runs, same forward-only gap every other newly-added
+        // export column has hit here first.
+        // Caveat, disclosed rather than hidden: a date's TrueHR/Matchup
+        // reflect whichever single daily snapshot got exported that day —
+        // if lineups churned intraday, the reconstructed pick could differ
+        // from whatever was literally on screen at some earlier moment that
+        // same day. Same inherent limitation as every other CSV-based
+        // historical reconstruction in this app.
+        const byDate = {};
+        unified.forEach(r => { (byDate[r.date] ||= []).push(r); });
+        const top4Map = {}; // `${date}_${batterId}` -> tier key
+        Object.entries(byDate).forEach(([date, dayRows]) => {
+          const eligible = dayRows.filter(r =>
+            r.batterId && !/elite|tough/i.test(r.pitcherGrade || ''));
+          // Skip dates where Barrel Lab's own scoring columns genuinely
+          // weren't populated yet (pre-Barrel-Lab-era or a truly sparse
+          // export) — a real threshold, not arbitrary: below this, most
+          // trueHR values are 0/missing and the "top pick" would be noise.
+          if (eligible.filter(r => r.trueHR > 0).length < 20) return;
+          // REAL BUG CAUGHT before shipping (2026-08-09), via a live
+          // validation run against real data: isYoungGun/isChalk are
+          // tri-state (true/false/null) and only genuinely populated from
+          // 2026-08-02 / 2026-07-27 respectively — on any earlier date both
+          // read as null, which is falsy for both checks, so EVERY batter
+          // silently fell into the Mid-Tier bucket by default (never a real
+          // Young Gun/Chalk pick, and Mid-Tier itself mislabeled as "the
+          // whole slate" instead of a real elimination result). Same
+          // ≥50%-resolved gate Daily HR Distribution already uses for the
+          // identical reason — skip a date entirely rather than silently
+          // mislabel it.
+          const resolvedPct = eligible.length
+            ? eligible.filter(r => r.isYoungGun !== null && r.isChalk !== null).length / eligible.length
+            : 0;
+          if (resolvedPct < 0.5) return;
+          const scored = eligible.map(r => ({
+            ...r,
+            _score: (r.trueHR||0)*0.5 + (r.matchup||0)*0.5
+              + (r.isSauce3?10:r.isSauce25?6:r.isSauce2?3:0)
+              + (r.bullpenRank && r.bullpenRank<=10 ? 8 : r.bullpenRank && r.bullpenRank>=21 ? -8 : 0),
+          }));
+          const byScore = arr => arr.slice().sort((a,b) => b._score - a._score);
+          const ygPool = byScore(scored.filter(r => r.isYoungGun));
+          const chPool = byScore(scored.filter(r => r.isChalk));
+          const lsPool = byScore(scored.filter(r => r.isLongshot));
+          const mtPool = byScore(scored.filter(r => !r.isLongshot && !r.isChalk && !r.isYoungGun));
+          const mtIso  = mtPool.filter(r => r.l7IsoRaw > 0.190 && r.afIsoRaw > 0.190);
+          const picked = new Set();
+          const selectFrom = pool => {
+            for (const c of pool) { if (!picked.has(c.batterId)) { picked.add(c.batterId); return c; } }
+            return null;
+          };
+          const picks = [
+            ['youngGun', selectFrom(ygPool)],
+            ['chalk',    selectFrom(chPool)],
+            ['midTier',  selectFrom(mtIso) || selectFrom(mtPool)],
+            ['longshot', selectFrom(lsPool)],
+          ];
+          picks.forEach(([tier, p]) => { if (p) top4Map[`${date}_${p.batterId}`] = tier; });
+        });
+        unified.forEach(r => {
+          const tier = top4Map[`${r.date}_${r.batterId}`] || null;
+          r.top4Tier = tier;
+          r.isTop4Pick = !!tier;
         });
 
         const dates = [...new Set(unified.map(r => r.date))].sort().reverse();
@@ -29251,6 +29344,7 @@ function TrackRecordTab() {
     if (showOnlyChalk) rows = rows.filter(r => r.isChalk);
     if (showOnlyMidTier) rows = rows.filter(r => r.isMidTier);
     if (showOnlyLongshotTR) rows = rows.filter(r => r.isLongshot);
+    if (showOnlyTop4Pick) rows = rows.filter(r => r.isTop4Pick);
     if (carryFilter)    rows = rows.filter(r => r.ballCarryVerdict === carryFilter);
     if (xhrFilter)       rows = rows.filter(r => r.xhrVerdict === xhrFilter);
     if (selPitcherGradesTR.size > 0) rows = rows.filter(r => selPitcherGradesTR.has((r.pitcherGrade||'').trim()));
@@ -29270,7 +29364,7 @@ function TrackRecordTab() {
       }
       return sortDir * ((av||0) - (bv||0));
     });
-  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, showOnlyWeakSlot, showOnlyCC, showOnlySauce2, showOnlySauce3, showOnlySauce25, showOnlyHitSignal, showOnlySecretSauce, showOnlyAvoid, showOnly2Bagger, showOnlyTBSignal, showOnlySimTB2, showOnlyHighIQ, showOnlyHandMatch, showOnlyDayLate, showOnlyYoungGun, showOnlyChalk, showOnlyMidTier, showOnlyLongshotTR, carryFilter, xhrFilter, selPitcherGradesTR, selBullpenTiers, search, sortCol, sortDir]);
+  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, showOnlyWeakSlot, showOnlyCC, showOnlySauce2, showOnlySauce3, showOnlySauce25, showOnlyHitSignal, showOnlySecretSauce, showOnlyAvoid, showOnly2Bagger, showOnlyTBSignal, showOnlySimTB2, showOnlyHighIQ, showOnlyHandMatch, showOnlyDayLate, showOnlyYoungGun, showOnlyChalk, showOnlyMidTier, showOnlyLongshotTR, showOnlyTop4Pick, carryFilter, xhrFilter, selPitcherGradesTR, selBullpenTiers, search, sortCol, sortDir]);
 
   const summary = useMemo(() => {
     // FIXED 2026-08-06: every card below used to compute off `dateRows`
@@ -29299,6 +29393,15 @@ function TrackRecordTab() {
     const kmHits       = keyMatchups.filter(r => r.wentYard);
     const longshots    = played.filter(r => r.isLongshot);
     const lsHits       = longshots.filter(r => r.wentYard);
+    // Top 4 Pick (2026-08-09) — reconstructed daily Top 4 Tonight selection
+    // (one per tier: Young Gun/Chalk/Mid-Tier/Longshot), see its own build
+    // comment in loadTrackRecordForYear() above. Prompted by 8/9's real live
+    // 3-of-4 hit, but that date isn't reconstructed yet (see that comment) —
+    // checked live before shipping: 7 real dates (8/2-8/8), n=27, 1 hit
+    // (3.7% vs 11.4% baseline) — too small a sample to mean anything either
+    // way, not a validated result.
+    const top4Picks     = played.filter(r => r.isTop4Pick);
+    const top4PickHits  = top4Picks.filter(r => r.wentYard);
     const weakSlots    = played.filter(r => r.isWeakSlot);
     const weakSlotHits = weakSlots.filter(r => r.wentYard);
     const sauce2       = played.filter(r => r.isSauce2);
@@ -29356,7 +29459,7 @@ function TrackRecordTab() {
       .sort((a,b) => a.yardScore - b.yardScore)[0];
     return { hrs, totalHR, signals, signalHits, keyMatchups, kmHits,
              longshots, lsHits, weakSlots, weakSlotHits, sauce2, sauce2Hits, sauce3, sauce3Hits, sauce25, sauce25Hits, hitSignal, hitSignalHits, secretSauce, secretSauceHits, avoidList, avoidListMisses, twoBaggers, tbSignals, tbSignalHits, simTB2, simTB2Hits,
-             highIQBatters, highIQHRHits, highIQTB2Hits, handMatches, handMatchHits, dayLate, dayLateHits,
+             highIQBatters, highIQHRHits, highIQTB2Hits, handMatches, handMatchHits, dayLate, dayLateHits, top4Picks, top4PickHits,
              topYS, biggestMiss, biggestUpset };
   }, [dateRows]);
 
@@ -29670,6 +29773,14 @@ function TrackRecordTab() {
               sub: `${summary.dayLateHits.length}/${summary.dayLate.length}`,
               color:'#22c1c3'
             },
+            {
+              label:'🏆 TOP 4 PICK HIT RATE',
+              value: summary.top4Picks.length
+                ? `${((summary.top4PickHits.length/summary.top4Picks.length)*100).toFixed(0)}%`
+                : '—',
+              sub: `${summary.top4PickHits.length}/${summary.top4Picks.length}`,
+              color:'#eab308'
+            },
           ];
           const stacks = [];
           for (let i = 0; i < cards.length; i += 3) stacks.push(cards.slice(i, i + 3));
@@ -29831,6 +29942,8 @@ function TrackRecordTab() {
             { key:'mt',    label:'🔵 Mid-Tier Only',        active:showOnlyMidTier,  onToggle:()=>setShowOnlyMidTier(v=>!v),  color:'#199e70',
               title:"Mid-Tier — not Young Gun, Chalk, or Longshot. Not an independently validated signal, just everyone else (the plain, unremarkable middle — ~78% of all real HRs per the Daily HR Distribution panel)." },
             { key:'ls',    label:'🎲 Longshot Only',        active:showOnlyLongshotTR, onToggle:()=>setShowOnlyLongshotTR(v=>!v), color:'#a78bfa' },
+            { key:'t4p',   label:'🏆 Top 4 Pick Only',      active:showOnlyTop4Pick,   onToggle:()=>setShowOnlyTop4Pick(v=>!v),  color:'#eab308',
+              title:"Reconstructed Top 4 Tonight selection (one per tier: Young Gun/Chalk/Mid-Tier/Longshot), same algorithm as the live tab." },
             { key:'2b',    label:'2️⃣ 2-Bagger (Non-HR) Only', active:showOnly2Bagger, onToggle:()=>setShowOnly2Bagger(v=>!v), color:'#38b8f2' },
             { key:'tbs',   label:'🎯 TB Signal Only',       active:showOnlyTBSignal, onToggle:()=>setShowOnlyTBSignal(v=>!v), color:'#38b8f2' },
             { key:'stb2',  label:'🎲 Sim TB ≥2.0 Only',     active:showOnlySimTB2,   onToggle:()=>setShowOnlySimTB2(v=>!v),   color:'#a78bfa' },
@@ -29854,7 +29967,7 @@ function TrackRecordTab() {
               'Pre-Game Pitcher','Went Yard Vs','SP/RP','Pitcher Grade',
               'Yard Score','Boom','Sig','Grade','gHR','Zone Fit','Sim TB','xwOBA','Flags',
               'Is Key Matchup','Weak Spot','Bullpen HR Rank','Sauce 2.0','Sauce 2.5','Sauce 3.0','Hit Signal','Secret Sauce','Avoid List','Day Late','2-Bagger (Non-HR)','Hit 2+ TB (Any)','TB Signal',
-              'TrueHR','Matchup','SimHR%','Barrel Signal','Longshot','Young Gun','Chalk','Mid-Tier',
+              'TrueHR','Matchup','SimHR%','Barrel Signal','Longshot','Young Gun','Chalk','Mid-Tier','Top 4 Pick',
               'PulledBrl%','Brl/BIP','HR/FB','FB%','HH%',
               'Plate IQ','IQ Grade','Zone Risk','Hand Match',
               'Went Yard','Any Hit','HR','AB','H','TB','RBI','BB','K','Avg EV','Launch Angle',
@@ -29876,6 +29989,7 @@ function TrackRecordTab() {
                 r.isYoungGun === true ? 'YES' : r.isYoungGun === false ? 'NO' : '',
                 r.isChalk === true ? 'YES' : r.isChalk === false ? 'NO' : '',
                 r.isMidTier === true ? 'YES' : r.isMidTier === false ? 'NO' : '',
+                r.top4Tier || '',
                 r.pulledBrl || '', r.brlBIP || '', r.hrFB || '', r.fb || '', r.hh || '',
                 r.plateIQ != null ? r.plateIQ : '', r.plateIQGrade?.label || '', r.zoneAttackRisk ? 'YES' : '', r.handMatchTier || '',
                 r.wentYard ? 'YES' : '', r.hitAny ? 'YES' : '', r.actualHR || 0, r.actualAB || 0, r.actualH || 0,
@@ -29962,6 +30076,7 @@ function TrackRecordTab() {
                   <SortTh col="isYoungGun" label="🌱" color="#38b8f2" title="Young Gun — <100 season PA. Discovery filter, not a hot signal."/>
                   <SortTh col="isChalk" label="💪🏽" color="#38b8f2" title="Chalk — real season HR leader (>=18 HR, >=.220 ISO) facing a genuinely soft matchup."/>
                   <SortTh col="isMidTier" label="🔵" color="#38b8f2" title="Mid-Tier — not Young Gun, Chalk, or Longshot. Not an independently validated signal, just everyone else."/>
+                  <SortTh col="top4Tier" label="🏆" color="#38b8f2" title="Reconstructed Top 4 Tonight pick — same algorithm as the live tab (one per tier, Mid-Tier gated by L7/Arsenal Fit ISO >.190)."/>
                   <SortTh col="plateIQ" label="IQ" color="#38b8f2" title="Plate IQ — display-only, does not affect Yard Score. See Legend for details."/>
                   <SortTh col="handMatchTier" label="Hand" color="#38b8f2" title="Hand Match — batter's handedness exploits the opposing pitcher's weakness (elite, full, or partial). See Legend for details."/>
                 </>}
@@ -30108,6 +30223,9 @@ function TrackRecordTab() {
                       </td>
                       <td style={{padding:'3px 6px', textAlign:'center'}}>
                         {r.isMidTier && <span title="Not Young Gun, Chalk, or Longshot — not an independently validated signal, just everyone else." style={{color:'#199e70'}}>🔵</span>}
+                      </td>
+                      <td style={{padding:'3px 6px', textAlign:'center'}}>
+                        {r.top4Tier && <span title={`Reconstructed Top 4 Tonight ${{youngGun:'Young Gun',chalk:'Chalk',midTier:'Mid-Tier',longshot:'Longshot'}[r.top4Tier]} pick`} style={{color:'#eab308'}}>🏆{{youngGun:'🌱',chalk:'💪🏽',midTier:'🔵',longshot:'🎲'}[r.top4Tier]}</span>}
                       </td>
                       <td style={{padding:'3px 6px', textAlign:'center'}}>
                         {r.plateIQGrade

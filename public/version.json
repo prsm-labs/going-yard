@@ -1,9 +1,9 @@
 {
   "version": "2026.08.09",
-  "bundleFile": "index-DCog1AqG.js",
+  "bundleFile": "index-NYg8sDlx.js",
   "changelog": [
-    "Add weather/park factor to Scouting Notes",
-    "remove redundant Mid-Tier name badge"
+    "Fix Top 4 Tonight: missing scout notes + scratched batters showing as picks",
+    "swap Mid-Tier emoji"
   ],
   "notifyUsers": true
 }
