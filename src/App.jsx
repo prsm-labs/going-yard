@@ -28843,11 +28843,32 @@ function TrackRecordTab() {
           const simTB    = parseFloat(r['Sim TB'] || 0);
           const brlSignal = ['true','1','yes'].includes(
             (blRow['Barrel Signal']||'').toString().toLowerCase().trim());
-          // Prefer CSV column if present (Longshot export not yet wired as of
-          // this build — falls back to inline compute until it is)
-          const isLongshot = blRow['Longshot']
-            ? blRow['Longshot'].toString().toLowerCase() === 'true'
+          // Prefer CSV column if present, fall back to inline compute.
+          // BUG FIXED 2026-08-08: the CSV column's real values are numeric
+          // "1"/"0" (confirmed directly against track-record-barrel.csv),
+          // never the string "true" — the old `.toString().toLowerCase() ===
+          // 'true'` check could therefore never match, so isLongshot was
+          // unconditionally FALSE on every date where the column existed
+          // (2026-07-27 onward) and only used the inline fallback on older
+          // dates where the column was genuinely blank — the exact opposite
+          // of the "prefer CSV" intent stated above. This silently broke the
+          // live "LONGSHOT HIT RATE" card and the 🎲 Longshot filter for
+          // every date from 7/27 forward until this fix.
+          const isLongshot = (blRow['Longshot'] !== undefined && blRow['Longshot'] !== '')
+            ? parseFloat(blRow['Longshot']) === 1
             : (trueHR > 0 && trueHR <= 55 && matchup >= 65 && simTB >= 1.2);
+          // Young Gun / Chalk (added 2026-08-08, for the Daily HR Distribution
+          // panel below) — no per-row fallback formula available here (Young
+          // Gun needs season_pa, Chalk needs season HR/ISO, neither present
+          // on this row), so these stay `null` (genuinely unknown) rather
+          // than `false` on any date before the CSV columns existed
+          // (2026-07-27ish) — a silent false would corrupt the panel's daily
+          // averages by counting "column not populated yet" as "zero that
+          // day," same class of bug just fixed on isLongshot above.
+          const isYoungGun = (blRow['Young Gun'] !== undefined && blRow['Young Gun'] !== '')
+            ? parseFloat(blRow['Young Gun']) === 1 : null;
+          const isChalk = (blRow['Chalk'] !== undefined && blRow['Chalk'] !== '')
+            ? parseFloat(blRow['Chalk']) === 1 : null;
 
           // Plate IQ — read the value SimLabView already computed and exported
           // (App.jsx's own CSV export, not gy_csv.py enrichment) rather than
@@ -28992,7 +29013,7 @@ function TrackRecordTab() {
             // with 💥 — do not use is2Bagger to judge signal predictive power.
             hitTB2: parseInt(r['TB'] || 0) >= 2,
             tbSignal,
-            trueHR, matchup, simHRPct, brlSignal, isLongshot,
+            trueHR, matchup, simHRPct, brlSignal, isLongshot, isYoungGun, isChalk,
             plateIQ, plateIQGrade: plateIQGrade(plateIQ),
             zoneAttackRisk: (r['Zone Risk']||'').toString().trim().toUpperCase() === 'YES',
             handMatchTier, isHandMatch,
@@ -29096,6 +29117,56 @@ function TrackRecordTab() {
   const dateRows = useMemo(() =>
     allRows.filter(r => r.date === selDate),
     [allRows, selDate]);
+
+  // Daily HR Distribution (2026-08-08) — a descriptive/retrospective
+  // reference panel, not a predictive signal: how a typical day's real home
+  // runs actually split across Young Gun / Chalk / Mid-Tier / Longshot,
+  // computed live from every real day Track Record has (not a hardcoded
+  // snapshot) — self-improves as more days accumulate, same philosophy as
+  // every other live-computed signal in this app. Prompted by a user
+  // hypothesis (checked directly against real data first): the claimed
+  // per-day ranges (Young Gun 1-3, Chalk 1-4, Mid-tier 4-6, Longshot 3-5)
+  // didn't hold — Mid-tier alone was 78% of all real HRs, 16-27/day, not a
+  // modest 4-6 slice. This panel replaces the wrong numbers with the real
+  // ones rather than the app silently agreeing with an unvalidated claim.
+  // Gated per-day on isYoungGun/isChalk actually being populated that day
+  // (both can be genuinely `null` before their CSV columns existed, ~2026-
+  // 07-27 — see the isYoungGun/isChalk comment above) — isLongshot always
+  // has a value (CSV column or inline fallback), so it needs no gate.
+  const dailyHrDistribution = useMemo(() => {
+    const byDate = {};
+    allRows.forEach(r => { (byDate[r.date] ||= []).push(r); });
+    const perDay = [];
+    Object.entries(byDate).forEach(([date, rows]) => {
+      const coverage = f => rows.filter(r => r[f] !== null && r[f] !== undefined).length / rows.length;
+      if (coverage('isYoungGun') < 0.5 || coverage('isChalk') < 0.5) return;
+      const hrs = rows.filter(r => r.wentYard);
+      if (!hrs.length) return;
+      let yg = 0, ch = 0, ls = 0, mid = 0;
+      hrs.forEach(r => {
+        if (r.isYoungGun) yg++;
+        else if (r.isChalk) ch++;
+        else if (r.isLongshot) ls++;
+        else mid++;
+      });
+      perDay.push({ date, yg, ch, mid, ls, total: hrs.length });
+    });
+    if (!perDay.length) return null;
+    const nDays = perDay.length;
+    const sum = k => perDay.reduce((s, d) => s + d[k], 0);
+    const totalHR = sum('total');
+    const buckets = [
+      { key: 'yg',  label: 'Young Gun', emoji: '🌱',  color: '#3987e5' },
+      { key: 'ch',  label: 'Chalk',     emoji: '💪🏽', color: '#d95926' },
+      { key: 'mid', label: 'Mid-Tier',  emoji: '⚾',  color: '#199e70' },
+      { key: 'ls',  label: 'Longshot',  emoji: '🎲',  color: '#c98500' },
+    ].map(b => ({
+      ...b,
+      avgPerDay: sum(b.key) / nDays,
+      sharePct: totalHR ? (sum(b.key) / totalHR) * 100 : 0,
+    }));
+    return { buckets, nDays, totalHR, maxAvg: Math.max(...buckets.map(b => b.avgPerDay)) };
+  }, [allRows]);
 
   const teams = useMemo(() =>
     ['ALL', ...Array.from(new Set(dateRows.map(r => r.team).filter(Boolean))).sort()],
@@ -29577,6 +29648,38 @@ function TrackRecordTab() {
           ));
         })()}
       </div>
+
+      {dailyHrDistribution && (
+        <div style={{margin:'0 14px 12px', padding:'10px 14px', borderRadius:8,
+          background:'var(--surface2)', border:'1px solid var(--border)'}}>
+          <div style={{display:'flex', alignItems:'baseline', justifyContent:'space-between', flexWrap:'wrap', gap:6, marginBottom:8}}>
+            <div style={{fontFamily:"'Oswald',sans-serif", fontSize:10, fontWeight:700, letterSpacing:.5,
+              textTransform:'uppercase', color:'var(--text)'}}>
+              📊 Daily HR Distribution
+            </div>
+            <div style={{fontFamily:mono, fontSize:8, color:'var(--muted)'}}>
+              real average across {dailyHrDistribution.nDays} tracked day{dailyHrDistribution.nDays===1?'':'s'} · {dailyHrDistribution.totalHR} HRs · descriptive, not a betting signal
+            </div>
+          </div>
+          {dailyHrDistribution.buckets.map(b => (
+            <div key={b.key} title={`${b.label}: averages ${b.avgPerDay.toFixed(1)} of the real HRs each tracked day (${b.sharePct.toFixed(0)}% of all ${dailyHrDistribution.totalHR} HRs across ${dailyHrDistribution.nDays} days).`}
+              style={{display:'flex', alignItems:'center', gap:8, padding:'3px 0'}}>
+              <div style={{width:88, flexShrink:0, fontFamily:mono, fontSize:9, color:'var(--muted)', whiteSpace:'nowrap'}}>
+                {b.emoji} {b.label}
+              </div>
+              <div style={{flex:1, height:8, borderRadius:4, background:'var(--surface)', overflow:'hidden'}}>
+                <div style={{
+                  width: `${dailyHrDistribution.maxAvg > 0 ? Math.max(4, (b.avgPerDay / dailyHrDistribution.maxAvg) * 100) : 0}%`,
+                  height:'100%', borderRadius:4, background:b.color, transition:'width .3s',
+                }}/>
+              </div>
+              <div style={{width:110, flexShrink:0, textAlign:'right', fontFamily:mono, fontSize:9, color:'var(--text)'}}>
+                {b.avgPerDay.toFixed(1)}/day <span style={{color:'var(--muted)'}}>({b.sharePct.toFixed(0)}%)</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {summary.biggestUpset && (
         <div style={{fontFamily:mono, fontSize:9, color:'var(--muted)',

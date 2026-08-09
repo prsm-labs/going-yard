@@ -1,8 +1,8 @@
 {
-  "version": "2026.08.07",
-  "bundleFile": "index-CjhpkiBS.js",
+  "version": "2026.08.08",
+  "bundleFile": "index-B38JrPDf.js",
   "changelog": [
-    "Add pitch-drag signal to Ball Carry: offline (Track Record) + live card"
+    "Gate Scouting Note generation behind sign-in (free: Top 3 + already-cached)"
   ],
   "notifyUsers": true
 }
