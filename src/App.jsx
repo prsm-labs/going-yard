@@ -16275,6 +16275,8 @@ function SimLabView({ data }) {
   const [afChalkOnly,     setAfChalkOnly]     = useState(false);
   const [afDayLateOnly,   setAfDayLateOnly]   = useState(false);
   const [afYoungGunsOnly, setAfYoungGunsOnly] = useState(false);
+  const [afLongshotOnly,  setAfLongshotOnly]  = useState(false);
+  const [afMidTierOnly,   setAfMidTierOnly]   = useState(false);
   const [afSauce3Only,    setAfSauce3Only]    = useState(false);
   const [afSauce25Only,   setAfSauce25Only]   = useState(false);
   const [afBullpenTiers,  setAfBullpenTiers]  = useState(() => new Set());
@@ -16577,21 +16579,39 @@ function SimLabView({ data }) {
   // Chalk/Day Late/Sauce 3.0/Hand Match/min-ISO-EV filters, then re-sorts
   // independently by afSortBy/afSortDir.
   const arsenalFitRows = useMemo(() => {
-    const withFlags = slate.map(r => ({
-      ...r,
-      isChalk:       isChalkBatter(r),
-      isDayLate:     isDayLateBatter(r),
-      isYoungGun:    isYoungGunBatter(r),
-      isSauce2:      isSauce2Batter(r),
-      isSauce3:      isSauce3Batter(r),
-      isSauce25:     isSauce25Batter(r),
-      isAvoid:       isAvoidBatter(r),
-      handMatchTier: getHandMatchTier(r),
-    }));
+    const withFlags = slate.map(r => {
+      // Arsenal Fit never computed TrueHR/MatchupScore before (2026-08-09) —
+      // needed here only as inputs to isLongshotBatter()/Mid-Tier below, same
+      // computeTrueHRScore()/computeMatchupScore() functions TopThreeTab
+      // already calls on raw slate-style rows. Not exposed as their own
+      // columns — Arsenal Fit's own Fit/ps_convergence ranking is unchanged.
+      const _trueHR = computeTrueHRScore(r);
+      const _matchup = computeMatchupScore(r);
+      const _isLongshot = isLongshotBatter(r, _trueHR, _matchup);
+      const _isChalk = isChalkBatter(r);
+      const _isYoungGun = isYoungGunBatter(r);
+      return {
+        ...r,
+        isChalk:       _isChalk,
+        isDayLate:     isDayLateBatter(r),
+        isYoungGun:    _isYoungGun,
+        isLongshot:    _isLongshot,
+        // Mid-Tier (2026-08-09) — see the matching Barrel Lab comment; NOT
+        // an independently-validated signal, just the elimination bucket.
+        isMidTier:     !_isLongshot && !_isChalk && !_isYoungGun,
+        isSauce2:      isSauce2Batter(r),
+        isSauce3:      isSauce3Batter(r),
+        isSauce25:     isSauce25Batter(r),
+        isAvoid:       isAvoidBatter(r),
+        handMatchTier: getHandMatchTier(r),
+      };
+    });
     const filtered = withFlags
       .filter(r => !afChalkOnly     || r.isChalk)
       .filter(r => !afDayLateOnly   || r.isDayLate)
       .filter(r => !afYoungGunsOnly || r.isYoungGun)
+      .filter(r => !afLongshotOnly  || r.isLongshot)
+      .filter(r => !afMidTierOnly   || r.isMidTier)
       .filter(r => !afSauce3Only    || r.isSauce3)
       .filter(r => !afSauce25Only   || r.isSauce25)
       .filter(r => afBullpenTiers.size === 0 || afBullpenTiers.has(bullpenTierLabel(r.bullpen_hr_rank)))
@@ -16608,7 +16628,7 @@ function SimLabView({ data }) {
       if (va > vb) return afSortDir === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [slate, afSortBy, afSortDir, afChalkOnly, afDayLateOnly, afYoungGunsOnly, afSauce3Only, afSauce25Only, afBullpenTiers, afAvoidOnly, afHideAvoid, afHandMatchOnly, afMinL7Iso, afMinIso, afMinL7Ev, afMinEv, afDayLateVer, afPlayerVer]);
+  }, [slate, afSortBy, afSortDir, afChalkOnly, afDayLateOnly, afYoungGunsOnly, afLongshotOnly, afMidTierOnly, afSauce3Only, afSauce25Only, afBullpenTiers, afAvoidOnly, afHideAvoid, afHandMatchOnly, afMinL7Iso, afMinIso, afMinL7Ev, afMinEv, afDayLateVer, afPlayerVer]);
 
   // Reset row cap when filters/sort change so user always sees top results
   useEffect(() => { setDisplayLimit(150); }, [sortBy, sortDir, selMatchups, lineupOnly, simActiveOnly, simSearch, filterKeyMatchup, slotMin, slotMax]);
@@ -17786,6 +17806,8 @@ function SimLabView({ data }) {
                 { key: 'chalk',     label: '💪🏽 Chalk',           active: afChalkOnly,      color: '#f5c542',    onToggle: () => setAfChalkOnly(v => !v) },
                 { key: 'daylate',   label: '🗓️ Day Late',        active: afDayLateOnly,    color: '#22c1c3',    onToggle: () => setAfDayLateOnly(v => !v) },
                 { key: 'younggun',  label: '🌱 Young Guns',      active: afYoungGunsOnly,  color: '#4ade80',    onToggle: () => setAfYoungGunsOnly(v => !v) },
+                { key: 'longshot',  label: '🎲 Longshot',        active: afLongshotOnly,   color: '#a78bfa',    onToggle: () => setAfLongshotOnly(v => !v) },
+                { key: 'midtier',   label: '⬜ Mid-Tier',         active: afMidTierOnly,    color: '#199e70',    onToggle: () => setAfMidTierOnly(v => !v) },
                 { key: 'sauce3',    label: '🍯🔥 Sauce 3.0',      active: afSauce3Only,     color: '#f59e0b',    onToggle: () => setAfSauce3Only(v => !v) },
                 { key: 'avoid',     label: '🚫 Avoid List',      active: afAvoidOnly,      color: '#ff6b6b',
                   title: "Avoid List — Sim H<=0.6 AND SwStr%>=19% AND (same-hand OR Tough/Elite pitcher). Full-season backtest: 58-61% miss rate vs 42.6% baseline, 1.4x lift. Filter-only, no badge.",
@@ -28625,6 +28647,16 @@ function TrackRecordTab() {
   const [showOnlyHighIQ, setShowOnlyHighIQ] = useState(false);
   const [showOnlyHandMatch, setShowOnlyHandMatch] = useState(false);
   const [showOnlyDayLate, setShowOnlyDayLate] = useState(false);
+  // Young Gun / Chalk / Mid-Tier / Longshot (2026-08-09) — these fields have
+  // existed on the row (isYoungGun/isChalk added 2026-08-08, isLongshot
+  // pre-existing) but never had their own filter here, only feeding the
+  // Daily HR Distribution panel's aggregate. Added so a researcher can
+  // actually isolate them in the table too, matching Barrel Lab/On Base/
+  // Arsenal Fit's own filters for the same three (plus the new Mid-Tier).
+  const [showOnlyYoungGun, setShowOnlyYoungGun] = useState(false);
+  const [showOnlyChalk,    setShowOnlyChalk]    = useState(false);
+  const [showOnlyMidTier,  setShowOnlyMidTier]  = useState(false);
+  const [showOnlyLongshotTR, setShowOnlyLongshotTR] = useState(false);
   const [carryFilter,    setCarryFilter]    = useState(''); // '' | 'DEAD' | 'JUICED'
   const [xhrFilter,      setXhrFilter]      = useState(''); // '' | 'DEAD' | 'JUICED'
   const [teamFilter,     setTeamFilter]     = useState('ALL');
@@ -28867,8 +28899,19 @@ function TrackRecordTab() {
           // day," same class of bug just fixed on isLongshot above.
           const isYoungGun = (blRow['Young Gun'] !== undefined && blRow['Young Gun'] !== '')
             ? parseFloat(blRow['Young Gun']) === 1 : null;
+          const _seasonPARaw = blRow['Season PA'] ?? obRow['Season PA'];
+          const seasonPA = (_seasonPARaw !== undefined && _seasonPARaw !== '' && !isNaN(parseFloat(_seasonPARaw)))
+            ? parseInt(_seasonPARaw) : null;
           const isChalk = (blRow['Chalk'] !== undefined && blRow['Chalk'] !== '')
             ? parseFloat(blRow['Chalk']) === 1 : null;
+          // Mid-Tier (2026-08-09) — NOT an independently-validated signal,
+          // just the elimination bucket (see Barrel Lab's matching comment).
+          // Tri-state like isYoungGun/isChalk above: stays `null` (unknown)
+          // rather than a false `true` if either input is itself unknown —
+          // isLongshot always has a real value (CSV or fallback), so it
+          // never forces this to null on its own.
+          const isMidTier = (isYoungGun === null || isChalk === null)
+            ? null : (!isYoungGun && !isChalk && !isLongshot);
 
           // Plate IQ — read the value SimLabView already computed and exported
           // (App.jsx's own CSV export, not gy_csv.py enrichment) rather than
@@ -29013,7 +29056,7 @@ function TrackRecordTab() {
             // with 💥 — do not use is2Bagger to judge signal predictive power.
             hitTB2: parseInt(r['TB'] || 0) >= 2,
             tbSignal,
-            trueHR, matchup, simHRPct, brlSignal, isLongshot, isYoungGun, isChalk,
+            trueHR, matchup, simHRPct, brlSignal, isLongshot, isYoungGun, isChalk, isMidTier, seasonPA,
             plateIQ, plateIQGrade: plateIQGrade(plateIQ),
             zoneAttackRisk: (r['Zone Risk']||'').toString().trim().toUpperCase() === 'YES',
             handMatchTier, isHandMatch,
@@ -29158,7 +29201,7 @@ function TrackRecordTab() {
     const buckets = [
       { key: 'yg',  label: 'Young Gun', emoji: '🌱',  color: '#3987e5' },
       { key: 'ch',  label: 'Chalk',     emoji: '💪🏽', color: '#d95926' },
-      { key: 'mid', label: 'Mid-Tier',  emoji: '⚾',  color: '#199e70' },
+      { key: 'mid', label: 'Mid-Tier',  emoji: '⬜',  color: '#199e70' },
       { key: 'ls',  label: 'Longshot',  emoji: '🎲',  color: '#c98500' },
     ].map(b => ({
       ...b,
@@ -29191,6 +29234,10 @@ function TrackRecordTab() {
     if (showOnlyHighIQ) rows = rows.filter(r => r.plateIQ != null && r.plateIQ >= 56);
     if (showOnlyHandMatch) rows = rows.filter(r => r.isHandMatch);
     if (showOnlyDayLate) rows = rows.filter(r => r.isDayLate);
+    if (showOnlyYoungGun) rows = rows.filter(r => r.isYoungGun);
+    if (showOnlyChalk) rows = rows.filter(r => r.isChalk);
+    if (showOnlyMidTier) rows = rows.filter(r => r.isMidTier);
+    if (showOnlyLongshotTR) rows = rows.filter(r => r.isLongshot);
     if (carryFilter)    rows = rows.filter(r => r.ballCarryVerdict === carryFilter);
     if (xhrFilter)       rows = rows.filter(r => r.xhrVerdict === xhrFilter);
     if (selPitcherGradesTR.size > 0) rows = rows.filter(r => selPitcherGradesTR.has((r.pitcherGrade||'').trim()));
@@ -29210,7 +29257,7 @@ function TrackRecordTab() {
       }
       return sortDir * ((av||0) - (bv||0));
     });
-  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, showOnlyWeakSlot, showOnlyCC, showOnlySauce2, showOnlySauce3, showOnlySauce25, showOnlyHitSignal, showOnlySecretSauce, showOnlyAvoid, showOnly2Bagger, showOnlyTBSignal, showOnlySimTB2, showOnlyHighIQ, showOnlyHandMatch, showOnlyDayLate, carryFilter, xhrFilter, selPitcherGradesTR, selBullpenTiers, search, sortCol, sortDir]);
+  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, showOnlyWeakSlot, showOnlyCC, showOnlySauce2, showOnlySauce3, showOnlySauce25, showOnlyHitSignal, showOnlySecretSauce, showOnlyAvoid, showOnly2Bagger, showOnlyTBSignal, showOnlySimTB2, showOnlyHighIQ, showOnlyHandMatch, showOnlyDayLate, showOnlyYoungGun, showOnlyChalk, showOnlyMidTier, showOnlyLongshotTR, carryFilter, xhrFilter, selPitcherGradesTR, selBullpenTiers, search, sortCol, sortDir]);
 
   const summary = useMemo(() => {
     // FIXED 2026-08-06: every card below used to compute off `dateRows`
@@ -29766,6 +29813,11 @@ function TrackRecordTab() {
             { key:'avoid', label:'🚫 Avoid List Only',       active:showOnlyAvoid,    onToggle:()=>setShowOnlyAvoid(v=>!v),    color:'#ff6b6b',
               title:"Avoid List — Sim H<=0.6 AND SwStr%>=19% AND (same-hand OR Tough/Elite pitcher). Full-season backtest: 58-61% miss rate vs 42.6% baseline, 1.4x lift, validated cleanly train/test." },
             { key:'dl',    label:'🗓️ Day Late Only',        active:showOnlyDayLate,  onToggle:()=>setShowOnlyDayLate(v=>!v),  color:'#22c1c3' },
+            { key:'yg',    label:'🌱 Young Gun Only',       active:showOnlyYoungGun, onToggle:()=>setShowOnlyYoungGun(v=>!v), color:'#4ade80' },
+            { key:'chk',   label:'💪🏽 Chalk Only',          active:showOnlyChalk,    onToggle:()=>setShowOnlyChalk(v=>!v),    color:'#f5c542' },
+            { key:'mt',    label:'⬜ Mid-Tier Only',        active:showOnlyMidTier,  onToggle:()=>setShowOnlyMidTier(v=>!v),  color:'#199e70',
+              title:"Mid-Tier — not Young Gun, Chalk, or Longshot. Not an independently validated signal, just everyone else (the plain, unremarkable middle — ~78% of all real HRs per the Daily HR Distribution panel)." },
+            { key:'ls',    label:'🎲 Longshot Only',        active:showOnlyLongshotTR, onToggle:()=>setShowOnlyLongshotTR(v=>!v), color:'#a78bfa' },
             { key:'2b',    label:'2️⃣ 2-Bagger (Non-HR) Only', active:showOnly2Bagger, onToggle:()=>setShowOnly2Bagger(v=>!v), color:'#38b8f2' },
             { key:'tbs',   label:'🎯 TB Signal Only',       active:showOnlyTBSignal, onToggle:()=>setShowOnlyTBSignal(v=>!v), color:'#38b8f2' },
             { key:'stb2',  label:'🎲 Sim TB ≥2.0 Only',     active:showOnlySimTB2,   onToggle:()=>setShowOnlySimTB2(v=>!v),   color:'#a78bfa' },
@@ -29789,7 +29841,7 @@ function TrackRecordTab() {
               'Pre-Game Pitcher','Went Yard Vs','SP/RP','Pitcher Grade',
               'Yard Score','Boom','Sig','Grade','gHR','Zone Fit','Sim TB','xwOBA','Flags',
               'Is Key Matchup','Weak Spot','Bullpen HR Rank','Sauce 2.0','Sauce 2.5','Sauce 3.0','Hit Signal','Secret Sauce','Avoid List','Day Late','2-Bagger (Non-HR)','Hit 2+ TB (Any)','TB Signal',
-              'TrueHR','Matchup','SimHR%','Barrel Signal','Longshot',
+              'TrueHR','Matchup','SimHR%','Barrel Signal','Longshot','Young Gun','Chalk','Mid-Tier',
               'PulledBrl%','Brl/BIP','HR/FB','FB%','HH%',
               'Plate IQ','IQ Grade','Zone Risk','Hand Match',
               'Went Yard','Any Hit','HR','AB','H','TB','RBI','BB','K','Avg EV','Launch Angle',
@@ -29808,6 +29860,9 @@ function TrackRecordTab() {
                 r.isKeyMatchup ? 'YES' : '', r.isWeakSlot ? 'YES' : '', r.bullpenRank || '', r.isSauce2 ? 'YES' : '', r.isSauce25 ? 'YES' : '', r.isSauce3 ? 'YES' : '', r.isHitSignal ? 'YES' : '', r.isSecretSauce ? 'YES' : '', r.isAvoid ? 'YES' : '', r.isDayLate ? 'YES' : '', r.is2Bagger ? 'YES' : '', r.hitTB2 ? 'YES' : '', r.tbSignal ? 'YES' : '',
                 r.trueHR || '', r.matchup || '', r.simHRPct || '',
                 r.brlSignal ? 'YES' : '', r.isLongshot ? 'YES' : '',
+                r.isYoungGun === true ? 'YES' : r.isYoungGun === false ? 'NO' : '',
+                r.isChalk === true ? 'YES' : r.isChalk === false ? 'NO' : '',
+                r.isMidTier === true ? 'YES' : r.isMidTier === false ? 'NO' : '',
                 r.pulledBrl || '', r.brlBIP || '', r.hrFB || '', r.fb || '', r.hh || '',
                 r.plateIQ != null ? r.plateIQ : '', r.plateIQGrade?.label || '', r.zoneAttackRisk ? 'YES' : '', r.handMatchTier || '',
                 r.wentYard ? 'YES' : '', r.hitAny ? 'YES' : '', r.actualHR || 0, r.actualAB || 0, r.actualH || 0,
@@ -29891,6 +29946,9 @@ function TrackRecordTab() {
                   <SortTh col="hh"        label="HH%" color="#38b8f2"/>
                   <SortTh col="brlSignal" label="Signal" color="#38b8f2"/>
                   <SortTh col="isLongshot" label="Longshot" color="#38b8f2"/>
+                  <SortTh col="isYoungGun" label="🌱" color="#38b8f2" title="Young Gun — <100 season PA. Discovery filter, not a hot signal."/>
+                  <SortTh col="isChalk" label="💪🏽" color="#38b8f2" title="Chalk — real season HR leader (>=18 HR, >=.220 ISO) facing a genuinely soft matchup."/>
+                  <SortTh col="isMidTier" label="⬜" color="#38b8f2" title="Mid-Tier — not Young Gun, Chalk, or Longshot. Not an independently validated signal, just everyone else."/>
                   <SortTh col="plateIQ" label="IQ" color="#38b8f2" title="Plate IQ — display-only, does not affect Yard Score. See Legend for details."/>
                   <SortTh col="handMatchTier" label="Hand" color="#38b8f2" title="Hand Match — batter's handedness exploits the opposing pitcher's weakness (elite, full, or partial). See Legend for details."/>
                 </>}
@@ -30028,6 +30086,15 @@ function TrackRecordTab() {
                       </td>
                       <td style={{padding:'3px 6px', textAlign:'center'}}>
                         {r.isLongshot && <span style={{color:'#a78bfa'}}>🎲</span>}
+                      </td>
+                      <td style={{padding:'3px 6px', textAlign:'center'}}>
+                        {r.isYoungGun && <span title={`Young Gun — ${r.seasonPA!=null?r.seasonPA:'?'} season PA`} style={{color:'#4ade80'}}>🌱</span>}
+                      </td>
+                      <td style={{padding:'3px 6px', textAlign:'center'}}>
+                        {r.isChalk && <span style={{color:'#f5c542'}}>💪🏽</span>}
+                      </td>
+                      <td style={{padding:'3px 6px', textAlign:'center'}}>
+                        {r.isMidTier && <span title="Not Young Gun, Chalk, or Longshot — not an independently validated signal, just everyone else." style={{color:'#199e70'}}>⬜</span>}
                       </td>
                       <td style={{padding:'3px 6px', textAlign:'center'}}>
                         {r.plateIQGrade
@@ -34031,6 +34098,7 @@ function BarrelLabTab() {
   const [blChalkOnly,      setBlChalkOnly]      = useState(false);
   const [blDayLateOnly,    setBlDayLateOnly]    = useState(false);
   const [blYoungGunsOnly,  setBlYoungGunsOnly]  = useState(false);
+  const [blMidTierOnly,    setBlMidTierOnly]    = useState(false);
   const [blPicksOnly,      setBlPicksOnly]      = useState(false);
   const [blGoneYardOnly,   setBlGoneYardOnly]   = useState(false);
   const [blTB2Only,        setBlTB2Only]        = useState(false);
@@ -34271,6 +34339,13 @@ function BarrelLabTab() {
         isChalk:    isChalkBatter(r),
         isDayLate:  isDayLateBatter(r),
         isYoungGun: isYoungGunBatter(r),
+        // Mid-Tier (2026-08-09) — NOT an independently-validated signal like
+        // the three above; it's the pure elimination bucket (whatever
+        // doesn't match Young Gun/Chalk/Longshot), added so the Daily HR
+        // Distribution panel's own "everyone else" bucket (Track Record) has
+        // a real, filterable, badge-able counterpart here too.
+        isMidTier: !isLongshotBatter(r, r.trueHRScore, r.matchupScore)
+          && !isChalkBatter(r) && !isYoungGunBatter(r),
         // Ball State Adjustment (2026-07-30) — display-only, see
         // getBallStateBadge's own comment block for the "never touches
         // scoring" guarantee. null on any non-live/no-signal game.
@@ -34296,6 +34371,7 @@ function BarrelLabTab() {
     .filter(r => !blHideFinal    || !FINAL_GAME_IDS.has(String(r.game_id)))
     .filter(r => !blLongshotOnly || r.isLongshot)
     .filter(r => !blChalkOnly    || r.isChalk)
+    .filter(r => !blMidTierOnly  || r.isMidTier)
     .filter(r => !blDayLateOnly  || r.isDayLate)
     .filter(r => !blYoungGunsOnly || r.isYoungGun)
     .filter(r => !blPicksOnly    || picks[String(parseInt(r.batter_id)||0)])
@@ -34317,7 +34393,7 @@ function BarrelLabTab() {
     .filter(r => blMinL7Ev  === '' || parseFloat(r.recent_avg_ev||0) >= parseFloat(blMinL7Ev))
     .filter(r => blMinEv    === '' || parseFloat(r.bvp_avg_ev||0)    >= parseFloat(blMinEv))
     .sort((a, b) => b.trueHRScore - a.trueHRScore);
-  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, blChalkOnly, blDayLateOnly, blYoungGunsOnly, blPicksOnly, picks, blGoneYardOnly, blTB2Only, blHighIQOnly, blHandMatchOnly, blSauce3Only, blSauce25Only, blHitSignalOnly, blSecretSauceOnly, blBullpenTiers, blAvoidOnly, blHideAvoid, blBatterHand, blPitcherGrades, blMinL7Iso, blMinIso, blMinL7Ev, blMinEv, hrVer, finalVer, dayLateVer, playerVer, ballStateVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, blChalkOnly, blMidTierOnly, blDayLateOnly, blYoungGunsOnly, blPicksOnly, picks, blGoneYardOnly, blTB2Only, blHighIQOnly, blHandMatchOnly, blSauce3Only, blSauce25Only, blHitSignalOnly, blSecretSauceOnly, blBullpenTiers, blAvoidOnly, blHideAvoid, blBatterHand, blPitcherGrades, blMinL7Iso, blMinIso, blMinL7Ev, blMinEv, hrVer, finalVer, dayLateVer, playerVer, ballStateVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Color threshold helpers
   const clr = (v, g1, g2, y1, y2) => {
@@ -34602,6 +34678,7 @@ function BarrelLabTab() {
                 {key:'chalk',     label:'💪🏽 Chalk',             active:blChalkOnly,     color:'#f5c542', onToggle:()=>setBlChalkOnly(v=>!v)},
                 {key:'daylate',   label:'🗓️ Day Late',          active:blDayLateOnly,   color:'#22c1c3', onToggle:()=>setBlDayLateOnly(v=>!v)},
                 {key:'younggun',  label:'🌱 Young Guns',        active:blYoungGunsOnly, color:'#4ade80', onToggle:()=>setBlYoungGunsOnly(v=>!v)},
+                {key:'midtier',   label:'⬜ Mid-Tier',           active:blMidTierOnly,   color:'#199e70', onToggle:()=>setBlMidTierOnly(v=>!v)},
                 {key:'sauce3',    label:'🍯🔥 Sauce 3.0',        active:blSauce3Only,    color:'#f59e0b', onToggle:()=>setBlSauce3Only(v=>!v)},
                 {key:'hitsignal', label:'⚾ Hit Signal',        active:blHitSignalOnly, color:'#93c5fd',
                   title:"Hit Signal — Sim H>=1.0 AND SwStr%<=15%. Full-season backtest: 64.1% hit rate (any hit), 1.12x lift, n=2,933, stable train/test (64.2%/63.8%). Filter-only, no badge — still accumulating its own Track Record validation.",
@@ -34656,7 +34733,7 @@ function BarrelLabTab() {
                 const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
                 const f1 = v => (v != null && v !== '' && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(1) : '';
                 const f3 = v => (v != null && v !== '' && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(3) : '';
-                const hdrs = ['Slot','Team','Player','Pitcher','Grade','TrueHR','Matchup','ZF','Form (gHR)','SimHR%','ISO','xwOBA','PulledBrl%','Brl/BIP%','HR/FB%','FB%','HH%','LA°','Barrel Signal','Plate IQ','IQ Grade','Zone Risk','Hand Match','Longshot','Chalk','Day Late','Young Gun','Season PA','Arsenal Fit ISO','Arsenal Blast%','Bullpen HR Rank','Sauce 2.0','Sauce 2.5','Sauce 3.0','Hit Signal','Secret Sauce','Avoid List',
+                const hdrs = ['Slot','Team','Player','Pitcher','Grade','TrueHR','Matchup','ZF','Form (gHR)','SimHR%','ISO','xwOBA','PulledBrl%','Brl/BIP%','HR/FB%','FB%','HH%','LA°','Barrel Signal','Plate IQ','IQ Grade','Zone Risk','Hand Match','Longshot','Chalk','Day Late','Young Gun','Mid-Tier','Season PA','Arsenal Fit ISO','Arsenal Blast%','Bullpen HR Rank','Sauce 2.0','Sauce 2.5','Sauce 3.0','Hit Signal','Secret Sauce','Avoid List',
                   'Game ID','Batter ID','Pitcher ID'];
                 const csvRows = [hdrs.map(esc).join(',')];
                 rows.forEach(b => {
@@ -34688,6 +34765,7 @@ function BarrelLabTab() {
                     esc(b.isChalk ? '1' : '0'),
                     esc(b.isDayLate ? '1' : '0'),
                     esc(b.isYoungGun ? '1' : '0'),
+                    esc(b.isMidTier ? '1' : '0'),
                     esc(parseInt(b.season_pa||0)),
                     esc(f3(b.bvp_iso)),
                     esc((() => { const bp = getArsenalBlastPct(b); return bp==null ? '' : bp; })()),
@@ -34973,6 +35051,13 @@ function BarrelLabTab() {
                     🌱 Young Gun ({parseInt(b.season_pa||0)} PA)
                   </div>
                 )}
+                {b.isMidTier && (
+                  <div title="Not Young Gun, Chalk, or Longshot — the plain, unremarkable-on-paper middle. NOT an independently validated signal (it has no threshold of its own, it's just everyone else) — added so the real daily HR split (Track Record's Daily HR Distribution panel: ~78% of all HRs, not the special tiers) has a filterable counterpart here."
+                    style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'#199e70',
+                    letterSpacing:.6,textTransform:'uppercase',marginBottom:4}}>
+                    ⬜ Mid-Tier
+                  </div>
+                )}
                 {b.isSauce3 && (
                   <div title="Sauce 2.0 AND both L7 ISO + Arsenal Fit ISO ≥.250 — 20.26% HR rate / 2.85x lift, full 2026 season backtest."
                     style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'#f59e0b',
@@ -35078,6 +35163,7 @@ function BarrelLabTab() {
                                   {b.isChalk && <span title="Chalk — real season HR leader (>=18 HR, >=.220 ISO) facing a genuinely soft matchup today (Target/Hittable/Average)." style={{color:'#f5c542',marginRight:2,fontWeight:900,fontSize:7}}>💪🏽</span>}
                                   {b.isDayLate && <span title="Day Late — a real ★ Barrel Signal on BOTH of the last 2 real game days, no HR either day, today's matchup not an outright Elite mismatch." style={{color:'#22c1c3',marginRight:2,fontWeight:900,fontSize:7}}>🗓️</span>}
                                   {b.isYoungGun && <span title={`Young Gun — ${parseInt(b.season_pa||0)} season PA. Discovery filter, not a hot signal — thin-history batters homer LESS often per game on average (7.9% vs 11.5%).`} style={{color:'#4ade80',marginRight:2,fontWeight:900,fontSize:7}}>🌱</span>}
+                                  {b.isMidTier && <span title="Not Young Gun/Chalk/Longshot -- the plain, unremarkable middle. Not an independently validated signal, just everyone else." style={{color:'#199e70',marginRight:2,fontWeight:900,fontSize:7}}>⬜</span>}
                                   {b.isSauce3 && <span title="Sauce 3.0 — Sauce 2.0 AND both L7 ISO + Arsenal Fit ISO ≥.250. 20.26% HR rate / 2.85x lift, full 2026 season backtest (n=380). Best validated combo in this app." style={{color:'#f59e0b',marginRight:2,fontWeight:900,fontSize:7}}>🍯🔥</span>}
                                   {b.isSauce25 && !b.isSauce3 && <span title="Sauce 2.5 — relaxed xwOBA≥.330, both ISO≥.220. 18.24% HR rate / 2.57x lift, full 2026 season backtest (n=899)." style={{color:'#eab308',marginRight:2,fontWeight:900,fontSize:7}}>🥫</span>}
                                   {b.handMatchTier && <span
@@ -35310,6 +35396,7 @@ function OnBaseTab() {
   const [obChalkOnly,      setObChalkOnly]      = useState(false);
   const [obDayLateOnly,    setObDayLateOnly]    = useState(false);
   const [obYoungGunsOnly,  setObYoungGunsOnly]  = useState(false);
+  const [obMidTierOnly,    setObMidTierOnly]    = useState(false);
   const [obPicksOnly,      setObPicksOnly]      = useState(false);
   const [obGoneYardOnly,   setObGoneYardOnly]   = useState(false);
   const [obTB2Only,        setObTB2Only]        = useState(false);
@@ -35488,6 +35575,11 @@ function OnBaseTab() {
         isChalk:    isChalkBatter(r),
         isDayLate:  isDayLateBatter(r),
         isYoungGun: isYoungGunBatter(r),
+        // Mid-Tier (2026-08-09) — see the matching Barrel Lab comment above
+        // this same function pair; NOT an independently-validated signal,
+        // just the elimination bucket.
+        isMidTier: !isLongshotBatter(r, r.onBaseScore, r.matchupScore)
+          && !isChalkBatter(r) && !isYoungGunBatter(r),
         // Ball State Adjustment (2026-07-30) — display-only, see
         // getBallStateBadge's own comment block for the "never touches
         // scoring" guarantee. null on any non-live/no-signal game.
@@ -35514,6 +35606,7 @@ function OnBaseTab() {
     })
     .filter(r => !obHideFinal || !FINAL_GAME_IDS.has(String(r.game_id)))
     .filter(r => !obLongshotOnly || r.isLongshot)
+    .filter(r => !obMidTierOnly  || r.isMidTier)
     .filter(r => !obChalkOnly    || r.isChalk)
     .filter(r => !obDayLateOnly  || r.isDayLate)
     .filter(r => !obYoungGunsOnly || r.isYoungGun)
@@ -35536,7 +35629,7 @@ function OnBaseTab() {
     .filter(r => obMinL7Ev  === '' || parseFloat(r.recent_avg_ev||0) >= parseFloat(obMinL7Ev))
     .filter(r => obMinEv    === '' || parseFloat(r.bvp_avg_ev||0)    >= parseFloat(obMinEv))
     .sort((a, b) => b.onBaseScore - a.onBaseScore);
-  }, [eligibleBatters, simResults, obHideFinal, obLongshotOnly, obChalkOnly, obDayLateOnly, obYoungGunsOnly, obPicksOnly, obGoneYardOnly, obTB2Only, obHighIQOnly, obHandMatchOnly, obSauce3Only, obSauce25Only, obHitSignalOnly, obSecretSauceOnly, obBullpenTiers, obAvoidOnly, obHideAvoid, obBatterHand, obPitcherGrades, obMinL7Iso, obMinIso, obMinL7Ev, obMinEv, picks, finalVer, hrVer, dayLateVer, playerVer, ballStateVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [eligibleBatters, simResults, obHideFinal, obLongshotOnly, obChalkOnly, obMidTierOnly, obDayLateOnly, obYoungGunsOnly, obPicksOnly, obGoneYardOnly, obTB2Only, obHighIQOnly, obHandMatchOnly, obSauce3Only, obSauce25Only, obHitSignalOnly, obSecretSauceOnly, obBullpenTiers, obAvoidOnly, obHideAvoid, obBatterHand, obPitcherGrades, obMinL7Iso, obMinIso, obMinL7Ev, obMinEv, picks, finalVer, hrVer, dayLateVer, playerVer, ballStateVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const byTeam = useMemo(() => {
     const teams = {};
@@ -35802,6 +35895,7 @@ function OnBaseTab() {
                 {key:'chalk',     label:'💪🏽 Chalk',             active:obChalkOnly,     color:'#f5c542', onToggle:()=>setObChalkOnly(v=>!v)},
                 {key:'daylate',   label:'🗓️ Day Late',          active:obDayLateOnly,   color:'#22c1c3', onToggle:()=>setObDayLateOnly(v=>!v)},
                 {key:'younggun',  label:'🌱 Young Guns',        active:obYoungGunsOnly, color:'#4ade80', onToggle:()=>setObYoungGunsOnly(v=>!v)},
+                {key:'midtier',   label:'⬜ Mid-Tier',           active:obMidTierOnly,   color:'#199e70', onToggle:()=>setObMidTierOnly(v=>!v)},
                 {key:'sauce3',    label:'🍯🔥 Sauce 3.0',        active:obSauce3Only,    color:'#f59e0b', onToggle:()=>setObSauce3Only(v=>!v)},
                 {key:'hitsignal', label:'⚾ Hit Signal',        active:obHitSignalOnly, color:'#93c5fd',
                   title:"Hit Signal — Sim H>=1.0 AND SwStr%<=15%. Full-season backtest: 64.1% hit rate (any hit), 1.12x lift, n=2,933, stable train/test (64.2%/63.8%). Filter-only, no badge — still accumulating its own Track Record validation.",
@@ -35854,7 +35948,7 @@ function OnBaseTab() {
                 const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
                 const f1 = v => (v != null && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(1) : '';
                 const f3 = v => (v != null && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(3) : '';
-                const hdrs = ['Slot','Team','Player','Pitcher','Grade','OnBaseScore','Matchup','ZF','G2TB%','SimTB2%','AVG','SLG','ISO','xwOBA','XBH%','HH%','SimTB','LA°','TB Signal','Plate IQ','IQ Grade','Zone Risk','Hand Match','Longshot','Chalk','Day Late','Young Gun','Season PA','Arsenal Fit ISO','Arsenal Blast%','Bullpen HR Rank','Sauce 2.0','Sauce 2.5','Sauce 3.0','Hit Signal','Secret Sauce','Avoid List',
+                const hdrs = ['Slot','Team','Player','Pitcher','Grade','OnBaseScore','Matchup','ZF','G2TB%','SimTB2%','AVG','SLG','ISO','xwOBA','XBH%','HH%','SimTB','LA°','TB Signal','Plate IQ','IQ Grade','Zone Risk','Hand Match','Longshot','Chalk','Day Late','Young Gun','Mid-Tier','Season PA','Arsenal Fit ISO','Arsenal Blast%','Bullpen HR Rank','Sauce 2.0','Sauce 2.5','Sauce 3.0','Hit Signal','Secret Sauce','Avoid List',
                   'Game ID','Batter ID','Pitcher ID'];
                 const csvRows = [hdrs.map(esc).join(',')];
                 rows.forEach(b => {
@@ -35886,6 +35980,7 @@ function OnBaseTab() {
                     esc(b.isChalk ? '1' : '0'),
                     esc(b.isDayLate ? '1' : '0'),
                     esc(b.isYoungGun ? '1' : '0'),
+                    esc(b.isMidTier ? '1' : '0'),
                     esc(parseInt(b.season_pa||0)),
                     esc(f3(b.bvp_iso)),
                     esc((() => { const bp = getArsenalBlastPct(b); return bp==null ? '' : bp; })()),
@@ -36102,6 +36197,13 @@ function OnBaseTab() {
                     🌱 Young Gun ({parseInt(b.season_pa||0)} PA)
                   </div>
                 )}
+                {b.isMidTier && (
+                  <div title="Not Young Gun, Chalk, or Longshot — the plain, unremarkable-on-paper middle. NOT an independently validated signal (it has no threshold of its own, it's just everyone else) — added so the real daily HR split (Track Record's Daily HR Distribution panel: ~78% of all HRs, not the special tiers) has a filterable counterpart here."
+                    style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'#199e70',
+                    letterSpacing:.6,textTransform:'uppercase',marginBottom:6}}>
+                    ⬜ Mid-Tier
+                  </div>
+                )}
                 {b.isSauce3 && (
                   <div title="Sauce 2.0 AND both L7 ISO + Arsenal Fit ISO ≥.250 — 20.26% HR rate / 2.85x lift, full 2026 season backtest."
                     style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'#f59e0b',
@@ -36206,6 +36308,7 @@ function OnBaseTab() {
                                 {b.isChalk && <span title="Chalk — real season HR leader (>=18 HR, >=.220 ISO) facing a genuinely soft matchup today." style={{color:'#f5c542',marginRight:2,fontWeight:900,fontSize:7}}>💪🏽</span>}
                                 {b.isDayLate && <span title="Day Late — a real ★ Barrel Signal on BOTH of the last 2 real game days, no HR either day, today's matchup not an outright Elite mismatch." style={{color:'#22c1c3',marginRight:2,fontWeight:900,fontSize:7}}>🗓️</span>}
                                 {b.isYoungGun && <span title={`Young Gun — ${parseInt(b.season_pa||0)} season PA. Discovery filter, not a hot signal — thin-history batters homer LESS often per game on average (7.9% vs 11.5%).`} style={{color:'#4ade80',marginRight:2,fontWeight:900,fontSize:7}}>🌱</span>}
+                                {b.isMidTier && <span title="Not Young Gun/Chalk/Longshot -- the plain, unremarkable middle. Not an independently validated signal, just everyone else." style={{color:'#199e70',marginRight:2,fontWeight:900,fontSize:7}}>⬜</span>}
                                 {b.isSauce3 && <span title="Sauce 3.0 — Sauce 2.0 AND both L7 ISO + Arsenal Fit ISO ≥.250. 20.26% HR rate / 2.85x lift, full 2026 season backtest (n=380). Best validated combo in this app." style={{color:'#f59e0b',marginRight:2,fontWeight:900,fontSize:7}}>🍯🔥</span>}
                                 {b.isSauce25 && !b.isSauce3 && <span title="Sauce 2.5 — relaxed xwOBA≥.330, both ISO≥.220. 18.24% HR rate / 2.57x lift, full 2026 season backtest (n=899)." style={{color:'#eab308',marginRight:2,fontWeight:900,fontSize:7}}>🥫</span>}
                                 {b.handMatchTier && <span
