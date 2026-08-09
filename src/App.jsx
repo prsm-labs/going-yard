@@ -30832,12 +30832,30 @@ function CrystalBallTab() {
   );
 }
 
-// ── Top 3 Tonight (2026-08-05) — deterministic "best 3 matchups today,"
-// with a real Claude-narrated Scouting Note per pick. NOT Crystal Ball's
-// random weighted draw — Crystal Ball is untouched and keeps its own fun/
-// random purpose; this reuses its card-flip visual only. Genesis: user asked
-// whether a real top-3-of-the-slate feature with real analysis (not random
-// tiers) was feasible without pre-pulling every batter's Scouting Note.
+// ── Top 4 Tonight (2026-08-05, reworked 2026-08-09) — deterministic, one
+// real pick per HR-distribution tier, with a real Claude-narrated Scouting
+// Note per pick. NOT Crystal Ball's random weighted draw — Crystal Ball is
+// untouched and keeps its own fun/random purpose; this reuses its card-flip
+// visual only.
+//
+// REWORK 2026-08-09: was originally "literal top 3 overall by composite
+// score" (no tier awareness at all). User asked whether picking a generic
+// top-graded batter per tier — instead of blindly ranking the whole slate —
+// made more sense, and separately floated an L7 ISO>.190 AND Arsenal Fit
+// ISO>.190 gate they'd noticed holding up. Backtested both against the real
+// 5/17-8/8 tracker before building anything: the bare ISO gate gives a real
+// but modest ~1.29x lift overall, but tested WITHIN each tier specifically
+// it only adds signal in the generic "everyone else" Mid-Tier bucket (12.2%
+// vs 9.8% tier baseline, 1.25x, n=558) — in Young Gun/Chalk/Longshot it's
+// flat-to-negative at those tiers' much smaller post-filter samples (n=19-92
+// combined). So: 4 cards, one per tier (Young Gun/Chalk/Mid-Tier/Longshot),
+// each ranked within its own tier by the same composite score as before —
+// only the Mid-Tier card additionally requires the ISO gate, falling back
+// to the plain top-graded Mid-Tier batter on the rare day nobody clears it.
+// A batter already picked for an earlier tier slot is excluded from later
+// slots' pools (Young Gun→Chalk→Mid-Tier→Longshot order) so all 4 cards are
+// always 4 distinct real names, even on the rare day a batter would
+// otherwise qualify as the top pick in more than one tier at once.
 //
 // Cost model, why this is cheap: SELECTION is 100% free — it's the exact
 // same computeTrueHRScore()/computeMatchupScore()/normalizeWithinMatchup()
@@ -30845,33 +30863,38 @@ function CrystalBallTab() {
 // network calls. Only the Scouting Note GENERATION costs anything (the
 // existing /api/batter-scouting-note endpoint — ~25 MLB API calls + 1
 // Anthropic call per batter, already cached 20hrs per batter-pitcher-date in
-// Redis) — and this only ever fires for the 3 currently-selected batters,
-// never the full slate. Re-selection is reactive on lineupVer (same
+// Redis) — and this only ever fires for the up-to-4 currently-selected
+// batters, never the full slate. Re-selection is reactive on lineupVer (same
 // subscribeLineup() pattern as every other lineup-aware tab) — if the real
-// top 3 changes once lineups confirm, only the newly-added batter(s) trigger
-// a fresh Scouting Note call; anyone still in the top 3 hits the existing
-// cache. Worst case a handful of generations per day, never hundreds.
+// picks change once lineups confirm, only the newly-added batter(s) trigger
+// a fresh Scouting Note call; anyone still picked hits the existing cache.
+// Worst case a handful of generations per day, never hundreds.
 //
-// Selection formula — pitcher/bullpen-weighted per the user's own framing
-// ("strongest likelihood... be the opposing pitcher and/or bullpen"):
-// trueHRScore (batter form, pool-normalized exactly like the real Barrel Lab
-// column) and matchupScore (pitcher/PS-Score/platoon-weighted) each 50%,
-// plus real bonuses (not invented weights) for an already-validated Sauce
-// tier and a favorable Bullpen Tier. Outright excludes Tough/Elite pitcher
-// matchups — same gate isLongshotBatter()/isChalkBatter() already use.
-const TOP3_RANKS = [
-  { name:'#1 Best Bet', emoji:'🥇', accentRgb:'255,215,0',
-    border:'rgba(255,215,0,0.5)', glow:'rgba(255,215,0,0.3)',
-    bg:'linear-gradient(160deg,rgba(255,215,0,0.12)0%,rgba(20,10,0,0.7)100%)',
-    tagBg:'rgba(255,215,0,0.1)', tagColor:'rgba(255,215,0,0.9)', tagBorder:'rgba(255,215,0,0.25)' },
-  { name:'#2', emoji:'🥈', accentRgb:'200,200,210',
-    border:'rgba(200,200,210,0.5)', glow:'rgba(200,200,210,0.22)',
-    bg:'linear-gradient(160deg,rgba(200,200,210,0.10)0%,rgba(15,15,18,0.7)100%)',
-    tagBg:'rgba(200,200,210,0.08)', tagColor:'rgba(210,210,220,0.9)', tagBorder:'rgba(200,200,210,0.22)' },
-  { name:'#3', emoji:'🥉', accentRgb:'205,127,50',
-    border:'rgba(205,127,50,0.5)', glow:'rgba(205,127,50,0.22)',
-    bg:'linear-gradient(160deg,rgba(205,127,50,0.10)0%,rgba(20,10,0,0.7)100%)',
-    tagBg:'rgba(205,127,50,0.08)', tagColor:'rgba(225,150,80,0.9)', tagBorder:'rgba(205,127,50,0.22)' },
+// Selection formula (within each tier) — pitcher/bullpen-weighted per the
+// user's own framing ("strongest likelihood... be the opposing pitcher
+// and/or bullpen"): trueHRScore (batter form, pool-normalized exactly like
+// the real Barrel Lab column) and matchupScore (pitcher/PS-Score/platoon-
+// weighted) each 50%, plus real bonuses (not invented weights) for an
+// already-validated Sauce tier and a favorable Bullpen Tier. Outright
+// excludes Tough/Elite pitcher matchups — same gate isLongshotBatter()/
+// isChalkBatter() already use.
+const TOP4_TIER_CARDS = [
+  { key:'youngGun', name:'🌱 Young Gun', emoji:'🌱', accentRgb:'74,222,128',
+    border:'rgba(74,222,128,0.5)', glow:'rgba(74,222,128,0.25)',
+    bg:'linear-gradient(160deg,rgba(74,222,128,0.12)0%,rgba(8,18,10,0.7)100%)',
+    tagBg:'rgba(74,222,128,0.1)', tagColor:'rgba(130,235,165,0.9)', tagBorder:'rgba(74,222,128,0.25)' },
+  { key:'chalk', name:'💪🏽 Chalk', emoji:'💪🏽', accentRgb:'245,197,66',
+    border:'rgba(245,197,66,0.5)', glow:'rgba(245,197,66,0.25)',
+    bg:'linear-gradient(160deg,rgba(245,197,66,0.12)0%,rgba(20,16,0,0.7)100%)',
+    tagBg:'rgba(245,197,66,0.1)', tagColor:'rgba(250,215,110,0.9)', tagBorder:'rgba(245,197,66,0.25)' },
+  { key:'midTier', name:'⬜ Mid-Tier', emoji:'⬜', accentRgb:'25,158,112',
+    border:'rgba(25,158,112,0.5)', glow:'rgba(25,158,112,0.25)',
+    bg:'linear-gradient(160deg,rgba(25,158,112,0.12)0%,rgba(6,16,13,0.7)100%)',
+    tagBg:'rgba(25,158,112,0.1)', tagColor:'rgba(75,205,165,0.9)', tagBorder:'rgba(25,158,112,0.25)' },
+  { key:'longshot', name:'🎲 Longshot', emoji:'🎲', accentRgb:'167,139,250',
+    border:'rgba(167,139,250,0.5)', glow:'rgba(167,139,250,0.25)',
+    bg:'linear-gradient(160deg,rgba(167,139,250,0.12)0%,rgba(16,10,20,0.7)100%)',
+    tagBg:'rgba(167,139,250,0.1)', tagColor:'rgba(195,175,255,0.9)', tagBorder:'rgba(167,139,250,0.25)' },
 ];
 
 function TopThreeTab() {
@@ -30879,7 +30902,7 @@ function TopThreeTab() {
   const [lineupVer, setLineupVer] = useState(LINEUP_VERSION || 0);
   const [injuryVer, setInjuryVer] = useState(0);
   const [refreshTick, setRefreshTick] = useState(0);
-  const [flipped,  setFlipped]  = useState([false,false,false]);
+  const [flipped,  setFlipped]  = useState([false,false,false,false]);
   const [notes,    setNotes]    = useState({}); // `${batterId}_${pitcherId}` -> {loading|data|error}
   const [showHelp, setShowHelp] = useState(false);
 
@@ -30910,51 +30933,105 @@ function TopThreeTab() {
     }));
     const normalized = normalizeWithinMatchup(withRaw); // real pool-normalized trueHRScore, matches Barrel Lab exactly
     const seen = new Set();
-    return normalized.map(r => {
+    const scored = normalized.map(r => {
       const sauce   = isSauce3Batter(r) ? '3.0' : isSauce25Batter(r) ? '2.5' : isSauce2Batter(r) ? '2.0' : null;
       const bpInfo  = bullpenTierInfo(parseInt(r.bullpen_hr_rank));
       const bpBonus = bpInfo?.label === 'Soft Pen' ? 8 : bpInfo?.label === 'Tough Pen' ? -8 : 0;
       const sauceBonus = sauce === '3.0' ? 10 : sauce === '2.5' ? 6 : sauce === '2.0' ? 3 : 0;
+      const isLongshot = isLongshotBatter(r, r.trueHRScore, r.matchupScore);
+      const isChalk    = isChalkBatter(r);
+      const isYoungGun = isYoungGunBatter(r);
       return {
         ...r,
         pitcher: resolvePitcherName(r.pitcher, r.batting_team, r.pitcher_id),
         sauce, bullpenTier: bpInfo?.label || null,
         selectionScore: r.trueHRScore * 0.5 + r.matchupScore * 0.5 + bpBonus + sauceBonus,
+        tierLongshot: isLongshot, tierChalk: isChalk, tierYoungGun: isYoungGun,
+        tierMidTier: !isLongshot && !isChalk && !isYoungGun,
       };
     })
-    .sort((a,b) => b.selectionScore - a.selectionScore)
     .filter(r => { // one card per batter — doubleheaders can produce two rows
       const bid = String(r.batter_id || '');
       if (seen.has(bid)) return false;
       seen.add(bid); return true;
-    })
-    .slice(0, 3);
+    });
+
+    const byScore = pool => pool.slice().sort((a,b) => b.selectionScore - a.selectionScore);
+    const youngGunPool = byScore(scored.filter(r => r.tierYoungGun));
+    const chalkPool    = byScore(scored.filter(r => r.tierChalk));
+    const longshotPool = byScore(scored.filter(r => r.tierLongshot));
+    const midTierPool  = byScore(scored.filter(r => r.tierMidTier));
+    // Mid-Tier's own extra gate (2026-08-09) — the only tier where a real
+    // backtest showed L7 ISO/Arsenal Fit ISO both >.190 adds signal on top
+    // of the composite score alone; falls back to the plain top-graded
+    // Mid-Tier batter if nobody clears both bars today.
+    const ISO_THRESHOLD = 0.190;
+    const midTierIsoQualified = midTierPool.filter(r =>
+      parseFloat(r.recent_iso || 0) > ISO_THRESHOLD && parseFloat(r.bvp_iso || 0) > ISO_THRESHOLD);
+
+    // A batter already picked for an earlier tier slot is excluded from
+    // later slots — keeps all 4 cards as distinct real names on the rare
+    // day a batter would otherwise be the top pick in more than one tier.
+    const pickedIds = new Set();
+    const selectFrom = pool => {
+      for (const cand of pool) {
+        const bid = String(cand.batter_id);
+        if (!pickedIds.has(bid)) { pickedIds.add(bid); return cand; }
+      }
+      return null;
+    };
+    const youngGunPick = selectFrom(youngGunPool);
+    const chalkPick    = selectFrom(chalkPool);
+    let midTierPick = selectFrom(midTierIsoQualified);
+    let midTierIsoFallback = false;
+    if (!midTierPick) {
+      midTierPick = selectFrom(midTierPool);
+      midTierIsoFallback = !!midTierPick;
+    }
+    const longshotPick = selectFrom(longshotPool);
+
+    return [
+      { tierKey:'youngGun', batter: youngGunPick, isoFallback:false },
+      { tierKey:'chalk',    batter: chalkPick,    isoFallback:false },
+      { tierKey:'midTier',  batter: midTierPick,  isoFallback: midTierIsoFallback },
+      { tierKey:'longshot', batter: longshotPick, isoFallback:false },
+    ];
   }, [eligibleBatters]);
 
-  // Reset the flip state whenever the actual 3 selected batters change (a
+  // Reset the flip state whenever the actual 4 selected batters change (a
   // new pick appearing should start face-down again) — never on every
   // re-render, only when the real composition of top3 changes.
-  const top3Key = top3.map(r => r.batter_id).join(',');
-  useEffect(() => { setFlipped([false,false,false]); }, [top3Key]);
+  const top3Key = top3.map(p => `${p.tierKey}:${p.batter?.batter_id||''}`).join(',');
+  useEffect(() => { setFlipped([false,false,false,false]); }, [top3Key]);
 
   // Fetch a Scouting Note for each currently-selected batter, skipping any
   // already in-flight/loaded for this exact batter-pitcher pair — this is
-  // what keeps re-selection free: a batter re-entering the top 3 (lineup
+  // what keeps re-selection free: a batter re-entering a tier slot (lineup
   // churn that nets out to the same picks) never re-triggers a real call.
   useEffect(() => {
-    top3.forEach((r, i) => {
+    const TIER_CONTEXT = {
+      youngGun: r => `Selected as tonight's 🌱 Young Gun pick — thin/no season track record (<100 season PA), the top-graded matchup among today's real Young Gun batters by TrueHRScore ${Math.round(r.trueHRScore)}/100 and MatchupScore ${Math.round(r.matchupScore)}/100${r.bullpenTier ? `, opposing bullpen: ${r.bullpenTier}` : ''}${r.sauce ? `, Sauce ${r.sauce} tier` : ''}. This is a discovery pick, not a hot-streak signal — thin-history batters have historically homered LESS often per game than established regulars.`,
+      chalk: r => `Selected as tonight's 💪🏽 Chalk pick — a real established season power bat (19+ season HR, or a season AB/HR under 21) facing a soft-enough matchup, the top-graded among today's real Chalk batters by TrueHRScore ${Math.round(r.trueHRScore)}/100 and MatchupScore ${Math.round(r.matchupScore)}/100${r.bullpenTier ? `, opposing bullpen: ${r.bullpenTier}` : ''}${r.sauce ? `, Sauce ${r.sauce} tier` : ''}.`,
+      midTier: (r, p) => `Selected as tonight's ⬜ Mid-Tier pick — not Young Gun, Chalk, or Longshot${p.isoFallback ? ' (no batter cleared both ISO bars today, so this is the top-graded Mid-Tier batter overall instead)' : ', additionally required L7 ISO and Arsenal Fit ISO both above .190 — the one tier where a real backtest showed that combination adds signal on top of the composite score'}, the top-graded among qualifying batters by TrueHRScore ${Math.round(r.trueHRScore)}/100 and MatchupScore ${Math.round(r.matchupScore)}/100${r.bullpenTier ? `, opposing bullpen: ${r.bullpenTier}` : ''}${r.sauce ? `, Sauce ${r.sauce} tier` : ''}.`,
+      longshot: r => `Selected as tonight's 🎲 Longshot pick — TrueHRScore≤55 with MatchupScore≥65 and Sim TB≥1.2 (a profile the model itself may be undervaluing), the top-graded among today's real Longshot batters by TrueHRScore ${Math.round(r.trueHRScore)}/100 and MatchupScore ${Math.round(r.matchupScore)}/100${r.bullpenTier ? `, opposing bullpen: ${r.bullpenTier}` : ''}${r.sauce ? `, Sauce ${r.sauce} tier` : ''}.`,
+    };
+    top3.forEach(p => {
+      const r = p.batter;
+      if (!r) return;
       const bid = parseInt(r.batter_id) || 0;
       const pid = parseInt(r.pitcher_id) || 0;
       if (!bid || !pid) return;
       const key = `${bid}_${pid}`;
-      // Tells the note why this batter was picked (2026-08-04) — the
+      // Tells the note why this batter was picked (2026-08-04, extended
+      // 2026-08-09 to name the specific tier + Mid-Tier's own ISO rule) — the
       // formula and the note are built from genuinely different data (season-
       // length composite vs. last-10-real-batted-ball recency window), so
       // they can legitimately disagree. Without this, the note has no idea
-      // it's describing a "top pick" and can't flag that tension when it
+      // which tier it's describing and can't flag that tension when it
       // exists — see buildPrompt()'s own comment in
       // api/batter-scouting-note.js for the system-prompt half of this fix.
-      const selectionContext = `Ranked #${i+1} in tonight's Top 3 by a season-length matchup composite — TrueHRScore ${Math.round(r.trueHRScore)}/100, MatchupScore ${Math.round(r.matchupScore)}/100${r.bullpenTier ? `, opposing bullpen: ${r.bullpenTier}` : ''}${r.sauce ? `, Sauce ${r.sauce} tier` : ''}. This ranking is NOT based on the recent-form data below.`;
+      const contextFn = TIER_CONTEXT[p.tierKey];
+      const selectionContext = (contextFn ? contextFn(r, p) : '') + ' This ranking is NOT based on the recent-form data below.';
       setNotes(n => {
         if (n[key]) return n;
         fetch('/api/batter-scouting-note', {
@@ -30980,18 +31057,19 @@ function TopThreeTab() {
   const flipCard = i => setFlipped(f => { const n=[...f]; n[i]=true; return n; });
   const confirmedCount = eligibleBatters.filter(r =>
     LINEUP_STATUS[String(r.batter_id||'').split('.')[0]]?.status === 'confirmed').length;
+  const anyPicks = top3.some(p => p.batter);
 
   return (
-    <div style={{maxWidth:760,margin:'0 auto',padding:'24px 16px',
+    <div style={{maxWidth:1000,margin:'0 auto',padding:'24px 16px',
       display:'flex',flexDirection:'column',alignItems:'center'}}>
 
       <div style={{textAlign:'center',marginBottom:18,width:'100%',position:'relative'}}>
         <div style={{fontFamily:osw,fontSize:24,fontWeight:900,letterSpacing:2,
           color:'var(--text)',textTransform:'uppercase',marginBottom:4}}>
-          🎯 Top 3 Tonight
+          🎯 Top 4 Tonight
         </div>
         <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',letterSpacing:.5,marginBottom:6}}>
-          Ranked by real matchup strength — pitcher, bullpen &amp; form · updates when lineups confirm
+          One real pick per tier — Young Gun, Chalk, Mid-Tier &amp; Longshot · updates when lineups confirm
         </div>
         <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>
           {eligibleBatters.length} eligible · {confirmedCount > 0 || Object.keys(LINEUP_STATUS).length > 0 ? `${confirmedCount} confirmed` : 'lineups pending'}
@@ -31011,24 +31089,40 @@ function TopThreeTab() {
           Loading today's slate… if nothing appears, tap ↺ above.
         </div>
       )}
-      {eligibleBatters.length > 0 && top3.length === 0 && (
+      {eligibleBatters.length > 0 && !anyPicks && (
         <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)',padding:'24px 14px',textAlign:'center'}}>
           No qualifying matchups today — every eligible batter is facing a Tough or Elite arm.
         </div>
       )}
 
-      {top3.length > 0 && (
+      {anyPicks && (
         <div style={{width:'100%',display:'flex',gap:14,
           justifyContent:'flex-start',flexWrap:'nowrap',overflowX:'auto',
           WebkitOverflowScrolling:'touch',paddingBottom:8,marginBottom:8,
           scrollSnapType:'x mandatory'}}>
           {top3.map((p, i) => {
-            const rank = TOP3_RANKS[i];
+            const rank = TOP4_TIER_CARDS[i];
+            if (!p.batter) {
+              return (
+                <div key={p.tierKey} style={{width:225,height:420,flexShrink:0,scrollSnapAlign:'start',
+                  borderRadius:12,border:`2px dashed ${rank.border}`,
+                  display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:8,
+                  background:'rgba(255,255,255,0.02)'}}>
+                  <div style={{fontSize:30,opacity:.4}}>{rank.emoji}</div>
+                  <div style={{fontFamily:osw,fontSize:12,fontWeight:800,letterSpacing:1,
+                    color:`rgba(${rank.accentRgb},0.6)`,textTransform:'uppercase'}}>{rank.name}</div>
+                  <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textAlign:'center',padding:'0 16px'}}>
+                    No qualifying batter in this tier today
+                  </div>
+                </div>
+              );
+            }
+            const bt = p.batter;
             const isFlipped = flipped[i];
-            const key = `${parseInt(p.batter_id)||0}_${parseInt(p.pitcher_id)||0}`;
+            const key = `${parseInt(bt.batter_id)||0}_${parseInt(bt.pitcher_id)||0}`;
             const noteState = notes[key];
             return (
-              <div key={p.batter_id}
+              <div key={bt.batter_id}
                 onClick={() => !isFlipped && flipCard(i)}
                 style={{width:225,height:420,flexShrink:0,scrollSnapAlign:'start',
                   perspective:1000,cursor:isFlipped?'default':'pointer',position:'relative'}}>
@@ -31065,51 +31159,65 @@ function TopThreeTab() {
                           color:`rgba(${rank.accentRgb},0.9)`,letterSpacing:1}}>{rank.name}</span>
                       </div>
                       <div style={{display:'flex',alignItems:'center',gap:4}}>
-                        {LINEUP_STATUS[parseInt(p.batter_id)||0]?.status === 'confirmed' && (
+                        {LINEUP_STATUS[parseInt(bt.batter_id)||0]?.status === 'confirmed' && (
                           <span title="Confirmed in today's lineup" style={{fontSize:11}}>✅</span>
                         )}
                       </div>
                     </div>
 
                     <div style={{display:'flex',alignItems:'center',gap:8}}>
-                      <PlayerAvatar pid={parseInt(p.batter_id)||0} size={34}/>
+                      <PlayerAvatar pid={parseInt(bt.batter_id)||0} size={34}/>
                       <div style={{flex:1,minWidth:0,cursor:'pointer'}}
                         onClick={e=>{e.stopPropagation();openPitcherSlide(null);
-                          openAtBatSlide({pid:parseInt(p.batter_id)||0,name:p.batter,team:p.batting_team||''});}}>
+                          openAtBatSlide({pid:parseInt(bt.batter_id)||0,name:bt.batter,team:bt.batting_team||''});}}>
                         <div style={{fontFamily:osw,fontSize:13,fontWeight:900,color:'var(--text)',
                           lineHeight:1.2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',
                           textDecoration:'underline',textDecorationColor:`rgba(${rank.accentRgb},0.4)`}}>
-                          {p.batter}
+                          {bt.batter}
                         </div>
                         <div style={{fontFamily:mono,fontSize:7.5,color:'var(--muted)'}}>
-                          {p.batting_team}{p.batter_hand?` · ${p.batter_hand}HB`:''}
+                          {bt.batting_team}{bt.batter_hand?` · ${bt.batter_hand}HB`:''}
                         </div>
                       </div>
                     </div>
 
                     <div style={{fontFamily:mono,fontSize:7.5,color:'var(--muted)',cursor:'pointer'}}
                       onClick={e=>{e.stopPropagation();openPitcherSlide(null);
-                        openPitcherSlide({pid:parseInt(p.pitcher_id)||0,name:p.pitcher,team:'',hand:p.pitcher_hand});}}>
-                      vs {p.pitcher} · {p._pgLabel || p.pitcher_grade_label || ''}
+                        openPitcherSlide({pid:parseInt(bt.pitcher_id)||0,name:bt.pitcher,team:'',hand:bt.pitcher_hand});}}>
+                      vs {bt.pitcher} · {bt._pgLabel || bt.pitcher_grade_label || ''}
                     </div>
 
                     <div style={{display:'flex',flexWrap:'wrap',gap:3}}>
                       <span style={{fontFamily:mono,fontSize:7,padding:'2px 5px',borderRadius:3,
                         background:rank.tagBg,color:rank.tagColor,border:`1px solid ${rank.tagBorder}`}}>
-                        TrueHR {Math.round(p.trueHRScore)}
+                        TrueHR {Math.round(bt.trueHRScore)}
                       </span>
                       <span style={{fontFamily:mono,fontSize:7,padding:'2px 5px',borderRadius:3,
                         background:rank.tagBg,color:rank.tagColor,border:`1px solid ${rank.tagBorder}`}}>
-                        Matchup {Math.round(p.matchupScore)}
+                        Matchup {Math.round(bt.matchupScore)}
                       </span>
-                      {p.bullpenTier && <span style={{fontFamily:mono,fontSize:7,padding:'2px 5px',borderRadius:3,
+                      {bt.bullpenTier && <span style={{fontFamily:mono,fontSize:7,padding:'2px 5px',borderRadius:3,
                         background:rank.tagBg,color:rank.tagColor,border:`1px solid ${rank.tagBorder}`}}>
-                        {p.bullpenTier}
+                        {bt.bullpenTier}
                       </span>}
-                      {p.sauce && <span style={{fontFamily:mono,fontSize:7,padding:'2px 5px',borderRadius:3,
+                      {bt.sauce && <span style={{fontFamily:mono,fontSize:7,padding:'2px 5px',borderRadius:3,
                         background:rank.tagBg,color:rank.tagColor,border:`1px solid ${rank.tagBorder}`}}>
-                        🍯 Sauce {p.sauce}
+                        🍯 Sauce {bt.sauce}
                       </span>}
+                      {p.tierKey === 'midTier' && !p.isoFallback && (
+                        <span title="Mid-Tier's own extra gate — the one tier where this combination showed a real backtested lift"
+                          style={{fontFamily:mono,fontSize:7,padding:'2px 5px',borderRadius:3,
+                          background:rank.tagBg,color:rank.tagColor,border:`1px solid ${rank.tagBorder}`}}>
+                          L7 ISO {parseFloat(bt.recent_iso||0).toFixed(3)} · AF ISO {parseFloat(bt.bvp_iso||0).toFixed(3)}
+                        </span>
+                      )}
+                      {p.tierKey === 'midTier' && p.isoFallback && (
+                        <span title="No Mid-Tier batter cleared both ISO bars today — top-graded fallback instead"
+                          style={{fontFamily:mono,fontSize:7,padding:'2px 5px',borderRadius:3,
+                          background:rank.tagBg,color:rank.tagColor,border:`1px solid ${rank.tagBorder}`}}>
+                          ISO bar not met — fallback
+                        </span>
+                      )}
                     </div>
 
                     <div style={{flex:1,minHeight:0,marginTop:2,padding:'6px 7px',borderRadius:6,
@@ -31126,13 +31234,13 @@ function TopThreeTab() {
                       )}
                       {noteState?.error && (
                         // "sign_in_required" here would mean the server's
-                        // approximate Top-3 ranking (api/batter-scouting-note.js
+                        // approximate Top-4 ranking (api/batter-scouting-note.js
                         // isTodaysTop3(), 2026-08-07) disagreed with this
-                        // tab's own real ranking above — should be rare given
-                        // both use the same weights/bonuses, but a genuine
-                        // Top 3 card asking the user to "sign in" would be
-                        // confusing, so it gets a generic message instead of
-                        // the raw error code.
+                        // tab's own real per-tier ranking above — should be
+                        // rare given both use the same weights/bonuses, but a
+                        // genuine Top 4 card asking the user to "sign in"
+                        // would be confusing, so it gets a generic message
+                        // instead of the raw error code.
                         <div style={{fontFamily:mono,fontSize:8,color:'#ff6b6b'}}>
                           {noteState.error === 'sign_in_required'
                             ? "Couldn't generate a note for this pick — try refreshing."
@@ -31163,7 +31271,7 @@ function TopThreeTab() {
                     </div>
 
                     <div style={{display:'flex',justifyContent:'center'}}>
-                      <PickButton pid={parseInt(p.batter_id)||0} name={p.batter} team={p.batting_team||''}/>
+                      <PickButton pid={parseInt(bt.batter_id)||0} name={bt.batter} team={bt.batting_team||''}/>
                     </div>
                   </div>
 
@@ -31179,12 +31287,13 @@ function TopThreeTab() {
         Real scores + AI-narrated analysis of real, verified stats. Not financial advice.
       </div>
 
-      {showHelp && <HelpSlideout title="🎯 Top 3 Tonight Guide" onClose={()=>setShowHelp(false)} items={[
-        ['How it works', 'Deterministic — not random. Every eligible batter on today\'s slate (excluding anyone facing a Tough or Elite pitcher outright) is ranked by TrueHRScore (pool-normalized, the exact same formula Daily Barrel uses) and MatchupScore (pitcher/PS-Score/platoon-weighted), with bonuses for an already-validated Sauce tier and a favorable Bullpen Tier. The literal top 3 by that composite score are shown.'],
+      {showHelp && <HelpSlideout title="🎯 Top 4 Tonight Guide" onClose={()=>setShowHelp(false)} items={[
+        ['How it works', 'Deterministic — not random. One real pick from each of the 4 HR-distribution tiers (Young Gun, Chalk, Mid-Tier, Longshot — same definitions as everywhere else in the app), ranked within its own tier by TrueHRScore (pool-normalized, the exact same formula Daily Barrel uses) and MatchupScore (pitcher/PS-Score/platoon-weighted), with bonuses for an already-validated Sauce tier and a favorable Bullpen Tier. Every eligible batter facing an outright Tough or Elite pitcher is excluded first, and a batter already picked for an earlier tier is excluded from later ones so all 4 cards are distinct names.'],
+        ['Why Mid-Tier is different', 'A backtest against the real 5/17-8/8 tracker found the plain composite ranking already works for Young Gun/Chalk/Longshot — adding an extra filter there was flat-to-negative at those tiers\' thin post-filter samples. But requiring L7 ISO AND Arsenal Fit ISO both above .190 specifically within Mid-Tier showed a real, validated lift (12.2% vs. 9.8% tier baseline, 1.25x, n=558) — so only the Mid-Tier card uses that extra gate, shown as a tag on the card. Falls back to the plain top-graded Mid-Tier batter on the rare day nobody clears both bars.'],
         ['📝 The Analysis', 'A short, Claude-narrated note built from each batter\'s real last-10 batted-ball events, fly-ball rate by the pitcher\'s actual pitch mix, and recent at-bats matched to tonight\'s real day/night + home/away context — the same tool available on any batter\'s own slideout. Claude never invents a number; every stat in the note is pre-verified server-side first.'],
-        ['When the score and note disagree', 'The ranking (TrueHRScore/MatchupScore) and the note are built from genuinely different data — season-length composite vs. the batter\'s last 10 real batted-ball events — so they can legitimately point different directions. Claude is told which batter it\'s describing and why it was ranked, and is explicitly instructed to name that tension rather than sound artificially bullish. The raw numbers (Barrel%/FB%/Pull%/350ft+ count) behind every note are also shown below it so you can check for yourself.'],
-        ['Updates automatically', 'Re-ranks itself the moment lineups shift enough to change who the real top 3 is. Only a newly-added pick triggers a fresh analysis — anyone still in the top 3 reuses the same 20-hour cache, so this never re-generates unnecessarily.'],
-        ['Not the same as Crystal Ball', 'Crystal Ball draws a random pick per tier for fun. This tab is the opposite — the literal best 3 matchups today, ranked, no randomness.'],
+        ['When the score and note disagree', 'The ranking (TrueHRScore/MatchupScore) and the note are built from genuinely different data — season-length composite vs. the batter\'s last 10 real batted-ball events — so they can legitimately point different directions. Claude is told which tier it\'s describing and why the batter was picked, and is explicitly instructed to name that tension rather than sound artificially bullish. The raw numbers (Barrel%/FB%/Pull%/350ft+ count) behind every note are also shown below it so you can check for yourself.'],
+        ['Updates automatically', 'Re-ranks itself the moment lineups shift enough to change who any of the 4 real picks are. Only a newly-added pick triggers a fresh analysis — anyone still picked in their tier reuses the same 20-hour cache, so this never re-generates unnecessarily.'],
+        ['Not the same as Crystal Ball', 'Crystal Ball draws a random pick per tier for fun. This tab is the opposite — the literal best real matchup in each tier today, ranked, no randomness.'],
       ]}/>}
 
       <style>{`
@@ -32875,7 +32984,7 @@ function HomeTab() {
         ['🔗 Pairs', 'Two-batter combos sharing favorable conditions — same park, pitcher, or contact trend. Curated to 2–3 top pairs per category.'],
         ['🎰 Sim', 'Monte Carlo simulator — runs up to 10,000 game simulations using each batter\'s Yard Score, pitcher grade, park & wind factors. Shows top 5 HR candidates by simulation frequency.'],
         ['🔮 Crystal Ball', 'The engine\'s three picks: The Chosen (elite stack), Dark Horse (under the radar), Wild Card (spike signal).'],
-        ['🎯 Top 3 Tonight', 'The deterministic counterpart to Crystal Ball — no randomness. Real-ranks today\'s slate by TrueHRScore + MatchupScore (pitcher/bullpen-weighted) and shows the literal top 3, each with a real Claude-narrated Scouting Note built from verified recent batted-ball data. Re-ranks itself automatically once lineups confirm.'],
+        ['🎯 Top 4 Tonight', 'The deterministic counterpart to Crystal Ball — no randomness. One real pick per HR-distribution tier (Young Gun, Chalk, Mid-Tier, Longshot), each ranked within its own tier by TrueHRScore + MatchupScore (pitcher/bullpen-weighted). The Mid-Tier pick additionally requires L7 ISO and Arsenal Fit ISO both above .190 — a backtested threshold that only shows real lift within that specific tier. Each pick comes with a real Claude-narrated Scouting Note built from verified recent batted-ball data. Re-ranks itself automatically once lineups confirm.'],
         ['🛢️ Daily Barrel', 'Monte Carlo HR simulation (10,000 PAs per matchup). TrueHRScore + MatchupScore per batter, ★ Barrel Signal flag for the strictest matchups, 🎲 Longshot flag for undervalued plays. Live tracker: Barrel Signal hits at 16.9% HR rate.'],
         ['🔵 On Base', 'A parallel Monte Carlo engine targeting 2+ total bases per game — the hits/TB prop market, not just HRs. OnBaseScore + MatchupScore + SimTB2%, with its own ★ TB Signal flag. Very new — early hit rate is promising but the sample is still small.'],
         ['🚫 Avoid List', 'The mirror image of Hit Signal — batters least likely to record a hit tonight (cold Sim H, real whiff risk, tough matchup, or unfavorable platoon). Full-season backtest: 58-61% miss rate vs. a 42.6% baseline, 1.4x lift, validated cleanly train/test. No badges — this list only exists here and as a filter in the usual tables.'],
@@ -32892,7 +33001,7 @@ function HomeTab() {
         <button style={stBtn('pairs')}      onClick={()=>setSub('pairs')}>🔗 Pairs</button>
         <button style={stBtn('sim')}        onClick={()=>setSub('sim')}>🎰 Sim</button>
         <button style={stBtn('crystal')}    onClick={()=>setSub('crystal')}>🔮</button>
-        <button style={stBtn('top3')}       onClick={()=>setSub('top3')}>🎯 Top 3</button>
+        <button style={stBtn('top3')}       onClick={()=>setSub('top3')}>🎯 Top 4</button>
         <button data-subtab="barrellab" style={stBtn('barrellab')} onClick={()=>setSub('barrellab')}>🛢️ Daily Barrel</button>
         <button data-subtab="onbase"    style={stBtn('onbase')}    onClick={()=>setSub('onbase')}>🔵 On Base</button>
         <button data-subtab="avoid"     style={stBtn('avoid')}     onClick={()=>setSub('avoid')}>🚫 Avoid</button>

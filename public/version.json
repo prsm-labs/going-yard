@@ -1,11 +1,8 @@
 {
   "version": "2026.08.09",
-  "bundleFile": "index-Cplsyuhc.js",
+  "bundleFile": "index-mSN0vvCD.js",
   "changelog": [
-    "Add Young Gun/Chalk/Mid-Tier/Longshot filters + badges to Barrel Lab",
-    "On Base",
-    "Arsenal Fit",
-    "Track Record"
+    "Loosen Chalk threshold: HR>=19 OR AB/HR<21 (was HR>=18 AND ISO>=.220)"
   ],
   "notifyUsers": true
 }
