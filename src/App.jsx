@@ -29264,8 +29264,20 @@ function TrackRecordTab() {
         unified.forEach(r => { (byDate[r.date] ||= []).push(r); });
         const top4Map = {}; // `${date}_${batterId}` -> tier key
         Object.entries(byDate).forEach(([date, dayRows]) => {
+          // FIXED 2026-08-10: this filter had no actualAB>0 gate — user
+          // caught Harry Ford reconstructed as 8/9's Young Gun pick despite
+          // recording zero real at-bats that day (the real live pick was
+          // Abimelec Ortiz). Unlike the LIVE tab (which has to guess
+          // eligibility ahead of time via lineup confirmation/season
+          // activity — filterLineupAwareEligible()), this is a RETROSPECTIVE
+          // reconstruction of a day that already happened — real ground
+          // truth (did they actually bat) is available and simpler/more
+          // reliable than re-deriving a lineup-confirmation proxy. Same
+          // actualAB>0 gate already applied to this tab's own summary/stat-
+          // card computation (2026-08-06's `played` fix) — just never
+          // extended to this later-added reconstruction block.
           const eligible = dayRows.filter(r =>
-            r.batterId && !/elite|tough/i.test(r.pitcherGrade || ''));
+            r.batterId && r.actualAB > 0 && !/elite|tough/i.test(r.pitcherGrade || ''));
           // Skip dates where Barrel Lab's own scoring columns genuinely
           // weren't populated yet (pre-Barrel-Lab-era or a truly sparse
           // export) — a real threshold, not arbitrary: below this, most
@@ -31148,11 +31160,13 @@ function TopThreeTab() {
   const [flipped,  setFlipped]  = useState([false,false,false,false]);
   const [notes,    setNotes]    = useState({}); // `${batterId}_${pitcherId}` -> {loading|data|error}
   const [showHelp, setShowHelp] = useState(false);
+  const [recentHrVer, setRecentHrVer] = useState(_RECENT_HR_VER);
 
   useEffect(() => {
     const unsub    = subscribeLineup(v => setLineupVer(v));
     const unsubInj = subscribeInjuries(() => setInjuryVer(v => v + 1));
     loadTodayLineups();
+    loadRecentHRLookup().then(() => setRecentHrVer(v => v + 1));
     return () => { unsub(); unsubInj(); };
   }, []);
 
@@ -31168,9 +31182,15 @@ function TopThreeTab() {
       if (INJURY_MAP[bid]) return false;
       const pg = (r.pitcher_grade_label || r._pgLabel || '').toLowerCase();
       if (pg.includes('elite') || pg.includes('tough')) return false; // never an outright bad matchup
+      // Recent-HR exclusion (2026-08-10) — see loadRecentHRLookup()'s own
+      // comment for the full rationale. RECENT_HR_LOOKUP may still be null
+      // on the very first render before the fetch above resolves — treated
+      // as "nothing to exclude yet" rather than blocking the whole tab.
+      const name = (r.batter || '').trim().toLowerCase();
+      if (name && RECENT_HR_LOOKUP && RECENT_HR_LOOKUP.has(name)) return false;
       return true;
     });
-  }, [lineupVer, injuryVer, refreshTick]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [lineupVer, injuryVer, refreshTick, recentHrVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const top3 = useMemo(() => {
     if (!eligibleBatters.length) return [];
@@ -33739,6 +33759,58 @@ function isDayLateBatter(r) {
   const pg = (r.pitcher_grade_label || r._pgLabel || '').toLowerCase();
   if (pg.includes('elite')) return false; // today's matchup not even close to favorable
   return true;
+}
+
+// ── Recent-HR exclusion (2026-08-10) — Top 4 Tonight only ───────────────────
+// User-reported real case: Alec Burleson (Mid-Tier, 8/9) and Kyle Schwarber
+// (2 HR, 8/9) both recurred as real Top 4 picks the very next day (8/10)
+// despite having just gone yard. Cited this project's own already-documented
+// research directly against it: the gHR lag-echo investigation found HR rate
+// correlates more strongly with YESTERDAY's home run than today's outcome
+// (an echo, not a real predictive signal), and the Hot-Hand-removal writeup
+// found HR rate actually INVERTED as the recent-HR signal climbed within the
+// top Yard Score tier (25.0% -> 10.0%) — the opposite of "hot yesterday
+// predicts hot today." A repeat pick built on exactly the signal this
+// project already found doesn't work isn't defensible, so it's excluded
+// outright from Top 4 Tonight's eligible pool rather than merely down-
+// weighted. Same reconstruct-from-track-record-exports pattern as
+// loadDayLateLookup() just above, but keyed to the SINGLE most recent
+// tracked date (not "either of the last 2") — matches "went yard yesterday"
+// literally, not a 2-day window.
+let RECENT_HR_LOOKUP = null;     // Set of lowercased batter names who went yard on the single most recent tracked date
+let RECENT_HR_LOOKUP_DATE = '';  // ET date this lookup was built for (cache guard)
+let _RECENT_HR_VER = 0;
+
+async function loadRecentHRLookup(force = false) {
+  const todayET = getETDateStr();
+  if (!force && RECENT_HR_LOOKUP && RECENT_HR_LOOKUP_DATE === todayET) return RECENT_HR_LOOKUP;
+  try {
+    const amText = await fetch('/data/track-record-matchups.csv').then(r => r.text());
+    const amRows = parseCSV(amText);
+    const dateSet = new Set(amRows.map(r => r.export_date).filter(Boolean));
+    const parsedDates = Array.from(dateSet)
+      .map(d => ({ raw: d, dt: new Date(d) }))
+      .filter(x => !isNaN(x.dt.getTime()));
+    parsedDates.sort((a, b) => b.dt - a.dt);
+    const mostRecent = parsedDates[0]?.raw;
+    const names = new Set();
+    if (mostRecent) {
+      amRows.forEach(r => {
+        if (r.export_date !== mostRecent) return;
+        if ((r['Gone Yard'] || '').trim().toUpperCase() !== 'YES') return;
+        const name = (r.Batter || '').trim().toLowerCase();
+        if (name) names.add(name);
+      });
+    }
+    RECENT_HR_LOOKUP = names;
+    RECENT_HR_LOOKUP_DATE = todayET;
+    _RECENT_HR_VER++;
+    return names;
+  } catch (e) {
+    console.warn('[RecentHR] lookup failed:', e.message);
+    RECENT_HR_LOOKUP = new Set(); RECENT_HR_LOOKUP_DATE = todayET; _RECENT_HR_VER++;
+    return RECENT_HR_LOOKUP;
+  }
 }
 
 // ── Sauce 2.0 / Sauce 3.0 (2026-07-30) ──────────────────────────────────────

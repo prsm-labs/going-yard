@@ -1,8 +1,8 @@
 {
-  "version": "2026.08.09",
-  "bundleFile": "index-R8I2kOmU.js",
+  "version": "2026.08.10",
+  "bundleFile": "index-FhizNh8h.js",
   "changelog": [
-    "Add Top 4 Pick reconstruction to Track Record"
+    "Add Bullpen Arsenal Fit — top-5 opposing-batter fit table for every real bullpen arm"
   ],
   "notifyUsers": true
 }

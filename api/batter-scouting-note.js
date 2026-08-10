@@ -282,6 +282,42 @@ function serverIsLongshot(r, trueHR, matchup) {
   return !grade.includes('elite');
 }
 
+// Recent-HR exclusion (2026-08-10) — server-side port of App.jsx's
+// loadRecentHRLookup()/eligibleBatters filter (see that file's comment for
+// the full rationale: this project's own gHR lag-echo / Hot-Hand research
+// found HR rate INVERTS as the recent-HR signal climbs, not the reverse, so
+// a batter who just went yard is excluded from Top 4 Tonight's pool outright
+// rather than merely down-weighted). Kept in sync here for the same reason
+// the tier-bucketing rework was needed 2026-08-09: a stale copy here would
+// silently treat a now-excluded batter as a legitimate free-tier pick again.
+function loadRecentHRExcludeSet() {
+  for (const p of [
+    join(process.cwd(), 'public', 'data', 'track-record-matchups.csv'),
+    join(process.cwd(), 'going-yard', 'public', 'data', 'track-record-matchups.csv'),
+  ]) {
+    try {
+      const rows = parseCsv(readFileSync(p, 'utf-8'));
+      if (!rows.length) continue;
+      const dateSet = new Set(rows.map(r => r.export_date).filter(Boolean));
+      const parsedDates = Array.from(dateSet)
+        .map(d => ({ raw: d, dt: new Date(d) }))
+        .filter(x => !isNaN(x.dt.getTime()));
+      parsedDates.sort((a, b) => b.dt - a.dt);
+      const mostRecent = parsedDates[0]?.raw;
+      if (!mostRecent) continue;
+      const names = new Set();
+      rows.forEach(r => {
+        if (r.export_date !== mostRecent) return;
+        if ((r['Gone Yard'] || '').trim().toUpperCase() !== 'YES') return;
+        const name = (r.Batter || '').trim().toLowerCase();
+        if (name) names.add(name);
+      });
+      return names;
+    } catch (_) { /* try next path */ }
+  }
+  return new Set();
+}
+
 // Independently recomputes today's real Top 4 Tonight selection server-side
 // (never trusts a client-supplied flag — see header comment). Fails CLOSED:
 // any load/parse failure returns false (requires sign-in) rather than
@@ -305,6 +341,7 @@ async function isTodaysTop4(batterId, pitcherId) {
     const rows = loadDailyPicksRows();
     if (!rows.length) return false;
     const playersMap = loadPlayersMap();
+    const recentHrExclude = loadRecentHRExcludeSet();
     const bId = String(batterId), pId = String(pitcherId);
 
     const eligible = rows
@@ -313,6 +350,7 @@ async function isTodaysTop4(batterId, pitcherId) {
         const grade = (r.pitcher_grade_label || '').toLowerCase();
         return !grade.includes('elite') && !grade.includes('tough'); // outright excluded, matches TopThreeTab
       })
+      .filter(r => !recentHrExclude.has((r.batter || '').trim().toLowerCase())) // 2026-08-10, matches TopThreeTab
       .map(r => {
         const trueHR  = serverTrueHRScore(r);
         const matchup = serverMatchupScore(r);
