@@ -1,8 +1,8 @@
 {
   "version": "2026.08.10",
-  "bundleFile": "index-FhizNh8h.js",
+  "bundleFile": "index-CHHzkf3e.js",
   "changelog": [
-    "Add Bullpen Arsenal Fit — top-5 opposing-batter fit table for every real bullpen arm"
+    "Fix Top 4 Tonight repeat-HR picks and Track Record's missing actualAB gate"
   ],
   "notifyUsers": true
 }

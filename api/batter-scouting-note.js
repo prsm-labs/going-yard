@@ -55,22 +55,21 @@
 // instance already used for picks/push-subscription storage — one real
 // generation per matchup per day, not per slideout open.
 //
-// Free-tier gate (added 2026-08-07): every cache HIT stays free for anyone,
-// signed in or not — the note's already paid for. A cache MISS (a genuinely
-// new Anthropic call) is only free for today's real Top 3 Tonight picks;
-// everyone else must be signed in (Clerk — same auth already wired in for
-// Cloud picks sync, api/save-picks.js/api/get-picks.js). "Today's real Top
-// 3" is deliberately NOT trusted from the client (a client-asserted
-// isTop3:true flag would be trivially spoofable via devtools) — instead
-// this endpoint independently recomputes an approximate ranking server-side
-// from daily_picks.csv, reusing the exact serverTrueHRScore()/
-// serverMatchupScore() approximations already proven out in
-// api/barrel-notify.js for the same "read the CSV, score every batter,
-// don't trust the client" purpose. Won't be byte-identical to the client's
-// own (more precise, per-game-pool-normalized) Top 3 Tonight ranking, but
-// uses the same signals/weights and will overlap heavily in practice — and
-// fails CLOSED (treats a data-load failure as "not top 3", i.e. requires
-// sign-in) rather than open.
+// Free-tier gate (added 2026-08-07, reworked 2026-08-10): every cache HIT
+// stays free for anyone, signed in or not — the note's already paid for. A
+// cache MISS (a genuinely new Anthropic call) is only free for a matchup
+// this endpoint judges to be roughly today's real Top 4 Tonight tier — see
+// isTodaysTop4()'s own comment for the full history. Deliberately NOT
+// trusted from the client (a client-asserted isTop3:true flag would be
+// trivially spoofable via devtools) — this endpoint independently
+// recomputes an approximate score server-side from daily_picks.csv
+// (serverTrueHRScore()/serverMatchupScore(), also used by
+// api/barrel-notify.js for the same purpose) and checks whether the
+// requested batter falls within a generous top-percentile slice of today's
+// eligible pool — not an exact top-1-per-tier match (tried that 2026-08-09,
+// confirmed live it fails almost always; see isTodaysTop4()). Fails CLOSED
+// (treats a data-load failure as "not eligible", i.e. requires sign-in)
+// rather than open.
 
 import { Redis } from '@upstash/redis';
 import { verifyToken } from '@clerk/backend';
@@ -86,7 +85,20 @@ import { join } from 'path';
 // Deliberately not inheriting that here; daily_picks.csv has 242+ columns
 // so a real quoted-field-aware parser is needed (column position shifts
 // with which fields are present), not a naive .split(',').
+//
+// BOM STRIP (2026-08-10): daily_picks.csv has no BOM, but
+// track-record-matchups.csv does — it's written via Python's
+// encoding='utf-8-sig' (gy_csv.py's append_to_season_file(), confirmed in
+// CLAUDE.md's July 2026 session history), and Node's readFileSync('utf-8')
+// does NOT strip a BOM automatically. Without this, the header parses as
+// '﻿export_date' instead of 'export_date' — every row.export_date read
+// silently comes back undefined, which is exactly what made
+// loadRecentHRExcludeSet() (added this same day) return an always-empty
+// Set: confirmed live via a standalone debug run (rows.length=34800 parsed
+// fine, but unique dates=0). Stripping it here fixes it for every current
+// and future caller of this parser, not just that one call site.
 function parseCsv(text) {
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
   const rows = [];
   let row = [], field = '', inQuotes = false;
   for (let i = 0; i < text.length; i++) {
@@ -231,57 +243,6 @@ function loadDailyPicksRows() {
   return [];
 }
 
-// players.json (2026-08-09) — needed for the Chalk check below, which
-// (like App.jsx's own isChalkBatter()) needs real season HR/AB, not
-// anything in daily_picks.csv. Same dual-path pattern as
-// loadDailyPicksRows().
-function loadPlayersMap() {
-  for (const p of [
-    join(process.cwd(), 'public', 'data', 'players.json'),
-    join(process.cwd(), 'going-yard', 'public', 'data', 'players.json'),
-  ]) {
-    try {
-      const raw = JSON.parse(readFileSync(p, 'utf-8'));
-      const arr = Array.isArray(raw) ? raw : (raw.players || []);
-      if (!arr.length) continue;
-      const map = {};
-      arr.forEach(pl => { if (pl.pid) map[String(pl.pid)] = pl; });
-      return map;
-    } catch (_) { /* try next path */ }
-  }
-  return {};
-}
-
-// Tier checks (2026-08-09) — server-side ports of App.jsx's isYoungGunBatter/
-// isChalkBatter/isLongshotBatter, kept in exact sync with those definitions
-// (same thresholds, same field names) since this endpoint's whole job is to
-// answer "is this the same batter/pitcher pair the client's Top 4 Tonight
-// would really pick" — a stale copy here would silently re-break the free
-// tier the same way the old literal-top-3 version already did (see below).
-function serverIsYoungGun(r) {
-  return parseFloat(r.season_pa ?? 999) < 100;
-}
-function serverIsChalk(r, playersMap) {
-  const p = playersMap[String(parseInt(r.batter_id) || 0)];
-  if (!p) return false;
-  const seasonPA = p.pa || p.ab || 0;
-  if (seasonPA < 100) return false;
-  const seasonHR = p.hr || 0;
-  const abPerHR = (p.abPerHR && p.abPerHR < 99)
-    ? p.abPerHR
-    : (seasonHR > 0 ? seasonPA / seasonHR : null);
-  if (!(seasonHR >= 19 || (abPerHR != null && abPerHR < 21))) return false;
-  const grade = (r.pitcher_grade_label || '').toLowerCase();
-  return !(grade.includes('elite') || grade.includes('tough'));
-}
-function serverIsLongshot(r, trueHR, matchup) {
-  if (trueHR > 55) return false;
-  if (matchup < 65) return false;
-  if (parseFloat(r.sim_tb || 0) < 1.2) return false;
-  const grade = (r.pitcher_grade_label || '').toLowerCase();
-  return !grade.includes('elite');
-}
-
 // Recent-HR exclusion (2026-08-10) — server-side port of App.jsx's
 // loadRecentHRLookup()/eligibleBatters filter (see that file's comment for
 // the full rationale: this project's own gHR lag-echo / Hot-Hand research
@@ -323,24 +284,38 @@ function loadRecentHRExcludeSet() {
 // any load/parse failure returns false (requires sign-in) rather than
 // silently handing out free generations.
 //
-// REWORK 2026-08-09: this used to just take the literal top 3 by raw
-// composite score across the whole slate — correct when Top 3 Tonight was a
-// simple ranked list, but never updated when the client moved to "one real
-// pick per tier" (2026-08-09 rework). Two structural problems with the old
-// version, confirmed live: (1) a strict top-N cutoff can never reliably
-// contain a real Longshot pick, since Longshot requires TrueHR≤55 by
-// definition while a raw top-N list is always dominated by 90+ scores: (2)
-// it only ever returned 3 slots for what's now 4 real distinct picks. Both
-// meant the server would say "no" (require sign-in) for real, legitimate Top
-// 4 picks — exactly the "Couldn't generate a note" failures seen live.
-// Fixed by porting the client's actual tier-bucketing + Mid-Tier ISO gate +
-// sequential-dedup selection here, using the same serverTrueHRScore()/
-// serverMatchupScore() this file already computes.
+// REWORK 2026-08-10: the 2026-08-09 version tried to exactly replicate the
+// client's tier-bucketed selection (one specific top-1-per-tier pick) —
+// confirmed live, via a standalone debug run against today's real slate,
+// that this fails almost always, not just occasionally. Two distinct causes
+// found: (1) TIER-CLASSIFICATION divergence — serverIsLongshot()'s gate used
+// this file's own raw, non-pool-normalized trueHR/matchup approximation,
+// which landed real client picks in the WRONG tier entirely (e.g. Freddie
+// Freeman was the client's real Longshot pick but classified Mid-Tier here;
+// Royce Lewis was the client's real Mid-Tier pick but classified Longshot
+// here) — no amount of within-tier rank widening fixes a batter who isn't
+// even in the right pool. (2) Even where the tier agreed, the raw score
+// approximation doesn't reliably land the SAME batter at exactly rank #1
+// (e.g. Shohei Ohtani, correctly Chalk on both sides, ranked #2 of 35 here,
+// essentially tied with #1). Net result debugged live: 0 of 4 real picks
+// matched, every single card.
+//
+// Rather than continue chasing exact parity with a client algorithm this
+// approximation can't precisely reproduce (per-game pool normalization,
+// full compute*Score() internals), this drops the tier-exact-match
+// requirement and checks a single, more robust bound instead: is this a
+// REAL matchup today, non-Elite/Tough, not recent-HR-excluded, and among
+// the top slice of today's eligible pool by this file's own score. A
+// self-calibrating percentage (not a fixed count) so it scales with a
+// light vs. full slate. Validated against today's real 4 live picks before
+// shipping: they ranked #2, #23, #50, #67 of 630 eligible — top 15%
+// (≈top 95 today) comfortably covers all 4 with real margin, while still
+// excluding ~85% of the pool (meaningfully bounds bulk free-tier abuse,
+// which is what this gate actually exists to prevent — see header comment).
 async function isTodaysTop4(batterId, pitcherId) {
   try {
     const rows = loadDailyPicksRows();
     if (!rows.length) return false;
-    const playersMap = loadPlayersMap();
     const recentHrExclude = loadRecentHRExcludeSet();
     const bId = String(batterId), pId = String(pitcherId);
 
@@ -351,44 +326,16 @@ async function isTodaysTop4(batterId, pitcherId) {
         return !grade.includes('elite') && !grade.includes('tough'); // outright excluded, matches TopThreeTab
       })
       .filter(r => !recentHrExclude.has((r.batter || '').trim().toLowerCase())) // 2026-08-10, matches TopThreeTab
-      .map(r => {
-        const trueHR  = serverTrueHRScore(r);
-        const matchup = serverMatchupScore(r);
-        return {
-          batterId: String(parseInt(r.batter_id) || 0),
-          pitcherId: String(parseInt(r.pitcher_id) || 0),
-          score: trueHR * 0.5 + matchup * 0.5 + sauceBonus(r) + bullpenBonus(r),
-          isYoungGun: serverIsYoungGun(r),
-          isChalk: serverIsChalk(r, playersMap),
-          isLongshot: serverIsLongshot(r, trueHR, matchup),
-          recentIso: parseFloat(r.recent_iso || 0),
-          bvpIso: parseFloat(r.bvp_iso || 0),
-        };
-      });
+      .map(r => ({
+        batterId: String(parseInt(r.batter_id) || 0),
+        pitcherId: String(parseInt(r.pitcher_id) || 0),
+        score: serverTrueHRScore(r) * 0.5 + serverMatchupScore(r) * 0.5 + sauceBonus(r) + bullpenBonus(r),
+      }))
+      .sort((a, b) => b.score - a.score);
 
-    const byScore = arr => arr.slice().sort((a, b) => b.score - a.score);
-    const youngGunPool = byScore(eligible.filter(r => r.isYoungGun));
-    const chalkPool    = byScore(eligible.filter(r => r.isChalk));
-    const longshotPool = byScore(eligible.filter(r => r.isLongshot));
-    const midTierPool  = byScore(eligible.filter(r => !r.isLongshot && !r.isChalk && !r.isYoungGun));
-    const midTierIsoQualified = midTierPool.filter(r => r.recentIso > 0.190 && r.bvpIso > 0.190);
-
-    // Same sequential dedup as the client (Young Gun→Chalk→Mid-Tier→
-    // Longshot) — the 4 tiers aren't mutually exclusive by construction, so
-    // a batter already claimed by an earlier tier is excluded from later
-    // pools, matching TopThreeTab's own selectFrom() exactly.
-    const pickedIds = new Set();
-    const selectFrom = pool => {
-      for (const cand of pool) {
-        if (!pickedIds.has(cand.batterId)) { pickedIds.add(cand.batterId); return cand; }
-      }
-      return null;
-    };
-    const picks = [selectFrom(youngGunPool), selectFrom(chalkPool)];
-    picks.push(selectFrom(midTierIsoQualified) || selectFrom(midTierPool));
-    picks.push(selectFrom(longshotPool));
-
-    return picks.filter(Boolean).some(p => p.batterId === bId && p.pitcherId === pId);
+    if (!eligible.length) return false;
+    const cutoffN = Math.max(20, Math.ceil(eligible.length * 0.15));
+    return eligible.slice(0, cutoffN).some(p => p.batterId === bId && p.pitcherId === pId);
   } catch (e) {
     return false; // fail closed
   }
