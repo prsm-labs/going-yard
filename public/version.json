@@ -1,9 +1,8 @@
 {
   "version": "2026.08.09",
-  "bundleFile": "index-NYg8sDlx.js",
+  "bundleFile": "index-R8I2kOmU.js",
   "changelog": [
-    "Fix Top 4 Tonight: missing scout notes + scratched batters showing as picks",
-    "swap Mid-Tier emoji"
+    "Add Top 4 Pick reconstruction to Track Record"
   ],
   "notifyUsers": true
 }

@@ -3688,6 +3688,116 @@ function Last7HRAllowedChart({ pitcherId }) {
   );
 }
 
+// ── Bullpen Arsenal Fit (2026-08-09) ─────────────────────────────────────────
+// See PROMPT_BullpenArsenalFit.md. Standalone pipeline script
+// (bullpen_arsenal_fit.py) precomputes a top-5-by-fit table for every real
+// bullpen arm (IP/appearance <=2.0, 15+ appearances this season — validated
+// 2026-08-09 against 3 real, differently-built staffs) on today's playing
+// teams, deliberately WITHOUT touching matchup_engine.py/daily_picks.csv.
+// Lazy-load-once, same pattern as loadGameSplitsData().
+let BULLPEN_ARSENAL_FIT = null;
+let BULLPEN_ARSENAL_FIT_LOADED = false;
+async function loadBullpenArsenalFit() {
+  if (BULLPEN_ARSENAL_FIT_LOADED) return BULLPEN_ARSENAL_FIT;
+  try {
+    const r = await fetch('/data/bullpen-arsenal-fit.json');
+    BULLPEN_ARSENAL_FIT = r.ok ? await r.json() : null;
+  } catch(e) { console.warn('Bullpen arsenal fit load failed:', e); BULLPEN_ARSENAL_FIT = null; }
+  BULLPEN_ARSENAL_FIT_LOADED = true;
+  return BULLPEN_ARSENAL_FIT;
+}
+
+function BullpenFitMiniTable({ rows }) {
+  const mono = "'DM Mono',monospace";
+  const numOr = (v, d) => (v!=null && v!=='' && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(d) : '—';
+  return (
+    <div style={{overflowX:'auto'}}>
+      <table style={{width:'100%',borderCollapse:'collapse',fontFamily:mono,fontSize:9,minWidth:480}}>
+        <thead>
+          <tr style={{borderBottom:'1px solid var(--border)'}}>
+            <th style={{textAlign:'left',padding:'2px 6px',color:'var(--muted)'}}>Batter</th>
+            <th style={{textAlign:'right',padding:'2px 6px',color:'var(--muted)'}}>PA</th>
+            <th style={{textAlign:'right',padding:'2px 6px',color:'var(--muted)'}} title="vs this reliever's arsenal + hand, season-to-date">ISO</th>
+            <th style={{textAlign:'right',padding:'2px 6px',color:'var(--muted)'}}>EV</th>
+            <th style={{textAlign:'right',padding:'2px 6px',color:'var(--muted)'}}>Brl%</th>
+            <th style={{textAlign:'right',padding:'2px 6px',color:'var(--muted)'}}>HR</th>
+            <th style={{textAlign:'right',padding:'2px 6px',color:'var(--accent2)'}} title="Arsenal-weighted pitch convergence">Fit</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(r => (
+            <tr key={r.batter_id} style={{borderBottom:'1px solid rgba(255,255,255,.04)'}}>
+              <td style={{padding:'2px 6px',cursor:'pointer',color:'var(--accent2)',fontWeight:700}}
+                title="Click for full batter detail"
+                onClick={()=>{ openPitcherSlide(null); openAtBatSlide({pid:r.batter_id, name:r.name||'', team:''}); }}>
+                {r.name||'—'} <span style={{color:'var(--muted)',fontWeight:400,fontSize:8}}>{r.hand||''}</span>
+              </td>
+              <td style={{textAlign:'right',padding:'2px 6px'}}>{r.pa||0}</td>
+              <td style={{textAlign:'right',padding:'2px 6px'}}>{numOr(r.iso,3)}</td>
+              <td style={{textAlign:'right',padding:'2px 6px'}}>{numOr(r.ev,1)}</td>
+              <td style={{textAlign:'right',padding:'2px 6px'}}>{numOr(r.brl_pct,1)}</td>
+              <td style={{textAlign:'right',padding:'2px 6px'}}>{r.hr||0}</td>
+              <td style={{textAlign:'right',padding:'2px 6px',color:'var(--accent2)',fontWeight:700}}
+                title={r.convergent_pitch ? `Best-fit pitch: ${r.convergent_pitch}` : ''}>
+                {numOr(r.fit_score,1)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function BullpenArsenalSection({ team }) {
+  const [data, setData] = useState(undefined); // undefined=loading, null=unavailable
+  const [open, setOpen] = useState(false);
+  useEffect(() => { let live = true; loadBullpenArsenalFit().then(d => { if (live) setData(d); }); return () => { live = false; }; }, []);
+
+  if (!team || data === undefined || !data) return null;
+  let blocks = null;
+  for (const g of Object.values(data.games || {})) {
+    if (g.bullpens && g.bullpens[team]) { blocks = g.bullpens[team]; break; }
+  }
+  if (!blocks || !blocks.length) return null;
+
+  return (
+    <div style={{padding:'14px 20px',borderBottom:'1px solid var(--border)'}}>
+      <div onClick={()=>setOpen(o=>!o)} style={{cursor:'pointer',display:'flex',alignItems:'center',gap:6}}>
+        <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
+          textTransform:'uppercase',letterSpacing:1}}>
+          {open?'▲ Hide':'▼'} Bullpen Arsenal Fit ({blocks.length} arm{blocks.length===1?'':'s'})
+        </span>
+      </div>
+      {open && (
+        <div style={{marginTop:10,display:'flex',flexDirection:'column',gap:14}}>
+          {blocks.map(b => (
+            <div key={b.pitcher_id}>
+              <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:4,flexWrap:'wrap'}}>
+                <span onClick={()=>openPitcherSlide({pid:parseInt(b.pitcher_id)||0,name:b.name,team,hand:b.hand,pitchMix:[]})}
+                  style={{cursor:'pointer',color:'var(--accent2)',fontWeight:700,fontFamily:"'Oswald',sans-serif",fontSize:13}}>
+                  {b.name}
+                </span>
+                <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
+                  ({b.hand}) {b.ip} IP · vsL {b.grade_vsL||'—'} · vsR {b.grade_vsR||'—'}
+                </span>
+              </div>
+              <BullpenFitMiniTable rows={b.top5}/>
+            </div>
+          ))}
+          <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",lineHeight:1.5}}>
+            Real bullpen arms only (IP/appearance ≤2.0, 15+ appearances this season — excludes
+            starters/swingmen/thin samples, validated 2026-08-09). Refreshed once/day; opposing
+            batter pool uses today's confirmed lineup where posted, otherwise active-roster season
+            activity. Simplified vs. the starter's own table above — no L7/recent-form, Blast%, or
+            Bullpen-rank columns yet.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PitcherSlideIn() {
   const [pitcher, setPitcher] = useState(null);
   const [stats, setStats]     = useState(null);
@@ -3970,6 +4080,8 @@ function PitcherSlideIn() {
         </div>
         <OpposingBatterTable pitcherId={pitcher.pid}/>
       </div>
+
+      <BullpenArsenalSection team={pitcher.team || dpRow?.pitcher_team || ''}/>
 
       {/* HR Allowed Chart */}
       <div style={{padding:'0 20px'}}>
