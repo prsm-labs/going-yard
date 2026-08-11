@@ -17925,14 +17925,42 @@ function SimLabView({ data }) {
                 border: `1px solid ${afSauce25Only ? 'rgba(234,179,8,.45)' : 'var(--border)'}` }}>
               🥫 {afSauce25Only ? 'Sauce 2.5 Only' : 'Sauce 2.5'}
             </button>
+            <button onClick={() => setAfChalkOnly(v => !v)}
+              title="Chalk 💪🏽 — established power bat (19+ season HR, or season AB/HR<21) facing a matchup that isn't Elite/Tough today."
+              style={{ padding: '2px 7px', borderRadius: 5, cursor: 'pointer', fontFamily: "'DM Mono',monospace",
+                fontSize: 13, lineHeight: 1.5, flexShrink: 0,
+                background: afChalkOnly ? 'rgba(245,197,66,.14)' : 'var(--surface2)',
+                border: `1px solid ${afChalkOnly ? 'rgba(245,197,66,.45)' : 'var(--border)'}` }}>
+              💪🏽
+            </button>
+            <button onClick={() => setAfYoungGunsOnly(v => !v)}
+              title="Young Gun 🌱 — thin/no season track record (<100 season PA). A discovery pick, not a hot signal — historically homers LESS often than established regulars."
+              style={{ padding: '2px 7px', borderRadius: 5, cursor: 'pointer', fontFamily: "'DM Mono',monospace",
+                fontSize: 13, lineHeight: 1.5, flexShrink: 0,
+                background: afYoungGunsOnly ? 'rgba(74,222,128,.14)' : 'var(--surface2)',
+                border: `1px solid ${afYoungGunsOnly ? 'rgba(74,222,128,.45)' : 'var(--border)'}` }}>
+              🌱
+            </button>
+            <button onClick={() => setAfLongshotOnly(v => !v)}
+              title="Longshot 🎲 — TrueHRScore≤55, MatchupScore≥65, Sim TB≥1.2, non-Elite pitcher. A profile the model itself may be undervaluing."
+              style={{ padding: '2px 7px', borderRadius: 5, cursor: 'pointer', fontFamily: "'DM Mono',monospace",
+                fontSize: 13, lineHeight: 1.5, flexShrink: 0,
+                background: afLongshotOnly ? 'rgba(167,139,250,.12)' : 'var(--surface2)',
+                border: `1px solid ${afLongshotOnly ? 'rgba(167,139,250,.4)' : 'var(--border)'}` }}>
+              🎲
+            </button>
+            <button onClick={() => setAfMidTierOnly(v => !v)}
+              title="Mid-Tier 🔵 — not Young Gun, Chalk, or Longshot. The residual/catch-all bucket, not an independently validated signal on its own."
+              style={{ padding: '2px 7px', borderRadius: 5, cursor: 'pointer', fontFamily: "'DM Mono',monospace",
+                fontSize: 13, lineHeight: 1.5, flexShrink: 0,
+                background: afMidTierOnly ? 'rgba(25,158,112,.14)' : 'var(--surface2)',
+                border: `1px solid ${afMidTierOnly ? 'rgba(25,158,112,.45)' : 'var(--border)'}` }}>
+              🔵
+            </button>
             <FilterPanel
               toggles={[
                 { key: 'hideFinal', label: '🚫 Hide Final',      active: slHideFinal,      color: '#ff6b6b',    onToggle: () => setSlHideFinal(v => !v) },
-                { key: 'chalk',     label: '💪🏽 Chalk',           active: afChalkOnly,      color: '#f5c542',    onToggle: () => setAfChalkOnly(v => !v) },
                 { key: 'daylate',   label: '🗓️ Day Late',        active: afDayLateOnly,    color: '#22c1c3',    onToggle: () => setAfDayLateOnly(v => !v) },
-                { key: 'younggun',  label: '🌱 Young Guns',      active: afYoungGunsOnly,  color: '#4ade80',    onToggle: () => setAfYoungGunsOnly(v => !v) },
-                { key: 'longshot',  label: '🎲 Longshot',        active: afLongshotOnly,   color: '#a78bfa',    onToggle: () => setAfLongshotOnly(v => !v) },
-                { key: 'midtier',   label: '🔵 Mid-Tier',         active: afMidTierOnly,    color: '#199e70',    onToggle: () => setAfMidTierOnly(v => !v) },
                 { key: 'sauce3',    label: '🍯🔥 Sauce 3.0',      active: afSauce3Only,     color: '#f59e0b',    onToggle: () => setAfSauce3Only(v => !v) },
                 { key: 'avoid',     label: '🚫 Avoid List',      active: afAvoidOnly,      color: '#ff6b6b',
                   title: "Avoid List — Sim H<=0.6 AND SwStr%>=19% AND (same-hand OR Tough/Elite pitcher). Full-season backtest: 58-61% miss rate vs 42.6% baseline, 1.4x lift. Filter-only, no badge.",
@@ -35120,16 +35148,52 @@ function BarrelLabTab() {
               </button>
             )}
             <button
-              onClick={() => setBlLongshotOnly(v => !v)}
+              onClick={() => setBlChalkOnly(v => !v)}
+              title="Chalk 💪🏽 — established power bat (19+ season HR, or season AB/HR<21) facing a matchup that isn't Elite/Tough today."
               style={{
-                padding:'2px 8px', borderRadius:5, cursor:'pointer',
-                fontFamily:"'DM Mono',monospace", fontSize:9, fontWeight:700,
+                padding:'2px 7px', borderRadius:5, cursor:'pointer',
+                fontFamily:"'DM Mono',monospace", fontSize:13,
+                lineHeight:1.5, flexShrink:0,
+                background: blChalkOnly ? 'rgba(245,197,66,.14)' : 'var(--surface2)',
+                border:`1px solid ${blChalkOnly ? 'rgba(245,197,66,.45)' : 'var(--border)'}`,
+              }}>
+              💪🏽
+            </button>
+            <button
+              onClick={() => setBlYoungGunsOnly(v => !v)}
+              title="Young Gun 🌱 — thin/no season track record (<100 season PA). A discovery pick, not a hot signal — historically homers LESS often than established regulars."
+              style={{
+                padding:'2px 7px', borderRadius:5, cursor:'pointer',
+                fontFamily:"'DM Mono',monospace", fontSize:13,
+                lineHeight:1.5, flexShrink:0,
+                background: blYoungGunsOnly ? 'rgba(74,222,128,.14)' : 'var(--surface2)',
+                border:`1px solid ${blYoungGunsOnly ? 'rgba(74,222,128,.45)' : 'var(--border)'}`,
+              }}>
+              🌱
+            </button>
+            <button
+              onClick={() => setBlLongshotOnly(v => !v)}
+              title="Longshot 🎲 — TrueHRScore≤55, MatchupScore≥65, Sim TB≥1.2, non-Elite pitcher. A profile the model itself may be undervaluing."
+              style={{
+                padding:'2px 7px', borderRadius:5, cursor:'pointer',
+                fontFamily:"'DM Mono',monospace", fontSize:13,
                 lineHeight:1.5, flexShrink:0,
                 background: blLongshotOnly ? 'rgba(167,139,250,.12)' : 'var(--surface2)',
-                color:      blLongshotOnly ? '#a78bfa' : 'var(--muted)',
                 border:`1px solid ${blLongshotOnly ? 'rgba(167,139,250,.4)' : 'var(--border)'}`,
               }}>
-              {blLongshotOnly ? '🎲 Longshots Only' : '🎲 Longshot'}
+              🎲
+            </button>
+            <button
+              onClick={() => setBlMidTierOnly(v => !v)}
+              title="Mid-Tier 🔵 — not Young Gun, Chalk, or Longshot. The residual/catch-all bucket, not an independently validated signal on its own."
+              style={{
+                padding:'2px 7px', borderRadius:5, cursor:'pointer',
+                fontFamily:"'DM Mono',monospace", fontSize:13,
+                lineHeight:1.5, flexShrink:0,
+                background: blMidTierOnly ? 'rgba(25,158,112,.14)' : 'var(--surface2)',
+                border:`1px solid ${blMidTierOnly ? 'rgba(25,158,112,.45)' : 'var(--border)'}`,
+              }}>
+              🔵
             </button>
             <button
               onClick={() => setBlHighIQOnly(v => !v)}
@@ -35173,10 +35237,7 @@ function BarrelLabTab() {
             <FilterPanel
               toggles={[
                 {key:'hideFinal', label:'🚫 Hide Final',        active:blHideFinal,     color:'#ff6b6b', onToggle:()=>setBlHideFinal(v=>!v)},
-                {key:'chalk',     label:'💪🏽 Chalk',             active:blChalkOnly,     color:'#f5c542', onToggle:()=>setBlChalkOnly(v=>!v)},
                 {key:'daylate',   label:'🗓️ Day Late',          active:blDayLateOnly,   color:'#22c1c3', onToggle:()=>setBlDayLateOnly(v=>!v)},
-                {key:'younggun',  label:'🌱 Young Guns',        active:blYoungGunsOnly, color:'#4ade80', onToggle:()=>setBlYoungGunsOnly(v=>!v)},
-                {key:'midtier',   label:'🔵 Mid-Tier',           active:blMidTierOnly,   color:'#199e70', onToggle:()=>setBlMidTierOnly(v=>!v)},
                 {key:'sauce3',    label:'🍯🔥 Sauce 3.0',        active:blSauce3Only,    color:'#f59e0b', onToggle:()=>setBlSauce3Only(v=>!v)},
                 {key:'hitsignal', label:'⚾ Hit Signal',        active:blHitSignalOnly, color:'#93c5fd',
                   title:"Hit Signal — Sim H>=1.0 AND SwStr%<=15%. Full-season backtest: 64.1% hit rate (any hit), 1.12x lift, n=2,933, stable train/test (64.2%/63.8%). Filter-only, no badge — still accumulating its own Track Record validation.",
@@ -36338,16 +36399,52 @@ function OnBaseTab() {
               </button>
             )}
             <button
-              onClick={() => setObLongshotOnly(v => !v)}
+              onClick={() => setObChalkOnly(v => !v)}
+              title="Chalk 💪🏽 — established power bat (19+ season HR, or season AB/HR<21) facing a matchup that isn't Elite/Tough today."
               style={{
-                padding:'2px 8px', borderRadius:5, cursor:'pointer',
-                fontFamily:mono, fontSize:9, fontWeight:700,
+                padding:'2px 7px', borderRadius:5, cursor:'pointer',
+                fontFamily:mono, fontSize:13,
+                lineHeight:1.5, flexShrink:0,
+                background: obChalkOnly ? 'rgba(245,197,66,.14)' : 'var(--surface2)',
+                border:`1px solid ${obChalkOnly ? 'rgba(245,197,66,.45)' : 'var(--border)'}`,
+              }}>
+              💪🏽
+            </button>
+            <button
+              onClick={() => setObYoungGunsOnly(v => !v)}
+              title="Young Gun 🌱 — thin/no season track record (<100 season PA). A discovery pick, not a hot signal — historically homers LESS often than established regulars."
+              style={{
+                padding:'2px 7px', borderRadius:5, cursor:'pointer',
+                fontFamily:mono, fontSize:13,
+                lineHeight:1.5, flexShrink:0,
+                background: obYoungGunsOnly ? 'rgba(74,222,128,.14)' : 'var(--surface2)',
+                border:`1px solid ${obYoungGunsOnly ? 'rgba(74,222,128,.45)' : 'var(--border)'}`,
+              }}>
+              🌱
+            </button>
+            <button
+              onClick={() => setObLongshotOnly(v => !v)}
+              title="Longshot 🎲 — TrueHRScore≤55, MatchupScore≥65, Sim TB≥1.2, non-Elite pitcher. A profile the model itself may be undervaluing."
+              style={{
+                padding:'2px 7px', borderRadius:5, cursor:'pointer',
+                fontFamily:mono, fontSize:13,
                 lineHeight:1.5, flexShrink:0,
                 background: obLongshotOnly ? 'rgba(167,139,250,.12)' : 'var(--surface2)',
-                color:      obLongshotOnly ? '#a78bfa' : 'var(--muted)',
                 border:`1px solid ${obLongshotOnly ? 'rgba(167,139,250,.4)' : 'var(--border)'}`,
               }}>
-              {obLongshotOnly ? '🎲 Longshots Only' : '🎲 Longshot'}
+              🎲
+            </button>
+            <button
+              onClick={() => setObMidTierOnly(v => !v)}
+              title="Mid-Tier 🔵 — not Young Gun, Chalk, or Longshot. The residual/catch-all bucket, not an independently validated signal on its own."
+              style={{
+                padding:'2px 7px', borderRadius:5, cursor:'pointer',
+                fontFamily:mono, fontSize:13,
+                lineHeight:1.5, flexShrink:0,
+                background: obMidTierOnly ? 'rgba(25,158,112,.14)' : 'var(--surface2)',
+                border:`1px solid ${obMidTierOnly ? 'rgba(25,158,112,.45)' : 'var(--border)'}`,
+              }}>
+              🔵
             </button>
             <button
               onClick={() => setObHighIQOnly(v => !v)}
@@ -36391,10 +36488,7 @@ function OnBaseTab() {
             <FilterPanel
               toggles={[
                 {key:'hideFinal', label:'🚫 Hide Final',        active:obHideFinal,     color:'#ff6b6b', onToggle:()=>setObHideFinal(v=>!v)},
-                {key:'chalk',     label:'💪🏽 Chalk',             active:obChalkOnly,     color:'#f5c542', onToggle:()=>setObChalkOnly(v=>!v)},
                 {key:'daylate',   label:'🗓️ Day Late',          active:obDayLateOnly,   color:'#22c1c3', onToggle:()=>setObDayLateOnly(v=>!v)},
-                {key:'younggun',  label:'🌱 Young Guns',        active:obYoungGunsOnly, color:'#4ade80', onToggle:()=>setObYoungGunsOnly(v=>!v)},
-                {key:'midtier',   label:'🔵 Mid-Tier',           active:obMidTierOnly,   color:'#199e70', onToggle:()=>setObMidTierOnly(v=>!v)},
                 {key:'sauce3',    label:'🍯🔥 Sauce 3.0',        active:obSauce3Only,    color:'#f59e0b', onToggle:()=>setObSauce3Only(v=>!v)},
                 {key:'hitsignal', label:'⚾ Hit Signal',        active:obHitSignalOnly, color:'#93c5fd',
                   title:"Hit Signal — Sim H>=1.0 AND SwStr%<=15%. Full-season backtest: 64.1% hit rate (any hit), 1.12x lift, n=2,933, stable train/test (64.2%/63.8%). Filter-only, no badge — still accumulating its own Track Record validation.",

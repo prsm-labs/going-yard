@@ -1,8 +1,8 @@
 {
-  "version": "2026.08.10",
-  "bundleFile": "index-CHHzkf3e.js",
+  "version": "2026.08.11",
+  "bundleFile": "index-D-U4YAz9.js",
   "changelog": [
-    "Fix Top 4 Tonight repeat-HR picks and Track Record's missing actualAB gate"
+    "Fix Scouting Note free-tier gate: BOM breaking recent-HR exclusion + broken exact-match check"
   ],
   "notifyUsers": true
 }
