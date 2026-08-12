@@ -3,7 +3,7 @@ Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitc
 2026-08-12,02:15 PM,STL,PHI,681517.0,554430.0,823017,2889,Busch Stadium,Wednesday,Wed,3,3,Finale,~ Neutral
 2026-08-12,03:05 PM,ATH,TB,678022.0,656876.0,824967,2529,Sutter Health Park,Wednesday,Wed,3,3,Finale,~ Neutral
 2026-08-12,03:40 PM,AZ,COL,518876.0,663372.0,825047,15,Chase Field,Wednesday,Wed,3,3,Finale,~ Neutral
-2026-08-12,03:45 PM,SF,HOU,,687911.0,823187,2395,Oracle Park,Wednesday,Wed,3,3,Finale,~ Neutral
+2026-08-12,03:45 PM,SF,HOU,605288.0,687911.0,823187,2395,Oracle Park,Wednesday,Wed,3,3,Finale,~ Neutral
 2026-08-12,04:10 PM,SD,MIL,592662.0,669160.0,823263,2680,Petco Park,Wednesday,Wed,3,3,Finale,~ Neutral
 2026-08-12,06:40 PM,DET,CLE,664285.0,656492.0,824241,2394,Comerica Park,Wednesday,Wed,2,3,Middle,~ Neutral
 2026-08-12,06:40 PM,MIA,PIT,676083.0,669387.0,823833,4169,loanDepot park,Wednesday,Wed,2,3,Middle,~ Neutral
@@ -20,6 +20,6 @@ Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitc
 2026-08-13,02:10 PM,CWS,CIN,663436.0,671096.0,824561,4,Rate Field,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
 2026-08-13,03:07 PM,TOR,BOS,453286.0,801139.0,822776,14,Rogers Centre,Thursday,Thu,4,4,Finale,✅ Best Day (getaway)
 2026-08-13,04:05 PM,WSH,CHC,676917.0,592332.0,822696,3309,Nationals Park,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
-2026-08-13,07:30 PM,MIN,PHI,,605400.0,823669,5445,Field of Dreams,Thursday,Thu,1,3,Opener,✅ Best Day (getaway)
+2026-08-13,07:30 PM,MIN,PHI,671737.0,605400.0,823669,5445,Field of Dreams,Thursday,Thu,1,3,Opener,✅ Best Day (getaway)
 2026-08-13,10:07 PM,LAA,TEX,700712.0,,823995,1,Angel Stadium,Thursday,Thu,4,4,Finale,✅ Best Day (getaway)
-2026-08-13,10:10 PM,LAD,MIL,,,823915,22,UNIQLO Field at Dodger Stadium,Thursday,Thu,1,4,Opener,✅ Best Day (getaway)
+2026-08-13,10:10 PM,LAD,MIL,,675660.0,823915,22,UNIQLO Field at Dodger Stadium,Thursday,Thu,1,4,Opener,✅ Best Day (getaway)
