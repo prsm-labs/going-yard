@@ -28638,7 +28638,8 @@ function LegendButton() {
       'The self-auditing page — merges the daily All Matchups, Barrel Lab, and On Base exports against actual box-score outcomes, every day, automatically.',
       '✅ HRs Only, ★ Barrel Signal Only, and 🥫 Sauce 2.5 Only stay as standalone quick-access buttons. Everything else — 🔑 Key Matchup, 🟢 Weak Spot, 📍 Close Call, 🍯 Sauce 2.0, 🍯🔥 Sauce 3.0, 🗓️ Day Late, 2️⃣ 2-Bagger (Non-HR), 🎯 TB Signal, 🎲 Sim TB ≥2.0, 🧠 High Plate IQ, ⭐ Hand Match, 🔴/🔵 Ball Carry Juiced/Dead, ⬆️/⬇️ xHR Juiced/Dead, plus a Pitcher Grade multi-select — moved into the ⚙ Filters dropdown 2026-08-02 once the flat button row grew past what fits on a phone screen, same consolidation Barrel Lab/On Base/Arsenal Fit already went through. Sauce 3.0\'s own quick button moved into the panel that same day, once Sauce 2.5 took over the standalone slot.',
       '🗓️ Day Late filter/card (added 2026-08-02, alongside the FilterPanel consolidation) — same definition as Barrel Lab/On Base\'s Day Late badge (★ Barrel Signal on both of the last 2 real game days, no HR either day, today\'s pitcher not Elite), reimplemented against Track Record\'s own historical row data so it works on any past date, not just today\'s live slate.',
-      '🏆 Top 4 Pick filter/column/card (added 2026-08-09, prompted by a real day — 8/9 — where 3 of the 4 live picks, Burleson/Conine/Ortiz, went yard) — reconstructs which batter WOULD have been each tier\'s real Top 4 Tonight pick (Young Gun/Chalk/Mid-Tier/Longshot, one each) using the exact same selection algorithm the live tab uses: TrueHR×0.5 + MatchupScore×0.5 + Sauce/Bullpen bonuses, ranked within each tier, with Mid-Tier additionally gated by L7 ISO + Arsenal Fit ISO both >.190 (falling back to the plain top-graded Mid-Tier batter if nobody clears it). A batter already picked for an earlier tier is excluded from later ones, same dedup as the live tab. Top 4 Tonight itself has no CSV export of its own — reconstructed here from already-exported columns instead, the same "backfill from what\'s already in the export" approach used for Sauce 2.5/3.0. Genuinely LIMITED to dates where Young Gun/Chalk are both real-populated (checked live 2026-08-09: that\'s 8/2 onward, not the full season) — dates before that are skipped entirely rather than silently mislabeled (a real bug caught in testing: on those older dates, blank Young Gun/Chalk data would have defaulted every batter into Mid-Tier). Real 8/9 (the actual live 3-of-4 hit) isn\'t in this reconstruction yet — it lands once that night\'s export pipeline runs. Card is HONEST about how thin this still is: at first build, 7 real dates / 27 picks / 1 hit (3.7%, vs 11.4% baseline) — well within normal noise at that sample size (n=27 vs a base rate implying ~3 expected hits), not yet a real read either way. The "🏆 tier-emoji" combo in the table cell shows which specific tier that date\'s pick represents.',
+      '🏆 Top 4 Pick filter/column/card (added 2026-08-09, prompted by a real day — 8/9 — where 3 of the 4 live picks, Burleson/Conine/Ortiz, went yard) — for dates from 2026-08-13 onward, this reads the REAL locked Top 4 Tonight record (see next item) instead of guessing. For dates before that, it reconstructs which batter WOULD have been each tier\'s pick (Young Gun/Chalk/Mid-Tier/Longshot, one each) using the same selection algorithm: TrueHR×0.5 + MatchupScore×0.5 + Sauce/Bullpen bonuses, ranked within each tier, with Mid-Tier additionally gated by L7 ISO + Arsenal Fit ISO both >.190 (falling back to the plain top-graded Mid-Tier batter if nobody clears it). A batter already picked for an earlier tier is excluded from later ones, same dedup as the live tab. Genuinely LIMITED to dates where Young Gun/Chalk are both real-populated (checked live 2026-08-09: that\'s 8/2 onward) — dates before that are skipped entirely rather than silently mislabeled (a real bug caught in testing: on those older dates, blank Young Gun/Chalk data would have defaulted every batter into Mid-Tier). Card is HONEST about how thin this still is: at first build, 7 real dates / 27 picks / 1 hit (3.7%, vs 11.4% baseline) — well within normal noise at that sample size, not yet a real read either way. The "🏆 tier-emoji" combo in the table cell shows which specific tier that date\'s pick represents.',
+      '🔒 Top 4 Tonight lock (added 2026-08-13) — the live Top 4 Tonight page used to recompute continuously all day (lineups confirming, injuries updating), so the "pick" for a tier could visibly change more than once before the day was over, and Track Record\'s own reconstruction (above) sometimes landed on a THIRD, different guess than either version actually shown live. Fixed by locking Top 4 Tonight\'s real picks at a flat 8pm ET cutoff each day and persisting that exact record server-side — the live page shows a stable 🔒 result for the rest of the day, and Track Record now reads that same real record instead of re-deriving its own guess. Deliberately NOT retroactive — dates before 2026-08-13 keep using the reconstruction above, which can genuinely disagree with what was shown live on those specific days.',
       '🍯🔥 Sauce 3.0 (added 2026-07-31) — Sauce 2.0 (Zone Fit≥2, xwOBA≥.360, Pitcher Grade not Elite/Tough) AND both Recent ISO + Arsenal Fit ISO ≥.250. Full-season backtest: 20.05% HR rate / 2.82x lift (vs. Sauce 2.0 alone\'s 2.17x) — the best validated combo in this app. Uses "Recent ISO (BF)", not the native "L7 ISO" column — that field turned out to have real coverage gaps within the Sauce 2.0 population (53%), which shrank the qualifying pool well below what was validated. Both ISO fields here are backfilled leak-free for historical dates (5/17-7/30, from the batter\'s own AB-log history strictly before each real game date; Arsenal Fit ISO additionally filtered to that matchup\'s real Top Pitches/P.Hand) and flow in natively going forward via the All Matchups export — so this hit-rate card keeps updating with real forward data, not just the one-time backtest.',
       '🥫 Sauce 2.5 (added 2026-08-02) — same Zone Fit≥2/non-Elite-Tough gate as Sauce 2.0/3.0, relaxed to xwOBA≥.330 and both Recent ISO (BF)/Arsenal Fit ISO ≥.220. Full-season backtest: 18.24% HR rate / 2.57x lift (n=899) — nearly matches Sauce 3.0\'s 2.74x while more than doubling the flagged population and season-HR recall (7.4% vs 3.5%). Built after confirming Sauce 2.0/3.0\'s thresholds were excluding most real HRs even in favorable-form scenarios (80.5% of HRs hit in same-hand "unfavorable" matchups had xwOBA below Sauce 2.0\'s own bar).',
       '⚾ Ball Carry column/filter: dead-ball / juiced-ball verdict for that game, joined by date+team from the Ball Carry tracker (Live tab). Park/elevation-adjusted, deliberately NOT weather-adjusted — see the Live tab\'s ⚾ Ball Carry guide.',
@@ -28853,7 +28854,7 @@ function TrackRecordTab() {
       // existing obRes.ok fallback already handles a 404 gracefully.
       const suf = year === 2025 ? '-2025' : '';
       try {
-        const [amRes, blRes, idRes, hrRes, obRes, bcRes, xhrRes] = await Promise.all([
+        const [amRes, blRes, idRes, hrRes, obRes, bcRes, xhrRes, top4LockRes] = await Promise.all([
           fetch(`/data/track-record-matchups${suf}.csv`),
           fetch(`/data/track-record-barrel${suf}.csv`),
           fetch('/data/player_id.csv'),
@@ -28861,6 +28862,17 @@ function TrackRecordTab() {
           fetch(`/data/track-record-onbase${suf}.csv`),
           fetch(`/data/track-record-ball-carry${suf}.csv`),
           fetch(`/data/track-record-xhr${suf}.csv`),
+          // Real locked Top 4 picks (2026-08-13) — see api/top4-lock.js and
+          // TopThreeTab's own comment for the full rationale. When a real
+          // record exists for a date, it OVERRIDES the reconstruction below
+          // rather than supplementing it — the reconstruction is a best-
+          // effort guess from an overnight CSV snapshot and can genuinely
+          // diverge from what was live (confirmed: Harry Ford 8/9, Pinckney/
+          // Bell/Mack-vs-Tawa churn 8/12-13). A real record is always more
+          // trustworthy. Forward-only by design (confirmed acceptable with
+          // the user) — this endpoint has nothing for dates before it
+          // shipped, so those keep using the existing reconstruction.
+          fetch('/api/top4-lock').catch(() => null),
         ]);
         // DAY_LATE_LOOKUP (2026-08-02) — Track Record loads its full row set
         // ONCE per mount (see setAllRows below, [] deps — unlike Barrel
@@ -29263,6 +29275,17 @@ function TrackRecordTab() {
         // ── Top 4 Pick reconstruction (2026-08-09) — user asked to track
         // Top 4 Tonight's real picks in Track Record after a real day (8/9)
         // where 3 of the 4 live picks (Burleson/Conine/Ortiz) went yard.
+        // SUPERSEDED going forward (2026-08-13): Top 4 Tonight now records
+        // its own real 8pm-ET-locked picks server-side (api/top4-lock.js) —
+        // for any date that has a real record, it OVERRIDES this whole
+        // reconstruction below (see the fetch above + the override block
+        // right after this loop). This reconstruction stays live ONLY as
+        // the fallback for dates before the lock feature shipped, since it
+        // was never a real record to begin with — a best-effort guess from
+        // whatever the overnight CSV export happened to snapshot, which
+        // measurably diverged from what was actually live more than once
+        // (Harry Ford 8/9; Pinckney/Bell vs. Trammell, Mack vs. Tawa 8/12-13
+        // — the exact user report that prompted building the real lock).
         // Top 4 Tonight itself has no CSV export of its own (it's a same-day
         // computed view, nothing logs its picks historically) — but every
         // ingredient its selection formula needs (TrueHR, Matchup, tier
@@ -29351,6 +29374,30 @@ function TrackRecordTab() {
           ];
           picks.forEach(([tier, p]) => { if (p) top4Map[`${date}_${p.batterId}`] = tier; });
         });
+
+        // Real locked records override the reconstruction above for any
+        // date that has one (see the fetch comment). Clear that date's
+        // reconstruction-derived entries FIRST — not just add the real
+        // ones on top — so a batter the guess picked but the real record
+        // didn't (e.g. Harry Ford) doesn't linger as a false isTop4Pick.
+        try {
+          const top4LockData = top4LockRes && top4LockRes.ok ? await top4LockRes.json() : null;
+          const lockHistory = top4LockData?.history || {};
+          Object.entries(lockHistory).forEach(([date, record]) => {
+            Object.keys(top4Map).forEach(k => { if (k.startsWith(`${date}_`)) delete top4Map[k]; });
+            (record?.picks || []).forEach(p => {
+              // parseInt normalization (2026-08-13) — unified.batterId is a
+              // clean integer (resolveId() -> parseInt(...)||0), but
+              // p.batter.batter_id here is a raw daily_picks.csv field,
+              // which is a string and can carry a trailing ".0" — without
+              // normalizing to the same integer form, the lookup key would
+              // silently never match (e.g. "..._621566.0" vs "..._621566").
+              const bid = parseInt(p?.batter?.batter_id) || 0;
+              if (p?.tierKey && bid) top4Map[`${date}_${bid}`] = p.tierKey;
+            });
+          });
+        } catch (e) { /* real records unavailable this load — reconstruction-only for every date, same as before this feature */ }
+
         unified.forEach(r => {
           const tier = top4Map[`${r.date}_${r.batterId}`] || null;
           r.top4Tier = tier;
@@ -31190,6 +31237,42 @@ function TopThreeTab() {
   const [showHelp, setShowHelp] = useState(false);
   const [recentHrVer, setRecentHrVer] = useState(_RECENT_HR_VER);
 
+  // ── Daily 8pm ET lock (2026-08-13) ────────────────────────────────────────
+  // User-reported: picks visibly churned all day (Mid-Tier Bell->Trammell,
+  // Longshot Mack->Tawa->Mack) since top3 recomputes on every lineup/injury/
+  // refresh trigger with no concept of "done deciding" — AND Track Record's
+  // own reconstruction of "what was picked that day" landed on a THIRD,
+  // different set of names, since it never recorded what was actually shown,
+  // only re-guessed from an overnight CSV export (same root cause class as
+  // the Harry Ford bug). Explicit design from the user: don't lock until
+  // 8pm ET flat (not "wait for every lineup" — postponements/late West
+  // Coast games could stall that forever; "by then all lineups should be
+  // posted or the top 4 should be pretty solid" per the user's own words),
+  // then freeze whatever's currently the best pick per tier — the existing
+  // selection algorithm already recomputes the true best candidate from the
+  // full live pool on every render (not some "keep the incumbent" stickiness
+  // logic), so locking doesn't change what's picked, only WHEN picking stops.
+  // Persisted server-side (api/top4-lock.js) so (a) a reload/second device
+  // after 8pm shows the same locked result instead of a fresh live compute,
+  // and (b) Track Record can read the REAL record instead of re-guessing —
+  // eliminating that mismatch class of bug going forward (not retroactive,
+  // confirmed acceptable with the user — historical dates keep the existing
+  // reconstruction).
+  const [lockedRecord, setLockedRecord] = useState(null); // {date, lockedAt, picks} or null
+  const [lockChecked,  setLockChecked]  = useState(false); // has the mount-time server check resolved yet
+  const lockPostedRef = useRef(false); // guards against a double-POST within this session
+
+  useEffect(() => {
+    const todayET = getETDateStr();
+    fetch(`/api/top4-lock?date=${todayET}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d?.record) { setLockedRecord({ date: todayET, ...d.record }); lockPostedRef.current = true; }
+      })
+      .catch(() => {})
+      .finally(() => setLockChecked(true));
+  }, []);
+
   useEffect(() => {
     const unsub    = subscribeLineup(v => setLineupVer(v));
     const unsubInj = subscribeInjuries(() => setInjuryVer(v => v + 1));
@@ -31294,10 +31377,39 @@ function TopThreeTab() {
     ];
   }, [eligibleBatters]);
 
+  // Fires the 8pm ET lock — see the state-declaration comment above for the
+  // full rationale. Only ever fires once per session (lockPostedRef) and
+  // only after the mount-time server check has resolved (lockChecked),
+  // so a client that finds an EXISTING lock on mount never tries to create
+  // a second, differently-timed one.
+  useEffect(() => {
+    if (!lockChecked || lockedRecord || lockPostedRef.current) return;
+    if (!top3.some(p => p.batter)) return; // nothing real to lock yet
+    const etHour = parseInt(new Date().toLocaleString('en-US', { timeZone:'America/New_York', hour:'2-digit', hour12:false }));
+    if (etHour < 20) return; // before 8pm ET — keep showing live picks
+    const todayET = getETDateStr();
+    lockPostedRef.current = true; // set before the async call — prevents a double-fire race within this session
+    fetch('/api/top4-lock', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date: todayET, picks: top3 }),
+    })
+      .then(r => r.json())
+      .then(d => { if (d?.record) setLockedRecord({ date: todayET, ...d.record }); })
+      .catch(() => { lockPostedRef.current = false; }); // allow a retry on the next trigger if the POST itself failed
+  }, [top3, lockChecked, lockedRecord]);
+
+  // Everything below renders from displayTop3, not the live-recomputing
+  // top3 directly — pre-lock they're identical (still fresh, never stale);
+  // once locked, displayTop3 freezes to the persisted record so the flip
+  // state, Scouting Note fetches, and the cards themselves all stop
+  // reacting to further lineup/injury churn for the rest of the day.
+  const displayTop3 = lockedRecord ? lockedRecord.picks : top3;
+  const anyPicks = displayTop3.some(p => p.batter);
+
   // Reset the flip state whenever the actual 4 selected batters change (a
   // new pick appearing should start face-down again) — never on every
   // re-render, only when the real composition of top3 changes.
-  const top3Key = top3.map(p => `${p.tierKey}:${p.batter?.batter_id||''}`).join(',');
+  const top3Key = displayTop3.map(p => `${p.tierKey}:${p.batter?.batter_id||''}`).join(',');
   useEffect(() => { setFlipped([false,false,false,false]); }, [top3Key]);
 
   // Fetch a Scouting Note for each currently-selected batter, skipping any
@@ -31315,7 +31427,7 @@ function TopThreeTab() {
       midTier: (r, p) => `Selected as today's 🔵 Mid-Tier pick — not Young Gun, Chalk, or Longshot${p.isoFallback ? ' (no batter cleared both ISO bars today, so this is the top-graded Mid-Tier batter overall instead)' : ', additionally required L7 ISO and Arsenal Fit ISO both above .190 — the one tier where a real backtest showed that combination adds signal on top of the composite score'}, the top-graded among qualifying batters by TrueHRScore ${Math.round(r.trueHRScore)}/100 and MatchupScore ${Math.round(r.matchupScore)}/100${r.bullpenTier ? `, opposing bullpen: ${r.bullpenTier}` : ''}${r.sauce ? `, Sauce ${r.sauce} tier` : ''}.`,
       longshot: r => `Selected as today's 🎲 Longshot pick — TrueHRScore≤55 with MatchupScore≥65 and Sim TB≥1.2 (a profile the model itself may be undervaluing), the top-graded among today's real Longshot batters by TrueHRScore ${Math.round(r.trueHRScore)}/100 and MatchupScore ${Math.round(r.matchupScore)}/100${r.bullpenTier ? `, opposing bullpen: ${r.bullpenTier}` : ''}${r.sauce ? `, Sauce ${r.sauce} tier` : ''}.`,
     };
-    top3.forEach(p => {
+    displayTop3.forEach(p => {
       const r = p.batter;
       if (!r) return;
       const bid = parseInt(r.batter_id) || 0;
@@ -31367,7 +31479,6 @@ function TopThreeTab() {
   const flipCard = i => setFlipped(f => { const n=[...f]; n[i]=true; return n; });
   const confirmedCount = eligibleBatters.filter(r =>
     LINEUP_STATUS[String(r.batter_id||'').split('.')[0]]?.status === 'confirmed').length;
-  const anyPicks = top3.some(p => p.batter);
 
   return (
     <div style={{maxWidth:1000,margin:'0 auto',padding:'24px 16px',
@@ -31379,10 +31490,16 @@ function TopThreeTab() {
           🎯 Top 4 Tonight
         </div>
         <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',letterSpacing:.5,marginBottom:6}}>
-          One real pick per tier — Young Gun, Chalk, Mid-Tier &amp; Longshot · updates when lineups confirm
+          One real pick per tier — Young Gun, Chalk, Mid-Tier &amp; Longshot · updates live, locks at 8pm ET
         </div>
-        <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>
-          {eligibleBatters.length} eligible · {confirmedCount > 0 || Object.keys(LINEUP_STATUS).length > 0 ? `${confirmedCount} confirmed` : 'lineups pending'}
+        <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',display:'flex',alignItems:'center',justifyContent:'center',gap:6,flexWrap:'wrap'}}>
+          <span>{eligibleBatters.length} eligible · {confirmedCount > 0 || Object.keys(LINEUP_STATUS).length > 0 ? `${confirmedCount} confirmed` : 'lineups pending'}</span>
+          {lockedRecord && (
+            <span title={`Locked ${new Date(lockedRecord.lockedAt).toLocaleTimeString('en-US',{timeZone:'America/New_York',hour:'numeric',minute:'2-digit'})} ET — these 4 picks are final for the rest of today, and this is the exact record Track Record will show for today going forward.`}
+              style={{color:'#27c97a',fontWeight:700}}>
+              🔒 Locked for today
+            </span>
+          )}
         </div>
         <div style={{position:'absolute',top:0,right:0,display:'flex',gap:6}}>
           <button onClick={()=>setRefreshTick(t=>t+1)} title="Re-check today's slate"
@@ -31410,7 +31527,7 @@ function TopThreeTab() {
           justifyContent:'flex-start',flexWrap:'nowrap',overflowX:'auto',
           WebkitOverflowScrolling:'touch',paddingBottom:8,marginBottom:8,
           scrollSnapType:'x mandatory'}}>
-          {top3.map((p, i) => {
+          {displayTop3.map((p, i) => {
             const rank = TOP4_TIER_CARDS[i];
             if (!p.batter) {
               return (
@@ -31602,7 +31719,7 @@ function TopThreeTab() {
         ['Why Mid-Tier is different', 'A backtest against the real 5/17-8/8 tracker found the plain composite ranking already works for Young Gun/Chalk/Longshot — adding an extra filter there was flat-to-negative at those tiers\' thin post-filter samples. But requiring L7 ISO AND Arsenal Fit ISO both above .190 specifically within Mid-Tier showed a real, validated lift (12.2% vs. 9.8% tier baseline, 1.25x, n=558) — so only the Mid-Tier card uses that extra gate, shown as a tag on the card. Falls back to the plain top-graded Mid-Tier batter on the rare day nobody clears both bars.'],
         ['📝 The Analysis', 'A short, Claude-narrated note built from each batter\'s real last-10 batted-ball events, fly-ball rate by the pitcher\'s actual pitch mix, and recent at-bats matched to tonight\'s real day/night + home/away context — the same tool available on any batter\'s own slideout. Claude never invents a number; every stat in the note is pre-verified server-side first.'],
         ['When the score and note disagree', 'The ranking (TrueHRScore/MatchupScore) and the note are built from genuinely different data — season-length composite vs. the batter\'s last 10 real batted-ball events — so they can legitimately point different directions. Claude is told which tier it\'s describing and why the batter was picked, and is explicitly instructed to name that tension rather than sound artificially bullish. The raw numbers (Barrel%/FB%/Pull%/350ft+ count) behind every note are also shown below it so you can check for yourself.'],
-        ['Updates automatically', 'Re-ranks itself the moment lineups shift enough to change who any of the 4 real picks are. Only a newly-added pick triggers a fresh analysis — anyone still picked in their tier reuses the same 20-hour cache, so this never re-generates unnecessarily.'],
+        ['Updates automatically, then locks at 8pm ET', 'Re-ranks itself the moment lineups shift enough to change who any of the 4 real picks are — right up until 8pm ET, when whatever\'s currently the best pick per tier gets frozen for the rest of the day (🔒 Locked appears once this happens). 8pm was chosen over "wait for every lineup" specifically because a postponed or very late West Coast game could otherwise stall the lock indefinitely; by 8pm ET the picks are reliably settled. The locked record is saved server-side, so Track Record shows this exact result going forward instead of re-guessing after the fact. Only a newly-added pick triggers a fresh analysis — anyone still picked in their tier reuses the same 20-hour cache, so this never re-generates unnecessarily.'],
         ['Not the same as Crystal Ball', 'Crystal Ball draws a random pick per tier for fun. This tab is the opposite — the literal best real matchup in each tier today, ranked, no randomness.'],
       ]}/>}
 

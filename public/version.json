@@ -1,8 +1,8 @@
 {
-  "version": "2026.08.11",
-  "bundleFile": "index-D-U4YAz9.js",
+  "version": "2026.08.13",
+  "bundleFile": "index-C7tUe7Ga.js",
   "changelog": [
-    "Fix Scouting Note free-tier gate: BOM breaking recent-HR exclusion + broken exact-match check"
+    "Move Chalk/Young Gun/Longshot/Mid-Tier from filter dropdown to emoji-only buttons"
   ],
   "notifyUsers": true
 }
