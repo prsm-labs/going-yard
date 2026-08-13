@@ -1,8 +1,9 @@
 {
   "version": "2026.08.13",
-  "bundleFile": "index-C7tUe7Ga.js",
+  "bundleFile": "index-O8bV72tn.js",
   "changelog": [
-    "Move Chalk/Young Gun/Longshot/Mid-Tier from filter dropdown to emoji-only buttons"
+    "Add 8pm ET lock for Top 4 Tonight",
+    "persisted server-side via Redis"
   ],
   "notifyUsers": true
 }

@@ -4078,7 +4078,7 @@ function PitcherSlideIn() {
           textTransform:'uppercase',letterSpacing:1,marginBottom:10}}>
           Opposing Batters Today — Arsenal Fit
         </div>
-        <OpposingBatterTable pitcherId={pitcher.pid}/>
+        <OpposingBatterTable pitcherId={pitcher.pid} team={pitcher.team || dpRow?.pitcher_team || ''}/>
       </div>
 
       <BullpenArsenalSection team={pitcher.team || dpRow?.pitcher_team || ''}/>
@@ -14813,7 +14813,7 @@ function afSortValue(r, key) {
   }
 }
 
-function OpposingBatterTable({ pitcherId }) {
+function OpposingBatterTable({ pitcherId, team }) {
   // FIXED 2026-07-28: baseRows only ever depended on [pitcherId] — since
   // isBarrelLabEligible(r) (called inside getOpposingBatters) checks
   // LINEUP_STATUS[bid]?.status === 'confirmed' internally, the eligible-
@@ -14830,6 +14830,32 @@ function OpposingBatterTable({ pitcherId }) {
   const [sortDir, setSortDir] = useState('desc');
   const mono = "'DM Mono',monospace";
 
+  // Bullpen fallback (2026-08-13, user-reported) — getOpposingBatters() only
+  // ever reads daily_picks.csv rows, which exist for today's probable
+  // STARTER per game, never a reliever — so every relief pitcher hit the
+  // dead-end "no pre-game matchup data" message here even though the exact
+  // same arsenal-fit data already exists for real bullpen arms via
+  // bullpen_arsenal_fit.py -> bullpen-arsenal-fit.json (built 2026-08-09) and
+  // was already being shown, just one section lower, inside the team-wide
+  // "Bullpen Arsenal Fit" dropdown. Mirrors that already-computed data in —
+  // no new pipeline/engine work, reuses loadBullpenArsenalFit()'s existing
+  // lazy-load-once cache (idempotent to call again here) and the already-
+  // built BullpenFitMiniTable renderer as-is.
+  const [bullpenData, setBullpenData] = useState(undefined);
+  useEffect(() => { let live = true; loadBullpenArsenalFit().then(d => { if (live) setBullpenData(d); }); return () => { live = false; }; }, []);
+  const bullpenRow = useMemo(() => {
+    if (baseRows.length || !bullpenData || !team) return null;
+    const pid = String(parseInt(pitcherId) || 0);
+    if (!pid || pid === '0') return null;
+    for (const g of Object.values(bullpenData.games || {})) {
+      const blocks = g.bullpens && g.bullpens[team];
+      if (!blocks) continue;
+      const match = blocks.find(b => String(parseInt(b.pitcher_id) || 0) === pid);
+      if (match) return match;
+    }
+    return null;
+  }, [baseRows.length, bullpenData, team, pitcherId]);
+
   const rows = useMemo(() => {
     return [...baseRows].sort((a, b) => {
       const va = obSortValue(a, sortCol), vb = obSortValue(b, sortCol);
@@ -14845,9 +14871,22 @@ function OpposingBatterTable({ pitcherId }) {
   };
 
   if (!baseRows.length) {
+    if (bullpenRow) {
+      return (
+        <div style={{marginTop:6}}>
+          <div style={{fontSize:8,color:'var(--muted)',fontFamily:mono,marginBottom:4}}>
+            Not today's probable starter — this is that reliever's own Bullpen Arsenal Fit
+            (real bullpen arm, IP/appearance ≤2.0, 15+ appearances this season). Simplified
+            vs. a starter's table above — no L7/recent-form, Blast%, or Bullpen-rank columns.
+          </div>
+          <BullpenFitMiniTable rows={bullpenRow.top5}/>
+        </div>
+      );
+    }
     return (
       <div style={{marginTop:6,fontSize:10,color:'var(--muted)',fontFamily:mono}}>
-        No pre-game matchup data — not today's probable starter.
+        No pre-game matchup data — not today's probable starter, and no bullpen arsenal
+        data available for this pitcher{team ? ' today' : ' (team unknown)'}.
       </div>
     );
   }
