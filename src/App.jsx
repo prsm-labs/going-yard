@@ -2800,7 +2800,10 @@ function AtBatSlideIn() {
           // to the vs-hand modes — there's no equivalent "vs_home"/"vs_away"
           // engine field, so Home/Away only ever shows the traditional
           // avg/obp/slg/HR line from the live split, honestly, no bonus.
-          const bonusEligible = (battingHand === 'L' || battingHand === 'R') && dp?.pitcher_hand === battingHand;
+          // FIXED 2026-08-16: dp.pitcher_hand is "Left"/"Right" (engine's
+          // Throw Side column, full word) — truncate before comparing to the
+          // single-letter battingHand toggle, or this never matches.
+          const bonusEligible = (battingHand === 'L' || battingHand === 'R') && (dp?.pitcher_hand||'').trim().charAt(0).toUpperCase() === battingHand;
           const numOrNull = v => (v!=null && v!=='' && v!=='—') ? parseFloat(v) : null;
           const row = battingHand === 'ALL' ? player : {
             avg: numOrNull(split.avg), obp: numOrNull(split.obp), slg: numOrNull(split.slg),
@@ -3879,7 +3882,11 @@ function PitcherSlideIn() {
 
   if (!pitcher) return null;
   const activePitchMix = pitchMix.length > 0 ? pitchMix : (pitcher.pitchMix || []);
-  const hand = pitcher.hand || stats?.hand || 'R';
+  // FIXED 2026-08-16: callers often pass pitcher.hand straight from
+  // daily_picks.csv's pitcher_hand field, which is "Left"/"Right" (full
+  // word, engine's Throw Side column) — truncate to the single letter this
+  // component actually displays ("{hand}HP"), or it renders "LeftHP"/"RightHP".
+  const hand = ((pitcher.hand || stats?.hand || 'R')+'').trim().charAt(0).toUpperCase() || 'R';
 
   const activeStats = statHand === 'ALL' ? stats : (handSplits?.[statHand==='L'?'vsL':'vsR'] || null);
 
@@ -18074,7 +18081,8 @@ function SimLabView({ data }) {
                           if (pitcherDisplay === 'N/A') return;
                           openPitcherSlide({ pid: parseInt(b.pitcher_id) || 0, name: pitcherDisplay, team: b.pitcher_team || '', hand: b.pitcher_hand || '', pitchMix: [] });
                         }}>
-                        {pitcherDisplay}{b.pitcher_hand ? <span style={{ fontSize: 8, color: 'var(--muted)' }}> ({b.pitcher_hand})</span> : null}
+                        {/* FIXED 2026-08-16: b.pitcher_hand is "Left"/"Right" — truncate for display */}
+                        {pitcherDisplay}{b.pitcher_hand ? <span style={{ fontSize: 8, color: 'var(--muted)' }}> ({(b.pitcher_hand||'').trim().charAt(0).toUpperCase()})</span> : null}
                       </td>
                       <td style={{ textAlign: 'center', padding: '3px 6px' }}>
                         {pgLabel.includes('Target')?'🎯':pgLabel.includes('Hittable')?'💥':pgLabel.includes('Elite')?'‼️':pgLabel.includes('Tough')?'⚠️':pgLabel?'🤔':''}
@@ -22074,7 +22082,9 @@ function StatsTab() {
                         if (!dp?.pitcher) return <span style={{fontFamily:mono,fontSize:7,color:'var(--muted)'}}>—</span>;
                         const pgL=dp._pgLabel||'';
                         const pgEmoji=pgL.includes('Target')?'🎯':pgL.includes('Hittable')?'💥':pgL.includes('Elite')?'‼️':pgL.includes('Tough')?'⚠️':'';
-                        const hand=dp.pitcher_hand==='L'?'LHP':dp.pitcher_hand==='R'?'RHP':'';
+                        // FIXED 2026-08-16: dp.pitcher_hand is "Left"/"Right" (full word) — truncate first.
+                        const _phTrunc=(dp.pitcher_hand||'').trim().charAt(0).toUpperCase();
+                        const hand=_phTrunc==='L'?'LHP':_phTrunc==='R'?'RHP':'';
                         return <div style={{display:'flex',alignItems:'center',gap:3}}>
                           <span onClick={()=>openPitcherSlide({pid:parseInt(dp.pitcher_id||0),name:dp.pitcher,team:dp.pitcher_team||'',hand:dp.pitcher_hand||'',pitchMix:[]})}
                             style={{fontFamily:osw,fontWeight:700,fontSize:9,color:'var(--text)',cursor:'pointer',whiteSpace:'nowrap'}}>{dp.pitcher}</span>
@@ -24222,7 +24232,10 @@ function KPropsTab() {
         built.push({
           pitcherId:   pid,
           pitcherName: dp.pitcher      || '',
-          pitcherHand: dp.pitcher_hand || '',
+          // FIXED 2026-08-16: dp.pitcher_hand is "Left"/"Right" (full word) —
+          // truncated here since this tab's own filter/display below compare
+          // it directly to 'L'/'R', not through PitcherSlideIn's own fix.
+          pitcherHand: (dp.pitcher_hand||'').trim().charAt(0).toUpperCase(),
           pitcherTeam: dp.pitcher_team || '',
           battingTeam: dp.batting_team || '',
           gameId: gid, gameTime: dp.game_time || '',
@@ -24439,7 +24452,9 @@ function SBPropsTab() {
         let sbScore = (speedTier/4)*35 + Math.min(seaSB/25,1)*35 + (sbPct/100)*20 + (pVuln?10:0);
         if (slot >= 1 && slot <= 2) sbScore *= 1.10;
         if (slot >= 7)              sbScore *= 0.90;
-        if ((dp.pitcher_hand||'R') === 'L') sbScore *= 0.90;
+        // FIXED 2026-08-16: dp.pitcher_hand is "Left"/"Right" (full word) —
+        // truncate before comparing, or this LHP penalty never fires.
+        if (((dp.pitcher_hand||'R')+'').trim().charAt(0).toUpperCase() === 'L') sbScore *= 0.90;
         sbScore = Math.min(99, Math.round(sbScore));
 
         const confirmed = LINEUP_STATUS[bid]?.status === 'confirmed';
@@ -36043,8 +36058,14 @@ function onbase_groupB(r) {
   const seasonWoba  = parseFloat(r.season_xwoba || 0.310);
   const vsHandWoba  = parseFloat(r.vs_hand_woba || seasonWoba);
   const platoonScore = Math.min(100, Math.max(0, (vsHandWoba - 0.250) / 0.200 * 100));
+  // FIXED 2026-08-16: r.pitcher_hand is "Left"/"Right" (full word, engine's
+  // Throw Side column) — pHand was never truncated, so bHand ('L'/'R')
+  // could never equal it, meaning platoonMult was ALWAYS 1.12 (the
+  // cross-hand bonus), never the 0.90 same-hand penalty. Matches the
+  // regex-based truncation groupB_MatchupVulnerability()/computeMatchupScore()
+  // (Barrel Lab's equivalents) already use correctly.
   const bHand = (r.batter_hand || '').toUpperCase();
-  const pHand = (r.pitcher_hand || '').toUpperCase();
+  const pHand = (r.pitcher_hand || '').replace(/^(L|R).*/i, '$1').toUpperCase();
   const platoonMult = (bHand !== pHand) ? 1.12 : 0.90;
   const simTB      = parseFloat(r.sim_tb || 0);
   const simTBScore = Math.min(100, (simTB / 2.5) * 100);
@@ -36077,8 +36098,11 @@ function computeOnBaseMatchupScore(r) {
   const gradeMult = pitcherGradeMult(getHandSpecificGrade(r));
   const seasonWoba = parseFloat(r.season_xwoba || 0.310);
   const vsHandWoba = parseFloat(r.vs_hand_woba || seasonWoba);
+  // FIXED 2026-08-16: same pitcher_hand full-word truncation fix as
+  // onbase_groupB() above — pHand was never truncated, so platoonMult was
+  // always 1.12, never applying the 0.90 same-hand penalty.
   const bHand = (r.batter_hand || '').toUpperCase();
-  const pHand = (r.pitcher_hand || '').toUpperCase();
+  const pHand = (r.pitcher_hand || '').replace(/^(L|R).*/i, '$1').toUpperCase();
   const handScore = Math.min(100, Math.max(0, (vsHandWoba - 0.250) / 0.200 * 100));
   const platoonMult = (bHand !== pHand) ? 1.12 : 0.90;
   const simTB      = parseFloat(r.sim_tb || 0);
