@@ -33469,6 +33469,7 @@ function HomeTab() {
         ['🛢️ Daily Barrel', 'Monte Carlo HR simulation (10,000 PAs per matchup). TrueHRScore + MatchupScore per batter, ★ Barrel Signal flag for the strictest matchups, 🎲 Longshot flag for undervalued plays. Live tracker: Barrel Signal hits at 16.9% HR rate.'],
         ['🔵 On Base', 'A parallel Monte Carlo engine targeting 2+ total bases per game — the hits/TB prop market, not just HRs. OnBaseScore + MatchupScore + SimTB2%, with its own ★ TB Signal flag. Very new — early hit rate is promising but the sample is still small.'],
         ['🚫 Avoid List', 'The mirror image of Hit Signal — batters least likely to record a hit tonight (cold Sim H, real whiff risk, tough matchup, or unfavorable platoon). Full-season backtest: 58-61% miss rate vs. a 42.6% baseline, 1.4x lift, validated cleanly train/test. No badges — this list only exists here and as a filter in the usual tables.'],
+        ['🆕 Young Guns', 'Every real MLB call-up (recalled or contract-purchase) from the last 45 days, pulled straight from MLB\'s own transactions feed. Tap Majors for a real Arsenal Fit/matchup read if they\'re in today\'s slate (or their live MLB stat line if not); tap Minors for their season stats, vs-LHP/vs-RHP splits, and a rolling last-7-games window at whatever level they were called up from. A 🆕 badge marks anyone called up today. Barrel%/xwOBA aren\'t shown — real batted-ball tracking only exists at Triple-A and would need a separate historical pipeline.'],
         ['🎯 Pitcher Grades', '🎯 Target = easiest to homer off · 💥 Hittable = solid spot · 🤔 Average = neutral · ⚠️ Tough = difficult · ‼️ Elite = avoid. Grading is now hand-specific (vs LHB / vs RHB splits) — tap any pitcher name to open their slideout.'],
         ['📊 Batter Grades', 'A+ = 6–8 signals (live tracker: 18.8% HR rate) · A = 4–5 (17.5%) · B = 2–3 (12.8%) · C = 1 (12.1%) · D = 0 (9.8%). Signals include LA lock, bat speed peak, pitch convergence, handedness match, and close call streaks.'],
         ['Dive Deeper', 'Use the → All Matchups button to go deeper on any batter\'s full matchup data, or open Track Record to see every signal\'s live, current hit rate.'],
@@ -33486,6 +33487,7 @@ function HomeTab() {
         <button data-subtab="barrellab" style={stBtn('barrellab')} onClick={()=>setSub('barrellab')}>🛢️ Daily Barrel</button>
         <button data-subtab="onbase"    style={stBtn('onbase')}    onClick={()=>setSub('onbase')}>🔵 On Base</button>
         <button data-subtab="avoid"     style={stBtn('avoid')}     onClick={()=>setSub('avoid')}>🚫 Avoid</button>
+        <button data-subtab="younggun"  style={stBtn('younggun')}  onClick={()=>setSub('younggun')}>🆕 Young Guns</button>
         <HelpBtn2/>
         {/* Refresh — visible when on cheat sheet */}
         {sub==='cheatsheet' && (
@@ -33518,6 +33520,7 @@ function HomeTab() {
       {sub==='barrellab'  && <BarrelLabTab/>}
       {sub==='onbase'     && <OnBaseTab/>}
       {sub==='avoid'      && <AvoidListTab/>}
+      {sub==='younggun'   && <YoungGunsCallUpTab/>}
     </div>
   );
 }
@@ -34761,6 +34764,346 @@ function AvoidListTab() {
                   <td style={{padding:'4px 6px',textAlign:'right',fontFamily:mono,fontSize:10}}>{r.recentEv ? r.recentEv.toFixed(1) : '—'}</td>
                   <td style={{padding:'4px 6px',textAlign:'center',fontFamily:mono,fontSize:10}}>{r.bullpenTier ? r.bullpenTier.split(' ')[0] : '—'}</td>
                 </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Young Guns — recent MLB call-up feed (2026-08-18) ───────────────────────
+// Feasibility confirmed live before building: MLB Stats API's transactions
+// endpoint (typeCode CU="Recalled"/SE="Selected", a literal debut) gives
+// real, structured call-up events; the same /people/{id}/stats pattern
+// already used by BvP Machine works at any minor-league sportId (11=AAA,
+// 12=AA, etc.) for season/split/gameLog stats. Deliberately excludes
+// Barrel%/xwOBA — real batted-ball tracking only exists at Triple-A, and
+// even there it'd need a whole separate AB-log-style pipeline (out of
+// scope, confirmed with the user). Majors tab reuses 100% existing
+// infrastructure (computeTrueHRScore/computeMatchupScore/getHandMatchTier,
+// same functions Barrel Lab/Arsenal Fit already run) for any call-up who's
+// in today's real daily_picks.csv slate; Minors tab is a live, on-demand
+// fetch (season/vsL-vsR splits/rolling L7 via gameLog) at whatever level
+// api/callups.js resolved them from — nothing pre-computed, nothing new in
+// the nightly pipeline.
+
+// Classic wOBA proxy (same linear-weights formula/constants already used
+// elsewhere in this project for the same "no Statcast xwOBA available"
+// situation) — works off plain box-score fields, so it's usable at any
+// level including the minors.
+function classicWoba(s) {
+  if (!s) return null;
+  const ab = parseInt(s.atBats) || 0;
+  const bb = parseInt(s.baseOnBalls) || 0;
+  const ibb = parseInt(s.intentionalWalks) || 0;
+  const hbp = parseInt(s.hitByPitch) || 0;
+  const sf = parseInt(s.sacFlies) || 0;
+  const h = parseInt(s.hits) || 0;
+  const d2 = parseInt(s.doubles) || 0;
+  const d3 = parseInt(s.triples) || 0;
+  const hr = parseInt(s.homeRuns) || 0;
+  const singles = Math.max(0, h - d2 - d3 - hr);
+  const uBB = Math.max(0, bb - ibb);
+  const denom = ab + bb - ibb + sf + hbp;
+  if (denom <= 0) return null;
+  const num = 0.69*uBB + 0.72*hbp + 0.89*singles + 1.27*d2 + 1.62*d3 + 2.10*hr;
+  return num / denom;
+}
+
+// Shared stat-line renderer for both the Majors (live-MLB fallback) and
+// Minors panels below — same field set every time: AVG/SLG/ISO/wOBA/HR/
+// XBH/K%/BB%/PA, all derivable from plain box-score counting stats.
+function YoungGunStatBlock({ title, s, color }) {
+  const mono = "'DM Mono',monospace";
+  const cellStyle = { padding:'3px 10px', fontFamily:mono, fontSize:10 };
+  if (!s) return <div style={{...cellStyle, color:'var(--muted)'}}>{title}: no data</div>;
+  const avg = s.avg ?? '—';
+  const slg = s.slg ?? '—';
+  const iso = (parseFloat(s.slg)||0) - (parseFloat(s.avg)||0);
+  const pa  = parseInt(s.plateAppearances) || 0;
+  const k   = parseInt(s.strikeOuts) || 0;
+  const bb  = parseInt(s.baseOnBalls) || 0;
+  const hr  = parseInt(s.homeRuns) || 0;
+  const xbh = (parseInt(s.doubles)||0) + (parseInt(s.triples)||0) + hr;
+  const kpct  = pa ? ((k/pa)*100).toFixed(1)+'%' : '—';
+  const bbpct = pa ? ((bb/pa)*100).toFixed(1)+'%' : '—';
+  const woba  = classicWoba(s);
+  return (
+    <div style={{marginBottom:8}}>
+      <div style={{...cellStyle, color: color||'var(--accent2)', fontWeight:700, paddingBottom:0}}>{title}</div>
+      <div style={{display:'flex',gap:14,flexWrap:'wrap'}}>
+        {[['AVG',avg],['SLG',slg],['ISO',iso.toFixed(3)],['wOBA',woba!=null?woba.toFixed(3):'—'],
+          ['HR',hr],['XBH',xbh],['K%',kpct],['BB%',bbpct],['PA',pa||'—']].map(([l,v]) => (
+          <div key={l}>
+            <div style={{...cellStyle,color:'var(--muted)',fontSize:8,padding:'2px 10px 0'}}>{l}</div>
+            <div style={{...cellStyle,fontWeight:700,padding:'0 10px 2px'}}>{v}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Majors tab: real Arsenal Fit/matchup read if this call-up is in today's
+// actual slate; otherwise a live MLB season-stat fallback if they have any
+// real MLB PA; otherwise an honest "no MLB at-bats yet" message.
+function YoungGunMajorsPanel({ row }) {
+  const mono = "'DM Mono',monospace";
+  const [liveStats, setLiveStats] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (row.dpRow || row.mlbPA <= 0) return;
+    setLoading(true);
+    fetch(`https://statsapi.mlb.com/api/v1/people/${row.playerId}/stats?stats=season&group=hitting&season=${new Date().getFullYear()}&sportId=1`)
+      .then(r => r.json())
+      .then(d => { setLiveStats(d?.stats?.[0]?.splits?.[0]?.stat || null); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [row.playerId, row.dpRow, row.mlbPA]);
+
+  if (row.dpRow) {
+    const dp = row.dpRow;
+    const trueHR = computeTrueHRScore(dp);
+    const matchup = computeMatchupScore(dp);
+    const tier = getHandMatchTier(dp);
+    const stars = tier==='elite' ? '⭐⭐⭐' : tier==='full' ? '⭐⭐' : tier==='partial' ? '⭐' : '—';
+    const bp = bullpenTierInfo(dp.bullpen_hr_rank);
+    return (
+      <div style={{padding:'10px 14px',display:'flex',gap:20,flexWrap:'wrap',alignItems:'flex-start'}}>
+        <div>
+          <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>TODAY'S MATCHUP</div>
+          <div style={{fontFamily:mono,fontSize:10,fontWeight:700}}>
+            vs {resolvePitcherName(dp.pitcher, dp.batting_team, dp.pitcher_id)} ({dp._pgLabel||dp.pitcher_grade_label||'—'})
+          </div>
+        </div>
+        <div><div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>TRUEHR SCORE</div>
+          <div style={{fontFamily:mono,fontSize:14,fontWeight:700,color:'var(--accent)'}}>{trueHR}</div></div>
+        <div><div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>MATCHUP SCORE</div>
+          <div style={{fontFamily:mono,fontSize:14,fontWeight:700,color:'var(--accent2)'}}>{matchup}</div></div>
+        <div><div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>HAND MATCH</div>
+          <div style={{fontFamily:mono,fontSize:14,fontWeight:700,color:'#fbbf24'}}>{stars}</div></div>
+        <div><div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>BULLPEN</div>
+          <div style={{fontFamily:mono,fontSize:10,fontWeight:700}}>{bp ? <span style={{color:bp.color}}>{bp.label}</span> : '—'}</div></div>
+      </div>
+    );
+  }
+
+  if (row.mlbPA <= 0) {
+    return <div style={{padding:'10px 14px',fontFamily:mono,fontSize:10,color:'var(--muted)'}}>No MLB at-bats yet — check the Minors tab.</div>;
+  }
+  if (loading) return <div style={{padding:'10px 14px',fontFamily:mono,fontSize:10,color:'var(--muted)'}}>Loading MLB stats…</div>;
+  if (!liveStats) return <div style={{padding:'10px 14px',fontFamily:mono,fontSize:10,color:'var(--muted)'}}>No MLB season data available.</div>;
+  return (
+    <div style={{padding:'10px 14px'}}>
+      <YoungGunStatBlock title="MLB SEASON (not in today's slate)" s={liveStats} color="var(--accent)"/>
+    </div>
+  );
+}
+
+// Minors tab: live season stats + vs-LHP/vs-RHP splits + a rolling
+// last-N-games window built from gameLog, at whatever sportId api/callups.js
+// resolved this player's most recent affiliate to. All on-demand, cached
+// only for this component's lifetime (re-fetches if the row is re-expanded
+// after unmounting) — this page's call volume doesn't justify anything
+// heavier.
+function YoungGunMinorsPanel({ row }) {
+  const mono = "'DM Mono',monospace";
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState(null);
+
+  useEffect(() => {
+    if (!row.fromLevelSportId) { setErr('Minor-league level unknown for this player.'); setLoading(false); return; }
+    const yr = new Date().getFullYear();
+    const sid = row.fromLevelSportId;
+    Promise.all([
+      fetch(`https://statsapi.mlb.com/api/v1/people/${row.playerId}/stats?stats=season&group=hitting&season=${yr}&sportId=${sid}`).then(r=>r.json()).catch(()=>null),
+      fetch(`https://statsapi.mlb.com/api/v1/people/${row.playerId}/stats?stats=statSplits&group=hitting&season=${yr}&sportId=${sid}&sitCodes=vl,vr`).then(r=>r.json()).catch(()=>null),
+      fetch(`https://statsapi.mlb.com/api/v1/people/${row.playerId}/stats?stats=gameLog&group=hitting&season=${yr}&sportId=${sid}`).then(r=>r.json()).catch(()=>null),
+    ]).then(([seasonD, splitD, logD]) => {
+      const season = seasonD?.stats?.[0]?.splits?.[0]?.stat || null;
+      const splits = splitD?.stats?.[0]?.splits || [];
+      // A player optioned between two affiliates this season returns one
+      // split entry PER TEAM per split code, plus (usually) a combined
+      // multi-team entry — confirmed live against a real case (Connor
+      // Norby, Jacksonville + Albuquerque) before shipping this. Prefer
+      // the combined entry; sum per-team rows only if it's missing.
+      const sumSplit = code => {
+        const combined = splits.find(sp => sp.split?.code === code && sp.numTeams);
+        if (combined) return combined.stat;
+        const matches = splits.filter(sp => sp.split?.code === code);
+        if (matches.length === 0) return null;
+        if (matches.length === 1) return matches[0].stat;
+        const sum = { atBats:0, hits:0, doubles:0, triples:0, homeRuns:0, baseOnBalls:0,
+          intentionalWalks:0, hitByPitch:0, sacFlies:0, strikeOuts:0, plateAppearances:0 };
+        matches.forEach(m => { Object.keys(sum).forEach(k => { sum[k] += parseInt(m.stat[k]) || 0; }); });
+        sum.avg = sum.atBats ? (sum.hits/sum.atBats).toFixed(3) : '.000';
+        const singles = sum.hits - sum.doubles - sum.triples - sum.homeRuns;
+        const tb = singles + sum.doubles*2 + sum.triples*3 + sum.homeRuns*4;
+        sum.slg = sum.atBats ? (tb/sum.atBats).toFixed(3) : '.000';
+        return sum;
+      };
+      const vsL = sumSplit('vl');
+      const vsR = sumSplit('vr');
+      const gameLog = (logD?.stats?.[0]?.splits || []).slice(-7).reverse(); // most recent 7
+      const l7 = gameLog.reduce((acc, g) => {
+        const st = g.stat || {};
+        Object.keys(acc).forEach(k => { acc[k] += parseInt(st[
+          k==='ab'?'atBats':k==='h'?'hits':k==='hr'?'homeRuns':k==='bb'?'baseOnBalls':
+          k==='k'?'strikeOuts':k==='pa'?'plateAppearances':k==='d2'?'doubles':k==='d3'?'triples':k
+        ]) || 0; });
+        return acc;
+      }, { ab:0, h:0, hr:0, bb:0, k:0, pa:0, d2:0, d3:0 });
+      const l7Stat = {
+        atBats: l7.ab, hits: l7.h, homeRuns: l7.hr, baseOnBalls: l7.bb, strikeOuts: l7.k,
+        plateAppearances: l7.pa, doubles: l7.d2, triples: l7.d3,
+        avg: l7.ab ? (l7.h/l7.ab).toFixed(3) : '.000',
+        slg: l7.ab ? ((l7.h - l7.d2 - l7.d3 - l7.hr) + l7.d2*2 + l7.d3*3 + l7.hr*4) / l7.ab : 0,
+      };
+      if (typeof l7Stat.slg === 'number') l7Stat.slg = l7Stat.slg.toFixed(3);
+      setData({ season, vsL, vsR, l7: l7Stat, games: gameLog.length });
+      setLoading(false);
+    }).catch(e => { setErr(e.message); setLoading(false); });
+  }, [row.playerId, row.fromLevelSportId]);
+
+  if (loading) return <div style={{padding:'10px 14px',fontFamily:mono,fontSize:10,color:'var(--muted)'}}>Loading {row.fromLevel||'minor-league'} stats…</div>;
+  if (err) return <div style={{padding:'10px 14px',fontFamily:mono,fontSize:10,color:'#ff6b6b'}}>{err}</div>;
+  if (!data || !data.season) return <div style={{padding:'10px 14px',fontFamily:mono,fontSize:10,color:'var(--muted)'}}>No {row.fromLevel||'minor-league'} data found.</div>;
+
+  return (
+    <div style={{padding:'10px 14px'}}>
+      <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginBottom:4}}>{row.fromLevel} — {row.fromTeam}</div>
+      <YoungGunStatBlock title={`SEASON (${row.fromLevel})`} s={data.season}/>
+      <YoungGunStatBlock title="VS LHP" s={data.vsL}/>
+      <YoungGunStatBlock title="VS RHP" s={data.vsR}/>
+      {data.games > 0 && <YoungGunStatBlock title={`LAST ${data.games} GAMES`} s={data.l7} color="#38f282"/>}
+    </div>
+  );
+}
+
+function YoungGunsCallUpTab() {
+  const mono = "'DM Mono',monospace";
+  const osw  = "'Oswald',sans-serif";
+  const [players, setPlayers] = useState(null); // null = loading
+  const [error, setError] = useState(null);
+  const [expandedId, setExpandedId] = useState(null);
+  const [expandedTab, setExpandedTab] = useState('majors');
+  const [playerVer, setPlayerVer] = useState(PLAYER_CACHE_DATE);
+
+  useEffect(() => {
+    fetch('/api/callups').then(r => r.json()).then(d => {
+      if (d.error) { setError(d.error); setPlayers([]); return; }
+      setPlayers(d.players || []);
+    }).catch(e => { setError(e.message); setPlayers([]); });
+  }, []);
+
+  // players.json (PLAYER_DATA_CACHE) loads app-wide on its own schedule —
+  // poll so "current MLB PA" fills in once ready, same pattern Chalk/Young
+  // Gun batter filters already use elsewhere for this exact cache.
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (PLAYER_CACHE_DATE !== playerVer) setPlayerVer(PLAYER_CACHE_DATE);
+    }, 2000);
+    return () => clearInterval(id);
+  }, [playerVer]);
+
+  const today = getETDateStr();
+
+  const rows = useMemo(() => {
+    if (!players) return [];
+    return players.map(p => {
+      const cached = getCachedPlayer(p.playerId);
+      const mlbPA  = cached ? (cached.pa || cached.ab || 0) : 0;
+      const dpRow  = DAILY_PICKS_CACHE[String(p.playerId)] || null;
+      return { ...p, mlbPA, cached, dpRow, isNew: p.callupDate === today };
+    });
+  }, [players, playerVer, today]);
+
+  const toggleExpand = (pid, tabName) => {
+    if (expandedId === pid && expandedTab === tabName) { setExpandedId(null); return; }
+    setExpandedId(pid); setExpandedTab(tabName);
+  };
+
+  return (
+    <div>
+      <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:8}}>
+        <span style={{fontFamily:osw,fontWeight:800,fontSize:14,color:'#38f282'}}>🆕 Young Guns</span>
+        <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>
+          {players === null ? 'Loading…' : `${rows.length} call-ups in the last 45 days`}
+        </span>
+      </div>
+
+      {error && (
+        <div style={{fontFamily:mono,fontSize:10,color:'#ff6b6b',padding:'8px 12px',
+          background:'rgba(255,107,107,.08)',borderRadius:6,marginBottom:8}}>
+          Couldn't load call-up data — {error}
+        </div>
+      )}
+
+      {players !== null && rows.length === 0 && !error && (
+        <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)',padding:'20px',textAlign:'center'}}>
+          No MLB call-ups in the last 45 days.
+        </div>
+      )}
+
+      {rows.length > 0 && (
+        <div className="tw" style={{overflowX:'auto'}}>
+          <table style={{width:'100%',borderCollapse:'collapse'}}>
+            <thead>
+              <tr style={{borderBottom:'1px solid var(--border)'}}>
+                <th style={{textAlign:'left',padding:'4px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>Batter</th>
+                <th style={{textAlign:'left',padding:'4px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>Call-Up</th>
+                <th style={{textAlign:'left',padding:'4px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>From</th>
+                <th style={{textAlign:'left',padding:'4px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>To</th>
+                <th style={{textAlign:'right',padding:'4px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)'}} title="Current-season MLB plate appearances">MLB PA</th>
+                <th style={{textAlign:'center',padding:'4px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>View</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(r => (
+                <React.Fragment key={r.playerId}>
+                  <tr style={{borderBottom:'1px solid var(--border)'}}>
+                    <td style={{padding:'5px 6px'}}>
+                      <span onClick={() => { openPitcherSlide(null); openAtBatSlide({pid:r.playerId,name:r.name,team:r.toTeam}); }}
+                        style={{color:'var(--accent2)',fontWeight:700,cursor:'pointer',
+                          textDecoration:'underline',textDecorationStyle:'dotted',fontFamily:osw,fontSize:11}}>
+                        {r.name}
+                      </span>
+                      {r.isNew && <span title="Called up today" style={{marginLeft:5,fontSize:8,fontWeight:700,color:'#38f282',
+                        padding:'1px 4px',borderRadius:3,background:'rgba(56,242,130,.12)',border:'1px solid rgba(56,242,130,.35)'}}>🆕 NEW</span>}
+                    </td>
+                    <td style={{padding:'5px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>
+                      {r.callupDate} <span style={{opacity:.7}}>({r.typeDesc})</span>
+                    </td>
+                    <td style={{padding:'5px 6px',fontFamily:mono,fontSize:9}}>{r.fromTeam} <span style={{color:'var(--muted)'}}>({r.fromLevel||'?'})</span></td>
+                    <td style={{padding:'5px 6px',fontFamily:mono,fontSize:9}}>{r.toTeam}</td>
+                    <td style={{padding:'5px 6px',textAlign:'right',fontFamily:mono,fontSize:10,
+                      color: r.mlbPA >= 100 ? 'var(--muted)' : 'var(--text)'}}>{r.mlbPA || 0}</td>
+                    <td style={{padding:'5px 6px',textAlign:'center'}}>
+                      <button onClick={() => toggleExpand(r.playerId, 'majors')}
+                        style={{padding:'2px 7px',marginRight:3,borderRadius:4,cursor:'pointer',fontFamily:mono,fontSize:8,fontWeight:700,
+                          background: expandedId===r.playerId && expandedTab==='majors' ? 'var(--accent)' : 'var(--surface2)',
+                          color: expandedId===r.playerId && expandedTab==='majors' ? 'white' : 'var(--muted)',
+                          border:'1px solid var(--border)'}}>Majors</button>
+                      <button onClick={() => toggleExpand(r.playerId, 'minors')}
+                        style={{padding:'2px 7px',borderRadius:4,cursor:'pointer',fontFamily:mono,fontSize:8,fontWeight:700,
+                          background: expandedId===r.playerId && expandedTab==='minors' ? 'var(--accent)' : 'var(--surface2)',
+                          color: expandedId===r.playerId && expandedTab==='minors' ? 'white' : 'var(--muted)',
+                          border:'1px solid var(--border)'}}>Minors</button>
+                    </td>
+                  </tr>
+                  {expandedId === r.playerId && (
+                    <tr>
+                      <td colSpan={6} style={{padding:0,background:'rgba(255,255,255,.02)'}}>
+                        {expandedTab === 'majors'
+                          ? <YoungGunMajorsPanel row={r}/>
+                          : <YoungGunMinorsPanel row={r}/>}
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
               ))}
             </tbody>
           </table>
