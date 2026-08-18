@@ -34991,6 +34991,10 @@ function YoungGunsCallUpTab() {
   const [expandedId, setExpandedId] = useState(null);
   const [expandedTab, setExpandedTab] = useState('majors');
   const [playerVer, setPlayerVer] = useState(PLAYER_CACHE_DATE);
+  const [search, setSearch] = useState('');
+  const [selTeam, setSelTeam] = useState('all');
+  const [sortCol, setSortCol] = useState('callupDate');
+  const [sortDir, setSortDir] = useState('desc'); // most-recent-first by default
 
   useEffect(() => {
     fetch('/api/callups').then(r => r.json()).then(d => {
@@ -35017,22 +35021,66 @@ function YoungGunsCallUpTab() {
       const cached = getCachedPlayer(p.playerId);
       const mlbPA  = cached ? (cached.pa || cached.ab || 0) : 0;
       const dpRow  = DAILY_PICKS_CACHE[String(p.playerId)] || null;
-      return { ...p, mlbPA, cached, dpRow, isNew: p.callupDate === today };
+      const teamAbbr = TEAM_ID_TO_ABBR[p.toTeamId] || '';
+      return { ...p, mlbPA, cached, dpRow, teamAbbr, isNew: p.callupDate === today };
     });
   }, [players, playerVer, today]);
+
+  const teamOptions = useMemo(() => {
+    const set = new Set(rows.map(r => r.teamAbbr).filter(Boolean));
+    return [...set].sort();
+  }, [rows]);
+
+  const filteredRows = useMemo(() => {
+    let base = rows;
+    if (selTeam !== 'all') base = base.filter(r => r.teamAbbr === selTeam);
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      base = base.filter(r => r.name.toLowerCase().includes(q));
+    }
+    const mul = sortDir === 'asc' ? 1 : -1;
+    return [...base].sort((a, b) => {
+      if (sortCol === 'name')     return mul * a.name.localeCompare(b.name);
+      if (sortCol === 'team')     return mul * a.teamAbbr.localeCompare(b.teamAbbr);
+      if (sortCol === 'mlbPA')    return mul * ((a.mlbPA||0) - (b.mlbPA||0));
+      return mul * a.callupDate.localeCompare(b.callupDate); // callupDate
+    });
+  }, [rows, selTeam, search, sortCol, sortDir]);
+
+  const toggleSort = key => {
+    if (sortCol === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortCol(key); setSortDir(key === 'name' || key === 'team' ? 'asc' : 'desc'); }
+  };
 
   const toggleExpand = (pid, tabName) => {
     if (expandedId === pid && expandedTab === tabName) { setExpandedId(null); return; }
     setExpandedId(pid); setExpandedTab(tabName);
   };
 
+  const sortTh = (key, label, align, title) => (
+    <th onClick={() => toggleSort(key)} title={title}
+      style={{textAlign:align||'left',padding:'4px 6px',fontFamily:mono,fontSize:9,cursor:'pointer',userSelect:'none',
+        color: sortCol===key ? 'var(--accent)' : 'var(--muted)'}}>
+      {label}{sortCol===key ? (sortDir==='desc' ? ' ▼' : ' ▲') : ''}
+    </th>
+  );
+
   return (
     <div>
       <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:8}}>
         <span style={{fontFamily:osw,fontWeight:800,fontSize:14,color:'#38f282'}}>🆕 Young Guns</span>
         <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>
-          {players === null ? 'Loading…' : `${rows.length} call-ups in the last 45 days`}
+          {players === null ? 'Loading…' : `${filteredRows.length} of ${rows.length} call-ups in the last 45 days`}
         </span>
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search batter…"
+          style={{padding:'3px 8px',borderRadius:5,fontFamily:mono,fontSize:9,width:130,
+            background:'var(--surface2)',border:'1px solid var(--border)',color:'var(--text)'}}/>
+        <select value={selTeam} onChange={e => setSelTeam(e.target.value)}
+          style={{padding:'3px 8px',borderRadius:5,fontFamily:mono,fontSize:9,
+            background:'var(--surface2)',border:'1px solid var(--border)',color:'var(--text)'}}>
+          <option value="all">All Teams</option>
+          {teamOptions.map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
       </div>
 
       {error && (
@@ -35048,37 +35096,61 @@ function YoungGunsCallUpTab() {
         </div>
       )}
 
-      {rows.length > 0 && (
+      {rows.length > 0 && filteredRows.length === 0 && (
+        <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)',padding:'20px',textAlign:'center'}}>
+          No call-ups match this search/team filter.
+        </div>
+      )}
+
+      {filteredRows.length > 0 && (
         <div className="tw" style={{overflowX:'auto'}}>
           <table style={{width:'100%',borderCollapse:'collapse'}}>
             <thead>
               <tr style={{borderBottom:'1px solid var(--border)'}}>
-                <th style={{textAlign:'left',padding:'4px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>Batter</th>
-                <th style={{textAlign:'left',padding:'4px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>Call-Up</th>
+                <th className="sticky-batter" onClick={() => toggleSort('name')} style={{textAlign:'left',padding:'4px 6px',fontFamily:mono,fontSize:9,cursor:'pointer',userSelect:'none',background:'var(--surface2)',
+                  color: sortCol==='name' ? 'var(--accent)' : 'var(--muted)'}}>
+                  Batter{sortCol==='name' ? (sortDir==='desc' ? ' ▼' : ' ▲') : ''}
+                </th>
+                {sortTh('team', 'Team', 'left')}
+                {sortTh('callupDate', 'Call-Up', 'left')}
                 <th style={{textAlign:'left',padding:'4px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>From</th>
-                <th style={{textAlign:'left',padding:'4px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>To</th>
-                <th style={{textAlign:'right',padding:'4px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)'}} title="Current-season MLB plate appearances">MLB PA</th>
+                <th style={{textAlign:'left',padding:'4px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>Today's Pitcher</th>
+                {sortTh('mlbPA', 'MLB PA', 'right', "Current-season MLB plate appearances")}
                 <th style={{textAlign:'center',padding:'4px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>View</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map(r => (
+              {filteredRows.map(r => {
+                const pitcherName = r.dpRow ? resolvePitcherName(r.dpRow.pitcher, r.dpRow.batting_team, r.dpRow.pitcher_id) : '';
+                return (
                 <React.Fragment key={r.playerId}>
                   <tr style={{borderBottom:'1px solid var(--border)'}}>
-                    <td style={{padding:'5px 6px'}}>
-                      <span onClick={() => { openPitcherSlide(null); openAtBatSlide({pid:r.playerId,name:r.name,team:r.toTeam}); }}
-                        style={{color:'var(--accent2)',fontWeight:700,cursor:'pointer',
-                          textDecoration:'underline',textDecorationStyle:'dotted',fontFamily:osw,fontSize:11}}>
-                        {r.name}
-                      </span>
-                      {r.isNew && <span title="Called up today" style={{marginLeft:5,fontSize:8,fontWeight:700,color:'#38f282',
-                        padding:'1px 4px',borderRadius:3,background:'rgba(56,242,130,.12)',border:'1px solid rgba(56,242,130,.35)'}}>🆕 NEW</span>}
+                    <td className="sticky-batter" style={{padding:'4px 6px',background:'var(--surface)',maxWidth:170}}>
+                      <div style={{display:'flex',alignItems:'center',gap:5,overflow:'hidden',cursor:'pointer'}}
+                        onClick={() => { openPitcherSlide(null); openAtBatSlide({pid:r.playerId,name:r.name,team:r.toTeam}); }}>
+                        <PlayerAvatar pid={r.playerId} name={r.name} size={22}/>
+                        <span style={{color:'var(--accent2)',fontWeight:700,fontFamily:osw,fontSize:11,
+                          overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                          {r.name}
+                        </span>
+                        {r.isNew && <span title="Called up today" style={{fontSize:8,fontWeight:700,color:'#38f282',flexShrink:0,
+                          padding:'1px 4px',borderRadius:3,background:'rgba(56,242,130,.12)',border:'1px solid rgba(56,242,130,.35)'}}>🆕 NEW</span>}
+                      </div>
                     </td>
+                    <td style={{padding:'5px 6px',fontFamily:mono,fontSize:9,fontWeight:700}}>{r.teamAbbr || r.toTeam}</td>
                     <td style={{padding:'5px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>
                       {r.callupDate} <span style={{opacity:.7}}>({r.typeDesc})</span>
                     </td>
                     <td style={{padding:'5px 6px',fontFamily:mono,fontSize:9}}>{r.fromTeam} <span style={{color:'var(--muted)'}}>({r.fromLevel||'?'})</span></td>
-                    <td style={{padding:'5px 6px',fontFamily:mono,fontSize:9}}>{r.toTeam}</td>
+                    <td style={{padding:'5px 6px'}}>
+                      {r.dpRow ? (
+                        <span onClick={() => { openAtBatSlide(null); openPitcherSlide({pid:parseInt(r.dpRow.pitcher_id)||0, name:pitcherName, team:r.dpRow.pitcher_team||'', hand:r.dpRow.pitcher_hand||'', pitchMix:[]}); }}
+                          style={{color:'var(--accent2)',fontWeight:700,cursor:'pointer',
+                            textDecoration:'underline',textDecorationStyle:'dotted',fontFamily:mono,fontSize:9}}>
+                          {pitcherName}
+                        </span>
+                      ) : <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>—</span>}
+                    </td>
                     <td style={{padding:'5px 6px',textAlign:'right',fontFamily:mono,fontSize:10,
                       color: r.mlbPA >= 100 ? 'var(--muted)' : 'var(--text)'}}>{r.mlbPA || 0}</td>
                     <td style={{padding:'5px 6px',textAlign:'center'}}>
@@ -35096,7 +35168,7 @@ function YoungGunsCallUpTab() {
                   </tr>
                   {expandedId === r.playerId && (
                     <tr>
-                      <td colSpan={6} style={{padding:0,background:'rgba(255,255,255,.02)'}}>
+                      <td colSpan={7} style={{padding:0,background:'rgba(255,255,255,.02)'}}>
                         {expandedTab === 'majors'
                           ? <YoungGunMajorsPanel row={r}/>
                           : <YoungGunMinorsPanel row={r}/>}
@@ -35104,7 +35176,8 @@ function YoungGunsCallUpTab() {
                     </tr>
                   )}
                 </React.Fragment>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
