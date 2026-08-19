@@ -3,7 +3,6 @@ ATH,667670,Brent Rooker,DH,Bone bruise in left knee.,,🟢,Injured 60-Day
 ATH,621139,Brooks Kriske,P,Right shoulder impingement,,⚪,Injured 60-Day
 ATH,672016,Denzel Clarke,CF,Mid foot bone bruise in right foot.,,🟢,Injured 60-Day
 ATH,680684,Gunnar Hoglund,P,Sprained right knee.,,🟡,Injured 60-Day
-ATH,605488,Jeffrey Springs,P,Right hip discomfort.,,⚪,Injured 15-Day
 ATH,660761,José Suarez,P,Right hip strain,,🟡,Injured 15-Day
 ATH,811965,Joshua Kuroda-Grauer,3B,Ruptured testicle surgery.,,🔴,Injured 10-Day
 ATH,686993,Justin Sterner,P,Right knee chondromalacia.,,⚪,Injured 60-Day
@@ -36,7 +35,6 @@ BAL,676059,Jordan Westburg,3B,Right elbow UCL sprain.,,🟡,Injured 60-Day
 BAL,669211,Keegan Akin,P,Left elbow discomfort,,⚪,Injured 60-Day
 BAL,664854,Ryan Helsley,P,Right elbow discomfort.,,⚪,Injured 60-Day
 BAL,663624,Ryan Mountcastle,1B,Left foot fracture,,🔴,Injured 60-Day
-BAL,694212,Samuel Basallo,C,Right shoulder inflammation.,,🟡,Injured 10-Day
 BAL,621107,Zach Eflin,P,Right elbow discomfort.,,⚪,Injured 60-Day
 BOS,678554,Curtis Mead,3B,Left wrist tracture,,⚪,Injured 10-Day
 BOS,676979,Garrett Crochet,P,Left shoulder inflammation.,,🟡,Injured 60-Day
@@ -72,6 +70,7 @@ CIN,668933,Graham Ashcraft,P,Right forearm UCL sprain.,,🟡,Injured 60-Day
 CIN,668881,Hunter Greene,P,Right elbow soreness.,,🟡,Injured 60-Day
 CIN,668715,Spencer Steer,1B,Right wrist sprain,,🟡,Injured 10-Day
 CIN,663574,Tony Santillan,P,Left oblique strain.,,🟡,Injured 15-Day
+CLE,656555,Rhys Hoskins,1B,Lower back inflammation.,,🟡,Injured 10-Day
 CLE,542888,Shawn Armstrong,P,Left calf strain.,,🟡,Injured 60-Day
 CLE,677944,Slade Cecconi,P,Right forearm inflammation.,,🟡,Injured 15-Day
 COL,801403,Chase Dollander,P,Right elbow strain.,,🟡,Injured 60-Day
@@ -111,7 +110,7 @@ DET,700242,Trey Sweeney,SS,Right shoulder strain,,🟡,Injured 60-Day
 DET,672761,Wenceel Pérez,RF,Left orbital fracture.,,🔴,Injured 60-Day
 DET,676684,Will Vest,P,Right posterior elbow inflammation.,,🟡,Injured 60-Day
 HOU,687888,Brandon Walter,P,Left elbow surgery recovery,,🔴,Injured 60-Day
-HOU,694728,Brice Matthews,CF,Left knee sprain.,,🟡,Injured 10-Day
+HOU,694728,Brice Matthews,CF,Left knee sprain.,,🟡,Injured 60-Day
 HOU,621043,Carlos Correa,SS,Left ankle tendon injury.,,⚪,Injured 60-Day
 HOU,681347,Mike Burrows,P,Right elbow neuritis.,,⚪,Injured 15-Day
 KC,679525,Alec Marsh,P,Right shoulder impingement.,,⚪,Injured 60-Day
@@ -159,7 +158,6 @@ MIL,682842,Abner Uribe,P,Right forearm flexor strain.,,🟡,Injured 15-Day
 MIL,672582,Angel Zerpa,P,Left forearm tightness.,,🟢,Injured 60-Day
 MIL,605540,Brandon Woodruff,P,Right shoulder inflammation.,,🟡,Injured 60-Day
 MIL,702153,Brian Fitzpatrick,P,Left elbow injury,,⚪,Injured 60-Day
-MIL,806198,Cooper Pratt,SS,Right hamstring strain.,,🟡,Injured 10-Day
 MIL,668941,JoJo Romero,P,Injured 15-Day,,⚪,Injured 15-Day
 MIL,669270,Joel Kuhnel,P,Right shoulder impingement.,,⚪,Injured 15-Day
 MIL,682990,Quinn Priester,P,Right thoracic outlet syndrome,,⚪,Injured 60-Day
@@ -215,8 +213,8 @@ SEA,670042,Luke Raley,RF,Left forearm strain.,,🟡,Injured 10-Day
 SEA,666374,Matt Brash,P,Right lat strain.,,🟡,Injured 15-Day
 SEA,669717,Will Wilson,3B,Left thumb fracture.,,🔴,Injured 60-Day
 SF,669477,Casey Schmitt,LF,Left knee meniscus tear.,,🔴,Injured 10-Day
-SF,691740,Daniel Susac,C,Left knee patella fracture,,🔴,Injured 10-Day
-SF,664056,Harrison Bader,CF,Left plantar fasciitis,,⚪,Injured 10-Day
+SF,691740,Daniel Susac,C,Left knee patella fracture.,,🔴,Injured 60-Day
+SF,664056,Harrison Bader,CF,Left plantar fasciitis.,,⚪,Injured 60-Day
 SF,806185,Hayden Birdsong,P,Tommy John surgery.,,🔴,Injured 60-Day
 SF,683679,Jesus Rodriguez,C,Right elbow neuritis.,,⚪,Injured 10-Day
 SF,666711,Joel Peguero,P,Left hamstring strain,,🟡,Injured 60-Day
@@ -238,6 +236,7 @@ TB,641584,Jake Fraley,RF,Hernia.,,⚪,Injured 60-Day
 TB,669169,Jonathan Heasley,P,Injured 60-Day,,⚪,Injured 60-Day
 TB,655889,Manuel Rodríguez,P,Injured 60-Day,,⚪,Injured 60-Day
 TB,686752,Ryan Pepiot,P,Right hip inflammation,,🟡,Injured 60-Day
+TB,683748,Victor Mesa Jr.,RF,Left hamstring strain.,,🟡,Injured 10-Day
 TEX,691945,Carter Baumler,P,Right intercostal strain.,,🟡,Injured 60-Day
 TEX,683004,Jack Leiter,P,Right ankle posterior impingement.,,⚪,Injured 60-Day
 TEX,656222,Jalen Beeks,P,Injured 60-Day,,⚪,Injured 60-Day
