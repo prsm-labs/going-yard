@@ -1,5 +1,5 @@
 {
-  "generated": "2026-08-20T04:44:02",
+  "generated": "2026-08-20T09:36:48",
   "date": "2026-08-20",
   "games": {
     "824474": {
@@ -21,15 +21,15 @@
               ],
               [
                 "SL",
-                23.4
+                22.9
               ],
               [
                 "CH",
-                20.1
+                20.5
               ],
               [
                 "SI",
-                16.4
+                16.5
               ]
             ],
             "top5": [
@@ -37,12 +37,12 @@
                 "batter_id": "691023",
                 "name": "Jordan Walker",
                 "hand": "R",
-                "fit_score": 16.0,
+                "fit_score": 15.9,
                 "convergent_pitch": "FF",
-                "pa": 68,
+                "pa": 69,
                 "iso": 0.27,
                 "ev": 96.6,
-                "brl_pct": 4.4,
+                "brl_pct": 4.3,
                 "hr": 4
               },
               {
@@ -61,7 +61,7 @@
                 "batter_id": "677592",
                 "name": "Everson Pereira",
                 "hand": "R",
-                "fit_score": 10.1,
+                "fit_score": 10.0,
                 "convergent_pitch": "SL",
                 "pa": 29,
                 "iso": 0.269,
@@ -73,10 +73,10 @@
                 "batter_id": "676475",
                 "name": "Alec Burleson",
                 "hand": "L",
-                "fit_score": 9.2,
+                "fit_score": 9.1,
                 "convergent_pitch": "CH",
-                "pa": 66,
-                "iso": 0.097,
+                "pa": 67,
+                "iso": 0.095,
                 "ev": 92.9,
                 "brl_pct": 1.5,
                 "hr": 1
@@ -87,7 +87,7 @@
                 "hand": "R",
                 "fit_score": 8.6,
                 "convergent_pitch": "CH",
-                "pa": 90,
+                "pa": 91,
                 "iso": 0.095,
                 "ev": 89.3,
                 "brl_pct": 3.3,
@@ -145,24 +145,24 @@
                 "batter_id": "802139",
                 "name": "JJ Wetherholt",
                 "hand": "L",
-                "fit_score": 15.2,
+                "fit_score": 15.3,
                 "convergent_pitch": "ST",
-                "pa": 129,
-                "iso": 0.264,
-                "ev": 93.3,
-                "brl_pct": 5.4,
+                "pa": 133,
+                "iso": 0.265,
+                "ev": 93.4,
+                "brl_pct": 6.0,
                 "hr": 8
               },
               {
                 "batter_id": "676475",
                 "name": "Alec Burleson",
                 "hand": "L",
-                "fit_score": 8.8,
+                "fit_score": 8.7,
                 "convergent_pitch": "FF",
-                "pa": 107,
-                "iso": 0.245,
-                "ev": 95.6,
-                "brl_pct": 3.7,
+                "pa": 110,
+                "iso": 0.238,
+                "ev": 95.5,
+                "brl_pct": 3.6,
                 "hr": 6
               },
               {
@@ -171,10 +171,10 @@
                 "hand": "L",
                 "fit_score": 8.0,
                 "convergent_pitch": "FF",
-                "pa": 42,
-                "iso": 0.237,
-                "ev": 91.6,
-                "brl_pct": 2.4,
+                "pa": 43,
+                "iso": 0.231,
+                "ev": 91.7,
+                "brl_pct": 2.3,
                 "hr": 3
               }
             ]
@@ -189,15 +189,15 @@
             "arsenal": [
               [
                 "FF",
-                75.0
+                75.5
               ],
               [
                 "FS",
-                13.0
+                12.3
               ],
               [
                 "FC",
-                12.0
+                12.3
               ]
             ],
             "top5": [
@@ -205,19 +205,19 @@
                 "batter_id": "676475",
                 "name": "Alec Burleson",
                 "hand": "L",
-                "fit_score": 15.4,
+                "fit_score": 15.2,
                 "convergent_pitch": "FF",
-                "pa": 111,
-                "iso": 0.248,
-                "ev": 95.6,
-                "brl_pct": 3.6,
+                "pa": 114,
+                "iso": 0.24,
+                "ev": 95.5,
+                "brl_pct": 3.5,
                 "hr": 6
               },
               {
                 "batter_id": "677592",
                 "name": "Everson Pereira",
                 "hand": "R",
-                "fit_score": 12.9,
+                "fit_score": 13.0,
                 "convergent_pitch": "FF",
                 "pa": 9,
                 "iso": 0.375,
@@ -229,24 +229,24 @@
                 "batter_id": "802139",
                 "name": "JJ Wetherholt",
                 "hand": "L",
-                "fit_score": 11.9,
+                "fit_score": 12.4,
                 "convergent_pitch": "FF",
-                "pa": 122,
-                "iso": 0.267,
-                "ev": 92.1,
-                "brl_pct": 4.9,
+                "pa": 126,
+                "iso": 0.269,
+                "ev": 92.2,
+                "brl_pct": 5.6,
                 "hr": 8
               },
               {
                 "batter_id": "663494",
                 "name": "Bryan Torres",
                 "hand": "L",
-                "fit_score": 11.7,
+                "fit_score": 11.6,
                 "convergent_pitch": "FF",
-                "pa": 40,
-                "iso": 0.243,
-                "ev": 91.6,
-                "brl_pct": 2.5,
+                "pa": 41,
+                "iso": 0.237,
+                "ev": 91.7,
+                "brl_pct": 2.4,
                 "hr": 3
               },
               {
@@ -285,12 +285,12 @@
                 "batter_id": "676475",
                 "name": "Alec Burleson",
                 "hand": "L",
-                "fit_score": 15.1,
+                "fit_score": 14.9,
                 "convergent_pitch": "FF",
-                "pa": 127,
-                "iso": 0.289,
-                "ev": 95.5,
-                "brl_pct": 3.9,
+                "pa": 130,
+                "iso": 0.282,
+                "ev": 95.4,
+                "brl_pct": 3.8,
                 "hr": 9
               },
               {
@@ -309,24 +309,24 @@
                 "batter_id": "802139",
                 "name": "JJ Wetherholt",
                 "hand": "L",
-                "fit_score": 10.4,
+                "fit_score": 10.6,
                 "convergent_pitch": "FF",
-                "pa": 128,
-                "iso": 0.266,
-                "ev": 92.5,
-                "brl_pct": 4.7,
+                "pa": 132,
+                "iso": 0.268,
+                "ev": 92.6,
+                "brl_pct": 5.3,
                 "hr": 8
               },
               {
                 "batter_id": "663494",
                 "name": "Bryan Torres",
                 "hand": "L",
-                "fit_score": 7.9,
+                "fit_score": 7.8,
                 "convergent_pitch": "FF",
-                "pa": 46,
-                "iso": 0.262,
-                "ev": 90.7,
-                "brl_pct": 2.2,
+                "pa": 47,
+                "iso": 0.256,
+                "ev": 90.8,
+                "brl_pct": 2.1,
                 "hr": 3
               },
               {
@@ -353,11 +353,11 @@
             "arsenal": [
               [
                 "SI",
-                43.2
+                43.1
               ],
               [
                 "ST",
-                26.7
+                27.0
               ],
               [
                 "FF",
@@ -365,7 +365,7 @@
               ],
               [
                 "CH",
-                12.1
+                11.8
               ]
             ],
             "top5": [
@@ -373,61 +373,61 @@
                 "batter_id": "691023",
                 "name": "Jordan Walker",
                 "hand": "R",
-                "fit_score": 14.5,
-                "convergent_pitch": "FF",
-                "pa": 57,
-                "iso": 0.245,
-                "ev": 97.0,
-                "brl_pct": 3.5,
-                "hr": 3
+                "fit_score": 13.5,
+                "convergent_pitch": "SI",
+                "pa": 31,
+                "iso": 0.16,
+                "ev": 94.7,
+                "brl_pct": 3.2,
+                "hr": 1
               },
               {
                 "batter_id": "691458",
                 "name": "Blaze Jordan",
                 "hand": "R",
-                "fit_score": 11.0,
+                "fit_score": 10.4,
                 "convergent_pitch": "SI",
-                "pa": 33,
-                "iso": 0.129,
-                "ev": 90.5,
-                "brl_pct": 6.1,
+                "pa": 13,
+                "iso": 0.0,
+                "ev": 89.8,
+                "brl_pct": 0.0,
                 "hr": 0
               },
               {
                 "batter_id": "686780",
                 "name": "Pedro Pagés",
                 "hand": "R",
-                "fit_score": 10.0,
+                "fit_score": 10.2,
                 "convergent_pitch": "SI",
-                "pa": 38,
-                "iso": 0.03,
-                "ev": 89.0,
-                "brl_pct": 2.6,
-                "hr": 0
-              },
-              {
-                "batter_id": "691026",
-                "name": "Masyn Winn",
-                "hand": "R",
-                "fit_score": 9.0,
-                "convergent_pitch": "SI",
-                "pa": 59,
-                "iso": 0.06,
-                "ev": 91.0,
-                "brl_pct": 0.0,
+                "pa": 15,
+                "iso": 0.071,
+                "ev": 88.2,
+                "brl_pct": 6.7,
                 "hr": 0
               },
               {
                 "batter_id": "671056",
                 "name": "Iván Herrera",
                 "hand": "R",
-                "fit_score": 8.6,
+                "fit_score": 8.9,
                 "convergent_pitch": "SI",
-                "pa": 87,
-                "iso": 0.159,
-                "ev": 90.2,
-                "brl_pct": 3.4,
-                "hr": 2
+                "pa": 40,
+                "iso": 0.241,
+                "ev": 92.2,
+                "brl_pct": 2.5,
+                "hr": 1
+              },
+              {
+                "batter_id": "691026",
+                "name": "Masyn Winn",
+                "hand": "R",
+                "fit_score": 8.9,
+                "convergent_pitch": "SI",
+                "pa": 20,
+                "iso": 0.056,
+                "ev": 92.6,
+                "brl_pct": 0.0,
+                "hr": 0
               }
             ]
           },
@@ -677,8 +677,8 @@
                 "hand": "L",
                 "fit_score": 6.5,
                 "convergent_pitch": "FF",
-                "pa": 185,
-                "iso": 0.221,
+                "pa": 186,
+                "iso": 0.219,
                 "ev": 87.9,
                 "brl_pct": 3.8,
                 "hr": 9
@@ -795,19 +795,19 @@
             "arsenal": [
               [
                 "CH",
-                46.8
+                46.2
               ],
               [
                 "FF",
-                28.6
+                27.5
               ],
               [
                 "ST",
-                15.6
+                17.5
               ],
               [
                 "SI",
-                9.1
+                8.8
               ]
             ],
             "top5": [
@@ -827,7 +827,7 @@
                 "batter_id": "682829",
                 "name": "Elly De La Cruz",
                 "hand": "S",
-                "fit_score": 9.8,
+                "fit_score": 9.7,
                 "convergent_pitch": "FF",
                 "pa": 158,
                 "iso": 0.212,
@@ -839,7 +839,7 @@
                 "batter_id": "663647",
                 "name": "Ke'Bryan Hayes",
                 "hand": "R",
-                "fit_score": 6.6,
+                "fit_score": 6.7,
                 "convergent_pitch": "CH",
                 "pa": 42,
                 "iso": 0.114,
@@ -851,10 +851,10 @@
                 "batter_id": "668709",
                 "name": "JJ Bleday",
                 "hand": "L",
-                "fit_score": 6.2,
+                "fit_score": 6.1,
                 "convergent_pitch": "FF",
-                "pa": 158,
-                "iso": 0.215,
+                "pa": 159,
+                "iso": 0.214,
                 "ev": 88.0,
                 "brl_pct": 4.4,
                 "hr": 8
@@ -883,15 +883,15 @@
             "arsenal": [
               [
                 "SI",
-                47.5
+                47.0
               ],
               [
                 "ST",
-                37.7
+                38.6
               ],
               [
                 "CH",
-                9.0
+                8.8
               ]
             ],
             "top5": [
@@ -899,19 +899,19 @@
                 "batter_id": "667472",
                 "name": "Dane Myers",
                 "hand": "R",
-                "fit_score": 15.7,
+                "fit_score": 14.5,
                 "convergent_pitch": "SI",
-                "pa": 19,
-                "iso": 0.357,
-                "ev": 99.1,
-                "brl_pct": 5.3,
+                "pa": 20,
+                "iso": 0.333,
+                "ev": 94.2,
+                "brl_pct": 5.0,
                 "hr": 1
               },
               {
                 "batter_id": "663647",
                 "name": "Ke'Bryan Hayes",
                 "hand": "R",
-                "fit_score": 12.6,
+                "fit_score": 12.5,
                 "convergent_pitch": "SI",
                 "pa": 9,
                 "iso": 0.444,
@@ -923,9 +923,9 @@
                 "batter_id": "553993",
                 "name": "Eugenio Suárez",
                 "hand": "R",
-                "fit_score": 12.4,
+                "fit_score": 12.3,
                 "convergent_pitch": "SI",
-                "pa": 16,
+                "pa": 17,
                 "iso": 0.267,
                 "ev": 95.8,
                 "brl_pct": 0.0,
@@ -944,16 +944,16 @@
                 "hr": 1
               },
               {
-                "batter_id": "663886",
-                "name": "Tyler Stephenson",
-                "hand": "R",
+                "batter_id": "682829",
+                "name": "Elly De La Cruz",
+                "hand": "S",
                 "fit_score": 8.8,
                 "convergent_pitch": "SI",
-                "pa": 21,
-                "iso": 0.154,
-                "ev": 94.7,
-                "brl_pct": 0.0,
-                "hr": 0
+                "pa": 33,
+                "iso": 0.231,
+                "ev": 97.5,
+                "brl_pct": 3.0,
+                "hr": 1
               }
             ]
           },
@@ -987,10 +987,10 @@
                 "batter_id": "553993",
                 "name": "Eugenio Suárez",
                 "hand": "R",
-                "fit_score": 12.5,
+                "fit_score": 12.4,
                 "convergent_pitch": "SI",
-                "pa": 38,
-                "iso": 0.278,
+                "pa": 40,
+                "iso": 0.263,
                 "ev": 92.3,
                 "brl_pct": 0.0,
                 "hr": 3
@@ -1006,18 +1006,6 @@
                 "ev": 92.7,
                 "brl_pct": 0.0,
                 "hr": 1
-              },
-              {
-                "batter_id": "667472",
-                "name": "Dane Myers",
-                "hand": "R",
-                "fit_score": 11.3,
-                "convergent_pitch": "SI",
-                "pa": 53,
-                "iso": 0.167,
-                "ev": 90.0,
-                "brl_pct": 1.9,
-                "hr": 2
               },
               {
                 "batter_id": "682829",
@@ -1042,6 +1030,18 @@
                 "ev": 84.6,
                 "brl_pct": 4.5,
                 "hr": 3
+              },
+              {
+                "batter_id": "667472",
+                "name": "Dane Myers",
+                "hand": "R",
+                "fit_score": 10.4,
+                "convergent_pitch": "SI",
+                "pa": 55,
+                "iso": 0.159,
+                "ev": 88.6,
+                "brl_pct": 3.6,
+                "hr": 2
               }
             ]
           },
@@ -1109,10 +1109,10 @@
                 "hand": "R",
                 "fit_score": 9.8,
                 "convergent_pitch": "SI",
-                "pa": 79,
-                "iso": 0.243,
-                "ev": 91.2,
-                "brl_pct": 6.3,
+                "pa": 80,
+                "iso": 0.24,
+                "ev": 90.9,
+                "brl_pct": 6.2,
                 "hr": 4
               },
               {
@@ -1235,15 +1235,15 @@
             "arsenal": [
               [
                 "FF",
-                69.2
+                69.7
               ],
               [
                 "FS",
-                22.6
+                22.3
               ],
               [
                 "ST",
-                8.2
+                8.1
               ]
             ],
             "top5": [
@@ -1251,7 +1251,7 @@
                 "batter_id": "682674",
                 "name": "Victor Bericoto",
                 "hand": "R",
-                "fit_score": 15.2,
+                "fit_score": 15.3,
                 "convergent_pitch": "FF",
                 "pa": 10,
                 "iso": 0.333,
@@ -1272,6 +1272,18 @@
                 "hr": 7
               },
               {
+                "batter_id": "678545",
+                "name": "Osleivis Basabe",
+                "hand": "R",
+                "fit_score": 11.1,
+                "convergent_pitch": "FF",
+                "pa": 16,
+                "iso": 0.286,
+                "ev": 93.7,
+                "brl_pct": 12.5,
+                "hr": 1
+              },
+              {
                 "batter_id": "646240",
                 "name": "Rafael Devers",
                 "hand": "L",
@@ -1284,22 +1296,10 @@
                 "hr": 10
               },
               {
-                "batter_id": "678545",
-                "name": "Osleivis Basabe",
-                "hand": "R",
-                "fit_score": 10.5,
-                "convergent_pitch": "FF",
-                "pa": 15,
-                "iso": 0.308,
-                "ev": 93.4,
-                "brl_pct": 13.3,
-                "hr": 1
-              },
-              {
                 "batter_id": "671083",
                 "name": "Buddy Kennedy",
                 "hand": "R",
-                "fit_score": 8.5,
+                "fit_score": 8.6,
                 "convergent_pitch": "FF",
                 "pa": 4,
                 "iso": 0.0,
@@ -1319,74 +1319,74 @@
             "arsenal": [
               [
                 "FF",
-                65.7
+                64.5
               ],
               [
                 "CU",
-                19.4
+                19.6
               ],
               [
                 "SL",
-                14.9
+                15.9
               ]
             ],
             "top5": [
+              {
+                "batter_id": "678545",
+                "name": "Osleivis Basabe",
+                "hand": "R",
+                "fit_score": 12.2,
+                "convergent_pitch": "FF",
+                "pa": 6,
+                "iso": 0.0,
+                "ev": 97.4,
+                "brl_pct": 0.0,
+                "hr": 0
+              },
               {
                 "batter_id": "646240",
                 "name": "Rafael Devers",
                 "hand": "L",
                 "fit_score": 10.6,
                 "convergent_pitch": "CU",
-                "pa": 57,
-                "iso": 0.122,
+                "pa": 58,
+                "iso": 0.12,
                 "ev": 98.1,
-                "brl_pct": 5.3,
+                "brl_pct": 5.2,
                 "hr": 2
-              },
-              {
-                "batter_id": "678545",
-                "name": "Osleivis Basabe",
-                "hand": "R",
-                "fit_score": 10.2,
-                "convergent_pitch": "FF",
-                "pa": 4,
-                "iso": 0.0,
-                "ev": 99.4,
-                "brl_pct": 0.0,
-                "hr": 0
-              },
-              {
-                "batter_id": "805811",
-                "name": "Bryce Eldridge",
-                "hand": "L",
-                "fit_score": 8.4,
-                "convergent_pitch": "FF",
-                "pa": 22,
-                "iso": 0.062,
-                "ev": 96.0,
-                "brl_pct": 0.0,
-                "hr": 0
               },
               {
                 "batter_id": "642715",
                 "name": "Willy Adames",
                 "hand": "R",
-                "fit_score": 8.3,
+                "fit_score": 8.6,
                 "convergent_pitch": "FF",
-                "pa": 41,
-                "iso": 0.225,
-                "ev": 90.4,
+                "pa": 44,
+                "iso": 0.209,
+                "ev": 90.3,
                 "brl_pct": 0.0,
                 "hr": 2
+              },
+              {
+                "batter_id": "805811",
+                "name": "Bryce Eldridge",
+                "hand": "L",
+                "fit_score": 7.4,
+                "convergent_pitch": "FF",
+                "pa": 24,
+                "iso": 0.056,
+                "ev": 95.3,
+                "brl_pct": 0.0,
+                "hr": 0
               },
               {
                 "batter_id": "813841",
                 "name": "Jonah Cox",
                 "hand": "R",
-                "fit_score": 7.2,
+                "fit_score": 7.0,
                 "convergent_pitch": "FF",
-                "pa": 14,
-                "iso": 0.143,
+                "pa": 16,
+                "iso": 0.125,
                 "ev": 89.5,
                 "brl_pct": 0.0,
                 "hr": 0
@@ -1447,12 +1447,12 @@
                 "batter_id": "678545",
                 "name": "Osleivis Basabe",
                 "hand": "R",
-                "fit_score": 9.1,
+                "fit_score": 9.5,
                 "convergent_pitch": "FF",
-                "pa": 14,
-                "iso": 0.333,
-                "ev": 94.6,
-                "brl_pct": 14.3,
+                "pa": 15,
+                "iso": 0.308,
+                "ev": 94.8,
+                "brl_pct": 13.3,
                 "hr": 1
               },
               {
@@ -1473,8 +1473,8 @@
                 "hand": "L",
                 "fit_score": 5.8,
                 "convergent_pitch": "FF",
-                "pa": 143,
-                "iso": 0.185,
+                "pa": 144,
+                "iso": 0.184,
                 "ev": 86.9,
                 "brl_pct": 1.4,
                 "hr": 3
@@ -1511,47 +1511,47 @@
                 "batter_id": "682674",
                 "name": "Victor Bericoto",
                 "hand": "R",
-                "fit_score": 12.0,
+                "fit_score": 11.7,
                 "convergent_pitch": "SI",
-                "pa": 24,
-                "iso": 0.208,
-                "ev": 94.2,
-                "brl_pct": 4.2,
+                "pa": 26,
+                "iso": 0.192,
+                "ev": 93.8,
+                "brl_pct": 3.8,
                 "hr": 1
               },
               {
                 "batter_id": "646240",
                 "name": "Rafael Devers",
                 "hand": "L",
-                "fit_score": 11.0,
+                "fit_score": 10.8,
                 "convergent_pitch": "CU",
-                "pa": 94,
-                "iso": 0.11,
+                "pa": 96,
+                "iso": 0.107,
                 "ev": 91.2,
-                "brl_pct": 5.3,
+                "brl_pct": 5.2,
                 "hr": 2
               },
               {
                 "batter_id": "683766",
                 "name": "Christian Koss",
                 "hand": "R",
-                "fit_score": 9.0,
+                "fit_score": 8.8,
                 "convergent_pitch": "SI",
-                "pa": 14,
+                "pa": 16,
                 "iso": 0.0,
                 "ev": 86.7,
-                "brl_pct": 7.1,
+                "brl_pct": 6.2,
                 "hr": 0
               },
               {
                 "batter_id": "678545",
                 "name": "Osleivis Basabe",
                 "hand": "R",
-                "fit_score": 8.1,
+                "fit_score": 8.7,
                 "convergent_pitch": "FF",
-                "pa": 7,
+                "pa": 9,
                 "iso": 0.0,
-                "ev": 93.8,
+                "ev": 93.1,
                 "brl_pct": 0.0,
                 "hr": 0
               },
@@ -1579,11 +1579,11 @@
             "arsenal": [
               [
                 "SL",
-                46.7
+                47.0
               ],
               [
                 "FF",
-                39.6
+                39.3
               ],
               [
                 "CH",
@@ -1607,7 +1607,7 @@
                 "batter_id": "805811",
                 "name": "Bryce Eldridge",
                 "hand": "L",
-                "fit_score": 10.0,
+                "fit_score": 9.9,
                 "convergent_pitch": "FF",
                 "pa": 96,
                 "iso": 0.312,
@@ -1631,25 +1631,25 @@
                 "batter_id": "678545",
                 "name": "Osleivis Basabe",
                 "hand": "R",
-                "fit_score": 7.0,
+                "fit_score": 7.2,
                 "convergent_pitch": "FF",
-                "pa": 20,
-                "iso": 0.222,
-                "ev": 84.6,
-                "brl_pct": 10.0,
+                "pa": 21,
+                "iso": 0.211,
+                "ev": 85.5,
+                "brl_pct": 9.5,
                 "hr": 1
               },
               {
-                "batter_id": "808982",
-                "name": "Jung Hoo Lee",
-                "hand": "L",
-                "fit_score": 6.7,
+                "batter_id": "671083",
+                "name": "Buddy Kennedy",
+                "hand": "R",
+                "fit_score": 6.6,
                 "convergent_pitch": "FF",
-                "pa": 154,
-                "iso": 0.174,
-                "ev": 87.2,
-                "brl_pct": 1.3,
-                "hr": 4
+                "pa": 4,
+                "iso": 0.0,
+                "ev": 102.2,
+                "brl_pct": 25.0,
+                "hr": 0
               }
             ]
           },
@@ -1695,12 +1695,12 @@
                 "batter_id": "678545",
                 "name": "Osleivis Basabe",
                 "hand": "R",
-                "fit_score": 11.9,
+                "fit_score": 12.3,
                 "convergent_pitch": "FF",
-                "pa": 17,
-                "iso": 0.533,
-                "ev": 91.8,
-                "brl_pct": 17.6,
+                "pa": 18,
+                "iso": 0.5,
+                "ev": 92.1,
+                "brl_pct": 16.7,
                 "hr": 2
               },
               {
@@ -1733,8 +1733,8 @@
                 "hand": "L",
                 "fit_score": 8.7,
                 "convergent_pitch": "ST",
-                "pa": 128,
-                "iso": 0.244,
+                "pa": 129,
+                "iso": 0.242,
                 "ev": 87.4,
                 "brl_pct": 1.6,
                 "hr": 4
@@ -1753,19 +1753,19 @@
             "arsenal": [
               [
                 "FF",
-                47.9
+                50.5
               ],
               [
                 "ST",
-                31.2
+                29.1
               ],
               [
                 "SI",
-                10.4
+                9.7
               ],
               [
                 "FS",
-                7.3
+                7.8
               ]
             ],
             "top5": [
@@ -1773,12 +1773,12 @@
                 "batter_id": "694197",
                 "name": "Angel Genao",
                 "hand": "S",
-                "fit_score": 17.7,
+                "fit_score": 18.0,
                 "convergent_pitch": "FF",
-                "pa": 11,
-                "iso": 0.3,
-                "ev": 96.3,
-                "brl_pct": 18.2,
+                "pa": 13,
+                "iso": 0.25,
+                "ev": 97.8,
+                "brl_pct": 15.4,
                 "hr": 1
               },
               {
@@ -1787,8 +1787,8 @@
                 "hand": "S",
                 "fit_score": 11.1,
                 "convergent_pitch": "FF",
-                "pa": 69,
-                "iso": 0.19,
+                "pa": 70,
+                "iso": 0.188,
                 "ev": 94.4,
                 "brl_pct": 4.3,
                 "hr": 3
@@ -1797,31 +1797,31 @@
                 "batter_id": "683953",
                 "name": "Travis Bazzana",
                 "hand": "L",
-                "fit_score": 10.2,
+                "fit_score": 10.7,
                 "convergent_pitch": "FF",
-                "pa": 106,
-                "iso": 0.255,
-                "ev": 92.2,
-                "brl_pct": 3.8,
+                "pa": 109,
+                "iso": 0.258,
+                "ev": 92.4,
+                "brl_pct": 4.6,
                 "hr": 5
               },
               {
                 "batter_id": "608070",
                 "name": "José Ramírez",
                 "hand": "S",
-                "fit_score": 9.8,
+                "fit_score": 9.9,
                 "convergent_pitch": "FF",
-                "pa": 81,
-                "iso": 0.227,
-                "ev": 89.0,
-                "brl_pct": 3.7,
+                "pa": 83,
+                "iso": 0.221,
+                "ev": 89.1,
+                "brl_pct": 3.6,
                 "hr": 4
               },
               {
                 "batter_id": "800050",
                 "name": "Chase DeLauter",
                 "hand": "L",
-                "fit_score": 9.0,
+                "fit_score": 9.1,
                 "convergent_pitch": "FF",
                 "pa": 119,
                 "iso": 0.16,
@@ -1858,28 +1858,28 @@
             ],
             "top5": [
               {
+                "batter_id": "694197",
+                "name": "Angel Genao",
+                "hand": "S",
+                "fit_score": 16.5,
+                "convergent_pitch": "FS",
+                "pa": 7,
+                "iso": 0.0,
+                "ev": 97.1,
+                "brl_pct": 0.0,
+                "hr": 0
+              },
+              {
                 "batter_id": "663993",
                 "name": "Nathaniel Lowe",
                 "hand": "L",
-                "fit_score": 16.2,
+                "fit_score": 16.1,
                 "convergent_pitch": "FS",
-                "pa": 46,
+                "pa": 47,
                 "iso": 0.306,
                 "ev": 96.8,
                 "brl_pct": 4.3,
                 "hr": 3
-              },
-              {
-                "batter_id": "694197",
-                "name": "Angel Genao",
-                "hand": "S",
-                "fit_score": 15.6,
-                "convergent_pitch": "SI",
-                "pa": 6,
-                "iso": 0.0,
-                "ev": 96.9,
-                "brl_pct": 0.0,
-                "hr": 0
               },
               {
                 "batter_id": "690984",
@@ -1909,11 +1909,11 @@
                 "batter_id": "677587",
                 "name": "Brayan Rocchio",
                 "hand": "S",
-                "fit_score": 8.4,
+                "fit_score": 8.5,
                 "convergent_pitch": "FS",
-                "pa": 65,
-                "iso": 0.082,
-                "ev": 87.9,
+                "pa": 67,
+                "iso": 0.079,
+                "ev": 87.8,
                 "brl_pct": 0.0,
                 "hr": 1
               }
@@ -1961,11 +1961,11 @@
                 "batter_id": "608070",
                 "name": "José Ramírez",
                 "hand": "S",
-                "fit_score": 11.4,
+                "fit_score": 11.1,
                 "convergent_pitch": "SL",
-                "pa": 61,
-                "iso": 0.218,
-                "ev": 94.8,
+                "pa": 62,
+                "iso": 0.214,
+                "ev": 94.3,
                 "brl_pct": 1.6,
                 "hr": 3
               },
@@ -1973,12 +1973,12 @@
                 "batter_id": "682657",
                 "name": "Angel Martínez",
                 "hand": "S",
-                "fit_score": 8.1,
+                "fit_score": 8.0,
                 "convergent_pitch": "SL",
-                "pa": 54,
-                "iso": 0.167,
-                "ev": 88.7,
-                "brl_pct": 5.6,
+                "pa": 55,
+                "iso": 0.163,
+                "ev": 88.2,
+                "brl_pct": 5.5,
                 "hr": 2
               },
               {
@@ -2037,12 +2037,12 @@
                 "batter_id": "694197",
                 "name": "Angel Genao",
                 "hand": "S",
-                "fit_score": 14.0,
-                "convergent_pitch": "SI",
-                "pa": 10,
+                "fit_score": 14.4,
+                "convergent_pitch": "SL",
+                "pa": 11,
                 "iso": 0.0,
-                "ev": 94.2,
-                "brl_pct": 10.0,
+                "ev": 94.6,
+                "brl_pct": 9.1,
                 "hr": 0
               },
               {
@@ -2061,9 +2061,9 @@
                 "batter_id": "663993",
                 "name": "Nathaniel Lowe",
                 "hand": "L",
-                "fit_score": 10.8,
+                "fit_score": 10.6,
                 "convergent_pitch": "SI",
-                "pa": 84,
+                "pa": 85,
                 "iso": 0.306,
                 "ev": 90.2,
                 "brl_pct": 2.4,
@@ -2087,10 +2087,10 @@
                 "hand": "L",
                 "fit_score": 8.6,
                 "convergent_pitch": "SL",
-                "pa": 39,
-                "iso": 0.077,
-                "ev": 85.2,
-                "brl_pct": 2.6,
+                "pa": 41,
+                "iso": 0.073,
+                "ev": 84.4,
+                "brl_pct": 2.4,
                 "hr": 0
               }
             ]
@@ -2138,28 +2138,28 @@
                 "hr": 2
               },
               {
-                "batter_id": "672960",
-                "name": "Kazuma Okamoto",
-                "hand": "R",
-                "fit_score": 7.1,
-                "convergent_pitch": "SI",
-                "pa": 110,
-                "iso": 0.245,
-                "ev": 90.9,
-                "brl_pct": 0.9,
-                "hr": 7
-              },
-              {
                 "batter_id": "807727",
                 "name": "Charles McAdoo",
                 "hand": "R",
-                "fit_score": 6.8,
+                "fit_score": 8.5,
                 "convergent_pitch": "FC",
-                "pa": 10,
-                "iso": 0.3,
-                "ev": 89.8,
-                "brl_pct": 10.0,
+                "pa": 11,
+                "iso": 0.273,
+                "ev": 91.2,
+                "brl_pct": 9.1,
                 "hr": 1
+              },
+              {
+                "batter_id": "672960",
+                "name": "Kazuma Okamoto",
+                "hand": "R",
+                "fit_score": 7.0,
+                "convergent_pitch": "SI",
+                "pa": 112,
+                "iso": 0.243,
+                "ev": 90.8,
+                "brl_pct": 0.9,
+                "hr": 7
               },
               {
                 "batter_id": "543807",
@@ -2179,10 +2179,10 @@
                 "hand": "L",
                 "fit_score": 6.2,
                 "convergent_pitch": "FC",
-                "pa": 64,
+                "pa": 67,
                 "iso": 0.017,
-                "ev": 88.8,
-                "brl_pct": 1.6,
+                "ev": 88.9,
+                "brl_pct": 1.5,
                 "hr": 0
               }
             ]
@@ -2197,19 +2197,19 @@
             "arsenal": [
               [
                 "SI",
-                57.4
+                57.0
               ],
               [
                 "CH",
-                29.7
+                30.5
               ],
               [
                 "ST",
-                6.7
+                6.5
               ],
               [
                 "FF",
-                6.2
+                6.0
               ]
             ],
             "top5": [
@@ -2229,11 +2229,11 @@
                 "batter_id": "672960",
                 "name": "Kazuma Okamoto",
                 "hand": "R",
-                "fit_score": 7.0,
+                "fit_score": 6.8,
                 "convergent_pitch": "SI",
-                "pa": 100,
-                "iso": 0.264,
-                "ev": 92.0,
+                "pa": 102,
+                "iso": 0.258,
+                "ev": 91.9,
                 "brl_pct": 1.0,
                 "hr": 7
               },
@@ -2241,25 +2241,13 @@
                 "batter_id": "672386",
                 "name": "Alejandro Kirk",
                 "hand": "R",
-                "fit_score": 6.3,
+                "fit_score": 6.5,
                 "convergent_pitch": "CH",
-                "pa": 44,
-                "iso": 0.048,
-                "ev": 85.7,
+                "pa": 45,
+                "iso": 0.047,
+                "ev": 86.0,
                 "brl_pct": 0.0,
                 "hr": 0
-              },
-              {
-                "batter_id": "678218",
-                "name": "Brandon Valenzuela",
-                "hand": "S",
-                "fit_score": 5.5,
-                "convergent_pitch": "CH",
-                "pa": 43,
-                "iso": 0.135,
-                "ev": 80.0,
-                "brl_pct": 2.3,
-                "hr": 1
               },
               {
                 "batter_id": "703520",
@@ -2272,6 +2260,18 @@
                 "ev": 72.7,
                 "brl_pct": 0.0,
                 "hr": 0
+              },
+              {
+                "batter_id": "678218",
+                "name": "Brandon Valenzuela",
+                "hand": "S",
+                "fit_score": 5.4,
+                "convergent_pitch": "CH",
+                "pa": 45,
+                "iso": 0.128,
+                "ev": 80.9,
+                "brl_pct": 2.2,
+                "hr": 1
               }
             ]
           },
@@ -2285,11 +2285,11 @@
             "arsenal": [
               [
                 "CH",
-                52.5
+                51.9
               ],
               [
                 "FF",
-                44.2
+                44.9
               ]
             ],
             "top5": [
@@ -2297,22 +2297,22 @@
                 "batter_id": "672386",
                 "name": "Alejandro Kirk",
                 "hand": "R",
-                "fit_score": 10.9,
+                "fit_score": 12.2,
                 "convergent_pitch": "FF",
-                "pa": 22,
-                "iso": 0.316,
-                "ev": 93.4,
-                "brl_pct": 9.1,
+                "pa": 23,
+                "iso": 0.3,
+                "ev": 93.8,
+                "brl_pct": 13.0,
                 "hr": 2
               },
               {
                 "batter_id": "660821",
                 "name": "Jesús Sánchez",
                 "hand": "L",
-                "fit_score": 9.4,
+                "fit_score": 9.3,
                 "convergent_pitch": "FF",
-                "pa": 96,
-                "iso": 0.174,
+                "pa": 98,
+                "iso": 0.17,
                 "ev": 90.5,
                 "brl_pct": 3.1,
                 "hr": 3
@@ -2321,12 +2321,12 @@
                 "batter_id": "678218",
                 "name": "Brandon Valenzuela",
                 "hand": "S",
-                "fit_score": 7.8,
+                "fit_score": 7.7,
                 "convergent_pitch": "FF",
-                "pa": 72,
-                "iso": 0.152,
-                "ev": 87.7,
-                "brl_pct": 2.8,
+                "pa": 74,
+                "iso": 0.147,
+                "ev": 88.1,
+                "brl_pct": 2.7,
                 "hr": 3
               },
               {
@@ -2335,8 +2335,8 @@
                 "hand": "L",
                 "fit_score": 5.9,
                 "convergent_pitch": "FF",
-                "pa": 121,
-                "iso": 0.064,
+                "pa": 123,
+                "iso": 0.063,
                 "ev": 84.0,
                 "brl_pct": 0.0,
                 "hr": 1
@@ -2345,10 +2345,10 @@
                 "batter_id": "665926",
                 "name": "Andrés Giménez",
                 "hand": "L",
-                "fit_score": 5.6,
+                "fit_score": 5.5,
                 "convergent_pitch": "FF",
-                "pa": 117,
-                "iso": 0.174,
+                "pa": 118,
+                "iso": 0.173,
                 "ev": 87.0,
                 "brl_pct": 0.0,
                 "hr": 4
@@ -2373,11 +2373,11 @@
               ],
               [
                 "FC",
-                25.1
+                25.6
               ],
               [
                 "SL",
-                17.2
+                16.9
               ]
             ],
             "top5": [
@@ -2385,58 +2385,58 @@
                 "batter_id": "660821",
                 "name": "Jesús Sánchez",
                 "hand": "L",
-                "fit_score": 10.6,
+                "fit_score": 10.5,
                 "convergent_pitch": "FC",
-                "pa": 119,
-                "iso": 0.198,
+                "pa": 121,
+                "iso": 0.194,
                 "ev": 90.3,
-                "brl_pct": 4.2,
+                "brl_pct": 4.1,
                 "hr": 5
               },
               {
                 "batter_id": "672386",
                 "name": "Alejandro Kirk",
                 "hand": "R",
-                "fit_score": 8.0,
+                "fit_score": 9.1,
                 "convergent_pitch": "FF",
-                "pa": 36,
-                "iso": 0.207,
-                "ev": 88.6,
-                "brl_pct": 5.6,
-                "hr": 2
+                "pa": 40,
+                "iso": 0.273,
+                "ev": 89.2,
+                "brl_pct": 7.5,
+                "hr": 3
               },
               {
                 "batter_id": "807727",
                 "name": "Charles McAdoo",
                 "hand": "R",
-                "fit_score": 7.7,
+                "fit_score": 7.6,
                 "convergent_pitch": "FC",
-                "pa": 9,
-                "iso": 0.333,
-                "ev": 90.7,
-                "brl_pct": 11.1,
+                "pa": 11,
+                "iso": 0.364,
+                "ev": 84.8,
+                "brl_pct": 9.1,
                 "hr": 1
               },
               {
                 "batter_id": "678218",
                 "name": "Brandon Valenzuela",
                 "hand": "S",
-                "fit_score": 7.0,
+                "fit_score": 6.9,
                 "convergent_pitch": "FF",
-                "pa": 83,
-                "iso": 0.133,
-                "ev": 86.8,
-                "brl_pct": 2.4,
+                "pa": 86,
+                "iso": 0.128,
+                "ev": 87.0,
+                "brl_pct": 2.3,
                 "hr": 3
               },
               {
                 "batter_id": "543807",
                 "name": "George Springer",
                 "hand": "R",
-                "fit_score": 6.6,
+                "fit_score": 6.5,
                 "convergent_pitch": "FC",
-                "pa": 96,
-                "iso": 0.256,
+                "pa": 97,
+                "iso": 0.253,
                 "ev": 90.6,
                 "brl_pct": 3.1,
                 "hr": 6
@@ -2541,15 +2541,15 @@
             "arsenal": [
               [
                 "FF",
-                44.6
+                44.3
               ],
               [
                 "FC",
-                35.7
+                36.5
               ],
               [
                 "ST",
-                17.0
+                16.5
               ]
             ],
             "top5": [
@@ -2557,7 +2557,7 @@
                 "batter_id": "672960",
                 "name": "Kazuma Okamoto",
                 "hand": "R",
-                "fit_score": 14.0,
+                "fit_score": 13.9,
                 "convergent_pitch": "FF",
                 "pa": 41,
                 "iso": 0.306,
@@ -2593,12 +2593,12 @@
                 "batter_id": "669701",
                 "name": "Josh Smith",
                 "hand": "L",
-                "fit_score": 6.5,
+                "fit_score": 6.3,
                 "convergent_pitch": "FF",
-                "pa": 5,
+                "pa": 6,
                 "iso": 0.0,
-                "ev": 98.2,
-                "brl_pct": 20.0,
+                "ev": 83.9,
+                "brl_pct": 16.7,
                 "hr": 0
               },
               {
@@ -2645,24 +2645,24 @@
                 "batter_id": "672386",
                 "name": "Alejandro Kirk",
                 "hand": "R",
-                "fit_score": 11.0,
+                "fit_score": 12.6,
                 "convergent_pitch": "FF",
-                "pa": 75,
-                "iso": 0.206,
-                "ev": 87.4,
-                "brl_pct": 2.7,
+                "pa": 77,
+                "iso": 0.2,
+                "ev": 87.7,
+                "brl_pct": 3.9,
                 "hr": 4
               },
               {
                 "batter_id": "660821",
                 "name": "Jesús Sánchez",
                 "hand": "L",
-                "fit_score": 10.1,
+                "fit_score": 10.0,
                 "convergent_pitch": "SI",
-                "pa": 105,
-                "iso": 0.172,
+                "pa": 107,
+                "iso": 0.168,
                 "ev": 92.0,
-                "brl_pct": 2.9,
+                "brl_pct": 2.8,
                 "hr": 3
               },
               {
@@ -2671,8 +2671,8 @@
                 "hand": "L",
                 "fit_score": 8.7,
                 "convergent_pitch": "ST",
-                "pa": 138,
-                "iso": 0.074,
+                "pa": 143,
+                "iso": 0.071,
                 "ev": 86.6,
                 "brl_pct": 0.7,
                 "hr": 2
@@ -2695,9 +2695,9 @@
                 "hand": "R",
                 "fit_score": 7.8,
                 "convergent_pitch": "SI",
-                "pa": 218,
-                "iso": 0.278,
-                "ev": 92.1,
+                "pa": 220,
+                "iso": 0.276,
+                "ev": 92.0,
                 "brl_pct": 1.8,
                 "hr": 16
               }
@@ -2715,7 +2715,7 @@
             "arsenal": [
               [
                 "FC",
-                50.8
+                51.0
               ],
               [
                 "ST",
@@ -2723,7 +2723,7 @@
               ],
               [
                 "CH",
-                11.3
+                11.1
               ]
             ],
             "top5": [
@@ -2738,18 +2738,6 @@
                 "ev": 99.0,
                 "brl_pct": 0.0,
                 "hr": 0
-              },
-              {
-                "batter_id": "650490",
-                "name": "Yandy Díaz",
-                "hand": "R",
-                "fit_score": 10.5,
-                "convergent_pitch": "FC",
-                "pa": 21,
-                "iso": 0.158,
-                "ev": 94.2,
-                "brl_pct": 0.0,
-                "hr": 1
               },
               {
                 "batter_id": "676356",
@@ -2776,15 +2764,27 @@
                 "hr": 1
               },
               {
+                "batter_id": "650490",
+                "name": "Yandy Díaz",
+                "hand": "R",
+                "fit_score": 10.2,
+                "convergent_pitch": "FC",
+                "pa": 22,
+                "iso": 0.15,
+                "ev": 94.2,
+                "brl_pct": 0.0,
+                "hr": 1
+              },
+              {
                 "batter_id": "666018",
                 "name": "Jonathan Aranda",
                 "hand": "L",
-                "fit_score": 8.3,
+                "fit_score": 8.0,
                 "convergent_pitch": "ST",
-                "pa": 26,
-                "iso": 0.095,
+                "pa": 27,
+                "iso": 0.091,
                 "ev": 93.6,
-                "brl_pct": 3.8,
+                "brl_pct": 3.7,
                 "hr": 0
               }
             ]
@@ -2803,15 +2803,15 @@
               ],
               [
                 "SL",
-                25.0
+                25.3
               ],
               [
                 "SI",
-                23.6
+                24.0
               ],
               [
                 "FF",
-                15.3
+                14.7
               ]
             ],
             "top5": [
@@ -2887,11 +2887,11 @@
             "arsenal": [
               [
                 "SI",
-                75.9
+                76.2
               ],
               [
                 "SL",
-                24.1
+                23.8
               ]
             ],
             "top5": [
@@ -2913,21 +2913,21 @@
                 "hand": "R",
                 "fit_score": 9.4,
                 "convergent_pitch": "SL",
-                "pa": 172,
-                "iso": 0.288,
-                "ev": 92.3,
-                "brl_pct": 4.7,
+                "pa": 174,
+                "iso": 0.29,
+                "ev": 92.4,
+                "brl_pct": 4.6,
                 "hr": 13
               },
               {
                 "batter_id": "689414",
                 "name": "Liam Hicks",
                 "hand": "L",
-                "fit_score": 8.6,
+                "fit_score": 8.5,
                 "convergent_pitch": "SL",
-                "pa": 81,
-                "iso": 0.211,
-                "ev": 88.5,
+                "pa": 82,
+                "iso": 0.208,
+                "ev": 88.2,
                 "brl_pct": 1.2,
                 "hr": 4
               },
@@ -2935,25 +2935,25 @@
                 "batter_id": "680700",
                 "name": "Richie Palacios",
                 "hand": "L",
-                "fit_score": 6.4,
+                "fit_score": 6.3,
                 "convergent_pitch": "SI",
-                "pa": 64,
-                "iso": 0.107,
-                "ev": 85.5,
-                "brl_pct": 1.6,
+                "pa": 65,
+                "iso": 0.105,
+                "ev": 85.4,
+                "brl_pct": 1.5,
                 "hr": 0
               },
               {
-                "batter_id": "668723",
-                "name": "Ryan Vilade",
-                "hand": "R",
+                "batter_id": "656775",
+                "name": "Cedric Mullins",
+                "hand": "L",
                 "fit_score": 6.1,
-                "convergent_pitch": "SL",
-                "pa": 33,
-                "iso": 0.241,
-                "ev": 87.4,
-                "brl_pct": 6.1,
-                "hr": 2
+                "convergent_pitch": "SI",
+                "pa": 86,
+                "iso": 0.167,
+                "ev": 86.9,
+                "brl_pct": 0.0,
+                "hr": 3
               }
             ]
           },
@@ -2975,22 +2975,10 @@
               ],
               [
                 "FF",
-                19.1
+                19.2
               ]
             ],
             "top5": [
-              {
-                "batter_id": "668723",
-                "name": "Ryan Vilade",
-                "hand": "R",
-                "fit_score": 12.1,
-                "convergent_pitch": "SL",
-                "pa": 13,
-                "iso": 0.545,
-                "ev": 89.1,
-                "brl_pct": 15.4,
-                "hr": 2
-              },
               {
                 "batter_id": "666018",
                 "name": "Jonathan Aranda",
@@ -3004,14 +2992,26 @@
                 "hr": 4
               },
               {
+                "batter_id": "668723",
+                "name": "Ryan Vilade",
+                "hand": "R",
+                "fit_score": 9.9,
+                "convergent_pitch": "SL",
+                "pa": 16,
+                "iso": 0.429,
+                "ev": 85.9,
+                "brl_pct": 12.5,
+                "hr": 2
+              },
+              {
                 "batter_id": "689414",
                 "name": "Liam Hicks",
                 "hand": "L",
-                "fit_score": 9.5,
+                "fit_score": 9.3,
                 "convergent_pitch": "CU",
-                "pa": 52,
-                "iso": 0.375,
-                "ev": 87.0,
+                "pa": 53,
+                "iso": 0.367,
+                "ev": 86.5,
                 "brl_pct": 1.9,
                 "hr": 5
               },
@@ -3019,25 +3019,25 @@
                 "batter_id": "691406",
                 "name": "Junior Caminero",
                 "hand": "R",
-                "fit_score": 7.9,
+                "fit_score": 7.8,
                 "convergent_pitch": "SL",
-                "pa": 96,
-                "iso": 0.27,
-                "ev": 91.1,
-                "brl_pct": 4.2,
+                "pa": 99,
+                "iso": 0.272,
+                "ev": 90.8,
+                "brl_pct": 4.0,
                 "hr": 7
               },
               {
-                "batter_id": "656775",
-                "name": "Cedric Mullins",
-                "hand": "L",
-                "fit_score": 5.7,
-                "convergent_pitch": "SL",
-                "pa": 58,
-                "iso": 0.174,
-                "ev": 86.3,
-                "brl_pct": 0.0,
-                "hr": 2
+                "batter_id": "650490",
+                "name": "Yandy Díaz",
+                "hand": "R",
+                "fit_score": 5.8,
+                "convergent_pitch": "CU",
+                "pa": 81,
+                "iso": 0.153,
+                "ev": 86.5,
+                "brl_pct": 3.7,
+                "hr": 3
               }
             ]
           },
@@ -3051,11 +3051,11 @@
             "arsenal": [
               [
                 "FF",
-                60.5
+                60.1
               ],
               [
                 "ST",
-                38.9
+                39.2
               ]
             ],
             "top5": [
@@ -3063,11 +3063,11 @@
                 "batter_id": "666018",
                 "name": "Jonathan Aranda",
                 "hand": "L",
-                "fit_score": 12.6,
+                "fit_score": 12.5,
                 "convergent_pitch": "ST",
-                "pa": 138,
-                "iso": 0.225,
-                "ev": 93.1,
+                "pa": 139,
+                "iso": 0.223,
+                "ev": 92.9,
                 "brl_pct": 3.6,
                 "hr": 6
               },
@@ -3075,21 +3075,21 @@
                 "batter_id": "691406",
                 "name": "Junior Caminero",
                 "hand": "R",
-                "fit_score": 11.4,
+                "fit_score": 11.3,
                 "convergent_pitch": "FF",
-                "pa": 112,
-                "iso": 0.277,
+                "pa": 113,
+                "iso": 0.275,
                 "ev": 95.9,
-                "brl_pct": 4.5,
+                "brl_pct": 4.4,
                 "hr": 8
               },
               {
                 "batter_id": "650490",
                 "name": "Yandy Díaz",
                 "hand": "R",
-                "fit_score": 11.0,
+                "fit_score": 10.9,
                 "convergent_pitch": "ST",
-                "pa": 120,
+                "pa": 121,
                 "iso": 0.214,
                 "ev": 93.6,
                 "brl_pct": 5.8,
@@ -3099,11 +3099,11 @@
                 "batter_id": "656775",
                 "name": "Cedric Mullins",
                 "hand": "L",
-                "fit_score": 10.0,
+                "fit_score": 9.9,
                 "convergent_pitch": "ST",
-                "pa": 123,
-                "iso": 0.239,
-                "ev": 86.2,
+                "pa": 126,
+                "iso": 0.237,
+                "ev": 86.1,
                 "brl_pct": 0.8,
                 "hr": 7
               },
@@ -3148,18 +3148,6 @@
             ],
             "top5": [
               {
-                "batter_id": "656775",
-                "name": "Cedric Mullins",
-                "hand": "L",
-                "fit_score": 13.0,
-                "convergent_pitch": "KC",
-                "pa": 116,
-                "iso": 0.248,
-                "ev": 86.1,
-                "brl_pct": 1.7,
-                "hr": 7
-              },
-              {
                 "batter_id": "691406",
                 "name": "Junior Caminero",
                 "hand": "R",
@@ -3172,15 +3160,27 @@
                 "hr": 6
               },
               {
+                "batter_id": "656775",
+                "name": "Cedric Mullins",
+                "hand": "L",
+                "fit_score": 12.9,
+                "convergent_pitch": "KC",
+                "pa": 119,
+                "iso": 0.245,
+                "ev": 86.0,
+                "brl_pct": 1.7,
+                "hr": 7
+              },
+              {
                 "batter_id": "650490",
                 "name": "Yandy Díaz",
                 "hand": "R",
                 "fit_score": 8.2,
                 "convergent_pitch": "FF",
-                "pa": 101,
+                "pa": 102,
                 "iso": 0.128,
                 "ev": 94.1,
-                "brl_pct": 4.0,
+                "brl_pct": 3.9,
                 "hr": 3
               },
               {
@@ -3189,8 +3189,8 @@
                 "hand": "L",
                 "fit_score": 8.0,
                 "convergent_pitch": "KC",
-                "pa": 129,
-                "iso": 0.184,
+                "pa": 130,
+                "iso": 0.183,
                 "ev": 87.1,
                 "brl_pct": 2.3,
                 "hr": 5
@@ -3199,11 +3199,11 @@
                 "batter_id": "666018",
                 "name": "Jonathan Aranda",
                 "hand": "L",
-                "fit_score": 7.9,
+                "fit_score": 7.8,
                 "convergent_pitch": "FF",
-                "pa": 124,
-                "iso": 0.194,
-                "ev": 93.0,
+                "pa": 125,
+                "iso": 0.192,
+                "ev": 92.9,
                 "brl_pct": 2.4,
                 "hr": 4
               }
@@ -3227,19 +3227,19 @@
             "arsenal": [
               [
                 "SL",
-                27.8
+                27.9
               ],
               [
                 "SI",
-                25.3
+                25.4
               ],
               [
                 "CH",
-                22.7
+                22.9
               ],
               [
                 "FF",
-                10.6
+                10.4
               ]
             ],
             "top5": [
@@ -3247,24 +3247,12 @@
                 "batter_id": "641680",
                 "name": "Jonah Heim",
                 "hand": "S",
-                "fit_score": 9.1,
+                "fit_score": 9.0,
                 "convergent_pitch": "SI",
-                "pa": 54,
-                "iso": 0.146,
-                "ev": 89.7,
-                "brl_pct": 1.9,
-                "hr": 1
-              },
-              {
-                "batter_id": "666126",
-                "name": "Carlos Cortes",
-                "hand": "L",
-                "fit_score": 8.8,
-                "convergent_pitch": "SL",
-                "pa": 113,
-                "iso": 0.119,
-                "ev": 89.9,
-                "brl_pct": 0.9,
+                "pa": 55,
+                "iso": 0.143,
+                "ev": 89.4,
+                "brl_pct": 1.8,
                 "hr": 1
               },
               {
@@ -3280,28 +3268,40 @@
                 "hr": 2
               },
               {
+                "batter_id": "666126",
+                "name": "Carlos Cortes",
+                "hand": "L",
+                "fit_score": 8.5,
+                "convergent_pitch": "SL",
+                "pa": 116,
+                "iso": 0.115,
+                "ev": 89.6,
+                "brl_pct": 0.9,
+                "hr": 1
+              },
+              {
                 "batter_id": "643446",
                 "name": "Jeff McNeil",
                 "hand": "L",
-                "fit_score": 7.3,
+                "fit_score": 7.4,
                 "convergent_pitch": "SI",
-                "pa": 118,
-                "iso": 0.083,
-                "ev": 87.8,
+                "pa": 122,
+                "iso": 0.088,
+                "ev": 88.0,
                 "brl_pct": 0.0,
                 "hr": 2
               },
               {
-                "batter_id": "695720",
-                "name": "Tommy White",
+                "batter_id": "675961",
+                "name": "Alika Williams",
                 "hand": "R",
-                "fit_score": 6.1,
-                "convergent_pitch": "SL",
+                "fit_score": 5.3,
+                "convergent_pitch": "CH",
                 "pa": 33,
-                "iso": 0.156,
-                "ev": 85.8,
-                "brl_pct": 9.1,
-                "hr": 1
+                "iso": 0.032,
+                "ev": 88.1,
+                "brl_pct": 0.0,
+                "hr": 0
               }
             ]
           },
@@ -3423,10 +3423,10 @@
                 "batter_id": "666126",
                 "name": "Carlos Cortes",
                 "hand": "L",
-                "fit_score": 10.0,
+                "fit_score": 9.9,
                 "convergent_pitch": "ST",
-                "pa": 124,
-                "iso": 0.144,
+                "pa": 125,
+                "iso": 0.143,
                 "ev": 90.9,
                 "brl_pct": 2.4,
                 "hr": 2
@@ -3437,9 +3437,9 @@
                 "hand": "S",
                 "fit_score": 9.0,
                 "convergent_pitch": "SI",
-                "pa": 89,
-                "iso": 0.114,
-                "ev": 89.5,
+                "pa": 91,
+                "iso": 0.111,
+                "ev": 89.2,
                 "brl_pct": 0.0,
                 "hr": 1
               },
@@ -3447,36 +3447,36 @@
                 "batter_id": "671732",
                 "name": "Lawrence Butler",
                 "hand": "L",
-                "fit_score": 8.8,
+                "fit_score": 8.7,
                 "convergent_pitch": "FF",
-                "pa": 126,
-                "iso": 0.103,
-                "ev": 92.7,
-                "brl_pct": 3.2,
-                "hr": 2
-              },
-              {
-                "batter_id": "622268",
-                "name": "Donovan Walton",
-                "hand": "L",
-                "fit_score": 8.3,
-                "convergent_pitch": "ST",
-                "pa": 69,
-                "iso": 0.241,
-                "ev": 88.8,
-                "brl_pct": 2.9,
+                "pa": 130,
+                "iso": 0.099,
+                "ev": 92.8,
+                "brl_pct": 3.1,
                 "hr": 2
               },
               {
                 "batter_id": "643446",
                 "name": "Jeff McNeil",
                 "hand": "L",
-                "fit_score": 8.1,
+                "fit_score": 8.3,
                 "convergent_pitch": "SI",
-                "pa": 140,
-                "iso": 0.086,
-                "ev": 88.8,
+                "pa": 141,
+                "iso": 0.085,
+                "ev": 88.9,
                 "brl_pct": 1.4,
+                "hr": 2
+              },
+              {
+                "batter_id": "622268",
+                "name": "Donovan Walton",
+                "hand": "L",
+                "fit_score": 8.0,
+                "convergent_pitch": "ST",
+                "pa": 73,
+                "iso": 0.226,
+                "ev": 88.7,
+                "brl_pct": 2.7,
                 "hr": 2
               }
             ]
@@ -3491,19 +3491,15 @@
             "arsenal": [
               [
                 "FF",
-                67.1
+                67.8
               ],
               [
                 "ST",
-                17.9
+                17.5
               ],
               [
                 "KC",
-                7.1
-              ],
-              [
-                "SI",
-                5.0
+                7.0
               ]
             ],
             "top5": [
@@ -3511,25 +3507,37 @@
                 "batter_id": "680869",
                 "name": "Zack Gelof",
                 "hand": "R",
-                "fit_score": 10.5,
+                "fit_score": 10.7,
                 "convergent_pitch": "FF",
-                "pa": 68,
-                "iso": 0.381,
-                "ev": 91.2,
-                "brl_pct": 5.9,
+                "pa": 69,
+                "iso": 0.375,
+                "ev": 91.4,
+                "brl_pct": 5.8,
                 "hr": 6
               },
               {
                 "batter_id": "671732",
                 "name": "Lawrence Butler",
                 "hand": "L",
-                "fit_score": 10.3,
+                "fit_score": 10.2,
                 "convergent_pitch": "FF",
-                "pa": 93,
-                "iso": 0.087,
-                "ev": 93.0,
-                "brl_pct": 3.2,
+                "pa": 97,
+                "iso": 0.083,
+                "ev": 93.1,
+                "brl_pct": 3.1,
                 "hr": 1
+              },
+              {
+                "batter_id": "622268",
+                "name": "Donovan Walton",
+                "hand": "L",
+                "fit_score": 8.6,
+                "convergent_pitch": "ST",
+                "pa": 47,
+                "iso": 0.31,
+                "ev": 89.0,
+                "brl_pct": 2.1,
+                "hr": 2
               },
               {
                 "batter_id": "666126",
@@ -3541,18 +3549,6 @@
                 "iso": 0.154,
                 "ev": 90.5,
                 "brl_pct": 3.8,
-                "hr": 2
-              },
-              {
-                "batter_id": "622268",
-                "name": "Donovan Walton",
-                "hand": "L",
-                "fit_score": 8.2,
-                "convergent_pitch": "ST",
-                "pa": 46,
-                "iso": 0.317,
-                "ev": 88.7,
-                "brl_pct": 2.2,
                 "hr": 2
               },
               {
@@ -3601,21 +3597,21 @@
                 "hand": "L",
                 "fit_score": 11.3,
                 "convergent_pitch": "SL",
-                "pa": 101,
-                "iso": 0.119,
-                "ev": 93.2,
-                "brl_pct": 3.0,
+                "pa": 105,
+                "iso": 0.114,
+                "ev": 93.3,
+                "brl_pct": 2.9,
                 "hr": 2
               },
               {
                 "batter_id": "666126",
                 "name": "Carlos Cortes",
                 "hand": "L",
-                "fit_score": 8.9,
+                "fit_score": 8.7,
                 "convergent_pitch": "SL",
-                "pa": 100,
-                "iso": 0.133,
-                "ev": 91.5,
+                "pa": 101,
+                "iso": 0.131,
+                "ev": 91.3,
                 "brl_pct": 2.0,
                 "hr": 2
               },
@@ -3623,11 +3619,11 @@
                 "batter_id": "680869",
                 "name": "Zack Gelof",
                 "hand": "R",
-                "fit_score": 7.8,
+                "fit_score": 7.9,
                 "convergent_pitch": "FF",
-                "pa": 73,
-                "iso": 0.313,
-                "ev": 91.0,
+                "pa": 74,
+                "iso": 0.309,
+                "ev": 91.2,
                 "brl_pct": 4.1,
                 "hr": 6
               },
@@ -3635,24 +3631,24 @@
                 "batter_id": "695720",
                 "name": "Tommy White",
                 "hand": "R",
-                "fit_score": 7.5,
+                "fit_score": 7.8,
                 "convergent_pitch": "SL",
-                "pa": 23,
-                "iso": 0.217,
-                "ev": 88.7,
-                "brl_pct": 8.7,
+                "pa": 26,
+                "iso": 0.192,
+                "ev": 88.3,
+                "brl_pct": 11.5,
                 "hr": 1
               },
               {
-                "batter_id": "622268",
-                "name": "Donovan Walton",
-                "hand": "L",
-                "fit_score": 6.3,
+                "batter_id": "691777",
+                "name": "Max Muncy",
+                "hand": "R",
+                "fit_score": 7.1,
                 "convergent_pitch": "FF",
-                "pa": 55,
-                "iso": 0.224,
-                "ev": 86.2,
-                "brl_pct": 1.8,
+                "pa": 43,
+                "iso": 0.205,
+                "ev": 91.4,
+                "brl_pct": 7.0,
                 "hr": 2
               }
             ]
@@ -3667,15 +3663,15 @@
             "arsenal": [
               [
                 "FF",
-                53.4
+                54.2
               ],
               [
                 "FC",
-                32.3
+                31.3
               ],
               [
                 "SL",
-                14.3
+                14.5
               ]
             ],
             "top5": [
@@ -3683,35 +3679,35 @@
                 "batter_id": "671732",
                 "name": "Lawrence Butler",
                 "hand": "L",
-                "fit_score": 12.0,
+                "fit_score": 11.9,
                 "convergent_pitch": "FC",
-                "pa": 108,
-                "iso": 0.183,
-                "ev": 91.6,
-                "brl_pct": 5.6,
+                "pa": 112,
+                "iso": 0.175,
+                "ev": 91.8,
+                "brl_pct": 5.4,
                 "hr": 4
               },
               {
                 "batter_id": "680869",
                 "name": "Zack Gelof",
                 "hand": "R",
-                "fit_score": 11.0,
+                "fit_score": 11.2,
                 "convergent_pitch": "FF",
-                "pa": 54,
-                "iso": 0.511,
-                "ev": 94.7,
-                "brl_pct": 7.4,
+                "pa": 55,
+                "iso": 0.5,
+                "ev": 94.9,
+                "brl_pct": 7.3,
                 "hr": 7
               },
               {
                 "batter_id": "622268",
                 "name": "Donovan Walton",
                 "hand": "L",
-                "fit_score": 10.4,
+                "fit_score": 10.6,
                 "convergent_pitch": "FC",
-                "pa": 55,
-                "iso": 0.292,
-                "ev": 90.4,
+                "pa": 56,
+                "iso": 0.286,
+                "ev": 90.7,
                 "brl_pct": 1.8,
                 "hr": 2
               },
@@ -3731,13 +3727,13 @@
                 "batter_id": "691777",
                 "name": "Max Muncy",
                 "hand": "R",
-                "fit_score": 7.0,
+                "fit_score": 9.8,
                 "convergent_pitch": "FC",
-                "pa": 27,
-                "iso": 0.32,
-                "ev": 90.5,
-                "brl_pct": 3.7,
-                "hr": 2
+                "pa": 28,
+                "iso": 0.423,
+                "ev": 91.4,
+                "brl_pct": 7.1,
+                "hr": 3
               }
             ]
           },
@@ -3771,47 +3767,47 @@
                 "batter_id": "666126",
                 "name": "Carlos Cortes",
                 "hand": "L",
-                "fit_score": 9.6,
+                "fit_score": 9.5,
                 "convergent_pitch": "ST",
-                "pa": 124,
-                "iso": 0.144,
+                "pa": 125,
+                "iso": 0.143,
                 "ev": 90.9,
                 "brl_pct": 2.4,
-                "hr": 2
-              },
-              {
-                "batter_id": "671732",
-                "name": "Lawrence Butler",
-                "hand": "L",
-                "fit_score": 9.1,
-                "convergent_pitch": "FF",
-                "pa": 126,
-                "iso": 0.103,
-                "ev": 92.7,
-                "brl_pct": 3.2,
                 "hr": 2
               },
               {
                 "batter_id": "641680",
                 "name": "Jonah Heim",
                 "hand": "S",
-                "fit_score": 8.9,
+                "fit_score": 9.0,
                 "convergent_pitch": "SI",
-                "pa": 89,
-                "iso": 0.114,
-                "ev": 89.5,
+                "pa": 91,
+                "iso": 0.111,
+                "ev": 89.2,
                 "brl_pct": 0.0,
                 "hr": 1
+              },
+              {
+                "batter_id": "671732",
+                "name": "Lawrence Butler",
+                "hand": "L",
+                "fit_score": 9.0,
+                "convergent_pitch": "FF",
+                "pa": 130,
+                "iso": 0.099,
+                "ev": 92.8,
+                "brl_pct": 3.1,
+                "hr": 2
               },
               {
                 "batter_id": "643446",
                 "name": "Jeff McNeil",
                 "hand": "L",
-                "fit_score": 8.1,
+                "fit_score": 8.2,
                 "convergent_pitch": "SI",
-                "pa": 140,
-                "iso": 0.086,
-                "ev": 88.8,
+                "pa": 141,
+                "iso": 0.085,
+                "ev": 88.9,
                 "brl_pct": 1.4,
                 "hr": 2
               },
@@ -3819,12 +3815,12 @@
                 "batter_id": "622268",
                 "name": "Donovan Walton",
                 "hand": "L",
-                "fit_score": 8.0,
+                "fit_score": 7.9,
                 "convergent_pitch": "ST",
-                "pa": 69,
-                "iso": 0.241,
-                "ev": 88.8,
-                "brl_pct": 2.9,
+                "pa": 73,
+                "iso": 0.226,
+                "ev": 88.7,
+                "brl_pct": 2.7,
                 "hr": 2
               }
             ]
@@ -3850,39 +3846,39 @@
             ],
             "top5": [
               {
-                "batter_id": "677951",
-                "name": "Bobby Witt Jr.",
-                "hand": "R",
-                "fit_score": 14.7,
-                "convergent_pitch": "CU",
-                "pa": 43,
-                "iso": 0.179,
-                "ev": 95.5,
-                "brl_pct": 2.3,
-                "hr": 1
-              },
-              {
                 "batter_id": "672580",
                 "name": "Maikel Garcia",
                 "hand": "R",
-                "fit_score": 14.3,
+                "fit_score": 14.7,
                 "convergent_pitch": "FF",
-                "pa": 19,
-                "iso": 0.062,
-                "ev": 98.7,
+                "pa": 21,
+                "iso": 0.056,
+                "ev": 98.4,
                 "brl_pct": 0.0,
                 "hr": 0
+              },
+              {
+                "batter_id": "677951",
+                "name": "Bobby Witt Jr.",
+                "hand": "R",
+                "fit_score": 14.3,
+                "convergent_pitch": "CU",
+                "pa": 44,
+                "iso": 0.175,
+                "ev": 95.0,
+                "brl_pct": 2.3,
+                "hr": 1
               },
               {
                 "batter_id": "521692",
                 "name": "Salvador Perez",
                 "hand": "R",
-                "fit_score": 11.5,
+                "fit_score": 12.9,
                 "convergent_pitch": "FF",
-                "pa": 41,
-                "iso": 0.111,
-                "ev": 94.2,
-                "brl_pct": 2.4,
+                "pa": 42,
+                "iso": 0.108,
+                "ev": 94.7,
+                "brl_pct": 4.8,
                 "hr": 1
               },
               {
@@ -3901,9 +3897,9 @@
                 "batter_id": "679845",
                 "name": "Nick Loftin",
                 "hand": "R",
-                "fit_score": 7.6,
+                "fit_score": 7.5,
                 "convergent_pitch": "CU",
-                "pa": 52,
+                "pa": 53,
                 "iso": 0.175,
                 "ev": 84.7,
                 "brl_pct": 1.9,
@@ -3941,11 +3937,11 @@
                 "batter_id": "677951",
                 "name": "Bobby Witt Jr.",
                 "hand": "R",
-                "fit_score": 16.3,
+                "fit_score": 16.0,
                 "convergent_pitch": "FC",
-                "pa": 52,
-                "iso": 0.167,
-                "ev": 95.7,
+                "pa": 53,
+                "iso": 0.163,
+                "ev": 95.3,
                 "brl_pct": 3.8,
                 "hr": 1
               },
@@ -3953,48 +3949,48 @@
                 "batter_id": "672580",
                 "name": "Maikel Garcia",
                 "hand": "R",
-                "fit_score": 14.7,
+                "fit_score": 15.0,
                 "convergent_pitch": "SL",
-                "pa": 26,
-                "iso": 0.05,
-                "ev": 99.0,
-                "brl_pct": 3.8,
+                "pa": 28,
+                "iso": 0.045,
+                "ev": 98.7,
+                "brl_pct": 3.6,
                 "hr": 0
               },
               {
                 "batter_id": "521692",
                 "name": "Salvador Perez",
                 "hand": "R",
-                "fit_score": 10.8,
+                "fit_score": 11.8,
                 "convergent_pitch": "FF",
-                "pa": 50,
-                "iso": 0.091,
-                "ev": 94.4,
-                "brl_pct": 2.0,
+                "pa": 51,
+                "iso": 0.089,
+                "ev": 94.8,
+                "brl_pct": 3.9,
                 "hr": 1
               },
               {
                 "batter_id": "695506",
                 "name": "Jac Caglianone",
                 "hand": "L",
-                "fit_score": 10.5,
+                "fit_score": 10.3,
                 "convergent_pitch": "SL",
-                "pa": 56,
-                "iso": 0.418,
-                "ev": 95.4,
-                "brl_pct": 7.1,
+                "pa": 57,
+                "iso": 0.411,
+                "ev": 94.9,
+                "brl_pct": 7.0,
                 "hr": 6
               },
               {
                 "batter_id": "679845",
                 "name": "Nick Loftin",
                 "hand": "R",
-                "fit_score": 7.4,
+                "fit_score": 7.3,
                 "convergent_pitch": "FC",
-                "pa": 67,
-                "iso": 0.132,
-                "ev": 85.4,
-                "brl_pct": 1.5,
+                "pa": 69,
+                "iso": 0.13,
+                "ev": 85.3,
+                "brl_pct": 1.4,
                 "hr": 0
               }
             ]
@@ -4074,15 +4070,15 @@
                 "hr": 7
               },
               {
-                "batter_id": "686555",
-                "name": "Isaac Collins",
-                "hand": "S",
-                "fit_score": 8.2,
+                "batter_id": "670231",
+                "name": "John Rave",
+                "hand": "L",
+                "fit_score": 8.5,
                 "convergent_pitch": "SI",
-                "pa": 187,
-                "iso": 0.118,
-                "ev": 87.3,
-                "brl_pct": 1.6,
+                "pa": 33,
+                "iso": 0.214,
+                "ev": 82.9,
+                "brl_pct": 6.1,
                 "hr": 1
               }
             ]
@@ -4097,15 +4093,15 @@
             "arsenal": [
               [
                 "FF",
-                55.4
+                55.0
               ],
               [
                 "SL",
-                26.4
+                25.8
               ],
               [
                 "SI",
-                14.2
+                15.2
               ]
             ],
             "top5": [
@@ -4149,7 +4145,7 @@
                 "batter_id": "695600",
                 "name": "Carter Jensen",
                 "hand": "L",
-                "fit_score": 8.4,
+                "fit_score": 8.3,
                 "convergent_pitch": "SL",
                 "pa": 165,
                 "iso": 0.181,
@@ -4161,10 +4157,10 @@
                 "batter_id": "686555",
                 "name": "Isaac Collins",
                 "hand": "S",
-                "fit_score": 8.4,
+                "fit_score": 8.3,
                 "convergent_pitch": "SL",
-                "pa": 154,
-                "iso": 0.16,
+                "pa": 155,
+                "iso": 0.158,
                 "ev": 86.8,
                 "brl_pct": 1.9,
                 "hr": 3
@@ -4273,19 +4269,19 @@
             "arsenal": [
               [
                 "FF",
-                52.3
+                51.8
               ],
               [
                 "CU",
-                24.3
+                24.7
               ],
               [
                 "SL",
-                14.4
+                14.2
               ],
               [
                 "SI",
-                8.6
+                8.9
               ]
             ],
             "top5": [
@@ -4293,31 +4289,31 @@
                 "batter_id": "686948",
                 "name": "Drake Baldwin",
                 "hand": "L",
-                "fit_score": 15.7,
+                "fit_score": 15.6,
                 "convergent_pitch": "CU",
-                "pa": 99,
-                "iso": 0.157,
+                "pa": 100,
+                "iso": 0.156,
                 "ev": 95.3,
-                "brl_pct": 6.1,
+                "brl_pct": 6.0,
                 "hr": 4
               },
               {
                 "batter_id": "621566",
                 "name": "Matt Olson",
                 "hand": "L",
-                "fit_score": 13.2,
+                "fit_score": 13.1,
                 "convergent_pitch": "FF",
-                "pa": 112,
-                "iso": 0.265,
-                "ev": 93.3,
-                "brl_pct": 5.4,
+                "pa": 113,
+                "iso": 0.263,
+                "ev": 93.2,
+                "brl_pct": 5.3,
                 "hr": 6
               },
               {
                 "batter_id": "671739",
                 "name": "Michael Harris II",
                 "hand": "L",
-                "fit_score": 13.1,
+                "fit_score": 13.0,
                 "convergent_pitch": "FF",
                 "pa": 83,
                 "iso": 0.28,
@@ -4329,12 +4325,12 @@
                 "batter_id": "660670",
                 "name": "Ronald Acuña Jr.",
                 "hand": "R",
-                "fit_score": 11.2,
+                "fit_score": 11.3,
                 "convergent_pitch": "CU",
-                "pa": 76,
-                "iso": 0.104,
-                "ev": 95.9,
-                "brl_pct": 3.9,
+                "pa": 78,
+                "iso": 0.101,
+                "ev": 96.1,
+                "brl_pct": 3.8,
                 "hr": 2
               },
               {
@@ -4361,15 +4357,15 @@
             "arsenal": [
               [
                 "FF",
-                36.9
+                36.7
               ],
               [
                 "SV",
-                29.3
+                28.5
               ],
               [
                 "SI",
-                25.7
+                26.6
               ]
             ],
             "top5": [
@@ -4377,7 +4373,7 @@
                 "batter_id": "660670",
                 "name": "Ronald Acuña Jr.",
                 "hand": "R",
-                "fit_score": 11.1,
+                "fit_score": 11.2,
                 "convergent_pitch": "SI",
                 "pa": 38,
                 "iso": 0.29,
@@ -4389,7 +4385,7 @@
                 "batter_id": "657041",
                 "name": "Lane Thomas",
                 "hand": "R",
-                "fit_score": 10.2,
+                "fit_score": 10.3,
                 "convergent_pitch": "SI",
                 "pa": 68,
                 "iso": 0.236,
@@ -4401,12 +4397,12 @@
                 "batter_id": "686948",
                 "name": "Drake Baldwin",
                 "hand": "L",
-                "fit_score": 10.0,
+                "fit_score": 10.1,
                 "convergent_pitch": "FF",
-                "pa": 84,
-                "iso": 0.227,
+                "pa": 85,
+                "iso": 0.224,
                 "ev": 93.4,
-                "brl_pct": 4.8,
+                "brl_pct": 4.7,
                 "hr": 5
               },
               {
@@ -4425,7 +4421,7 @@
                 "batter_id": "643289",
                 "name": "Mauricio Dubón",
                 "hand": "R",
-                "fit_score": 8.0,
+                "fit_score": 8.1,
                 "convergent_pitch": "SI",
                 "pa": 72,
                 "iso": 0.119,
@@ -4573,12 +4569,12 @@
                 "batter_id": "686948",
                 "name": "Drake Baldwin",
                 "hand": "L",
-                "fit_score": 12.3,
+                "fit_score": 12.2,
                 "convergent_pitch": "FF",
-                "pa": 108,
-                "iso": 0.156,
+                "pa": 109,
+                "iso": 0.155,
                 "ev": 93.7,
-                "brl_pct": 1.9,
+                "brl_pct": 1.8,
                 "hr": 4
               },
               {
@@ -4597,10 +4593,10 @@
                 "batter_id": "642086",
                 "name": "Dominic Smith",
                 "hand": "L",
-                "fit_score": 8.7,
+                "fit_score": 8.6,
                 "convergent_pitch": "FF",
-                "pa": 102,
-                "iso": 0.116,
+                "pa": 103,
+                "iso": 0.115,
                 "ev": 88.1,
                 "brl_pct": 0.0,
                 "hr": 3
@@ -4629,12 +4625,12 @@
                 "batter_id": "686948",
                 "name": "Drake Baldwin",
                 "hand": "L",
-                "fit_score": 10.8,
+                "fit_score": 11.0,
                 "convergent_pitch": "FF",
-                "pa": 53,
-                "iso": 0.25,
-                "ev": 93.3,
-                "brl_pct": 3.8,
+                "pa": 54,
+                "iso": 0.245,
+                "ev": 93.4,
+                "brl_pct": 3.7,
                 "hr": 4
               },
               {
@@ -4665,12 +4661,12 @@
                 "batter_id": "645277",
                 "name": "Ozzie Albies",
                 "hand": "S",
-                "fit_score": 8.7,
+                "fit_score": 8.6,
                 "convergent_pitch": "FF",
-                "pa": 61,
+                "pa": 62,
                 "iso": 0.236,
-                "ev": 90.7,
-                "brl_pct": 3.3,
+                "ev": 90.5,
+                "brl_pct": 3.2,
                 "hr": 3
               },
               {
@@ -4731,12 +4727,12 @@
                 "batter_id": "808959",
                 "name": "Munetaka Murakami",
                 "hand": "L",
-                "fit_score": 12.8,
+                "fit_score": 12.5,
                 "convergent_pitch": "FF",
-                "pa": 113,
-                "iso": 0.489,
-                "ev": 95.3,
-                "brl_pct": 6.2,
+                "pa": 114,
+                "iso": 0.484,
+                "ev": 95.0,
+                "brl_pct": 6.1,
                 "hr": 14
               },
               {
@@ -4752,18 +4748,6 @@
                 "hr": 2
               },
               {
-                "batter_id": "695657",
-                "name": "Colson Montgomery",
-                "hand": "L",
-                "fit_score": 9.0,
-                "convergent_pitch": "CH",
-                "pa": 173,
-                "iso": 0.172,
-                "ev": 88.1,
-                "brl_pct": 1.7,
-                "hr": 8
-              },
-              {
                 "batter_id": "643217",
                 "name": "Andrew Benintendi",
                 "hand": "L",
@@ -4773,6 +4757,18 @@
                 "iso": 0.231,
                 "ev": 89.2,
                 "brl_pct": 5.4,
+                "hr": 8
+              },
+              {
+                "batter_id": "695657",
+                "name": "Colson Montgomery",
+                "hand": "L",
+                "fit_score": 8.4,
+                "convergent_pitch": "CH",
+                "pa": 175,
+                "iso": 0.17,
+                "ev": 87.9,
+                "brl_pct": 1.7,
                 "hr": 8
               }
             ]
@@ -4787,15 +4783,15 @@
             "arsenal": [
               [
                 "SL",
-                49.7
+                50.7
               ],
               [
                 "FF",
-                35.5
+                34.8
               ],
               [
                 "CH",
-                14.7
+                14.4
               ]
             ],
             "top5": [
@@ -4803,19 +4799,19 @@
                 "batter_id": "678246",
                 "name": "Miguel Vargas",
                 "hand": "R",
-                "fit_score": 16.2,
-                "convergent_pitch": "SL",
-                "pa": 68,
+                "fit_score": 15.7,
+                "convergent_pitch": "FF",
+                "pa": 69,
                 "iso": 0.327,
                 "ev": 94.9,
-                "brl_pct": 7.4,
+                "brl_pct": 7.2,
                 "hr": 6
               },
               {
                 "batter_id": "805367",
                 "name": "Chase Meidroth",
                 "hand": "R",
-                "fit_score": 12.0,
+                "fit_score": 12.1,
                 "convergent_pitch": "SL",
                 "pa": 59,
                 "iso": 0.261,
@@ -4827,7 +4823,7 @@
                 "batter_id": "682668",
                 "name": "Luisangel Acuña",
                 "hand": "R",
-                "fit_score": 9.7,
+                "fit_score": 9.6,
                 "convergent_pitch": "FF",
                 "pa": 33,
                 "iso": 0.031,
@@ -4839,7 +4835,7 @@
                 "batter_id": "668670",
                 "name": "Jake Rogers",
                 "hand": "R",
-                "fit_score": 8.9,
+                "fit_score": 8.8,
                 "convergent_pitch": "FF",
                 "pa": 15,
                 "iso": 0.364,
@@ -4851,12 +4847,12 @@
                 "batter_id": "695731",
                 "name": "Braden Montgomery",
                 "hand": "S",
-                "fit_score": 8.5,
+                "fit_score": 8.3,
                 "convergent_pitch": "SL",
-                "pa": 31,
-                "iso": 0.24,
-                "ev": 93.8,
-                "brl_pct": 3.2,
+                "pa": 32,
+                "iso": 0.269,
+                "ev": 93.4,
+                "brl_pct": 3.1,
                 "hr": 1
               }
             ]
@@ -4923,10 +4919,10 @@
                 "batter_id": "803011",
                 "name": "Sam Antonacci",
                 "hand": "L",
-                "fit_score": 8.5,
+                "fit_score": 8.4,
                 "convergent_pitch": "SL",
-                "pa": 148,
-                "iso": 0.223,
+                "pa": 149,
+                "iso": 0.221,
                 "ev": 90.1,
                 "brl_pct": 2.0,
                 "hr": 6
@@ -4955,19 +4951,19 @@
             "arsenal": [
               [
                 "FC",
-                55.0
+                53.5
               ],
               [
                 "FF",
-                27.5
+                25.6
               ],
               [
                 "SI",
-                6.2
+                10.5
               ],
               [
                 "CH",
-                6.2
+                5.8
               ]
             ],
             "top5": [
@@ -4975,7 +4971,7 @@
                 "batter_id": "695657",
                 "name": "Colson Montgomery",
                 "hand": "L",
-                "fit_score": 16.7,
+                "fit_score": 16.9,
                 "convergent_pitch": "FC",
                 "pa": 158,
                 "iso": 0.204,
@@ -4987,7 +4983,7 @@
                 "batter_id": "808959",
                 "name": "Munetaka Murakami",
                 "hand": "L",
-                "fit_score": 15.3,
+                "fit_score": 15.2,
                 "convergent_pitch": "FF",
                 "pa": 100,
                 "iso": 0.518,
@@ -5023,12 +5019,12 @@
                 "batter_id": "671976",
                 "name": "Tristan Peters",
                 "hand": "L",
-                "fit_score": 8.4,
+                "fit_score": 8.2,
                 "convergent_pitch": "FC",
-                "pa": 134,
-                "iso": 0.252,
-                "ev": 86.1,
-                "brl_pct": 3.0,
+                "pa": 136,
+                "iso": 0.25,
+                "ev": 85.9,
+                "brl_pct": 2.9,
                 "hr": 4
               }
             ]
@@ -5043,11 +5039,11 @@
             "arsenal": [
               [
                 "SI",
-                54.9
+                55.2
               ],
               [
                 "FC",
-                40.1
+                40.0
               ]
             ],
             "top5": [
@@ -5145,10 +5141,10 @@
                 "hand": "R",
                 "fit_score": 14.1,
                 "convergent_pitch": "CH",
-                "pa": 86,
-                "iso": 0.25,
-                "ev": 91.2,
-                "brl_pct": 7.0,
+                "pa": 87,
+                "iso": 0.259,
+                "ev": 91.1,
+                "brl_pct": 6.9,
                 "hr": 3
               },
               {
@@ -5219,19 +5215,19 @@
             "arsenal": [
               [
                 "FF",
-                41.2
+                40.4
               ],
               [
                 "FC",
-                28.5
+                29.3
               ],
               [
                 "SI",
-                13.1
+                13.3
               ],
               [
                 "CU",
-                6.3
+                6.2
               ]
             ],
             "top5": [
@@ -5239,19 +5235,19 @@
                 "batter_id": "686527",
                 "name": "Dominic Canzone",
                 "hand": "L",
-                "fit_score": 14.7,
-                "convergent_pitch": "FC",
-                "pa": 138,
-                "iso": 0.274,
-                "ev": 94.1,
-                "brl_pct": 5.1,
+                "fit_score": 13.9,
+                "convergent_pitch": "FF",
+                "pa": 141,
+                "iso": 0.276,
+                "ev": 93.9,
+                "brl_pct": 5.0,
                 "hr": 8
               },
               {
                 "batter_id": "640902",
                 "name": "Jhonny Pereda",
                 "hand": "R",
-                "fit_score": 12.0,
+                "fit_score": 12.1,
                 "convergent_pitch": "FC",
                 "pa": 37,
                 "iso": 0.083,
@@ -5263,24 +5259,12 @@
                 "batter_id": "647304",
                 "name": "Josh Naylor",
                 "hand": "L",
-                "fit_score": 8.9,
+                "fit_score": 8.7,
                 "convergent_pitch": "SI",
-                "pa": 193,
-                "iso": 0.139,
-                "ev": 89.5,
-                "brl_pct": 2.6,
-                "hr": 6
-              },
-              {
-                "batter_id": "702284",
-                "name": "Cole Young",
-                "hand": "L",
-                "fit_score": 8.8,
-                "convergent_pitch": "SI",
-                "pa": 189,
-                "iso": 0.148,
-                "ev": 90.8,
-                "brl_pct": 2.1,
+                "pa": 197,
+                "iso": 0.136,
+                "ev": 89.2,
+                "brl_pct": 2.5,
                 "hr": 6
               },
               {
@@ -5289,10 +5273,22 @@
                 "hand": "R",
                 "fit_score": 8.7,
                 "convergent_pitch": "FC",
-                "pa": 190,
-                "iso": 0.171,
-                "ev": 92.2,
-                "brl_pct": 4.2,
+                "pa": 193,
+                "iso": 0.169,
+                "ev": 92.4,
+                "brl_pct": 4.1,
+                "hr": 6
+              },
+              {
+                "batter_id": "702284",
+                "name": "Cole Young",
+                "hand": "L",
+                "fit_score": 8.2,
+                "convergent_pitch": "SI",
+                "pa": 193,
+                "iso": 0.145,
+                "ev": 90.6,
+                "brl_pct": 2.1,
                 "hr": 6
               }
             ]
@@ -5307,19 +5303,19 @@
             "arsenal": [
               [
                 "SI",
-                35.4
+                35.7
               ],
               [
                 "FF",
-                17.7
+                18.6
               ],
               [
                 "CH",
-                13.1
+                12.1
               ],
               [
                 "CU",
-                11.5
+                12.1
               ]
             ],
             "top5": [
@@ -5327,10 +5323,10 @@
                 "batter_id": "677594",
                 "name": "Julio Rodríguez",
                 "hand": "R",
-                "fit_score": 14.8,
+                "fit_score": 14.6,
                 "convergent_pitch": "SI",
-                "pa": 103,
-                "iso": 0.176,
+                "pa": 104,
+                "iso": 0.174,
                 "ev": 93.4,
                 "brl_pct": 1.9,
                 "hr": 5
@@ -5341,9 +5337,9 @@
                 "hand": "R",
                 "fit_score": 12.7,
                 "convergent_pitch": "SI",
-                "pa": 90,
-                "iso": 0.222,
-                "ev": 92.3,
+                "pa": 91,
+                "iso": 0.22,
+                "ev": 92.4,
                 "brl_pct": 1.1,
                 "hr": 4
               },
@@ -5365,8 +5361,8 @@
                 "hand": "R",
                 "fit_score": 9.4,
                 "convergent_pitch": "FF",
-                "pa": 114,
-                "iso": 0.151,
+                "pa": 115,
+                "iso": 0.149,
                 "ev": 91.2,
                 "brl_pct": 3.5,
                 "hr": 3
@@ -5415,12 +5411,12 @@
                 "batter_id": "677594",
                 "name": "Julio Rodríguez",
                 "hand": "R",
-                "fit_score": 17.3,
+                "fit_score": 17.0,
                 "convergent_pitch": "SI",
-                "pa": 40,
-                "iso": 0.395,
+                "pa": 41,
+                "iso": 0.385,
                 "ev": 94.5,
-                "brl_pct": 7.5,
+                "brl_pct": 7.3,
                 "hr": 5
               },
               {
@@ -5429,10 +5425,10 @@
                 "hand": "R",
                 "fit_score": 13.4,
                 "convergent_pitch": "SI",
-                "pa": 37,
-                "iso": 0.206,
-                "ev": 88.2,
-                "brl_pct": 2.7,
+                "pa": 38,
+                "iso": 0.2,
+                "ev": 88.7,
+                "brl_pct": 2.6,
                 "hr": 2
               },
               {
@@ -5465,8 +5461,8 @@
                 "hand": "R",
                 "fit_score": 8.4,
                 "convergent_pitch": "SI",
-                "pa": 59,
-                "iso": 0.062,
+                "pa": 60,
+                "iso": 0.061,
                 "ev": 89.8,
                 "brl_pct": 1.7,
                 "hr": 1
@@ -5483,15 +5479,15 @@
             "arsenal": [
               [
                 "FF",
-                39.2
+                40.0
               ],
               [
                 "ST",
-                34.3
+                34.1
               ],
               [
                 "SI",
-                23.8
+                23.2
               ]
             ],
             "top5": [
@@ -5535,11 +5531,11 @@
                 "batter_id": "668227",
                 "name": "Randy Arozarena",
                 "hand": "R",
-                "fit_score": 8.9,
+                "fit_score": 8.6,
                 "convergent_pitch": "FF",
-                "pa": 128,
-                "iso": 0.202,
-                "ev": 95.2,
+                "pa": 130,
+                "iso": 0.198,
+                "ev": 94.9,
                 "brl_pct": 6.2,
                 "hr": 6
               },
@@ -5649,11 +5645,11 @@
             "arsenal": [
               [
                 "SI",
-                67.3
+                67.4
               ],
               [
                 "ST",
-                30.9
+                30.8
               ]
             ],
             "top5": [
@@ -5661,7 +5657,7 @@
                 "batter_id": "641343",
                 "name": "Jake Bauers",
                 "hand": "L",
-                "fit_score": 14.0,
+                "fit_score": 14.1,
                 "convergent_pitch": "SI",
                 "pa": 59,
                 "iso": 0.367,
@@ -5729,15 +5725,15 @@
             "arsenal": [
               [
                 "SI",
-                74.5
+                73.7
               ],
               [
                 "CH",
-                14.2
+                14.4
               ],
               [
                 "SL",
-                11.3
+                12.0
               ]
             ],
             "top5": [
@@ -5745,11 +5741,11 @@
                 "batter_id": "694192",
                 "name": "Jackson Chourio",
                 "hand": "R",
-                "fit_score": 16.1,
+                "fit_score": 15.4,
                 "convergent_pitch": "SI",
-                "pa": 43,
-                "iso": 0.231,
-                "ev": 93.1,
+                "pa": 44,
+                "iso": 0.225,
+                "ev": 93.0,
                 "brl_pct": 2.3,
                 "hr": 3
               },
@@ -5841,12 +5837,12 @@
                 "batter_id": "641343",
                 "name": "Jake Bauers",
                 "hand": "L",
-                "fit_score": 11.5,
+                "fit_score": 11.9,
                 "convergent_pitch": "SI",
-                "pa": 93,
-                "iso": 0.413,
-                "ev": 94.1,
-                "brl_pct": 5.4,
+                "pa": 94,
+                "iso": 0.408,
+                "ev": 94.4,
+                "brl_pct": 5.3,
                 "hr": 9
               },
               {
@@ -5865,24 +5861,24 @@
                 "batter_id": "694192",
                 "name": "Jackson Chourio",
                 "hand": "R",
-                "fit_score": 8.2,
+                "fit_score": 7.6,
                 "convergent_pitch": "SI",
-                "pa": 109,
-                "iso": 0.092,
-                "ev": 93.7,
+                "pa": 112,
+                "iso": 0.089,
+                "ev": 93.6,
                 "brl_pct": 1.8,
                 "hr": 1
               },
               {
-                "batter_id": "800325",
-                "name": "Luis Lara",
-                "hand": "S",
-                "fit_score": 7.1,
-                "convergent_pitch": "SL",
-                "pa": 22,
-                "iso": 0.0,
-                "ev": 87.9,
-                "brl_pct": 0.0,
+                "batter_id": "592885",
+                "name": "Christian Yelich",
+                "hand": "L",
+                "fit_score": 6.5,
+                "convergent_pitch": "SI",
+                "pa": 74,
+                "iso": 0.048,
+                "ev": 89.9,
+                "brl_pct": 1.4,
                 "hr": 0
               }
             ]
@@ -5929,11 +5925,11 @@
                 "batter_id": "668930",
                 "name": "Brice Turang",
                 "hand": "L",
-                "fit_score": 13.4,
+                "fit_score": 13.3,
                 "convergent_pitch": "FC",
-                "pa": 166,
-                "iso": 0.293,
-                "ev": 92.7,
+                "pa": 168,
+                "iso": 0.291,
+                "ev": 92.4,
                 "brl_pct": 4.2,
                 "hr": 10
               },
@@ -5941,10 +5937,10 @@
                 "batter_id": "641343",
                 "name": "Jake Bauers",
                 "hand": "L",
-                "fit_score": 9.2,
+                "fit_score": 9.1,
                 "convergent_pitch": "FF",
-                "pa": 145,
-                "iso": 0.164,
+                "pa": 146,
+                "iso": 0.163,
                 "ev": 93.7,
                 "brl_pct": 1.4,
                 "hr": 5
@@ -5953,9 +5949,9 @@
                 "batter_id": "592885",
                 "name": "Christian Yelich",
                 "hand": "L",
-                "fit_score": 8.5,
+                "fit_score": 8.4,
                 "convergent_pitch": "FF",
-                "pa": 131,
+                "pa": 133,
                 "iso": 0.144,
                 "ev": 88.4,
                 "brl_pct": 3.8,
@@ -5965,12 +5961,12 @@
                 "batter_id": "800325",
                 "name": "Luis Lara",
                 "hand": "S",
-                "fit_score": 7.9,
+                "fit_score": 8.0,
                 "convergent_pitch": "FF",
-                "pa": 40,
-                "iso": 0.111,
-                "ev": 87.7,
-                "brl_pct": 5.0,
+                "pa": 42,
+                "iso": 0.105,
+                "ev": 87.8,
+                "brl_pct": 4.8,
                 "hr": 0
               }
             ]
@@ -5985,15 +5981,15 @@
             "arsenal": [
               [
                 "SL",
-                51.6
+                51.9
               ],
               [
                 "FF",
-                38.7
+                38.6
               ],
               [
                 "SI",
-                5.9
+                5.8
               ]
             ],
             "top5": [
@@ -6001,11 +5997,11 @@
                 "batter_id": "668930",
                 "name": "Brice Turang",
                 "hand": "L",
-                "fit_score": 12.4,
+                "fit_score": 12.3,
                 "convergent_pitch": "SL",
-                "pa": 170,
-                "iso": 0.207,
-                "ev": 92.5,
+                "pa": 172,
+                "iso": 0.206,
+                "ev": 92.3,
                 "brl_pct": 3.5,
                 "hr": 7
               },
@@ -6013,11 +6009,11 @@
                 "batter_id": "641343",
                 "name": "Jake Bauers",
                 "hand": "L",
-                "fit_score": 11.1,
+                "fit_score": 11.3,
                 "convergent_pitch": "FF",
-                "pa": 149,
-                "iso": 0.24,
-                "ev": 94.0,
+                "pa": 151,
+                "iso": 0.236,
+                "ev": 94.2,
                 "brl_pct": 2.0,
                 "hr": 8
               },
@@ -6034,28 +6030,28 @@
                 "hr": 4
               },
               {
-                "batter_id": "800325",
-                "name": "Luis Lara",
-                "hand": "S",
-                "fit_score": 8.5,
-                "convergent_pitch": "FF",
-                "pa": 40,
-                "iso": 0.094,
-                "ev": 90.0,
-                "brl_pct": 2.5,
-                "hr": 0
-              },
-              {
                 "batter_id": "694192",
                 "name": "Jackson Chourio",
                 "hand": "R",
-                "fit_score": 8.3,
+                "fit_score": 7.9,
                 "convergent_pitch": "FF",
-                "pa": 119,
-                "iso": 0.218,
-                "ev": 93.8,
-                "brl_pct": 5.0,
+                "pa": 122,
+                "iso": 0.212,
+                "ev": 93.7,
+                "brl_pct": 4.9,
                 "hr": 5
+              },
+              {
+                "batter_id": "800325",
+                "name": "Luis Lara",
+                "hand": "S",
+                "fit_score": 7.9,
+                "convergent_pitch": "FF",
+                "pa": 43,
+                "iso": 0.086,
+                "ev": 89.1,
+                "brl_pct": 2.3,
+                "hr": 0
               }
             ]
           },
@@ -6073,15 +6069,15 @@
               ],
               [
                 "ST",
-                25.9
+                25.3
               ],
               [
                 "SI",
-                15.5
+                16.3
               ],
               [
                 "FS",
-                12.1
+                11.8
               ]
             ],
             "top5": [
@@ -6091,8 +6087,8 @@
                 "hand": "L",
                 "fit_score": 10.4,
                 "convergent_pitch": "FF",
-                "pa": 115,
-                "iso": 0.172,
+                "pa": 116,
+                "iso": 0.17,
                 "ev": 94.2,
                 "brl_pct": 0.9,
                 "hr": 4
@@ -6101,7 +6097,7 @@
                 "batter_id": "669003",
                 "name": "Garrett Mitchell",
                 "hand": "L",
-                "fit_score": 9.6,
+                "fit_score": 9.7,
                 "convergent_pitch": "FF",
                 "pa": 133,
                 "iso": 0.138,
@@ -6113,11 +6109,11 @@
                 "batter_id": "668930",
                 "name": "Brice Turang",
                 "hand": "L",
-                "fit_score": 9.2,
+                "fit_score": 9.0,
                 "convergent_pitch": "ST",
-                "pa": 140,
-                "iso": 0.228,
-                "ev": 91.5,
+                "pa": 142,
+                "iso": 0.226,
+                "ev": 91.2,
                 "brl_pct": 2.1,
                 "hr": 6
               },
@@ -6125,24 +6121,24 @@
                 "batter_id": "592885",
                 "name": "Christian Yelich",
                 "hand": "L",
-                "fit_score": 8.8,
+                "fit_score": 8.6,
                 "convergent_pitch": "FF",
-                "pa": 102,
+                "pa": 104,
                 "iso": 0.133,
                 "ev": 90.2,
-                "brl_pct": 3.9,
+                "brl_pct": 3.8,
                 "hr": 2
               },
               {
                 "batter_id": "800325",
                 "name": "Luis Lara",
                 "hand": "S",
-                "fit_score": 8.0,
+                "fit_score": 8.1,
                 "convergent_pitch": "FF",
-                "pa": 29,
-                "iso": 0.12,
-                "ev": 89.6,
-                "brl_pct": 3.4,
+                "pa": 31,
+                "iso": 0.111,
+                "ev": 89.7,
+                "brl_pct": 3.2,
                 "hr": 0
               }
             ]
@@ -6157,15 +6153,15 @@
             "arsenal": [
               [
                 "SI",
-                38.0
+                38.5
               ],
               [
                 "FF",
-                37.2
+                36.9
               ],
               [
                 "SL",
-                24.8
+                24.6
               ]
             ],
             "top5": [
@@ -6173,12 +6169,12 @@
                 "batter_id": "694192",
                 "name": "Jackson Chourio",
                 "hand": "R",
-                "fit_score": 16.6,
+                "fit_score": 16.3,
                 "convergent_pitch": "SI",
-                "pa": 57,
-                "iso": 0.26,
-                "ev": 97.7,
-                "brl_pct": 5.3,
+                "pa": 58,
+                "iso": 0.255,
+                "ev": 97.5,
+                "brl_pct": 5.2,
                 "hr": 3
               },
               {
@@ -6221,9 +6217,9 @@
                 "batter_id": "592885",
                 "name": "Christian Yelich",
                 "hand": "L",
-                "fit_score": 8.3,
+                "fit_score": 8.2,
                 "convergent_pitch": "FF",
-                "pa": 46,
+                "pa": 47,
                 "iso": 0.0,
                 "ev": 86.2,
                 "brl_pct": 4.3,
@@ -6249,15 +6245,15 @@
             "arsenal": [
               [
                 "FF",
-                41.8
+                42.9
               ],
               [
                 "SL",
-                40.5
+                39.3
               ],
               [
                 "CH",
-                16.5
+                16.7
               ]
             ],
             "top5": [
@@ -6265,60 +6261,60 @@
                 "batter_id": "700250",
                 "name": "Ben Rice",
                 "hand": "L",
-                "fit_score": 13.8,
+                "fit_score": 14.3,
                 "convergent_pitch": "FF",
-                "pa": 114,
-                "iso": 0.412,
-                "ev": 95.2,
-                "brl_pct": 5.3,
-                "hr": 10
-              },
-              {
-                "batter_id": "669224",
-                "name": "Austin Wells",
-                "hand": "L",
-                "fit_score": 11.4,
-                "convergent_pitch": "FF",
-                "pa": 84,
-                "iso": 0.155,
-                "ev": 92.4,
-                "brl_pct": 3.6,
-                "hr": 3
+                "pa": 117,
+                "iso": 0.43,
+                "ev": 95.4,
+                "brl_pct": 6.0,
+                "hr": 11
               },
               {
                 "batter_id": "663757",
                 "name": "Trent Grisham",
                 "hand": "L",
-                "fit_score": 11.4,
+                "fit_score": 11.3,
                 "convergent_pitch": "FF",
-                "pa": 128,
-                "iso": 0.254,
+                "pa": 131,
+                "iso": 0.25,
                 "ev": 92.7,
-                "brl_pct": 5.5,
+                "brl_pct": 5.3,
                 "hr": 7
+              },
+              {
+                "batter_id": "669224",
+                "name": "Austin Wells",
+                "hand": "L",
+                "fit_score": 11.0,
+                "convergent_pitch": "SL",
+                "pa": 85,
+                "iso": 0.153,
+                "ev": 91.3,
+                "brl_pct": 3.5,
+                "hr": 3
               },
               {
                 "batter_id": "671277",
                 "name": "Luis García Jr.",
                 "hand": "L",
-                "fit_score": 11.1,
+                "fit_score": 11.0,
                 "convergent_pitch": "FF",
-                "pa": 120,
-                "iso": 0.219,
+                "pa": 122,
+                "iso": 0.216,
                 "ev": 93.0,
-                "brl_pct": 5.0,
+                "brl_pct": 4.9,
                 "hr": 5
               },
               {
                 "batter_id": "682987",
                 "name": "Spencer Jones",
                 "hand": "L",
-                "fit_score": 10.9,
+                "fit_score": 10.7,
                 "convergent_pitch": "SL",
-                "pa": 72,
-                "iso": 0.062,
-                "ev": 93.9,
-                "brl_pct": 2.8,
+                "pa": 74,
+                "iso": 0.061,
+                "ev": 93.6,
+                "brl_pct": 2.7,
                 "hr": 0
               }
             ]
@@ -6382,27 +6378,27 @@
                 "hr": 5
               },
               {
-                "batter_id": "641857",
-                "name": "Ryan McMahon",
-                "hand": "L",
-                "fit_score": 12.0,
-                "convergent_pitch": "SI",
-                "pa": 48,
-                "iso": 0.163,
-                "ev": 93.0,
-                "brl_pct": 2.1,
-                "hr": 2
-              },
-              {
                 "batter_id": "669224",
                 "name": "Austin Wells",
                 "hand": "L",
-                "fit_score": 11.6,
+                "fit_score": 11.8,
                 "convergent_pitch": "SI",
-                "pa": 43,
-                "iso": 0.179,
-                "ev": 90.2,
-                "brl_pct": 7.0,
+                "pa": 44,
+                "iso": 0.175,
+                "ev": 90.5,
+                "brl_pct": 6.8,
+                "hr": 2
+              },
+              {
+                "batter_id": "641857",
+                "name": "Ryan McMahon",
+                "hand": "L",
+                "fit_score": 11.7,
+                "convergent_pitch": "SI",
+                "pa": 49,
+                "iso": 0.159,
+                "ev": 93.0,
+                "brl_pct": 2.0,
                 "hr": 2
               }
             ]
@@ -6417,15 +6413,15 @@
             "arsenal": [
               [
                 "SL",
-                41.1
+                40.3
               ],
               [
                 "FF",
-                39.0
+                40.3
               ],
               [
                 "SI",
-                19.1
+                18.8
               ]
             ],
             "top5": [
@@ -6433,60 +6429,60 @@
                 "batter_id": "700250",
                 "name": "Ben Rice",
                 "hand": "L",
-                "fit_score": 13.6,
+                "fit_score": 14.1,
                 "convergent_pitch": "FF",
-                "pa": 114,
-                "iso": 0.412,
-                "ev": 95.2,
-                "brl_pct": 5.3,
-                "hr": 10
-              },
-              {
-                "batter_id": "669224",
-                "name": "Austin Wells",
-                "hand": "L",
-                "fit_score": 11.4,
-                "convergent_pitch": "FF",
-                "pa": 84,
-                "iso": 0.155,
-                "ev": 92.4,
-                "brl_pct": 3.6,
-                "hr": 3
+                "pa": 117,
+                "iso": 0.43,
+                "ev": 95.4,
+                "brl_pct": 6.0,
+                "hr": 11
               },
               {
                 "batter_id": "663757",
                 "name": "Trent Grisham",
                 "hand": "L",
-                "fit_score": 11.3,
+                "fit_score": 11.2,
                 "convergent_pitch": "FF",
-                "pa": 128,
-                "iso": 0.254,
+                "pa": 131,
+                "iso": 0.25,
                 "ev": 92.7,
-                "brl_pct": 5.5,
+                "brl_pct": 5.3,
                 "hr": 7
+              },
+              {
+                "batter_id": "669224",
+                "name": "Austin Wells",
+                "hand": "L",
+                "fit_score": 11.0,
+                "convergent_pitch": "SL",
+                "pa": 85,
+                "iso": 0.153,
+                "ev": 91.3,
+                "brl_pct": 3.5,
+                "hr": 3
               },
               {
                 "batter_id": "671277",
                 "name": "Luis García Jr.",
                 "hand": "L",
-                "fit_score": 11.0,
+                "fit_score": 10.9,
                 "convergent_pitch": "FF",
-                "pa": 120,
-                "iso": 0.219,
+                "pa": 122,
+                "iso": 0.216,
                 "ev": 93.0,
-                "brl_pct": 5.0,
+                "brl_pct": 4.9,
                 "hr": 5
               },
               {
                 "batter_id": "682987",
                 "name": "Spencer Jones",
                 "hand": "L",
-                "fit_score": 11.0,
+                "fit_score": 10.7,
                 "convergent_pitch": "SL",
-                "pa": 72,
-                "iso": 0.062,
-                "ev": 93.9,
-                "brl_pct": 2.8,
+                "pa": 74,
+                "iso": 0.061,
+                "ev": 93.6,
+                "brl_pct": 2.7,
                 "hr": 0
               }
             ]
@@ -6500,20 +6496,20 @@
             "grade_vsR": "🤔 Average",
             "arsenal": [
               [
+                "FF",
+                28.9
+              ],
+              [
                 "CH",
                 28.4
               ],
               [
-                "FF",
-                27.9
-              ],
-              [
                 "SL",
-                23.2
+                22.7
               ],
               [
                 "CU",
-                20.5
+                20.1
               ]
             ],
             "top5": [
@@ -6521,48 +6517,48 @@
                 "batter_id": "700250",
                 "name": "Ben Rice",
                 "hand": "L",
-                "fit_score": 13.6,
+                "fit_score": 14.1,
                 "convergent_pitch": "FF",
-                "pa": 159,
-                "iso": 0.367,
-                "ev": 93.9,
-                "brl_pct": 6.3,
-                "hr": 13
+                "pa": 163,
+                "iso": 0.378,
+                "ev": 94.1,
+                "brl_pct": 6.7,
+                "hr": 14
               },
               {
                 "batter_id": "682987",
                 "name": "Spencer Jones",
                 "hand": "L",
-                "fit_score": 12.2,
+                "fit_score": 12.0,
                 "convergent_pitch": "CH",
-                "pa": 87,
-                "iso": 0.101,
-                "ev": 94.3,
-                "brl_pct": 4.6,
+                "pa": 89,
+                "iso": 0.099,
+                "ev": 94.0,
+                "brl_pct": 4.5,
                 "hr": 1
               },
               {
                 "batter_id": "671277",
                 "name": "Luis García Jr.",
                 "hand": "L",
-                "fit_score": 11.0,
+                "fit_score": 11.1,
                 "convergent_pitch": "FF",
-                "pa": 190,
-                "iso": 0.235,
-                "ev": 92.1,
-                "brl_pct": 4.2,
+                "pa": 194,
+                "iso": 0.23,
+                "ev": 92.2,
+                "brl_pct": 4.1,
                 "hr": 10
               },
               {
                 "batter_id": "663757",
                 "name": "Trent Grisham",
                 "hand": "L",
-                "fit_score": 10.4,
+                "fit_score": 10.3,
                 "convergent_pitch": "FF",
-                "pa": 164,
-                "iso": 0.272,
+                "pa": 167,
+                "iso": 0.268,
                 "ev": 91.5,
-                "brl_pct": 4.9,
+                "brl_pct": 4.8,
                 "hr": 10
               },
               {
@@ -6589,19 +6585,19 @@
             "arsenal": [
               [
                 "SI",
-                43.6
+                43.3
               ],
               [
                 "FF",
-                23.1
+                22.9
               ],
               [
                 "CU",
-                12.8
+                13.4
               ],
               [
                 "SL",
-                12.8
+                12.7
               ]
             ],
             "top5": [
@@ -6645,7 +6641,7 @@
                 "batter_id": "682987",
                 "name": "Spencer Jones",
                 "hand": "L",
-                "fit_score": 10.9,
+                "fit_score": 10.8,
                 "convergent_pitch": "FF",
                 "pa": 16,
                 "iso": 0.583,
@@ -6761,19 +6757,19 @@
             "arsenal": [
               [
                 "SI",
-                54.2
+                54.1
               ],
               [
                 "FS",
-                28.6
+                28.8
               ],
               [
                 "SL",
-                8.3
+                8.2
               ],
               [
                 "FF",
-                5.4
+                5.3
               ]
             ],
             "top5": [
@@ -6802,18 +6798,6 @@
                 "hr": 3
               },
               {
-                "batter_id": "641857",
-                "name": "Ryan McMahon",
-                "hand": "L",
-                "fit_score": 13.1,
-                "convergent_pitch": "SI",
-                "pa": 36,
-                "iso": 0.281,
-                "ev": 90.6,
-                "brl_pct": 2.8,
-                "hr": 2
-              },
-              {
                 "batter_id": "700250",
                 "name": "Ben Rice",
                 "hand": "L",
@@ -6826,16 +6810,28 @@
                 "hr": 3
               },
               {
-                "batter_id": "663757",
-                "name": "Trent Grisham",
+                "batter_id": "641857",
+                "name": "Ryan McMahon",
                 "hand": "L",
-                "fit_score": 10.1,
+                "fit_score": 12.7,
                 "convergent_pitch": "SI",
-                "pa": 59,
-                "iso": 0.217,
-                "ev": 92.4,
-                "brl_pct": 3.4,
-                "hr": 3
+                "pa": 37,
+                "iso": 0.273,
+                "ev": 90.6,
+                "brl_pct": 2.7,
+                "hr": 2
+              },
+              {
+                "batter_id": "669224",
+                "name": "Austin Wells",
+                "hand": "L",
+                "fit_score": 9.8,
+                "convergent_pitch": "SI",
+                "pa": 45,
+                "iso": 0.154,
+                "ev": 86.7,
+                "brl_pct": 4.4,
+                "hr": 2
               }
             ]
           }
@@ -6851,15 +6847,15 @@
             "arsenal": [
               [
                 "FS",
-                58.9
+                59.2
               ],
               [
                 "FF",
-                31.4
+                30.8
               ],
               [
                 "SL",
-                6.3
+                6.2
               ]
             ],
             "top5": [
@@ -6867,13 +6863,13 @@
                 "batter_id": "624413",
                 "name": "Pete Alonso",
                 "hand": "R",
-                "fit_score": 12.3,
+                "fit_score": 12.6,
                 "convergent_pitch": "FF",
-                "pa": 89,
-                "iso": 0.39,
-                "ev": 96.0,
-                "brl_pct": 9.0,
-                "hr": 9
+                "pa": 90,
+                "iso": 0.423,
+                "ev": 96.2,
+                "brl_pct": 10.0,
+                "hr": 10
               },
               {
                 "batter_id": "694212",
@@ -6881,10 +6877,10 @@
                 "hand": "L",
                 "fit_score": 11.3,
                 "convergent_pitch": "FF",
-                "pa": 84,
-                "iso": 0.26,
-                "ev": 94.5,
-                "brl_pct": 1.2,
+                "pa": 85,
+                "iso": 0.256,
+                "ev": 94.7,
+                "brl_pct": 2.4,
                 "hr": 5
               },
               {
@@ -6893,34 +6889,34 @@
                 "hand": "L",
                 "fit_score": 10.3,
                 "convergent_pitch": "FF",
-                "pa": 135,
+                "pa": 136,
                 "iso": 0.143,
                 "ev": 92.7,
-                "brl_pct": 3.0,
+                "brl_pct": 2.9,
                 "hr": 4
               },
               {
                 "batter_id": "702616",
                 "name": "Jackson Holliday",
                 "hand": "L",
-                "fit_score": 9.4,
+                "fit_score": 8.9,
                 "convergent_pitch": "FS",
-                "pa": 77,
-                "iso": 0.258,
-                "ev": 88.0,
-                "brl_pct": 3.9,
+                "pa": 78,
+                "iso": 0.254,
+                "ev": 87.9,
+                "brl_pct": 3.8,
                 "hr": 4
               },
               {
                 "batter_id": "691723",
                 "name": "Coby Mayo",
                 "hand": "R",
-                "fit_score": 7.8,
-                "convergent_pitch": "FS",
-                "pa": 51,
-                "iso": 0.068,
+                "fit_score": 6.8,
+                "convergent_pitch": "FF",
+                "pa": 52,
+                "iso": 0.067,
                 "ev": 93.6,
-                "brl_pct": 2.0,
+                "brl_pct": 1.9,
                 "hr": 0
               }
             ]
@@ -6935,15 +6931,15 @@
             "arsenal": [
               [
                 "SI",
-                84.0
+                83.8
               ],
               [
                 "FF",
-                8.6
+                8.4
               ],
               [
                 "SL",
-                7.5
+                7.9
               ]
             ],
             "top5": [
@@ -6951,11 +6947,11 @@
                 "batter_id": "624413",
                 "name": "Pete Alonso",
                 "hand": "R",
-                "fit_score": 16.0,
-                "convergent_pitch": "FF",
-                "pa": 65,
-                "iso": 0.121,
-                "ev": 97.9,
+                "fit_score": 16.4,
+                "convergent_pitch": "SI",
+                "pa": 67,
+                "iso": 0.117,
+                "ev": 98.1,
                 "brl_pct": 1.5,
                 "hr": 1
               },
@@ -6965,10 +6961,10 @@
                 "hand": "R",
                 "fit_score": 15.1,
                 "convergent_pitch": "FF",
-                "pa": 48,
-                "iso": 0.475,
+                "pa": 49,
+                "iso": 0.463,
                 "ev": 96.4,
-                "brl_pct": 4.2,
+                "brl_pct": 4.1,
                 "hr": 5
               },
               {
@@ -6987,7 +6983,7 @@
                 "batter_id": "691723",
                 "name": "Coby Mayo",
                 "hand": "R",
-                "fit_score": 11.0,
+                "fit_score": 10.9,
                 "convergent_pitch": "FF",
                 "pa": 54,
                 "iso": 0.479,
@@ -6996,14 +6992,14 @@
                 "hr": 6
               },
               {
-                "batter_id": "665966",
-                "name": "Carlos Narváez",
-                "hand": "R",
-                "fit_score": 5.1,
-                "convergent_pitch": "FF",
-                "pa": 23,
-                "iso": 0.053,
-                "ev": 89.6,
+                "batter_id": "683002",
+                "name": "Gunnar Henderson",
+                "hand": "L",
+                "fit_score": 5.2,
+                "convergent_pitch": "SI",
+                "pa": 81,
+                "iso": 0.113,
+                "ev": 90.1,
                 "brl_pct": 0.0,
                 "hr": 0
               }
@@ -7019,7 +7015,7 @@
             "arsenal": [
               [
                 "FS",
-                53.1
+                53.3
               ],
               [
                 "FF",
@@ -7027,7 +7023,7 @@
               ],
               [
                 "CU",
-                11.1
+                11.0
               ]
             ],
             "top5": [
@@ -7035,24 +7031,24 @@
                 "batter_id": "624413",
                 "name": "Pete Alonso",
                 "hand": "R",
-                "fit_score": 12.5,
+                "fit_score": 13.0,
                 "convergent_pitch": "FF",
-                "pa": 89,
-                "iso": 0.39,
-                "ev": 96.0,
-                "brl_pct": 9.0,
-                "hr": 9
+                "pa": 90,
+                "iso": 0.423,
+                "ev": 96.2,
+                "brl_pct": 10.0,
+                "hr": 10
               },
               {
                 "batter_id": "694212",
                 "name": "Samuel Basallo",
                 "hand": "L",
-                "fit_score": 11.4,
+                "fit_score": 11.5,
                 "convergent_pitch": "FF",
-                "pa": 84,
-                "iso": 0.26,
-                "ev": 94.5,
-                "brl_pct": 1.2,
+                "pa": 85,
+                "iso": 0.256,
+                "ev": 94.7,
+                "brl_pct": 2.4,
                 "hr": 5
               },
               {
@@ -7061,35 +7057,35 @@
                 "hand": "L",
                 "fit_score": 10.4,
                 "convergent_pitch": "FF",
-                "pa": 135,
+                "pa": 136,
                 "iso": 0.143,
                 "ev": 92.7,
-                "brl_pct": 3.0,
+                "brl_pct": 2.9,
                 "hr": 4
               },
               {
                 "batter_id": "702616",
                 "name": "Jackson Holliday",
                 "hand": "L",
-                "fit_score": 9.2,
+                "fit_score": 8.8,
                 "convergent_pitch": "FS",
-                "pa": 77,
-                "iso": 0.258,
-                "ev": 88.0,
-                "brl_pct": 3.9,
+                "pa": 78,
+                "iso": 0.254,
+                "ev": 87.9,
+                "brl_pct": 3.8,
                 "hr": 4
               },
               {
-                "batter_id": "691723",
-                "name": "Coby Mayo",
-                "hand": "R",
-                "fit_score": 7.8,
-                "convergent_pitch": "FS",
-                "pa": 51,
-                "iso": 0.068,
-                "ev": 93.6,
-                "brl_pct": 2.0,
-                "hr": 0
+                "batter_id": "681297",
+                "name": "Colton Cowser",
+                "hand": "L",
+                "fit_score": 7.2,
+                "convergent_pitch": "FF",
+                "pa": 98,
+                "iso": 0.11,
+                "ev": 88.3,
+                "brl_pct": 0.0,
+                "hr": 2
               }
             ]
           },
@@ -7191,19 +7187,19 @@
             "arsenal": [
               [
                 "SI",
-                34.0
+                33.7
               ],
               [
                 "CH",
-                24.2
+                24.5
               ],
               [
                 "FC",
-                16.0
+                16.1
               ],
               [
                 "CU",
-                13.7
+                13.4
               ]
             ],
             "top5": [
@@ -7211,10 +7207,10 @@
                 "batter_id": "694212",
                 "name": "Samuel Basallo",
                 "hand": "L",
-                "fit_score": 13.0,
-                "convergent_pitch": "FC",
-                "pa": 71,
-                "iso": 0.339,
+                "fit_score": 12.8,
+                "convergent_pitch": "SI",
+                "pa": 72,
+                "iso": 0.333,
                 "ev": 91.7,
                 "brl_pct": 1.4,
                 "hr": 6
@@ -7223,11 +7219,11 @@
                 "batter_id": "683002",
                 "name": "Gunnar Henderson",
                 "hand": "L",
-                "fit_score": 12.1,
+                "fit_score": 12.2,
                 "convergent_pitch": "FC",
-                "pa": 134,
-                "iso": 0.197,
-                "ev": 92.7,
+                "pa": 136,
+                "iso": 0.202,
+                "ev": 92.9,
                 "brl_pct": 2.2,
                 "hr": 7
               },
@@ -7237,11 +7233,23 @@
                 "hand": "L",
                 "fit_score": 9.4,
                 "convergent_pitch": "FC",
-                "pa": 81,
-                "iso": 0.182,
-                "ev": 86.3,
+                "pa": 82,
+                "iso": 0.179,
+                "ev": 86.4,
                 "brl_pct": 3.7,
                 "hr": 4
+              },
+              {
+                "batter_id": "687637",
+                "name": "Dylan Beavers",
+                "hand": "L",
+                "fit_score": 9.0,
+                "convergent_pitch": "SI",
+                "pa": 71,
+                "iso": 0.119,
+                "ev": 89.2,
+                "brl_pct": 2.8,
+                "hr": 1
               },
               {
                 "batter_id": "687952",
@@ -7254,18 +7262,6 @@
                 "ev": 91.3,
                 "brl_pct": 11.1,
                 "hr": 1
-              },
-              {
-                "batter_id": "687637",
-                "name": "Dylan Beavers",
-                "hand": "L",
-                "fit_score": 8.4,
-                "convergent_pitch": "SI",
-                "pa": 68,
-                "iso": 0.07,
-                "ev": 88.9,
-                "brl_pct": 1.5,
-                "hr": 0
               }
             ]
           },
@@ -7279,19 +7275,19 @@
             "arsenal": [
               [
                 "FF",
-                55.1
+                55.3
               ],
               [
                 "SL",
-                27.2
+                26.8
               ],
               [
                 "SI",
-                10.7
+                11.0
               ],
               [
                 "FS",
-                7.0
+                6.9
               ]
             ],
             "top5": [
@@ -7323,12 +7319,12 @@
                 "batter_id": "641933",
                 "name": "Tyler O'Neill",
                 "hand": "R",
-                "fit_score": 15.1,
+                "fit_score": 15.0,
                 "convergent_pitch": "FF",
-                "pa": 43,
-                "iso": 0.395,
+                "pa": 44,
+                "iso": 0.385,
                 "ev": 95.5,
-                "brl_pct": 4.7,
+                "brl_pct": 4.5,
                 "hr": 4
               },
               {
@@ -7337,8 +7333,8 @@
                 "hand": "R",
                 "fit_score": 14.0,
                 "convergent_pitch": "FF",
-                "pa": 59,
-                "iso": 0.255,
+                "pa": 60,
+                "iso": 0.25,
                 "ev": 95.9,
                 "brl_pct": 1.7,
                 "hr": 3
@@ -7347,12 +7343,12 @@
                 "batter_id": "694212",
                 "name": "Samuel Basallo",
                 "hand": "L",
-                "fit_score": 8.8,
+                "fit_score": 8.6,
                 "convergent_pitch": "SL",
-                "pa": 37,
-                "iso": 0.167,
+                "pa": 38,
+                "iso": 0.162,
                 "ev": 92.6,
-                "brl_pct": 2.7,
+                "brl_pct": 2.6,
                 "hr": 2
               }
             ]
@@ -7395,25 +7391,37 @@
                 "batter_id": "682928",
                 "name": "CJ Abrams",
                 "hand": "L",
-                "fit_score": 14.0,
+                "fit_score": 13.7,
                 "convergent_pitch": "SI",
-                "pa": 126,
-                "iso": 0.302,
-                "ev": 92.7,
-                "brl_pct": 4.0,
+                "pa": 129,
+                "iso": 0.294,
+                "ev": 92.5,
+                "brl_pct": 3.9,
                 "hr": 10
               },
               {
                 "batter_id": "677588",
                 "name": "José Tena",
                 "hand": "L",
-                "fit_score": 10.9,
+                "fit_score": 10.8,
                 "convergent_pitch": "SI",
-                "pa": 99,
-                "iso": 0.157,
-                "ev": 90.4,
+                "pa": 101,
+                "iso": 0.154,
+                "ev": 90.5,
                 "brl_pct": 2.0,
                 "hr": 4
+              },
+              {
+                "batter_id": "665953",
+                "name": "Andrés Chaparro",
+                "hand": "R",
+                "fit_score": 10.4,
+                "convergent_pitch": "SI",
+                "pa": 7,
+                "iso": 0.571,
+                "ev": 88.2,
+                "brl_pct": 28.6,
+                "hr": 1
               },
               {
                 "batter_id": "660688",
@@ -7421,9 +7429,9 @@
                 "hand": "S",
                 "fit_score": 9.6,
                 "convergent_pitch": "SI",
-                "pa": 75,
-                "iso": 0.125,
-                "ev": 87.8,
+                "pa": 76,
+                "iso": 0.123,
+                "ev": 87.9,
                 "brl_pct": 0.0,
                 "hr": 1
               },
@@ -7431,25 +7439,13 @@
                 "batter_id": "695734",
                 "name": "Daylen Lile",
                 "hand": "L",
-                "fit_score": 8.8,
+                "fit_score": 8.7,
                 "convergent_pitch": "SI",
-                "pa": 129,
-                "iso": 0.18,
-                "ev": 87.1,
-                "brl_pct": 3.9,
+                "pa": 131,
+                "iso": 0.177,
+                "ev": 87.2,
+                "brl_pct": 3.8,
                 "hr": 5
-              },
-              {
-                "batter_id": "691781",
-                "name": "Brady House",
-                "hand": "R",
-                "fit_score": 8.5,
-                "convergent_pitch": "CH",
-                "pa": 73,
-                "iso": 0.071,
-                "ev": 90.6,
-                "brl_pct": 4.1,
-                "hr": 1
               }
             ]
           },
@@ -7463,19 +7459,19 @@
             "arsenal": [
               [
                 "FF",
-                30.5
+                30.8
               ],
               [
                 "SL",
-                26.6
+                26.4
               ],
               [
                 "FC",
-                26.0
+                26.4
               ],
               [
                 "FS",
-                14.7
+                14.3
               ]
             ],
             "top5": [
@@ -7483,61 +7479,61 @@
                 "batter_id": "694673",
                 "name": "Abimelec Ortiz",
                 "hand": "L",
-                "fit_score": 12.4,
+                "fit_score": 12.2,
                 "convergent_pitch": "FF",
-                "pa": 25,
-                "iso": 0.417,
-                "ev": 94.7,
-                "brl_pct": 16.0,
+                "pa": 27,
+                "iso": 0.44,
+                "ev": 94.6,
+                "brl_pct": 14.8,
                 "hr": 3
               },
               {
                 "batter_id": "677588",
                 "name": "José Tena",
                 "hand": "L",
-                "fit_score": 12.1,
+                "fit_score": 12.0,
                 "convergent_pitch": "FC",
-                "pa": 110,
+                "pa": 111,
                 "iso": 0.168,
                 "ev": 94.4,
                 "brl_pct": 0.0,
                 "hr": 3
               },
               {
+                "batter_id": "665953",
+                "name": "Andrés Chaparro",
+                "hand": "R",
+                "fit_score": 8.9,
+                "convergent_pitch": "FF",
+                "pa": 18,
+                "iso": 0.556,
+                "ev": 83.9,
+                "brl_pct": 11.1,
+                "hr": 3
+              },
+              {
                 "batter_id": "682928",
                 "name": "CJ Abrams",
                 "hand": "L",
-                "fit_score": 8.8,
+                "fit_score": 8.7,
                 "convergent_pitch": "SL",
-                "pa": 180,
-                "iso": 0.284,
+                "pa": 182,
+                "iso": 0.28,
                 "ev": 89.6,
-                "brl_pct": 1.7,
+                "brl_pct": 1.6,
                 "hr": 10
               },
               {
                 "batter_id": "695734",
                 "name": "Daylen Lile",
                 "hand": "L",
-                "fit_score": 8.1,
+                "fit_score": 8.3,
                 "convergent_pitch": "FC",
-                "pa": 171,
-                "iso": 0.222,
-                "ev": 89.2,
-                "brl_pct": 4.1,
+                "pa": 173,
+                "iso": 0.219,
+                "ev": 89.3,
+                "brl_pct": 4.6,
                 "hr": 6
-              },
-              {
-                "batter_id": "660688",
-                "name": "Keibert Ruiz",
-                "hand": "S",
-                "fit_score": 8.0,
-                "convergent_pitch": "FC",
-                "pa": 94,
-                "iso": 0.184,
-                "ev": 87.6,
-                "brl_pct": 1.1,
-                "hr": 3
               }
             ]
           },
@@ -7583,35 +7579,35 @@
                 "batter_id": "691781",
                 "name": "Brady House",
                 "hand": "R",
-                "fit_score": 10.0,
+                "fit_score": 9.7,
                 "convergent_pitch": "FF",
-                "pa": 46,
-                "iso": 0.268,
-                "ev": 94.6,
-                "brl_pct": 2.2,
+                "pa": 47,
+                "iso": 0.262,
+                "ev": 93.8,
+                "brl_pct": 2.1,
                 "hr": 2
               },
               {
                 "batter_id": "686611",
                 "name": "Dylan Crews",
                 "hand": "R",
-                "fit_score": 8.5,
+                "fit_score": 8.3,
                 "convergent_pitch": "SI",
-                "pa": 67,
-                "iso": 0.179,
-                "ev": 93.6,
-                "brl_pct": 3.0,
+                "pa": 68,
+                "iso": 0.175,
+                "ev": 93.4,
+                "brl_pct": 2.9,
                 "hr": 3
               },
               {
                 "batter_id": "696285",
                 "name": "Jacob Young",
                 "hand": "R",
-                "fit_score": 8.2,
+                "fit_score": 8.1,
                 "convergent_pitch": "FF",
-                "pa": 69,
-                "iso": 0.259,
-                "ev": 90.2,
+                "pa": 70,
+                "iso": 0.254,
+                "ev": 90.0,
                 "brl_pct": 2.9,
                 "hr": 3
               },
@@ -7639,11 +7635,11 @@
             "arsenal": [
               [
                 "CH",
-                48.1
+                47.7
               ],
               [
                 "FF",
-                35.2
+                35.6
               ],
               [
                 "SL",
@@ -7657,29 +7653,29 @@
                 "hand": "L",
                 "fit_score": 13.0,
                 "convergent_pitch": "FF",
-                "pa": 22,
+                "pa": 23,
                 "iso": 0.5,
                 "ev": 95.3,
-                "brl_pct": 18.2,
+                "brl_pct": 17.4,
                 "hr": 3
               },
               {
-                "batter_id": "682928",
-                "name": "CJ Abrams",
-                "hand": "L",
-                "fit_score": 10.5,
-                "convergent_pitch": "CH",
-                "pa": 151,
-                "iso": 0.271,
-                "ev": 89.6,
-                "brl_pct": 3.3,
-                "hr": 9
+                "batter_id": "665953",
+                "name": "Andrés Chaparro",
+                "hand": "R",
+                "fit_score": 11.0,
+                "convergent_pitch": "FF",
+                "pa": 9,
+                "iso": 0.778,
+                "ev": 88.9,
+                "brl_pct": 11.1,
+                "hr": 2
               },
               {
                 "batter_id": "691781",
                 "name": "Brady House",
                 "hand": "R",
-                "fit_score": 10.3,
+                "fit_score": 10.2,
                 "convergent_pitch": "CH",
                 "pa": 35,
                 "iso": 0.121,
@@ -7688,28 +7684,28 @@
                 "hr": 1
               },
               {
+                "batter_id": "682928",
+                "name": "CJ Abrams",
+                "hand": "L",
+                "fit_score": 10.2,
+                "convergent_pitch": "CH",
+                "pa": 153,
+                "iso": 0.267,
+                "ev": 89.5,
+                "brl_pct": 3.3,
+                "hr": 9
+              },
+              {
                 "batter_id": "660688",
                 "name": "Keibert Ruiz",
                 "hand": "S",
-                "fit_score": 9.3,
+                "fit_score": 9.4,
                 "convergent_pitch": "CH",
-                "pa": 87,
-                "iso": 0.185,
-                "ev": 88.6,
+                "pa": 89,
+                "iso": 0.181,
+                "ev": 88.8,
                 "brl_pct": 1.1,
                 "hr": 3
-              },
-              {
-                "batter_id": "677588",
-                "name": "José Tena",
-                "hand": "L",
-                "fit_score": 8.3,
-                "convergent_pitch": "FF",
-                "pa": 110,
-                "iso": 0.109,
-                "ev": 90.0,
-                "brl_pct": 0.0,
-                "hr": 2
               }
             ]
           },
@@ -7755,11 +7751,11 @@
                 "batter_id": "691781",
                 "name": "Brady House",
                 "hand": "R",
-                "fit_score": 9.6,
+                "fit_score": 9.3,
                 "convergent_pitch": "FF",
-                "pa": 52,
-                "iso": 0.239,
-                "ev": 91.5,
+                "pa": 53,
+                "iso": 0.234,
+                "ev": 90.8,
                 "brl_pct": 1.9,
                 "hr": 2
               },
@@ -7767,11 +7763,11 @@
                 "batter_id": "686611",
                 "name": "Dylan Crews",
                 "hand": "R",
-                "fit_score": 8.9,
+                "fit_score": 8.8,
                 "convergent_pitch": "SI",
-                "pa": 71,
-                "iso": 0.197,
-                "ev": 92.8,
+                "pa": 72,
+                "iso": 0.194,
+                "ev": 92.7,
                 "brl_pct": 2.8,
                 "hr": 3
               },
@@ -7779,12 +7775,12 @@
                 "batter_id": "696285",
                 "name": "Jacob Young",
                 "hand": "R",
-                "fit_score": 7.5,
+                "fit_score": 7.4,
                 "convergent_pitch": "FF",
-                "pa": 85,
-                "iso": 0.203,
-                "ev": 88.4,
-                "brl_pct": 2.4,
+                "pa": 86,
+                "iso": 0.2,
+                "ev": 88.3,
+                "brl_pct": 2.3,
                 "hr": 3
               },
               {
@@ -7833,41 +7829,41 @@
                 "hand": "L",
                 "fit_score": 15.8,
                 "convergent_pitch": "FF",
-                "pa": 27,
+                "pa": 28,
                 "iso": 0.5,
                 "ev": 93.4,
-                "brl_pct": 18.5,
+                "brl_pct": 17.9,
                 "hr": 4
               },
               {
                 "batter_id": "677588",
                 "name": "José Tena",
                 "hand": "L",
-                "fit_score": 9.8,
+                "fit_score": 11.7,
                 "convergent_pitch": "FS",
-                "pa": 78,
-                "iso": 0.157,
-                "ev": 93.9,
-                "brl_pct": 0.0,
-                "hr": 2
+                "pa": 80,
+                "iso": 0.197,
+                "ev": 94.1,
+                "brl_pct": 1.2,
+                "hr": 3
               },
               {
                 "batter_id": "695734",
                 "name": "Daylen Lile",
                 "hand": "L",
-                "fit_score": 9.7,
+                "fit_score": 9.9,
                 "convergent_pitch": "ST",
-                "pa": 149,
-                "iso": 0.213,
-                "ev": 89.7,
-                "brl_pct": 3.4,
+                "pa": 151,
+                "iso": 0.21,
+                "ev": 89.8,
+                "brl_pct": 4.0,
                 "hr": 5
               },
               {
                 "batter_id": "665953",
                 "name": "Andrés Chaparro",
                 "hand": "R",
-                "fit_score": 8.1,
+                "fit_score": 9.7,
                 "convergent_pitch": "FF",
                 "pa": 15,
                 "iso": 0.533,
@@ -7881,10 +7877,10 @@
                 "hand": "L",
                 "fit_score": 7.7,
                 "convergent_pitch": "FS",
-                "pa": 140,
-                "iso": 0.177,
+                "pa": 141,
+                "iso": 0.175,
                 "ev": 89.2,
-                "brl_pct": 3.6,
+                "brl_pct": 3.5,
                 "hr": 4
               }
             ]
@@ -7931,12 +7927,12 @@
                 "batter_id": "691781",
                 "name": "Brady House",
                 "hand": "R",
-                "fit_score": 12.7,
+                "fit_score": 11.9,
                 "convergent_pitch": "FF",
-                "pa": 37,
-                "iso": 0.25,
-                "ev": 89.9,
-                "brl_pct": 2.7,
+                "pa": 38,
+                "iso": 0.243,
+                "ev": 89.1,
+                "brl_pct": 2.6,
                 "hr": 2
               },
               {
@@ -7955,11 +7951,11 @@
                 "batter_id": "686611",
                 "name": "Dylan Crews",
                 "hand": "R",
-                "fit_score": 8.5,
+                "fit_score": 8.2,
                 "convergent_pitch": "FF",
-                "pa": 45,
-                "iso": 0.211,
-                "ev": 92.2,
+                "pa": 46,
+                "iso": 0.205,
+                "ev": 92.0,
                 "brl_pct": 2.2,
                 "hr": 2
               },
@@ -7989,19 +7985,19 @@
             "arsenal": [
               [
                 "FF",
-                47.7
+                48.2
               ],
               [
                 "CH",
-                23.4
+                22.8
               ],
               [
                 "CU",
-                14.4
+                14.9
               ],
               [
                 "FC",
-                9.0
+                8.8
               ]
             ],
             "top5": [
@@ -8021,7 +8017,7 @@
                 "batter_id": "553869",
                 "name": "Elias Díaz",
                 "hand": "R",
-                "fit_score": 9.5,
+                "fit_score": 9.6,
                 "convergent_pitch": "FF",
                 "pa": 36,
                 "iso": 0.229,
@@ -8057,7 +8053,7 @@
                 "batter_id": "679822",
                 "name": "Justin Foscue",
                 "hand": "R",
-                "fit_score": 7.3,
+                "fit_score": 7.2,
                 "convergent_pitch": "CH",
                 "pa": 53,
                 "iso": 0.25,
@@ -8111,22 +8107,10 @@
                 "hand": "L",
                 "fit_score": 12.3,
                 "convergent_pitch": "SL",
-                "pa": 182,
-                "iso": 0.165,
+                "pa": 185,
+                "iso": 0.161,
                 "ev": 93.3,
                 "brl_pct": 0.5,
-                "hr": 5
-              },
-              {
-                "batter_id": "608369",
-                "name": "Corey Seager",
-                "hand": "L",
-                "fit_score": 12.2,
-                "convergent_pitch": "SL",
-                "pa": 87,
-                "iso": 0.216,
-                "ev": 91.0,
-                "brl_pct": 4.6,
                 "hr": 5
               },
               {
@@ -8135,11 +8119,23 @@
                 "hand": "L",
                 "fit_score": 12.2,
                 "convergent_pitch": "SI",
-                "pa": 173,
-                "iso": 0.257,
+                "pa": 176,
+                "iso": 0.252,
                 "ev": 94.8,
                 "brl_pct": 2.3,
                 "hr": 10
+              },
+              {
+                "batter_id": "608369",
+                "name": "Corey Seager",
+                "hand": "L",
+                "fit_score": 12.1,
+                "convergent_pitch": "SL",
+                "pa": 88,
+                "iso": 0.213,
+                "ev": 90.6,
+                "brl_pct": 4.5,
+                "hr": 5
               },
               {
                 "batter_id": "694497",
@@ -8165,19 +8161,19 @@
             "arsenal": [
               [
                 "SI",
-                43.5
+                42.7
               ],
               [
                 "ST",
-                29.9
+                30.7
               ],
               [
                 "CU",
-                13.6
+                13.3
               ],
               [
                 "FF",
-                9.5
+                10.0
               ]
             ],
             "top5": [
@@ -8185,7 +8181,7 @@
                 "batter_id": "592626",
                 "name": "Joc Pederson",
                 "hand": "L",
-                "fit_score": 16.7,
+                "fit_score": 16.8,
                 "convergent_pitch": "ST",
                 "pa": 48,
                 "iso": 0.378,
@@ -8197,10 +8193,10 @@
                 "batter_id": "607043",
                 "name": "Brandon Nimmo",
                 "hand": "L",
-                "fit_score": 12.9,
+                "fit_score": 13.1,
                 "convergent_pitch": "ST",
-                "pa": 58,
-                "iso": 0.059,
+                "pa": 59,
+                "iso": 0.058,
                 "ev": 96.0,
                 "brl_pct": 0.0,
                 "hr": 0
@@ -8221,7 +8217,7 @@
                 "batter_id": "672284",
                 "name": "Jarred Kelenic",
                 "hand": "L",
-                "fit_score": 8.4,
+                "fit_score": 8.3,
                 "convergent_pitch": "SI",
                 "pa": 10,
                 "iso": 0.0,
@@ -8233,11 +8229,11 @@
                 "batter_id": "608369",
                 "name": "Corey Seager",
                 "hand": "L",
-                "fit_score": 6.8,
+                "fit_score": 6.7,
                 "convergent_pitch": "ST",
-                "pa": 38,
-                "iso": 0.031,
-                "ev": 88.8,
+                "pa": 39,
+                "iso": 0.03,
+                "ev": 88.1,
                 "brl_pct": 0.0,
                 "hr": 0
               }
@@ -8289,10 +8285,10 @@
                 "batter_id": "607043",
                 "name": "Brandon Nimmo",
                 "hand": "L",
-                "fit_score": 12.9,
+                "fit_score": 12.8,
                 "convergent_pitch": "SL",
-                "pa": 145,
-                "iso": 0.197,
+                "pa": 147,
+                "iso": 0.194,
                 "ev": 92.8,
                 "brl_pct": 0.7,
                 "hr": 5
@@ -8303,10 +8299,10 @@
                 "hand": "L",
                 "fit_score": 11.3,
                 "convergent_pitch": "FF",
-                "pa": 139,
-                "iso": 0.248,
+                "pa": 142,
+                "iso": 0.242,
                 "ev": 94.5,
-                "brl_pct": 2.9,
+                "brl_pct": 2.8,
                 "hr": 8
               },
               {
@@ -8341,19 +8337,31 @@
             "arsenal": [
               [
                 "SL",
-                72.1
+                71.3
               ],
               [
                 "FF",
-                24.3
+                24.8
               ]
             ],
             "top5": [
               {
+                "batter_id": "642350",
+                "name": "Jose Siri",
+                "hand": "R",
+                "fit_score": 14.4,
+                "convergent_pitch": "FF",
+                "pa": 30,
+                "iso": 0.25,
+                "ev": 95.4,
+                "brl_pct": 10.0,
+                "hr": 2
+              },
+              {
                 "batter_id": "694203",
                 "name": "Denzer Guzman",
                 "hand": "R",
-                "fit_score": 12.1,
+                "fit_score": 12.0,
                 "convergent_pitch": "SL",
                 "pa": 22,
                 "iso": 0.316,
@@ -8362,24 +8370,12 @@
                 "hr": 2
               },
               {
-                "batter_id": "642350",
-                "name": "Jose Siri",
-                "hand": "R",
-                "fit_score": 11.6,
-                "convergent_pitch": "FF",
-                "pa": 28,
-                "iso": 0.269,
-                "ev": 94.8,
-                "brl_pct": 7.1,
-                "hr": 2
-              },
-              {
                 "batter_id": "672724",
                 "name": "Oswald Peraza",
                 "hand": "R",
                 "fit_score": 8.9,
                 "convergent_pitch": "SL",
-                "pa": 47,
+                "pa": 48,
                 "iso": 0.227,
                 "ev": 90.3,
                 "brl_pct": 2.1,
@@ -8389,9 +8385,9 @@
                 "batter_id": "518595",
                 "name": "Travis d'Arnaud",
                 "hand": "R",
-                "fit_score": 7.0,
+                "fit_score": 7.1,
                 "convergent_pitch": "FF",
-                "pa": 8,
+                "pa": 9,
                 "iso": 0.429,
                 "ev": 99.3,
                 "brl_pct": 0.0,
@@ -8401,11 +8397,11 @@
                 "batter_id": "687263",
                 "name": "Zach Neto",
                 "hand": "R",
-                "fit_score": 6.9,
+                "fit_score": 7.0,
                 "convergent_pitch": "FF",
-                "pa": 61,
-                "iso": 0.158,
-                "ev": 91.9,
+                "pa": 62,
+                "iso": 0.155,
+                "ev": 91.1,
                 "brl_pct": 0.0,
                 "hr": 2
               }
@@ -8421,15 +8417,15 @@
             "arsenal": [
               [
                 "FF",
-                53.9
+                54.4
               ],
               [
                 "CH",
-                24.4
+                24.2
               ],
               [
                 "ST",
-                17.6
+                17.4
               ]
             ],
             "top5": [
@@ -8449,12 +8445,12 @@
                 "batter_id": "666139",
                 "name": "Josh Lowe",
                 "hand": "L",
-                "fit_score": 9.5,
+                "fit_score": 9.3,
                 "convergent_pitch": "FF",
-                "pa": 88,
-                "iso": 0.139,
-                "ev": 88.9,
-                "brl_pct": 4.5,
+                "pa": 91,
+                "iso": 0.136,
+                "ev": 88.8,
+                "brl_pct": 4.4,
                 "hr": 3
               },
               {
@@ -8463,8 +8459,8 @@
                 "hand": "L",
                 "fit_score": 8.6,
                 "convergent_pitch": "FF",
-                "pa": 90,
-                "iso": 0.076,
+                "pa": 91,
+                "iso": 0.075,
                 "ev": 88.3,
                 "brl_pct": 2.2,
                 "hr": 1
@@ -8473,19 +8469,19 @@
                 "batter_id": "694384",
                 "name": "Nolan Schanuel",
                 "hand": "L",
-                "fit_score": 6.4,
+                "fit_score": 6.2,
                 "convergent_pitch": "FF",
-                "pa": 137,
-                "iso": 0.08,
-                "ev": 87.0,
-                "brl_pct": 1.5,
+                "pa": 139,
+                "iso": 0.078,
+                "ev": 86.8,
+                "brl_pct": 1.4,
                 "hr": 1
               },
               {
                 "batter_id": "642350",
                 "name": "Jose Siri",
                 "hand": "R",
-                "fit_score": 6.2,
+                "fit_score": 6.1,
                 "convergent_pitch": "CH",
                 "pa": 25,
                 "iso": 0.368,
@@ -8505,15 +8501,15 @@
             "arsenal": [
               [
                 "FF",
-                48.4
+                48.7
               ],
               [
                 "SL",
-                44.2
+                44.0
               ],
               [
                 "FC",
-                6.8
+                6.7
               ]
             ],
             "top5": [
@@ -8521,10 +8517,10 @@
                 "batter_id": "666139",
                 "name": "Josh Lowe",
                 "hand": "L",
-                "fit_score": 14.4,
+                "fit_score": 14.3,
                 "convergent_pitch": "SL",
-                "pa": 80,
-                "iso": 0.216,
+                "pa": 81,
+                "iso": 0.213,
                 "ev": 92.9,
                 "brl_pct": 6.2,
                 "hr": 5
@@ -8533,12 +8529,12 @@
                 "batter_id": "694208",
                 "name": "Moisés Ballesteros",
                 "hand": "L",
-                "fit_score": 11.7,
+                "fit_score": 11.6,
                 "convergent_pitch": "SL",
-                "pa": 75,
-                "iso": 0.154,
+                "pa": 76,
+                "iso": 0.152,
                 "ev": 93.3,
-                "brl_pct": 4.0,
+                "brl_pct": 3.9,
                 "hr": 3
               },
               {
@@ -8557,11 +8553,11 @@
                 "batter_id": "694384",
                 "name": "Nolan Schanuel",
                 "hand": "L",
-                "fit_score": 6.2,
+                "fit_score": 6.1,
                 "convergent_pitch": "FF",
-                "pa": 126,
-                "iso": 0.117,
-                "ev": 88.8,
+                "pa": 128,
+                "iso": 0.114,
+                "ev": 88.5,
                 "brl_pct": 1.6,
                 "hr": 2
               },
@@ -8617,22 +8613,22 @@
                 "batter_id": "666139",
                 "name": "Josh Lowe",
                 "hand": "L",
-                "fit_score": 9.1,
+                "fit_score": 8.8,
                 "convergent_pitch": "FF",
-                "pa": 88,
-                "iso": 0.139,
-                "ev": 88.9,
-                "brl_pct": 4.5,
+                "pa": 91,
+                "iso": 0.136,
+                "ev": 88.8,
+                "brl_pct": 4.4,
                 "hr": 3
               },
               {
                 "batter_id": "694208",
                 "name": "Moisés Ballesteros",
                 "hand": "L",
-                "fit_score": 8.5,
+                "fit_score": 8.4,
                 "convergent_pitch": "FF",
-                "pa": 90,
-                "iso": 0.076,
+                "pa": 91,
+                "iso": 0.075,
                 "ev": 88.3,
                 "brl_pct": 2.2,
                 "hr": 1
@@ -8653,12 +8649,12 @@
                 "batter_id": "694384",
                 "name": "Nolan Schanuel",
                 "hand": "L",
-                "fit_score": 6.2,
+                "fit_score": 6.1,
                 "convergent_pitch": "FF",
-                "pa": 137,
-                "iso": 0.08,
-                "ev": 87.0,
-                "brl_pct": 1.5,
+                "pa": 139,
+                "iso": 0.078,
+                "ev": 86.8,
+                "brl_pct": 1.4,
                 "hr": 1
               }
             ]
@@ -8673,11 +8669,11 @@
             "arsenal": [
               [
                 "SL",
-                66.1
+                64.2
               ],
               [
                 "FF",
-                29.0
+                29.9
               ]
             ],
             "top5": [
@@ -8685,12 +8681,12 @@
                 "batter_id": "642350",
                 "name": "Jose Siri",
                 "hand": "R",
-                "fit_score": 12.0,
+                "fit_score": 14.7,
                 "convergent_pitch": "FF",
-                "pa": 28,
-                "iso": 0.269,
-                "ev": 94.8,
-                "brl_pct": 7.1,
+                "pa": 30,
+                "iso": 0.25,
+                "ev": 95.4,
+                "brl_pct": 10.0,
                 "hr": 2
               },
               {
@@ -8711,7 +8707,7 @@
                 "hand": "R",
                 "fit_score": 8.8,
                 "convergent_pitch": "SL",
-                "pa": 47,
+                "pa": 48,
                 "iso": 0.227,
                 "ev": 90.3,
                 "brl_pct": 2.1,
@@ -8721,9 +8717,9 @@
                 "batter_id": "518595",
                 "name": "Travis d'Arnaud",
                 "hand": "R",
-                "fit_score": 7.4,
+                "fit_score": 7.5,
                 "convergent_pitch": "FF",
-                "pa": 8,
+                "pa": 9,
                 "iso": 0.429,
                 "ev": 99.3,
                 "brl_pct": 0.0,
@@ -8733,11 +8729,11 @@
                 "batter_id": "687263",
                 "name": "Zach Neto",
                 "hand": "R",
-                "fit_score": 7.3,
+                "fit_score": 7.4,
                 "convergent_pitch": "FF",
-                "pa": 61,
-                "iso": 0.158,
-                "ev": 91.9,
+                "pa": 62,
+                "iso": 0.155,
+                "ev": 91.1,
                 "brl_pct": 0.0,
                 "hr": 2
               }
@@ -8837,11 +8833,11 @@
             "arsenal": [
               [
                 "SI",
-                58.4
+                58.1
               ],
               [
                 "SL",
-                41.6
+                41.9
               ]
             ],
             "top5": [
@@ -8849,24 +8845,12 @@
                 "batter_id": "642350",
                 "name": "Jose Siri",
                 "hand": "R",
-                "fit_score": 11.9,
+                "fit_score": 13.4,
                 "convergent_pitch": "SI",
-                "pa": 14,
-                "iso": 0.154,
-                "ev": 96.6,
-                "brl_pct": 7.1,
-                "hr": 0
-              },
-              {
-                "batter_id": "672724",
-                "name": "Oswald Peraza",
-                "hand": "R",
-                "fit_score": 11.9,
-                "convergent_pitch": "SI",
-                "pa": 23,
-                "iso": 0.238,
-                "ev": 89.6,
-                "brl_pct": 4.3,
+                "pa": 16,
+                "iso": 0.133,
+                "ev": 97.8,
+                "brl_pct": 12.5,
                 "hr": 0
               },
               {
@@ -8882,15 +8866,27 @@
                 "hr": 0
               },
               {
+                "batter_id": "672724",
+                "name": "Oswald Peraza",
+                "hand": "R",
+                "fit_score": 10.7,
+                "convergent_pitch": "SI",
+                "pa": 24,
+                "iso": 0.227,
+                "ev": 88.2,
+                "brl_pct": 4.2,
+                "hr": 0
+              },
+              {
                 "batter_id": "694203",
                 "name": "Denzer Guzman",
                 "hand": "R",
-                "fit_score": 11.0,
+                "fit_score": 9.6,
                 "convergent_pitch": "SL",
-                "pa": 11,
-                "iso": 0.3,
-                "ev": 90.3,
-                "brl_pct": 9.1,
+                "pa": 12,
+                "iso": 0.273,
+                "ev": 88.6,
+                "brl_pct": 8.3,
                 "hr": 1
               },
               {
@@ -8899,10 +8895,10 @@
                 "hand": "R",
                 "fit_score": 8.5,
                 "convergent_pitch": "SI",
-                "pa": 5,
+                "pa": 6,
                 "iso": 0.0,
                 "ev": 100.5,
-                "brl_pct": 20.0,
+                "brl_pct": 16.7,
                 "hr": 0
               }
             ]
@@ -9031,12 +9027,12 @@
                 "batter_id": "669397",
                 "name": "Nick Allen",
                 "hand": "R",
-                "fit_score": 13.2,
+                "fit_score": 12.1,
                 "convergent_pitch": "FF",
-                "pa": 12,
-                "iso": 0.4,
+                "pa": 13,
+                "iso": 0.364,
                 "ev": 86.7,
-                "brl_pct": 8.3,
+                "brl_pct": 7.7,
                 "hr": 1
               },
               {
@@ -9143,12 +9139,12 @@
                 "batter_id": "664774",
                 "name": "LaMonte Wade Jr.",
                 "hand": "L",
-                "fit_score": 6.8,
+                "fit_score": 6.9,
                 "convergent_pitch": "SI",
-                "pa": 60,
-                "iso": 0.085,
-                "ev": 83.0,
-                "brl_pct": 1.7,
+                "pa": 61,
+                "iso": 0.083,
+                "ev": 83.6,
+                "brl_pct": 1.6,
                 "hr": 1
               },
               {
