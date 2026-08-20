@@ -1,9 +1,9 @@
 {
-  "fitted_date": "2026-08-19",
+  "fitted_date": "2026-08-20",
   "n_pitcher_games": 13448,
   "population_mean_cd_proxy": 0.00159298,
   "population_sd_cd_proxy": 7.416e-05,
-  "residual_sd": 0.00010621,
+  "residual_sd": 0.0001062,
   "min_ff_pitches_pg": 3,
   "min_pitchers_per_game": 2,
   "pitcher_baseline": {
@@ -396,8 +396,8 @@
       "n": 7
     },
     "621111": {
-      "mean": 0.00160513,
-      "n": 401
+      "mean": 0.00160507,
+      "n": 402
     },
     "621112": {
       "mean": 0.00160621,
@@ -2316,8 +2316,8 @@
       "n": 77
     },
     "690986": {
-      "mean": 0.00161833,
-      "n": 977
+      "mean": 0.00161838,
+      "n": 979
     },
     "690990": {
       "mean": 0.00172863,
