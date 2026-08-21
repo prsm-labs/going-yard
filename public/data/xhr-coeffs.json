@@ -1,17 +1,17 @@
 {
   "fitted_date": "2026-08-21",
-  "n_batted_balls": 91533,
-  "season_actual_hr": 4176,
-  "season_predicted_xhr": 4176.0,
+  "n_batted_balls": 91968,
+  "season_actual_hr": 4190,
+  "season_predicted_xhr": 4190.0,
   "coeffs": [
-    -34.619483,
-    0.160124,
-    0.392246,
-    -5.9e-05,
-    -0.016542,
-    0.006803,
-    2.106806,
-    0.822159
+    -34.649846,
+    0.159913,
+    0.392679,
+    -5.5e-05,
+    -0.016562,
+    0.006811,
+    2.106135,
+    0.819968
   ],
   "coeffs_order": [
     "intercept",
