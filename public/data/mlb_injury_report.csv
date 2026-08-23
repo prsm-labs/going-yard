@@ -23,9 +23,9 @@ AZ,685314,Andrew Saalfrank,P,Left labrum repair surgery.,,🔴,Injured 60-Day
 AZ,686796,Blake Walston,P,Left UCL surgery,,🔴,Injured 60-Day
 AZ,669203,Corbin Burnes,P,Right ulnar collateral ligament surgery recovery.,,🔴,Injured 60-Day
 AZ,691441,Cristian Mena,P,Right shoulder strain,,🟡,Injured 60-Day
-AZ,686753,Drey Jameson,P,Right hip inflammation.,,🟡,Injured 15-Day
 AZ,606466,Ketel Marte,2B,Left knee inflammation.,,🟡,Injured 10-Day
 AZ,666971,Lourdes Gurriel Jr.,LF,Right adductor strain,,🟡,Injured 10-Day
+AZ,647336,Michael Soroka,P,Right arm inflammation.,,🟡,Injured 15-Day
 AZ,657044,Ryan Thompson,P,Strained lower back.,,🟡,Injured 15-Day
 AZ,669194,Ryne Nelson,P,Strained right elbow.,,🟡,Injured 60-Day
 AZ,694371,Tommy Troy,LF,Sprained right AC joint.,,🟡,Injured 10-Day
@@ -69,6 +69,7 @@ CIN,694362,Blake Dunn,CF,Right elbow sprain.,,🟡,Injured 60-Day
 CIN,682227,Brandon Williamson,P,Left shoulder fatigue.,,⚪,Injured 60-Day
 CIN,668933,Graham Ashcraft,P,Right forearm UCL sprain.,,🟡,Injured 60-Day
 CIN,668881,Hunter Greene,P,Right elbow soreness.,,🟡,Injured 60-Day
+CIN,669911,Michael Toglia,1B,Right shoulder dislocation.,,⚪,Injured 10-Day
 CIN,668715,Spencer Steer,1B,Right wrist sprain,,🟡,Injured 10-Day
 CLE,656555,Rhys Hoskins,1B,Lower back inflammation.,,🟡,Injured 10-Day
 CLE,542888,Shawn Armstrong,P,Left calf strain.,,🟡,Injured 60-Day
@@ -77,10 +78,10 @@ COL,801403,Chase Dollander,P,Right elbow strain.,,🟡,Injured 60-Day
 COL,696100,Hunter Goodman,C,Left shoulder strain,,🟡,Injured 10-Day
 COL,500779,Jose Quintana,P,Left elbow sprain.,,🟡,Injured 60-Day
 COL,592178,Kris Bryant,DH,Lumbar degenerative disk disease.,,⚪,Injured 60-Day
+COL,691720,Kyle Karros,3B,Concussion.,,⚪,Injured 7-Day
 COL,685326,McCade Brown,P,Right shoulder inflammation.,,🟡,Injured 60-Day
 COL,701487,Pierson Ohl,P,Injured 60-Day,,⚪,Injured 60-Day
 COL,807743,Sean Sullivan,P,Injured 15-Day,,⚪,Injured 15-Day
-COL,671289,Tyler Freeman,RF,Lumbar pain,,⚪,Injured 10-Day
 COL,700327,Welinton Herrera,P,Left elbow inflammation.,,🟡,Injured 60-Day
 CWS,681460,Brooks Baldwin,LF,Right elbow sprain,,🟡,Injured 60-Day
 CWS,669684,Chris Murphy,P,Left flexor strain.,,🟡,Injured 15-Day
@@ -97,7 +98,6 @@ DET,690544,Bailey Horn,P,Left elbow arthroscopy recovery,,⚪,Injured 60-Day
 DET,676428,Brant Hurter,P,Lumbar spine inflammation.,,🟡,Injured 60-Day
 DET,572143,Burch Smith,P,Right shoulder inflammation.,,🟡,Injured 60-Day
 DET,656427,Jack Flaherty,P,Right flexor inflammation.,,🟡,Injured 15-Day
-DET,681546,James Outman,CF,Concussion.,,⚪,Injured 7-Day
 DET,434378,Justin Verlander,P,Left hip inflammation.,,🟡,Injured 60-Day
 DET,681481,Kerry Carpenter,RF,Left foot plantar fasciitis,,⚪,Injured 10-Day
 DET,663837,Matt Vierling,CF,Left adductor strain,,🟡,Injured 10-Day
@@ -206,6 +206,7 @@ SD,609280,Miguel Andujar,DH,Right wrist fracture.,,🔴,Injured 10-Day
 SD,601713,Nick Pivetta,P,Right elbow inflammation.,,🟡,Injured 60-Day
 SD,657656,Ramón Laureano,LF,Injured 60-Day,,⚪,Injured 60-Day
 SD,669392,Samad Taylor,LF,Right oblique strain.,,🟡,Injured 10-Day
+SEA,680977,Brendan Donovan,3B,Concussion.,,⚪,Injured 7-Day
 SEA,677961,Cole Wilcox,P,Left oblique strain.,,🟡,Injured 15-Day
 SEA,806068,Colt Emerson,SS,Left wrist tendon inflammation.,,🟡,Injured 10-Day
 SEA,681867,Cooper Criswell,P,Right shoulder strain.,,🟡,Injured 60-Day

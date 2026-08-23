@@ -1,26 +1,26 @@
 Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitcher ID (Away),Game ID,Venue ID,Venue Name,Day of Week,Day Abbr,Series Game #,Games in Series,Series Position,Day Context
-2026-08-23,01:35 PM,BAL,TB,669358.0,607259.0,824799,2,Oriole Park at Camden Yards,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-08-23,01:35 PM,PHI,STL,650911.0,681517.0,823421,2681,Citizens Bank Park,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-08-23,01:35 PM,NYY,TOR,607074.0,667755.0,823507,3313,Yankee Stadium,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-08-23,01:40 PM,MIA,WSH,676083.0,800600.0,823827,4169,loanDepot park,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-08-23,02:10 PM,KC,DET,663738.0,621097.0,824071,7,Kauffman Stadium,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-08-23,02:10 PM,HOU,ATH,664299.0,669620.0,824150,2392,Daikin Park,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-08-23,02:10 PM,CWS,NYM,656794.0,690997.0,824558,4,Rate Field,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-08-23,02:35 PM,TEX,LAA,615698.0,579328.0,822856,5325,Globe Life Field,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-08-23,03:10 PM,COL,CLE,608372.0,656492.0,824315,19,Coors Field,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-08-23,03:15 PM,BOS,SF,687562.0,683363.0,824720,3,Fenway Park,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-08-23,04:10 PM,LAD,PIT,605483.0,669199.0,823909,22,UNIQLO Field at Dodger Stadium,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-08-23,04:10 PM,SEA,CHC,682243.0,684007.0,823099,680,T-Mobile Park,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-08-23,04:10 PM,SD,MIN,621111.0,641927.0,823258,2680,Petco Park,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-08-23,04:15 PM,AZ,CIN,683352.0,671096.0,825043,15,Chase Field,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-08-23,07:10 PM,MIL,ATL,675660.0,641816.0,823745,2735,Journey Bank Ballpark,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
-2026-08-24,06:40 PM,DET,TB,,,824235,2394,Comerica Park,Monday,Mon,1,3,Opener,~ Solid
-2026-08-24,06:40 PM,MIA,BOS,,,823828,4169,loanDepot park,Monday,Mon,1,3,Opener,~ Solid
-2026-08-24,06:45 PM,WSH,COL,,,822695,3309,Nationals Park,Monday,Mon,1,4,Opener,~ Solid
-2026-08-24,07:40 PM,CWS,TEX,,,824557,4,Rate Field,Monday,Mon,1,3,Opener,~ Solid
-2026-08-24,09:38 PM,LAA,CLE,,800048.0,823992,1,Angel Stadium,Monday,Mon,1,3,Opener,~ Solid
-2026-08-24,09:40 PM,AZ,CHC,,,825041,15,Chase Field,Monday,Mon,1,3,Opener,~ Solid
-2026-08-24,09:40 PM,SD,PIT,592662.0,,823260,2680,Petco Park,Monday,Mon,1,3,Opener,~ Solid
-2026-08-24,09:40 PM,ATH,MIN,,,824964,2529,Sutter Health Park,Monday,Mon,1,3,Opener,~ Solid
-2026-08-24,09:40 PM,SEA,PHI,,554430.0,823097,680,T-Mobile Park,Monday,Mon,1,3,Opener,~ Solid
-2026-08-24,09:45 PM,SF,CIN,,695505.0,823183,2395,Oracle Park,Monday,Mon,1,3,Opener,~ Solid
+2026-08-23,01:35 PM,BAL,TB,669358.0,607259,824799,2,Oriole Park at Camden Yards,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
+2026-08-23,01:35 PM,PHI,STL,650911.0,681517,823421,2681,Citizens Bank Park,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
+2026-08-23,01:35 PM,NYY,TOR,607074.0,667755,823507,3313,Yankee Stadium,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
+2026-08-23,01:40 PM,MIA,WSH,676083.0,800600,823827,4169,loanDepot park,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
+2026-08-23,02:10 PM,KC,DET,663738.0,621097,824071,7,Kauffman Stadium,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
+2026-08-23,02:10 PM,HOU,ATH,664299.0,669620,824150,2392,Daikin Park,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
+2026-08-23,02:10 PM,CWS,NYM,656794.0,690997,824558,4,Rate Field,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
+2026-08-23,02:35 PM,TEX,LAA,615698.0,579328,822856,5325,Globe Life Field,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
+2026-08-23,03:10 PM,COL,CLE,608372.0,656492,824315,19,Coors Field,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
+2026-08-23,03:15 PM,BOS,SF,687562.0,683363,824720,3,Fenway Park,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
+2026-08-23,04:10 PM,LAD,PIT,605483.0,669199,823909,22,UNIQLO Field at Dodger Stadium,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
+2026-08-23,04:10 PM,SEA,CHC,682243.0,684007,823099,680,T-Mobile Park,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
+2026-08-23,04:10 PM,SD,MIN,621111.0,641927,823258,2680,Petco Park,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
+2026-08-23,04:15 PM,AZ,CIN,683352.0,671096,825043,15,Chase Field,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
+2026-08-23,07:10 PM,MIL,ATL,675660.0,641816,823745,2735,Journey Bank Ballpark,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
+2026-08-24,06:40 PM,DET,TB,664285.0,656876,824235,2394,Comerica Park,Monday,Mon,1,3,Opener,~ Solid
+2026-08-24,06:40 PM,MIA,BOS,645261.0,624133,823828,4169,loanDepot park,Monday,Mon,1,3,Opener,~ Solid
+2026-08-24,06:45 PM,WSH,COL,676917.0,663372,822695,3309,Nationals Park,Monday,Mon,1,4,Opener,~ Solid
+2026-08-24,07:40 PM,CWS,TEX,,677958,824557,4,Rate Field,Monday,Mon,1,3,Opener,~ Solid
+2026-08-24,09:38 PM,LAA,CLE,691946.0,800048,823992,1,Angel Stadium,Monday,Mon,1,3,Opener,~ Solid
+2026-08-24,09:40 PM,AZ,CHC,518876.0,592332,825041,15,Chase Field,Monday,Mon,1,3,Opener,~ Solid
+2026-08-24,09:40 PM,SD,PIT,592662.0,677952,823260,2680,Petco Park,Monday,Mon,1,3,Opener,~ Solid
+2026-08-24,09:40 PM,ATH,MIN,605488.0,805673,824964,2529,Sutter Health Park,Monday,Mon,1,3,Opener,~ Solid
+2026-08-24,09:40 PM,SEA,PHI,669302.0,554430,823097,680,T-Mobile Park,Monday,Mon,1,3,Opener,~ Solid
+2026-08-24,09:45 PM,SF,CIN,,695505,823183,2395,Oracle Park,Monday,Mon,1,3,Opener,~ Solid
