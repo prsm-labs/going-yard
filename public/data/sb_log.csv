@@ -3145,3 +3145,34 @@ game_id,game_date,runner_id,runner_name,pitcher_id,pitcher_name,stolen_base,caug
 824560,2026-08-22,666182,Bo Bichette,805326,Tyler Schweitzer,0,1,2B,6,top,top
 824718,2026-08-22,808982,Jung Hoo Lee,681544,Wyatt Olds,1,0,2B,8,top,top
 824798,2026-08-22,656775,Cedric Mullins,687064,Brandon Young,0,1,2B,5,top,top
+822856,2026-08-23,669394,Jake Burger,579328,Yusei Kikuchi,1,0,2B,4,bottom,bottom
+822856,2026-08-23,669394,Jake Burger,684665,Luke Murphy,0,1,2B,6,bottom,bottom
+823099,2026-08-23,645302,Victor Robles,684007,Shota Imanaga,1,0,2B,2,bottom,bottom
+823099,2026-08-23,645302,Victor Robles,684007,Shota Imanaga,1,0,3B,2,bottom,bottom
+823099,2026-08-23,673548,Seiya Suzuki,682243,Bryce Miller,1,0,2B,3,top,top
+823099,2026-08-23,691718,Pete Crow-Armstrong,682243,Bryce Miller,1,0,2B,5,top,top
+823258,2026-08-23,701538,Jackson Merrill,681892,Kody Funderburk,0,1,2B,6,bottom,bottom
+823258,2026-08-23,665487,Fernando Tatis Jr.,656546,Jeff Hoffman,1,0,2B,6,bottom,bottom
+823421,2026-08-23,802139,JJ Wetherholt,650911,Cristopher Sánchez,1,0,2B,1,top,top
+823421,2026-08-23,691023,Jordan Walker,650911,Cristopher Sánchez,1,0,2B,4,top,top
+823507,2026-08-23,682987,Spencer Jones,667755,José Soriano,0,1,2B,4,bottom,bottom
+823745,2026-08-23,660670,Ronald Acuña Jr.,675660,Shane Drohan,1,0,2B,5,top,top
+823745,2026-08-23,663586,Austin Riley,681982,Grant Anderson,1,0,2B,6,top,top
+823909,2026-08-23,693304,Nick Gonzales,605483,Blake Snell,1,0,2B,1,top,top
+823909,2026-08-23,660271,Shohei Ohtani,669199,Lake Bachar,1,0,2B,1,bottom,bottom
+824071,2026-08-23,521692,Salvador Perez,621097,Jacob Waguespack,1,0,2B,2,bottom,bottom
+824071,2026-08-23,677951,Bobby Witt Jr.,680744,Ty Madden,1,0,2B,2,bottom,bottom
+824071,2026-08-23,677951,Bobby Witt Jr.,680744,Ty Madden,0,1,H,2,bottom,bottom
+824071,2026-08-23,701162,Ben Malgeri,670167,John Schreiber,1,0,3B,6,top,top
+824071,2026-08-23,703601,Max Clark,670167,John Schreiber,1,0,2B,6,top,top
+824071,2026-08-23,670231,John Rave,640448,Kyle Finnegan,1,0,2B,8,bottom,bottom
+824071,2026-08-23,670231,John Rave,640448,Kyle Finnegan,1,0,3B,8,bottom,bottom
+824071,2026-08-23,664728,Kyle Isbel,640448,Kyle Finnegan,1,0,2B,8,bottom,bottom
+824315,2026-08-23,677587,Brayan Rocchio,608372,Tomoyuki Sugano,1,0,2B,2,top,top
+824315,2026-08-23,650489,Willi Castro,656492,Foster Griffin,0,1,3B,3,bottom,bottom
+824315,2026-08-23,682657,Angel Martínez,693308,Nick Frasso,1,0,2B,8,top,top
+824558,2026-08-23,676724,Jared Young,607200,Erick Fedde,0,1,2B,4,top,top
+824558,2026-08-23,671976,Tristan Peters,673380,Dedniel Núñez,1,0,2B,7,bottom,bottom
+824720,2026-08-23,678882,Ceddanne Rafaela,683363,Matt Wilkinson,1,0,2B,3,bottom,bottom
+824799,2026-08-23,802415,Chandler Simpson,669358,Shane Baz,0,1,2B,2,top,top
+824799,2026-08-23,676356,Jonny DeLuca,669358,Shane Baz,0,1,2B,5,top,top
