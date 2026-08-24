@@ -1,26 +1,26 @@
 Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitcher ID (Away),Game ID,Venue ID,Venue Name,Day of Week,Day Abbr,Series Game #,Games in Series,Series Position,Day Context
-2026-08-24,06:40 PM,DET,TB,664285.0,656876,824235,2394,Comerica Park,Monday,Mon,1,3,Opener,~ Solid
-2026-08-24,06:40 PM,MIA,BOS,645261.0,624133,823828,4169,loanDepot park,Monday,Mon,1,3,Opener,~ Solid
-2026-08-24,06:45 PM,WSH,COL,676917.0,663372,822695,3309,Nationals Park,Monday,Mon,1,4,Opener,~ Solid
-2026-08-24,07:40 PM,CWS,TEX,664353.0,677958,824557,4,Rate Field,Monday,Mon,1,3,Opener,~ Solid
-2026-08-24,09:38 PM,LAA,CLE,691946.0,800048,823992,1,Angel Stadium,Monday,Mon,1,3,Opener,~ Solid
-2026-08-24,09:40 PM,AZ,CHC,518876.0,592332,825041,15,Chase Field,Monday,Mon,1,3,Opener,~ Solid
-2026-08-24,09:40 PM,SD,PIT,592662.0,677952,823260,2680,Petco Park,Monday,Mon,1,3,Opener,~ Solid
-2026-08-24,09:40 PM,ATH,MIN,605488.0,805673,824964,2529,Sutter Health Park,Monday,Mon,1,3,Opener,~ Solid
-2026-08-24,09:40 PM,SEA,PHI,669302.0,554430,823097,680,T-Mobile Park,Monday,Mon,1,3,Opener,~ Solid
-2026-08-24,09:45 PM,SF,CIN,687931.0,695505,823183,2395,Oracle Park,Monday,Mon,1,3,Opener,~ Solid
-2026-08-25,06:40 PM,DET,TB,695549.0,693855,824233,2394,Comerica Park,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
-2026-08-25,06:40 PM,MIA,BOS,,801139,823826,4169,loanDepot park,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
-2026-08-25,06:45 PM,WSH,COL,674841.0,607536,822693,3309,Nationals Park,Tuesday,Tue,2,4,Middle,⚠️ Weakest Day
-2026-08-25,07:05 PM,NYY,HOU,701542.0,814490,823505,3313,Yankee Stadium,Tuesday,Tue,1,3,Opener,⚠️ Weakest Day
-2026-08-25,07:07 PM,TOR,KC,453286.0,607625,822773,14,Rogers Centre,Tuesday,Tue,1,3,Opener,⚠️ Weakest Day
-2026-08-25,07:10 PM,NYM,MIL,804267.0,690986,823585,3289,Citi Field,Tuesday,Tue,1,3,Opener,⚠️ Weakest Day
-2026-08-25,07:15 PM,ATL,LAD,693821.0,607192,824881,4705,Truist Park,Tuesday,Tue,1,3,Opener,⚠️ Weakest Day
-2026-08-25,07:40 PM,CWS,TEX,641743.0,594798,824556,4,Rate Field,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
-2026-08-25,07:45 PM,STL,BAL,,605135,823016,2889,Busch Stadium,Tuesday,Tue,1,3,Opener,⚠️ Weakest Day
-2026-08-25,09:38 PM,LAA,CLE,700712.0,668909,823989,1,Angel Stadium,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
-2026-08-25,09:40 PM,AZ,CHC,694297.0,605280,825042,15,Chase Field,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
-2026-08-25,09:40 PM,SD,PIT,650633.0,694973,823259,2680,Petco Park,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
-2026-08-25,09:40 PM,ATH,MIN,695611.0,671737,824962,2529,Sutter Health Park,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
-2026-08-25,09:40 PM,SEA,PHI,669923.0,605400,823098,680,T-Mobile Park,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
-2026-08-25,09:45 PM,SF,CIN,605288.0,663903,823181,2395,Oracle Park,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
+2026-08-24,06:40 PM,DET,TB,664285.0,656876.0,824235,2394,Comerica Park,Monday,Mon,1,3,Opener,~ Solid
+2026-08-24,06:40 PM,MIA,BOS,645261.0,624133.0,823828,4169,loanDepot park,Monday,Mon,1,3,Opener,~ Solid
+2026-08-24,06:45 PM,WSH,COL,676917.0,663372.0,822695,3309,Nationals Park,Monday,Mon,1,4,Opener,~ Solid
+2026-08-24,07:40 PM,CWS,TEX,664353.0,677958.0,824557,4,Rate Field,Monday,Mon,1,3,Opener,~ Solid
+2026-08-24,09:38 PM,LAA,CLE,691946.0,800048.0,823992,1,Angel Stadium,Monday,Mon,1,3,Opener,~ Solid
+2026-08-24,09:40 PM,AZ,CHC,518876.0,592332.0,825041,15,Chase Field,Monday,Mon,1,3,Opener,~ Solid
+2026-08-24,09:40 PM,SD,PIT,592662.0,677952.0,823260,2680,Petco Park,Monday,Mon,1,3,Opener,~ Solid
+2026-08-24,09:40 PM,ATH,MIN,605488.0,805673.0,824964,2529,Sutter Health Park,Monday,Mon,1,3,Opener,~ Solid
+2026-08-24,09:40 PM,SEA,PHI,669302.0,554430.0,823097,680,T-Mobile Park,Monday,Mon,1,3,Opener,~ Solid
+2026-08-24,09:45 PM,SF,CIN,687931.0,695505.0,823183,2395,Oracle Park,Monday,Mon,1,3,Opener,~ Solid
+2026-08-25,06:40 PM,DET,TB,695549.0,693855.0,824233,2394,Comerica Park,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
+2026-08-25,06:40 PM,MIA,BOS,,801139.0,823826,4169,loanDepot park,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
+2026-08-25,06:45 PM,WSH,COL,674841.0,,822693,3309,Nationals Park,Tuesday,Tue,2,4,Middle,⚠️ Weakest Day
+2026-08-25,07:05 PM,NYY,HOU,701542.0,814490.0,823505,3313,Yankee Stadium,Tuesday,Tue,1,3,Opener,⚠️ Weakest Day
+2026-08-25,07:07 PM,TOR,KC,453286.0,607625.0,822773,14,Rogers Centre,Tuesday,Tue,1,3,Opener,⚠️ Weakest Day
+2026-08-25,07:10 PM,NYM,MIL,804267.0,690986.0,823585,3289,Citi Field,Tuesday,Tue,1,3,Opener,⚠️ Weakest Day
+2026-08-25,07:15 PM,ATL,LAD,693821.0,607192.0,824881,4705,Truist Park,Tuesday,Tue,1,3,Opener,⚠️ Weakest Day
+2026-08-25,07:40 PM,CWS,TEX,641743.0,594798.0,824556,4,Rate Field,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
+2026-08-25,07:45 PM,STL,BAL,,605135.0,823016,2889,Busch Stadium,Tuesday,Tue,1,3,Opener,⚠️ Weakest Day
+2026-08-25,09:38 PM,LAA,CLE,700712.0,668909.0,823989,1,Angel Stadium,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
+2026-08-25,09:40 PM,AZ,CHC,694297.0,605280.0,825042,15,Chase Field,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
+2026-08-25,09:40 PM,SD,PIT,650633.0,694973.0,823259,2680,Petco Park,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
+2026-08-25,09:40 PM,ATH,MIN,695611.0,671737.0,824962,2529,Sutter Health Park,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
+2026-08-25,09:40 PM,SEA,PHI,669923.0,605400.0,823098,680,T-Mobile Park,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
+2026-08-25,09:45 PM,SF,CIN,605288.0,663903.0,823181,2395,Oracle Park,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
