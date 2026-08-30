@@ -1,5 +1,5 @@
 {
-  "generated": "2026-08-30T06:15:23",
+  "generated": "2026-08-30T08:15:13",
   "date": "2026-08-30",
   "games": {
     "822688": {
@@ -2222,18 +2222,6 @@
                 "hr": 2
               },
               {
-                "batter_id": "663330",
-                "name": "Jahmai Jones",
-                "hand": "R",
-                "fit_score": 9.5,
-                "convergent_pitch": "FF",
-                "pa": 57,
-                "iso": 0.156,
-                "ev": 93.3,
-                "brl_pct": 0.0,
-                "hr": 1
-              },
-              {
                 "batter_id": "655316",
                 "name": "Andruw Monasterio",
                 "hand": "R",
@@ -2244,6 +2232,18 @@
                 "ev": 89.0,
                 "brl_pct": 5.4,
                 "hr": 2
+              },
+              {
+                "batter_id": "663330",
+                "name": "Jahmai Jones",
+                "hand": "R",
+                "fit_score": 8.9,
+                "convergent_pitch": "FF",
+                "pa": 57,
+                "iso": 0.156,
+                "ev": 92.7,
+                "brl_pct": 0.0,
+                "hr": 1
               },
               {
                 "batter_id": "575929",
