@@ -1,10 +1,9 @@
 Team,Batter ID,Player Name,Position,Injury Description,Expected Return,Severity,Status
 ATH,667670,Brent Rooker,DH,Bone bruise in left knee.,,🟢,Injured 60-Day
 ATH,621139,Brooks Kriske,P,Right shoulder impingement,,⚪,Injured 60-Day
-ATH,672016,Denzel Clarke,CF,Mid foot bone bruise in right foot.,,🟢,Injured 60-Day
 ATH,680684,Gunnar Hoglund,P,Sprained right knee.,,🟡,Injured 60-Day
 ATH,805779,Jacob Wilson,SS,Left shoulder subluxation.,,⚪,Injured 60-Day
-ATH,811965,Joshua Kuroda-Grauer,3B,Ruptured testicle surgery.,,🔴,Injured 10-Day
+ATH,811965,Joshua Kuroda-Grauer,3B,Ruptured testicle surgery.,,🔴,Injured 60-Day
 ATH,686993,Justin Sterner,P,Right knee chondromalacia.,,⚪,Injured 60-Day
 ATH,622663,Luis Severino,P,Right shoulder strain.,,🟡,Injured 60-Day
 ATH,643410,Mark Leiter Jr.,P,Right hip impingement.,,⚪,Injured 60-Day
@@ -28,6 +27,7 @@ AZ,657044,Ryan Thompson,P,Strained lower back.,,🟡,Injured 15-Day
 AZ,669194,Ryne Nelson,P,Strained right elbow.,,🟡,Injured 60-Day
 AZ,694371,Tommy Troy,LF,Sprained right AC joint.,,🟡,Injured 10-Day
 AZ,668678,Zac Gallen,P,Right elbow inflammation.,,🟡,Injured 60-Day
+BAL,681047,Christian Franklin,CF,Left hand inflammation.,,🟡,Injured 10-Day
 BAL,681882,Colin Selby,P,Right shoulder inflammation.,,🟡,Injured 60-Day
 BAL,642585,Félix Bautista,P,Right shoulder surgery.,,🔴,Injured 60-Day
 BAL,676059,Jordan Westburg,3B,Right elbow UCL sprain.,,🟡,Injured 60-Day
@@ -45,6 +45,7 @@ BOS,676710,Kutter Crawford,P,Right wrist surgery,,🔴,Injured 60-Day
 BOS,807799,Masataka Yoshida,DH,Left hamstring strain.,,🟡,Injured 10-Day
 BOS,656557,Tanner Houck,P,Injured 60-Day,,⚪,Injured 60-Day
 BOS,671213,Triston Casas,1B,Recovery from left patellar tendon repair,,⚪,Injured 60-Day
+BOS,594027,Tyron Guerrero,P,Right shoulder inflammation.,,🟡,Injured 15-Day
 BOS,575929,Willson Contreras,1B,Left hamstring strain,,🟡,Injured 10-Day
 BOS,677161,Zack Kelly,P,Right elbow inflammation.,,🟡,Injured 60-Day
 CHC,676962,Ben Brown,P,Neck strain.,,🟡,Injured 60-Day
@@ -98,7 +99,6 @@ DET,681481,Kerry Carpenter,RF,Left foot plantar fasciitis,,⚪,Injured 10-Day
 DET,663837,Matt Vierling,CF,Left adductor strain,,🟡,Injured 10-Day
 DET,678009,Parker Meadows,CF,Left radius fracture.,,🔴,Injured 60-Day
 DET,681857,Reese Olson,P,Right Shoulder Labral Repair,,⚪,Injured 60-Day
-DET,682985,Riley Greene,LF,Right hamstring strain.,,🟡,Injured 10-Day
 DET,700242,Trey Sweeney,SS,Right shoulder strain,,🟡,Injured 60-Day
 DET,672761,Wenceel Pérez,RF,Left orbital fracture.,,🔴,Injured 60-Day
 DET,676684,Will Vest,P,Right posterior elbow inflammation.,,🟡,Injured 60-Day
@@ -126,22 +126,18 @@ LAA,686799,Jack Kochanowicz,P,Right elbow inflammation.,,🟡,Injured 60-Day
 LAA,694384,Nolan Schanuel,1B,Right intercostal muscle strain,,🟡,Injured 10-Day
 LAA,596112,Robert Stephenson,P,Right elbow inflammation.,,🟡,Injured 60-Day
 LAA,696147,Sam Bachman,P,Right forearm radial nerve inflammation.,,🟡,Injured 15-Day
-LAA,696519,Samy Natera Jr.,P,Low back muscle spasms.,,⚪,Injured 15-Day
 LAA,660162,Yoán Moncada,3B,Right knee inflammation.,,🟡,Injured 60-Day
 LAD,681624,Andy Pages,CF,Left hand fracture.,,🔴,Injured 10-Day
 LAD,676508,Ben Casparius,P,Right shoulder inflammation,,🟡,Injured 60-Day
 LAD,595014,Blake Treinen,P,Right elbow inflammation.,,🟡,Injured 60-Day
 LAD,676272,Bobby Miller,P,Right shoulder soreness.,,🟡,Injured 60-Day
 LAD,660813,Brusdar Graterol,P,Injured 60-Day,,⚪,Injured 60-Day
-LAD,687221,Dalton Rushing,C,Right elbow inflammation.,,🟡,Injured 10-Day
 LAD,621242,Edwin Díaz,P,Neck inflammation.,,🟡,Injured 15-Day
 LAD,694813,Gavin Stone,P,Right shoulder inflammation.,,🟡,Injured 60-Day
 LAD,664776,Jake Cousins,P,Injured 60-Day,,⚪,Injured 60-Day
-LAD,680736,Justin Wrobleski,P,Left forearm inflammation.,,🟡,Injured 15-Day
 LAD,663460,Kris Bubic,P,Injured 60-Day,,⚪,Injured 60-Day
 LAD,808963,Roki Sasaki,P,Right middle finger blister,,⚪,Injured 15-Day
 LAD,694361,Will Klein,P,Right elbow discomfort.,,⚪,Injured 15-Day
-LAD,669257,Will Smith,C,Neck inflammation.,,🟡,Injured 60-Day
 MIA,800049,Adam Mazur,P,Right elbow surgery.,,🔴,Injured 60-Day
 MIA,677053,Andrew Nardi,P,Left rib cage stress reaction.,,⚪,Injured 60-Day
 MIA,669622,Anthony Bender,P,Right shin stress reaction.,,⚪,Injured 15-Day
@@ -155,7 +151,6 @@ MIL,672582,Angel Zerpa,P,Left forearm tightness.,,🟢,Injured 60-Day
 MIL,605540,Brandon Woodruff,P,Right shoulder inflammation.,,🟡,Injured 60-Day
 MIL,702153,Brian Fitzpatrick,P,Left elbow injury,,⚪,Injured 60-Day
 MIL,669060,Bryse Wilson,P,Low back strain.,,🟡,Injured 15-Day
-MIL,668941,JoJo Romero,P,Injured 15-Day,,⚪,Injured 15-Day
 MIL,669270,Joel Kuhnel,P,Right shoulder impingement.,,⚪,Injured 15-Day
 MIL,682990,Quinn Priester,P,Right thoracic outlet syndrome,,⚪,Injured 60-Day
 MIL,642239,Rob Zastryzny,P,Left trapezius strain.,,🟡,Injured 60-Day
@@ -179,14 +174,12 @@ NYY,657376,Clarke Schmidt,P,Right forearm tightness.,,🟢,Injured 60-Day
 NYY,518585,Fernando Cruz,P,Right elbow discomfort.,,⚪,Injured 15-Day
 NYY,519317,Giancarlo Stanton,DH,Right calf strain.,,🟡,Injured 60-Day
 NYY,665645,Kervin Castro,P,Right elbow neuritis.,,⚪,Injured 60-Day
-NYY,641857,Ryan McMahon,3B,Left thumb sprain.,,🟡,Injured 10-Day
 NYY,677960,Ryan Weathers,P,Left forearm flexor strain.,,🟡,Injured 15-Day
 PHI,666969,Adolis García,RF,Right latissimus dorsi tear,,🔴,Injured 60-Day
 PHI,641745,Brad Keller,P,Right elbow UCL tear.,,🔴,Injured 60-Day
 PHI,668873,Caleb Kilian,P,Left oblique strain.,,🟡,Injured 15-Day
 PHI,694025,Felix Reyes,LF,Right wrist fracture,,🔴,Injured 60-Day
 PHI,679032,Johan Rojas,CF,Right elbow UCL repair.,,⚪,Injured 60-Day
-PHI,665561,Rafael Marchán,C,Left knee patellar tendinitis,,⚪,Injured 10-Day
 PHI,621383,Tanner Banks,P,Left forearm strain.,,🟡,Injured 60-Day
 PIT,682848,Endy Rodríguez,C,Left hip inflammation.,,🟡,Injured 60-Day
 PIT,804606,Konnor Griffin,SS,Left ring finger sagittal band injury,,⚪,Injured 60-Day
@@ -264,10 +257,8 @@ TOR,670102,Bowden Francis,P,Right elbow surgery.,,🔴,Injured 60-Day
 TOR,664074,Cody Ponce,P,Right knee ACL sprain.,,🟡,Injured 60-Day
 TOR,814005,Jake Bloss,P,Injured 60-Day,,⚪,Injured 60-Day
 TOR,592791,Jameson Taillon,P,Right forearm tendinits,,⚪,Injured 15-Day
-TOR,573009,Joe Mantiply,P,Left knee inflammation.,,🟡,Injured 60-Day
 TOR,682729,Jonatan Clase,LF,Left plantar fasciitis.,,⚪,Injured 60-Day
 TOR,621244,José Berríos,P,Right elbow stress fracture.,,🔴,Injured 60-Day
-TOR,669701,Josh Smith,2B,Left hamstring inflammation,,🟡,Injured 10-Day
 TOR,649966,Luis Urías,2B,Right quad strain.,,🟡,Injured 10-Day
 TOR,571578,Patrick Corbin,P,Left teres major strain.,,🟡,Injured 60-Day
 TOR,669456,Shane Bieber,P,Right teres major inflammation,,🟡,Injured 15-Day
@@ -275,7 +266,7 @@ TOR,702056,Trey Yesavage,P,Left knee inflammation.,,🟡,Injured 15-Day
 TOR,554340,Yimi García,P,Right elbow ulnar nerve and AC joint surgery.,,🔴,Injured 60-Day
 WSH,813349,Connelly Early,P,Left elbow inflammation.,,🟡,Injured 60-Day
 WSH,687792,DJ Herz,P,Injured 60-Day,,⚪,Injured 60-Day
-WSH,686452,Drew Millas,C,Left index finger fracture.,,🔴,Injured 10-Day
+WSH,686452,Drew Millas,C,Left index finger fracture.,,🔴,Injured 60-Day
 WSH,695578,James Wood,RF,Left oblique strain.,,🟡,Injured 10-Day
 WSH,680686,Josiah Gray,P,Right flexor strain.,,🟡,Injured 60-Day
 WSH,686610,Ken Waldichuk,P,Left forearm tightness.,,🟢,Injured 60-Day
