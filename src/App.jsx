@@ -14735,6 +14735,9 @@ const OB_COLS = [
   { key:'ev',     label:'EV',     align:'right',  title:"Season avg EV vs this pitcher's pitch mix + handedness" },
   { key:'brl',    label:'Brl%',   align:'right',  title:"Season Barrel% vs this pitcher's pitch mix + handedness" },
   { key:'fb',     label:'FB%',    align:'right',  title:"Season Fly Ball% vs this pitcher's pitch mix + handedness" },
+  { key:'pull',   label:'Pull%',  align:'right',  title:"Season Pull% (any batted-ball type) vs this pitcher's pitch mix + handedness. Added 2026-09-02." },
+  { key:'pullair',label:'PullAir%',align:'right', title:"Season Pulled Air% (pulled fly balls) vs this pitcher's pitch mix + handedness. Same field Boom's Pull×Park Fit component already uses. Added 2026-09-02." },
+  { key:'fb350',  label:'350+',   align:'right',  title:"350+ ft fly balls, raw count, vs this pitcher's pitch mix + handedness. Added 2026-09-02." },
   { key:'hr',     label:'HR',     align:'right',  title:"Season HR count vs this pitcher's pitch mix + handedness" },
   { key:'blast',  label:'Blast%', align:'right',  title:"Arsenal Blast% — home-brewed swing-quality composite (bat speed + attack-angle optimality) vs this pitcher's arsenal. Not a Statcast/MLB stat, not wired into any score — context only. See CLAUDE.md for the validation." },
   { key:'pen',    label:'Pen',    align:'center', title:"Bullpen HR/9 rank (1-30, rank 1 = most home-run-prone) for the team behind this pitcher — late-game upside if the starter gets pulled. Fixed 2026-07-30." },
@@ -14751,6 +14754,9 @@ function obSortValue(r, key) {
     case 'ev':     return parseFloat(r.bvp_avg_ev)||0;
     case 'brl':    return parseFloat(r.bvp_barrel_pct)||0;
     case 'fb':     return parseFloat(r.bvp_fb_pct)||0;
+    case 'pull':   return parseFloat(r.bvp_pull_pct)||0;
+    case 'pullair':return parseFloat(r.bvp_pulled_fb_pct)||0;
+    case 'fb350':  return parseInt(r.bvp_fb350_count)||0;
     case 'hr':     return parseInt(r.bvp_hr_count)||0;
     case 'blast':  return getArsenalBlastPct(r) ?? -1;
     // Sorted so "most home-run-prone" (rank 1) comes first on desc sort —
@@ -14794,6 +14800,9 @@ const ARSENAL_FIT_COLS = [
   { key:'ev',      label:'EV',       align:'right',  title:"Season avg EV vs this pitcher's pitch mix + handedness" },
   { key:'brl',     label:'Brl%',     align:'right',  title:"Season Barrel% vs this pitcher's pitch mix + handedness" },
   { key:'fb',      label:'FB%',      align:'right',  title:"Season Fly Ball% vs this pitcher's pitch mix + handedness" },
+  { key:'pull',    label:'Pull%',    align:'right',  title:"Season Pull% (any batted-ball type) vs this pitcher's pitch mix + handedness. Added 2026-09-02." },
+  { key:'pullair', label:'PullAir%', align:'right',  title:"Season Pulled Air% (pulled fly balls) vs this pitcher's pitch mix + handedness. Same field Boom's Pull×Park Fit component already uses. Added 2026-09-02." },
+  { key:'fb350',   label:'350+',     align:'right',  title:"350+ ft fly balls, raw count, vs this pitcher's pitch mix + handedness. Added 2026-09-02." },
   { key:'hr',      label:'HR',       align:'right',  title:"Season HR count vs this pitcher's pitch mix + handedness" },
   { key:'blast',   label:'Blast%',   align:'right',  title:"Arsenal Blast% — home-brewed swing-quality composite (bat speed + attack-angle optimality) vs this pitcher's arsenal. Not a Statcast/MLB stat, not wired into any score — context only. See CLAUDE.md for the validation." },
   { key:'pen',     label:'Pen',      align:'center', title:"Bullpen HR/9 rank (1-30, rank 1 = most home-run-prone) for the team behind this pitcher — late-game upside if the starter gets pulled. Fixed 2026-07-30." },
@@ -14812,6 +14821,9 @@ function afSortValue(r, key) {
     case 'ev':      return parseFloat(r.bvp_avg_ev)||0;
     case 'brl':     return parseFloat(r.bvp_barrel_pct)||0;
     case 'fb':      return parseFloat(r.bvp_fb_pct)||0;
+    case 'pull':    return parseFloat(r.bvp_pull_pct)||0;
+    case 'pullair': return parseFloat(r.bvp_pulled_fb_pct)||0;
+    case 'fb350':   return parseInt(r.bvp_fb350_count)||0;
     case 'hr':      return parseInt(r.bvp_hr_count)||0;
     case 'blast':   return getArsenalBlastPct(r) ?? -1;
     case 'pen':     return parseInt(r.bullpen_hr_rank)>0 ? 31 - parseInt(r.bullpen_hr_rank) : -1;
@@ -14950,6 +14962,9 @@ function OpposingBatterTable({ pitcherId, team }) {
                 <td style={dimStyle}>{numOr(r.bvp_avg_ev,1)}</td>
                 <td style={dimStyle}>{numOr(r.bvp_barrel_pct,1)}</td>
                 <td style={dimStyle}>{numOr(r.bvp_fb_pct,1)}</td>
+                <td style={dimStyle}>{numOr(r.bvp_pull_pct,1)}</td>
+                <td style={dimStyle}>{numOr(r.bvp_pulled_fb_pct,1)}</td>
+                <td style={dimStyle}>{parseInt(r.bvp_fb350_count)||0}</td>
                 <td style={dimStyle}>{parseInt(r.bvp_hr_count)||0}</td>
                 <td style={dimStyle} title="Arsenal Blast% — home-brewed swing-quality composite, context only, not a real stat or a scoring input">
                   {(() => { const bp = getArsenalBlastPct(r); return bp==null ? '—' : bp; })()}
@@ -18098,6 +18113,9 @@ function SimLabView({ data }) {
                       <td style={dimStyle}>{numOr(b.bvp_avg_ev, 1)}</td>
                       <td style={dimStyle}>{numOr(b.bvp_barrel_pct, 1)}</td>
                       <td style={dimStyle}>{numOr(b.bvp_fb_pct, 1)}</td>
+                      <td style={dimStyle}>{numOr(b.bvp_pull_pct, 1)}</td>
+                      <td style={dimStyle}>{numOr(b.bvp_pulled_fb_pct, 1)}</td>
+                      <td style={dimStyle}>{parseInt(b.bvp_fb350_count) || 0}</td>
                       <td style={dimStyle}>{parseInt(b.bvp_hr_count) || 0}</td>
                       <td style={dimStyle} title="Arsenal Blast% — home-brewed swing-quality composite, context only, not a real stat or a scoring input">
                         {(() => { const bp = getArsenalBlastPct(b); return bp==null ? '—' : bp; })()}
@@ -35613,6 +35631,15 @@ function BarrelLabTab() {
       title:"Arsenal Fit — season Barrel% vs this pitcher's pitch mix + handedness" },
     { h:'FB%',    key:'af_fb',    acc: b => parseFloat(b.bvp_fb_pct||0),      align:'right', color:'#818cf8',
       title:"Arsenal Fit — season Fly Ball% vs this pitcher's pitch mix + handedness" },
+    // Pull%, Pulled Air% (pulled fly balls), 350+ ft FB count — added
+    // 2026-09-02. All 3 are bvp_* (Arsenal Fit) fields only, not recent/L7 —
+    // see matchup_engine.py:evaluate_flags() for the shared computation.
+    { h:'Pull%',  key:'af_pull',  acc: b => parseFloat(b.bvp_pull_pct||0),    align:'right', color:'#818cf8',
+      title:"Arsenal Fit — season Pull% (any batted-ball type) vs this pitcher's pitch mix + handedness" },
+    { h:'PAir%',  key:'af_pullair', acc: b => parseFloat(b.bvp_pulled_fb_pct||0), align:'right', color:'#818cf8',
+      title:"Arsenal Fit — season Pulled Air% (pulled fly balls) vs this pitcher's pitch mix + handedness — same field Boom's Pull×Park Fit component already uses" },
+    { h:'350+',   key:'af_fb350', acc: b => parseInt(b.bvp_fb350_count||0),   align:'right', color:'#818cf8',
+      title:"Arsenal Fit — 350+ ft fly balls, raw count, vs this pitcher's pitch mix + handedness" },
     { h:'HR',     key:'af_hr',    acc: b => parseInt(b.bvp_hr_count||0),      align:'right', color:'#818cf8',
       title:"Arsenal Fit — season HR count vs this pitcher's pitch mix + handedness" },
     // 2026-08-04 — home-brewed swing-quality composite (bat speed +
@@ -35879,7 +35906,7 @@ function BarrelLabTab() {
                 const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
                 const f1 = v => (v != null && v !== '' && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(1) : '';
                 const f3 = v => (v != null && v !== '' && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(3) : '';
-                const hdrs = ['Slot','Team','Player','Pitcher','Grade','TrueHR','Matchup','ZF','Form (gHR)','SimHR%','ISO','xwOBA','PulledBrl%','Brl/BIP%','HR/FB%','FB%','HH%','LA°','Barrel Signal','Plate IQ','IQ Grade','Zone Risk','Hand Match','Longshot','Chalk','Day Late','Young Gun','Mid-Tier','Season PA','Arsenal Fit ISO','Arsenal Blast%','Bullpen HR Rank','Sauce 2.0','Sauce 2.5','Sauce 3.0','Hit Signal','Secret Sauce','Avoid List',
+                const hdrs = ['Slot','Team','Player','Pitcher','Grade','TrueHR','Matchup','ZF','Form (gHR)','SimHR%','ISO','xwOBA','PulledBrl%','Brl/BIP%','HR/FB%','FB%','HH%','LA°','Barrel Signal','Plate IQ','IQ Grade','Zone Risk','Hand Match','Longshot','Chalk','Day Late','Young Gun','Mid-Tier','Season PA','Arsenal Fit ISO','Arsenal Fit Pull%','Arsenal Fit PulledAir%','Arsenal Fit 350+','Arsenal Blast%','Bullpen HR Rank','Sauce 2.0','Sauce 2.5','Sauce 3.0','Hit Signal','Secret Sauce','Avoid List',
                   'Game ID','Batter ID','Pitcher ID'];
                 const csvRows = [hdrs.map(esc).join(',')];
                 rows.forEach(b => {
@@ -35914,6 +35941,9 @@ function BarrelLabTab() {
                     esc(b.isMidTier ? '1' : '0'),
                     esc(parseInt(b.season_pa||0)),
                     esc(f3(b.bvp_iso)),
+                    esc(f1(b.bvp_pull_pct)),
+                    esc(f1(b.bvp_pulled_fb_pct)),
+                    esc(parseInt(b.bvp_fb350_count||0)),
                     esc((() => { const bp = getArsenalBlastPct(b); return bp==null ? '' : bp; })()),
                     esc(parseInt(b.bullpen_hr_rank)>0 ? parseInt(b.bullpen_hr_rank) : ''),
                     esc(b.isSauce2 ? '1' : '0'),
@@ -36390,6 +36420,9 @@ function BarrelLabTab() {
                               <td style={dim}>{fmt(b.bvp_avg_ev,1)}</td>
                               <td style={dim}>{fmt(b.bvp_barrel_pct,1)}</td>
                               <td style={dim}>{fmt(b.bvp_fb_pct,1)}</td>
+                              <td style={dim}>{fmt(b.bvp_pull_pct,1)}</td>
+                              <td style={dim}>{fmt(b.bvp_pulled_fb_pct,1)}</td>
+                              <td style={dim}>{parseInt(b.bvp_fb350_count)||0}</td>
                               <td style={dim}>{parseInt(b.bvp_hr_count)||0}</td>
                               <td style={dim} title="Arsenal Blast% — home-brewed swing-quality composite, context only, not a real stat or a scoring input">
                                 {(() => { const bp = getArsenalBlastPct(b); return bp==null ? '—' : bp; })()}
@@ -36876,6 +36909,15 @@ function OnBaseTab() {
       title:"Arsenal Fit — season Barrel% vs this pitcher's pitch mix + handedness" },
     { h:'FB%',    key:'af_fb',    acc: b => parseFloat(b.bvp_fb_pct||0),      align:'right', color:'#818cf8',
       title:"Arsenal Fit — season Fly Ball% vs this pitcher's pitch mix + handedness" },
+    // Pull%, Pulled Air% (pulled fly balls), 350+ ft FB count — added
+    // 2026-09-02. All 3 are bvp_* (Arsenal Fit) fields only, not recent/L7 —
+    // see matchup_engine.py:evaluate_flags() for the shared computation.
+    { h:'Pull%',  key:'af_pull',  acc: b => parseFloat(b.bvp_pull_pct||0),    align:'right', color:'#818cf8',
+      title:"Arsenal Fit — season Pull% (any batted-ball type) vs this pitcher's pitch mix + handedness" },
+    { h:'PAir%',  key:'af_pullair', acc: b => parseFloat(b.bvp_pulled_fb_pct||0), align:'right', color:'#818cf8',
+      title:"Arsenal Fit — season Pulled Air% (pulled fly balls) vs this pitcher's pitch mix + handedness — same field Boom's Pull×Park Fit component already uses" },
+    { h:'350+',   key:'af_fb350', acc: b => parseInt(b.bvp_fb350_count||0),   align:'right', color:'#818cf8',
+      title:"Arsenal Fit — 350+ ft fly balls, raw count, vs this pitcher's pitch mix + handedness" },
     { h:'HR',     key:'af_hr',    acc: b => parseInt(b.bvp_hr_count||0),      align:'right', color:'#818cf8',
       title:"Arsenal Fit — season HR count vs this pitcher's pitch mix + handedness" },
     // 2026-08-04 — home-brewed swing-quality composite (bat speed +
@@ -37137,7 +37179,7 @@ function OnBaseTab() {
                 const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
                 const f1 = v => (v != null && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(1) : '';
                 const f3 = v => (v != null && !isNaN(parseFloat(v))) ? parseFloat(v).toFixed(3) : '';
-                const hdrs = ['Slot','Team','Player','Pitcher','Grade','OnBaseScore','Matchup','ZF','G2TB%','SimTB2%','AVG','SLG','ISO','xwOBA','XBH%','HH%','SimTB','LA°','TB Signal','Plate IQ','IQ Grade','Zone Risk','Hand Match','Longshot','Chalk','Day Late','Young Gun','Mid-Tier','Season PA','Arsenal Fit ISO','Arsenal Blast%','Bullpen HR Rank','Sauce 2.0','Sauce 2.5','Sauce 3.0','Hit Signal','Secret Sauce','Avoid List',
+                const hdrs = ['Slot','Team','Player','Pitcher','Grade','OnBaseScore','Matchup','ZF','G2TB%','SimTB2%','AVG','SLG','ISO','xwOBA','XBH%','HH%','SimTB','LA°','TB Signal','Plate IQ','IQ Grade','Zone Risk','Hand Match','Longshot','Chalk','Day Late','Young Gun','Mid-Tier','Season PA','Arsenal Fit ISO','Arsenal Fit Pull%','Arsenal Fit PulledAir%','Arsenal Fit 350+','Arsenal Blast%','Bullpen HR Rank','Sauce 2.0','Sauce 2.5','Sauce 3.0','Hit Signal','Secret Sauce','Avoid List',
                   'Game ID','Batter ID','Pitcher ID'];
                 const csvRows = [hdrs.map(esc).join(',')];
                 rows.forEach(b => {
@@ -37172,6 +37214,9 @@ function OnBaseTab() {
                     esc(b.isMidTier ? '1' : '0'),
                     esc(parseInt(b.season_pa||0)),
                     esc(f3(b.bvp_iso)),
+                    esc(f1(b.bvp_pull_pct)),
+                    esc(f1(b.bvp_pulled_fb_pct)),
+                    esc(parseInt(b.bvp_fb350_count||0)),
                     esc((() => { const bp = getArsenalBlastPct(b); return bp==null ? '' : bp; })()),
                     esc(parseInt(b.bullpen_hr_rank)>0 ? parseInt(b.bullpen_hr_rank) : ''),
                     esc(b.isSauce2 ? '1' : '0'),
@@ -37577,6 +37622,9 @@ function OnBaseTab() {
                               <td style={dim}>{fmt(b.bvp_avg_ev,1)}</td>
                               <td style={dim}>{fmt(b.bvp_barrel_pct,1)}</td>
                               <td style={dim}>{fmt(b.bvp_fb_pct,1)}</td>
+                              <td style={dim}>{fmt(b.bvp_pull_pct,1)}</td>
+                              <td style={dim}>{fmt(b.bvp_pulled_fb_pct,1)}</td>
+                              <td style={dim}>{parseInt(b.bvp_fb350_count)||0}</td>
                               <td style={dim}>{parseInt(b.bvp_hr_count)||0}</td>
                               <td style={dim} title="Arsenal Blast% — home-brewed swing-quality composite, context only, not a real stat or a scoring input">
                                 {(() => { const bp = getArsenalBlastPct(b); return bp==null ? '—' : bp; })()}

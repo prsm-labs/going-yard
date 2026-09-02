@@ -1,9 +1,8 @@
 {
-  "version": "2026.08.13",
-  "bundleFile": "index-O8bV72tn.js",
+  "version": "2026.09.02",
+  "bundleFile": "index--Nfuf6AX.js",
   "changelog": [
-    "Add 8pm ET lock for Top 4 Tonight",
-    "persisted server-side via Redis"
+    "Daily data update 2026-09-02"
   ],
-  "notifyUsers": true
+  "notifyUsers": false
 }
