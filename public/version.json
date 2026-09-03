@@ -1,10 +1,9 @@
 {
   "version": "2026.09.03",
-  "bundleFile": "index-DUeUq8SH.js",
+  "bundleFile": "index-Eo_wRsTx.js",
   "changelog": [
-    "Add Pull%",
-    "PullAir%",
-    "350+ FB count to Arsenal Fit columns"
+    "Rename Young Guns tab to Called-Up",
+    "add Confirmed badge/filter"
   ],
   "notifyUsers": true
 }

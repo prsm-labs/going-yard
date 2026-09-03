@@ -16465,6 +16465,14 @@ function SimLabView({ data }) {
   const [afMidTierOnly,   setAfMidTierOnly]   = useState(false);
   const [afSauce3Only,    setAfSauce3Only]    = useState(false);
   const [afSauce25Only,   setAfSauce25Only]   = useState(false);
+  // Top ISO (2026-09-03) — Arsenal Fit ISO > .200 alone, no Zone Fit/xwOBA/
+  // pitcher-grade gate. Validated against real track-record-barrel.csv
+  // outcomes before shipping: 1.33x lift at n=2,638 (base 10.6%), and
+  // notably cleaner/more monotonic than the same threshold on L7 ISO
+  // (1.31x, non-monotonic — dips back down at .25) per the user's own
+  // observation. Deliberately simpler than the Sauce tiers — a single-
+  // field quick filter, not a new compound signal.
+  const [afTopIsoOnly,    setAfTopIsoOnly]    = useState(false);
   const [afBullpenTiers,  setAfBullpenTiers]  = useState(() => new Set());
   const [afAvoidOnly,     setAfAvoidOnly]     = useState(false);
   const [afHideAvoid,     setAfHideAvoid]     = useState(false);
@@ -16800,6 +16808,7 @@ function SimLabView({ data }) {
       .filter(r => !afMidTierOnly   || r.isMidTier)
       .filter(r => !afSauce3Only    || r.isSauce3)
       .filter(r => !afSauce25Only   || r.isSauce25)
+      .filter(r => !afTopIsoOnly    || parseFloat(r.bvp_iso||0) > 0.2)
       .filter(r => afBullpenTiers.size === 0 || afBullpenTiers.has(bullpenTierLabel(r.bullpen_hr_rank)))
       .filter(r => !afAvoidOnly     || r.isAvoid)
       .filter(r => !afHideAvoid     || !r.isAvoid)
@@ -16814,7 +16823,7 @@ function SimLabView({ data }) {
       if (va > vb) return afSortDir === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [slate, afSortBy, afSortDir, afChalkOnly, afDayLateOnly, afYoungGunsOnly, afLongshotOnly, afMidTierOnly, afSauce3Only, afSauce25Only, afBullpenTiers, afAvoidOnly, afHideAvoid, afHandMatchOnly, afMinL7Iso, afMinIso, afMinL7Ev, afMinEv, afDayLateVer, afPlayerVer]);
+  }, [slate, afSortBy, afSortDir, afChalkOnly, afDayLateOnly, afYoungGunsOnly, afLongshotOnly, afMidTierOnly, afSauce3Only, afSauce25Only, afTopIsoOnly, afBullpenTiers, afAvoidOnly, afHideAvoid, afHandMatchOnly, afMinL7Iso, afMinIso, afMinL7Ev, afMinEv, afDayLateVer, afPlayerVer]);
 
   // Reset row cap when filters/sort change so user always sees top results
   useEffect(() => { setDisplayLimit(150); }, [sortBy, sortDir, selMatchups, lineupOnly, simActiveOnly, simSearch, filterKeyMatchup, slotMin, slotMax]);
@@ -17985,6 +17994,15 @@ function SimLabView({ data }) {
                 color: afSauce25Only ? '#eab308' : 'var(--muted)',
                 border: `1px solid ${afSauce25Only ? 'rgba(234,179,8,.45)' : 'var(--border)'}` }}>
               🥫 {afSauce25Only ? 'Sauce 2.5 Only' : 'Sauce 2.5'}
+            </button>
+            <button onClick={() => setAfTopIsoOnly(v => !v)}
+              title="Top ISO — Arsenal Fit ISO (season vs this pitcher's pitch mix + handedness) > .200, alone. Validated: 1.33x HR lift (n=2,638, full 2026 season) — cleaner/more monotonic than the same threshold on L7 ISO."
+              style={{ padding: '2px 8px', borderRadius: 5, cursor: 'pointer', fontFamily: "'DM Mono',monospace",
+                fontSize: 9, fontWeight: 700, lineHeight: 1.5, flexShrink: 0,
+                background: afTopIsoOnly ? 'rgba(56,184,242,.14)' : 'var(--surface2)',
+                color: afTopIsoOnly ? '#38b8f2' : 'var(--muted)',
+                border: `1px solid ${afTopIsoOnly ? 'rgba(56,184,242,.45)' : 'var(--border)'}` }}>
+              📈 {afTopIsoOnly ? 'Top ISO Only' : 'Top ISO'}
             </button>
             <button onClick={() => setAfChalkOnly(v => !v)}
               title="Chalk 💪🏽 — established power bat (19+ season HR, or season AB/HR<21) facing a matchup that isn't Elite/Tough today."
@@ -35254,6 +35272,10 @@ function BarrelLabTab() {
   const [blHandMatchOnly,  setBlHandMatchOnly]  = useState(false);
   const [blSauce3Only,     setBlSauce3Only]     = useState(false);
   const [blSauce25Only,    setBlSauce25Only]    = useState(false);
+  // Top ISO (2026-09-03) — Arsenal Fit ISO > .200 alone, no Zone Fit/xwOBA/
+  // pitcher-grade gate. See the matching comment on Arsenal Fit's own
+  // afTopIsoOnly for the validated 1.33x lift and why L7 ISO was excluded.
+  const [blTopIsoOnly,     setBlTopIsoOnly]     = useState(false);
   const [blHitSignalOnly,  setBlHitSignalOnly]  = useState(false);
   const [blSecretSauceOnly,setBlSecretSauceOnly]= useState(false);
   const [blBullpenTiers,   setBlBullpenTiers]   = useState(() => new Set());
@@ -35531,6 +35553,7 @@ function BarrelLabTab() {
     .filter(r => !blHandMatchOnly || r.handMatchTier)
     .filter(r => !blSauce3Only || r.isSauce3)
     .filter(r => !blSauce25Only || r.isSauce25)
+    .filter(r => !blTopIsoOnly || parseFloat(r.bvp_iso||0) > 0.2)
     .filter(r => !blHitSignalOnly   || r.isHitSignal)
     .filter(r => !blSecretSauceOnly || r.isSecretSauce)
     .filter(r => blPitcherGrades.size === 0 || blPitcherGrades.has((r.pitcher_grade_label||r._pgLabel||'').trim()))
@@ -35543,7 +35566,7 @@ function BarrelLabTab() {
     .filter(r => blMinL7Ev  === '' || parseFloat(r.recent_avg_ev||0) >= parseFloat(blMinL7Ev))
     .filter(r => blMinEv    === '' || parseFloat(r.bvp_avg_ev||0)    >= parseFloat(blMinEv))
     .sort((a, b) => b.trueHRScore - a.trueHRScore);
-  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, blChalkOnly, blMidTierOnly, blDayLateOnly, blYoungGunsOnly, blPicksOnly, picks, blGoneYardOnly, blTB2Only, blHighIQOnly, blHandMatchOnly, blSauce3Only, blSauce25Only, blHitSignalOnly, blSecretSauceOnly, blBullpenTiers, blAvoidOnly, blHideAvoid, blBatterHand, blPitcherGrades, blMinL7Iso, blMinIso, blMinL7Ev, blMinEv, hrVer, finalVer, dayLateVer, playerVer, ballStateVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, blChalkOnly, blMidTierOnly, blDayLateOnly, blYoungGunsOnly, blPicksOnly, picks, blGoneYardOnly, blTB2Only, blHighIQOnly, blHandMatchOnly, blSauce3Only, blSauce25Only, blTopIsoOnly, blHitSignalOnly, blSecretSauceOnly, blBullpenTiers, blAvoidOnly, blHideAvoid, blBatterHand, blPitcherGrades, blMinL7Iso, blMinIso, blMinL7Ev, blMinEv, hrVer, finalVer, dayLateVer, playerVer, ballStateVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Color threshold helpers
   const clr = (v, g1, g2, y1, y2) => {
@@ -35866,6 +35889,19 @@ function BarrelLabTab() {
                 border:`1px solid ${blSauce25Only ? 'rgba(234,179,8,.45)' : 'var(--border)'}`,
               }}>
               🥫 {blSauce25Only ? 'Sauce 2.5 Only' : 'Sauce 2.5'}
+            </button>
+            <button
+              onClick={() => setBlTopIsoOnly(v => !v)}
+              title="Top ISO — Arsenal Fit ISO (season vs this pitcher's pitch mix + handedness) > .200, alone. Validated: 1.33x HR lift (n=2,638, full 2026 season) — cleaner/more monotonic than the same threshold on L7 ISO."
+              style={{
+                padding:'2px 8px', borderRadius:5, cursor:'pointer',
+                fontFamily:"'DM Mono',monospace", fontSize:9, fontWeight:700,
+                lineHeight:1.5, flexShrink:0,
+                background: blTopIsoOnly ? 'rgba(56,184,242,.14)' : 'var(--surface2)',
+                color:      blTopIsoOnly ? '#38b8f2' : 'var(--muted)',
+                border:`1px solid ${blTopIsoOnly ? 'rgba(56,184,242,.45)' : 'var(--border)'}`,
+              }}>
+              📈 {blTopIsoOnly ? 'Top ISO Only' : 'Top ISO'}
             </button>
             <FilterPanel
               toggles={[
