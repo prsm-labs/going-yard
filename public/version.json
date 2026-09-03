@@ -1,8 +1,10 @@
 {
-  "version": "2026.09.02",
-  "bundleFile": "index--Nfuf6AX.js",
+  "version": "2026.09.03",
+  "bundleFile": "index-DUeUq8SH.js",
   "changelog": [
-    "Daily data update 2026-09-02"
+    "Add Pull%",
+    "PullAir%",
+    "350+ FB count to Arsenal Fit columns"
   ],
-  "notifyUsers": false
+  "notifyUsers": true
 }

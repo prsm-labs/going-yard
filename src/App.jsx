@@ -33487,7 +33487,7 @@ function HomeTab() {
         ['🛢️ Daily Barrel', 'Monte Carlo HR simulation (10,000 PAs per matchup). TrueHRScore + MatchupScore per batter, ★ Barrel Signal flag for the strictest matchups, 🎲 Longshot flag for undervalued plays. Live tracker: Barrel Signal hits at 16.9% HR rate.'],
         ['🔵 On Base', 'A parallel Monte Carlo engine targeting 2+ total bases per game — the hits/TB prop market, not just HRs. OnBaseScore + MatchupScore + SimTB2%, with its own ★ TB Signal flag. Very new — early hit rate is promising but the sample is still small.'],
         ['🚫 Avoid List', 'The mirror image of Hit Signal — batters least likely to record a hit tonight (cold Sim H, real whiff risk, tough matchup, or unfavorable platoon). Full-season backtest: 58-61% miss rate vs. a 42.6% baseline, 1.4x lift, validated cleanly train/test. No badges — this list only exists here and as a filter in the usual tables.'],
-        ['🆕 Young Guns', 'Every real MLB call-up (recalled or contract-purchase) from the last 45 days, pulled straight from MLB\'s own transactions feed. Tap Majors for a real Arsenal Fit/matchup read if they\'re in today\'s slate (or their live MLB stat line if not); tap Minors for their season stats, vs-LHP/vs-RHP splits, and a rolling last-7-games window at whatever level they were called up from. A 🆕 badge marks anyone called up today. Barrel%/xwOBA aren\'t shown — real batted-ball tracking only exists at Triple-A and would need a separate historical pipeline.'],
+        ['☎️ Called-Up', 'Every real MLB call-up (recalled or contract-purchase) from the last 45 days, pulled straight from MLB\'s own transactions feed. Tap Majors for a real Arsenal Fit/matchup read if they\'re in today\'s slate (or their live MLB stat line if not); tap Minors for their season stats, vs-LHP/vs-RHP splits, and a rolling last-7-games window at whatever level they were called up from. A 🆕 badge marks anyone called up today; a ✅ badge marks anyone confirmed in today\'s live lineup, with a matching "Confirmed ✅" filter. Barrel%/xwOBA aren\'t shown — real batted-ball tracking only exists at Triple-A and would need a separate historical pipeline.'],
         ['🎯 Pitcher Grades', '🎯 Target = easiest to homer off · 💥 Hittable = solid spot · 🤔 Average = neutral · ⚠️ Tough = difficult · ‼️ Elite = avoid. Grading is now hand-specific (vs LHB / vs RHB splits) — tap any pitcher name to open their slideout.'],
         ['📊 Batter Grades', 'A+ = 6–8 signals (live tracker: 18.8% HR rate) · A = 4–5 (17.5%) · B = 2–3 (12.8%) · C = 1 (12.1%) · D = 0 (9.8%). Signals include LA lock, bat speed peak, pitch convergence, handedness match, and close call streaks.'],
         ['Dive Deeper', 'Use the → All Matchups button to go deeper on any batter\'s full matchup data, or open Track Record to see every signal\'s live, current hit rate.'],
@@ -33505,7 +33505,7 @@ function HomeTab() {
         <button data-subtab="barrellab" style={stBtn('barrellab')} onClick={()=>setSub('barrellab')}>🛢️ Daily Barrel</button>
         <button data-subtab="onbase"    style={stBtn('onbase')}    onClick={()=>setSub('onbase')}>🔵 On Base</button>
         <button data-subtab="avoid"     style={stBtn('avoid')}     onClick={()=>setSub('avoid')}>🚫 Avoid</button>
-        <button data-subtab="younggun"  style={stBtn('younggun')}  onClick={()=>setSub('younggun')}>🆕 Young Guns</button>
+        <button data-subtab="younggun"  style={stBtn('younggun')}  onClick={()=>setSub('younggun')}>☎️ Called-Up</button>
         <HelpBtn2/>
         {/* Refresh — visible when on cheat sheet */}
         {sub==='cheatsheet' && (
@@ -35013,6 +35013,13 @@ function YoungGunsCallUpTab() {
   const [selTeam, setSelTeam] = useState('all');
   const [sortCol, setSortCol] = useState('callupDate');
   const [sortDir, setSortDir] = useState('desc'); // most-recent-first by default
+  const [confirmedOnly, setConfirmedOnly] = useState(false);
+
+  // Live lineup confirmation — same LINEUP_STATUS/subscribeLineup() pattern
+  // used everywhere else in the app (Barrel Lab, On Base, Arsenal Fit, etc.)
+  // for the ✅ Confirmed badge/filter, added 2026-09-03.
+  const [lineupVer, setLineupVer] = useState(0);
+  useEffect(() => { const unsub = subscribeLineup(v => setLineupVer(v)); return unsub; }, []);
 
   useEffect(() => {
     fetch('/api/callups').then(r => r.json()).then(d => {
@@ -35040,9 +35047,10 @@ function YoungGunsCallUpTab() {
       const mlbPA  = cached ? (cached.pa || cached.ab || 0) : 0;
       const dpRow  = DAILY_PICKS_CACHE[String(p.playerId)] || null;
       const teamAbbr = TEAM_ID_TO_ABBR[p.toTeamId] || '';
-      return { ...p, mlbPA, cached, dpRow, teamAbbr, isNew: p.callupDate === today };
+      const isConfirmed = LINEUP_STATUS[p.playerId]?.status === 'confirmed';
+      return { ...p, mlbPA, cached, dpRow, teamAbbr, isNew: p.callupDate === today, isConfirmed };
     });
-  }, [players, playerVer, today]);
+  }, [players, playerVer, today, lineupVer]);
 
   const teamOptions = useMemo(() => {
     const set = new Set(rows.map(r => r.teamAbbr).filter(Boolean));
@@ -35052,6 +35060,7 @@ function YoungGunsCallUpTab() {
   const filteredRows = useMemo(() => {
     let base = rows;
     if (selTeam !== 'all') base = base.filter(r => r.teamAbbr === selTeam);
+    if (confirmedOnly) base = base.filter(r => r.isConfirmed);
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       base = base.filter(r => r.name.toLowerCase().includes(q));
@@ -35063,7 +35072,7 @@ function YoungGunsCallUpTab() {
       if (sortCol === 'mlbPA')    return mul * ((a.mlbPA||0) - (b.mlbPA||0));
       return mul * a.callupDate.localeCompare(b.callupDate); // callupDate
     });
-  }, [rows, selTeam, search, sortCol, sortDir]);
+  }, [rows, selTeam, confirmedOnly, search, sortCol, sortDir]);
 
   const toggleSort = key => {
     if (sortCol === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -35086,7 +35095,7 @@ function YoungGunsCallUpTab() {
   return (
     <div>
       <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:8}}>
-        <span style={{fontFamily:osw,fontWeight:800,fontSize:14,color:'#38f282'}}>🆕 Young Guns</span>
+        <span style={{fontFamily:osw,fontWeight:800,fontSize:14,color:'#38f282'}}>☎️ Called-Up</span>
         <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>
           {players === null ? 'Loading…' : `${filteredRows.length} of ${rows.length} call-ups in the last 45 days`}
         </span>
@@ -35099,6 +35108,14 @@ function YoungGunsCallUpTab() {
           <option value="all">All Teams</option>
           {teamOptions.map(t => <option key={t} value={t}>{t}</option>)}
         </select>
+        <button onClick={() => setConfirmedOnly(v => !v)}
+          title="Show only call-ups confirmed in today's live lineup"
+          style={{padding:'3px 8px',borderRadius:5,cursor:'pointer',fontFamily:mono,fontSize:9,fontWeight:700,
+            background: confirmedOnly ? 'rgba(39,201,122,.14)' : 'var(--surface2)',
+            border:`1px solid ${confirmedOnly ? 'rgba(39,201,122,.45)' : 'var(--border)'}`,
+            color: confirmedOnly ? '#27c97a' : 'var(--muted)'}}>
+          {confirmedOnly ? '✅ Confirmed Only' : 'Confirmed ✅'}
+        </button>
       </div>
 
       {error && (
@@ -35153,6 +35170,8 @@ function YoungGunsCallUpTab() {
                         </span>
                         {r.isNew && <span title="Called up today" style={{fontSize:8,fontWeight:700,color:'#38f282',flexShrink:0,
                           padding:'1px 4px',borderRadius:3,background:'rgba(56,242,130,.12)',border:'1px solid rgba(56,242,130,.35)'}}>🆕 NEW</span>}
+                        {r.isConfirmed && <span title="Confirmed in today's live lineup" style={{fontSize:8,fontWeight:700,color:'#27c97a',flexShrink:0,
+                          padding:'1px 4px',borderRadius:3,background:'rgba(39,201,122,.12)',border:'1px solid rgba(39,201,122,.35)'}}>✅</span>}
                       </div>
                     </td>
                     <td style={{padding:'5px 6px',fontFamily:mono,fontSize:9,fontWeight:700}}>{r.teamAbbr || r.toTeam}</td>
