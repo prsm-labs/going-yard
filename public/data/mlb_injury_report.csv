@@ -23,7 +23,6 @@ AZ,691441,Cristian Mena,P,Right shoulder strain,,🟡,Injured 60-Day
 AZ,647336,Michael Soroka,P,Right arm inflammation.,,🟡,Injured 15-Day
 AZ,657044,Ryan Thompson,P,Strained lower back.,,🟡,Injured 60-Day
 AZ,669194,Ryne Nelson,P,Strained right elbow.,,🟡,Injured 60-Day
-AZ,694371,Tommy Troy,LF,Sprained right AC joint.,,🟡,Injured 10-Day
 AZ,668678,Zac Gallen,P,Right elbow inflammation.,,🟡,Injured 60-Day
 BAL,681047,Christian Franklin,CF,Left hand inflammation.,,🟡,Injured 10-Day
 BAL,681882,Colin Selby,P,Right shoulder inflammation.,,🟡,Injured 60-Day
@@ -62,7 +61,7 @@ CIN,694362,Blake Dunn,CF,Right elbow sprain.,,🟡,Injured 60-Day
 CIN,668933,Graham Ashcraft,P,Right forearm UCL sprain.,,🟡,Injured 60-Day
 CIN,668881,Hunter Greene,P,Right elbow soreness.,,🟡,Injured 60-Day
 CIN,663647,Ke'Bryan Hayes,3B,Left groin strain.,,🟡,Injured 10-Day
-CIN,669911,Michael Toglia,1B,Right shoulder dislocation.,,⚪,Injured 10-Day
+CIN,669911,Michael Toglia,1B,Right shoulder dislocation.,,⚪,Injured 60-Day
 CIN,668715,Spencer Steer,1B,Right wrist sprain,,🟡,Injured 10-Day
 CLE,670059,Colin Holderman,P,Right wrist inflammation.,,🟡,Injured 15-Day
 CLE,656555,Rhys Hoskins,1B,Lower back inflammation.,,🟡,Injured 10-Day
@@ -102,6 +101,7 @@ HOU,687888,Brandon Walter,P,Left elbow surgery recovery,,🔴,Injured 60-Day
 HOU,694728,Brice Matthews,CF,Left knee sprain.,,🟡,Injured 60-Day
 HOU,621043,Carlos Correa,SS,Left ankle tendon injury.,,⚪,Injured 60-Day
 HOU,681347,Mike Burrows,P,Right elbow neuritis.,,⚪,Injured 15-Day
+HOU,595345,Steven Okert,P,Right hamstring strain.,,🟡,Injured 15-Day
 KC,679525,Alec Marsh,P,Right shoulder impingement.,,⚪,Injured 60-Day
 KC,694360,Beck Way,P,Low back spasms/tightness.,,🟢,Injured 15-Day
 KC,608032,Carlos Estévez,P,Left foot contusion.,,🟢,Injured 60-Day
@@ -176,7 +176,6 @@ PHI,679032,Johan Rojas,CF,Right elbow UCL repair.,,⚪,Injured 60-Day
 PHI,621383,Tanner Banks,P,Left forearm strain.,,🟡,Injured 60-Day
 PIT,682848,Endy Rodríguez,C,Left hip inflammation.,,🟡,Injured 60-Day
 PIT,489446,Kirby Yates,P,Right shoulder impingement.,,⚪,Injured 15-Day
-PIT,804606,Konnor Griffin,SS,Left ring finger sagittal band injury,,⚪,Injured 60-Day
 PIT,656605,Mitch Keller,P,Right arm teres major muscle injury.,,⚪,Injured 60-Day
 PIT,656811,Ryan O'Hearn,RF,Left quad strain.,,🟡,Injured 10-Day
 SD,663773,Bryan Hoeing,P,Torn right elbow flexor tendon.,,⚪,Injured 60-Day
@@ -206,7 +205,7 @@ SF,691740,Daniel Susac,C,Left knee patella fracture.,,🔴,Injured 60-Day
 SF,664056,Harrison Bader,CF,Left plantar fasciitis.,,⚪,Injured 60-Day
 SF,806185,Hayden Birdsong,P,Tommy John surgery.,,🔴,Injured 60-Day
 SF,664141,JT Brubaker,P,Bruised ribs,,🟢,Injured 10-Day
-SF,683679,Jesus Rodriguez,C,Right elbow neuritis.,,⚪,Injured 10-Day
+SF,683679,Jesus Rodriguez,C,Right elbow neuritis.,,⚪,Injured 60-Day
 SF,666711,Joel Peguero,P,Left hamstring strain,,🟡,Injured 60-Day
 SF,676130,José Buttó,P,Right arm fatigue,,⚪,Injured 60-Day
 SF,676775,Keaton Winn,P,Right elbow neuritis.,,⚪,Injured 60-Day
