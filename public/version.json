@@ -1,9 +1,8 @@
 {
   "version": "2026.09.06",
-  "bundleFile": "index-DN0qx5Hz.js",
+  "bundleFile": "index-DdPEdPg_.js",
   "changelog": [
-    "Add Top ISO filter (Arsenal Fit + Barrel Lab)",
-    "regenerate splits data"
+    "Add Top ISO filter/card/column to Track Record"
   ],
   "notifyUsers": true
 }

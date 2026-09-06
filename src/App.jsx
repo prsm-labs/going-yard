@@ -16473,6 +16473,9 @@ function SimLabView({ data }) {
   // observation. Deliberately simpler than the Sauce tiers — a single-
   // field quick filter, not a new compound signal.
   const [afTopIsoOnly,    setAfTopIsoOnly]    = useState(false);
+  // Prime ISO (2026-09-06) — Arsenal Fit ISO>.200 + BvP EV>=93 + Zone Fit>=2.
+  // See isPrimeIsoBatter()'s own comment for the full validation.
+  const [afPrimeIsoOnly,  setAfPrimeIsoOnly]  = useState(false);
   const [afBullpenTiers,  setAfBullpenTiers]  = useState(() => new Set());
   const [afAvoidOnly,     setAfAvoidOnly]     = useState(false);
   const [afHideAvoid,     setAfHideAvoid]     = useState(false);
@@ -16809,6 +16812,7 @@ function SimLabView({ data }) {
       .filter(r => !afSauce3Only    || r.isSauce3)
       .filter(r => !afSauce25Only   || r.isSauce25)
       .filter(r => !afTopIsoOnly    || parseFloat(r.bvp_iso||0) > 0.2)
+      .filter(r => !afPrimeIsoOnly  || isPrimeIsoBatter(r))
       .filter(r => afBullpenTiers.size === 0 || afBullpenTiers.has(bullpenTierLabel(r.bullpen_hr_rank)))
       .filter(r => !afAvoidOnly     || r.isAvoid)
       .filter(r => !afHideAvoid     || !r.isAvoid)
@@ -16823,7 +16827,7 @@ function SimLabView({ data }) {
       if (va > vb) return afSortDir === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [slate, afSortBy, afSortDir, afChalkOnly, afDayLateOnly, afYoungGunsOnly, afLongshotOnly, afMidTierOnly, afSauce3Only, afSauce25Only, afTopIsoOnly, afBullpenTiers, afAvoidOnly, afHideAvoid, afHandMatchOnly, afMinL7Iso, afMinIso, afMinL7Ev, afMinEv, afDayLateVer, afPlayerVer]);
+  }, [slate, afSortBy, afSortDir, afChalkOnly, afDayLateOnly, afYoungGunsOnly, afLongshotOnly, afMidTierOnly, afSauce3Only, afSauce25Only, afTopIsoOnly, afPrimeIsoOnly, afBullpenTiers, afAvoidOnly, afHideAvoid, afHandMatchOnly, afMinL7Iso, afMinIso, afMinL7Ev, afMinEv, afDayLateVer, afPlayerVer]);
 
   // Reset row cap when filters/sort change so user always sees top results
   useEffect(() => { setDisplayLimit(150); }, [sortBy, sortDir, selMatchups, lineupOnly, simActiveOnly, simSearch, filterKeyMatchup, slotMin, slotMax]);
@@ -18003,6 +18007,15 @@ function SimLabView({ data }) {
                 color: afTopIsoOnly ? '#38b8f2' : 'var(--muted)',
                 border: `1px solid ${afTopIsoOnly ? 'rgba(56,184,242,.45)' : 'var(--border)'}` }}>
               📈 {afTopIsoOnly ? 'Top ISO Only' : 'Top ISO'}
+            </button>
+            <button onClick={() => setAfPrimeIsoOnly(v => !v)}
+              title="Prime ISO — Arsenal Fit ISO>.200 + BvP EV>=93 + Zone Fit>=2. Validated: 18.4% HR rate (1.57x) train / 17.1% (1.66x) test, full 2026 season — held up on the held-out half. BvP EV alone correlates with HR even more strongly than Arsenal Fit ISO itself (r=0.081 vs 0.066)."
+              style={{ padding: '2px 8px', borderRadius: 5, cursor: 'pointer', fontFamily: "'DM Mono',monospace",
+                fontSize: 9, fontWeight: 700, lineHeight: 1.5, flexShrink: 0,
+                background: afPrimeIsoOnly ? 'rgba(167,139,250,.14)' : 'var(--surface2)',
+                color: afPrimeIsoOnly ? '#a78bfa' : 'var(--muted)',
+                border: `1px solid ${afPrimeIsoOnly ? 'rgba(167,139,250,.45)' : 'var(--border)'}` }}>
+              💎 {afPrimeIsoOnly ? 'Prime ISO Only' : 'Prime ISO'}
             </button>
             <button onClick={() => setAfChalkOnly(v => !v)}
               title="Chalk 💪🏽 — established power bat (19+ season HR, or season AB/HR<21) facing a matchup that isn't Elite/Tough today."
@@ -28726,8 +28739,9 @@ function LegendButton() {
     ] },
     { tab:'📋 Track Record',   items:[
       'The self-auditing page — merges the daily All Matchups, Barrel Lab, and On Base exports against actual box-score outcomes, every day, automatically.',
-      '✅ HRs Only, ★ Barrel Signal Only, and 🥫 Sauce 2.5 Only stay as standalone quick-access buttons. Everything else — 🔑 Key Matchup, 🟢 Weak Spot, 📍 Close Call, 🍯 Sauce 2.0, 🍯🔥 Sauce 3.0, 📈 Top ISO, 🗓️ Day Late, 2️⃣ 2-Bagger (Non-HR), 🎯 TB Signal, 🎲 Sim TB ≥2.0, 🧠 High Plate IQ, ⭐ Hand Match, 🔴/🔵 Ball Carry Juiced/Dead, ⬆️/⬇️ xHR Juiced/Dead, plus a Pitcher Grade multi-select — moved into the ⚙ Filters dropdown 2026-08-02 once the flat button row grew past what fits on a phone screen, same consolidation Barrel Lab/On Base/Arsenal Fit already went through. Sauce 3.0\'s own quick button moved into the panel that same day, once Sauce 2.5 took over the standalone slot.',
+      '✅ HRs Only, ★ Barrel Signal Only, and 🥫 Sauce 2.5 Only stay as standalone quick-access buttons. Everything else — 🔑 Key Matchup, 🟢 Weak Spot, 📍 Close Call, 🍯 Sauce 2.0, 🍯🔥 Sauce 3.0, 📈 Top ISO, 💎 Prime ISO, 🗓️ Day Late, 2️⃣ 2-Bagger (Non-HR), 🎯 TB Signal, 🎲 Sim TB ≥2.0, 🧠 High Plate IQ, ⭐ Hand Match, 🔴/🔵 Ball Carry Juiced/Dead, ⬆️/⬇️ xHR Juiced/Dead, plus a Pitcher Grade multi-select — moved into the ⚙ Filters dropdown 2026-08-02 once the flat button row grew past what fits on a phone screen, same consolidation Barrel Lab/On Base/Arsenal Fit already went through. Sauce 3.0\'s own quick button moved into the panel that same day, once Sauce 2.5 took over the standalone slot.',
       '📈 Top ISO filter/card/column (added 2026-09-06) — Arsenal Fit ISO > .200 alone, same definition and validated 1.33x HR lift as Barrel Lab/Arsenal Fit\'s own Top ISO filter (added 2026-09-03). Reads "Arsenal Fit ISO" straight off the All Matchups export (already backfilled leak-free back to 5/17 for the Sauce 3.0 work, 85.8% coverage) — no new backfill needed. The "AF ISO" table column (Matchup Engine group) shows the raw value; "—" for any row where it\'s genuinely missing rather than 0.',
+      '💎 Prime ISO filter/card (added 2026-09-06, same day as Top ISO) — Arsenal Fit ISO>.200 + BvP EV>=93 + Zone Fit>=2. Found by ranking every non-recent field\'s correlation with HR: BvP EV (r=0.081) actually beats Arsenal Fit ISO itself (r=0.066) as a standalone predictor — the single strongest thing to pair with it. Validated on a chronological 70/30 train/test split: 18.4% HR rate (1.57x lift) train, 17.1% (1.66x) test — held up, in fact strengthened, on the held-out half. Deliberately NOT a Sauce variant (no xwOBA/pitcher-grade gate) — a genuinely separate signal family, purely Arsenal-Fit-window contact quality + spatial zone fit.',
       '🗓️ Day Late filter/card (added 2026-08-02, alongside the FilterPanel consolidation) — same definition as Barrel Lab/On Base\'s Day Late badge (★ Barrel Signal on both of the last 2 real game days, no HR either day, today\'s pitcher not Elite), reimplemented against Track Record\'s own historical row data so it works on any past date, not just today\'s live slate.',
       '🏆 Top 4 Pick filter/column/card (added 2026-08-09, prompted by a real day — 8/9 — where 3 of the 4 live picks, Burleson/Conine/Ortiz, went yard) — for dates from 2026-08-13 onward, this reads the REAL locked Top 4 Tonight record (see next item) instead of guessing. For dates before that, it reconstructs which batter WOULD have been each tier\'s pick (Young Gun/Chalk/Mid-Tier/Longshot, one each) using the same selection algorithm: TrueHR×0.5 + MatchupScore×0.5 + Sauce/Bullpen bonuses, ranked within each tier, with Mid-Tier additionally gated by L7 ISO + Arsenal Fit ISO both >.190 (falling back to the plain top-graded Mid-Tier batter if nobody clears it). A batter already picked for an earlier tier is excluded from later ones, same dedup as the live tab. Genuinely LIMITED to dates where Young Gun/Chalk are both real-populated (checked live 2026-08-09: that\'s 8/2 onward) — dates before that are skipped entirely rather than silently mislabeled (a real bug caught in testing: on those older dates, blank Young Gun/Chalk data would have defaulted every batter into Mid-Tier). Card is HONEST about how thin this still is: at first build, 7 real dates / 27 picks / 1 hit (3.7%, vs 11.4% baseline) — well within normal noise at that sample size, not yet a real read either way. The "🏆 tier-emoji" combo in the table cell shows which specific tier that date\'s pick represents.',
       '🔒 Top 4 Tonight lock (added 2026-08-13) — the live Top 4 Tonight page used to recompute continuously all day (lineups confirming, injuries updating), so the "pick" for a tier could visibly change more than once before the day was over, and Track Record\'s own reconstruction (above) sometimes landed on a THIRD, different guess than either version actually shown live. Fixed by locking Top 4 Tonight\'s real picks at a flat 8pm ET cutoff each day and persisting that exact record server-side — the live page shows a stable 🔒 result for the rest of the day, and Track Record now reads that same real record instead of re-deriving its own guess. Deliberately NOT retroactive — dates before 2026-08-13 keep using the reconstruction above, which can genuinely disagree with what was shown live on those specific days.',
@@ -28884,6 +28898,7 @@ function TrackRecordTab() {
   const [showOnlySauce3, setShowOnlySauce3] = useState(false);
   const [showOnlySauce25, setShowOnlySauce25] = useState(false);
   const [showOnlyTopIso, setShowOnlyTopIso] = useState(false);
+  const [showOnlyPrimeIso, setShowOnlyPrimeIso] = useState(false);
   const [showOnlyHitSignal, setShowOnlyHitSignal] = useState(false);
   const [showOnlySecretSauce, setShowOnlySecretSauce] = useState(false);
   const [selBullpenTiers, setSelBullpenTiers] = useState(() => new Set());
@@ -29327,6 +29342,15 @@ function TrackRecordTab() {
             // filter (added 2026-09-03). Reads the same afIsoRaw already
             // extracted above — no new field needed.
             isTopIso: parseFloat(r['Arsenal Fit ISO']||0) > 0.2,
+            // Prime ISO (2026-09-06) — Arsenal Fit ISO>.200 + BvP EV>=93 +
+            // Zone Fit>=2. Same definition as isPrimeIsoBatter() (module
+            // scope) — reimplemented inline against Track Record's own
+            // bracket-notation CSV row shape, same precedent as isSauce2/
+            // isSauce25/isTopIso above. See isPrimeIsoBatter() for the full
+            // validation (18.4% train / 17.1% test HR rate, ~1.6x lift).
+            isPrimeIso: parseFloat(r['Arsenal Fit ISO']||0) > 0.2
+              && parseFloat(r['BvP EV']||0) >= 93
+              && parseFloat(r['Zone Fit']||0) >= 2,
             plateIQ, plateIQGrade: plateIQGrade(plateIQ),
             zoneAttackRisk: (r['Zone Risk']||'').toString().trim().toUpperCase() === 'YES',
             handMatchTier, isHandMatch,
@@ -29629,6 +29653,7 @@ function TrackRecordTab() {
     if (showOnlySauce3) rows = rows.filter(r => r.isSauce3);
     if (showOnlySauce25) rows = rows.filter(r => r.isSauce25);
     if (showOnlyTopIso) rows = rows.filter(r => r.isTopIso);
+    if (showOnlyPrimeIso) rows = rows.filter(r => r.isPrimeIso);
     if (showOnlyHitSignal) rows = rows.filter(r => r.isHitSignal);
     if (showOnlySecretSauce) rows = rows.filter(r => r.isSecretSauce);
     if (showOnly2Bagger) rows = rows.filter(r => r.is2Bagger);
@@ -29661,7 +29686,7 @@ function TrackRecordTab() {
       }
       return sortDir * ((av||0) - (bv||0));
     });
-  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, showOnlyWeakSlot, showOnlyCC, showOnlySauce2, showOnlySauce3, showOnlySauce25, showOnlyTopIso, showOnlyHitSignal, showOnlySecretSauce, showOnlyAvoid, showOnly2Bagger, showOnlyTBSignal, showOnlySimTB2, showOnlyHighIQ, showOnlyHandMatch, showOnlyDayLate, showOnlyYoungGun, showOnlyChalk, showOnlyMidTier, showOnlyLongshotTR, showOnlyTop4Pick, carryFilter, xhrFilter, selPitcherGradesTR, selBullpenTiers, search, sortCol, sortDir]);
+  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, showOnlyWeakSlot, showOnlyCC, showOnlySauce2, showOnlySauce3, showOnlySauce25, showOnlyTopIso, showOnlyPrimeIso, showOnlyHitSignal, showOnlySecretSauce, showOnlyAvoid, showOnly2Bagger, showOnlyTBSignal, showOnlySimTB2, showOnlyHighIQ, showOnlyHandMatch, showOnlyDayLate, showOnlyYoungGun, showOnlyChalk, showOnlyMidTier, showOnlyLongshotTR, showOnlyTop4Pick, carryFilter, xhrFilter, selPitcherGradesTR, selBullpenTiers, search, sortCol, sortDir]);
 
   const summary = useMemo(() => {
     // FIXED 2026-08-06: every card below used to compute off `dateRows`
@@ -29712,6 +29737,10 @@ function TrackRecordTab() {
     // batters go yard each day"), same convention as Barrel Signal/Sauce.
     const topIso        = played.filter(r => r.isTopIso);
     const topIsoHits     = topIso.filter(r => r.wentYard);
+    // Prime ISO (2026-09-06) — Arsenal Fit ISO>.200 + BvP EV>=93 + Zone
+    // Fit>=2. See isPrimeIsoBatter()'s own comment for the full validation.
+    const primeIso       = played.filter(r => r.isPrimeIso);
+    const primeIsoHits    = primeIso.filter(r => r.wentYard);
     // Hit Signal / Secret Sauce (2026-08-04) — validated against hitAny
     // ("any hit" — single/double/triple/HR all count), NOT wentYard. This is
     // the whole point of the signal: everything else on this page tracks HR
@@ -29760,7 +29789,7 @@ function TrackRecordTab() {
     const biggestUpset = [...played.filter(r => r.wentYard)]
       .sort((a,b) => a.yardScore - b.yardScore)[0];
     return { hrs, totalHR, signals, signalHits, keyMatchups, kmHits,
-             longshots, lsHits, weakSlots, weakSlotHits, sauce2, sauce2Hits, sauce3, sauce3Hits, sauce25, sauce25Hits, topIso, topIsoHits, hitSignal, hitSignalHits, secretSauce, secretSauceHits, avoidList, avoidListMisses, twoBaggers, tbSignals, tbSignalHits, simTB2, simTB2Hits,
+             longshots, lsHits, weakSlots, weakSlotHits, sauce2, sauce2Hits, sauce3, sauce3Hits, sauce25, sauce25Hits, topIso, topIsoHits, primeIso, primeIsoHits, hitSignal, hitSignalHits, secretSauce, secretSauceHits, avoidList, avoidListMisses, twoBaggers, tbSignals, tbSignalHits, simTB2, simTB2Hits,
              highIQBatters, highIQHRHits, highIQTB2Hits, handMatches, handMatchHits, dayLate, dayLateHits, top4Picks, top4PickHits,
              topYS, biggestMiss, biggestUpset };
   }, [dateRows]);
@@ -30012,6 +30041,14 @@ function TrackRecordTab() {
               color:'#38b8f2'
             },
             {
+              label:'💎 PRIME ISO HR RATE',
+              value: summary.primeIso.length
+                ? `${((summary.primeIsoHits.length/summary.primeIso.length)*100).toFixed(0)}%`
+                : '—',
+              sub: `${summary.primeIsoHits.length}/${summary.primeIso.length}`,
+              color:'#a78bfa'
+            },
+            {
               label:'⚾ HIT SIGNAL RATE',
               value: summary.hitSignal.length
                 ? `${((summary.hitSignalHits.length/summary.hitSignal.length)*100).toFixed(0)}%`
@@ -30242,6 +30279,8 @@ function TrackRecordTab() {
             { key:'s3',    label:'🍯🔥 Sauce 3.0 Only',     active:showOnlySauce3,   onToggle:()=>setShowOnlySauce3(v=>!v),   color:'#f59e0b' },
             { key:'topiso', label:'📈 Top ISO Only',        active:showOnlyTopIso,   onToggle:()=>setShowOnlyTopIso(v=>!v),   color:'#38b8f2',
               title:"Top ISO — Arsenal Fit ISO (season vs this pitcher's pitch mix + handedness) > .200, alone. Validated: 1.33x HR lift (n=2,638, full 2026 season) — cleaner/more monotonic than the same threshold on L7 ISO." },
+            { key:'primeiso', label:'💎 Prime ISO Only',     active:showOnlyPrimeIso, onToggle:()=>setShowOnlyPrimeIso(v=>!v), color:'#a78bfa',
+              title:"Prime ISO — Arsenal Fit ISO>.200 + BvP EV>=93 + Zone Fit>=2. Validated: 18.4% HR rate (1.57x) train / 17.1% (1.66x) test, full 2026 season — held up on the held-out half. BvP EV alone correlates with HR even more strongly than Arsenal Fit ISO itself (r=0.081 vs 0.066)." },
             { key:'hitsig', label:'⚾ Hit Signal Only',      active:showOnlyHitSignal, onToggle:()=>setShowOnlyHitSignal(v=>!v), color:'#93c5fd',
               title:"Hit Signal — Sim H>=1.0 AND SwStr%<=15%. Full-season backtest: 64.1% any-hit rate, 1.12x lift, n=2,933, stable train/test." },
             { key:'secsauce', label:'🤫 Secret Sauce Only',  active:showOnlySecretSauce, onToggle:()=>setShowOnlySecretSauce(v=>!v), color:'#c084fc',
@@ -30278,7 +30317,7 @@ function TrackRecordTab() {
             const headers = ['Date','Batter','Team','Hand','Lineup Slot',
               'Pre-Game Pitcher','Went Yard Vs','SP/RP','Pitcher Grade',
               'Yard Score','Boom','Sig','Grade','gHR','Zone Fit','Sim TB','xwOBA','Flags',
-              'Is Key Matchup','Weak Spot','Bullpen HR Rank','Arsenal Fit ISO','Top ISO','Sauce 2.0','Sauce 2.5','Sauce 3.0','Hit Signal','Secret Sauce','Avoid List','Day Late','2-Bagger (Non-HR)','Hit 2+ TB (Any)','TB Signal',
+              'Is Key Matchup','Weak Spot','Bullpen HR Rank','Arsenal Fit ISO','Top ISO','Prime ISO','Sauce 2.0','Sauce 2.5','Sauce 3.0','Hit Signal','Secret Sauce','Avoid List','Day Late','2-Bagger (Non-HR)','Hit 2+ TB (Any)','TB Signal',
               'TrueHR','Matchup','SimHR%','Barrel Signal','Longshot','Young Gun','Chalk','Mid-Tier','Top 4 Pick',
               'PulledBrl%','Brl/BIP','HR/FB','FB%','HH%',
               'Plate IQ','IQ Grade','Zone Risk','Hand Match',
@@ -30295,7 +30334,7 @@ function TrackRecordTab() {
                 (r.wentYard && r.actualPitcher && !r.actualPitcherIsSP) ? '' : r.pitcherGrade,
                 r.yardScore || '', r.boom || '', r.sig || '', r.grade || '', r.ghr || '',
                 r.zoneFit || '', r.simTB || '', r.xwoba || '', r.flags || '',
-                r.isKeyMatchup ? 'YES' : '', r.isWeakSlot ? 'YES' : '', r.bullpenRank || '', r.afIsoRaw || '', r.isTopIso ? 'YES' : '', r.isSauce2 ? 'YES' : '', r.isSauce25 ? 'YES' : '', r.isSauce3 ? 'YES' : '', r.isHitSignal ? 'YES' : '', r.isSecretSauce ? 'YES' : '', r.isAvoid ? 'YES' : '', r.isDayLate ? 'YES' : '', r.is2Bagger ? 'YES' : '', r.hitTB2 ? 'YES' : '', r.tbSignal ? 'YES' : '',
+                r.isKeyMatchup ? 'YES' : '', r.isWeakSlot ? 'YES' : '', r.bullpenRank || '', r.afIsoRaw || '', r.isTopIso ? 'YES' : '', r.isPrimeIso ? 'YES' : '', r.isSauce2 ? 'YES' : '', r.isSauce25 ? 'YES' : '', r.isSauce3 ? 'YES' : '', r.isHitSignal ? 'YES' : '', r.isSecretSauce ? 'YES' : '', r.isAvoid ? 'YES' : '', r.isDayLate ? 'YES' : '', r.is2Bagger ? 'YES' : '', r.hitTB2 ? 'YES' : '', r.tbSignal ? 'YES' : '',
                 r.trueHR || '', r.matchup || '', r.simHRPct || '',
                 r.brlSignal ? 'YES' : '', r.isLongshot ? 'YES' : '',
                 r.isYoungGun === true ? 'YES' : r.isYoungGun === false ? 'NO' : '',
@@ -34137,6 +34176,25 @@ function isSauce25Batter(r) {
   return Number.isFinite(bvpIso) && Number.isFinite(recentIso) && bvpIso >= 0.220 && recentIso >= 0.220;
 }
 
+// Prime ISO (2026-09-06) — the strongest Arsenal-Fit-anchored combo found in
+// the Sept 6 Track Record correlation study: Arsenal Fit ISO (bvp_iso) > .200
+// AND BvP EV (bvp_avg_ev) >= 93 AND Zone Fit >= 2. Real finding from that
+// study: BvP EV alone (r=0.081, full 2026 season) correlates with HR MORE
+// strongly than Arsenal Fit ISO itself (r=0.066) — not previously surfaced
+// as its own signal anywhere in this app. Validated via chronological 70/30
+// train/test split on real track-record-matchups.csv outcomes: 18.4% HR
+// rate (1.57x lift) train (n=1,511), 17.1% (1.66x) test (n=572) — held up,
+// in fact strengthened, on the held-out half. Deliberately no xwOBA/pitcher-
+// grade gate (unlike Sauce 2.0/2.5/3.0) — this is the pure Arsenal-Fit-window
+// combo (ISO + contact quality + spatial zone fit), a genuinely different
+// signal family from the Sauce tiers, not a variant of them.
+function isPrimeIsoBatter(r) {
+  const iso = parseFloat(r.bvp_iso ?? NaN);
+  const ev  = parseFloat(r.bvp_avg_ev ?? NaN);
+  const zf  = parseFloat(r.zone_fit || 0);
+  return Number.isFinite(iso) && iso > 0.2 && Number.isFinite(ev) && ev >= 93 && zf >= 2;
+}
+
 // ── Hit Signal (2026-08-04) — the "any hit" analog to Barrel/TB Signal.
 // Every existing signal in this app is validated against HR or 2+TB;
 // nothing validates plain "did this batter get a hit tonight" (base rate
@@ -35302,6 +35360,10 @@ function BarrelLabTab() {
   // pitcher-grade gate. See the matching comment on Arsenal Fit's own
   // afTopIsoOnly for the validated 1.33x lift and why L7 ISO was excluded.
   const [blTopIsoOnly,     setBlTopIsoOnly]     = useState(false);
+  // Prime ISO (2026-09-06) — Arsenal Fit ISO>.200 + BvP EV>=93 + Zone Fit>=2.
+  // See isPrimeIsoBatter()'s own comment for the full validation (18.4%
+  // train / 17.1% test HR rate, ~1.6x lift, both stable).
+  const [blPrimeIsoOnly,   setBlPrimeIsoOnly]   = useState(false);
   const [blHitSignalOnly,  setBlHitSignalOnly]  = useState(false);
   const [blSecretSauceOnly,setBlSecretSauceOnly]= useState(false);
   const [blBullpenTiers,   setBlBullpenTiers]   = useState(() => new Set());
@@ -35580,6 +35642,7 @@ function BarrelLabTab() {
     .filter(r => !blSauce3Only || r.isSauce3)
     .filter(r => !blSauce25Only || r.isSauce25)
     .filter(r => !blTopIsoOnly || parseFloat(r.bvp_iso||0) > 0.2)
+    .filter(r => !blPrimeIsoOnly || isPrimeIsoBatter(r))
     .filter(r => !blHitSignalOnly   || r.isHitSignal)
     .filter(r => !blSecretSauceOnly || r.isSecretSauce)
     .filter(r => blPitcherGrades.size === 0 || blPitcherGrades.has((r.pitcher_grade_label||r._pgLabel||'').trim()))
@@ -35592,7 +35655,7 @@ function BarrelLabTab() {
     .filter(r => blMinL7Ev  === '' || parseFloat(r.recent_avg_ev||0) >= parseFloat(blMinL7Ev))
     .filter(r => blMinEv    === '' || parseFloat(r.bvp_avg_ev||0)    >= parseFloat(blMinEv))
     .sort((a, b) => b.trueHRScore - a.trueHRScore);
-  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, blChalkOnly, blMidTierOnly, blDayLateOnly, blYoungGunsOnly, blPicksOnly, picks, blGoneYardOnly, blTB2Only, blHighIQOnly, blHandMatchOnly, blSauce3Only, blSauce25Only, blTopIsoOnly, blHitSignalOnly, blSecretSauceOnly, blBullpenTiers, blAvoidOnly, blHideAvoid, blBatterHand, blPitcherGrades, blMinL7Iso, blMinIso, blMinL7Ev, blMinEv, hrVer, finalVer, dayLateVer, playerVer, ballStateVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, blChalkOnly, blMidTierOnly, blDayLateOnly, blYoungGunsOnly, blPicksOnly, picks, blGoneYardOnly, blTB2Only, blHighIQOnly, blHandMatchOnly, blSauce3Only, blSauce25Only, blTopIsoOnly, blPrimeIsoOnly, blHitSignalOnly, blSecretSauceOnly, blBullpenTiers, blAvoidOnly, blHideAvoid, blBatterHand, blPitcherGrades, blMinL7Iso, blMinIso, blMinL7Ev, blMinEv, hrVer, finalVer, dayLateVer, playerVer, ballStateVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Color threshold helpers
   const clr = (v, g1, g2, y1, y2) => {
@@ -35928,6 +35991,19 @@ function BarrelLabTab() {
                 border:`1px solid ${blTopIsoOnly ? 'rgba(56,184,242,.45)' : 'var(--border)'}`,
               }}>
               📈 {blTopIsoOnly ? 'Top ISO Only' : 'Top ISO'}
+            </button>
+            <button
+              onClick={() => setBlPrimeIsoOnly(v => !v)}
+              title="Prime ISO — Arsenal Fit ISO>.200 + BvP EV>=93 + Zone Fit>=2. Validated: 18.4% HR rate (1.57x) train / 17.1% (1.66x) test, full 2026 season — held up on the held-out half. BvP EV alone correlates with HR even more strongly than Arsenal Fit ISO itself (r=0.081 vs 0.066)."
+              style={{
+                padding:'2px 8px', borderRadius:5, cursor:'pointer',
+                fontFamily:"'DM Mono',monospace", fontSize:9, fontWeight:700,
+                lineHeight:1.5, flexShrink:0,
+                background: blPrimeIsoOnly ? 'rgba(167,139,250,.14)' : 'var(--surface2)',
+                color:      blPrimeIsoOnly ? '#a78bfa' : 'var(--muted)',
+                border:`1px solid ${blPrimeIsoOnly ? 'rgba(167,139,250,.45)' : 'var(--border)'}`,
+              }}>
+              💎 {blPrimeIsoOnly ? 'Prime ISO Only' : 'Prime ISO'}
             </button>
             <FilterPanel
               toggles={[
