@@ -2,6 +2,7 @@ Team,Batter ID,Player Name,Position,Injury Description,Expected Return,Severity,
 ATH,667670,Brent Rooker,DH,Bone bruise in left knee.,,🟢,Injured 60-Day
 ATH,621139,Brooks Kriske,P,Right shoulder impingement,,⚪,Injured 60-Day
 ATH,680684,Gunnar Hoglund,P,Sprained right knee.,,🟡,Injured 60-Day
+ATH,669372,J.T. Ginn,P,Right elbow impingement.,,⚪,Injured 15-Day
 ATH,805779,Jacob Wilson,SS,Left shoulder subluxation.,,⚪,Injured 60-Day
 ATH,811965,Joshua Kuroda-Grauer,3B,Ruptured testicle surgery.,,🔴,Injured 60-Day
 ATH,686993,Justin Sterner,P,Right knee chondromalacia.,,⚪,Injured 60-Day
@@ -75,6 +76,7 @@ COL,685326,McCade Brown,P,Right shoulder inflammation.,,🟡,Injured 60-Day
 COL,701487,Pierson Ohl,P,Injured 60-Day,,⚪,Injured 60-Day
 COL,807743,Sean Sullivan,P,Injured 15-Day,,⚪,Injured 15-Day
 COL,700327,Welinton Herrera,P,Left elbow inflammation.,,🟡,Injured 60-Day
+COL,650489,Willi Castro,2B,Left heel inflammation.,,🟡,Injured 10-Day
 CWS,681460,Brooks Baldwin,LF,Right elbow sprain,,🟡,Injured 60-Day
 CWS,669684,Chris Murphy,P,Left flexor strain.,,🟡,Injured 15-Day
 CWS,689672,Drew Thorpe,P,Recovery from Tommy John surgery.,,🔴,Injured 60-Day
@@ -124,7 +126,6 @@ LAA,696147,Sam Bachman,P,Right forearm radial nerve inflammation.,,🟡,Injured 
 LAA,660162,Yoán Moncada,3B,Right knee inflammation.,,🟡,Injured 60-Day
 LAD,681624,Andy Pages,CF,Left hand fracture.,,🔴,Injured 10-Day
 LAD,676508,Ben Casparius,P,Right shoulder inflammation,,🟡,Injured 60-Day
-LAD,676272,Bobby Miller,P,Right shoulder soreness.,,🟡,Injured 60-Day
 LAD,660813,Brusdar Graterol,P,Injured 60-Day,,⚪,Injured 60-Day
 LAD,621242,Edwin Díaz,P,Neck inflammation.,,🟡,Injured 15-Day
 LAD,641778,Eric Lauer,P,Left elbow inflammation.,,🟡,Injured 15-Day
