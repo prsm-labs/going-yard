@@ -1,9 +1,9 @@
 {
-  "version": "2026.09.03",
-  "bundleFile": "index-Eo_wRsTx.js",
+  "version": "2026.09.06",
+  "bundleFile": "index-DN0qx5Hz.js",
   "changelog": [
-    "Rename Young Guns tab to Called-Up",
-    "add Confirmed badge/filter"
+    "Add Top ISO filter (Arsenal Fit + Barrel Lab)",
+    "regenerate splits data"
   ],
   "notifyUsers": true
 }

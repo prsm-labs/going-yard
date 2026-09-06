@@ -28726,7 +28726,8 @@ function LegendButton() {
     ] },
     { tab:'📋 Track Record',   items:[
       'The self-auditing page — merges the daily All Matchups, Barrel Lab, and On Base exports against actual box-score outcomes, every day, automatically.',
-      '✅ HRs Only, ★ Barrel Signal Only, and 🥫 Sauce 2.5 Only stay as standalone quick-access buttons. Everything else — 🔑 Key Matchup, 🟢 Weak Spot, 📍 Close Call, 🍯 Sauce 2.0, 🍯🔥 Sauce 3.0, 🗓️ Day Late, 2️⃣ 2-Bagger (Non-HR), 🎯 TB Signal, 🎲 Sim TB ≥2.0, 🧠 High Plate IQ, ⭐ Hand Match, 🔴/🔵 Ball Carry Juiced/Dead, ⬆️/⬇️ xHR Juiced/Dead, plus a Pitcher Grade multi-select — moved into the ⚙ Filters dropdown 2026-08-02 once the flat button row grew past what fits on a phone screen, same consolidation Barrel Lab/On Base/Arsenal Fit already went through. Sauce 3.0\'s own quick button moved into the panel that same day, once Sauce 2.5 took over the standalone slot.',
+      '✅ HRs Only, ★ Barrel Signal Only, and 🥫 Sauce 2.5 Only stay as standalone quick-access buttons. Everything else — 🔑 Key Matchup, 🟢 Weak Spot, 📍 Close Call, 🍯 Sauce 2.0, 🍯🔥 Sauce 3.0, 📈 Top ISO, 🗓️ Day Late, 2️⃣ 2-Bagger (Non-HR), 🎯 TB Signal, 🎲 Sim TB ≥2.0, 🧠 High Plate IQ, ⭐ Hand Match, 🔴/🔵 Ball Carry Juiced/Dead, ⬆️/⬇️ xHR Juiced/Dead, plus a Pitcher Grade multi-select — moved into the ⚙ Filters dropdown 2026-08-02 once the flat button row grew past what fits on a phone screen, same consolidation Barrel Lab/On Base/Arsenal Fit already went through. Sauce 3.0\'s own quick button moved into the panel that same day, once Sauce 2.5 took over the standalone slot.',
+      '📈 Top ISO filter/card/column (added 2026-09-06) — Arsenal Fit ISO > .200 alone, same definition and validated 1.33x HR lift as Barrel Lab/Arsenal Fit\'s own Top ISO filter (added 2026-09-03). Reads "Arsenal Fit ISO" straight off the All Matchups export (already backfilled leak-free back to 5/17 for the Sauce 3.0 work, 85.8% coverage) — no new backfill needed. The "AF ISO" table column (Matchup Engine group) shows the raw value; "—" for any row where it\'s genuinely missing rather than 0.',
       '🗓️ Day Late filter/card (added 2026-08-02, alongside the FilterPanel consolidation) — same definition as Barrel Lab/On Base\'s Day Late badge (★ Barrel Signal on both of the last 2 real game days, no HR either day, today\'s pitcher not Elite), reimplemented against Track Record\'s own historical row data so it works on any past date, not just today\'s live slate.',
       '🏆 Top 4 Pick filter/column/card (added 2026-08-09, prompted by a real day — 8/9 — where 3 of the 4 live picks, Burleson/Conine/Ortiz, went yard) — for dates from 2026-08-13 onward, this reads the REAL locked Top 4 Tonight record (see next item) instead of guessing. For dates before that, it reconstructs which batter WOULD have been each tier\'s pick (Young Gun/Chalk/Mid-Tier/Longshot, one each) using the same selection algorithm: TrueHR×0.5 + MatchupScore×0.5 + Sauce/Bullpen bonuses, ranked within each tier, with Mid-Tier additionally gated by L7 ISO + Arsenal Fit ISO both >.190 (falling back to the plain top-graded Mid-Tier batter if nobody clears it). A batter already picked for an earlier tier is excluded from later ones, same dedup as the live tab. Genuinely LIMITED to dates where Young Gun/Chalk are both real-populated (checked live 2026-08-09: that\'s 8/2 onward) — dates before that are skipped entirely rather than silently mislabeled (a real bug caught in testing: on those older dates, blank Young Gun/Chalk data would have defaulted every batter into Mid-Tier). Card is HONEST about how thin this still is: at first build, 7 real dates / 27 picks / 1 hit (3.7%, vs 11.4% baseline) — well within normal noise at that sample size, not yet a real read either way. The "🏆 tier-emoji" combo in the table cell shows which specific tier that date\'s pick represents.',
       '🔒 Top 4 Tonight lock (added 2026-08-13) — the live Top 4 Tonight page used to recompute continuously all day (lineups confirming, injuries updating), so the "pick" for a tier could visibly change more than once before the day was over, and Track Record\'s own reconstruction (above) sometimes landed on a THIRD, different guess than either version actually shown live. Fixed by locking Top 4 Tonight\'s real picks at a flat 8pm ET cutoff each day and persisting that exact record server-side — the live page shows a stable 🔒 result for the rest of the day, and Track Record now reads that same real record instead of re-deriving its own guess. Deliberately NOT retroactive — dates before 2026-08-13 keep using the reconstruction above, which can genuinely disagree with what was shown live on those specific days.',
@@ -28882,6 +28883,7 @@ function TrackRecordTab() {
   const [showOnlySauce2, setShowOnlySauce2] = useState(false);
   const [showOnlySauce3, setShowOnlySauce3] = useState(false);
   const [showOnlySauce25, setShowOnlySauce25] = useState(false);
+  const [showOnlyTopIso, setShowOnlyTopIso] = useState(false);
   const [showOnlyHitSignal, setShowOnlyHitSignal] = useState(false);
   const [showOnlySecretSauce, setShowOnlySecretSauce] = useState(false);
   const [selBullpenTiers, setSelBullpenTiers] = useState(() => new Set());
@@ -29320,6 +29322,11 @@ function TrackRecordTab() {
             // NOT the 'Recent ISO (BF)' backfilled substitute Sauce 3.0 uses
             // for better historical coverage — different goal here).
             l7IsoRaw: parseFloat(r['L7 ISO']||0), afIsoRaw: parseFloat(r['Arsenal Fit ISO']||0),
+            // Top ISO (2026-09-06) — Arsenal Fit ISO > .200 alone, same
+            // threshold/definition as Barrel Lab/Arsenal Fit's own 📈 Top ISO
+            // filter (added 2026-09-03). Reads the same afIsoRaw already
+            // extracted above — no new field needed.
+            isTopIso: parseFloat(r['Arsenal Fit ISO']||0) > 0.2,
             plateIQ, plateIQGrade: plateIQGrade(plateIQ),
             zoneAttackRisk: (r['Zone Risk']||'').toString().trim().toUpperCase() === 'YES',
             handMatchTier, isHandMatch,
@@ -29621,6 +29628,7 @@ function TrackRecordTab() {
     if (showOnlySauce2) rows = rows.filter(r => r.isSauce2);
     if (showOnlySauce3) rows = rows.filter(r => r.isSauce3);
     if (showOnlySauce25) rows = rows.filter(r => r.isSauce25);
+    if (showOnlyTopIso) rows = rows.filter(r => r.isTopIso);
     if (showOnlyHitSignal) rows = rows.filter(r => r.isHitSignal);
     if (showOnlySecretSauce) rows = rows.filter(r => r.isSecretSauce);
     if (showOnly2Bagger) rows = rows.filter(r => r.is2Bagger);
@@ -29653,7 +29661,7 @@ function TrackRecordTab() {
       }
       return sortDir * ((av||0) - (bv||0));
     });
-  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, showOnlyWeakSlot, showOnlyCC, showOnlySauce2, showOnlySauce3, showOnlySauce25, showOnlyHitSignal, showOnlySecretSauce, showOnlyAvoid, showOnly2Bagger, showOnlyTBSignal, showOnlySimTB2, showOnlyHighIQ, showOnlyHandMatch, showOnlyDayLate, showOnlyYoungGun, showOnlyChalk, showOnlyMidTier, showOnlyLongshotTR, showOnlyTop4Pick, carryFilter, xhrFilter, selPitcherGradesTR, selBullpenTiers, search, sortCol, sortDir]);
+  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, showOnlyWeakSlot, showOnlyCC, showOnlySauce2, showOnlySauce3, showOnlySauce25, showOnlyTopIso, showOnlyHitSignal, showOnlySecretSauce, showOnlyAvoid, showOnly2Bagger, showOnlyTBSignal, showOnlySimTB2, showOnlyHighIQ, showOnlyHandMatch, showOnlyDayLate, showOnlyYoungGun, showOnlyChalk, showOnlyMidTier, showOnlyLongshotTR, showOnlyTop4Pick, carryFilter, xhrFilter, selPitcherGradesTR, selBullpenTiers, search, sortCol, sortDir]);
 
   const summary = useMemo(() => {
     // FIXED 2026-08-06: every card below used to compute off `dateRows`
@@ -29699,6 +29707,11 @@ function TrackRecordTab() {
     const sauce3Hits    = sauce3.filter(r => r.wentYard);
     const sauce25       = played.filter(r => r.isSauce25);
     const sauce25Hits    = sauce25.filter(r => r.wentYard);
+    // Top ISO (2026-09-06) — Arsenal Fit ISO > .200 alone. Success = wentYard
+    // (HR), the outcome the user specifically asked about ("how many top ISO
+    // batters go yard each day"), same convention as Barrel Signal/Sauce.
+    const topIso        = played.filter(r => r.isTopIso);
+    const topIsoHits     = topIso.filter(r => r.wentYard);
     // Hit Signal / Secret Sauce (2026-08-04) — validated against hitAny
     // ("any hit" — single/double/triple/HR all count), NOT wentYard. This is
     // the whole point of the signal: everything else on this page tracks HR
@@ -29747,7 +29760,7 @@ function TrackRecordTab() {
     const biggestUpset = [...played.filter(r => r.wentYard)]
       .sort((a,b) => a.yardScore - b.yardScore)[0];
     return { hrs, totalHR, signals, signalHits, keyMatchups, kmHits,
-             longshots, lsHits, weakSlots, weakSlotHits, sauce2, sauce2Hits, sauce3, sauce3Hits, sauce25, sauce25Hits, hitSignal, hitSignalHits, secretSauce, secretSauceHits, avoidList, avoidListMisses, twoBaggers, tbSignals, tbSignalHits, simTB2, simTB2Hits,
+             longshots, lsHits, weakSlots, weakSlotHits, sauce2, sauce2Hits, sauce3, sauce3Hits, sauce25, sauce25Hits, topIso, topIsoHits, hitSignal, hitSignalHits, secretSauce, secretSauceHits, avoidList, avoidListMisses, twoBaggers, tbSignals, tbSignalHits, simTB2, simTB2Hits,
              highIQBatters, highIQHRHits, highIQTB2Hits, handMatches, handMatchHits, dayLate, dayLateHits, top4Picks, top4PickHits,
              topYS, biggestMiss, biggestUpset };
   }, [dateRows]);
@@ -29991,6 +30004,14 @@ function TrackRecordTab() {
               color:'#eab308'
             },
             {
+              label:'📈 TOP ISO HR RATE',
+              value: summary.topIso.length
+                ? `${((summary.topIsoHits.length/summary.topIso.length)*100).toFixed(0)}%`
+                : '—',
+              sub: `${summary.topIsoHits.length}/${summary.topIso.length}`,
+              color:'#38b8f2'
+            },
+            {
               label:'⚾ HIT SIGNAL RATE',
               value: summary.hitSignal.length
                 ? `${((summary.hitSignalHits.length/summary.hitSignal.length)*100).toFixed(0)}%`
@@ -30219,6 +30240,8 @@ function TrackRecordTab() {
             { key:'cc',    label:'📍 Close Call Only',      active:showOnlyCC,       onToggle:()=>setShowOnlyCC(v=>!v),       color:'#f5a623' },
             { key:'s2',    label:'🍯 Sauce 2.0 Only',       active:showOnlySauce2,   onToggle:()=>setShowOnlySauce2(v=>!v),   color:'#34d399' },
             { key:'s3',    label:'🍯🔥 Sauce 3.0 Only',     active:showOnlySauce3,   onToggle:()=>setShowOnlySauce3(v=>!v),   color:'#f59e0b' },
+            { key:'topiso', label:'📈 Top ISO Only',        active:showOnlyTopIso,   onToggle:()=>setShowOnlyTopIso(v=>!v),   color:'#38b8f2',
+              title:"Top ISO — Arsenal Fit ISO (season vs this pitcher's pitch mix + handedness) > .200, alone. Validated: 1.33x HR lift (n=2,638, full 2026 season) — cleaner/more monotonic than the same threshold on L7 ISO." },
             { key:'hitsig', label:'⚾ Hit Signal Only',      active:showOnlyHitSignal, onToggle:()=>setShowOnlyHitSignal(v=>!v), color:'#93c5fd',
               title:"Hit Signal — Sim H>=1.0 AND SwStr%<=15%. Full-season backtest: 64.1% any-hit rate, 1.12x lift, n=2,933, stable train/test." },
             { key:'secsauce', label:'🤫 Secret Sauce Only',  active:showOnlySecretSauce, onToggle:()=>setShowOnlySecretSauce(v=>!v), color:'#c084fc',
@@ -30255,7 +30278,7 @@ function TrackRecordTab() {
             const headers = ['Date','Batter','Team','Hand','Lineup Slot',
               'Pre-Game Pitcher','Went Yard Vs','SP/RP','Pitcher Grade',
               'Yard Score','Boom','Sig','Grade','gHR','Zone Fit','Sim TB','xwOBA','Flags',
-              'Is Key Matchup','Weak Spot','Bullpen HR Rank','Sauce 2.0','Sauce 2.5','Sauce 3.0','Hit Signal','Secret Sauce','Avoid List','Day Late','2-Bagger (Non-HR)','Hit 2+ TB (Any)','TB Signal',
+              'Is Key Matchup','Weak Spot','Bullpen HR Rank','Arsenal Fit ISO','Top ISO','Sauce 2.0','Sauce 2.5','Sauce 3.0','Hit Signal','Secret Sauce','Avoid List','Day Late','2-Bagger (Non-HR)','Hit 2+ TB (Any)','TB Signal',
               'TrueHR','Matchup','SimHR%','Barrel Signal','Longshot','Young Gun','Chalk','Mid-Tier','Top 4 Pick',
               'PulledBrl%','Brl/BIP','HR/FB','FB%','HH%',
               'Plate IQ','IQ Grade','Zone Risk','Hand Match',
@@ -30272,7 +30295,7 @@ function TrackRecordTab() {
                 (r.wentYard && r.actualPitcher && !r.actualPitcherIsSP) ? '' : r.pitcherGrade,
                 r.yardScore || '', r.boom || '', r.sig || '', r.grade || '', r.ghr || '',
                 r.zoneFit || '', r.simTB || '', r.xwoba || '', r.flags || '',
-                r.isKeyMatchup ? 'YES' : '', r.isWeakSlot ? 'YES' : '', r.bullpenRank || '', r.isSauce2 ? 'YES' : '', r.isSauce25 ? 'YES' : '', r.isSauce3 ? 'YES' : '', r.isHitSignal ? 'YES' : '', r.isSecretSauce ? 'YES' : '', r.isAvoid ? 'YES' : '', r.isDayLate ? 'YES' : '', r.is2Bagger ? 'YES' : '', r.hitTB2 ? 'YES' : '', r.tbSignal ? 'YES' : '',
+                r.isKeyMatchup ? 'YES' : '', r.isWeakSlot ? 'YES' : '', r.bullpenRank || '', r.afIsoRaw || '', r.isTopIso ? 'YES' : '', r.isSauce2 ? 'YES' : '', r.isSauce25 ? 'YES' : '', r.isSauce3 ? 'YES' : '', r.isHitSignal ? 'YES' : '', r.isSecretSauce ? 'YES' : '', r.isAvoid ? 'YES' : '', r.isDayLate ? 'YES' : '', r.is2Bagger ? 'YES' : '', r.hitTB2 ? 'YES' : '', r.tbSignal ? 'YES' : '',
                 r.trueHR || '', r.matchup || '', r.simHRPct || '',
                 r.brlSignal ? 'YES' : '', r.isLongshot ? 'YES' : '',
                 r.isYoungGun === true ? 'YES' : r.isYoungGun === false ? 'NO' : '',
@@ -30349,6 +30372,7 @@ function TrackRecordTab() {
                   <SortTh col="isKeyMatchup" label="KM" color="#e8411a"/>
                   <SortTh col="isWeakSlot" label="Weak Spot" color="#e8411a"/>
                   <SortTh col="bullpenRank" label="Pen" color="#e8411a"/>
+                  <SortTh col="afIsoRaw" label="AF ISO" color="#e8411a" title="Arsenal Fit ISO — season ISO vs this pitcher's pitch mix + handedness. Added 2026-09-06; not populated before 2026-07-30 (the field didn't exist in the export yet)."/>
                 </>}
 
                 {showBarrel && <>
@@ -30478,6 +30502,8 @@ function TrackRecordTab() {
                           ? <span style={{color:bp.color}} title={`${bp.label} #${r.bullpenRank}/30`}>{bp.short}</span>
                           : '—'; })()}
                       </td>
+                      <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
+                        textAlign:'center', color:tierColor(r.afIsoRaw,0.25,0.22,0.20)}}>{r.afIsoRaw ? r.afIsoRaw.toFixed(3) : '—'}</td>
                     </>}
 
                     {showBarrel && <>
