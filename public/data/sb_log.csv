@@ -3496,3 +3496,30 @@ game_id,game_date,runner_id,runner_name,pitcher_id,pitcher_name,stolen_base,caug
 824469,2026-09-06,701398,Sal Stewart,690986,Kyle Harrison,1,0,3B,4,bottom,bottom
 824469,2026-09-06,553993,Eugenio Suárez,690986,Kyle Harrison,1,0,2B,4,bottom,bottom
 824552,2026-09-06,678246,Miguel Vargas,641927,Bailey Ober,1,0,2B,3,bottom,bottom
+823175,2026-09-07,693409,César Prieto,671345,Jason Foley,1,0,2B,11,top,top
+823254,2026-09-07,701538,Jackson Merrill,663623,Jake Irvin,1,0,2B,1,bottom,bottom
+823254,2026-09-07,665487,Fernando Tatis Jr.,663623,Jake Irvin,1,0,2B,4,bottom,bottom
+823742,2026-09-07,691718,Pete Crow-Armstrong,688107,Robert Gasser,1,0,2B,5,top,top
+823742,2026-09-07,691718,Pete Crow-Armstrong,676879,Aaron Ashby,1,0,2B,7,top,top
+823742,2026-09-07,694192,Jackson Chourio,666171,Ryan Zeferjahn,1,0,2B,8,bottom,bottom
+823820,2026-09-07,701807,Carson Benge,691587,Eury Pérez,1,0,2B,1,top,top
+823820,2026-09-07,701807,Carson Benge,691587,Eury Pérez,1,0,2B,1,top,top
+823820,2026-09-07,805999,A.J. Ewing,691587,Eury Pérez,0,1,2B,3,top,top
+823820,2026-09-07,703492,Nick Morabito,806188,Cade Gibson,1,0,2B,5,top,top
+823902,2026-09-07,606192,Teoscar Hernández,682227,Brandon Williamson,1,0,2B,5,bottom,bottom
+823902,2026-09-07,518692,Freddie Freeman,682227,Brandon Williamson,1,0,2B,6,bottom,bottom
+823902,2026-09-07,682829,Elly De La Cruz,676263,Jack Dreyer,1,0,2B,8,top,top
+824062,2026-09-07,670231,John Rave,679885,Justin Martinez,1,0,2B,9,bottom,bottom
+824229,2026-09-07,807712,Luke Keaschall,675512,Troy Melton,1,0,3B,1,top,top
+824229,2026-09-07,686797,Brooks Lee,675512,Troy Melton,1,0,2B,1,top,top
+824229,2026-09-07,807726,John Peck,687570,Connor Prielipp,1,0,2B,6,bottom,bottom
+824715,2026-09-07,666139,Josh Lowe,678394,Brayan Bello,1,0,2B,2,top,top
+824715,2026-09-07,643396,Isiah Kiner-Falefa,680570,Grayson Rodriguez,1,0,2B,3,bottom,bottom
+824958,2026-09-07,703607,Henry Bolte,656302,Dylan Cease,1,0,2B,1,bottom,bottom
+824958,2026-09-07,680869,Zack Gelof,656302,Dylan Cease,0,1,H,1,bottom,bottom
+824958,2026-09-07,666126,Carlos Cortes,656302,Dylan Cease,0,1,H,1,bottom,bottom
+824958,2026-09-07,703607,Henry Bolte,656302,Dylan Cease,1,0,2B,3,bottom,bottom
+824958,2026-09-07,703607,Henry Bolte,656302,Dylan Cease,1,0,3B,3,bottom,bottom
+824958,2026-09-07,680869,Zack Gelof,656302,Dylan Cease,1,0,2B,3,bottom,bottom
+824958,2026-09-07,680869,Zack Gelof,656302,Dylan Cease,1,0,3B,3,bottom,bottom
+824958,2026-09-07,665926,Andrés Giménez,665622,Luis Medina,0,1,3B,7,top,top
