@@ -13396,34 +13396,38 @@ function MLBTab() {
                       </div>
                       <div style={{display:'flex',gap:0,alignItems:'stretch',overflowX:'auto',
                         paddingBottom:8}}>
-                        {/* Wild Card round */}
+                        {/* Wild Card round -- only #1 AND #2 seeds get a bye (fixed
+                            2026-09-12: this previously gave only #1 a bye, ran a 3rd WC
+                            series against a nonexistent "4th wild card team" that isn't a
+                            real playoff seed, and dropped #2's bye from the bracket
+                            entirely). Correct format: WC round is 2 series, #3 vs #6 and
+                            #4 vs #5. */}
                         <Round title="Wild Card (3 games)">
                           <div style={{marginBottom:16}}>
                             <BracketTeam t={leaders[2]} seed={3} highlight/>
                             <VS/>
-                            <BracketTeam t={wc[0]} seed={6}/>
+                            <BracketTeam t={wc[2]} seed={6}/>
                           </div>
-                          <div style={{marginBottom:16}}>
-                            <BracketTeam t={leaders[1]} seed={2} highlight/>
+                          <div>
+                            <BracketTeam t={wc[0]} seed={4}/>
                             <VS/>
                             <BracketTeam t={wc[1]} seed={5}/>
                           </div>
-                          <div>
-                            <BracketTeam t={wc[2]} seed={null}/>
-                            <VS/>
-                            <BracketTeam t={wildcardTeams[lg][3]} seed={null}/>
-                          </div>
                         </Round>
                         <Arrow/>
-                        {/* Division Series */}
+                        {/* Division Series -- both bye teams (#1 and #2) are seeded in
+                            directly; the other DS slot in each matchup is that side's
+                            Wild Card round winner (unresolved pre-playoffs, shown as
+                            "WC" since this bracket is a standings projection, not a
+                            live-updated one). */}
                         <Round title="Division Series (5 games)">
-                          <div style={{marginBottom:32}}>
+                          <div style={{marginBottom:16}}>
                             <BracketTeam t={leaders[0]} seed={1} highlight/>
                             <VS/>
                             <BracketTeam t={null} seed="WC"/>
                           </div>
-                          <div style={{marginBottom:16}}>
-                            <BracketTeam t={null} seed="WC"/>
+                          <div>
+                            <BracketTeam t={leaders[1]} seed={2} highlight/>
                             <VS/>
                             <BracketTeam t={null} seed="WC"/>
                           </div>
