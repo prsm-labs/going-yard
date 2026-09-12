@@ -3578,3 +3578,36 @@ game_id,game_date,runner_id,runner_name,pitcher_id,pitcher_name,stolen_base,caug
 824550,2026-09-10,663968,Jake Mangum,607200,Erick Fedde,1,0,2B,5,top,top
 824550,2026-09-10,669707,Jared Triolo,607200,Erick Fedde,1,0,2B,5,top,top
 824550,2026-09-10,669707,Jared Triolo,607200,Erick Fedde,1,0,2B,8,top,top
+822684,2026-09-11,695578,James Wood,579328,Yusei Kikuchi,1,0,2B,1,bottom,bottom
+822684,2026-09-11,695670,Harry Ford,579328,Yusei Kikuchi,1,0,2B,4,bottom,bottom
+822684,2026-09-11,666139,Josh Lowe,676917,Cade Cavalli,1,0,2B,5,top,top
+822684,2026-09-11,694208,Moisés Ballesteros,702021,Will Dion,0,1,3B,7,top,top
+822684,2026-09-11,695681,Christian Moore,702021,Will Dion,0,1,3B,7,top,top
+822684,2026-09-11,691002,Yohandy Morales,696519,Samy Natera Jr.,1,0,2B,8,bottom,bottom
+822767,2026-09-11,681297,Colton Cowser,453286,Max Scherzer,1,0,2B,4,top,top
+822930,2026-09-11,680700,Richie Palacios,814490,Ethan Pecko,1,0,2B,3,bottom,bottom
+822930,2026-09-11,514888,Jose Altuve,656876,Drew Rasmussen,1,0,2B,5,top,top
+822930,2026-09-11,622761,Jorge Mateo,814490,Ethan Pecko,0,1,2B,6,bottom,bottom
+822930,2026-09-11,683748,Victor Mesa Jr.,814490,Ethan Pecko,1,0,2B,7,bottom,bottom
+822930,2026-09-11,665161,Jeremy Peña,669330,Tyler Wells,0,1,2B,8,top,top
+823012,2026-09-11,686668,Brenton Doyle,669461,Matthew Liberatore,0,1,2B,4,top,top
+823012,2026-09-11,678246,Miguel Vargas,700669,Gordon Graceffo,1,0,2B,5,top,top
+823173,2026-09-11,813841,Jonah Cox,592662,Robbie Ray,1,0,2B,1,bottom,bottom
+823173,2026-09-11,701538,Jackson Merrill,683627,Anthony Molina,1,0,2B,3,top,top
+823173,2026-09-11,669392,Samad Taylor,805074,Yunior Marte,1,0,2B,5,top,top
+823659,2026-09-11,680757,Steven Kwan,681892,Kody Funderburk,1,0,2B,9,top,top
+823817,2026-09-11,672640,Otto Lopez,605483,Blake Snell,0,1,2B,1,bottom,bottom
+823817,2026-09-11,800543,Josue De Paula,687473,Ryan Gusto,0,1,2B,4,top,top
+823817,2026-09-11,691594,Javier Sanoja,623465,Evan Phillips,1,0,2B,6,bottom,bottom
+824227,2026-09-11,703601,Max Clark,693308,Nick Frasso,1,0,2B,6,bottom,bottom
+824227,2026-09-11,807726,John Peck,693308,Nick Frasso,1,0,2B,6,bottom,bottom
+824631,2026-09-11,665833,Oneil Cruz,684007,Shota Imanaga,0,1,2B,1,top,top
+824711,2026-09-11,670231,John Rave,543243,Sonny Gray,1,0,2B,4,top,top
+824711,2026-09-11,680776,Jarren Duran,607625,Seth Lugo,1,0,2B,4,bottom,bottom
+824711,2026-09-11,686475,Tyler Tolbert,669711,Greg Weissert,0,1,2B,8,top,top
+824711,2026-09-11,686555,Isaac Collins,663558,Jovani Morán,1,0,2B,9,top,top
+824954,2026-09-11,668227,Randy Arozarena,605488,Jeffrey Springs,1,0,2B,1,top,top
+824954,2026-09-11,703607,Henry Bolte,669923,George Kirby,1,0,2B,1,bottom,bottom
+824954,2026-09-11,642215,Weston Wilson,605488,Jeffrey Springs,1,0,2B,2,top,top
+824954,2026-09-11,666126,Carlos Cortes,669923,George Kirby,0,1,2B,6,bottom,bottom
+824954,2026-09-11,647304,Josh Naylor,688297,Chris Roycroft,1,0,2B,10,top,top
