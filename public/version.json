@@ -1,8 +1,8 @@
 {
   "version": "2026.09.12",
-  "bundleFile": "index-CwCdPeDh.js",
+  "bundleFile": "index-CRfZW86K.js",
   "changelog": [
-    "Daily data update 2026-09-12"
+    "Fix Playoff Picture bracket: #1 and #2 seeds both get a bye"
   ],
-  "notifyUsers": false
+  "notifyUsers": true
 }
