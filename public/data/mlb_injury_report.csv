@@ -1,6 +1,7 @@
 Team,Batter ID,Player Name,Position,Injury Description,Expected Return,Severity,Status
 ATH,667670,Brent Rooker,DH,Bone bruise in left knee.,,🟢,Injured 60-Day
 ATH,621139,Brooks Kriske,P,Right shoulder impingement,,⚪,Injured 60-Day
+ATH,695611,Gage Jump,P,Left shoulder impingement.,,⚪,Injured 15-Day
 ATH,680684,Gunnar Hoglund,P,Sprained right knee.,,🟡,Injured 60-Day
 ATH,669372,J.T. Ginn,P,Right elbow impingement.,,⚪,Injured 15-Day
 ATH,805779,Jacob Wilson,SS,Left shoulder subluxation.,,⚪,Injured 60-Day
@@ -14,6 +15,7 @@ ATL,693821,Bryce Elder,P,Right knee surgery.,,🔴,Injured 15-Day
 ATL,641729,Joe Jiménez,P,Injured 60-Day,,⚪,Injured 60-Day
 ATL,666214,Joey Wentz,P,Right knee ACL tear.,,🔴,Injured 60-Day
 ATL,657041,Lane Thomas,LF,Strained left intercostal muscle.,,🟡,Injured 10-Day
+ATL,625643,Reynaldo López,P,Right shoulder inflammation.,,🟡,Injured 15-Day
 ATL,663158,Robert Suarez,P,Right elbow inflammation.,,🟡,Injured 60-Day
 ATL,680885,Spencer Schwellenbach,P,Injured 60-Day,,⚪,Injured 60-Day
 ATL,675911,Spencer Strider,P,Right elbow inflammation.,,🟡,Injured 60-Day
@@ -111,7 +113,6 @@ KC,657756,Connor Seabold,P,Right lat strain.,,🟡,Injured 60-Day
 KC,663704,James McArthur,P,Right elbow inflammation.,,🟡,Injured 60-Day
 KC,663697,Jonathan India,2B,Left shoulder subluxation.,,⚪,Injured 60-Day
 KC,679883,Luinder Avila,P,Right forearm tightness.,,🟢,Injured 60-Day
-KC,672580,Maikel Garcia,3B,Left hamstring strain.,,🟡,Injured 10-Day
 KC,683232,Nick Mears,P,Right shoulder impingement.,,⚪,Injured 60-Day
 KC,663568,Stephen Kolek,P,Right flexor strain.,,🟡,Injured 60-Day
 KC,664062,Tony Gonsolin,P,Right elbow surgery.,,🔴,Injured 15-Day
@@ -231,7 +232,6 @@ TB,810938,Ben Williamson,2B,Right hamstring strain.,,🟡,Injured 10-Day
 TB,670955,Edwin Uceta,P,Right shoulder impingement,,⚪,Injured 60-Day
 TB,664076,Garrett Cleavinger,P,Left forearm tightness.,,🟢,Injured 15-Day
 TB,666158,Gavin Lux,LF,Right shoulder impingement,,⚪,Injured 60-Day
-TB,641584,Jake Fraley,RF,Hernia.,,⚪,Injured 60-Day
 TB,669169,Jonathan Heasley,P,Injured 60-Day,,⚪,Injured 60-Day
 TB,655889,Manuel Rodríguez,P,Low back strain.,,🟡,Injured 15-Day
 TB,686752,Ryan Pepiot,P,Right hip inflammation,,🟡,Injured 60-Day
