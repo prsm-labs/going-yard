@@ -1,8 +1,8 @@
 {
-  "version": "2026.09.12",
-  "bundleFile": "index-CRfZW86K.js",
+  "version": "2026.09.15",
+  "bundleFile": "index-CELletxm.js",
   "changelog": [
-    "Fix Playoff Picture bracket: #1 and #2 seeds both get a bye"
+    "Arsenal Fit: Solid Contact filter + Track Record column group"
   ],
   "notifyUsers": true
 }

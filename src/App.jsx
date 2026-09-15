@@ -70,6 +70,62 @@ const styles = `
     --accent:#e8411a;--accent2:#f5a623;--ice:#38b8f2;--green:#27c97a;
     --text:#e8edf2;--muted:#8a9db0;--fire2:#ff7a00;--fire3:#ffb700;
     --aplus:#ff3010;--a:#ff7000;--b:#f5a623;--c:#8bc4e8;--d:#8a9db0;--f:#38b8f2;
+    /* Signal/badge accent palette (2026-09-15) -- dark-mode default values,
+       unchanged from what each color has always been. Real solid-hex literals
+       throughout this file are being routed through these var() names so
+       light mode (below) can swap in WCAG-legible variants without touching
+       every call site's own inline style object individually. */
+    --c-danger:#ff4020;--c-warn:#ff8020;--c-purple:#a78bfa;--c-indigo:#818cf8;
+    --c-coral:#ff6b6b;--c-yellow:#ffc840;--c-amber:#fbbf24;--c-gold:#ffd700;
+    --c-orange2:#fb923c;--c-mint:#38f282;--c-sauce25:#eab308;--c-violet:#a855f7;
+    --c-lime:#60d360;--c-emerald:#34d399;--c-sauce3:#f59e0b;--c-teal:#22c1c3;
+    --c-slate:#5a7080;--c-yellow2:#ffcc00;--c-gold2:#f5c542;--c-lavender:#c084fc;
+    --c-younggun:#4ade80;
+  }
+  /* ── Light mode ──────────────────────────────────────────────────────────
+     Fires when the OS/browser reports a light preference AND the user hasn't
+     explicitly picked dark via the toggle ([data-theme] unset or ="light"
+     both allowed to fall through here; explicit dark wins via the block below). */
+  @media(prefers-color-scheme:light){
+    :root:not([data-theme="dark"]){
+      --bg:#f5f6f8;--surface:#ffffff;--surface2:#eef1f4;--border:#d7dee5;
+      --text:#1a2733;--muted:#738aa1;
+      --accent:#e8411a;--accent2:#b67508;--ice:#0e93d0;--green:#1f9e60;
+      --fire2:#d96800;--fire3:#b28000;--aplus:#ff3010;
+      --a:#d95f00;--b:#b67508;--c:#288ccb;--d:#738aa1;--f:#0e93d0;
+      --c-danger:#ff4020;--c-warn:#df6000;--c-purple:#9473f9;--c-indigo:#6976f7;
+      --c-coral:#ff3838;--c-yellow:#b37f00;--c-amber:#a97b03;--c-gold:#998100;
+      --c-orange2:#d96404;--c-mint:#0aa046;--c-sauce25:#ac8406;--c-violet:#a855f7;
+      --c-lime:#2a972a;--c-emerald:#21996d;--c-sauce3:#b97708;--c-teal:#1a9698;
+      --c-slate:#5a7080;--c-yellow2:#a68500;--c-gold2:#ae8209;--c-lavender:#ad5ffb;
+      --c-younggun:#1c994a;
+    }
+  }
+  /* Explicit user choice always wins over the OS preference, both directions */
+  :root[data-theme="light"]{
+    --bg:#f5f6f8;--surface:#ffffff;--surface2:#eef1f4;--border:#d7dee5;
+    --text:#1a2733;--muted:#738aa1;
+    --accent:#e8411a;--accent2:#b67508;--ice:#0e93d0;--green:#1f9e60;
+    --fire2:#d96800;--fire3:#b28000;--aplus:#ff3010;
+    --a:#d95f00;--b:#b67508;--c:#288ccb;--d:#738aa1;--f:#0e93d0;
+    --c-danger:#ff4020;--c-warn:#df6000;--c-purple:#9473f9;--c-indigo:#6976f7;
+    --c-coral:#ff3838;--c-yellow:#b37f00;--c-amber:#a97b03;--c-gold:#998100;
+    --c-orange2:#d96404;--c-mint:#0aa046;--c-sauce25:#ac8406;--c-violet:#a855f7;
+    --c-lime:#2a972a;--c-emerald:#21996d;--c-sauce3:#b97708;--c-teal:#1a9698;
+    --c-slate:#5a7080;--c-yellow2:#a68500;--c-gold2:#ae8209;--c-lavender:#ad5ffb;
+    --c-younggun:#1c994a;
+  }
+  :root[data-theme="dark"]{
+    --bg:#080c10;--surface:#0d1318;--surface2:#131b22;--border:#1e2d3a;
+    --accent:#e8411a;--accent2:#f5a623;--ice:#38b8f2;--green:#27c97a;
+    --text:#e8edf2;--muted:#8a9db0;--fire2:#ff7a00;--fire3:#ffb700;
+    --aplus:#ff3010;--a:#ff7000;--b:#f5a623;--c:#8bc4e8;--d:#8a9db0;--f:#38b8f2;
+    --c-danger:#ff4020;--c-warn:#ff8020;--c-purple:#a78bfa;--c-indigo:#818cf8;
+    --c-coral:#ff6b6b;--c-yellow:#ffc840;--c-amber:#fbbf24;--c-gold:#ffd700;
+    --c-orange2:#fb923c;--c-mint:#38f282;--c-sauce25:#eab308;--c-violet:#a855f7;
+    --c-lime:#60d360;--c-emerald:#34d399;--c-sauce3:#f59e0b;--c-teal:#22c1c3;
+    --c-slate:#5a7080;--c-yellow2:#ffcc00;--c-gold2:#f5c542;--c-lavender:#c084fc;
+    --c-younggun:#4ade80;
   }
   html,body{background:var(--bg);color:var(--text);font-family:'Oswald',sans-serif;min-height:100vh;overflow-x:clip;max-width:100%;width:100%;}
   .app{min-height:100vh;display:flex;flex-direction:column;overflow-x:clip;max-width:100%;width:100%;}
@@ -474,7 +530,7 @@ const getHS = (r) => {
   const chaseScore = chase <= T.CHASE_EL ? 5 : chase <= T.CHASE_GD ? 3 : 0;
   return Math.round(ev + laScore + barScore + fbScore + pullScore + chaseScore);
 };
-const getHC = (s) => s >= 75 ? "#ff4020" : s >= 58 ? "#ff8020" : s >= 42 ? "#ffbe20" : s >= 25 ? "#8899a6" : "#38b8f2";
+const getHC = (s) => s >= 75 ? "var(--c-danger)" : s >= 58 ? "var(--c-warn)" : s >= 42 ? "#ffbe20" : s >= 25 ? "#8899a6" : "var(--ice)";
 const getLHL = (ev, la, hh) => {
   const ep = ev >= T.EV_EL ? 3 : ev >= T.EV_HH ? 2 : ev >= 90 ? 1 : 0;
   
@@ -652,17 +708,17 @@ function PlayerAvatar({ pid, name, size=32, border='1.5px solid var(--border)', 
 
 // Position abbreviation → color mapping
 const POS_COLORS = {
-  "C":   "#38b8f2", // catcher — blue
-  "1B":  "#f5a623", // first base — orange
-  "2B":  "#f5a623",
-  "3B":  "#f5a623",
-  "SS":  "#f5a623",
-  "LF":  "#27c97a", // outfield — green
-  "CF":  "#27c97a",
-  "RF":  "#27c97a",
-  "OF":  "#27c97a",
-  "DH":  "#e8411a", // DH — red
-  "P":   "#5a7080", // pitcher — muted (shouldn't appear)
+  "C":   "var(--ice)", // catcher — blue
+  "1B":  "var(--accent2)", // first base — orange
+  "2B":  "var(--accent2)",
+  "3B":  "var(--accent2)",
+  "SS":  "var(--accent2)",
+  "LF":  "var(--green)", // outfield — green
+  "CF":  "var(--green)",
+  "RF":  "var(--green)",
+  "OF":  "var(--green)",
+  "DH":  "var(--accent)", // DH — red
+  "P":   "var(--c-slate)", // pitcher — muted (shouldn't appear)
 };
 
 // PosAvatar — shows position abbreviation with color coding
@@ -822,7 +878,7 @@ const getPIQ = (p) => {
   if (sc >= 55) return {label:"✅ Patient",color:"var(--green)"};
   if (sc >= 38) return {label:"— Average",color:"var(--muted)"};
   if (sc >= 22) return {label:"⚠️ Chaser",color:"var(--fire3)"};
-  return {label:"🚫 Free Swinger",color:"#ff3010"};
+  return {label:"🚫 Free Swinger",color:"var(--aplus)"};
 };
 
 // LIFTOFF ENGINE
@@ -949,15 +1005,15 @@ function SearchBar({ value, onChange, placeholder = "Search players…" }) {
 
 // ── PICK TYPES + STORE ────────────────────────────────────────
 const PICK_TYPES = {
-  favorite:  {label:"💣 Favorite",   cls:"favorite",  color:"#ff4020"},
-  darkhorse: {label:"⭐ Dark Horse",  cls:"darkhorse", color:"#f5a623"},
-  longshot:  {label:"🎯 Longshot",    cls:"longshot",  color:"#38b8f2"},
-  daylate:   {label:"📆 Day Late",    cls:"daylate",   color:"#a855f7"},
+  favorite:  {label:"💣 Favorite",   cls:"favorite",  color:"var(--c-danger)"},
+  darkhorse: {label:"⭐ Dark Horse",  cls:"darkhorse", color:"var(--accent2)"},
+  longshot:  {label:"🎯 Longshot",    cls:"longshot",  color:"var(--ice)"},
+  daylate:   {label:"📆 Day Late",    cls:"daylate",   color:"var(--c-violet)"},
   due:       {label:"⏳ Due",         cls:"due",        color:"#22d3ee"},
-  tailed:    {label:"🤝 Tailed",      cls:"tailed",    color:"#34d399"},
-  hotbat:    {label:"🔥 Hot Bat",     cls:"hotbat",    color:"#fb923c"},
+  tailed:    {label:"🤝 Tailed",      cls:"tailed",    color:"var(--c-emerald)"},
+  hotbat:    {label:"🔥 Hot Bat",     cls:"hotbat",    color:"var(--c-orange2)"},
   listed:    {label:"🗒️ Listed",      cls:"listed",    color:"#94a3b8"},
-  b2b:       {label:"🔁 Back to Back",cls:"b2b",       color:"#fbbf24"},
+  b2b:       {label:"🔁 Back to Back",cls:"b2b",       color:"var(--c-amber)"},
 };
 function loadPicks() { try { return JSON.parse(localStorage.getItem("gy_picks")||"{}"); } catch { return {}; } }
 function savePicks(p) { try { localStorage.setItem("gy_picks",JSON.stringify(p)); } catch {} }
@@ -1006,13 +1062,13 @@ function usePicks() {
 // ── BATTER PROPS — persisted per-batter prop selections ───────
 const BATTER_PROP_OPTS = [
   { value:'',    label:'— Prop',  color:'var(--muted)' },
-  { value:'HIT', label:'HIT',     color:'#27c97a' },
-  { value:'2B+', label:'2 Bases', color:'#38b8f2' },
-  { value:'2B',  label:'Double',  color:'#38b8f2' },
-  { value:'3B',  label:'Triple',  color:'#f5a623' },
-  { value:'RBI', label:'RBI',     color:'#ff8020' },
+  { value:'HIT', label:'HIT',     color:'var(--green)' },
+  { value:'2B+', label:'2 Bases', color:'var(--ice)' },
+  { value:'2B',  label:'Double',  color:'var(--ice)' },
+  { value:'3B',  label:'Triple',  color:'var(--accent2)' },
+  { value:'RBI', label:'RBI',     color:'var(--c-warn)' },
   { value:'HRR', label:'H+R+R',   color:'var(--accent)' },
-  { value:'HR',  label:'HR',      color:'#ff3010' },
+  { value:'HR',  label:'HR',      color:'var(--aplus)' },
 ];
 function loadBatterProps() { try { return JSON.parse(localStorage.getItem("gy_bprops")||"{}"); } catch { return {}; } }
 function saveBatterProps(p) { try { localStorage.setItem("gy_bprops",JSON.stringify(p)); } catch {} }
@@ -1354,7 +1410,7 @@ function ClearButton() {
             style={{padding:'7px 12px',borderRadius:5,cursor:'pointer',textAlign:'left',
               fontFamily:"'DM Mono',monospace",fontSize:11,
               border:'1px solid transparent',background:'transparent',
-              color:'#f5a623',opacity:hasProps?1:.4,cursor:hasProps?'pointer':'default'}}>
+              color:'var(--accent2)',opacity:hasProps?1:.4,cursor:hasProps?'pointer':'default'}}>
             ✕ Clear Props only
           </button>
           <div style={{borderTop:'1px solid var(--border)',margin:'3px 0'}}/>
@@ -1662,8 +1718,8 @@ function openBetSlip(picks, bprops) {
         URL.revokeObjectURL(url);
         dlBtn.textContent = '✓ Saved!';
         dlBtn.style.background = 'rgba(39,201,122,.25)';
-        dlBtn.style.borderColor = '#27c97a';
-        dlBtn.style.color = '#27c97a';
+        dlBtn.style.borderColor = 'var(--green)';
+        dlBtn.style.color = 'var(--green)';
         setTimeout(() => { dlBtn.textContent = '⬇ Download'; dlBtn.style.cssText = 'flex:1;padding:11px 6px;border-radius:9px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.07);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:Oswald,sans-serif;letter-spacing:.5px'; dlBtn.disabled = false; }, 2000);
       }, dlBtn);
     });
@@ -1779,7 +1835,7 @@ function MyPicksTab() {
       <button onClick={()=>openBetSlip(picks, bprops)}
         style={{padding:"5px 12px",borderRadius:6,
           background:"rgba(255,100,20,.18)",
-          border:"1px solid rgba(255,128,32,.4)",color:"#ff8020",cursor:"pointer",
+          border:"1px solid rgba(255,128,32,.4)",color:"var(--c-warn)",cursor:"pointer",
           fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:700}}>
         📸 Get Slip
       </button>
@@ -1817,22 +1873,22 @@ function MyPicksTab() {
       <div style={{display:'flex',flexWrap:'wrap',gap:'2px 20px'}}>
         <div style={{display:'flex',alignItems:'center',gap:5,minWidth:200,marginBottom:2}}>
           <span style={{fontSize:13}}>💣</span>
-          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'#ff4020',minWidth:78}}>Favorite</span>
+          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'var(--c-danger)',minWidth:78}}>Favorite</span>
           <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',lineHeight:1.4}}>Your highest-confidence play today</span>
         </div>
         <div style={{display:'flex',alignItems:'center',gap:5,minWidth:200,marginBottom:2}}>
           <span style={{fontSize:13}}>⭐</span>
-          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'#f5a623',minWidth:78}}>Dark Horse</span>
+          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'var(--accent2)',minWidth:78}}>Dark Horse</span>
           <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',lineHeight:1.4}}>Good matchup, flying under the radar</span>
         </div>
         <div style={{display:'flex',alignItems:'center',gap:5,minWidth:200,marginBottom:2}}>
           <span style={{fontSize:13}}>🎯</span>
-          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'#38b8f2',minWidth:78}}>Longshot</span>
+          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'var(--ice)',minWidth:78}}>Longshot</span>
           <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',lineHeight:1.4}}>Higher risk, higher reward</span>
         </div>
         <div style={{display:'flex',alignItems:'center',gap:5,minWidth:200,marginBottom:2}}>
           <span style={{fontSize:13}}>📆</span>
-          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'#a855f7',minWidth:78}}>Day Late</span>
+          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'var(--c-violet)',minWidth:78}}>Day Late</span>
           <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',lineHeight:1.4}}>Missed it yesterday — doubling down</span>
         </div>
         <div style={{display:'flex',alignItems:'center',gap:5,minWidth:200,marginBottom:2}}>
@@ -1842,12 +1898,12 @@ function MyPicksTab() {
         </div>
         <div style={{display:'flex',alignItems:'center',gap:5,minWidth:200,marginBottom:2}}>
           <span style={{fontSize:13}}>🤝</span>
-          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'#34d399',minWidth:78}}>Tailed</span>
+          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'var(--c-emerald)',minWidth:78}}>Tailed</span>
           <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',lineHeight:1.4}}>Picked up from someone else's card</span>
         </div>
         <div style={{display:'flex',alignItems:'center',gap:5,minWidth:200,marginBottom:2}}>
           <span style={{fontSize:13}}>🔥</span>
-          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'#fb923c',minWidth:78}}>Hot Bat</span>
+          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'var(--c-orange2)',minWidth:78}}>Hot Bat</span>
           <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',lineHeight:1.4}}>On a tear — riding the hot hand</span>
         </div>
         <div style={{display:'flex',alignItems:'center',gap:5,minWidth:200,marginBottom:2}}>
@@ -1857,7 +1913,7 @@ function MyPicksTab() {
         </div>
         <div style={{display:'flex',alignItems:'center',gap:5,minWidth:200,marginBottom:2}}>
           <span style={{fontSize:13}}>🔁</span>
-          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'#fbbf24',minWidth:78}}>Back to Back</span>
+          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'var(--c-amber)',minWidth:78}}>Back to Back</span>
           <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',lineHeight:1.4}}>Went yard yesterday — riding the momentum</span>
         </div>
       </div>
@@ -1959,11 +2015,11 @@ function MatchupCard({ dp }) {
   const brl  = parseFloat(dp.recent_barrel_pct) || 0;
   const fb   = parseFloat(dp.recent_fb_pct) || 0;
   const la   = parseFloat(dp.recent_avg_la) || 0;
-  const pgColor = pgLabel.includes('Target')?'#27c97a':pgLabel.includes('Hittable')?'#60d360':pgLabel.includes('Average')?'#f5a623':pgLabel.includes('Tough')||pgLabel.includes('Elite')?'#ff4020':'var(--muted)';
+  const pgColor = pgLabel.includes('Target')?'var(--green)':pgLabel.includes('Hittable')?'var(--c-lime)':pgLabel.includes('Average')?'var(--accent2)':pgLabel.includes('Tough')||pgLabel.includes('Elite')?'var(--c-danger)':'var(--muted)';
   const formKey = getFormClass(dp);
   const fc = formKey && FORM_CLASSES[formKey];
-  const sigColor = sig>=10?'#ff4020':sig>=7?'#f5a623':sig>=4?'#27c97a':'var(--muted)';
-  const boomColor = boom>=70?'#ff4020':boom>=50?'#f5a623':boom>=30?'#27c97a':'var(--muted)';
+  const sigColor = sig>=10?'var(--c-danger)':sig>=7?'var(--accent2)':sig>=4?'var(--green)':'var(--muted)';
+  const boomColor = boom>=70?'var(--c-danger)':boom>=50?'var(--accent2)':boom>=30?'var(--green)':'var(--muted)';
   return (
     <div style={{padding:'12px 16px',borderBottom:'1px solid var(--border)'}}>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
@@ -1980,24 +2036,24 @@ function MatchupCard({ dp }) {
       <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
         <div style={{display:'flex',gap:6,minWidth:'max-content',paddingBottom:4}}>
           {[
-            ['🎯 Yard', sig>0||boom>0?(()=>{const ys=computeYardScore(sig,parseFloat(dp.gHR)||0,boom,getPS(dp),dp.batter_hand||'',dp.pitcher_hand||'',parseInt(dp.days_rest??1),liveSlot(dp.batter_id,dp.lineup_slot), getHandSpecificGrade(dp));return ys>0?ys:'—';})():'—', (()=>{const ys=computeYardScore(sig,parseFloat(dp.gHR)||0,boom,getPS(dp),dp.batter_hand||'',dp.pitcher_hand||'',parseInt(dp.days_rest??1),liveSlot(dp.batter_id,dp.lineup_slot), getHandSpecificGrade(dp));return ys>=28?'#ffd700':ys>=20?'#ff4020':ys>=15?'#f5a623':'var(--muted)';})()],
+            ['🎯 Yard', sig>0||boom>0?(()=>{const ys=computeYardScore(sig,parseFloat(dp.gHR)||0,boom,getPS(dp),dp.batter_hand||'',dp.pitcher_hand||'',parseInt(dp.days_rest??1),liveSlot(dp.batter_id,dp.lineup_slot), getHandSpecificGrade(dp));return ys>0?ys:'—';})():'—', (()=>{const ys=computeYardScore(sig,parseFloat(dp.gHR)||0,boom,getPS(dp),dp.batter_hand||'',dp.pitcher_hand||'',parseInt(dp.days_rest??1),liveSlot(dp.batter_id,dp.lineup_slot), getHandSpecificGrade(dp));return ys>=28?'var(--c-gold)':ys>=20?'var(--c-danger)':ys>=15?'var(--accent2)':'var(--muted)';})()],
             ['💥 Boom', boom>0?Math.round(boom):'—', boomColor],
-            ['⚡️ PS', getPS(dp)>=1?Math.round(getPS(dp)):'—', getPS(dp)>=75?'#a855f7':getPS(dp)>=60?'#ff4020':'var(--muted)'],
+            ['⚡️ PS', getPS(dp)>=1?Math.round(getPS(dp)):'—', getPS(dp)>=75?'var(--c-violet)':getPS(dp)>=60?'var(--c-danger)':'var(--muted)'],
             ['⚡ Sig',  sig>0?sig:'—',               sigColor],
             ['P.Grade', pgLabel.split(' ')[0],        pgColor],
             ['Form',    fc?fc.short:'—',              fc?fc.color:'var(--muted)'],
             ['HR⬆', (()=>{const u=computeHRUpside(dp);return u.label==='BELOW AVG'?'LOW':u.label==='STRONG'?'STR':u.label;})(), (()=>{const u=computeHRUpside(dp);return u.color;})()],
             ['Sim TB',  simTB>0?simTB.toFixed(2):'—','var(--text)'],
-            ['gHR',     ghr>0?Math.round(ghr):'—',   ghr>=70?'#ff4020':ghr>=50?'#f5a623':'var(--muted)'],
-            ['L7 ISO',  iso>0?iso.toFixed(3):'—',     iso>=0.25?'#ff8020':iso>=0.18?'#f5a623':'var(--muted)'],
-            ['ZoneFit', zf>0?(zf.toFixed(1)+'%'):'—',zf>=8?'#ff4020':zf>=5?'#f5a623':zf>=2?'#27c97a':'var(--muted)'],
-            ['EV',      ev>0?ev.toFixed(1):'—',       ev>=103?'#ff4020':ev>=97?'#f5a623':'var(--muted)'],
-            ['Barrel%', brl>0?(brl.toFixed(1)+'%'):'—',brl>=10?'#ff4020':brl>=6?'#f5a623':'var(--muted)'],
-            ['FB%',     fb>0?(fb.toFixed(1)+'%'):'—', fb>=35?'#f5a623':'var(--muted)'],
-            ['Avg LA',  la>0?(la.toFixed(1)+'°'):'—', la>=22?'#27c97a':'var(--muted)'],
-            ['L7 xwOBA',   (l7xwoba||0)>0?(l7xwoba).toFixed(3):'—', (l7xwoba||0)>=0.380?'#ff4020':(l7xwoba||0)>=0.320?'#f5a623':'var(--muted)'],
-            ['L7 wOBA',    l7woba>0?l7woba.toFixed(3):'—',   l7woba>=0.370?'#ff4020':l7woba>=0.310?'#f5a623':'var(--muted)'],
-            ['SwStr%',  (parseFloat(dp.season_swstr_pct)||0)>0?((parseFloat(dp.season_swstr_pct)).toFixed(1)+'%'):'—', (parseFloat(dp.season_swstr_pct)||0)>=20?'#ff4020':(parseFloat(dp.season_swstr_pct)||0)>=14?'#f5a623':'#27c97a'],
+            ['gHR',     ghr>0?Math.round(ghr):'—',   ghr>=70?'var(--c-danger)':ghr>=50?'var(--accent2)':'var(--muted)'],
+            ['L7 ISO',  iso>0?iso.toFixed(3):'—',     iso>=0.25?'var(--c-warn)':iso>=0.18?'var(--accent2)':'var(--muted)'],
+            ['ZoneFit', zf>0?(zf.toFixed(1)+'%'):'—',zf>=8?'var(--c-danger)':zf>=5?'var(--accent2)':zf>=2?'var(--green)':'var(--muted)'],
+            ['EV',      ev>0?ev.toFixed(1):'—',       ev>=103?'var(--c-danger)':ev>=97?'var(--accent2)':'var(--muted)'],
+            ['Barrel%', brl>0?(brl.toFixed(1)+'%'):'—',brl>=10?'var(--c-danger)':brl>=6?'var(--accent2)':'var(--muted)'],
+            ['FB%',     fb>0?(fb.toFixed(1)+'%'):'—', fb>=35?'var(--accent2)':'var(--muted)'],
+            ['Avg LA',  la>0?(la.toFixed(1)+'°'):'—', la>=22?'var(--green)':'var(--muted)'],
+            ['L7 xwOBA',   (l7xwoba||0)>0?(l7xwoba).toFixed(3):'—', (l7xwoba||0)>=0.380?'var(--c-danger)':(l7xwoba||0)>=0.320?'var(--accent2)':'var(--muted)'],
+            ['L7 wOBA',    l7woba>0?l7woba.toFixed(3):'—',   l7woba>=0.370?'var(--c-danger)':l7woba>=0.310?'var(--accent2)':'var(--muted)'],
+            ['SwStr%',  (parseFloat(dp.season_swstr_pct)||0)>0?((parseFloat(dp.season_swstr_pct)).toFixed(1)+'%'):'—', (parseFloat(dp.season_swstr_pct)||0)>=20?'var(--c-danger)':(parseFloat(dp.season_swstr_pct)||0)>=14?'var(--accent2)':'var(--green)'],
           ].map(([lbl,val,col])=>(
             <div key={lbl} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,
               padding:'5px 8px',textAlign:'center',minWidth:52,flexShrink:0}}>
@@ -2015,13 +2071,13 @@ function MatchupCard({ dp }) {
           <div style={{background:'var(--surface2)',borderRadius:8,border:'1px solid var(--border)',padding:'10px 12px'}}>
             <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:8}}>📅 Recent Form (L7 At-Bats)</div>
             {[
-              ['Avg EV',    dp.recent_avg_ev,      'mph', v=>parseFloat(v)>=103?'#ff4020':parseFloat(v)>=97?'#f5a623':'var(--text)'],
-              ['Barrel%',   dp.recent_barrel_pct,  '%',   v=>parseFloat(v)>=10?'#ff4020':parseFloat(v)>=6?'#f5a623':'var(--muted)'],
-              ['↙ PBrl%',   dp.recent_pulled_barrel_pct, '%', v=>{const n=parseFloat(v); return n>=15?'#f5a623':n>=6?'#27c97a':n>0?'var(--text)':'var(--muted)';}],
-              ['HH%',       dp.recent_hh_pct,      '%',   v=>parseFloat(v)>=45?'#ff8020':'var(--muted)'],
-              ['FB%',       dp.recent_fb_pct,      '%',   v=>parseFloat(v)>=35?'#f5a623':'var(--muted)'],
-              ['Avg LA',    dp.recent_avg_la,      '°',   v=>parseFloat(v)>=22?'#27c97a':'var(--muted)'],
-              ['HR Count',  dp.recent_hr_count,    '',    v=>parseInt(v)>=2?'#ff4020':parseInt(v)>=1?'#f5a623':'var(--muted)'],
+              ['Avg EV',    dp.recent_avg_ev,      'mph', v=>parseFloat(v)>=103?'var(--c-danger)':parseFloat(v)>=97?'var(--accent2)':'var(--text)'],
+              ['Barrel%',   dp.recent_barrel_pct,  '%',   v=>parseFloat(v)>=10?'var(--c-danger)':parseFloat(v)>=6?'var(--accent2)':'var(--muted)'],
+              ['↙ PBrl%',   dp.recent_pulled_barrel_pct, '%', v=>{const n=parseFloat(v); return n>=15?'var(--accent2)':n>=6?'var(--green)':n>0?'var(--text)':'var(--muted)';}],
+              ['HH%',       dp.recent_hh_pct,      '%',   v=>parseFloat(v)>=45?'var(--c-warn)':'var(--muted)'],
+              ['FB%',       dp.recent_fb_pct,      '%',   v=>parseFloat(v)>=35?'var(--accent2)':'var(--muted)'],
+              ['Avg LA',    dp.recent_avg_la,      '°',   v=>parseFloat(v)>=22?'var(--green)':'var(--muted)'],
+              ['HR Count',  dp.recent_hr_count,    '',    v=>parseInt(v)>=2?'var(--c-danger)':parseInt(v)>=1?'var(--accent2)':'var(--muted)'],
 
 
             ].map(([lbl,val,suf,col])=>{
@@ -2043,11 +2099,11 @@ function MatchupCard({ dp }) {
           <div style={{background:'var(--surface2)',borderRadius:8,border:'1px solid var(--border)',padding:'10px 12px'}}>
             <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:8}}>⚔️ BvP Splits</div>
             {[
-              ['Avg EV',   dp.bvp_avg_ev,      'mph', v=>parseFloat(v)>=103?'#ff4020':parseFloat(v)>=97?'#f5a623':'var(--text)'],
+              ['Avg EV',   dp.bvp_avg_ev,      'mph', v=>parseFloat(v)>=103?'var(--c-danger)':parseFloat(v)>=97?'var(--accent2)':'var(--text)'],
               ['Barrel%',  dp.bvp_barrel_pct,  '%',   ()=>'var(--muted)'],
-              ['HH%',      dp.bvp_hh_pct,      '%',   v=>parseFloat(v)>=45?'#ff8020':'var(--muted)'],
+              ['HH%',      dp.bvp_hh_pct,      '%',   v=>parseFloat(v)>=45?'var(--c-warn)':'var(--muted)'],
               ['FB%',      dp.bvp_fb_pct,      '%',   ()=>'var(--muted)'],
-              ['Avg LA',   dp.bvp_avg_la,      '°',   v=>parseFloat(v)>=22?'#27c97a':'var(--muted)'],
+              ['Avg LA',   dp.bvp_avg_la,      '°',   v=>parseFloat(v)>=22?'var(--green)':'var(--muted)'],
               ['PA',       dp.bvp_pa,          '',    ()=>'var(--text)'],
             ].map(([lbl,val,suf,col])=>{
               if (!val && val!==0) return null;
@@ -2070,10 +2126,10 @@ function MatchupCard({ dp }) {
                   <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:8}}>📊 Season Contact Quality (via Statcast API)</div>
                   <div style={{display:'flex',gap:20,flexWrap:'wrap'}}>
                     {[
-                      ['xwOBA', dp.season_xwoba,     v=>parseFloat(v)>=0.380?'#ff4020':parseFloat(v)>=0.320?'#f5a623':'var(--muted)', v=>parseFloat(v).toFixed(3)],
-                      ['wOBA',  dp.season_woba,      v=>parseFloat(v)>=0.370?'#ff4020':parseFloat(v)>=0.310?'#f5a623':'var(--muted)', v=>parseFloat(v).toFixed(3)],
-                      ['SwStr%',dp.season_swstr_pct, v=>parseFloat(v)>=20?'#ff4020':parseFloat(v)>=14?'#f5a623':'#27c97a', v=>parseFloat(v).toFixed(1)+'%'],
-                      ['ISO',   dp.season_iso||dp.recent_iso, v=>parseFloat(v)>=0.25?'#ff8020':parseFloat(v)>=0.18?'#f5a623':'var(--muted)', v=>parseFloat(v).toFixed(3)],
+                      ['xwOBA', dp.season_xwoba,     v=>parseFloat(v)>=0.380?'var(--c-danger)':parseFloat(v)>=0.320?'var(--accent2)':'var(--muted)', v=>parseFloat(v).toFixed(3)],
+                      ['wOBA',  dp.season_woba,      v=>parseFloat(v)>=0.370?'var(--c-danger)':parseFloat(v)>=0.310?'var(--accent2)':'var(--muted)', v=>parseFloat(v).toFixed(3)],
+                      ['SwStr%',dp.season_swstr_pct, v=>parseFloat(v)>=20?'var(--c-danger)':parseFloat(v)>=14?'var(--accent2)':'var(--green)', v=>parseFloat(v).toFixed(1)+'%'],
+                      ['ISO',   dp.season_iso||dp.recent_iso, v=>parseFloat(v)>=0.25?'var(--c-warn)':parseFloat(v)>=0.18?'var(--accent2)':'var(--muted)', v=>parseFloat(v).toFixed(3)],
                     ].map(([lbl,val,col,fmt])=>{
                       if (!val||parseFloat(val)===0) return null;
                       return (<div key={lbl} style={{textAlign:'center'}}>
@@ -2089,7 +2145,7 @@ function MatchupCard({ dp }) {
             {(()=>{
               const mono2     = "'DM Mono',monospace";
               const ps        = getPS(dp);
-              const psCol     = ps>=75?'#a855f7':ps>=60?'#ff4020':ps>=45?'#f5a623':'var(--muted)';
+              const psCol     = ps>=75?'var(--c-violet)':ps>=60?'var(--c-danger)':ps>=45?'var(--accent2)':'var(--muted)';
               const psLbl     = ps>=75?'Perfect Storm':ps>=60?'Elite':ps>=45?'Favorable':'Below Avg';
               const veloR     = parseFloat(dp.fastball_velo_recent)||0;
               const veloS     = parseFloat(dp.fastball_velo_season)||0;
@@ -2109,14 +2165,14 @@ function MatchupCard({ dp }) {
               // Pre-computed styles — avoid nested ternaries in template literals
               const zfBg      = zf>=8?'rgba(255,64,32,.1)':zf>=5?'rgba(245,166,35,.1)':zf>=2?'rgba(39,201,122,.08)':'rgba(0,0,0,.2)';
               const zfBd      = '1px solid '+(zf>=8?'rgba(255,64,32,.3)':zf>=5?'rgba(245,166,35,.3)':zf>=2?'rgba(39,201,122,.2)':'var(--border)');
-              const zfCol     = zf>=8?'#ff4020':zf>=5?'#f5a623':zf>=2?'#27c97a':'var(--muted)';
+              const zfCol     = zf>=8?'var(--c-danger)':zf>=5?'var(--accent2)':zf>=2?'var(--green)':'var(--muted)';
               const mbBg      = mb>=55?'rgba(255,128,32,.1)':mb>=45?'rgba(245,166,35,.08)':'rgba(0,0,0,.2)';
               const mbBd      = '1px solid '+(mb>=55?'rgba(255,128,32,.3)':mb>=45?'rgba(245,166,35,.3)':'var(--border)');
-              const mbCol     = mb>=55?'#ff4020':mb>=45?'#f5a623':'var(--muted)';
+              const mbCol     = mb>=55?'var(--c-danger)':mb>=45?'var(--accent2)':'var(--muted)';
               const veloBd    = '1px solid '+(veloDec?'rgba(56,184,242,.25)':'var(--border)');
               const veloBg    = veloDec?'rgba(56,184,242,.08)':'rgba(0,0,0,.2)';
-              const veloCol   = veloDec?'#38b8f2':'var(--text)';
-              const cmCol     = countMb>=40?'#ff8020':countMb>=32?'#f5a623':'var(--muted)';
+              const veloCol   = veloDec?'var(--ice)':'var(--text)';
+              const cmCol     = countMb>=40?'var(--c-warn)':countMb>=32?'var(--accent2)':'var(--muted)';
               const psBg      = ps>0?(psCol+'18'):'transparent';
               const psBd      = '1px solid '+(ps>0?(psCol+'44'):'transparent');
               return (
@@ -2138,10 +2194,10 @@ function MatchupCard({ dp }) {
                         textTransform:'uppercase',letterSpacing:.7,marginRight:6}}>Arsenal:</span>
                       <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:'var(--text)'}}>{topPitch}</span>
                       {primaryHR>0&&<span style={{fontFamily:mono2,fontSize:9,marginLeft:8,
-                        color:primaryHR>=8?'#ff4020':primaryHR>=5?'#f5a623':'var(--muted)'}}>
+                        color:primaryHR>=8?'var(--c-danger)':primaryHR>=5?'var(--accent2)':'var(--muted)'}}>
                         {'· '+primaryHR.toFixed(1)+'% HR vs primary pitch'}
                       </span>}
-                      {platoon&&<span style={{fontFamily:mono2,fontSize:9,color:'#38b8f2',fontWeight:700,marginLeft:8}}>{'· ✓ platoon adv'}</span>}
+                      {platoon&&<span style={{fontFamily:mono2,fontSize:9,color:'var(--ice)',fontWeight:700,marginLeft:8}}>{'· ✓ platoon adv'}</span>}
                     </div>
                   )}
 
@@ -2168,7 +2224,7 @@ function MatchupCard({ dp }) {
                         {(veloR||veloS)>0?(veloR||veloS).toFixed(1):'—'}
                         <span style={{fontSize:8,fontWeight:400,color:'var(--muted)'}}> mph</span>
                       </div>
-                      {veloDec&&veloDrop>0&&<div style={{fontFamily:mono2,fontSize:7,color:'#38b8f2',marginTop:1}}>
+                      {veloDec&&veloDrop>0&&<div style={{fontFamily:mono2,fontSize:7,color:'var(--ice)',marginTop:1}}>
                         {'↓ '+veloDrop.toFixed(1)+' vs season'}
                       </div>}
                     </div>
@@ -2182,7 +2238,7 @@ function MatchupCard({ dp }) {
                       {lbl:'HH Allowed',         val:parseFloat(dp.pitcher_hh_pct_allowed)||0,    t1:42, t2:38, suf:'%'},
                     ].map(({lbl,val,t1,t2,suf})=>{
                       if(!val) return null;
-                      const col=val>=t1?'#ff4020':val>=t2?'#f5a623':'var(--muted)';
+                      const col=val>=t1?'var(--c-danger)':val>=t2?'var(--accent2)':'var(--muted)';
                       return(<div key={lbl} style={{textAlign:'center',minWidth:60}}>
                         <div style={{fontFamily:mono2,fontSize:7,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.3,marginBottom:2}}>{lbl}</div>
                         <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color:col}}>{val.toFixed(1)+suf}</div>
@@ -2245,7 +2301,7 @@ function SlideoutMatchupLine({ team, pid }) {
     statusColor = 'var(--muted)';
   } else if (isWarmup) {
     statusLabel = '⚾ Warmup';
-    statusColor = '#f5a623';
+    statusColor = 'var(--accent2)';
   } else if (isPostponed) {
     statusLabel = '🌧 Postponed';
     statusColor = '#6b7280';
@@ -2256,8 +2312,8 @@ function SlideoutMatchupLine({ team, pid }) {
 
   // At-bat status — only show when game is live and pid is known
   const abStatus = pid && isLive ? LIVE_AB_STATUS_CACHE[parseInt(pid)] : null;
-  const abBadge  = abStatus === 'atbat'  ? { icon:'⚡', label:'At Bat',      color:'#ffd700' }
-                 : abStatus === 'ondeck' ? { icon:'👀', label:'On Deck',     color:'#f5a623' }
+  const abBadge  = abStatus === 'atbat'  ? { icon:'⚡', label:'At Bat',      color:'var(--c-gold)' }
+                 : abStatus === 'ondeck' ? { icon:'👀', label:'On Deck',     color:'var(--accent2)' }
                  : abStatus === 'inhole' ? { icon:'⛳', label:'In the Hole', color:'var(--muted)' }
                  : null;
 
@@ -2671,7 +2727,7 @@ function AtBatSlideIn() {
         {risp && (
           <div style={{margin:'8px 0 4px',padding:'8px 12px',borderRadius:7,
             background:'rgba(245,166,35,.08)',border:'1px solid rgba(245,166,35,.2)'}}>
-            <div style={{fontFamily:mono,fontSize:7,color:'#f5a623',letterSpacing:1,
+            <div style={{fontFamily:mono,fontSize:7,color:'var(--accent2)',letterSpacing:1,
               textTransform:'uppercase',marginBottom:5}}>
               🏃 Runners in Scoring Position · {risp.pa} PA
             </div>
@@ -2679,7 +2735,7 @@ function AtBatSlideIn() {
               {[['AVG',risp.avg],['OBP',risp.obp],['SLG',risp.slg],['OPS',risp.ops]].map(([lbl,val])=>(
                 <div key={lbl} style={{textAlign:'center'}}>
                   <div style={{fontFamily:osw,fontWeight:800,fontSize:14,
-                    color:parseFloat(val)>=.300?'#27c97a':parseFloat(val)>=.250?'#f5a623':'var(--text)',
+                    color:parseFloat(val)>=.300?'var(--green)':parseFloat(val)>=.250?'var(--accent2)':'var(--text)',
                     lineHeight:1}}>{val||'.---'}</div>
                   <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',marginTop:2}}>{lbl}</div>
                 </div>
@@ -2715,7 +2771,7 @@ function AtBatSlideIn() {
             <span style={{fontSize:16}}>&#x1F3AF;</span>
             <div>
               <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:11,
-                color:'#ffd700',letterSpacing:.5}}>
+                color:'var(--c-gold)',letterSpacing:.5}}>
                 PITCHER WEAK SPOT &#8212; Batting #{slot}
               </div>
               <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,
@@ -2818,19 +2874,19 @@ function AtBatSlideIn() {
           return <>
             <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
               {[
-                {label:"Avg EV",   val:row.avgEV,        suffix:"",   color: row.avgEV>=92?"var(--accent)":row.avgEV>=88?"#ff8020":"var(--text)"},
-                {label:"Barrel%",  val:row.barrel,       suffix:"%",  color: row.barrel>=12?"#ff4020":row.barrel>=8?"#ff8020":row.barrel>=5?"#f5a623":"var(--text)"},
-                {label:"HardHit%", val:row.hardHit,      suffix:"%",  color: row.hardHit>=50?"#ff4020":row.hardHit>=42?"#ff8020":"var(--text)"},
+                {label:"Avg EV",   val:row.avgEV,        suffix:"",   color: row.avgEV>=92?"var(--accent)":row.avgEV>=88?"var(--c-warn)":"var(--text)"},
+                {label:"Barrel%",  val:row.barrel,       suffix:"%",  color: row.barrel>=12?"var(--c-danger)":row.barrel>=8?"var(--c-warn)":row.barrel>=5?"var(--accent2)":"var(--text)"},
+                {label:"HardHit%", val:row.hardHit,      suffix:"%",  color: row.hardHit>=50?"var(--c-danger)":row.hardHit>=42?"var(--c-warn)":"var(--text)"},
                 {label:"FB%",      val:row.flyBall,      suffix:"%",  color:"var(--text)"},
                 {label:"GB%",      val:row.gbPct,        suffix:"%",  color:"var(--muted)"},
                 {label:"Launch°",  val:row.launchAngle,  suffix:"°",  color: row.launchAngle>=20&&row.launchAngle<=35?"var(--green)":"var(--text)"},
-                {label:"BA",       val:row.avg,          suffix:"",   fmt: v=>v>0?'.'+String(Math.round(v*1000)).padStart(3,'0'):'—', color: row.avg>=0.300?"var(--accent)":row.avg>=0.260?"#ff8020":"var(--text)"},
-                {label:"OBP",      val:row.obp,          suffix:"",   fmt: v=>v>0?'.'+String(Math.round(v*1000)).padStart(3,'0'):'—', color: row.obp>=0.370?"var(--accent)":row.obp>=0.330?"#ff8020":"var(--text)"},
-                {label:"SLG",      val:row.slg,          suffix:"",   fmt: v=>v>0?'.'+String(Math.round(v*1000)).padStart(3,'0'):'—', color: row.slg>=0.500?"var(--accent)":row.slg>=0.420?"#ff8020":"var(--text)"},
-                {label:"xwOBA",    val:row.xwoba,        suffix:"",   fmt: v=>v>0?v.toFixed(3):'—', color: row.xwoba>=0.380?"var(--accent)":row.xwoba>=0.320?"#ff8020":"var(--text)"},
-                {label:"Chase%",   val:row.oSwing,       suffix:"%",  color: row.oSwing<=20?"var(--green)":row.oSwing>=30?"#ff8020":"var(--text)"},
+                {label:"BA",       val:row.avg,          suffix:"",   fmt: v=>v>0?'.'+String(Math.round(v*1000)).padStart(3,'0'):'—', color: row.avg>=0.300?"var(--accent)":row.avg>=0.260?"var(--c-warn)":"var(--text)"},
+                {label:"OBP",      val:row.obp,          suffix:"",   fmt: v=>v>0?'.'+String(Math.round(v*1000)).padStart(3,'0'):'—', color: row.obp>=0.370?"var(--accent)":row.obp>=0.330?"var(--c-warn)":"var(--text)"},
+                {label:"SLG",      val:row.slg,          suffix:"",   fmt: v=>v>0?'.'+String(Math.round(v*1000)).padStart(3,'0'):'—', color: row.slg>=0.500?"var(--accent)":row.slg>=0.420?"var(--c-warn)":"var(--text)"},
+                {label:"xwOBA",    val:row.xwoba,        suffix:"",   fmt: v=>v>0?v.toFixed(3):'—', color: row.xwoba>=0.380?"var(--accent)":row.xwoba>=0.320?"var(--c-warn)":"var(--text)"},
+                {label:"Chase%",   val:row.oSwing,       suffix:"%",  color: row.oSwing<=20?"var(--green)":row.oSwing>=30?"var(--c-warn)":"var(--text)"},
                 {label:"K%",       val:row.kPct,         suffix:"%",  color: row.kPct>=28?"var(--ice)":"var(--muted)"},
-                {label:"BB%",      val:row.bbPct,        suffix:"%",  color: row.bbPct>=12?"#27c97a":"var(--muted)"},
+                {label:"BB%",      val:row.bbPct,        suffix:"%",  color: row.bbPct>=12?"var(--green)":"var(--muted)"},
                 {label:"HR",       val:battingHand!=='ALL' ? split.hr : null, suffix:"", color:"var(--text)"},
               ].filter(s => s.val != null && s.val > 0).map(s=>(
                 <div key={s.label} style={{background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8,padding:"8px 12px",minWidth:64,textAlign:"center"}}>
@@ -2916,7 +2972,7 @@ function AtBatSlideIn() {
                           : hrR>=0.05||avg>=0.260 ? 'GOOD'
                           : avg>=0.200             ? 'NEUTRAL'
                           :                         'WEAK';
-              const col = grade==='STRONG'?'#27c97a':grade==='GOOD'?'#f5a623':grade==='NEUTRAL'?'var(--muted)':'#ff4020';
+              const col = grade==='STRONG'?'var(--green)':grade==='GOOD'?'var(--accent2)':grade==='NEUTRAL'?'var(--muted)':'var(--c-danger)';
               return (
                 <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:9,
                   color:col,padding:'2px 7px',borderRadius:4,letterSpacing:.5,
@@ -2953,9 +3009,9 @@ function AtBatSlideIn() {
                 const careerSLG = bvpData.slg;
                 const rows = [
                   [careerPA, null],[careerAB, null],
-                  [careerH,  careerH>0?"#27c97a":null],
+                  [careerH,  careerH>0?"var(--green)":null],
                   [careerHR, careerHR>0?"var(--accent)":null],
-                  [career2B||'—', null],[careerBB, careerBB>0?"#27c97a":null],
+                  [career2B||'—', null],[careerBB, careerBB>0?"var(--green)":null],
                   [careerK,  careerK>0?"var(--ice)":null],
                   [careerAVG,null],[careerOBP,null],[careerSLG,null],
                 ];
@@ -3029,12 +3085,12 @@ function AtBatSlideIn() {
                                   <td style={{padding:'4px 6px',fontFamily:"'Oswald',sans-serif",fontWeight:700,color:'var(--text)'}}>{sea}</td>
                                   <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'DM Mono',monospace",color:'var(--muted)'}}>{pav||'—'}</td>
                                   <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'Oswald',sans-serif",fontWeight:700}}>{s.atBats??'—'}</td>
-                                  <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'Oswald',sans-serif",fontWeight:700,color:hv>0?'#27c97a':'var(--text)'}}>{s.hits??'—'}</td>
+                                  <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'Oswald',sans-serif",fontWeight:700,color:hv>0?'var(--green)':'var(--text)'}}>{s.hits??'—'}</td>
                                   <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'Oswald',sans-serif",fontWeight:700,color:hrv>0?'var(--accent)':'var(--text)'}}>{s.homeRuns??'—'}</td>
                                   <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'DM Mono',monospace",color:'var(--muted)'}}>{s.doubles??'—'}</td>
-                                  <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'DM Mono',monospace",color:parseInt(s.baseOnBalls||0)>0?'#27c97a':'var(--muted)'}}>{s.baseOnBalls??'—'}</td>
+                                  <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'DM Mono',monospace",color:parseInt(s.baseOnBalls||0)>0?'var(--green)':'var(--muted)'}}>{s.baseOnBalls??'—'}</td>
                                   <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'DM Mono',monospace",color:parseInt(s.strikeOuts||0)>0?'var(--ice)':'var(--muted)'}}>{s.strikeOuts??'—'}</td>
-                                  <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'DM Mono',monospace",color:parseFloat(s.avg||0)>=0.300?'#27c97a':parseFloat(s.avg||0)>=0.250?'var(--text)':'var(--muted)'}}>{s.avg??'—'}</td>
+                                  <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'DM Mono',monospace",color:parseFloat(s.avg||0)>=0.300?'var(--green)':parseFloat(s.avg||0)>=0.250?'var(--text)':'var(--muted)'}}>{s.avg??'—'}</td>
                                 </tr>
                               );
                             })}
@@ -3044,12 +3100,12 @@ function AtBatSlideIn() {
                               <td style={{padding:'4px 6px',fontFamily:"'DM Mono',monospace",color:'var(--muted)',fontSize:9}}>—</td>
                               <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'DM Mono',monospace",color:'var(--muted)',fontSize:9}}>{h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.plateAppearances||sp.stat?.atBats||0)),0)}</td>
                               <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11}}>{h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.atBats||0)),0)}</td>
-                              <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.hits||0)),0)>0?'#27c97a':'var(--text)'}}>{h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.hits||0)),0)}</td>
+                              <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.hits||0)),0)>0?'var(--green)':'var(--text)'}}>{h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.hits||0)),0)}</td>
                               <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.homeRuns||0)),0)>0?'var(--accent)':'var(--text)'}}>{h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.homeRuns||0)),0)}</td>
                               <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'DM Mono',monospace",color:'var(--muted)',fontSize:9}}>{h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.doubles||0)),0)||'∅'}</td>
-                              <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'DM Mono',monospace",fontSize:9,color:h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.baseOnBalls||0)),0)>0?'#27c97a':'var(--muted)'}}>{h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.baseOnBalls||0)),0)||'∅'}</td>
+                              <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'DM Mono',monospace",fontSize:9,color:h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.baseOnBalls||0)),0)>0?'var(--green)':'var(--muted)'}}>{h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.baseOnBalls||0)),0)||'∅'}</td>
                               <td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'DM Mono',monospace",fontSize:9,color:h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.strikeOuts||0)),0)>0?'var(--ice)':'var(--muted)'}}>{h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.strikeOuts||0)),0)||'∅'}</td>
-                              {(()=>{const ab=h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.atBats||0)),0);const h=h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.hits||0)),0);const avg=ab>0?'.'+String(Math.round(h/ab*1000)).padStart(3,'0'):'.000';return<td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'DM Mono',monospace",fontSize:9,color:parseFloat(avg)>=0.280?'#27c97a':parseFloat(avg)>=0.250?'var(--text)':'var(--muted)'}}>{avg}</td>;})()}
+                              {(()=>{const ab=h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.atBats||0)),0);const h=h2hLog.reduce((s,sp)=>s+(parseInt(sp.stat?.hits||0)),0);const avg=ab>0?'.'+String(Math.round(h/ab*1000)).padStart(3,'0'):'.000';return<td style={{padding:'4px 6px',textAlign:'center',fontFamily:"'DM Mono',monospace",fontSize:9,color:parseFloat(avg)>=0.280?'var(--green)':parseFloat(avg)>=0.250?'var(--text)':'var(--muted)'}}>{avg}</td>;})()}
                             </tr>
                           )}
                           </tbody>
@@ -3119,7 +3175,7 @@ function AtBatSlideIn() {
                 </div>
               )}
               {!scoutNoteLocked && scoutNoteError && (
-                <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'#ff6b6b'}}>
+                <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--c-coral)'}}>
                   Couldn't generate a note: {scoutNoteError}
                 </div>
               )}
@@ -3203,7 +3259,7 @@ function AtBatSlideIn() {
               textTransform:'uppercase',letterSpacing:.8}}>Zone Overlap vs Pitcher</span>
             {zoneData?.edges?.length > 0 && (
               <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:9,
-                color:'#ff4020',background:'rgba(255,64,32,.12)',border:'1px solid rgba(255,64,32,.3)',
+                color:'var(--c-danger)',background:'rgba(255,64,32,.12)',border:'1px solid rgba(255,64,32,.3)',
                 borderRadius:4,padding:'1px 5px'}}>
                 {zoneData.edges.length} edge{zoneData.edges.length!==1?'s':''}
               </span>
@@ -3268,7 +3324,7 @@ function AtBatSlideIn() {
                 position:'relative',border:isEdge&&!showPitcher?'1px solid #ff4020':'1px solid rgba(255,255,255,.06)',
                 minHeight:42}}>
                 {isEdge && !showPitcher && (
-                  <div style={{position:'absolute',top:1,right:2,fontSize:7,color:'#ff4020'}}>★</div>
+                  <div style={{position:'absolute',top:1,right:2,fontSize:7,color:'var(--c-danger)'}}>★</div>
                 )}
                 <div style={{fontFamily:mono3,fontSize:7,color:'rgba(255,255,255,.4)',marginBottom:2}}>Z{zn}</div>
                 <div style={{fontFamily:osw3,fontWeight:700,fontSize:10,
@@ -3294,7 +3350,7 @@ function AtBatSlideIn() {
                       cursor:'pointer',
                       border:'1px solid '+(zoneStat===key?'rgba(232,65,26,.6)':'var(--border)'),
                       background:zoneStat===key?'rgba(232,65,26,.12)':'none',
-                      color:zoneStat===key?'#ff4020':'var(--muted)'}}>
+                      color:zoneStat===key?'var(--c-danger)':'var(--muted)'}}>
                     {lbl}
                   </button>
                 ); })}
@@ -3307,7 +3363,7 @@ function AtBatSlideIn() {
                 <div style={{background:'rgba(232,65,26,.06)',border:'1px solid rgba(232,65,26,.2)',
                   borderRadius:6,padding:'8px 10px',marginBottom:12}}>
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
-                    <div style={{fontFamily:mono3,fontSize:8,color:'#ff4020',fontWeight:700,
+                    <div style={{fontFamily:mono3,fontSize:8,color:'var(--c-danger)',fontWeight:700,
                       textTransform:'uppercase',letterSpacing:.8}}>
                       Matchup Edges &#8212; pitcher targets batter hot zones
                     </div>
@@ -3317,7 +3373,7 @@ function AtBatSlideIn() {
                       if(!boost) return null;
                       return (
                         <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,
-                          fontSize:9,color:'#27c97a',background:'rgba(39,201,122,.12)',
+                          fontSize:9,color:'var(--green)',background:'rgba(39,201,122,.12)',
                           border:'1px solid rgba(39,201,122,.3)',borderRadius:4,
                           padding:'1px 6px',letterSpacing:.3}}>
                           {boost} Boom Score
@@ -3329,9 +3385,9 @@ function AtBatSlideIn() {
                     <div key={i} style={{display:'flex',alignItems:'center',gap:8,
                       marginBottom:4,fontFamily:mono3,fontSize:9}}>
                       <span style={{background:'rgba(232,65,26,.3)',borderRadius:3,padding:'1px 5px',
-                        color:'#ff4020',fontWeight:700,fontSize:8}}>Z{e.zone}</span>
+                        color:'var(--c-danger)',fontWeight:700,fontSize:8}}>Z{e.zone}</span>
                       <span style={{color:'var(--muted)'}}>{e.label}</span>
-                      <span style={{color:'#ff4020',fontWeight:700}}>{e.usage.toFixed(0)}% usage</span>
+                      <span style={{color:'var(--c-danger)',fontWeight:700}}>{e.usage.toFixed(0)}% usage</span>
                       <span style={{color:'rgba(255,255,255,.5)'}}>
                         {e.bHR>0?e.bHR.toFixed(1)+'% HR':''}{e.bBrl>0?' '+e.bBrl.toFixed(0)+'% Brl':''}
                       </span>
@@ -3440,7 +3496,7 @@ function AtBatSlideIn() {
         const total    = checks.length;
         // Thresholds match KM checklist: 7+/9=ELITE, 5+/9=STRONG, 3+/9=GOOD
         const uLabel   = litClamp>=(total===10?8:7)?'ELITE':litClamp>=(total===10?6:5)?'STRONG':litClamp>=(total===10?4:3)?'GOOD':'BELOW AVG';
-        const uCol     = uLabel==='ELITE'?'#ff4020':uLabel==='STRONG'?'#f5a623':uLabel==='GOOD'?'#27c97a':'var(--muted)';
+        const uCol     = uLabel==='ELITE'?'var(--c-danger)':uLabel==='STRONG'?'var(--accent2)':uLabel==='GOOD'?'var(--green)':'var(--muted)';
         return (
           <div style={{padding:'14px 20px',borderBottom:'1px solid var(--border)'}}>
             <div style={{background:'var(--surface2)',borderRadius:9,
@@ -3457,18 +3513,18 @@ function AtBatSlideIn() {
                 {checks.map((ch,i)=>{
                   const isFade = ch.fade;
                   const isOk   = ch.ok && !isFade;
-                  const dotCol = isOk?'#27c97a':isFade?'#ff4020':'rgba(255,255,255,.15)';
+                  const dotCol = isOk?'var(--green)':isFade?'var(--c-danger)':'rgba(255,255,255,.15)';
                   const icon   = isOk?'✅':isFade?'⚠️':'○';
                   return(
                     <div key={i} style={{display:'flex',alignItems:'center',gap:6,padding:'3px 0',
                       borderBottom:'1px solid rgba(255,255,255,.04)'}}>
                       <span style={{fontSize:10,flexShrink:0,color:dotCol}}>{icon}</span>
                       <span style={{fontFamily:mono2,fontSize:9,flex:1,
-                        color:isOk?'var(--text)':isFade?'#ff4020':'var(--muted)',
+                        color:isOk?'var(--text)':isFade?'var(--c-danger)':'var(--muted)',
                         fontWeight:isOk||isFade?600:400}}>{ch.label}</span>
                       <span style={{fontFamily:mono2,fontSize:9,flexShrink:0,
                         fontWeight:isOk?700:400,
-                        color:isOk?'#27c97a':isFade?'#ff4020':'rgba(255,255,255,.2)'}}>
+                        color:isOk?'var(--green)':isFade?'var(--c-danger)':'rgba(255,255,255,.2)'}}>
                         {ch.val}
                       </span>
                     </div>
@@ -3512,7 +3568,7 @@ function AtBatSlideIn() {
                         <td style={{padding:"7px 8px",fontFamily:"'DM Mono',monospace",fontSize:11,textAlign:"center"}}>{g.rbi}</td>
                         <td style={{padding:"7px 8px",fontFamily:"'DM Mono',monospace",fontSize:11,textAlign:"center",color:g.bb>0?"var(--green)":"var(--muted)"}}>{g.bb}</td>
                         <td style={{padding:"7px 8px",fontFamily:"'DM Mono',monospace",fontSize:11,textAlign:"center",color:g.k>=3?"var(--ice)":"var(--muted)"}}>{g.k}</td>
-                        <td style={{padding:"7px 8px",fontFamily:"'DM Mono',monospace",fontSize:11,textAlign:"center",color:parseFloat(g.avg)>=0.300?"var(--accent)":parseFloat(g.avg)>=0.250?"#ff8020":"var(--text)"}}>{g.avg}</td>
+                        <td style={{padding:"7px 8px",fontFamily:"'DM Mono',monospace",fontSize:11,textAlign:"center",color:parseFloat(g.avg)>=0.300?"var(--accent)":parseFloat(g.avg)>=0.250?"var(--c-warn)":"var(--text)"}}>{g.avg}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -3590,13 +3646,13 @@ function Last7HRAllowedChart({ pitcherId }) {
   const pct     = Math.round((allowedGames / games.length) * 100);
   const maxHRA  = Math.max(view==='k'?5:1, ...games.map(g => getVal(g)));
   const BAR_H   = 100;
-  const barGood = view==='k'?'#27c97a':'rgba(39,201,122,.2)';
+  const barGood = view==='k'?'var(--green)':'rgba(39,201,122,.2)';
   const barBad  = view==='k'?'rgba(255,64,32,.2)':'linear-gradient(180deg,#ff4020,#c02010)';
-  const numGood = view==='k'?'#27c97a':'#27c97a';
-  const numBad  = view==='k'?'#ff4020':'#ff4020';
+  const numGood = view==='k'?'var(--green)':'var(--green)';
+  const numBad  = view==='k'?'var(--c-danger)':'var(--c-danger)';
   const pctColor = view==='k'
-    ? (pct <= 14 ? '#ff4020' : pct <= 42 ? '#ffc840' : '#27c97a')
-    : (pct <= 14 ? '#27c97a' : pct <= 42 ? '#ffc840' : '#ff4020');
+    ? (pct <= 14 ? 'var(--c-danger)' : pct <= 42 ? 'var(--c-yellow)' : 'var(--green)')
+    : (pct <= 14 ? 'var(--green)' : pct <= 42 ? 'var(--c-yellow)' : 'var(--c-danger)');
   const label   = games.length < 7 ? `LAST ${games.length}` : 'LAST 7';
 
   return (
@@ -3932,7 +3988,7 @@ function PitcherSlideIn() {
                 below is set and today's daily_picks.csv row has it. */}
             {(()=>{
               const pgLabel = activePgLabel;
-              const col = pgLabel.includes('Target')?'#27c97a':pgLabel.includes('Hittable')?'#f5a623':pgLabel.includes('Tough')||pgLabel.includes('Elite')?'var(--accent)':'var(--muted)';
+              const col = pgLabel.includes('Target')?'var(--green)':pgLabel.includes('Hittable')?'var(--accent2)':pgLabel.includes('Tough')||pgLabel.includes('Elite')?'var(--accent)':'var(--muted)';
               return pgLabel ? (
                 <span title={`Going Yard Pitcher Grade${statHand!=='ALL'?` (vs ${statHand==='L'?'LHB':'RHB'})`:''}: ${pgLabel}`}
                   style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,
@@ -3946,7 +4002,7 @@ function PitcherSlideIn() {
             {isPitcherRP(stats?.gs) && (
               <span title="Season-classified as a reliever (0 games started) — today's start is very likely an opener/bulk-game situation. Display-only warning; doesn't affect any score."
                 style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,
-                  color:'#f5a623',padding:'2px 6px',borderRadius:4,
+                  color:'var(--accent2)',padding:'2px 6px',borderRadius:4,
                   background:'rgba(245,166,35,.12)',border:'1px solid rgba(245,166,35,.35)',
                   flexShrink:0,cursor:'default'}}>
                 RP
@@ -3987,12 +4043,12 @@ function PitcherSlideIn() {
           : <>
             <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
               {[
-                {label:'ERA',  val:activeStats?.era,   color: parseFloat(activeStats?.era)<=3?'#27c97a':parseFloat(activeStats?.era)>=4.5?'var(--accent)':'var(--text)'},
-                {label:'WHIP', val:activeStats?.whip,  color: parseFloat(activeStats?.whip)<=1.1?'#27c97a':parseFloat(activeStats?.whip)>=1.4?'var(--accent)':'var(--text)'},
-                {label:'K/9',  val:activeStats?.k9,    color: parseFloat(activeStats?.k9)>=10?'#27c97a':'var(--text)'},
-                {label:'BB/9', val:activeStats?.bb9,   color: parseFloat(activeStats?.bb9)<=2.5?'#27c97a':parseFloat(activeStats?.bb9)>=4?'var(--accent)':'var(--text)'},
+                {label:'ERA',  val:activeStats?.era,   color: parseFloat(activeStats?.era)<=3?'var(--green)':parseFloat(activeStats?.era)>=4.5?'var(--accent)':'var(--text)'},
+                {label:'WHIP', val:activeStats?.whip,  color: parseFloat(activeStats?.whip)<=1.1?'var(--green)':parseFloat(activeStats?.whip)>=1.4?'var(--accent)':'var(--text)'},
+                {label:'K/9',  val:activeStats?.k9,    color: parseFloat(activeStats?.k9)>=10?'var(--green)':'var(--text)'},
+                {label:'BB/9', val:activeStats?.bb9,   color: parseFloat(activeStats?.bb9)<=2.5?'var(--green)':parseFloat(activeStats?.bb9)>=4?'var(--accent)':'var(--text)'},
                 {label:'HR/9', val:activeStats?.hr9,   color: parseFloat(activeStats?.hr9)>=1.5?'var(--accent)':'var(--text)'},
-                {label:'HR',   val:activeStats?.hr>0?activeStats.hr:null, color: (activeStats?.hr||0)>=15?'var(--accent)':(activeStats?.hr||0)>=8?'#ff8020':'var(--text)'},
+                {label:'HR',   val:activeStats?.hr>0?activeStats.hr:null, color: (activeStats?.hr||0)>=15?'var(--accent)':(activeStats?.hr||0)>=8?'var(--c-warn)':'var(--text)'},
                 {label:'FB Vel', val:(()=>{ const fb = activePitchMix.find(px=>px.code==='FF'||px.code==='SI'||px.name?.includes('Fastball')); return fb?.velo>0?parseFloat(fb.velo).toFixed(1):null; })(), color:'var(--text)'},
               ].filter(s=>s.val&&s.val!=='—'&&s.val!=='0'&&s.val!==0).map(s=>(
                 <div key={s.label} style={{background:'var(--surface2)',border:'1px solid var(--border)',
@@ -4033,12 +4089,12 @@ function PitcherSlideIn() {
           </div>
           <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
             {[
-              {label:'GB%',   val:activeBattedBall.gbPct,   color: activeBattedBall.gbPct>=50?'#27c97a':activeBattedBall.gbPct>=44?'var(--accent2)':'var(--text)', tip:'Ground ball % allowed — higher is better for pitcher'},
-              {label:'FB%',   val:activeBattedBall.fbPct,   color: activeBattedBall.fbPct>=40?'var(--accent)':activeBattedBall.fbPct>=35?'#ff8020':'var(--text)', tip:'Fly ball % allowed — lower is better'},
+              {label:'GB%',   val:activeBattedBall.gbPct,   color: activeBattedBall.gbPct>=50?'var(--green)':activeBattedBall.gbPct>=44?'var(--accent2)':'var(--text)', tip:'Ground ball % allowed — higher is better for pitcher'},
+              {label:'FB%',   val:activeBattedBall.fbPct,   color: activeBattedBall.fbPct>=40?'var(--accent)':activeBattedBall.fbPct>=35?'var(--c-warn)':'var(--text)', tip:'Fly ball % allowed — lower is better'},
               {label:'LD%',   val:activeBattedBall.ldPct,   color: activeBattedBall.ldPct>=24?'var(--accent)':'var(--text)', tip:'Line drive % allowed — lower is better'},
-              {label:'HH%',   val:activeBattedBall.hhPct,   color: activeBattedBall.hhPct>=42?'var(--accent)':activeBattedBall.hhPct<=36?'#27c97a':'var(--text)', tip:'Hard hit % allowed — lower is better'},
-              {label:'Barrel%',val:activeBattedBall.barrelPct, color: activeBattedBall.barrelPct>=9?'var(--accent)':activeBattedBall.barrelPct<=5?'#27c97a':'var(--text)', tip:'Barrel % allowed — lower is better'},
-              {label:'HR%',   val:activeBattedBall.hrPct,   color: activeBattedBall.hrPct>=6?'var(--accent)':activeBattedBall.hrPct<=3?'#27c97a':'var(--text)', tip:'HR per PA allowed vs this hand — lower is better'},
+              {label:'HH%',   val:activeBattedBall.hhPct,   color: activeBattedBall.hhPct>=42?'var(--accent)':activeBattedBall.hhPct<=36?'var(--green)':'var(--text)', tip:'Hard hit % allowed — lower is better'},
+              {label:'Barrel%',val:activeBattedBall.barrelPct, color: activeBattedBall.barrelPct>=9?'var(--accent)':activeBattedBall.barrelPct<=5?'var(--green)':'var(--text)', tip:'Barrel % allowed — lower is better'},
+              {label:'HR%',   val:activeBattedBall.hrPct,   color: activeBattedBall.hrPct>=6?'var(--accent)':activeBattedBall.hrPct<=3?'var(--green)':'var(--text)', tip:'HR per PA allowed vs this hand — lower is better'},
             ].filter(s=>s.val!=null&&s.val>0).map(s=>(
               <div key={s.label} title={s.tip} style={{background:'var(--surface2)',border:'1px solid var(--border)',
                 borderRadius:8,padding:'8px 12px',minWidth:64,textAlign:'center'}}>
@@ -4126,9 +4182,9 @@ function PitcherSlideIn() {
                         <td style={{padding:'7px 8px',fontFamily:"'Oswald',sans-serif",fontWeight:600,fontSize:12}}>{g.opp}</td>
                         <td style={{padding:'7px 8px',fontFamily:"'DM Mono',monospace",fontSize:11,textAlign:'center'}}>{g.ip}</td>
                         <td style={{padding:'7px 8px',fontFamily:"'DM Mono',monospace",fontSize:11,textAlign:'center',color:g.h>=5?'var(--accent)':'var(--muted)'}}>{g.h}</td>
-                        <td style={{padding:'7px 8px',fontFamily:"'DM Mono',monospace",fontSize:11,textAlign:'center',color:g.er>=4?'var(--accent)':g.er===0?'#27c97a':'var(--text)',fontWeight:g.er===0?700:400}}>{g.er}</td>
+                        <td style={{padding:'7px 8px',fontFamily:"'DM Mono',monospace",fontSize:11,textAlign:'center',color:g.er>=4?'var(--accent)':g.er===0?'var(--green)':'var(--text)',fontWeight:g.er===0?700:400}}>{g.er}</td>
                         <td style={{padding:'7px 8px',fontFamily:"'DM Mono',monospace",fontSize:11,textAlign:'center',color:g.bb>=3?'var(--accent)':'var(--muted)'}}>{g.bb}</td>
-                        <td style={{padding:'7px 8px',fontFamily:"'DM Mono',monospace",fontSize:11,textAlign:'center',color:g.k>=8?'#27c97a':g.k>=6?'var(--accent2)':'var(--text)',fontWeight:g.k>=8?700:400}}>{g.k}</td>
+                        <td style={{padding:'7px 8px',fontFamily:"'DM Mono',monospace",fontSize:11,textAlign:'center',color:g.k>=8?'var(--green)':g.k>=6?'var(--accent2)':'var(--text)',fontWeight:g.k>=8?700:400}}>{g.k}</td>
                         <td style={{padding:'7px 8px',fontFamily:"'DM Mono',monospace",fontSize:11,textAlign:'center',color:g.hr>0?'var(--accent)':'var(--muted)'}}>{g.hr}</td>
                       </tr>
                     ))}
@@ -4249,8 +4305,8 @@ function getWindDir(deg) {
 
 // Park factor color
 function getPFColor(hr) {
-  return hr >= 115 ? "#ff4020" : hr >= 108 ? "#ff8020" : hr >= 103 ? "#ffbe20" :
-         hr <= 90  ? "#38b8f2" : hr <= 95  ? "#60a0d0" : hr <= 98  ? "#8899a6" : "var(--muted)";
+  return hr >= 115 ? "var(--c-danger)" : hr >= 108 ? "var(--c-warn)" : hr >= 103 ? "#ffbe20" :
+         hr <= 90  ? "var(--ice)" : hr <= 95  ? "#60a0d0" : hr <= 98  ? "#8899a6" : "var(--muted)";
 }
 
 // ── WEATHER BANNER COMPONENT ─────────────────────────────────
@@ -4270,7 +4326,7 @@ function WeatherBanner({ team }) {
   const { parkFactor: pf, weather: w, hrEnvScore } = data;
   const pfColor = getPFColor(pf?.hr || 100);
   const envLabel = hrEnvScore >= 60 ? "🔥 HR-friendly environment" : hrEnvScore >= 52 ? "📈 Slight HR boost" : hrEnvScore >= 46 ? "— Neutral conditions" : hrEnvScore >= 38 ? "📉 Slight suppressor" : "🧊 Pitcher-friendly conditions";
-  const envColor = hrEnvScore >= 60 ? "#ff4020" : hrEnvScore >= 52 ? "#ff8020" : hrEnvScore >= 46 ? "var(--muted)" : hrEnvScore >= 38 ? "#38b8f2" : "#38b8f2";
+  const envColor = hrEnvScore >= 60 ? "var(--c-danger)" : hrEnvScore >= 52 ? "var(--c-warn)" : hrEnvScore >= 46 ? "var(--muted)" : hrEnvScore >= 38 ? "var(--ice)" : "var(--ice)";
 
   return <div style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:8,padding:"10px 14px",marginBottom:12,display:"flex",gap:16,alignItems:"center",flexWrap:"wrap"}}>
     {/* Park factor */}
@@ -4297,7 +4353,7 @@ function WeatherBanner({ team }) {
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:1}}>
             <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1}}>Wind</div>
-            <div style={{fontSize:12,fontFamily:"'DM Mono',monospace",color:w.windSpeed>=15?"#ff8020":"var(--text)"}}>{w.windLabel}</div>
+            <div style={{fontSize:12,fontFamily:"'DM Mono',monospace",color:w.windSpeed>=15?"var(--c-warn)":"var(--text)"}}>{w.windLabel}</div>
             <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>{w.windSpeed} mph {getWindDir(w.windDir)}</div>
           </div>
           {w.precip > 0 && <div style={{padding:"3px 8px",borderRadius:5,background:"rgba(56,184,242,.1)",border:"1px solid rgba(56,184,242,.2)",fontSize:10,color:"var(--ice)",fontFamily:"'DM Mono',monospace"}}>🌧️ {w.precip}" precip</div>}
@@ -5473,10 +5529,10 @@ async function fetchLiftoffBatters(game) {
       ).slice(0, 12);
 
       const GRADE_CFG_LO = {
-        'diamond': {color:'#ffcc00', label:'💎 Diamond'},
-        'A+': {color:'#ff3010', label:'🔴 A+'},
+        'diamond': {color:'var(--c-yellow2)', label:'💎 Diamond'},
+        'A+': {color:'var(--aplus)', label:'🔴 A+'},
         'A':  {color:'#ff7000', label:'🔥 A'},
-        'B':  {color:'#f5a623', label:'⚡ B'},
+        'B':  {color:'var(--accent2)', label:'⚡ B'},
         'C':  {color:'#8bc4e8', label:'👀 C'},
         'D':  {color:'#8a9db0', label:'❄️ D'},
       };
@@ -5837,21 +5893,21 @@ function CBar({label, tv, l7, max, col}) {
 function XRow({b}) {
   const inZ = inHRZ(b.launchAngle), zl = getLAZ(b.launchAngle);
   const evUp = b.avgEV >= (b.recentAvgEV ?? 88);
-  const ec = b.avgEV >= T.EV_EL ? "#ff4020" : b.avgEV >= T.EV_HH ? "#ff8020" : "#8899a6";
-  const vrd = b.avgEV >= T.EV_EL && inZ && b.hardHits >= 2 ? {t:"🔥 Everything working — prime HR condition", c:"#ff4020"} : b.avgEV >= T.EV_HH && inZ ? {t:"⚡ Hard contact in HR zone — heating up", c:"#ff8020"} : inZ ? {t:"🎯 Good angle — needs more exit velo", c:"#ffc840"} : b.avgEV >= T.EV_HH ? {t:"💪 Big velo, wrong angle — not lifting", c:"#38b8f2"} : {t:"❄️ Soft contact, bad angle — cold", c:"#38b8f2"};
+  const ec = b.avgEV >= T.EV_EL ? "var(--c-danger)" : b.avgEV >= T.EV_HH ? "var(--c-warn)" : "#8899a6";
+  const vrd = b.avgEV >= T.EV_EL && inZ && b.hardHits >= 2 ? {t:"🔥 Everything working — prime HR condition", c:"var(--c-danger)"} : b.avgEV >= T.EV_HH && inZ ? {t:"⚡ Hard contact in HR zone — heating up", c:"var(--c-warn)"} : inZ ? {t:"🎯 Good angle — needs more exit velo", c:"var(--c-yellow)"} : b.avgEV >= T.EV_HH ? {t:"💪 Big velo, wrong angle — not lifting", c:"var(--ice)"} : {t:"❄️ Soft contact, bad angle — cold", c:"var(--ice)"};
   return <div className="xd">
     <div style={{marginBottom:9,padding:"7px 11px",background:"rgba(255,255,255,.03)",borderRadius:6,borderLeft:`3px solid ${vrd.c}`,fontSize:11,color:vrd.c,fontFamily:"DM Mono,monospace"}}>{vrd.t}</div>
     <div className="xg">
       <div className="xb"><div className="xbl">Avg EV <span style={{fontSize:8,opacity:.6}}>Today</span></div><div className="xbv" style={{color:ec}}>{b.avgEV.toFixed(1)}</div><div className="xbs" style={{color:evUp?"var(--green)":"var(--ice)"}}>{evUp?"▲":"▼"} vs L7 ({(b.recentAvgEV??88).toFixed(1)})</div></div>
       <div className="xb"><div className="xbl">Launch Angle</div><div className="xbv" style={{color:inZ?"var(--green)":"var(--muted)"}}>{b.launchAngle.toFixed(1)}°</div><div className="xbs" style={{color:inZ?"var(--green)":"var(--muted)"}}>{zl??"Outside HR zone"}</div></div>
-      <div className="xb"><div className="xbl">Hard Hits 95+</div><div className="xbv" style={{color:b.hardHits>=2?"#ff8020":b.hardHits===1?"#ffc840":"var(--muted)"}}>{b.hardHits}</div><div className="xbs" style={{color:"var(--muted)"}}>this game</div></div>
-      <div className="xb"><div className="xbl">Barrel% <span style={{fontSize:8,opacity:.6}}>L7</span></div><div className="xbv" style={{color:(b.recentBarrel!=null?b.recentBarrel:b.barrel??0)>=T.BAR_EL?"#ff4020":(b.recentBarrel!=null?b.recentBarrel:b.barrel??0)>=8?"#ff8020":"var(--text)"}}>{(b.recentBarrel!=null?b.recentBarrel:(b.barrel??0)).toFixed(1)}%</div><div className="xbs" style={{color:"var(--muted)"}}>L7</div></div>
-      <div className="xb"><div className="xbl">HH% <span style={{fontSize:8,opacity:.6}}>L7</span></div><div className="xbv" style={{color:(b.recentHardHit!=null?b.recentHardHit:b.hardHit??0)>=50?"#ff4020":(b.recentHardHit!=null?b.recentHardHit:b.hardHit??0)>=40?"#ff8020":"var(--text)"}}>{(b.recentHardHit!=null?b.recentHardHit:(b.hardHit??0)).toFixed(1)}%</div><div className="xbs" style={{color:"var(--muted)"}}>L7</div></div>
-      <div className="xb"><div className="xbl">FB% <span style={{fontSize:8,opacity:.6}}>L7</span></div><div className="xbv" style={{color:(b.recentFlyBall!=null?b.recentFlyBall:b.flyBall??0)>=35&&(b.recentFlyBall!=null?b.recentFlyBall:b.flyBall??0)<=45?"#ff8020":"var(--text)"}}>{(b.recentFlyBall!=null?b.recentFlyBall:(b.flyBall??0)).toFixed(1)}%</div><div className="xbs" style={{color:"var(--muted)"}}>L7</div></div>
+      <div className="xb"><div className="xbl">Hard Hits 95+</div><div className="xbv" style={{color:b.hardHits>=2?"var(--c-warn)":b.hardHits===1?"var(--c-yellow)":"var(--muted)"}}>{b.hardHits}</div><div className="xbs" style={{color:"var(--muted)"}}>this game</div></div>
+      <div className="xb"><div className="xbl">Barrel% <span style={{fontSize:8,opacity:.6}}>L7</span></div><div className="xbv" style={{color:(b.recentBarrel!=null?b.recentBarrel:b.barrel??0)>=T.BAR_EL?"var(--c-danger)":(b.recentBarrel!=null?b.recentBarrel:b.barrel??0)>=8?"var(--c-warn)":"var(--text)"}}>{(b.recentBarrel!=null?b.recentBarrel:(b.barrel??0)).toFixed(1)}%</div><div className="xbs" style={{color:"var(--muted)"}}>L7</div></div>
+      <div className="xb"><div className="xbl">HH% <span style={{fontSize:8,opacity:.6}}>L7</span></div><div className="xbv" style={{color:(b.recentHardHit!=null?b.recentHardHit:b.hardHit??0)>=50?"var(--c-danger)":(b.recentHardHit!=null?b.recentHardHit:b.hardHit??0)>=40?"var(--c-warn)":"var(--text)"}}>{(b.recentHardHit!=null?b.recentHardHit:(b.hardHit??0)).toFixed(1)}%</div><div className="xbs" style={{color:"var(--muted)"}}>L7</div></div>
+      <div className="xb"><div className="xbl">FB% <span style={{fontSize:8,opacity:.6}}>L7</span></div><div className="xbv" style={{color:(b.recentFlyBall!=null?b.recentFlyBall:b.flyBall??0)>=35&&(b.recentFlyBall!=null?b.recentFlyBall:b.flyBall??0)<=45?"var(--c-warn)":"var(--text)"}}>{(b.recentFlyBall!=null?b.recentFlyBall:(b.flyBall??0)).toFixed(1)}%</div><div className="xbs" style={{color:"var(--muted)"}}>L7</div></div>
     </div>
     <div style={{marginBottom:4,fontSize:9,color:"var(--muted)",fontFamily:"DM Mono,monospace",textTransform:"uppercase",letterSpacing:1}}>Today vs L7</div>
     <CBar label="Exit Velo" tv={b.avgEV} l7={b.recentAvgEV??88} max={112} col={ec}/>
-    <CBar label="Hard Hit%" tv={(b.recentHardHit??0)>0?(b.recentHardHit??0):(b.hardHit??0)} l7={(b.recentHardHit??0)>0?(b.recentHardHit??0):(b.hardHit??0)} max={80} col="#ff8020"/>
+    <CBar label="Hard Hit%" tv={(b.recentHardHit??0)>0?(b.recentHardHit??0):(b.hardHit??0)} l7={(b.recentHardHit??0)>0?(b.recentHardHit??0):(b.hardHit??0)} max={80} col="var(--c-warn)"/>
     <div className="stags">
       {inZ && <span className="stag pos">✓ HR Zone</span>}
       {b.avgEV >= T.EV_HH && <span className="stag fire">⚡ 95+ MPH</span>}
@@ -5867,13 +5923,13 @@ function XRow({b}) {
     }}>
       {[
         {label:'AB', val:b.ab,         color:'var(--text)'},
-        {label:'H',  val:b.hits,       color:(b.hits||0)>0?'#27c97a':'var(--text)'},
+        {label:'H',  val:b.hits,       color:(b.hits||0)>0?'var(--green)':'var(--text)'},
         {label:'HR', val:b.hr,         color:(b.hr||0)>0?'var(--accent)':'var(--text)'},
-        {label:'R',  val:b.runs??0,    color:(b.runs||0)>0?'#27c97a':'var(--text)'},
-        {label:'TB', val:b.totalBases??0,color:(b.totalBases||0)>=4?'var(--accent)':(b.totalBases||0)>=2?'#ff8020':'var(--text)'},
-        {label:'RBI',val:b.rbi??0,     color:(b.rbi||0)>0?'#ffc840':'var(--text)'},
-        {label:'BB', val:b.bb??0,      color:(b.bb||0)>0?'#38b8f2':'var(--text)'},
-        {label:'K',  val:b.so??0,      color:(b.so||0)>=2?'#38b8f2':'var(--text)'},
+        {label:'R',  val:b.runs??0,    color:(b.runs||0)>0?'var(--green)':'var(--text)'},
+        {label:'TB', val:b.totalBases??0,color:(b.totalBases||0)>=4?'var(--accent)':(b.totalBases||0)>=2?'var(--c-warn)':'var(--text)'},
+        {label:'RBI',val:b.rbi??0,     color:(b.rbi||0)>0?'var(--c-yellow)':'var(--text)'},
+        {label:'BB', val:b.bb??0,      color:(b.bb||0)>0?'var(--ice)':'var(--text)'},
+        {label:'K',  val:b.so??0,      color:(b.so||0)>=2?'var(--ice)':'var(--text)'},
       ].map((s,i,arr) => (
         <div key={s.label} style={{
           flex:1,textAlign:'center',padding:'6px 4px',
@@ -5912,8 +5968,8 @@ function XRow({b}) {
           </thead>
           <tbody>
             {(b.atBats||[]).map((ab,i)=>{
-              const evColor = (ab.ev||0)>=103?"#ff4020":(ab.ev||0)>=95?"#ff8020":(ab.ev||0)>=90?"#ffc840":"var(--text)";
-              const distColor = (ab.dist||0)>=400?"#ff4020":(ab.dist||0)>=350?"#ff8020":(ab.dist||0)>=300?"#ffc840":"var(--text)";
+              const evColor = (ab.ev||0)>=103?"var(--c-danger)":(ab.ev||0)>=95?"var(--c-warn)":(ab.ev||0)>=90?"var(--c-yellow)":"var(--text)";
+              const distColor = (ab.dist||0)>=400?"var(--c-danger)":(ab.dist||0)>=350?"var(--c-warn)":(ab.dist||0)>=300?"var(--c-yellow)":"var(--text)";
               const isGoodResult = /home_run|double|triple|single/i.test(ab.result||"");
               const isOut = /out|grounded|fly|lined|popped|struck/i.test(ab.result||"");
               return <tr key={i} style={{borderBottom:"1px solid rgba(255,255,255,.04)",
@@ -5923,7 +5979,7 @@ function XRow({b}) {
                   {ab.halfInning==="top"?"▲":"▼"}{ab.inning||"—"}
                 </td>
                 <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",
-                  color:isGoodResult?"#27c97a":isOut?"var(--muted)":"var(--text)",
+                  color:isGoodResult?"var(--green)":isOut?"var(--muted)":"var(--text)",
                   fontWeight:isGoodResult?700:400,maxWidth:140,overflow:"hidden",
                   textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                   {ab.result||"—"}
@@ -5934,7 +5990,7 @@ function XRow({b}) {
                   {ab.ev && <span style={{fontSize:9,color:"var(--muted)",fontWeight:400}}> mph</span>}
                 </td>
                 <td style={{padding:"5px 8px",fontFamily:"'DM Mono',monospace",
-                  color:ab.la>=25&&ab.la<=35?"#27c97a":"var(--text)",whiteSpace:"nowrap"}}>
+                  color:ab.la>=25&&ab.la<=35?"var(--green)":"var(--text)",whiteSpace:"nowrap"}}>
                   {ab.la!=null && ab.ev ? `${ab.la}°` : "—"}
                 </td>
                 <td style={{padding:"5px 8px",fontFamily:"'Oswald',sans-serif",
@@ -5961,7 +6017,7 @@ function XRow({b}) {
 }
 
 function LRow({b, rank}) {
-  const vc = b.gradeColor || (b.grade === null ? 'var(--muted)' : b.verdict?.cls==="primed"?"#ff4020":b.verdict?.cls==="hot"?"#ff8020":b.verdict?.cls==="watch"?"#ffc840":"#38b8f2");
+  const vc = b.gradeColor || (b.grade === null ? 'var(--muted)' : b.verdict?.cls==="primed"?"var(--c-danger)":b.verdict?.cls==="hot"?"var(--c-warn)":b.verdict?.cls==="watch"?"var(--c-yellow)":"var(--ice)");
   const handleClick = () => {
     const cached = getCachedPlayer(b.id);
     openAtBatSlide(cached
@@ -5993,7 +6049,7 @@ function LRow({b, rank}) {
               </span>
               {isHighVar && <span title="⚡ High Variance — limited MLB track record, score less reliable"
                 style={{padding:'1px 4px',borderRadius:4,fontSize:9,fontWeight:700,
-                background:'rgba(168,85,247,.15)',color:'#a855f7',border:'1px solid rgba(168,85,247,.3)',flexShrink:0}}>
+                background:'rgba(168,85,247,.15)',color:'var(--c-violet)',border:'1px solid rgba(168,85,247,.3)',flexShrink:0}}>
                 ⚡HV
               </span>}
             </>;
@@ -6003,13 +6059,13 @@ function LRow({b, rank}) {
           )}
           {b.due && DUE_BADGE}
           {b.isDiamond && <span style={{padding:'1px 4px',borderRadius:4,fontSize:9,fontWeight:700,
-            background:'rgba(255,204,0,.15)',color:'#ffcc00',border:'1px solid rgba(255,204,0,.3)',flexShrink:0}}>💎</span>}
+            background:'rgba(255,204,0,.15)',color:'var(--c-yellow2)',border:'1px solid rgba(255,204,0,.3)',flexShrink:0}}>💎</span>}
           {isHotBatPlayer(getCachedPlayer(b.id)) && <span style={{fontSize:10,flexShrink:0,lineHeight:1}}
             title='🔥 Hot Bat — 3+ HRs in last 7 days'>🔥</span>}
           <InjuryBadge pid={b.id} name={b.name}/>
           <div style={{minWidth:0,flex:1}}>
           <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,
-            color:isKeyMatchup(b.id)?'#ff8020':'var(--text)',
+            color:isKeyMatchup(b.id)?'var(--c-warn)':'var(--text)',
             whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',display:'block',maxWidth:140}}>{b.name}</span>
         </div>
         </div>
@@ -6043,15 +6099,15 @@ function LRow({b, rank}) {
       const zf = parseFloat(dp?.zone_fit)||0;
       const due = abSinceHR!=null && abPerHR!=null && abSinceHR > abPerHR*1.15;
       return <div className="lmini">
-        <div className="lms"><div className="lmsv" style={{color:brl>=10?'#ff8020':brl>=6?'var(--accent2)':'var(--text)'}}>{brl>0?brl.toFixed(0)+'%':'—'}</div><div className="lmsl">Brl%</div></div>
-        <div className="lms"><div className="lmsv" style={{color:ev>=T.EV_HH?'#ff8020':'var(--text)'}}>{ev>0?ev.toFixed(0):'—'}</div><div className="lmsl">EV</div></div>
-        <div className="lms"><div className="lmsv" style={{color:abPerHR&&abPerHR<=18?'#ff8020':abPerHR&&abPerHR<=25?'#ffc840':'var(--text)'}}>{abPerHR||'—'}</div><div className="lmsl">AB/HR</div></div>
+        <div className="lms"><div className="lmsv" style={{color:brl>=10?'var(--c-warn)':brl>=6?'var(--accent2)':'var(--text)'}}>{brl>0?brl.toFixed(0)+'%':'—'}</div><div className="lmsl">Brl%</div></div>
+        <div className="lms"><div className="lmsv" style={{color:ev>=T.EV_HH?'var(--c-warn)':'var(--text)'}}>{ev>0?ev.toFixed(0):'—'}</div><div className="lmsl">EV</div></div>
+        <div className="lms"><div className="lmsv" style={{color:abPerHR&&abPerHR<=18?'var(--c-warn)':abPerHR&&abPerHR<=25?'var(--c-yellow)':'var(--text)'}}>{abPerHR||'—'}</div><div className="lmsl">AB/HR</div></div>
         <div className="lms" style={{background:due?'rgba(56,184,242,.1)':undefined}}>
-          <div className="lmsv" style={{color:due?'var(--ice)':abSinceHR!=null&&abSinceHR>=10?'#ffc840':'var(--text)'}}>
+          <div className="lmsv" style={{color:due?'var(--ice)':abSinceHR!=null&&abSinceHR>=10?'var(--c-yellow)':'var(--text)'}}>
             {abSinceHR!=null?abSinceHR:'—'}
           </div><div className="lmsl">AB Since</div>
         </div>
-        <div className="lms"><div className="lmsv" style={{color:zf>=80?'#27c97a':zf>=65?'var(--accent2)':'var(--muted)'}}>{zf>0?zf.toFixed(0)+'%':'—'}</div><div className="lmsl">ZF%</div></div>
+        <div className="lms"><div className="lmsv" style={{color:zf>=80?'var(--green)':zf>=65?'var(--accent2)':'var(--muted)'}}>{zf>0?zf.toFixed(0)+'%':'—'}</div><div className="lmsl">ZF%</div></div>
       </div>;
     })()}
   </div>;
@@ -6087,12 +6143,12 @@ function GPanel({game, isLive, isFinal=false}) {
   const eventColor = (evt) => {
     if (!evt) return 'var(--muted)';
     const e = evt.toLowerCase();
-    if (e.includes('home run'))  return '#ff4020';
-    if (e.includes('triple'))    return '#f5a623';
-    if (e.includes('double'))    return '#f5a623';
-    if (e.includes('single'))    return '#27c97a';
-    if (e.includes('walk') || e.includes('hit by pitch')) return '#38b8f2';
-    if (e.includes('strikeout') || e.includes('struck out')) return '#5a7080';
+    if (e.includes('home run'))  return 'var(--c-danger)';
+    if (e.includes('triple'))    return 'var(--accent2)';
+    if (e.includes('double'))    return 'var(--accent2)';
+    if (e.includes('single'))    return 'var(--green)';
+    if (e.includes('walk') || e.includes('hit by pitch')) return 'var(--ice)';
+    if (e.includes('strikeout') || e.includes('struck out')) return 'var(--c-slate)';
     return 'var(--muted)';
   };
 
@@ -6101,8 +6157,8 @@ function GPanel({game, isLive, isFinal=false}) {
     if (!r) return null;
     const Base = ({filled, cx, cy}) => (
       <rect x={cx-4} y={cy-4} width={8} height={8} rx={0.5}
-        fill={filled ? '#f5a623' : 'transparent'}
-        stroke={filled ? '#f5a623' : 'rgba(255,255,255,.3)'}
+        fill={filled ? 'var(--accent2)' : 'transparent'}
+        stroke={filled ? 'var(--accent2)' : 'rgba(255,255,255,.3)'}
         strokeWidth={1.5}
         transform={"rotate(45 " + cx + " " + cy + ")"}/>
     );
@@ -6122,8 +6178,8 @@ function GPanel({game, isLive, isFinal=false}) {
             {[0,1].map(i=>(
               <div key={i} style={{
                 width:6,height:6,borderRadius:'50%',
-                background: i < outs ? '#ff8020' : 'transparent',
-                border:'1px solid ' + (i < outs ? '#ff8020' : 'rgba(255,255,255,.25)'),
+                background: i < outs ? 'var(--c-warn)' : 'transparent',
+                border:'1px solid ' + (i < outs ? 'var(--c-warn)' : 'rgba(255,255,255,.25)'),
               }}/>
             ))}
           </div>
@@ -6207,7 +6263,7 @@ function GPanel({game, isLive, isFinal=false}) {
                     <PlayerAvatar pid={b.id} name={b.name} size={26}/>
                     <div style={{minWidth:0}}>
                       <div style={{display:'flex',alignItems:'center',gap:3}}>
-                        <div className="pn" style={{fontSize:12,...(isKeyMatchup(b.id)?{color:'#ff8020',fontWeight:700}:{})}}>{b.name}</div>
+                        <div className="pn" style={{fontSize:12,...(isKeyMatchup(b.id)?{color:'var(--c-warn)',fontWeight:700}:{})}}>{b.name}</div>
                         {isHotBatPlayer(b) && <span style={{fontSize:10,flexShrink:0,lineHeight:1}}
                           title='🔥 Hot Bat — 3+ HRs in last 7 days'>🔥</span>}
                         <InjuryBadge pid={parseInt(b.batter_id||b.id)||0} name={b.name||b.batter}/>
@@ -6331,7 +6387,7 @@ function GCard({game}) {
   const isLive = game.status === "Live", isFin = game.status === "Final", isPre = !isLive && !isFin;
   const aw = game.away.score > game.home.score, hw = game.home.score > game.away.score;
   const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
-  const statusColor = isLive ? '#ff4020' : isFin ? 'var(--muted)' : 'var(--green)';
+  const statusColor = isLive ? 'var(--c-danger)' : isFin ? 'var(--muted)' : 'var(--green)';
 
   return <div className="gpw">
     <div className={`gc ${exp?"exp":""}`} onClick={() => setExp(e => !e)}
@@ -6342,7 +6398,7 @@ function GCard({game}) {
         padding:'5px 12px',borderBottom:'1px solid rgba(255,255,255,.05)',
         background:'rgba(0,0,0,.2)'}}>
         <div style={{display:'flex',alignItems:'center',gap:5}}>
-          {isLive && <span style={{width:6,height:6,borderRadius:'50%',background:'#ff4020',
+          {isLive && <span style={{width:6,height:6,borderRadius:'50%',background:'var(--c-danger)',
             display:'inline-block',animation:'pulse 1.2s ease-in-out infinite',flexShrink:0}}/>}
           <span style={{fontFamily:mono,fontSize:9,fontWeight:600,color:statusColor,
             textTransform:'uppercase',letterSpacing:.8}}>
@@ -6397,8 +6453,8 @@ function GCard({game}) {
               const outs = r.outs ?? game.outs ?? null;
               const Base = ({filled,cx,cy}) => (
                 <rect x={cx-4} y={cy-4} width={8} height={8} rx={0.5}
-                  fill={filled?'#f5a623':'transparent'}
-                  stroke={filled?'#f5a623':'rgba(255,255,255,.3)'}
+                  fill={filled?'var(--accent2)':'transparent'}
+                  stroke={filled?'var(--accent2)':'rgba(255,255,255,.3)'}
                   strokeWidth={1.5}
                   transform={`rotate(45 ${cx} ${cy})`}/>
               );
@@ -6414,8 +6470,8 @@ function GCard({game}) {
                   <div style={{display:'flex',gap:3,alignItems:'center'}}>
                     {[0,1].map(i=>(
                       <div key={i} style={{width:5,height:5,borderRadius:'50%',
-                        background:i<outs?'#ff8020':'transparent',
-                        border:'1px solid '+(i<outs?'#ff8020':'rgba(255,255,255,.25)')}}/>
+                        background:i<outs?'var(--c-warn)':'transparent',
+                        border:'1px solid '+(i<outs?'var(--c-warn)':'rgba(255,255,255,.25)')}}/>
                     ))}
                   </div>
                 )}
@@ -6954,8 +7010,8 @@ function HeatingUpSlideout({ games, onClose }) {
     })();
   }, [liveGames.length]);
 
-  const evColor = (ev) => (ev||0)>=103?'#ff4020':(ev||0)>=95?'#ff8020':(ev||0)>=90?'#ffc840':'var(--muted)';
-  const laColor = (la) => (la||0)>=25&&(la||0)<=35?'#27c97a':(la||0)>=18?'var(--accent2)':'var(--muted)';
+  const evColor = (ev) => (ev||0)>=103?'var(--c-danger)':(ev||0)>=95?'var(--c-warn)':(ev||0)>=90?'var(--c-yellow)':'var(--muted)';
+  const laColor = (la) => (la||0)>=25&&(la||0)<=35?'var(--green)':(la||0)>=18?'var(--accent2)':'var(--muted)';
 
   return <>
     <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.6)',zIndex:900}}/>
@@ -7013,7 +7069,7 @@ function HeatingUpSlideout({ games, onClose }) {
 
             {/* Rank */}
             <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:900,fontSize:13,
-              color:idx===0?'#ffd700':idx===1?'#c0c0c0':idx===2?'#cd7f32':'var(--muted)',
+              color:idx===0?'var(--c-gold)':idx===1?'#c0c0c0':idx===2?'#cd7f32':'var(--muted)',
               minWidth:16,textAlign:'center',flexShrink:0}}>
               {idx+1}
             </div>
@@ -7029,7 +7085,7 @@ function HeatingUpSlideout({ games, onClose }) {
                   color:'var(--accent2)',fontWeight:700,flexShrink:0}}>{getTeam(b.id, b.team)}</span>
                 <span style={{fontSize:8,padding:'1px 5px',borderRadius:4,flexShrink:0,
                   background:b.heatLabel?.cls==='gone_yard'?'rgba(255,20,0,.25)':b.heatLabel?.cls==='elite'?'rgba(232,65,26,.15)':'rgba(255,128,32,.12)',
-                  color:b.heatLabel?.cls==='gone_yard'?'#fff':b.heatLabel?.cls==='elite'?'#ff4020':'#ff8020',
+                  color:b.heatLabel?.cls==='gone_yard'?'#fff':b.heatLabel?.cls==='elite'?'var(--c-danger)':'var(--c-warn)',
                   fontFamily:"'DM Mono',monospace",fontWeight:b.heatLabel?.cls==='gone_yard'?800:600,
                   border:`1px solid ${b.heatLabel?.cls==='gone_yard'?'rgba(255,20,0,.5)':b.heatLabel?.cls==='elite'?'rgba(232,65,26,.3)':'rgba(255,128,32,.25)'}`}}>
                   {b.heatLabel?.label||'—'}
@@ -7063,7 +7119,7 @@ function HeatingUpSlideout({ games, onClose }) {
               {/* Dist */}
               <div style={{textAlign:'center',minWidth:34}}>
                 <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,
-                  color:(b.avgDist||0)>=350?'#ff8020':(b.avgDist||0)>=300?'#ffc840':'var(--text)',lineHeight:1}}>
+                  color:(b.avgDist||0)>=350?'var(--c-warn)':(b.avgDist||0)>=300?'var(--c-yellow)':'var(--text)',lineHeight:1}}>
                   {b.avgDist>0?`${Math.round(b.avgDist)}ft`:'—'}
                 </div>
                 <div style={{fontSize:7,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
@@ -7072,7 +7128,7 @@ function HeatingUpSlideout({ games, onClose }) {
               {/* HH */}
               {b.hardHits>0&&<div style={{textAlign:'center',minWidth:22}}>
                 <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,
-                  color:'#ff8020',lineHeight:1}}>
+                  color:'var(--c-warn)',lineHeight:1}}>
                   {b.hardHits}🔥
                 </div>
                 <div style={{fontSize:7,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
@@ -7087,13 +7143,13 @@ function HeatingUpSlideout({ games, onClose }) {
             {(b.ab > 0) && <div style={{display:'flex',gap:0,margin:'8px 12px 4px',border:'1px solid var(--border)',borderRadius:8,overflow:'hidden'}}>
               {[
                 {label:'AB', val:b.ab,           color:'var(--text)'},
-                {label:'H',  val:b.hits||0,      color:(b.hits||0)>0?'#27c97a':'var(--text)'},
+                {label:'H',  val:b.hits||0,      color:(b.hits||0)>0?'var(--green)':'var(--text)'},
                 {label:'HR', val:b.hr||0,        color:(b.hr||0)>0?'var(--accent)':'var(--text)'},
-                {label:'R',  val:b.runs??0,      color:(b.runs||0)>0?'#27c97a':'var(--text)'},
-                {label:'TB', val:b.totalBases??0,color:(b.totalBases||0)>=4?'var(--accent)':(b.totalBases||0)>=2?'#ff8020':'var(--text)'},
-                {label:'RBI',val:b.rbi??0,       color:(b.rbi||0)>0?'#ffc840':'var(--text)'},
-                {label:'BB', val:b.bb??0,        color:(b.bb||0)>0?'#38b8f2':'var(--text)'},
-                {label:'K',  val:b.so??0,        color:(b.so||0)>=2?'#38b8f2':'var(--text)'},
+                {label:'R',  val:b.runs??0,      color:(b.runs||0)>0?'var(--green)':'var(--text)'},
+                {label:'TB', val:b.totalBases??0,color:(b.totalBases||0)>=4?'var(--accent)':(b.totalBases||0)>=2?'var(--c-warn)':'var(--text)'},
+                {label:'RBI',val:b.rbi??0,       color:(b.rbi||0)>0?'var(--c-yellow)':'var(--text)'},
+                {label:'BB', val:b.bb??0,        color:(b.bb||0)>0?'var(--ice)':'var(--text)'},
+                {label:'K',  val:b.so??0,        color:(b.so||0)>=2?'var(--ice)':'var(--text)'},
               ].map((s,si,arr)=>(
                 <div key={s.label} style={{flex:1,textAlign:'center',padding:'5px 3px',
                   background:'rgba(255,255,255,.02)',borderRight:si<arr.length-1?'1px solid var(--border)':'none'}}>
@@ -7113,12 +7169,12 @@ function HeatingUpSlideout({ games, onClose }) {
                   </tr></thead>
                   <tbody>
                     {(b.atBats||[]).map((ab,ai)=>{
-                      const evc=(ab.ev||0)>=103?'#ff4020':(ab.ev||0)>=95?'#ff8020':(ab.ev||0)>=90?'#ffc840':'var(--text)';
-                      const dc=(ab.dist||0)>=400?'#ff4020':(ab.dist||0)>=350?'#ff8020':(ab.dist||0)>=300?'#ffc840':'var(--text)';
+                      const evc=(ab.ev||0)>=103?'var(--c-danger)':(ab.ev||0)>=95?'var(--c-warn)':(ab.ev||0)>=90?'var(--c-yellow)':'var(--text)';
+                      const dc=(ab.dist||0)>=400?'var(--c-danger)':(ab.dist||0)>=350?'var(--c-warn)':(ab.dist||0)>=300?'var(--c-yellow)':'var(--text)';
                       const good=/home_run|double|triple|single/i.test(ab.result||'');
                       return <tr key={ai} style={{borderBottom:'1px solid rgba(255,255,255,.04)',background:ai%2===0?'rgba(255,255,255,.01)':'transparent'}}>
                         <td style={{padding:'3px 5px',color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:9,whiteSpace:'nowrap'}}>{ab.halfInning==='top'?'▲':'▼'}{ab.inning||'—'}</td>
-                        <td style={{padding:'3px 5px',color:good?'#27c97a':'var(--muted)',fontWeight:good?700:400,maxWidth:100,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontFamily:"'DM Mono',monospace",fontSize:9}}>{ab.result||'—'}</td>
+                        <td style={{padding:'3px 5px',color:good?'var(--green)':'var(--muted)',fontWeight:good?700:400,maxWidth:100,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontFamily:"'DM Mono',monospace",fontSize:9}}>{ab.result||'—'}</td>
                         <td style={{padding:'3px 5px',color:evc,fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,whiteSpace:'nowrap'}}>{ab.ev>0?ab.ev.toFixed(1):'—'}</td>
                         <td style={{padding:'3px 5px',color:'var(--text)',fontFamily:"'DM Mono',monospace",fontSize:9,whiteSpace:'nowrap'}}>{(ab.la||ab.launchAngle||0)>0?(ab.la||ab.launchAngle).toFixed(0)+'°':'—'}</td>
                         <td style={{padding:'3px 5px',color:dc,fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,whiteSpace:'nowrap'}}>{ab.dist>0?ab.dist+'ft':'—'}</td>
@@ -7165,10 +7221,10 @@ function InlinePitcherCard({ pitcherId, pitcherName }) {
     stats.whip, stats.bb9, stats.hr9, stats.avg, stats.obp, stats.ip
   ) : null;
 
-  const eraC  = v => { const n=parseFloat(v); return n<2.5?'#ff4020':n<3.5?'#ff8020':n<4.5?'var(--text)':'#27c97a'; };
-  const whipC = v => { const n=parseFloat(v); return n<1.0?'#ff4020':n<1.22?'#ff8020':'var(--text)'; };
-  const k9C   = v => { const n=parseFloat(v); return n>11?'#ff4020':n>9?'#ff8020':'var(--text)'; };
-  const hr9C  = v => { const n=parseFloat(v); return n>1.5?'#27c97a':n>1.0?'#ffc840':'var(--text)'; };
+  const eraC  = v => { const n=parseFloat(v); return n<2.5?'var(--c-danger)':n<3.5?'var(--c-warn)':n<4.5?'var(--text)':'var(--green)'; };
+  const whipC = v => { const n=parseFloat(v); return n<1.0?'var(--c-danger)':n<1.22?'var(--c-warn)':'var(--text)'; };
+  const k9C   = v => { const n=parseFloat(v); return n>11?'var(--c-danger)':n>9?'var(--c-warn)':'var(--text)'; };
+  const hr9C  = v => { const n=parseFloat(v); return n>1.5?'var(--green)':n>1.0?'var(--c-yellow)':'var(--text)'; };
 
   const MiniStat = ({label, val, color}) => (
     <div style={{textAlign:'center',padding:'4px 6px',borderRadius:6,flex:1,
@@ -7199,7 +7255,7 @@ function InlinePitcherCard({ pitcherId, pitcherName }) {
             <span style={{fontSize:8,fontFamily:"'DM Mono',monospace",fontWeight:700,padding:'1px 4px',
               borderRadius:3,flexShrink:0,
               background:stats.hand==='L'?'rgba(56,184,242,.12)':'rgba(255,128,32,.10)',
-              color:stats.hand==='L'?'#38b8f2':'#ff8020'}}>
+              color:stats.hand==='L'?'var(--ice)':'var(--c-warn)'}}>
               {stats.hand==='L'?'LHP':'RHP'}
             </span>
           )}
@@ -7313,7 +7369,7 @@ function LineupsView({ date }) {
   );
 
   const StatusBadge = ({confirmed}) => confirmed
-    ? <span style={{display:'inline-flex',alignItems:'center',gap:3,fontSize:9,padding:'2px 7px',borderRadius:10,fontFamily:"'DM Mono',monospace",fontWeight:700,background:'rgba(39,201,122,.12)',border:'1px solid rgba(39,201,122,.3)',color:'#27c97a',letterSpacing:.3}}>🟢 CONFIRMED</span>
+    ? <span style={{display:'inline-flex',alignItems:'center',gap:3,fontSize:9,padding:'2px 7px',borderRadius:10,fontFamily:"'DM Mono',monospace",fontWeight:700,background:'rgba(39,201,122,.12)',border:'1px solid rgba(39,201,122,.3)',color:'var(--green)',letterSpacing:.3}}>🟢 CONFIRMED</span>
     : <span style={{display:'inline-flex',alignItems:'center',gap:3,fontSize:9,padding:'2px 7px',borderRadius:10,fontFamily:"'DM Mono',monospace",fontWeight:700,background:'rgba(245,166,35,.10)',border:'1px solid rgba(245,166,35,.28)',color:'var(--accent2)',letterSpacing:.3}}>🟡 PROJECTED</span>;
 
   // ── Inline batter panel (stat card + recent games + pick button) ──────────
@@ -7348,10 +7404,10 @@ function LineupsView({ date }) {
           {hasStats && (
             <div style={{display:'flex',gap:0,border:'1px solid var(--border)',borderRadius:7,overflow:'hidden',flexShrink:0}}>
               {[
-                {label:'EV L7',   val:ev   != null ? ev.toFixed(1)   : null, color: ev>=95?'#ff4020':ev>=90?'#ff8020':'var(--text)'},
-                {label:'HH%',     val:hh   != null ? hh.toFixed(1)+'%' : null, color: hh>=50?'#ff8020':'var(--text)'},
-                {label:'Brl%',    val:brl  != null ? brl.toFixed(1)+'%' : null, color: brl>=8?'var(--accent)':brl>=5?'#ff8020':'var(--text)'},
-                {label:'FB%',     val:fb   != null ? fb.toFixed(1)+'%'  : null, color: fb>=25?'#27c97a':'var(--text)'},
+                {label:'EV L7',   val:ev   != null ? ev.toFixed(1)   : null, color: ev>=95?'var(--c-danger)':ev>=90?'var(--c-warn)':'var(--text)'},
+                {label:'HH%',     val:hh   != null ? hh.toFixed(1)+'%' : null, color: hh>=50?'var(--c-warn)':'var(--text)'},
+                {label:'Brl%',    val:brl  != null ? brl.toFixed(1)+'%' : null, color: brl>=8?'var(--accent)':brl>=5?'var(--c-warn)':'var(--text)'},
+                {label:'FB%',     val:fb   != null ? fb.toFixed(1)+'%'  : null, color: fb>=25?'var(--green)':'var(--text)'},
               ].filter(s=>s.val!=null).map((s,i,arr) => (
                 <div key={s.label} style={{
                   padding:'5px 9px',textAlign:'center',
@@ -7406,12 +7462,12 @@ function LineupsView({ date }) {
                     {[
                       {val:mmdd,     color:'var(--muted)'},
                       {val:s.atBats||0, color:'var(--text)'},
-                      {val:s.hits||0,   color:hasHit?'#27c97a':'var(--text)'},
+                      {val:s.hits||0,   color:hasHit?'var(--green)':'var(--text)'},
                       {val:s.homeRuns||0, color:hasHR?'var(--accent)':'var(--text)',bold:hasHR},
                       {val:s.rbi||0,    color:'var(--text)'},
                       {val:s.baseOnBalls||0, color:'var(--text)'},
-                      {val:s.strikeOuts||0,  color:(parseInt(s.strikeOuts)||0)>=3?'#ff4020':'var(--text)'},
-                      {val:avg>0?avg.toFixed(3).replace('0.','.'): '.000', color:avg>=.300?'#27c97a':avg>=.250?'var(--text)':'var(--muted)'},
+                      {val:s.strikeOuts||0,  color:(parseInt(s.strikeOuts)||0)>=3?'var(--c-danger)':'var(--text)'},
+                      {val:avg>0?avg.toFixed(3).replace('0.','.'): '.000', color:avg>=.300?'var(--green)':avg>=.250?'var(--text)':'var(--muted)'},
                     ].map((cell,ci) => (
                       <div key={ci} style={{padding:'3px 5px',textAlign:'center',
                         fontFamily:"'DM Mono',monospace",fontSize:9,color:cell.color,
@@ -7462,11 +7518,11 @@ function LineupsView({ date }) {
                 </span>
                 <PosChip pos={pos}/>
                 <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:600,fontSize:11,
-                  color:isKeyMatchup(p.id)?'#ff8020':'var(--text)',flex:1,minWidth:0,
+                  color:isKeyMatchup(p.id)?'var(--c-warn)':'var(--text)',flex:1,minWidth:0,
                   whiteSpace:'normal',wordBreak:'break-word',lineHeight:1.2}}>
                   {name}
                 </span>
-                {ev >= 90 && <span style={{fontSize:8,color:ev>=95?'#ff8020':'var(--muted)',
+                {ev >= 90 && <span style={{fontSize:8,color:ev>=95?'var(--c-warn)':'var(--muted)',
                   fontFamily:"'DM Mono',monospace",flexShrink:0}}>{ev.toFixed(0)}</span>}
                 <span style={{fontSize:8,color:'rgba(255,255,255,.2)',flexShrink:0}}>›</span>
               </div>
@@ -7527,9 +7583,9 @@ function LineupsView({ date }) {
           {lineupGames.filter(g=>lineupGameFilter==='all'||String(g.gamePk)===lineupGameFilter).map(game => {
             const eitherConfirmed = game.away.confirmed || game.home.confirmed;
             const confirmed = game.away.confirmed && game.home.confirmed;
-            const statusColor = game.status==='Live'?'var(--accent)':game.status==='Final'?'var(--muted)':'#27c97a';
+            const statusColor = game.status==='Live'?'var(--accent)':game.status==='Final'?'var(--muted)':'var(--green)';
             return (
-              <div key={game.gamePk} style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:10,overflow:'hidden',borderTop:`2px solid ${confirmed?'#27c97a':eitherConfirmed?'var(--accent2)':'var(--border)'}`}}>
+              <div key={game.gamePk} style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:10,overflow:'hidden',borderTop:`2px solid ${confirmed?'var(--green)':eitherConfirmed?'var(--accent2)':'var(--border)'}`}}>
                 {/* ── Clickable header ─────────────────────────────────────── */}
                 <div onClick={()=>toggleGame(game.gamePk)}
                   style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',
@@ -7569,7 +7625,7 @@ function LineupsView({ date }) {
                           <div style={{display:'flex',flexWrap:'wrap',gap:'2px 4px',marginTop:4}}>
                             {side.lineup.slice(0,9).map((p,pi) => (
                               <span key={pi} style={{fontFamily:"'DM Mono',monospace",fontSize:7,
-                                color: LINEUP_STATUS[p.id]?.status==='confirmed'?'#27c97a':'var(--muted)',
+                                color: LINEUP_STATUS[p.id]?.status==='confirmed'?'var(--green)':'var(--muted)',
                                 whiteSpace:'nowrap'}}>
                                 {pi+1}. {lastNameOf(p.fullName)}
                               </span>
@@ -7653,7 +7709,7 @@ function LineupsView({ date }) {
 // ── Live Themes: Tier badge ───────────────────────────────────────────────────
 function TierBadge({ tier }) {
   const cfg = {
-    1: { color:'#f5a623', bg:'rgba(245,166,35,.16)', border:'rgba(245,166,35,.45)' },
+    1: { color:'var(--accent2)', bg:'rgba(245,166,35,.16)', border:'rgba(245,166,35,.45)' },
     2: { color:'#a0aab4', bg:'rgba(160,170,180,.12)', border:'rgba(160,170,180,.30)' },
     3: { color:'#5a636c', bg:'rgba(90,99,108,.09)',   border:'rgba(90,99,108,.22)'  },
   }[tier] || {};
@@ -7710,10 +7766,10 @@ function ThemeMatchTable({ rows }) {
             const boom  = b._boom  ?? 0;
             const sig   = b._sig   ?? 0;
             const pgLabel = b._pgLabel || b.pitcher_grade_label || '';
-            const pgColor = pgLabel.toLowerCase().includes('elite') ? '#ff4020'
-                          : pgLabel.toLowerCase().includes('tough') ? '#ff8020'
-                          : pgLabel.toLowerCase().includes('hittable') ? '#27c97a'
-                          : pgLabel.toLowerCase().includes('target') ? '#38b8f2'
+            const pgColor = pgLabel.toLowerCase().includes('elite') ? 'var(--c-danger)'
+                          : pgLabel.toLowerCase().includes('tough') ? 'var(--c-warn)'
+                          : pgLabel.toLowerCase().includes('hittable') ? 'var(--green)'
+                          : pgLabel.toLowerCase().includes('target') ? 'var(--ice)'
                           : 'var(--muted)';
             const simTB = parseFloat(b.sim_tb)||0;
             const ev7   = parseFloat(b.recent_avg_ev)||0;
@@ -7739,7 +7795,7 @@ function ThemeMatchTable({ rows }) {
                       <span
                         onClick={e => { e.stopPropagation(); openAtBatSlide({ pid, name: b.batter||'', team: b.batting_team||'' }); }}
                         style={{fontFamily:osw,fontWeight:700,fontSize:10,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',
-                          cursor:'pointer',color:isKeyMatchup(pid,b.batter||'')?'#ff8020':'var(--text)'}}>
+                          cursor:'pointer',color:isKeyMatchup(pid,b.batter||'')?'var(--c-warn)':'var(--text)'}}>
                         {b.batter||'—'}
                       </span>
                       <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={pid} name={b.batter||''} team={b.batting_team||''}/></span>
@@ -7747,11 +7803,11 @@ function ThemeMatchTable({ rows }) {
                   </td>
                   <td style={{padding:'2px 4px',textAlign:'center',verticalAlign:'middle'}}><YardBadge score={yard}/></td>
                   <td style={{padding:'2px 6px',textAlign:'right',fontFamily:osw,fontWeight:800,fontSize:10,
-                    color:boom>=60?'#ff4020':boom>=45?'#f5a623':boom>=30?'var(--text)':'var(--muted)'}}>
+                    color:boom>=60?'var(--c-danger)':boom>=45?'var(--accent2)':boom>=30?'var(--text)':'var(--muted)'}}>
                     {boom>0?Math.round(boom):'—'}
                   </td>
                   <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,
-                    color:sig>=10?'#ff4020':sig>=7?'#f5a623':sig>=4?'#27c97a':'var(--muted)'}}>
+                    color:sig>=10?'var(--c-danger)':sig>=7?'var(--accent2)':sig>=4?'var(--green)':'var(--muted)'}}>
                     {sig>0?sig.toFixed(1):'—'}
                   </td>
                   <td style={{padding:'2px 6px',textAlign:'right'}}>
@@ -7766,30 +7822,30 @@ function ThemeMatchTable({ rows }) {
                     {resolvePitcherName(b.pitcher,b.batting_team,b.pitcher_id)}
                   </td>
                   <td style={{padding:'2px 6px',textAlign:'right',fontFamily:osw,fontWeight:800,fontSize:11,
-                    color:simTB>=2?'#ff8020':simTB>=1.5?'#f5a623':'var(--text)'}}>
+                    color:simTB>=2?'var(--c-warn)':simTB>=1.5?'var(--accent2)':'var(--text)'}}>
                     {simTB>0?simTB.toFixed(2):'—'}
                   </td>
                   <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,
-                    color:ev7>=97?'#f5a623':ev7>=93?'var(--text)':'var(--muted)'}}>
+                    color:ev7>=97?'var(--accent2)':ev7>=93?'var(--text)':'var(--muted)'}}>
                     {ev7>0?ev7.toFixed(1):'—'}
                   </td>
                   <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,
-                    color:brl7>=12?'#ff4020':brl7>=8?'#f5a623':brl7>=5?'var(--text)':'var(--muted)'}}>
+                    color:brl7>=12?'var(--c-danger)':brl7>=8?'var(--accent2)':brl7>=5?'var(--text)':'var(--muted)'}}>
                     {brl7>0?brl7.toFixed(1)+'%':'—'}
                   </td>
                   <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,
-                    color:zf>=8?'#ff4020':zf>=5?'#f5a623':zf>=2?'#27c97a':'var(--muted)'}}>
+                    color:zf>=8?'var(--c-danger)':zf>=5?'var(--accent2)':zf>=2?'var(--green)':'var(--muted)'}}>
                     {zf>0?zf.toFixed(1)+'%':'—'}
                   </td>
                   <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,
-                    color:xw>=0.400?'#ff4020':xw>=0.360?'#f5a623':xw>=0.320?'#27c97a':'var(--muted)'}}>
+                    color:xw>=0.400?'var(--c-danger)':xw>=0.360?'var(--accent2)':xw>=0.320?'var(--green)':'var(--muted)'}}>
                     {xw>0?xw.toFixed(3):'—'}
                   </td>
                   <td style={{padding:'2px 6px',textAlign:'right'}}>
                     <span style={{fontFamily:mono,fontSize:9,color:gc.color,fontWeight:700}}>{effG}</span>
                   </td>
                   <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,fontWeight:700,
-                    color:(b._themeScore??0)>=70?'#ff4020':(b._themeScore??0)>=50?'#f5a623':'var(--muted)'}}>
+                    color:(b._themeScore??0)>=70?'var(--c-danger)':(b._themeScore??0)>=50?'var(--accent2)':'var(--muted)'}}>
                     {b._themeScore!=null?b._themeScore.toFixed(0):'—'}
                   </td>
                 </tr>
@@ -8083,7 +8139,7 @@ function LiveThemesTab() {
                 padding:'4px 10px',borderRadius:6,cursor:'pointer',
                 fontFamily:mono,fontSize:9,fontWeight:700,
                 background: themesHideFinal ? 'rgba(255,107,107,.12)' : 'var(--surface2)',
-                color:       themesHideFinal ? '#ff6b6b' : 'var(--muted)',
+                color:       themesHideFinal ? 'var(--c-coral)' : 'var(--muted)',
                 border:`1px solid ${themesHideFinal ? 'rgba(255,107,107,.4)' : 'var(--border)'}`,
               }}>
               {themesHideFinal ? '✓ Hiding Final' : '🚫 Hide Final'}
@@ -8141,16 +8197,16 @@ function LiveThemesTab() {
 // farther at matched EV+LA) are both handled server-side (see
 // api/ball-carry.js). Weather shown below is context only.
 const CARRY_VERDICT_STYLE = {
-  JUICED: { color: '#ff8020', label: '🔴 Ball carrying HOT',  bg: 'rgba(255,128,32,.08)'  },
-  DEAD:   { color: '#38b8f2', label: '🔵 Ball carrying DEAD', bg: 'rgba(56,184,242,.08)'   },
-  NORMAL: { color: '#27c97a', label: '✅ Ball carrying normal', bg: 'rgba(39,201,122,.06)' },
+  JUICED: { color: 'var(--c-warn)', label: '🔴 Ball carrying HOT',  bg: 'rgba(255,128,32,.08)'  },
+  DEAD:   { color: 'var(--ice)', label: '🔵 Ball carrying DEAD', bg: 'rgba(56,184,242,.08)'   },
+  NORMAL: { color: 'var(--green)', label: '✅ Ball carrying normal', bg: 'rgba(39,201,122,.06)' },
 };
 // A NORMAL verdict within this many ft of either threshold gets flagged
 // "Borderline" instead of reading as a flat, unremarkable normal day —
 // added 2026-07-22 after the ATH@AZ case (park-adj +9ft vs an +11.7ft
 // JUICED bar — a real near-miss, not a clean normal).
 const BORDERLINE_MARGIN_FT = 3;
-const CARRY_BORDERLINE_STYLE = { color: '#f5a623', label: '🟡 Borderline normal', bg: 'rgba(245,166,35,.08)' };
+const CARRY_BORDERLINE_STYLE = { color: 'var(--accent2)', label: '🟡 Borderline normal', bg: 'rgba(245,166,35,.08)' };
 
 // Pitch-drag (2026-08-07) — a separate diagnostic, so deliberately kept
 // visually secondary to the batted-ball verdict above (no background tint
@@ -8158,7 +8214,7 @@ const CARRY_BORDERLINE_STYLE = { color: '#f5a623', label: '🟡 Borderline norma
 // Reuses the same JUICED=orange/DEAD=blue convention as CARRY_VERDICT_STYLE
 // so the meaning stays consistent throughout the app; NORMAL stays muted
 // rather than green, since this signal is supplementary, not primary.
-const PITCH_DRAG_VERDICT_COLOR = { JUICED: '#ff8020', DEAD: '#38b8f2', NORMAL: 'var(--muted)' };
+const PITCH_DRAG_VERDICT_COLOR = { JUICED: 'var(--c-warn)', DEAD: 'var(--ice)', NORMAL: 'var(--muted)' };
 
 function BallCarryCard({ game }) {
   const [data, setData]       = useState(null);
@@ -8209,7 +8265,7 @@ function BallCarryCard({ game }) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 13 }}>{label}</span>
-          {game.status === 'Live' && <span style={{ fontSize: 9, color: '#e8411a', fontFamily: "'DM Mono',monospace", fontWeight: 700 }}>🔴 {game.inning || 'LIVE'}</span>}
+          {game.status === 'Live' && <span style={{ fontSize: 9, color: 'var(--accent)', fontFamily: "'DM Mono',monospace", fontWeight: 700 }}>🔴 {game.inning || 'LIVE'}</span>}
           {game.status === 'Final' && <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>FINAL</span>}
         </div>
         {/* Wind is still context-only (too noisy at single-game granularity — see
@@ -8287,12 +8343,12 @@ function BallCarryCard({ game }) {
                   <span>{b.ev}mph / {b.la}°</span>
                   <span>{b.dist}ft (exp {b.exp_dist}ft)</span>
                   {b.direction && <span style={{ opacity: 0.7 }}>{b.direction}</span>}
-                  <span style={{ color: b.deviation >= 0 ? '#27c97a' : '#ff6b6b', fontWeight: 700 }}>
+                  <span style={{ color: b.deviation >= 0 ? 'var(--green)' : 'var(--c-coral)', fontWeight: 700 }}>
                     {b.deviation >= 0 ? '+' : ''}{b.deviation}ft
                   </span>
                   {b.is_outlier && (
                     <span title={`Individual-ball outlier — |deviation| ≥ 25ft. Doesn't move the game verdict on its own (that needs several balls to mean anything), but this specific ball carried meaningfully differently than its own EV/LA/temp/direction predicted.`}
-                      style={{ color: '#a78bfa', fontWeight: 700 }}>
+                      style={{ color: 'var(--c-purple)', fontWeight: 700 }}>
                       ⚡ outlier
                     </span>
                   )}
@@ -8349,9 +8405,9 @@ function BallCarryTab({ games }) {
 // 2026-07-26 alongside a shrinkage fix to Barrel Lab's Monte Carlo — see
 // api/xhr-conversion.js header comment for the model/coefficients.
 const XHR_VERDICT_STYLE = {
-  JUICED: { color: '#a78bfa', label: '⬆️ HR conversion running HOT',  bg: 'rgba(167,139,250,.08)' },
+  JUICED: { color: 'var(--c-purple)', label: '⬆️ HR conversion running HOT',  bg: 'rgba(167,139,250,.08)' },
   DEAD:   { color: '#f472b6', label: '⬇️ HR conversion running COLD', bg: 'rgba(244,114,182,.08)' },
-  NORMAL: { color: '#27c97a', label: '✅ HR conversion normal',        bg: 'rgba(39,201,122,.06)'  },
+  NORMAL: { color: 'var(--green)', label: '✅ HR conversion normal',        bg: 'rgba(39,201,122,.06)'  },
 };
 
 function XhrConversionCard({ game, onData }) {
@@ -8384,7 +8440,7 @@ function XhrConversionCard({ game, onData }) {
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 13 }}>{label}</span>
-        {game.status === 'Live' && <span style={{ fontSize: 9, color: '#e8411a', fontFamily: "'DM Mono',monospace", fontWeight: 700 }}>🔴 {game.inning || 'LIVE'}</span>}
+        {game.status === 'Live' && <span style={{ fontSize: 9, color: 'var(--accent)', fontFamily: "'DM Mono',monospace", fontWeight: 700 }}>🔴 {game.inning || 'LIVE'}</span>}
         {game.status === 'Final' && <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>FINAL</span>}
       </div>
 
@@ -8415,7 +8471,7 @@ function XhrConversionCard({ game, onData }) {
                   <span>Inn {b.inning}</span>
                   <span>{b.ev}mph / {b.la}°</span>
                   {b.direction && <span style={{ opacity: 0.7 }}>{b.direction}</span>}
-                  <span style={{ color: b.isHR ? '#a78bfa' : 'var(--muted)', fontWeight: b.isHR ? 700 : 400 }}>
+                  <span style={{ color: b.isHR ? 'var(--c-purple)' : 'var(--muted)', fontWeight: b.isHR ? 700 : 400 }}>
                     xHR {(b.xhr_prob * 100).toFixed(0)}%
                   </span>
                 </div>
@@ -8646,8 +8702,8 @@ function LiveTab() {
       <div className="note">ℹ️ <strong>Live</strong>: tap → hard contact in HR zones now vs L7. <strong>Upcoming</strong>: tap → 🚀 Liftoff list ranked by HR probability.</div>
     <div className="cards" style={{marginBottom:14}}>
 <div className="card"><div className="cl">💥 HRs Today</div><div className="cv" style={{color:"var(--accent)"}}>{todayHRCount??"—"}</div><div className="cs">total homers</div></div>
-      <div className="card"><div className="cl">Live Games</div><div className="cv" style={{color:"#e8411a"}}>{live.length}</div><div className="cs">in progress</div></div>
-      <div className="card"><div className="cl">Scheduled</div><div className="cv" style={{color:"#27c97a"}}>{pre.length}</div><div className="cs">today</div></div>
+      <div className="card"><div className="cl">Live Games</div><div className="cv" style={{color:"var(--accent)"}}>{live.length}</div><div className="cs">in progress</div></div>
+      <div className="card"><div className="cl">Scheduled</div><div className="cv" style={{color:"var(--green)"}}>{pre.length}</div><div className="cs">today</div></div>
       <div className="card"><div className="cl">Total</div><div className="cv">{games.length}</div><div className="cs">on slate</div></div>
     </div>
     {loading ? <div className="lw"><div className="sp"/><div className="lt">Fetching schedule…</div></div> : <>
@@ -8866,31 +8922,31 @@ function BvPTab() {
             <td>
               <span className={`sv ${evC}`}>{(b.evVsFB??88).toFixed(1)}</span>
               <div style={{width:46,height:3,borderRadius:2,background:"var(--border)",overflow:"hidden",marginTop:2}}>
-                <div style={{height:"100%",borderRadius:2,width:`${Math.min(((b.evVsFB??88)/112)*100,100)}%`,background:(b.evVsFB??88)>=T.EV_EL?"#ff3010":(b.evVsFB??88)>=T.EV_HH?"#ff8020":"#5a7080"}}/>
+                <div style={{height:"100%",borderRadius:2,width:`${Math.min(((b.evVsFB??88)/112)*100,100)}%`,background:(b.evVsFB??88)>=T.EV_EL?"var(--aplus)":(b.evVsFB??88)>=T.EV_HH?"var(--c-warn)":"var(--c-slate)"}}/>
               </div>
             </td>
             <td>
               <span className={`sv ${barC}`}>{(b.barrelVsPitch??b.barrel).toFixed(1)}%</span>
               <div style={{width:46,height:3,borderRadius:2,background:"var(--border)",overflow:"hidden",marginTop:2}}>
-                <div style={{height:"100%",borderRadius:2,width:`${Math.min((b.barrelVsPitch??b.barrel)/25*100,100)}%`,background:(b.barrelVsPitch??b.barrel)>=T.BAR_EL?"#ff8020":"#5a7080"}}/>
+                <div style={{height:"100%",borderRadius:2,width:`${Math.min((b.barrelVsPitch??b.barrel)/25*100,100)}%`,background:(b.barrelVsPitch??b.barrel)>=T.BAR_EL?"var(--c-warn)":"var(--c-slate)"}}/>
               </div>
             </td>
             <td>
               <span className={`sv ${fbC}`}>{(b.flyBallVsPitch??35).toFixed(1)}%</span>
               <div style={{width:46,height:3,borderRadius:2,background:"var(--border)",overflow:"hidden",marginTop:2}}>
-                <div style={{height:"100%",borderRadius:2,width:`${Math.min((b.flyBallVsPitch??35)/50*100,100)}%`,background:(b.flyBallVsPitch??35)>=40?"#ff8020":"#5a7080"}}/>
+                <div style={{height:"100%",borderRadius:2,width:`${Math.min((b.flyBallVsPitch??35)/50*100,100)}%`,background:(b.flyBallVsPitch??35)>=40?"var(--c-warn)":"var(--c-slate)"}}/>
               </div>
             </td>
             <td>
               <span className={`sv ${chC}`}>{(b.chaseVsPitch??30).toFixed(1)}%</span>
               <div style={{width:46,height:3,borderRadius:2,background:"var(--border)",overflow:"hidden",marginTop:2}}>
-                <div style={{height:"100%",borderRadius:2,width:`${Math.min((b.chaseVsPitch??30)/50*100,100)}%`,background:(b.chaseVsPitch??30)>=35?"#38b8f2":(b.chaseVsPitch??30)>=27?"#5a7080":"#27c97a"}}/>
+                <div style={{height:"100%",borderRadius:2,width:`${Math.min((b.chaseVsPitch??30)/50*100,100)}%`,background:(b.chaseVsPitch??30)>=35?"var(--ice)":(b.chaseVsPitch??30)>=27?"var(--c-slate)":"var(--green)"}}/>
               </div>
             </td>
             <td>
               <span className={`sv ${puC}`}>{(b.pullAirVsPitch??18).toFixed(1)}%</span>
               <div style={{width:46,height:3,borderRadius:2,background:"var(--border)",overflow:"hidden",marginTop:2}}>
-                <div style={{height:"100%",borderRadius:2,width:`${Math.min((b.pullAirVsPitch??18)/32*100,100)}%`,background:(b.pullAirVsPitch??18)>=22?"#ff8020":"#5a7080"}}/>
+                <div style={{height:"100%",borderRadius:2,width:`${Math.min((b.pullAirVsPitch??18)/32*100,100)}%`,background:(b.pullAirVsPitch??18)>=22?"var(--c-warn)":"var(--c-slate)"}}/>
               </div>
             </td>
             <td>
@@ -8899,8 +8955,8 @@ function BvPTab() {
             </td>
             <td>
               <div className="h2h">
-                <div className="h2hs"><div className="h2hv" style={{color:(b.careerBA??0.25)>=0.28?"#ff8020":"var(--text)"}}>{(b.careerBA??0.25).toFixed(3)}</div><div className="h2hl">AVG</div></div>
-                <div className="h2hs"><div className="h2hv" style={{color:(b.careerHR??0)>=2?"#ff4020":(b.careerHR??0)>=1?"#ff8020":"var(--muted)"}}>{b.careerHR??0}</div><div className="h2hl">HR</div></div>
+                <div className="h2hs"><div className="h2hv" style={{color:(b.careerBA??0.25)>=0.28?"var(--c-warn)":"var(--text)"}}>{(b.careerBA??0.25).toFixed(3)}</div><div className="h2hl">AVG</div></div>
+                <div className="h2hs"><div className="h2hv" style={{color:(b.careerHR??0)>=2?"var(--c-danger)":(b.careerHR??0)>=1?"var(--c-warn)":"var(--muted)"}}>{b.careerHR??0}</div><div className="h2hl">HR</div></div>
                 <div className="h2hs"><div className="h2hv" style={{color:"var(--muted)"}}>{b.careerAB??0}</div><div className="h2hl">AB</div></div>
               </div>
             </td>
@@ -8926,11 +8982,11 @@ const PITCH_FAMILIES = {
 };
 const PITCH_COLORS = {
   // Fastballs — reds/oranges
-  "4-Seam FB":"#ff4020","2-Seam FB":"#ff6030","Sinker":"#ff8040","Cutter":"#ffaa60",
+  "4-Seam FB":"var(--c-danger)","2-Seam FB":"#ff6030","Sinker":"#ff8040","Cutter":"#ffaa60",
   // Breaking — blues
-  "Curveball":"#f5a623","Knuckle Curve":"#e8c020","Slider":"#38b8f2","Sweeper":"#60d0ff","Slurve":"#80b8e8",
+  "Curveball":"var(--accent2)","Knuckle Curve":"#e8c020","Slider":"var(--ice)","Sweeper":"#60d0ff","Slurve":"#80b8e8",
   // Offspeed — greens
-  "Changeup":"#27c97a","Splitter":"#40e090","Forkball":"#20a860","Circle Changeup":"#60d8a0",
+  "Changeup":"var(--green)","Splitter":"#40e090","Forkball":"#20a860","Circle Changeup":"#60d8a0",
   // Specialty — purples
   "Knuckleball":"#b088e8","Screwball":"#d080c8",
 };
@@ -9442,7 +9498,7 @@ function LiveAtBatViewer({ gamePk }) {
               <br/>
               <span style={{color:'#f87171'}}>{state.pitcherStats.k}K</span>
               <span style={{color:'rgba(255,255,255,.18)',margin:'0 4px'}}>·</span>
-              <span style={{color:state.pitcherStats.er>0?'#fb923c':'rgba(255,255,255,.4)'}}>
+              <span style={{color:state.pitcherStats.er>0?'var(--c-orange2)':'rgba(255,255,255,.4)'}}>
                 {state.pitcherStats.er}ER
               </span>
             </div>
@@ -9499,7 +9555,7 @@ function LiveAtBatViewer({ gamePk }) {
               </span>
               {state.batterStats.hr > 0 && (<>
                 <span style={{color:'rgba(255,255,255,.18)',margin:'0 3px'}}>·</span>
-                <span style={{color:'#fbbf24',fontWeight:700}}>{state.batterStats.hr}HR</span>
+                <span style={{color:'var(--c-amber)',fontWeight:700}}>{state.batterStats.hr}HR</span>
               </>)}
               <br/>
               {state.batterStats.rbi > 0 && (
@@ -9530,11 +9586,11 @@ function LiveAtBatViewer({ gamePk }) {
             <g key={label}>
               <rect x={x-8} y={y-8} width={16} height={16}
                 rx={1.5} transform={`rotate(45,${x},${y})`}
-                fill={on?'#f5a623':'rgba(255,255,255,.1)'}
-                stroke={on?'#f5a623':'rgba(255,255,255,.2)'} strokeWidth="1.5"/>
+                fill={on?'var(--accent2)':'rgba(255,255,255,.1)'}
+                stroke={on?'var(--accent2)':'rgba(255,255,255,.2)'} strokeWidth="1.5"/>
               <text x={x} y={y+18} textAnchor="middle"
                 style={{fontFamily:mono,fontSize:6,
-                  fill:on?'#f5a623':'rgba(255,255,255,.25)'}}>
+                  fill:on?'var(--accent2)':'rgba(255,255,255,.25)'}}>
                 {label}
               </text>
             </g>
@@ -9580,9 +9636,9 @@ function LiveAtBatViewer({ gamePk }) {
 // reliable field to categorize on here.
 function pitchResultColor(desc) {
   const d = (desc || '').toLowerCase();
-  if (d.includes('in play')) return '#38b8f2'; // blue
+  if (d.includes('in play')) return 'var(--ice)'; // blue
   if (d.includes('foul') || d.includes('strike') || d.includes('bunt')) return '#ff4d4d'; // red — foul, called/swinging strike, missed/foul bunt (a missed bunt attempt is a strike with no "strike"/"foul" in its own text)
-  if (d.includes('ball') || d.includes('hit by pitch') || d.includes('pitchout')) return '#27c97a'; // green
+  if (d.includes('ball') || d.includes('hit by pitch') || d.includes('pitchout')) return 'var(--green)'; // green
   return '#8899a6';
 }
 
@@ -9622,7 +9678,7 @@ function BattedBallField({ r, animate=false }) {
   const reduceMotion = typeof window !== 'undefined' && window.matchMedia
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const shouldAnimate = animate && hasCoords && !reduceMotion;
-  const evColor = r.ev == null ? 'var(--muted)' : r.ev >= 103 ? '#ff4020' : r.ev >= 95 ? '#ff8020' : r.ev >= 90 ? '#ffc840' : 'var(--text)';
+  const evColor = r.ev == null ? 'var(--muted)' : r.ev >= 103 ? 'var(--c-danger)' : r.ev >= 95 ? 'var(--c-warn)' : r.ev >= 90 ? 'var(--c-yellow)' : 'var(--text)';
   return (
     <div style={{display:'flex',gap:12,flexShrink:0,background:'rgba(0,0,0,.4)',
       borderRadius:6,border:'1px solid var(--border)',padding:10}}>
@@ -9901,8 +9957,8 @@ function BatTrackingTab({ games, date, isToday }) {
   };
   const resultColor = r => {
     if (r==='home_run') return 'var(--accent)';
-    if (['single','double','triple'].includes(r)) return '#27c97a';
-    if (r==='walk'||r==='intent_walk'||r==='hit_by_pitch') return '#38b8f2';
+    if (['single','double','triple'].includes(r)) return 'var(--green)';
+    if (r==='walk'||r==='intent_walk'||r==='hit_by_pitch') return 'var(--ice)';
     if (r==='strikeout'||r==='strikeout_double_play') return 'var(--ice)';
     return 'var(--muted)';
   };
@@ -10082,10 +10138,10 @@ function BatTrackingTab({ games, date, isToday }) {
                 border:filterCC?'1px solid #f5a623':'1px solid var(--border)',
                 transition:'all .15s'}}>
               <div style={{fontFamily:osw,fontWeight:800,fontSize:13,
-                color:filterCC?'#f5a623':'var(--text)'}}>{count}</div>
+                color:filterCC?'var(--accent2)':'var(--text)'}}>{count}</div>
               <div style={{fontFamily:mono,fontSize:7,marginTop:1,
                 textTransform:'uppercase',letterSpacing:.5,
-                color:filterCC?'#f5a623':'var(--muted)'}}>
+                color:filterCC?'var(--accent2)':'var(--muted)'}}>
                 🤏 Close Calls{filterCC?' ✓':''}
               </div>
             </div>
@@ -10124,7 +10180,7 @@ function BatTrackingTab({ games, date, isToday }) {
                     <div style={{textAlign:'left',padding:'0 12px'}}>
                       <div style={{color:'var(--accent)',marginBottom:6}}>No plate appearances found — debug info:</div>
                       <div>GamePk: <span style={{color:'var(--text)'}}>{fetchDebug.gamePk ?? 'MISSING'}</span></div>
-                      <div>PBP fetch: <span style={{color:fetchDebug.pbpStatus==='fulfilled'?'#27c97a':'var(--accent)'}}>{fetchDebug.pbpStatus}</span></div>
+                      <div>PBP fetch: <span style={{color:fetchDebug.pbpStatus==='fulfilled'?'var(--green)':'var(--accent)'}}>{fetchDebug.pbpStatus}</span></div>
                       <div>Total plays returned: <span style={{color:'var(--text)'}}>{fetchDebug.totalPlays}</span></div>
                       <div>Complete: {fetchDebug.complete} / HasResult: {fetchDebug.hasResult}</div>
                       <div>Savant bat speeds: {fetchDebug.savantBatSpeeds}</div>
@@ -10135,7 +10191,7 @@ function BatTrackingTab({ games, date, isToday }) {
                 </td></tr>
               )}
               {filtered.map((r,i) => {
-                const evColor = r.ev==null?'var(--muted)':r.ev>=103?'#ff4020':r.ev>=95?'#ff8020':r.ev>=90?'#ffc840':'var(--text)';
+                const evColor = r.ev==null?'var(--muted)':r.ev>=103?'var(--c-danger)':r.ev>=95?'var(--c-warn)':r.ev>=90?'var(--c-yellow)':'var(--text)';
                 const laGood  = r.la!=null && r.la>=18 && r.la<=35;
                 const isRecent = i < 5;
                 const isSel   = selPlay && selPlay.gamePk===r.gamePk && selPlay.pa===r.pa;
@@ -10190,17 +10246,17 @@ function BatTrackingTab({ games, date, isToday }) {
                         {r.ev != null ? r.ev.toFixed(1) : '—'}
                       </td>
                       <td style={{padding:'3px 6px',textAlign:'right',fontFamily:mono,
-                        fontSize:9,color:laGood?'#27c97a':'var(--muted)'}}>
+                        fontSize:9,color:laGood?'var(--green)':'var(--muted)'}}>
                         {r.la != null ? r.la.toFixed(0)+'°' : '—'}
                       </td>
                       <td style={{padding:'3px 6px',textAlign:'right',fontFamily:mono,
-                        fontSize:9,color:r.dist>=400?'#ff4020':r.dist>=350?'#ff8020':
+                        fontSize:9,color:r.dist>=400?'var(--c-danger)':r.dist>=350?'var(--c-warn)':
                           r.dist>0?'var(--text)':'var(--muted)'}}>
                         {r.dist != null && r.dist > 0 ? r.dist+'ft' : '—'}
                       </td>
                       <td style={{padding:'3px 6px',textAlign:'right',fontFamily:osw,
                         fontWeight:r.batSpd>=75?700:400,fontSize:11,
-                        color:r.batSpd>=78?'#ffd700':r.batSpd>=74?'#f5a623':
+                        color:r.batSpd>=78?'var(--c-gold)':r.batSpd>=74?'var(--accent2)':
                           r.batSpd!=null?'var(--muted)':'var(--muted)'}}>
                         {r.batSpd != null ? r.batSpd.toFixed(1) : '—'}
                       </td>
@@ -10304,7 +10360,7 @@ function BatTrackingTab({ games, date, isToday }) {
                               </div>
                               {r.batSpd != null && (
                                 <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid rgba(255,255,255,.06)'}}>
-                                  <span style={{fontFamily:osw,fontWeight:800,fontSize:13,color:'#ffd700'}}>{r.batSpd.toFixed(1)}</span>
+                                  <span style={{fontFamily:osw,fontWeight:800,fontSize:13,color:'var(--c-gold)'}}>{r.batSpd.toFixed(1)}</span>
                                   <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginLeft:5}}>mph bat speed</span>
                                 </div>
                               )}
@@ -10486,9 +10542,9 @@ function GamedayTab() {
     }
     if (abs === 'Live') {
       const half = ls.inningHalf === 'Top' ? '▲' : '▼';
-      return { label: `${half}${ls.currentInning || ''}`, color: '#27c97a', dot: true };
+      return { label: `${half}${ls.currentInning || ''}`, color: 'var(--green)', dot: true };
     }
-    if (det === 'Warmup' || det === 'Pre-Game') return { label: 'WARMUP', color: '#f5a623', dot: true };
+    if (det === 'Warmup' || det === 'Pre-Game') return { label: 'WARMUP', color: 'var(--accent2)', dot: true };
     if (det === 'Postponed')  return { label: 'PPD',  color: 'var(--muted)', dot: false };
     if (det === 'Cancelled')  return { label: 'CNCL', color: 'var(--muted)', dot: false };
     const gt = g.gameDate
@@ -10558,8 +10614,8 @@ function GamedayTab() {
   // Play event color
   const evColor = (ev='') => {
     const e = ev.toLowerCase();
-    if (e.includes('home run'))  return '#f5a623';
-    if (e.includes('single') || e.includes('double') || e.includes('triple')) return '#27c97a';
+    if (e.includes('home run'))  return 'var(--accent2)';
+    if (e.includes('single') || e.includes('double') || e.includes('triple')) return 'var(--green)';
     if (e.includes('strikeout')) return 'var(--accent)';
     if (e.includes('walk') || e.includes('hit by')) return 'var(--ice)';
     return 'var(--muted)';
@@ -10683,16 +10739,16 @@ function GamedayTab() {
                     {key:'first', top:'50%', right:0,    transform:'translate(0,-50%) rotate(45deg)'},
                   ].map(b => (
                     <div key={b.key} style={{position:'absolute',width:13,height:13,borderRadius:2,
-                      background: runners[b.key] ? '#f5a623' : 'var(--surface2)',
-                      border:`1.5px solid ${runners[b.key] ? '#f5a623' : 'var(--border)'}`,
+                      background: runners[b.key] ? 'var(--accent2)' : 'var(--surface2)',
+                      border:`1.5px solid ${runners[b.key] ? 'var(--accent2)' : 'var(--border)'}`,
                       top:b.top,left:b.left,right:b.right,transform:b.transform}}/>
                   ))}
                 </div>
                 <div style={{display:'flex',gap:4}}>
                   {[0,1,2].map(i => (
                     <div key={i} style={{width:8,height:8,borderRadius:'50%',
-                      background: i<(lsOuts??0)?'#f5a623':'var(--surface2)',
-                      border:`1.5px solid ${i<(lsOuts??0)?'#f5a623':'var(--border)'}`}}/>
+                      background: i<(lsOuts??0)?'var(--accent2)':'var(--surface2)',
+                      border:`1.5px solid ${i<(lsOuts??0)?'var(--accent2)':'var(--border)'}`}}/>
                   ))}
                 </div>
                 <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>{lsOuts??0} out{(lsOuts??0)!==1?'s':''}</span>
@@ -10760,10 +10816,10 @@ function GamedayTab() {
           // ── PitchZone SVG (defined once, used in detail panel) ──────────────
           const pitchCol = code => {
             if (!code) return 'var(--muted)';
-            if ('BI*V'.includes(code)) return '#27c97a';
-            if (code === 'X')          return '#38b8f2';
-            if ('CF'.includes(code))   return '#f5a623';
-            return '#ff4020';
+            if ('BI*V'.includes(code)) return 'var(--green)';
+            if (code === 'X')          return 'var(--ice)';
+            if ('CF'.includes(code))   return 'var(--accent2)';
+            return 'var(--c-danger)';
           };
           const PitchZone = ({ pitches, szTop=3.5, szBot=1.5 }) => {
             const W=100, H=120;
@@ -10985,7 +11041,7 @@ function GamedayTab() {
                             </td>
                             {[r.ab,r.r,r.h,r.rbi,r.bb,r.k,r.avg,r.ops].map((v,j) => (
                               <td key={j} style={{...cell,textAlign:'center',
-                                color:j===2&&v>0?'#27c97a':j===3&&v>0?'var(--accent2)':undefined}}>{v}</td>
+                                color:j===2&&v>0?'var(--green)':j===3&&v>0?'var(--accent2)':undefined}}>{v}</td>
                             ))}
                           </tr>
                           {isBatExp && (
@@ -11127,7 +11183,7 @@ function GamedayTab() {
             {/* Decisions */}
             {abs==='Final' && g.decisions && (
               <div style={{marginTop:6,paddingTop:6,borderTop:'1px solid rgba(255,255,255,.05)',display:'flex',gap:10}}>
-                {g.decisions.winner && <span style={{fontFamily:mono,fontSize:8,color:'#27c97a'}}>W: {lastNameOf(g.decisions.winner.fullName)}</span>}
+                {g.decisions.winner && <span style={{fontFamily:mono,fontSize:8,color:'var(--green)'}}>W: {lastNameOf(g.decisions.winner.fullName)}</span>}
                 {g.decisions.loser  && <span style={{fontFamily:mono,fontSize:8,color:'var(--accent)'}}>L: {lastNameOf(g.decisions.loser.fullName)}</span>}
                 {g.decisions.save   && <span style={{fontFamily:mono,fontSize:8,color:'var(--accent2)'}}>S: {lastNameOf(g.decisions.save.fullName)}</span>}
               </div>
@@ -11366,7 +11422,7 @@ function HROddsCell({ pid }) {
   );
   const o   = d.odds;
   const pct = (d.implied * 100).toFixed(0) + '%';
-  const col = o >= 500 ? '#f5a623' : o >= 300 ? 'var(--ice)' : o >= 150 ? 'var(--text)' : '#27c97a';
+  const col = o >= 500 ? 'var(--accent2)' : o >= 300 ? 'var(--ice)' : o >= 150 ? 'var(--text)' : 'var(--green)';
   const tip = `HR Odds: ${o>0?'+':''}${o} · ${pct} implied · ${d.book}`;
   return (
     <span title={tip}
@@ -12056,7 +12112,7 @@ function getBallStateBadge(gameId) {
   return {
     icon: isJuiced ? '🔴' : '🔵',
     label: isJuiced ? 'Juiced Ball' : 'Dead Ball',
-    color: isJuiced ? '#ff8020' : '#38b8f2',
+    color: isJuiced ? 'var(--c-warn)' : 'var(--ice)',
     tooltip: `Live-only ball state signal — does not affect any score. ${parts.join(' · ')}.${confidenceNote}`,
   };
 }
@@ -12186,7 +12242,7 @@ function HRTicker({ onHRClick }) {
             {items.map((hr, i) => (
               <div key={i} className="ticker-item">
                 <span style={{color:"var(--accent)",fontWeight:700}}>💥</span>
-                <span style={{color:isKeyMatchup(hr.batterId, hr.batterName)?"#ff8020":"var(--accent2)",fontWeight:700}}>{hr.batterName}</span>
+                <span style={{color:isKeyMatchup(hr.batterId, hr.batterName)?"var(--c-warn)":"var(--accent2)",fontWeight:700}}>{hr.batterName}</span>
                 <span style={{color:"var(--muted)"}}>({hr.batterTeam})</span>
                 <span style={{color:"var(--text)"}}>{hr.hrType}</span>
                 {hr.distance && <span style={{color:"var(--green)",fontWeight:600}}>{hr.distance}ft</span>}
@@ -12561,7 +12617,7 @@ function HRTrackerTab() {
                 return <tr key={i} style={{height:26}}>
                 <td style={{padding:"1px 3px"}}><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,color:i<3?"var(--accent)":"var(--muted)"}}>{sorted.length - i}</span></td>
                 <td style={{padding:"1px 3px",whiteSpace:"nowrap"}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:"var(--text)",whiteSpace:"nowrap"}}>{hr.timeET&&hr.timeET!==""?hr.timeET:`I${hr.inning}`}</span></td>
-                <td style={{padding:"1px 3px",whiteSpace:"nowrap"}}><div style={{display:"flex",alignItems:"center",gap:4}}><PlayerAvatar pid={hr.batterId} name={hr.batterName} size={18}/><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:9,color:"var(--accent2)",minWidth:28}}>{hr.batterTeam}</span><span className="pn" style={{fontSize:10,whiteSpace:"nowrap",cursor:"pointer",textDecoration:"underline",textDecorationStyle:"dotted",...(isKeyMatchup(hr.batterId,hr.batterName)?{color:"#ff8020",fontWeight:700}:{})}} onClick={e=>{e.stopPropagation();const cp=getCachedPlayer(hr.batterId)||{};openAtBatSlide({pid:hr.batterId,name:hr.batterName,team:hr.batterTeam,avgEV:cp.avgEV,barrel:cp.barrel,hardHit:cp.hardHit,flyBall:cp.flyBall,hr:cp.hr,avg:cp.avg,obp:cp.obp,slg:cp.slg,xwoba:cp.xwoba,kPct:cp.kPct,bbPct:cp.bbPct,launchAngle:cp.launchAngle});}}>{hr.batterName}</span><InjuryBadge pid={hr.batterId} name={hr.batterName}/></div></td>
+                <td style={{padding:"1px 3px",whiteSpace:"nowrap"}}><div style={{display:"flex",alignItems:"center",gap:4}}><PlayerAvatar pid={hr.batterId} name={hr.batterName} size={18}/><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:9,color:"var(--accent2)",minWidth:28}}>{hr.batterTeam}</span><span className="pn" style={{fontSize:10,whiteSpace:"nowrap",cursor:"pointer",textDecoration:"underline",textDecorationStyle:"dotted",...(isKeyMatchup(hr.batterId,hr.batterName)?{color:"var(--c-warn)",fontWeight:700}:{})}} onClick={e=>{e.stopPropagation();const cp=getCachedPlayer(hr.batterId)||{};openAtBatSlide({pid:hr.batterId,name:hr.batterName,team:hr.batterTeam,avgEV:cp.avgEV,barrel:cp.barrel,hardHit:cp.hardHit,flyBall:cp.flyBall,hr:cp.hr,avg:cp.avg,obp:cp.obp,slg:cp.slg,xwoba:cp.xwoba,kPct:cp.kPct,bbPct:cp.bbPct,launchAngle:cp.launchAngle});}}>{hr.batterName}</span><InjuryBadge pid={hr.batterId} name={hr.batterName}/></div></td>
                 <td style={{padding:"1px 3px"}}><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:10,color:"var(--accent)"}}>{seasonNum}</span></td>
                 <td style={{padding:"1px 3px",whiteSpace:"nowrap"}}><span className={`hr-badge ${badgeCls}`} style={{fontSize:8,padding:"1px 4px",whiteSpace:"nowrap"}}>{hr.hrType}</span></td>
                 <td style={{padding:"1px 3px"}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:9}}>{hr.halfInning==="top"?"▲":"▼"}{hr.inning}</span></td>
@@ -12716,7 +12772,7 @@ function HRLeaderboardTab() {
   );
 
   if (loading) return <div style={{padding:24,textAlign:'center',fontFamily:mono,fontSize:10,color:'var(--muted)'}}>Loading leaderboard...</div>;
-  if (error)   return <div style={{padding:24,textAlign:'center',fontFamily:mono,fontSize:10,color:'#ff4020'}}>Error: {error}</div>;
+  if (error)   return <div style={{padding:24,textAlign:'center',fontFamily:mono,fontSize:10,color:'var(--c-danger)'}}>Error: {error}</div>;
 
   return (
     <div style={{padding:'12px 16px'}}>
@@ -12730,14 +12786,14 @@ function HRLeaderboardTab() {
         <div style={{flex:'2 1 160px',minWidth:160,background:'var(--surface2)',borderRadius:8,border:'1px solid var(--border)',padding:'10px 14px'}}>
           <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8}}>🚀 Longest HR</div>
           {statCards.longDist ? <>
-            <div style={{fontFamily:osw,fontWeight:800,fontSize:22,color:'#38b8f2',lineHeight:1}}>{statCards.longDist.dist} ft</div>
+            <div style={{fontFamily:osw,fontWeight:800,fontSize:22,color:'var(--ice)',lineHeight:1}}>{statCards.longDist.dist} ft</div>
             <div style={{fontFamily:mono,fontSize:9,color:'var(--text)',marginTop:1}}>{statCards.longDist.name}<span style={{color:'var(--muted)',marginLeft:4,fontSize:8}}>{statCards.longDist.team}</span></div>
           </> : <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)'}}>Loading...</div>}
         </div>
         <div style={{flex:'2 1 160px',minWidth:160,background:'var(--surface2)',borderRadius:8,border:'1px solid var(--border)',padding:'10px 14px'}}>
           <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8}}>⚡ Hardest Hit HR</div>
           {statCards.longEV ? <>
-            <div style={{fontFamily:osw,fontWeight:800,fontSize:22,color:'#ff4020',lineHeight:1}}>{statCards.longEV.ev?.toFixed(1)} mph</div>
+            <div style={{fontFamily:osw,fontWeight:800,fontSize:22,color:'var(--c-danger)',lineHeight:1}}>{statCards.longEV.ev?.toFixed(1)} mph</div>
             <div style={{fontFamily:mono,fontSize:9,color:'var(--text)',marginTop:1}}>{statCards.longEV.name}<span style={{color:'var(--muted)',marginLeft:4,fontSize:8}}>{statCards.longEV.team}</span></div>
           </> : <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)'}}>Loading...</div>}
         </div>
@@ -12779,12 +12835,12 @@ function HRLeaderboardTab() {
                     <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={r.pid} name={r.name} team={r.team}/></span>
                   </div>
                 </td>
-                <td style={{padding:'2px 6px',textAlign:'right'}}><span style={{fontFamily:osw,fontWeight:800,fontSize:13,color:r.hrs>=20?'var(--accent)':r.hrs>=12?'#f5a623':'var(--text)'}}>{r.hrs}</span></td>
-                <td style={{padding:'2px 6px',textAlign:'right'}}><span style={{fontFamily:osw,fontWeight:700,fontSize:11,color:r.laser105>0?'#ff8020':'var(--muted)'}}>{r.laser105||'—'}</span></td>
-                <td style={{padding:'2px 6px',textAlign:'right'}}><span style={{fontFamily:osw,fontWeight:700,fontSize:11,color:r.laser110>0?'#ff3010':'var(--muted)'}}>{r.laser110||'—'}</span></td>
-                <td style={{padding:'2px 6px',textAlign:'right'}}><span style={{fontFamily:osw,fontWeight:700,fontSize:11,color:r.moonshots>0?'#a78bfa':'var(--muted)'}}>{r.moonshots||'—'}</span></td>
-                <td style={{padding:'2px 6px',textAlign:'right'}}><span style={{fontFamily:osw,fontWeight:700,fontSize:11,color:r.hh105>=40?'#38b8f2':r.hh105>=20?'#27c97a':'var(--text)'}}>{r.hh105||'—'}</span></td>
-                <td style={{padding:'2px 6px',textAlign:'right'}}><span style={{fontFamily:osw,fontWeight:700,fontSize:11,color:r.hh110>=8?'#27c97a':'var(--text)'}}>{r.hh110||'—'}</span></td>
+                <td style={{padding:'2px 6px',textAlign:'right'}}><span style={{fontFamily:osw,fontWeight:800,fontSize:13,color:r.hrs>=20?'var(--accent)':r.hrs>=12?'var(--accent2)':'var(--text)'}}>{r.hrs}</span></td>
+                <td style={{padding:'2px 6px',textAlign:'right'}}><span style={{fontFamily:osw,fontWeight:700,fontSize:11,color:r.laser105>0?'var(--c-warn)':'var(--muted)'}}>{r.laser105||'—'}</span></td>
+                <td style={{padding:'2px 6px',textAlign:'right'}}><span style={{fontFamily:osw,fontWeight:700,fontSize:11,color:r.laser110>0?'var(--aplus)':'var(--muted)'}}>{r.laser110||'—'}</span></td>
+                <td style={{padding:'2px 6px',textAlign:'right'}}><span style={{fontFamily:osw,fontWeight:700,fontSize:11,color:r.moonshots>0?'var(--c-purple)':'var(--muted)'}}>{r.moonshots||'—'}</span></td>
+                <td style={{padding:'2px 6px',textAlign:'right'}}><span style={{fontFamily:osw,fontWeight:700,fontSize:11,color:r.hh105>=40?'var(--ice)':r.hh105>=20?'var(--green)':'var(--text)'}}>{r.hh105||'—'}</span></td>
+                <td style={{padding:'2px 6px',textAlign:'right'}}><span style={{fontFamily:osw,fontWeight:700,fontSize:11,color:r.hh110>=8?'var(--green)':'var(--text)'}}>{r.hh110||'—'}</span></td>
               </tr>
             ))}
           </tbody>
@@ -12881,14 +12937,14 @@ function HotBatsTab() {
                 <td onClick={e=>{e.stopPropagation();openAtBatSlide({pid:p.pid,name:p.name,team:p.team});}} style={{padding:'2px 6px',maxWidth:160,cursor:'pointer'}}>
                   <div style={{display:'flex',alignItems:'center',gap:4,overflow:'hidden'}}>
                     <PlayerAvatar pid={p.pid} name={p.name} size={16}/>
-                    <span style={{fontFamily:osw,fontWeight:700,fontSize:10,color:isKeyMatchup(p.pid,p.name)?'#ff8020':'var(--text)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.name}</span>
+                    <span style={{fontFamily:osw,fontWeight:700,fontSize:10,color:isKeyMatchup(p.pid,p.name)?'var(--c-warn)':'var(--text)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.name}</span>
                     <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={p.pid} name={p.name} team={p.team}/></span>
                   </div>
                 </td>
-                <td style={{padding:'2px 6px',textAlign:'right'}}><span style={{fontFamily:osw,fontWeight:800,fontSize:12,color:p.l7hr>=3?'#ff4020':p.l7hr>=2?'#f5a623':'#27c97a'}}>{p.l7hr}</span></td>
+                <td style={{padding:'2px 6px',textAlign:'right'}}><span style={{fontFamily:osw,fontWeight:800,fontSize:12,color:p.l7hr>=3?'var(--c-danger)':p.l7hr>=2?'var(--accent2)':'var(--green)'}}>{p.l7hr}</span></td>
                 <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9}}>{p.seasonHR}</td>
                 <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{p.abhr||'—'}</td>
-                <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,color:p.abSince>20?'var(--ice)':p.abSince>10?'var(--muted)':'#27c97a'}}>{p.abSince}</td>
+                <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,color:p.abSince>20?'var(--ice)':p.abSince>10?'var(--muted)':'var(--green)'}}>{p.abSince}</td>
               </tr>),
               expPid===p.pid && (<tr key={p.pid+'x'}><td colSpan={6} style={{padding:'0 10px 10px',background:'rgba(255,255,255,.02)'}}>
                 <Last7HRChart batterId={p.pid}/>
@@ -12939,7 +12995,7 @@ function HeatingUpTab() {
 
   const teams_hu = ['ALL', ...Array.from(new Set(rows.map(p=>p.team).filter(Boolean))).sort()];
   const sorted = [...rows].filter(p => teamFilter==='ALL' || p.team===teamFilter).sort((a,b) => sortDir * ((parseFloat(b[sort])||0)-(parseFloat(a[sort])||0)));
-  const evCol = v => v>=103?'#ff4020':v>=98?'#ff8020':v>=95?'#f5a623':v>=90?'var(--text)':'var(--muted)';
+  const evCol = v => v>=103?'var(--c-danger)':v>=98?'var(--c-warn)':v>=95?'var(--accent2)':v>=90?'var(--text)':'var(--muted)';
   const Th = ({k,l}) => (<th onClick={()=>{ if(sort===k) setSortDir(d=>-d); else { setSort(k); setSortDir(-1); } }}
     style={{padding:'5px 6px',fontSize:7,fontFamily:mono,textTransform:'uppercase',letterSpacing:.6,
       color:sort===k?'var(--accent2)':'var(--muted)',cursor:'pointer',textAlign:'right',
@@ -12979,7 +13035,7 @@ function HeatingUpTab() {
                 <td onClick={e=>{e.stopPropagation();openAtBatSlide({pid:p.pid,name:p.name,team:p.team});}} style={{padding:'2px 5px',maxWidth:150,cursor:'pointer'}}>
                   <div style={{display:'flex',alignItems:'center',gap:4,overflow:'hidden'}}>
                     <PlayerAvatar pid={p.pid} name={p.name} size={16}/>
-                    <span style={{fontFamily:osw,fontWeight:700,fontSize:10,color:isKeyMatchup(p.pid,p.name)?'#ff8020':'var(--text)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.name}</span>
+                    <span style={{fontFamily:osw,fontWeight:700,fontSize:10,color:isKeyMatchup(p.pid,p.name)?'var(--c-warn)':'var(--text)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.name}</span>
                     <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={p.pid} name={p.name} team={p.team}/></span>
                   </div>
                 </td>
@@ -12987,10 +13043,10 @@ function HeatingUpTab() {
                 <td style={{padding:'2px 5px',textAlign:'right',fontFamily:mono,fontSize:9}}>{p.hh.toFixed(1)}%</td>
                 <td style={{padding:'2px 5px',textAlign:'right',fontFamily:mono,fontSize:9}}>{p.fb.toFixed(1)}%</td>
                 <td style={{padding:'2px 5px',textAlign:'right',fontFamily:mono,fontSize:9}}>{p.barrel.toFixed(1)}%</td>
-                <td style={{padding:'2px 5px',textAlign:'right'}}><span style={{fontFamily:osw,fontWeight:700,fontSize:11,color:p.l7hr>=3?'#ff4020':p.l7hr>=1?'#f5a623':'rgba(255,255,255,.2)'}}>{p.l7hr||'—'}</span></td>
+                <td style={{padding:'2px 5px',textAlign:'right'}}><span style={{fontFamily:osw,fontWeight:700,fontSize:11,color:p.l7hr>=3?'var(--c-danger)':p.l7hr>=1?'var(--accent2)':'rgba(255,255,255,.2)'}}>{p.l7hr||'—'}</span></td>
                 <td style={{padding:'2px 5px',textAlign:'right',fontFamily:mono,fontSize:9}}>{p.seasonHR||'—'}</td>
                 <td style={{padding:'2px 5px',textAlign:'right',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{p.abhr||'—'}</td>
-                <td style={{padding:'2px 5px',textAlign:'right',fontFamily:mono,fontSize:9,color:p.abSince!=null?(p.abSince>20?'var(--ice)':p.abSince>10?'var(--muted)':'#27c97a'):'rgba(255,255,255,.2)'}}>{p.abSince!=null?p.abSince:'—'}</td>
+                <td style={{padding:'2px 5px',textAlign:'right',fontFamily:mono,fontSize:9,color:p.abSince!=null?(p.abSince>20?'var(--ice)':p.abSince>10?'var(--muted)':'var(--green)'):'rgba(255,255,255,.2)'}}>{p.abSince!=null?p.abSince:'—'}</td>
               </tr>),
               expPid===p.pid && (<tr key={p.pid+'x'}><td colSpan={10} style={{padding:'0 10px 10px',background:'rgba(255,255,255,.02)'}}>
                 <Last7HRChart batterId={p.pid}/>
@@ -13102,8 +13158,8 @@ function MLBTab() {
 
   // ── Team row ──────────────────────────────────────────────────────────────
   const TeamRow = ({t, rank, showWC}) => {
-    const diffCol = t.diff > 0 ? '#27c97a' : t.diff < 0 ? 'var(--accent)' : 'var(--muted)';
-    const pctCol  = t.pct >= .600 ? '#27c97a' : t.pct >= .500 ? 'var(--text)' : t.pct < .400 ? 'var(--accent)' : 'var(--muted)';
+    const diffCol = t.diff > 0 ? 'var(--green)' : t.diff < 0 ? 'var(--accent)' : 'var(--muted)';
+    const pctCol  = t.pct >= .600 ? 'var(--green)' : t.pct >= .500 ? 'var(--text)' : t.pct < .400 ? 'var(--accent)' : 'var(--muted)';
     return (
       <tr style={{borderBottom:'1px solid rgba(255,255,255,.04)',
         background: rank===1?'rgba(39,201,122,.04)':'transparent'}}>
@@ -13118,7 +13174,7 @@ function MLBTab() {
               textDecoration:'underline',textDecorationStyle:'dotted'}}>
               {t.abbr}
             </span>
-            {t.clinched && <span style={{fontSize:8,color:'#27c97a'}}>✓</span>}
+            {t.clinched && <span style={{fontSize:8,color:'var(--green)'}}>✓</span>}
           </div>
         </td>
         <td style={{padding:'4px 6px',fontFamily:osw,fontWeight:700,fontSize:12,textAlign:'right'}}>{t.w}</td>
@@ -13128,7 +13184,7 @@ function MLBTab() {
         <td style={{padding:'4px 6px',fontFamily:mono,fontSize:9,textAlign:'right',color:diffCol}}>{t.diff>0?`+${t.diff}`:t.diff}</td>
         <td style={{padding:'4px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',textAlign:'right'}}>{t.l10}</td>
         <td style={{padding:'4px 6px',fontFamily:mono,fontSize:9,textAlign:'right',
-          color:/^W/.test(t.streak)?'#27c97a':'var(--accent)'}}>{t.streak}</td>
+          color:/^W/.test(t.streak)?'var(--green)':'var(--accent)'}}>{t.streak}</td>
       </tr>
     );
   };
@@ -13165,7 +13221,7 @@ function MLBTab() {
               <div key={t.teamId} style={{display:'flex',alignItems:'center',gap:8,
                 padding:'5px 8px',borderRadius:6,marginBottom:4,
                 background:'rgba(39,201,122,.06)',border:'1px solid rgba(39,201,122,.15)'}}>
-                <span style={{fontFamily:mono,fontSize:9,color:'#27c97a',width:14}}>{i+1}</span>
+                <span style={{fontFamily:mono,fontSize:9,color:'var(--green)',width:14}}>{i+1}</span>
                 <span onClick={()=>_OPEN_TEAM_SLIDE?.(t)}
                   style={{fontFamily:osw,fontWeight:800,fontSize:12,color:'var(--accent2)',
                     cursor:'pointer',flex:1}}>
@@ -13184,7 +13240,7 @@ function MLBTab() {
                 padding:'5px 8px',borderRadius:6,marginBottom:4,
                 background: i<3?'rgba(245,166,35,.06)':'rgba(255,255,255,.02)',
                 border: i<3?'1px solid rgba(245,166,35,.2)':'1px solid rgba(255,255,255,.04)'}}>
-                <span style={{fontFamily:mono,fontSize:9,color:i<3?'#f5a623':'var(--muted)',width:14}}>
+                <span style={{fontFamily:mono,fontSize:9,color:i<3?'var(--accent2)':'var(--muted)',width:14}}>
                   {i<3?'✓':'·'}
                 </span>
                 <span onClick={()=>_OPEN_TEAM_SLIDE?.(t)}
@@ -13193,7 +13249,7 @@ function MLBTab() {
                   {t.abbr}
                 </span>
                 <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>
-                  {t.wildCardGB === '-' || t.wildCardGB === 0 ? <span style={{color:'#f5a623'}}>—</span> : `-${t.wildCardGB}`}
+                  {t.wildCardGB === '-' || t.wildCardGB === 0 ? <span style={{color:'var(--accent2)'}}>—</span> : `-${t.wildCardGB}`}
                 </span>
               </div>
             ))}
@@ -13275,7 +13331,7 @@ function MLBTab() {
                 return (
                   <div key={lg} style={{border:'1px solid var(--border)',borderRadius:8,overflow:'hidden'}}>
                     <div style={{padding:'6px 10px',background:'var(--surface2)',
-                      fontFamily:osw,fontWeight:800,fontSize:12,color:'#f5a623',
+                      fontFamily:osw,fontWeight:800,fontSize:12,color:'var(--accent2)',
                       letterSpacing:.8}}>{lg} Wild Card Race</div>
                     <table style={{width:'100%',borderCollapse:'collapse'}}>
                       <THead gbLabel="WC GB"/>
@@ -13283,7 +13339,7 @@ function MLBTab() {
                         <tr key={t.teamId} style={{borderBottom:'1px solid rgba(255,255,255,.04)',
                           background:i<3?'rgba(245,166,35,.03)':'transparent'}}>
                           <td style={{padding:'4px 6px',fontFamily:mono,fontSize:9,
-                            color:i<3?'#f5a623':'var(--muted)',textAlign:'center',width:24}}>
+                            color:i<3?'var(--accent2)':'var(--muted)',textAlign:'center',width:24}}>
                             {i<3?'✓':'·'}
                           </td>
                           <td style={{padding:'4px 6px'}}>
@@ -13298,9 +13354,9 @@ function MLBTab() {
                           <td style={{padding:'4px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',textAlign:'right'}}>{t.l}</td>
                           <td style={{padding:'4px 6px',fontFamily:osw,fontWeight:700,fontSize:11,textAlign:'right'}}>{t.pct.toFixed(3).replace('0.','.')}</td>
                           <td style={{padding:'4px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',textAlign:'right'}}>{t.wildCardGB===0?'—':t.wildCardGB}</td>
-                          <td style={{padding:'4px 6px',fontFamily:mono,fontSize:9,textAlign:'right',color:t.diff>0?'#27c97a':'var(--accent)'}}>{t.diff>0?`+${t.diff}`:t.diff}</td>
+                          <td style={{padding:'4px 6px',fontFamily:mono,fontSize:9,textAlign:'right',color:t.diff>0?'var(--green)':'var(--accent)'}}>{t.diff>0?`+${t.diff}`:t.diff}</td>
                           <td style={{padding:'4px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',textAlign:'right'}}>{t.l10}</td>
-                          <td style={{padding:'4px 6px',fontFamily:mono,fontSize:9,textAlign:'right',color:/^W/.test(t.streak)?'#27c97a':'var(--accent)'}}>{t.streak}</td>
+                          <td style={{padding:'4px 6px',fontFamily:mono,fontSize:9,textAlign:'right',color:/^W/.test(t.streak)?'var(--green)':'var(--accent)'}}>{t.streak}</td>
                         </tr>
                       ))}</tbody>
                     </table>
@@ -13462,7 +13518,7 @@ function MLBTab() {
                                 padding:'4px 8px',borderRadius:5,cursor:'pointer',
                                 background:i<3?'rgba(245,166,35,.06)':'rgba(255,255,255,.02)',
                                 border:i<3?'1px solid rgba(245,166,35,.2)':'1px solid rgba(255,255,255,.04)'}}>
-                              <span style={{fontFamily:mono,fontSize:8,color:i<3?'#f5a623':'var(--muted)',width:14}}>
+                              <span style={{fontFamily:mono,fontSize:8,color:i<3?'var(--accent2)':'var(--muted)',width:14}}>
                                 {i<3?`WC${i+1}`:`+${i-2}`}
                               </span>
                               <img src={t.logo} alt={t.abbr}
@@ -13827,7 +13883,7 @@ function OddsCalculatorSlideout({ onClose }) {
                   border:'1px solid rgba(56,184,242,.25)',borderRadius:6,
                   padding:'5px 10px',textAlign:'center'}}>
                   <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)',display:'block'}}>AMERICAN</span>
-                  <span style={{fontFamily:osw,fontWeight:700,fontSize:15,color:'#38b8f2'}}>
+                  <span style={{fontFamily:osw,fontWeight:700,fontSize:15,color:'var(--ice)'}}>
                     {parsed.american >= 0 ? '+' : ''}{parsed.american}
                   </span>
                 </div>
@@ -13835,7 +13891,7 @@ function OddsCalculatorSlideout({ onClose }) {
                   border:'1px solid rgba(245,166,35,.25)',borderRadius:6,
                   padding:'5px 10px',textAlign:'center'}}>
                   <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)',display:'block'}}>DECIMAL</span>
-                  <span style={{fontFamily:osw,fontWeight:700,fontSize:15,color:'#f5a623'}}>
+                  <span style={{fontFamily:osw,fontWeight:700,fontSize:15,color:'var(--accent2)'}}>
                     {parsed.decimal.toFixed(2)}
                   </span>
                 </div>
@@ -13843,7 +13899,7 @@ function OddsCalculatorSlideout({ onClose }) {
                   border:'1px solid rgba(56,242,130,.25)',borderRadius:6,
                   padding:'5px 10px',textAlign:'center'}}>
                   <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)',display:'block'}}>IMPLIED</span>
-                  <span style={{fontFamily:osw,fontWeight:700,fontSize:15,color:'#38f282'}}>
+                  <span style={{fontFamily:osw,fontWeight:700,fontSize:15,color:'var(--c-mint)'}}>
                     {(100/parsed.decimal).toFixed(1)}%
                   </span>
                 </div>
@@ -13960,7 +14016,7 @@ function OddsCalculatorSlideout({ onClose }) {
                       placeholder="+180  ·  −150  ·  2.80"
                       style={{...inpStyle,fontSize:12}}/>
                     <span style={{fontFamily:mono,fontSize:10,width:44,textAlign:'right',
-                      color:p?'#38f282':'var(--muted)'}}>
+                      color:p?'var(--c-mint)':'var(--muted)'}}>
                       {p ? p.decimal.toFixed(2) : '—'}
                     </span>
                   </div>
@@ -14034,7 +14090,7 @@ function OddsCalculatorSlideout({ onClose }) {
                           borderBottom:i<SCALE_ROWS.length-1?'1px solid rgba(255,255,255,.04)':'none',
                           background:i%2===0?'transparent':'rgba(255,255,255,.02)'}}>
                           <td style={{padding:'5px 10px',color:'var(--text)'}}>{range}</td>
-                          <td style={{padding:'5px 10px',textAlign:'right',color:'#38f282',fontWeight:700}}>{unit}</td>
+                          <td style={{padding:'5px 10px',textAlign:'right',color:'var(--c-mint)',fontWeight:700}}>{unit}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -14066,16 +14122,16 @@ function OddsCalculatorSlideout({ onClose }) {
                'var(--text)', 13],
               ['Suggested Fraction',
                `${result.unitFrac.toFixed(3)}u of ${sym}${result.fullUnitValue.toFixed(2)}`,
-               '#f5a623', 12],
+               'var(--accent2)', 12],
               ['Est. Stake',
                calcFmtCcy(result.estStake, currency),
-               '#38f282', 14],
+               'var(--c-mint)', 14],
               ['Total Return',
                calcFmtCcy(result.potReturn, currency),
-               '#38b8f2', 14],
+               'var(--ice)', 14],
               ['Profit on Win',
                calcFmtCcy(result.profit, currency),
-               '#38f282', 14],
+               'var(--c-mint)', 14],
             ].map(([lbl, val, clr, fsz]) => (
               <div key={lbl} style={{display:'flex',justifyContent:'space-between',
                 alignItems:'baseline',padding:'6px 0',
@@ -14088,7 +14144,7 @@ function OddsCalculatorSlideout({ onClose }) {
               background:'rgba(56,242,130,.06)',border:'1px solid rgba(56,242,130,.18)'}}>
               <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)',textTransform:'uppercase',
                 letterSpacing:.5}}>Risk level: </span>
-              <span style={{fontFamily:osw,fontWeight:700,fontSize:12,color:'#38f282'}}>{result.desc}</span>
+              <span style={{fontFamily:osw,fontWeight:700,fontSize:12,color:'var(--c-mint)'}}>{result.desc}</span>
             </div>
             <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginTop:8,lineHeight:1.6}}>
               Floor: {sym}0.10.{mode==='manual'?' Sized to return 1 unit profit.':' Fraction auto-suggested from odds.'}
@@ -14119,10 +14175,10 @@ function OddsCalculatorSlideout({ onClose }) {
                 </div>
                 {[
                   ['Parlay Odds', `${parlayResult.american>=0?'+':''}${parlayResult.american}  ·  ${parlayResult.decimal.toFixed(2)}`, 'var(--text)', 13],
-                  ['Suggested Unit', `${fmtFrac(parlayResult.frac)}u of ${sym}${(parseFloat(unitSize)||0).toFixed(2)}`, '#f5a623', 12],
-                  ['Suggested Stake', calcFmtCcy(parlayResult.stake, currency), '#38f282', 14],
-                  ['Total Payout', calcFmtCcy(parlayResult.payout, currency), '#38b8f2', 14],
-                  ['Profit on Win', calcFmtCcy(parlayResult.profit, currency), '#38f282', 14],
+                  ['Suggested Unit', `${fmtFrac(parlayResult.frac)}u of ${sym}${(parseFloat(unitSize)||0).toFixed(2)}`, 'var(--accent2)', 12],
+                  ['Suggested Stake', calcFmtCcy(parlayResult.stake, currency), 'var(--c-mint)', 14],
+                  ['Total Payout', calcFmtCcy(parlayResult.payout, currency), 'var(--ice)', 14],
+                  ['Profit on Win', calcFmtCcy(parlayResult.profit, currency), 'var(--c-mint)', 14],
                 ].map(([lbl, val, clr, fsz]) => (
                   <div key={lbl} style={{display:'flex',justifyContent:'space-between',
                     alignItems:'baseline',padding:'6px 0',
@@ -14135,7 +14191,7 @@ function OddsCalculatorSlideout({ onClose }) {
                   background:'rgba(56,242,130,.06)',border:'1px solid rgba(56,242,130,.18)'}}>
                   <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)',textTransform:'uppercase',
                     letterSpacing:.5}}>Risk level: </span>
-                  <span style={{fontFamily:osw,fontWeight:700,fontSize:11,color:'#38f282'}}>{parlayResult.desc}</span>
+                  <span style={{fontFamily:osw,fontWeight:700,fontSize:11,color:'var(--c-mint)'}}>{parlayResult.desc}</span>
                 </div>
                 <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginTop:8}}>
                   All {rrPickNum} picks must hit for this bet to pay out.
@@ -14149,11 +14205,11 @@ function OddsCalculatorSlideout({ onClose }) {
                 borderRadius:8,padding:'14px 16px'}}>
                 {[
                   ['Lines (combinations)', String(rrResult.combos.length), 'var(--text)', 13],
-                  ['Total Stake',      calcFmtCcy(rrResult.totalStake, currency), '#38f282', 14],
-                  ['Max Payout (all hit)',  calcFmtCcy(rrResult.maxPayout, currency),  '#38b8f2', 14],
-                  ['Max Profit (all hit)',  calcFmtCcy(rrResult.maxProfit, currency),  '#38f282', 14],
-                  ['Best single line',  calcFmtCcy(rrResult.ceilPayout, currency),  '#f5a623', 12],
-                  ['Floor — worst winning line', calcFmtCcy(rrResult.floorPayout, currency), '#f5a623', 12],
+                  ['Total Stake',      calcFmtCcy(rrResult.totalStake, currency), 'var(--c-mint)', 14],
+                  ['Max Payout (all hit)',  calcFmtCcy(rrResult.maxPayout, currency),  'var(--ice)', 14],
+                  ['Max Profit (all hit)',  calcFmtCcy(rrResult.maxProfit, currency),  'var(--c-mint)', 14],
+                  ['Best single line',  calcFmtCcy(rrResult.ceilPayout, currency),  'var(--accent2)', 12],
+                  ['Floor — worst winning line', calcFmtCcy(rrResult.floorPayout, currency), 'var(--accent2)', 12],
                 ].map(([lbl, val, clr, fsz]) => (
                   <div key={lbl} style={{display:'flex',justifyContent:'space-between',
                     alignItems:'baseline',padding:'6px 0',
@@ -14186,13 +14242,13 @@ function OddsCalculatorSlideout({ onClose }) {
                           <td style={{padding:'5px 8px',textAlign:'right',color:'var(--text)'}}>
                             {c.decimal.toFixed(2)}
                           </td>
-                          <td style={{padding:'5px 8px',textAlign:'right',color:'#f5a623'}}>
+                          <td style={{padding:'5px 8px',textAlign:'right',color:'var(--accent2)'}}>
                             {fmtFrac(c.frac)}u
                           </td>
                           <td style={{padding:'5px 8px',textAlign:'right',color:'var(--text)'}}>
                             {calcFmtCcy(c.stake, currency)}
                           </td>
-                          <td style={{padding:'5px 8px',textAlign:'right',color:'#38f282',fontWeight:700}}>
+                          <td style={{padding:'5px 8px',textAlign:'right',color:'var(--c-mint)',fontWeight:700}}>
                             {calcFmtCcy(c.payout, currency)}
                           </td>
                         </tr>
@@ -14385,10 +14441,10 @@ function OnlyHomersTab() {
 
 // ── GRADE CONFIG ─────────────────────────────────────────────────
 const GRADE_CFG = {
-  "A+": {color:"#ffcc00",bg:"rgba(255,204,0,.18)", border:"rgba(255,204,0,.5)",  label:"A+"},
-  "A":  {color:"#ff4020",bg:"rgba(255,64,32,.18)", border:"rgba(255,64,32,.4)",  label:"A"},
-  "B":  {color:"#ff8020",bg:"rgba(255,128,32,.14)",border:"rgba(255,128,32,.3)", label:"B"},
-  "C":  {color:"#ffc840",bg:"rgba(255,200,64,.10)",border:"rgba(255,200,64,.25)",label:"C"},
+  "A+": {color:"var(--c-yellow2)",bg:"rgba(255,204,0,.18)", border:"rgba(255,204,0,.5)",  label:"A+"},
+  "A":  {color:"var(--c-danger)",bg:"rgba(255,64,32,.18)", border:"rgba(255,64,32,.4)",  label:"A"},
+  "B":  {color:"var(--c-warn)",bg:"rgba(255,128,32,.14)",border:"rgba(255,128,32,.3)", label:"B"},
+  "C":  {color:"var(--c-yellow)",bg:"rgba(255,200,64,.10)",border:"rgba(255,200,64,.25)",label:"C"},
   "D":  {color:"#8899a6",bg:"rgba(136,153,166,.08)",border:"rgba(136,153,166,.2)",label:"D"},
 };
 
@@ -14454,9 +14510,9 @@ function LiveBatterBox({ batterId, gamePk, onData }) {
 
   const heatCfg = {
     gone_yard: {color:'#fff',   bg:'rgba(255,20,0,.25)',  border:'rgba(255,20,0,.5)'},
-    elite:     {color:'#ff4020',bg:'rgba(255,45,0,.15)',  border:'rgba(255,45,0,.3)'},
-    hot:       {color:'#ff8020',bg:'rgba(255,128,32,.12)',border:'rgba(255,128,32,.25)'},
-    warm:      {color:'#ffc840',bg:'rgba(255,183,0,.10)', border:'rgba(255,183,0,.2)'},
+    elite:     {color:'var(--c-danger)',bg:'rgba(255,45,0,.15)',  border:'rgba(255,45,0,.3)'},
+    hot:       {color:'var(--c-warn)',bg:'rgba(255,128,32,.12)',border:'rgba(255,128,32,.25)'},
+    warm:      {color:'var(--c-yellow)',bg:'rgba(255,183,0,.10)', border:'rgba(255,183,0,.2)'},
     avg:       {color:'var(--muted)',bg:'transparent',    border:'var(--border)'},
   };
   const hc = heatCfg[stats.heatLabel?.cls] || heatCfg.avg;
@@ -14478,7 +14534,7 @@ function LiveBatterBox({ batterId, gamePk, onData }) {
         </span>}
         {stats.isAtBat && <span style={{
           fontSize:8,padding:'1px 6px',borderRadius:4,
-          background:'rgba(39,201,122,.2)',color:'#27c97a',
+          background:'rgba(39,201,122,.2)',color:'var(--green)',
           fontFamily:"'DM Mono',monospace",fontWeight:700,
           border:'1px solid rgba(39,201,122,.4)',
           animation:'pulse 1.2s ease-in-out infinite'}}>⚡ AT BAT</span>}
@@ -14494,7 +14550,7 @@ function LiveBatterBox({ batterId, gamePk, onData }) {
           border:'1px solid rgba(56,184,242,.2)'}}>⛳ IN THE HOLE</span>}
         {stats.isPinchHitter && <span style={{
           fontSize:8,padding:'1px 6px',borderRadius:4,
-          background:'rgba(168,85,247,.12)',color:'#a855f7',
+          background:'rgba(168,85,247,.12)',color:'var(--c-violet)',
           fontFamily:"'DM Mono',monospace",fontWeight:600,
           border:'1px solid rgba(168,85,247,.25)'}}>🙋‍♂️ PH</span>}
         {stats.isSubbedOut && <span style={{
@@ -14509,13 +14565,13 @@ function LiveBatterBox({ batterId, gamePk, onData }) {
         borderRadius:8,overflow:'hidden',marginBottom:8}}>
         {[
           {label:'AB',  val:stats.ab||0,          color:'var(--text)'},
-          {label:'H',   val:stats.hits||0,         color:(stats.hits||0)>0?'#27c97a':'var(--text)'},
+          {label:'H',   val:stats.hits||0,         color:(stats.hits||0)>0?'var(--green)':'var(--text)'},
           {label:'HR',  val:stats.hr||0,           color:(stats.hr||0)>0?'var(--accent)':'var(--text)'},
-          {label:'R',   val:stats.runs??0,         color:(stats.runs||0)>0?'#27c97a':'var(--text)'},
-          {label:'TB',  val:stats.totalBases??0,   color:(stats.totalBases||0)>=4?'var(--accent)':(stats.totalBases||0)>=2?'#ff8020':'var(--text)'},
-          {label:'RBI', val:stats.rbi??0,          color:(stats.rbi||0)>0?'#ffc840':'var(--text)'},
-          {label:'BB',  val:stats.bb??0,           color:(stats.bb||0)>0?'#38b8f2':'var(--text)'},
-          {label:'K',   val:stats.so??0,           color:(stats.so||0)>=2?'#38b8f2':'var(--text)'},
+          {label:'R',   val:stats.runs??0,         color:(stats.runs||0)>0?'var(--green)':'var(--text)'},
+          {label:'TB',  val:stats.totalBases??0,   color:(stats.totalBases||0)>=4?'var(--accent)':(stats.totalBases||0)>=2?'var(--c-warn)':'var(--text)'},
+          {label:'RBI', val:stats.rbi??0,          color:(stats.rbi||0)>0?'var(--c-yellow)':'var(--text)'},
+          {label:'BB',  val:stats.bb??0,           color:(stats.bb||0)>0?'var(--ice)':'var(--text)'},
+          {label:'K',   val:stats.so??0,           color:(stats.so||0)>=2?'var(--ice)':'var(--text)'},
         ].map((s,i,arr) => (
           <div key={s.label} style={{flex:1,textAlign:'center',padding:'5px 3px',
             background:'rgba(255,255,255,.02)',
@@ -14537,7 +14593,7 @@ function LiveBatterBox({ batterId, gamePk, onData }) {
             fontFamily:"'DM Mono',monospace"}}>
             <span style={{color:'var(--muted)',fontSize:8}}>EV </span>
             <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,
-              color:stats.avgEV>=103?'#ff4020':stats.avgEV>=95?'#ff8020':'var(--text)'}}>
+              color:stats.avgEV>=103?'var(--c-danger)':stats.avgEV>=95?'var(--c-warn)':'var(--text)'}}>
               {stats.avgEV.toFixed(1)}
             </span>
           </div>}
@@ -14547,7 +14603,7 @@ function LiveBatterBox({ batterId, gamePk, onData }) {
             fontFamily:"'DM Mono',monospace"}}>
             <span style={{color:'var(--muted)',fontSize:8}}>LA </span>
             <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,
-              color:stats.launchAngle>=25&&stats.launchAngle<=35?'#27c97a':'var(--text)'}}>
+              color:stats.launchAngle>=25&&stats.launchAngle<=35?'var(--green)':'var(--text)'}}>
               {stats.launchAngle.toFixed(0)}°
             </span>
           </div>}
@@ -14557,7 +14613,7 @@ function LiveBatterBox({ batterId, gamePk, onData }) {
             fontFamily:"'DM Mono',monospace"}}>
             <span style={{color:'var(--muted)',fontSize:8}}>Dist </span>
             <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,
-              color:(stats.avgDist||0)>=350?'#ff8020':'var(--text)'}}>
+              color:(stats.avgDist||0)>=350?'var(--c-warn)':'var(--text)'}}>
               {Math.round(stats.avgDist)}ft
             </span>
           </div>}
@@ -14566,7 +14622,7 @@ function LiveBatterBox({ batterId, gamePk, onData }) {
             background:'rgba(255,128,32,.08)',border:'1px solid rgba(255,128,32,.2)',
             fontFamily:"'DM Mono',monospace"}}>
             <span style={{color:'var(--muted)',fontSize:8}}>HH </span>
-            <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,color:'#ff8020'}}>
+            <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,color:'var(--c-warn)'}}>
               {stats.hardHits}🔥
             </span>
           </div>}
@@ -14588,13 +14644,13 @@ function LiveBatterBox({ batterId, gamePk, onData }) {
             </tr></thead>
             <tbody>
               {stats.atBats.map((ab,ai) => {
-                const evc=(ab.ev||0)>=103?'#ff4020':(ab.ev||0)>=95?'#ff8020':(ab.ev||0)>=90?'#ffc840':'var(--text)';
-                const dc=(ab.dist||0)>=400?'#ff4020':(ab.dist||0)>=350?'#ff8020':(ab.dist||0)>=300?'#ffc840':'var(--text)';
+                const evc=(ab.ev||0)>=103?'var(--c-danger)':(ab.ev||0)>=95?'var(--c-warn)':(ab.ev||0)>=90?'var(--c-yellow)':'var(--text)';
+                const dc=(ab.dist||0)>=400?'var(--c-danger)':(ab.dist||0)>=350?'var(--c-warn)':(ab.dist||0)>=300?'var(--c-yellow)':'var(--text)';
                 const good=/home_run|double|triple|single/i.test(ab.result||'');
                 return <tr key={ai} style={{borderBottom:'1px solid rgba(255,255,255,.04)',
                   background:ai%2===0?'rgba(255,255,255,.01)':'transparent'}}>
                   <td style={{padding:'3px 6px',color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:9,whiteSpace:'nowrap'}}>{ab.halfInning==='top'?'▲':'▼'}{ab.inning||'—'}</td>
-                  <td style={{padding:'3px 6px',color:good?'#27c97a':'var(--muted)',fontWeight:good?700:400,maxWidth:110,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontFamily:"'DM Mono',monospace",fontSize:9}}>{ab.result||'—'}</td>
+                  <td style={{padding:'3px 6px',color:good?'var(--green)':'var(--muted)',fontWeight:good?700:400,maxWidth:110,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontFamily:"'DM Mono',monospace",fontSize:9}}>{ab.result||'—'}</td>
                   <td style={{padding:'3px 6px',color:evc,fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,whiteSpace:'nowrap'}}>{ab.ev>0?ab.ev.toFixed(1):'—'}</td>
                   <td style={{padding:'3px 6px',color:'var(--text)',fontFamily:"'DM Mono',monospace",fontSize:9,whiteSpace:'nowrap'}}>{(ab.la||ab.launchAngle||0)>0?(ab.la||ab.launchAngle).toFixed(0)+'°':'—'}</td>
                   <td style={{padding:'3px 6px',color:dc,fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,whiteSpace:'nowrap'}}>{ab.dist>0?ab.dist+'ft':'—'}</td>
@@ -14635,18 +14691,18 @@ function gradePitcher(era, k9, whip, bb9, hr9, avg, obp, ip = 999) {
   // outing. Cap how extreme a grade a small sample can produce.
   const ipF = parseFloat(ip) || 0;
   if (ipF < 10) {
-    if (s >= 5) return { label:'💥 Hittable', color:'#27c97a',
+    if (s >= 5) return { label:'💥 Hittable', color:'var(--green)',
       bg:'rgba(39,201,122,.08)', desc:'Small sample (<10 IP) — grade capped at Hittable' };
   } else if (ipF < 20) {
-    if (s >= 13) return { label:'⚠️ Tough', color:'#ff8020',
+    if (s >= 13) return { label:'⚠️ Tough', color:'var(--c-warn)',
       bg:'rgba(255,128,32,.08)', desc:'Small sample (<20 IP) — Elite requires ≥20 IP' };
   }
 
-  if (s >= 13) return { label:'‼️ Elite',   color:'#ff4020', bg:'rgba(255,64,32,.10)',    desc:'Elite ERA/K-rate/WHIP' };
-  if (s >= 9)  return { label:'⚠️ Tough',   color:'#ff8020', bg:'rgba(255,128,32,.08)',   desc:'Above-average pitcher' };
+  if (s >= 13) return { label:'‼️ Elite',   color:'var(--c-danger)', bg:'rgba(255,64,32,.10)',    desc:'Elite ERA/K-rate/WHIP' };
+  if (s >= 9)  return { label:'⚠️ Tough',   color:'var(--c-warn)', bg:'rgba(255,128,32,.08)',   desc:'Above-average pitcher' };
   if (s >= 5)  return { label:'🤔 Average', color:'var(--muted)', bg:'rgba(255,255,255,.04)', desc:'League-average matchup' };
-  if (s >= 2)  return { label:'💥 Hittable',color:'#27c97a', bg:'rgba(39,201,122,.08)',   desc:'Elevated ERA/HR-rate' };
-  return              { label:'🎯 Target',  color:'#38b8f2', bg:'rgba(56,184,242,.08)',   desc:'ERA > 5.00 / WHIP > 1.45' };
+  if (s >= 2)  return { label:'💥 Hittable',color:'var(--green)', bg:'rgba(39,201,122,.08)',   desc:'Elevated ERA/HR-rate' };
+  return              { label:'🎯 Target',  color:'var(--ice)', bg:'rgba(56,184,242,.08)',   desc:'ERA > 5.00 / WHIP > 1.45' };
 }
 
 // ── Pitcher-First Arsenal Fit (2026-07-28) ──────────────────────────────
@@ -14955,7 +15011,7 @@ function OpposingBatterTable({ pitcherId, team }) {
                   }}>
                   {r.batter||'—'} <span style={{color:'var(--muted)',fontWeight:400,fontSize:8}}>{r.batter_hand||''}</span>
                 </td>
-                <td style={{textAlign:'center',padding:'3px 6px',color:'#fbbf24'}}>{stars}</td>
+                <td style={{textAlign:'center',padding:'3px 6px',color:'var(--c-amber)'}}>{stars}</td>
                 <td style={{textAlign:'right',padding:'3px 6px'}}>{numOr(r.recent_iso,3)}</td>
                 <td style={{textAlign:'right',padding:'3px 6px'}}>{numOr(r.recent_avg_ev,1)}</td>
                 <td style={{textAlign:'right',padding:'3px 6px',color:thin?'var(--muted)':'var(--text)'}}
@@ -15042,10 +15098,10 @@ function PitcherCard({ pitcherId, pitcherName, onGrade }) {
     }
   }, [grade?.label]);
 
-  const eraColor  = (v) => { const n=parseFloat(v); if(n<2.50) return '#ff4020'; if(n<3.50) return '#ff8020'; if(n<4.50) return 'var(--text)'; return '#27c97a'; };
-  const whipColor = (v) => { const n=parseFloat(v); if(n<1.00) return '#ff4020'; if(n<1.20) return '#ff8020'; return 'var(--text)'; };
-  const k9Color   = (v) => { const n=parseFloat(v); if(n>11)   return '#ff4020'; if(n>9)    return '#ff8020'; return 'var(--text)'; };
-  const hr9Color  = (v) => { const n=parseFloat(v); if(n>1.5)  return '#27c97a'; if(n>1.0)  return '#ffc840'; return 'var(--text)'; };
+  const eraColor  = (v) => { const n=parseFloat(v); if(n<2.50) return 'var(--c-danger)'; if(n<3.50) return 'var(--c-warn)'; if(n<4.50) return 'var(--text)'; return 'var(--green)'; };
+  const whipColor = (v) => { const n=parseFloat(v); if(n<1.00) return 'var(--c-danger)'; if(n<1.20) return 'var(--c-warn)'; return 'var(--text)'; };
+  const k9Color   = (v) => { const n=parseFloat(v); if(n>11)   return 'var(--c-danger)'; if(n>9)    return 'var(--c-warn)'; return 'var(--text)'; };
+  const hr9Color  = (v) => { const n=parseFloat(v); if(n>1.5)  return 'var(--green)'; if(n>1.0)  return 'var(--c-yellow)'; return 'var(--text)'; };
 
   const Stat = ({label, val, color}) => (
     <div style={{textAlign:'center',padding:'6px 10px',borderRadius:8,
@@ -15073,7 +15129,7 @@ function PitcherCard({ pitcherId, pitcherName, onGrade }) {
               marginLeft:5,fontFamily:"'DM Mono',monospace",fontSize:9,fontWeight:700,
               padding:'1px 5px',borderRadius:4,
               background:stats.hand==='L'?'rgba(56,184,242,.12)':'rgba(255,128,32,.10)',
-              color:stats.hand==='L'?'#38b8f2':'#ff8020',
+              color:stats.hand==='L'?'var(--ice)':'var(--c-warn)',
             }}>{stats.hand==='L'?'LHP':'RHP'}</span>}</>
         : <span style={{color:'var(--muted)'}}>--</span>}
     <span style={{opacity:.4,marginLeft:3,fontSize:9}}>{open?'^':'v'}</span>
@@ -15099,7 +15155,7 @@ function PitcherCard({ pitcherId, pitcherName, onGrade }) {
                   fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:700,
                   padding:'1px 6px',borderRadius:4,
                   background:stats.hand==='L'?'rgba(56,184,242,.12)':'rgba(255,128,32,.10)',
-                  color:stats.hand==='L'?'#38b8f2':'#ff8020',
+                  color:stats.hand==='L'?'var(--ice)':'var(--c-warn)',
                   border:`1px solid ${stats.hand==='L'?'rgba(56,184,242,.3)':'rgba(255,128,32,.3)'}`,
                 }}>{stats.hand==='L'?'LHP':'RHP'}</span>}
                 <span style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
@@ -15188,11 +15244,11 @@ function matchesHandFilter(hand, filter) {
 // Priority order: Moonshot > Cold > Whiff > Worm > Gap > Contact > null
 // A batter gets exactly ONE class (highest priority trigger wins)
 const FORM_CLASSES = {
-  'moonshot': { label:'🌙 Moonshot Mafia', short:'🌙 Moonshot', color:'#ff8020', bg:'rgba(255,128,32,.15)', border:'rgba(255,128,32,.35)', desc:'Multiple HRs + elevated angle in L7' },
-  'cold':     { label:'🥶 Cold Bat',       short:'🥶 Cold',     color:'#38b8f2', bg:'rgba(56,184,242,.12)', border:'rgba(56,184,242,.3)',  desc:'Weak contact, low EV or bat speed in L7' },
-  'whiff':    { label:'💨 Whiff King',     short:'💨 Whiff',    color:'#f5a623', bg:'rgba(245,166,35,.12)', border:'rgba(245,166,35,.3)',  desc:'High strikeout rate in L7' },
-  'worm':     { label:'🪱 Worm Burner',    short:'🪱 Worm',     color:'#a78bfa', bg:'rgba(167,139,250,.12)',border:'rgba(167,139,250,.3)', desc:'Heavy ground-ball pattern in L7' },
-  'gap':      { label:'🎯 Gap Sniper',     short:'🎯 Gap',      color:'#27c97a', bg:'rgba(39,201,122,.12)', border:'rgba(39,201,122,.3)',  desc:'High XBH/doubles rate in L7' },
+  'moonshot': { label:'🌙 Moonshot Mafia', short:'🌙 Moonshot', color:'var(--c-warn)', bg:'rgba(255,128,32,.15)', border:'rgba(255,128,32,.35)', desc:'Multiple HRs + elevated angle in L7' },
+  'cold':     { label:'🥶 Cold Bat',       short:'🥶 Cold',     color:'var(--ice)', bg:'rgba(56,184,242,.12)', border:'rgba(56,184,242,.3)',  desc:'Weak contact, low EV or bat speed in L7' },
+  'whiff':    { label:'💨 Whiff King',     short:'💨 Whiff',    color:'var(--accent2)', bg:'rgba(245,166,35,.12)', border:'rgba(245,166,35,.3)',  desc:'High strikeout rate in L7' },
+  'worm':     { label:'🪱 Worm Burner',    short:'🪱 Worm',     color:'var(--c-purple)', bg:'rgba(167,139,250,.12)',border:'rgba(167,139,250,.3)', desc:'Heavy ground-ball pattern in L7' },
+  'gap':      { label:'🎯 Gap Sniper',     short:'🎯 Gap',      color:'var(--green)', bg:'rgba(39,201,122,.12)', border:'rgba(39,201,122,.3)',  desc:'High XBH/doubles rate in L7' },
   'contact':  { label:'🎩 Contact King',   short:'🎩 Contact',  color:'#e2e8f0', bg:'rgba(226,232,240,.08)',border:'rgba(226,232,240,.2)', desc:'High avg, low K%, solid hard contact in L7' },
 };
 
@@ -15534,12 +15590,12 @@ function computePlateIQ(r) {
 
 function plateIQGrade(score) {
   if (score == null) return null;
-  if (score >= 80) return { label:'A+', color:'#27c97a' };
-  if (score >= 68) return { label:'A',  color:'#38b8f2' };
-  if (score >= 56) return { label:'B',  color:'#f5a623' };
-  if (score >= 44) return { label:'C',  color:'#ff8020' };
-  if (score >= 32) return { label:'D',  color:'#ff4020' };
-  return                   { label:'F',  color:'#a855f7' };
+  if (score >= 80) return { label:'A+', color:'var(--green)' };
+  if (score >= 68) return { label:'A',  color:'var(--ice)' };
+  if (score >= 56) return { label:'B',  color:'var(--accent2)' };
+  if (score >= 44) return { label:'C',  color:'var(--c-warn)' };
+  if (score >= 32) return { label:'D',  color:'var(--c-danger)' };
+  return                   { label:'F',  color:'var(--c-violet)' };
 }
 
 // Zone attack risk — low-IQ batter facing a pitcher who elevates more than
@@ -15691,7 +15747,7 @@ function computeHRUpside(b) {
   const label = (total===9)
     ? (lit>=7?'ELITE':lit>=5?'STRONG':lit>=3?'GOOD':'BELOW AVG')
     : (lit>=6?'ELITE':lit>=4?'STRONG':lit>=2?'GOOD':'BELOW AVG');
-  const color = label==='ELITE'?'#ff4020':label==='STRONG'?'#f5a623':label==='GOOD'?'#27c97a':'var(--muted)';
+  const color = label==='ELITE'?'var(--c-danger)':label==='STRONG'?'var(--accent2)':label==='GOOD'?'var(--green)':'var(--muted)';
   return { label, color, lit, total, h2hLoaded, h2hAdj };
 }
 
@@ -15722,7 +15778,7 @@ function computeHRUpsideWithH2H(b, bvpData) {
   const litAdj  = Math.max(0, base.lit + h2hAdj);
   const total   = pa >= 4 ? 9 : 8;  // only count H2H when sample exists
   const label   = litAdj>=(total===9?7:6)?'ELITE':litAdj>=(total===9?5:4)?'STRONG':litAdj>=(total===9?3:2)?'GOOD':'BELOW AVG';
-  const color   = litAdj>=(total===9?7:6)?'#ff4020':litAdj>=(total===9?5:4)?'#f5a623':litAdj>=(total===9?3:2)?'#27c97a':'var(--muted)';
+  const color   = litAdj>=(total===9?7:6)?'var(--c-danger)':litAdj>=(total===9?5:4)?'var(--accent2)':litAdj>=(total===9?3:2)?'var(--green)':'var(--muted)';
   return { ...base, label, color, lit:litAdj, total, h2hAdj, h2hLabel, h2hOk, h2hPA:pa };
 }
 
@@ -16081,7 +16137,7 @@ function YardBadge({ score }) {
   // Thresholds recalibrated to new sweet spot (data: 20-34 = 9-11% HR rate)
   // 32+ = Elite tier (target ~12-15%), 24+ = High, 18+ = Mid, 13+ = Watch, <13 = Noise
   const bg  = score>=28?'rgba(255,215,0,.22)':score>=20?'rgba(255,64,32,.18)':score>=15?'rgba(245,166,35,.15)':score>=10?'rgba(210,180,140,.15)':'rgba(255,255,255,.04)';
-  const col = score>=28?'#ffd700':score>=20?'#ff4020':score>=15?'#f5a623':score>=10?'#c4a882':'var(--muted)';
+  const col = score>=28?'var(--c-gold)':score>=20?'var(--c-danger)':score>=15?'var(--accent2)':score>=10?'#c4a882':'var(--muted)';
   return (
     <span title={`Yard Score: ${score} — Boom(42%)+Sig(25%)+PS(25%)+gHR(8%) × pitcher penalty × platoon × rest · Recalibrated June 2026`}
       style={{display:'inline-block',padding:'1px 5px',borderRadius:4,
@@ -16124,7 +16180,7 @@ function SplashScreen({ onDone }) {
 function PSBadge({ score }) {
   if (!score || score < 1) return null;
   const bg  = score>=75?'rgba(147,51,234,.2)':score>=60?'rgba(255,64,32,.18)':score>=45?'rgba(245,166,35,.15)':'rgba(255,255,255,.06)';
-  const col = score>=75?'#a855f7':score>=60?'#ff4020':score>=45?'#f5a623':'var(--muted)';
+  const col = score>=75?'var(--c-violet)':score>=60?'var(--c-danger)':score>=45?'var(--accent2)':'var(--muted)';
   return (
     <span title={`PS: ${score} — Perfect Storm Score (90+=beyond reasonable doubt)`}
       style={{display:'inline-block',padding:'1px 5px',borderRadius:4,
@@ -16137,7 +16193,7 @@ function PSBadge({ score }) {
 function BoomBadge({ score }) {
   if (!score || score < 10) return null;
   const bg  = score>=70?'rgba(255,64,32,.2)':score>=50?'rgba(245,166,35,.18)':score>=30?'rgba(39,201,122,.15)':'rgba(255,255,255,.06)';
-  const col = score>=70?'#ff4020':score>=50?'#f5a623':score>=30?'#27c97a':'var(--muted)';
+  const col = score>=70?'var(--c-danger)':score>=50?'var(--accent2)':score>=30?'var(--green)':'var(--muted)';
   return (
     <span title={`Boom: ${score} — Sig + ZoneFit + ISO + SimTB + Engine`}
       style={{display:'inline-block',padding:'1px 5px',borderRadius:4,
@@ -16176,8 +16232,8 @@ function LongShotView({ data }) {
   const [cacheVersion, setCacheVersion] = useState(0);
   const SOFT_GRADES = new Set(['🎯 Target','💥 Hittable','🤔 Average']);
   const SOFT_LABEL_LIST = ['ALL','🤔 Average','💥 Hittable','🎯 Target'];
-  const pgColor = pg => ({'💥 Hittable':'#27c97a','🎯 Target':'#38b8f2','🤔 Average':'var(--muted)'}[pg]||'var(--muted)');
-  const tbColor = v => v>=2.0?'#27c97a':v>=1.5?'var(--accent2)':v>=1.0?'var(--text)':'var(--muted)';
+  const pgColor = pg => ({'💥 Hittable':'var(--green)','🎯 Target':'var(--ice)','🤔 Average':'var(--muted)'}[pg]||'var(--muted)');
+  const tbColor = v => v>=2.0?'var(--green)':v>=1.5?'var(--accent2)':v>=1.0?'var(--text)':'var(--muted)';
 
   const rows = React.useMemo(() => {
     const out = [];
@@ -16279,9 +16335,9 @@ function LongShotView({ data }) {
       <FormClassFilter selected={formFilter} onChange={setFormFilter}/>
       
             <button onClick={()=>setHideFinal(v=>!v)} style={{padding:'3px 9px',borderRadius:6,
-        border:`1px solid ${hideFinal?'#ff4020':'var(--border)'}`,
+        border:`1px solid ${hideFinal?'var(--c-danger)':'var(--border)'}`,
         background:hideFinal?'rgba(255,64,32,.12)':'transparent',
-        color:hideFinal?'#ff4020':'var(--muted)',fontFamily:"'DM Mono',monospace",
+        color:hideFinal?'var(--c-danger)':'var(--muted)',fontFamily:"'DM Mono',monospace",
         fontSize:9,cursor:'pointer',whiteSpace:'nowrap'}}>
         {hideFinal?'✓ Hiding Final':'Hide Final'}
       </button>
@@ -16316,14 +16372,14 @@ function LongShotView({ data }) {
       {/* Sticker filters */}
       <div style={{display:'flex',gap:6,marginBottom:10,flexWrap:'wrap'}}>
         {[
-          [()=>setLineupOnly(v=>!v), lineupOnly,  'rgba(39,201,122,.12)', '#27c97a',        '✅'],
+          [()=>setLineupOnly(v=>!v), lineupOnly,  'rgba(39,201,122,.12)', 'var(--green)',        '✅'],
           [()=>setGoneYard(v=>!v),   goneYard,    'rgba(255,64,32,.15)',  'var(--accent)',   '💥'],
           [()=>setDueOnly(v=>!v),    dueOnly,     'rgba(56,184,242,.18)', 'var(--ice)',      '⏳'],
-          [()=>{setActiveOnly(v=>!v);if(!activeOnly)setInjuredOnly(false);}, activeOnly,  'rgba(52,211,153,.12)', '#34d399', '☑️'],
-          [()=>{setInjuredOnly(v=>!v);if(!injuredOnly)setActiveOnly(false);},injuredOnly,'rgba(251,146,60,.12)', '#fb923c', '🤕'],
-          [()=>setHotOnly(v=>!v),    hotOnly,     'rgba(251,146,60,.12)', '#fb923c',        '🔥'],
+          [()=>{setActiveOnly(v=>!v);if(!activeOnly)setInjuredOnly(false);}, activeOnly,  'rgba(52,211,153,.12)', 'var(--c-emerald)', '☑️'],
+          [()=>{setInjuredOnly(v=>!v);if(!injuredOnly)setActiveOnly(false);},injuredOnly,'rgba(251,146,60,.12)', 'var(--c-orange2)', '🤕'],
+          [()=>setHotOnly(v=>!v),    hotOnly,     'rgba(251,146,60,.12)', 'var(--c-orange2)',        '🔥'],
           [()=>setPicksOnly(v=>!v),  picksOnly,   'rgba(245,166,35,.12)', 'var(--accent2)', '🎯'],
-          [()=>setDiamondOnly(v=>!v),diamondOnly, 'rgba(255,204,0,.18)',  '#ffcc00',        '💎'],
+          [()=>setDiamondOnly(v=>!v),diamondOnly, 'rgba(255,204,0,.18)',  'var(--c-yellow2)',        '💎'],
         ].map(([fn,active,bg,col,emoji])=>(
           <button key={emoji} onClick={fn}
             style={{padding:'4px 9px',borderRadius:7,cursor:'pointer',flexShrink:0,fontSize:14,
@@ -16366,7 +16422,7 @@ function LongShotView({ data }) {
                       <div style={{display:'flex',alignItems:'center',gap:4,overflow:'hidden'}}>
                         <PlayerAvatar pid={pid} name={name} size={16}/>
                         <span style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'var(--accent2)',whiteSpace:'nowrap',flexShrink:0}}>{b.batting_team||''}</span>
-                        <span style={{fontFamily:osw,fontWeight:700,fontSize:10,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',color:isKeyMatchup(pid,name)?'#ff8020':(b._boom>=50&&b._ps>=40)?'#a855f7':'var(--text)'}}>{name}</span>
+                        <span style={{fontFamily:osw,fontWeight:700,fontSize:10,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',color:isKeyMatchup(pid,name)?'var(--c-warn)':(b._boom>=50&&b._ps>=40)?'var(--c-violet)':'var(--text)'}}>{name}</span>
                         <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={pid} name={name} team={b.batting_team||''}/></span>
                       </div>
                     </td>
@@ -16404,21 +16460,21 @@ function LongShotView({ data }) {
                       <span style={{fontFamily:osw,fontWeight:800,fontSize:11,color:tbColor(b._simTB)}}>{b._simTB.toFixed(2)}</span>
                     </td>
                     <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,
-                      color:b._iso>=0.25?'#ff8020':b._iso>=0.18?'#f5a623':'var(--muted)'}}>
+                      color:b._iso>=0.25?'var(--c-warn)':b._iso>=0.18?'var(--accent2)':'var(--muted)'}}>
                       {b._iso>0?b._iso.toFixed(3):'—'}
                     </td>
                     <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,
-                      color:b._zf>=8?'#ff4020':b._zf>=5?'#f5a623':b._zf>=2?'#27c97a':'var(--muted)'}}>
+                      color:b._zf>=8?'var(--c-danger)':b._zf>=5?'var(--accent2)':b._zf>=2?'var(--green)':'var(--muted)'}}>
                       {b._zf>0?b._zf.toFixed(1)+'%':'—'}
                     </td>
-                    <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,color:b._bvpFB>=20&&b._bvpFB<36?'#27c97a':b._bvpFB>=36&&b._bvpFB<42?'#f5a623':'var(--muted)'}}>{b._bvpFB>0?`${b._bvpFB.toFixed(0)}%`:'—'}</td>
-                    <td style={{padding:'2px 6px',textAlign:'right',fontFamily:osw,fontWeight:700,fontSize:10,color:b._recEV>=97?'#ff8020':b._recEV>=93?'var(--text)':'var(--muted)'}}>{b._recEV>0?b._recEV.toFixed(1):'—'}</td>
+                    <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,color:b._bvpFB>=20&&b._bvpFB<36?'var(--green)':b._bvpFB>=36&&b._bvpFB<42?'var(--accent2)':'var(--muted)'}}>{b._bvpFB>0?`${b._bvpFB.toFixed(0)}%`:'—'}</td>
+                    <td style={{padding:'2px 6px',textAlign:'right',fontFamily:osw,fontWeight:700,fontSize:10,color:b._recEV>=97?'var(--c-warn)':b._recEV>=93?'var(--text)':'var(--muted)'}}>{b._recEV>0?b._recEV.toFixed(1):'—'}</td>
                     <td style={{padding:'2px 5px',textAlign:'right',fontFamily:mono,fontSize:9}}>
                       {(()=>{
                         const d=b._bsD;
                         if(d==null||isNaN(d)) return <span style={{color:'var(--muted)'}}>—</span>;
                         const arrow=d>=0.5?'↑':d<=-0.5?'↓':'→';
-                        const col=d>=1.5?'#27c97a':d>=0.5?'#a8d8a8':d<=-1.5?'#ff4020':d<=-0.5?'#f5a623':'var(--muted)';
+                        const col=d>=1.5?'var(--green)':d>=0.5?'#a8d8a8':d<=-1.5?'var(--c-danger)':d<=-0.5?'var(--accent2)':'var(--muted)';
                         return <span style={{color:col,fontWeight:700}}>{arrow}{d>=0?'+':''}{d.toFixed(1)}</span>;
                       })()}
                     </td>
@@ -17011,7 +17067,7 @@ function SimLabView({ data }) {
                   fontFamily:"'DM Mono',monospace",fontWeight:selPitcherGradesSim.size===0?700:400,fontSize:10}}>All P</button>
               {['‼️ Elite','⚠️ Tough','🤔 Average','💥 Hittable','🎯 Target'].map(g=>{
                 const active=selPitcherGradesSim.has(g);
-                const col={'‼️ Elite':'#ff4020','⚠️ Tough':'#ff8020','🤔 Average':'var(--muted)','💥 Hittable':'#27c97a','🎯 Target':'#38b8f2'}[g];
+                const col={'‼️ Elite':'var(--c-danger)','⚠️ Tough':'var(--c-warn)','🤔 Average':'var(--muted)','💥 Hittable':'var(--green)','🎯 Target':'var(--ice)'}[g];
                 return(<button key={g} onClick={()=>setSelPitcherGradesSim(prev=>{const next=new Set(prev);next.has(g)?next.delete(g):next.add(g);return next;})}
                   style={{padding:'3px 8px',borderRadius:6,cursor:'pointer',
                     background:active?'rgba(255,255,255,.08)':'transparent',color:active?col:'var(--muted)',
@@ -17060,19 +17116,19 @@ function SimLabView({ data }) {
                   textTransform:'uppercase',letterSpacing:1,marginBottom:7}}>Batter Flags</div>
                 <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
                   {[
-                    [()=>setLineupOnly(v=>!v),        lineupOnly,        '#27c97a',        '✅ In Lineup'],
+                    [()=>setLineupOnly(v=>!v),        lineupOnly,        'var(--green)',        '✅ In Lineup'],
                     [()=>setFilterGoneYardSim(v=>!v), filterGoneYardSim, 'var(--accent)',  '💥 Gone Yard Today'],
-                    [()=>setFilterTB2Sim(v=>!v),      filterTB2Sim,      '#38b8f2',        '2️⃣ 2+ TB Today'],
+                    [()=>setFilterTB2Sim(v=>!v),      filterTB2Sim,      'var(--ice)',        '2️⃣ 2+ TB Today'],
                     [()=>setFilterDueSim(v=>!v),      filterDueSim,      'var(--ice)',     '⏳ Due'],
-                    [()=>{setSimActiveOnly(s=>!s);if(!simActiveOnly)setSimInjuredOnly(false);}, simActiveOnly,'#34d399','☑️ Active Only'],
-                    [()=>{setSimInjuredOnly(s=>!s);if(!simInjuredOnly)setSimActiveOnly(false);},simInjuredOnly,'#fb923c','🤕 Injured'],
-                    [()=>setSimHotOnly(s=>!s),        simHotOnly,        '#fb923c',        '🔥 Hot Bat'],
+                    [()=>{setSimActiveOnly(s=>!s);if(!simActiveOnly)setSimInjuredOnly(false);}, simActiveOnly,'var(--c-emerald)','☑️ Active Only'],
+                    [()=>{setSimInjuredOnly(s=>!s);if(!simInjuredOnly)setSimActiveOnly(false);},simInjuredOnly,'var(--c-orange2)','🤕 Injured'],
+                    [()=>setSimHotOnly(s=>!s),        simHotOnly,        'var(--c-orange2)',        '🔥 Hot Bat'],
                     [()=>setSimPicksOnly(s=>!s),      simPicksOnly,      'var(--accent2)', '🎯 My Picks'],
-                    [()=>setFilterDiamondSim(v=>!v),  filterDiamondSim,  '#ffcc00',        '💎 Diamond'],
-                    [()=>setFilterKeyMatchup(v=>!v),  filterKeyMatchup,  '#ffd700',        '🔑 Key Matchup'],
-                    [()=>setWeakSpotOnly(v=>!v),      weakSpotOnly,      '#a78bfa',        '🟢 Weak Spot'],
-                    [()=>setCloseCallOnly(v=>!v),     closeCallOnly,     '#f5a623',        '📍 Live Close Call'],
-                    [()=>setSlHideFinal(v=>!v),       slHideFinal,       '#ff6b6b',        '🚫 Hide Final Games'],
+                    [()=>setFilterDiamondSim(v=>!v),  filterDiamondSim,  'var(--c-yellow2)',        '💎 Diamond'],
+                    [()=>setFilterKeyMatchup(v=>!v),  filterKeyMatchup,  'var(--c-gold)',        '🔑 Key Matchup'],
+                    [()=>setWeakSpotOnly(v=>!v),      weakSpotOnly,      'var(--c-purple)',        '🟢 Weak Spot'],
+                    [()=>setCloseCallOnly(v=>!v),     closeCallOnly,     'var(--accent2)',        '📍 Live Close Call'],
+                    [()=>setSlHideFinal(v=>!v),       slHideFinal,       'var(--c-coral)',        '🚫 Hide Final Games'],
                   ].map(([fn,active,col,label])=>(
                     <button key={label} onClick={fn}
                       style={{padding:'5px 11px',borderRadius:7,cursor:'pointer',fontSize:10,
@@ -17120,8 +17176,8 @@ function SimLabView({ data }) {
                   textTransform:'uppercase',letterSpacing:1,marginBottom:7}}>HR Upside</div>
                 <div style={{display:'flex',gap:5,flexWrap:'wrap',alignItems:'center'}}>
                   {[
-                    ['ELITE',    '#ff4020'], ['STRONG', '#f5a623'],
-                    ['GOOD',     '#27c97a'], ['LOW',    'var(--muted)'],
+                    ['ELITE',    'var(--c-danger)'], ['STRONG', 'var(--accent2)'],
+                    ['GOOD',     'var(--green)'], ['LOW',    'var(--muted)'],
                   ].map(([label,col])=>{
                     const key = label==='LOW'?'BELOW AVG':label;
                     const active = selHRUpside?.has(key);
@@ -17147,7 +17203,7 @@ function SimLabView({ data }) {
                 <div style={{display:'flex',gap:5,flexWrap:'wrap',alignItems:'center'}}>
                   {['A+','A','B','C','D'].map(g=>{
                     const active=selBatterGradesSim.has(g);
-                    const col={'A+':'#f5a623','A':'#e8411a','B':'#38b8f2','C':'var(--muted)','D':'var(--muted)'}[g]||'var(--muted)';
+                    const col={'A+':'var(--accent2)','A':'var(--accent)','B':'var(--ice)','C':'var(--muted)','D':'var(--muted)'}[g]||'var(--muted)';
                     return(<button key={g} onClick={()=>setSelBatterGradesSim(prev=>{const next=new Set(prev);active?next.delete(g):next.add(g);return next;})}
                       style={{padding:'5px 13px',borderRadius:5,cursor:'pointer',fontWeight:active?800:500,
                         border:`1px solid ${active?col:'var(--border)'}`,background:active?`${col}22`:'transparent',
@@ -17496,7 +17552,7 @@ function SimLabView({ data }) {
                   const tb = parseFloat(b.sim_tb) || 0;  // sim_tb = rate × proj PA (can exceed 1.5)
                   const rbi = parseFloat(b.proj_avg_rbi) || 0;
 
-                  const hitColor = hitP >= 35 ? '#27c97a' : hitP >= 28 ? '#f5a623' : 'var(--text)';
+                  const hitColor = hitP >= 35 ? 'var(--green)' : hitP >= 28 ? 'var(--accent2)' : 'var(--text)';
                   const _effGradeKM = computeEffectiveGrade(b.grade, b._pgLabel || '');
                   const gc = GRADE_CFG[_effGradeKM] || GRADE_CFG['D'];
                   // ── Tracker ⚡ Sig — v5 calibrated (241k PAs · 7,322 HRs) ──
@@ -17659,12 +17715,12 @@ function SimLabView({ data }) {
                             onClick={e=>{e.stopPropagation();const cp=getCachedPlayer(parseInt(b.batter_id)||0)||{};openAtBatSlide({pid:parseInt(b.batter_id)||0,name:b.batter,team:b.batting_team,avgEV:cp.avgEV,barrel:cp.barrel,hardHit:cp.hardHit,flyBall:cp.flyBall,hr:cp.hr,avg:cp.avg,obp:cp.obp,slg:cp.slg,xwoba:cp.xwoba,kPct:cp.kPct,bbPct:cp.bbPct,launchAngle:cp.launchAngle});}}>
                             <span style={{ fontFamily:"'Oswald',sans-serif", fontWeight:700, fontSize:11, whiteSpace:'nowrap',
                               overflow:'hidden', textOverflow:'ellipsis',
-                              color: isKeyMatchup(parseInt(b.batter_id)||0, b.batter) ? '#ff8020' : (b._boom>=50&&(parseFloat(b.ps_score)||0)>=40)?'#a855f7':'var(--text)' }}>{b.batter}</span>
+                              color: isKeyMatchup(parseInt(b.batter_id)||0, b.batter) ? 'var(--c-warn)' : (b._boom>=50&&(parseFloat(b.ps_score)||0)>=40)?'var(--c-violet)':'var(--text)' }}>{b.batter}</span>
                             <span style={{fontSize:9,color:'var(--muted)',opacity:.4,flexShrink:0}}>›</span>
                             {/* Stickers — inline, no wrap */}
                             <InjuryBadge pid={parseInt(b.batter_id)||0} name={b.batter}/>
                             {isHotBatPlayer(b)     && <span style={{fontSize:9,flexShrink:0}} title="🔥 Hot Bat" data-tip="🔥 Hot Bat — 3 or more HRs in the last 7 days">🔥</span>}
-                            {isConfirmed(b)         && <span style={{fontSize:9,flexShrink:0,color:'#27c97a'}}>✅</span>}
+                            {isConfirmed(b)         && <span style={{fontSize:9,flexShrink:0,color:'var(--green)'}}>✅</span>}
                             {isGoneYardSim(b)       && <span style={{fontSize:9,flexShrink:0}}>💥</span>}
                             {!isGoneYardSim(b) && is2BagSim(b) && <span title="2+ total bases today (no HR)" style={{fontSize:9,flexShrink:0}}>2️⃣</span>}
                             {isDueFromRow(b,parseInt(b.batter_id)||0) && <span style={{fontSize:9,flexShrink:0}} title="Due" data-tip="⏳ Overdue — AB count since last HR exceeds normal rate">⏳</span>}
@@ -17690,7 +17746,7 @@ function SimLabView({ data }) {
                           return <span title={`YV2: ${_yv2} — k=150 shrinkage blend, promoted to the live gHR on 2026-07-31 (37% corr improvement vs. the old fixed blend, p=0.006). Should equal Yard Score exactly.`}
                             style={{display:'inline-block',padding:'1px 5px',borderRadius:4,
                               fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:10,
-                              background:'rgba(56,184,242,.10)',color:'#38b8f2',
+                              background:'rgba(56,184,242,.10)',color:'var(--ice)',
                               border:'1px dashed rgba(56,184,242,.30)',cursor:'default',whiteSpace:'nowrap'}}>
                             {_yv2}
                           </span>;
@@ -17700,7 +17756,7 @@ function SimLabView({ data }) {
                         {(() => {
                           const sig = Math.round(parseFloat(b._sig ?? b._trackerSig ?? (b.weighted_flag_score ? parseFloat(b.weighted_flag_score)*4.6 : 0)) || 0);
                           if (!sig) return <span style={{color:'var(--muted)',fontSize:8}}>—</span>;
-                          const col = sig>=7?'#ffd700':sig>=5?'#f5a623':sig>=3?'var(--text)':'var(--muted)';
+                          const col = sig>=7?'var(--c-gold)':sig>=5?'var(--accent2)':sig>=3?'var(--text)':'var(--muted)';
                           return <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:11,color:col}}>{sig}</span>;
                         })()}
                       </td>
@@ -17727,11 +17783,11 @@ function SimLabView({ data }) {
                           const g   = pid ? simPitcherGrades.current[pid] : null;
                           const ws  = b.pitcher_lineup_weak_spot ? parseInt(b.pitcher_lineup_weak_spot) : null;
                           if (!g) return <span style={{color:'rgba(255,255,255,.15)',fontSize:9}}>—</span>;
-                          const col = g==='‼️ Elite'?'#ff4020':g==='⚠️ Tough'?'#ff8020':g==='🤔 Average'?'var(--muted)':g==='💥 Hittable'?'#27c97a':g==='🎯 Target'?'#38b8f2':'var(--muted)';
+                          const col = g==='‼️ Elite'?'var(--c-danger)':g==='⚠️ Tough'?'var(--c-warn)':g==='🤔 Average'?'var(--muted)':g==='💥 Hittable'?'var(--green)':g==='🎯 Target'?'var(--ice)':'var(--muted)';
                           return <span style={{display:'flex',alignItems:'center',gap:3,justifyContent:'center'}}>
                             <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:col,fontWeight:700,whiteSpace:'nowrap'}}>{g}</span>
                             {ws && <span title={`Weak vs #${ws}`} style={{fontFamily:"'DM Mono',monospace",fontSize:7,fontWeight:700,
-                              color:'#f5a623',background:'rgba(245,166,35,.12)',
+                              color:'var(--accent2)',background:'rgba(245,166,35,.12)',
                               border:'1px solid rgba(245,166,35,.3)',borderRadius:3,padding:'0 3px'}}>#{ws}</span>}
                           </span>;
                         })()}
@@ -17745,9 +17801,9 @@ function SimLabView({ data }) {
 
                       <td style={{ textAlign: 'right', padding:'3px 6px' }}><span style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:hitColor }}>{hitP > 0 ? hitP.toFixed(1)+'%' : '—'}</span></td>
                       <td style={{ textAlign: 'right', padding:'3px 6px' }}><span style={{ fontFamily:"'DM Mono',monospace", fontSize:10 }}>{xbhP > 0 ? xbhP.toFixed(1)+'%' : '—'}</span></td>
-                      <td style={{ textAlign: 'right', padding:'3px 6px' }}><span style={{ fontFamily:"'Oswald',sans-serif", fontWeight:700, fontSize:11, color:tb>=1.5?'#ff8020':tb>=1.0?'#f5a623':'var(--text)' }}>{tb > 0 ? tb.toFixed(2) : '—'}</span></td>
+                      <td style={{ textAlign: 'right', padding:'3px 6px' }}><span style={{ fontFamily:"'Oswald',sans-serif", fontWeight:700, fontSize:11, color:tb>=1.5?'var(--c-warn)':tb>=1.0?'var(--accent2)':'var(--text)' }}>{tb > 0 ? tb.toFixed(2) : '—'}</span></td>
                       <td style={{textAlign:'right',padding:'3px 6px',fontFamily:"'DM Mono',monospace",fontSize:10,
-                        color:(parseFloat(b.recent_avg_ev)||0)>=103?'#ff4020':(parseFloat(b.recent_avg_ev)||0)>=97?'#f5a623':'var(--muted)'}}>
+                        color:(parseFloat(b.recent_avg_ev)||0)>=103?'var(--c-danger)':(parseFloat(b.recent_avg_ev)||0)>=97?'var(--accent2)':'var(--muted)'}}>
                         {(parseFloat(b.recent_avg_ev)||0)>0?(parseFloat(b.recent_avg_ev)||0).toFixed(1):'—'}
                         {/* Hypothesis flag (July 13, 2026 calibration): Grade C/D batters with */}
                         {/* elevated Recent EV (>=88mph) — 35% of all matched HRs came from this */}
@@ -17756,7 +17812,7 @@ function SimLabView({ data }) {
                         {/* tracker before treating as a confirmed signal. */}
                         {(b.grade === 'C' || b.grade === 'D') && (parseFloat(b.recent_avg_ev)||0) >= 88 && (
                           <span title="Grade C/D + Recent EV ≥88mph — profile behind 35% of all HRs the model scored low on this season (2026 midseason calibration)"
-                            style={{marginLeft:3,fontSize:8,color:'#f5a623'}}>⚡</span>
+                            style={{marginLeft:3,fontSize:8,color:'var(--accent2)'}}>⚡</span>
                         )}
                       </td>
                       <td style={{textAlign:'right',padding:'3px 6px',fontFamily:"'DM Mono',monospace",fontSize:10}}>
@@ -17764,7 +17820,7 @@ function SimLabView({ data }) {
                           const d=parseFloat(b.bat_speed_vs_baseline);
                           if(isNaN(d)||b.bat_speed_vs_baseline===''||b.bat_speed_vs_baseline==null) return <span style={{color:'var(--muted)'}}>—</span>;
                           const arrow=d>=0.5?'↑':d<=-0.5?'↓':'→';
-                          const col=d>=1.5?'#27c97a':d>=0.5?'#a8d8a8':d<=-1.5?'#ff4020':d<=-0.5?'#f5a623':'var(--muted)';
+                          const col=d>=1.5?'var(--green)':d>=0.5?'#a8d8a8':d<=-1.5?'var(--c-danger)':d<=-0.5?'var(--accent2)':'var(--muted)';
                           return <span style={{color:col,fontWeight:700}}>{arrow}{d>=0?'+':''}{d.toFixed(1)}</span>;
                         })()}
                       </td>
@@ -17792,32 +17848,32 @@ function SimLabView({ data }) {
                         })()}
                       </td>
                       <td style={{textAlign:'right',padding:'3px 6px',fontFamily:"'DM Mono',monospace",fontSize:10,
-                        color:(parseFloat(b.recent_hh_pct)||0)>=40?'#ff4020':(parseFloat(b.recent_hh_pct)||0)>=30?'#f5a623':'var(--muted)'}}>
+                        color:(parseFloat(b.recent_hh_pct)||0)>=40?'var(--c-danger)':(parseFloat(b.recent_hh_pct)||0)>=30?'var(--accent2)':'var(--muted)'}}>
                         {(parseFloat(b.recent_hh_pct)||0)>0?((parseFloat(b.recent_hh_pct)||0).toFixed(1)+'%'):'—'}
                       </td>
                       <td style={{textAlign:'right',padding:'3px 6px',fontFamily:"'DM Mono',monospace",fontSize:10,
                         fontWeight:(parseFloat(b.recent_barrel_pct)||0)>=8?700:400,
-                        color:(parseFloat(b.recent_barrel_pct)||0)>=12?'#ff4020':(parseFloat(b.recent_barrel_pct)||0)>=8?'#f5a623':(parseFloat(b.recent_barrel_pct)||0)>=5?'var(--text)':'var(--muted)'}}
+                        color:(parseFloat(b.recent_barrel_pct)||0)>=12?'var(--c-danger)':(parseFloat(b.recent_barrel_pct)||0)>=8?'var(--accent2)':(parseFloat(b.recent_barrel_pct)||0)>=5?'var(--text)':'var(--muted)'}}
                         title={`L7 Barrel%: ${(parseFloat(b.recent_barrel_pct)||0).toFixed(1)}% — ${(parseFloat(b.recent_barrel_pct)||0)>=12?'🔥 Primed':(parseFloat(b.recent_barrel_pct)||0)>=8?'⚡ Elite':'—'}`}>
                         {(parseFloat(b.recent_barrel_pct)||0)>0?((parseFloat(b.recent_barrel_pct)||0).toFixed(1)+'%'):'—'}
                       </td>
                       <td style={{textAlign:'right',padding:'3px 6px',fontFamily:"'DM Mono',monospace",fontSize:10,
-                        color:(parseFloat(b.recent_fb_pct)||0)>=35?'#27c97a':'var(--muted)'}}>
+                        color:(parseFloat(b.recent_fb_pct)||0)>=35?'var(--green)':'var(--muted)'}}>
                         {(parseFloat(b.recent_fb_pct)||0)>0?((parseFloat(b.recent_fb_pct)||0).toFixed(1)+'%'):'—'}
                       </td>
                       <td style={{textAlign:'right',padding:'3px 6px',fontFamily:"'DM Mono',monospace",fontSize:10,
-                        color:(parseFloat(b.recent_iso)||0)>=0.25?'#ff8020':(parseFloat(b.recent_iso)||0)>=0.18?'#f5a623':'var(--muted)'}}>
+                        color:(parseFloat(b.recent_iso)||0)>=0.25?'var(--c-warn)':(parseFloat(b.recent_iso)||0)>=0.18?'var(--accent2)':'var(--muted)'}}>
                         {(()=>{
                           const li=parseFloat(b.l7_iso)||parseFloat(b.recent_iso)||0;
                           const si=parseFloat(b.season_iso||b.recent_iso)||0;
                           const trending=li>si*1.15?'↑':li<si*0.85?'↓':'';
-                          return li>0?<>{li.toFixed(3)}{trending&&<span style={{fontSize:8,marginLeft:1,color:trending==='↑'?'#27c97a':'#f5a623'}}>{trending}</span>}</>:'—';
+                          return li>0?<>{li.toFixed(3)}{trending&&<span style={{fontSize:8,marginLeft:1,color:trending==='↑'?'var(--green)':'var(--accent2)'}}>{trending}</span>}</>:'—';
                         })()}
                       </td>
                       <td style={{textAlign:'center',padding:'3px 4px'}}>
                         {(() => {
                           const n = parseInt(b.recent_hr_count||0);
-                          const col = n>=3?'#ff4020':n>=1?'#f5a623':'rgba(255,255,255,.2)';
+                          const col = n>=3?'var(--c-danger)':n>=1?'var(--accent2)':'rgba(255,255,255,.2)';
                           return <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,color:col}}>{n>0?n:'—'}</span>;
                         })()}
                       </td>
@@ -17828,7 +17884,7 @@ function SimLabView({ data }) {
                           const n = lcc?.count || 0;
                           if (!n) return <span style={{color:'rgba(255,255,255,.15)',fontSize:8}}>—</span>;
                           const maxEV = Math.max(...lcc.plays.map(p=>p.ev||0));
-                          const col = maxEV>=103?'#ff4020':'#f5a623';
+                          const col = maxEV>=103?'var(--c-danger)':'var(--accent2)';
                           return (
                             <span title={`${n} live close call${n!==1?'s':''} today · Max EV: ${maxEV.toFixed(1)}`}
                               style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:11,color:col,cursor:'default'}}>
@@ -17842,7 +17898,7 @@ function SimLabView({ data }) {
                         {(() => {
                           const cc = parseInt(b.so_close_count||0);
                           if (!cc) return <span style={{color:'rgba(255,255,255,.15)',fontSize:8}}>—</span>;
-                          const col = cc>=3?'#ff4020':cc>=2?'#f5a623':'var(--muted)';
+                          const col = cc>=3?'var(--c-danger)':cc>=2?'var(--accent2)':'var(--muted)';
                           return (
                             <span title={`${cc} close call${cc!==1?'s':''} in the last 7 days · Max EV: ${b.so_close_max_ev||'—'} · Max Dist: ${b.so_close_max_dist||'—'}ft`}
                               style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:11,
@@ -17854,13 +17910,13 @@ function SimLabView({ data }) {
                       </td>
 
                       <td style={{textAlign:'right',padding:'3px 6px',fontFamily:"'DM Mono',monospace",fontSize:10,
-                        color:(parseFloat(b.zone_fit)||0)>=8?'#ff4020':(parseFloat(b.zone_fit)||0)>=5?'#f5a623':(parseFloat(b.zone_fit)||0)>=2?'#27c97a':'var(--muted)'}}>
+                        color:(parseFloat(b.zone_fit)||0)>=8?'var(--c-danger)':(parseFloat(b.zone_fit)||0)>=5?'var(--accent2)':(parseFloat(b.zone_fit)||0)>=2?'var(--green)':'var(--muted)'}}>
                         {(parseFloat(b.zone_fit)||0)>0?((parseFloat(b.zone_fit)||0).toFixed(1)+'%'):'—'}
                       </td>
                       <td style={{textAlign:'center',padding:'2px 4px',fontSize:11}}>{(()=>{const _ls=liveSlot(b.batter_id,b.lineup_slot);return _ls>0&&(b.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(_ls)?'🟢':'';})()}</td>
-                      <td style={{textAlign:'center',padding:'2px 4px',fontFamily:"'DM Mono',monospace",fontSize:9}}>{(()=>{const ze=parseInt(b._zoneEdges||DAILY_PICKS_CACHE[String(parseInt(b.batter_id)||0)]?._zoneEdges||0);return ze>0?<span style={{color:ze>=3?'#ff4020':ze>=2?'#f5a623':'var(--muted)',fontWeight:ze>=2?700:400}}>{ze}</span>:'—';})()}</td>
+                      <td style={{textAlign:'center',padding:'2px 4px',fontFamily:"'DM Mono',monospace",fontSize:9}}>{(()=>{const ze=parseInt(b._zoneEdges||DAILY_PICKS_CACHE[String(parseInt(b.batter_id)||0)]?._zoneEdges||0);return ze>0?<span style={{color:ze>=3?'var(--c-danger)':ze>=2?'var(--accent2)':'var(--muted)',fontWeight:ze>=2?700:400}}>{ze}</span>:'—';})()}</td>
                       <td style={{textAlign:'right',padding:'3px 6px',fontFamily:"'DM Mono',monospace",fontSize:10,
-                        color:(parseFloat(b.season_xwoba)||0)>=0.400?'#ff4020':(parseFloat(b.season_xwoba)||0)>=0.360?'#f5a623':(parseFloat(b.season_xwoba)||0)>=0.320?'#27c97a':'var(--muted)'}}>
+                        color:(parseFloat(b.season_xwoba)||0)>=0.400?'var(--c-danger)':(parseFloat(b.season_xwoba)||0)>=0.360?'var(--accent2)':(parseFloat(b.season_xwoba)||0)>=0.320?'var(--green)':'var(--muted)'}}>
                         {(parseFloat(b.season_xwoba)||0)>0?(parseFloat(b.season_xwoba)).toFixed(3):'—'}
                       </td>
                       <td style={{ textAlign: 'right', padding:'3px 4px' }}>
@@ -17869,7 +17925,7 @@ function SimLabView({ data }) {
                       <td style={{ textAlign: 'right', padding:'3px 6px' }}>
                         {parseFloat(b.meatball_matchup_score) > 0 ? (() => {
                           const ms = parseFloat(b.meatball_matchup_score);
-                          const col = ms >= 0.15 ? '#ff4020' : ms >= 0.08 ? '#f5a623' : '#27c97a';
+                          const col = ms >= 0.15 ? 'var(--c-danger)' : ms >= 0.08 ? 'var(--accent2)' : 'var(--green)';
                           return <span style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:col, fontWeight:700 }}>{(ms*100).toFixed(1)}%</span>;
                         })() : <span style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:'rgba(255,255,255,.2)' }}>—</span>}
                       </td>
@@ -17962,7 +18018,7 @@ function SimLabView({ data }) {
               <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 9, color: 'var(--muted)',
                 marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
-                  background: lineupReady ? '#27c97a' : '#f5a623' }}/>
+                  background: lineupReady ? 'var(--green)' : 'var(--accent2)' }}/>
                 {lineupReady
                   ? `${arsenalFitRows.length} batters · lineups confirmed`
                   : `Lineups pending · ${arsenalFitRows.length} batters (10+ recent PA)`
@@ -17972,7 +18028,7 @@ function SimLabView({ data }) {
                     style={{
                       background: lineupOnly ? 'rgba(39,201,122,.12)' : 'var(--surface2)',
                       border: `1px solid ${lineupOnly ? 'rgba(39,201,122,.4)' : 'var(--border)'}`,
-                      color: lineupOnly ? '#27c97a' : 'var(--muted)',
+                      color: lineupOnly ? 'var(--green)' : 'var(--muted)',
                       borderRadius: 5, padding: '2px 8px', fontSize: 9, cursor: 'pointer',
                       fontFamily: "'DM Mono',monospace", lineHeight: 1.5, flexShrink: 0,
                     }}>
@@ -17994,7 +18050,7 @@ function SimLabView({ data }) {
               style={{ padding: '2px 8px', borderRadius: 5, cursor: 'pointer', fontFamily: "'DM Mono',monospace",
                 fontSize: 9, fontWeight: 700, lineHeight: 1.5, flexShrink: 0,
                 background: afHandMatchOnly ? 'rgba(251,191,36,.12)' : 'var(--surface2)',
-                color: afHandMatchOnly ? '#fbbf24' : 'var(--muted)',
+                color: afHandMatchOnly ? 'var(--c-amber)' : 'var(--muted)',
                 border: `1px solid ${afHandMatchOnly ? 'rgba(251,191,36,.4)' : 'var(--border)'}` }}>
               ⭐ {afHandMatchOnly ? 'Hand Match Only' : 'Hand Match'}
             </button>
@@ -18003,7 +18059,7 @@ function SimLabView({ data }) {
               style={{ padding: '2px 8px', borderRadius: 5, cursor: 'pointer', fontFamily: "'DM Mono',monospace",
                 fontSize: 9, fontWeight: 700, lineHeight: 1.5, flexShrink: 0,
                 background: afSauce25Only ? 'rgba(234,179,8,.14)' : 'var(--surface2)',
-                color: afSauce25Only ? '#eab308' : 'var(--muted)',
+                color: afSauce25Only ? 'var(--c-sauce25)' : 'var(--muted)',
                 border: `1px solid ${afSauce25Only ? 'rgba(234,179,8,.45)' : 'var(--border)'}` }}>
               🥫 {afSauce25Only ? 'Sauce 2.5 Only' : 'Sauce 2.5'}
             </button>
@@ -18012,7 +18068,7 @@ function SimLabView({ data }) {
               style={{ padding: '2px 8px', borderRadius: 5, cursor: 'pointer', fontFamily: "'DM Mono',monospace",
                 fontSize: 9, fontWeight: 700, lineHeight: 1.5, flexShrink: 0,
                 background: afTopIsoOnly ? 'rgba(56,184,242,.14)' : 'var(--surface2)',
-                color: afTopIsoOnly ? '#38b8f2' : 'var(--muted)',
+                color: afTopIsoOnly ? 'var(--ice)' : 'var(--muted)',
                 border: `1px solid ${afTopIsoOnly ? 'rgba(56,184,242,.45)' : 'var(--border)'}` }}>
               📈 {afTopIsoOnly ? 'Top ISO Only' : 'Top ISO'}
             </button>
@@ -18021,7 +18077,7 @@ function SimLabView({ data }) {
               style={{ padding: '2px 8px', borderRadius: 5, cursor: 'pointer', fontFamily: "'DM Mono',monospace",
                 fontSize: 9, fontWeight: 700, lineHeight: 1.5, flexShrink: 0,
                 background: afPrimeIsoOnly ? 'rgba(167,139,250,.14)' : 'var(--surface2)',
-                color: afPrimeIsoOnly ? '#a78bfa' : 'var(--muted)',
+                color: afPrimeIsoOnly ? 'var(--c-purple)' : 'var(--muted)',
                 border: `1px solid ${afPrimeIsoOnly ? 'rgba(167,139,250,.45)' : 'var(--border)'}` }}>
               💎 {afPrimeIsoOnly ? 'Prime ISO Only' : 'Prime ISO'}
             </button>
@@ -18068,18 +18124,18 @@ function SimLabView({ data }) {
             </button>
             <FilterPanel
               toggles={[
-                { key: 'hideFinal', label: '🚫 Hide Final',      active: slHideFinal,      color: '#ff6b6b',    onToggle: () => setSlHideFinal(v => !v) },
-                { key: 'daylate',   label: '🗓️ Day Late',        active: afDayLateOnly,    color: '#22c1c3',    onToggle: () => setAfDayLateOnly(v => !v) },
-                { key: 'sauce3',    label: '🍯🔥 Sauce 3.0',      active: afSauce3Only,     color: '#f59e0b',    onToggle: () => setAfSauce3Only(v => !v) },
-                { key: 'avoid',     label: '🚫 Avoid List',      active: afAvoidOnly,      color: '#ff6b6b',
+                { key: 'hideFinal', label: '🚫 Hide Final',      active: slHideFinal,      color: 'var(--c-coral)',    onToggle: () => setSlHideFinal(v => !v) },
+                { key: 'daylate',   label: '🗓️ Day Late',        active: afDayLateOnly,    color: 'var(--c-teal)',    onToggle: () => setAfDayLateOnly(v => !v) },
+                { key: 'sauce3',    label: '🍯🔥 Sauce 3.0',      active: afSauce3Only,     color: 'var(--c-sauce3)',    onToggle: () => setAfSauce3Only(v => !v) },
+                { key: 'avoid',     label: '🚫 Avoid List',      active: afAvoidOnly,      color: 'var(--c-coral)',
                   title: "Avoid List — Sim H<=0.6 AND SwStr%>=19% AND (same-hand OR Tough/Elite pitcher). Full-season backtest: 58-61% miss rate vs 42.6% baseline, 1.4x lift. Filter-only, no badge.",
                   onToggle: () => setAfAvoidOnly(v => !v) },
-                { key: 'hideavoid', label: '🙈 Hide Avoid List', active: afHideAvoid,      color: '#ff6b6b',
+                { key: 'hideavoid', label: '🙈 Hide Avoid List', active: afHideAvoid,      color: 'var(--c-coral)',
                   title: "Removes Avoid List batters from view entirely — the inverse of the Avoid List toggle above, for browsing the rest of the slate without them cluttering it.",
                   onToggle: () => setAfHideAvoid(v => !v) },
                 { key: 'picks',     label: '🎯 My Picks',        active: simPicksOnly,     color: 'var(--accent2)', onToggle: () => setSimPicksOnly(v => !v) },
                 { key: 'goneyard',  label: '💥 Gone Yard Today', active: filterGoneYardSim, color: 'var(--accent)', onToggle: () => setFilterGoneYardSim(v => !v) },
-                { key: 'tb2',       label: '2️⃣ 2+ TB Today',     active: filterTB2Sim,     color: '#38b8f2',    onToggle: () => setFilterTB2Sim(v => !v) },
+                { key: 'tb2',       label: '2️⃣ 2+ TB Today',     active: filterTB2Sim,     color: 'var(--ice)',    onToggle: () => setFilterTB2Sim(v => !v) },
               ]}
               pitcherGrades={selPitcherGradesSim}
               onPitcherGradesChange={setSelPitcherGradesSim}
@@ -18150,7 +18206,7 @@ function SimLabView({ data }) {
                       <td style={{ textAlign: 'center', padding: '3px 6px' }}>
                         {pgLabel.includes('Target')?'🎯':pgLabel.includes('Hittable')?'💥':pgLabel.includes('Elite')?'‼️':pgLabel.includes('Tough')?'⚠️':pgLabel?'🤔':''}
                       </td>
-                      <td style={{ textAlign: 'center', padding: '3px 6px', color: '#fbbf24' }}>{stars}</td>
+                      <td style={{ textAlign: 'center', padding: '3px 6px', color: 'var(--c-amber)' }}>{stars}</td>
                       <td style={{ textAlign: 'right', padding: '3px 6px' }}>{numOr(b.recent_iso, 3)}</td>
                       <td style={{ textAlign: 'right', padding: '3px 6px' }}>{numOr(b.recent_avg_ev, 1)}</td>
                       <td style={{ textAlign: 'right', padding: '3px 6px', color: thin ? 'var(--muted)' : 'var(--text)' }}
@@ -18253,7 +18309,7 @@ function SimLabView({ data }) {
                     const gc   = GRADE_CFG[_effGradeSL] || GRADE_CFG['D'];
 
                     const Cell = ({ pass, val }) => {
-                      const col = pass ? '#27c97a' : '#38b8f2';
+                      const col = pass ? 'var(--green)' : 'var(--ice)';
                       const bg = pass ? 'rgba(39,201,122,.1)' : 'rgba(56,184,242,.08)';
                       const bdr = pass ? 'rgba(39,201,122,.3)' : 'rgba(56,184,242,.2)';
                       return (
@@ -18280,7 +18336,7 @@ function SimLabView({ data }) {
                             <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 12, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{b.batter}</span>
                           </div>
                         </td>
-                        <td style={{ textAlign: 'left' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)' }}>{resolvePitcherName(b.pitcher, b.batting_team, b.pitcher_id)}</span>{isPitcherRP(b.pitcher_games_started) && <span title="Season-classified as a reliever — likely an opener/bulk-game situation" style={{fontSize:8,fontWeight:700,color:'#f5a623',marginLeft:4,padding:'0 4px',borderRadius:3,background:'rgba(245,166,35,.12)',border:'1px solid rgba(245,166,35,.35)',fontFamily:"'DM Mono',monospace"}}>RP</span>}</td>
+                        <td style={{ textAlign: 'left' }}><span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)' }}>{resolvePitcherName(b.pitcher, b.batting_team, b.pitcher_id)}</span>{isPitcherRP(b.pitcher_games_started) && <span title="Season-classified as a reliever — likely an opener/bulk-game situation" style={{fontSize:8,fontWeight:700,color:'var(--accent2)',marginLeft:4,padding:'0 4px',borderRadius:3,background:'rgba(245,166,35,.12)',border:'1px solid rgba(245,166,35,.35)',fontFamily:"'DM Mono',monospace"}}>RP</span>}</td>
                         <td style={{textAlign:'center',padding:'2px 4px'}}>
                           <PSBadge score={b._ps ?? getPS(b)}/>
                         </td>
@@ -18291,7 +18347,7 @@ function SimLabView({ data }) {
                           <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',
                             width:22,height:18,borderRadius:4,fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:11,
                             background:b._trackerSig>=10?'rgba(255,64,32,.25)':b._trackerSig>=7?'rgba(245,166,35,.2)':b._trackerSig>=4?'rgba(39,201,122,.15)':'rgba(255,255,255,.05)',
-                            color:b._trackerSig>=10?'#ff4020':b._trackerSig>=7?'#f5a623':b._trackerSig>=4?'#27c97a':'var(--muted)'}}>
+                            color:b._trackerSig>=10?'var(--c-danger)':b._trackerSig>=7?'var(--accent2)':b._trackerSig>=4?'var(--green)':'var(--muted)'}}>
                             {b._trackerSig||'—'}
                           </span>
                         </td>
@@ -18466,7 +18522,7 @@ function InjuryBanner({ pid, playerName, style = {} }) {
   const inj = INJURY_MAP[String(pid || '')]
     || (playerName ? ROTO_NEWS_BY_NAME[playerName.toLowerCase()] : null);
   if (!inj) return null;
-  const col = inj.emoji==='🚫'?'#ff4020':inj.emoji==='⚠️'?'#f5a623':inj.emoji==='🤕'?'#ff8020':'#38b8f2';
+  const col = inj.emoji==='🚫'?'var(--c-danger)':inj.emoji==='⚠️'?'var(--accent2)':inj.emoji==='🤕'?'var(--c-warn)':'var(--ice)';
   return (
     <div style={{
       display:'flex',alignItems:'flex-start',gap:10,
@@ -18517,7 +18573,7 @@ function InjuryModal() {
   if (!data) return null;
   const inj = INJURY_MAP[data.pid];
   if (!inj) return null;
-  const col = inj.emoji==='🚫'?'#ff4020':inj.emoji==='🤕'?'#ff8020':'#38b8f2';
+  const col = inj.emoji==='🚫'?'var(--c-danger)':inj.emoji==='🤕'?'var(--c-warn)':'var(--ice)';
   return (
     <div onClick={() => setData(null)}
       style={{position:'fixed',inset:0,zIndex:2000,background:'rgba(0,0,0,.72)',
@@ -18709,9 +18765,9 @@ function CheatCodeButton({ onSauceFilter, onSauceFilter2 }) {
               title={sauceOn ? 'Disable Sauce Filter' : 'Enable recommended Sauce filter set'}
               style={{
                 background: sauceOn ? 'rgba(232,65,26,.9)' : 'rgba(232,65,26,.12)',
-                border: '1px solid ' + (sauceOn ? '#e8411a' : 'rgba(232,65,26,.4)'),
+                border: '1px solid ' + (sauceOn ? 'var(--accent)' : 'rgba(232,65,26,.4)'),
                 borderRadius: 6, cursor: 'pointer',
-                color: sauceOn ? '#fff' : '#e8411a',
+                color: sauceOn ? '#fff' : 'var(--accent)',
                 fontFamily: mono, fontSize: 9, fontWeight: 700,
                 padding: '5px 10px', letterSpacing: .5,
                 transition: 'all .2s', whiteSpace: 'nowrap',
@@ -18745,7 +18801,7 @@ function CheatCodeButton({ onSauceFilter, onSauceFilter2 }) {
           {/* Data foundation */}
           <div style={{background:'rgba(39,201,122,.07)',border:'1px solid rgba(39,201,122,.2)',
             borderRadius:8,padding:'12px 14px',marginBottom:20}}>
-            <div style={{fontFamily:osw,fontWeight:700,fontSize:12,color:'#27c97a',
+            <div style={{fontFamily:osw,fontWeight:700,fontSize:12,color:'var(--green)',
               letterSpacing:.8,marginBottom:6}}>DATA FOUNDATION</div>
             <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',lineHeight:1.7}}>
               Every signal validated against 638,357 at-bats (2023-2026)
@@ -18789,7 +18845,7 @@ function CheatCodeButton({ onSauceFilter, onSauceFilter2 }) {
           </Section>
 
           {/* Grade reality */}
-          <Section emoji="🎖️" title="Grade — What It Actually Means" color="#f5a623">
+          <Section emoji="🎖️" title="Grade — What It Actually Means" color="var(--accent2)">
             <div style={{background:'rgba(245,166,35,.06)',border:'1px solid rgba(245,166,35,.2)',
               borderRadius:8,padding:'10px 14px',marginBottom:8}}>
               {[['A+','18.8%','224 matchups'],['A','17.5%','709'],
@@ -18798,7 +18854,7 @@ function CheatCodeButton({ onSauceFilter, onSauceFilter2 }) {
                 <div key={g} style={{display:'flex',alignItems:'center',
                   gap:8,padding:'3px 0',borderBottom:'1px solid rgba(255,255,255,.04)'}}>
                   <span style={{fontFamily:osw,fontWeight:800,fontSize:13,
-                    color:{'A+':'#f5a623','A':'#e8411a','B':'#38b8f2','C':'var(--muted)','D':'var(--muted)'}[g],
+                    color:{'A+':'var(--accent2)','A':'var(--accent)','B':'var(--ice)','C':'var(--muted)','D':'var(--muted)'}[g],
                     width:24}}>{g}</span>
                   <span style={{fontFamily:osw,fontWeight:700,fontSize:13,
                     color:'var(--text)',width:48}}>{r}</span>
@@ -18814,14 +18870,14 @@ function CheatCodeButton({ onSauceFilter, onSauceFilter2 }) {
           </Section>
 
           {/* Sig — live tracker, 55 days */}
-          <Section emoji="⚡" title="Sig Score — The Real Story" color="#ffd700">
+          <Section emoji="⚡" title="Sig Score — The Real Story" color="var(--c-gold)">
             <Row label="Sig 0" value="9.3%" color="var(--muted)" col="⚡ SIG"
               sub="Below base (11.8%) — no meaningful signals firing"/>
             <Row label="Sig 1–3" value="13.0%" color="var(--muted)" col="⚡ SIG"
               sub="Slightly above base. Not strong enough alone."/>
-            <Row label="Sig 4–5" value="13.8%" color="#f5a623" col="⚡ SIG"
+            <Row label="Sig 4–5" value="13.8%" color="var(--accent2)" col="⚡ SIG"
               sub="This is the real floor for actionable plays."/>
-            <Row label="Sig 6–7" value="16.3%" color="#ffd700" col="⚡ SIG"
+            <Row label="Sig 6–7" value="16.3%" color="var(--c-gold)" col="⚡ SIG"
               sub="Strong signal. Set minimum Sig filter to 4."/>
           </Section>
 
@@ -18836,7 +18892,7 @@ function CheatCodeButton({ onSauceFilter, onSauceFilter2 }) {
           </Section>
 
           {/* Handedness */}
-          <Section emoji="🤝" title="Platoon — Now in Scoring" color="#a78bfa">
+          <Section emoji="🤝" title="Platoon — Now in Scoring" color="var(--c-purple)">
             <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',lineHeight:1.6,marginBottom:8}}>
               638k rows confirmed: LHB vs LHP = -0.626%/PA. LHB vs RHP = +0.202%/PA.
               The combination matters — individual hand alone is near-zero signal.
@@ -18846,7 +18902,7 @@ function CheatCodeButton({ onSauceFilter, onSauceFilter2 }) {
           </Section>
 
           {/* Daily scan */}
-          <Section emoji="🗺️" title="Daily Scan — 5 Steps" color="#27c97a">
+          <Section emoji="🗺️" title="Daily Scan — 5 Steps" color="var(--green)">
             <div style={{fontFamily:mono,fontSize:10,lineHeight:2.0,color:'var(--text)'}}>
               {[
                 ['1','Filter Sim TB ≥ 1.5 — cuts low-ceiling noise immediately'],
@@ -18900,7 +18956,7 @@ function CheatCodeButton({ onSauceFilter, onSauceFilter2 }) {
                 <div style={{flexShrink:0,width:68}}>
                   <div style={{fontFamily:osw,fontWeight:700,fontSize:11}}>{fc}</div>
                   <div style={{fontFamily:mono,fontSize:9,
-                    color:parseFloat(rate)>=9?'#27c97a':parseFloat(rate)<=5?'var(--accent)':'var(--muted)'}}>{rate}</div>
+                    color:parseFloat(rate)>=9?'var(--green)':parseFloat(rate)<=5?'var(--accent)':'var(--muted)'}}>{rate}</div>
                 </div>
                 <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',
                   lineHeight:1.4,flex:1}}>{desc}</div>
@@ -18933,7 +18989,7 @@ function CheatCodeButton({ onSauceFilter, onSauceFilter2 }) {
           {sauceOn && (
             <div style={{background:'rgba(232,65,26,.08)',border:'1px solid rgba(232,65,26,.3)',
               borderRadius:8,padding:'10px 14px',marginBottom:16}}>
-              <div style={{fontFamily:mono,fontSize:9,color:'#e8411a',fontWeight:700,
+              <div style={{fontFamily:mono,fontSize:9,color:'var(--accent)',fontWeight:700,
                 marginBottom:6,letterSpacing:.5}}>⚡ SAUCE FILTER ACTIVE</div>
               <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',lineHeight:1.8}}>
                 ✔ Sim TB ≥ 1.5 &nbsp;✔ Pitcher: Target / Hittable / Average<br/>
@@ -19136,9 +19192,9 @@ function BvPHistoryTab({ data }) {
     {key:'bb',   label:'BB',  align:'right', render:r=>r.pa>0?r.bb:'—'},
     {key:'k',    label:'K',   align:'right', render:r=>r.pa>0?r.k:'—'},
     {key:'sb',   label:'SB',  align:'right', render:r=>r.pa>0?r.sb:'—'},
-    {key:'avg',  label:'AVG', align:'right', render:r=>r.pa>0?<span style={{color:parseFloat(r.avg)>=.300?'#27c97a':parseFloat(r.avg)<=.200?'var(--accent)':'var(--text)',fontWeight:600}}>{r.avg}</span>:'—'},
-    {key:'obp',  label:'OBP', align:'right', render:r=>r.pa>0?<span style={{color:parseFloat(r.obp)>=.370?'#27c97a':'var(--text)'}}>{r.obp}</span>:'—'},
-    {key:'slg',  label:'SLG', align:'right', render:r=>r.pa>0?<span style={{color:parseFloat(r.slg)>=.500?'#27c97a':'var(--text)'}}>{r.slg}</span>:'—'},
+    {key:'avg',  label:'AVG', align:'right', render:r=>r.pa>0?<span style={{color:parseFloat(r.avg)>=.300?'var(--green)':parseFloat(r.avg)<=.200?'var(--accent)':'var(--text)',fontWeight:600}}>{r.avg}</span>:'—'},
+    {key:'obp',  label:'OBP', align:'right', render:r=>r.pa>0?<span style={{color:parseFloat(r.obp)>=.370?'var(--green)':'var(--text)'}}>{r.obp}</span>:'—'},
+    {key:'slg',  label:'SLG', align:'right', render:r=>r.pa>0?<span style={{color:parseFloat(r.slg)>=.500?'var(--green)':'var(--text)'}}>{r.slg}</span>:'—'},
     {key:'hrOdds',label:'HR Odds',align:'right',render:r=><HROddsCell pid={r.batterId}/>},
   ];
 
@@ -19159,9 +19215,9 @@ function BvPHistoryTab({ data }) {
         </button>
         <button onClick={()=>setBvpMode('machine')}
           style={{padding:'5px 12px',borderRadius:6,cursor:'pointer',
-            border:`1px solid ${bvpMode==='machine'?'#a78bfa':'var(--border)'}`,
+            border:`1px solid ${bvpMode==='machine'?'var(--c-purple)':'var(--border)'}`,
             background:bvpMode==='machine'?'rgba(167,139,250,.14)':'transparent',
-            color:bvpMode==='machine'?'#a78bfa':'var(--muted)',
+            color:bvpMode==='machine'?'var(--c-purple)':'var(--muted)',
             fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:bvpMode==='machine'?700:400}}>
           🥊 BvP Machine
         </button>
@@ -19194,26 +19250,26 @@ function BvPHistoryTab({ data }) {
         </div>
         <button onClick={()=>setBvpLineupOnly(s=>!s)}
           style={{padding:'3px 10px',borderRadius:6,cursor:'pointer',flexShrink:0,
-            border:`1px solid ${bvpLineupOnly?'#27c97a':'var(--border)'}`,
+            border:`1px solid ${bvpLineupOnly?'var(--green)':'var(--border)'}`,
             background:bvpLineupOnly?'rgba(39,201,122,.12)':'transparent',
-            color:bvpLineupOnly?'#27c97a':'var(--muted)',
+            color:bvpLineupOnly?'var(--green)':'var(--muted)',
             fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:bvpLineupOnly?700:400}}>
           ✅
         </button>
         <button onClick={()=>{setBvpActiveOnly(s=>!s);if(!bvpActiveOnly)setBvpInjuredOnly(false);}}
           style={{padding:'3px 10px',borderRadius:6,cursor:'pointer',
-            border:`1px solid ${bvpActiveOnly?'#34d399':'var(--border)'}`,
+            border:`1px solid ${bvpActiveOnly?'var(--c-emerald)':'var(--border)'}`,
             background:bvpActiveOnly?'rgba(52,211,153,.12)':'transparent',
-            color:bvpActiveOnly?'#34d399':'var(--muted)',
+            color:bvpActiveOnly?'var(--c-emerald)':'var(--muted)',
             fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:bvpActiveOnly?700:400,
             whiteSpace:'nowrap',flexShrink:0}}>
           ☑️
         </button>
         <button onClick={()=>{setBvpInjuredOnly(s=>!s);if(!bvpInjuredOnly)setBvpActiveOnly(false);}}
           style={{padding:'3px 10px',borderRadius:6,cursor:'pointer',
-            border:`1px solid ${bvpInjuredOnly?'#fb923c':'var(--border)'}`,
+            border:`1px solid ${bvpInjuredOnly?'var(--c-orange2)':'var(--border)'}`,
             background:bvpInjuredOnly?'rgba(251,146,60,.12)':'transparent',
-            color:bvpInjuredOnly?'#fb923c':'var(--muted)',
+            color:bvpInjuredOnly?'var(--c-orange2)':'var(--muted)',
             fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:bvpInjuredOnly?700:400,
             whiteSpace:'nowrap',flexShrink:0}}>
           🤕
@@ -19503,7 +19559,7 @@ function BvPMachinePanel() {
             {pSel && (
               <div style={{marginTop:6}}>
                 <span style={{padding:'3px 9px',borderRadius:6,background:'rgba(255,128,32,.12)',
-                  border:'1px solid rgba(255,128,32,.3)',color:'#ff8020',fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:700}}>
+                  border:'1px solid rgba(255,128,32,.3)',color:'var(--c-warn)',fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:700}}>
                   {pSel.team || '—'} · {pSel.throws}HP
                 </span>
               </div>
@@ -19572,7 +19628,7 @@ function BvPMachinePanel() {
               </div>
             : <>
               {bvp.rangeUsed === 'career' && (
-                <div style={{fontSize:10,color:'#f5a623',fontFamily:"'DM Mono',monospace",marginBottom:10,
+                <div style={{fontSize:10,color:'var(--accent2)',fontFamily:"'DM Mono',monospace",marginBottom:10,
                   padding:'5px 9px',background:'rgba(245,166,35,.08)',borderRadius:5,border:'1px solid rgba(245,166,35,.25)'}}>
                   ⓘ Recent-years data unavailable for this pairing — showing full career instead.
                 </div>
@@ -19620,7 +19676,7 @@ function BvPMachinePanel() {
       {!pTeamMode && bSel && pSel && (
         <div style={{marginTop:20,padding:'12px 14px',borderRadius:8,
           background:'rgba(167,139,250,.06)',border:'1px solid rgba(167,139,250,.25)'}}>
-          <div style={{fontSize:10,color:'#a78bfa',fontFamily:"'DM Mono',monospace",
+          <div style={{fontSize:10,color:'var(--c-purple)',fontFamily:"'DM Mono',monospace",
             textTransform:'uppercase',letterSpacing:.8,marginBottom:8}}>
             🧪 Cold Matchup Grade — standalone, not the live Yard Score engine
           </div>
@@ -19628,7 +19684,7 @@ function BvPMachinePanel() {
           {!gradeLoading && grade && (
             <div>
               <div style={{fontSize:28,fontWeight:800,fontFamily:"'Oswald',sans-serif",
-                color: grade.score>=65?'#27c97a':grade.score>=45?'var(--text)':'#ff6b6b'}}>
+                color: grade.score>=65?'var(--green)':grade.score>=45?'var(--text)':'var(--c-coral)'}}>
                 {grade.score}<span style={{fontSize:14,color:'var(--muted)'}}>/100</span>
               </div>
               <div style={{fontSize:11,fontFamily:"'DM Mono',monospace",color:'var(--muted)',lineHeight:1.7}}>
@@ -19839,11 +19895,11 @@ function BatterLeaderboard() {
   const fmtPct  = v => v != null ? v.toFixed(1) + '%' : '—';
   const fmtLA   = v => v != null ? v.toFixed(1) + '°' : '—';
 
-  const evCol  = v => v >= 92 ? '#ff4020' : v >= 90 ? '#ff8020' : v >= 88 ? '#f5a623' : v >= 85 ? 'var(--text)' : 'var(--muted)';
-  const brlCol = v => v >= 12 ? '#ff4020' : v >= 8 ? '#ff8020' : v >= 5 ? '#f5a623' : 'var(--muted)';
-  const hhCol  = v => v >= 50 ? '#ff4020' : v >= 42 ? '#ff8020' : v >= 35 ? '#f5a623' : 'var(--muted)';
-  const opsCol = v => v >= 1.0 ? '#ff4020' : v >= .900 ? '#ff8020' : v >= .800 ? '#f5a623' : 'var(--text)';
-  const hrCol  = v => v >= 15 ? '#ff4020' : v >= 10 ? '#f5a623' : 'var(--text)';
+  const evCol  = v => v >= 92 ? 'var(--c-danger)' : v >= 90 ? 'var(--c-warn)' : v >= 88 ? 'var(--accent2)' : v >= 85 ? 'var(--text)' : 'var(--muted)';
+  const brlCol = v => v >= 12 ? 'var(--c-danger)' : v >= 8 ? 'var(--c-warn)' : v >= 5 ? 'var(--accent2)' : 'var(--muted)';
+  const hhCol  = v => v >= 50 ? 'var(--c-danger)' : v >= 42 ? 'var(--c-warn)' : v >= 35 ? 'var(--accent2)' : 'var(--muted)';
+  const opsCol = v => v >= 1.0 ? 'var(--c-danger)' : v >= .900 ? 'var(--c-warn)' : v >= .800 ? 'var(--accent2)' : 'var(--text)';
+  const hrCol  = v => v >= 15 ? 'var(--c-danger)' : v >= 10 ? 'var(--accent2)' : 'var(--text)';
 
   // Statcast cols use ws() for window-aware values; traditional stats always season
   const STAT_COLS = [
@@ -19854,13 +19910,13 @@ function BatterLeaderboard() {
         const hh = ws(p,'hardHit') || 0;
         const pa = ws(p,'pa') || ws(p,'ab') || 0;
         const v = pa > 0 ? Math.round(hh / 100 * pa) : (p.recentAtBats||[]).filter(a=>(a.ev||0)>=95).length;
-        return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=10?'#ff4020':v>=6?'#ff8020':v>=3?'#f5a623':'var(--text)'}}>{v||0}</span>;
+        return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=10?'var(--c-danger)':v>=6?'var(--c-warn)':v>=3?'var(--accent2)':'var(--text)'}}>{v||0}</span>;
       }},
     { key:'ev100',label:'100+ EV',render: p => {
         const hh = ws(p,'hardHit') || 0;
         const pa = ws(p,'pa') || ws(p,'ab') || 0;
         const v = pa > 0 ? Math.round(hh / 100 * pa * 0.40) : (p.recentAtBats||[]).filter(a=>(a.ev||0)>=100).length;
-        return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=5?'#ff4020':v>=3?'#ff8020':v>=1?'#f5a623':'var(--text)'}}>{v||0}</span>;
+        return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=5?'var(--c-danger)':v>=3?'var(--c-warn)':v>=1?'var(--accent2)':'var(--text)'}}>{v||0}</span>;
       }},
     { key:'barrel',     label:'Brl%',   render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:brlCol(ws(p,'barrel'))}}>{fmtPct(ws(p,'barrel'))}</span> },
     { key:'hardHit',    label:'HH%',    render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:hhCol(ws(p,'hardHit'))}}>{fmtPct(ws(p,'hardHit'))}</span> },
@@ -19878,18 +19934,18 @@ function BatterLeaderboard() {
         const pid = String(p.pid||p.id||'');
         const fromPicks = DAILY_PICKS_CACHE[pid]?.recent_hr_count;
         const n = parseInt(fromPicks != null ? fromPicks : (l7FallbackCache[pid] ?? 0));
-        const col = n>=3?'#ff4020':n>=1?'#f5a623':'rgba(255,255,255,.2)';
+        const col = n>=3?'var(--c-danger)':n>=1?'var(--accent2)':'rgba(255,255,255,.2)';
         return <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,color:col}}>{n>0?n:'—'}</span>;
       }},
-    { key:'hits', label:'H',   render: p => { const v=ws(p,'hits'); return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=30?'#27c97a':v>=20?'#f5a623':'var(--text)'}}>{v||0}</span>; }},
-    { key:'xbh',  label:'XBH', render: p => { const v=ws(p,'xbh');  return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=12?'#ff8020':v>=7?'#f5a623':'var(--text)'}}>{v||0}</span>; }},
+    { key:'hits', label:'H',   render: p => { const v=ws(p,'hits'); return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=30?'var(--green)':v>=20?'var(--accent2)':'var(--text)'}}>{v||0}</span>; }},
+    { key:'xbh',  label:'XBH', render: p => { const v=ws(p,'xbh');  return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=12?'var(--c-warn)':v>=7?'var(--accent2)':'var(--text)'}}>{v||0}</span>; }},
     { key:'kPct', label:'K%',  render: p => { const v=ws(p,'kPct'); return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=28?'var(--ice)':'var(--muted)'}}>{fmtPct(v)}</span>; }},
-    { key:'bbPct',label:'BB%', render: p => { const v=ws(p,'bbPct'); return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=12?'#27c97a':'var(--muted)'}}>{fmtPct(v)}</span>; }},
+    { key:'bbPct',label:'BB%', render: p => { const v=ws(p,'bbPct'); return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:v>=12?'var(--green)':'var(--muted)'}}>{fmtPct(v)}</span>; }},
     { key:'bspd', label:'BSPD', render: p => {
         const pid = String(p.pid||p.id||'');
         const v = parseFloat(DAILY_PICKS_CACHE[pid]?.recent_avg_bat_speed || 0) || null;
         return <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,
-          color: v!=null ? (v>=77?'#ff4020':v>=74?'#f5a623':'var(--text)') : 'var(--muted)'}}>
+          color: v!=null ? (v>=77?'var(--c-danger)':v>=74?'var(--accent2)':'var(--text)') : 'var(--muted)'}}>
           {v!=null ? v.toFixed(1) : '—'}
         </span>;
       }},
@@ -19942,9 +19998,9 @@ function BatterLeaderboard() {
         </div>
         <button onClick={()=>setBattersLineupOnly(s=>!s)}
           style={{padding:'6px 12px',borderRadius:7,cursor:'pointer',
-            border:`1px solid ${battersLineupOnly?'#27c97a':'var(--border)'}`,
+            border:`1px solid ${battersLineupOnly?'var(--green)':'var(--border)'}`,
             background:battersLineupOnly?'rgba(39,201,122,.12)':'var(--surface2)',
-            color:battersLineupOnly?'#27c97a':'var(--muted)',
+            color:battersLineupOnly?'var(--green)':'var(--muted)',
             fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:battersLineupOnly?700:400,
             whiteSpace:'nowrap'}}>
           ✅
@@ -19960,27 +20016,27 @@ function BatterLeaderboard() {
         </button>
         <button onClick={()=>{setActiveOnly(s=>!s);if(!activeOnly)setInjuredOnly(false);}}
           style={{padding:'6px 12px',borderRadius:7,cursor:'pointer',
-            border:`1px solid ${activeOnly?'#34d399':'var(--border)'}`,
+            border:`1px solid ${activeOnly?'var(--c-emerald)':'var(--border)'}`,
             background:activeOnly?'rgba(52,211,153,.12)':'var(--surface2)',
-            color:activeOnly?'#34d399':'var(--muted)',
+            color:activeOnly?'var(--c-emerald)':'var(--muted)',
             fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:activeOnly?700:400,
             whiteSpace:'nowrap'}}>
           ☑️
         </button>
         <button onClick={()=>{setInjuredOnly(s=>!s);if(!injuredOnly)setActiveOnly(false);}}
           style={{padding:'6px 12px',borderRadius:7,cursor:'pointer',
-            border:`1px solid ${injuredOnly?'#fb923c':'var(--border)'}`,
+            border:`1px solid ${injuredOnly?'var(--c-orange2)':'var(--border)'}`,
             background:injuredOnly?'rgba(251,146,60,.12)':'var(--surface2)',
-            color:injuredOnly?'#fb923c':'var(--muted)',
+            color:injuredOnly?'var(--c-orange2)':'var(--muted)',
             fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:injuredOnly?700:400,
             whiteSpace:'nowrap'}}>
           🤕
         </button>
         <button onClick={()=>setHotBatOnly(s=>!s)}
           style={{padding:'6px 12px',borderRadius:7,cursor:'pointer',
-            border:`1px solid ${hotBatOnly?'#fb923c':'var(--border)'}`,
+            border:`1px solid ${hotBatOnly?'var(--c-orange2)':'var(--border)'}`,
             background:hotBatOnly?'rgba(251,146,60,.12)':'var(--surface2)',
-            color:hotBatOnly?'#fb923c':'var(--muted)',
+            color:hotBatOnly?'var(--c-orange2)':'var(--muted)',
             fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:hotBatOnly?700:400,
             whiteSpace:'nowrap'}}>
           🔥
@@ -19989,7 +20045,7 @@ function BatterLeaderboard() {
           style={{padding:'6px 12px',borderRadius:7,cursor:'pointer',
             border:`1px solid ${filterGoneYard?'rgba(255,20,0,.5)':'var(--border)'}`,
             background:filterGoneYard?'rgba(255,20,0,.18)':'var(--surface2)',
-            color:filterGoneYard?'#ff4020':'var(--muted)',
+            color:filterGoneYard?'var(--c-danger)':'var(--muted)',
             fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:filterGoneYard?700:400,
             whiteSpace:'nowrap',transition:'all .15s'}}>
           💥
@@ -19998,7 +20054,7 @@ function BatterLeaderboard() {
           style={{padding:'6px 12px',borderRadius:7,cursor:'pointer',
             border:`1px solid ${filterTB2?'rgba(56,184,242,.5)':'var(--border)'}`,
             background:filterTB2?'rgba(56,184,242,.18)':'var(--surface2)',
-            color:filterTB2?'#38b8f2':'var(--muted)',
+            color:filterTB2?'var(--ice)':'var(--muted)',
             fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:filterTB2?700:400,
             whiteSpace:'nowrap',transition:'all .15s'}}>
           2️⃣
@@ -20098,7 +20154,7 @@ function BatterLeaderboard() {
         {/* Data source indicator */}
         <span style={{
           marginLeft:6,fontSize:9,fontFamily:"'DM Mono',monospace",
-          color: (selectedWin==='season2025' ? hasSeason2025 : hasRealWindows) ? '#27c97a' : '#f5a623',
+          color: (selectedWin==='season2025' ? hasSeason2025 : hasRealWindows) ? 'var(--green)' : 'var(--accent2)',
           padding:'2px 8px',borderRadius:5,
           background: (selectedWin==='season2025' ? hasSeason2025 : hasRealWindows) ? 'rgba(39,201,122,.1)' : 'rgba(245,166,35,.1)',
           border:`1px solid ${(selectedWin==='season2025' ? hasSeason2025 : hasRealWindows)?'rgba(39,201,122,.25)':'rgba(245,166,35,.25)'}`,
@@ -20117,7 +20173,7 @@ function BatterLeaderboard() {
       ) : selectedWin === 'season2025' && !hasSeason2025 ? (
         <div style={{padding:'32px 20px',textAlign:'center',background:'rgba(245,166,35,.06)',
           border:'1px solid rgba(245,166,35,.2)',borderRadius:9,
-          fontFamily:"'DM Mono',monospace",fontSize:11,color:'#f5a623',lineHeight:1.8}}>
+          fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--accent2)',lineHeight:1.8}}>
           ⚠ No 2025 season data in cache<br/>
           <span style={{color:'var(--muted)',fontSize:10}}>
             Re-run mlbdata_aggregate.py to populate season2025 window data, then commit players.json
@@ -20180,7 +20236,7 @@ function BatterLeaderboard() {
                           color:'#fff',fontFamily:"'DM Mono',monospace",fontWeight:800,flexShrink:0}}>GY</span>}
                         {!isGoneYard(p) && isTB2(p) && <span title="2+ total bases today (no HR)" style={{fontSize:7,padding:'1px 4px',borderRadius:3,
                           background:'rgba(56,184,242,.20)',border:'1px solid rgba(56,184,242,.4)',
-                          color:'#38b8f2',fontFamily:"'DM Mono',monospace",fontWeight:800,flexShrink:0}}>2B</span>}
+                          color:'var(--ice)',fontFamily:"'DM Mono',monospace",fontWeight:800,flexShrink:0}}>2B</span>}
                         {isHotBatPlayer(p) && <span style={{fontSize:10,flexShrink:0,lineHeight:1}}
                           title={`🔥 Hot Bat — ${parseFloat(p.windows?.last7?.hr??0).toFixed(0)} HR in last 7 days`}>🔥</span>}
                         <InjuryBadge pid={p.pid||p.id} name={p.name}/>
@@ -20338,11 +20394,11 @@ function PitcherLeaderboard() {
   const fmtStat = v => v > 0 ? '.'+String(Math.round(v*1000)).padStart(3,'0') : '—';
   const fmtDec  = (v,d=2) => v!=null&&!isNaN(v)&&v<99 ? v.toFixed(d) : '—';
 
-  const eraCol  = v => v < 3.0 ? '#27c97a' : v < 3.75 ? '#f5a623' : v < 4.50 ? 'var(--text)' : v < 5.50 ? 'var(--ice)' : '#ff4020';
-  const whipCol = v => v < 1.10 ? '#27c97a' : v < 1.25 ? '#f5a623' : v < 1.40 ? 'var(--text)' : '#ff4020';
-  const k9Col   = v => v >= 11 ? '#ff4020' : v >= 9.5 ? '#ff8020' : v >= 8 ? '#f5a623' : 'var(--muted)';
-  const bb9Col  = v => v < 2.0 ? '#27c97a' : v < 3.0 ? '#f5a623' : v < 4.0 ? 'var(--text)' : '#38b8f2';
-  const hr9Col  = v => v < 0.8 ? '#27c97a' : v < 1.2 ? '#f5a623' : v < 1.6 ? 'var(--text)' : '#ff4020';
+  const eraCol  = v => v < 3.0 ? 'var(--green)' : v < 3.75 ? 'var(--accent2)' : v < 4.50 ? 'var(--text)' : v < 5.50 ? 'var(--ice)' : 'var(--c-danger)';
+  const whipCol = v => v < 1.10 ? 'var(--green)' : v < 1.25 ? 'var(--accent2)' : v < 1.40 ? 'var(--text)' : 'var(--c-danger)';
+  const k9Col   = v => v >= 11 ? 'var(--c-danger)' : v >= 9.5 ? 'var(--c-warn)' : v >= 8 ? 'var(--accent2)' : 'var(--muted)';
+  const bb9Col  = v => v < 2.0 ? 'var(--green)' : v < 3.0 ? 'var(--accent2)' : v < 4.0 ? 'var(--text)' : 'var(--ice)';
+  const hr9Col  = v => v < 0.8 ? 'var(--green)' : v < 1.2 ? 'var(--accent2)' : v < 1.6 ? 'var(--text)' : 'var(--c-danger)';
 
   const COLS = [
     { key:'name',   label:'Pitcher',   align:'left',
@@ -20360,7 +20416,7 @@ function PitcherLeaderboard() {
         fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:700,
         padding:'1px 6px',borderRadius:4,
         background: p.hand==='L'?'rgba(56,184,242,.12)':'rgba(255,128,32,.10)',
-        color: p.hand==='L'?'#38b8f2':'#ff8020',
+        color: p.hand==='L'?'var(--ice)':'var(--c-warn)',
         border:`1px solid ${p.hand==='L'?'rgba(56,184,242,.3)':'rgba(255,128,32,.3)'}`,
       }}>{p.hand==='L'?'LHP':p.hand==='R'?'RHP':'—'}</span>
     },
@@ -20374,7 +20430,7 @@ function PitcherLeaderboard() {
     },
     { key:'wins',   label:'W-L',    align:'center',
       render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:700}}>
-        <span style={{color:'#27c97a'}}>{p.wins}</span>
+        <span style={{color:'var(--green)'}}>{p.wins}</span>
         <span style={{color:'var(--muted)'}}>-</span>
         <span style={{color:'var(--ice)'}}>{p.losses}</span>
       </span>
@@ -20386,7 +20442,7 @@ function PitcherLeaderboard() {
     { key:'hr9',    label:'HR/9',   render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:hr9Col(p.hr9)}}>{fmtDec(p.hr9)}</span> },
     { key:'ip',     label:'IP',     render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{p.ipDisplay||fmtDec(p.ip,1)}</span> },
     { key:'so',     label:'K',      render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{p.so}</span> },
-    { key:'hr',     label:'HR',     render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:p.hr>=15?'#ff4020':p.hr>=10?'#f5a623':'var(--text)',fontWeight:p.hr>=10?700:400}}>{p.hr}</span> },
+    { key:'hr',     label:'HR',     render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:p.hr>=15?'var(--c-danger)':p.hr>=10?'var(--accent2)':'var(--text)',fontWeight:p.hr>=10?700:400}}>{p.hr}</span> },
     { key:'avg',    label:'BAA',    render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{fmtStat(p.avg)}</span> },
     { key:'obp',    label:'OBP',    render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{fmtStat(p.obp)}</span> },
     { key:'ops',    label:'OPS',    render: p => <span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{fmtStat(p.ops)}</span> },
@@ -20478,9 +20534,9 @@ function PitcherLeaderboard() {
           </span>
           {['all','‼️ Elite','⚠️ Tough','🤔 Average','💥 Hittable','🎯 Target'].map(g => {
             const cfg = g==='all' ? null : {
-              '‼️ Elite':   {color:'#ff4020'}, '⚠️ Tough':   {color:'#ff8020'},
-              '🤔 Average': {color:'var(--muted)'}, '💥 Hittable': {color:'#27c97a'},
-              '🎯 Target':  {color:'#38b8f2'},
+              '‼️ Elite':   {color:'var(--c-danger)'}, '⚠️ Tough':   {color:'var(--c-warn)'},
+              '🤔 Average': {color:'var(--muted)'}, '💥 Hittable': {color:'var(--green)'},
+              '🎯 Target':  {color:'var(--ice)'},
             }[g];
             const active = gradeFilter === g;
             const col = cfg?.color || 'var(--accent2)';
@@ -20604,7 +20660,7 @@ function HRDotTimeline({ batterId }) {
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
         <span style={{fontFamily:osw,fontWeight:700,fontSize:10,color:'var(--muted)',textTransform:'uppercase',letterSpacing:1}}>LAST {games.length} GAMES</span>
         <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>
-          <span style={{fontFamily:osw,fontWeight:800,fontSize:12,color:hrGames>=4?'#ff4020':hrGames>=2?'#f5a623':'var(--text)',marginRight:4}}>{hrGames} HR</span>
+          <span style={{fontFamily:osw,fontWeight:800,fontSize:12,color:hrGames>=4?'var(--c-danger)':hrGames>=2?'var(--accent2)':'var(--text)',marginRight:4}}>{hrGames} HR</span>
           · 1+ in {hrGames}/{games.length} ({pct}%)
         </span>
       </div>
@@ -20614,7 +20670,7 @@ function HRDotTimeline({ batterId }) {
           return(
             <div key={i} title={`Game ${i+1}: ${g.hrs} HR, ${g.h||0} H, ${g.totalBases||0} TB · ${g.date||''}`}
               style={{width:hasHR?22:18,height:hasHR?22:18,borderRadius:hasHR?6:4,
-                background:multiHR?'#ff4020':hasHR?'#27c97a':hasTB2?'rgba(245,166,35,.35)':'rgba(255,255,255,.07)',
+                background:multiHR?'var(--c-danger)':hasHR?'var(--green)':hasTB2?'rgba(245,166,35,.35)':'rgba(255,255,255,.07)',
                 border:hasHR?`2px solid ${multiHR?'#ff6040':'#3fdf9a'}`:'1px solid rgba(255,255,255,.1)',
                 display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,cursor:'default',transition:'transform .1s'}}
               onMouseEnter={e=>e.currentTarget.style.transform='scale(1.2)'}
@@ -20625,7 +20681,7 @@ function HRDotTimeline({ batterId }) {
         })}
       </div>
       <div style={{display:'flex',gap:10,marginTop:5}}>
-        {[['#27c97a','1 HR'],['#ff4020','2+ HR'],['rgba(245,166,35,.5)','2TB no HR'],['rgba(255,255,255,.07)','No HR']].map(([col,lbl])=>(
+        {[['var(--green)','1 HR'],['var(--c-danger)','2+ HR'],['rgba(245,166,35,.5)','2TB no HR'],['rgba(255,255,255,.07)','No HR']].map(([col,lbl])=>(
           <div key={lbl} style={{display:'flex',alignItems:'center',gap:3}}>
             <div style={{width:7,height:7,borderRadius:2,background:col,flexShrink:0}}/>
             <span style={{fontFamily:mono,fontSize:7,color:'var(--muted)'}}>{lbl}</span>
@@ -20663,9 +20719,9 @@ function Last7HRChart({ batterId }) {
   const pct       = Math.round((hitGames / games.length) * 100);
   const maxVal    = Math.max(view==='2tb'?2:view==='rbi'?1:view==='2b'?1:1, ...games.map(g => getValue(g)));
   const BAR_H     = 120;
-  const barColor  = view==='2tb' ? '#27c97a' : '#27c97a';
+  const barColor  = view==='2tb' ? 'var(--green)' : 'var(--green)';
   const noColor   = view==='2tb' ? 'rgba(255,255,255,.08)' : 'rgba(255,64,32,.15)';
-  const pctColor  = pct >= 57 ? '#27c97a' : pct >= 43 ? '#ffc840' : 'var(--muted)';
+  const pctColor  = pct >= 57 ? 'var(--green)' : pct >= 43 ? 'var(--c-yellow)' : 'var(--muted)';
   const label     = games.length < 7 ? `LAST ${games.length}` : 'LAST 7';
 
   return (
@@ -20714,7 +20770,7 @@ function Last7HRChart({ batterId }) {
             <div key={i} style={{flex:1,display:'flex',flexDirection:'column',
               alignItems:'center',justifyContent:'flex-end',height:'100%',gap:2,zIndex:1}}>
               <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,
-                lineHeight:1,color:isHit?barColor:'#ff4020'}}>{val}</span>
+                lineHeight:1,color:isHit?barColor:'var(--c-danger)'}}>{val}</span>
               <div style={{width:'100%',borderRadius:'4px 4px 0 0',
                 height:isHit ? barH : 2,
                 background:isHit?`linear-gradient(180deg,${barColor},#1aa862)`:noColor,
@@ -20893,8 +20949,8 @@ function RecentGameLog({ batterId }) {
   };
   const resultColor = r => {
     if (r === 'home_run') return 'var(--accent)';
-    if (['single','double','triple'].includes(r)) return '#27c97a';
-    if (r === 'walk' || r === 'intent_walk' || r === 'hit_by_pitch') return '#38b8f2';
+    if (['single','double','triple'].includes(r)) return 'var(--green)';
+    if (r === 'walk' || r === 'intent_walk' || r === 'hit_by_pitch') return 'var(--ice)';
     if (r === 'strikeout' || r === 'strikeout_double_play') return 'var(--ice)';
     return 'var(--muted)';
   };
@@ -20910,7 +20966,7 @@ function RecentGameLog({ batterId }) {
         display:'flex',alignItems:'center',gap:6}}>
         📋 Recent At-Bats
         {source === 'live' && (
-          <span style={{fontSize:7,color:'#27c97a',opacity:.7}}>· live</span>
+          <span style={{fontSize:7,color:'var(--green)',opacity:.7}}>· live</span>
         )}
       </div>
       <div style={{border:'1px solid var(--border)',borderRadius:7,overflow:'hidden'}}>
@@ -20945,15 +21001,15 @@ function RecentGameLog({ batterId }) {
                     {RESULT_LABEL[a.result]||a.result||'—'}
                   </td>
                   <td style={{padding:'4px 7px',textAlign:'center',fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,
-                    color:a.ev>=103?'#ff4020':a.ev>=95?'#ff8020':a.ev>=90?'#ffc840':a.ev>0?'var(--text)':'var(--muted)'}}>
+                    color:a.ev>=103?'var(--c-danger)':a.ev>=95?'var(--c-warn)':a.ev>=90?'var(--c-yellow)':a.ev>0?'var(--text)':'var(--muted)'}}>
                     {a.ev!=null?a.ev.toFixed(1):'—'}
                   </td>
                   <td style={{padding:'4px 7px',textAlign:'center',fontFamily:mono,fontSize:9,
-                    color:a.la!=null&&a.la>=20&&a.la<=35?'#27c97a':'var(--muted)'}}>
+                    color:a.la!=null&&a.la>=20&&a.la<=35?'var(--green)':'var(--muted)'}}>
                     {a.la!=null?a.la.toFixed(0)+'°':'—'}
                   </td>
                   <td style={{padding:'4px 7px',textAlign:'center',fontFamily:mono,fontSize:9,
-                    color:a.dist>=400?'#ff4020':a.dist>=350?'#ff8020':a.dist>0?'var(--text)':'var(--muted)'}}>
+                    color:a.dist>=400?'var(--c-danger)':a.dist>=350?'var(--c-warn)':a.dist>0?'var(--text)':'var(--muted)'}}>
                     {a.dist>0?a.dist+'ft':'—'}
                   </td>
                   <td style={{padding:'4px 7px',textAlign:'center',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>
@@ -21419,11 +21475,11 @@ function StatsTab() {
   const fmtPct = v => v>0 ? v.toFixed(1)+'%' : '—';
   const fmtDec = v => v>0 ? v.toFixed(3) : '—';
   const fmtN   = v => v>0 ? String(Math.round(v)) : '—';
-  const evCol   = v => v>=103?'#ff4020':v>=97?'#f5a623':v>=93?'#27c97a':'var(--muted)';
-  const wobaCol = v => v>=0.380?'#ff4020':v>=0.340?'#f5a623':v>=0.310?'var(--text)':'var(--muted)';
-  const isoCol  = v => v>=0.250?'#ff8020':v>=0.180?'#f5a623':'var(--muted)';
-  const hhCol   = v => v>=42?'#ff4020':v>=35?'#f5a623':'var(--muted)';
-  const pgCol   = g => !g?'var(--muted)':g.includes('Target')?'#27c97a':g.includes('Hittable')?'#60d360':g.includes('Elite')?'#ff4020':g.includes('Tough')?'#f5a623':'var(--muted)';
+  const evCol   = v => v>=103?'var(--c-danger)':v>=97?'var(--accent2)':v>=93?'var(--green)':'var(--muted)';
+  const wobaCol = v => v>=0.380?'var(--c-danger)':v>=0.340?'var(--accent2)':v>=0.310?'var(--text)':'var(--muted)';
+  const isoCol  = v => v>=0.250?'var(--c-warn)':v>=0.180?'var(--accent2)':'var(--muted)';
+  const hhCol   = v => v>=42?'var(--c-danger)':v>=35?'var(--accent2)':'var(--muted)';
+  const pgCol   = g => !g?'var(--muted)':g.includes('Target')?'var(--green)':g.includes('Hittable')?'var(--c-lime)':g.includes('Elite')?'var(--c-danger)':g.includes('Tough')?'var(--accent2)':'var(--muted)';
   const gradeEmojis = [['Target','🎯'],['Hittable','💥'],['Average','🤔'],['Tough','⚠️'],['Elite','‼️']];
 
   // ── Sortable Th (takes a setter) ──────────────────────────────────────────────
@@ -21614,24 +21670,24 @@ function StatsTab() {
             </div>
             <div style={{display:'flex',gap:5,flexWrap:'wrap',alignItems:'center'}}>
               <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0,minWidth:32}}>Role:</span>
-              <PillRow items={[['','All'],['SP','SP'],['RP','RP']]} active={pRoleFilter} onSelect={setPRoleFilter} color='rgba(251,191,36,.2)' activeColor='#fbbf24'/>
+              <PillRow items={[['','All'],['SP','SP'],['RP','RP']]} active={pRoleFilter} onSelect={setPRoleFilter} color='rgba(251,191,36,.2)' activeColor='var(--c-amber)'/>
             </div>
             <div style={{display:'flex',gap:5,flexWrap:'wrap',alignItems:'center'}}>
               <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0,minWidth:32}}>Loc:</span>
-              <PillRow items={[['','All'],['home','Home'],['away','Away']]} active={sharedPLoc} onSelect={onPLocChange} color='rgba(39,201,122,.2)' activeColor='#27c97a'/>
+              <PillRow items={[['','All'],['home','Home'],['away','Away']]} active={sharedPLoc} onSelect={onPLocChange} color='rgba(39,201,122,.2)' activeColor='var(--green)'/>
               <span style={{fontFamily:mono,fontSize:8,color:'var(--accent2)',marginLeft:4,opacity:.6}}>↕ flips batter location</span>
             </div>
             <div style={{display:'flex',gap:5,flexWrap:'wrap',alignItems:'center'}}>
               <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0,minWidth:32}}>D/N:</span>
-              <PillRow items={[['','All'],['day','Day'],['night','Night']]} active={sharedDN} onSelect={setSharedDN} color='rgba(245,166,35,.2)' activeColor='#f5a623'/>
+              <PillRow items={[['','All'],['day','Day'],['night','Night']]} active={sharedDN} onSelect={setSharedDN} color='rgba(245,166,35,.2)' activeColor='var(--accent2)'/>
               <span style={{fontFamily:mono,fontSize:8,color:'var(--accent2)',marginLeft:4,opacity:.6}}>↕ affects both tables</span>
             </div>
             <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
               <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0,minWidth:32}}>More:</span>
               <button onClick={()=>setPScheduledOnly(v=>!v)}
                 style={{padding:'3px 8px',borderRadius:5,fontSize:10,cursor:'pointer',fontFamily:mono,fontWeight:700,flexShrink:0,
-                  border:`1px solid ${pScheduledOnly?'#f5a623':'var(--border)'}`,
-                  background:pScheduledOnly?'rgba(245,166,35,.15)':'transparent',color:pScheduledOnly?'#f5a623':'var(--muted)'}}>
+                  border:`1px solid ${pScheduledOnly?'var(--accent2)':'var(--border)'}`,
+                  background:pScheduledOnly?'rgba(245,166,35,.15)':'transparent',color:pScheduledOnly?'var(--accent2)':'var(--muted)'}}>
                 ⚾ Scheduled SP
               </button>
               <div style={{display:'flex',gap:2,alignItems:'center'}}>
@@ -21708,36 +21764,36 @@ function StatsTab() {
                           return null;
                         })()}
                         <span style={{fontFamily:mono,fontSize:7,color:'var(--muted)'}}>{r.hand==='L'?'LHP':r.hand==='R'?'RHP':''}</span>
-                        {r.role&&<span style={{padding:'1px 3px',borderRadius:3,fontSize:7,fontWeight:700,background:r.role==='SP'?'rgba(56,184,242,.15)':'rgba(251,191,36,.15)',color:r.role==='SP'?'var(--ice)':'#fbbf24',border:`1px solid ${r.role==='SP'?'rgba(56,184,242,.3)':'rgba(251,191,36,.3)'}`}}>{r.role}</span>}
+                        {r.role&&<span style={{padding:'1px 3px',borderRadius:3,fontSize:7,fontWeight:700,background:r.role==='SP'?'rgba(56,184,242,.15)':'rgba(251,191,36,.15)',color:r.role==='SP'?'var(--ice)':'var(--c-amber)',border:`1px solid ${r.role==='SP'?'rgba(56,184,242,.3)':'rgba(251,191,36,.3)'}`}}>{r.role}</span>}
                       </div>
                     </td>
                     <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{fmtN(r.bf)}</td>
-                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,fontWeight:700,color:(r.hr_per9||0)>=1.5?'#ff4020':(r.hr_per9||0)>=1.0?'#f5a623':(r.hr_per9||0)>=0.5?'#fbbf24':'#27c97a'}}>{r.hr_per9>0?r.hr_per9.toFixed(2):'—'}</td>
-                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,fontWeight:700,color:(r.woba_allowed||0)>=0.360?'#ff4020':(r.woba_allowed||0)>=0.320?'#f5a623':'#27c97a'}}>{fmtDec(r.woba_allowed)}</td>
-                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:osw,fontWeight:800,fontSize:11,color:(r.hr_allowed||0)>=8?'#ff4020':(r.hr_allowed||0)>=4?'#f5a623':'var(--muted)'}}>{r.hr_allowed||0}</td>
-                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.k_per9||0)>=10?'#27c97a':(r.k_per9||0)>=8?'#f5a623':'var(--muted)'}}>{r.k_per9>0?r.k_per9.toFixed(1):'—'}</td>
-                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.k_pct||0)>=28?'#27c97a':(r.k_pct||0)>=22?'#f5a623':'var(--muted)'}}>{fmtPct(r.k_pct)}</td>
-                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.bb_pct||0)>=10?'#ff4020':'var(--muted)'}}>{fmtPct(r.bb_pct)}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,fontWeight:700,color:(r.hr_per9||0)>=1.5?'var(--c-danger)':(r.hr_per9||0)>=1.0?'var(--accent2)':(r.hr_per9||0)>=0.5?'var(--c-amber)':'var(--green)'}}>{r.hr_per9>0?r.hr_per9.toFixed(2):'—'}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,fontWeight:700,color:(r.woba_allowed||0)>=0.360?'var(--c-danger)':(r.woba_allowed||0)>=0.320?'var(--accent2)':'var(--green)'}}>{fmtDec(r.woba_allowed)}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:osw,fontWeight:800,fontSize:11,color:(r.hr_allowed||0)>=8?'var(--c-danger)':(r.hr_allowed||0)>=4?'var(--accent2)':'var(--muted)'}}>{r.hr_allowed||0}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.k_per9||0)>=10?'var(--green)':(r.k_per9||0)>=8?'var(--accent2)':'var(--muted)'}}>{r.k_per9>0?r.k_per9.toFixed(1):'—'}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.k_pct||0)>=28?'var(--green)':(r.k_pct||0)>=22?'var(--accent2)':'var(--muted)'}}>{fmtPct(r.k_pct)}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.bb_pct||0)>=10?'var(--c-danger)':'var(--muted)'}}>{fmtPct(r.bb_pct)}</td>
                     <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:evCol(r.ev_allowed||0)}}>{r.ev_allowed?r.ev_allowed.toFixed(1):'—'}</td>
                     <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:hhCol(r.hh_pct_allowed||0)}}>{fmtPct(r.hh_pct_allowed)}</td>
-                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.brl_pct_allowed||0)>=10?'#ff4020':(r.brl_pct_allowed||0)>=6?'#f5a623':'var(--muted)'}}>{fmtPct(r.brl_pct_allowed)}</td>
-                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.fb_pct_allowed||0)>=40?'#ff4020':(r.fb_pct_allowed||0)>=35?'#f5a623':'var(--muted)'}}>{fmtPct(r.fb_pct_allowed)}</td>
-                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.meatball_pct||0)>=60?'#ff4020':(r.meatball_pct||0)>=50?'#f5a623':'var(--muted)'}}>{fmtPct(r.meatball_pct)}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.brl_pct_allowed||0)>=10?'var(--c-danger)':(r.brl_pct_allowed||0)>=6?'var(--accent2)':'var(--muted)'}}>{fmtPct(r.brl_pct_allowed)}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.fb_pct_allowed||0)>=40?'var(--c-danger)':(r.fb_pct_allowed||0)>=35?'var(--accent2)':'var(--muted)'}}>{fmtPct(r.fb_pct_allowed)}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.meatball_pct||0)>=60?'var(--c-danger)':(r.meatball_pct||0)>=50?'var(--accent2)':'var(--muted)'}}>{fmtPct(r.meatball_pct)}</td>
                     <td onClick={e=>{e.stopPropagation();setPitchGroup(p=>p==='fastball'?'':'fastball');}}
                       style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,cursor:'pointer',
-                        color:pitchGroup==='fastball'?'var(--accent)':(r.fb_pct_p||0)>=55?'#ff4020':(r.fb_pct_p||0)>=45?'#f5a623':'var(--muted)',
+                        color:pitchGroup==='fastball'?'var(--accent)':(r.fb_pct_p||0)>=55?'var(--c-danger)':(r.fb_pct_p||0)>=45?'var(--accent2)':'var(--muted)',
                         fontWeight:pitchGroup==='fastball'?700:400,
                         background:pitchGroup==='fastball'?'rgba(232,65,26,.08)':'transparent',borderRadius:3}}>
                       {r.fb_pct_p>0?r.fb_pct_p.toFixed(1)+'%':'—'}</td>
                     <td onClick={e=>{e.stopPropagation();setPitchGroup(p=>p==='breaking'?'':'breaking');}}
                       style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,cursor:'pointer',
-                        color:pitchGroup==='breaking'?'#38b8f2':(r.br_pct_p||0)>=35?'#ff4020':(r.br_pct_p||0)>=25?'#f5a623':'var(--muted)',
+                        color:pitchGroup==='breaking'?'var(--ice)':(r.br_pct_p||0)>=35?'var(--c-danger)':(r.br_pct_p||0)>=25?'var(--accent2)':'var(--muted)',
                         fontWeight:pitchGroup==='breaking'?700:400,
                         background:pitchGroup==='breaking'?'rgba(56,184,242,.08)':'transparent',borderRadius:3}}>
                       {r.br_pct_p>0?r.br_pct_p.toFixed(1)+'%':'—'}</td>
                     <td onClick={e=>{e.stopPropagation();setPitchGroup(p=>p==='offspeed'?'':'offspeed');}}
                       style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,cursor:'pointer',
-                        color:pitchGroup==='offspeed'?'#27c97a':(r.os_pct_p||0)>=25?'#ff4020':(r.os_pct_p||0)>=15?'#f5a623':'var(--muted)',
+                        color:pitchGroup==='offspeed'?'var(--green)':(r.os_pct_p||0)>=25?'var(--c-danger)':(r.os_pct_p||0)>=15?'var(--accent2)':'var(--muted)',
                         fontWeight:pitchGroup==='offspeed'?700:400,
                         background:pitchGroup==='offspeed'?'rgba(39,201,122,.08)':'transparent',borderRadius:3}}>
                       {r.os_pct_p>0?r.os_pct_p.toFixed(1)+'%':'—'}</td>
@@ -21858,12 +21914,12 @@ function StatsTab() {
             </div>
             <div style={{display:'flex',gap:5,flexWrap:'wrap',alignItems:'center'}}>
               <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0,minWidth:32}}>Loc:</span>
-              <PillRow items={[['','All'],['home','Home'],['away','Away']]} active={sharedBLoc} onSelect={onBLocChange} color='rgba(39,201,122,.2)' activeColor='#27c97a'/>
+              <PillRow items={[['','All'],['home','Home'],['away','Away']]} active={sharedBLoc} onSelect={onBLocChange} color='rgba(39,201,122,.2)' activeColor='var(--green)'/>
               <span style={{fontFamily:mono,fontSize:8,color:'var(--accent2)',marginLeft:4,opacity:.6}}>↕ flips pitcher location</span>
             </div>
             <div style={{display:'flex',gap:5,flexWrap:'wrap',alignItems:'center'}}>
               <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0,minWidth:32}}>D/N:</span>
-              <PillRow items={[['','All'],['day','Day'],['night','Night']]} active={sharedDN} onSelect={setSharedDN} color='rgba(245,166,35,.2)' activeColor='#f5a623'/>
+              <PillRow items={[['','All'],['day','Day'],['night','Night']]} active={sharedDN} onSelect={setSharedDN} color='rgba(245,166,35,.2)' activeColor='var(--accent2)'/>
               <span style={{fontFamily:mono,fontSize:8,color:'var(--accent2)',marginLeft:4,opacity:.6}}>↕ affects both tables</span>
             </div>
             <div style={{display:'flex',gap:5,flexWrap:'wrap',alignItems:'center'}}>
@@ -21905,9 +21961,9 @@ function StatsTab() {
                     <button onClick={()=>setPitchGroup(p=>p==='breaking'?'':'breaking')}
                       style={{padding:'3px 8px',borderRadius:5,fontSize:9,fontFamily:mono,cursor:'pointer',
                         display:'flex',alignItems:'center',gap:4,
-                        border:`1px solid ${pitchGroup==='breaking'?'#38b8f2':'var(--border)'}`,
+                        border:`1px solid ${pitchGroup==='breaking'?'var(--ice)':'var(--border)'}`,
                         background:pitchGroup==='breaking'?'rgba(56,184,242,.15)':'transparent',
-                        color:pitchGroup==='breaking'?'#38b8f2':'var(--muted)',
+                        color:pitchGroup==='breaking'?'var(--ice)':'var(--muted)',
                         fontWeight:pitchGroup==='breaking'?700:400}}>
                       🌀 Breaking
                       {avgBk&&<span style={{fontFamily:mono,fontSize:8,opacity:.75,marginLeft:2}}>{avgBk}%</span>}
@@ -21915,9 +21971,9 @@ function StatsTab() {
                     <button onClick={()=>setPitchGroup(p=>p==='offspeed'?'':'offspeed')}
                       style={{padding:'3px 8px',borderRadius:5,fontSize:9,fontFamily:mono,cursor:'pointer',
                         display:'flex',alignItems:'center',gap:4,
-                        border:`1px solid ${pitchGroup==='offspeed'?'#27c97a':'var(--border)'}`,
+                        border:`1px solid ${pitchGroup==='offspeed'?'var(--green)':'var(--border)'}`,
                         background:pitchGroup==='offspeed'?'rgba(39,201,122,.15)':'transparent',
-                        color:pitchGroup==='offspeed'?'#27c97a':'var(--muted)',
+                        color:pitchGroup==='offspeed'?'var(--green)':'var(--muted)',
                         fontWeight:pitchGroup==='offspeed'?700:400}}>
                       💨 Offspeed
                       {avgOs&&<span style={{fontFamily:mono,fontSize:8,opacity:.75,marginLeft:2}}>{avgOs}%</span>}
@@ -21955,7 +22011,7 @@ function StatsTab() {
             })()}
             <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
               <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0,minWidth:32}}>Flags:</span>
-              {[[bPicksOnly,setBPicksOnly,'var(--accent2)','🎯 My Picks'],[bConfirmed,setBConfirmed,'#27c97a','✅ Confirmed'],[bHotOnly,setBHotOnly,'#fb923c','🔥 Hot Bat'],[bGYOnly,setBGYOnly,'var(--accent)','💥 Gone Yard'],[bTB2Only,setBTB2Only,'#38b8f2','2️⃣ 2+ TB'],[bHideInj,setBHideInj,'#fb923c','🤕 Hide Inj']].map(([active,setFn,col,label])=>(
+              {[[bPicksOnly,setBPicksOnly,'var(--accent2)','🎯 My Picks'],[bConfirmed,setBConfirmed,'var(--green)','✅ Confirmed'],[bHotOnly,setBHotOnly,'var(--c-orange2)','🔥 Hot Bat'],[bGYOnly,setBGYOnly,'var(--accent)','💥 Gone Yard'],[bTB2Only,setBTB2Only,'var(--ice)','2️⃣ 2+ TB'],[bHideInj,setBHideInj,'var(--c-orange2)','🤕 Hide Inj']].map(([active,setFn,col,label])=>(
                 <button key={label} onClick={()=>setFn(v=>!v)}
                   style={{padding:'4px 9px',borderRadius:6,cursor:'pointer',fontSize:9,fontFamily:mono,fontWeight:active?700:400,
                     border:`1px solid ${active?col:'var(--border)'}`,background:active?`${col}22`:'transparent',
@@ -21984,20 +22040,20 @@ function StatsTab() {
             <div style={{display:'flex',alignItems:'center',gap:4,flexWrap:'wrap',marginTop:4}}>
               <button onClick={()=>setThreshPanelOpen(v=>!v)}
                 style={{padding:'3px 8px',borderRadius:6,cursor:'pointer',fontFamily:mono,fontWeight:700,fontSize:9,letterSpacing:.4,
-                  border:`1px solid ${threshPanelOpen||threshFilters.length?'#a78bfa':'var(--border)'}`,
+                  border:`1px solid ${threshPanelOpen||threshFilters.length?'var(--c-purple)':'var(--border)'}`,
                   background:threshFilters.length?'rgba(167,139,250,.12)':'var(--surface2)',
-                  color:threshPanelOpen||threshFilters.length?'#a78bfa':'var(--muted)',
+                  color:threshPanelOpen||threshFilters.length?'var(--c-purple)':'var(--muted)',
                   display:'flex',alignItems:'center',gap:3}}>
                 🎯 {threshPanelOpen?'CLOSE':'THRESHOLD'}
                 {threshFilters.length>0&&!threshPanelOpen&&
-                  <span style={{background:'#a78bfa',color:'#000',borderRadius:8,padding:'0 4px',fontSize:8,fontWeight:900}}>{threshFilters.length}</span>}
+                  <span style={{background:'var(--c-purple)',color:'#000',borderRadius:8,padding:'0 4px',fontSize:8,fontWeight:900}}>{threshFilters.length}</span>}
               </button>
               {threshFilters.map((f,i)=>(
                 <span key={i} style={{display:'flex',alignItems:'center',gap:3,padding:'2px 6px',borderRadius:5,fontSize:8,fontFamily:mono,
-                  background:'rgba(167,139,250,.12)',border:'1px solid rgba(167,139,250,.3)',color:'#a78bfa'}}>
+                  background:'rgba(167,139,250,.12)',border:'1px solid rgba(167,139,250,.3)',color:'var(--c-purple)'}}>
                   {f.col} {f.op} {f.val}
                   <button onClick={()=>setThreshFilters(fs=>fs.filter((_,j)=>j!==i))}
-                    style={{background:'none',border:'none',color:'#a78bfa',cursor:'pointer',padding:0,fontSize:10}}>✕</button>
+                    style={{background:'none',border:'none',color:'var(--c-purple)',cursor:'pointer',padding:0,fontSize:10}}>✕</button>
                 </span>
               ))}
             </div>
@@ -22023,7 +22079,7 @@ function StatsTab() {
                   placeholder="value" step="0.1"
                   style={{width:60,padding:'4px 6px',borderRadius:5,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:9,outline:'none'}}/>
                 <button onClick={()=>{const v=parseFloat(threshVal);if(!isNaN(v)&&threshCol){setThreshFilters(fs=>[...fs,{col:threshCol,op:threshOp,val:v}]);setThreshVal('');}}}
-                  style={{padding:'4px 10px',borderRadius:5,border:'none',cursor:'pointer',background:'rgba(167,139,250,.2)',color:'#a78bfa',fontFamily:mono,fontSize:9,fontWeight:700}}>
+                  style={{padding:'4px 10px',borderRadius:5,border:'none',cursor:'pointer',background:'rgba(167,139,250,.2)',color:'var(--c-purple)',fontFamily:mono,fontSize:9,fontWeight:700}}>
                   + Add
                 </button>
                 {threshFilters.length>0&&(
@@ -22105,42 +22161,42 @@ function StatsTab() {
                         <PickButton pid={parseInt(r.id)||0} name={r.name||r.id} team={r.team||''}/>
                       </div>
                     </td>
-                    <td style={{textAlign:'center',padding:'2px 4px',fontFamily:mono,fontSize:9,fontWeight:700,color:r._slot<99?'#27c97a':'transparent',minWidth:18}}>{r._slot<99?r._slot:'·'}</td>
+                    <td style={{textAlign:'center',padding:'2px 4px',fontFamily:mono,fontSize:9,fontWeight:700,color:r._slot<99?'var(--green)':'transparent',minWidth:18}}>{r._slot<99?r._slot:'·'}</td>
                     <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{fmtN(r.pa)}</td>
                     <td style={{textAlign:'center',padding:'2px 4px'}}>
                       {r._yard>0 ? <YardBadge score={parseFloat(r._yard)}/> : <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>—</span>}
                     </td>
-                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.avg||0)>=0.280?'#27c97a':'var(--muted)'}}>{fmtAvg(r.avg)}</td>
-                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.obp||0)>=0.360?'#27c97a':'var(--muted)'}}>{fmtAvg(r.obp)}</td>
-                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.slg||0)>=0.480?'#ff8020':(r.slg||0)>=0.400?'#f5a623':'var(--muted)'}}>{fmtAvg(r.slg)}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.avg||0)>=0.280?'var(--green)':'var(--muted)'}}>{fmtAvg(r.avg)}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.obp||0)>=0.360?'var(--green)':'var(--muted)'}}>{fmtAvg(r.obp)}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.slg||0)>=0.480?'var(--c-warn)':(r.slg||0)>=0.400?'var(--accent2)':'var(--muted)'}}>{fmtAvg(r.slg)}</td>
                     <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,fontWeight:700,color:isoCol(r.iso||0)}}>{fmtDec(r.iso)}</td>
                     <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,fontWeight:700,color:wobaCol(r.woba||0)}}>{fmtDec(r.woba)}</td>
-                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:osw,fontWeight:800,fontSize:11,color:(r.hr||0)>=5?'#ff4020':(r.hr||0)>=2?'#f5a623':'var(--muted)'}}>{r.hr||0}</td>
-                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.hr_rate||0)>=8?'#ff4020':(r.hr_rate||0)>=4?'#f5a623':'var(--muted)'}}>{fmtPct(r.hr_rate)}</td>
-                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:osw,fontWeight:700,fontSize:10,color:(r.xbh||0)>=8?'#ff8020':(r.xbh||0)>=4?'#f5a623':'var(--muted)'}}>{r.xbh||0}</td>
-                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.xbh_pct||0)>=15?'#ff8020':(r.xbh_pct||0)>=10?'#f5a623':'var(--muted)'}}>{fmtPct(r.xbh_pct)}</td>
-                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.tb||0)>=20?'#ff4020':(r.tb||0)>=12?'#f5a623':'var(--muted)'}}>{r.tb||0}</td>
-                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.k_pct||0)>=28?'#ff4020':(r.k_pct||0)>=22?'#f5a623':'var(--muted)'}}>{fmtPct(r.k_pct)}</td>
-                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.bb_pct||0)>=12?'#27c97a':'var(--muted)'}}>{fmtPct(r.bb_pct)}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:osw,fontWeight:800,fontSize:11,color:(r.hr||0)>=5?'var(--c-danger)':(r.hr||0)>=2?'var(--accent2)':'var(--muted)'}}>{r.hr||0}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.hr_rate||0)>=8?'var(--c-danger)':(r.hr_rate||0)>=4?'var(--accent2)':'var(--muted)'}}>{fmtPct(r.hr_rate)}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:osw,fontWeight:700,fontSize:10,color:(r.xbh||0)>=8?'var(--c-warn)':(r.xbh||0)>=4?'var(--accent2)':'var(--muted)'}}>{r.xbh||0}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.xbh_pct||0)>=15?'var(--c-warn)':(r.xbh_pct||0)>=10?'var(--accent2)':'var(--muted)'}}>{fmtPct(r.xbh_pct)}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.tb||0)>=20?'var(--c-danger)':(r.tb||0)>=12?'var(--accent2)':'var(--muted)'}}>{r.tb||0}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.k_pct||0)>=28?'var(--c-danger)':(r.k_pct||0)>=22?'var(--accent2)':'var(--muted)'}}>{fmtPct(r.k_pct)}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.bb_pct||0)>=12?'var(--green)':'var(--muted)'}}>{fmtPct(r.bb_pct)}</td>
                     <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:evCol(r.ev||0)}}>{r.ev?r.ev.toFixed(1):'—'}</td>
                     <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:hhCol(r.hh_pct||0)}}>{fmtPct(r.hh_pct)}</td>
-                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.pbrl_pct||0)>=8?'#ff4020':'var(--muted)'}}>{fmtPct(r.pbrl_pct)}</td>
-                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.fb_pct||0)>=38?'#27c97a':'var(--muted)'}}>{fmtPct(r.fb_pct)}</td>
-                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.la_mean||0)>=18&&(r.la_mean||0)<=30?'#27c97a':'var(--muted)'}}>{r.la_mean?r.la_mean.toFixed(1)+'°':'—'}</td>
-                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.gb_pct||0)>=55?'#27c97a':'var(--muted)'}}>{r.gb_pct!=null?r.gb_pct.toFixed(1)+'%':'—'}</td>
-                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.ld_pct||0)>=28?'#ff4020':(r.ld_pct||0)>=22?'#f5a623':'var(--muted)'}}>{r.ld_pct!=null?r.ld_pct.toFixed(1)+'%':'—'}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.pbrl_pct||0)>=8?'var(--c-danger)':'var(--muted)'}}>{fmtPct(r.pbrl_pct)}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.fb_pct||0)>=38?'var(--green)':'var(--muted)'}}>{fmtPct(r.fb_pct)}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.la_mean||0)>=18&&(r.la_mean||0)<=30?'var(--green)':'var(--muted)'}}>{r.la_mean?r.la_mean.toFixed(1)+'°':'—'}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.gb_pct||0)>=55?'var(--green)':'var(--muted)'}}>{r.gb_pct!=null?r.gb_pct.toFixed(1)+'%':'—'}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.ld_pct||0)>=28?'var(--c-danger)':(r.ld_pct||0)>=22?'var(--accent2)':'var(--muted)'}}>{r.ld_pct!=null?r.ld_pct.toFixed(1)+'%':'—'}</td>
                     <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{r.popup_pct!=null?r.popup_pct.toFixed(1)+'%':'—'}</td>
-                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.pull_pct||0)>=45?'#ff4020':'var(--muted)'}}>{r.pull_pct!=null?r.pull_pct.toFixed(1)+'%':'—'}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.pull_pct||0)>=45?'var(--c-danger)':'var(--muted)'}}>{r.pull_pct!=null?r.pull_pct.toFixed(1)+'%':'—'}</td>
                     <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{r.straight_pct!=null?r.straight_pct.toFixed(1)+'%':'—'}</td>
-                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.oppo_pct||0)>=30?'#27c97a':'var(--muted)'}}>{r.oppo_pct!=null?r.oppo_pct.toFixed(1)+'%':'—'}</td>
-                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.avg_dist||0)>=320?'#ff4020':(r.avg_dist||0)>=280?'#f5a623':'var(--muted)'}}>{r.avg_dist!=null?r.avg_dist.toFixed(0):'—'}</td>
-                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.dist_300||0)>=10?'#f5a623':'var(--muted)'}}>{r.dist_300!=null?r.dist_300:'—'}</td>
-                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.dist_350||0)>=5?'#ff4020':'var(--muted)'}}>{r.dist_350!=null?r.dist_350:'—'}</td>
-                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.near_hr||0)>=3?'#f5a623':'var(--muted)'}}>{r.near_hr!=null?r.near_hr:'—'}</td>
-                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.swstr_pct||0)>=15?'#27c97a':'var(--muted)'}}>{r.swstr_pct!=null?r.swstr_pct.toFixed(1)+'%':'—'}</td>
-                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.whiff_pct||0)>=35?'#27c97a':'var(--muted)'}}>{r.whiff_pct!=null?r.whiff_pct.toFixed(1)+'%':'—'}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.oppo_pct||0)>=30?'var(--green)':'var(--muted)'}}>{r.oppo_pct!=null?r.oppo_pct.toFixed(1)+'%':'—'}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.avg_dist||0)>=320?'var(--c-danger)':(r.avg_dist||0)>=280?'var(--accent2)':'var(--muted)'}}>{r.avg_dist!=null?r.avg_dist.toFixed(0):'—'}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.dist_300||0)>=10?'var(--accent2)':'var(--muted)'}}>{r.dist_300!=null?r.dist_300:'—'}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.dist_350||0)>=5?'var(--c-danger)':'var(--muted)'}}>{r.dist_350!=null?r.dist_350:'—'}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.near_hr||0)>=3?'var(--accent2)':'var(--muted)'}}>{r.near_hr!=null?r.near_hr:'—'}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.swstr_pct||0)>=15?'var(--green)':'var(--muted)'}}>{r.swstr_pct!=null?r.swstr_pct.toFixed(1)+'%':'—'}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.whiff_pct||0)>=35?'var(--green)':'var(--muted)'}}>{r.whiff_pct!=null?r.whiff_pct.toFixed(1)+'%':'—'}</td>
                     <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{r.first_pitch_swing_pct!=null?r.first_pitch_swing_pct.toFixed(1)+'%':'—'}</td>
-                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.bat_speed||0)>=75?'#ff4020':(r.bat_speed||0)>=70?'#f5a623':'var(--muted)'}}>{r.bat_speed!=null?r.bat_speed.toFixed(1):'—'}</td>
+                    <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.bat_speed||0)>=75?'var(--c-danger)':(r.bat_speed||0)>=70?'var(--accent2)':'var(--muted)'}}>{r.bat_speed!=null?r.bat_speed.toFixed(1):'—'}</td>
 
                     <td style={{padding:'2px 8px',whiteSpace:'nowrap'}}>
                       {(()=>{
@@ -22245,20 +22301,20 @@ function StatsTab() {
                       </td>
                       <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{r.players}</td>
                       <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{Math.round(r.pa)}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.avg||0)>=.270?'#27c97a':'var(--muted)'}}>{r.avg>0?'.'+String(Math.round(r.avg*1000)).padStart(3,'0'):'—'}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.obp||0)>=.340?'#27c97a':'var(--muted)'}}>{r.obp>0?'.'+String(Math.round(r.obp*1000)).padStart(3,'0'):'—'}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.slg||0)>=.450?'#ff8020':(r.slg||0)>=.380?'#f5a623':'var(--muted)'}}>{r.slg>0?'.'+String(Math.round(r.slg*1000)).padStart(3,'0'):'—'}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,fontWeight:700,color:(r.iso||0)>=.200?'#ff8020':(r.iso||0)>=.160?'#f5a623':'var(--muted)'}}>{r.iso>0?r.iso.toFixed(3):'—'}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,fontWeight:700,color:(r.woba||0)>=.340?'#ff4020':(r.woba||0)>=.310?'#f5a623':'var(--muted)'}}>{r.woba>0?r.woba.toFixed(3):'—'}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:osw,fontWeight:800,fontSize:11,color:(r.hr||0)>=15?'#ff4020':(r.hr||0)>=8?'#f5a623':'var(--muted)'}}>{r.hr||0}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.hr_rate||0)>=5?'#ff4020':(r.hr_rate||0)>=3?'#f5a623':'var(--muted)'}}>{r.hr_rate>0?r.hr_rate.toFixed(1)+'%':'—'}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.k_pct||0)>=26?'#ff4020':'var(--muted)'}}>{r.k_pct>0?r.k_pct.toFixed(1)+'%':'—'}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.bb_pct||0)>=11?'#27c97a':'var(--muted)'}}>{r.bb_pct>0?r.bb_pct.toFixed(1)+'%':'—'}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.ev||0)>=103?'#ff4020':(r.ev||0)>=98?'#f5a623':'var(--muted)'}}>{r.ev>0?r.ev.toFixed(1):'—'}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.hh_pct||0)>=42?'#ff4020':(r.hh_pct||0)>=36?'#f5a623':'var(--muted)'}}>{r.hh_pct>0?r.hh_pct.toFixed(1)+'%':'—'}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.pbrl_pct||0)>=8?'#ff4020':'var(--muted)'}}>{r.pbrl_pct>0?r.pbrl_pct.toFixed(1)+'%':'—'}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.fb_pct||0)>=38?'#27c97a':'var(--muted)'}}>{r.fb_pct>0?r.fb_pct.toFixed(1)+'%':'—'}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.la_mean||0)>=18&&(r.la_mean||0)<=30?'#27c97a':'var(--muted)'}}>{r.la_mean>0?r.la_mean.toFixed(1)+'°':'—'}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.avg||0)>=.270?'var(--green)':'var(--muted)'}}>{r.avg>0?'.'+String(Math.round(r.avg*1000)).padStart(3,'0'):'—'}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.obp||0)>=.340?'var(--green)':'var(--muted)'}}>{r.obp>0?'.'+String(Math.round(r.obp*1000)).padStart(3,'0'):'—'}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.slg||0)>=.450?'var(--c-warn)':(r.slg||0)>=.380?'var(--accent2)':'var(--muted)'}}>{r.slg>0?'.'+String(Math.round(r.slg*1000)).padStart(3,'0'):'—'}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,fontWeight:700,color:(r.iso||0)>=.200?'var(--c-warn)':(r.iso||0)>=.160?'var(--accent2)':'var(--muted)'}}>{r.iso>0?r.iso.toFixed(3):'—'}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,fontWeight:700,color:(r.woba||0)>=.340?'var(--c-danger)':(r.woba||0)>=.310?'var(--accent2)':'var(--muted)'}}>{r.woba>0?r.woba.toFixed(3):'—'}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:osw,fontWeight:800,fontSize:11,color:(r.hr||0)>=15?'var(--c-danger)':(r.hr||0)>=8?'var(--accent2)':'var(--muted)'}}>{r.hr||0}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.hr_rate||0)>=5?'var(--c-danger)':(r.hr_rate||0)>=3?'var(--accent2)':'var(--muted)'}}>{r.hr_rate>0?r.hr_rate.toFixed(1)+'%':'—'}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.k_pct||0)>=26?'var(--c-danger)':'var(--muted)'}}>{r.k_pct>0?r.k_pct.toFixed(1)+'%':'—'}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.bb_pct||0)>=11?'var(--green)':'var(--muted)'}}>{r.bb_pct>0?r.bb_pct.toFixed(1)+'%':'—'}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.ev||0)>=103?'var(--c-danger)':(r.ev||0)>=98?'var(--accent2)':'var(--muted)'}}>{r.ev>0?r.ev.toFixed(1):'—'}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.hh_pct||0)>=42?'var(--c-danger)':(r.hh_pct||0)>=36?'var(--accent2)':'var(--muted)'}}>{r.hh_pct>0?r.hh_pct.toFixed(1)+'%':'—'}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.pbrl_pct||0)>=8?'var(--c-danger)':'var(--muted)'}}>{r.pbrl_pct>0?r.pbrl_pct.toFixed(1)+'%':'—'}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.fb_pct||0)>=38?'var(--green)':'var(--muted)'}}>{r.fb_pct>0?r.fb_pct.toFixed(1)+'%':'—'}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.la_mean||0)>=18&&(r.la_mean||0)<=30?'var(--green)':'var(--muted)'}}>{r.la_mean>0?r.la_mean.toFixed(1)+'°':'—'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -22403,9 +22459,9 @@ function SoCloseTab({ data }) {
     URL.revokeObjectURL(url);
   };
 
-  const distCol = d => d>=390?'#ff4020':d>=370?'#f5a623':d>=350?'#fbbf24':'var(--muted)';
-  const evCol   = e => e>=105?'#ff4020':e>=100?'#f5a623':e>=95?'#27c97a':'var(--muted)';
-  const pgCol   = g => !g?'var(--muted)':g.includes('Target')?'#27c97a':g.includes('Hittable')?'#60d360':g.includes('Elite')?'#ff4020':g.includes('Tough')?'#f5a623':'var(--muted)';
+  const distCol = d => d>=390?'var(--c-danger)':d>=370?'var(--accent2)':d>=350?'var(--c-amber)':'var(--muted)';
+  const evCol   = e => e>=105?'var(--c-danger)':e>=100?'var(--accent2)':e>=95?'var(--green)':'var(--muted)';
+  const pgCol   = g => !g?'var(--muted)':g.includes('Target')?'var(--green)':g.includes('Hittable')?'var(--c-lime)':g.includes('Elite')?'var(--c-danger)':g.includes('Tough')?'var(--accent2)':'var(--muted)';
 
   return (
     <div style={{padding:'0 4px'}}>
@@ -22427,7 +22483,7 @@ function SoCloseTab({ data }) {
         <button onClick={()=>setConfirmedOnly(v=>!v)}
           title={confirmedOnly?'Showing confirmed only':'Filter to confirmed lineup'}
           style={{padding:'5px 10px',borderRadius:6,cursor:'pointer',fontSize:14,
-            border:`1px solid ${confirmedOnly?'#27c97a':'var(--border)'}`,
+            border:`1px solid ${confirmedOnly?'var(--green)':'var(--border)'}`,
             background:confirmedOnly?'rgba(39,201,122,.12)':'transparent'}}>
           ✅
         </button>
@@ -22443,8 +22499,8 @@ function SoCloseTab({ data }) {
       <div style={{marginBottom:10,background:'rgba(251,191,36,.06)',borderRadius:6,
         border:'1px solid rgba(251,191,36,.2)',padding:'7px 12px',
         fontFamily:mono,fontSize:8,color:'var(--muted)',lineHeight:1.7}}>
-        <span style={{color:'#fbbf24',fontWeight:700}}>{rows.length} batters</span> had ≥2 near-HR events in the last 7 days and are playing today ·
-        Excludes yesterday HRs unless 3+ close calls (<span style={{color:'#ff8020'}}>🔥 on a tear</span>) ·
+        <span style={{color:'var(--c-amber)',fontWeight:700}}>{rows.length} batters</span> had ≥2 near-HR events in the last 7 days and are playing today ·
+        Excludes yesterday HRs unless 3+ close calls (<span style={{color:'var(--c-warn)'}}>🔥 on a tear</span>) ·
         Click any row to expand recent ABs
       </div>
 
@@ -22492,7 +22548,7 @@ function SoCloseTab({ data }) {
                       <div style={{display:'flex',alignItems:'center',gap:3}}>
                         <PlayerAvatar pid={r.pid} name={r.name} size={16}/>
                         {r.confirmed && <span title="Confirmed in lineup" data-tip="✅ Confirmed in today's lineup" style={{fontSize:8,flexShrink:0}}>✅</span>}
-                        {r.isDiamond  && <span style={{padding:'1px 3px',borderRadius:3,fontSize:7,fontWeight:700,background:'rgba(255,204,0,.15)',color:'#ffcc00',border:'1px solid rgba(255,204,0,.3)',flexShrink:0}}>💎</span>}
+                        {r.isDiamond  && <span style={{padding:'1px 3px',borderRadius:3,fontSize:7,fontWeight:700,background:'rgba(255,204,0,.15)',color:'var(--c-yellow2)',border:'1px solid rgba(255,204,0,.3)',flexShrink:0}}>💎</span>}
                         {isGoneYardToday(r.pid,r.name) && <span title="💥 Gone Yard Today" style={{fontSize:9,flexShrink:0}}>💥</span>}
                         {!isGoneYardToday(r.pid,r.name) && is2BagToday(r.pid,r.name) && <span title="2️⃣ 2+ total bases today (no HR)" style={{fontSize:9,flexShrink:0}}>2️⃣</span>}
                         {isHotBatPlayer(getCachedPlayer(r.pid)||{recent_hr_count:r.count}) && <span title="🔥 3+ HRs L7" style={{fontSize:9,flexShrink:0}}>🔥</span>}
@@ -22509,35 +22565,35 @@ function SoCloseTab({ data }) {
                       {r._yard>0&&<YardBadge score={r._yard}/>}
                     </td>
                     <td style={{textAlign:'center',padding:'2px 4px',fontFamily:mono,fontSize:9,fontWeight:700,
-                      color:r.grade==='A+'?'#ffd700':r.grade==='A'?'#27c97a':r.grade==='B'?'#f5a623':'var(--muted)'}}>
+                      color:r.grade==='A+'?'var(--c-gold)':r.grade==='A'?'var(--green)':r.grade==='B'?'var(--accent2)':'var(--muted)'}}>
                       {r.grade||'—'}
                     </td>
                     <td style={{textAlign:'center',padding:'2px 4px',fontFamily:mono,fontSize:8,fontWeight:700,
-                      color:r.pgLabel?.includes('Target')?'#27c97a':r.pgLabel?.includes('Hittable')?'#60d360':r.pgLabel?.includes('Elite')?'#ff4020':r.pgLabel?.includes('Tough')?'#f5a623':'var(--muted)'}}>
+                      color:r.pgLabel?.includes('Target')?'var(--green)':r.pgLabel?.includes('Hittable')?'var(--c-lime)':r.pgLabel?.includes('Elite')?'var(--c-danger)':r.pgLabel?.includes('Tough')?'var(--accent2)':'var(--muted)'}}>
                       {r.pgLabel?r.pgLabel.split(' ').slice(-1)[0]:'—'}
                     </td>
                     <td style={{textAlign:'center',padding:'2px 4px',fontFamily:osw,fontWeight:800,fontSize:11,
-                      color:r.count>=4?'#ff4020':r.count>=3?'#f5a623':'#fbbf24'}}>
+                      color:r.count>=4?'var(--c-danger)':r.count>=3?'var(--accent2)':'var(--c-amber)'}}>
                       {r.count}
                     </td>
                     <td style={{textAlign:'right',padding:'2px 4px',fontFamily:mono,fontSize:9,fontWeight:700,
-                      color:r.max_dist>=390?'#ff4020':r.max_dist>=370?'#f5a623':r.max_dist>=350?'#fbbf24':'var(--muted)'}}>
+                      color:r.max_dist>=390?'var(--c-danger)':r.max_dist>=370?'var(--accent2)':r.max_dist>=350?'var(--c-amber)':'var(--muted)'}}>
                       {r.max_dist>0?r.max_dist.toFixed(0)+'ft':'—'}
                     </td>
                     <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,
-                      color:r.max_ev>=105?'#ff4020':r.max_ev>=100?'#f5a623':r.max_ev>=95?'#27c97a':'var(--muted)'}}>
+                      color:r.max_ev>=105?'var(--c-danger)':r.max_ev>=100?'var(--accent2)':r.max_ev>=95?'var(--green)':'var(--muted)'}}>
                       {r.max_ev>0?r.max_ev.toFixed(1):'—'}
                     </td>
                     <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,
-                      color:r.rec_ev>=95?'#ff4020':r.rec_ev>=90?'#f5a623':r.rec_ev>=85?'#27c97a':'var(--muted)'}}>
+                      color:r.rec_ev>=95?'var(--c-danger)':r.rec_ev>=90?'var(--accent2)':r.rec_ev>=85?'var(--green)':'var(--muted)'}}>
                       {r.rec_ev>0?r.rec_ev.toFixed(1):'—'}
                     </td>
                     <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,
-                      color:r.sim_tb>=1.4?'#ff4020':r.sim_tb>=1.1?'#f5a623':'var(--muted)'}}>
+                      color:r.sim_tb>=1.4?'var(--c-danger)':r.sim_tb>=1.1?'var(--accent2)':'var(--muted)'}}>
                       {r.sim_tb>0?r.sim_tb.toFixed(2):'—'}
                     </td>
                     <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,
-                      color:r.iso>=0.250?'#ff8020':r.iso>=0.180?'#f5a623':'var(--muted)'}}>
+                      color:r.iso>=0.250?'var(--c-warn)':r.iso>=0.180?'var(--accent2)':'var(--muted)'}}>
                       {r.iso>0?r.iso.toFixed(3):'—'}
                     </td>
                     <td style={{padding:'2px 8px',fontFamily:"'Barlow Condensed',sans-serif",
@@ -22598,7 +22654,7 @@ const PAIR_TYPES = [
   {
     id: 'arsenal_twins',
     label: '🎯 Arsenal Twins',
-    color: '#fbbf24', bg: 'rgba(251,191,36,.08)', border: 'rgba(251,191,36,.25)',
+    color: 'var(--c-amber)', bg: 'rgba(251,191,36,.08)', border: 'rgba(251,191,36,.25)',
     desc: "Both with a real Hand Match tier (full/elite) or Fit ≥8 with a genuine BvP sample vs their OWN pitcher today — arsenal fit, not a shared stat",
     qualify: b => {
       const tier = getHandMatchTier(b);
@@ -22610,7 +22666,7 @@ const PAIR_TYPES = [
   {
     id: 'sauce2_duo',
     label: '🍯 Sauce 2.0 Duo',
-    color: '#34d399', bg: 'rgba(52,211,153,.08)', border: 'rgba(52,211,153,.25)',
+    color: 'var(--c-emerald)', bg: 'rgba(52,211,153,.08)', border: 'rgba(52,211,153,.25)',
     desc: 'Both clear Sauce 2.0 (Zone Fit ≥2, xwOBA ≥.360, Hittable-or-better pitcher) — the best-validated filter in the tracker (19-23% HR rate)',
     qualify: b => {
       const zf = getZoneFit(b);
@@ -22624,7 +22680,7 @@ const PAIR_TYPES = [
   {
     id: 'matchup_score_duo',
     label: '⚔️ Matchup Score Duo',
-    color: '#ff6b6b', bg: 'rgba(255,107,107,.08)', border: 'rgba(255,107,107,.25)',
+    color: 'var(--c-coral)', bg: 'rgba(255,107,107,.08)', border: 'rgba(255,107,107,.25)',
     // Not the full Barrel Signal gate (that needs Barrel Lab's Monte Carlo
     // worker, not run in this tab) — computeMatchupScore() is the real,
     // self-contained half of it (Zone Fit + PS Score + platoon-adjusted
@@ -22648,7 +22704,7 @@ const PAIR_TYPES = [
   {
     id: 'same_game_heat',
     label: '🔥 Same Game Heat',
-    color: '#ff8020', bg: 'rgba(255,128,32,.08)', border: 'rgba(255,128,32,.25)',
+    color: 'var(--c-warn)', bg: 'rgba(255,128,32,.08)', border: 'rgba(255,128,32,.25)',
     // REVISED 2026-07-28: was just HH%/FB% with no pitcher context. Now
     // requires the shared pitcher to actually grade Hittable-or-better —
     // "hot bats exploiting a real weakness together," not just "hot bats
@@ -22664,7 +22720,7 @@ const PAIR_TYPES = [
   {
     id: 'barrel_bros',
     label: '🛢️ Barrel Bros',
-    color: '#ff4020', bg: 'rgba(255,64,32,.08)', border: 'rgba(255,64,32,.25)',
+    color: 'var(--c-danger)', bg: 'rgba(255,64,32,.08)', border: 'rgba(255,64,32,.25)',
     desc: 'Both with pulled barrel% ≥6% — optimal exit angle + pull-side contact, the highest HR predictor',
     qualify: b => parseFloat(b.recent_pulled_barrel_pct||0) >= 6,
     sameGame: false, maxPairs: 3,
@@ -22672,7 +22728,7 @@ const PAIR_TYPES = [
   {
     id: 'iso_surge',
     label: '💰 ISO Surge',
-    color: '#a78bfa', bg: 'rgba(167,139,250,.08)', border: 'rgba(167,139,250,.25)',
+    color: 'var(--c-purple)', bg: 'rgba(167,139,250,.08)', border: 'rgba(167,139,250,.25)',
     desc: 'Both with L7 ISO ≥.220 — genuine power surge in the last 7 days, not a season mirage',
     qualify: b => parseFloat(b.l7_iso||b.recent_iso||0) >= 0.220,
     sameGame: false, maxPairs: 3,
@@ -22680,7 +22736,7 @@ const PAIR_TYPES = [
   {
     id: 'close_call_combo',
     label: '🤏 Close Call Combo',
-    color: '#fbbf24', bg: 'rgba(251,191,36,.08)', border: 'rgba(251,191,36,.25)',
+    color: 'var(--c-amber)', bg: 'rgba(251,191,36,.08)', border: 'rgba(251,191,36,.25)',
     desc: 'Both had 2+ near-HR events in the last 7 days — deep fly outs that nearly left the yard',
     qualify: b => parseInt(b.so_close_count||0) >= 2,
     sameGame: false, maxPairs: 2,
@@ -22689,7 +22745,7 @@ const PAIR_TYPES = [
   {
     id: 'double_trouble',
     label: '2️⃣ Double Trouble',
-    color: '#38b8f2', bg: 'rgba(56,184,242,.08)', border: 'rgba(56,184,242,.25)',
+    color: 'var(--ice)', bg: 'rgba(56,184,242,.08)', border: 'rgba(56,184,242,.25)',
     desc: 'Both with Sim TB ≥1.5 and Sig ≥4 — XBH stack. Per 17k matchups: 41%+ XBH rate at this threshold',
     qualify: b => parseFloat(b.sim_tb||0) >= 1.5 && (parseFloat(b.weighted_flag_score||0)*4.6) >= 4,
     sameGame: false, maxPairs: 3,
@@ -22697,7 +22753,7 @@ const PAIR_TYPES = [
   {
     id: 'it_takes_two',
     label: '🏃 It Takes Two',
-    color: '#27c97a', bg: 'rgba(39,201,122,.08)', border: 'rgba(39,201,122,.25)',
+    color: 'var(--green)', bg: 'rgba(39,201,122,.08)', border: 'rgba(39,201,122,.25)',
     desc: 'Both with Sim H ≥1.0 — the #1 hit predictor per model (r=0.109). 62%+ hit rate at this threshold',
     qualify: b => parseFloat(b.sim_h||0) >= 1.0,
     sameGame: false, maxPairs: 3,
@@ -22705,7 +22761,7 @@ const PAIR_TYPES = [
   {
     id: 'hit_factory',
     label: '🏭 Hit Factory',
-    color: '#4ade80', bg: 'rgba(74,222,128,.08)', border: 'rgba(74,222,128,.25)',
+    color: 'var(--c-younggun)', bg: 'rgba(74,222,128,.08)', border: 'rgba(74,222,128,.25)',
     desc: 'Same game, both with Sim H ≥0.9 and recent AVG ≥.280 — reliable contact sharing the same matchup',
     qualify: b => parseFloat(b.sim_h||0) >= 0.9 && parseFloat(b.recent_avg||0) >= 0.280,
     sameGame: true, maxPairs: 2,
@@ -22849,7 +22905,7 @@ function PairsTab({ data }) {
     FINAL_GAME_IDS.has(String(p.b.game_id))
   );
 
-  const ydCol = v => !v?'var(--muted)':v>=75?'#ffd700':v>=60?'#ff4020':v>=45?'#f5a623':v>=20?'#c4a882':'var(--muted)';
+  const ydCol = v => !v?'var(--muted)':v>=75?'var(--c-gold)':v>=60?'var(--c-danger)':v>=45?'var(--accent2)':v>=20?'#c4a882':'var(--muted)';
 
   function BatterCard({ b, type }) {
     const yard = parseFloat(b._yard||0);
@@ -22871,7 +22927,7 @@ function PairsTab({ data }) {
           <div style={{minWidth:0}}>
             <div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}>
               {(()=>{const bid=parseInt(b.batter_id)||0;const ls=LINEUP_STATUS[bid];return ls?.status==='confirmed'&&<span style={{fontSize:9}}>✅</span>;})()}
-              {(b.is_diamond==='True'||b.is_diamond===true)&&<span style={{padding:'1px 4px',borderRadius:3,fontSize:8,fontWeight:700,background:'rgba(255,204,0,.15)',color:'#ffcc00',border:'1px solid rgba(255,204,0,.3)'}}>💎</span>}
+              {(b.is_diamond==='True'||b.is_diamond===true)&&<span style={{padding:'1px 4px',borderRadius:3,fontSize:8,fontWeight:700,background:'rgba(255,204,0,.15)',color:'var(--c-yellow2)',border:'1px solid rgba(255,204,0,.3)'}}>💎</span>}
               {isGoneYardToday(parseInt(b.batter_id)||0, b.batter)&&(
                 <span title="💥 Gone Yard Today" data-tip="💥 Hit a HR in today's live games" style={{fontSize:10,lineHeight:1}}>💥</span>
               )}
@@ -22907,7 +22963,7 @@ function PairsTab({ data }) {
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
               <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>BS Δ</span>
               <span style={{fontFamily:mono,fontSize:9,fontWeight:700,
-                color:bs>=1.5?'#27c97a':bs>=0.5?'#a8d8a8':bs<=-0.5?'#f5a623':'var(--muted)'}}>
+                color:bs>=1.5?'var(--green)':bs>=0.5?'#a8d8a8':bs<=-0.5?'var(--accent2)':'var(--muted)'}}>
                 {bs>=0?'+':''}{bs.toFixed(1)} mph
               </span>
             </div>
@@ -22922,7 +22978,7 @@ function PairsTab({ data }) {
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
               <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>ISO</span>
               <span style={{fontFamily:mono,fontSize:9,
-                color:iso>=0.250?'#ff8020':iso>=0.180?'#f5a623':'var(--muted)'}}>
+                color:iso>=0.250?'var(--c-warn)':iso>=0.180?'var(--accent2)':'var(--muted)'}}>
                 {iso.toFixed(3)}
               </span>
             </div>
@@ -22931,7 +22987,7 @@ function PairsTab({ data }) {
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
               <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>HH%</span>
               <span style={{fontFamily:mono,fontSize:9,
-                color:hh>=40?'#ff4020':hh>=30?'#f5a623':'var(--muted)'}}>
+                color:hh>=40?'var(--c-danger)':hh>=30?'var(--accent2)':'var(--muted)'}}>
                 {hh.toFixed(1)}%
               </span>
             </div>
@@ -22940,7 +22996,7 @@ function PairsTab({ data }) {
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
               <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>FB%</span>
               <span style={{fontFamily:mono,fontSize:9,
-                color:fb>=35?'#27c97a':'var(--muted)'}}>{fb.toFixed(1)}%
+                color:fb>=35?'var(--green)':'var(--muted)'}}>{fb.toFixed(1)}%
               </span>
             </div>
           )}
@@ -23314,15 +23370,15 @@ function BvPDeepDiveTab() {
   const sortArrow = col => col===sortBy?(sortDir==='desc'?'▼':'▲'):'';
 
   // ── Colors ─────────────────────────────────────────────────────────────────
-  const evCol  = v => !v?'var(--muted)':v>=103?'#ff4020':v>=97?'#f5a623':'var(--muted)';
-  const hhCol  = v => !v?'var(--muted)':v>=40?'#ff4020':v>=30?'#f5a623':'var(--muted)';
-  const brlCol = v => !v?'var(--muted)':v>=10?'#ff4020':v>=6?'#f5a623':'var(--muted)';
-  const avCol  = v => !v?'var(--muted)':v>=0.280?'#27c97a':v>=0.240?'#f5a623':'var(--muted)';
-  const wCol   = v => !v?'var(--muted)':v>=0.370?'#ff4020':v>=0.310?'#f5a623':'var(--muted)';
-  const xwCol  = v => !v?'var(--muted)':v>=0.380?'#ff4020':v>=0.320?'#f5a623':'var(--muted)';
-  const isoCol = v => !v?'var(--muted)':v>=0.250?'#ff8020':v>=0.180?'#f5a623':'var(--muted)';
-  const ydCol  = v => !v?'var(--muted)':v>=75?'#ffd700':v>=60?'#ff4020':v>=45?'#f5a623':v>=20?'#c4a882':'var(--muted)';
-  const pgCol  = g => !g?'var(--muted)':g.includes('Target')?'#27c97a':g.includes('Hittable')?'#60d360':g.includes('Elite')?'#ff4020':g.includes('Tough')?'#f5a623':'var(--muted)';
+  const evCol  = v => !v?'var(--muted)':v>=103?'var(--c-danger)':v>=97?'var(--accent2)':'var(--muted)';
+  const hhCol  = v => !v?'var(--muted)':v>=40?'var(--c-danger)':v>=30?'var(--accent2)':'var(--muted)';
+  const brlCol = v => !v?'var(--muted)':v>=10?'var(--c-danger)':v>=6?'var(--accent2)':'var(--muted)';
+  const avCol  = v => !v?'var(--muted)':v>=0.280?'var(--green)':v>=0.240?'var(--accent2)':'var(--muted)';
+  const wCol   = v => !v?'var(--muted)':v>=0.370?'var(--c-danger)':v>=0.310?'var(--accent2)':'var(--muted)';
+  const xwCol  = v => !v?'var(--muted)':v>=0.380?'var(--c-danger)':v>=0.320?'var(--accent2)':'var(--muted)';
+  const isoCol = v => !v?'var(--muted)':v>=0.250?'var(--c-warn)':v>=0.180?'var(--accent2)':'var(--muted)';
+  const ydCol  = v => !v?'var(--muted)':v>=75?'var(--c-gold)':v>=60?'var(--c-danger)':v>=45?'var(--accent2)':v>=20?'#c4a882':'var(--muted)';
+  const pgCol  = g => !g?'var(--muted)':g.includes('Target')?'var(--green)':g.includes('Hittable')?'var(--c-lime)':g.includes('Elite')?'var(--c-danger)':g.includes('Tough')?'var(--accent2)':'var(--muted)';
 
   const TH = ({ col, label, title }) => (
     <th onClick={()=>handleSort(col)} title={title}
@@ -23507,13 +23563,13 @@ function BvPDeepDiveTab() {
             const kk  = split.k_pct;
             const bb  = split.bb_pct;
             return [
-              ['HH% Allowed', hh,  v=>v>=35?'#ff4020':v>=28?'#f5a623':'var(--muted)', v=>v?.toFixed(1)+'%'],
-              ['Brl% Allowed', brl, v=>v>=9?'#ff4020':v>=6?'#f5a623':'var(--muted)',  v=>v?.toFixed(1)+'%'],
-              ['Meatball%',   mb,  v=>v>=60?'#ff4020':v>=50?'#f5a623':'var(--muted)', v=>v?.toFixed(1)+'%'],
-              ['HR Allowed',  hr,  v=>v>=20?'#ff4020':v>=12?'#f5a623':'var(--muted)', v=>String(v)],
-              ...(fb!=null?[['FB% Allowed', fb, v=>v>=38?'#ff4020':v>=30?'#f5a623':'var(--muted)', v=>v?.toFixed(1)+'%']]:[]),
-              ...(kk!=null?[['K%',          kk, v=>v>=28?'#27c97a':v>=22?'#60d360':'var(--muted)',  v=>v?.toFixed(1)+'%']]:[]),
-              ...(bb!=null?[['BB%',         bb, v=>v>=12?'#f5a623':'var(--muted)',                  v=>v?.toFixed(1)+'%']]:[]),
+              ['HH% Allowed', hh,  v=>v>=35?'var(--c-danger)':v>=28?'var(--accent2)':'var(--muted)', v=>v?.toFixed(1)+'%'],
+              ['Brl% Allowed', brl, v=>v>=9?'var(--c-danger)':v>=6?'var(--accent2)':'var(--muted)',  v=>v?.toFixed(1)+'%'],
+              ['Meatball%',   mb,  v=>v>=60?'var(--c-danger)':v>=50?'var(--accent2)':'var(--muted)', v=>v?.toFixed(1)+'%'],
+              ['HR Allowed',  hr,  v=>v>=20?'var(--c-danger)':v>=12?'var(--accent2)':'var(--muted)', v=>String(v)],
+              ...(fb!=null?[['FB% Allowed', fb, v=>v>=38?'var(--c-danger)':v>=30?'var(--accent2)':'var(--muted)', v=>v?.toFixed(1)+'%']]:[]),
+              ...(kk!=null?[['K%',          kk, v=>v>=28?'var(--green)':v>=22?'var(--c-lime)':'var(--muted)',  v=>v?.toFixed(1)+'%']]:[]),
+              ...(bb!=null?[['BB%',         bb, v=>v>=12?'var(--accent2)':'var(--muted)',                  v=>v?.toFixed(1)+'%']]:[]),
               ['PA (split)',  pa,  ()=>'var(--muted)', v=>String(v)],
             ].filter(([,val])=>val!=null);
           })().map(([lbl,val,col,fmt])=>(
@@ -23541,9 +23597,9 @@ function BvPDeepDiveTab() {
                 return (
                   <button key={pt} onClick={()=>togglePitch(pt)}
                     style={{padding:'5px 10px',borderRadius:6,fontSize:9,fontFamily:mono,cursor:'pointer',
-                      border:`1px solid ${isOn?'#60d360':'var(--border)'}`,
+                      border:`1px solid ${isOn?'var(--c-lime)':'var(--border)'}`,
                       background:isOn?'rgba(39,201,122,.12)':'var(--surface2)',
-                      color:isOn?'#60d360':'var(--text)',fontWeight:isOn?700:400}}>
+                      color:isOn?'var(--c-lime)':'var(--text)',fontWeight:isOn?700:400}}>
                     {pitcher.pitch_names?.[pt]||pt}
                     <span style={{marginLeft:4,opacity:.7}}>{pct.toFixed(0)}%</span>
                   </button>
@@ -23576,9 +23632,9 @@ function BvPDeepDiveTab() {
           {[['A','All Season'],['30','L30'],['15','L15'],['7','L7']].map(([v,l])=>(
             <button key={v} onClick={()=>setDateWin(v)}
               style={{padding:'3px 9px',borderRadius:5,fontSize:9,fontFamily:mono,cursor:'pointer',
-                border:`1px solid ${dateWin===v?'#ffd700':'var(--border)'}`,
+                border:`1px solid ${dateWin===v?'var(--c-gold)':'var(--border)'}`,
                 background:dateWin===v?'rgba(255,215,0,.1)':'transparent',
-                color:dateWin===v?'#ffd700':'var(--muted)',fontWeight:dateWin===v?700:400}}>
+                color:dateWin===v?'var(--c-gold)':'var(--muted)',fontWeight:dateWin===v?700:400}}>
               {l}
             </button>
           ))}
@@ -23598,9 +23654,9 @@ function BvPDeepDiveTab() {
           {[['A','All'],['H','🏠 Home'],['Away','✈️ Away']].map(([v,l])=>(
             <button key={v} onClick={()=>setLocation(v)}
               style={{padding:'3px 9px',borderRadius:5,fontSize:9,fontFamily:mono,cursor:'pointer',
-                border:`1px solid ${location===v?'#38b8f2':'var(--border)'}`,
+                border:`1px solid ${location===v?'var(--ice)':'var(--border)'}`,
                 background:location===v?'rgba(56,184,242,.1)':'transparent',
-                color:location===v?'#38b8f2':'var(--muted)',fontWeight:location===v?700:400}}>
+                color:location===v?'var(--ice)':'var(--muted)',fontWeight:location===v?700:400}}>
               {l}
             </button>
           ))}
@@ -23677,7 +23733,7 @@ function BvPDeepDiveTab() {
                         </span>
                         <span onClick={e=>{e.stopPropagation();openAtBatSlide({pid:parseInt(r.bid)||0,name:r.name,team:r.team||''});}}
                           style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,
-                            color:isKeyMatchup(parseInt(r.bid)||0,r.name)?'#ff8020':'var(--text)',
+                            color:isKeyMatchup(parseInt(r.bid)||0,r.name)?'var(--c-warn)':'var(--text)',
                             cursor:'pointer',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
                           {r.name}
                         </span>
@@ -23685,7 +23741,7 @@ function BvPDeepDiveTab() {
                           const ph = pitcher?.hand?.charAt(0).toUpperCase();
                           const bh = r.hand?.charAt(0).toUpperCase();
                           const platoon = (ph==='R'&&(bh==='L'||bh==='S'))||(ph==='L'&&bh==='R');
-                          return platoon ? <span title="Platoon advantage" data-tip="✓ Natural platoon advantage vs pitcher's hand" style={{fontSize:9,color:'#27c97a',marginLeft:2,flexShrink:0}}>✓</span> : null;
+                          return platoon ? <span title="Platoon advantage" data-tip="✓ Natural platoon advantage vs pitcher's hand" style={{fontSize:9,color:'var(--green)',marginLeft:2,flexShrink:0}}>✓</span> : null;
                         })()}
                         <span style={{flexShrink:0}}>
                           <PickButton pid={parseInt(r.bid)||0} name={r.name} team={r.team||''}/>
@@ -23698,21 +23754,21 @@ function BvPDeepDiveTab() {
                     </td>
                     {/* Grade */}
                     <td style={{textAlign:'center',padding:'2px 4px',fontFamily:mono,fontSize:9,
-                      color:r.grade==='A+'?'#ffd700':r.grade==='A'?'#27c97a':r.grade==='B'?'#f5a623':'var(--muted)',fontWeight:700}}>
+                      color:r.grade==='A+'?'var(--c-gold)':r.grade==='A'?'var(--green)':r.grade==='B'?'var(--accent2)':'var(--muted)',fontWeight:700}}>
                       {r.grade||'—'}
                     </td>
                     {/* BvP stats — adjust to pitch/day/night selection */}
                     <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,color:r.pa>=10?'var(--text)':'var(--muted)'}}>{r.pa}</td>
                     <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,color:avCol(r.avg)}}>{r.avg?.toFixed(3)||'—'}</td>
-                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:osw,fontWeight:700,fontSize:10,color:r.hr>=2?'#ff4020':r.hr>=1?'#f5a623':'var(--muted)'}}>{r.hr||'—'}</td>
+                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:osw,fontWeight:700,fontSize:10,color:r.hr>=2?'var(--c-danger)':r.hr>=1?'var(--accent2)':'var(--muted)'}}>{r.hr||'—'}</td>
                     <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{r.bb||'—'}</td>
-                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,color:r.k>=4?'#ff4020':'var(--muted)'}}>{r.k||'—'}</td>
+                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,color:r.k>=4?'var(--c-danger)':'var(--muted)'}}>{r.k||'—'}</td>
                     <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,color:evCol(r.avg_ev)}}>{r.avg_ev?.toFixed(1)||'—'}</td>
                     <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,color:hhCol(r.hh_pct)}}>{r.hh_pct!=null?r.hh_pct.toFixed(1)+'%':'—'}</td>
                     <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,color:brlCol(r.brl_pct)}}>{r.brl_pct!=null?r.brl_pct.toFixed(1)+'%':'—'}</td>
-                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,color:r.pbrl_pct>=5?'#ff4020':'var(--muted)'}}>{r.pbrl_pct!=null?r.pbrl_pct.toFixed(1)+'%':'—'}</td>
-                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,color:r.fb_pct>=35?'#27c97a':'var(--muted)'}}>{r.fb_pct!=null?r.fb_pct.toFixed(1)+'%':'—'}</td>
-                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,color:r.gb_pct>=55?'#ff4020':'var(--muted)'}}>{r.gb_pct!=null?r.gb_pct.toFixed(1)+'%':'—'}</td>
+                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,color:r.pbrl_pct>=5?'var(--c-danger)':'var(--muted)'}}>{r.pbrl_pct!=null?r.pbrl_pct.toFixed(1)+'%':'—'}</td>
+                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,color:r.fb_pct>=35?'var(--green)':'var(--muted)'}}>{r.fb_pct!=null?r.fb_pct.toFixed(1)+'%':'—'}</td>
+                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,color:r.gb_pct>=55?'var(--c-danger)':'var(--muted)'}}>{r.gb_pct!=null?r.gb_pct.toFixed(1)+'%':'—'}</td>
                     <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{r.pfb_pct!=null?r.pfb_pct.toFixed(1)+'%':'—'}</td>
                     <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,color:isoCol(r.iso)}}>{r.iso?.toFixed(3)||'—'}</td>
                     <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,color:wCol(r.woba)}}>{r.woba?.toFixed(3)||'—'}</td>
@@ -23889,21 +23945,21 @@ function AppTeamSlideout({ t, teamStats, teamLoading, teamSchedule, schedLoading
           ? <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)',padding:20,textAlign:'center'}}>Loading team stats…</div>
           : <>
             <div style={{fontFamily:osw,fontWeight:700,fontSize:11,color:'var(--accent)',letterSpacing:.8,textTransform:'uppercase',marginBottom:8,borderBottom:'1px solid var(--border)',paddingBottom:4}}>🏏 Team Hitting</div>
-            <StatLine label="Home Runs" val={h.homeRuns} col="#ff4020" sub="Season total"/>
-            <StatLine label="OPS" val={h.ops} col={parseFloat(h.ops)>=.800?'#27c97a':parseFloat(h.ops)>=.730?'var(--text)':'var(--muted)'} sub="On-base + slugging"/>
+            <StatLine label="Home Runs" val={h.homeRuns} col="var(--c-danger)" sub="Season total"/>
+            <StatLine label="OPS" val={h.ops} col={parseFloat(h.ops)>=.800?'var(--green)':parseFloat(h.ops)>=.730?'var(--text)':'var(--muted)'} sub="On-base + slugging"/>
             <StatLine label="AVG / OBP / SLG" val={`${h.avg||'—'} / ${h.obp||'—'} / ${h.slg||'—'}`} sub="Season slash line"/>
-            <StatLine label="ISO" val={h.slg&&h.avg?(parseFloat(h.slg)-parseFloat(h.avg)).toFixed(3):null} col="#f5a623" sub="Isolated power"/>
+            <StatLine label="ISO" val={h.slg&&h.avg?(parseFloat(h.slg)-parseFloat(h.avg)).toFixed(3):null} col="var(--accent2)" sub="Isolated power"/>
             <StatLine label="Runs Scored" val={h.runs} sub="Season total"/>
             <div style={{height:12}}/>
-            <div style={{fontFamily:osw,fontWeight:700,fontSize:11,color:'#38b8f2',letterSpacing:.8,textTransform:'uppercase',marginBottom:8,borderBottom:'1px solid var(--border)',paddingBottom:4}}>⚾ Team Pitching</div>
+            <div style={{fontFamily:osw,fontWeight:700,fontSize:11,color:'var(--ice)',letterSpacing:.8,textTransform:'uppercase',marginBottom:8,borderBottom:'1px solid var(--border)',paddingBottom:4}}>⚾ Team Pitching</div>
             <StatLine label="HR Allowed" val={p.homeRuns} col={parseInt(p.homeRuns)>100?'var(--accent)':'var(--muted)'} sub="Key for batters facing these pitchers"/>
-            <StatLine label="ERA" val={p.era} col={parseFloat(p.era)<3.5?'#27c97a':parseFloat(p.era)>4.5?'var(--accent)':'var(--text)'}/>
-            <StatLine label="WHIP" val={p.whip} col={parseFloat(p.whip)<1.20?'#27c97a':parseFloat(p.whip)>1.40?'var(--accent)':'var(--text)'}/>
+            <StatLine label="ERA" val={p.era} col={parseFloat(p.era)<3.5?'var(--green)':parseFloat(p.era)>4.5?'var(--accent)':'var(--text)'}/>
+            <StatLine label="WHIP" val={p.whip} col={parseFloat(p.whip)<1.20?'var(--green)':parseFloat(p.whip)>1.40?'var(--accent)':'var(--text)'}/>
             <StatLine label="K/9" val={p.strikeoutsPer9Inn} sub="Strikeouts per 9 innings"/>
             <StatLine label="HR/9" val={p.homeRunsPer9} col={parseFloat(p.homeRunsPer9)>1.2?'var(--accent)':'var(--muted)'} sub="Higher = more HR-prone staff"/>
             {/* Schedule */}
             <div style={{marginTop:16,borderTop:'1px solid var(--border)',paddingTop:14}}>
-              <div style={{fontFamily:osw,fontWeight:700,fontSize:11,color:'#a78bfa',letterSpacing:.8,textTransform:'uppercase',marginBottom:10,borderBottom:'1px solid var(--border)',paddingBottom:4}}>📅 Schedule</div>
+              <div style={{fontFamily:osw,fontWeight:700,fontSize:11,color:'var(--c-purple)',letterSpacing:.8,textTransform:'uppercase',marginBottom:10,borderBottom:'1px solid var(--border)',paddingBottom:4}}>📅 Schedule</div>
               {schedLoading
                 ? <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',padding:'8px 0'}}>Loading schedule…</div>
                 : teamSchedule.length===0
@@ -23922,7 +23978,7 @@ function AppTeamSlideout({ t, teamStats, teamLoading, teamSchedule, schedLoading
                             </div>
                             <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',width:12,flexShrink:0,textAlign:'center'}}>{vsAt}</div>
                             <div style={{fontFamily:osw,fontWeight:800,fontSize:11,color:'var(--text)',width:36,flexShrink:0}}>{opp}</div>
-                            <div style={{fontFamily:mono,fontSize:9,flex:1,color:won===true?'#27c97a':won===false?'var(--accent)':isToday?'var(--accent2)':'var(--muted)'}}>
+                            <div style={{fontFamily:mono,fontSize:9,flex:1,color:won===true?'var(--green)':won===false?'var(--accent)':isToday?'var(--accent2)':'var(--muted)'}}>
                               {score}{g.isFinal&&won!==null&&<span style={{marginLeft:4,fontWeight:700}}>{won?'W':'L'}</span>}
                             </div>
                           </div>
@@ -23952,7 +24008,7 @@ function YardBotFloat() {
   const [unread,   setUnread]   = useState(0);
   const bottomRef = useRef(null);
 
-  const GRADE_COLORS = {'A+':'#ff4020','A':'#f5a623','B+':'#27c97a','B':'#38b8f2','C+':'var(--muted)','C':'var(--muted)','D':'var(--muted)'};
+  const GRADE_COLORS = {'A+':'var(--c-danger)','A':'var(--accent2)','B+':'var(--green)','B':'var(--ice)','C+':'var(--muted)','C':'var(--muted)','D':'var(--muted)'};
   const QUICK_PROMPTS = ['3 legger HR play vs top pitching targets','safe 2 leg strikeout parlay','best solo HR plays today','top SB candidates today','walk prop targets today'];
 
   // Barrel Lab quick-pass (2026-08-04) — matchupScore/trueHR/sauce/bullpenTier/
@@ -24197,7 +24253,7 @@ For non-pick questions: {"intro":"your full answer","picks":[],"disclaimer":""}`
                           </div>
                           <div style={{padding:'2px 6px',borderRadius:3,fontSize:7,fontFamily:mono,fontWeight:700,flexShrink:0,
                             background:pick.confidence==='High'?'rgba(39,201,122,.15)':pick.confidence==='Medium'?'rgba(245,166,35,.15)':'rgba(255,255,255,.05)',
-                            color:pick.confidence==='High'?'#27c97a':pick.confidence==='Medium'?'#f5a623':'var(--muted)',
+                            color:pick.confidence==='High'?'var(--green)':pick.confidence==='Medium'?'var(--accent2)':'var(--muted)',
                             border:`1px solid ${pick.confidence==='High'?'rgba(39,201,122,.25)':pick.confidence==='Medium'?'rgba(245,166,35,.25)':'var(--border)'}`}}>{pick.confidence}</div>
                         </div>
                         {(pick.reasons||[]).map((r,ri)=>(
@@ -24241,7 +24297,7 @@ For non-pick questions: {"intro":"your full answer","picks":[],"disclaimer":""}`
       <span style={{fontSize:22}}>{open?'✕':'🤖'}</span>
       {!open&&unread>0&&(
         <div style={{position:'absolute',top:-2,right:-2,width:16,height:16,borderRadius:'50%',
-          background:'#27c97a',border:'2px solid var(--bg)',display:'flex',alignItems:'center',justifyContent:'center',
+          background:'var(--green)',border:'2px solid var(--bg)',display:'flex',alignItems:'center',justifyContent:'center',
           fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:8,color:'white'}}>{unread}</div>
       )}
     </button>
@@ -24313,7 +24369,7 @@ function KPropsTab() {
     }).catch(() => setLoading(false));
   }, []);
 
-  const gradeColor = g => g==='KE'?'#ff4020':g==='KH'?'#f5a623':g==='KA'?'#27c97a':'var(--muted)';
+  const gradeColor = g => g==='KE'?'var(--c-danger)':g==='KH'?'var(--accent2)':g==='KA'?'var(--green)':'var(--muted)';
   const gradeLabel = g => g==='KE'?'⚡ Elite':g==='KH'?'🔥 High':g==='KA'?'~ Avg':'🟢 Low';
 
   // Build unique game list — "Away @ Home · HH:MM", sorted earliest first
@@ -24426,12 +24482,12 @@ function KPropsTab() {
               </td>
               <td><span style={{fontFamily:mono,fontSize:10,fontWeight:700,color:gradeColor(r.kGrade)}}>{gradeLabel(r.kGrade)}</span></td>
               <td style={{fontFamily:mono,fontSize:11,textAlign:'right'}}>{r.pKPct>0?r.pKPct.toFixed(1)+'%':'—'}</td>
-              <td style={{fontFamily:mono,fontSize:11,textAlign:'right',color:r.swStr>=14?'#ff4020':r.swStr>=10?'#f5a623':'var(--text)'}}>{r.swStr>0?r.swStr.toFixed(1)+'%':'—'}</td>
-              <td style={{fontFamily:mono,fontSize:11,textAlign:'right',color:r.brPct>=50?'#a78bfa':'var(--text)'}}>{r.brPct>0?r.brPct.toFixed(1)+'%':'—'}</td>
+              <td style={{fontFamily:mono,fontSize:11,textAlign:'right',color:r.swStr>=14?'var(--c-danger)':r.swStr>=10?'var(--accent2)':'var(--text)'}}>{r.swStr>0?r.swStr.toFixed(1)+'%':'—'}</td>
+              <td style={{fontFamily:mono,fontSize:11,textAlign:'right',color:r.brPct>=50?'var(--c-purple)':'var(--text)'}}>{r.brPct>0?r.brPct.toFixed(1)+'%':'—'}</td>
               <td style={{fontFamily:mono,fontSize:11,textAlign:'right'}}>{r.kPer9>0?r.kPer9.toFixed(1):'—'}</td>
               <td style={{fontFamily:mono,fontSize:11,textAlign:'right'}}>{r.domPct>0?r.domPct.toFixed(0)+'%':'—'}</td>
-              <td style={{fontFamily:mono,fontSize:11,textAlign:'right',color:r.bKPct>=28?'#ff4020':r.bKPct>=22?'#f5a623':'var(--text)'}}>{r.bKPct>0?r.bKPct.toFixed(1)+'%':'—'}</td>
-              <td><span style={{fontFamily:mono,fontSize:11,fontWeight:700,color:r.kScore>=65?'#ff4020':r.kScore>=45?'#f5a623':'var(--muted)'}}>{r.kScore}</span></td>
+              <td style={{fontFamily:mono,fontSize:11,textAlign:'right',color:r.bKPct>=28?'var(--c-danger)':r.bKPct>=22?'var(--accent2)':'var(--text)'}}>{r.bKPct>0?r.bKPct.toFixed(1)+'%':'—'}</td>
+              <td><span style={{fontFamily:mono,fontSize:11,fontWeight:700,color:r.kScore>=65?'var(--c-danger)':r.kScore>=45?'var(--accent2)':'var(--muted)'}}>{r.kScore}</span></td>
             </tr>
           ))}
         </tbody></table></div></div>
@@ -24546,7 +24602,7 @@ function SBPropsTab() {
     }).catch(() => setLoading(false));
   }, []);
 
-  const speedColor = t => t>=4?'#ff4020':t>=3?'#f5a623':t>=2?'#27c97a':'var(--muted)';
+  const speedColor = t => t>=4?'var(--c-danger)':t>=3?'var(--accent2)':t>=2?'var(--green)':'var(--muted)';
 
   const games = useMemo(() => {
     const seen = new Set(); const out = [];
@@ -24601,7 +24657,7 @@ function SBPropsTab() {
           {[0,5,10,15,20].map(v=>(
             <button key={v} className={`chip ${minSB===v?'active':''}`} onClick={()=>setMinSB(v)} style={{fontFamily:mono,fontSize:10}}>{v===0?'All':v+'+'}</button>
           ))}
-          <button className={`chip ${confirmedOnly?'active':''}`} onClick={()=>setConfirmedOnly(v=>!v)} style={{marginLeft:8,fontFamily:mono,fontSize:10,color:confirmedOnly?'white':'#27c97a'}}>
+          <button className={`chip ${confirmedOnly?'active':''}`} onClick={()=>setConfirmedOnly(v=>!v)} style={{marginLeft:8,fontFamily:mono,fontSize:10,color:confirmedOnly?'white':'var(--green)'}}>
             ✅ Confirmed Only
           </button>
         </div>
@@ -24660,12 +24716,12 @@ function SBPropsTab() {
                 </div>
               </td>
               <td><span style={{fontFamily:mono,fontSize:10,fontWeight:700,color:speedColor(r.speedTier)}}>{r.speed>0?r.speed.toFixed(1):'—'}</span></td>
-              <td style={{fontFamily:mono,fontSize:11,textAlign:'right',fontWeight:700,color:r.seaSB>=20?'#ff4020':r.seaSB>=10?'#f5a623':'var(--text)'}}>{r.seaSB}</td>
+              <td style={{fontFamily:mono,fontSize:11,textAlign:'right',fontWeight:700,color:r.seaSB>=20?'var(--c-danger)':r.seaSB>=10?'var(--accent2)':'var(--text)'}}>{r.seaSB}</td>
               <td style={{fontFamily:mono,fontSize:11,textAlign:'right'}}>{r.sbPct>0?r.sbPct.toFixed(1)+'%':'—'}</td>
-              <td style={{fontFamily:mono,fontSize:11,textAlign:'right',color:r.lineupSlot<=2?'#27c97a':'var(--muted)'}}>{r.lineupSlot>0?'#'+r.lineupSlot:'—'}</td>
-              <td style={{fontFamily:mono,fontSize:11,textAlign:'right',color:r.pVuln?'#ff4020':'var(--muted)'}}>{r.pSBRate>0?(r.pSBRate*100).toFixed(0)+'%':'—'}</td>
+              <td style={{fontFamily:mono,fontSize:11,textAlign:'right',color:r.lineupSlot<=2?'var(--green)':'var(--muted)'}}>{r.lineupSlot>0?'#'+r.lineupSlot:'—'}</td>
+              <td style={{fontFamily:mono,fontSize:11,textAlign:'right',color:r.pVuln?'var(--c-danger)':'var(--muted)'}}>{r.pSBRate>0?(r.pSBRate*100).toFixed(0)+'%':'—'}</td>
               <td style={{fontFamily:mono,fontSize:11,textAlign:'center'}}>{r.pVuln?'🎯':'—'}</td>
-              <td><span style={{fontFamily:mono,fontSize:11,fontWeight:700,color:r.sbScore>=65?'#ff4020':r.sbScore>=45?'#f5a623':'var(--muted)'}}>{r.sbScore}</span></td>
+              <td><span style={{fontFamily:mono,fontSize:11,fontWeight:700,color:r.sbScore>=65?'var(--c-danger)':r.sbScore>=45?'var(--accent2)':'var(--muted)'}}>{r.sbScore}</span></td>
             </tr>
           ))}
         </tbody></table></div></div>
@@ -24768,7 +24824,7 @@ function WalksTab() {
     }).catch(() => setLoading(false));
   }, []);
 
-  const gradeColor = g => g==='BE'?'#27c97a':g==='BH'?'#38b8f2':g==='BA'?'#f5a623':'var(--muted)';
+  const gradeColor = g => g==='BE'?'var(--green)':g==='BH'?'var(--ice)':g==='BA'?'var(--accent2)':'var(--muted)';
   const gradeLabel = g => g==='BE'?'🚶 Elite':g==='BH'?'💧 High':g==='BA'?'~ Avg':'🔴 Low';
 
   // Game dropdown — sorted earliest first
@@ -24826,7 +24882,7 @@ function WalksTab() {
           {[0,5,20,50,100].map(v=>(
             <button key={v} className={`chip ${minPA===v?'active':''}`} onClick={()=>setMinPA(v)} style={{fontFamily:mono,fontSize:10}}>{v===0?'All':v+'+'}</button>
           ))}
-          <button className={`chip ${confirmedOnly?'active':''}`} onClick={()=>setConfirmedOnly(v=>!v)} style={{marginLeft:8,fontFamily:mono,fontSize:10,color:confirmedOnly?'white':'#27c97a'}}>
+          <button className={`chip ${confirmedOnly?'active':''}`} onClick={()=>setConfirmedOnly(v=>!v)} style={{marginLeft:8,fontFamily:mono,fontSize:10,color:confirmedOnly?'white':'var(--green)'}}>
             ✅ Confirmed Only
           </button>
         </div>
@@ -24894,14 +24950,14 @@ function WalksTab() {
                 </div>
               </td>
               <td><span style={{fontFamily:mono,fontSize:10,fontWeight:700,color:gradeColor(r.bbGrade)}}>{gradeLabel(r.bbGrade)}</span></td>
-              <td style={{fontFamily:mono,fontSize:11,textAlign:'right',color:r.batBBPct>=12?'#27c97a':r.batBBPct>=9?'#38b8f2':'var(--text)'}}>{r.batBBPct>0?r.batBBPct.toFixed(1)+'%':'—'}</td>
-              <td style={{fontFamily:mono,fontSize:11,textAlign:'right',color:r.recentBBPct>r.batBBPct*1.2?'#27c97a':'var(--muted)'}}>{r.recentBBPct>0?r.recentBBPct.toFixed(1)+'%':'—'}</td>
-              <td style={{fontFamily:mono,fontSize:11,textAlign:'right',color:r.ozSwing<22?'#27c97a':r.ozSwing>30?'#ff4020':'var(--text)'}}>{r.ozSwing<100?r.ozSwing.toFixed(1)+'%':'—'}</td>
-              <td style={{fontFamily:mono,fontSize:11,textAlign:'right',color:r.discScore>=70?'#27c97a':r.discScore>=50?'var(--text)':'var(--muted)'}}>{r.discScore>0?Math.round(r.discScore):'—'}</td>
-              <td style={{fontFamily:mono,fontSize:11,textAlign:'right',color:r.pitBBPct>=10?'#f5a623':r.pitBBPct>=8?'#38b8f2':'var(--muted)'}}>{r.pitBBPct>0?r.pitBBPct.toFixed(1)+'%':'—'}</td>
-              <td style={{fontFamily:mono,fontSize:11,textAlign:'right',color:r.meatball>=12?'#f5a623':'var(--muted)'}}>{r.meatball>0?r.meatball.toFixed(1)+'%':'—'}</td>
+              <td style={{fontFamily:mono,fontSize:11,textAlign:'right',color:r.batBBPct>=12?'var(--green)':r.batBBPct>=9?'var(--ice)':'var(--text)'}}>{r.batBBPct>0?r.batBBPct.toFixed(1)+'%':'—'}</td>
+              <td style={{fontFamily:mono,fontSize:11,textAlign:'right',color:r.recentBBPct>r.batBBPct*1.2?'var(--green)':'var(--muted)'}}>{r.recentBBPct>0?r.recentBBPct.toFixed(1)+'%':'—'}</td>
+              <td style={{fontFamily:mono,fontSize:11,textAlign:'right',color:r.ozSwing<22?'var(--green)':r.ozSwing>30?'var(--c-danger)':'var(--text)'}}>{r.ozSwing<100?r.ozSwing.toFixed(1)+'%':'—'}</td>
+              <td style={{fontFamily:mono,fontSize:11,textAlign:'right',color:r.discScore>=70?'var(--green)':r.discScore>=50?'var(--text)':'var(--muted)'}}>{r.discScore>0?Math.round(r.discScore):'—'}</td>
+              <td style={{fontFamily:mono,fontSize:11,textAlign:'right',color:r.pitBBPct>=10?'var(--accent2)':r.pitBBPct>=8?'var(--ice)':'var(--muted)'}}>{r.pitBBPct>0?r.pitBBPct.toFixed(1)+'%':'—'}</td>
+              <td style={{fontFamily:mono,fontSize:11,textAlign:'right',color:r.meatball>=12?'var(--accent2)':'var(--muted)'}}>{r.meatball>0?r.meatball.toFixed(1)+'%':'—'}</td>
               <td style={{fontFamily:mono,fontSize:11,textAlign:'right'}}>{r.simBB>0?r.simBB.toFixed(2):'—'}</td>
-              <td><span style={{fontFamily:mono,fontSize:11,fontWeight:700,color:r.bbScore>=65?'#27c97a':r.bbScore>=45?'#38b8f2':'var(--muted)'}}>{r.bbScore}</span></td>
+              <td><span style={{fontFamily:mono,fontSize:11,fontWeight:700,color:r.bbScore>=65?'var(--green)':r.bbScore>=45?'var(--ice)':'var(--muted)'}}>{r.bbScore}</span></td>
             </tr>
           ))}
         </tbody></table></div></div>
@@ -24995,11 +25051,11 @@ function PitchersToAttackTab() {
   const stickyTd = { position:'sticky', left:0, zIndex:5, background:'var(--surface)', minWidth:200 };
 
   // Heat scale helpers — red=danger to pitcher (attack him), green=safe for pitcher
-  const heatHR9   = v => v>=1.8?'#ff4020':v>=1.3?'#f5a623':v>=0.8?'#fbbf24':'#27c97a';
-  const heatBrl    = v => v>=12?'#ff4020':v>=8?'#f5a623':v>=5?'#fbbf24':'#27c97a';
-  const heatHH     = v => v>=45?'#ff4020':v>=38?'#f5a623':v>=32?'#fbbf24':'#27c97a';
-  const heatHRFB   = v => v>=20?'#ff4020':v>=14?'#f5a623':v>=8?'#fbbf24':'#27c97a';
-  const heatFB     = v => v>=30?'#f5a623':v>=22?'#fbbf24':'var(--text)';
+  const heatHR9   = v => v>=1.8?'var(--c-danger)':v>=1.3?'var(--accent2)':v>=0.8?'var(--c-amber)':'var(--green)';
+  const heatBrl    = v => v>=12?'var(--c-danger)':v>=8?'var(--accent2)':v>=5?'var(--c-amber)':'var(--green)';
+  const heatHH     = v => v>=45?'var(--c-danger)':v>=38?'var(--accent2)':v>=32?'var(--c-amber)':'var(--green)';
+  const heatHRFB   = v => v>=20?'var(--c-danger)':v>=14?'var(--accent2)':v>=8?'var(--c-amber)':'var(--green)';
+  const heatFB     = v => v>=30?'var(--accent2)':v>=22?'var(--c-amber)':'var(--text)';
 
   return (
     <div>
@@ -25018,7 +25074,7 @@ function PitchersToAttackTab() {
           {[10,15,25,40].map(v=>(
             <button key={v} className={`chip ${minBF===v?'active':''}`} onClick={()=>setMinBF(v)} style={{fontFamily:mono,fontSize:10}}>{v}+</button>
           ))}
-          <button className={`chip ${todayOnly?'active':''}`} onClick={()=>setTodayOnly(v=>!v)} style={{marginLeft:8,fontFamily:mono,fontSize:10,color:todayOnly?'white':'#27c97a'}}>
+          <button className={`chip ${todayOnly?'active':''}`} onClick={()=>setTodayOnly(v=>!v)} style={{marginLeft:8,fontFamily:mono,fontSize:10,color:todayOnly?'white':'var(--green)'}}>
             📅 Pitching Today Only
           </button>
         </div>
@@ -25060,7 +25116,7 @@ function PitchersToAttackTab() {
                 </div>
               </td>
               <td style={{fontFamily:mono,fontSize:11,textAlign:'right'}}>{r.bf}</td>
-              <td style={{fontFamily:osw,fontWeight:800,fontSize:12,textAlign:'right',color:r.hrAllow>=8?'#ff4020':r.hrAllow>=4?'#f5a623':'var(--muted)'}}>{r.hrAllow}</td>
+              <td style={{fontFamily:osw,fontWeight:800,fontSize:12,textAlign:'right',color:r.hrAllow>=8?'var(--c-danger)':r.hrAllow>=4?'var(--accent2)':'var(--muted)'}}>{r.hrAllow}</td>
               <td style={{fontFamily:mono,fontSize:11,textAlign:'right'}}>{r.abPerHR>0?r.abPerHR.toFixed(1):'—'}</td>
               <td style={{fontFamily:mono,fontSize:11,fontWeight:700,textAlign:'right',color:heatHR9(r.hrPer9)}}>{r.hrPer9>0?r.hrPer9.toFixed(2):'—'}</td>
               <td style={{fontFamily:mono,fontSize:11,textAlign:'right',color:heatBrl(r.brlPct)}}>{r.brlPct>0?r.brlPct.toFixed(1)+'%':'—'}</td>
@@ -25689,7 +25745,7 @@ function MatchupEngineTab() {
             <div style={{display:'flex',gap:4,alignItems:'center',marginLeft:'auto',flexWrap:'wrap'}}>
               {['all','‼️ Elite','⚠️ Tough','🤔 Average','💥 Hittable','🎯 Target'].map(g=>{
                 const active=selPitcherGrade===g;
-                const col={'‼️ Elite':'#ff4020','⚠️ Tough':'#ff8020','🤔 Average':'var(--muted)','💥 Hittable':'#27c97a','🎯 Target':'#38b8f2'}[g]||'var(--text)';
+                const col={'‼️ Elite':'var(--c-danger)','⚠️ Tough':'var(--c-warn)','🤔 Average':'var(--muted)','💥 Hittable':'var(--green)','🎯 Target':'var(--ice)'}[g]||'var(--text)';
                 return(<button key={g} onClick={()=>setSelPitcherGrade(s=>s===g?'all':g)}
                   style={{padding:'3px 8px',borderRadius:6,cursor:'pointer',
                     background:active?'rgba(255,255,255,.08)':'transparent',color:active?col:'var(--muted)',
@@ -25738,14 +25794,14 @@ function MatchupEngineTab() {
                 <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
                   {[
                     [()=>setFilterGoneYard(s=>!s), filterGoneYard, 'var(--accent)',  '💥 Gone Yard'],
-                    [()=>setFilterTB2(s=>!s), filterTB2, '#38b8f2',  '2️⃣ 2+ TB'],
+                    [()=>setFilterTB2(s=>!s), filterTB2, 'var(--ice)',  '2️⃣ 2+ TB'],
                     [()=>setFilterDue(v=>!v),       filterDue,      'var(--ice)',     '⏳ Due'],
-                    [()=>{setKmActiveOnly(s=>!s);if(!kmActiveOnly)setKmInjuredOnly(false);},kmActiveOnly,'#34d399','☑️ Active Only'],
-                    [()=>{setKmInjuredOnly(s=>!s);if(!kmInjuredOnly)setKmActiveOnly(false);},kmInjuredOnly,'#fb923c','🤕 Injured'],
-                    [()=>setKmHotOnly(s=>!s),       kmHotOnly,      '#fb923c',       '🔥 Hot Bat'],
+                    [()=>{setKmActiveOnly(s=>!s);if(!kmActiveOnly)setKmInjuredOnly(false);},kmActiveOnly,'var(--c-emerald)','☑️ Active Only'],
+                    [()=>{setKmInjuredOnly(s=>!s);if(!kmInjuredOnly)setKmActiveOnly(false);},kmInjuredOnly,'var(--c-orange2)','🤕 Injured'],
+                    [()=>setKmHotOnly(s=>!s),       kmHotOnly,      'var(--c-orange2)',       '🔥 Hot Bat'],
                     [()=>setKmPicksOnly(s=>!s),     kmPicksOnly,    'var(--accent2)','🎯 My Picks'],
-                    [()=>setFilterDiamond(v=>!v),   filterDiamond,  '#ffcc00',       '💎 Diamond'],
-                    [()=>setKmHideFinal(v=>!v),     kmHideFinal,    '#ff6b6b',       '🚫 Hide Final'],
+                    [()=>setFilterDiamond(v=>!v),   filterDiamond,  'var(--c-yellow2)',       '💎 Diamond'],
+                    [()=>setKmHideFinal(v=>!v),     kmHideFinal,    'var(--c-coral)',       '🚫 Hide Final'],
                   ].map(([fn,active,col,label])=>(
                     <button key={label} onClick={fn}
                       style={{padding:'5px 11px',borderRadius:7,cursor:'pointer',fontSize:10,
@@ -25905,13 +25961,13 @@ function MatchupEngineTab() {
                     💥</div>}
                   {is2Bag && <div style={{padding:'2px 8px',borderRadius:5,flexShrink:0,
                     background:'rgba(56,184,242,.20)',border:'1px solid rgba(56,184,242,.4)',
-                    color:'#38b8f2',fontFamily:"'DM Mono',monospace",
+                    color:'var(--ice)',fontFamily:"'DM Mono',monospace",
                     fontWeight:800,fontSize:10,letterSpacing:.5}}>
                     2️⃣</div>}
                   {(b.is_hit_specialist==='True'||b.is_hit_specialist===true) && (
                     <div style={{padding:'2px 7px',borderRadius:5,flexShrink:0,
                       background:'rgba(39,201,122,.15)',border:'1px solid rgba(39,201,122,.35)',
-                      color:'#27c97a',fontFamily:"'DM Mono',monospace",fontWeight:800,fontSize:9,letterSpacing:.5}}
+                      color:'var(--green)',fontFamily:"'DM Mono',monospace",fontWeight:800,fontSize:9,letterSpacing:.5}}
                       title="Hit Specialist — strong proj hit rate vs this pitch mix">
                       📈 H
                     </div>
@@ -25930,7 +25986,7 @@ function MatchupEngineTab() {
                     const kmPG = pitcherGradeCache.current[String(parseInt(b.pitcher_id)||0)];
                     const isDmd = b.grade==='A+' && kmTB>=2.0 && (kmPG==='💥 Hittable'||kmPG==='🎯 Target');
                     return isDmd && <span style={{padding:'1px 5px',borderRadius:4,fontSize:9,fontWeight:700,
-                      background:'rgba(255,204,0,.15)',color:'#ffcc00',
+                      background:'rgba(255,204,0,.15)',color:'var(--c-yellow2)',
                       border:'1px solid rgba(255,204,0,.4)',flexShrink:0,marginLeft:2}}
                       title="💎 Tier 1 Lock: A+ + Sim TB≥2.0 + Hittable/Target pitcher">💎</span>;
                   })()}
@@ -25957,13 +26013,13 @@ function MatchupEngineTab() {
                     <div style={{display:'flex',gap:4,marginTop:3,flexWrap:'wrap'}}>
                       {flag(b.recent_ev_flag) &&
                         <span style={{fontSize:8,padding:'1px 5px',borderRadius:4,
-                          background:'rgba(255,64,32,.12)',color:'#ff4020',
+                          background:'rgba(255,64,32,.12)',color:'var(--c-danger)',
                           fontFamily:"'DM Mono',monospace",border:'1px solid rgba(255,64,32,.25)'}}>
                           ⚡ EV
                         </span>}
                       {flag(b.recent_barrel_flag) &&
                         <span style={{fontSize:8,padding:'1px 5px',borderRadius:4,
-                          background:'rgba(255,128,32,.12)',color:'#ff8020',
+                          background:'rgba(255,128,32,.12)',color:'var(--c-warn)',
                           fontFamily:"'DM Mono',monospace",border:'1px solid rgba(255,128,32,.25)'}}>
                           🛢 Brl
                         </span>}
@@ -25975,7 +26031,7 @@ function MatchupEngineTab() {
                         </span>}
                       {flag(b.recent_la_flag) &&
                         <span style={{fontSize:8,padding:'1px 5px',borderRadius:4,
-                          background:'rgba(39,201,122,.10)',color:'#27c97a',
+                          background:'rgba(39,201,122,.10)',color:'var(--green)',
                           fontFamily:"'DM Mono',monospace",border:'1px solid rgba(39,201,122,.22)'}}>
                           ✓ LA
                         </span>}
@@ -26001,11 +26057,11 @@ function MatchupEngineTab() {
             <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",fontWeight:700,
               padding:'1px 5px',borderRadius:4,flexShrink:0,
               background:'rgba(39,201,122,.12)',border:'1px solid rgba(39,201,122,.35)',
-              color:'#27c97a',letterSpacing:.3}}>✅</span>
+              color:'var(--green)',letterSpacing:.3}}>✅</span>
           )}
                     {recentEV > 0 && <div style={{textAlign:'center'}}>
                       <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,
-                        fontSize:14,color:recentEV>=95?'#ff8020':recentEV>=90?'#ffc840':'var(--text)',lineHeight:1}}>
+                        fontSize:14,color:recentEV>=95?'var(--c-warn)':recentEV>=90?'var(--c-yellow)':'var(--text)',lineHeight:1}}>
                         {recentEV.toFixed(1)}
                       </div>
                       <div style={{fontSize:7,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
@@ -26078,7 +26134,7 @@ function MatchupEngineTab() {
                           </span>
                           <div style={{display:'flex',alignItems:'center',gap:4}}>
                             <span style={{fontSize:11,fontFamily:"'Oswald',sans-serif",fontWeight:700,
-                              color:m.flag?'#27c97a':'var(--text)'}}>{m.val}</span>
+                              color:m.flag?'var(--green)':'var(--text)'}}>{m.val}</span>
                             {m.flag && <span style={{fontSize:9}}>✓</span>}
                           </div>
                         </div>
@@ -26097,7 +26153,7 @@ function MatchupEngineTab() {
                   const abSinceHR = cp?.windows?.last7?.abSinceHR
                     ?? (cp?.daysSinceHR != null ? Math.round(cp.daysSinceHR * 3.8) : null);
                   const due = isDue(pid);
-                  const abPHRColor = abPerHR<=15?'#ff4020':abPerHR<=22?'#ff8020':abPerHR<=30?'var(--accent2)':'var(--text)';
+                  const abPHRColor = abPerHR<=15?'var(--c-danger)':abPerHR<=22?'var(--c-warn)':abPerHR<=30?'var(--accent2)':'var(--text)';
                   const abSHRColor = abSinceHR!=null&&abSinceHR>abPerHR*1.15?'var(--ice)':'var(--muted)';
                   return (
                     <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:12,
@@ -26148,34 +26204,34 @@ function MatchupEngineTab() {
                   const perfStorm=parseInt(b.perfect_storm)||0;
                   const enhDL=hrs3d===0&&brl3d>=2&&pb2d>=1,stdDL=hrs3d===0&&brl3d>=2&&!enhDL;
                   if(perfStorm) bullets.push({icon:'⚡',color:'#facc15',text:'PERFECT STORM — all signals aligned: bat speed, zone fit, count discipline, matchup',bold:true});
-                  if(enhDL)    bullets.push({icon:'↙',color:'#f5a623',text:`Enhanced Day Late — pulled barrel last 2d + ${brl3d} barrels/3d, 0 HRs · 1.66x HR lift`,bold:true});
-                  else if(stdDL) bullets.push({icon:'📆',color:'#a855f7',text:`Day Late — ${brl3d} barrels/3d, 0 HRs · 1.24x HR lift`,bold:false});
-                  if(bsSpeed>=77) bullets.push({icon:'💨',color:'#38b8f2',text:`${bsSpeed.toFixed(1)} mph bat speed — elite tier · 3x HR baseline`});
-                  else if(bsSpeed>=74) bullets.push({icon:'💨',color:'#38b8f2',text:`${bsSpeed.toFixed(1)} mph bat speed — strong tier · 2x HR baseline`});
-                  if(ev7>=100) bullets.push({icon:'⚡',color:'#ff4020',text:`${ev7.toFixed(1)} mph avg EV L7 — elite exit velocity`});
-                  else if(ev7>=95) bullets.push({icon:'⚡',color:'#f5a623',text:`${ev7.toFixed(1)} mph avg EV L7 — above average contact`});
-                  if(brlPct>=12) bullets.push({icon:'🛢️',color:'#ff4020',text:`${brlPct.toFixed(1)}% Barrel% L7 — 🔥 Primed tier`});
-                  else if(brlPct>=8) bullets.push({icon:'🛢️',color:'#f5a623',text:`${brlPct.toFixed(1)}% Barrel% L7 — elite barrel rate`});
-                  if(pbPct>=6&&pbPct<15) bullets.push({icon:'↙',color:'#27c97a',text:`${pbPct.toFixed(1)}% pulled barrel L7 — hitting with pull-side power`});
-                  if(zf>=85) bullets.push({icon:'🗺️',color:'#27c97a',text:`${zf.toFixed(0)}% Zone Fit — pitcher throws where this batter crushes`});
-                  else if(zf>=70) bullets.push({icon:'🗺️',color:'#f5a623',text:`${zf.toFixed(0)}% Zone Fit — favorable overlap`});
-                  if(la7>=22&&la7<=32) bullets.push({icon:'📐',color:'#27c97a',text:`${la7.toFixed(1)}° avg launch angle — in the 22-32° HR sweet spot`});
+                  if(enhDL)    bullets.push({icon:'↙',color:'var(--accent2)',text:`Enhanced Day Late — pulled barrel last 2d + ${brl3d} barrels/3d, 0 HRs · 1.66x HR lift`,bold:true});
+                  else if(stdDL) bullets.push({icon:'📆',color:'var(--c-violet)',text:`Day Late — ${brl3d} barrels/3d, 0 HRs · 1.24x HR lift`,bold:false});
+                  if(bsSpeed>=77) bullets.push({icon:'💨',color:'var(--ice)',text:`${bsSpeed.toFixed(1)} mph bat speed — elite tier · 3x HR baseline`});
+                  else if(bsSpeed>=74) bullets.push({icon:'💨',color:'var(--ice)',text:`${bsSpeed.toFixed(1)} mph bat speed — strong tier · 2x HR baseline`});
+                  if(ev7>=100) bullets.push({icon:'⚡',color:'var(--c-danger)',text:`${ev7.toFixed(1)} mph avg EV L7 — elite exit velocity`});
+                  else if(ev7>=95) bullets.push({icon:'⚡',color:'var(--accent2)',text:`${ev7.toFixed(1)} mph avg EV L7 — above average contact`});
+                  if(brlPct>=12) bullets.push({icon:'🛢️',color:'var(--c-danger)',text:`${brlPct.toFixed(1)}% Barrel% L7 — 🔥 Primed tier`});
+                  else if(brlPct>=8) bullets.push({icon:'🛢️',color:'var(--accent2)',text:`${brlPct.toFixed(1)}% Barrel% L7 — elite barrel rate`});
+                  if(pbPct>=6&&pbPct<15) bullets.push({icon:'↙',color:'var(--green)',text:`${pbPct.toFixed(1)}% pulled barrel L7 — hitting with pull-side power`});
+                  if(zf>=85) bullets.push({icon:'🗺️',color:'var(--green)',text:`${zf.toFixed(0)}% Zone Fit — pitcher throws where this batter crushes`});
+                  else if(zf>=70) bullets.push({icon:'🗺️',color:'var(--accent2)',text:`${zf.toFixed(0)}% Zone Fit — favorable overlap`});
+                  if(la7>=22&&la7<=32) bullets.push({icon:'📐',color:'var(--green)',text:`${la7.toFixed(1)}° avg launch angle — in the 22-32° HR sweet spot`});
                   // LA Locked — tight angle consistency
-                  if(b.la_locked===true||b.la_locked==='True') bullets.push({icon:'🎯',color:'#27c97a',text:'Launch angle locked — consistent HR-zone contact profile (stddev < 8°)'});
+                  if(b.la_locked===true||b.la_locked==='True') bullets.push({icon:'🎯',color:'var(--green)',text:'Launch angle locked — consistent HR-zone contact profile (stddev < 8°)'});
                   // SwStr% warning
                   const swst2=parseFloat(b.season_swstr_pct)||0;
                   if(swst2>=18) bullets.push({icon:'⚠️',color:'#f97316',text:`${swst2.toFixed(1)}% SwStr% — elevated whiff rate, fade if pitcher has sharp breaking ball`,bold:false});
                   // Pull × Park
                   const ppf2=parseFloat(b.park_pull_fit)||0;
-                  if(ppf2>=5) bullets.push({icon:'🏟️',color:'#27c97a',text:`Pull×Park Fit ${ppf2.toFixed(0)}/10 — pull tendency aligns with this park's power alley`});
+                  if(ppf2>=5) bullets.push({icon:'🏟️',color:'var(--green)',text:`Pull×Park Fit ${ppf2.toFixed(0)}/10 — pull tendency aligns with this park's power alley`});
                   const platAdv=(ph==='L'&&(bh==='R'||bh==='S'))||(ph==='R'&&(bh==='L'||bh==='S'));
-                  if(platAdv) bullets.push({icon:'🤝',color:'#38b8f2',text:`Power-side advantage — ${bh==='R'?'RHB':'LHB'} vs ${ph==='L'?'LHP':'RHP'}`});
-                  if(hotHand>=3) bullets.push({icon:'🔥',color:'#fb923c',text:`${hotHand} HR in last 7 days — on fire 🔥`});
-                  if(bvpHR>=2&&bvpPA>=8) bullets.push({icon:'🆚',color:'#38b8f2',text:`${bvpHR} HR in ${bvpPA} PA vs this pitch mix`});
-                  if(psScore>=75) bullets.push({icon:'🎯',color:'#27c97a',text:`PS Score ${psScore.toFixed(0)} — elite pitch convergence`});
-                  if(pBarrel>=10) bullets.push({icon:'🎯',color:'#ff4020',text:`${pBarrel.toFixed(1)}% barrel rate allowed — pitcher is hittable`});
+                  if(platAdv) bullets.push({icon:'🤝',color:'var(--ice)',text:`Power-side advantage — ${bh==='R'?'RHB':'LHB'} vs ${ph==='L'?'LHP':'RHP'}`});
+                  if(hotHand>=3) bullets.push({icon:'🔥',color:'var(--c-orange2)',text:`${hotHand} HR in last 7 days — on fire 🔥`});
+                  if(bvpHR>=2&&bvpPA>=8) bullets.push({icon:'🆚',color:'var(--ice)',text:`${bvpHR} HR in ${bvpPA} PA vs this pitch mix`});
+                  if(psScore>=75) bullets.push({icon:'🎯',color:'var(--green)',text:`PS Score ${psScore.toFixed(0)} — elite pitch convergence`});
+                  if(pBarrel>=10) bullets.push({icon:'🎯',color:'var(--c-danger)',text:`${pBarrel.toFixed(1)}% barrel rate allowed — pitcher is hittable`});
                   if(windEff&&windEff!=='N/A'&&(windEff.includes('Out')||windEff.includes('Help')||windEff.includes('Boost')))
-                    bullets.push({icon:'🌬️',color:'#38b8f2',text:`Wind: ${windEff}`});
+                    bullets.push({icon:'🌬️',color:'var(--ice)',text:`Wind: ${windEff}`});
                   if(bullets.length===0) return null;
                   return(
                     <div style={{marginBottom:12,background:'rgba(0,0,0,.3)',borderRadius:8,padding:'10px 12px',border:'1px solid rgba(255,255,255,.06)'}}>
@@ -26216,7 +26272,7 @@ function MatchupEngineTab() {
                   ];
                   const lit=checks.filter(ch=>ch.ok).length;
                   const upside=lit>=7?'ELITE':lit>=5?'STRONG':lit>=3?'GOOD':'BELOW AVG';
-                  const uCol=lit>=7?'#ff4020':lit>=5?'#f5a623':lit>=3?'#27c97a':'var(--muted)';
+                  const uCol=lit>=7?'var(--c-danger)':lit>=5?'var(--accent2)':lit>=3?'var(--green)':'var(--muted)';
                   return(
                     <div style={{marginBottom:12,background:'var(--surface)',borderRadius:8,padding:'10px 12px',border:'1px solid var(--border)'}}>
                       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
@@ -26226,9 +26282,9 @@ function MatchupEngineTab() {
                       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px 12px'}}>
                         {checks.map(ch=>(
                           <div key={ch.label} style={{display:'flex',alignItems:'center',gap:6,padding:'3px 0'}}>
-                            <span style={{fontSize:10,flexShrink:0,color:ch.ok?'#27c97a':'rgba(255,255,255,.18)'}}>{ch.ok?'✅':'○'}</span>
+                            <span style={{fontSize:10,flexShrink:0,color:ch.ok?'var(--green)':'rgba(255,255,255,.18)'}}>{ch.ok?'✅':'○'}</span>
                             <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:ch.ok?'var(--text)':'var(--muted)',fontWeight:ch.ok?600:400,flex:1}}>{ch.label}</span>
-                            <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:ch.ok?'#27c97a':'var(--muted)',fontWeight:ch.ok?700:400,flexShrink:0}}>{ch.val}</span>
+                            <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:ch.ok?'var(--green)':'var(--muted)',fontWeight:ch.ok?700:400,flexShrink:0}}>{ch.val}</span>
                           </div>
                         ))}
                       </div>
@@ -26246,10 +26302,10 @@ function MatchupEngineTab() {
                     <div style={{marginBottom:10,padding:'8px 12px',borderRadius:8,background:'var(--surface)',border:'1px solid var(--border)'}}>
                       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
                         <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,color:'var(--muted)',textTransform:'uppercase',letterSpacing:1}}>PROJECTED HR</span>
-                        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:16,color:simHRPct>=15?'#ff4020':simHRPct>=10?'#f5a623':'var(--text)'}}>{simHRPct}%</span>
+                        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:16,color:simHRPct>=15?'var(--c-danger)':simHRPct>=10?'var(--accent2)':'var(--text)'}}>{simHRPct}%</span>
                       </div>
                       <div style={{height:4,borderRadius:2,background:'rgba(255,255,255,.08)',overflow:'hidden',marginBottom:4}}>
-                        <div style={{height:'100%',borderRadius:2,background:simHRPct>=15?'#ff4020':simHRPct>=10?'#f5a623':'#27c97a',width:`${Math.min(100,simHRPct*3.5)}%`,transition:'width .4s'}}/>
+                        <div style={{height:'100%',borderRadius:2,background:simHRPct>=15?'var(--c-danger)':simHRPct>=10?'var(--accent2)':'var(--green)',width:`${Math.min(100,simHRPct*3.5)}%`,transition:'width .4s'}}/>
                       </div>
                       <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--muted)'}}>{recentHRs>0?`${recentHRs} HR last 7d · `:''}Sim-based · see chart below</div>
                     </div>
@@ -26289,7 +26345,7 @@ function MatchupEngineTab() {
                   {/* Pitcher barrel allowed */}
                   {b.pitcher_barrel_pct_allowed && parseFloat(b.pitcher_barrel_pct_allowed) > 0 && (() => {
                     const v = parseFloat(b.pitcher_barrel_pct_allowed);
-                    const col = v >= 10 ? '#ff4020' : v >= 6 ? '#f5a623' : 'var(--muted)';
+                    const col = v >= 10 ? 'var(--c-danger)' : v >= 6 ? 'var(--accent2)' : 'var(--muted)';
                     return <div style={{padding:'3px 10px',borderRadius:6,fontSize:10,
                       background:'rgba(255,255,255,.04)',border:`1px solid ${v>=6?'rgba(255,128,32,.3)':'var(--border)'}`,
                       fontFamily:"'DM Mono',monospace",color:col}}>
@@ -26311,7 +26367,7 @@ function MatchupEngineTab() {
                     const ws = parseInt(b.pitcher_lineup_weak_spot);
                     return <div style={{padding:'3px 10px',borderRadius:6,fontSize:10,
                       background:'rgba(245,166,35,.08)',border:'1px solid rgba(245,166,35,.3)',
-                      fontFamily:"'DM Mono',monospace",color:'#f5a623',fontWeight:700}}
+                      fontFamily:"'DM Mono',monospace",color:'var(--accent2)',fontWeight:700}}
                       title={`This pitcher gives up the most HRs to the #${ws} lineup spot`}>
                       ⚠️ Weak vs #{ws}
                     </div>;
@@ -26320,7 +26376,7 @@ function MatchupEngineTab() {
                   {b.meatball_matchup_score && parseFloat(b.meatball_matchup_score) > 0 && (() => {
                     const ms = parseFloat(b.meatball_matchup_score);
                     const display = (ms * 100).toFixed(0);
-                    const col = ms >= 0.15 ? '#ff4020' : ms >= 0.08 ? '#f5a623' : '#27c97a';
+                    const col = ms >= 0.15 ? 'var(--c-danger)' : ms >= 0.08 ? 'var(--accent2)' : 'var(--green)';
                     const label = ms >= 0.15 ? '🔥 Elite' : ms >= 0.08 ? '⚡ Solid' : '✓ Mild';
                     return <div style={{padding:'3px 10px',borderRadius:6,fontSize:10,
                       background:'rgba(255,64,32,.08)',border:'1px solid rgba(255,64,32,.25)',
@@ -26496,8 +26552,8 @@ function DailyBarrelTab() {
   const sortArr = (arr,col,dir) => [...arr].sort((a,b)=>{ const av=a[col]??-Infinity,bv=b[col]??-Infinity; return dir==='desc'?bv-av:av-bv; });
   const thClick = col => () => setSortCol(s=>({col,dir:s.col===col&&s.dir==='desc'?'asc':'desc'}));
   const thArrow = col => sortCol.col===col?(sortCol.dir==='desc'?' ▼':' ▲'):'';
-  const evCol = v => v==null?'var(--muted)':v>=95?'#ff4020':v>=92?'#ff8020':v>=90?'var(--accent2)':'var(--text)';
-  const brlCol = v => v>=10?'#ff4020':v>=6?'#ff8020':v>=3?'var(--accent2)':'var(--text)';
+  const evCol = v => v==null?'var(--muted)':v>=95?'var(--c-danger)':v>=92?'var(--c-warn)':v>=90?'var(--accent2)':'var(--text)';
+  const brlCol = v => v>=10?'var(--c-danger)':v>=6?'var(--c-warn)':v>=3?'var(--accent2)':'var(--text)';
   const pillStyle = (active,col='var(--accent2)')=>({ padding:'3px 9px',borderRadius:20,cursor:'pointer',fontSize:10,fontWeight:active?700:400,fontFamily:"'DM Mono',monospace",border:`1px solid ${active?col:'var(--border)'}`,background:active?col+'20':'transparent',color:active?col:'var(--muted)',transition:'all .12s',whiteSpace:'nowrap' });
 
   if (loading) return <div style={{padding:'40px',textAlign:'center'}}><div className="sp" style={{margin:'0 auto 12px',width:24,height:24,borderWidth:2}}/><div style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--muted)'}}>Loading at-bat log…</div></div>;
@@ -26563,7 +26619,7 @@ function DailyBarrelTab() {
       <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
         <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1}}>Batter:</span>
         {['all','L','R','S'].map(h=>(
-          <button key={h} onClick={()=>setFBatHand(h)} style={pillStyle(fBatHand===h,'#27c97a')}>
+          <button key={h} onClick={()=>setFBatHand(h)} style={pillStyle(fBatHand===h,'var(--green)')}>
             {h==='all'?'Both Hands':h+'HB'}
           </button>
         ))}
@@ -26580,7 +26636,7 @@ function DailyBarrelTab() {
             {fMinEV>0?`${fMinEV}+`:'Any'}
           </span>
         </div>
-        <button onClick={()=>setFBarrel(v=>!v)} style={{...pillStyle(fBarrel,'#ff8020')}}>🛢 Barrel</button>
+        <button onClick={()=>setFBarrel(v=>!v)} style={{...pillStyle(fBarrel,'var(--c-warn)')}}>🛢 Barrel</button>
       </div>
     </div>
 
@@ -26619,7 +26675,7 @@ function DailyBarrelTab() {
                 <td><div style={{display:'flex',alignItems:'center',gap:6}}>
                   <PlayerAvatar pid={m.id} name={m.name} size={22}/>
                   <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,
-                    color:isKeyMatchup(m.id)?'#ff8020':'var(--text)'}}>{m.name}</span>
+                    color:isKeyMatchup(m.id)?'var(--c-warn)':'var(--text)'}}>{m.name}</span>
                 </div></td>
                 <td style={{textAlign:'center'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)'}}>{m.hand}HB</span></td>
                 <td style={{textAlign:'right'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{m.pa}</span></td>
@@ -26628,8 +26684,8 @@ function DailyBarrelTab() {
                 <td style={{textAlign:'right'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:m.hhPct>=40?'var(--accent2)':'var(--text)'}}>{m.hhPct}%</span></td>
                 <td style={{textAlign:'right'}}><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color:m.hrCount>0?'var(--accent)':'var(--text)'}}>{m.hrCount}</span></td>
                 <td style={{textAlign:'right'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{m.fbPct}%</span></td>
-                <td style={{textAlign:'right'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:m.avgLA>=18&&m.avgLA<=35?'#27c97a':'var(--text)'}}>{m.avgLA!=null?`${m.avgLA}°`:'—'}</span></td>
-                <td style={{textAlign:'right'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:m.hitRate>=30?'#27c97a':'var(--text)'}}>{m.hitRate}%</span></td>
+                <td style={{textAlign:'right'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:m.avgLA>=18&&m.avgLA<=35?'var(--green)':'var(--text)'}}>{m.avgLA!=null?`${m.avgLA}°`:'—'}</span></td>
+                <td style={{textAlign:'right'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:m.hitRate>=30?'var(--green)':'var(--text)'}}>{m.hitRate}%</span></td>
                 <td style={{textAlign:'center'}}>
                   <button onClick={()=>setSelBatter(s=>s===m.id?null:m.id)}
                     style={{padding:'2px 8px',borderRadius:5,cursor:'pointer',fontSize:9,
@@ -26671,7 +26727,7 @@ function DailyBarrelTab() {
                 <td><span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)'}}>{r.date}</span></td>
                 <td><span style={{padding:'1px 5px',borderRadius:4,fontFamily:"'DM Mono',monospace",fontSize:9,fontWeight:700,background:'rgba(255,255,255,.05)',border:'1px solid rgba(255,255,255,.1)',color:'var(--text)'}}>{r.pitch}</span></td>
                 <td style={{textAlign:'right'}}><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,color:evCol(r.ev)}}>{r.ev??'—'}</span></td>
-                <td style={{textAlign:'right'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:r.la>=18&&r.la<=35?'#27c97a':'var(--text)'}}>{r.la!=null?`${r.la}°`:'—'}</span></td>
+                <td style={{textAlign:'right'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:r.la>=18&&r.la<=35?'var(--green)':'var(--text)'}}>{r.la!=null?`${r.la}°`:'—'}</span></td>
                 <td style={{textAlign:'right'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--text)'}}>{r.dist??'—'}</span></td>
                 <td><span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)'}}>{r.result}</span></td>
                 <td><div style={{display:'flex',gap:2}}>
@@ -26759,7 +26815,7 @@ function GetAppTab() {
       <Step n="4" text={<>Tap <strong>"Add"</strong> in the top right — the Going Yard icon appears on your home screen</>}/>
       <div style={{marginTop:10,padding:"8px 12px",borderRadius:8,
         background:"rgba(39,201,122,.06)",border:"1px solid rgba(39,201,122,.15)",
-        fontSize:10,color:"#27c97a",fontFamily:"'DM Mono',monospace"}}>
+        fontSize:10,color:"var(--green)",fontFamily:"'DM Mono',monospace"}}>
         ✓ Launches full screen with no browser bar — just like a native app
       </div>
     </Card>
@@ -26772,7 +26828,7 @@ function GetAppTab() {
       <Step n="4" text={<>Tap <strong>"Add"</strong> — the icon appears on your home screen and app drawer</>}/>
       <div style={{marginTop:10,padding:"8px 12px",borderRadius:8,
         background:"rgba(39,201,122,.06)",border:"1px solid rgba(39,201,122,.15)",
-        fontSize:10,color:"#27c97a",fontFamily:"'DM Mono',monospace"}}>
+        fontSize:10,color:"var(--green)",fontFamily:"'DM Mono',monospace"}}>
         ✓ Chrome may show an automatic "Install" banner at the bottom — tap that too
       </div>
     </Card>
@@ -26827,7 +26883,7 @@ function GetAppTab() {
           You'll get alerted when a{' '}
           <strong style={{color:'var(--accent)'}}>💥 home run</strong>{' '}
           is hit and when{' '}
-          <strong style={{color:'#27c97a'}}>✅ lineups are confirmed</strong>{' '}
+          <strong style={{color:'var(--green)'}}>✅ lineups are confirmed</strong>{' '}
           for today's games.
         </div>
       </div>
@@ -27008,12 +27064,12 @@ function DataStatusBadge() {
   }, []);
 
   const cfg = {
-    live:     {dot:"#27c97a", text:"Live",     tip:"Games in progress · data updating"},
-    ok:       {dot:"#38b8f2", text:"Scheduled", tip:"Data connected · games scheduled"},
-    idle:     {dot:"#5a7080", text:"Off Day",   tip:"No games today"},
-    checking: {dot:"#5a7080", text:"...",        tip:"Checking data connection"},
-    offline:  {dot:"#ff4020", text:"Offline",   tip:"Data connection issue · retrying"},
-  }[status] || {dot:"#5a7080",text:"—",tip:""};
+    live:     {dot:"var(--green)", text:"Live",     tip:"Games in progress · data updating"},
+    ok:       {dot:"var(--ice)", text:"Scheduled", tip:"Data connected · games scheduled"},
+    idle:     {dot:"var(--c-slate)", text:"Off Day",   tip:"No games today"},
+    checking: {dot:"var(--c-slate)", text:"...",        tip:"Checking data connection"},
+    offline:  {dot:"var(--c-danger)", text:"Offline",   tip:"Data connection issue · retrying"},
+  }[status] || {dot:"var(--c-slate)",text:"—",tip:""};
 
   return (
     <div title={cfg.tip + (lastOk ? ` · ${lastOk}` : "")} style={{display:"flex",alignItems:"center",cursor:"default"}}>
@@ -27137,7 +27193,7 @@ function fmtHour12(h) {
 }
 
 const WD_EMOJI = {'out-strong':'💨','out':'🌬️','in-strong':'❄️','in':'🧊','cross':'↔️','calm':'🌤️'};
-const WD_COLOR = {'out-strong':'#ff4020','out':'#ff8020','in-strong':'#38b8f2','in':'#60a0d0','cross':'#f5a623','calm':'var(--muted)'};
+const WD_COLOR = {'out-strong':'var(--c-danger)','out':'var(--c-warn)','in-strong':'var(--ice)','in':'#60a0d0','cross':'var(--accent2)','calm':'var(--muted)'};
 
 function windBadge(dir, label) {
   const col = WD_COLOR[dir]||'var(--muted)';
@@ -27152,10 +27208,10 @@ function windBadge(dir, label) {
 }
 
 function envScore(s) {
-  return s>=65?{c:'#ff4020',l:'🔥 HR Friendly'}:
-         s>=55?{c:'#ff8020',l:'📈 Slight Boost'}:
+  return s>=65?{c:'var(--c-danger)',l:'🔥 HR Friendly'}:
+         s>=55?{c:'var(--c-warn)',l:'📈 Slight Boost'}:
          s>=45?{c:'var(--text)',l:'— Neutral'}:
-               {c:'#38b8f2',l:'📉 Suppressor'};
+               {c:'var(--ice)',l:'📉 Suppressor'};
 }
 
 // Stadium wind diagram: top-down field with wind arrow
@@ -27198,7 +27254,7 @@ function StadiumWindDiagram({ cfDir, windDeg, windDir, size=72 }) {
   const wx1   = cx - wLen*0.5*Math.cos(wRad);
   const wy1   = cy - wLen*0.5*Math.sin(wRad);
 
-  const wCol = {'out-strong':'#ff4020','out':'#ff8020','in-strong':'#38b8f2','in':'#60a0d0','cross':'#f5a623','calm':'#888'}[windDir]||'#888';
+  const wCol = {'out-strong':'var(--c-danger)','out':'var(--c-warn)','in-strong':'var(--ice)','in':'#60a0d0','cross':'var(--accent2)','calm':'#888'}[windDir]||'#888';
   const uid  = `wd${Math.abs(windDeg)}${Math.abs(cfDir)}`;
 
   return (
@@ -27260,7 +27316,7 @@ function WindArrow({ deg, size=36 }) {
 
 // Park factor HR color
 function pfColor(hr) {
-  return hr>=115?'#ff4020':hr>=108?'#ff8020':hr>=103?'#ffc840':hr>=97?'var(--text)':'#38b8f2';
+  return hr>=115?'var(--c-danger)':hr>=108?'var(--c-warn)':hr>=103?'var(--c-yellow)':hr>=97?'var(--text)':'var(--ice)';
 }
 
 function WeatherGameCard({ g, wd }) {
@@ -27321,7 +27377,7 @@ function WeatherGameCard({ g, wd }) {
             {wd.venueOverride && (
               <span title="Special venue — not team's home park" style={{
                 fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:8,
-                color:'#f5a623',background:'rgba(245,166,35,.15)',
+                color:'var(--accent2)',background:'rgba(245,166,35,.15)',
                 border:'1px solid rgba(245,166,35,.35)',borderRadius:3,
                 padding:'1px 4px',letterSpacing:.3,flexShrink:0}}>
                 SPECIAL
@@ -27331,8 +27387,8 @@ function WeatherGameCard({ g, wd }) {
           <div style={{fontSize:10,color:'var(--accent2)',fontFamily:"'DM Mono',monospace",marginTop:1}}>
             {g.gameTime||'TBD'} ET
             {gtSlot
-              ? <span style={{marginLeft:6,color:'#27c97a',fontWeight:700}}>⚾ game forecast</span>
-              : display && !wd.isDome && <span style={{marginLeft:6,color:'#ff8020'}}>⚡ current</span>}
+              ? <span style={{marginLeft:6,color:'var(--green)',fontWeight:700}}>⚾ game forecast</span>
+              : display && !wd.isDome && <span style={{marginLeft:6,color:'var(--c-warn)'}}>⚡ current</span>}
           </div>
         </div>
 
@@ -27346,7 +27402,7 @@ function WeatherGameCard({ g, wd }) {
           {/* Temp */}
           <div style={{textAlign:'center',minWidth:54,flexShrink:0}}>
             <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:24,lineHeight:1,
-              color:display.temp>=85?'#ff4020':display.temp>=75?'#ff8020':display.temp>=60?'var(--text)':'#38b8f2'}}>
+              color:display.temp>=85?'var(--c-danger)':display.temp>=75?'var(--c-warn)':display.temp>=60?'var(--text)':'var(--ice)'}}>
               {display.temp}°
             </div>
             <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",
@@ -27366,7 +27422,7 @@ function WeatherGameCard({ g, wd }) {
                 from {display.windDirRaw} ({display.windDeg}°)<br/>
                 <span style={{opacity:.6}}>CF faces {wd.cfDir}°</span>
                 {display.metarSource && (
-                  <span style={{marginLeft:6,color:'#27c97a',fontWeight:700,opacity:.8}}
+                  <span style={{marginLeft:6,color:'var(--green)',fontWeight:700,opacity:.8}}
                     title={`Live observed wind from ${display.metarSource} METAR station`}>
                     · METAR
                   </span>
@@ -27380,10 +27436,10 @@ function WeatherGameCard({ g, wd }) {
             <div style={{fontSize:11,color:'var(--text)',fontFamily:"'DM Mono',monospace",marginBottom:3}}>
               {display.condition}
             </div>
-            <div style={{fontSize:10,color:'#38b8f2',fontFamily:"'DM Mono',monospace"}}>
+            <div style={{fontSize:10,color:'var(--ice)',fontFamily:"'DM Mono',monospace"}}>
               {(display.rainChance||0)>0 ? `🌧 ${display.rainChance}%` : ''}
               {peakRain!=null && peakRain > (display.rainChance||0) + 10 && (
-                <span style={{color:'#f5a623'}}
+                <span style={{color:'var(--accent2)'}}
                   title="Peak rain chance across the game's ~3hr window — a storm arriving after first pitch would show up here even if it's calm right now.">
                   {' '}→{peakRain}% peak
                 </span>
@@ -27445,7 +27501,7 @@ function WeatherGameCard({ g, wd }) {
                   </div>
                   <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:20,
                     lineHeight:1,marginBottom:2,
-                    color:h.temp>=85?'#ff4020':h.temp>=75?'#ff8020':h.temp>=60?'var(--text)':'#38b8f2'}}>
+                    color:h.temp>=85?'var(--c-danger)':h.temp>=75?'var(--c-warn)':h.temp>=60?'var(--text)':'var(--ice)'}}>
                     {h.temp}°
                   </div>
                   <div style={{marginBottom:4}}>
@@ -27458,7 +27514,7 @@ function WeatherGameCard({ g, wd }) {
                   <div style={{fontSize:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginBottom:4}}>
                     from {h.windDirRaw}
                   </div>
-                  {(h.rainChance||0)>0&&<div style={{fontSize:9,color:'#38b8f2',
+                  {(h.rainChance||0)>0&&<div style={{fontSize:9,color:'var(--ice)',
                     fontFamily:"'DM Mono',monospace",marginBottom:3}}>
                     🌧 {h.rainChance}%
                   </div>}
@@ -27778,7 +27834,7 @@ function LocationMapTab({ games, weather }) {
       const gtSlot   = gameHour != null ? (w.hourly || []).find(h => h.hour === gameHour) : null;
       const display  = gtSlot || w.current;
       const hrScore  = display?.hrEnvScore ?? 50;
-      const dotColor = hrScore >= 80 ? '#ff4020' : hrScore >= 60 ? '#f5a623' : hrScore >= 40 ? '#38b8f2' : '#60a0d0';
+      const dotColor = hrScore >= 80 ? 'var(--c-danger)' : hrScore >= 60 ? 'var(--accent2)' : hrScore >= 40 ? 'var(--ice)' : '#60a0d0';
 
       const icon = L.divIcon({
         className: '',
@@ -27908,7 +27964,7 @@ function WeatherTab() {
     s.col===col ? {col, dir: s.dir==='desc'?'asc':'desc'} : {col, dir: col==='abbr'||col==='venue'?'asc':'desc'}
   );
 
-  const hrColor = v => v>=120?'#ff4020':v>=110?'#ff8020':v>=105?'#f5a623':v>=98?'var(--text)':v>=90?'var(--muted)':'#38b8f2';
+  const hrColor = v => v>=120?'var(--c-danger)':v>=110?'var(--c-warn)':v>=105?'var(--accent2)':v>=98?'var(--text)':v>=90?'var(--muted)':'var(--ice)';
   const hrLabel = v => v>=120?'🔥 Very Hot':v>=110?'🔶 Hot':v>=105?'🟡 Warm':v>=98?'⚪ Neutral':v>=90?'🔵 Cool':'❄️ Cold';
 
   const loadWeather = async (gamesList) => {
@@ -27979,8 +28035,8 @@ function WeatherTab() {
         : <>
           <div style={{display:'flex',gap:8,marginBottom:16,flexWrap:'wrap'}}>
             {[
-              {label:'💨 Blowing Out',count:out,  color:'#ff8020'},
-              {label:'❄️ Blowing In', count:inp,  color:'#38b8f2'},
+              {label:'💨 Blowing Out',count:out,  color:'var(--c-warn)'},
+              {label:'❄️ Blowing In', count:inp,  color:'var(--ice)'},
               {label:'🏟️ Domes',      count:domes,color:'var(--muted)'},
               {label:'🌧️ Rain Risk',  count:rain, color:'#60a0d0'},
             ].filter(s=>s.count>0).map(s=>(
@@ -27995,7 +28051,7 @@ function WeatherTab() {
             <a href="https://rotogrinders.com/weather/mlb" target="_blank" rel="noopener noreferrer"
               style={{fontSize:10,color:'var(--ice)',fontFamily:"'DM Mono',monospace",fontWeight:600,textDecoration:'none',flexShrink:0}}>RotoGrinders ↗</a>
             <a href="https://www.ballparkpal.com/Park-Factors.php" target="_blank" rel="noopener noreferrer"
-              style={{fontSize:10,color:'#27c97a',fontFamily:"'DM Mono',monospace",fontWeight:600,textDecoration:'none',flexShrink:0}}>BallparkPal ↗</a>
+              style={{fontSize:10,color:'var(--green)',fontFamily:"'DM Mono',monospace",fontWeight:600,textDecoration:'none',flexShrink:0}}>BallparkPal ↗</a>
           </div>
           {games.map(g=>(
             <WeatherGameCard key={g.gamePk||g.id} g={g} wd={weather[g.home?.abbr]}/>
@@ -28016,7 +28072,7 @@ function WeatherTab() {
               </button>
             ))}
             <a href="https://www.ballparkpal.com/Park-Factors.php" target="_blank" rel="noopener noreferrer"
-              style={{marginLeft:'auto',fontSize:10,color:'#27c97a',fontFamily:"'DM Mono',monospace",
+              style={{marginLeft:'auto',fontSize:10,color:'var(--green)',fontFamily:"'DM Mono',monospace",
                 fontWeight:600,textDecoration:'none',alignSelf:'center',flexShrink:0}}>
               Full BallparkPal Data ↗
             </a>
@@ -28089,7 +28145,7 @@ function WeatherTab() {
                 });
 
                 const pctCell = (v) => {
-                  const col = v>12?'#ff4020':v>5?'#ff8020':v>0?'#f5a623':v<-12?'#38b8f2':v<-5?'#60a0d0':v<0?'var(--muted)':'var(--muted)';
+                  const col = v>12?'var(--c-danger)':v>5?'var(--c-warn)':v>0?'var(--accent2)':v<-12?'var(--ice)':v<-5?'#60a0d0':v<0?'var(--muted)':'var(--muted)';
                   return <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:col}}>
                     {v>0?'+':''}{v}%
                   </span>;
@@ -28116,10 +28172,10 @@ function WeatherTab() {
                             <th style={{textAlign:'left'}}>Game</th>
                             <th style={{textAlign:'center',cursor:'default',color:'var(--muted)'}}>Wind</th>
                             <th style={{textAlign:'center',cursor:'default',color:'var(--muted)'}}>Temp</th>
-                            <TH col="hrPct"   label="HR"   color="#ff8020"/>
-                            <TH col="xbhPct"  label="2B/3B" color="#f5a623"/>
+                            <TH col="hrPct"   label="HR"   color="var(--c-warn)"/>
+                            <TH col="xbhPct"  label="2B/3B" color="var(--accent2)"/>
                             <TH col="singPct" label="1B"   color="var(--text)"/>
-                            <TH col="runPct"  label="Runs" color="#27c97a"/>
+                            <TH col="runPct"  label="Runs" color="var(--green)"/>
                           </tr>
                         </thead>
                         <tbody>
@@ -28133,11 +28189,11 @@ function WeatherTab() {
                                 <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,color:'var(--text)',display:'flex',alignItems:'center',gap:5}}>
                                   {r.away} @ {r.home}
                                   {r.weatherAlert && <span title="Weather may impact game — use caution" style={{fontSize:11}}>⚠️</span>}
-                                  {r.venueOverride && <span title="Special venue — not team's home park" style={{fontSize:9,fontFamily:"'Oswald',sans-serif",fontWeight:800,color:'#f5a623',background:'rgba(245,166,35,.12)',border:'1px solid rgba(245,166,35,.3)',borderRadius:3,padding:'0 4px',marginLeft:2}}>SPECIAL</span>}
+                                  {r.venueOverride && <span title="Special venue — not team's home park" style={{fontSize:9,fontFamily:"'Oswald',sans-serif",fontWeight:800,color:'var(--accent2)',background:'rgba(245,166,35,.12)',border:'1px solid rgba(245,166,35,.3)',borderRadius:3,padding:'0 4px',marginLeft:2}}>SPECIAL</span>}
                                 </div>
                                 <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",marginTop:1}}>
                                   {r.venue}{r.gameTime ? ` · ${r.gameTime}` : ''}
-                                  {r.elevation > 500 && <span style={{marginLeft:4,color:'#f5a623'}}>⛰️ {r.elevation.toLocaleString()}ft</span>}
+                                  {r.elevation > 500 && <span style={{marginLeft:4,color:'var(--accent2)'}}>⛰️ {r.elevation.toLocaleString()}ft</span>}
                                 </div>
                               </td>
                               <td style={{textAlign:'center'}}>
@@ -28149,7 +28205,7 @@ function WeatherTab() {
                               </td>
                               <td style={{textAlign:'center'}}>
                                 <span style={{fontSize:11,fontFamily:"'DM Mono',monospace",
-                                  color:r.temp>=85?'#ff4020':r.temp>=75?'#ff8020':r.temp>=60?'var(--text)':'#38b8f2'}}>
+                                  color:r.temp>=85?'var(--c-danger)':r.temp>=75?'var(--c-warn)':r.temp>=60?'var(--text)':'var(--ice)'}}>
                                   {Math.round(r.temp)}°
                                 </span>
                               </td>
@@ -28203,7 +28259,7 @@ function WeatherTab() {
                 </table>
               </div>
               <div style={{marginTop:14,display:'flex',gap:8,flexWrap:'wrap'}}>
-                {[{l:'🔥 Very Hot',r:'≥120',c:'#ff4020'},{l:'🔶 Hot',r:'110–119',c:'#ff8020'},{l:'🟡 Warm',r:'105–109',c:'#f5a623'},{l:'⚪ Neutral',r:'98–104',c:'var(--text)'},{l:'🔵 Cool',r:'90–97',c:'var(--muted)'},{l:'❄️ Cold',r:'<90',c:'#38b8f2'}].map(x=>(
+                {[{l:'🔥 Very Hot',r:'≥120',c:'var(--c-danger)'},{l:'🔶 Hot',r:'110–119',c:'var(--c-warn)'},{l:'🟡 Warm',r:'105–109',c:'var(--accent2)'},{l:'⚪ Neutral',r:'98–104',c:'var(--text)'},{l:'🔵 Cool',r:'90–97',c:'var(--muted)'},{l:'❄️ Cold',r:'<90',c:'var(--ice)'}].map(x=>(
                   <div key={x.l} style={{padding:'3px 10px',borderRadius:6,fontSize:9,background:'var(--surface)',border:`1px solid ${x.c}30`,fontFamily:"'DM Mono',monospace",color:x.c,whiteSpace:'nowrap'}}>
                     {x.l} <span style={{color:'rgba(255,255,255,.55)'}}>{x.r}</span>
                   </div>
@@ -28389,7 +28445,7 @@ function HRNotificationBanner({ notif, onDismiss }) {
 
   // ── Non-HR types ────────────────────────────────────────────────────────
   if (notif.notifType === 'onFire') {
-    const t = { icon:'🔥', color:'#fb923c', bg:'rgba(251,146,60,.18)', label:'ON FIRE' };
+    const t = { icon:'🔥', color:'var(--c-orange2)', bg:'rgba(251,146,60,.18)', label:'ON FIRE' };
     const tp = {...touchProps, onClick:()=>handleClick('live','gameday')};
     return (
       <div {...tp} style={{...wrapStyle,cursor:'pointer'}}>
@@ -28433,7 +28489,7 @@ function HRNotificationBanner({ notif, onDismiss }) {
   }
 
   if (notif.notifType === 'lineup') {
-    const t = { icon:'📋', color:'#38b8f2', bg:'rgba(56,184,242,.15)', label:'LINEUPS' };
+    const t = { icon:'📋', color:'var(--ice)', bg:'rgba(56,184,242,.15)', label:'LINEUPS' };
     const tp = {...touchProps, onClick:()=>handleClick('live','lineups')};
     return (
       <div {...tp} style={{...wrapStyle,cursor:'pointer'}}>
@@ -28456,10 +28512,10 @@ function HRNotificationBanner({ notif, onDismiss }) {
 
   // Default: HR notification
   const typeMap = {
-    'Grand Slam': { icon:'💥', label:'GRAND SLAM', color:'#ff4020', bg:'rgba(232,65,26,.22)' },
-    '3-Run':      { icon:'💥', label:'3-RUN HR',   color:'#ff4020', bg:'rgba(232,65,26,.18)' },
-    '2-Run':      { icon:'💥', label:'2-RUN HR',   color:'#ff8020', bg:'rgba(255,128,32,.16)' },
-    'Solo':       { icon:'💥', label:'SOLO HR',    color:'#ffc840', bg:'rgba(255,200,64,.14)' },
+    'Grand Slam': { icon:'💥', label:'GRAND SLAM', color:'var(--c-danger)', bg:'rgba(232,65,26,.22)' },
+    '3-Run':      { icon:'💥', label:'3-RUN HR',   color:'var(--c-danger)', bg:'rgba(232,65,26,.18)' },
+    '2-Run':      { icon:'💥', label:'2-RUN HR',   color:'var(--c-warn)', bg:'rgba(255,128,32,.16)' },
+    'Solo':       { icon:'💥', label:'SOLO HR',    color:'var(--c-yellow)', bg:'rgba(255,200,64,.14)' },
   };
   const t = typeMap[notif.type] || typeMap['Solo'];
 
@@ -28513,7 +28569,7 @@ function HRNotificationBanner({ notif, onDismiss }) {
             </span>
             {notif.exitVelo > 0 && <span style={{
               fontSize:9, fontFamily:"'DM Mono',monospace",
-              color:notif.exitVelo>=103?'#ff4020':notif.exitVelo>=95?'#ff8020':'var(--muted)',
+              color:notif.exitVelo>=103?'var(--c-danger)':notif.exitVelo>=95?'var(--c-warn)':'var(--muted)',
             }}>⚡{notif.exitVelo.toFixed(1)} mph</span>}
             {notif.distance > 0 && <span style={{
               fontSize:9, fontFamily:"'DM Mono',monospace", color:'var(--muted)',
@@ -28570,16 +28626,16 @@ function NotificationBell() {
   }, [open]);
 
   const typeMap = {
-    'Grand Slam': { icon:'💥', label:'GRAND SLAM', color:'#ff4020' },
-    '3-Run':      { icon:'💥', label:'3-Run HR',   color:'#ff4020' },
-    '2-Run':      { icon:'💥', label:'2-Run HR',   color:'#ff8020' },
-    'Solo':       { icon:'💥', label:'Solo HR',    color:'#ffc840' },
+    'Grand Slam': { icon:'💥', label:'GRAND SLAM', color:'var(--c-danger)' },
+    '3-Run':      { icon:'💥', label:'3-Run HR',   color:'var(--c-danger)' },
+    '2-Run':      { icon:'💥', label:'2-Run HR',   color:'var(--c-warn)' },
+    'Solo':       { icon:'💥', label:'Solo HR',    color:'var(--c-yellow)' },
   };
   const notifTypeMap = {
-    onFire:   { icon:'🔥', label:'On Fire',           color:'#fb923c' },
+    onFire:   { icon:'🔥', label:'On Fire',           color:'var(--c-orange2)' },
     battling: { icon:'🥊', label:'Battling',          color:'#60a5fa' },
-    lineup:   { icon:'📋', label:'Lineup Confirmed',  color:'#38b8f2' },
-    hr:       { icon:'💥', label:'Gone Yard',         color:'#ff4020' },
+    lineup:   { icon:'📋', label:'Lineup Confirmed',  color:'var(--ice)' },
+    hr:       { icon:'💥', label:'Gone Yard',         color:'var(--c-danger)' },
   };
 
   return (
@@ -28592,7 +28648,7 @@ function NotificationBell() {
         <span style={{fontSize:12}}>🚨</span>
         {unread > 0 && (
           <span style={{position:'absolute',top:-4,right:-4,
-            background:'#ff4020',color:'white',borderRadius:'50%',
+            background:'var(--c-danger)',color:'white',borderRadius:'50%',
             width:15,height:15,fontSize:9,fontWeight:700,
             display:'flex',alignItems:'center',justifyContent:'center',
             fontFamily:"'DM Mono',monospace"}}>
@@ -29891,13 +29947,13 @@ function TrackRecordTab() {
   const tierColor = (val, hi, mid, lo, invert) => {
     if (val == null || isNaN(val)) return 'var(--text)';
     if (invert) {
-      if (val >= hi) return '#ff6b6b';
-      if (val >= mid) return '#ffc840';
-      return '#27c97a';
+      if (val >= hi) return 'var(--c-coral)';
+      if (val >= mid) return 'var(--c-yellow)';
+      return 'var(--green)';
     }
-    if (val >= hi) return '#27c97a';
-    if (val >= mid) return '#ffc840';
-    if (lo != null && val < lo) return '#ff6b6b';
+    if (val >= hi) return 'var(--green)';
+    if (val >= mid) return 'var(--c-yellow)';
+    if (lo != null && val < lo) return 'var(--c-coral)';
     return 'var(--text)';
   };
 
@@ -29982,7 +30038,7 @@ function TrackRecordTab() {
       <div style={{margin:'8px 14px 0', padding:'8px 12px', borderRadius:8,
         background:'rgba(245,198,66,.08)', border:'1px solid rgba(245,198,66,.3)',
         fontFamily:mono, fontSize:9, color:'var(--muted)', lineHeight:1.5}}>
-        📋 <b style={{color:'#f5c542'}}>2025 backfill</b> — reconstructed leak-free from the AB log.
+        📋 <b style={{color:'var(--c-gold2)'}}>2025 backfill</b> — reconstructed leak-free from the AB log.
         ISO, Zone Fit, wOBA (proxy for xwOBA), Pitcher Grade (rolling AB-log proxy), Arsenal Fit ISO,
         Sauce 2.0/2.5/3.0, HR outcomes, Close Calls, Ball Carry/xHR are populated. Yard Score/Boom/Sig/gHR/PS Score
         and Monte-Carlo-dependent signals (Barrel Signal, TB Signal, Hand Match, Day Late, Longshot, Plate IQ, Sim TB)
@@ -30037,7 +30093,7 @@ function TrackRecordTab() {
                 ? `${((summary.kmHits.length/summary.keyMatchups.length)*100).toFixed(0)}%`
                 : '—',
               sub: `${summary.kmHits.length}/${summary.keyMatchups.length}`,
-              color:'#38b8f2'
+              color:'var(--ice)'
             },
             {
               label:'BARREL SIGNAL HIT RATE',
@@ -30053,7 +30109,7 @@ function TrackRecordTab() {
                 ? `${((summary.lsHits.length/summary.longshots.length)*100).toFixed(0)}%`
                 : '—',
               sub: `${summary.lsHits.length}/${summary.longshots.length}`,
-              color:'#a78bfa'
+              color:'var(--c-purple)'
             },
             {
               label:'WEAK SPOT HR RATE',
@@ -30069,7 +30125,7 @@ function TrackRecordTab() {
                 ? `${((summary.sauce2Hits.length/summary.sauce2.length)*100).toFixed(0)}%`
                 : '—',
               sub: `${summary.sauce2Hits.length}/${summary.sauce2.length}`,
-              color:'#34d399'
+              color:'var(--c-emerald)'
             },
             {
               label:'SAUCE 3.0 HIT RATE',
@@ -30077,7 +30133,7 @@ function TrackRecordTab() {
                 ? `${((summary.sauce3Hits.length/summary.sauce3.length)*100).toFixed(0)}%`
                 : '—',
               sub: `${summary.sauce3Hits.length}/${summary.sauce3.length}`,
-              color:'#f59e0b'
+              color:'var(--c-sauce3)'
             },
             {
               label:'🥫 SAUCE 2.5 HIT RATE',
@@ -30085,7 +30141,7 @@ function TrackRecordTab() {
                 ? `${((summary.sauce25Hits.length/summary.sauce25.length)*100).toFixed(0)}%`
                 : '—',
               sub: `${summary.sauce25Hits.length}/${summary.sauce25.length}`,
-              color:'#eab308'
+              color:'var(--c-sauce25)'
             },
             {
               label:'📈 TOP ISO HR RATE',
@@ -30093,7 +30149,7 @@ function TrackRecordTab() {
                 ? `${((summary.topIsoHits.length/summary.topIso.length)*100).toFixed(0)}%`
                 : '—',
               sub: `${summary.topIsoHits.length}/${summary.topIso.length}`,
-              color:'#38b8f2'
+              color:'var(--ice)'
             },
             {
               label:'💎 PRIME ISO HR RATE',
@@ -30101,7 +30157,7 @@ function TrackRecordTab() {
                 ? `${((summary.primeIsoHits.length/summary.primeIso.length)*100).toFixed(0)}%`
                 : '—',
               sub: `${summary.primeIsoHits.length}/${summary.primeIso.length}`,
-              color:'#a78bfa'
+              color:'var(--c-purple)'
             },
             {
               label:'🥊 SOLID CONTACT HR RATE',
@@ -30125,7 +30181,7 @@ function TrackRecordTab() {
                 ? `${((summary.secretSauceHits.length/summary.secretSauce.length)*100).toFixed(0)}%`
                 : '—',
               sub: `${summary.secretSauceHits.length}/${summary.secretSauce.length}`,
-              color:'#c084fc'
+              color:'var(--c-lavender)'
             },
             {
               label:'🚫 AVOID LIST MISS RATE',
@@ -30133,7 +30189,7 @@ function TrackRecordTab() {
                 ? `${((summary.avoidListMisses.length/summary.avoidList.length)*100).toFixed(0)}%`
                 : '—',
               sub: `${summary.avoidListMisses.length}/${summary.avoidList.length}`,
-              color:'#ff6b6b'
+              color:'var(--c-coral)'
             },
             {
               label:'2 TB SIGNAL RATE',
@@ -30141,7 +30197,7 @@ function TrackRecordTab() {
                 ? `${((summary.tbSignalHits.length/summary.tbSignals.length)*100).toFixed(0)}%`
                 : '—',
               sub: `${summary.tbSignalHits.length}/${summary.tbSignals.length}`,
-              color:'#38b8f2'
+              color:'var(--ice)'
             },
             {
               label:'SIM TB ≥2.0 HIT RATE',
@@ -30149,7 +30205,7 @@ function TrackRecordTab() {
                 ? `${((summary.simTB2Hits.length/summary.simTB2.length)*100).toFixed(0)}%`
                 : '—',
               sub: `${summary.simTB2Hits.length}/${summary.simTB2.length}`,
-              color:'#a78bfa'
+              color:'var(--c-purple)'
             },
             {
               label:'HIGH IQ HR RATE',
@@ -30157,7 +30213,7 @@ function TrackRecordTab() {
                 ? `${((summary.highIQHRHits.length/summary.highIQBatters.length)*100).toFixed(0)}%`
                 : '—',
               sub: `${summary.highIQHRHits.length}/${summary.highIQBatters.length}`,
-              color:'#38b8f2'
+              color:'var(--ice)'
             },
             {
               label:'HIGH IQ 2+TB RATE',
@@ -30165,7 +30221,7 @@ function TrackRecordTab() {
                 ? `${((summary.highIQTB2Hits.length/summary.highIQBatters.length)*100).toFixed(0)}%`
                 : '—',
               sub: `${summary.highIQTB2Hits.length}/${summary.highIQBatters.length}`,
-              color:'#38b8f2'
+              color:'var(--ice)'
             },
             {
               label:'HAND MATCH HR RATE',
@@ -30173,7 +30229,7 @@ function TrackRecordTab() {
                 ? `${((summary.handMatchHits.length/summary.handMatches.length)*100).toFixed(0)}%`
                 : '—',
               sub: `${summary.handMatchHits.length}/${summary.handMatches.length}`,
-              color:'#fbbf24'
+              color:'var(--c-amber)'
             },
             {
               label:'🗓️ DAY LATE HIT RATE',
@@ -30181,7 +30237,7 @@ function TrackRecordTab() {
                 ? `${((summary.dayLateHits.length/summary.dayLate.length)*100).toFixed(0)}%`
                 : '—',
               sub: `${summary.dayLateHits.length}/${summary.dayLate.length}`,
-              color:'#22c1c3'
+              color:'var(--c-teal)'
             },
             {
               label:'🏆 TOP 4 PICK HIT RATE',
@@ -30189,7 +30245,7 @@ function TrackRecordTab() {
                 ? `${((summary.top4PickHits.length/summary.top4Picks.length)*100).toFixed(0)}%`
                 : '—',
               sub: `${summary.top4PickHits.length}/${summary.top4Picks.length}`,
-              color:'#eab308'
+              color:'var(--c-sauce25)'
             },
           ];
           const stacks = [];
@@ -30269,7 +30325,7 @@ function TrackRecordTab() {
             {summary.biggestUpset.batter}
           </span> (YS {summary.biggestUpset.yardScore}) went yard
           {summary.biggestMiss && (
-            <> · 🚫 Biggest miss: <span style={{color:'#ff6b6b'}}>
+            <> · 🚫 Biggest miss: <span style={{color:'var(--c-coral)'}}>
               {summary.biggestMiss.batter}
             </span> (YS {summary.biggestMiss.yardScore}) did not</>
           )}
@@ -30315,7 +30371,7 @@ function TrackRecordTab() {
           style={{padding:'4px 10px', borderRadius:6, border:'none',
             cursor:'pointer', fontFamily:mono, fontSize:9, fontWeight:700,
             background: showOnlySauce25 ? 'rgba(234,179,8,.15)' : 'var(--surface2)',
-            color:       showOnlySauce25 ? '#eab308' : 'var(--muted)',
+            color:       showOnlySauce25 ? 'var(--c-sauce25)' : 'var(--muted)',
             border: `1px solid ${showOnlySauce25 ? 'rgba(234,179,8,.4)' : 'var(--border)'}` }}>
           🥫 Sauce 2.5 Only
         </button>
@@ -30335,39 +30391,39 @@ function TrackRecordTab() {
             filter here too, not just a placeholder). */}
         <FilterPanel
           toggles={[
-            { key:'km',    label:'🔑 Key Matchup Only',    active:showOnlyKM,       onToggle:()=>setShowOnlyKM(v=>!v),       color:'#38b8f2' },
+            { key:'km',    label:'🔑 Key Matchup Only',    active:showOnlyKM,       onToggle:()=>setShowOnlyKM(v=>!v),       color:'var(--ice)' },
             { key:'ws',    label:'🟢 Weak Spot Only',       active:showOnlyWeakSlot, onToggle:()=>setShowOnlyWeakSlot(v=>!v), color:'#ffd60a' },
-            { key:'cc',    label:'📍 Close Call Only',      active:showOnlyCC,       onToggle:()=>setShowOnlyCC(v=>!v),       color:'#f5a623' },
-            { key:'s2',    label:'🍯 Sauce 2.0 Only',       active:showOnlySauce2,   onToggle:()=>setShowOnlySauce2(v=>!v),   color:'#34d399' },
-            { key:'s3',    label:'🍯🔥 Sauce 3.0 Only',     active:showOnlySauce3,   onToggle:()=>setShowOnlySauce3(v=>!v),   color:'#f59e0b' },
-            { key:'topiso', label:'📈 Top ISO Only',        active:showOnlyTopIso,   onToggle:()=>setShowOnlyTopIso(v=>!v),   color:'#38b8f2',
+            { key:'cc',    label:'📍 Close Call Only',      active:showOnlyCC,       onToggle:()=>setShowOnlyCC(v=>!v),       color:'var(--accent2)' },
+            { key:'s2',    label:'🍯 Sauce 2.0 Only',       active:showOnlySauce2,   onToggle:()=>setShowOnlySauce2(v=>!v),   color:'var(--c-emerald)' },
+            { key:'s3',    label:'🍯🔥 Sauce 3.0 Only',     active:showOnlySauce3,   onToggle:()=>setShowOnlySauce3(v=>!v),   color:'var(--c-sauce3)' },
+            { key:'topiso', label:'📈 Top ISO Only',        active:showOnlyTopIso,   onToggle:()=>setShowOnlyTopIso(v=>!v),   color:'var(--ice)',
               title:"Top ISO — Arsenal Fit ISO (season vs this pitcher's pitch mix + handedness) > .200, alone. Validated: 1.33x HR lift (n=2,638, full 2026 season) — cleaner/more monotonic than the same threshold on L7 ISO." },
-            { key:'primeiso', label:'💎 Prime ISO Only',     active:showOnlyPrimeIso, onToggle:()=>setShowOnlyPrimeIso(v=>!v), color:'#a78bfa',
+            { key:'primeiso', label:'💎 Prime ISO Only',     active:showOnlyPrimeIso, onToggle:()=>setShowOnlyPrimeIso(v=>!v), color:'var(--c-purple)',
               title:"Prime ISO — Arsenal Fit ISO>.200 + BvP EV>=93 + Zone Fit>=2. Validated: 18.4% HR rate (1.57x) train / 17.1% (1.66x) test, full 2026 season — held up on the held-out half. BvP EV alone correlates with HR even more strongly than Arsenal Fit ISO itself (r=0.081 vs 0.066)." },
             { key:'solidcontact', label:'🥊 Solid Contact Only', active:showOnlySolidContact, onToggle:()=>setShowOnlySolidContact(v=>!v), color:'#fb7185',
               title:"Solid Contact — Arsenal Fit ISO>.180 + BvP EV>88.0. Validated: 15.01% HR rate (1.35x lift, n=8,536, full 2026 season) — 1.33x train / 1.39x test on a chronological 70/30 split, stable." },
             { key:'hitsig', label:'⚾ Hit Signal Only',      active:showOnlyHitSignal, onToggle:()=>setShowOnlyHitSignal(v=>!v), color:'#93c5fd',
               title:"Hit Signal — Sim H>=1.0 AND SwStr%<=15%. Full-season backtest: 64.1% any-hit rate, 1.12x lift, n=2,933, stable train/test." },
-            { key:'secsauce', label:'🤫 Secret Sauce Only',  active:showOnlySecretSauce, onToggle:()=>setShowOnlySecretSauce(v=>!v), color:'#c084fc',
+            { key:'secsauce', label:'🤫 Secret Sauce Only',  active:showOnlySecretSauce, onToggle:()=>setShowOnlySecretSauce(v=>!v), color:'var(--c-lavender)',
               title:"Secret Sauce — Sauce 2.5 + Hit Signal. 75.6% any-hit rate / 1.32x in the backtest, but n=90 with a large train/test swing — a promising lead, NOT confirmed." },
-            { key:'avoid', label:'🚫 Avoid List Only',       active:showOnlyAvoid,    onToggle:()=>setShowOnlyAvoid(v=>!v),    color:'#ff6b6b',
+            { key:'avoid', label:'🚫 Avoid List Only',       active:showOnlyAvoid,    onToggle:()=>setShowOnlyAvoid(v=>!v),    color:'var(--c-coral)',
               title:"Avoid List — Sim H<=0.6 AND SwStr%>=19% AND (same-hand OR Tough/Elite pitcher). Full-season backtest: 58-61% miss rate vs 42.6% baseline, 1.4x lift, validated cleanly train/test." },
-            { key:'dl',    label:'🗓️ Day Late Only',        active:showOnlyDayLate,  onToggle:()=>setShowOnlyDayLate(v=>!v),  color:'#22c1c3' },
-            { key:'yg',    label:'🌱 Young Gun Only',       active:showOnlyYoungGun, onToggle:()=>setShowOnlyYoungGun(v=>!v), color:'#4ade80' },
-            { key:'chk',   label:'💪🏽 Chalk Only',          active:showOnlyChalk,    onToggle:()=>setShowOnlyChalk(v=>!v),    color:'#f5c542' },
+            { key:'dl',    label:'🗓️ Day Late Only',        active:showOnlyDayLate,  onToggle:()=>setShowOnlyDayLate(v=>!v),  color:'var(--c-teal)' },
+            { key:'yg',    label:'🌱 Young Gun Only',       active:showOnlyYoungGun, onToggle:()=>setShowOnlyYoungGun(v=>!v), color:'var(--c-younggun)' },
+            { key:'chk',   label:'💪🏽 Chalk Only',          active:showOnlyChalk,    onToggle:()=>setShowOnlyChalk(v=>!v),    color:'var(--c-gold2)' },
             { key:'mt',    label:'🔵 Mid-Tier Only',        active:showOnlyMidTier,  onToggle:()=>setShowOnlyMidTier(v=>!v),  color:'#199e70',
               title:"Mid-Tier — not Young Gun, Chalk, or Longshot. Not an independently validated signal, just everyone else (the plain, unremarkable middle — ~78% of all real HRs per the Daily HR Distribution panel)." },
-            { key:'ls',    label:'🎲 Longshot Only',        active:showOnlyLongshotTR, onToggle:()=>setShowOnlyLongshotTR(v=>!v), color:'#a78bfa' },
-            { key:'t4p',   label:'🏆 Top 4 Pick Only',      active:showOnlyTop4Pick,   onToggle:()=>setShowOnlyTop4Pick(v=>!v),  color:'#eab308',
+            { key:'ls',    label:'🎲 Longshot Only',        active:showOnlyLongshotTR, onToggle:()=>setShowOnlyLongshotTR(v=>!v), color:'var(--c-purple)' },
+            { key:'t4p',   label:'🏆 Top 4 Pick Only',      active:showOnlyTop4Pick,   onToggle:()=>setShowOnlyTop4Pick(v=>!v),  color:'var(--c-sauce25)',
               title:"Reconstructed Top 4 Tonight selection (one per tier: Young Gun/Chalk/Mid-Tier/Longshot), same algorithm as the live tab." },
-            { key:'2b',    label:'2️⃣ 2-Bagger (Non-HR) Only', active:showOnly2Bagger, onToggle:()=>setShowOnly2Bagger(v=>!v), color:'#38b8f2' },
-            { key:'tbs',   label:'🎯 TB Signal Only',       active:showOnlyTBSignal, onToggle:()=>setShowOnlyTBSignal(v=>!v), color:'#38b8f2' },
-            { key:'stb2',  label:'🎲 Sim TB ≥2.0 Only',     active:showOnlySimTB2,   onToggle:()=>setShowOnlySimTB2(v=>!v),   color:'#a78bfa' },
-            { key:'iq',    label:'🧠 High Plate IQ Only',   active:showOnlyHighIQ,   onToggle:()=>setShowOnlyHighIQ(v=>!v),   color:'#38b8f2' },
-            { key:'hm',    label:'⭐ Hand Match Only',      active:showOnlyHandMatch,onToggle:()=>setShowOnlyHandMatch(v=>!v),color:'#fbbf24' },
-            { key:'cj',    label:'🔴 Juiced Ball Only',     active:carryFilter==='JUICED', onToggle:()=>setCarryFilter(v=>v==='JUICED'?'':'JUICED'), color:'#ff8020' },
-            { key:'cd',    label:'🔵 Dead Ball Only',       active:carryFilter==='DEAD',   onToggle:()=>setCarryFilter(v=>v==='DEAD'?'':'DEAD'),     color:'#38b8f2' },
-            { key:'xj',    label:'⬆️ xHR Juiced Only',      active:xhrFilter==='JUICED',   onToggle:()=>setXhrFilter(v=>v==='JUICED'?'':'JUICED'),   color:'#a78bfa' },
+            { key:'2b',    label:'2️⃣ 2-Bagger (Non-HR) Only', active:showOnly2Bagger, onToggle:()=>setShowOnly2Bagger(v=>!v), color:'var(--ice)' },
+            { key:'tbs',   label:'🎯 TB Signal Only',       active:showOnlyTBSignal, onToggle:()=>setShowOnlyTBSignal(v=>!v), color:'var(--ice)' },
+            { key:'stb2',  label:'🎲 Sim TB ≥2.0 Only',     active:showOnlySimTB2,   onToggle:()=>setShowOnlySimTB2(v=>!v),   color:'var(--c-purple)' },
+            { key:'iq',    label:'🧠 High Plate IQ Only',   active:showOnlyHighIQ,   onToggle:()=>setShowOnlyHighIQ(v=>!v),   color:'var(--ice)' },
+            { key:'hm',    label:'⭐ Hand Match Only',      active:showOnlyHandMatch,onToggle:()=>setShowOnlyHandMatch(v=>!v),color:'var(--c-amber)' },
+            { key:'cj',    label:'🔴 Juiced Ball Only',     active:carryFilter==='JUICED', onToggle:()=>setCarryFilter(v=>v==='JUICED'?'':'JUICED'), color:'var(--c-warn)' },
+            { key:'cd',    label:'🔵 Dead Ball Only',       active:carryFilter==='DEAD',   onToggle:()=>setCarryFilter(v=>v==='DEAD'?'':'DEAD'),     color:'var(--ice)' },
+            { key:'xj',    label:'⬆️ xHR Juiced Only',      active:xhrFilter==='JUICED',   onToggle:()=>setXhrFilter(v=>v==='JUICED'?'':'JUICED'),   color:'var(--c-purple)' },
             { key:'xd',    label:'⬇️ xHR Dead Only',        active:xhrFilter==='DEAD',     onToggle:()=>setXhrFilter(v=>v==='DEAD'?'':'DEAD'),       color:'#f472b6' },
           ]}
           pitcherGrades={selPitcherGradesTR}
@@ -30439,19 +30495,19 @@ function TrackRecordTab() {
           <div style={{display:'flex', gap:6, marginBottom:4, minWidth:900}}>
             <div style={{flex:1}}>
               <GroupBar label="Matchup Engine" open={showMatchup}
-                onToggle={() => setShowMatchup(v=>!v)} color="#e8411a"/>
+                onToggle={() => setShowMatchup(v=>!v)} color="var(--accent)"/>
             </div>
             <div style={{flex:1}}>
               <GroupBar label="Arsenal Fit" open={showArsenalFit}
-                onToggle={() => setShowArsenalFit(v=>!v)} color="#818cf8"/>
+                onToggle={() => setShowArsenalFit(v=>!v)} color="var(--c-indigo)"/>
             </div>
             <div style={{flex:1}}>
               <GroupBar label="Barrel Lab" open={showBarrel}
-                onToggle={() => setShowBarrel(v=>!v)} color="#38b8f2"/>
+                onToggle={() => setShowBarrel(v=>!v)} color="var(--ice)"/>
             </div>
             <div style={{flex:1}}>
               <GroupBar label="Box Score" open={showBoxScore}
-                onToggle={() => setShowBoxScore(v=>!v)} color="#27c97a"/>
+                onToggle={() => setShowBoxScore(v=>!v)} color="var(--green)"/>
             </div>
           </div>
           <table style={{borderCollapse:'collapse', width:'100%', minWidth:900}}>
@@ -30468,66 +30524,66 @@ function TrackRecordTab() {
                 <SortTh col="pitcherGrade" label="PGrade"/>
 
                 {showMatchup && <>
-                  <SortTh col="yardScore" label="YS" color="#e8411a"/>
-                  <SortTh col="boom"      label="Boom" color="#e8411a"/>
-                  <SortTh col="sig"       label="Sig" color="#e8411a"/>
-                  <SortTh col="grade"    label="Grade" color="#e8411a"/>
-                  <SortTh col="ghr"      label="gHR" color="#e8411a"/>
-                  <SortTh col="zoneFit"  label="ZF" color="#e8411a"/>
-                  <SortTh col="simTB"    label="SimTB" color="#e8411a"/>
-                  <SortTh col="xwoba"    label="xwOBA" color="#e8411a"/>
-                  <SortTh col="flags"    label="Flags" color="#e8411a"/>
-                  <SortTh col="isKeyMatchup" label="KM" color="#e8411a"/>
-                  <SortTh col="isWeakSlot" label="Weak Spot" color="#e8411a"/>
-                  <SortTh col="bullpenRank" label="Pen" color="#e8411a"/>
+                  <SortTh col="yardScore" label="YS" color="var(--accent)"/>
+                  <SortTh col="boom"      label="Boom" color="var(--accent)"/>
+                  <SortTh col="sig"       label="Sig" color="var(--accent)"/>
+                  <SortTh col="grade"    label="Grade" color="var(--accent)"/>
+                  <SortTh col="ghr"      label="gHR" color="var(--accent)"/>
+                  <SortTh col="zoneFit"  label="ZF" color="var(--accent)"/>
+                  <SortTh col="simTB"    label="SimTB" color="var(--accent)"/>
+                  <SortTh col="xwoba"    label="xwOBA" color="var(--accent)"/>
+                  <SortTh col="flags"    label="Flags" color="var(--accent)"/>
+                  <SortTh col="isKeyMatchup" label="KM" color="var(--accent)"/>
+                  <SortTh col="isWeakSlot" label="Weak Spot" color="var(--accent)"/>
+                  <SortTh col="bullpenRank" label="Pen" color="var(--accent)"/>
                 </>}
 
                 {showArsenalFit && <>
-                  <SortTh col="afIsoRaw"      label="ISO"    color="#818cf8" title="Arsenal Fit ISO — season ISO vs this pitcher's pitch mix + handedness. Added 2026-09-06; not populated before 2026-07-30 (the field didn't exist in the export yet)."/>
-                  <SortTh col="afEv"          label="EV"     color="#818cf8" title="Arsenal Fit EV (BvP EV) — same window as ISO. Populated back to 5/17."/>
-                  <SortTh col="afBarrelPct"   label="Brl%"   color="#818cf8" title="Arsenal Fit Barrel% (BvP Barrel%). Populated back to 5/17."/>
-                  <SortTh col="afFbPct"       label="FB%"    color="#818cf8" title="Arsenal Fit FB% (BvP FB%). Populated back to 5/17."/>
-                  <SortTh col="afLa"          label="LA"     color="#818cf8" title="Arsenal Fit avg launch angle (BvP LA). Populated back to 5/17."/>
-                  <SortTh col="afPullPct"     label="Pull%"  color="#818cf8" title="Arsenal Fit Pull% — added 2026-09-02, narrower coverage from that date onward."/>
-                  <SortTh col="afPulledAirPct" label="PAir%" color="#818cf8" title="Arsenal Fit Pulled Air% — added 2026-09-02, narrower coverage from that date onward."/>
-                  <SortTh col="af350"         label="350+"   color="#818cf8" title="Arsenal Fit 350+ ft fly-ball count — added 2026-09-02, narrower coverage from that date onward."/>
-                  <SortTh col="afBlast"       label="Blast%" color="#818cf8" title="Arsenal Blast% — added 2026-08-03, narrower coverage from that date onward."/>
+                  <SortTh col="afIsoRaw"      label="ISO"    color="var(--c-indigo)" title="Arsenal Fit ISO — season ISO vs this pitcher's pitch mix + handedness. Added 2026-09-06; not populated before 2026-07-30 (the field didn't exist in the export yet)."/>
+                  <SortTh col="afEv"          label="EV"     color="var(--c-indigo)" title="Arsenal Fit EV (BvP EV) — same window as ISO. Populated back to 5/17."/>
+                  <SortTh col="afBarrelPct"   label="Brl%"   color="var(--c-indigo)" title="Arsenal Fit Barrel% (BvP Barrel%). Populated back to 5/17."/>
+                  <SortTh col="afFbPct"       label="FB%"    color="var(--c-indigo)" title="Arsenal Fit FB% (BvP FB%). Populated back to 5/17."/>
+                  <SortTh col="afLa"          label="LA"     color="var(--c-indigo)" title="Arsenal Fit avg launch angle (BvP LA). Populated back to 5/17."/>
+                  <SortTh col="afPullPct"     label="Pull%"  color="var(--c-indigo)" title="Arsenal Fit Pull% — added 2026-09-02, narrower coverage from that date onward."/>
+                  <SortTh col="afPulledAirPct" label="PAir%" color="var(--c-indigo)" title="Arsenal Fit Pulled Air% — added 2026-09-02, narrower coverage from that date onward."/>
+                  <SortTh col="af350"         label="350+"   color="var(--c-indigo)" title="Arsenal Fit 350+ ft fly-ball count — added 2026-09-02, narrower coverage from that date onward."/>
+                  <SortTh col="afBlast"       label="Blast%" color="var(--c-indigo)" title="Arsenal Blast% — added 2026-08-03, narrower coverage from that date onward."/>
                 </>}
 
                 {showBarrel && <>
-                  <SortTh col="trueHR"    label="TrueHR" color="#38b8f2"/>
-                  <SortTh col="matchup"   label="Matchup" color="#38b8f2"/>
-                  <SortTh col="simHRPct"  label="SimHR%" color="#38b8f2"/>
-                  <SortTh col="pulledBrl" label="PBrl%" color="#38b8f2"/>
-                  <SortTh col="brlBIP"    label="Brl/BIP" color="#38b8f2"/>
-                  <SortTh col="hrFB"      label="HR/FB" color="#38b8f2"/>
-                  <SortTh col="fb"        label="FB%" color="#38b8f2"/>
-                  <SortTh col="hh"        label="HH%" color="#38b8f2"/>
-                  <SortTh col="brlSignal" label="Signal" color="#38b8f2"/>
-                  <SortTh col="isLongshot" label="Longshot" color="#38b8f2"/>
-                  <SortTh col="isYoungGun" label="🌱" color="#38b8f2" title="Young Gun — <100 season PA. Discovery filter, not a hot signal."/>
-                  <SortTh col="isChalk" label="💪🏽" color="#38b8f2" title="Chalk — real season HR leader (>=18 HR, >=.220 ISO) facing a genuinely soft matchup."/>
-                  <SortTh col="isMidTier" label="🔵" color="#38b8f2" title="Mid-Tier — not Young Gun, Chalk, or Longshot. Not an independently validated signal, just everyone else."/>
-                  <SortTh col="top4Tier" label="🏆" color="#38b8f2" title="Reconstructed Top 4 Tonight pick — same algorithm as the live tab (one per tier, Mid-Tier gated by L7/Arsenal Fit ISO >.190)."/>
-                  <SortTh col="plateIQ" label="IQ" color="#38b8f2" title="Plate IQ — display-only, does not affect Yard Score. See Legend for details."/>
-                  <SortTh col="handMatchTier" label="Hand" color="#38b8f2" title="Hand Match — batter's handedness exploits the opposing pitcher's weakness (elite, full, or partial). See Legend for details."/>
+                  <SortTh col="trueHR"    label="TrueHR" color="var(--ice)"/>
+                  <SortTh col="matchup"   label="Matchup" color="var(--ice)"/>
+                  <SortTh col="simHRPct"  label="SimHR%" color="var(--ice)"/>
+                  <SortTh col="pulledBrl" label="PBrl%" color="var(--ice)"/>
+                  <SortTh col="brlBIP"    label="Brl/BIP" color="var(--ice)"/>
+                  <SortTh col="hrFB"      label="HR/FB" color="var(--ice)"/>
+                  <SortTh col="fb"        label="FB%" color="var(--ice)"/>
+                  <SortTh col="hh"        label="HH%" color="var(--ice)"/>
+                  <SortTh col="brlSignal" label="Signal" color="var(--ice)"/>
+                  <SortTh col="isLongshot" label="Longshot" color="var(--ice)"/>
+                  <SortTh col="isYoungGun" label="🌱" color="var(--ice)" title="Young Gun — <100 season PA. Discovery filter, not a hot signal."/>
+                  <SortTh col="isChalk" label="💪🏽" color="var(--ice)" title="Chalk — real season HR leader (>=18 HR, >=.220 ISO) facing a genuinely soft matchup."/>
+                  <SortTh col="isMidTier" label="🔵" color="var(--ice)" title="Mid-Tier — not Young Gun, Chalk, or Longshot. Not an independently validated signal, just everyone else."/>
+                  <SortTh col="top4Tier" label="🏆" color="var(--ice)" title="Reconstructed Top 4 Tonight pick — same algorithm as the live tab (one per tier, Mid-Tier gated by L7/Arsenal Fit ISO >.190)."/>
+                  <SortTh col="plateIQ" label="IQ" color="var(--ice)" title="Plate IQ — display-only, does not affect Yard Score. See Legend for details."/>
+                  <SortTh col="handMatchTier" label="Hand" color="var(--ice)" title="Hand Match — batter's handedness exploits the opposing pitcher's weakness (elite, full, or partial). See Legend for details."/>
                 </>}
 
                 {showBoxScore && <>
-                  <SortTh col="actualHR"  label="HR" color="#27c97a"/>
-                  <SortTh col="actualAB"  label="AB" color="#27c97a"/>
-                  <SortTh col="actualH"   label="H" color="#27c97a"/>
-                  <SortTh col="actualTB"  label="TB" color="#27c97a"/>
-                  <SortTh col="is2Bagger" label="2B" color="#27c97a"/>
-                  <SortTh col="actualRBI" label="RBI" color="#27c97a"/>
-                  <SortTh col="actualEV"  label="EV" color="#27c97a"/>
-                  <SortTh col="actualLA"  label="LA°" color="#27c97a"/>
-                  <SortTh col="closeCalls" label="CC" color="#27c97a"/>
-                  <SortTh col="ccMaxEV"   label="CC Max EV" color="#27c97a"/>
-                  <SortTh col="ccMaxDist" label="CC Dist" color="#27c97a"/>
-                  <SortTh col="ballCarryVerdict" label="Ball Carry" color="#27c97a"
+                  <SortTh col="actualHR"  label="HR" color="var(--green)"/>
+                  <SortTh col="actualAB"  label="AB" color="var(--green)"/>
+                  <SortTh col="actualH"   label="H" color="var(--green)"/>
+                  <SortTh col="actualTB"  label="TB" color="var(--green)"/>
+                  <SortTh col="is2Bagger" label="2B" color="var(--green)"/>
+                  <SortTh col="actualRBI" label="RBI" color="var(--green)"/>
+                  <SortTh col="actualEV"  label="EV" color="var(--green)"/>
+                  <SortTh col="actualLA"  label="LA°" color="var(--green)"/>
+                  <SortTh col="closeCalls" label="CC" color="var(--green)"/>
+                  <SortTh col="ccMaxEV"   label="CC Max EV" color="var(--green)"/>
+                  <SortTh col="ccMaxDist" label="CC Dist" color="var(--green)"/>
+                  <SortTh col="ballCarryVerdict" label="Ball Carry" color="var(--green)"
                     title="Dead ball / juiced ball verdict for this game (park/elevation-adjusted, not weather-adjusted)"/>
-                  <SortTh col="xhrVerdict" label="xHR" color="#27c97a"
+                  <SortTh col="xhrVerdict" label="xHR" color="var(--green)"
                     title="xHR conversion verdict — did as many of this game's batted balls actually clear the fence as EV/LA/direction history predicts (z-score based, distinct from Ball Carry)"/>
                 </>}
               </tr>
@@ -30579,7 +30635,7 @@ function TrackRecordTab() {
                       {r.wentYard && r.actualPitcher && (
                         <span style={{marginLeft:4, padding:'1px 4px', borderRadius:3,
                           fontSize:7, fontWeight:800, letterSpacing:.4,
-                          color: r.actualPitcherIsSP ? '#38b8f2' : '#ff8020',
+                          color: r.actualPitcherIsSP ? 'var(--ice)' : 'var(--c-warn)',
                           border:`1px solid ${r.actualPitcherIsSP ? 'rgba(56,184,242,.4)' : 'rgba(255,128,32,.4)'}`}}>
                           {r.actualPitcherIsSP ? 'SP' : 'RP'}
                         </span>
@@ -30666,19 +30722,19 @@ function TrackRecordTab() {
                         {r.brlSignal && <span style={{color:'var(--accent)'}}>★</span>}
                       </td>
                       <td style={{padding:'3px 6px', textAlign:'center'}}>
-                        {r.isLongshot && <span style={{color:'#a78bfa'}}>🎲</span>}
+                        {r.isLongshot && <span style={{color:'var(--c-purple)'}}>🎲</span>}
                       </td>
                       <td style={{padding:'3px 6px', textAlign:'center'}}>
-                        {r.isYoungGun && <span title={`Young Gun — ${r.seasonPA!=null?r.seasonPA:'?'} season PA`} style={{color:'#4ade80'}}>🌱</span>}
+                        {r.isYoungGun && <span title={`Young Gun — ${r.seasonPA!=null?r.seasonPA:'?'} season PA`} style={{color:'var(--c-younggun)'}}>🌱</span>}
                       </td>
                       <td style={{padding:'3px 6px', textAlign:'center'}}>
-                        {r.isChalk && <span style={{color:'#f5c542'}}>💪🏽</span>}
+                        {r.isChalk && <span style={{color:'var(--c-gold2)'}}>💪🏽</span>}
                       </td>
                       <td style={{padding:'3px 6px', textAlign:'center'}}>
                         {r.isMidTier && <span title="Not Young Gun, Chalk, or Longshot — not an independently validated signal, just everyone else." style={{color:'#199e70'}}>🔵</span>}
                       </td>
                       <td style={{padding:'3px 6px', textAlign:'center'}}>
-                        {r.top4Tier && <span title={`Reconstructed Top 4 Tonight ${{youngGun:'Young Gun',chalk:'Chalk',midTier:'Mid-Tier',longshot:'Longshot'}[r.top4Tier]} pick`} style={{color:'#eab308'}}>🏆{{youngGun:'🌱',chalk:'💪🏽',midTier:'🔵',longshot:'🎲'}[r.top4Tier]}</span>}
+                        {r.top4Tier && <span title={`Reconstructed Top 4 Tonight ${{youngGun:'Young Gun',chalk:'Chalk',midTier:'Mid-Tier',longshot:'Longshot'}[r.top4Tier]} pick`} style={{color:'var(--c-sauce25)'}}>🏆{{youngGun:'🌱',chalk:'💪🏽',midTier:'🔵',longshot:'🎲'}[r.top4Tier]}</span>}
                       </td>
                       <td style={{padding:'3px 6px', textAlign:'center'}}>
                         {r.plateIQGrade
@@ -30692,7 +30748,7 @@ function TrackRecordTab() {
                       <td style={{padding:'3px 6px', textAlign:'center'}}>
                         {r.handMatchTier && <span
                           title={r.handMatchTier==='elite' ? 'Hand Match (elite)' : r.handMatchTier==='full' ? 'Hand Match (full)' : 'Partial Hand Match'}
-                          style={{color:'#fbbf24', opacity:r.handMatchTier==='partial'?.6:1}}>
+                          style={{color:'var(--c-amber)', opacity:r.handMatchTier==='partial'?.6:1}}>
                           {r.handMatchTier==='elite' ? '⭐⭐⭐' : r.handMatchTier==='full' ? '⭐⭐' : '⭐'}
                         </span>}
                       </td>
@@ -30724,13 +30780,13 @@ function TrackRecordTab() {
                         textAlign:'center'}}>{r.ccMaxDist || '—'}</td>
                       <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
                         textAlign:'center', fontWeight:700,
-                        color: r.ballCarryVerdict==='JUICED' ? '#ff8020' : r.ballCarryVerdict==='DEAD' ? '#38b8f2' : r.isBorderlineCarry ? '#f5a623' : 'var(--muted)'}}
+                        color: r.ballCarryVerdict==='JUICED' ? 'var(--c-warn)' : r.ballCarryVerdict==='DEAD' ? 'var(--ice)' : r.isBorderlineCarry ? 'var(--accent2)' : 'var(--muted)'}}
                         title={r.ballCarryDev != null ? `park-adj deviation ${r.ballCarryDev>=0?'+':''}${r.ballCarryDev}ft${r.isBorderlineCarry?' — borderline (within 3ft of a threshold)':''}` : ''}>
                         {r.ballCarryVerdict==='JUICED' ? '🔴' : r.ballCarryVerdict==='DEAD' ? '🔵' : r.isBorderlineCarry ? '🟡' : r.ballCarryVerdict==='NORMAL' ? '—' : ''}
                       </td>
                       <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
                         textAlign:'center', fontWeight:700,
-                        color: r.xhrVerdict==='JUICED' ? '#a78bfa' : r.xhrVerdict==='DEAD' ? '#f472b6' : 'var(--muted)'}}
+                        color: r.xhrVerdict==='JUICED' ? 'var(--c-purple)' : r.xhrVerdict==='DEAD' ? '#f472b6' : 'var(--muted)'}}
                         title={r.xhrZ != null ? `z=${r.xhrZ>=0?'+':''}${r.xhrZ} (actual ${r.xhrDiff>=0?'+':''}${r.xhrDiff} HR vs. expected)` : ''}>
                         {r.xhrVerdict==='JUICED' ? '⬆️' : r.xhrVerdict==='DEAD' ? '⬇️' : r.xhrVerdict==='NORMAL' ? '—' : ''}
                       </td>
@@ -30769,14 +30825,14 @@ function LinksTab() {
       name: 'Blast Report',
       url:  'https://blast-report.com',
       emoji: '💣',
-      color: '#27c97a',
+      color: 'var(--green)',
       summary: 'Bat speed and attack angle data from Blast Motion sensors. Detailed swing metrics for hitter analysis.',
     },
     {
       name: 'Doink Sports',
       url:  'https://doinksports.com',
       emoji: '👾',
-      color: '#60d360',
+      color: 'var(--c-lime)',
       summary: 'MLB weather and park factor tools for prop bettors. Wind, temp, and game conditions in one clean dashboard.',
     },
     {
@@ -30790,21 +30846,21 @@ function LinksTab() {
       name: 'Gameday Insights',
       url:  'https://new.gameday-insights.com/',
       emoji: '📊',
-      color: '#38b8f2',
+      color: 'var(--ice)',
       summary: 'Real-time MLB game intelligence and daily matchup breakdowns. Pitcher and batter insights to sharpen your pre-game research.',
     },
     {
       name: 'Degenelytics',
       url:  'https://www.degenelytics.net/',
       emoji: '🎲',
-      color: '#a855f7',
+      color: 'var(--c-violet)',
       summary: 'Data-driven sports analytics and betting tools. Sharp research and model-based breakdowns for the serious bettor.',
     },
     {
       name: 'BallparkPal',
       url:  'https://www.ballparkpal.com',
       emoji: '🏟️',
-      color: '#f5a623',
+      color: 'var(--accent2)',
       summary: 'Park factor and weather data for every MLB ballpark. Understand how venue and conditions affect HR potential before you pick.',
     },
   ];
@@ -31064,7 +31120,7 @@ function CrystalBallTab() {
     setOrbPulse(false);
   };
 
-  const gradeColor = g => g==='A+'?'#ffd700':g==='A'?'#ff9f1c':g==='B'?'#38b8f2':'var(--muted)';
+  const gradeColor = g => g==='A+'?'var(--c-gold)':g==='A'?'#ff9f1c':g==='B'?'var(--ice)':'var(--muted)';
   const allFlipped = flipped.every(Boolean);
 
   return (
@@ -31141,7 +31197,7 @@ function CrystalBallTab() {
             style={{padding:'10px 30px',borderRadius:8,cursor:'pointer',
               fontFamily:osw,fontSize:14,fontWeight:800,letterSpacing:2,
               border:'1px solid rgba(168,85,247,0.45)',
-              background:'rgba(168,85,247,0.12)',color:'#c084fc',
+              background:'rgba(168,85,247,0.12)',color:'var(--c-lavender)',
               boxShadow:'0 0 20px rgba(168,85,247,0.18)',textTransform:'uppercase'}}>
             🔮 Begin Grand Reveal
           </button>
@@ -31371,7 +31427,7 @@ function CrystalBallTab() {
             style={{padding:'7px 20px',borderRadius:7,cursor:'pointer',marginRight:8,
               fontFamily:mono,fontSize:9,fontWeight:700,letterSpacing:1,
               border:'1px solid rgba(168,85,247,0.3)',
-              background:'rgba(168,85,247,0.1)',color:'#c084fc'}}>
+              background:'rgba(168,85,247,0.1)',color:'var(--c-lavender)'}}>
             🔮 Ask Again
           </button>
           <button onClick={reset}
@@ -31750,7 +31806,7 @@ function TopThreeTab() {
           <span>{eligibleBatters.length} eligible · {confirmedCount > 0 || Object.keys(LINEUP_STATUS).length > 0 ? `${confirmedCount} confirmed` : 'lineups pending'}</span>
           {lockedRecord && (
             <span title={`Locked ${new Date(lockedRecord.lockedAt).toLocaleTimeString('en-US',{timeZone:'America/New_York',hour:'numeric',minute:'2-digit'})} ET — these 4 picks are final for the rest of today, and this is the exact record Track Record will show for today going forward.`}
-              style={{color:'#27c97a',fontWeight:700}}>
+              style={{color:'var(--green)',fontWeight:700}}>
               🔒 Locked for today
             </span>
           )}
@@ -31922,7 +31978,7 @@ function TopThreeTab() {
                         // genuine Top 4 card asking the user to "sign in"
                         // would be confusing, so it gets a generic message
                         // instead of the raw error code.
-                        <div style={{fontFamily:mono,fontSize:8,color:'#ff6b6b'}}>
+                        <div style={{fontFamily:mono,fontSize:8,color:'var(--c-coral)'}}>
                           {noteState.error === 'sign_in_required'
                             ? "Couldn't generate a note for this pick — try refreshing."
                             : `Couldn't generate: ${noteState.error}`}
@@ -32249,8 +32305,8 @@ function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, on
   const fmtAvg = v => v>0?'.'+String(Math.round(v*1000)).padStart(3,'0'):'—';
   const fmtPct = v => v>0?v.toFixed(1)+'%':'—';
   const fmtN   = v => v!=null&&v!==''?v:'—';
-  const pgCol  = g => !g?'var(--muted)':g.includes('Target')?'#27c97a':g.includes('Hittable')?'#60d360':g.includes('Elite')?'#ff4020':g.includes('Tough')?'#f5a623':'var(--muted)';
-  const evCol  = v => v>=103?'#ff4020':v>=97?'#f5a623':'var(--muted)';
+  const pgCol  = g => !g?'var(--muted)':g.includes('Target')?'var(--green)':g.includes('Hittable')?'var(--c-lime)':g.includes('Elite')?'var(--c-danger)':g.includes('Tough')?'var(--accent2)':'var(--muted)';
+  const evCol  = v => v>=103?'var(--c-danger)':v>=97?'var(--accent2)':'var(--muted)';
 
   // ── Sortable Th makers ────────────────────────────────────────────────────
   const makeTh = (sortBy,setSortBy,sortDir,setSortDir) =>
@@ -32365,8 +32421,8 @@ function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, on
       <div style={{display:'flex',gap:5,flexWrap:'nowrap',alignItems:'center',marginBottom:6,overflowX:'auto',WebkitOverflowScrolling:'touch',paddingBottom:2}}>
         <PillRow items={[['','All','All hands'],['L','LHP','LHP → batters see vsLHP split'],['R','RHP','RHP → batters see vsRHP split']]} active={sharedPHand} onSelect={setSharedPHand}/>
         <PillRow items={[['','All','All batters'],['L','LHB','LHB → pitchers see vsLHB split'],['R','RHB','RHB → pitchers see vsRHB split'],['S','SWB','Switch hitters']]} active={sharedBHand} onSelect={setSharedBHand}/>
-        <PillRow items={[['','All'],['home','Home'],['away','Away']]} active={sharedPLoc} onSelect={onPLocChange} color='rgba(39,201,122,.2)' activeColor='#27c97a'/>
-        <PillRow items={[['','All'],['day','Day'],['night','Night']]} active={sharedDN} onSelect={v=>{setSharedDN(v);setSelDOW('');}} color='rgba(245,166,35,.2)' activeColor='#f5a623'/>
+        <PillRow items={[['','All'],['home','Home'],['away','Away']]} active={sharedPLoc} onSelect={onPLocChange} color='rgba(39,201,122,.2)' activeColor='var(--green)'/>
+        <PillRow items={[['','All'],['day','Day'],['night','Night']]} active={sharedDN} onSelect={v=>{setSharedDN(v);setSelDOW('');}} color='rgba(245,166,35,.2)' activeColor='var(--accent2)'/>
       </div>
 
       {/* Day of Week — own row, dropdown to stay compact */}
@@ -32376,9 +32432,9 @@ function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, on
         <select value={selDOW} onChange={e=>{setSelDOW(e.target.value);if(e.target.value)setSharedDN('');}}
           style={{padding:'4px 10px',borderRadius:6,fontSize:10,cursor:'pointer',
             fontFamily:"'DM Mono',monospace",
-            border:`1px solid ${selDOW?'#a78bfa':'var(--border)'}`,
+            border:`1px solid ${selDOW?'var(--c-purple)':'var(--border)'}`,
             background:selDOW?'rgba(167,139,250,.08)':'var(--surface2)',
-            color:selDOW?'#a78bfa':'var(--text)',outline:'none'}}>
+            color:selDOW?'var(--c-purple)':'var(--text)',outline:'none'}}>
           <option value=''>All Days</option>
           {[['mon','Monday'],['tue','Tuesday'],['wed','Wednesday'],['thu','Thursday'],
             ['fri','Friday'],['sat','Saturday'],['sun','Sunday']].map(([v,l])=>(
@@ -32429,10 +32485,10 @@ function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, on
           </div>
           {gpFiltersOpen&&(
             <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:7,padding:'10px 12px',marginBottom:8,display:'flex',flexWrap:'wrap',gap:8,alignItems:'center',boxShadow:'0 3px 16px rgba(0,0,0,.4)'}}>
-              <PillRow items={[['','All'],['SP','SP'],['RP','RP']]} active={pRoleFilter} onSelect={setPRoleFilter} color='rgba(251,191,36,.2)' activeColor='#fbbf24'/>
+              <PillRow items={[['','All'],['SP','SP'],['RP','RP']]} active={pRoleFilter} onSelect={setPRoleFilter} color='rgba(251,191,36,.2)' activeColor='var(--c-amber)'/>
               <button onClick={()=>setPScheduledOnly(v=>!v)}
                 style={{padding:'3px 8px',borderRadius:5,fontSize:10,cursor:'pointer',fontFamily:mono,fontWeight:700,
-                  border:`1px solid ${pScheduledOnly?'#f5a623':'var(--border)'}`,background:pScheduledOnly?'rgba(245,166,35,.15)':'transparent',color:pScheduledOnly?'#f5a623':'var(--muted)'}}>⚾ Scheduled</button>
+                  border:`1px solid ${pScheduledOnly?'var(--accent2)':'var(--border)'}`,background:pScheduledOnly?'rgba(245,166,35,.15)':'transparent',color:pScheduledOnly?'var(--accent2)':'var(--muted)'}}>⚾ Scheduled</button>
               <div style={{display:'flex',alignItems:'center',gap:4}}>
                 <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',flexShrink:0}}>Min G:</span>
                 <input type="number" min={1} max={50} value={pMinBF} onChange={e=>setPMinBF(+e.target.value||1)}
@@ -32482,24 +32538,24 @@ function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, on
                           <span onClick={e=>{e.stopPropagation();openPitcherSlide({pid:parseInt(r.id)||0,name:r.name||r.id,team:r.team||'',hand:r.hand||'',pitchMix:[]});}}
                             style={{fontFamily:osw,fontWeight:700,fontSize:10,color:'var(--text)',cursor:'pointer'}}>{r.name||r.id}</span>
                           <span style={{fontFamily:mono,fontSize:7,color:'var(--muted)'}}>{r.hand==='L'?'LHP':r.hand==='R'?'RHP':''}</span>
-                          {r.role&&<span style={{padding:'1px 3px',borderRadius:3,fontSize:7,fontWeight:700,background:r.role==='SP'?'rgba(56,184,242,.15)':'rgba(251,191,36,.15)',color:r.role==='SP'?'var(--ice)':'#fbbf24'}}>{r.role}</span>}
+                          {r.role&&<span style={{padding:'1px 3px',borderRadius:3,fontSize:7,fontWeight:700,background:r.role==='SP'?'rgba(56,184,242,.15)':'rgba(251,191,36,.15)',color:r.role==='SP'?'var(--ice)':'var(--c-amber)'}}>{r.role}</span>}
                           {!confirmedBatterOnly&&(confirmedSP?<span title="Confirmed SP" style={{fontSize:9}}>🟢</span>:probablePitcherIds.has(r.id)?<span title="Probable SP" style={{fontSize:9}}>🟡</span>:null)}
                         </div>
                       </td>
                       <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{r.games||0}</td>
                       <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{r.est_ip?.toFixed(1)||'—'}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,fontWeight:700,color:(r.hr_per9||0)>=1.5?'#ff4020':(r.hr_per9||0)>=1.0?'#f5a623':'#27c97a'}}>{r.hr_per9>0?r.hr_per9.toFixed(2):'—'}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.woba_allowed||0)>=.360?'#ff4020':(r.woba_allowed||0)>=.320?'#f5a623':'#27c97a'}}>{r.woba_allowed>0?r.woba_allowed.toFixed(3):'—'}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:osw,fontWeight:800,fontSize:11,color:(r.hr||0)>=8?'#ff4020':(r.hr||0)>=4?'#f5a623':'var(--muted)'}}>{r.hr||0}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.k_per9||0)>=10?'#27c97a':'var(--muted)'}}>{r.k_per9>0?r.k_per9.toFixed(1):'—'}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.k_pct||0)>=28?'#27c97a':'var(--muted)'}}>{fmtPct(r.k_pct)}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.bb_pct||0)>=10?'#ff4020':'var(--muted)'}}>{fmtPct(r.bb_pct)}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,fontWeight:700,color:(r.hr_per9||0)>=1.5?'var(--c-danger)':(r.hr_per9||0)>=1.0?'var(--accent2)':'var(--green)'}}>{r.hr_per9>0?r.hr_per9.toFixed(2):'—'}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.woba_allowed||0)>=.360?'var(--c-danger)':(r.woba_allowed||0)>=.320?'var(--accent2)':'var(--green)'}}>{r.woba_allowed>0?r.woba_allowed.toFixed(3):'—'}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:osw,fontWeight:800,fontSize:11,color:(r.hr||0)>=8?'var(--c-danger)':(r.hr||0)>=4?'var(--accent2)':'var(--muted)'}}>{r.hr||0}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.k_per9||0)>=10?'var(--green)':'var(--muted)'}}>{r.k_per9>0?r.k_per9.toFixed(1):'—'}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.k_pct||0)>=28?'var(--green)':'var(--muted)'}}>{fmtPct(r.k_pct)}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.bb_pct||0)>=10?'var(--c-danger)':'var(--muted)'}}>{fmtPct(r.bb_pct)}</td>
                       <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:evCol(r.hh_pct||0)}}>{fmtPct(r.hh_pct)}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.brl_pct||0)>=10?'#ff4020':'var(--muted)'}}>{fmtPct(r.brl_pct)}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.no_hr_game||0)>=10?'#27c97a':'var(--muted)',fontWeight:700}}>{fmtN(r.no_hr_game)}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.no_hr_pct||0)>=70?'#27c97a':(r.no_hr_pct||0)>=50?'#f5a623':'var(--muted)'}}>{fmtPct(r.no_hr_pct)}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.multi_hr_game||0)>=3?'#ff4020':'var(--muted)'}}>{fmtN(r.multi_hr_game)}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.dom_game||0)>=5?'#27c97a':'var(--muted)'}}>{fmtN(r.dom_game)}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.brl_pct||0)>=10?'var(--c-danger)':'var(--muted)'}}>{fmtPct(r.brl_pct)}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.no_hr_game||0)>=10?'var(--green)':'var(--muted)',fontWeight:700}}>{fmtN(r.no_hr_game)}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.no_hr_pct||0)>=70?'var(--green)':(r.no_hr_pct||0)>=50?'var(--accent2)':'var(--muted)'}}>{fmtPct(r.no_hr_pct)}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.multi_hr_game||0)>=3?'var(--c-danger)':'var(--muted)'}}>{fmtN(r.multi_hr_game)}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.dom_game||0)>=5?'var(--green)':'var(--muted)'}}>{fmtN(r.dom_game)}</td>
                       <td style={{textAlign:'center',padding:'2px 5px',fontFamily:mono,fontSize:8,fontWeight:700,color:pgCol(r._pgLabel)}}>{r._pgLabel?.split(' ')[0]||'—'}</td>
                     </tr>);
                     return [mainP];
@@ -32596,7 +32652,7 @@ function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, on
           {gbFiltersOpen&&(
             <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:7,padding:'10px 12px',marginBottom:8,display:'flex',flexWrap:'wrap',gap:8,alignItems:'center',boxShadow:'0 3px 16px rgba(0,0,0,.4)'}}>
               <PillRow items={[['','All'],['L','LHB'],['R','RHB'],['S','SWB']]} active={bHandFilter} onSelect={setBHandFilter}/>
-              {[[bPicksOnly,setBPicksOnly,'var(--accent2)','🎯 Picks'],[bConfirmed,setBConfirmed,'#27c97a','✅ Confirmed'],[bHideInj,setBHideInj,'#fb923c','🤕 Hide Inj']].map(([active,setFn,col,label])=>(
+              {[[bPicksOnly,setBPicksOnly,'var(--accent2)','🎯 Picks'],[bConfirmed,setBConfirmed,'var(--green)','✅ Confirmed'],[bHideInj,setBHideInj,'var(--c-orange2)','🤕 Hide Inj']].map(([active,setFn,col,label])=>(
                 <button key={label} onClick={()=>setFn(v=>!v)}
                   style={{padding:'3px 8px',borderRadius:5,fontSize:9,cursor:'pointer',fontFamily:mono,fontWeight:active?700:400,
                     border:`1px solid ${active?col:'var(--border)'}`,background:active?`${col}22`:'transparent',color:active?col:'var(--muted)'}}>
@@ -32658,26 +32714,26 @@ function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, on
                           <PickButton pid={parseInt(r.id)||0} name={r.name||r.id} team={r.team||''}/>
                         </div>
                       </td>
-                      <td style={{textAlign:'center',padding:'2px 4px',fontFamily:mono,fontSize:9,fontWeight:700,color:r._slot<99?'#27c97a':'transparent',minWidth:18}}>{r._slot<99?r._slot:'·'}</td>
+                      <td style={{textAlign:'center',padding:'2px 4px',fontFamily:mono,fontSize:9,fontWeight:700,color:r._slot<99?'var(--green)':'transparent',minWidth:18}}>{r._slot<99?r._slot:'·'}</td>
                       <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{r.games||0}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.avg||0)>=.280?'#27c97a':'var(--muted)'}}>{fmtAvg(r.avg)}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.obp||0)>=.360?'#27c97a':'var(--muted)'}}>{fmtAvg(r.obp)}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.slg||0)>=.480?'#ff8020':(r.slg||0)>=.400?'#f5a623':'var(--muted)'}}>{fmtAvg(r.slg)}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,fontWeight:700,color:(r.iso||0)>=.250?'#ff8020':(r.iso||0)>=.180?'#f5a623':'var(--muted)'}}>{r.iso>0?r.iso.toFixed(3):'—'}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,fontWeight:700,color:(r.woba||0)>=.380?'#ff4020':(r.woba||0)>=.340?'#f5a623':'var(--muted)'}}>{r.woba>0?r.woba.toFixed(3):'—'}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:osw,fontWeight:800,fontSize:11,color:(r.hr||0)>=5?'#ff4020':(r.hr||0)>=2?'#f5a623':'var(--muted)'}}>{r.hr||0}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.hr_game||0)>=5?'#ff4020':(r.hr_game||0)>=2?'#f5a623':'var(--muted)',fontWeight:700}}>{fmtN(r.hr_game)}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.hr_game_pct||0)>=25?'#ff4020':(r.hr_game_pct||0)>=15?'#f5a623':'var(--muted)'}}>{fmtPct(r.hr_game_pct)}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.xbh||0)>=8?'#ff8020':'var(--muted)',fontWeight:700}}>{r.xbh||0}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.xbh_pct||0)>=15?'#f5a623':'var(--muted)'}}>{fmtPct(r.xbh_pct)}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.tb||0)>=20?'#ff4020':'var(--muted)'}}>{r.tb||0}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.avg_tb||0)>=2?'#ff8020':(r.avg_tb||0)>=1.5?'#f5a623':'var(--muted)',fontWeight:700}}>{r.avg_tb>0?r.avg_tb.toFixed(2):'—'}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.g2tb||0)>=10?'#ff8020':'var(--muted)',fontWeight:700}}>{fmtN(r.g2tb)}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,fontWeight:700,color:(r.g2tb_pct||0)>=60?'#ff4020':(r.g2tb_pct||0)>=40?'#f5a623':'var(--muted)'}}>{fmtPct(r.g2tb_pct)}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.h_game||0)>=15?'#27c97a':'var(--muted)',fontWeight:700}}>{fmtN(r.h_game)}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,fontWeight:700,color:(r.h_game_pct||0)>=80?'#27c97a':(r.h_game_pct||0)>=60?'#f5a623':'var(--muted)'}}>{fmtPct(r.h_game_pct)}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.k_pct||0)>=28?'#ff4020':'var(--muted)'}}>{fmtPct(r.k_pct)}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.bb_pct||0)>=12?'#27c97a':'var(--muted)'}}>{fmtPct(r.bb_pct)}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.avg||0)>=.280?'var(--green)':'var(--muted)'}}>{fmtAvg(r.avg)}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.obp||0)>=.360?'var(--green)':'var(--muted)'}}>{fmtAvg(r.obp)}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.slg||0)>=.480?'var(--c-warn)':(r.slg||0)>=.400?'var(--accent2)':'var(--muted)'}}>{fmtAvg(r.slg)}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,fontWeight:700,color:(r.iso||0)>=.250?'var(--c-warn)':(r.iso||0)>=.180?'var(--accent2)':'var(--muted)'}}>{r.iso>0?r.iso.toFixed(3):'—'}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,fontWeight:700,color:(r.woba||0)>=.380?'var(--c-danger)':(r.woba||0)>=.340?'var(--accent2)':'var(--muted)'}}>{r.woba>0?r.woba.toFixed(3):'—'}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:osw,fontWeight:800,fontSize:11,color:(r.hr||0)>=5?'var(--c-danger)':(r.hr||0)>=2?'var(--accent2)':'var(--muted)'}}>{r.hr||0}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.hr_game||0)>=5?'var(--c-danger)':(r.hr_game||0)>=2?'var(--accent2)':'var(--muted)',fontWeight:700}}>{fmtN(r.hr_game)}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.hr_game_pct||0)>=25?'var(--c-danger)':(r.hr_game_pct||0)>=15?'var(--accent2)':'var(--muted)'}}>{fmtPct(r.hr_game_pct)}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.xbh||0)>=8?'var(--c-warn)':'var(--muted)',fontWeight:700}}>{r.xbh||0}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.xbh_pct||0)>=15?'var(--accent2)':'var(--muted)'}}>{fmtPct(r.xbh_pct)}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.tb||0)>=20?'var(--c-danger)':'var(--muted)'}}>{r.tb||0}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.avg_tb||0)>=2?'var(--c-warn)':(r.avg_tb||0)>=1.5?'var(--accent2)':'var(--muted)',fontWeight:700}}>{r.avg_tb>0?r.avg_tb.toFixed(2):'—'}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.g2tb||0)>=10?'var(--c-warn)':'var(--muted)',fontWeight:700}}>{fmtN(r.g2tb)}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,fontWeight:700,color:(r.g2tb_pct||0)>=60?'var(--c-danger)':(r.g2tb_pct||0)>=40?'var(--accent2)':'var(--muted)'}}>{fmtPct(r.g2tb_pct)}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.h_game||0)>=15?'var(--green)':'var(--muted)',fontWeight:700}}>{fmtN(r.h_game)}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,fontWeight:700,color:(r.h_game_pct||0)>=80?'var(--green)':(r.h_game_pct||0)>=60?'var(--accent2)':'var(--muted)'}}>{fmtPct(r.h_game_pct)}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.k_pct||0)>=28?'var(--c-danger)':'var(--muted)'}}>{fmtPct(r.k_pct)}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.bb_pct||0)>=12?'var(--green)':'var(--muted)'}}>{fmtPct(r.bb_pct)}</td>
                     </tr>);
                     return [mainB];
                   })}
@@ -32767,21 +32823,21 @@ function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, on
                       </td>
                       <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{r.players}</td>
                       {/* games td hidden */}
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.avg||0)>=.270?'#27c97a':'var(--muted)'}}>{r.avg>0?fmtAvg(r.avg):'—'}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.obp||0)>=.340?'#27c97a':'var(--muted)'}}>{r.obp>0?fmtAvg(r.obp):'—'}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.slg||0)>=.450?'#ff8020':'var(--muted)'}}>{r.slg>0?fmtAvg(r.slg):'—'}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,fontWeight:700,color:(r.woba||0)>=.340?'#ff4020':(r.woba||0)>=.310?'#f5a623':'var(--muted)'}}>{r.woba>0?r.woba.toFixed(3):'—'}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:osw,fontWeight:800,fontSize:11,color:(r.hr||0)>=15?'#ff4020':'var(--muted)'}}>{r.hr||0}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.xbh||0)>=25?'#f5a623':'var(--muted)'}}>{r.xbh||0}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.avg||0)>=.270?'var(--green)':'var(--muted)'}}>{r.avg>0?fmtAvg(r.avg):'—'}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.obp||0)>=.340?'var(--green)':'var(--muted)'}}>{r.obp>0?fmtAvg(r.obp):'—'}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.slg||0)>=.450?'var(--c-warn)':'var(--muted)'}}>{r.slg>0?fmtAvg(r.slg):'—'}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,fontWeight:700,color:(r.woba||0)>=.340?'var(--c-danger)':(r.woba||0)>=.310?'var(--accent2)':'var(--muted)'}}>{r.woba>0?r.woba.toFixed(3):'—'}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:osw,fontWeight:800,fontSize:11,color:(r.hr||0)>=15?'var(--c-danger)':'var(--muted)'}}>{r.hr||0}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.xbh||0)>=25?'var(--accent2)':'var(--muted)'}}>{r.xbh||0}</td>
                       <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{r.tb||0}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,fontWeight:700,color:(r.g2tb||0)>=15?'#ff8020':'var(--muted)'}}>{r.g2tb||0}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,fontWeight:700,color:(r.g2tb_pct||0)>=50?'#ff4020':(r.g2tb_pct||0)>=35?'#f5a623':'var(--muted)'}}>{fmtPct(r.g2tb_pct)}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,fontWeight:700,color:(r.h_game||0)>=20?'#27c97a':'var(--muted)'}}>{r.h_game||0}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,fontWeight:700,color:(r.h_game_pct||0)>=70?'#27c97a':(r.h_game_pct||0)>=50?'#f5a623':'var(--muted)'}}>{fmtPct(r.h_game_pct)}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.hr_game||0)>=8?'#ff4020':'var(--muted)'}}>{r.hr_game||0}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.hr_game_pct||0)>=25?'#ff4020':'var(--muted)'}}>{fmtPct(r.hr_game_pct)}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.k_pct||0)>=26?'#ff4020':'var(--muted)'}}>{fmtPct(r.k_pct)}</td>
-                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.bb_pct||0)>=11?'#27c97a':'var(--muted)'}}>{fmtPct(r.bb_pct)}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,fontWeight:700,color:(r.g2tb||0)>=15?'var(--c-warn)':'var(--muted)'}}>{r.g2tb||0}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,fontWeight:700,color:(r.g2tb_pct||0)>=50?'var(--c-danger)':(r.g2tb_pct||0)>=35?'var(--accent2)':'var(--muted)'}}>{fmtPct(r.g2tb_pct)}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,fontWeight:700,color:(r.h_game||0)>=20?'var(--green)':'var(--muted)'}}>{r.h_game||0}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,fontWeight:700,color:(r.h_game_pct||0)>=70?'var(--green)':(r.h_game_pct||0)>=50?'var(--accent2)':'var(--muted)'}}>{fmtPct(r.h_game_pct)}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.hr_game||0)>=8?'var(--c-danger)':'var(--muted)'}}>{r.hr_game||0}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.hr_game_pct||0)>=25?'var(--c-danger)':'var(--muted)'}}>{fmtPct(r.hr_game_pct)}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.k_pct||0)>=26?'var(--c-danger)':'var(--muted)'}}>{fmtPct(r.k_pct)}</td>
+                      <td style={{textAlign:'right',padding:'2px 5px',fontFamily:mono,fontSize:9,color:(r.bb_pct||0)>=11?'var(--green)':'var(--muted)'}}>{fmtPct(r.bb_pct)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -32999,7 +33055,7 @@ function SimTab({ data }) {
 
   // ── Medal colors ──────────────────────────────────────────────────────────
   const MEDALS = [
-    { icon:'🥇', col:'#ffd700', bg:'rgba(255,215,0,.10)',  border:'rgba(255,215,0,.25)' },
+    { icon:'🥇', col:'var(--c-gold)', bg:'rgba(255,215,0,.10)',  border:'rgba(255,215,0,.25)' },
     { icon:'🥈', col:'#c0c0c0', bg:'rgba(192,192,192,.08)',border:'rgba(192,192,192,.20)' },
     { icon:'🥉', col:'#cd7f32', bg:'rgba(205,127,50,.10)', border:'rgba(205,127,50,.22)' },
     { icon:'4',  col:'rgba(255,255,255,.5)', bg:'rgba(255,255,255,.04)', border:'rgba(255,255,255,.10)' },
@@ -33040,7 +33096,7 @@ function SimTab({ data }) {
               style={{padding:'4px 9px',borderRadius:6,cursor:phase==='running'?'not-allowed':'pointer',
                 border:`1px solid ${simCount===n?'rgba(232,65,26,.5)':'var(--border)'}`,
                 background:simCount===n?'rgba(232,65,26,.15)':'var(--surface2)',
-                color:simCount===n?'#ff4020':'var(--muted)',
+                color:simCount===n?'var(--c-danger)':'var(--muted)',
                 fontFamily:mono,fontSize:9,transition:'all .12s'}}>
               {n.toLocaleString()}
             </button>
@@ -33096,8 +33152,8 @@ function SimTab({ data }) {
           {results.map((b, i) => {
             const m = MEDALS[i] || MEDALS[4];
             const barW = Math.round((b.hrPct / maxPct) * 100);
-            const pitcherTag = b.pgLabel.includes('Target')  ? { txt:'🎯 Target',  col:'#27c97a' }
-                             : b.pgLabel.includes('Hittable') ? { txt:'💥 Hit',     col:'#f5a623' }
+            const pitcherTag = b.pgLabel.includes('Target')  ? { txt:'🎯 Target',  col:'var(--green)' }
+                             : b.pgLabel.includes('Hittable') ? { txt:'💥 Hit',     col:'var(--accent2)' }
                              : b.pgLabel.includes('Tough')    ? { txt:'⚠️ Tough',   col:'#ef4444' }
                              : b.pgLabel.includes('Elite')    ? { txt:'‼️ Elite',   col:'#ef4444' }
                              : null;
@@ -33215,13 +33271,13 @@ function SimTab({ data }) {
                 <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
                   {[
                     { label:'Yard', val:b.yard,
-                      col: b.yard>=32?'#ffd700':b.yard>=24?'#ff4020':b.yard>=18?'#f5a623':'var(--muted)' },
+                      col: b.yard>=32?'var(--c-gold)':b.yard>=24?'var(--c-danger)':b.yard>=18?'var(--accent2)':'var(--muted)' },
                     { label:'Sig',  val:b.sig,
-                      col: b.sig>=6?'#ff4020':b.sig>=4?'#f5a623':b.sig>=2?'#27c97a':'var(--muted)' },
+                      col: b.sig>=6?'var(--c-danger)':b.sig>=4?'var(--accent2)':b.sig>=2?'var(--green)':'var(--muted)' },
                     { label:'Boom', val:b.boom,
-                      col: b.boom>=70?'#ff4020':b.boom>=50?'#f5a623':'var(--muted)' },
+                      col: b.boom>=70?'var(--c-danger)':b.boom>=50?'var(--accent2)':'var(--muted)' },
                     { label:'gHR',  val:b.ghr>0?Math.round(b.ghr):null,
-                      col: b.ghr>=70?'#ff4020':b.ghr>=50?'#f5a623':'var(--muted)' },
+                      col: b.ghr>=70?'var(--c-danger)':b.ghr>=50?'var(--accent2)':'var(--muted)' },
                   ].filter(x=>x.val!=null&&x.val>0).map(x => (
                     <span key={x.label} style={{fontFamily:mono,fontSize:7,
                       color:x.col,background:`${x.col}14`,border:`1px solid ${x.col}30`,
@@ -33358,7 +33414,7 @@ function AllStarWeekTab() {
               <div style={{ fontFamily: osw, fontWeight: 700, fontSize: 13, color: 'var(--accent)', marginBottom: 6 }}>🥊 Home Run Derby</div>
               {derby ? <>
                 <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)' }}>{allStarFmtDate(derby.eventDate)}</div>
-                <div style={{ fontFamily: mono, fontSize: 11, marginTop: 4, color: derbyIsLive ? '#27c97a' : 'var(--text)' }}>
+                <div style={{ fontFamily: mono, fontSize: 11, marginTop: 4, color: derbyIsLive ? 'var(--green)' : 'var(--text)' }}>
                   {derbyIsLive ? '🔴 LIVE — ' : ''}{derby.status?.state || 'Scheduled'}
                 </div>
               </> : <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)' }}>Derby data unavailable</div>}
@@ -33383,7 +33439,7 @@ function AllStarWeekTab() {
             <>
               <div style={{ fontFamily: osw, fontWeight: 800, fontSize: 16, marginBottom: 4 }}>{derby.name}</div>
               <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)', marginBottom: 4 }}>{derby.venue?.name} · {allStarFmtDate(derby.eventDate)}</div>
-              <div style={{ fontFamily: mono, fontSize: 11, color: derbyIsLive ? '#27c97a' : 'var(--accent)', marginBottom: 16 }}>
+              <div style={{ fontFamily: mono, fontSize: 11, color: derbyIsLive ? 'var(--green)' : 'var(--accent)', marginBottom: 16 }}>
                 {derbyIsLive ? '🔴 LIVE — ' : ''}{derby.status?.state}
                 {derby.status?.currentRound ? ` · Round ${derby.status.currentRound}` : ''}
                 {derbyIsLive && derby.status?.swingsRemaining != null ? ` · ${derby.status.swingsRemaining} swings left` : ''}
@@ -33413,7 +33469,7 @@ function AllStarWeekTab() {
                       <PlayerAvatar pid={pid} name={b.player?.fullName} size={26} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{
-                          fontFamily: osw, fontWeight: 700, fontSize: 11, color: b.winner ? '#27c97a' : 'var(--text)',
+                          fontFamily: osw, fontWeight: 700, fontSize: 11, color: b.winner ? 'var(--green)' : 'var(--text)',
                           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                         }}>
                           {b.winner && '👑 '}{b.player?.fullName || 'TBD'}
@@ -33472,14 +33528,14 @@ function AllStarWeekTab() {
               <div style={{ display: 'flex', gap: 20, alignItems: 'center', marginBottom: 12 }}>
                 <div style={{ textAlign: 'center' }}>
                   <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)' }}>{asg.teams.away.name}</div>
-                  <div style={{ fontFamily: osw, fontWeight: 800, fontSize: 28, color: asg.isWinner.away ? '#27c97a' : 'var(--text)' }}>
+                  <div style={{ fontFamily: osw, fontWeight: 800, fontSize: 28, color: asg.isWinner.away ? 'var(--green)' : 'var(--text)' }}>
                     {asg.teams.away.score ?? '–'}
                   </div>
                 </div>
                 <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)' }}>at</div>
                 <div style={{ textAlign: 'center' }}>
                   <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)' }}>{asg.teams.home.name}</div>
-                  <div style={{ fontFamily: osw, fontWeight: 800, fontSize: 28, color: asg.isWinner.home ? '#27c97a' : 'var(--text)' }}>
+                  <div style={{ fontFamily: osw, fontWeight: 800, fontSize: 28, color: asg.isWinner.home ? 'var(--green)' : 'var(--text)' }}>
                     {asg.teams.home.score ?? '–'}
                   </div>
                 </div>
@@ -34340,9 +34396,9 @@ function isSolidContactBatter(r) {
 function bullpenTierInfo(rank) {
   const r = parseInt(rank);
   if (!r || r <= 0) return null;
-  if (r <= 10) return { label:'Soft Pen',  short:'💥', color:'#27c97a', border:'rgba(39,201,122,.3)' };
-  if (r <= 20) return { label:'Avg Pen',   short:'⚾', color:'#f5a623', border:'rgba(245,166,35,.3)' };
-  return          { label:'Tough Pen', short:'🔒', color:'#ff4020', border:'rgba(255,64,32,.3)' };
+  if (r <= 10) return { label:'Soft Pen',  short:'💥', color:'var(--green)', border:'rgba(39,201,122,.3)' };
+  if (r <= 20) return { label:'Avg Pen',   short:'⚾', color:'var(--accent2)', border:'rgba(245,166,35,.3)' };
+  return          { label:'Tough Pen', short:'🔒', color:'var(--c-danger)', border:'rgba(255,64,32,.3)' };
 }
 // Matches BULLPEN_TIER_OPTIONS' exact checkbox label strings, so the
 // Bullpen Tier filter (FilterPanel) can compare directly against a Set.
@@ -34465,7 +34521,7 @@ function FilterPanel({ toggles, pitcherGrades, onPitcherGradesChange, bullpenTie
         style={{padding:'2px 8px',borderRadius:5,cursor:'pointer',
           fontFamily:monoFont,fontSize:9,fontWeight:700,lineHeight:1.5,flexShrink:0,
           background: activeCount>0 ? 'rgba(56,184,242,.12)' : 'var(--surface2)',
-          color:      activeCount>0 ? '#38b8f2' : 'var(--muted)',
+          color:      activeCount>0 ? 'var(--ice)' : 'var(--muted)',
           border:`1px solid ${activeCount>0 ? 'rgba(56,184,242,.4)' : 'var(--border)'}`}}>
         ⚙ Filters{activeCount>0 ? ` (${activeCount})` : ''}
       </button>
@@ -34480,9 +34536,9 @@ function FilterPanel({ toggles, pitcherGrades, onPitcherGradesChange, bullpenTie
           {toggles.map(t => (
             <label key={t.key} title={t.title} style={{display:'flex',alignItems:'center',gap:7,cursor:'pointer',
               fontFamily:monoFont,fontSize:10,fontWeight:700,
-              color: t.active ? (t.color||'#38b8f2') : 'var(--muted)'}}>
+              color: t.active ? (t.color||'var(--ice)') : 'var(--muted)'}}>
               <input type="checkbox" checked={t.active} onChange={t.onToggle}
-                style={{accentColor:t.color||'#38b8f2'}}/>
+                style={{accentColor:t.color||'var(--ice)'}}/>
               {t.label}
             </label>
           ))}
@@ -34535,7 +34591,7 @@ function FilterPanel({ toggles, pitcherGrades, onPitcherGradesChange, bullpenTie
               {minFilters.map(f => (
                 <label key={f.key} style={{display:'flex',alignItems:'center',justifyContent:'space-between',
                   gap:7,marginBottom:4,fontFamily:monoFont,fontSize:10,
-                  color: (f.value!==''&&f.value!=null) ? '#818cf8' : 'var(--muted)'}}>
+                  color: (f.value!==''&&f.value!=null) ? 'var(--c-indigo)' : 'var(--muted)'}}>
                   {f.label}
                   <input type="number" inputMode="decimal" step={f.step||'any'} value={f.value}
                     placeholder={f.placeholder||'—'} onChange={e => f.onChange(e.target.value)}
@@ -34712,10 +34768,10 @@ function buildGameWeatherMap(rows) {
 // noisy) with a hitter-friendly park factor (hrf>=103, the same "amber"
 // cutoff WeatherStrip's own hrfColor() already uses for "hitter-friendly").
 const WEATHER_CARD_COLORS = {
-  purple: { bg: 'rgba(168,85,247,.16)', border: 'rgba(168,85,247,.55)', text: '#c084fc', icon: '☔', label: 'High Rain' },
-  green:  { bg: 'rgba(39,201,122,.16)', border: 'rgba(39,201,122,.55)', text: '#27c97a', icon: '💨', label: 'Wind Out 10+' },
-  blue:   { bg: 'rgba(56,184,242,.16)', border: 'rgba(56,184,242,.55)', text: '#38b8f2', icon: '🌬️', label: 'Wind In 10+' },
-  red:    { bg: 'rgba(255,64,32,.16)',  border: 'rgba(255,64,32,.55)',  text: '#ff4020', icon: '🔥', label: 'Hot + Hitter Park' },
+  purple: { bg: 'rgba(168,85,247,.16)', border: 'rgba(168,85,247,.55)', text: 'var(--c-lavender)', icon: '☔', label: 'High Rain' },
+  green:  { bg: 'rgba(39,201,122,.16)', border: 'rgba(39,201,122,.55)', text: 'var(--green)', icon: '💨', label: 'Wind Out 10+' },
+  blue:   { bg: 'rgba(56,184,242,.16)', border: 'rgba(56,184,242,.55)', text: 'var(--ice)', icon: '🌬️', label: 'Wind In 10+' },
+  red:    { bg: 'rgba(255,64,32,.16)',  border: 'rgba(255,64,32,.55)',  text: 'var(--c-danger)', icon: '🔥', label: 'Hot + Hitter Park' },
 };
 
 function getWeatherCardColor(g) {
@@ -34749,8 +34805,8 @@ function WeatherStrip({ rows }) {
 
   if (!games.length) return null;
 
-  const hrfColor  = v => v >= 110 ? '#ff4020' : v >= 103 ? '#f5a623' : v <= 95 ? '#38b8f2' : 'var(--muted)';
-  const rainColor = v => v >= 50 ? '#38b8f2' : v >= 25 ? '#f5a623' : 'var(--muted)';
+  const hrfColor  = v => v >= 110 ? 'var(--c-danger)' : v >= 103 ? 'var(--accent2)' : v <= 95 ? 'var(--ice)' : 'var(--muted)';
+  const rainColor = v => v >= 50 ? 'var(--ice)' : v >= 25 ? 'var(--accent2)' : 'var(--muted)';
 
   return (
     <div style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:8,marginBottom:12}}>
@@ -34896,7 +34952,7 @@ function AvoidListTab() {
   return (
     <div>
       <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:8}}>
-        <span style={{fontFamily:osw,fontWeight:800,fontSize:14,color:'#ff6b6b'}}>🚫 Avoid List</span>
+        <span style={{fontFamily:osw,fontWeight:800,fontSize:14,color:'var(--c-coral)'}}>🚫 Avoid List</span>
         <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>
           {rows.length} flagged
           {' · '}
@@ -34913,14 +34969,14 @@ function AvoidListTab() {
         <button onClick={() => setConfirmedOnly(v => { userSetConfirmed.current = true; return !v; })}
           style={{padding:'2px 8px',borderRadius:5,cursor:'pointer',fontFamily:mono,fontSize:9,fontWeight:700,
             background: confirmedOnly ? 'rgba(39,201,122,.12)' : 'var(--surface2)',
-            color: confirmedOnly ? '#27c97a' : 'var(--muted)',
+            color: confirmedOnly ? 'var(--green)' : 'var(--muted)',
             border:`1px solid ${confirmedOnly ? 'rgba(39,201,122,.4)' : 'var(--border)'}`}}>
           {confirmedOnly ? '✅ Confirmed only' : '👁 All eligible'}
         </button>
         <button onClick={() => setHideFinal(v => !v)}
           style={{padding:'2px 8px',borderRadius:5,cursor:'pointer',fontFamily:mono,fontSize:9,fontWeight:700,
             background: hideFinal ? 'rgba(255,107,107,.12)' : 'var(--surface2)',
-            color: hideFinal ? '#ff6b6b' : 'var(--muted)',
+            color: hideFinal ? 'var(--c-coral)' : 'var(--muted)',
             border:`1px solid ${hideFinal ? 'rgba(255,107,107,.4)' : 'var(--border)'}`}}>
           🚫 Hide Final
         </button>
@@ -34964,7 +35020,7 @@ function AvoidListTab() {
                   <th key={col.key} title={col.title} onClick={() => toggleSort(col.key)}
                     className={col.key==='batter' ? 'sticky-batter' : undefined}
                     style={{padding:'4px 6px',textAlign:col.align,cursor:'pointer',
-                      fontFamily:mono,fontSize:9,color: sortCol===col.key ? '#ff6b6b' : 'var(--muted)',
+                      fontFamily:mono,fontSize:9,color: sortCol===col.key ? 'var(--c-coral)' : 'var(--muted)',
                       whiteSpace:'nowrap',background: col.key==='batter' ? 'var(--surface2)' : undefined}}>
                     {col.label}{sortCol===col.key ? (sortDir==='asc'?' ▲':' ▼') : ''}
                   </th>
@@ -34991,10 +35047,10 @@ function AvoidListTab() {
                     </span>
                     <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginLeft:4}}>{r._pgLabel||r.pitcher_grade_label||''}</span>
                   </td>
-                  <td style={{padding:'4px 6px',textAlign:'right',fontFamily:mono,fontSize:10,color:'#ff6b6b',fontWeight:700}}>{r.simH.toFixed(2)}</td>
+                  <td style={{padding:'4px 6px',textAlign:'right',fontFamily:mono,fontSize:10,color:'var(--c-coral)',fontWeight:700}}>{r.simH.toFixed(2)}</td>
                   <td style={{padding:'4px 6px',textAlign:'right',fontFamily:mono,fontSize:10}}>{r.swstr.toFixed(1)}%</td>
                   <td style={{padding:'4px 6px',textAlign:'center',fontFamily:mono,fontSize:9,
-                    color: r.sameHand ? '#ff6b6b' : 'var(--muted)'}}>{r.sameHand ? 'Same' : 'Cross'}</td>
+                    color: r.sameHand ? 'var(--c-coral)' : 'var(--muted)'}}>{r.sameHand ? 'Same' : 'Cross'}</td>
                   <td style={{padding:'4px 6px',textAlign:'center',fontFamily:mono,fontSize:10}}>{r.slot||'—'}</td>
                   <td style={{padding:'4px 6px',textAlign:'right',fontFamily:mono,fontSize:10}}>{r.l7iso ? r.l7iso.toFixed(3) : '—'}</td>
                   <td style={{padding:'4px 6px',textAlign:'right',fontFamily:mono,fontSize:10}}>{r.recentEv ? r.recentEv.toFixed(1) : '—'}</td>
@@ -35119,7 +35175,7 @@ function YoungGunMajorsPanel({ row }) {
         <div><div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>MATCHUP SCORE</div>
           <div style={{fontFamily:mono,fontSize:14,fontWeight:700,color:'var(--accent2)'}}>{matchup}</div></div>
         <div><div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>HAND MATCH</div>
-          <div style={{fontFamily:mono,fontSize:14,fontWeight:700,color:'#fbbf24'}}>{stars}</div></div>
+          <div style={{fontFamily:mono,fontSize:14,fontWeight:700,color:'var(--c-amber)'}}>{stars}</div></div>
         <div><div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>BULLPEN</div>
           <div style={{fontFamily:mono,fontSize:10,fontWeight:700}}>{bp ? <span style={{color:bp.color}}>{bp.label}</span> : '—'}</div></div>
       </div>
@@ -35205,7 +35261,7 @@ function YoungGunMinorsPanel({ row }) {
   }, [row.playerId, row.fromLevelSportId]);
 
   if (loading) return <div style={{padding:'10px 14px',fontFamily:mono,fontSize:10,color:'var(--muted)'}}>Loading {row.fromLevel||'minor-league'} stats…</div>;
-  if (err) return <div style={{padding:'10px 14px',fontFamily:mono,fontSize:10,color:'#ff6b6b'}}>{err}</div>;
+  if (err) return <div style={{padding:'10px 14px',fontFamily:mono,fontSize:10,color:'var(--c-coral)'}}>{err}</div>;
   if (!data || !data.season) return <div style={{padding:'10px 14px',fontFamily:mono,fontSize:10,color:'var(--muted)'}}>No {row.fromLevel||'minor-league'} data found.</div>;
 
   return (
@@ -35214,7 +35270,7 @@ function YoungGunMinorsPanel({ row }) {
       <YoungGunStatBlock title={`SEASON (${row.fromLevel})`} s={data.season}/>
       <YoungGunStatBlock title="VS LHP" s={data.vsL}/>
       <YoungGunStatBlock title="VS RHP" s={data.vsR}/>
-      {data.games > 0 && <YoungGunStatBlock title={`LAST ${data.games} GAMES`} s={data.l7} color="#38f282"/>}
+      {data.games > 0 && <YoungGunStatBlock title={`LAST ${data.games} GAMES`} s={data.l7} color="var(--c-mint)"/>}
     </div>
   );
 }
@@ -35313,7 +35369,7 @@ function YoungGunsCallUpTab() {
   return (
     <div>
       <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:8}}>
-        <span style={{fontFamily:osw,fontWeight:800,fontSize:14,color:'#38f282'}}>☎️ Called-Up</span>
+        <span style={{fontFamily:osw,fontWeight:800,fontSize:14,color:'var(--c-mint)'}}>☎️ Called-Up</span>
         <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>
           {players === null ? 'Loading…' : `${filteredRows.length} of ${rows.length} call-ups in the last 45 days`}
         </span>
@@ -35331,13 +35387,13 @@ function YoungGunsCallUpTab() {
           style={{padding:'3px 8px',borderRadius:5,cursor:'pointer',fontFamily:mono,fontSize:9,fontWeight:700,
             background: confirmedOnly ? 'rgba(39,201,122,.14)' : 'var(--surface2)',
             border:`1px solid ${confirmedOnly ? 'rgba(39,201,122,.45)' : 'var(--border)'}`,
-            color: confirmedOnly ? '#27c97a' : 'var(--muted)'}}>
+            color: confirmedOnly ? 'var(--green)' : 'var(--muted)'}}>
           {confirmedOnly ? '✅ Confirmed Only' : 'Confirmed ✅'}
         </button>
       </div>
 
       {error && (
-        <div style={{fontFamily:mono,fontSize:10,color:'#ff6b6b',padding:'8px 12px',
+        <div style={{fontFamily:mono,fontSize:10,color:'var(--c-coral)',padding:'8px 12px',
           background:'rgba(255,107,107,.08)',borderRadius:6,marginBottom:8}}>
           Couldn't load call-up data — {error}
         </div>
@@ -35386,9 +35442,9 @@ function YoungGunsCallUpTab() {
                           overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
                           {r.name}
                         </span>
-                        {r.isNew && <span title="Called up today" style={{fontSize:8,fontWeight:700,color:'#38f282',flexShrink:0,
+                        {r.isNew && <span title="Called up today" style={{fontSize:8,fontWeight:700,color:'var(--c-mint)',flexShrink:0,
                           padding:'1px 4px',borderRadius:3,background:'rgba(56,242,130,.12)',border:'1px solid rgba(56,242,130,.35)'}}>🆕 NEW</span>}
-                        {r.isConfirmed && <span title="Confirmed in today's live lineup" style={{fontSize:8,fontWeight:700,color:'#27c97a',flexShrink:0,
+                        {r.isConfirmed && <span title="Confirmed in today's live lineup" style={{fontSize:8,fontWeight:700,color:'var(--green)',flexShrink:0,
                           padding:'1px 4px',borderRadius:3,background:'rgba(39,201,122,.12)',border:'1px solid rgba(39,201,122,.35)'}}>✅</span>}
                       </div>
                     </td>
@@ -35782,9 +35838,9 @@ function BarrelLabTab() {
     if (v == null || v === '') return 'var(--muted)';
     const n = parseFloat(v);
     if (isNaN(n)) return 'var(--muted)';
-    if (n >= g1 && (g2 == null || n <= g2)) return '#27c97a';
-    if (n >= y1 && (y2 == null || n <= y2)) return '#f5a623';
-    return '#ff6b6b';
+    if (n >= g1 && (g2 == null || n <= g2)) return 'var(--green)';
+    if (n >= y1 && (y2 == null || n <= y2)) return 'var(--accent2)';
+    return 'var(--c-coral)';
   };
   const trueClr     = v => clr(v, 80, null, 60, null);
   const matchupClr  = v => clr(v, 75, null, 50, null);
@@ -35798,8 +35854,8 @@ function BarrelLabTab() {
   // Uses the hand-specific grade (getHandSpecificGrade), matching what
   // actually feeds TrueHRScore/MatchupScore via pitcherGradeMult(), not
   // the hand-agnostic overall label — see Ben Rice case study (July 8-9).
-  const pgCol = g => !g ? 'var(--muted)' : g.includes('Target') ? '#27c97a' : g.includes('Hittable') ? '#60d360'
-    : g.includes('Elite') ? '#ff4020' : g.includes('Tough') ? '#f5a623' : 'var(--muted)';
+  const pgCol = g => !g ? 'var(--muted)' : g.includes('Target') ? 'var(--green)' : g.includes('Hittable') ? 'var(--c-lime)'
+    : g.includes('Elite') ? 'var(--c-danger)' : g.includes('Tough') ? 'var(--accent2)' : 'var(--muted)';
 
   // Group by team for lineup boards
   const byTeam = useMemo(() => {
@@ -35868,43 +35924,43 @@ function BarrelLabTab() {
     // Tinted + divider-bordered as a group since 'ISO' and 'FB%' otherwise
     // collide in label with this tab's own recent_iso/recent_fb_pct columns
     // above — same numbers exist under both names for different windows.
-    { h:'L7 ISO', key:'af_l7iso', acc: b => parseFloat(b.recent_iso||0),      align:'right', color:'#818cf8', divider:true,
+    { h:'L7 ISO', key:'af_l7iso', acc: b => parseFloat(b.recent_iso||0),      align:'right', color:'var(--c-indigo)', divider:true,
       title:"Arsenal Fit — batter's own recent 7-day ISO (not pitcher-specific)" },
-    { h:'L7 EV',  key:'af_l7ev',  acc: b => parseFloat(b.recent_avg_ev||0),   align:'right', color:'#818cf8',
+    { h:'L7 EV',  key:'af_l7ev',  acc: b => parseFloat(b.recent_avg_ev||0),   align:'right', color:'var(--c-indigo)',
       title:"Arsenal Fit — batter's own recent 7-day avg exit velocity (not pitcher-specific)" },
-    { h:'PA',     key:'af_pa',    acc: b => parseInt(b.bvp_pa||0),            align:'right', color:'#818cf8',
+    { h:'PA',     key:'af_pa',    acc: b => parseInt(b.bvp_pa||0),            align:'right', color:'var(--c-indigo)',
       title:`Arsenal Fit — season PAs vs this pitcher's pitch mix + handedness — dimmed below ${MIN_BVP_PA_TRUST}` },
-    { h:'ISO',    key:'af_iso',   acc: b => parseFloat(b.bvp_iso||0),         align:'right', color:'#818cf8',
+    { h:'ISO',    key:'af_iso',   acc: b => parseFloat(b.bvp_iso||0),         align:'right', color:'var(--c-indigo)',
       title:"Arsenal Fit — season ISO vs this pitcher's pitch mix + handedness" },
-    { h:'EV',     key:'af_ev',    acc: b => parseFloat(b.bvp_avg_ev||0),      align:'right', color:'#818cf8',
+    { h:'EV',     key:'af_ev',    acc: b => parseFloat(b.bvp_avg_ev||0),      align:'right', color:'var(--c-indigo)',
       title:"Arsenal Fit — season avg EV vs this pitcher's pitch mix + handedness" },
-    { h:'BRL%',   key:'af_brl',   acc: b => parseFloat(b.bvp_barrel_pct||0),  align:'right', color:'#818cf8',
+    { h:'BRL%',   key:'af_brl',   acc: b => parseFloat(b.bvp_barrel_pct||0),  align:'right', color:'var(--c-indigo)',
       title:"Arsenal Fit — season Barrel% vs this pitcher's pitch mix + handedness" },
-    { h:'FB%',    key:'af_fb',    acc: b => parseFloat(b.bvp_fb_pct||0),      align:'right', color:'#818cf8',
+    { h:'FB%',    key:'af_fb',    acc: b => parseFloat(b.bvp_fb_pct||0),      align:'right', color:'var(--c-indigo)',
       title:"Arsenal Fit — season Fly Ball% vs this pitcher's pitch mix + handedness" },
     // Pull%, Pulled Air% (pulled fly balls), 350+ ft FB count — added
     // 2026-09-02. All 3 are bvp_* (Arsenal Fit) fields only, not recent/L7 —
     // see matchup_engine.py:evaluate_flags() for the shared computation.
-    { h:'Pull%',  key:'af_pull',  acc: b => parseFloat(b.bvp_pull_pct||0),    align:'right', color:'#818cf8',
+    { h:'Pull%',  key:'af_pull',  acc: b => parseFloat(b.bvp_pull_pct||0),    align:'right', color:'var(--c-indigo)',
       title:"Arsenal Fit — season Pull% (any batted-ball type) vs this pitcher's pitch mix + handedness" },
-    { h:'PAir%',  key:'af_pullair', acc: b => parseFloat(b.bvp_pulled_fb_pct||0), align:'right', color:'#818cf8',
+    { h:'PAir%',  key:'af_pullair', acc: b => parseFloat(b.bvp_pulled_fb_pct||0), align:'right', color:'var(--c-indigo)',
       title:"Arsenal Fit — season Pulled Air% (pulled fly balls) vs this pitcher's pitch mix + handedness — same field Boom's Pull×Park Fit component already uses" },
-    { h:'350+',   key:'af_fb350', acc: b => parseInt(b.bvp_fb350_count||0),   align:'right', color:'#818cf8',
+    { h:'350+',   key:'af_fb350', acc: b => parseInt(b.bvp_fb350_count||0),   align:'right', color:'var(--c-indigo)',
       title:"Arsenal Fit — 350+ ft fly balls, raw count, vs this pitcher's pitch mix + handedness" },
-    { h:'HR',     key:'af_hr',    acc: b => parseInt(b.bvp_hr_count||0),      align:'right', color:'#818cf8',
+    { h:'HR',     key:'af_hr',    acc: b => parseInt(b.bvp_hr_count||0),      align:'right', color:'var(--c-indigo)',
       title:"Arsenal Fit — season HR count vs this pitcher's pitch mix + handedness" },
     // 2026-08-04 — home-brewed swing-quality composite (bat speed +
     // attack-angle optimality), NOT a real Statcast/MLB stat, NOT wired
     // into any score — context only, same bar as HH%/PulledBrl% above.
     // See getArsenalBlastPct()'s own comment for the full validation.
-    { h:'Blast%', key:'af_blast', acc: b => getArsenalBlastPct(b) ?? -1,      align:'right', color:'#818cf8',
+    { h:'Blast%', key:'af_blast', acc: b => getArsenalBlastPct(b) ?? -1,      align:'right', color:'var(--c-indigo)',
       title:"Arsenal Blast% — home-brewed swing-quality composite (bat speed + attack-angle optimality) vs this pitcher's arsenal. Not a real stat, not a scoring input — context only." },
     // 2026-08-04 — opposing team's bullpen HR/9 rank (1-30, rank 1 = most
     // home-run-prone), late-game upside if this pitcher gets pulled. Engine
     // field fixed 2026-07-30 (fetch_bullpen_stats()); already nudges Sig by
     // a small +-0.10/0.12 modifier there, but was never shown anywhere until
     // now — see bullpenTierInfo()'s own comment for the fuller context.
-    { h:'Pen',    key:'af_pen',   acc: b => parseInt(b.bullpen_hr_rank)>0 ? 31-parseInt(b.bullpen_hr_rank) : -1, align:'center', color:'#818cf8',
+    { h:'Pen',    key:'af_pen',   acc: b => parseInt(b.bullpen_hr_rank)>0 ? 31-parseInt(b.bullpen_hr_rank) : -1, align:'center', color:'var(--c-indigo)',
       title:"Bullpen HR/9 rank for the team behind this pitcher — late-game upside if the starter gets pulled." },
   ];
 
@@ -35993,7 +36049,7 @@ function BarrelLabTab() {
             marginBottom:10,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
             <span style={{
               display:'inline-block',width:7,height:7,borderRadius:'50%',flexShrink:0,
-              background: lineupReady ? '#27c97a' : '#f5a623',
+              background: lineupReady ? 'var(--green)' : 'var(--accent2)',
             }}/>
             {lineupReady
               ? `${eligibleBatters.length} batters · lineups confirmed`
@@ -36005,7 +36061,7 @@ function BarrelLabTab() {
                 style={{
                   background: confirmedOnly ? 'rgba(39,201,122,.12)' : 'var(--surface2)',
                   border: `1px solid ${confirmedOnly ? 'rgba(39,201,122,.4)' : 'var(--border)'}`,
-                  color: confirmedOnly ? '#27c97a' : 'var(--muted)',
+                  color: confirmedOnly ? 'var(--green)' : 'var(--muted)',
                   borderRadius:5,padding:'2px 8px',fontSize:9,cursor:'pointer',
                   fontFamily:"'DM Mono',monospace",lineHeight:1.5,flexShrink:0,
                 }}>
@@ -36068,7 +36124,7 @@ function BarrelLabTab() {
                 fontFamily:"'DM Mono',monospace", fontSize:9, fontWeight:700,
                 lineHeight:1.5, flexShrink:0,
                 background: blHighIQOnly ? 'rgba(56,184,242,.12)' : 'var(--surface2)',
-                color:      blHighIQOnly ? '#38b8f2' : 'var(--muted)',
+                color:      blHighIQOnly ? 'var(--ice)' : 'var(--muted)',
                 border:`1px solid ${blHighIQOnly ? 'rgba(56,184,242,.4)' : 'var(--border)'}`,
               }}>
               🧠 {blHighIQOnly ? 'High IQ Only' : 'Plate IQ'}
@@ -36081,7 +36137,7 @@ function BarrelLabTab() {
                 fontFamily:"'DM Mono',monospace", fontSize:9, fontWeight:700,
                 lineHeight:1.5, flexShrink:0,
                 background: blHandMatchOnly ? 'rgba(251,191,36,.12)' : 'var(--surface2)',
-                color:      blHandMatchOnly ? '#fbbf24' : 'var(--muted)',
+                color:      blHandMatchOnly ? 'var(--c-amber)' : 'var(--muted)',
                 border:`1px solid ${blHandMatchOnly ? 'rgba(251,191,36,.4)' : 'var(--border)'}`,
               }}>
               ⭐ {blHandMatchOnly ? 'Hand Match Only' : 'Hand Match'}
@@ -36094,7 +36150,7 @@ function BarrelLabTab() {
                 fontFamily:"'DM Mono',monospace", fontSize:9, fontWeight:700,
                 lineHeight:1.5, flexShrink:0,
                 background: blSauce25Only ? 'rgba(234,179,8,.14)' : 'var(--surface2)',
-                color:      blSauce25Only ? '#eab308' : 'var(--muted)',
+                color:      blSauce25Only ? 'var(--c-sauce25)' : 'var(--muted)',
                 border:`1px solid ${blSauce25Only ? 'rgba(234,179,8,.45)' : 'var(--border)'}`,
               }}>
               🥫 {blSauce25Only ? 'Sauce 2.5 Only' : 'Sauce 2.5'}
@@ -36107,7 +36163,7 @@ function BarrelLabTab() {
                 fontFamily:"'DM Mono',monospace", fontSize:9, fontWeight:700,
                 lineHeight:1.5, flexShrink:0,
                 background: blTopIsoOnly ? 'rgba(56,184,242,.14)' : 'var(--surface2)',
-                color:      blTopIsoOnly ? '#38b8f2' : 'var(--muted)',
+                color:      blTopIsoOnly ? 'var(--ice)' : 'var(--muted)',
                 border:`1px solid ${blTopIsoOnly ? 'rgba(56,184,242,.45)' : 'var(--border)'}`,
               }}>
               📈 {blTopIsoOnly ? 'Top ISO Only' : 'Top ISO'}
@@ -36120,7 +36176,7 @@ function BarrelLabTab() {
                 fontFamily:"'DM Mono',monospace", fontSize:9, fontWeight:700,
                 lineHeight:1.5, flexShrink:0,
                 background: blPrimeIsoOnly ? 'rgba(167,139,250,.14)' : 'var(--surface2)',
-                color:      blPrimeIsoOnly ? '#a78bfa' : 'var(--muted)',
+                color:      blPrimeIsoOnly ? 'var(--c-purple)' : 'var(--muted)',
                 border:`1px solid ${blPrimeIsoOnly ? 'rgba(167,139,250,.45)' : 'var(--border)'}`,
               }}>
               💎 {blPrimeIsoOnly ? 'Prime ISO Only' : 'Prime ISO'}
@@ -36140,24 +36196,24 @@ function BarrelLabTab() {
             </button>
             <FilterPanel
               toggles={[
-                {key:'hideFinal', label:'🚫 Hide Final',        active:blHideFinal,     color:'#ff6b6b', onToggle:()=>setBlHideFinal(v=>!v)},
-                {key:'daylate',   label:'🗓️ Day Late',          active:blDayLateOnly,   color:'#22c1c3', onToggle:()=>setBlDayLateOnly(v=>!v)},
-                {key:'sauce3',    label:'🍯🔥 Sauce 3.0',        active:blSauce3Only,    color:'#f59e0b', onToggle:()=>setBlSauce3Only(v=>!v)},
+                {key:'hideFinal', label:'🚫 Hide Final',        active:blHideFinal,     color:'var(--c-coral)', onToggle:()=>setBlHideFinal(v=>!v)},
+                {key:'daylate',   label:'🗓️ Day Late',          active:blDayLateOnly,   color:'var(--c-teal)', onToggle:()=>setBlDayLateOnly(v=>!v)},
+                {key:'sauce3',    label:'🍯🔥 Sauce 3.0',        active:blSauce3Only,    color:'var(--c-sauce3)', onToggle:()=>setBlSauce3Only(v=>!v)},
                 {key:'hitsignal', label:'⚾ Hit Signal',        active:blHitSignalOnly, color:'#93c5fd',
                   title:"Hit Signal — Sim H>=1.0 AND SwStr%<=15%. Full-season backtest: 64.1% hit rate (any hit), 1.12x lift, n=2,933, stable train/test (64.2%/63.8%). Filter-only, no badge — still accumulating its own Track Record validation.",
                   onToggle:()=>setBlHitSignalOnly(v=>!v)},
-                {key:'secretsauce', label:'🤫 Secret Sauce',    active:blSecretSauceOnly, color:'#c084fc',
+                {key:'secretsauce', label:'🤫 Secret Sauce',    active:blSecretSauceOnly, color:'var(--c-lavender)',
                   title:"Secret Sauce — Sauce 2.5 + Hit Signal stacked. 75.6% hit rate / 1.32x in the full-season backtest, but n=90 with a large train/test swing (70.6% -> 82.1%) — a promising lead, NOT a confirmed signal. Dropdown-only, no badge, on purpose.",
                   onToggle:()=>setBlSecretSauceOnly(v=>!v)},
-                {key:'avoid',     label:'🚫 Avoid List',        active:blAvoidOnly,     color:'#ff6b6b',
+                {key:'avoid',     label:'🚫 Avoid List',        active:blAvoidOnly,     color:'var(--c-coral)',
                   title:"Avoid List — Sim H<=0.6 AND SwStr%>=19% AND (same-hand OR Tough/Elite pitcher). Full-season backtest: 58-61% miss rate vs 42.6% baseline, 1.4x lift, validated cleanly train/test. Filter-only, no badge.",
                   onToggle:()=>setBlAvoidOnly(v=>!v)},
-                {key:'hideavoid', label:'🙈 Hide Avoid List',   active:blHideAvoid,     color:'#ff6b6b',
+                {key:'hideavoid', label:'🙈 Hide Avoid List',   active:blHideAvoid,     color:'var(--c-coral)',
                   title:"Removes Avoid List batters from view entirely — the inverse of the Avoid List toggle above, for browsing the rest of the slate without them cluttering it.",
                   onToggle:()=>setBlHideAvoid(v=>!v)},
                 {key:'picks',     label:'🎯 My Picks',          active:blPicksOnly,     color:'var(--accent2)', onToggle:()=>setBlPicksOnly(v=>!v)},
                 {key:'goneyard',  label:'💥 Gone Yard Today',   active:blGoneYardOnly,  color:'var(--accent)', onToggle:()=>setBlGoneYardOnly(v=>!v)},
-                {key:'tb2',       label:'2️⃣ 2+ TB Today',       active:blTB2Only,       color:'#38b8f2', onToggle:()=>setBlTB2Only(v=>!v)},
+                {key:'tb2',       label:'2️⃣ 2+ TB Today',       active:blTB2Only,       color:'var(--ice)', onToggle:()=>setBlTB2Only(v=>!v)},
               ]}
               pitcherGrades={blPitcherGrades}
               onPitcherGradesChange={setBlPitcherGrades}
@@ -36315,7 +36371,7 @@ function BarrelLabTab() {
                 title="Sum of SimHR% (Monte Carlo HR probability) across today's batters — a pre-game aggregate, not a guarantee. Weather and park factor are already baked into each batter's own SimHR%. Compare against the Live tab's xHR Conversion page once games start for the running actual count.">
                 {expTotal.toFixed(1)}
               </span>
-              <span style={{fontFamily:mono,fontSize:9,color: useConfirmed ? 'var(--muted)' : '#f5a623'}}>
+              <span style={{fontFamily:mono,fontSize:9,color: useConfirmed ? 'var(--muted)' : 'var(--accent2)'}}>
                 {useConfirmed
                   ? `confirmed lineups — ${confirmedRows.length} of ${gameRows.length} eligible batters`
                   : `provisional — lineups not posted yet (${gameRows.length} eligible, 10+ recent PA)`}
@@ -36349,7 +36405,7 @@ function BarrelLabTab() {
             <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:4}}>
               LONGSHOTS
             </div>
-            <div style={{fontFamily:osw,fontSize:22,fontWeight:700,color:'#a78bfa',lineHeight:1}}>
+            <div style={{fontFamily:osw,fontSize:22,fontWeight:700,color:'var(--c-purple)',lineHeight:1}}>
               {gameRows.filter(r => r.isLongshot).length}
             </div>
             <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:4}}>Low profile, good spot</div>
@@ -36360,7 +36416,7 @@ function BarrelLabTab() {
             <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:4}}>
               CHALK
             </div>
-            <div style={{fontFamily:osw,fontSize:22,fontWeight:700,color:'#f5c542',lineHeight:1}}>
+            <div style={{fontFamily:osw,fontSize:22,fontWeight:700,color:'var(--c-gold2)',lineHeight:1}}>
               {gameRows.filter(r => r.isChalk).length}
             </div>
             <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:4}}>Proven bat, soft spot</div>
@@ -36371,7 +36427,7 @@ function BarrelLabTab() {
             <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:4}}>
               DAY LATE
             </div>
-            <div style={{fontFamily:osw,fontSize:22,fontWeight:700,color:'#22c1c3',lineHeight:1}}>
+            <div style={{fontFamily:osw,fontSize:22,fontWeight:700,color:'var(--c-teal)',lineHeight:1}}>
               {gameRows.filter(r => r.isDayLate).length}
             </div>
             <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:4}}>Primed twice, still due</div>
@@ -36382,7 +36438,7 @@ function BarrelLabTab() {
             <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:4}}>
               SAUCE 3.0
             </div>
-            <div style={{fontFamily:osw,fontSize:22,fontWeight:700,color:'#f59e0b',lineHeight:1}}>
+            <div style={{fontFamily:osw,fontSize:22,fontWeight:700,color:'var(--c-sauce3)',lineHeight:1}}>
               {gameRows.filter(r => r.isSauce3).length}
             </div>
             <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:4}}>2.85x validated lift</div>
@@ -36393,7 +36449,7 @@ function BarrelLabTab() {
             <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:4}}>
               SAUCE 2.5
             </div>
-            <div style={{fontFamily:osw,fontSize:22,fontWeight:700,color:'#eab308',lineHeight:1}}>
+            <div style={{fontFamily:osw,fontSize:22,fontWeight:700,color:'var(--c-sauce25)',lineHeight:1}}>
               {gameRows.filter(r => r.isSauce25).length}
             </div>
             <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:4}}>2.57x validated lift</div>
@@ -36404,7 +36460,7 @@ function BarrelLabTab() {
             <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:4}}>
               HIGH PLATE IQ
             </div>
-            <div style={{fontFamily:osw,fontSize:22,fontWeight:700,color:'#38b8f2',lineHeight:1}}>
+            <div style={{fontFamily:osw,fontSize:22,fontWeight:700,color:'var(--ice)',lineHeight:1}}>
               {gameRows.filter(r => r.plateIQ != null && r.plateIQ >= 56).length}
             </div>
             <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:4}}>Navigates modern pitching</div>
@@ -36456,8 +36512,8 @@ function BarrelLabTab() {
               <div key={`${b._bid}_${b.game_id}`} style={{
                 minWidth:200,flex:'0 0 auto',
                 background:'var(--surface2)',borderRadius:8,padding:'10px 12px',
-                border:`1px solid ${b.isBarrelSignal ? 'var(--accent)' : b.rainRiskTier==='warning' ? '#a78bfa' : 'var(--border)'}`,
-                borderLeft:`3px solid ${b.isBarrelSignal ? 'var(--accent)' : b.rainRiskTier==='warning' ? '#a78bfa' : 'var(--border)'}`,
+                border:`1px solid ${b.isBarrelSignal ? 'var(--accent)' : b.rainRiskTier==='warning' ? 'var(--c-purple)' : 'var(--border)'}`,
+                borderLeft:`3px solid ${b.isBarrelSignal ? 'var(--accent)' : b.rainRiskTier==='warning' ? 'var(--c-purple)' : 'var(--border)'}`,
                 opacity: isFinal(b.game_id) ? 0.5 : 1,
               }}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
@@ -36474,7 +36530,7 @@ function BarrelLabTab() {
                       <div style={{fontFamily:mono,fontSize:7,color:pgCol(getHandSpecificGrade(b)),whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
                         vs <span
                           onClick={e=>{e.stopPropagation(); if(b.pitcher_id) openPitcherSlide({pid:parseInt(b.pitcher_id)||0,name:b.pitcher,team:'',hand:b.pitcher_hand||'',pitchMix:[]});}}
-                          style={{cursor:'pointer',textDecoration:'underline dotted'}}>{b.pitcher||'?'}</span>{isPitcherRP(b.pitcher_games_started) && <span title="Season-classified as a reliever — likely an opener/bulk-game situation" style={{fontSize:8,fontWeight:700,color:'#f5a623',marginLeft:3,marginRight:2,padding:'0 4px',borderRadius:3,background:'rgba(245,166,35,.12)',border:'1px solid rgba(245,166,35,.35)'}}>RP</span>} · {getHandSpecificGrade(b) || '—'}
+                          style={{cursor:'pointer',textDecoration:'underline dotted'}}>{b.pitcher||'?'}</span>{isPitcherRP(b.pitcher_games_started) && <span title="Season-classified as a reliever — likely an opener/bulk-game situation" style={{fontSize:8,fontWeight:700,color:'var(--accent2)',marginLeft:3,marginRight:2,padding:'0 4px',borderRadius:3,background:'rgba(245,166,35,.12)',border:'1px solid rgba(245,166,35,.35)'}}>RP</span>} · {getHandSpecificGrade(b) || '—'}
                       </div>
                     </div>
                   </div>
@@ -36493,26 +36549,26 @@ function BarrelLabTab() {
                   </div>
                 )}
                 {b.isLongshot && (
-                  <div style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'#a78bfa',
+                  <div style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'var(--c-purple)',
                     letterSpacing:.6,textTransform:'uppercase',marginBottom:4}}>
                     🎲 Longshot
                   </div>
                 )}
                 {b.isChalk && (
-                  <div style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'#f5c542',
+                  <div style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'var(--c-gold2)',
                     letterSpacing:.6,textTransform:'uppercase',marginBottom:4}}>
                     💪🏽 Chalk
                   </div>
                 )}
                 {b.isDayLate && (
-                  <div style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'#22c1c3',
+                  <div style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'var(--c-teal)',
                     letterSpacing:.6,textTransform:'uppercase',marginBottom:4}}>
                     🗓️ Day Late
                   </div>
                 )}
                 {b.isYoungGun && (
                   <div title="Thin/no season track record (<100 PA) — discovery filter, NOT a hot signal. Rookie HRs skew toward fastballs (pitchers haven't scouted them yet), but as a group these batters homer LESS often per game than established ones (7.9% vs 11.5%, full 2026 season)."
-                    style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'#4ade80',
+                    style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'var(--c-younggun)',
                     letterSpacing:.6,textTransform:'uppercase',marginBottom:4}}>
                     🌱 Young Gun ({parseInt(b.season_pa||0)} PA)
                   </div>
@@ -36526,27 +36582,27 @@ function BarrelLabTab() {
                 )}
                 {b.isSauce3 && (
                   <div title="Sauce 2.0 AND both L7 ISO + Arsenal Fit ISO ≥.250 — 20.26% HR rate / 2.85x lift, full 2026 season backtest."
-                    style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'#f59e0b',
+                    style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'var(--c-sauce3)',
                     letterSpacing:.6,textTransform:'uppercase',marginBottom:4}}>
                     🍯🔥 Sauce 3.0
                   </div>
                 )}
                 {b.isSauce25 && !b.isSauce3 && (
                   <div title="Sauce 2.5 — relaxed xwOBA≥.330, both ISO≥.220 — 18.24% HR rate / 2.57x lift, full 2026 season backtest."
-                    style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'#eab308',
+                    style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'var(--c-sauce25)',
                     letterSpacing:.6,textTransform:'uppercase',marginBottom:4}}>
                     🥫 Sauce 2.5
                   </div>
                 )}
                 {b.handMatchTier && (
-                  <div style={{fontFamily:mono,fontSize:8,color:'#fbbf24',marginBottom:4,
+                  <div style={{fontFamily:mono,fontSize:8,color:'var(--c-amber)',marginBottom:4,
                     opacity:b.handMatchTier==='partial'?.75:1}}>
                     {b.handMatchTier==='elite' ? '⭐⭐⭐ Elite Hand Match' : b.handMatchTier==='full' ? '⭐⭐ Hand Match' : '⭐ Partial Hand Match'}
                   </div>
                 )}
                 {b.rainRiskTier && (
                   <div title={`~${Math.round(b.rainRiskPct)}% chance during the game window${/thunder/i.test(b.condition||'')?' with thunder in the forecast':''}. Games can be delayed/postponed, and wet grip can affect contact.`}
-                    style={{fontFamily:mono,fontSize:8,color:'#a78bfa',marginBottom:4,
+                    style={{fontFamily:mono,fontSize:8,color:'var(--c-purple)',marginBottom:4,
                     fontWeight:b.rainRiskTier==='warning'?700:400}}>
                     {b.rainRiskTier==='warning' ? `⚠️ Rain Risk (${Math.round(b.rainRiskPct)}%)` : `🌧 Rain Watch (${Math.round(b.rainRiskPct)}%)`}
                   </div>
@@ -36625,19 +36681,19 @@ function BarrelLabTab() {
                                 <PlayerAvatar pid={b.batter_id} name={b.batter} size={22}/>
                                 <span style={{color:'var(--text)'}}>
                                   {b.isBarrelSignal && <span title="Barrel Signal — TrueHRScore ≥75, MatchupScore ≥60, simulated HR% ≥12%." style={{color:'var(--accent)',marginRight:2,fontWeight:900,fontSize:7}}>★</span>}
-                                  {b.isLongshot && <span title="Longshot — TrueHRScore ≤55, MatchupScore ≥65, Sim TB ≥1.2, non-elite pitcher." style={{color:'#a78bfa',marginRight:2,fontWeight:900,fontSize:7}}>🎲</span>}
-                                  {b.isChalk && <span title="Chalk — real season HR leader (>=18 HR, >=.220 ISO) facing a genuinely soft matchup today (Target/Hittable/Average)." style={{color:'#f5c542',marginRight:2,fontWeight:900,fontSize:7}}>💪🏽</span>}
-                                  {b.isDayLate && <span title="Day Late — a real ★ Barrel Signal on BOTH of the last 2 real game days, no HR either day, today's matchup not an outright Elite mismatch." style={{color:'#22c1c3',marginRight:2,fontWeight:900,fontSize:7}}>🗓️</span>}
-                                  {b.isYoungGun && <span title={`Young Gun — ${parseInt(b.season_pa||0)} season PA. Discovery filter, not a hot signal — thin-history batters homer LESS often per game on average (7.9% vs 11.5%).`} style={{color:'#4ade80',marginRight:2,fontWeight:900,fontSize:7}}>🌱</span>}
-                                  {b.isSauce3 && <span title="Sauce 3.0 — Sauce 2.0 AND both L7 ISO + Arsenal Fit ISO ≥.250. 20.26% HR rate / 2.85x lift, full 2026 season backtest (n=380). Best validated combo in this app." style={{color:'#f59e0b',marginRight:2,fontWeight:900,fontSize:7}}>🍯🔥</span>}
-                                  {b.isSauce25 && !b.isSauce3 && <span title="Sauce 2.5 — relaxed xwOBA≥.330, both ISO≥.220. 18.24% HR rate / 2.57x lift, full 2026 season backtest (n=899)." style={{color:'#eab308',marginRight:2,fontWeight:900,fontSize:7}}>🥫</span>}
+                                  {b.isLongshot && <span title="Longshot — TrueHRScore ≤55, MatchupScore ≥65, Sim TB ≥1.2, non-elite pitcher." style={{color:'var(--c-purple)',marginRight:2,fontWeight:900,fontSize:7}}>🎲</span>}
+                                  {b.isChalk && <span title="Chalk — real season HR leader (>=18 HR, >=.220 ISO) facing a genuinely soft matchup today (Target/Hittable/Average)." style={{color:'var(--c-gold2)',marginRight:2,fontWeight:900,fontSize:7}}>💪🏽</span>}
+                                  {b.isDayLate && <span title="Day Late — a real ★ Barrel Signal on BOTH of the last 2 real game days, no HR either day, today's matchup not an outright Elite mismatch." style={{color:'var(--c-teal)',marginRight:2,fontWeight:900,fontSize:7}}>🗓️</span>}
+                                  {b.isYoungGun && <span title={`Young Gun — ${parseInt(b.season_pa||0)} season PA. Discovery filter, not a hot signal — thin-history batters homer LESS often per game on average (7.9% vs 11.5%).`} style={{color:'var(--c-younggun)',marginRight:2,fontWeight:900,fontSize:7}}>🌱</span>}
+                                  {b.isSauce3 && <span title="Sauce 3.0 — Sauce 2.0 AND both L7 ISO + Arsenal Fit ISO ≥.250. 20.26% HR rate / 2.85x lift, full 2026 season backtest (n=380). Best validated combo in this app." style={{color:'var(--c-sauce3)',marginRight:2,fontWeight:900,fontSize:7}}>🍯🔥</span>}
+                                  {b.isSauce25 && !b.isSauce3 && <span title="Sauce 2.5 — relaxed xwOBA≥.330, both ISO≥.220. 18.24% HR rate / 2.57x lift, full 2026 season backtest (n=899)." style={{color:'var(--c-sauce25)',marginRight:2,fontWeight:900,fontSize:7}}>🥫</span>}
                                   {b.handMatchTier && <span
                                     title={b.handMatchTier==='elite'
                                       ? `Elite Hand Match — ${b.pitcher||'this pitcher'} (${(b.pitcher_hand||'?').charAt(0)}HP) is genuinely weak vs ${b.batter_hand||'?'}HB, ${b.batter} has strong arsenal fit (ps_convergence=${fmt(b.ps_convergence,1)}${b.ps_conv_pitch ? ', best pitch: '+b.ps_conv_pitch : ''}), AND an elite ${fmt(b.vs_hand_hr_rate,1)}% HR rate vs that hand. Diamond in the rough.`
                                       : b.handMatchTier==='full'
                                       ? `Hand Match — ${b.pitcher||'this pitcher'} (${(b.pitcher_hand||'?').charAt(0)}HP) is genuinely weak vs ${b.batter_hand||'?'}HB, and ${b.batter} has hit that hand well. Platoon + weakness compound.`
                                       : `Partial Hand Match — cross-handed matchup with strong arsenal fit (ps_convergence=${fmt(b.ps_convergence,1)}${b.ps_conv_pitch ? ', best pitch: '+b.ps_conv_pitch : ''}) even though the pitcher's overall vs-hand rates aren't clearly weak yet.`}
-                                    style={{color:'#fbbf24',marginRight:2,fontWeight:900,fontSize:7,opacity:b.handMatchTier==='partial'?.6:1}}>
+                                    style={{color:'var(--c-amber)',marginRight:2,fontWeight:900,fontSize:7,opacity:b.handMatchTier==='partial'?.6:1}}>
                                     {b.handMatchTier==='elite' ? '⭐⭐⭐' : b.handMatchTier==='full' ? '⭐⭐' : '⭐'}
                                   </span>}
                                   {b.rainRiskTier==='warning' && <span
@@ -36656,7 +36712,7 @@ function BarrelLabTab() {
                                   <div title="2+ TB Today — this batter has already reached 2+ total bases today (without a HR)."
                                     style={{padding:'2px 6px',borderRadius:4,flexShrink:0,
                                     background:'rgba(56,184,242,.20)',border:'1px solid rgba(56,184,242,.4)',
-                                    color:'#38b8f2',fontFamily:"'DM Mono',monospace",
+                                    color:'var(--ice)',fontFamily:"'DM Mono',monospace",
                                     fontWeight:800,fontSize:7,letterSpacing:.5}}>2️⃣</div>
                                 )}
                                 {b.ballStateBadge && (
@@ -36671,7 +36727,7 @@ function BarrelLabTab() {
                             </div>
                           </td>
                           {!selGame && <td style={{padding:'4px 6px',color:'var(--muted)',fontFamily:mono,fontSize:8,whiteSpace:'nowrap',cursor:b.pitcher_id?'pointer':'default',textDecoration:b.pitcher_id?'underline dotted':'none'}}
-                            onClick={()=>{ if(b.pitcher_id) openPitcherSlide({pid:parseInt(b.pitcher_id)||0,name:b.pitcher,team:'',hand:b.pitcher_hand||'',pitchMix:[]}); }}>{b.pitcher||'—'}{isPitcherRP(b.pitcher_games_started) && <span title="Season-classified as a reliever — likely an opener/bulk-game situation" style={{fontSize:7,fontWeight:700,color:'#f5a623',marginLeft:3,padding:'0 3px',borderRadius:3,background:'rgba(245,166,35,.12)',border:'1px solid rgba(245,166,35,.35)'}}>RP</span>}</td>}
+                            onClick={()=>{ if(b.pitcher_id) openPitcherSlide({pid:parseInt(b.pitcher_id)||0,name:b.pitcher,team:'',hand:b.pitcher_hand||'',pitchMix:[]}); }}>{b.pitcher||'—'}{isPitcherRP(b.pitcher_games_started) && <span title="Season-classified as a reliever — likely an opener/bulk-game situation" style={{fontSize:7,fontWeight:700,color:'var(--accent2)',marginLeft:3,padding:'0 3px',borderRadius:3,background:'rgba(245,166,35,.12)',border:'1px solid rgba(245,166,35,.35)'}}>RP</span>}</td>}
                           {!selGame && (() => { const _g = getHandSpecificGrade(b); return (
                             <td style={{padding:'4px 6px',color:pgCol(_g),fontFamily:mono,fontSize:8,whiteSpace:'nowrap'}}>{_g || '—'}</td>
                           ); })()}
@@ -36756,10 +36812,10 @@ function BarrelLabTab() {
                   {team} hitters vs <span
                     onClick={()=>{ if(pitcherId) openPitcherSlide({pid:parseInt(pitcherId)||0,name:pitcher,team:'',hand:pitcherHand||'',pitchMix:[]}); }}
                     style={{cursor: pitcherId ? 'pointer' : 'default', textDecoration: pitcherId ? 'underline dotted' : 'none'}}>{pitcher || '?'}</span> ({(pitcherHand||'').charAt(0)})
-                  {isPitcherRP(pitcherGS) && <span title="Season-classified as a reliever — likely an opener/bulk-game situation" style={{fontSize:8,fontWeight:700,color:'#f5a623',marginLeft:5,padding:'0 4px',borderRadius:3,background:'rgba(245,166,35,.12)',border:'1px solid rgba(245,166,35,.35)'}}>RP</span>}
-                  {' · '}<span style={{color: pgLabel.includes('Elite')||pgLabel.includes('Tough') ? '#ff6b6b' : pgLabel.includes('Target')||pgLabel.includes('Hittable') ? '#27c97a' : 'var(--muted)'}}>{pgLabel}</span>
+                  {isPitcherRP(pitcherGS) && <span title="Season-classified as a reliever — likely an opener/bulk-game situation" style={{fontSize:8,fontWeight:700,color:'var(--accent2)',marginLeft:5,padding:'0 4px',borderRadius:3,background:'rgba(245,166,35,.12)',border:'1px solid rgba(245,166,35,.35)'}}>RP</span>}
+                  {' · '}<span style={{color: pgLabel.includes('Elite')||pgLabel.includes('Tough') ? 'var(--c-coral)' : pgLabel.includes('Target')||pgLabel.includes('Hittable') ? 'var(--green)' : 'var(--muted)'}}>{pgLabel}</span>
                   {pitcherGB > 50 && (
-                    <span style={{color:'#f5a623',marginLeft:8}}>
+                    <span style={{color:'var(--accent2)',marginLeft:8}}>
                       · Groundball pitcher — FB% suppressed in sim
                     </span>
                   )}
@@ -37144,19 +37200,19 @@ function OnBaseTab() {
   };
 
   // Color helpers
-  const obsClr  = v => v == null ? 'var(--muted)' : v >= 80 ? '#27c97a' : v >= 60 ? '#f5a623' : v < 40 ? '#ff6b6b' : 'var(--text)';
-  const mscClr  = v => v == null ? 'var(--muted)' : v >= 75 ? '#27c97a' : v >= 50 ? '#f5a623' : v < 35 ? '#ff6b6b' : 'var(--text)';
-  const simClr  = v => v == null ? 'var(--muted)' : v >= 45 ? '#27c97a' : v >= 30 ? '#f5a623' : v < 20 ? '#ff6b6b' : 'var(--text)';
-  const g2tbClr = v => v == null ? 'var(--muted)' : v >= 50 ? '#27c97a' : v >= 38 ? '#f5a623' : v < 25 ? '#ff6b6b' : 'var(--text)';
-  const xbhClr  = v => v == null ? 'var(--muted)' : v >= 18 ? '#27c97a' : v >= 12 ? '#f5a623' : 'var(--text)';
-  const slgClr  = v => v == null ? 'var(--muted)' : v >= 0.550 ? '#27c97a' : v >= 0.450 ? '#f5a623' : v < 0.300 ? '#ff6b6b' : 'var(--text)';
-  const zfClr   = v => v == null ? 'var(--muted)' : v >= 7 ? '#27c97a' : v >= 4 ? '#f5a623' : 'var(--text)';
+  const obsClr  = v => v == null ? 'var(--muted)' : v >= 80 ? 'var(--green)' : v >= 60 ? 'var(--accent2)' : v < 40 ? 'var(--c-coral)' : 'var(--text)';
+  const mscClr  = v => v == null ? 'var(--muted)' : v >= 75 ? 'var(--green)' : v >= 50 ? 'var(--accent2)' : v < 35 ? 'var(--c-coral)' : 'var(--text)';
+  const simClr  = v => v == null ? 'var(--muted)' : v >= 45 ? 'var(--green)' : v >= 30 ? 'var(--accent2)' : v < 20 ? 'var(--c-coral)' : 'var(--text)';
+  const g2tbClr = v => v == null ? 'var(--muted)' : v >= 50 ? 'var(--green)' : v >= 38 ? 'var(--accent2)' : v < 25 ? 'var(--c-coral)' : 'var(--text)';
+  const xbhClr  = v => v == null ? 'var(--muted)' : v >= 18 ? 'var(--green)' : v >= 12 ? 'var(--accent2)' : 'var(--text)';
+  const slgClr  = v => v == null ? 'var(--muted)' : v >= 0.550 ? 'var(--green)' : v >= 0.450 ? 'var(--accent2)' : v < 0.300 ? 'var(--c-coral)' : 'var(--text)';
+  const zfClr   = v => v == null ? 'var(--muted)' : v >= 7 ? 'var(--green)' : v >= 4 ? 'var(--accent2)' : 'var(--text)';
   const fmt     = (v, d=1) => v != null && !isNaN(parseFloat(v)) ? parseFloat(v).toFixed(d) : '—';
   // Opposing pitcher grade color — mirrors BarrelLabTab's pgCol, uses the
   // hand-specific grade that actually feeds onbase_groupB/computeOnBaseMatchupScore
   // via pitcherGradeMult(), not the hand-agnostic overall label.
-  const pgCol = g => !g ? 'var(--muted)' : g.includes('Target') ? '#27c97a' : g.includes('Hittable') ? '#60d360'
-    : g.includes('Elite') ? '#ff4020' : g.includes('Tough') ? '#f5a623' : 'var(--muted)';
+  const pgCol = g => !g ? 'var(--muted)' : g.includes('Target') ? 'var(--green)' : g.includes('Hittable') ? 'var(--c-lime)'
+    : g.includes('Elite') ? 'var(--c-danger)' : g.includes('Tough') ? 'var(--accent2)' : 'var(--muted)';
 
   const COLS = [
     { h:'Slot',      key:'lineup_slot',     acc: b => liveSlot(parseInt(b.batter_id||0), b.lineup_slot)||99,            align:'left',  allOnly:false },
@@ -37185,43 +37241,43 @@ function OnBaseTab() {
     // block for the full rationale. 'ISO' doesn't collide with anything in
     // this tab's own COLS (unlike BarrelLabTab), but kept the same tinted/
     // divider treatment for visual consistency between the two tabs.
-    { h:'L7 ISO', key:'af_l7iso', acc: b => parseFloat(b.recent_iso||0),      align:'right', color:'#818cf8', divider:true,
+    { h:'L7 ISO', key:'af_l7iso', acc: b => parseFloat(b.recent_iso||0),      align:'right', color:'var(--c-indigo)', divider:true,
       title:"Arsenal Fit — batter's own recent 7-day ISO (not pitcher-specific)" },
-    { h:'L7 EV',  key:'af_l7ev',  acc: b => parseFloat(b.recent_avg_ev||0),   align:'right', color:'#818cf8',
+    { h:'L7 EV',  key:'af_l7ev',  acc: b => parseFloat(b.recent_avg_ev||0),   align:'right', color:'var(--c-indigo)',
       title:"Arsenal Fit — batter's own recent 7-day avg exit velocity (not pitcher-specific)" },
-    { h:'PA',     key:'af_pa',    acc: b => parseInt(b.bvp_pa||0),            align:'right', color:'#818cf8',
+    { h:'PA',     key:'af_pa',    acc: b => parseInt(b.bvp_pa||0),            align:'right', color:'var(--c-indigo)',
       title:`Arsenal Fit — season PAs vs this pitcher's pitch mix + handedness — dimmed below ${MIN_BVP_PA_TRUST}` },
-    { h:'ISO',    key:'af_iso',   acc: b => parseFloat(b.bvp_iso||0),         align:'right', color:'#818cf8',
+    { h:'ISO',    key:'af_iso',   acc: b => parseFloat(b.bvp_iso||0),         align:'right', color:'var(--c-indigo)',
       title:"Arsenal Fit — season ISO vs this pitcher's pitch mix + handedness" },
-    { h:'EV',     key:'af_ev',    acc: b => parseFloat(b.bvp_avg_ev||0),      align:'right', color:'#818cf8',
+    { h:'EV',     key:'af_ev',    acc: b => parseFloat(b.bvp_avg_ev||0),      align:'right', color:'var(--c-indigo)',
       title:"Arsenal Fit — season avg EV vs this pitcher's pitch mix + handedness" },
-    { h:'BRL%',   key:'af_brl',   acc: b => parseFloat(b.bvp_barrel_pct||0),  align:'right', color:'#818cf8',
+    { h:'BRL%',   key:'af_brl',   acc: b => parseFloat(b.bvp_barrel_pct||0),  align:'right', color:'var(--c-indigo)',
       title:"Arsenal Fit — season Barrel% vs this pitcher's pitch mix + handedness" },
-    { h:'FB%',    key:'af_fb',    acc: b => parseFloat(b.bvp_fb_pct||0),      align:'right', color:'#818cf8',
+    { h:'FB%',    key:'af_fb',    acc: b => parseFloat(b.bvp_fb_pct||0),      align:'right', color:'var(--c-indigo)',
       title:"Arsenal Fit — season Fly Ball% vs this pitcher's pitch mix + handedness" },
     // Pull%, Pulled Air% (pulled fly balls), 350+ ft FB count — added
     // 2026-09-02. All 3 are bvp_* (Arsenal Fit) fields only, not recent/L7 —
     // see matchup_engine.py:evaluate_flags() for the shared computation.
-    { h:'Pull%',  key:'af_pull',  acc: b => parseFloat(b.bvp_pull_pct||0),    align:'right', color:'#818cf8',
+    { h:'Pull%',  key:'af_pull',  acc: b => parseFloat(b.bvp_pull_pct||0),    align:'right', color:'var(--c-indigo)',
       title:"Arsenal Fit — season Pull% (any batted-ball type) vs this pitcher's pitch mix + handedness" },
-    { h:'PAir%',  key:'af_pullair', acc: b => parseFloat(b.bvp_pulled_fb_pct||0), align:'right', color:'#818cf8',
+    { h:'PAir%',  key:'af_pullair', acc: b => parseFloat(b.bvp_pulled_fb_pct||0), align:'right', color:'var(--c-indigo)',
       title:"Arsenal Fit — season Pulled Air% (pulled fly balls) vs this pitcher's pitch mix + handedness — same field Boom's Pull×Park Fit component already uses" },
-    { h:'350+',   key:'af_fb350', acc: b => parseInt(b.bvp_fb350_count||0),   align:'right', color:'#818cf8',
+    { h:'350+',   key:'af_fb350', acc: b => parseInt(b.bvp_fb350_count||0),   align:'right', color:'var(--c-indigo)',
       title:"Arsenal Fit — 350+ ft fly balls, raw count, vs this pitcher's pitch mix + handedness" },
-    { h:'HR',     key:'af_hr',    acc: b => parseInt(b.bvp_hr_count||0),      align:'right', color:'#818cf8',
+    { h:'HR',     key:'af_hr',    acc: b => parseInt(b.bvp_hr_count||0),      align:'right', color:'var(--c-indigo)',
       title:"Arsenal Fit — season HR count vs this pitcher's pitch mix + handedness" },
     // 2026-08-04 — home-brewed swing-quality composite (bat speed +
     // attack-angle optimality), NOT a real Statcast/MLB stat, NOT wired
     // into any score — context only, same bar as HH%/PulledBrl% above.
     // See getArsenalBlastPct()'s own comment for the full validation.
-    { h:'Blast%', key:'af_blast', acc: b => getArsenalBlastPct(b) ?? -1,      align:'right', color:'#818cf8',
+    { h:'Blast%', key:'af_blast', acc: b => getArsenalBlastPct(b) ?? -1,      align:'right', color:'var(--c-indigo)',
       title:"Arsenal Blast% — home-brewed swing-quality composite (bat speed + attack-angle optimality) vs this pitcher's arsenal. Not a real stat, not a scoring input — context only." },
     // 2026-08-04 — opposing team's bullpen HR/9 rank (1-30, rank 1 = most
     // home-run-prone), late-game upside if this pitcher gets pulled. Engine
     // field fixed 2026-07-30 (fetch_bullpen_stats()); already nudges Sig by
     // a small +-0.10/0.12 modifier there, but was never shown anywhere until
     // now — see bullpenTierInfo()'s own comment for the fuller context.
-    { h:'Pen',    key:'af_pen',   acc: b => parseInt(b.bullpen_hr_rank)>0 ? 31-parseInt(b.bullpen_hr_rank) : -1, align:'center', color:'#818cf8',
+    { h:'Pen',    key:'af_pen',   acc: b => parseInt(b.bullpen_hr_rank)>0 ? 31-parseInt(b.bullpen_hr_rank) : -1, align:'center', color:'var(--c-indigo)',
       title:"Bullpen HR/9 rank for the team behind this pitcher — late-game upside if the starter gets pulled." },
   ];
 
@@ -37266,7 +37322,7 @@ function OnBaseTab() {
             textAlign:'center',
           }}>
           <div style={{fontFamily:osw,fontSize:11,fontWeight:700,letterSpacing:.6,
-            color: !selGame ? '#38b8f2' : 'var(--muted)'}}>
+            color: !selGame ? 'var(--ice)' : 'var(--muted)'}}>
             ALL GAMES
           </div>
         </button>
@@ -37287,7 +37343,7 @@ function OnBaseTab() {
                 background: sel ? 'rgba(56,184,242,.12)' : 'var(--surface2)',
                 textAlign:'center',opacity: fin ? 0.55 : 1,
               }}>
-              <div style={{fontFamily:osw,fontSize:11,fontWeight:700,color: sel ? '#38b8f2' : 'var(--text)',letterSpacing:.6}}>
+              <div style={{fontFamily:osw,fontSize:11,fontWeight:700,color: sel ? 'var(--ice)' : 'var(--text)',letterSpacing:.6}}>
                 {g.away_abbr} @ {g.home_abbr}
               </div>
               <div style={{fontFamily:mono,fontSize:8,color: sel ? 'rgba(56,184,242,.7)' : 'var(--muted)',marginTop:2}}>
@@ -37307,7 +37363,7 @@ function OnBaseTab() {
             marginBottom:10,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
             <span style={{
               display:'inline-block',width:7,height:7,borderRadius:'50%',flexShrink:0,
-              background: lineupReady ? '#27c97a' : '#f5a623',
+              background: lineupReady ? 'var(--green)' : 'var(--accent2)',
             }}/>
             {lineupReady
               ? `${eligibleBatters.length} batters · lineups confirmed`
@@ -37319,7 +37375,7 @@ function OnBaseTab() {
                 style={{
                   background: confirmedOnly ? 'rgba(56,184,242,.12)' : 'var(--surface2)',
                   border: `1px solid ${confirmedOnly ? 'rgba(56,184,242,.4)' : 'var(--border)'}`,
-                  color: confirmedOnly ? '#38b8f2' : 'var(--muted)',
+                  color: confirmedOnly ? 'var(--ice)' : 'var(--muted)',
                   borderRadius:5,padding:'2px 8px',fontSize:9,cursor:'pointer',
                   fontFamily:mono,lineHeight:1.5,flexShrink:0,
                 }}>
@@ -37382,7 +37438,7 @@ function OnBaseTab() {
                 fontFamily:mono, fontSize:9, fontWeight:700,
                 lineHeight:1.5, flexShrink:0,
                 background: obHighIQOnly ? 'rgba(56,184,242,.12)' : 'var(--surface2)',
-                color:      obHighIQOnly ? '#38b8f2' : 'var(--muted)',
+                color:      obHighIQOnly ? 'var(--ice)' : 'var(--muted)',
                 border:`1px solid ${obHighIQOnly ? 'rgba(56,184,242,.4)' : 'var(--border)'}`,
               }}>
               🧠 {obHighIQOnly ? 'High IQ Only' : 'Plate IQ'}
@@ -37395,7 +37451,7 @@ function OnBaseTab() {
                 fontFamily:mono, fontSize:9, fontWeight:700,
                 lineHeight:1.5, flexShrink:0,
                 background: obHandMatchOnly ? 'rgba(251,191,36,.12)' : 'var(--surface2)',
-                color:      obHandMatchOnly ? '#fbbf24' : 'var(--muted)',
+                color:      obHandMatchOnly ? 'var(--c-amber)' : 'var(--muted)',
                 border:`1px solid ${obHandMatchOnly ? 'rgba(251,191,36,.4)' : 'var(--border)'}`,
               }}>
               ⭐ {obHandMatchOnly ? 'Hand Match Only' : 'Hand Match'}
@@ -37408,31 +37464,31 @@ function OnBaseTab() {
                 fontFamily:mono, fontSize:9, fontWeight:700,
                 lineHeight:1.5, flexShrink:0,
                 background: obSauce25Only ? 'rgba(234,179,8,.14)' : 'var(--surface2)',
-                color:      obSauce25Only ? '#eab308' : 'var(--muted)',
+                color:      obSauce25Only ? 'var(--c-sauce25)' : 'var(--muted)',
                 border:`1px solid ${obSauce25Only ? 'rgba(234,179,8,.45)' : 'var(--border)'}`,
               }}>
               🥫 {obSauce25Only ? 'Sauce 2.5 Only' : 'Sauce 2.5'}
             </button>
             <FilterPanel
               toggles={[
-                {key:'hideFinal', label:'🚫 Hide Final',        active:obHideFinal,     color:'#ff6b6b', onToggle:()=>setObHideFinal(v=>!v)},
-                {key:'daylate',   label:'🗓️ Day Late',          active:obDayLateOnly,   color:'#22c1c3', onToggle:()=>setObDayLateOnly(v=>!v)},
-                {key:'sauce3',    label:'🍯🔥 Sauce 3.0',        active:obSauce3Only,    color:'#f59e0b', onToggle:()=>setObSauce3Only(v=>!v)},
+                {key:'hideFinal', label:'🚫 Hide Final',        active:obHideFinal,     color:'var(--c-coral)', onToggle:()=>setObHideFinal(v=>!v)},
+                {key:'daylate',   label:'🗓️ Day Late',          active:obDayLateOnly,   color:'var(--c-teal)', onToggle:()=>setObDayLateOnly(v=>!v)},
+                {key:'sauce3',    label:'🍯🔥 Sauce 3.0',        active:obSauce3Only,    color:'var(--c-sauce3)', onToggle:()=>setObSauce3Only(v=>!v)},
                 {key:'hitsignal', label:'⚾ Hit Signal',        active:obHitSignalOnly, color:'#93c5fd',
                   title:"Hit Signal — Sim H>=1.0 AND SwStr%<=15%. Full-season backtest: 64.1% hit rate (any hit), 1.12x lift, n=2,933, stable train/test (64.2%/63.8%). Filter-only, no badge — still accumulating its own Track Record validation.",
                   onToggle:()=>setObHitSignalOnly(v=>!v)},
-                {key:'secretsauce', label:'🤫 Secret Sauce',    active:obSecretSauceOnly, color:'#c084fc',
+                {key:'secretsauce', label:'🤫 Secret Sauce',    active:obSecretSauceOnly, color:'var(--c-lavender)',
                   title:"Secret Sauce — Sauce 2.5 + Hit Signal stacked. 75.6% hit rate / 1.32x in the full-season backtest, but n=90 with a large train/test swing (70.6% -> 82.1%) — a promising lead, NOT a confirmed signal. Dropdown-only, no badge, on purpose.",
                   onToggle:()=>setObSecretSauceOnly(v=>!v)},
-                {key:'avoid',     label:'🚫 Avoid List',        active:obAvoidOnly,     color:'#ff6b6b',
+                {key:'avoid',     label:'🚫 Avoid List',        active:obAvoidOnly,     color:'var(--c-coral)',
                   title:"Avoid List — Sim H<=0.6 AND SwStr%>=19% AND (same-hand OR Tough/Elite pitcher). Full-season backtest: 58-61% miss rate vs 42.6% baseline, 1.4x lift, validated cleanly train/test. Filter-only, no badge.",
                   onToggle:()=>setObAvoidOnly(v=>!v)},
-                {key:'hideavoid', label:'🙈 Hide Avoid List',   active:obHideAvoid,     color:'#ff6b6b',
+                {key:'hideavoid', label:'🙈 Hide Avoid List',   active:obHideAvoid,     color:'var(--c-coral)',
                   title:"Removes Avoid List batters from view entirely — the inverse of the Avoid List toggle above, for browsing the rest of the slate without them cluttering it.",
                   onToggle:()=>setObHideAvoid(v=>!v)},
                 {key:'picks',     label:'🎯 My Picks',          active:obPicksOnly,     color:'var(--accent2)', onToggle:()=>setObPicksOnly(v=>!v)},
                 {key:'goneyard',  label:'💥 Gone Yard Today',   active:obGoneYardOnly,  color:'var(--accent)', onToggle:()=>setObGoneYardOnly(v=>!v)},
-                {key:'tb2',       label:'2️⃣ 2+ TB Today',       active:obTB2Only,       color:'#38b8f2', onToggle:()=>setObTB2Only(v=>!v)},
+                {key:'tb2',       label:'2️⃣ 2+ TB Today',       active:obTB2Only,       color:'var(--ice)', onToggle:()=>setObTB2Only(v=>!v)},
               ]}
               pitcherGrades={obPitcherGrades}
               onPitcherGradesChange={setObPitcherGrades}
@@ -37546,7 +37602,7 @@ function OnBaseTab() {
               <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:4}}>
                 {label}
               </div>
-              <div style={{fontFamily:osw,fontSize:22,fontWeight:700,color:'#38b8f2',lineHeight:1}}>
+              <div style={{fontFamily:osw,fontSize:22,fontWeight:700,color:'var(--ice)',lineHeight:1}}>
                 {val}
               </div>
               <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:4}}>{sub}</div>
@@ -37557,7 +37613,7 @@ function OnBaseTab() {
             <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:4}}>
               LONGSHOTS
             </div>
-            <div style={{fontFamily:osw,fontSize:22,fontWeight:700,color:'#a78bfa',lineHeight:1}}>
+            <div style={{fontFamily:osw,fontSize:22,fontWeight:700,color:'var(--c-purple)',lineHeight:1}}>
               {gameRows.filter(r => r.isLongshot).length}
             </div>
             <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:4}}>Low profile, good spot</div>
@@ -37568,7 +37624,7 @@ function OnBaseTab() {
             <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:4}}>
               CHALK
             </div>
-            <div style={{fontFamily:osw,fontSize:22,fontWeight:700,color:'#f5c542',lineHeight:1}}>
+            <div style={{fontFamily:osw,fontSize:22,fontWeight:700,color:'var(--c-gold2)',lineHeight:1}}>
               {gameRows.filter(r => r.isChalk).length}
             </div>
             <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:4}}>Proven bat, soft spot</div>
@@ -37579,7 +37635,7 @@ function OnBaseTab() {
             <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:4}}>
               DAY LATE
             </div>
-            <div style={{fontFamily:osw,fontSize:22,fontWeight:700,color:'#22c1c3',lineHeight:1}}>
+            <div style={{fontFamily:osw,fontSize:22,fontWeight:700,color:'var(--c-teal)',lineHeight:1}}>
               {gameRows.filter(r => r.isDayLate).length}
             </div>
             <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:4}}>Primed twice, still due</div>
@@ -37590,7 +37646,7 @@ function OnBaseTab() {
             <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:4}}>
               SAUCE 3.0
             </div>
-            <div style={{fontFamily:osw,fontSize:22,fontWeight:700,color:'#f59e0b',lineHeight:1}}>
+            <div style={{fontFamily:osw,fontSize:22,fontWeight:700,color:'var(--c-sauce3)',lineHeight:1}}>
               {gameRows.filter(r => r.isSauce3).length}
             </div>
             <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:4}}>2.85x validated lift</div>
@@ -37601,7 +37657,7 @@ function OnBaseTab() {
             <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:4}}>
               SAUCE 2.5
             </div>
-            <div style={{fontFamily:osw,fontSize:22,fontWeight:700,color:'#eab308',lineHeight:1}}>
+            <div style={{fontFamily:osw,fontSize:22,fontWeight:700,color:'var(--c-sauce25)',lineHeight:1}}>
               {gameRows.filter(r => r.isSauce25).length}
             </div>
             <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:4}}>2.57x validated lift</div>
@@ -37612,7 +37668,7 @@ function OnBaseTab() {
             <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8,marginBottom:4}}>
               HIGH PLATE IQ
             </div>
-            <div style={{fontFamily:osw,fontSize:22,fontWeight:700,color:'#38b8f2',lineHeight:1}}>
+            <div style={{fontFamily:osw,fontSize:22,fontWeight:700,color:'var(--ice)',lineHeight:1}}>
               {gameRows.filter(r => r.plateIQ != null && r.plateIQ >= 56).length}
             </div>
             <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:4}}>Navigates modern pitching</div>
@@ -37660,8 +37716,8 @@ function OnBaseTab() {
               <div key={`${b._bid}_${b.game_id}`} style={{
                 minWidth:200,flex:'0 0 auto',
                 background:'var(--surface2)',borderRadius:8,padding:'10px 12px',
-                border:`1px solid ${b.isTBSignal ? 'rgba(56,184,242,.6)' : b.rainRiskTier==='warning' ? '#a78bfa' : 'var(--border)'}`,
-                borderLeft:`3px solid ${b.isTBSignal ? '#38b8f2' : b.rainRiskTier==='warning' ? '#a78bfa' : 'var(--border)'}`,
+                border:`1px solid ${b.isTBSignal ? 'rgba(56,184,242,.6)' : b.rainRiskTier==='warning' ? 'var(--c-purple)' : 'var(--border)'}`,
+                borderLeft:`3px solid ${b.isTBSignal ? 'var(--ice)' : b.rainRiskTier==='warning' ? 'var(--c-purple)' : 'var(--border)'}`,
                 opacity: isFinal(b.game_id) ? 0.5 : 1,
               }}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
@@ -37678,12 +37734,12 @@ function OnBaseTab() {
                       <div style={{fontFamily:mono,fontSize:7,color:pgCol(getHandSpecificGrade(b)),whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
                         vs <span
                           onClick={e=>{e.stopPropagation(); if(b.pitcher_id) openPitcherSlide({pid:parseInt(b.pitcher_id)||0,name:b.pitcher,team:'',hand:b.pitcher_hand||'',pitchMix:[]});}}
-                          style={{cursor:'pointer',textDecoration:'underline dotted'}}>{b.pitcher||'?'}</span>{isPitcherRP(b.pitcher_games_started) && <span title="Season-classified as a reliever — likely an opener/bulk-game situation" style={{fontSize:8,fontWeight:700,color:'#f5a623',marginLeft:3,marginRight:2,padding:'0 4px',borderRadius:3,background:'rgba(245,166,35,.12)',border:'1px solid rgba(245,166,35,.35)'}}>RP</span>} · {getHandSpecificGrade(b) || '—'}
+                          style={{cursor:'pointer',textDecoration:'underline dotted'}}>{b.pitcher||'?'}</span>{isPitcherRP(b.pitcher_games_started) && <span title="Season-classified as a reliever — likely an opener/bulk-game situation" style={{fontSize:8,fontWeight:700,color:'var(--accent2)',marginLeft:3,marginRight:2,padding:'0 4px',borderRadius:3,background:'rgba(245,166,35,.12)',border:'1px solid rgba(245,166,35,.35)'}}>RP</span>} · {getHandSpecificGrade(b) || '—'}
                       </div>
                     </div>
                   </div>
                   <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:4,flexShrink:0,marginLeft:6}}>
-                    <div style={{fontFamily:osw,fontSize:22,fontWeight:800,color:'#38b8f2',lineHeight:1}}>
+                    <div style={{fontFamily:osw,fontSize:22,fontWeight:800,color:'var(--ice)',lineHeight:1}}>
                       {b.onBaseScore}
                     </div>
                     <div onClick={e => e.stopPropagation()}>
@@ -37692,31 +37748,31 @@ function OnBaseTab() {
                   </div>
                 </div>
                 {b.isTBSignal && (
-                  <div style={{fontFamily:mono,fontSize:8,color:'#38b8f2',marginBottom:6}}>
+                  <div style={{fontFamily:mono,fontSize:8,color:'var(--ice)',marginBottom:6}}>
                     ★ TB Signal
                   </div>
                 )}
                 {b.isLongshot && (
-                  <div style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'#a78bfa',
+                  <div style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'var(--c-purple)',
                     letterSpacing:.6,textTransform:'uppercase',marginBottom:6}}>
                     🎲 Longshot
                   </div>
                 )}
                 {b.isChalk && (
-                  <div style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'#f5c542',
+                  <div style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'var(--c-gold2)',
                     letterSpacing:.6,textTransform:'uppercase',marginBottom:6}}>
                     💪🏽 Chalk
                   </div>
                 )}
                 {b.isDayLate && (
-                  <div style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'#22c1c3',
+                  <div style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'var(--c-teal)',
                     letterSpacing:.6,textTransform:'uppercase',marginBottom:6}}>
                     🗓️ Day Late
                   </div>
                 )}
                 {b.isYoungGun && (
                   <div title="Thin/no season track record (<100 PA) — discovery filter, NOT a hot signal. Rookie HRs skew toward fastballs (pitchers haven't scouted them yet), but as a group these batters homer LESS often per game than established ones (7.9% vs 11.5%, full 2026 season)."
-                    style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'#4ade80',
+                    style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'var(--c-younggun)',
                     letterSpacing:.6,textTransform:'uppercase',marginBottom:6}}>
                     🌱 Young Gun ({parseInt(b.season_pa||0)} PA)
                   </div>
@@ -37730,27 +37786,27 @@ function OnBaseTab() {
                 )}
                 {b.isSauce3 && (
                   <div title="Sauce 2.0 AND both L7 ISO + Arsenal Fit ISO ≥.250 — 20.26% HR rate / 2.85x lift, full 2026 season backtest."
-                    style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'#f59e0b',
+                    style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'var(--c-sauce3)',
                     letterSpacing:.6,textTransform:'uppercase',marginBottom:6}}>
                     🍯🔥 Sauce 3.0
                   </div>
                 )}
                 {b.isSauce25 && !b.isSauce3 && (
                   <div title="Sauce 2.5 — relaxed xwOBA≥.330, both ISO≥.220 — 18.24% HR rate / 2.57x lift, full 2026 season backtest."
-                    style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'#eab308',
+                    style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'var(--c-sauce25)',
                     letterSpacing:.6,textTransform:'uppercase',marginBottom:6}}>
                     🥫 Sauce 2.5
                   </div>
                 )}
                 {b.handMatchTier && (
-                  <div style={{fontFamily:mono,fontSize:8,color:'#fbbf24',marginBottom:6,
+                  <div style={{fontFamily:mono,fontSize:8,color:'var(--c-amber)',marginBottom:6,
                     opacity:b.handMatchTier==='partial'?.75:1}}>
                     {b.handMatchTier==='elite' ? '⭐⭐⭐ Elite Hand Match' : b.handMatchTier==='full' ? '⭐⭐ Hand Match' : '⭐ Partial Hand Match'}
                   </div>
                 )}
                 {b.rainRiskTier && (
                   <div title={`~${Math.round(b.rainRiskPct)}% chance during the game window${/thunder/i.test(b.condition||'')?' with thunder in the forecast':''}. Games can be delayed/postponed, and wet grip can affect contact.`}
-                    style={{fontFamily:mono,fontSize:8,color:'#a78bfa',marginBottom:6,
+                    style={{fontFamily:mono,fontSize:8,color:'var(--c-purple)',marginBottom:6,
                     fontWeight:b.rainRiskTier==='warning'?700:400}}>
                     {b.rainRiskTier==='warning' ? `⚠️ Rain Risk (${Math.round(b.rainRiskPct)}%)` : `🌧 Rain Watch (${Math.round(b.rainRiskPct)}%)`}
                   </div>
@@ -37800,7 +37856,7 @@ function OnBaseTab() {
                             title={col.title || ''}
                             style={{padding:'4px 6px',textAlign:col.align||'right',whiteSpace:'nowrap',
                               cursor:'pointer',userSelect:'none',
-                              color: col.color || (active ? '#38b8f2' : 'var(--muted)'),
+                              color: col.color || (active ? 'var(--ice)' : 'var(--muted)'),
                               background: isBatterCol ? 'var(--surface2)' : (active ? '#0f1a21' : 'var(--surface2)'),
                               borderLeft: col.divider ? '2px solid #818cf8' : undefined,
                             }}>
@@ -37827,20 +37883,20 @@ function OnBaseTab() {
                             <div style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer'}} onClick={() => openBatter(b)}>
                               <PlayerAvatar pid={b.batter_id} name={b.batter} size={22}/>
                               <span style={{color:'var(--text)'}}>
-                                {b.isTBSignal && <span title="TB Signal — OnBaseScore ≥75, MatchupScore ≥60, SimTB2% ≥30%." style={{color:'#38b8f2',marginRight:2,fontWeight:900,fontSize:7}}>★</span>}
-                                {b.isLongshot && <span title="Longshot — OnBaseScore ≤55, MatchupScore ≥65, Sim TB ≥1.2, non-elite pitcher." style={{color:'#a78bfa',marginRight:2,fontWeight:900,fontSize:7}}>🎲</span>}
-                                {b.isChalk && <span title="Chalk — real season HR leader (>=18 HR, >=.220 ISO) facing a genuinely soft matchup today." style={{color:'#f5c542',marginRight:2,fontWeight:900,fontSize:7}}>💪🏽</span>}
-                                {b.isDayLate && <span title="Day Late — a real ★ Barrel Signal on BOTH of the last 2 real game days, no HR either day, today's matchup not an outright Elite mismatch." style={{color:'#22c1c3',marginRight:2,fontWeight:900,fontSize:7}}>🗓️</span>}
-                                {b.isYoungGun && <span title={`Young Gun — ${parseInt(b.season_pa||0)} season PA. Discovery filter, not a hot signal — thin-history batters homer LESS often per game on average (7.9% vs 11.5%).`} style={{color:'#4ade80',marginRight:2,fontWeight:900,fontSize:7}}>🌱</span>}
-                                {b.isSauce3 && <span title="Sauce 3.0 — Sauce 2.0 AND both L7 ISO + Arsenal Fit ISO ≥.250. 20.26% HR rate / 2.85x lift, full 2026 season backtest (n=380). Best validated combo in this app." style={{color:'#f59e0b',marginRight:2,fontWeight:900,fontSize:7}}>🍯🔥</span>}
-                                {b.isSauce25 && !b.isSauce3 && <span title="Sauce 2.5 — relaxed xwOBA≥.330, both ISO≥.220. 18.24% HR rate / 2.57x lift, full 2026 season backtest (n=899)." style={{color:'#eab308',marginRight:2,fontWeight:900,fontSize:7}}>🥫</span>}
+                                {b.isTBSignal && <span title="TB Signal — OnBaseScore ≥75, MatchupScore ≥60, SimTB2% ≥30%." style={{color:'var(--ice)',marginRight:2,fontWeight:900,fontSize:7}}>★</span>}
+                                {b.isLongshot && <span title="Longshot — OnBaseScore ≤55, MatchupScore ≥65, Sim TB ≥1.2, non-elite pitcher." style={{color:'var(--c-purple)',marginRight:2,fontWeight:900,fontSize:7}}>🎲</span>}
+                                {b.isChalk && <span title="Chalk — real season HR leader (>=18 HR, >=.220 ISO) facing a genuinely soft matchup today." style={{color:'var(--c-gold2)',marginRight:2,fontWeight:900,fontSize:7}}>💪🏽</span>}
+                                {b.isDayLate && <span title="Day Late — a real ★ Barrel Signal on BOTH of the last 2 real game days, no HR either day, today's matchup not an outright Elite mismatch." style={{color:'var(--c-teal)',marginRight:2,fontWeight:900,fontSize:7}}>🗓️</span>}
+                                {b.isYoungGun && <span title={`Young Gun — ${parseInt(b.season_pa||0)} season PA. Discovery filter, not a hot signal — thin-history batters homer LESS often per game on average (7.9% vs 11.5%).`} style={{color:'var(--c-younggun)',marginRight:2,fontWeight:900,fontSize:7}}>🌱</span>}
+                                {b.isSauce3 && <span title="Sauce 3.0 — Sauce 2.0 AND both L7 ISO + Arsenal Fit ISO ≥.250. 20.26% HR rate / 2.85x lift, full 2026 season backtest (n=380). Best validated combo in this app." style={{color:'var(--c-sauce3)',marginRight:2,fontWeight:900,fontSize:7}}>🍯🔥</span>}
+                                {b.isSauce25 && !b.isSauce3 && <span title="Sauce 2.5 — relaxed xwOBA≥.330, both ISO≥.220. 18.24% HR rate / 2.57x lift, full 2026 season backtest (n=899)." style={{color:'var(--c-sauce25)',marginRight:2,fontWeight:900,fontSize:7}}>🥫</span>}
                                 {b.handMatchTier && <span
                                   title={b.handMatchTier==='elite'
                                     ? `Elite Hand Match — ${b.pitcher||'this pitcher'} (${(b.pitcher_hand||'?').charAt(0)}HP) is genuinely weak vs ${b.batter_hand||'?'}HB, ${b.batter} has strong arsenal fit (ps_convergence=${fmt(b.ps_convergence,1)}${b.ps_conv_pitch ? ', best pitch: '+b.ps_conv_pitch : ''}), AND an elite ${fmt(b.vs_hand_hr_rate,1)}% HR rate vs that hand. Diamond in the rough.`
                                     : b.handMatchTier==='full'
                                     ? `Hand Match — ${b.pitcher||'this pitcher'} (${(b.pitcher_hand||'?').charAt(0)}HP) is genuinely weak vs ${b.batter_hand||'?'}HB, and ${b.batter} has hit that hand well. Platoon + weakness compound.`
                                     : `Partial Hand Match — cross-handed matchup with strong arsenal fit (ps_convergence=${fmt(b.ps_convergence,1)}${b.ps_conv_pitch ? ', best pitch: '+b.ps_conv_pitch : ''}) even though the pitcher's overall vs-hand rates aren't clearly weak yet.`}
-                                  style={{color:'#fbbf24',marginRight:2,fontWeight:900,fontSize:7,opacity:b.handMatchTier==='partial'?.6:1}}>
+                                  style={{color:'var(--c-amber)',marginRight:2,fontWeight:900,fontSize:7,opacity:b.handMatchTier==='partial'?.6:1}}>
                                   {b.handMatchTier==='elite' ? '⭐⭐⭐' : b.handMatchTier==='full' ? '⭐⭐' : '⭐'}
                                 </span>}
                                 {b.rainRiskTier==='warning' && <span
@@ -37859,7 +37915,7 @@ function OnBaseTab() {
                                 <div title="2+ TB Today — this batter has already reached 2+ total bases today (without a HR)."
                                   style={{padding:'2px 6px',borderRadius:4,flexShrink:0,
                                   background:'rgba(56,184,242,.20)',border:'1px solid rgba(56,184,242,.4)',
-                                  color:'#38b8f2',fontFamily:"'DM Mono',monospace",
+                                  color:'var(--ice)',fontFamily:"'DM Mono',monospace",
                                   fontWeight:800,fontSize:7,letterSpacing:.5}}>2️⃣</div>
                               )}
                               {b.ballStateBadge && (
@@ -37873,7 +37929,7 @@ function OnBaseTab() {
                             </div>
                           </td>
                           {!selGame && <td style={{padding:'4px 6px',color:'var(--muted)',fontFamily:mono,fontSize:8,whiteSpace:'nowrap',cursor:b.pitcher_id?'pointer':'default',textDecoration:b.pitcher_id?'underline dotted':'none'}}
-                            onClick={()=>{ if(b.pitcher_id) openPitcherSlide({pid:parseInt(b.pitcher_id)||0,name:b.pitcher,team:'',hand:b.pitcher_hand||'',pitchMix:[]}); }}>{b.pitcher||'—'}{isPitcherRP(b.pitcher_games_started) && <span title="Season-classified as a reliever — likely an opener/bulk-game situation" style={{fontSize:7,fontWeight:700,color:'#f5a623',marginLeft:3,padding:'0 3px',borderRadius:3,background:'rgba(245,166,35,.12)',border:'1px solid rgba(245,166,35,.35)'}}>RP</span>}</td>}
+                            onClick={()=>{ if(b.pitcher_id) openPitcherSlide({pid:parseInt(b.pitcher_id)||0,name:b.pitcher,team:'',hand:b.pitcher_hand||'',pitchMix:[]}); }}>{b.pitcher||'—'}{isPitcherRP(b.pitcher_games_started) && <span title="Season-classified as a reliever — likely an opener/bulk-game situation" style={{fontSize:7,fontWeight:700,color:'var(--accent2)',marginLeft:3,padding:'0 3px',borderRadius:3,background:'rgba(245,166,35,.12)',border:'1px solid rgba(245,166,35,.35)'}}>RP</span>}</td>}
                           {!selGame && (() => { const _g = getHandSpecificGrade(b); return (
                             <td style={{padding:'4px 6px',color:pgCol(_g),fontFamily:mono,fontSize:8,whiteSpace:'nowrap'}}>{_g || '—'}</td>
                           ); })()}
@@ -37956,8 +38012,8 @@ function OnBaseTab() {
                   {team} hitters vs <span
                     onClick={()=>{ if(pitcherId) openPitcherSlide({pid:parseInt(pitcherId)||0,name:pitcher,team:'',hand:pitcherHand||'',pitchMix:[]}); }}
                     style={{cursor: pitcherId ? 'pointer' : 'default', textDecoration: pitcherId ? 'underline dotted' : 'none'}}>{pitcher || '?'}</span> ({(pitcherHand||'').charAt(0)})
-                  {isPitcherRP(pitcherGS) && <span title="Season-classified as a reliever — likely an opener/bulk-game situation" style={{fontSize:8,fontWeight:700,color:'#f5a623',marginLeft:5,padding:'0 4px',borderRadius:3,background:'rgba(245,166,35,.12)',border:'1px solid rgba(245,166,35,.35)'}}>RP</span>}
-                  {' · '}<span style={{color: pgLabel.includes('Elite')||pgLabel.includes('Tough') ? '#ff6b6b' : pgLabel.includes('Target')||pgLabel.includes('Hittable') ? '#27c97a' : 'var(--muted)'}}>{pgLabel}</span>
+                  {isPitcherRP(pitcherGS) && <span title="Season-classified as a reliever — likely an opener/bulk-game situation" style={{fontSize:8,fontWeight:700,color:'var(--accent2)',marginLeft:5,padding:'0 4px',borderRadius:3,background:'rgba(245,166,35,.12)',border:'1px solid rgba(245,166,35,.35)'}}>RP</span>}
+                  {' · '}<span style={{color: pgLabel.includes('Elite')||pgLabel.includes('Tough') ? 'var(--c-coral)' : pgLabel.includes('Target')||pgLabel.includes('Hittable') ? 'var(--green)' : 'var(--muted)'}}>{pgLabel}</span>
                 </div>
                 {renderTable(sortBatters(tBatters))}
               </div>
@@ -38350,7 +38406,7 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
       </div>
       <div style={{display:'flex',gap:16,flexWrap:'wrap',alignItems:'flex-start'}}>
 
-        <Section emoji="💥" title="HR Candidates" color="#ff4020">
+        <Section emoji="💥" title="HR Candidates" color="var(--c-danger)">
           <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',marginBottom:6,
             padding:'3px 6px',background:'rgba(232,65,26,.06)',borderRadius:4,
             letterSpacing:.3}}>Yard + Sig + SimTB + Grade + Pitcher — stacked signals</div>
@@ -38367,7 +38423,7 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
           ))}
         </Section>
 
-        <Section emoji="🎯" title="Top Starting Pitchers to Attack" color="#ff4020">
+        <Section emoji="🎯" title="Top Starting Pitchers to Attack" color="var(--c-danger)">
           <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',marginBottom:6,
             padding:'3px 6px',background:'rgba(255,64,32,.06)',borderRadius:4,
             letterSpacing:.3}}>Season HR/9, weighted to today's actual opposing lineup by hand</div>
@@ -38386,7 +38442,7 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
           })}
         </Section>
 
-        <Section emoji="🎯" title="2+ Bases" color="#f5a623">
+        <Section emoji="🎯" title="2+ Bases" color="var(--accent2)">
           <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',marginBottom:6,
             padding:'3px 6px',background:'rgba(245,166,35,.06)',borderRadius:4,
             letterSpacing:.3}}>Ranked by L7 rate × Sim TB × Sig — not just recent history</div>
@@ -38402,7 +38458,7 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
           ))}
         </Section>
 
-        <Section emoji="⚾" title="Hit Machines" color="#27c97a">
+        <Section emoji="⚾" title="Hit Machines" color="var(--green)">
           <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',marginBottom:6,
             padding:'3px 6px',background:'rgba(39,201,122,.06)',borderRadius:4,
             letterSpacing:.3}}>Ranked by L7 rate × Sim H × Sig — Sim H is the #1 hit predictor</div>
@@ -38418,7 +38474,7 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
           ))}
         </Section>
 
-        <Section emoji="🤏" title="Close Calls" color="#60d360">
+        <Section emoji="🤏" title="Close Calls" color="var(--c-lime)">
           {top5Close.length===0
             ?<div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',padding:12}}>No close calls found</div>
             :top5Close.map((r,i)=>(
@@ -38431,7 +38487,7 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
           ))}
         </Section>
 
-        <Section emoji="🚀" title="Avg Exit Velo" color="#a855f7">
+        <Section emoji="🚀" title="Avg Exit Velo" color="var(--c-violet)">
           {top5EV.length===0
             ?<div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',padding:12}}>No EV data yet</div>
             :top5EV.map((r,i)=>(
@@ -38517,18 +38573,18 @@ function ContactSlideout({ onClose }) {
           {/* From field — required */}
           <div>
             <label style={{fontFamily:mono,fontSize:8,color:'var(--muted)',display:'block',marginBottom:4}}>
-              FROM <span style={{color:'#ff4020'}}>*</span>
+              FROM <span style={{color:'var(--c-danger)'}}>*</span>
             </label>
             <input value={from_} onChange={e=>setFrom(e.target.value)}
               placeholder="your@email.com"
               type="email"
               required
               style={{width:'100%',padding:'8px 10px',borderRadius:6,
-                border:`1px solid ${from_&&!/^[^@]+@[^@]+\.[^@]+$/.test(from_)?'#ff4020':'var(--border)'}`,
+                border:`1px solid ${from_&&!/^[^@]+@[^@]+\.[^@]+$/.test(from_)?'var(--c-danger)':'var(--border)'}`,
                 background:'var(--surface2)',color:'var(--text)',fontFamily:mono,fontSize:9,
                 outline:'none',boxSizing:'border-box'}}/>
             {from_&&!/^[^@]+@[^@]+\.[^@]+$/.test(from_)&&(
-              <div style={{fontFamily:mono,fontSize:7,color:'#ff4020',marginTop:3}}>Please enter a valid email</div>
+              <div style={{fontFamily:mono,fontSize:7,color:'var(--c-danger)',marginTop:3}}>Please enter a valid email</div>
             )}
           </div>
 
@@ -38831,10 +38887,10 @@ function StreaksTab() {
       <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginBottom:10,display:'flex',gap:12,alignItems:'center'}}>
         <span>Each box = 1 game · most recent on right</span>
         <span style={{display:'flex',alignItems:'center',gap:4}}>
-          <span style={{width:12,height:12,borderRadius:2,background:'#27c97a',display:'inline-block'}}/>✅ success
+          <span style={{width:12,height:12,borderRadius:2,background:'var(--green)',display:'inline-block'}}/>✅ success
         </span>
         <span style={{display:'flex',alignItems:'center',gap:4}}>
-          <span style={{width:12,height:12,borderRadius:2,background:'#ff4020',display:'inline-block'}}/>❌ break
+          <span style={{width:12,height:12,borderRadius:2,background:'var(--c-danger)',display:'inline-block'}}/>❌ break
         </span>
       </div>
 
@@ -38875,7 +38931,7 @@ function StreaksTab() {
                   <div key={i}
                     data-tip={`${b.date||''} vs ${b.opp||''} — ${b.success?cat.label:'no '+cat.label}`}
                     style={{width:14,height:14,borderRadius:2,flexShrink:0,
-                      background:b.success?'#27c97a':'#ff4020',
+                      background:b.success?'var(--green)':'var(--c-danger)',
                       opacity:b.success?1:0.7}}/>
                 ))}
               </div>
@@ -38896,6 +38952,29 @@ function StreaksTab() {
 export default function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [tab, setTab] = useState("home");
+  // Theme: 'light' | 'dark' | null (null = follow OS/browser prefers-color-scheme).
+  // Persisted explicitly only when the user picks light/dark via the toggle --
+  // localStorage absence means "still following system," matching the
+  // @media(prefers-color-scheme) block in `styles` above.
+  const [theme, setTheme] = useState(() => {
+    try { return localStorage.getItem('gy_theme') || null; } catch { return null; }
+  });
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme) root.setAttribute('data-theme', theme);
+    else root.removeAttribute('data-theme');
+  }, [theme]);
+  const cycleTheme = useCallback(() => {
+    setTheme(prev => {
+      // system -> light -> dark -> system
+      const next = prev === null ? 'light' : prev === 'light' ? 'dark' : null;
+      try {
+        if (next) localStorage.setItem('gy_theme', next);
+        else localStorage.removeItem('gy_theme');
+      } catch {}
+      return next;
+    });
+  }, []);
   const [newVersionAvailable, setNewVersionAvailable] = useState(false);
   const [newVersionChangelog, setNewVersionChangelog] = useState([]);
   // Dismiss is session-only — a ref (not state) so the 12-min poll's stale
@@ -39109,7 +39188,7 @@ export default function App() {
                 window.location.reload(true);
               }}
               style={{
-                background:'#fff', color:'#ff4020', border:'none',
+                background:'#fff', color:'var(--c-danger)', border:'none',
                 borderRadius:6, padding:'6px 14px', cursor:'pointer',
                 fontFamily:"'Oswald',sans-serif", fontWeight:700,
                 fontSize:11, letterSpacing:.5, textTransform:'uppercase',
@@ -39147,6 +39226,13 @@ export default function App() {
         </div>
         <div style={{display:"flex",alignItems:"center",gap:5}}> 
           <DataStatusBadge/>
+          <button onClick={cycleTheme}
+            title={theme===null ? "Theme: Auto (matches your device) — tap for Light" : theme==='light' ? "Theme: Light — tap for Dark" : "Theme: Dark — tap for Auto"}
+            style={{padding:"3px 6px",borderRadius:6,border:"1px solid var(--border)",
+              background:"var(--surface2)",cursor:"pointer",fontSize:14,lineHeight:1,
+              display:"flex",alignItems:"center",flexShrink:0}}>
+            {theme===null ? '🌗' : theme==='light' ? '☀️' : '🌙'}
+          </button>
           <NotificationBell/>
           <LegendButton/>
           <button onClick={()=>setShowPicksSlideout(s=>!s)}
