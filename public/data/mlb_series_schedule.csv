@@ -1,31 +1,31 @@
 Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitcher ID (Away),Game ID,Venue ID,Venue Name,Day of Week,Day Abbr,Series Game #,Games in Series,Series Position,Day Context
-2026-09-15,06:40 PM,CIN,LAD,695076.0,808967.0,824466,2602,Great American Ball Park,Tuesday,Tue,2,4,Middle,⚠️ Weakest Day
-2026-09-15,06:40 PM,TB,ATH,643377.0,678022.0,822925,12,Tropicana Field,Tuesday,Tue,1,3,Opener,⚠️ Weakest Day
-2026-09-15,06:40 PM,CLE,CWS,656492.0,663436.0,824384,5,Progressive Field,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
-2026-09-15,06:40 PM,PIT,MIL,669199.0,694819.0,823333,31,PNC Park,Tuesday,Tue,1,3,Opener,⚠️ Weakest Day
-2026-09-15,06:45 PM,WSH,PHI,800600.0,650911.0,822683,3309,Nationals Park,Tuesday,Tue,1,2,Opener,⚠️ Weakest Day
-2026-09-15,07:07 PM,TOR,DET,680755.0,623454.0,822762,14,Rogers Centre,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
-2026-09-15,07:10 PM,NYM,BAL,640455.0,669358.0,823574,3289,Citi Field,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
-2026-09-15,07:40 PM,CHC,ATL,592332.0,527048.0,824627,17,Wrigley Field,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
-2026-09-15,07:40 PM,MIN,NYY,641927.0,608331.0,823654,3312,Target Field,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
-2026-09-15,07:45 PM,STL,SF,669467.0,694918.0,823007,2889,Busch Stadium,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
-2026-09-15,08:05 PM,TEX,BOS,,663776.0,822849,5325,Globe Life Field,Tuesday,Tue,1,3,Opener,⚠️ Weakest Day
-2026-09-15,08:10 PM,HOU,KC,686613.0,608379.0,824143,2392,Daikin Park,Tuesday,Tue,1,3,Opener,⚠️ Weakest Day
-2026-09-15,08:40 PM,COL,SD,607536.0,621111.0,824307,19,Coors Field,Tuesday,Tue,2,4,Middle,⚠️ Weakest Day
-2026-09-15,09:38 PM,LAA,SEA,696270.0,669302.0,823980,1,Angel Stadium,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
-2026-09-15,09:40 PM,AZ,MIA,647336.0,676083.0,825030,15,Chase Field,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
-2026-09-16,01:10 PM,CLE,CWS,800048.0,,824382,5,Progressive Field,Wednesday,Wed,3,3,Finale,~ Neutral
-2026-09-16,01:15 PM,STL,SF,669461.0,,823004,2889,Busch Stadium,Wednesday,Wed,3,3,Finale,~ Neutral
-2026-09-16,01:40 PM,MIN,NYY,805673.0,607074.0,823655,3312,Target Field,Wednesday,Wed,3,3,Finale,~ Neutral
-2026-09-16,03:07 PM,TOR,DET,453286.0,672456.0,822763,14,Rogers Centre,Wednesday,Wed,3,3,Finale,~ Neutral
-2026-09-16,06:40 PM,CIN,LAD,671096.0,605483.0,824467,2602,Great American Ball Park,Wednesday,Wed,3,4,Middle,~ Neutral
-2026-09-16,06:40 PM,TB,ATH,607259.0,669620.0,822926,12,Tropicana Field,Wednesday,Wed,2,3,Middle,~ Neutral
-2026-09-16,06:40 PM,PIT,MIL,683003.0,701656.0,823332,31,PNC Park,Wednesday,Wed,2,3,Middle,~ Neutral
-2026-09-16,06:45 PM,WSH,PHI,676917.0,554430.0,822680,3309,Nationals Park,Wednesday,Wed,2,2,Finale,~ Neutral
-2026-09-16,07:10 PM,NYM,BAL,476594.0,605135.0,823576,3289,Citi Field,Wednesday,Wed,3,3,Finale,~ Neutral
-2026-09-16,07:40 PM,CHC,ATL,684007.0,702275.0,824626,17,Wrigley Field,Wednesday,Wed,3,3,Finale,~ Neutral
-2026-09-16,08:05 PM,TEX,BOS,,687562.0,822846,5325,Globe Life Field,Wednesday,Wed,2,3,Middle,~ Neutral
-2026-09-16,08:10 PM,HOU,KC,664299.0,663738.0,824140,2392,Daikin Park,Wednesday,Wed,2,3,Middle,~ Neutral
-2026-09-16,08:40 PM,COL,SD,690279.0,592662.0,824306,19,Coors Field,Wednesday,Wed,3,4,Middle,~ Neutral
-2026-09-16,09:38 PM,LAA,SEA,579328.0,669923.0,823979,1,Angel Stadium,Wednesday,Wed,3,3,Finale,~ Neutral
-2026-09-16,09:40 PM,AZ,MIA,518876.0,687473.0,825031,15,Chase Field,Wednesday,Wed,3,3,Finale,~ Neutral
+2026-09-15,06:40 PM,CIN,LAD,695076,808967.0,824466,2602,Great American Ball Park,Tuesday,Tue,2,4,Middle,⚠️ Weakest Day
+2026-09-15,06:40 PM,TB,ATH,643377,678022.0,822925,12,Tropicana Field,Tuesday,Tue,1,3,Opener,⚠️ Weakest Day
+2026-09-15,06:40 PM,CLE,CWS,656492,669684.0,824384,5,Progressive Field,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
+2026-09-15,06:40 PM,PIT,MIL,669199,694819.0,823333,31,PNC Park,Tuesday,Tue,1,3,Opener,⚠️ Weakest Day
+2026-09-15,06:45 PM,WSH,PHI,800600,650911.0,822683,3309,Nationals Park,Tuesday,Tue,1,2,Opener,⚠️ Weakest Day
+2026-09-15,07:07 PM,TOR,DET,680755,623454.0,822762,14,Rogers Centre,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
+2026-09-15,07:10 PM,NYM,BAL,640455,669358.0,823574,3289,Citi Field,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
+2026-09-15,07:40 PM,CHC,ATL,592332,527048.0,824627,17,Wrigley Field,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
+2026-09-15,07:40 PM,MIN,NYY,641927,608331.0,823654,3312,Target Field,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
+2026-09-15,07:45 PM,STL,SF,669467,694918.0,823007,2889,Busch Stadium,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
+2026-09-15,08:05 PM,TEX,BOS,594798,663776.0,822849,5325,Globe Life Field,Tuesday,Tue,1,3,Opener,⚠️ Weakest Day
+2026-09-15,08:10 PM,HOU,KC,686613,608379.0,824143,2392,Daikin Park,Tuesday,Tue,1,3,Opener,⚠️ Weakest Day
+2026-09-15,08:40 PM,COL,SD,607536,621111.0,824307,19,Coors Field,Tuesday,Tue,2,4,Middle,⚠️ Weakest Day
+2026-09-15,09:38 PM,LAA,SEA,696270,669302.0,823980,1,Angel Stadium,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
+2026-09-15,09:40 PM,AZ,MIA,647336,676083.0,825030,15,Chase Field,Tuesday,Tue,2,3,Middle,⚠️ Weakest Day
+2026-09-16,01:10 PM,CLE,CWS,800048,,824382,5,Progressive Field,Wednesday,Wed,3,3,Finale,~ Neutral
+2026-09-16,01:15 PM,STL,SF,669461,,823004,2889,Busch Stadium,Wednesday,Wed,3,3,Finale,~ Neutral
+2026-09-16,01:40 PM,MIN,NYY,805673,607074.0,823655,3312,Target Field,Wednesday,Wed,3,3,Finale,~ Neutral
+2026-09-16,03:07 PM,TOR,DET,453286,672456.0,822763,14,Rogers Centre,Wednesday,Wed,3,3,Finale,~ Neutral
+2026-09-16,06:40 PM,CIN,LAD,671096,605483.0,824467,2602,Great American Ball Park,Wednesday,Wed,3,4,Middle,~ Neutral
+2026-09-16,06:40 PM,TB,ATH,607259,669620.0,822926,12,Tropicana Field,Wednesday,Wed,2,3,Middle,~ Neutral
+2026-09-16,06:40 PM,PIT,MIL,683003,701656.0,823332,31,PNC Park,Wednesday,Wed,2,3,Middle,~ Neutral
+2026-09-16,06:45 PM,WSH,PHI,676917,554430.0,822680,3309,Nationals Park,Wednesday,Wed,2,2,Finale,~ Neutral
+2026-09-16,07:10 PM,NYM,BAL,476594,605135.0,823576,3289,Citi Field,Wednesday,Wed,3,3,Finale,~ Neutral
+2026-09-16,07:40 PM,CHC,ATL,684007,702275.0,824626,17,Wrigley Field,Wednesday,Wed,3,3,Finale,~ Neutral
+2026-09-16,08:05 PM,TEX,BOS,669022,687562.0,822846,5325,Globe Life Field,Wednesday,Wed,2,3,Middle,~ Neutral
+2026-09-16,08:10 PM,HOU,KC,664299,663738.0,824140,2392,Daikin Park,Wednesday,Wed,2,3,Middle,~ Neutral
+2026-09-16,08:40 PM,COL,SD,690279,592662.0,824306,19,Coors Field,Wednesday,Wed,3,4,Middle,~ Neutral
+2026-09-16,09:38 PM,LAA,SEA,579328,669923.0,823979,1,Angel Stadium,Wednesday,Wed,3,3,Finale,~ Neutral
+2026-09-16,09:40 PM,AZ,MIA,518876,687473.0,825031,15,Chase Field,Wednesday,Wed,3,3,Finale,~ Neutral
