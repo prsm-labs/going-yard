@@ -1,24 +1,43 @@
 // api/batter-scouting-note.js — Scouting Note (2026-08-03)
 //
-// Computes verified recent-form stats for a batter against TODAY's opposing
-// pitcher's real arsenal (last-10 real batted-ball events, per-pitch-type
-// FB%, and at-bats vs that mix in games matching TODAY's actual day/night +
-// home/away context, with their literal distances), then asks Claude to
-// phrase those EXACT numbers into a short scouting note. Claude never
-// computes or invents a single number here — every figure in the prompt is
-// pre-verified server-side by this endpoint, the same discipline every
-// other stat in this app already follows, since this feeds a real
-// betting-decision surface (AtBatSlideIn's collapsed "Scouting Note"
-// section).
+// REWORK (2026-09-15): the original design anchored the whole note on
+// RECENT real batted-ball data (last-10 events, per-pitch-type recent FB%,
+// and recent at-bats vs the pitcher's mix matched to today's day/night +
+// home/away context). Subsequent research (the 2026-09-03/09-06 Top ISO /
+// Prime ISO backtests, and consistent with this project's much older
+// gHR-lag-echo and recent-vs-season-weighting findings) found recent/L7
+// batted-ball data carries little to no standalone HR correlation, while
+// Arsenal Fit — the batter's SEASON-LONG performance specifically vs this
+// pitcher's real pitch mix + handedness, already computed by the engine as
+// bvp_iso/bvp_avg_ev/bvp_barrel_pct/ps_convergence and exported to
+// daily_picks.csv — is the dominant, validated signal. The note is now
+// anchored on Arsenal Fit (client-supplied straight from the daily_picks.csv
+// row already in hand, per the same pattern the weather fields already use
+// below — no new server-side fetch), with recent batted-ball mechanics kept
+// only as an explicitly-subordinated "recent form" side note, never the
+// note's main analytical claim. The recent-games "vs this mix, matched to
+// today's context" distance citation (matchTieredContext(), the most
+// literally "recent batted ball vs mix" piece of the old design) is removed
+// outright — it's now redundant with, and weaker than, the real season-long
+// bvp_iso/ps_convergence numbers.
+//
+// Computes verified stats for a batter against today's opposing pitcher,
+// then asks Claude to phrase those EXACT numbers into a short scouting
+// note. Claude never computes or invents a single number here — every
+// figure in the prompt is pre-verified server-side (or client-supplied from
+// an already-verified source), the same discipline every other stat in
+// this app already follows, since this feeds a real betting-decision
+// surface (AtBatSlideIn's collapsed "Scouting Note" section).
 //
 // Day/night + home/away (2026-08-03, same-day follow-up): the first version
 // hardcoded "night" — correct by coincidence for that day's two validation
 // matchups (both real night games), but wrong in general (day games happen
 // every week) and ignored home/away entirely. Fixed by resolving TODAY's
 // real game context (both dimensions) and matching recent at-bats against
-// it with a tiered fallback (see matchTieredContext()) rather than a fixed
-// filter — a batter with a thin same-context sample still gets a real
-// answer, just at a looser (and honestly-labeled) tier instead of silence.
+// it with a tiered fallback (matchTieredContext(), removed 2026-09-15 — see
+// the file-header rework note) rather than a fixed filter — a batter with a
+// thin same-context sample still got a real answer, just at a looser (and
+// honestly-labeled) tier instead of silence.
 //
 // Weather/park factor (2026-08-09): user asked directly whether these were
 // factored in — they weren't (confirmed via grep, zero mentions anywhere in
@@ -29,19 +48,28 @@
 // (hot + hitter's park, strong wind out, or a dome making it irrelevant)
 // rather than padding every note with an unremarkable forecast.
 //
-// Data sources — all MLB Stats API, no Baseball Savant scraping needed:
+// Data sources:
+//   - Arsenal Fit (bvpPa/bvpIso/bvpAvgEv/bvpBarrelPct/bvpFbPct/bvpHrCount/
+//     psConvergence/psConvPitch) — CLIENT-SUPPLIED, straight off the exact
+//     daily_picks.csv row already open in the caller's batter slideout (the
+//     same client-already-has-it pattern the weather fields below use). No
+//     server fetch or CSV re-parse needed — this is only available when the
+//     batter is today's real probable-starter matchup; absent for a
+//     historical/non-slate lookup, in which case the note falls back to
+//     recent form alone (see computeRecentStats()'s gate in handler()).
 //   - schedule?gamePk={id}             → TODAY's real dayNight + home/away
 //     team IDs, for the one specific game this slideout is about (cheap —
-//     lighter than a full feed/live pull for just this one flag).
-//   - people/{id}/stats?stats=gameLog  → batter's recent games
+//     lighter than a full feed/live pull for just this one flag). Still
+//     used for the weather-line day/night label even though the recent-
+//     batted-ball mix-matching that originally needed it is gone.
+//   - people/{id}/stats?stats=gameLog  → batter's recent games (secondary/
+//     demoted "recent form" side note only, see the rework note above)
 //   - game/{gamePk}/feed/live          → real batted-ball events (hitData)
-//     PLUS gameData.datetime.dayNight for free, same response — no
-//     separate schedule join needed for the RECENT games (confirmed live
-//     2026-08-03). Home/away per event comes from about.isTopInning (top =
-//     away team batting, bottom = home team batting) — no team-ID
-//     comparison needed either.
+//     PLUS gameData.datetime.dayNight for free, same response. Home/away
+//     per event comes from about.isTopInning.
 //   - people/{id}/stats?stats=pitchArsenal → pitcher's real pitch mix
-//     (same endpoint api/pitcher.js already uses).
+//     (same endpoint api/pitcher.js already uses) — still reported in the
+//     note as context on what the batter's being fit against.
 //
 // Barrel is approximated from EV+LA using the same widened-EV-scaled
 // formula mlbdata_yesterday.py falls back to when Statcast's own
@@ -342,11 +370,16 @@ async function isTodaysTop4(batterId, pitcherId) {
 }
 
 const H = { 'User-Agent': 'Mozilla/5.0' };
-const MIN_BBE = 8;        // below this, decline to generate — too thin a sample to say anything
-const RECENT_N = 10;      // "L10 BBE" headline window
-const POOL_GAMES = 25;    // recent games scanned for the larger per-pitch-type / night-vs-mix pool
-const MIN_PITCH_PA = 3;   // minimum batted balls vs a single pitch type before reporting its FB%
+const MIN_BBE = 8;        // recent-form side note needs at least this many recent BBEs to report
+const RECENT_N = 10;      // "L10 BBE" recent-form window
+const POOL_GAMES = 25;    // recent games scanned for the L10 recent-form pool
 const MIN_ARSENAL_PCT = 0.08; // pitcher's real mix = pitches thrown >=8% of the time
+// Arsenal Fit sample-size trust floor — mirrors App.jsx's own
+// MIN_BVP_PA_TRUST (2026-07-28), which itself mirrors the engine's
+// MIN_PA_BVP_RATED (8 PA). Below this, the Arsenal Fit numbers are still
+// reported (never hidden — same "show it, flag it" convention this app
+// always uses for thin samples) but explicitly labeled thin.
+const MIN_BVP_PA_TRUST = 8;
 
 function getETDateStr() {
   const et = new Date().toLocaleString('en-US', { timeZone: 'America/New_York' });
@@ -445,44 +478,16 @@ async function fetchPitcherArsenal(pitcherId, season) {
     .filter(p => p.code);
 }
 
-// Tiered fallback for the "vs this mix, in a context like today's game"
-// citation. Requiring BOTH day/night AND home/away to match today can
-// starve the sample (home/away alone roughly halves it on top of whatever
-// day/night already cut) — so this tries the most specific match first and
-// only loosens when the strict tier comes up thin, always labeling which
-// tier actually produced the numbers so the note never overstates how
-// context-matched the citation really is.
-function matchTieredContext(events, arsenalCodes, todayDayNight, isHomeToday) {
-  const base = events.filter(e => arsenalCodes.includes(e.pitchType) && (e.dist || 0) >= 150);
-  const tiers = [];
-  if (todayDayNight != null && isHomeToday != null) {
-    tiers.push({ label: `${todayDayNight} games, ${isHomeToday ? 'home' : 'away'}`,
-      pool: base.filter(e => e.dayNight === todayDayNight && e.isHome === isHomeToday) });
-  }
-  if (todayDayNight != null) {
-    tiers.push({ label: `${todayDayNight} games (any venue)`,
-      pool: base.filter(e => e.dayNight === todayDayNight) });
-  }
-  if (isHomeToday != null) {
-    tiers.push({ label: `${isHomeToday ? 'home' : 'away'} games (any time of day)`,
-      pool: base.filter(e => e.isHome === isHomeToday) });
-  }
-  tiers.push({ label: 'any recent game', pool: base });
-
-  for (const t of tiers) {
-    if (t.pool.length >= 3) {
-      return { label: t.label, distances: t.pool.slice(0, 8).map(e => Math.round(e.dist || 0)) };
-    }
-  }
-  // Nothing hit the 3-event floor at any tier — return the loosest pool
-  // anyway (even 1-2 real data points), honestly labeled as thin.
-  const loosest = tiers[tiers.length - 1];
-  return { label: loosest.label + ' (thin sample)', distances: loosest.pool.slice(0, 8).map(e => Math.round(e.dist || 0)) };
-}
-
-function computeStats(events, batterHand, pitcherHand, arsenal, todayContext) {
+// Recent-form side note (DEMOTED, 2026-09-15 — see the file-header rework
+// comment). General "is this batter hot or cold right now" contact-quality
+// context only — NOT matched to the opposing pitcher's specific mix (that
+// citation, matchTieredContext(), was removed outright: it was the most
+// literally "recent batted-ball data vs the mix" piece of the old design,
+// and research found that exact class of data carries little standalone
+// HR signal). Returns null below MIN_BBE — a thin recent-form sample simply
+// means the note leans on Arsenal Fit alone, not that it should be refused.
+function computeRecentStats(events, batterHand, pitcherHand) {
   if (events.length < MIN_BBE) return null;
-  const arsenalCodes = arsenal.map(a => a.code);
 
   // Switch hitters ('S') bat from the side OPPOSITE the opposing pitcher's
   // throwing hand for this specific matchup — resolve to a real L/R before
@@ -505,44 +510,55 @@ function computeStats(events, batterHand, pitcherHand, arsenal, todayContext) {
   }).length / l10.length);
   const farBallCount = l10.filter(e => (e.dist || 0) >= 350).length;
 
-  const byPitchFB = [];
-  for (const a of arsenal) {
-    const sub = events.filter(e => e.pitchType === a.code);
-    if (sub.length >= MIN_PITCH_PA) {
-      byPitchFB.push({
-        pitch: a.name, code: a.code, usagePct: a.pct, n: sub.length,
-        fbPct: Math.round(100 * sub.filter(e => e.trajectory === 'fly_ball').length / sub.length),
-      });
-    }
-  }
+  return { l10BBE: l10.length, barrelPct, fbPct, pullPct, farBallCount, poolSize: events.length };
+}
 
-  // Matched to TODAY's real day/night + home/away context, not a fixed
-  // "night" filter — see matchTieredContext()'s own comment for the tiered-
-  // fallback rationale. Distance floor (150ft) unchanged from the original
-  // fix: keeps real fly/line-drive contact, drops dribbler/foul-tip noise.
-  const mixContext = matchTieredContext(
-    events, arsenalCodes, todayContext?.dayNight ?? null, todayContext?.isHomeToday ?? null);
-
+// Arsenal Fit — the PRIMARY, validated data block (2026-09-15 rework, see
+// file header). Client-supplied straight off the daily_picks.csv row
+// already open in the caller's slideout (bvp_pa/bvp_iso/bvp_avg_ev/
+// bvp_barrel_pct/bvp_fb_pct/bvp_hr_count/ps_convergence/ps_conv_pitch —
+// exact field names confirmed against App.jsx's own OB_COLS/ARSENAL_FIT_COLS
+// usage before wiring this). Returns null when the fields aren't present at
+// all (e.g. a historical/non-slate lookup where this batter isn't today's
+// real probable-starter matchup) rather than fabricating zeros.
+function buildArsenalFit({ bvpPa, bvpIso, bvpAvgEv, bvpBarrelPct, bvpFbPct, bvpHrCount, psConvergence, psConvPitch }) {
+  const pa = parseInt(bvpPa);
+  if (!Number.isFinite(pa) || pa <= 0) return null;
   return {
-    l10BBE: l10.length, barrelPct, fbPct, pullPct, farBallCount,
-    byPitchFB, mixContextLabel: mixContext.label, mixContextDistances: mixContext.distances,
-    poolSize: events.length,
+    pa,
+    iso: Number.isFinite(parseFloat(bvpIso)) ? parseFloat(bvpIso) : null,
+    avgEv: Number.isFinite(parseFloat(bvpAvgEv)) ? parseFloat(bvpAvgEv) : null,
+    barrelPct: Number.isFinite(parseFloat(bvpBarrelPct)) ? parseFloat(bvpBarrelPct) : null,
+    fbPct: Number.isFinite(parseFloat(bvpFbPct)) ? parseFloat(bvpFbPct) : null,
+    hrCount: Number.isFinite(parseInt(bvpHrCount)) ? parseInt(bvpHrCount) : null,
+    psConvergence: Number.isFinite(parseFloat(psConvergence)) ? parseFloat(psConvergence) : null,
+    psConvPitch: psConvPitch || null,
+    trustworthy: pa >= MIN_BVP_PA_TRUST,
   };
 }
 
-function buildPrompt({ batterName, pitcherName, pitcherGrade, batterHand, pitcherHand, arsenal, stats, selectionContext, weather, dayNight }) {
+function buildPrompt({ batterName, pitcherName, pitcherGrade, batterHand, pitcherHand, arsenal, arsenalFit, recentStats, selectionContext, weather, dayNight }) {
   const arsenalStr = arsenal.map(a => `${a.name} (${a.pct}%)`).join(', ');
-  const byPitchStr = stats.byPitchFB.length
-    ? stats.byPitchFB.map(p => `${p.fbPct}% FB rate vs ${p.pitch} (n=${p.n})`).join('; ')
-    : 'not enough recent at-bats vs individual pitch types to report';
-  // mixContextLabel describes whichever tier actually produced the numbers
-  // (matched to TODAY's real day/night + home/away, or a looser fallback —
-  // see matchTieredContext()) — never hardcoded, so the note correctly says
-  // "day games" / "away games" / etc. on the days that's what's true,
-  // instead of always claiming "at night" regardless of today's real slate.
-  const mixStr = stats.mixContextDistances.length
-    ? `${stats.mixContextDistances.length} recent at-bats vs this pitch mix in ${stats.mixContextLabel}, batted-ball distances: ${stats.mixContextDistances.join('ft, ')}ft`
-    : `no recent at-bats vs this specific pitch mix on record (checked: ${stats.mixContextLabel})`;
+
+  // Arsenal Fit (2026-09-15) — the PRIMARY data block. Season-long, not
+  // recent — the validated signal per the file-header rework comment.
+  const afStr = arsenalFit
+    ? `${arsenalFit.pa} season PA vs this pitcher's real pitch mix + handedness${arsenalFit.trustworthy ? '' : ' (THIN sample — under 8 PA, treat cautiously)'}: `
+      + [
+          arsenalFit.iso != null ? `${arsenalFit.iso.toFixed(3)} ISO` : null,
+          arsenalFit.avgEv != null ? `${arsenalFit.avgEv.toFixed(1)}mph avg EV` : null,
+          arsenalFit.barrelPct != null ? `${arsenalFit.barrelPct.toFixed(1)}% Barrel` : null,
+          arsenalFit.fbPct != null ? `${arsenalFit.fbPct.toFixed(1)}% Fly Ball` : null,
+          arsenalFit.hrCount != null ? `${arsenalFit.hrCount} HR` : null,
+        ].filter(Boolean).join(', ')
+      + (arsenalFit.psConvergence != null ? `. Pitch-convergence fit score ${arsenalFit.psConvergence.toFixed(1)}${arsenalFit.psConvPitch ? ` (driven mainly by his ${arsenalFit.psConvPitch})` : ''}` : '')
+      + '.'
+    : 'unavailable for this matchup (not resolvable to a real today\'s-slate pitcher).';
+
+  const recentStr = recentStats
+    ? `${recentStats.barrelPct}% Barrel, ${recentStats.fbPct}% Fly Ball, ${recentStats.pullPct}% Pull, ${recentStats.farBallCount} balls hit 350ft+ (last ${recentStats.l10BBE} real batted-ball events, any opponent)`
+    : null;
+
   // Weather/park (2026-08-09) — client-supplied from daily_picks.csv's own
   // pre-game forecast columns (temp_f/wind_speed_mph/wind_effect/
   // hr_factor_int), the same fields WeatherStrip/Ball Carry/xHR Conversion
@@ -554,22 +570,21 @@ function buildPrompt({ batterName, pitcherName, pitcherGrade, batterHand, pitche
     : (weather && weather.tempF != null)
       ? `${weather.tempF}°F, wind ${weather.windEffect || 'calm'}${weather.windMph != null ? ` at ${weather.windMph}mph` : ''}, park HR factor ${weather.hrFactor ?? 100} (100=neutral)${weather.rainPct >= 40 ? `, ${weather.rainPct}% rain risk` : ''}.`
       : null;
-  // Same day/night value the "at-bats vs this pitch mix" line above is
-  // matched against (see matchTieredContext()) — labeled explicitly rather
-  // than a generic "today" so the weather line can never contradict what
-  // the mix-context line already says about today's real game (e.g. a
-  // Sunday day-game slate must never read "tonight" anywhere in the note).
+  // Labeled day/night context, still used for the weather line (2026-08-03
+  // fix — never hardcode "tonight") even though the recent-batted-ball
+  // mix-matching that originally needed this value is gone.
   const dnLabel = dayNight === 'day' ? "today's day game" : dayNight === 'night' ? "today's night game" : "today's game";
 
-  const system = `You are writing a terse, factual scouting note for a baseball betting/DFS tool. You will be given a fixed set of real, pre-verified statistics. Write 2-4 sentences using ONLY the numbers provided below — never introduce, estimate, or infer any statistic not explicitly given, including the specific game context (day/night, home/away) the "at-bats vs this pitch mix" figure is drawn from — state exactly what's given, do not assume it's a night game or a home game unless the data says so. If a data point is marked unavailable, do not mention it or make one up. Be direct and concise, matchup-analyst tone, no hedging filler like "it's worth noting." Always mention the pitcher's grade for balance — do not write a purely bullish note about a batter facing a Tough or Elite pitcher without saying so.${selectionContext ? ` A "Selection context" line will also be given, explaining why this batter was picked (typically a season-length composite score, not today's recent form). If the recent batted-ball stats below don't clearly support that reasoning — e.g. a low/0% barrel rate, few long fly balls, a cold-looking recent stretch — say so plainly and name that tension directly (e.g. "ranked on season form, but recent contact has been quiet"). Do not write an artificially bullish note just because the batter was already selected as a pick — the note's job is to report what the recent data actually shows, even when that cuts against the selection.` : ''}${weatherStr ? ` A "${dnLabel} conditions" line will also be given (a pre-game forecast, not a live reading) — only work it into the note when it's genuinely notable for a home run (e.g. hot temperature combined with a hitter-friendly park factor, a strong double-digit-mph wind blowing out, or a dome making weather irrelevant); skip it silently if conditions are unremarkable (mild temp, calm wind, a roughly neutral park factor near 100) rather than padding the note with a forced mention. If you reference this game at all, describe it exactly as "${dnLabel}" — never call it "tonight" unless that literal phrase was given, and never contradict the day/night context already established by the "at-bats vs this pitch mix" data above. Never state a wind direction, temperature, or park factor other than exactly what's given.` : ''}`;
+  const system = `You are writing a terse, factual scouting note for a baseball betting/DFS tool. You will be given a fixed set of real, pre-verified statistics. Write 2-4 sentences using ONLY the numbers provided below — never introduce, estimate, or infer any statistic not explicitly given. If a data point is marked unavailable, do not mention it or make one up. Be direct and concise, matchup-analyst tone, no hedging filler like "it's worth noting." Always mention the pitcher's grade for balance — do not write a purely bullish note about a batter facing a Tough or Elite pitcher without saying so.
+
+The "Arsenal Fit" data (season-long performance specifically vs this pitcher's real pitch mix + handedness) is the DOMINANT, validated signal for home run prediction and MUST anchor the note's main analytical claim — lead with it. The "Recent form" data (if given) is a SECONDARY, subordinated side note only — general contact-quality trend, not matched to this specific pitcher's mix, and this project's own research found this class of recent-batted-ball data carries little to no standalone HR correlation on its own. Never present recent form as equally predictive to Arsenal Fit, and never let it override or contradict what Arsenal Fit says — if the two disagree (e.g. strong Arsenal Fit numbers but a cold recent stretch, or vice versa), name that tension explicitly and still treat Arsenal Fit as the more trustworthy read. If Arsenal Fit itself is marked unavailable, say so plainly and lean on recent form and the pitcher's grade instead, without overstating confidence. If Arsenal Fit is marked as a THIN sample, note the small sample size rather than treating it with full confidence.${selectionContext ? ` A "Selection context" line will also be given, explaining why this batter was picked (typically a season-length composite score). If the data below doesn't clearly support that reasoning, say so plainly and name that tension directly — do not write an artificially bullish note just because the batter was already selected.` : ''}${weatherStr ? ` A "${dnLabel} conditions" line will also be given (a pre-game forecast, not a live reading) — only work it into the note when it's genuinely notable for a home run (e.g. hot temperature combined with a hitter-friendly park factor, a strong double-digit-mph wind blowing out, or a dome making weather irrelevant); skip it silently if conditions are unremarkable rather than padding the note with a forced mention. If you reference this game at all, describe it exactly as "${dnLabel}" — never call it "tonight" unless that literal phrase was given. Never state a wind direction, temperature, or park factor other than exactly what's given.` : ''}`;
 
   const user = `Batter: ${batterName} (bats ${batterHand})
 Opposing pitcher: ${pitcherName} (throws ${pitcherHand}, grade: ${pitcherGrade || 'unknown'})
 Pitcher's real arsenal (>=8% usage): ${arsenalStr || 'unavailable'}
 ${selectionContext ? `\nSelection context: ${selectionContext}\n` : ''}${weatherStr ? `\n${dnLabel[0].toUpperCase()}${dnLabel.slice(1)} conditions (pre-game forecast, not a live reading): ${weatherStr}\n` : ''}
-Batter's last ${stats.l10BBE} real batted-ball events: ${stats.barrelPct}% Barrel, ${stats.fbPct}% Fly Ball, ${stats.pullPct}% Pull, ${stats.farBallCount} balls hit 350ft+.
-Batter's fly-ball rate by pitch type (recent games, larger sample): ${byPitchStr}.
-Batter vs this exact pitch mix, matched to today's real game context: ${mixStr}.
+Arsenal Fit (season-long vs this exact pitch mix + hand — the dominant signal): ${afStr}
+${recentStr ? `Recent form (secondary, general contact trend — NOT matched to this pitcher's mix, weaker signal): ${recentStr}.` : 'Recent form: not enough recent batted-ball events to report.'}
 
 Write the scouting note now.`;
 
@@ -580,7 +595,11 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const { batterId, pitcherId, batterName, pitcherName, batterHand, pitcherHand, pitcherGrade, gameId, isHomeToday, selectionContext,
-    tempF, windMph, windEffect, hrFactor, isDome, rainPct } = req.body || {};
+    tempF, windMph, windEffect, hrFactor, isDome, rainPct,
+    // Arsenal Fit (2026-09-15) — client-supplied straight off the exact
+    // daily_picks.csv row already open in the caller's slideout, same
+    // pattern as the weather fields above. See buildArsenalFit()'s comment.
+    bvpPa, bvpIso, bvpAvgEv, bvpBarrelPct, bvpFbPct, bvpHrCount, psConvergence, psConvPitch } = req.body || {};
   if (!batterId || !pitcherId) return res.status(400).json({ error: 'batterId and pitcherId required' });
 
   const season = new Date().getFullYear();
@@ -591,7 +610,11 @@ export default async function handler(req, res) {
   // caller (the plain batter-slideout note vs. Top 3 Tonight's tension-aware
   // one) generates first for a given batter/pitcher/date silently poisons the
   // cache for the other, serving back a note written under the wrong prompt.
-  const cacheKey = `scoutnote:${batterId}:${pitcherId}:${etDate}${selectionContext ? ':sel' : ''}`;
+  // :v2 (2026-09-15) — bumped so a note cached earlier today under the OLD
+  // recent-batted-ball-anchored architecture (pre-rework) can never be
+  // served as a "cached" hit under the new Arsenal Fit-anchored one; the
+  // old key still expires naturally via its own 20h TTL, just orphaned.
+  const cacheKey = `scoutnote:${batterId}:${pitcherId}:${etDate}${selectionContext ? ':sel' : ''}:v2`;
 
   let redis = null;
   if (process.env.UPSTASH_KV_REST_API_URL && process.env.UPSTASH_KV_REST_API_TOKEN) {
@@ -643,17 +666,23 @@ export default async function handler(req, res) {
       isHomeToday: typeof isHomeToday === 'boolean' ? isHomeToday : null,
     };
 
-    const stats = computeStats(events, batterHand, pitcherHand, arsenal, todayContext);
-    if (!stats) {
+    const arsenalFit = buildArsenalFit({ bvpPa, bvpIso, bvpAvgEv, bvpBarrelPct, bvpFbPct, bvpHrCount, psConvergence, psConvPitch });
+    const recentStats = computeRecentStats(events, batterHand, pitcherHand);
+    // Decline only if BOTH data sources are unavailable — Arsenal Fit
+    // (the primary, validated signal) alone is enough to write a note even
+    // when the batter's recent games are thin (early season, off IL, etc.);
+    // recent form alone still works when Arsenal Fit isn't resolvable to a
+    // real today's-slate matchup (see buildArsenalFit()'s own comment).
+    if (!arsenalFit && !recentStats) {
       const thin = { insufficientData: true, note: null, stats: null, cached: false };
-      return res.status(200).json(thin); // not enough recent contact — don't force a writeup, don't cache a null result
+      return res.status(200).json(thin);
     }
 
     const weather = (tempF != null || isDome === true)
       ? { tempF: tempF ?? null, windMph: windMph ?? null, windEffect: windEffect || null,
           hrFactor: hrFactor ?? null, isDome: !!isDome, rainPct: rainPct ?? null }
       : null;
-    const { system, user } = buildPrompt({ batterName, pitcherName, pitcherGrade, batterHand, pitcherHand, arsenal, stats, selectionContext, weather, dayNight: todayContext.dayNight });
+    const { system, user } = buildPrompt({ batterName, pitcherName, pitcherGrade, batterHand, pitcherHand, arsenal, arsenalFit, recentStats, selectionContext, weather, dayNight: todayContext.dayNight });
 
     const anthRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -675,7 +704,11 @@ export default async function handler(req, res) {
     }
     const note = anthData?.content?.[0]?.text?.trim() || null;
 
-    const payload = { insufficientData: false, note, stats, arsenal, cached: false };
+    // arsenalFit/recentStats returned separately (was one combined `stats`
+    // object pre-rework) so the client can render the raw verified numbers
+    // behind the note under their correct primary/secondary labels rather
+    // than one flat block — see AtBatSlideIn's render, updated to match.
+    const payload = { insufficientData: false, note, arsenalFit, recentStats, arsenal, cached: false };
     if (redis && note) {
       try { await redis.set(cacheKey, payload, { ex: 60 * 60 * 20 }); } catch (e) { /* cache write failure is non-fatal */ }
     }

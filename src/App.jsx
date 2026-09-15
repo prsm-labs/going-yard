@@ -81,6 +81,14 @@ const styles = `
     --c-lime:#60d360;--c-emerald:#34d399;--c-sauce3:#f59e0b;--c-teal:#22c1c3;
     --c-slate:#5a7080;--c-yellow2:#ffcc00;--c-gold2:#f5c542;--c-lavender:#c084fc;
     --c-younggun:#4ade80;
+    /* Opaque sticky-cell/header row-highlight tints (2026-09-15) -- these were
+       hardcoded solid literals (a real color composited over the DARK
+       --surface, needed because a sticky td can't use a translucent rgba()
+       fallback without the scrolled table's own content bleeding through
+       underneath it, per the 2026-07-12 sticky-cell fix). Composited fresh
+       per-theme here instead so light mode gets its own correct solid tint. */
+    --tint-weakslot:#2f2e16;--tint-barrelsignal:#171817;--tint-rainrisk:#211a2e;
+    --tint-tbsignal:#0f1a21;--tint-activehdr:#212320;
   }
   /* ── Light mode ──────────────────────────────────────────────────────────
      Fires when the OS/browser reports a light preference AND the user hasn't
@@ -99,6 +107,8 @@ const styles = `
       --c-lime:#2a972a;--c-emerald:#21996d;--c-sauce3:#b97708;--c-teal:#1a9698;
       --c-slate:#5a7080;--c-yellow2:#a68500;--c-gold2:#ae8209;--c-lavender:#ad5ffb;
       --c-younggun:#1c994a;
+      --tint-weakslot:#fff9dd;--tint-barrelsignal:#fffbf5;--tint-rainrisk:#f4f1fe;
+      --tint-tbsignal:#f7fcfe;--tint-activehdr:#e2e6ea;
     }
   }
   /* Explicit user choice always wins over the OS preference, both directions */
@@ -114,6 +124,8 @@ const styles = `
     --c-lime:#2a972a;--c-emerald:#21996d;--c-sauce3:#b97708;--c-teal:#1a9698;
     --c-slate:#5a7080;--c-yellow2:#a68500;--c-gold2:#ae8209;--c-lavender:#ad5ffb;
     --c-younggun:#1c994a;
+    --tint-weakslot:#fff9dd;--tint-barrelsignal:#fffbf5;--tint-rainrisk:#f4f1fe;
+    --tint-tbsignal:#f7fcfe;--tint-activehdr:#e2e6ea;
   }
   :root[data-theme="dark"]{
     --bg:#080c10;--surface:#0d1318;--surface2:#131b22;--border:#1e2d3a;
@@ -126,6 +138,8 @@ const styles = `
     --c-lime:#60d360;--c-emerald:#34d399;--c-sauce3:#f59e0b;--c-teal:#22c1c3;
     --c-slate:#5a7080;--c-yellow2:#ffcc00;--c-gold2:#f5c542;--c-lavender:#c084fc;
     --c-younggun:#4ade80;
+    --tint-weakslot:#2f2e16;--tint-barrelsignal:#171817;--tint-rainrisk:#211a2e;
+    --tint-tbsignal:#0f1a21;--tint-activehdr:#212320;
   }
   html,body{background:var(--bg);color:var(--text);font-family:'Oswald',sans-serif;min-height:100vh;overflow-x:clip;max-width:100%;width:100%;}
   .app{min-height:100vh;display:flex;flex-direction:column;overflow-x:clip;max-width:100%;width:100%;}
@@ -2436,6 +2450,15 @@ function AtBatSlideIn() {
           hrFactor: wx ? wx.hrf : null,
           isDome: wx ? wx.isDome : false,
           rainPct: wx && !wx.isDome ? wx.rain : null,
+          // Arsenal Fit (2026-09-15) — straight off this exact daily_picks.csv
+          // row already open in this slideout, no separate fetch. Now the
+          // note's PRIMARY data source (see api/batter-scouting-note.js's own
+          // header comment for why: recent-batted-ball data was found to
+          // carry little standalone HR correlation, this does).
+          bvpPa: dpRow.bvp_pa, bvpIso: dpRow.bvp_iso, bvpAvgEv: dpRow.bvp_avg_ev,
+          bvpBarrelPct: dpRow.bvp_barrel_pct, bvpFbPct: dpRow.bvp_fb_pct,
+          bvpHrCount: dpRow.bvp_hr_count, psConvergence: dpRow.ps_convergence,
+          psConvPitch: dpRow.ps_conv_pitch,
         }),
       });
       if (res.status === 401) { setScoutNoteLocked(true); return; }
@@ -3181,7 +3204,7 @@ function AtBatSlideIn() {
               )}
               {!scoutNoteLocked && !scoutNoteError && scoutNoteData?.insufficientData && (
                 <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)'}}>
-                  Not enough recent real contact on record to say anything meaningful yet.
+                  Not enough Arsenal Fit or recent contact data on record to say anything meaningful yet.
                 </div>
               )}
               {!scoutNoteLocked && !scoutNoteError && scoutNoteData?.note && (
@@ -3190,7 +3213,9 @@ function AtBatSlideIn() {
                     {scoutNoteData.note}
                   </div>
                   <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--muted)',marginTop:6}}>
-                    Based on last {scoutNoteData.stats?.l10BBE ?? '—'} real batted-ball events vs {dp.pitcher}'s arsenal
+                    {scoutNoteData.arsenalFit
+                      ? `Based on ${scoutNoteData.arsenalFit.pa} season PA vs ${dp.pitcher}'s real mix+hand${scoutNoteData.arsenalFit.trustworthy ? '' : ' (thin sample)'}`
+                      : `Arsenal Fit unavailable · based on recent form only`}
                     {scoutNoteData.cached ? ' · cached from earlier today' : ' · generated just now'}
                   </div>
                 </>
@@ -31650,13 +31675,18 @@ function TopThreeTab() {
     const chalkPool    = byScore(scored.filter(r => r.tierChalk));
     const longshotPool = byScore(scored.filter(r => r.tierLongshot));
     const midTierPool  = byScore(scored.filter(r => r.tierMidTier));
-    // Mid-Tier's own extra gate (2026-08-09) — the only tier where a real
-    // backtest showed L7 ISO/Arsenal Fit ISO both >.190 adds signal on top
-    // of the composite score alone; falls back to the plain top-graded
-    // Mid-Tier batter if nobody clears both bars today.
-    const ISO_THRESHOLD = 0.190;
-    const midTierIsoQualified = midTierPool.filter(r =>
-      parseFloat(r.recent_iso || 0) > ISO_THRESHOLD && parseFloat(r.bvp_iso || 0) > ISO_THRESHOLD);
+    // Mid-Tier's own extra gate — originally (2026-08-09) required BOTH L7
+    // ISO and Arsenal Fit ISO above .190. Swapped 2026-09-15: subsequent
+    // research (the Sept 3/6 Top ISO / Prime ISO backtests) found recent/L7
+    // ISO carries little to no standalone HR correlation — the same "recent
+    // form doesn't hold up, season-length arsenal-specific data does" theme
+    // as this project's gHR lag-echo and recent-vs-season-weighting findings
+    // — while Prime ISO (Arsenal Fit ISO>.200 AND BvP EV>=93 AND Zone Fit>=2,
+    // all three genuinely season-long/arsenal-fit stats, zero recent-form
+    // input) is the highest-lift validated combo of its kind (1.57x train /
+    // 1.66x test). Reused verbatim rather than inventing a fresh threshold.
+    // Falls back to the plain top-graded Mid-Tier batter if nobody qualifies.
+    const midTierIsoQualified = midTierPool.filter(isPrimeIsoBatter);
 
     // A batter already picked for an earlier tier slot is excluded from
     // later slots — keeps all 4 cards as distinct real names on the rare
@@ -31734,7 +31764,7 @@ function TopThreeTab() {
     const TIER_CONTEXT = {
       youngGun: r => `Selected as today's 🌱 Young Gun pick — thin/no season track record (<100 season PA), the top-graded matchup among today's real Young Gun batters by TrueHRScore ${Math.round(r.trueHRScore)}/100 and MatchupScore ${Math.round(r.matchupScore)}/100${r.bullpenTier ? `, opposing bullpen: ${r.bullpenTier}` : ''}${r.sauce ? `, Sauce ${r.sauce} tier` : ''}. This is a discovery pick, not a hot-streak signal — thin-history batters have historically homered LESS often per game than established regulars.`,
       chalk: r => `Selected as today's 💪🏽 Chalk pick — a real established season power bat (19+ season HR, or a season AB/HR under 21) facing a soft-enough matchup, the top-graded among today's real Chalk batters by TrueHRScore ${Math.round(r.trueHRScore)}/100 and MatchupScore ${Math.round(r.matchupScore)}/100${r.bullpenTier ? `, opposing bullpen: ${r.bullpenTier}` : ''}${r.sauce ? `, Sauce ${r.sauce} tier` : ''}.`,
-      midTier: (r, p) => `Selected as today's 🔵 Mid-Tier pick — not Young Gun, Chalk, or Longshot${p.isoFallback ? ' (no batter cleared both ISO bars today, so this is the top-graded Mid-Tier batter overall instead)' : ', additionally required L7 ISO and Arsenal Fit ISO both above .190 — the one tier where a real backtest showed that combination adds signal on top of the composite score'}, the top-graded among qualifying batters by TrueHRScore ${Math.round(r.trueHRScore)}/100 and MatchupScore ${Math.round(r.matchupScore)}/100${r.bullpenTier ? `, opposing bullpen: ${r.bullpenTier}` : ''}${r.sauce ? `, Sauce ${r.sauce} tier` : ''}.`,
+      midTier: (r, p) => `Selected as today's 🔵 Mid-Tier pick — not Young Gun, Chalk, or Longshot${p.isoFallback ? ' (no batter cleared Prime ISO today, so this is the top-graded Mid-Tier batter overall instead)' : ", additionally required Prime ISO (Arsenal Fit ISO>.200, BvP EV>=93, Zone Fit>=2 — all season-long performance vs this exact pitcher's arsenal+hand, not recent form) — the highest-validated combo of its kind (1.57-1.66x lift) after research found recent/L7 form carries little standalone HR signal"}, the top-graded among qualifying batters by TrueHRScore ${Math.round(r.trueHRScore)}/100 and MatchupScore ${Math.round(r.matchupScore)}/100${r.bullpenTier ? `, opposing bullpen: ${r.bullpenTier}` : ''}${r.sauce ? `, Sauce ${r.sauce} tier` : ''}.`,
       longshot: r => `Selected as today's 🎲 Longshot pick — TrueHRScore≤55 with MatchupScore≥65 and Sim TB≥1.2 (a profile the model itself may be undervaluing), the top-graded among today's real Longshot batters by TrueHRScore ${Math.round(r.trueHRScore)}/100 and MatchupScore ${Math.round(r.matchupScore)}/100${r.bullpenTier ? `, opposing bullpen: ${r.bullpenTier}` : ''}${r.sauce ? `, Sauce ${r.sauce} tier` : ''}.`,
     };
     displayTop3.forEach(p => {
@@ -31746,14 +31776,14 @@ function TopThreeTab() {
       const key = `${bid}_${pid}`;
       // Tells the note why this batter was picked (2026-08-04, extended
       // 2026-08-09 to name the specific tier + Mid-Tier's own ISO rule) — the
-      // formula and the note are built from genuinely different data (season-
-      // length composite vs. last-10-real-batted-ball recency window), so
-      // they can legitimately disagree. Without this, the note has no idea
-      // which tier it's describing and can't flag that tension when it
-      // exists — see buildPrompt()'s own comment in
-      // api/batter-scouting-note.js for the system-prompt half of this fix.
+      // selection formula and the note's own data are built from genuinely
+      // different computations, so they can legitimately disagree. Without
+      // this, the note has no idea which tier it's describing and can't
+      // flag that tension when it exists — see buildPrompt()'s own comment
+      // in api/batter-scouting-note.js for the system-prompt half of this
+      // fix (also updated 2026-09-15 to prefer Arsenal Fit over recent form).
       const contextFn = TIER_CONTEXT[p.tierKey];
-      const selectionContext = (contextFn ? contextFn(r, p) : '') + ' This ranking is NOT based on the recent-form data below.';
+      const selectionContext = (contextFn ? contextFn(r, p) : '') + ' This ranking is a separate composite, not identical to the Arsenal Fit/recent-form data below.';
       setNotes(n => {
         if (n[key]) return n;
         // Weather/park (2026-08-09) — same buildGameWeatherMap() reuse as
@@ -31776,6 +31806,13 @@ function TopThreeTab() {
             isDome: wx ? wx.isDome : false,
             rainPct: wx && !wx.isDome ? wx.rain : null,
             selectionContext,
+            // Arsenal Fit (2026-09-15) — same fields as AtBatSlideIn's own
+            // loadScoutingNote(), straight off this batter's daily_picks.csv
+            // row already in `r` — no separate fetch.
+            bvpPa: r.bvp_pa, bvpIso: r.bvp_iso, bvpAvgEv: r.bvp_avg_ev,
+            bvpBarrelPct: r.bvp_barrel_pct, bvpFbPct: r.bvp_fb_pct,
+            bvpHrCount: r.bvp_hr_count, psConvergence: r.ps_convergence,
+            psConvPitch: r.ps_conv_pitch,
           }),
         }).then(res => res.json().then(data => ({ ok: res.ok, data })))
           .then(({ ok, data }) => setNotes(n2 => ({ ...n2,
@@ -31949,10 +31986,10 @@ function TopThreeTab() {
                         </span>
                       )}
                       {p.tierKey === 'midTier' && p.isoFallback && (
-                        <span title="No Mid-Tier batter cleared both ISO bars today — top-graded fallback instead"
+                        <span title="No Mid-Tier batter cleared Prime ISO today (Arsenal Fit ISO>.200 & BvP EV>=93 & Zone Fit>=2) — top-graded fallback instead"
                           style={{fontFamily:mono,fontSize:7,padding:'2px 5px',borderRadius:3,
                           background:rank.tagBg,color:rank.tagColor,border:`1px solid ${rank.tagBorder}`}}>
-                          ISO bar not met — fallback
+                          Prime ISO not met — fallback
                         </span>
                       )}
                     </div>
@@ -31986,7 +32023,7 @@ function TopThreeTab() {
                       )}
                       {noteState?.data?.insufficientData && (
                         <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>
-                          Not enough recent real contact on record to say anything meaningful yet.
+                          Not enough Arsenal Fit or recent contact data on record to say anything meaningful yet.
                         </div>
                       )}
                       {noteState?.data?.note && (
@@ -31994,15 +32031,23 @@ function TopThreeTab() {
                           {noteState.data.note}
                         </div>
                       )}
-                      {/* Raw verified stats behind the note above (2026-08-04) — shown
-                          regardless of what the prose says, so a "sounds mixed" note
-                          can be checked against the real numbers directly instead of
-                          only trusting Claude's summary of them. */}
-                      {noteState?.data?.stats && (
+                      {/* Raw verified stats behind the note above (2026-08-04, split into
+                          Arsenal Fit/recent-form 2026-09-15) — shown regardless of what the
+                          prose says, so a "sounds mixed" note can be checked against the
+                          real numbers directly instead of only trusting Claude's summary. */}
+                      {noteState?.data?.arsenalFit && (
                         <div style={{marginTop:5,paddingTop:5,borderTop:'1px solid rgba(255,255,255,.08)',
                           fontFamily:mono,fontSize:7,color:'var(--muted)',lineHeight:1.5}}
-                          title={`Based on the batter's last ${noteState.data.stats.l10BBE} real batted-ball events`}>
-                          L{noteState.data.stats.l10BBE}: {noteState.data.stats.barrelPct}% Barrel · {noteState.data.stats.fbPct}% FB · {noteState.data.stats.pullPct}% Pull · {noteState.data.stats.farBallCount} balls 350ft+
+                          title="Season-long performance vs this pitcher's real pitch mix + handedness — the dominant, validated signal">
+                          Arsenal Fit ({noteState.data.arsenalFit.pa} PA{noteState.data.arsenalFit.trustworthy ? '' : ', thin'}): {noteState.data.arsenalFit.iso!=null?`${noteState.data.arsenalFit.iso.toFixed(3)} ISO`:'—'} · {noteState.data.arsenalFit.avgEv!=null?`${noteState.data.arsenalFit.avgEv.toFixed(1)}mph EV`:'—'} · {noteState.data.arsenalFit.barrelPct!=null?`${noteState.data.arsenalFit.barrelPct.toFixed(1)}% Brl`:'—'}
+                        </div>
+                      )}
+                      {noteState?.data?.recentStats && (
+                        <div style={{marginTop:noteState?.data?.arsenalFit?2:5,paddingTop:noteState?.data?.arsenalFit?0:5,
+                          borderTop:noteState?.data?.arsenalFit?'none':'1px solid rgba(255,255,255,.08)',
+                          fontFamily:mono,fontSize:7,color:'var(--muted)',lineHeight:1.5,opacity:.75}}
+                          title="General recent contact trend — not matched to this pitcher's mix, secondary/weaker signal">
+                          Recent form (secondary) L{noteState.data.recentStats.l10BBE}: {noteState.data.recentStats.barrelPct}% Barrel · {noteState.data.recentStats.fbPct}% FB · {noteState.data.recentStats.pullPct}% Pull · {noteState.data.recentStats.farBallCount} balls 350ft+
                         </div>
                       )}
                     </div>
@@ -32026,8 +32071,8 @@ function TopThreeTab() {
 
       {showHelp && <HelpSlideout title="🎯 Top 4 Tonight Guide" onClose={()=>setShowHelp(false)} items={[
         ['How it works', 'Deterministic — not random. One real pick from each of the 4 HR-distribution tiers (Young Gun, Chalk, Mid-Tier, Longshot — same definitions as everywhere else in the app), ranked within its own tier by TrueHRScore (pool-normalized, the exact same formula Daily Barrel uses) and MatchupScore (pitcher/PS-Score/platoon-weighted), with bonuses for an already-validated Sauce tier and a favorable Bullpen Tier. Every eligible batter facing an outright Tough or Elite pitcher is excluded first, and a batter already picked for an earlier tier is excluded from later ones so all 4 cards are distinct names.'],
-        ['Why Mid-Tier is different', 'A backtest against the real 5/17-8/8 tracker found the plain composite ranking already works for Young Gun/Chalk/Longshot — adding an extra filter there was flat-to-negative at those tiers\' thin post-filter samples. But requiring L7 ISO AND Arsenal Fit ISO both above .190 specifically within Mid-Tier showed a real, validated lift (12.2% vs. 9.8% tier baseline, 1.25x, n=558) — so only the Mid-Tier card uses that extra gate, shown as a tag on the card. Falls back to the plain top-graded Mid-Tier batter on the rare day nobody clears both bars.'],
-        ['📝 The Analysis', 'A short, Claude-narrated note built from each batter\'s real last-10 batted-ball events, fly-ball rate by the pitcher\'s actual pitch mix, and recent at-bats matched to tonight\'s real day/night + home/away context — the same tool available on any batter\'s own slideout. Claude never invents a number; every stat in the note is pre-verified server-side first.'],
+        ['Why Mid-Tier is different', 'A backtest against the real 5/17-8/8 tracker found the plain composite ranking already works for Young Gun/Chalk/Longshot — adding an extra filter there was flat-to-negative at those tiers\' thin post-filter samples. Mid-Tier originally (2026-08-09) added a filter requiring L7 ISO AND Arsenal Fit ISO both above .190. Swapped 2026-09-15 for Prime ISO (Arsenal Fit ISO>.200, BvP EV>=93, Zone Fit>=2 — all season-long performance vs this pitcher\'s exact arsenal+hand, no recent-form input) after further research found recent/L7 ISO carries little standalone HR correlation on its own — Prime ISO is the highest-lift validated combo of its kind (1.57x train / 1.66x test). Shown as a tag on the card. Falls back to the plain top-graded Mid-Tier batter on the rare day nobody clears it.'],
+        ['📝 The Analysis', 'A short, Claude-narrated note anchored on Arsenal Fit — the batter\'s real season-long performance vs this exact pitcher\'s pitch mix + handedness (ISO, EV, Barrel%, pitch-convergence fit), the validated signal — with recent batted-ball form kept only as a subordinated secondary note. Reworked 2026-09-15: earlier versions leaned on recent-batted-ball data, which research later found carries little standalone HR correlation on its own. Same tool available on any batter\'s own slideout. Claude never invents a number; every stat in the note is pre-verified server-side or pulled straight from the already-verified daily_picks.csv row.'],
         ['When the score and note disagree', 'The ranking (TrueHRScore/MatchupScore) and the note are built from genuinely different data — season-length composite vs. the batter\'s last 10 real batted-ball events — so they can legitimately point different directions. Claude is told which tier it\'s describing and why the batter was picked, and is explicitly instructed to name that tension rather than sound artificially bullish. The raw numbers (Barrel%/FB%/Pull%/350ft+ count) behind every note are also shown below it so you can check for yourself.'],
         ['Updates automatically, then locks at 8pm ET', 'Re-ranks itself the moment lineups shift enough to change who any of the 4 real picks are — right up until 8pm ET, when whatever\'s currently the best pick per tier gets frozen for the rest of the day (🔒 Locked appears once this happens). 8pm was chosen over "wait for every lineup" specifically because a postponed or very late West Coast game could otherwise stall the lock indefinitely; by 8pm ET the picks are reliably settled. The locked record is saved server-side, so Track Record shows this exact result going forward instead of re-guessing after the fact. Only a newly-added pick triggers a fresh analysis — anyone still picked in their tier reuses the same 20-hour cache, so this never re-generates unnecessarily.'],
         ['Not the same as Crystal Ball', 'Crystal Ball draws a random pick per tier for fun. This tab is the opposite — the literal best real matchup in each tier today, ranked, no randomness.'],
@@ -33721,7 +33766,7 @@ function HomeTab() {
         ['🔗 Pairs', 'Two-batter combos sharing favorable conditions — same park, pitcher, or contact trend. Curated to 2–3 top pairs per category.'],
         ['🎰 Sim', 'Monte Carlo simulator — runs up to 10,000 game simulations using each batter\'s Yard Score, pitcher grade, park & wind factors. Shows top 5 HR candidates by simulation frequency.'],
         ['🔮 Crystal Ball', 'The engine\'s three picks: The Chosen (elite stack), Dark Horse (under the radar), Wild Card (spike signal).'],
-        ['🎯 Top 4 Tonight', 'The deterministic counterpart to Crystal Ball — no randomness. One real pick per HR-distribution tier (Young Gun, Chalk, Mid-Tier, Longshot), each ranked within its own tier by TrueHRScore + MatchupScore (pitcher/bullpen-weighted). The Mid-Tier pick additionally requires L7 ISO and Arsenal Fit ISO both above .190 — a backtested threshold that only shows real lift within that specific tier. Each pick comes with a real Claude-narrated Scouting Note built from verified recent batted-ball data. Re-ranks itself automatically once lineups confirm.'],
+        ['🎯 Top 4 Tonight', 'The deterministic counterpart to Crystal Ball — no randomness. One real pick per HR-distribution tier (Young Gun, Chalk, Mid-Tier, Longshot), each ranked within its own tier by TrueHRScore + MatchupScore (pitcher/bullpen-weighted). The Mid-Tier pick additionally requires Prime ISO (Arsenal Fit ISO>.200, BvP EV>=93, Zone Fit>=2 — all season-long, no recent-form input) — the highest-validated combo of its kind after research found recent/L7 form carries little standalone HR correlation. Each pick comes with a real Claude-narrated Scouting Note anchored on that same Arsenal Fit data. Re-ranks itself automatically once lineups confirm.'],
         ['🛢️ Daily Barrel', 'Monte Carlo HR simulation (10,000 PAs per matchup). TrueHRScore + MatchupScore per batter, ★ Barrel Signal flag for the strictest matchups, 🎲 Longshot flag for undervalued plays. Live tracker: Barrel Signal hits at 16.9% HR rate.'],
         ['🔵 On Base', 'A parallel Monte Carlo engine targeting 2+ total bases per game — the hits/TB prop market, not just HRs. OnBaseScore + MatchupScore + SimTB2%, with its own ★ TB Signal flag. Very new — early hit rate is promising but the sample is still small.'],
         ['🚫 Avoid List', 'The mirror image of Hit Signal — batters least likely to record a hit tonight (cold Sim H, real whiff risk, tough matchup, or unfavorable platoon). Full-season backtest: 58-61% miss rate vs. a 42.6% baseline, 1.4x lift, validated cleanly train/test. No badges — this list only exists here and as a filter in the usual tables.'],
@@ -36653,7 +36698,7 @@ function BarrelLabTab() {
                             style={{padding:'4px 6px',textAlign:col.align,whiteSpace:'nowrap',
                               cursor:'pointer',userSelect:'none',
                               color: col.color || (active ? 'var(--accent)' : 'var(--muted)'),
-                              background: isBatterCol ? 'var(--surface2)' : (active ? '#212320' : 'var(--surface2)'),
+                              background: isBatterCol ? 'var(--surface2)' : (active ? 'var(--tint-activehdr)' : 'var(--surface2)'),
                               borderLeft: col.divider ? '2px solid #818cf8' : undefined,
                             }}>
                             {col.h}{active ? (sortDir==='desc' ? ' ▼' : ' ▲') : ''}
@@ -36675,7 +36720,7 @@ function BarrelLabTab() {
                           <td style={{padding:'4px 6px',color:'var(--muted)'}}>{liveSlot(parseInt(b.batter_id||0), b.lineup_slot) || '—'}</td>
                           {!selGame && <td style={{padding:'4px 6px',color:'var(--muted)',fontFamily:mono,fontSize:8}}>{b.batting_team||'—'}</td>}
                           <td className="sticky-batter" style={{padding:'4px 6px',whiteSpace:'nowrap',
-                            background: b.isWeakSlot ? '#2f2e16' : b.isBarrelSignal ? '#171817' : b.rainRiskTier ? '#211a2e' : 'var(--surface)'}}>
+                            background: b.isWeakSlot ? 'var(--tint-weakslot)' : b.isBarrelSignal ? 'var(--tint-barrelsignal)' : b.rainRiskTier ? 'var(--tint-rainrisk)' : 'var(--surface)'}}>
                             <div style={{display:'flex',alignItems:'center',gap:6}}>
                               <div style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer',flex:1}} onClick={() => openBatter(b)}>
                                 <PlayerAvatar pid={b.batter_id} name={b.batter} size={22}/>
@@ -37857,7 +37902,7 @@ function OnBaseTab() {
                             style={{padding:'4px 6px',textAlign:col.align||'right',whiteSpace:'nowrap',
                               cursor:'pointer',userSelect:'none',
                               color: col.color || (active ? 'var(--ice)' : 'var(--muted)'),
-                              background: isBatterCol ? 'var(--surface2)' : (active ? '#0f1a21' : 'var(--surface2)'),
+                              background: isBatterCol ? 'var(--surface2)' : (active ? 'var(--tint-tbsignal)' : 'var(--surface2)'),
                               borderLeft: col.divider ? '2px solid #818cf8' : undefined,
                             }}>
                             {col.h}{active ? (sortDir==='desc' ? ' ▼' : ' ▲') : ''}
@@ -37879,7 +37924,7 @@ function OnBaseTab() {
                           <td style={{padding:'4px 6px',color:'var(--muted)'}}>{liveSlot(parseInt(b.batter_id||0), b.lineup_slot) || '—'}</td>
                           {!selGame && <td style={{padding:'4px 6px',color:'var(--muted)',fontFamily:mono,fontSize:8}}>{b.batting_team||'—'}</td>}
                           <td className="sticky-batter" style={{padding:'4px 6px',whiteSpace:'nowrap',
-                            background: b.isWeakSlot ? '#2f2e16' : b.isTBSignal ? '#0f1a21' : b.rainRiskTier ? '#211a2e' : 'var(--surface)'}}>
+                            background: b.isWeakSlot ? 'var(--tint-weakslot)' : b.isTBSignal ? 'var(--tint-tbsignal)' : b.rainRiskTier ? 'var(--tint-rainrisk)' : 'var(--surface)'}}>
                             <div style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer'}} onClick={() => openBatter(b)}>
                               <PlayerAvatar pid={b.batter_id} name={b.batter} size={22}/>
                               <span style={{color:'var(--text)'}}>
