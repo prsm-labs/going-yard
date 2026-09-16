@@ -1,8 +1,9 @@
 {
-  "version": "2026.09.15",
-  "bundleFile": "index-qQw5RV81.js",
+  "version": "2026.09.16",
+  "bundleFile": "index-BBhdmkOO.js",
   "changelog": [
-    "Add light/dark theme toggle with WCAG-verified color palette"
+    "Fix light-mode opaque sticky cells",
+    "anchor Scouting Notes on Arsenal Fit"
   ],
   "notifyUsers": true
 }

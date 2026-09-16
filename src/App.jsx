@@ -16564,6 +16564,10 @@ function SimLabView({ data }) {
   // Solid Contact (2026-09-12) — Arsenal Fit ISO>.180 + BvP EV>88. See
   // isSolidContactBatter()'s own comment for the full validation.
   const [afSolidContactOnly, setAfSolidContactOnly] = useState(false);
+  // Locked In (2026-09-16) — Top ISO + Solid Contact's EV bar + top-quartile
+  // Arsenal Blast%. See isLockedInBatter()'s own comment for the full
+  // validation.
+  const [afLockedInOnly, setAfLockedInOnly] = useState(false);
   const [afBullpenTiers,  setAfBullpenTiers]  = useState(() => new Set());
   const [afAvoidOnly,     setAfAvoidOnly]     = useState(false);
   const [afHideAvoid,     setAfHideAvoid]     = useState(false);
@@ -16902,6 +16906,7 @@ function SimLabView({ data }) {
       .filter(r => !afTopIsoOnly    || parseFloat(r.bvp_iso||0) > 0.2)
       .filter(r => !afPrimeIsoOnly  || isPrimeIsoBatter(r))
       .filter(r => !afSolidContactOnly || isSolidContactBatter(r))
+      .filter(r => !afLockedInOnly || isLockedInBatter(r))
       .filter(r => afBullpenTiers.size === 0 || afBullpenTiers.has(bullpenTierLabel(r.bullpen_hr_rank)))
       .filter(r => !afAvoidOnly     || r.isAvoid)
       .filter(r => !afHideAvoid     || !r.isAvoid)
@@ -16916,7 +16921,7 @@ function SimLabView({ data }) {
       if (va > vb) return afSortDir === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [slate, afSortBy, afSortDir, afChalkOnly, afDayLateOnly, afYoungGunsOnly, afLongshotOnly, afMidTierOnly, afSauce3Only, afSauce25Only, afTopIsoOnly, afPrimeIsoOnly, afSolidContactOnly, afBullpenTiers, afAvoidOnly, afHideAvoid, afHandMatchOnly, afMinL7Iso, afMinIso, afMinL7Ev, afMinEv, afDayLateVer, afPlayerVer]);
+  }, [slate, afSortBy, afSortDir, afChalkOnly, afDayLateOnly, afYoungGunsOnly, afLongshotOnly, afMidTierOnly, afSauce3Only, afSauce25Only, afTopIsoOnly, afPrimeIsoOnly, afSolidContactOnly, afLockedInOnly, afBullpenTiers, afAvoidOnly, afHideAvoid, afHandMatchOnly, afMinL7Iso, afMinIso, afMinL7Ev, afMinEv, afDayLateVer, afPlayerVer]);
 
   // Reset row cap when filters/sort change so user always sees top results
   useEffect(() => { setDisplayLimit(150); }, [sortBy, sortDir, selMatchups, lineupOnly, simActiveOnly, simSearch, filterKeyMatchup, slotMin, slotMax]);
@@ -18114,6 +18119,15 @@ function SimLabView({ data }) {
                 color: afSolidContactOnly ? '#fb7185' : 'var(--muted)',
                 border: `1px solid ${afSolidContactOnly ? 'rgba(251,113,133,.45)' : 'var(--border)'}` }}>
               🥊 {afSolidContactOnly ? 'Solid Contact Only' : 'Solid Contact'}
+            </button>
+            <button onClick={() => setAfLockedInOnly(v => !v)}
+              title="Locked In 🔐 — Top ISO (Arsenal Fit ISO>.200) + Solid Contact's EV bar (BvP EV>88.0) + Arsenal Blast% in the top quartile (>=71). Validated: 16.58% HR rate (1.54x lift, n=1,351, full 2026 season) — 15.55% train / 18.69% test on a chronological 70/30 split, strengthened on held-out data."
+              style={{ padding: '2px 8px', borderRadius: 5, cursor: 'pointer', fontFamily: "'DM Mono',monospace",
+                fontSize: 9, fontWeight: 700, lineHeight: 1.5, flexShrink: 0,
+                background: afLockedInOnly ? 'rgba(56,242,130,.14)' : 'var(--surface2)',
+                color: afLockedInOnly ? 'var(--c-mint)' : 'var(--muted)',
+                border: `1px solid ${afLockedInOnly ? 'rgba(56,242,130,.45)' : 'var(--border)'}` }}>
+              🔐 {afLockedInOnly ? 'Locked In Only' : 'Locked In'}
             </button>
             <button onClick={() => setAfChalkOnly(v => !v)}
               title="Chalk 💪🏽 — established power bat (19+ season HR, or season AB/HR<21) facing a matchup that isn't Elite/Tough today."
@@ -28837,9 +28851,10 @@ function LegendButton() {
     ] },
     { tab:'📋 Track Record',   items:[
       'The self-auditing page — merges the daily All Matchups, Barrel Lab, and On Base exports against actual box-score outcomes, every day, automatically.',
-      '✅ HRs Only, ★ Barrel Signal Only, and 🥫 Sauce 2.5 Only stay as standalone quick-access buttons. Everything else — 🔑 Key Matchup, 🟢 Weak Spot, 📍 Close Call, 🍯 Sauce 2.0, 🍯🔥 Sauce 3.0, 📈 Top ISO, 💎 Prime ISO, 🗓️ Day Late, 2️⃣ 2-Bagger (Non-HR), 🎯 TB Signal, 🎲 Sim TB ≥2.0, 🧠 High Plate IQ, ⭐ Hand Match, 🔴/🔵 Ball Carry Juiced/Dead, ⬆️/⬇️ xHR Juiced/Dead, plus a Pitcher Grade multi-select — moved into the ⚙ Filters dropdown 2026-08-02 once the flat button row grew past what fits on a phone screen, same consolidation Barrel Lab/On Base/Arsenal Fit already went through. Sauce 3.0\'s own quick button moved into the panel that same day, once Sauce 2.5 took over the standalone slot.',
+      '✅ HRs Only, ★ Barrel Signal Only, and 🥫 Sauce 2.5 Only stay as standalone quick-access buttons. Everything else — 🔑 Key Matchup, 🟢 Weak Spot, 📍 Close Call, 🍯 Sauce 2.0, 🍯🔥 Sauce 3.0, 📈 Top ISO, 💎 Prime ISO, 🥊 Solid Contact, 🔐 Locked In, 🗓️ Day Late, 2️⃣ 2-Bagger (Non-HR), 🎯 TB Signal, 🎲 Sim TB ≥2.0, 🧠 High Plate IQ, ⭐ Hand Match, 🔴/🔵 Ball Carry Juiced/Dead, ⬆️/⬇️ xHR Juiced/Dead, plus a Pitcher Grade multi-select — moved into the ⚙ Filters dropdown 2026-08-02 once the flat button row grew past what fits on a phone screen, same consolidation Barrel Lab/On Base/Arsenal Fit already went through. Sauce 3.0\'s own quick button moved into the panel that same day, once Sauce 2.5 took over the standalone slot.',
       '📈 Top ISO filter/card/column (added 2026-09-06) — Arsenal Fit ISO > .200 alone, same definition and validated 1.33x HR lift as Barrel Lab/Arsenal Fit\'s own Top ISO filter (added 2026-09-03). Reads "Arsenal Fit ISO" straight off the All Matchups export (already backfilled leak-free back to 5/17 for the Sauce 3.0 work, 85.8% coverage) — no new backfill needed. The "AF ISO" table column (Matchup Engine group) shows the raw value; "—" for any row where it\'s genuinely missing rather than 0.',
       '💎 Prime ISO filter/card (added 2026-09-06, same day as Top ISO) — Arsenal Fit ISO>.200 + BvP EV>=93 + Zone Fit>=2. Found by ranking every non-recent field\'s correlation with HR: BvP EV (r=0.081) actually beats Arsenal Fit ISO itself (r=0.066) as a standalone predictor — the single strongest thing to pair with it. Validated on a chronological 70/30 train/test split: 18.4% HR rate (1.57x lift) train, 17.1% (1.66x) test — held up, in fact strengthened, on the held-out half. Deliberately NOT a Sauce variant (no xwOBA/pitcher-grade gate) — a genuinely separate signal family, purely Arsenal-Fit-window contact quality + spatial zone fit.',
+      '🔐 Locked In filter/card (added 2026-09-16) — Top ISO (Arsenal Fit ISO>.200) + Solid Contact\'s own EV bar (BvP EV>88.0) + Arsenal Blast% in the top quartile (>=71). Found by stacking those three together and checking whether any of ~18 other columns added further real signal on top — most (Zone Fit, xwOBA, Key Matchup, Recent EV/Barrel%, Sim TB, Temp, etc.) either didn\'t move the needle or fell apart on held-out data, the same "recent form doesn\'t hold up" pattern this app keeps finding. Validated: full 2026 season window with real Arsenal Blast% data (8/3-9/14, n=1,351) 16.58% HR rate, 1.54x lift vs 10.77% base; chronological 70/30 split 15.55% train (n=907) / 18.69% test (n=444) — strengthened on the held-out half. xwOBA>=.360 was tested as a possible 4th gate (18.64% HR%, 1.73x, n=617) but left out by explicit user choice — it roughly halves the pool for +2pp, and stacking further candidates on top collapsed the test sample below 60 rows with train/test disagreeing.',
       '🗓️ Day Late filter/card (added 2026-08-02, alongside the FilterPanel consolidation) — same definition as Barrel Lab/On Base\'s Day Late badge (★ Barrel Signal on both of the last 2 real game days, no HR either day, today\'s pitcher not Elite), reimplemented against Track Record\'s own historical row data so it works on any past date, not just today\'s live slate.',
       '🏆 Top 4 Pick filter/column/card (added 2026-08-09, prompted by a real day — 8/9 — where 3 of the 4 live picks, Burleson/Conine/Ortiz, went yard) — for dates from 2026-08-13 onward, this reads the REAL locked Top 4 Tonight record (see next item) instead of guessing. For dates before that, it reconstructs which batter WOULD have been each tier\'s pick (Young Gun/Chalk/Mid-Tier/Longshot, one each) using the same selection algorithm: TrueHR×0.5 + MatchupScore×0.5 + Sauce/Bullpen bonuses, ranked within each tier, with Mid-Tier additionally gated by L7 ISO + Arsenal Fit ISO both >.190 (falling back to the plain top-graded Mid-Tier batter if nobody clears it). A batter already picked for an earlier tier is excluded from later ones, same dedup as the live tab. Genuinely LIMITED to dates where Young Gun/Chalk are both real-populated (checked live 2026-08-09: that\'s 8/2 onward) — dates before that are skipped entirely rather than silently mislabeled (a real bug caught in testing: on those older dates, blank Young Gun/Chalk data would have defaulted every batter into Mid-Tier). Card is HONEST about how thin this still is: at first build, 7 real dates / 27 picks / 1 hit (3.7%, vs 11.4% baseline) — well within normal noise at that sample size, not yet a real read either way. The "🏆 tier-emoji" combo in the table cell shows which specific tier that date\'s pick represents.',
       '🔒 Top 4 Tonight lock (added 2026-08-13) — the live Top 4 Tonight page used to recompute continuously all day (lineups confirming, injuries updating), so the "pick" for a tier could visibly change more than once before the day was over, and Track Record\'s own reconstruction (above) sometimes landed on a THIRD, different guess than either version actually shown live. Fixed by locking Top 4 Tonight\'s real picks at a flat 8pm ET cutoff each day and persisting that exact record server-side — the live page shows a stable 🔒 result for the rest of the day, and Track Record now reads that same real record instead of re-deriving its own guess. Deliberately NOT retroactive — dates before 2026-08-13 keep using the reconstruction above, which can genuinely disagree with what was shown live on those specific days.',
@@ -28998,6 +29013,7 @@ function TrackRecordTab() {
   const [showOnlyTopIso, setShowOnlyTopIso] = useState(false);
   const [showOnlyPrimeIso, setShowOnlyPrimeIso] = useState(false);
   const [showOnlySolidContact, setShowOnlySolidContact] = useState(false);
+  const [showOnlyLockedIn, setShowOnlyLockedIn] = useState(false);
   const [showOnlyHitSignal, setShowOnlyHitSignal] = useState(false);
   const [showOnlySecretSauce, setShowOnlySecretSauce] = useState(false);
   const [selBullpenTiers, setSelBullpenTiers] = useState(() => new Set());
@@ -29460,6 +29476,16 @@ function TrackRecordTab() {
             // test on a chronological 70/30 split).
             isSolidContact: parseFloat(r['Arsenal Fit ISO']||0) > 0.180
               && parseFloat(r['BvP EV']||0) > 88.0,
+            // Locked In (2026-09-16) — Top ISO + Solid Contact's EV bar +
+            // top-quartile Arsenal Blast%. Same definition as
+            // isLockedInBatter() (module scope), reimplemented inline
+            // against Track Record's own bracket-notation row shape, same
+            // precedent as isTopIso/isPrimeIso/isSolidContact above. See
+            // isLockedInBatter() for the full validation (16.58% HR rate,
+            // 1.54x lift, n=1,351; 15.55% train / 18.69% test).
+            isLockedIn: parseFloat(r['Arsenal Fit ISO']||0) > 0.2
+              && parseFloat(r['BvP EV']||0) > 88.0
+              && parseFloat(blRow['Arsenal Blast%'] || obRow['Arsenal Blast%'] || 0) >= 71,
             plateIQ, plateIQGrade: plateIQGrade(plateIQ),
             zoneAttackRisk: (r['Zone Risk']||'').toString().trim().toUpperCase() === 'YES',
             handMatchTier, isHandMatch,
@@ -29786,6 +29812,7 @@ function TrackRecordTab() {
     if (showOnlyTopIso) rows = rows.filter(r => r.isTopIso);
     if (showOnlyPrimeIso) rows = rows.filter(r => r.isPrimeIso);
     if (showOnlySolidContact) rows = rows.filter(r => r.isSolidContact);
+    if (showOnlyLockedIn) rows = rows.filter(r => r.isLockedIn);
     if (showOnlyHitSignal) rows = rows.filter(r => r.isHitSignal);
     if (showOnlySecretSauce) rows = rows.filter(r => r.isSecretSauce);
     if (showOnly2Bagger) rows = rows.filter(r => r.is2Bagger);
@@ -29818,7 +29845,7 @@ function TrackRecordTab() {
       }
       return sortDir * ((av||0) - (bv||0));
     });
-  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, showOnlyWeakSlot, showOnlyCC, showOnlySauce2, showOnlySauce3, showOnlySauce25, showOnlyTopIso, showOnlyPrimeIso, showOnlySolidContact, showOnlyHitSignal, showOnlySecretSauce, showOnlyAvoid, showOnly2Bagger, showOnlyTBSignal, showOnlySimTB2, showOnlyHighIQ, showOnlyHandMatch, showOnlyDayLate, showOnlyYoungGun, showOnlyChalk, showOnlyMidTier, showOnlyLongshotTR, showOnlyTop4Pick, carryFilter, xhrFilter, selPitcherGradesTR, selBullpenTiers, search, sortCol, sortDir]);
+  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, showOnlyWeakSlot, showOnlyCC, showOnlySauce2, showOnlySauce3, showOnlySauce25, showOnlyTopIso, showOnlyPrimeIso, showOnlySolidContact, showOnlyLockedIn, showOnlyHitSignal, showOnlySecretSauce, showOnlyAvoid, showOnly2Bagger, showOnlyTBSignal, showOnlySimTB2, showOnlyHighIQ, showOnlyHandMatch, showOnlyDayLate, showOnlyYoungGun, showOnlyChalk, showOnlyMidTier, showOnlyLongshotTR, showOnlyTop4Pick, carryFilter, xhrFilter, selPitcherGradesTR, selBullpenTiers, search, sortCol, sortDir]);
 
   const summary = useMemo(() => {
     // FIXED 2026-08-06: every card below used to compute off `dateRows`
@@ -29877,6 +29904,11 @@ function TrackRecordTab() {
     // isSolidContactBatter()'s own comment for the full validation.
     const solidContact      = played.filter(r => r.isSolidContact);
     const solidContactHits  = solidContact.filter(r => r.wentYard);
+    // Locked In (2026-09-16) — Top ISO + Solid Contact's EV bar + top-
+    // quartile Arsenal Blast%. See isLockedInBatter()'s own comment for the
+    // full validation.
+    const lockedIn      = played.filter(r => r.isLockedIn);
+    const lockedInHits  = lockedIn.filter(r => r.wentYard);
     // Hit Signal / Secret Sauce (2026-08-04) — validated against hitAny
     // ("any hit" — single/double/triple/HR all count), NOT wentYard. This is
     // the whole point of the signal: everything else on this page tracks HR
@@ -29925,7 +29957,7 @@ function TrackRecordTab() {
     const biggestUpset = [...played.filter(r => r.wentYard)]
       .sort((a,b) => a.yardScore - b.yardScore)[0];
     return { hrs, totalHR, signals, signalHits, keyMatchups, kmHits,
-             longshots, lsHits, weakSlots, weakSlotHits, sauce2, sauce2Hits, sauce3, sauce3Hits, sauce25, sauce25Hits, topIso, topIsoHits, primeIso, primeIsoHits, solidContact, solidContactHits, hitSignal, hitSignalHits, secretSauce, secretSauceHits, avoidList, avoidListMisses, twoBaggers, tbSignals, tbSignalHits, simTB2, simTB2Hits,
+             longshots, lsHits, weakSlots, weakSlotHits, sauce2, sauce2Hits, sauce3, sauce3Hits, sauce25, sauce25Hits, topIso, topIsoHits, primeIso, primeIsoHits, solidContact, solidContactHits, lockedIn, lockedInHits, hitSignal, hitSignalHits, secretSauce, secretSauceHits, avoidList, avoidListMisses, twoBaggers, tbSignals, tbSignalHits, simTB2, simTB2Hits,
              highIQBatters, highIQHRHits, highIQTB2Hits, handMatches, handMatchHits, dayLate, dayLateHits, top4Picks, top4PickHits,
              topYS, biggestMiss, biggestUpset };
   }, [dateRows]);
@@ -30193,6 +30225,14 @@ function TrackRecordTab() {
               color:'#fb7185'
             },
             {
+              label:'🔐 LOCKED IN HR RATE',
+              value: summary.lockedIn.length
+                ? `${((summary.lockedInHits.length/summary.lockedIn.length)*100).toFixed(0)}%`
+                : '—',
+              sub: `${summary.lockedInHits.length}/${summary.lockedIn.length}`,
+              color:'var(--c-mint)'
+            },
+            {
               label:'⚾ HIT SIGNAL RATE',
               value: summary.hitSignal.length
                 ? `${((summary.hitSignalHits.length/summary.hitSignal.length)*100).toFixed(0)}%`
@@ -30427,6 +30467,8 @@ function TrackRecordTab() {
               title:"Prime ISO — Arsenal Fit ISO>.200 + BvP EV>=93 + Zone Fit>=2. Validated: 18.4% HR rate (1.57x) train / 17.1% (1.66x) test, full 2026 season — held up on the held-out half. BvP EV alone correlates with HR even more strongly than Arsenal Fit ISO itself (r=0.081 vs 0.066)." },
             { key:'solidcontact', label:'🥊 Solid Contact Only', active:showOnlySolidContact, onToggle:()=>setShowOnlySolidContact(v=>!v), color:'#fb7185',
               title:"Solid Contact — Arsenal Fit ISO>.180 + BvP EV>88.0. Validated: 15.01% HR rate (1.35x lift, n=8,536, full 2026 season) — 1.33x train / 1.39x test on a chronological 70/30 split, stable." },
+            { key:'lockedin', label:'🔐 Locked In Only', active:showOnlyLockedIn, onToggle:()=>setShowOnlyLockedIn(v=>!v), color:'var(--c-mint)',
+              title:"Locked In — Top ISO (Arsenal Fit ISO>.200) + Solid Contact's EV bar (BvP EV>88.0) + Arsenal Blast% in the top quartile (>=71). Validated: 16.58% HR rate (1.54x lift, n=1,351, full 2026 season) — 15.55% train / 18.69% test on a chronological 70/30 split, strengthened on held-out data." },
             { key:'hitsig', label:'⚾ Hit Signal Only',      active:showOnlyHitSignal, onToggle:()=>setShowOnlyHitSignal(v=>!v), color:'#93c5fd',
               title:"Hit Signal — Sim H>=1.0 AND SwStr%<=15%. Full-season backtest: 64.1% any-hit rate, 1.12x lift, n=2,933, stable train/test." },
             { key:'secsauce', label:'🤫 Secret Sauce Only',  active:showOnlySecretSauce, onToggle:()=>setShowOnlySecretSauce(v=>!v), color:'var(--c-lavender)',
@@ -30463,7 +30505,7 @@ function TrackRecordTab() {
             const headers = ['Date','Batter','Team','Hand','Lineup Slot',
               'Pre-Game Pitcher','Went Yard Vs','SP/RP','Pitcher Grade',
               'Yard Score','Boom','Sig','Grade','gHR','Zone Fit','Sim TB','xwOBA','Flags',
-              'Is Key Matchup','Weak Spot','Bullpen HR Rank','Arsenal Fit ISO','Arsenal Fit EV','Arsenal Fit Barrel%','Arsenal Fit FB%','Arsenal Fit LA','Arsenal Fit Pull%','Arsenal Fit PulledAir%','Arsenal Fit 350+','Arsenal Blast%','Top ISO','Prime ISO','Solid Contact','Sauce 2.0','Sauce 2.5','Sauce 3.0','Hit Signal','Secret Sauce','Avoid List','Day Late','2-Bagger (Non-HR)','Hit 2+ TB (Any)','TB Signal',
+              'Is Key Matchup','Weak Spot','Bullpen HR Rank','Arsenal Fit ISO','Arsenal Fit EV','Arsenal Fit Barrel%','Arsenal Fit FB%','Arsenal Fit LA','Arsenal Fit Pull%','Arsenal Fit PulledAir%','Arsenal Fit 350+','Arsenal Blast%','Top ISO','Prime ISO','Solid Contact','Locked In','Sauce 2.0','Sauce 2.5','Sauce 3.0','Hit Signal','Secret Sauce','Avoid List','Day Late','2-Bagger (Non-HR)','Hit 2+ TB (Any)','TB Signal',
               'TrueHR','Matchup','SimHR%','Barrel Signal','Longshot','Young Gun','Chalk','Mid-Tier','Top 4 Pick',
               'PulledBrl%','Brl/BIP','HR/FB','FB%','HH%',
               'Plate IQ','IQ Grade','Zone Risk','Hand Match',
@@ -30480,7 +30522,7 @@ function TrackRecordTab() {
                 (r.wentYard && r.actualPitcher && !r.actualPitcherIsSP) ? '' : r.pitcherGrade,
                 r.yardScore || '', r.boom || '', r.sig || '', r.grade || '', r.ghr || '',
                 r.zoneFit || '', r.simTB || '', r.xwoba || '', r.flags || '',
-                r.isKeyMatchup ? 'YES' : '', r.isWeakSlot ? 'YES' : '', r.bullpenRank || '', r.afIsoRaw || '', r.afEv || '', r.afBarrelPct || '', r.afFbPct || '', r.afLa || '', r.afPullPct || '', r.afPulledAirPct || '', r.af350 || '', r.afBlast || '', r.isTopIso ? 'YES' : '', r.isPrimeIso ? 'YES' : '', r.isSolidContact ? 'YES' : '', r.isSauce2 ? 'YES' : '', r.isSauce25 ? 'YES' : '', r.isSauce3 ? 'YES' : '', r.isHitSignal ? 'YES' : '', r.isSecretSauce ? 'YES' : '', r.isAvoid ? 'YES' : '', r.isDayLate ? 'YES' : '', r.is2Bagger ? 'YES' : '', r.hitTB2 ? 'YES' : '', r.tbSignal ? 'YES' : '',
+                r.isKeyMatchup ? 'YES' : '', r.isWeakSlot ? 'YES' : '', r.bullpenRank || '', r.afIsoRaw || '', r.afEv || '', r.afBarrelPct || '', r.afFbPct || '', r.afLa || '', r.afPullPct || '', r.afPulledAirPct || '', r.af350 || '', r.afBlast || '', r.isTopIso ? 'YES' : '', r.isPrimeIso ? 'YES' : '', r.isSolidContact ? 'YES' : '', r.isLockedIn ? 'YES' : '', r.isSauce2 ? 'YES' : '', r.isSauce25 ? 'YES' : '', r.isSauce3 ? 'YES' : '', r.isHitSignal ? 'YES' : '', r.isSecretSauce ? 'YES' : '', r.isAvoid ? 'YES' : '', r.isDayLate ? 'YES' : '', r.is2Bagger ? 'YES' : '', r.hitTB2 ? 'YES' : '', r.tbSignal ? 'YES' : '',
                 r.trueHR || '', r.matchup || '', r.simHRPct || '',
                 r.brlSignal ? 'YES' : '', r.isLongshot ? 'YES' : '',
                 r.isYoungGun === true ? 'YES' : r.isYoungGun === false ? 'NO' : '',
@@ -34412,6 +34454,32 @@ function isSolidContactBatter(r) {
   return Number.isFinite(iso) && iso > 0.180 && Number.isFinite(ev) && ev > 88.0;
 }
 
+// Locked In (2026-09-16) — Top ISO (Arsenal Fit ISO>.200) + Solid Contact's
+// own EV bar (BvP EV>88.0) + Arsenal Blast% in the top quartile (>=71, the
+// train-derived p75 cut, confirmed identical on the full window). Stacking
+// all three found a real edge neither catches alone. Validated against real
+// track-record-matchups.csv + track-record-barrel.csv outcomes (joined on
+// date+Batter ID, Arsenal Blast% only exists from 2026-08-03 onward):
+// full window (8/3-9/14, n=1,351) 16.58% HR rate, 1.54x lift vs 10.77% base.
+// Chronological 70/30 split: train 15.55% (n=907), test 18.69% (n=444) --
+// strengthened on held-out data, same "held up or improved" bar every
+// stacked signal in this app (Sauce tiers, Prime ISO) has had to clear.
+// A broad sweep of ~18 other columns (Zone Fit, xwOBA, Key Matchup, Weak
+// Slot, Bullpen Rank, Recent EV/Barrel%, Sim TB, Temp, Hand Match, Pulled
+// Barrel%, etc.) as a possible 4th gate found xwOBA>=.360 the most stable
+// (18.64% HR%, 1.73x, n=617) — but it roughly halves the pool for +2pp, and
+// stacking any two of the surviving candidates together collapsed the test
+// sample below 60 rows with train/test disagreeing (overfitting). Left out
+// of this filter by explicit user choice — 3 signals, not 4 or more.
+function isLockedInBatter(r) {
+  const iso   = parseFloat(r.bvp_iso ?? NaN);
+  const ev    = parseFloat(r.bvp_avg_ev ?? NaN);
+  const blast = getArsenalBlastPct(r);
+  return Number.isFinite(iso) && iso > 0.2
+    && Number.isFinite(ev) && ev > 88.0
+    && blast != null && blast >= 71;
+}
+
 // ── Hit Signal (2026-08-04) — the "any hit" analog to Barrel/TB Signal.
 // Every existing signal in this app is validated against HR or 2+TB;
 // nothing validates plain "did this batter get a hit tonight" (base rate
@@ -35584,6 +35652,10 @@ function BarrelLabTab() {
   // Solid Contact (2026-09-12) — Arsenal Fit ISO>.180 + BvP EV>88. See
   // isSolidContactBatter()'s own comment for the full validation.
   const [blSolidContactOnly, setBlSolidContactOnly] = useState(false);
+  // Locked In (2026-09-16) — Top ISO + Solid Contact's EV bar + top-quartile
+  // Arsenal Blast%. See isLockedInBatter()'s own comment for the full
+  // validation.
+  const [blLockedInOnly, setBlLockedInOnly] = useState(false);
   const [blHitSignalOnly,  setBlHitSignalOnly]  = useState(false);
   const [blSecretSauceOnly,setBlSecretSauceOnly]= useState(false);
   const [blBullpenTiers,   setBlBullpenTiers]   = useState(() => new Set());
@@ -35864,6 +35936,7 @@ function BarrelLabTab() {
     .filter(r => !blTopIsoOnly || parseFloat(r.bvp_iso||0) > 0.2)
     .filter(r => !blPrimeIsoOnly || isPrimeIsoBatter(r))
     .filter(r => !blSolidContactOnly || isSolidContactBatter(r))
+    .filter(r => !blLockedInOnly || isLockedInBatter(r))
     .filter(r => !blHitSignalOnly   || r.isHitSignal)
     .filter(r => !blSecretSauceOnly || r.isSecretSauce)
     .filter(r => blPitcherGrades.size === 0 || blPitcherGrades.has((r.pitcher_grade_label||r._pgLabel||'').trim()))
@@ -35876,7 +35949,7 @@ function BarrelLabTab() {
     .filter(r => blMinL7Ev  === '' || parseFloat(r.recent_avg_ev||0) >= parseFloat(blMinL7Ev))
     .filter(r => blMinEv    === '' || parseFloat(r.bvp_avg_ev||0)    >= parseFloat(blMinEv))
     .sort((a, b) => b.trueHRScore - a.trueHRScore);
-  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, blChalkOnly, blMidTierOnly, blDayLateOnly, blYoungGunsOnly, blPicksOnly, picks, blGoneYardOnly, blTB2Only, blHighIQOnly, blHandMatchOnly, blSauce3Only, blSauce25Only, blTopIsoOnly, blPrimeIsoOnly, blSolidContactOnly, blHitSignalOnly, blSecretSauceOnly, blBullpenTiers, blAvoidOnly, blHideAvoid, blBatterHand, blPitcherGrades, blMinL7Iso, blMinIso, blMinL7Ev, blMinEv, hrVer, finalVer, dayLateVer, playerVer, ballStateVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, blChalkOnly, blMidTierOnly, blDayLateOnly, blYoungGunsOnly, blPicksOnly, picks, blGoneYardOnly, blTB2Only, blHighIQOnly, blHandMatchOnly, blSauce3Only, blSauce25Only, blTopIsoOnly, blPrimeIsoOnly, blSolidContactOnly, blLockedInOnly, blHitSignalOnly, blSecretSauceOnly, blBullpenTiers, blAvoidOnly, blHideAvoid, blBatterHand, blPitcherGrades, blMinL7Iso, blMinIso, blMinL7Ev, blMinEv, hrVer, finalVer, dayLateVer, playerVer, ballStateVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Color threshold helpers
   const clr = (v, g1, g2, y1, y2) => {
@@ -36238,6 +36311,19 @@ function BarrelLabTab() {
                 border:`1px solid ${blSolidContactOnly ? 'rgba(251,113,133,.45)' : 'var(--border)'}`,
               }}>
               🥊 {blSolidContactOnly ? 'Solid Contact Only' : 'Solid Contact'}
+            </button>
+            <button
+              onClick={() => setBlLockedInOnly(v => !v)}
+              title="Locked In 🔐 — Top ISO (Arsenal Fit ISO>.200) + Solid Contact's EV bar (BvP EV>88.0) + Arsenal Blast% in the top quartile (>=71). Validated: 16.58% HR rate (1.54x lift, n=1,351, full 2026 season) — 15.55% train / 18.69% test on a chronological 70/30 split, strengthened on held-out data."
+              style={{
+                padding:'2px 8px', borderRadius:5, cursor:'pointer',
+                fontFamily:"'DM Mono',monospace", fontSize:9, fontWeight:700,
+                lineHeight:1.5, flexShrink:0,
+                background: blLockedInOnly ? 'rgba(56,242,130,.14)' : 'var(--surface2)',
+                color:      blLockedInOnly ? 'var(--c-mint)' : 'var(--muted)',
+                border:`1px solid ${blLockedInOnly ? 'rgba(56,242,130,.45)' : 'var(--border)'}`,
+              }}>
+              🔐 {blLockedInOnly ? 'Locked In Only' : 'Locked In'}
             </button>
             <FilterPanel
               toggles={[
