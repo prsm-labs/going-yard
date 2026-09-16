@@ -73,7 +73,6 @@ CLE,542888,Shawn Armstrong,P,Left calf strain.,,🟡,Injured 60-Day
 COL,801403,Chase Dollander,P,Right elbow strain.,,🟡,Injured 60-Day
 COL,500779,Jose Quintana,P,Left elbow sprain.,,🟡,Injured 60-Day
 COL,592178,Kris Bryant,DH,Lumbar degenerative disk disease.,,⚪,Injured 60-Day
-COL,607536,Kyle Freeland,P,Cervical radiculopathy.,,⚪,Injured 15-Day
 COL,685326,McCade Brown,P,Right shoulder inflammation.,,🟡,Injured 60-Day
 COL,701487,Pierson Ohl,P,Injured 60-Day,,⚪,Injured 60-Day
 COL,807743,Sean Sullivan,P,Injured 15-Day,,⚪,Injured 15-Day
@@ -142,6 +141,7 @@ MIA,677053,Andrew Nardi,P,Left rib cage stress reaction.,,⚪,Injured 60-Day
 MIA,669622,Anthony Bender,P,Right shin stress reaction.,,⚪,Injured 15-Day
 MIA,676974,Max Meyer,P,Neck strain.,,🟡,Injured 15-Day
 MIA,683357,Owen Caissie,RF,Lumbar stress reaction,,⚪,Injured 10-Day
+MIA,664126,Pete Fairbanks,P,Right median nerve irritation.,,⚪,Injured 15-Day
 MIA,702281,Robby Snelling,P,Injured 60-Day,,⚪,Injured 60-Day
 MIA,678692,Ronny Henriquez,P,Right elbow surgery.,,🔴,Injured 60-Day
 MIA,687531,William Kempner,P,Right elbow sprain.,,🟡,Injured 60-Day
@@ -175,6 +175,7 @@ PHI,666969,Adolis García,RF,Right latissimus dorsi tear,,🔴,Injured 60-Day
 PHI,641745,Brad Keller,P,Right elbow UCL tear.,,🔴,Injured 60-Day
 PHI,668873,Caleb Kilian,P,Left oblique strain.,,🟡,Injured 15-Day
 PHI,694025,Felix Reyes,LF,Right wrist fracture,,🔴,Injured 60-Day
+PHI,666200,Jesús Luzardo,P,Left shoulder inflammation.,,🟡,Injured 15-Day
 PHI,679032,Johan Rojas,CF,Right elbow UCL repair.,,⚪,Injured 60-Day
 PIT,677952,Braxton Ashcraft,P,Right arm discomfort,,⚪,Injured 15-Day
 PIT,682848,Endy Rodríguez,C,Left hip inflammation.,,🟡,Injured 60-Day
@@ -237,6 +238,7 @@ TB,655889,Manuel Rodríguez,P,Low back strain.,,🟡,Injured 15-Day
 TB,686752,Ryan Pepiot,P,Right hip inflammation,,🟡,Injured 60-Day
 TB,663556,Shane McClanahan,P,Left forearm tightness.,,🟢,Injured 15-Day
 TB,670764,Taylor Walls,SS,Right hip flexor strain.,,🟡,Injured 10-Day
+TB,669330,Tyler Wells,P,Right forearm tightness.,,🟢,Injured 15-Day
 TEX,691945,Carter Baumler,P,Right intercostal strain.,,🟡,Injured 60-Day
 TEX,668390,Cole Winn,P,Right rotator cuff strain,,🟡,Injured 15-Day
 TEX,683004,Jack Leiter,P,Right ankle posterior impingement.,,⚪,Injured 60-Day
