@@ -18121,7 +18121,7 @@ function SimLabView({ data }) {
               🥊 {afSolidContactOnly ? 'Solid Contact Only' : 'Solid Contact'}
             </button>
             <button onClick={() => setAfLockedInOnly(v => !v)}
-              title="Locked In 🔐 — Top ISO (Arsenal Fit ISO>.200) + Solid Contact's EV bar (BvP EV>88.0) + Arsenal Blast% in the top quartile (>=71). Validated: 16.58% HR rate (1.54x lift, n=1,351, full 2026 season) — 15.55% train / 18.69% test on a chronological 70/30 split, strengthened on held-out data."
+              title="Locked In 🔐 — Top ISO (Arsenal Fit ISO>.200) + Solid Contact's EV bar (BvP EV>88.0) + Arsenal Blast% in the top quartile (>=71) + Hand Match full or elite (⭐⭐/⭐⭐⭐, not ⭐ partial). Validated: 20.39% HR rate (1.89x lift, n=407, full 2026 season) — 19.57% train / 22.22% test on a chronological 70/30 split, held up on the held-out half."
               style={{ padding: '2px 8px', borderRadius: 5, cursor: 'pointer', fontFamily: "'DM Mono',monospace",
                 fontSize: 9, fontWeight: 700, lineHeight: 1.5, flexShrink: 0,
                 background: afLockedInOnly ? 'rgba(56,242,130,.14)' : 'var(--surface2)',
@@ -28854,7 +28854,7 @@ function LegendButton() {
       '✅ HRs Only, ★ Barrel Signal Only, and 🥫 Sauce 2.5 Only stay as standalone quick-access buttons. Everything else — 🔑 Key Matchup, 🟢 Weak Spot, 📍 Close Call, 🍯 Sauce 2.0, 🍯🔥 Sauce 3.0, 📈 Top ISO, 💎 Prime ISO, 🥊 Solid Contact, 🔐 Locked In, 🗓️ Day Late, 2️⃣ 2-Bagger (Non-HR), 🎯 TB Signal, 🎲 Sim TB ≥2.0, 🧠 High Plate IQ, ⭐ Hand Match, 🔴/🔵 Ball Carry Juiced/Dead, ⬆️/⬇️ xHR Juiced/Dead, plus a Pitcher Grade multi-select — moved into the ⚙ Filters dropdown 2026-08-02 once the flat button row grew past what fits on a phone screen, same consolidation Barrel Lab/On Base/Arsenal Fit already went through. Sauce 3.0\'s own quick button moved into the panel that same day, once Sauce 2.5 took over the standalone slot.',
       '📈 Top ISO filter/card/column (added 2026-09-06) — Arsenal Fit ISO > .200 alone, same definition and validated 1.33x HR lift as Barrel Lab/Arsenal Fit\'s own Top ISO filter (added 2026-09-03). Reads "Arsenal Fit ISO" straight off the All Matchups export (already backfilled leak-free back to 5/17 for the Sauce 3.0 work, 85.8% coverage) — no new backfill needed. The "AF ISO" table column (Matchup Engine group) shows the raw value; "—" for any row where it\'s genuinely missing rather than 0.',
       '💎 Prime ISO filter/card (added 2026-09-06, same day as Top ISO) — Arsenal Fit ISO>.200 + BvP EV>=93 + Zone Fit>=2. Found by ranking every non-recent field\'s correlation with HR: BvP EV (r=0.081) actually beats Arsenal Fit ISO itself (r=0.066) as a standalone predictor — the single strongest thing to pair with it. Validated on a chronological 70/30 train/test split: 18.4% HR rate (1.57x lift) train, 17.1% (1.66x) test — held up, in fact strengthened, on the held-out half. Deliberately NOT a Sauce variant (no xwOBA/pitcher-grade gate) — a genuinely separate signal family, purely Arsenal-Fit-window contact quality + spatial zone fit.',
-      '🔐 Locked In filter/card (added 2026-09-16) — Top ISO (Arsenal Fit ISO>.200) + Solid Contact\'s own EV bar (BvP EV>88.0) + Arsenal Blast% in the top quartile (>=71). Found by stacking those three together and checking whether any of ~18 other columns added further real signal on top — most (Zone Fit, xwOBA, Key Matchup, Recent EV/Barrel%, Sim TB, Temp, etc.) either didn\'t move the needle or fell apart on held-out data, the same "recent form doesn\'t hold up" pattern this app keeps finding. Validated: full 2026 season window with real Arsenal Blast% data (8/3-9/14, n=1,351) 16.58% HR rate, 1.54x lift vs 10.77% base; chronological 70/30 split 15.55% train (n=907) / 18.69% test (n=444) — strengthened on the held-out half. xwOBA>=.360 was tested as a possible 4th gate (18.64% HR%, 1.73x, n=617) but left out by explicit user choice — it roughly halves the pool for +2pp, and stacking further candidates on top collapsed the test sample below 60 rows with train/test disagreeing.',
+      '🔐 Locked In filter/card (added 2026-09-16, Hand Match added same day) — Top ISO (Arsenal Fit ISO>.200) + Solid Contact\'s own EV bar (BvP EV>88.0) + Arsenal Blast% in the top quartile (>=71) + Hand Match full or elite (⭐⭐/⭐⭐⭐ — NOT ⭐ partial, which tested slightly negative on its own). Found by stacking Top ISO/Solid Contact/Blast% together, then checking whether any of ~18 other columns added further real signal on top — most (Zone Fit, xwOBA, Key Matchup, Recent EV/Barrel%, Sim TB, Temp, etc.) either didn\'t move the needle or fell apart on held-out data, the same "recent form doesn\'t hold up" pattern this app keeps finding. Hand Match won out over xwOBA\'s own runner-up result (18.64% HR%, 1.73x, n=617) — bigger point-gain, comparable retained sample. Validated: full 2026 season window with real Arsenal Blast% data (8/3-9/14) 20.39% HR rate (1.89x lift vs 10.79% base, n=407); chronological 70/30 split 19.57% train (n=281) / 22.22% test (n=126) — held up, higher on the held-out half than train.',
       '🗓️ Day Late filter/card (added 2026-08-02, alongside the FilterPanel consolidation) — same definition as Barrel Lab/On Base\'s Day Late badge (★ Barrel Signal on both of the last 2 real game days, no HR either day, today\'s pitcher not Elite), reimplemented against Track Record\'s own historical row data so it works on any past date, not just today\'s live slate.',
       '🏆 Top 4 Pick filter/column/card (added 2026-08-09, prompted by a real day — 8/9 — where 3 of the 4 live picks, Burleson/Conine/Ortiz, went yard) — for dates from 2026-08-13 onward, this reads the REAL locked Top 4 Tonight record (see next item) instead of guessing. For dates before that, it reconstructs which batter WOULD have been each tier\'s pick (Young Gun/Chalk/Mid-Tier/Longshot, one each) using the same selection algorithm: TrueHR×0.5 + MatchupScore×0.5 + Sauce/Bullpen bonuses, ranked within each tier, with Mid-Tier additionally gated by L7 ISO + Arsenal Fit ISO both >.190 (falling back to the plain top-graded Mid-Tier batter if nobody clears it). A batter already picked for an earlier tier is excluded from later ones, same dedup as the live tab. Genuinely LIMITED to dates where Young Gun/Chalk are both real-populated (checked live 2026-08-09: that\'s 8/2 onward) — dates before that are skipped entirely rather than silently mislabeled (a real bug caught in testing: on those older dates, blank Young Gun/Chalk data would have defaulted every batter into Mid-Tier). Card is HONEST about how thin this still is: at first build, 7 real dates / 27 picks / 1 hit (3.7%, vs 11.4% baseline) — well within normal noise at that sample size, not yet a real read either way. The "🏆 tier-emoji" combo in the table cell shows which specific tier that date\'s pick represents.',
       '🔒 Top 4 Tonight lock (added 2026-08-13) — the live Top 4 Tonight page used to recompute continuously all day (lineups confirming, injuries updating), so the "pick" for a tier could visibly change more than once before the day was over, and Track Record\'s own reconstruction (above) sometimes landed on a THIRD, different guess than either version actually shown live. Fixed by locking Top 4 Tonight\'s real picks at a flat 8pm ET cutoff each day and persisting that exact record server-side — the live page shows a stable 🔒 result for the rest of the day, and Track Record now reads that same real record instead of re-deriving its own guess. Deliberately NOT retroactive — dates before 2026-08-13 keep using the reconstruction above, which can genuinely disagree with what was shown live on those specific days.',
@@ -29476,16 +29476,21 @@ function TrackRecordTab() {
             // test on a chronological 70/30 split).
             isSolidContact: parseFloat(r['Arsenal Fit ISO']||0) > 0.180
               && parseFloat(r['BvP EV']||0) > 88.0,
-            // Locked In (2026-09-16) — Top ISO + Solid Contact's EV bar +
-            // top-quartile Arsenal Blast%. Same definition as
+            // Locked In (2026-09-16, Hand Match added same day) — Top ISO +
+            // Solid Contact's EV bar + top-quartile Arsenal Blast% + Hand
+            // Match full or elite (⭐⭐/⭐⭐⭐, not ⭐ partial — tested
+            // slightly negative on its own). Same definition as
             // isLockedInBatter() (module scope), reimplemented inline
             // against Track Record's own bracket-notation row shape, same
-            // precedent as isTopIso/isPrimeIso/isSolidContact above. See
-            // isLockedInBatter() for the full validation (16.58% HR rate,
-            // 1.54x lift, n=1,351; 15.55% train / 18.69% test).
+            // precedent as isTopIso/isPrimeIso/isSolidContact above. Reuses
+            // handMatchTier (already computed above, from blRow/obRow's
+            // 'Hand Match' column) rather than recomputing it. See
+            // isLockedInBatter() for the full validation (20.39% HR rate,
+            // 1.89x lift, n=407; 19.57% train / 22.22% test).
             isLockedIn: parseFloat(r['Arsenal Fit ISO']||0) > 0.2
               && parseFloat(r['BvP EV']||0) > 88.0
-              && parseFloat(blRow['Arsenal Blast%'] || obRow['Arsenal Blast%'] || 0) >= 71,
+              && parseFloat(blRow['Arsenal Blast%'] || obRow['Arsenal Blast%'] || 0) >= 71
+              && (handMatchTier === 'full' || handMatchTier === 'elite'),
             plateIQ, plateIQGrade: plateIQGrade(plateIQ),
             zoneAttackRisk: (r['Zone Risk']||'').toString().trim().toUpperCase() === 'YES',
             handMatchTier, isHandMatch,
@@ -30468,7 +30473,7 @@ function TrackRecordTab() {
             { key:'solidcontact', label:'🥊 Solid Contact Only', active:showOnlySolidContact, onToggle:()=>setShowOnlySolidContact(v=>!v), color:'#fb7185',
               title:"Solid Contact — Arsenal Fit ISO>.180 + BvP EV>88.0. Validated: 15.01% HR rate (1.35x lift, n=8,536, full 2026 season) — 1.33x train / 1.39x test on a chronological 70/30 split, stable." },
             { key:'lockedin', label:'🔐 Locked In Only', active:showOnlyLockedIn, onToggle:()=>setShowOnlyLockedIn(v=>!v), color:'var(--c-mint)',
-              title:"Locked In — Top ISO (Arsenal Fit ISO>.200) + Solid Contact's EV bar (BvP EV>88.0) + Arsenal Blast% in the top quartile (>=71). Validated: 16.58% HR rate (1.54x lift, n=1,351, full 2026 season) — 15.55% train / 18.69% test on a chronological 70/30 split, strengthened on held-out data." },
+              title:"Locked In — Top ISO (Arsenal Fit ISO>.200) + Solid Contact's EV bar (BvP EV>88.0) + Arsenal Blast% in the top quartile (>=71) + Hand Match full or elite (⭐⭐/⭐⭐⭐, not ⭐ partial). Validated: 20.39% HR rate (1.89x lift, n=407, full 2026 season) — 19.57% train / 22.22% test on a chronological 70/30 split, held up on the held-out half." },
             { key:'hitsig', label:'⚾ Hit Signal Only',      active:showOnlyHitSignal, onToggle:()=>setShowOnlyHitSignal(v=>!v), color:'#93c5fd',
               title:"Hit Signal — Sim H>=1.0 AND SwStr%<=15%. Full-season backtest: 64.1% any-hit rate, 1.12x lift, n=2,933, stable train/test." },
             { key:'secsauce', label:'🤫 Secret Sauce Only',  active:showOnlySecretSauce, onToggle:()=>setShowOnlySecretSauce(v=>!v), color:'var(--c-lavender)',
@@ -34454,30 +34459,44 @@ function isSolidContactBatter(r) {
   return Number.isFinite(iso) && iso > 0.180 && Number.isFinite(ev) && ev > 88.0;
 }
 
-// Locked In (2026-09-16) — Top ISO (Arsenal Fit ISO>.200) + Solid Contact's
-// own EV bar (BvP EV>88.0) + Arsenal Blast% in the top quartile (>=71, the
-// train-derived p75 cut, confirmed identical on the full window). Stacking
-// all three found a real edge neither catches alone. Validated against real
-// track-record-matchups.csv + track-record-barrel.csv outcomes (joined on
-// date+Batter ID, Arsenal Blast% only exists from 2026-08-03 onward):
-// full window (8/3-9/14, n=1,351) 16.58% HR rate, 1.54x lift vs 10.77% base.
-// Chronological 70/30 split: train 15.55% (n=907), test 18.69% (n=444) --
-// strengthened on held-out data, same "held up or improved" bar every
-// stacked signal in this app (Sauce tiers, Prime ISO) has had to clear.
+// Locked In (2026-09-16, Hand Match added 2026-09-16 same day) — Top ISO
+// (Arsenal Fit ISO>.200) + Solid Contact's own EV bar (BvP EV>88.0) +
+// Arsenal Blast% in the top quartile (>=71, the train-derived p75 cut,
+// confirmed identical on the full window) + Hand Match tier full or elite
+// (⭐⭐ or ⭐⭐⭐ — NOT ⭐ partial, which tested slightly negative on top of
+// the other three; see getHandMatchTier()'s own comment for what each
+// star tier means). Validated against real track-record-matchups.csv +
+// track-record-barrel.csv outcomes (joined on date+Batter ID, Arsenal
+// Blast% only exists from 2026-08-03 onward):
+//   3 signals alone (no Hand Match): full window n=1,392, 16.88% HR rate,
+//     1.56x lift vs 10.79% base.
+//   + Hand Match full/elite: full window n=407, 20.39% HR rate, 1.89x lift
+//     — a bigger jump than any other candidate tested (see below), on a
+//     comparable retained sample. Chronological 70/30 split: train 19.57%
+//     (n=281), test 22.22% (n=126) — held up, higher on test than train,
+//     same "held up or improved" bar every stacked signal in this app
+//     (Sauce tiers, Prime ISO) has had to clear.
+//   Per-tier breakdown on top of the 3-signal base (full window): ⭐ partial
+//     alone 15.86% (n=536, actually BELOW the 16.88% base — no help); ⭐⭐
+//     full alone 19.02% (n=368); ⭐⭐⭐ elite alone 33.33% (n=39, real
+//     direction but too thin to trust standalone); all three tiers combined
+//     17.82% (n=943, diluted by including the weak ⭐ tier) — confirming
+//     "full or elite" (excluding partial) is the right cut, not "any tier."
 // A broad sweep of ~18 other columns (Zone Fit, xwOBA, Key Matchup, Weak
-// Slot, Bullpen Rank, Recent EV/Barrel%, Sim TB, Temp, Hand Match, Pulled
-// Barrel%, etc.) as a possible 4th gate found xwOBA>=.360 the most stable
-// (18.64% HR%, 1.73x, n=617) — but it roughly halves the pool for +2pp, and
-// stacking any two of the surviving candidates together collapsed the test
-// sample below 60 rows with train/test disagreeing (overfitting). Left out
-// of this filter by explicit user choice — 3 signals, not 4 or more.
+// Slot, Bullpen Rank, Recent EV/Barrel%, Sim TB, Temp, Pulled Barrel%, etc.)
+// as a possible 4th gate found xwOBA>=.360 the most stable of the rest
+// (18.64% HR%, 1.73x, n=617) — but Hand Match beat it (bigger point-gain,
+// n=407 vs 617 — a smaller cut but not by much) and was chosen instead, by
+// explicit user request; xwOBA was tried once and explicitly rejected.
 function isLockedInBatter(r) {
   const iso   = parseFloat(r.bvp_iso ?? NaN);
   const ev    = parseFloat(r.bvp_avg_ev ?? NaN);
   const blast = getArsenalBlastPct(r);
+  const hm    = getHandMatchTier(r);
   return Number.isFinite(iso) && iso > 0.2
     && Number.isFinite(ev) && ev > 88.0
-    && blast != null && blast >= 71;
+    && blast != null && blast >= 71
+    && (hm === 'full' || hm === 'elite');
 }
 
 // ── Hit Signal (2026-08-04) — the "any hit" analog to Barrel/TB Signal.
@@ -36314,7 +36333,7 @@ function BarrelLabTab() {
             </button>
             <button
               onClick={() => setBlLockedInOnly(v => !v)}
-              title="Locked In 🔐 — Top ISO (Arsenal Fit ISO>.200) + Solid Contact's EV bar (BvP EV>88.0) + Arsenal Blast% in the top quartile (>=71). Validated: 16.58% HR rate (1.54x lift, n=1,351, full 2026 season) — 15.55% train / 18.69% test on a chronological 70/30 split, strengthened on held-out data."
+              title="Locked In 🔐 — Top ISO (Arsenal Fit ISO>.200) + Solid Contact's EV bar (BvP EV>88.0) + Arsenal Blast% in the top quartile (>=71) + Hand Match full or elite (⭐⭐/⭐⭐⭐, not ⭐ partial). Validated: 20.39% HR rate (1.89x lift, n=407, full 2026 season) — 19.57% train / 22.22% test on a chronological 70/30 split, held up on the held-out half."
               style={{
                 padding:'2px 8px', borderRadius:5, cursor:'pointer',
                 fontFamily:"'DM Mono',monospace", fontSize:9, fontWeight:700,
