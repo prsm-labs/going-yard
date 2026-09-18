@@ -53,7 +53,6 @@ BOS,594027,Tyron Guerrero,P,Right shoulder inflammation.,,🟡,Injured 15-Day
 BOS,677161,Zack Kelly,P,Right elbow inflammation.,,🟡,Injured 60-Day
 CHC,676962,Ben Brown,P,Neck strain.,,🟡,Injured 60-Day
 CHC,690990,Cade Horton,P,Right forearm strain.,,🟡,Injured 60-Day
-CHC,621020,Dansby Swanson,SS,Left oblique strain.,,🟡,Injured 10-Day
 CHC,668970,Gavin Hollowell,P,Right shoulder inflammation.,,🟡,Injured 15-Day
 CHC,640451,Hunter Harvey,P,Right triceps inflammation.,,🟡,Injured 60-Day
 CHC,657006,Justin Steele,P,Left elbow injury,,⚪,Injured 60-Day
@@ -65,8 +64,9 @@ CHC,663423,Trent Thornton,P,Left ankle sprain.,,🟡,Injured 15-Day
 CHC,592122,Tyler Austin,1B,Right knee surgery.,,🔴,Injured 60-Day
 CIN,694362,Blake Dunn,CF,Right elbow sprain.,,🟡,Injured 60-Day
 CIN,668881,Hunter Greene,P,Right elbow soreness.,,🟡,Injured 60-Day
+CIN,670062,Julian Garcia,P,Right elbow loose bodies,,⚪,Injured 15-Day
 CIN,669911,Michael Toglia,1B,Right shoulder dislocation.,,⚪,Injured 60-Day
-CIN,668715,Spencer Steer,1B,Right wrist sprain,,🟡,Injured 10-Day
+CIN,668715,Spencer Steer,1B,Right wrist sprain,,🟡,Injured 60-Day
 CLE,670059,Colin Holderman,P,Right wrist inflammation.,,🟡,Injured 15-Day
 CLE,656555,Rhys Hoskins,1B,Lower back inflammation.,,🟡,Injured 10-Day
 CLE,542888,Shawn Armstrong,P,Left calf strain.,,🟡,Injured 60-Day
@@ -156,6 +156,7 @@ MIN,701785,Kaelen Culpepper,SS,Left hamstring strain.,,🟡,Injured 10-Day
 MIN,690953,Mick Abel,P,Right elbow inflammation.,,🟡,Injured 60-Day
 MIN,702474,Mike Paredes,P,Left oblique strain.,,🟡,Injured 60-Day
 MIN,641154,Pablo López,P,Tommy John surgery.,,🔴,Injured 60-Day
+MIN,663616,Trevor Larnach,LF,Left wrist sprain.,,🟡,Injured 10-Day
 NYM,672335,Cionel Pérez,P,Left forearm strain.,,🟡,Injured 15-Day
 NYM,650960,Daniel Duarte,P,Left hamstring strain,,🟡,Injured 15-Day
 NYM,642207,Devin Williams,P,Right shoulder strain.,,🟡,Injured 15-Day
@@ -224,6 +225,7 @@ SF,642715,Willy Adames,SS,Left elbow sprain,,🟡,Injured 10-Day
 STL,691458,Blaze Jordan,3B,Left ankle sprain,,🟡,Injured 10-Day
 STL,677592,Everson Pereira,RF,Left hand contusion.,,🟢,Injured 10-Day
 STL,690928,Hunter Dobbins,P,Right forearm tightness.,,🟢,Injured 15-Day
+STL,695491,Joshua Báez,LF,Left oblique strain,,🟡,Injured 10-Day
 STL,691008,Max Rajcic,P,Right elbow soreness.,,🟡,Injured 60-Day
 TB,810938,Ben Williamson,2B,Right hamstring strain.,,🟡,Injured 10-Day
 TB,670955,Edwin Uceta,P,Right shoulder impingement,,⚪,Injured 60-Day
