@@ -1,7 +1,7 @@
 Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitcher ID (Away),Game ID,Venue ID,Venue Name,Day of Week,Day Abbr,Series Game #,Games in Series,Series Position,Day Context
 2026-09-19,02:10 PM,CWS,DET,680732.0,695549.0,824545,4,Rate Field,Saturday,Sat,3,4,Middle,✅ Strong (hittable pitchers)
 2026-09-19,04:05 PM,BAL,MIL,669432.0,688107.0,824788,2,Oriole Park at Camden Yards,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
-2026-09-19,04:10 PM,TB,BOS,642547.0,,822921,12,Tropicana Field,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
+2026-09-19,04:10 PM,TB,BOS,642547.0,678394.0,822921,12,Tropicana Field,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
 2026-09-19,04:10 PM,NYM,PHI,681035.0,691725.0,823571,3289,Citi Field,Saturday,Sat,3,4,Middle,✅ Strong (hittable pitchers)
 2026-09-19,06:10 PM,CLE,ATH,676440.0,682052.0,824380,5,Progressive Field,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
 2026-09-19,06:40 PM,CIN,CHC,666157.0,571510.0,824461,2602,Great American Ball Park,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
@@ -12,7 +12,7 @@ Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitc
 2026-09-19,08:10 PM,COL,SEA,500779.0,682243.0,824304,19,Coors Field,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
 2026-09-19,08:10 PM,AZ,NYY,694297.0,693645.0,825029,15,Chase Field,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
 2026-09-19,08:40 PM,SD,MIA,663554.0,691587.0,823249,2680,Petco Park,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
-2026-09-19,09:10 PM,LAD,SF,669373.0,,823899,22,UNIQLO Field at Dodger Stadium,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
+2026-09-19,09:10 PM,LAD,SF,669373.0,805074.0,823899,22,UNIQLO Field at Dodger Stadium,Saturday,Sat,2,3,Middle,✅ Strong (hittable pitchers)
 2026-09-19,09:38 PM,LAA,MIN,672282.0,657746.0,823976,1,Angel Stadium,Saturday,Sat,3,4,Middle,✅ Strong (hittable pitchers)
 2026-09-20,01:10 PM,NYM,PHI,804636.0,650911.0,823570,3289,Citi Field,Sunday,Sun,4,4,Finale,~ Neutral (check pitcher)
 2026-09-20,01:35 PM,PIT,KC,,608379.0,823329,31,PNC Park,Sunday,Sun,3,3,Finale,~ Neutral (check pitcher)
