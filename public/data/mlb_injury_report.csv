@@ -69,7 +69,6 @@ CLE,670059,Colin Holderman,P,Right wrist inflammation.,,🟡,Injured 15-Day
 CLE,656555,Rhys Hoskins,1B,Lower back inflammation.,,🟡,Injured 10-Day
 CLE,542888,Shawn Armstrong,P,Left calf strain.,,🟡,Injured 60-Day
 COL,801403,Chase Dollander,P,Right elbow strain.,,🟡,Injured 60-Day
-COL,500779,Jose Quintana,P,Left elbow sprain.,,🟡,Injured 60-Day
 COL,592178,Kris Bryant,DH,Lumbar degenerative disk disease.,,⚪,Injured 60-Day
 COL,685326,McCade Brown,P,Right shoulder inflammation.,,🟡,Injured 60-Day
 COL,701487,Pierson Ohl,P,Injured 60-Day,,⚪,Injured 60-Day
@@ -97,6 +96,7 @@ DET,672761,Wenceel Pérez,RF,Left orbital fracture.,,🔴,Injured 60-Day
 DET,676684,Will Vest,P,Right posterior elbow inflammation.,,🟡,Injured 60-Day
 HOU,687888,Brandon Walter,P,Left elbow surgery recovery,,🔴,Injured 60-Day
 HOU,621043,Carlos Correa,SS,Left ankle tendon injury.,,⚪,Injured 60-Day
+HOU,660853,Enyel De Los Santos,P,Right knee tendinitis.,,⚪,Injured 15-Day
 HOU,681347,Mike Burrows,P,Injured 60-Day,,⚪,Injured 60-Day
 HOU,595345,Steven Okert,P,Right hamstring strain.,,🟡,Injured 15-Day
 KC,679525,Alec Marsh,P,Right shoulder impingement.,,⚪,Injured 60-Day
@@ -217,8 +217,8 @@ SF,657424,Matt Gage,P,Left elbow strain.,,🟡,Injured 60-Day
 SF,801501,Nate Furman,2B,Right oblique strain.,,🟡,Injured 10-Day
 SF,646240,Rafael Devers,1B,Core muscle injury.,,⚪,Injured 60-Day
 SF,678495,Randy Rodríguez,P,Injured 60-Day,,⚪,Injured 60-Day
+SF,665665,Reiver Sanmartin,P,Right oblique strain.,,🟡,Injured 15-Day
 SF,592858,Rowan Wick,P,Recovery from Tommy John surgery.,,🔴,Injured 60-Day
-SF,656529,Sam Hentges,P,Left forearm strain.,,🟡,Injured 15-Day
 SF,686790,Trevor McDonald,P,Right elbow strain.,,🟡,Injured 60-Day
 SF,642715,Willy Adames,SS,Left elbow sprain,,🟡,Injured 10-Day
 STL,691458,Blaze Jordan,3B,Left ankle sprain,,🟡,Injured 10-Day
@@ -242,6 +242,7 @@ TEX,656222,Jalen Beeks,P,Injured 60-Day,,⚪,Injured 60-Day
 TEX,692030,Jose Corniell,P,Injured 60-Day,,⚪,Injured 60-Day
 TEX,543309,Kyle Higashioka,C,Injured 10-Day,,⚪,Injured 10-Day
 TEX,680737,Michael Helman,CF,Right finger fracture,,🔴,Injured 60-Day
+TEX,671305,Michel Otañez,P,Viral illness.,,⚪,Injured 15-Day
 TEX,682608,Peyton Gray,P,Right elbow inflammation,,🟡,Injured 15-Day
 TOR,680718,Addison Barger,RF,Right elbow inflammation.,,🟡,Injured 60-Day
 TOR,623993,Anthony Santander,RF,Left shoulder labral tear.,,🔴,Injured 60-Day
