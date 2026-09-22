@@ -83,6 +83,7 @@ CWS,672860,Prelander Berroa,P,Tommy John surgery recovery,,🔴,Injured 60-Day
 CWS,695020,Tanner Murray,LF,Left shoulder dislocation.,,⚪,Injured 60-Day
 DET,690544,Bailey Horn,P,Left elbow arthroscopy recovery,,⚪,Injured 60-Day
 DET,572143,Burch Smith,P,Right shoulder inflammation.,,🟡,Injured 60-Day
+DET,690993,Colt Keith,3B,Injured 10-Day,,⚪,Injured 10-Day
 DET,656427,Jack Flaherty,P,Right flexor inflammation.,,🟡,Injured 15-Day
 DET,434378,Justin Verlander,P,Left hip inflammation.,,🟡,Injured 60-Day
 DET,681481,Kerry Carpenter,RF,Left foot plantar fasciitis,,⚪,Injured 10-Day
@@ -91,6 +92,7 @@ DET,663837,Matt Vierling,CF,Left adductor strain,,🟡,Injured 60-Day
 DET,678009,Parker Meadows,CF,Left radius fracture.,,🔴,Injured 60-Day
 DET,681857,Reese Olson,P,Right Shoulder Labral Repair,,⚪,Injured 60-Day
 DET,700242,Trey Sweeney,SS,Right shoulder strain,,🟡,Injured 60-Day
+DET,675512,Troy Melton,P,Injured 15-Day,,⚪,Injured 15-Day
 DET,672761,Wenceel Pérez,RF,Left orbital fracture.,,🔴,Injured 60-Day
 DET,676684,Will Vest,P,Right posterior elbow inflammation.,,🟡,Injured 60-Day
 HOU,687888,Brandon Walter,P,Left elbow surgery recovery,,🔴,Injured 60-Day
@@ -108,7 +110,6 @@ KC,663697,Jonathan India,2B,Left shoulder subluxation.,,⚪,Injured 60-Day
 KC,679883,Luinder Avila,P,Right forearm tightness.,,🟢,Injured 60-Day
 KC,683232,Nick Mears,P,Right shoulder impingement.,,⚪,Injured 60-Day
 KC,663568,Stephen Kolek,P,Right flexor strain.,,🟡,Injured 60-Day
-KC,664062,Tony Gonsolin,P,Right elbow surgery.,,🔴,Injured 15-Day
 LAA,543685,Anthony Rendon,3B,Left hip labrum surgery.,,🔴,Injured 60-Day
 LAA,691946,George Klassen,P,Left low back inflammation.,,🟡,Injured 15-Day
 LAA,672569,Gustavo Campero,OF,Right hamstring strain.,,🟡,Injured 10-Day
@@ -118,7 +119,6 @@ LAA,694384,Nolan Schanuel,1B,Right intercostal muscle strain,,🟡,Injured 10-Da
 LAA,596112,Robert Stephenson,P,Right elbow inflammation.,,🟡,Injured 60-Day
 LAA,696519,Samy Natera Jr.,P,Left forearm inflammation.,,🟡,Injured 15-Day
 LAA,660162,Yoán Moncada,3B,Right knee inflammation.,,🟡,Injured 60-Day
-LAD,681624,Andy Pages,CF,Left hand fracture.,,🔴,Injured 10-Day
 LAD,676508,Ben Casparius,P,Right shoulder inflammation,,🟡,Injured 60-Day
 LAD,660813,Brusdar Graterol,P,Injured 60-Day,,⚪,Injured 60-Day
 LAD,687221,Dalton Rushing,C,Right elbow discomfort,,⚪,Injured 10-Day
@@ -126,7 +126,6 @@ LAD,683618,Edgardo Henriquez,P,Lower back discomfort,,⚪,Injured 15-Day
 LAD,641778,Eric Lauer,P,Left elbow inflammation.,,🟡,Injured 60-Day
 LAD,694813,Gavin Stone,P,Right shoulder inflammation.,,🟡,Injured 60-Day
 LAD,664776,Jake Cousins,P,Injured 60-Day,,⚪,Injured 60-Day
-LAD,808963,Roki Sasaki,P,Right middle finger blister,,⚪,Injured 15-Day
 LAD,660271,Shohei Ohtani,TWP,Right biceps inflammation,,🟡,Injured 15-Day
 LAD,694361,Will Klein,P,Right elbow discomfort.,,⚪,Injured 60-Day
 MIA,800049,Adam Mazur,P,Right elbow surgery.,,🔴,Injured 60-Day
@@ -199,6 +198,7 @@ SEA,666374,Matt Brash,P,Right lat strain.,,🟡,Injured 60-Day
 SEA,689546,Nick Davila,P,SC joint sprain.,,🟡,Injured 60-Day
 SEA,669717,Will Wilson,3B,Left thumb fracture.,,🔴,Injured 60-Day
 SF,605288,Adrian Houser,P,Right forearm strain.,,🟡,Injured 60-Day
+SF,805811,Bryce Eldridge,DH,Concussion,,⚪,Injured 7-Day
 SF,687931,Carson Whisenhunt,P,Left elbow sprain.,,🟡,Injured 60-Day
 SF,669477,Casey Schmitt,LF,Left knee meniscus tear.,,🔴,Injured 60-Day
 SF,691740,Daniel Susac,C,Left knee patella fracture.,,🔴,Injured 60-Day
@@ -208,9 +208,9 @@ SF,664141,JT Brubaker,P,Bruised ribs,,🟢,Injured 10-Day
 SF,683679,Jesus Rodriguez,C,Right elbow neuritis.,,⚪,Injured 60-Day
 SF,666711,Joel Peguero,P,Left hamstring strain,,🟡,Injured 60-Day
 SF,676130,José Buttó,P,Right arm fatigue,,⚪,Injured 60-Day
+SF,808982,Jung Hoo Lee,RF,Groin contusion,,🟢,Injured 10-Day
 SF,676775,Keaton Winn,P,Right elbow neuritis.,,⚪,Injured 60-Day
 SF,657277,Logan Webb,P,Right middle finger blister.,,⚪,Injured 15-Day
-SF,691785,Marcelo Mayer,2B,Injured 10-Day,,⚪,Injured 10-Day
 SF,656305,Matt Chapman,3B,Abdominal strain.,,🟡,Injured 60-Day
 SF,657424,Matt Gage,P,Left elbow strain.,,🟡,Injured 60-Day
 SF,801501,Nate Furman,2B,Right oblique strain.,,🟡,Injured 10-Day
