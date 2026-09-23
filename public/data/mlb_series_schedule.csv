@@ -1,6 +1,6 @@
 Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitcher ID (Away),Game ID,Venue ID,Venue Name,Day of Week,Day Abbr,Series Game #,Games in Series,Series Position,Day Context
 2026-09-23,01:10 PM,DET,WSH,664285.0,663992.0,824223,2394,Comerica Park,Wednesday,Wed,3,3,Finale,~ Neutral
-2026-09-23,01:35 PM,BAL,TOR,,453286.0,824785,2,Oriole Park at Camden Yards,Wednesday,Wed,2,3,Middle,~ Neutral
+2026-09-23,01:35 PM,BAL,TOR,605135.0,453286.0,824785,2,Oriole Park at Camden Yards,Wednesday,Wed,2,3,Middle,~ Neutral
 2026-09-23,06:35 PM,BAL,TOR,,,824784,2,Oriole Park at Camden Yards,Wednesday,Wed,3,3,Finale,~ Neutral
 2026-09-23,03:45 PM,SF,MIN,702885.0,687570.0,823168,2395,Oracle Park,Wednesday,Wed,3,3,Finale,~ Neutral
 2026-09-23,06:40 PM,PIT,STL,669199.0,669461.0,823327,31,PNC Park,Wednesday,Wed,2,3,Middle,~ Neutral
@@ -10,7 +10,7 @@ Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitc
 2026-09-23,07:15 PM,ATL,CIN,519242.0,671096.0,824868,4705,Truist Park,Wednesday,Wed,2,3,Middle,~ Neutral
 2026-09-23,07:40 PM,KC,CWS,607625.0,663542.0,824060,7,Kauffman Stadium,Wednesday,Wed,2,3,Middle,~ Neutral
 2026-09-23,07:40 PM,CHC,MIA,592332.0,687473.0,824625,17,Wrigley Field,Wednesday,Wed,2,3,Middle,~ Neutral
-2026-09-23,08:05 PM,TEX,NYM,,690997.0,822841,5325,Globe Life Field,Wednesday,Wed,2,3,Middle,~ Neutral
+2026-09-23,08:05 PM,TEX,NYM,674003.0,690997.0,822841,5325,Globe Life Field,Wednesday,Wed,2,3,Middle,~ Neutral
 2026-09-23,08:40 PM,COL,AZ,690279.0,518876.0,824301,19,Coors Field,Wednesday,Wed,2,3,Middle,~ Neutral
 2026-09-23,09:40 PM,ATH,LAA,605488.0,700712.0,824951,2529,Sutter Health Park,Wednesday,Wed,2,2,Finale,~ Neutral
 2026-09-23,10:10 PM,LAD,SD,808967.0,592662.0,823894,22,UNIQLO Field at Dodger Stadium,Wednesday,Wed,2,3,Middle,~ Neutral
