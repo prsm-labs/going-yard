@@ -1,7 +1,7 @@
 Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitcher ID (Away),Game ID,Venue ID,Venue Name,Day of Week,Day Abbr,Series Game #,Games in Series,Series Position,Day Context
 2026-09-23,01:10 PM,DET,WSH,664285.0,663992.0,824223,2394,Comerica Park,Wednesday,Wed,3,3,Finale,~ Neutral
 2026-09-23,01:35 PM,BAL,TOR,605135.0,453286.0,824785,2,Oriole Park at Camden Yards,Wednesday,Wed,2,3,Middle,~ Neutral
-2026-09-23,06:35 PM,BAL,TOR,,,824784,2,Oriole Park at Camden Yards,Wednesday,Wed,3,3,Finale,~ Neutral
+2026-09-23,06:35 PM,BAL,TOR,694346.0,,824784,2,Oriole Park at Camden Yards,Wednesday,Wed,3,3,Finale,~ Neutral
 2026-09-23,03:45 PM,SF,MIN,702885.0,687570.0,823168,2395,Oracle Park,Wednesday,Wed,3,3,Finale,~ Neutral
 2026-09-23,06:40 PM,PIT,STL,669199.0,669461.0,823327,31,PNC Park,Wednesday,Wed,2,3,Middle,~ Neutral
 2026-09-23,06:40 PM,PHI,MIL,605400.0,701656.0,823410,2681,Citizens Bank Park,Wednesday,Wed,2,3,Middle,~ Neutral
@@ -19,8 +19,8 @@ Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitc
 2026-09-24,02:10 PM,KC,CWS,677976.0,,824059,7,Kauffman Stadium,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
 2026-09-24,02:20 PM,CHC,MIA,,663969.0,824623,17,Wrigley Field,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
 2026-09-24,02:35 PM,TEX,NYM,,804267.0,822842,5325,Globe Life Field,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
-2026-09-24,03:10 PM,COL,AZ,,593958.0,824298,19,Coors Field,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
-2026-09-24,06:05 PM,PHI,MIL,,,823411,2681,Citizens Bank Park,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
+2026-09-24,03:10 PM,COL,AZ,685299.0,593958.0,824298,19,Coors Field,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
+2026-09-24,06:05 PM,PHI,MIL,691725.0,,823411,2681,Citizens Bank Park,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
 2026-09-24,06:45 PM,BOS,CLE,624133.0,,824707,3,Fenway Park,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
 2026-09-24,07:05 PM,NYY,TB,693645.0,642547.0,823493,3313,Yankee Stadium,Thursday,Thu,4,4,Finale,✅ Best Day (getaway)
 2026-09-24,07:15 PM,ATL,CIN,641816.0,663903.0,824866,4705,Truist Park,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
