@@ -16903,7 +16903,7 @@ function SimLabView({ data }) {
       .filter(r => !afMidTierOnly   || r.isMidTier)
       .filter(r => !afSauce3Only    || r.isSauce3)
       .filter(r => !afSauce25Only   || r.isSauce25)
-      .filter(r => !afTopIsoOnly    || parseFloat(r.bvp_iso||0) > 0.2)
+      .filter(r => !afTopIsoOnly    || parseFloat(r.bvp_iso||0) > 0.199)
       .filter(r => !afPrimeIsoOnly  || isPrimeIsoBatter(r))
       .filter(r => !afSolidContactOnly || isSolidContactBatter(r))
       .filter(r => !afLockedInOnly || isLockedInBatter(r))
@@ -29457,14 +29457,23 @@ function TrackRecordTab() {
             // threshold/definition as Barrel Lab/Arsenal Fit's own 📈 Top ISO
             // filter (added 2026-09-03). Reads the same afIsoRaw already
             // extracted above — no new field needed.
-            isTopIso: parseFloat(r['Arsenal Fit ISO']||0) > 0.2,
+            // Threshold moved to >.199 (2026-09-24) — a real batter reported
+            // at exactly .200 was being excluded by the strict >0.2 check
+            // (equality isn't "greater than"); >.199 is functionally
+            // identical to >=.200 for this 3-decimal-precision field but
+            // also absorbs any float-representation noise in the source
+            // data, and matches the exact fix applied to the module-scope
+            // isPrimeIsoBatter()/isLockedInBatter() and both live Top ISO
+            // filter call sites (Arsenal Fit/Barrel Lab) the same day.
+            isTopIso: parseFloat(r['Arsenal Fit ISO']||0) > 0.199,
             // Prime ISO (2026-09-06) — Arsenal Fit ISO>.200 + BvP EV>=93 +
             // Zone Fit>=2. Same definition as isPrimeIsoBatter() (module
             // scope) — reimplemented inline against Track Record's own
             // bracket-notation CSV row shape, same precedent as isSauce2/
             // isSauce25/isTopIso above. See isPrimeIsoBatter() for the full
             // validation (18.4% train / 17.1% test HR rate, ~1.6x lift).
-            isPrimeIso: parseFloat(r['Arsenal Fit ISO']||0) > 0.2
+            // Same >.199 boundary fix as isTopIso above (2026-09-24).
+            isPrimeIso: parseFloat(r['Arsenal Fit ISO']||0) > 0.199
               && parseFloat(r['BvP EV']||0) >= 93
               && parseFloat(r['Zone Fit']||0) >= 2,
             // Solid Contact (2026-09-12) — Arsenal Fit ISO>.180 + BvP EV>88.
@@ -29486,8 +29495,9 @@ function TrackRecordTab() {
             // handMatchTier (already computed above, from blRow/obRow's
             // 'Hand Match' column) rather than recomputing it. See
             // isLockedInBatter() for the full validation (20.39% HR rate,
-            // 1.89x lift, n=407; 19.57% train / 22.22% test).
-            isLockedIn: parseFloat(r['Arsenal Fit ISO']||0) > 0.2
+            // 1.89x lift, n=407; 19.57% train / 22.22% test). Same >.199
+            // boundary fix as isTopIso/isPrimeIso above (2026-09-24).
+            isLockedIn: parseFloat(r['Arsenal Fit ISO']||0) > 0.199
               && parseFloat(r['BvP EV']||0) > 88.0
               && parseFloat(blRow['Arsenal Blast%'] || obRow['Arsenal Blast%'] || 0) >= 71
               && (handMatchTier === 'full' || handMatchTier === 'elite'),
@@ -34439,7 +34449,13 @@ function isPrimeIsoBatter(r) {
   const iso = parseFloat(r.bvp_iso ?? NaN);
   const ev  = parseFloat(r.bvp_avg_ev ?? NaN);
   const zf  = parseFloat(r.zone_fit || 0);
-  return Number.isFinite(iso) && iso > 0.2 && Number.isFinite(ev) && ev >= 93 && zf >= 2;
+  // >.199, not >.2 (2026-09-24) — a batter reported at exactly .200 was
+  // being excluded by strict >0.2 (equality isn't "greater than"); >.199 is
+  // functionally identical to >=.200 for this 3-decimal-precision field.
+  // Same fix applied everywhere else this ISO condition is used: Top ISO's
+  // two live filter call sites, isLockedInBatter(), and all 3 of Track
+  // Record's own inline reimplementations.
+  return Number.isFinite(iso) && iso > 0.199 && Number.isFinite(ev) && ev >= 93 && zf >= 2;
 }
 
 // Solid Contact (2026-09-12) — Arsenal Fit ISO > .180 AND BvP EV > 88.0. A
@@ -34493,7 +34509,10 @@ function isLockedInBatter(r) {
   const ev    = parseFloat(r.bvp_avg_ev ?? NaN);
   const blast = getArsenalBlastPct(r);
   const hm    = getHandMatchTier(r);
-  return Number.isFinite(iso) && iso > 0.2
+  // >.199, not >.2 (2026-09-24) — same boundary fix as isPrimeIsoBatter()'s
+  // own comment explains: a .200-exactly batter was being excluded by the
+  // strict >0.2 check.
+  return Number.isFinite(iso) && iso > 0.199
     && Number.isFinite(ev) && ev > 88.0
     && blast != null && blast >= 71
     && (hm === 'full' || hm === 'elite');
@@ -35952,7 +35971,7 @@ function BarrelLabTab() {
     .filter(r => !blHandMatchOnly || r.handMatchTier)
     .filter(r => !blSauce3Only || r.isSauce3)
     .filter(r => !blSauce25Only || r.isSauce25)
-    .filter(r => !blTopIsoOnly || parseFloat(r.bvp_iso||0) > 0.2)
+    .filter(r => !blTopIsoOnly || parseFloat(r.bvp_iso||0) > 0.199)
     .filter(r => !blPrimeIsoOnly || isPrimeIsoBatter(r))
     .filter(r => !blSolidContactOnly || isSolidContactBatter(r))
     .filter(r => !blLockedInOnly || isLockedInBatter(r))
