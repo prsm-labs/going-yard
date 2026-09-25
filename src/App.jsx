@@ -25519,6 +25519,7 @@ function MatchupEngineTab() {
       ['Yard Score 🎯', "Going Yard's HR probability score (0–99). Higher = stronger alignment of contact quality, matchup, park, weather, and recent form. Not a guarantee — a signal composite."],
       ['Pitcher Grades', "🎯 Target = most favorable to homer off · 💥 Hittable = solid spot · 🤔 Average = neutral · ⚠️ Tough = difficult · ‼️ Elite = avoid. Based on HR/9, wOBA allowed, and zone vulnerability."],
       ['Batter Grades', "A+ = 6–8 signal flags (live tracker: 18.8% HR rate) · A = 4–5 (17.5%) · B = 2–3 (12.8%) · C = 1 (12.1%) · D = 0 (9.8%). Signals include LA lock, bat speed peak, pitch convergence, platoon match, close calls, and zone fit."],
+      ['🏆 Milestones', "Every active batter within 5 of a career or season round-number milestone (Home Runs, Hits, Total Bases, Stolen Bases, Extra-Base Hits) — modeled on Baseball-Reference's own upcoming-milestones page, extended to season totals too. Refreshed nightly (not live during games) by a standalone MLB Stats API pull — too many players (~660) to check live on page load. Career milestones use nearest-100 (HR/SB/XBH) or nearest-500 (Hits/Total Bases, since career totals run into the thousands); season milestones use nearest-10 (HR/SB/XBH) or nearest-50 (Hits/Total Bases) so a real single-season number like 30 stolen bases doesn't get missed."],
     ]} onClose={()=>setShowKMHelp(false)}/>}
     <div style={{display:'flex',flexDirection:'column',gap:4,marginBottom:14}}>
       {/* Row 1: matchup boards */}
@@ -25539,6 +25540,7 @@ function MatchupEngineTab() {
         <button style={stBtn('batters')}   onClick={()=>setSubTab('batters')}>🧢 Batters</button>
         <button style={stBtn('pitchers')}  onClick={()=>setSubTab('pitchers')}>⚾ Pitchers</button>
         <button style={stBtn('history')}   onClick={()=>setSubTab('history')}>📜 BvP History</button>
+        <button style={stBtn('milestones')} data-subtab="milestones" onClick={()=>setSubTab('milestones')}>🏆 Milestones</button>
         <HelpBtn onClick={()=>setShowKMHelp(v=>!v)}/>
       </div>
     </div>
@@ -25612,6 +25614,8 @@ function MatchupEngineTab() {
     {subTab==='barrel' && <DailyBarrelTab/>}
 
     {subTab==='history' && <BvPHistoryTab data={activeData}/>}
+
+    {subTab==='milestones' && <MilestonesTab/>}
 
     {subTab==='batters' && (
       <div>
@@ -34983,6 +34987,187 @@ function WeatherStrip({ rows }) {
         </div>
         );
       })}
+    </div>
+  );
+}
+
+// ── Milestones Tab (2026-09-25) — career/season milestone proximity for
+// every active batter. Modeled on baseball-reference.com/friv/upcoming-
+// milestones.shtml (confirmed live before building: real examples like
+// Manny Machado 398->400 career HR, Joc Pederson 1,998->2,000 career TB),
+// extended to season milestones too (B-R's own page is career-only) and
+// scoped to the 5 categories the user asked for (HR, Hits, Total Bases,
+// Stolen Bases, Extra-Base Hits). Fully precomputed by milestone_tracker.py
+// (~1,300 live MLB Stats API calls, too slow for a live page load) — this
+// component is a pure read-only display of that output, no client-side
+// computation of milestone distance at all.
+//
+// Milestone step sizes (confirmed with the user, NOT a uniform nearest-100
+// — they gave a real counterexample: Elly De La Cruz at 29 season steals
+// needs the SEASON step to be nearest-10, not nearest-100, or it would
+// never fire for a single-season total):
+//   Career HR/SB/XBH -> nearest 100   Career Hits/TB -> nearest 500
+//   Season HR/SB/XBH -> nearest 10    Season Hits/TB -> nearest 50
+// See milestone_tracker.py's own header comment for the full rationale
+// and the live-data verification behind each design choice.
+function MilestonesTab() {
+  const mono = "'DM Mono',monospace";
+  const osw  = "'Oswald',sans-serif";
+  const [rows,    setRows]    = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState(null);
+  const [scopeFilter, setScopeFilter] = useState('all'); // 'all' | 'Career' | 'Season'
+  const [catFilter,   setCatFilter]   = useState(() => new Set()); // empty = all categories
+  const [sortCol, setSortCol] = useState('Away');
+  const [sortDir, setSortDir] = useState('asc'); // closest to a milestone first, by default
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/data/milestones.csv')
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text(); })
+      .then(text => {
+        if (cancelled) return;
+        const parsed = parseCSVText(text).map(r => ({
+          ...r,
+          Current:   parseInt(r.Current, 10) || 0,
+          Milestone: parseInt(r.Milestone, 10) || 0,
+          Away:      parseInt(r.Away, 10) || 0,
+        }));
+        setRows(parsed);
+        setLoading(false);
+      })
+      .catch(e => { if (!cancelled) { setError(e.message); setLoading(false); } });
+    return () => { cancelled = true; };
+  }, []);
+
+  const CATEGORIES = ['Home Runs', 'Hits', 'Total Bases', 'Stolen Bases', 'Extra-Base Hits'];
+
+  const filtered = useMemo(() => {
+    let base = rows;
+    if (scopeFilter !== 'all') base = base.filter(r => r.Scope === scopeFilter);
+    if (catFilter.size > 0) base = base.filter(r => catFilter.has(r.Category));
+    return [...base].sort((a, b) => {
+      const va = a[sortCol], vb = b[sortCol];
+      if (va < vb) return sortDir === 'asc' ? -1 : 1;
+      if (va > vb) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [rows, scopeFilter, catFilter, sortCol, sortDir]);
+
+  const toggleCat = (cat) => setCatFilter(prev => {
+    const next = new Set(prev);
+    if (next.has(cat)) next.delete(cat); else next.add(cat);
+    return next;
+  });
+
+  const handleSort = (col) => {
+    if (!col) return;
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortCol(col); setSortDir('asc'); }
+  };
+
+  const SortTh = ({ col, label, align }) => (
+    <th onClick={() => handleSort(col)} style={{
+      padding: '5px 8px', fontFamily: mono, fontSize: 9, textTransform: 'uppercase',
+      letterSpacing: .6, textAlign: align || 'left', cursor: 'pointer', userSelect: 'none',
+      color: sortCol === col ? 'var(--accent)' : 'var(--muted)', whiteSpace: 'nowrap',
+    }}>
+      {label}{sortCol === col ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''}
+    </th>
+  );
+
+  return (
+    <div>
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontFamily: osw, fontWeight: 700, fontSize: 18, textTransform: 'uppercase',
+          letterSpacing: 1, color: 'var(--text)' }}>🏆 Milestones</div>
+        <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
+          Active batters within 5 of a career or season round-number milestone (HR, Hits, Total Bases,
+          Stolen Bases, Extra-Base Hits) — refreshed nightly, not live during games.
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10, alignItems: 'center' }}>
+        {['all', 'Career', 'Season'].map(s => (
+          <button key={s} onClick={() => setScopeFilter(s)} style={{
+            padding: '3px 10px', borderRadius: 5, cursor: 'pointer', fontFamily: mono,
+            fontSize: 9, fontWeight: 700, letterSpacing: .5, textTransform: 'uppercase',
+            background: scopeFilter === s ? 'rgba(232,65,26,.14)' : 'var(--surface2)',
+            color: scopeFilter === s ? 'var(--accent)' : 'var(--muted)',
+            border: `1px solid ${scopeFilter === s ? 'rgba(232,65,26,.45)' : 'var(--border)'}`,
+          }}>
+            {s === 'all' ? 'All' : s}
+          </button>
+        ))}
+        <span style={{ width: 1, height: 16, background: 'var(--border)', margin: '0 2px' }} />
+        {CATEGORIES.map(cat => {
+          const active = catFilter.has(cat);
+          return (
+            <button key={cat} onClick={() => toggleCat(cat)} style={{
+              padding: '3px 10px', borderRadius: 5, cursor: 'pointer', fontFamily: mono,
+              fontSize: 9, fontWeight: 700, letterSpacing: .5,
+              background: active ? 'rgba(56,184,242,.14)' : 'var(--surface2)',
+              color: active ? 'var(--ice)' : 'var(--muted)',
+              border: `1px solid ${active ? 'rgba(56,184,242,.45)' : 'var(--border)'}`,
+            }}>
+              {cat}
+            </button>
+          );
+        })}
+      </div>
+
+      {loading && (
+        <div style={{ fontFamily: mono, fontSize: 11, color: 'var(--muted)' }}>Loading milestones…</div>
+      )}
+      {error && (
+        <div style={{ fontFamily: mono, fontSize: 11, color: 'var(--c-coral)' }}>
+          Couldn't load milestones.csv: {error}
+        </div>
+      )}
+      {!loading && !error && filtered.length === 0 && (
+        <div style={{ fontFamily: mono, fontSize: 11, color: 'var(--muted)' }}>
+          No batters currently within 5 of a milestone in the selected categories.
+        </div>
+      )}
+      {!loading && !error && filtered.length > 0 && (
+        <div className="tw" style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: mono, fontSize: 11 }}>
+            <thead><tr>
+              <th className="sticky-batter" style={{
+                padding: '5px 8px', fontFamily: mono, fontSize: 9, textTransform: 'uppercase',
+                letterSpacing: .6, color: 'var(--muted)', textAlign: 'left',
+              }}>Player</th>
+              <SortTh col="Team" label="Team" />
+              <SortTh col="Category" label="Category" />
+              <SortTh col="Scope" label="Scope" />
+              <SortTh col="Current" label="Current" align="right" />
+              <SortTh col="Milestone" label="Milestone" align="right" />
+              <SortTh col="Away" label="Away" align="right" />
+            </tr></thead>
+            <tbody>
+              {filtered.map((r, i) => (
+                <tr key={`${r['Player ID']}_${r.Category}_${r.Scope}_${i}`} style={{ borderBottom: '1px solid rgba(255,255,255,.04)' }}>
+                  <td className="sticky-batter" style={{ padding: '4px 8px', background: 'var(--surface)' }}>
+                    <span onClick={() => openAtBatSlide({ pid: r['Player ID'], name: r.Player, team: r.Team })}
+                      style={{ color: 'var(--accent2)', fontWeight: 600, cursor: 'pointer' }}>
+                      {r.Player}
+                    </span>
+                  </td>
+                  <td style={{ padding: '4px 8px', color: 'var(--muted)' }}>{r.Team || '—'}</td>
+                  <td style={{ padding: '4px 8px' }}>{r.Category}</td>
+                  <td style={{ padding: '4px 8px', color: r.Scope === 'Career' ? 'var(--accent)' : 'var(--ice)' }}>{r.Scope}</td>
+                  <td style={{ padding: '4px 8px', textAlign: 'right' }}>{r.Current.toLocaleString()}</td>
+                  <td style={{ padding: '4px 8px', textAlign: 'right', color: 'var(--muted)' }}>{r.Milestone.toLocaleString()}</td>
+                  <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 700,
+                    color: r.Away === 0 ? 'var(--green)' : r.Away <= 2 ? 'var(--accent2)' : 'var(--text)' }}>
+                    {r.Away === 0 ? 'REACHED' : r.Away}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

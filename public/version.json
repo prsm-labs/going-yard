@@ -1,8 +1,8 @@
 {
-  "version": "2026.09.24",
-  "bundleFile": "index-CPCP_ccD.js",
+  "version": "2026.09.25",
+  "bundleFile": "index-DZoisCSc.js",
   "changelog": [
-    "Daily data update 2026-09-24"
+    "Fix Top ISO/Prime ISO/Locked In excluding exactly-.200 batters"
   ],
-  "notifyUsers": false
+  "notifyUsers": true
 }
