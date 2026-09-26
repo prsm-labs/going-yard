@@ -1,11 +1,11 @@
 Player,Player ID,Team,Category,Scope,Current,Milestone,Away
 Dillon Dingler,693307,DET,Extra-Base Hits,Career,100,100,0
 Nick Gonzales,693304,PIT,Extra-Base Hits,Career,100,100,0
-Zach Neto,687263,LAA,Extra-Base Hits,Career,200,200,0
 Vinnie Pasquantino,686469,KC,Extra-Base Hits,Career,200,200,0
 Amed Rosario,642708,NYY,Extra-Base Hits,Career,300,300,0
 Ozzie Albies,645277,ATL,Extra-Base Hits,Season,50,50,0
 Francisco Alvarez,682626,NYM,Extra-Base Hits,Season,30,30,0
+Randy Arozarena,668227,SEA,Extra-Base Hits,Season,60,60,0
 Harrison Bader,664056,SF,Extra-Base Hits,Season,10,10,0
 Jake Bauers,641343,MIL,Extra-Base Hits,Season,50,50,0
 Jordan Beck,687597,COL,Extra-Base Hits,Season,10,10,0
@@ -16,6 +16,7 @@ Luis Campusano,669134,SD,Extra-Base Hits,Season,20,20,0
 Kerry Carpenter,681481,DET,Extra-Base Hits,Season,20,20,0
 Jake Cronenworth,630105,SD,Extra-Base Hits,Season,20,20,0
 Elias Díaz,553869,TEX,Extra-Base Hits,Season,20,20,0
+Yainer Diaz,673237,HOU,Extra-Base Hits,Season,30,30,0
 Blake Dunn,694362,CIN,Extra-Base Hits,Season,10,10,0
 Jarren Duran,680776,BOS,Extra-Base Hits,Season,40,40,0
 Bryce Eldridge,805811,SF,Extra-Base Hits,Season,40,40,0
@@ -23,11 +24,9 @@ A.J. Ewing,805999,NYM,Extra-Base Hits,Season,30,30,0
 Tyler Freeman,671289,COL,Extra-Base Hits,Season,10,10,0
 Mickey Gasper,681508,BOS,Extra-Base Hits,Season,20,20,0
 Zack Gelof,680869,ATH,Extra-Base Hits,Season,40,40,0
-Hunter Goodman,696100,COL,Extra-Base Hits,Season,60,60,0
 Jackson Holliday,702616,BAL,Extra-Base Hits,Season,20,20,0
-Jeremiah Jackson,669236,BAL,Extra-Base Hits,Season,20,20,0
-Carter Jensen,695600,KC,Extra-Base Hits,Season,60,60,0
 Josh Jung,673962,TEX,Extra-Base Hits,Season,40,40,0
+Luke Keaschall,807712,MIN,Extra-Base Hits,Season,40,40,0
 Christian Koss,683766,SF,Extra-Base Hits,Season,10,10,0
 Ryan Kreidler,668952,MIN,Extra-Base Hits,Season,20,20,0
 Hao-Yu Lee,701678,DET,Extra-Base Hits,Season,30,30,0
@@ -41,10 +40,10 @@ Andruw Monasterio,655316,BOS,Extra-Base Hits,Season,30,30,0
 Gabriel Moreno,672515,AZ,Extra-Base Hits,Season,50,50,0
 Max Muncy,691777,ATH,Extra-Base Hits,Season,20,20,0
 Carlos Narváez,665966,BAL,Extra-Base Hits,Season,10,10,0
-Zach Neto,687263,LAA,Extra-Base Hits,Season,60,60,0
 Connor Norby,681393,COL,Extra-Base Hits,Season,30,30,0
 Shohei Ohtani,660271,LAD,Extra-Base Hits,Season,60,60,0
 Abimelec Ortiz,694673,WSH,Extra-Base Hits,Season,10,10,0
+Andy Pages,681624,LAD,Extra-Base Hits,Season,50,50,0
 Pedro Pagés,686780,STL,Extra-Base Hits,Season,10,10,0
 Joc Pederson,592626,TEX,Extra-Base Hits,Season,40,40,0
 Everson Pereira,677592,STL,Extra-Base Hits,Season,10,10,0
@@ -56,19 +55,26 @@ Nick Sogard,686765,BOS,Extra-Base Hits,Season,20,20,0
 Edmundo Sosa,624641,PHI,Extra-Base Hits,Season,20,20,0
 Juan Soto,665742,NYM,Extra-Base Hits,Season,40,40,0
 Spencer Steer,668715,CIN,Extra-Base Hits,Season,30,30,0
-Leody Taveras,665750,BAL,Extra-Base Hits,Season,30,30,0
+Fernando Tatis Jr.,665487,SD,Extra-Base Hits,Season,60,60,0
 Lane Thomas,657041,ATL,Extra-Base Hits,Season,30,30,0
 Taylor Trammell,666211,HOU,Extra-Base Hits,Season,20,20,0
+Brice Turang,668930,MIL,Extra-Base Hits,Season,60,60,0
+Eduardo Valencia,680664,DET,Extra-Base Hits,Season,20,20,0
 Nelson Velázquez,676369,HOU,Extra-Base Hits,Season,10,10,0
 LaMonte Wade Jr.,664774,HOU,Extra-Base Hits,Season,10,10,0
 Ryan Waldschmidt,814439,AZ,Extra-Base Hits,Season,20,20,0
 Cole Young,702284,SEA,Extra-Base Hits,Season,40,40,0
+CJ Abrams,682928,WSH,Hits,Season,150,150,0
 Andrew Benintendi,643217,CWS,Hits,Season,100,100,0
+Andrés Chaparro,665953,WSH,Hits,Season,50,50,0
 Elias Díaz,553869,TEX,Hits,Season,50,50,0
+Joey Ortiz,687401,MIL,Hits,Season,100,100,0
 Christian Vázquez,543877,HOU,Hits,Season,50,50,0
 Gary Sánchez,596142,MIL,Home Runs,Career,200,200,0
 Ronald Acuña Jr.,660670,ATL,Home Runs,Season,20,20,0
+Nolan Arenado,571448,AZ,Home Runs,Season,30,30,0
 Josh Bell,605137,MIN,Home Runs,Season,20,20,0
+Carson Benge,701807,NYM,Home Runs,Season,20,20,0
 Michael Busch,683737,CHC,Home Runs,Season,20,20,0
 Nathan Church,701675,STL,Home Runs,Season,10,10,0
 Carlos Cortes,666126,ATH,Home Runs,Season,10,10,0
@@ -77,11 +83,11 @@ Henry Davis,680779,PIT,Home Runs,Season,10,10,0
 Elly De La Cruz,682829,CIN,Home Runs,Season,30,30,0
 Jarren Duran,680776,BOS,Home Runs,Season,20,20,0
 A.J. Ewing,805999,NYM,Home Runs,Season,10,10,0
-Rafael Flores Jr.,804668,PIT,Home Runs,Season,10,10,0
 Luis García Jr.,671277,NYY,Home Runs,Season,30,30,0
 Mickey Gasper,681508,BOS,Home Runs,Season,10,10,0
 Spencer Horwitz,687462,PIT,Home Runs,Season,10,10,0
 Brady House,691781,WSH,Home Runs,Season,10,10,0
+Jeremiah Jackson,669236,BAL,Home Runs,Season,10,10,0
 Luke Keaschall,807712,MIN,Home Runs,Season,10,10,0
 Colt Keith,690993,DET,Home Runs,Season,10,10,0
 Carson Kelly,608348,CHC,Home Runs,Season,10,10,0
@@ -95,12 +101,10 @@ Tyler O'Neill,641933,BAL,Home Runs,Season,10,10,0
 Shohei Ohtani,660271,LAD,Home Runs,Season,30,30,0
 Richie Palacios,680700,TB,Home Runs,Season,10,10,0
 Jeremy Peña,665161,HOU,Home Runs,Season,20,20,0
-Salvador Perez,521692,KC,Home Runs,Season,20,20,0
 Brent Rooker,667670,ATH,Home Runs,Season,10,10,0
 Amed Rosario,642708,NYY,Home Runs,Season,10,10,0
 Keibert Ruiz,660688,WSH,Home Runs,Season,10,10,0
 Javier Sanoja,691594,MIA,Home Runs,Season,10,10,0
-Cam Smith,701358,HOU,Home Runs,Season,20,20,0
 Will Smith,669257,LAD,Home Runs,Season,10,10,0
 Bryson Stott,681082,PHI,Home Runs,Season,10,10,0
 Brice Turang,668930,MIL,Home Runs,Season,20,20,0
@@ -111,8 +115,10 @@ Luis Arraez,650333,PHI,Stolen Bases,Season,10,10,0
 Lawrence Butler,671732,ATH,Stolen Bases,Season,10,10,0
 Willi Castro,650489,COL,Stolen Bases,Season,10,10,0
 Nathan Church,701675,STL,Stolen Bases,Season,10,10,0
+Kody Clemens,665019,MIN,Stolen Bases,Season,10,10,0
 Colton Cowser,681297,BAL,Stolen Bases,Season,10,10,0
-Pete Crow-Armstrong,691718,CHC,Stolen Bases,Season,40,40,0
+Oneil Cruz,665833,PIT,Stolen Bases,Season,30,30,0
+Elly De La Cruz,682829,CIN,Stolen Bases,Season,30,30,0
 Mauricio Dubón,643289,ATL,Stolen Bases,Season,10,10,0
 Caleb Durbin,702332,BOS,Stolen Bases,Season,20,20,0
 Andrés Giménez,665926,TOR,Stolen Bases,Season,20,20,0
@@ -121,6 +127,7 @@ David Hamilton,666152,MIL,Stolen Bases,Season,30,30,0
 Dustin Harris,687957,SD,Stolen Bases,Season,10,10,0
 Gunnar Henderson,683002,BAL,Stolen Bases,Season,10,10,0
 Spencer Jones,682987,NYY,Stolen Bases,Season,10,10,0
+Luke Keaschall,807712,MIN,Stolen Bases,Season,20,20,0
 Steven Kwan,680757,CLE,Stolen Bases,Season,10,10,0
 Josh Lowe,666139,LAA,Stolen Bases,Season,10,10,0
 Dane Myers,667472,CIN,Stolen Bases,Season,10,10,0
@@ -129,13 +136,14 @@ Victor Robles,645302,SEA,Stolen Bases,Season,10,10,0
 Brayan Rocchio,677587,CLE,Stolen Bases,Season,20,20,0
 Marcus Semien,543760,NYM,Stolen Bases,Season,10,10,0
 Masyn Winn,691026,STL,Stolen Bases,Season,10,10,0
+Jonathan Aranda,666018,TB,Total Bases,Season,250,250,0
+Nolan Arenado,571448,AZ,Total Bases,Season,250,250,0
 Luis Arraez,650333,PHI,Total Bases,Season,250,250,0
 José Caballero,676609,NYY,Total Bases,Season,150,150,0
-Yainer Diaz,673237,HOU,Total Bases,Season,150,150,0
-Gunnar Henderson,683002,BAL,Total Bases,Season,250,250,0
+Christian Encarnacion-Strand,687952,BAL,Total Bases,Season,100,100,0
+Isiah Kiner-Falefa,643396,BOS,Total Bases,Season,50,50,0
 Shea Langeliers,669127,ATH,Total Bases,Season,200,200,0
 James Outman,681546,DET,Total Bases,Season,50,50,0
-Jose Trevino,624431,CIN,Total Bases,Season,50,50,0
 Jorbit Vivas,678391,WSH,Total Bases,Season,100,100,0
 Weston Wilson,642215,SEA,Total Bases,Season,50,50,0
 Will Benson,666181,CIN,Extra-Base Hits,Career,99,100,1
@@ -145,16 +153,20 @@ Scott Kingery,664068,CHC,Extra-Base Hits,Career,99,100,1
 Logan O'Hoppe,681351,TEX,Extra-Base Hits,Career,99,100,1
 Jake Rogers,668670,CWS,Extra-Base Hits,Career,99,100,1
 Juan Soto,665742,NYM,Extra-Base Hits,Career,499,500,1
+Ezequiel Tovar,678662,COL,Extra-Base Hits,Career,199,200,1
 Ronald Acuña Jr.,660670,ATL,Extra-Base Hits,Season,39,40,1
+Jo Adell,666176,CLE,Extra-Base Hits,Season,49,50,1
 Blaze Alexander,677942,BAL,Extra-Base Hits,Season,19,20,1
 Nick Allen,669397,HOU,Extra-Base Hits,Season,9,10,1
 Adael Amador,691182,COL,Extra-Base Hits,Season,9,10,1
-Randy Arozarena,668227,SEA,Extra-Base Hits,Season,59,60,1
+Roman Anthony,701350,BOS,Extra-Base Hits,Season,19,20,1
 Moisés Ballesteros,694208,LAA,Extra-Base Hits,Season,19,20,1
 Samuel Basallo,694212,BAL,Extra-Base Hits,Season,29,30,1
 Brett Bateman,703520,TOR,Extra-Base Hits,Season,9,10,1
+Dylan Beavers,687637,BAL,Extra-Base Hits,Season,29,30,1
 Josh Bell,605137,MIN,Extra-Base Hits,Season,49,50,1
 Victor Bericoto,682674,SF,Extra-Base Hits,Season,9,10,1
+Henry Bolte,703607,ATH,Extra-Base Hits,Season,29,30,1
 Juan Brito,682877,CIN,Extra-Base Hits,Season,9,10,1
 Michael Busch,683737,CHC,Extra-Base Hits,Season,49,50,1
 Alex Call,669743,LAD,Extra-Base Hits,Season,9,10,1
@@ -162,7 +174,6 @@ Tyler Callihan,682997,PIT,Extra-Base Hits,Season,9,10,1
 Nick Castellanos,592206,SD,Extra-Base Hits,Season,9,10,1
 Nathan Church,701675,STL,Extra-Base Hits,Season,29,30,1
 Jonah Cox,813841,SF,Extra-Base Hits,Season,9,10,1
-Yainer Diaz,673237,HOU,Extra-Base Hits,Season,29,30,1
 Caleb Durbin,702332,BOS,Extra-Base Hits,Season,39,40,1
 Xavier Edwards,669364,MIA,Extra-Base Hits,Season,29,30,1
 Harry Ford,695670,WSH,Extra-Base Hits,Season,9,10,1
@@ -171,22 +182,25 @@ Freddie Freeman,518692,LAD,Extra-Base Hits,Season,49,50,1
 Tristan Gray,656484,MIN,Extra-Base Hits,Season,9,10,1
 Trent Grisham,663757,NYY,Extra-Base Hits,Season,39,40,1
 Petey Halpin,690984,CLE,Extra-Base Hits,Season,9,10,1
+David Hamilton,666152,MIL,Extra-Base Hits,Season,19,20,1
 Max Kepler,596146,AZ,Extra-Base Hits,Season,9,10,1
 Wyatt Langford,694671,TEX,Extra-Base Hits,Season,39,40,1
 Royce Lewis,668904,MIN,Extra-Base Hits,Season,39,40,1
 Joey Loperfido,694388,HOU,Extra-Base Hits,Season,9,10,1
 Nathaniel Lowe,663993,CLE,Extra-Base Hits,Season,39,40,1
 Michael Massey,686681,KC,Extra-Base Hits,Season,39,40,1
-Munetaka Murakami,808959,CWS,Extra-Base Hits,Season,49,50,1
+Wade Meckler,685133,LAA,Extra-Base Hits,Season,19,20,1
 Dane Myers,667472,CIN,Extra-Base Hits,Season,19,20,1
 Nasim Nuñez,683083,WSH,Extra-Base Hits,Season,9,10,1
-Andy Pages,681624,LAD,Extra-Base Hits,Season,49,50,1
+Kazuma Okamoto,672960,TOR,Extra-Base Hits,Season,59,60,1
 José Ramírez,608070,CLE,Extra-Base Hits,Season,39,40,1
 J.T. Realmuto,592663,PHI,Extra-Base Hits,Season,29,30,1
 Bryan Reynolds,668804,PIT,Extra-Base Hits,Season,59,60,1
+Ben Rice,700250,NYY,Extra-Base Hits,Season,69,70,1
 Brayan Rocchio,677587,CLE,Extra-Base Hits,Season,39,40,1
 Jake Rogers,668670,CWS,Extra-Base Hits,Season,9,10,1
 Esteury Ruiz,665923,MIA,Extra-Base Hits,Season,19,20,1
+TJ Rumfield,681198,COL,Extra-Base Hits,Season,49,50,1
 Adley Rutschman,668939,BOS,Extra-Base Hits,Season,39,40,1
 Nolan Schanuel,694384,LAA,Extra-Base Hits,Season,29,30,1
 Casey Schmitt,669477,SF,Extra-Base Hits,Season,39,40,1
@@ -197,32 +211,33 @@ Jorge Soler,624585,LAA,Extra-Base Hits,Season,29,30,1
 George Springer,543807,TOR,Extra-Base Hits,Season,39,40,1
 Giancarlo Stanton,519317,NYY,Extra-Base Hits,Season,9,10,1
 Trevor Story,596115,BOS,Extra-Base Hits,Season,19,20,1
-Fernando Tatis Jr.,665487,SD,Extra-Base Hits,Season,59,60,1
-Eduardo Valencia,680664,DET,Extra-Base Hits,Season,19,20,1
 Jorbit Vivas,678391,WSH,Extra-Base Hits,Season,19,20,1
 Joey Wiemer,686894,WSH,Extra-Base Hits,Season,9,10,1
 Weston Wilson,642215,SEA,Extra-Base Hits,Season,9,10,1
 Jared Young,676724,NYM,Extra-Base Hits,Season,29,30,1
-CJ Abrams,682928,WSH,Hits,Season,149,150,1
-Andrés Chaparro,665953,WSH,Hits,Season,49,50,1
+Miguel Amaya,665804,CHC,Hits,Season,49,50,1
+Brett Baty,683146,NYM,Hits,Season,99,100,1
 Zack Gelof,680869,ATH,Hits,Season,99,100,1
 Nolan Gorman,669357,STL,Hits,Season,49,50,1
-Vaughn Grissom,687093,LAA,Hits,Season,99,100,1
+Heriberto Hernández,681715,MIA,Hits,Season,99,100,1
 Edouard Julien,666397,COL,Hits,Season,49,50,1
 Colt Keith,690993,DET,Hits,Season,99,100,1
 Steven Kwan,680757,CLE,Hits,Season,149,150,1
 Jung Hoo Lee,808982,SF,Hits,Season,149,150,1
+Angel Martínez,682657,CLE,Hits,Season,99,100,1
 Tyler O'Neill,641933,BAL,Hits,Season,49,50,1
+Heliot Ramos,671218,NYY,Hits,Season,99,100,1
 Tyler Stephenson,663886,CIN,Hits,Season,99,100,1
 Brett Sullivan,664954,COL,Hits,Season,49,50,1
+Ezequiel Tovar,678662,COL,Hits,Season,99,100,1
 Taylor Trammell,666211,HOU,Hits,Season,49,50,1
+Connor Wong,657136,BOS,Hits,Season,49,50,1
 Willson Contreras,575929,BOS,Home Runs,Career,199,200,1
 Michael Harris II,671739,ATL,Home Runs,Career,99,100,1
 Rhys Hoskins,656555,CLE,Home Runs,Career,199,200,1
 Francisco Lindor,596019,NYM,Home Runs,Career,299,300,1
-Nolan Arenado,571448,AZ,Home Runs,Season,29,30,1
 Moisés Ballesteros,694208,LAA,Home Runs,Season,9,10,1
-Carson Benge,701807,NYM,Home Runs,Season,19,20,1
+Dylan Beavers,687637,BAL,Home Runs,Season,9,10,1
 Evan Carter,694497,TEX,Home Runs,Season,9,10,1
 Jazz Chisholm Jr.,665862,NYY,Home Runs,Season,19,20,1
 Ernie Clement,676391,TOR,Home Runs,Season,9,10,1
@@ -231,7 +246,7 @@ Andrés Giménez,665926,TOR,Home Runs,Season,9,10,1
 Hunter Goodman,696100,COL,Home Runs,Season,39,40,1
 Nolan Gorman,669357,STL,Home Runs,Season,9,10,1
 Vladimir Guerrero Jr.,665489,TOR,Home Runs,Season,9,10,1
-Jeremiah Jackson,669236,BAL,Home Runs,Season,9,10,1
+Iván Herrera,671056,STL,Home Runs,Season,19,20,1
 Manny Machado,592518,SD,Home Runs,Season,29,30,1
 Jeff McNeil,643446,ATH,Home Runs,Season,9,10,1
 Max Muncy,571970,LAD,Home Runs,Season,29,30,1
@@ -246,17 +261,14 @@ Dansby Swanson,621020,CHC,Home Runs,Season,19,20,1
 Luis Torrens,620443,NYM,Home Runs,Season,9,10,1
 Trea Turner,607208,PHI,Home Runs,Season,19,20,1
 Ildemaro Vargas,545121,AZ,Home Runs,Season,9,10,1
+Jordan Walker,691023,STL,Home Runs,Season,29,30,1
 Donovan Walton,622268,ATH,Home Runs,Season,9,10,1
 Jared Young,676724,NYM,Home Runs,Season,9,10,1
 Sam Antonacci,803011,CWS,Stolen Bases,Season,19,20,1
 Travis Bazzana,683953,CLE,Stolen Bases,Season,19,20,1
-Kody Clemens,665019,MIN,Stolen Bases,Season,9,10,1
 Jake Cronenworth,630105,SD,Stolen Bases,Season,9,10,1
-Oneil Cruz,665833,PIT,Stolen Bases,Season,29,30,1
-Elly De La Cruz,682829,CIN,Stolen Bases,Season,29,30,1
 Jose Fernandez,699912,AZ,Stolen Bases,Season,9,10,1
 Trent Grisham,663757,NYY,Stolen Bases,Season,9,10,1
-Luke Keaschall,807712,MIN,Stolen Bases,Season,19,20,1
 Jorge Mateo,622761,TB,Stolen Bases,Season,19,20,1
 Matt McLain,680574,CIN,Stolen Bases,Season,19,20,1
 Victor Mesa Jr.,683748,TB,Stolen Bases,Season,9,10,1
@@ -272,50 +284,56 @@ Juan Soto,665742,NYM,Stolen Bases,Season,9,10,1
 Lane Thomas,657041,ATL,Stolen Bases,Season,9,10,1
 Brice Turang,668930,MIL,Stolen Bases,Season,19,20,1
 Kahlil Watson,696135,CLE,Stolen Bases,Season,9,10,1
+Spencer Torkelson,679529,DET,Total Bases,Career,999,1000,1
+Bobby Witt Jr.,677951,KC,Total Bases,Career,1499,1500,1
 Francisco Alvarez,682626,NYM,Total Bases,Season,149,150,1
-Jonathan Aranda,666018,TB,Total Bases,Season,249,250,1
+Carson Benge,701807,NYM,Total Bases,Season,249,250,1
+Jackson Chourio,694192,MIL,Total Bases,Season,249,250,1
+Dylan Crews,686611,WSH,Total Bases,Season,149,150,1
+Jarren Duran,680776,BOS,Total Bases,Season,199,200,1
 Freddie Freeman,518692,LAD,Total Bases,Season,249,250,1
 Rhys Hoskins,656555,CLE,Total Bases,Season,99,100,1
 Ben Malgeri,701162,DET,Total Bases,Season,49,50,1
+Cedric Mullins,656775,TB,Total Bases,Season,149,150,1
 Max Muncy,691777,ATH,Total Bases,Season,99,100,1
+Joey Ortiz,687401,MIL,Total Bases,Season,149,150,1
 Luis Rengifo,650859,SD,Total Bases,Season,99,100,1
-Adley Rutschman,668939,BOS,Total Bases,Season,149,150,1
+Brayan Rocchio,677587,CLE,Total Bases,Season,199,200,1
 Dominic Smith,642086,ATL,Total Bases,Season,99,100,1
-Myles Straw,664702,TOR,Total Bases,Season,99,100,1
+Will Smith,669257,LAD,Total Bases,Season,99,100,1
 Masyn Winn,691026,STL,Total Bases,Season,149,150,1
 Sal Frelick,686217,MIL,Extra-Base Hits,Career,98,100,2
+Iván Herrera,671056,STL,Extra-Base Hits,Career,98,100,2
 Bryson Stott,681082,PHI,Extra-Base Hits,Career,198,200,2
-Ezequiel Tovar,678662,COL,Extra-Base Hits,Career,198,200,2
-Jo Adell,666176,CLE,Extra-Base Hits,Season,48,50,2
 Jonathan Aranda,666018,TB,Extra-Base Hits,Season,48,50,2
 Gabriel Arias,672356,CHC,Extra-Base Hits,Season,8,10,2
 Joey Bart,663698,CWS,Extra-Base Hits,Season,8,10,2
 Osleivis Basabe,678545,SF,Extra-Base Hits,Season,8,10,2
-Henry Bolte,703607,ATH,Extra-Base Hits,Season,28,30,2
+Travis Bazzana,683953,CLE,Extra-Base Hits,Season,38,40,2
 Lawrence Butler,671732,ATH,Extra-Base Hits,Season,38,40,2
 Owen Caissie,683357,MIA,Extra-Base Hits,Season,28,30,2
 Jazz Chisholm Jr.,665862,NYY,Extra-Base Hits,Season,38,40,2
 Carlos Cortes,666126,ATH,Extra-Base Hits,Season,28,30,2
 Kaelen Culpepper,701785,MIN,Extra-Base Hits,Season,8,10,2
+Chase DeLauter,800050,CLE,Extra-Base Hits,Season,48,50,2
 Yandy Díaz,650490,TB,Extra-Base Hits,Season,48,50,2
 Jasson Domínguez,691176,NYY,Extra-Base Hits,Season,18,20,2
 Ezequiel Duran,677649,TEX,Extra-Base Hits,Season,48,50,2
 Drew Gilbert,687551,SF,Extra-Base Hits,Season,28,30,2
-David Hamilton,666152,MIL,Extra-Base Hits,Season,18,20,2
 Ke'Bryan Hayes,663647,CIN,Extra-Base Hits,Season,8,10,2
 Nico Hoerner,663538,CHC,Extra-Base Hits,Season,38,40,2
+Brady House,691781,WSH,Extra-Base Hits,Season,28,30,2
 Aaron Judge,592450,NYY,Extra-Base Hits,Season,28,30,2
-Luke Keaschall,807712,MIN,Extra-Base Hits,Season,38,40,2
+Alejandro Kirk,672386,TOR,Extra-Base Hits,Season,18,20,2
 Joshua Kuroda-Grauer,811965,ATH,Extra-Base Hits,Season,8,10,2
 Daylen Lile,695734,WSH,Extra-Base Hits,Season,58,60,2
 Jake McCarthy,664983,COL,Extra-Base Hits,Season,58,60,2
 Yohandy Morales,691002,WSH,Extra-Base Hits,Season,8,10,2
 Cedric Mullins,656775,TB,Extra-Base Hits,Season,28,30,2
 Tyler O'Neill,641933,BAL,Extra-Base Hits,Season,18,20,2
+Geraldo Perdomo,672695,AZ,Extra-Base Hits,Season,38,40,2
 Cal Raleigh,663728,SEA,Extra-Base Hits,Season,38,40,2
-Ben Rice,700250,NYY,Extra-Base Hits,Season,68,70,2
 Julio Rodríguez,677594,SEA,Extra-Base Hits,Season,48,50,2
-TJ Rumfield,681198,COL,Extra-Base Hits,Season,48,50,2
 Max Schuemann,680474,NYY,Extra-Base Hits,Season,8,10,2
 Braden Shewmake,669699,MIL,Extra-Base Hits,Season,8,10,2
 Lenyn Sosa,672820,TOR,Extra-Base Hits,Season,8,10,2
@@ -328,42 +346,39 @@ Tyler Tolbert,686475,KC,Extra-Base Hits,Season,8,10,2
 Jose Trevino,624431,CIN,Extra-Base Hits,Season,8,10,2
 Mike Trout,545361,LAA,Extra-Base Hits,Season,48,50,2
 Tommy Troy,694371,AZ,Extra-Base Hits,Season,8,10,2
-Brice Turang,668930,MIL,Extra-Base Hits,Season,58,60,2
 Trea Turner,607208,PHI,Extra-Base Hits,Season,48,50,2
 Daulton Varsho,662139,HOU,Extra-Base Hits,Season,38,40,2
 Taylor Ward,621493,SEA,Extra-Base Hits,Season,28,30,2
 Tommy White,695720,ATH,Extra-Base Hits,Season,8,10,2
 Masyn Winn,691026,STL,Extra-Base Hits,Season,28,30,2
 Gavin Sheets,657757,SD,Hits,Career,498,500,2
-Miguel Amaya,665804,CHC,Hits,Season,48,50,2
-Roman Anthony,701350,BOS,Hits,Season,48,50,2
+Wilyer Abreu,677800,BOS,Hits,Season,148,150,2
 Brett Bateman,703520,TOR,Hits,Season,48,50,2
-Brett Baty,683146,NYM,Hits,Season,98,100,2
 JJ Bleday,668709,CIN,Hits,Season,98,100,2
 Kerry Carpenter,681481,DET,Hits,Season,48,50,2
+Max Clark,703601,DET,Hits,Season,48,50,2
 Hunter Feduccia,676439,LAD,Hits,Season,48,50,2
 Mickey Gasper,681508,BOS,Hits,Season,48,50,2
-Heriberto Hernández,681715,MIA,Hits,Season,98,100,2
 Derek Hill,656537,PHI,Hits,Season,48,50,2
 Carson Kelly,608348,CHC,Hits,Season,98,100,2
-Joey Ortiz,687401,MIL,Hits,Season,98,100,2
-Ben Rice,700250,NYY,Hits,Season,148,150,2
-Ezequiel Tovar,678662,COL,Hits,Season,98,100,2
-Connor Wong,657136,BOS,Hits,Season,48,50,2
+Daylen Lile,695734,WSH,Hits,Season,148,150,2
+Zach Neto,687263,LAA,Hits,Season,148,150,2
 Manny Machado,592518,SD,Home Runs,Career,398,400,2
 Ryan Mountcastle,663624,BAL,Home Runs,Career,98,100,2
 Sam Antonacci,803011,CWS,Home Runs,Season,8,10,2
 Patrick Bailey,672275,CLE,Home Runs,Season,8,10,2
 Samuel Basallo,694212,BAL,Home Runs,Season,18,20,2
+Bo Bichette,666182,NYM,Home Runs,Season,18,20,2
 Luis Campusano,669134,SD,Home Runs,Season,8,10,2
+Griffin Conine,665052,MIA,Home Runs,Season,18,20,2
 William Contreras,661388,MIL,Home Runs,Season,18,20,2
 Tommy Edman,669242,LAD,Home Runs,Season,8,10,2
 Colt Emerson,806068,SEA,Home Runs,Season,8,10,2
+David Fry,681807,CLE,Home Runs,Season,8,10,2
 Paul Goldschmidt,502671,NYY,Home Runs,Season,18,20,2
 Trent Grisham,663757,NYY,Home Runs,Season,18,20,2
 Denzer Guzman,694203,LAA,Home Runs,Season,8,10,2
 Bryce Harper,547180,PHI,Home Runs,Season,28,30,2
-Iván Herrera,671056,STL,Home Runs,Season,18,20,2
 Liam Hicks,689414,TB,Home Runs,Season,18,20,2
 Nico Hoerner,663538,CHC,Home Runs,Season,8,10,2
 Aaron Judge,592450,NYY,Home Runs,Season,18,20,2
@@ -372,6 +387,7 @@ Nick Loftin,679845,KC,Home Runs,Season,8,10,2
 Brandon Marsh,669016,PHI,Home Runs,Season,18,20,2
 Angel Martínez,682657,CLE,Home Runs,Season,18,20,2
 Dane Myers,667472,CIN,Home Runs,Season,8,10,2
+Lars Nootbaar,663457,AZ,Home Runs,Season,8,10,2
 Ryan O'Hearn,656811,PIT,Home Runs,Season,18,20,2
 Marcell Ozuna,542303,PIT,Home Runs,Season,8,10,2
 Jesús Sánchez,660821,AZ,Home Runs,Season,8,10,2
@@ -381,7 +397,7 @@ Leody Taveras,665750,BAL,Home Runs,Season,8,10,2
 Gleyber Torres,650402,DET,Home Runs,Season,8,10,2
 Taylor Trammell,666211,HOU,Home Runs,Season,8,10,2
 Brandon Valenzuela,678218,TOR,Home Runs,Season,8,10,2
-Jordan Walker,691023,STL,Home Runs,Season,28,30,2
+Christian Walker,572233,HOU,Home Runs,Season,28,30,2
 Bobby Witt Jr.,677951,KC,Home Runs,Season,18,20,2
 Mookie Betts,605141,LAD,Stolen Bases,Career,198,200,2
 Wilyer Abreu,677800,BOS,Stolen Bases,Season,8,10,2
@@ -397,36 +413,32 @@ Jeff McNeil,643446,ATH,Stolen Bases,Season,8,10,2
 Wade Meckler,685133,LAA,Stolen Bases,Season,8,10,2
 Tristan Peters,671976,CWS,Stolen Bases,Season,8,10,2
 Cooper Pratt,806198,MIL,Stolen Bases,Season,18,20,2
+John Rave,670231,KC,Stolen Bases,Season,8,10,2
 Fernando Tatis Jr.,665487,SD,Stolen Bases,Season,38,40,2
 Tim Tawa,694374,AZ,Stolen Bases,Season,8,10,2
 Ezequiel Tovar,678662,COL,Stolen Bases,Season,8,10,2
 Ben Williamson,810938,TB,Stolen Bases,Season,8,10,2
 Jacob Young,696285,WSH,Stolen Bases,Season,18,20,2
 Joc Pederson,592626,TEX,Total Bases,Career,1998,2000,2
-Bobby Witt Jr.,677951,KC,Total Bases,Career,1498,1500,2
 Jorge Barrosa,678489,HOU,Total Bases,Season,48,50,2
 Alex Call,669743,LAD,Total Bases,Season,48,50,2
-Jackson Chourio,694192,MIL,Total Bases,Season,248,250,2
-Jarren Duran,680776,BOS,Total Bases,Season,198,200,2
-Isiah Kiner-Falefa,643396,BOS,Total Bases,Season,48,50,2
+Justin Crawford,702222,PHI,Total Bases,Season,148,150,2
 Brooks Lee,686797,MIN,Total Bases,Season,248,250,2
 Starling Marte,516782,KC,Total Bases,Season,48,50,2
-Cedric Mullins,656775,TB,Total Bases,Season,148,150,2
 Edgar Quero,700337,CWS,Total Bases,Season,48,50,2
 Bryan Reynolds,668804,PIT,Total Bases,Season,248,250,2
-Brayan Rocchio,677587,CLE,Total Bases,Season,198,200,2
+Leody Taveras,665750,BAL,Total Bases,Season,148,150,2
 Jared Triolo,669707,PIT,Total Bases,Season,98,100,2
 Brett Baty,683146,NYM,Extra-Base Hits,Career,97,100,3
-Iván Herrera,671056,STL,Extra-Base Hits,Career,97,100,3
 Trey Mancini,641820,LAA,Extra-Base Hits,Career,297,300,3
 Casey Schmitt,669477,SF,Extra-Base Hits,Career,97,100,3
 Tyler Stephenson,663886,CIN,Extra-Base Hits,Career,197,200,3
 Trevor Story,596115,BOS,Extra-Base Hits,Career,497,500,3
 Willy Adames,642715,SF,Extra-Base Hits,Season,47,50,3
+Pete Alonso,624413,BAL,Extra-Base Hits,Season,67,70,3
+Miguel Amaya,665804,CHC,Extra-Base Hits,Season,17,20,3
 Miguel Andujar,609280,SD,Extra-Base Hits,Season,27,30,3
 Patrick Bailey,672275,CLE,Extra-Base Hits,Season,17,20,3
-Travis Bazzana,683953,CLE,Extra-Base Hits,Season,37,40,3
-Dylan Beavers,687637,BAL,Extra-Base Hits,Season,27,30,3
 Will Benson,666181,CIN,Extra-Base Hits,Season,7,10,3
 Leo Bernal,699024,STL,Extra-Base Hits,Season,7,10,3
 Mookie Betts,605141,LAD,Extra-Base Hits,Season,47,50,3
@@ -434,9 +446,9 @@ José Caballero,676609,NYY,Extra-Base Hits,Season,27,30,3
 Junior Caminero,691406,TB,Extra-Base Hits,Season,67,70,3
 Max Clark,703601,DET,Extra-Base Hits,Season,17,20,3
 Justin Crawford,702222,PHI,Extra-Base Hits,Season,27,30,3
-Chase DeLauter,800050,CLE,Extra-Base Hits,Season,47,50,3
 Rodolfo Durán,660710,SD,Extra-Base Hits,Season,7,10,3
 Freddy Fermin,666023,SD,Extra-Base Hits,Season,17,20,3
+Rafael Flores Jr.,804668,PIT,Extra-Base Hits,Season,17,20,3
 Ty France,664034,SD,Extra-Base Hits,Season,47,50,3
 Mitch Garver,641598,SEA,Extra-Base Hits,Season,7,10,3
 Denzer Guzman,694203,LAA,Extra-Base Hits,Season,17,20,3
@@ -446,30 +458,31 @@ Gunnar Henderson,683002,BAL,Extra-Base Hits,Season,57,60,3
 Enrique Hernández,571771,LAD,Extra-Base Hits,Season,7,10,3
 Derek Hill,656537,PHI,Extra-Base Hits,Season,17,20,3
 Turner Hill,806367,SF,Extra-Base Hits,Season,7,10,3
-Brady House,691781,WSH,Extra-Base Hits,Season,27,30,3
 Jim Jarvis,805347,ATL,Extra-Base Hits,Season,7,10,3
 Troy Johnston,687859,COL,Extra-Base Hits,Season,37,40,3
 Kyle Karros,691720,COL,Extra-Base Hits,Season,37,40,3
 Isiah Kiner-Falefa,643396,BOS,Extra-Base Hits,Season,7,10,3
-Alejandro Kirk,672386,TOR,Extra-Base Hits,Season,17,20,3
 Nick Kurtz,701762,ATH,Extra-Base Hits,Season,37,40,3
 Trevor Larnach,663616,MIN,Extra-Base Hits,Season,37,40,3
 Nick Loftin,679845,KC,Extra-Base Hits,Season,37,40,3
+Jakob Marsee,805300,MIA,Extra-Base Hits,Season,37,40,3
 Starling Marte,516782,KC,Extra-Base Hits,Season,7,10,3
-Wade Meckler,685133,LAA,Extra-Base Hits,Season,17,20,3
 Jackson Merrill,701538,SD,Extra-Base Hits,Season,57,60,3
+Christian Moore,695681,LAA,Extra-Base Hits,Season,7,10,3
 Sean Murphy,669221,ATL,Extra-Base Hits,Season,7,10,3
-Kazuma Okamoto,672960,TOR,Extra-Base Hits,Season,57,60,3
 Joey Ortiz,687401,MIL,Extra-Base Hits,Season,27,30,3
 Vinnie Pasquantino,686469,KC,Extra-Base Hits,Season,37,40,3
 Blake Perkins,663368,MIL,Extra-Base Hits,Season,7,10,3
 Tristan Peters,671976,CWS,Extra-Base Hits,Season,47,50,3
 Jorge Polanco,593871,NYM,Extra-Base Hits,Season,7,10,3
+Heliot Ramos,671218,NYY,Extra-Base Hits,Season,37,40,3
 Amed Rosario,642708,NYY,Extra-Base Hits,Season,17,20,3
 Javier Sanoja,691594,MIA,Extra-Base Hits,Season,47,50,3
 Daniel Schneemann,682177,CLE,Extra-Base Hits,Season,17,20,3
+Matt Shaw,807713,CHC,Extra-Base Hits,Season,17,20,3
 Tyler Stephenson,663886,CIN,Extra-Base Hits,Season,37,40,3
 Sal Stewart,701398,CIN,Extra-Base Hits,Season,57,60,3
+Tyrone Taylor,621438,CHC,Extra-Base Hits,Season,27,30,3
 Colby Thomas,687515,ATH,Extra-Base Hits,Season,7,10,3
 Bryan Torres,663494,STL,Extra-Base Hits,Season,7,10,3
 Ramón Urías,602104,STL,Extra-Base Hits,Season,7,10,3
@@ -483,14 +496,14 @@ Christian Yelich,592885,MIL,Extra-Base Hits,Season,37,40,3
 Michael Conforto,624424,CHC,Hits,Career,997,1000,3
 Mitch Garver,641598,SEA,Hits,Career,497,500,3
 Jake McCarthy,664983,COL,Hits,Career,497,500,3
-Wilyer Abreu,677800,BOS,Hits,Season,147,150,3
-Max Clark,703601,DET,Hits,Season,47,50,3
+Jackson Chourio,694192,MIL,Hits,Season,147,150,3
 Jasson Domínguez,691176,NYY,Hits,Season,47,50,3
 Brenton Doyle,686668,CWS,Hits,Season,47,50,3
 Rhys Hoskins,656555,CLE,Hits,Season,47,50,3
-Angel Martínez,682657,CLE,Hits,Season,97,100,3
+Luke Keaschall,807712,MIN,Hits,Season,147,150,3
 Julio Rodríguez,677594,SEA,Hits,Season,147,150,3
 Tyler Soderstrom,691016,ATH,Hits,Season,97,100,3
+Seiya Suzuki,673548,CHC,Hits,Season,147,150,3
 Samad Taylor,669392,SD,Hits,Season,47,50,3
 Miguel Vargas,678246,CWS,Hits,Season,147,150,3
 Eli White,642201,BOS,Hits,Season,47,50,3
@@ -499,14 +512,12 @@ Riley Greene,682985,DET,Home Runs,Career,97,100,3
 Ian Happ,664023,CHC,Home Runs,Career,197,200,3
 José Ramírez,608070,CLE,Home Runs,Career,297,300,3
 Joshua Báez,695491,STL,Home Runs,Season,7,10,3
-Dylan Beavers,687637,BAL,Home Runs,Season,7,10,3
 Cody Bellinger,641355,NYY,Home Runs,Season,17,20,3
-Bo Bichette,666182,NYM,Home Runs,Season,17,20,3
 Jake Burger,669394,TEX,Home Runs,Season,27,30,3
 Lawrence Butler,671732,ATH,Home Runs,Season,17,20,3
 Victor Caratini,605170,MIN,Home Runs,Season,7,10,3
 Matt Chapman,656305,SF,Home Runs,Season,7,10,3
-Griffin Conine,665052,MIA,Home Runs,Season,17,20,3
+Kody Clemens,665019,MIN,Home Runs,Season,27,30,3
 Willson Contreras,575929,BOS,Home Runs,Season,27,30,3
 Jake Cronenworth,630105,SD,Home Runs,Season,7,10,3
 Rafael Devers,646240,SF,Home Runs,Season,37,40,3
@@ -514,10 +525,10 @@ Elias Díaz,553869,TEX,Home Runs,Season,7,10,3
 Dillon Dingler,693307,DET,Home Runs,Season,27,30,3
 Ezequiel Duran,677649,TEX,Home Runs,Season,17,20,3
 Bryce Eldridge,805811,SF,Home Runs,Season,17,20,3
-David Fry,681807,CLE,Home Runs,Season,7,10,3
 Adolis García,666969,PHI,Home Runs,Season,7,10,3
 Kyle Higashioka,543309,TEX,Home Runs,Season,7,10,3
 Jackson Holliday,702616,BAL,Home Runs,Season,7,10,3
+Carter Jensen,695600,KC,Home Runs,Season,27,30,3
 Wyatt Langford,694671,TEX,Home Runs,Season,17,20,3
 Ramón Laureano,657656,SD,Home Runs,Season,7,10,3
 George Lombard Jr.,806146,NYY,Home Runs,Season,7,10,3
@@ -525,7 +536,7 @@ Nathaniel Lowe,663993,CLE,Home Runs,Season,17,20,3
 Brice Matthews,694728,HOU,Home Runs,Season,7,10,3
 Kevin McGonigle,805808,DET,Home Runs,Season,17,20,3
 Curtis Mead,678554,BOS,Home Runs,Season,17,20,3
-Lars Nootbaar,663457,AZ,Home Runs,Season,7,10,3
+Zach Neto,687263,LAA,Home Runs,Season,27,30,3
 Connor Norby,681393,COL,Home Runs,Season,7,10,3
 Oswald Peraza,672724,LAA,Home Runs,Season,7,10,3
 Wenceel Pérez,672761,DET,Home Runs,Season,7,10,3
@@ -539,7 +550,6 @@ José Tena,677588,WSH,Home Runs,Season,7,10,3
 Kyle Tucker,663656,LAD,Home Runs,Season,17,20,3
 Esmerlyn Valdez,699013,PIT,Home Runs,Season,17,20,3
 Christian Vázquez,543877,HOU,Home Runs,Season,7,10,3
-Christian Walker,572233,HOU,Home Runs,Season,27,30,3
 Taylor Ward,621493,SEA,Home Runs,Season,7,10,3
 JJ Wetherholt,802139,STL,Home Runs,Season,17,20,3
 Jacob Wilson,805779,ATH,Home Runs,Season,7,10,3
@@ -562,40 +572,42 @@ Brandon Nimmo,607043,TEX,Stolen Bases,Season,7,10,3
 Richie Palacios,680700,TB,Stolen Bases,Season,17,20,3
 Ceddanne Rafaela,678882,BOS,Stolen Bases,Season,17,20,3
 José Ramírez,608070,CLE,Stolen Bases,Season,37,40,3
-John Rave,670231,KC,Stolen Bases,Season,7,10,3
 Myles Straw,664702,TOR,Stolen Bases,Season,7,10,3
 Dansby Swanson,621020,CHC,Stolen Bases,Season,17,20,3
 Ryan Waldschmidt,814439,AZ,Stolen Bases,Season,7,10,3
 Willy Adames,642715,SF,Total Bases,Season,197,200,3
-Justin Crawford,702222,PHI,Total Bases,Season,147,150,3
-Christian Encarnacion-Strand,687952,BAL,Total Bases,Season,97,100,3
-Jeremiah Jackson,669236,BAL,Total Bases,Season,97,100,3
-Joey Ortiz,687401,MIL,Total Bases,Season,147,150,3
+Bo Bichette,666182,NYM,Total Bases,Season,247,250,3
+Keibert Ruiz,660688,WSH,Total Bases,Season,147,150,3
+TJ Rumfield,681198,COL,Total Bases,Season,247,250,3
+Cam Smith,701358,HOU,Total Bases,Season,197,200,3
 Freddie Freeman,518692,LAD,Extra-Base Hits,Career,996,1000,4
+Spencer Horwitz,687462,PIT,Extra-Base Hits,Career,96,100,4
 Sandy León,506702,ATL,Extra-Base Hits,Career,96,100,4
 Nathaniel Lowe,663993,CLE,Extra-Base Hits,Career,296,300,4
 Cedric Mullins,656775,TB,Extra-Base Hits,Career,296,300,4
 Joey Ortiz,687401,MIL,Extra-Base Hits,Career,96,100,4
 Brayan Rocchio,677587,CLE,Extra-Base Hits,Career,96,100,4
 CJ Abrams,682928,WSH,Extra-Base Hits,Season,66,70,4
-Miguel Amaya,665804,CHC,Extra-Base Hits,Season,16,20,4
-Roman Anthony,701350,BOS,Extra-Base Hits,Season,16,20,4
+Wilyer Abreu,677800,BOS,Extra-Base Hits,Season,66,70,4
 Sam Antonacci,803011,CWS,Extra-Base Hits,Season,36,40,4
 Luis Arraez,650333,PHI,Extra-Base Hits,Season,46,50,4
 Victor Caratini,605170,MIN,Extra-Base Hits,Season,16,20,4
 Cole Carrigg,694249,COL,Extra-Base Hits,Season,36,40,4
 Willi Castro,650489,COL,Extra-Base Hits,Season,36,40,4
 Matt Chapman,656305,SF,Extra-Base Hits,Season,26,30,4
+Kody Clemens,665019,MIN,Extra-Base Hits,Season,56,60,4
+Griffin Conine,665052,MIA,Extra-Base Hits,Season,26,30,4
 William Contreras,661388,MIL,Extra-Base Hits,Season,46,50,4
 Henry Davis,680779,PIT,Extra-Base Hits,Season,16,20,4
 Bryan De La Cruz,650559,PHI,Extra-Base Hits,Season,6,10,4
 Dillon Dingler,693307,DET,Extra-Base Hits,Season,56,60,4
 J.C. Escarra,641555,NYY,Extra-Base Hits,Season,6,10,4
-Rafael Flores Jr.,804668,PIT,Extra-Base Hits,Season,16,20,4
 Adolis García,666969,PHI,Extra-Base Hits,Season,16,20,4
 Maikel Garcia,672580,KC,Extra-Base Hits,Season,26,30,4
 Angel Genao,694197,CLE,Extra-Base Hits,Season,6,10,4
 Austin Hays,669720,SD,Extra-Base Hits,Season,6,10,4
+Austin Hedges,595978,CLE,Extra-Base Hits,Season,16,20,4
+Iván Herrera,671056,STL,Extra-Base Hits,Season,46,50,4
 Rhys Hoskins,656555,CLE,Extra-Base Hits,Season,26,30,4
 Kyle Isbel,664728,KC,Extra-Base Hits,Season,16,20,4
 Danny Jansen,643376,TEX,Extra-Base Hits,Season,16,20,4
@@ -606,16 +618,13 @@ Steven Kwan,680757,CLE,Extra-Base Hits,Season,26,30,4
 Francisco Lindor,596019,NYM,Extra-Base Hits,Season,36,40,4
 Nicky Lopez,670032,TEX,Extra-Base Hits,Season,6,10,4
 Jake Mangum,663968,PIT,Extra-Base Hits,Season,26,30,4
-Jakob Marsee,805300,MIA,Extra-Base Hits,Season,36,40,4
+Charles McAdoo,807727,TOR,Extra-Base Hits,Season,6,10,4
 Chase Meidroth,805367,CWS,Extra-Base Hits,Season,46,50,4
 Drew Millas,686452,WSH,Extra-Base Hits,Season,6,10,4
 Mickey Moniak,666160,COL,Extra-Base Hits,Season,46,50,4
-Christian Moore,695681,LAA,Extra-Base Hits,Season,6,10,4
 Max Muncy,571970,LAD,Extra-Base Hits,Season,56,60,4
 Alejandro Osuna,696030,TEX,Extra-Base Hits,Season,6,10,4
-Geraldo Perdomo,672695,AZ,Extra-Base Hits,Season,36,40,4
 Agustín Ramírez,682663,MIA,Extra-Base Hits,Season,16,20,4
-Heliot Ramos,671218,NYY,Extra-Base Hits,Season,36,40,4
 Luis Rengifo,650859,SD,Extra-Base Hits,Season,16,20,4
 Gabriel Rincones Jr.,687282,PHI,Extra-Base Hits,Season,6,10,4
 Luis Robert Jr.,673357,BAL,Extra-Base Hits,Season,16,20,4
@@ -624,25 +633,25 @@ Jesús Sánchez,660821,AZ,Extra-Base Hits,Season,26,30,4
 Victor Scott II,687363,STL,Extra-Base Hits,Season,6,10,4
 Anthony Seigler,678011,BOS,Extra-Base Hits,Season,16,20,4
 Brian Serven,661531,ATH,Extra-Base Hits,Season,6,10,4
-Matt Shaw,807713,CHC,Extra-Base Hits,Season,16,20,4
 Pavin Smith,656976,AZ,Extra-Base Hits,Season,6,10,4
-Tyrone Taylor,621438,CHC,Extra-Base Hits,Season,26,30,4
 Sterlin Thompson,694514,COL,Extra-Base Hits,Season,6,10,4
 Luis Urías,649966,TOR,Extra-Base Hits,Season,6,10,4
 Andrew Vaughn,683734,MIL,Extra-Base Hits,Season,26,30,4
 Eli White,642201,BOS,Extra-Base Hits,Season,16,20,4
+Connor Wong,657136,BOS,Extra-Base Hits,Season,16,20,4
 Gage Workman,669398,SD,Extra-Base Hits,Season,6,10,4
 Luisangel Acuña,682668,CWS,Hits,Season,46,50,4
 Ozzie Albies,645277,ATL,Hits,Season,146,150,4
-Jackson Chourio,694192,MIL,Hits,Season,146,150,4
+Iván Herrera,671056,STL,Hits,Season,146,150,4
 Blaze Jordan,691458,STL,Hits,Season,46,50,4
 Wyatt Langford,694671,TEX,Hits,Season,96,100,4
 Luis Lara,800325,MIL,Hits,Season,46,50,4
 Brooks Lee,686797,MIN,Hits,Season,146,150,4
-Daylen Lile,695734,WSH,Hits,Season,146,150,4
 Mickey Moniak,666160,COL,Hits,Season,96,100,4
-Heliot Ramos,671218,NYY,Hits,Season,96,100,4
+Gabriel Moreno,672515,AZ,Hits,Season,146,150,4
+Geraldo Perdomo,672695,AZ,Hits,Season,146,150,4
 Gary Sánchez,596142,MIL,Hits,Season,46,50,4
+Tommy White,695720,ATH,Hits,Season,46,50,4
 Javier Báez,595879,DET,Home Runs,Career,196,200,4
 Sean Murphy,669221,ATL,Home Runs,Career,96,100,4
 Jose Altuve,514888,HOU,Home Runs,Season,16,20,4
@@ -652,18 +661,21 @@ Randy Arozarena,668227,SEA,Home Runs,Season,26,30,4
 Luis Arraez,650333,PHI,Home Runs,Season,6,10,4
 Jake Bauers,641343,MIL,Home Runs,Season,26,30,4
 Alex Bregman,608324,CHC,Home Runs,Season,26,30,4
-Kody Clemens,665019,MIN,Home Runs,Season,26,30,4
 Isaac Collins,686555,KC,Home Runs,Season,6,10,4
 Jasson Domínguez,691176,NYY,Home Runs,Season,6,10,4
 Xavier Edwards,669364,MIA,Home Runs,Season,6,10,4
 José Fermín,665877,STL,Home Runs,Season,6,10,4
+Nick Fortes,663743,TB,Home Runs,Season,6,10,4
 Freddie Freeman,518692,LAD,Home Runs,Season,16,20,4
 Nick Gonzales,693304,PIT,Home Runs,Season,6,10,4
 Jacob Gonzalez,694378,PIT,Home Runs,Season,6,10,4
 Michael Harris II,671739,ATL,Home Runs,Season,26,30,4
+Austin Hedges,595978,CLE,Home Runs,Season,6,10,4
+Teoscar Hernández,606192,LAD,Home Runs,Season,16,20,4
 Kyle Isbel,664728,KC,Home Runs,Season,6,10,4
 Danny Jansen,643376,TEX,Home Runs,Season,6,10,4
 Jahmai Jones,663330,BOS,Home Runs,Season,6,10,4
+Jordan Lawlar,691783,AZ,Home Runs,Season,6,10,4
 Noelvi Marte,682622,CIN,Home Runs,Season,6,10,4
 James McCann,543510,AZ,Home Runs,Season,6,10,4
 Chase Meidroth,805367,CWS,Home Runs,Season,16,20,4
@@ -671,18 +683,20 @@ Jackson Merrill,701538,SD,Home Runs,Season,26,30,4
 Andruw Monasterio,655316,BOS,Home Runs,Season,6,10,4
 Braden Montgomery,695731,CWS,Home Runs,Season,6,10,4
 Gabriel Moreno,672515,AZ,Home Runs,Season,16,20,4
-Zach Neto,687263,LAA,Home Runs,Season,26,30,4
 Joc Pederson,592626,TEX,Home Runs,Season,26,30,4
 Ceddanne Rafaela,678882,BOS,Home Runs,Season,16,20,4
 Pedro Ramírez,699393,CHC,Home Runs,Season,6,10,4
 John Rave,670231,KC,Home Runs,Season,6,10,4
 Héctor Rodríguez,699302,CIN,Home Runs,Season,6,10,4
 Esteury Ruiz,665923,MIA,Home Runs,Season,6,10,4
+TJ Rumfield,681198,COL,Home Runs,Season,16,20,4
 Daniel Schneemann,682177,CLE,Home Runs,Season,6,10,4
 Gavin Sheets,657757,SD,Home Runs,Season,16,20,4
 Josh Smith,669701,TOR,Home Runs,Season,6,10,4
 Spencer Steer,668715,CIN,Home Runs,Season,16,20,4
+Eugenio Suárez,553993,CIN,Home Runs,Season,26,30,4
 Seiya Suzuki,673548,CHC,Home Runs,Season,26,30,4
+Spencer Torkelson,679529,DET,Home Runs,Season,26,30,4
 Eduardo Valencia,680664,DET,Home Runs,Season,6,10,4
 Andrew Vaughn,683734,MIL,Home Runs,Season,6,10,4
 Nelson Velázquez,676369,HOU,Home Runs,Season,6,10,4
@@ -709,38 +723,36 @@ Chandler Simpson,802415,TB,Stolen Bases,Season,46,50,4
 Bryson Stott,681082,PHI,Stolen Bases,Season,26,30,4
 José Tena,677588,WSH,Stolen Bases,Season,6,10,4
 Weston Wilson,642215,SEA,Stolen Bases,Season,6,10,4
-Nolan Arenado,571448,AZ,Total Bases,Season,246,250,4
 Patrick Bailey,672275,CLE,Total Bases,Season,96,100,4
 Drake Baldwin,686948,ATL,Total Bases,Season,246,250,4
 Samuel Basallo,694212,BAL,Total Bases,Season,146,150,4
+Jac Caglianone,695506,KC,Total Bases,Season,246,250,4
 Kerry Carpenter,681481,DET,Total Bases,Season,96,100,4
+Andrés Chaparro,665953,WSH,Total Bases,Season,96,100,4
+Randal Grichuk,545341,CWS,Total Bases,Season,146,150,4
 Matt McLain,680574,CIN,Total Bases,Season,146,150,4
 Jake Meyers,676694,HOU,Total Bases,Season,46,50,4
-Keibert Ruiz,660688,WSH,Total Bases,Season,146,150,4
-Will Smith,669257,LAD,Total Bases,Season,96,100,4
 JJ Wetherholt,802139,STL,Total Bases,Season,196,200,4
 Ronald Acuña Jr.,660670,ATL,Extra-Base Hits,Career,395,400,5
 Patrick Bailey,672275,CLE,Extra-Base Hits,Career,95,100,5
-Spencer Horwitz,687462,PIT,Extra-Base Hits,Career,95,100,5
 Rhys Hoskins,656555,CLE,Extra-Base Hits,Career,395,400,5
-Wilyer Abreu,677800,BOS,Extra-Base Hits,Season,65,70,5
 Luisangel Acuña,682668,CWS,Extra-Base Hits,Season,5,10,5
-Pete Alonso,624413,BAL,Extra-Base Hits,Season,65,70,5
 Yordan Alvarez,670541,HOU,Extra-Base Hits,Season,75,80,5
+Nolan Arenado,571448,AZ,Extra-Base Hits,Season,55,60,5
 Edwin Arroyo,695490,CIN,Extra-Base Hits,Season,5,10,5
 Javier Báez,595879,DET,Extra-Base Hits,Season,15,20,5
 Drake Baldwin,686948,ATL,Extra-Base Hits,Season,45,50,5
 Jorge Barrosa,678489,HOU,Extra-Base Hits,Season,15,20,5
 Cody Bellinger,641355,NYY,Extra-Base Hits,Season,45,50,5
+Bo Bichette,666182,NYM,Extra-Base Hits,Season,45,50,5
 Alec Bohm,664761,PHI,Extra-Base Hits,Season,45,50,5
 Jase Bowen,687749,SD,Extra-Base Hits,Season,5,10,5
 Brett Callahan,814430,DET,Extra-Base Hits,Season,5,10,5
 Evan Carter,694497,TEX,Extra-Base Hits,Season,25,30,5
 Cam Cauley,695508,TEX,Extra-Base Hits,Season,5,10,5
-Kody Clemens,665019,MIN,Extra-Base Hits,Season,55,60,5
-Griffin Conine,665052,MIA,Extra-Base Hits,Season,25,30,5
 J.P. Crawford,641487,SEA,Extra-Base Hits,Season,25,30,5
 Oneil Cruz,665833,PIT,Extra-Base Hits,Season,35,40,5
+Elly De La Cruz,682829,CIN,Extra-Base Hits,Season,65,70,5
 Josue De Paula,800543,LAD,Extra-Base Hits,Season,5,10,5
 Zach Dezenzo,701305,HOU,Extra-Base Hits,Season,5,10,5
 Colt Emerson,806068,SEA,Extra-Base Hits,Season,15,20,5
@@ -752,11 +764,11 @@ Romy Gonzalez,663853,BOS,Extra-Base Hits,Season,5,10,5
 Nolan Gorman,669357,STL,Extra-Base Hits,Season,15,20,5
 Vaughn Grissom,687093,LAA,Extra-Base Hits,Season,35,40,5
 Ian Happ,664023,CHC,Extra-Base Hits,Season,55,60,5
-Austin Hedges,595978,CLE,Extra-Base Hits,Season,15,20,5
 Tyler Heineman,623168,LAA,Extra-Base Hits,Season,5,10,5
-Iván Herrera,671056,STL,Extra-Base Hits,Season,45,50,5
+Teoscar Hernández,606192,LAD,Extra-Base Hits,Season,35,40,5
 Brewer Hicklen,676551,ATL,Extra-Base Hits,Season,5,10,5
 Rece Hinds,677956,BAL,Extra-Base Hits,Season,5,10,5
+Spencer Horwitz,687462,PIT,Extra-Base Hits,Season,25,30,5
 Alex Jackson,656577,MIN,Extra-Base Hits,Season,5,10,5
 Spencer Jones,682987,NYY,Extra-Base Hits,Season,25,30,5
 Blaze Jordan,691458,STL,Extra-Base Hits,Season,15,20,5
@@ -764,10 +776,11 @@ Carson Kelly,608348,CHC,Extra-Base Hits,Season,25,30,5
 Hyeseong Kim,808975,LAD,Extra-Base Hits,Season,5,10,5
 Ramón Laureano,657656,SD,Extra-Base Hits,Season,15,20,5
 Jung Hoo Lee,808982,SF,Extra-Base Hits,Season,45,50,5
+Nathan Lukes,664770,TOR,Extra-Base Hits,Season,25,30,5
 Ketel Marte,606466,AZ,Extra-Base Hits,Season,55,60,5
 Coby Mayo,691723,BAL,Extra-Base Hits,Season,45,50,5
-Charles McAdoo,807727,TOR,Extra-Base Hits,Season,5,10,5
 Grant McCray,687529,SF,Extra-Base Hits,Season,5,10,5
+Ryan McMahon,641857,NYY,Extra-Base Hits,Season,25,30,5
 Curtis Mead,678554,BOS,Extra-Base Hits,Season,35,40,5
 Garrett Mitchell,669003,MIL,Extra-Base Hits,Season,45,50,5
 Yoán Moncada,660162,LAA,Extra-Base Hits,Season,5,10,5
@@ -780,6 +793,7 @@ Ryan O'Hearn,656811,PIT,Extra-Base Hits,Season,35,40,5
 Matt Olson,621566,ATL,Extra-Base Hits,Season,75,80,5
 Marcell Ozuna,542303,PIT,Extra-Base Hits,Season,15,20,5
 Richie Palacios,680700,TB,Extra-Base Hits,Season,25,30,5
+Salvador Perez,521692,KC,Extra-Base Hits,Season,45,50,5
 Luke Raley,670042,SEA,Extra-Base Hits,Season,25,30,5
 John Rave,670231,KC,Extra-Base Hits,Season,15,20,5
 Rob Refsnyder,608701,SEA,Extra-Base Hits,Season,5,10,5
@@ -792,25 +806,24 @@ Corey Seager,608369,TEX,Extra-Base Hits,Season,35,40,5
 Dominic Smith,642086,ATL,Extra-Base Hits,Season,15,20,5
 Sung-Mun Song,823550,SD,Extra-Base Hits,Season,5,10,5
 Tim Tawa,694374,AZ,Extra-Base Hits,Season,25,30,5
+Spencer Torkelson,679529,DET,Extra-Base Hits,Season,55,60,5
+Ezequiel Tovar,678662,COL,Extra-Base Hits,Season,35,40,5
 Jared Triolo,669707,PIT,Extra-Base Hits,Season,15,20,5
 Miguel Vargas,678246,CWS,Extra-Base Hits,Season,65,70,5
+Anthony Volpe,683011,NYY,Extra-Base Hits,Season,15,20,5
 Alika Williams,675961,ATH,Extra-Base Hits,Season,25,30,5
-Connor Wong,657136,BOS,Extra-Base Hits,Season,15,20,5
 Nick Yorke,694377,PIT,Extra-Base Hits,Season,5,10,5
 Jacob Young,696285,WSH,Extra-Base Hits,Season,35,40,5
 Ernie Clement,676391,TOR,Hits,Career,495,500,5
+Michael Busch,683737,CHC,Hits,Season,145,150,5
 José Caballero,676609,NYY,Hits,Season,95,100,5
 Xavier Edwards,669364,MIA,Hits,Season,145,150,5
 Freddy Fermin,666023,SD,Hits,Season,45,50,5
 Adolis García,666969,PHI,Hits,Season,45,50,5
 Jacob Gonzalez,694378,PIT,Hits,Season,45,50,5
-Iván Herrera,671056,STL,Hits,Season,145,150,5
 Marcelo Mayer,691785,SF,Hits,Season,45,50,5
-Zach Neto,687263,LAA,Hits,Season,145,150,5
 Luis Robert Jr.,673357,BAL,Hits,Season,45,50,5
 Esteury Ruiz,665923,MIA,Hits,Season,45,50,5
-Seiya Suzuki,673548,CHC,Hits,Season,145,150,5
-Tommy White,695720,ATH,Hits,Season,45,50,5
 Eloy Jiménez,650391,TOR,Home Runs,Career,95,100,5
 Miguel Andujar,609280,SD,Home Runs,Season,5,10,5
 Roman Anthony,701350,BOS,Home Runs,Season,5,10,5
@@ -820,6 +833,7 @@ Osleivis Basabe,678545,SF,Home Runs,Season,5,10,5
 Travis Bazzana,683953,CLE,Home Runs,Season,15,20,5
 Victor Bericoto,682674,SF,Home Runs,Season,5,10,5
 Alec Bohm,664761,PHI,Home Runs,Season,15,20,5
+Alec Burleson,676475,STL,Home Runs,Season,25,30,5
 Byron Buxton,621439,MIN,Home Runs,Season,25,30,5
 Willi Castro,650489,COL,Home Runs,Season,15,20,5
 Jackson Chourio,694192,MIL,Home Runs,Season,25,30,5
@@ -828,19 +842,15 @@ Jimmy Crooks,699625,STL,Home Runs,Season,5,10,5
 Pete Crow-Armstrong,691718,CHC,Home Runs,Season,45,50,5
 Chase DeLauter,800050,CLE,Home Runs,Season,15,20,5
 Adrian Del Castillo,680728,AZ,Home Runs,Season,5,10,5
-Nick Fortes,663743,TB,Home Runs,Season,5,10,5
 Konnor Griffin,804606,PIT,Home Runs,Season,5,10,5
 Ke'Bryan Hayes,663647,CIN,Home Runs,Season,5,10,5
-Austin Hedges,595978,CLE,Home Runs,Season,5,10,5
-Teoscar Hernández,606192,LAD,Home Runs,Season,15,20,5
-Carter Jensen,695600,KC,Home Runs,Season,25,30,5
-Jordan Lawlar,691783,AZ,Home Runs,Season,5,10,5
 Ben Malgeri,701162,DET,Home Runs,Season,5,10,5
 Jake Mangum,663968,PIT,Home Runs,Season,5,10,5
 Jorge Mateo,622761,TB,Home Runs,Season,5,10,5
 Jake McCarthy,664983,COL,Home Runs,Season,15,20,5
 Matt McLain,680574,CIN,Home Runs,Season,15,20,5
 Cedric Mullins,656775,TB,Home Runs,Season,15,20,5
+Munetaka Murakami,808959,CWS,Home Runs,Season,35,40,5
 Abimelec Ortiz,694673,WSH,Home Runs,Season,5,10,5
 James Outman,681546,DET,Home Runs,Season,5,10,5
 Vinnie Pasquantino,686469,KC,Home Runs,Season,15,20,5
@@ -848,7 +858,6 @@ Everson Pereira,677592,STL,Home Runs,Season,5,10,5
 Yohendrick Piñango,682818,TOR,Home Runs,Season,5,10,5
 Luke Raley,670042,SEA,Home Runs,Season,15,20,5
 Agustín Ramírez,682663,MIA,Home Runs,Season,5,10,5
-TJ Rumfield,681198,COL,Home Runs,Season,15,20,5
 Davis Schneider,676914,TOR,Home Runs,Season,5,10,5
 Kyle Schwarber,656941,PHI,Home Runs,Season,45,50,5
 Marcus Semien,543760,NYM,Home Runs,Season,15,20,5
@@ -858,10 +867,8 @@ Nick Sogard,686765,BOS,Home Runs,Season,5,10,5
 George Springer,543807,TOR,Home Runs,Season,15,20,5
 Tyler Stephenson,663886,CIN,Home Runs,Season,15,20,5
 Trevor Story,596115,BOS,Home Runs,Season,5,10,5
-Eugenio Suárez,553993,CIN,Home Runs,Season,25,30,5
 Fernando Tatis Jr.,665487,SD,Home Runs,Season,25,30,5
 Kyle Teel,691019,CWS,Home Runs,Season,5,10,5
-Spencer Torkelson,679529,DET,Home Runs,Season,25,30,5
 Jose Trevino,624431,CIN,Home Runs,Season,5,10,5
 Matt Vierling,663837,DET,Home Runs,Season,5,10,5
 Masyn Winn,691026,STL,Home Runs,Season,5,10,5
@@ -902,11 +909,10 @@ Trevor Story,596115,BOS,Stolen Bases,Season,5,10,5
 Bryce Teodosio,669326,LAA,Stolen Bases,Season,5,10,5
 Eli White,642201,BOS,Stolen Bases,Season,5,10,5
 Jordan Beck,687597,COL,Total Bases,Season,45,50,5
-Andrés Chaparro,665953,WSH,Total Bases,Season,95,100,5
-Dylan Crews,686611,WSH,Total Bases,Season,145,150,5
 Jimmy Crooks,699625,STL,Total Bases,Season,45,50,5
+Dillon Dingler,693307,DET,Total Bases,Season,245,250,5
 Adam Frazier,624428,LAA,Total Bases,Season,45,50,5
-Randal Grichuk,545341,CWS,Total Bases,Season,145,150,5
+Dustin Harris,687957,SD,Total Bases,Season,45,50,5
 Austin Martin,668885,MIN,Total Bases,Season,95,100,5
 Isaac Paredes,670623,HOU,Total Bases,Season,245,250,5
 Pedro Ramírez,699393,CHC,Total Bases,Season,95,100,5

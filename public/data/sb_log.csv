@@ -3934,3 +3934,27 @@ game_id,game_date,runner_id,runner_name,pitcher_id,pitcher_name,stolen_base,caug
 824866,2026-09-24,643289,Mauricio Dubón,685112,Zach McCambley,1,0,2B,5,bottom,bottom
 824866,2026-09-24,660670,Ronald Acuña Jr.,683175,Connor Phillips,1,0,3B,6,bottom,bottom
 824950,2026-09-24,665161,Jeremy Peña,665660,Elvis Alvarado,1,0,2B,9,top,top
+822681,2026-09-25,686611,Dylan Crews,642376,Jefry Yan,1,0,2B,1,bottom,bottom
+822681,2026-09-25,695578,James Wood,702752,Jonathan Pintaro,0,1,2B,2,bottom,bottom
+822681,2026-09-25,686611,Dylan Crews,672335,Cionel Pérez,1,0,3B,3,bottom,bottom
+822681,2026-09-25,682928,CJ Abrams,672335,Cionel Pérez,1,0,2B,3,bottom,bottom
+822760,2026-09-25,682829,Elly De La Cruz,667755,José Soriano,1,0,3B,3,top,top
+823085,2026-09-25,687263,Zach Neto,682243,Bryce Miller,1,0,3B,5,top,top
+823085,2026-09-25,703197,Michael Arroyo,672282,Reid Detmers,1,0,2B,5,bottom,bottom
+823167,2026-09-25,681624,Andy Pages,805074,Yunior Marte,1,0,2B,5,top,top
+823248,2026-09-25,672515,Gabriel Moreno,663554,Casey Mize,0,1,2B,4,top,top
+823489,2026-09-25,700250,Ben Rice,687064,Brandon Young,0,1,2B,1,bottom,bottom
+823489,2026-09-25,650968,Yohel Pozo,642232,Ryan Yarbrough,1,0,2B,2,top,top
+823489,2026-09-25,681047,Christian Franklin,701542,Will Warren,1,0,2B,6,top,top
+823652,2026-09-25,665019,Kody Clemens,594798,Jacob deGrom,1,0,2B,2,bottom,bottom
+823652,2026-09-25,807712,Luke Keaschall,686560,Gavin Collyer,1,0,2B,6,bottom,bottom
+823735,2026-09-25,669003,Garrett Mitchell,685464,Cade Winquest,0,1,3B,8,bottom,bottom
+823735,2026-09-25,668930,Brice Turang,685464,Cade Winquest,0,1,3B,8,bottom,bottom
+824058,2026-09-25,670231,John Rave,682120,Tim Herrin,1,0,3B,4,bottom,bottom
+824058,2026-09-25,677951,Bobby Witt Jr.,682120,Tim Herrin,1,0,2B,4,bottom,bottom
+824220,2026-09-25,665833,Oneil Cruz,695549,Jackson Jobe,1,0,2B,2,top,top
+824220,2026-09-25,701678,Hao-Yu Lee,681895,Evan Sisk,1,0,2B,4,bottom,bottom
+824544,2026-09-25,803011,Sam Antonacci,608372,Tomoyuki Sugano,0,1,2B,3,bottom,bottom
+824703,2026-09-25,691718,Pete Crow-Armstrong,687562,Jake Bennett,1,0,2B,5,top,top
+824703,2026-09-25,807713,Matt Shaw,687562,Jake Bennett,0,1,2B,6,top,top
+824706,2026-09-25,686765,Nick Sogard,656849,David Peterson,1,0,2B,4,bottom,bottom
