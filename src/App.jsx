@@ -2623,7 +2623,10 @@ function AtBatSlideIn() {
       setBvpLoading(true);
       const today = new Date().toLocaleDateString('en-US',{timeZone:'America/New_York',
         year:'numeric',month:'2-digit',day:'2-digit'}).replace(/(\d+)\/(\d+)\/(\d+)/,'$3-$1-$2');
-      fetch(`https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${today}&hydrate=probablePitcher,team&gameType=R`)
+      // gameType widened 2026-09-29 -- same R-only gap as GamedayTab; this
+      // fallback couldn't find a batter's opposing pitcher for a postseason
+      // game at all without it.
+      fetch(`https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${today}&hydrate=probablePitcher,team&gameType=R,A,F,D,L,W`)
         .then(r => r.json())
         .then(d => {
           const games = d.dates?.[0]?.games || [];
@@ -5297,7 +5300,10 @@ async function fetchGames(setL, setG, setE, silent=false) {
       const etDate2 = new Date().toLocaleDateString("en-US",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"});
       const [m2,d2,y2] = etDate2.split("/");
       const td2 = `${y2}-${m2}-${d2}`;
-      fetch(`https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${td2}&hydrate=broadcasts,team&gameType=R`)
+      // gameType widened 2026-09-29 alongside GamedayTab's own fetch -- same
+      // R-only gap, here it just silently blanked postseason games' TV
+      // network instead of hiding the games entirely.
+      fetch(`https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${td2}&hydrate=broadcasts,team&gameType=R,A,F,D,L,W`)
         .then(r=>r.json()).then(bData=>{
           const bGames = bData?.dates?.[0]?.games||[];
           const bMap = {};
@@ -10446,7 +10452,13 @@ function GamedayTab() {
     try {
       const r = await fetch(
         `https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${date}` +
-        `&hydrate=probablePitcher,linescore,decisions,team&gameType=R,A`
+        // R=regular season, A=All-Star, F/D/L/W=Wild Card/Division/
+        // Championship/World Series. Fixed 2026-09-29 -- this was R,A only
+        // (added Aug 2026 for the All-Star Game specifically, before the
+        // postseason was ever a consideration), which silently excluded
+        // every real playoff game from Gameday. Confirmed live: today's 4
+        // real Wild Card games only appear with all 6 types included.
+        `&hydrate=probablePitcher,linescore,decisions,team&gameType=R,A,F,D,L,W`
       );
       const d = await r.json();
       setGames(d.dates?.[0]?.games || []);
@@ -39378,7 +39390,10 @@ export default function App() {
     setAppSchedLoading(true);
     const today = new Date(), fmt = d=>d.toISOString().slice(0,10);
     const past=fmt(new Date(today-8*864e5)), future=fmt(new Date(+today+8*864e5));
-    fetch(`https://statsapi.mlb.com/api/v1/schedule?teamId=${tid}&startDate=${past}&endDate=${future}&sportId=1&gameType=R&hydrate=linescore,team`)
+    // gameType widened 2026-09-29 -- a playoff team's upcoming games in this
+    // +/-8-day window would otherwise silently vanish once the regular
+    // season ends.
+    fetch(`https://statsapi.mlb.com/api/v1/schedule?teamId=${tid}&startDate=${past}&endDate=${future}&sportId=1&gameType=R,A,F,D,L,W&hydrate=linescore,team`)
       .then(r=>r.json()).then(d=>{
         setAppTeamSchedule((d.dates||[]).flatMap(date=>(date.games||[]).map(g=>({
           date:date.date, gameId:g.gamePk, status:g.status?.detailedState||'',
