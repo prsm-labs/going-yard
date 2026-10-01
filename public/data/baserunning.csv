@@ -113,9 +113,9 @@ player_id,name,team,stolen_bases,caught_stealing,sb_pct,sb_opportunities
 665019,Kody Clemens,MIN,10,2,83.3,0
 671732,Lawrence Butler,ATH,10,7,58.8,0
 691026,Masyn Winn,STL,10,3,76.9,0
-683002,Gunnar Henderson,BAL,10,5,66.7,0
 681297,Colton Cowser,BAL,10,4,71.4,0
 690984,Petey Halpin,CLE,10,2,83.3,0
+683002,Gunnar Henderson,BAL,10,5,66.7,0
 543760,Marcus Semien,NYM,10,3,76.9,0
 666139,Josh Lowe,LAA,10,1,90.9,0
 665742,Juan Soto,NYM,9,3,75.0,0
@@ -320,8 +320,8 @@ player_id,name,team,stolen_bases,caught_stealing,sb_pct,sb_opportunities
 695491,Joshua Báez,STL,2,1,66.7,0
 663494,Bryan Torres,STL,2,0,100.0,0
 608369,Corey Seager,TEX,2,0,100.0,0
-678218,Brandon Valenzuela,TOR,2,0,100.0,0
 656484,Tristan Gray,MIN,2,0,100.0,0
+678218,Brandon Valenzuela,TOR,2,0,100.0,0
 673357,Luis Robert Jr.,BAL,2,3,40.0,0
 694378,Jacob Gonzalez,PIT,2,1,66.7,0
 694203,Denzer Guzman,LAA,2,1,66.7,0

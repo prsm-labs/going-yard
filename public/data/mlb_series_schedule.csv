@@ -1,9 +1,2 @@
 Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitcher ID (Away),Game ID,Venue ID,Venue Name,Day of Week,Day Abbr,Series Game #,Games in Series,Series Position,Day Context
-2026-09-30,02:00 PM,ATL,PHI,641816.0,650911.0,849841,4705,Truist Park,Wednesday,Wed,2,3,Middle,~ Neutral
-2026-09-30,05:00 PM,HOU,CWS,686613.0,680732.0,849846,2392,Daikin Park,Wednesday,Wed,2,3,Middle,~ Neutral
-2026-09-30,08:00 PM,NYY,BOS,608331.0,543243.0,849848,3313,Yankee Stadium,Wednesday,Wed,2,3,Middle,~ Neutral
-2026-09-30,10:00 PM,SD,CHC,601713.0,592332.0,849842,2680,Petco Park,Wednesday,Wed,2,3,Middle,~ Neutral
-2026-10-01,02:00 PM,ATL,PHI,,,849844,4705,Truist Park,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
-2026-10-01,05:00 PM,HOU,CWS,,,849850,2392,Daikin Park,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
-2026-10-01,08:00 PM,NYY,BOS,543037.0,624133.0,849847,3313,Yankee Stadium,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
-2026-10-01,10:00 PM,SD,CHC,,,849840,2680,Petco Park,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
+2026-10-01,08:00 PM,ATL,PHI,,,849844,4705,Truist Park,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
