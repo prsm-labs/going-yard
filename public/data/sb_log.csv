@@ -4000,3 +4000,14 @@ game_id,game_date,runner_id,runner_name,pitcher_id,pitcher_name,stolen_base,caug
 849843,2026-09-29,691718,Pete Crow-Armstrong,650633,Michael King,1,0,2B,3,top,top
 849843,2026-09-29,665487,Fernando Tatis Jr.,650644,Aaron Civale,1,0,2B,7,bottom,bottom
 849845,2026-09-29,607208,Trea Turner,519242,Chris Sale,0,1,2B,3,top,top
+849841,2026-09-30,660670,Ronald Acuña Jr.,650911,Cristopher Sánchez,1,0,2B,1,bottom,bottom
+849841,2026-09-30,660670,Ronald Acuña Jr.,650911,Cristopher Sánchez,1,0,3B,1,bottom,bottom
+849842,2026-09-30,701538,Jackson Merrill,592332,Kevin Gausman,1,0,2B,2,bottom,bottom
+849842,2026-09-30,701538,Jackson Merrill,656849,David Peterson,0,1,2B,6,bottom,bottom
+849846,2026-09-30,682668,Luisangel Acuña,663567,Peter Lambert,1,0,2B,6,top,top
+849846,2026-09-30,682668,Luisangel Acuña,650556,Bryan Abreu,1,0,3B,6,top,top
+849846,2026-09-30,671976,Tristan Peters,650556,Bryan Abreu,1,0,2B,6,top,top
+849848,2026-09-30,682987,Spencer Jones,676979,Garrett Crochet,1,0,2B,6,bottom,bottom
+849848,2026-09-30,665862,Jazz Chisholm Jr.,676477,Garrett Whitlock,1,0,2B,7,bottom,bottom
+849848,2026-09-30,665862,Jazz Chisholm Jr.,676477,Garrett Whitlock,1,0,3B,7,bottom,bottom
+849848,2026-09-30,663757,Trent Grisham,676477,Garrett Whitlock,1,0,2B,7,bottom,bottom
