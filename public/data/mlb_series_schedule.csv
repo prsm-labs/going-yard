@@ -1,2 +1,5 @@
 Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitcher ID (Away),Game ID,Venue ID,Venue Name,Day of Week,Day Abbr,Series Game #,Games in Series,Series Position,Day Context
-2026-10-01,08:00 PM,ATL,PHI,678061,605400,849844,4705,Truist Park,Thursday,Thu,3,3,Finale,✅ Best Day (getaway)
+2026-10-03,01:00 PM,CLE,CWS,800048.0,,849829,5,Progressive Field,Saturday,Sat,1,5,Opener,✅ Strong (hittable pitchers)
+2026-10-03,04:00 PM,LAD,ATL,,,849828,22,UNIQLO Field at Dodger Stadium,Saturday,Sat,1,5,Opener,✅ Strong (hittable pitchers)
+2026-10-03,06:30 PM,TB,NYY,656876.0,,849835,12,Tropicana Field,Saturday,Sat,1,5,Opener,✅ Strong (hittable pitchers)
+2026-10-03,08:30 PM,MIL,SD,694819.0,,849830,32,American Family Field,Saturday,Sat,1,5,Opener,✅ Strong (hittable pitchers)

@@ -65,6 +65,7 @@ LaMonte Wade Jr.,664774,HOU,Extra-Base Hits,Season,10,10,0
 Ryan Waldschmidt,814439,AZ,Extra-Base Hits,Season,20,20,0
 Cole Young,702284,SEA,Extra-Base Hits,Season,40,40,0
 Gavin Sheets,657757,SD,Hits,Career,500,500,0
+Brett Baty,683146,NYM,Hits,Season,100,100,0
 Joey Ortiz,687401,MIL,Hits,Season,100,100,0
 Christian Vázquez,543877,HOU,Hits,Season,50,50,0
 Francisco Lindor,596019,NYM,Home Runs,Career,300,300,0
@@ -153,7 +154,7 @@ Eric Haase,606992,SF,Extra-Base Hits,Career,99,100,1
 Scott Kingery,664068,CHC,Extra-Base Hits,Career,99,100,1
 Logan O'Hoppe,681351,TEX,Extra-Base Hits,Career,99,100,1
 Brayan Rocchio,677587,CLE,Extra-Base Hits,Career,99,100,1
-Jake Rogers,668670,DET,Extra-Base Hits,Career,99,100,1
+Jake Rogers,668670,CWS,Extra-Base Hits,Career,99,100,1
 Juan Soto,665742,NYM,Extra-Base Hits,Career,499,500,1
 Ronald Acuña Jr.,660670,ATL,Extra-Base Hits,Season,39,40,1
 Blaze Alexander,677942,BAL,Extra-Base Hits,Season,19,20,1
@@ -190,7 +191,7 @@ Kazuma Okamoto,672960,TOR,Extra-Base Hits,Season,59,60,1
 Vinnie Pasquantino,686469,KC,Extra-Base Hits,Season,39,40,1
 José Ramírez,608070,CLE,Extra-Base Hits,Season,39,40,1
 Ben Rice,700250,NYY,Extra-Base Hits,Season,69,70,1
-Jake Rogers,668670,DET,Extra-Base Hits,Season,9,10,1
+Jake Rogers,668670,CWS,Extra-Base Hits,Season,9,10,1
 Esteury Ruiz,665923,MIA,Extra-Base Hits,Season,19,20,1
 TJ Rumfield,681198,COL,Extra-Base Hits,Season,49,50,1
 Nolan Schanuel,694384,LAA,Extra-Base Hits,Season,29,30,1
@@ -206,7 +207,6 @@ Joey Wiemer,686894,WSH,Extra-Base Hits,Season,9,10,1
 Weston Wilson,642215,SEA,Extra-Base Hits,Season,9,10,1
 Jared Young,676724,NYM,Extra-Base Hits,Season,29,30,1
 Michael Conforto,624424,CHC,Hits,Career,999,1000,1
-Brett Baty,683146,NYM,Hits,Season,99,100,1
 Max Clark,703601,DET,Hits,Season,49,50,1
 Brenton Doyle,686668,CWS,Hits,Season,49,50,1
 Nolan Gorman,669357,STL,Hits,Season,49,50,1
@@ -466,7 +466,7 @@ Max Muncy,571970,LAD,Extra-Base Hits,Season,57,60,3
 Sean Murphy,669221,ATL,Extra-Base Hits,Season,7,10,3
 Joey Ortiz,687401,MIL,Extra-Base Hits,Season,27,30,3
 Alejandro Osuna,696030,TEX,Extra-Base Hits,Season,7,10,3
-Blake Perkins,663368,MIL,Extra-Base Hits,Season,7,10,3
+Blake Perkins,663368,CLE,Extra-Base Hits,Season,7,10,3
 Tristan Peters,671976,CWS,Extra-Base Hits,Season,47,50,3
 Jorge Polanco,593871,NYM,Extra-Base Hits,Season,7,10,3
 Heliot Ramos,671218,NYY,Extra-Base Hits,Season,37,40,3
