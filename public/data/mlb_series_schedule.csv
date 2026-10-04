@@ -1,5 +1,5 @@
 Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitcher ID (Away),Game ID,Venue ID,Venue Name,Day of Week,Day Abbr,Series Game #,Games in Series,Series Position,Day Context
-2026-10-04,04:00 PM,MIL,SD,701656,650633.0,849825,32,American Family Field,Sunday,Sun,2,5,Middle,~ Neutral (check pitcher)
-2026-10-04,08:00 PM,LAD,ATL,605483,,849823,22,UNIQLO Field at Dodger Stadium,Sunday,Sun,2,5,Middle,~ Neutral (check pitcher)
-2026-10-05,05:00 PM,CLE,CWS,668909,641743.0,849834,5,Progressive Field,Monday,Mon,2,5,Middle,~ Solid
-2026-10-05,08:00 PM,TB,NYY,642547,693645.0,849839,12,Tropicana Field,Monday,Mon,2,5,Middle,~ Solid
+2026-10-04,04:00 PM,MIL,SD,701656,650633,849825,32,American Family Field,Sunday,Sun,2,5,Middle,~ Neutral (check pitcher)
+2026-10-04,08:00 PM,LAD,ATL,605483,678061,849823,22,UNIQLO Field at Dodger Stadium,Sunday,Sun,2,5,Middle,~ Neutral (check pitcher)
+2026-10-05,05:00 PM,CLE,CWS,668909,641743,849834,5,Progressive Field,Monday,Mon,2,5,Middle,~ Solid
+2026-10-05,08:00 PM,TB,NYY,642547,693645,849839,12,Tropicana Field,Monday,Mon,2,5,Middle,~ Solid
