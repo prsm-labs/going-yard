@@ -4032,3 +4032,8 @@ game_id,game_date,runner_id,runner_name,pitcher_id,pitcher_name,stolen_base,caug
 849833,2026-10-07,608070,José Ramírez,702273,Noah Schultz,1,0,3B,5,top,top
 849833,2026-10-07,677587,Brayan Rocchio,663436,Davis Martin,1,0,2B,9,top,top
 849838,2026-10-07,665862,Jazz Chisholm Jr.,641329,Bryan Baker,1,0,2B,9,bottom,bottom
+849832,2026-10-08,678246,Miguel Vargas,542888,Shawn Armstrong,1,0,3B,3,bottom,bottom
+849832,2026-10-08,808959,Munetaka Murakami,542888,Shawn Armstrong,1,0,2B,3,bottom,bottom
+849832,2026-10-08,682657,Angel Martínez,641743,Anthony Kay,1,0,2B,6,top,top
+849832,2026-10-08,800050,Chase DeLauter,663542,Bryan Hudson,0,1,3B,6,top,top
+849832,2026-10-08,666176,Jo Adell,663542,Bryan Hudson,0,1,3B,6,top,top
