@@ -1,4 +1,4 @@
 Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitcher ID (Away),Game ID,Venue ID,Venue Name,Day of Week,Day Abbr,Series Game #,Games in Series,Series Position,Day Context
-2026-10-11,08:00 PM,MIL,LAD,694819,669373.0,849809,32,American Family Field,Sunday,Sun,1,7,Opener,~ Neutral (check pitcher)
-2026-10-12,05:00 PM,MIL,LAD,701656,808967.0,849812,32,American Family Field,Monday,Mon,2,7,Middle,~ Solid
-2026-10-12,08:00 PM,TB,CLE,656876,,849820,12,Tropicana Field,Monday,Mon,1,7,Opener,~ Solid
+2026-10-12,05:00 PM,MIL,LAD,701656.0,808967.0,849812,32,American Family Field,Monday,Mon,2,7,Middle,~ Solid
+2026-10-12,08:00 PM,TB,CLE,656876.0,656492.0,849820,12,Tropicana Field,Monday,Mon,1,7,Opener,~ Solid
+2026-10-13,08:00 PM,TB,CLE,,,849813,12,Tropicana Field,Tuesday,Tue,2,7,Middle,⚠️ Weakest Day
