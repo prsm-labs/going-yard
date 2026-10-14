@@ -1080,6 +1080,7 @@ const BATTER_PROP_OPTS = [
   { value:'2B+', label:'2 Bases', color:'var(--ice)' },
   { value:'2B',  label:'Double',  color:'var(--ice)' },
   { value:'3B',  label:'Triple',  color:'var(--accent2)' },
+  { value:'BB',  label:'Walk',    color:'var(--c-emerald)' },
   { value:'RBI', label:'RBI',     color:'var(--c-warn)' },
   { value:'HRR', label:'H+R+R',   color:'var(--accent)' },
   { value:'HR',  label:'HR',      color:'var(--aplus)' },
@@ -1099,6 +1100,122 @@ function useBatterProps() {
   const [bprops, setState] = useState({...GLOBAL_BPROPS});
   useEffect(() => { BPROP_LISTENERS.add(setState); return () => BPROP_LISTENERS.delete(setState); }, []);
   return bprops;
+}
+
+// ── GAMBLY ────────────────────────────────────────────────────
+// Gambly (gambly.com) builds a bet slip at the user's own sportsbook from
+// plain text pre-filled via a `?q=` URL param on its chat page. No account,
+// API key, or odds API involved on our side — this just copies bet text and
+// opens Gambly with it typed in; the user reviews and sends it themselves.
+const GAMBLY_PROPS = {
+  hr:     "To Hit a Home Run",
+  tb2:    "2+ Total Bases",
+  hit:    "To Record a Hit",
+  double: "To Hit a Double",
+  triple: "To Hit a Triple",
+  walk:   "To Draw a Walk",
+  rbi:    "To Record an RBI",
+  hrr:    "1+ Combined Hits+Runs+RBIs",
+};
+const GAMBLY_PROP_LABELS = {
+  hr:"🏠 HR", tb2:"📏 2+ TB", hit:"⚾ Hit", double:"🎯 Double", triple:"🔺 Triple",
+  walk:"🚶 Walk", rbi:"🏃 RBI", hrr:"🧮 H+R+RBI",
+};
+// My Picks' own per-pick "Prop" dropdown (BATTER_PROP_OPTS below) already lets
+// the user tag a pick with a specific stat — map its values straight onto a
+// Gambly prop so the Gambly button there sends the right bet, not always HR.
+const BPROP_TO_GAMBLY = { '':'hr', HIT:'hit', '2B+':'tb2', '2B':'double', '3B':'triple', BB:'walk', RBI:'rbi', HRR:'hrr', HR:'hr' };
+const betLine = (name, team, prop='hr') => `${name}${team ? ` (${team})` : ''} — ${GAMBLY_PROPS[prop] || prop}`;
+function betText(lines, { sameGame=false } = {}) {
+  if (lines.length < 2) return lines.join('');
+  return [...lines, `(${lines.length}-leg ${sameGame ? 'same game ' : ''}parlay)`].join('\n');
+}
+const gamblyUrl = (text) => `https://gambly.com/chat?q=${encodeURIComponent(text)}`;
+
+function GamblyButton({ name, team, prop='hr', text, compact=true, label='Gambly', title, onAfterClick, style }) {
+  const [done, setDone] = useState(false);
+  const betTxt = text || (name ? betLine(name, team, prop) : null);
+  if (!betTxt) return null;
+  const go = async (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    try {
+      await navigator.clipboard.writeText(betTxt);
+      setDone(true);
+      setTimeout(() => setDone(false), 2000);
+    } catch { /* clipboard blocked: the bet is still typed into Gambly */ }
+    window.open(gamblyUrl(betTxt), "_blank", "noopener,noreferrer");
+    if (onAfterClick) onAfterClick();
+  };
+  const tip = title || `Gambly: copies "${betTxt.split("\n").join(" · ")}" and opens Gambly with it typed in`;
+  return (
+    <button type="button" onClick={go} title={tip}
+      style={{fontSize:10, display:'inline-flex', alignItems:'center', gap:4,
+        padding: compact ? '1px 4px' : '4px 9px', verticalAlign:'middle', lineHeight:1,
+        border:'1px solid var(--border)', borderRadius:5, background:'var(--surface2)',
+        color:'var(--muted)', cursor:'pointer', whiteSpace:'nowrap', ...style}}>
+      <img src="/brand/gambly.png" alt="Gambly" width={compact?12:14} height={compact?12:14} style={{display:'block',flexShrink:0}}/>
+      {done ? '✓' : compact ? null : label}
+    </button>
+  );
+}
+
+// Full prop menu — used in the batter slideout so the HR/2+TB/Walk/Double/
+// H+R+RBI options don't crowd the header as five separate buttons. Portal
+// into document.body (same reason PickButton's menu does) so a slideout's
+// own CSS transform can't clip it.
+function GamblyMenuButton({ name, team }) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState({top:0,left:0});
+  const btnRef = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const h = () => setOpen(false);
+    document.addEventListener('click', h);
+    return () => document.removeEventListener('click', h);
+  }, [open]);
+  const handleOpen = (e) => {
+    e.stopPropagation();
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      const menuW = 190, menuH = 220;
+      const vw = window.innerWidth, vh = window.innerHeight;
+      let left = r.right - menuW;
+      if (left < 4) left = Math.min(4, r.left);
+      if (left + menuW > vw - 4) left = vw - menuW - 4;
+      let top = r.bottom + 4;
+      if (top + menuH > vh - 8) top = Math.max(8, r.top - menuH - 4);
+      setPos({ top, left });
+    }
+    setOpen(o => !o);
+  };
+  const menu = open ? ReactDOM.createPortal(
+    <div style={{position:'fixed', top:pos.top, left:pos.left, zIndex:99999,
+      background:'#0d1318', border:'1px solid var(--border)', borderRadius:8, padding:5,
+      display:'flex', flexDirection:'column', gap:3, minWidth:190,
+      boxShadow:'0 8px 28px rgba(0,0,0,.85)'}}
+      onClick={e=>e.stopPropagation()}>
+      {Object.keys(GAMBLY_PROPS).map(p => (
+        <GamblyButton key={p} name={name} team={team} prop={p} compact={false}
+          label={GAMBLY_PROP_LABELS[p]} onAfterClick={()=>setOpen(false)}
+          style={{justifyContent:'flex-start', width:'100%'}}/>
+      ))}
+    </div>,
+    document.body
+  ) : null;
+  return (
+    <div style={{position:'relative', display:'inline-block'}}>
+      <button ref={btnRef} type="button" onClick={handleOpen}
+        title="Send this bet to Gambly"
+        style={{fontSize:10, display:'inline-flex', alignItems:'center', gap:5,
+          padding:'4px 9px', borderRadius:5, border:'1px solid var(--border)',
+          background:'var(--surface2)', color:'var(--muted)', cursor:'pointer', whiteSpace:'nowrap'}}>
+        <img src="/brand/gambly.png" alt="Gambly" width={14} height={14} style={{display:'block'}}/>
+        Send to Gambly ▾
+      </button>
+      {menu}
+    </div>
+  );
 }
 
 // ── PICK BUTTON ───────────────────────────────────────────────
@@ -1827,6 +1944,9 @@ function PickRow({p, bprops}) {
         ))}
       </select>
 
+      {/* Gambly — sends whatever prop is selected above; defaults to HR if none picked */}
+      <GamblyButton name={p.name} team={getTeam(p.pid,p.team)} prop={BPROP_TO_GAMBLY[propVal] || 'hr'}/>
+
       {/* Remove */}
       <button onClick={()=>setPick(p.pid,p.name,p.team,p.type)}
         style={{background:"none",border:"1px solid var(--border)",borderRadius:5,
@@ -1943,11 +2063,16 @@ function MyPicksTab() {
             const cfgColor = cfg.color || '#888';
             const cfgEmoji = cfg.label ? cfg.label.split(" ")[0] : '';
             const cfgName  = cfg.label ? cfg.label.split(" ").slice(1).join(" ").toUpperCase() : type.toUpperCase();
+            const groupGids = players.map(p=>DAILY_PICKS_CACHE[String(p.pid)]?._gid);
+            const sameGame = groupGids.length>0 && groupGids.every(g=>g && g===groupGids[0]);
+            const parlayLines = players.map(p=>betLine(p.name, getTeam(p.pid,p.team), BPROP_TO_GAMBLY[bprops[String(p.pid)]] || 'hr'));
             return <div key={type} style={{background:"var(--surface)",border:"1px solid "+cfgColor+"30",borderRadius:10,overflow:"hidden"}}>
               <div style={{padding:"10px 14px",background:cfgColor+"10",borderBottom:"1px solid "+cfgColor+"20",display:"flex",alignItems:"center",gap:8}}>
                 <span style={{fontSize:16}}>{cfgEmoji}</span>
                 <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:cfgColor,letterSpacing:1}}>{cfgName}</span>
                 <span style={{marginLeft:"auto",fontFamily:"'DM Mono',monospace",fontSize:11,color:"var(--muted)"}}>{players.length} batter{players.length!==1?"s":""}</span>
+                {players.length>=2 && <GamblyButton text={betText(parlayLines,{sameGame})} compact={false}
+                  label={`All ${players.length} as a parlay`}/>}
               </div>
               {players.map(p=><PickRow key={p.pid} p={p} bprops={bprops}/>)}
             </div>;
@@ -2748,6 +2873,7 @@ function AtBatSlideIn() {
               style={{fontSize:13,lineHeight:1}}>✅</span>
           )}
           <PickButton pid={player.pid} name={player.name} team={player.team}/>
+          <GamblyMenuButton name={player.name} team={player.team}/>
         </div>
         {/* RISP Stats */}
         {risp && (
@@ -6315,7 +6441,7 @@ function GPanel({game, isLive, isFinal=false}) {
                   <span className={`hl ${b.heatLabel.cls}`}
                     style={{flexShrink:0,fontSize:9}}>{b.heatLabel.label}</span>
                   <div onClick={e=>e.stopPropagation()} style={{flexShrink:0}}>
-                    <PickButton pid={b.id} name={b.name} team={b.team}/>
+                    <PickButton pid={b.id} name={b.name} team={b.team}/><GamblyButton name={b.name} team={b.team} prop="hr"/>
                   </div>
                   {/* Today's line: H/AB HR */}
                   <div style={{textAlign:"right",flexShrink:0}}>
@@ -7452,7 +7578,7 @@ function LineupsView({ date }) {
           )}
 
           {/* Pick button */}
-          {pid > 0 && <PickButton pid={pid} name={player.fullName} team={teamAbbr}/>}
+          {pid > 0 && <><PickButton pid={pid} name={player.fullName} team={teamAbbr}/><GamblyButton name={player.fullName} team={teamAbbr} prop="hr"/></>}
 
           {!hasStats && !pid && (
             <span style={{fontSize:10,color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontStyle:'italic'}}>
@@ -7829,7 +7955,7 @@ function ThemeMatchTable({ rows }) {
                           cursor:'pointer',color:isKeyMatchup(pid,b.batter||'')?'var(--c-warn)':'var(--text)'}}>
                         {b.batter||'—'}
                       </span>
-                      <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={pid} name={b.batter||''} team={b.batting_team||''}/></span>
+                      <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={pid} name={b.batter||''} team={b.batting_team||''}/><GamblyButton name={b.batter||''} team={b.batting_team||''} prop="hr"/></span>
                     </div>
                   </td>
                   <td style={{padding:'2px 4px',textAlign:'center',verticalAlign:'middle'}}><YardBadge score={yard}/></td>
@@ -12869,7 +12995,7 @@ function HRLeaderboardTab() {
                     <PlayerAvatar pid={r.pid} name={r.name} size={16}/>
                     <span style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'var(--accent2)',whiteSpace:'nowrap',flexShrink:0}}>{r.team}</span>
                     <span style={{fontFamily:osw,fontWeight:700,fontSize:10,color:'var(--text)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.name}</span>
-                    <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={r.pid} name={r.name} team={r.team}/></span>
+                    <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={r.pid} name={r.name} team={r.team}/><GamblyButton name={r.name} team={r.team} prop="hr"/></span>
                   </div>
                 </td>
                 <td style={{padding:'2px 6px',textAlign:'right'}}><span style={{fontFamily:osw,fontWeight:800,fontSize:13,color:r.hrs>=20?'var(--accent)':r.hrs>=12?'var(--accent2)':'var(--text)'}}>{r.hrs}</span></td>
@@ -12975,7 +13101,7 @@ function HotBatsTab() {
                   <div style={{display:'flex',alignItems:'center',gap:4,overflow:'hidden'}}>
                     <PlayerAvatar pid={p.pid} name={p.name} size={16}/>
                     <span style={{fontFamily:osw,fontWeight:700,fontSize:10,color:isKeyMatchup(p.pid,p.name)?'var(--c-warn)':'var(--text)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.name}</span>
-                    <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={p.pid} name={p.name} team={p.team}/></span>
+                    <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={p.pid} name={p.name} team={p.team}/><GamblyButton name={p.name} team={p.team} prop="hr"/></span>
                   </div>
                 </td>
                 <td style={{padding:'2px 6px',textAlign:'right'}}><span style={{fontFamily:osw,fontWeight:800,fontSize:12,color:p.l7hr>=3?'var(--c-danger)':p.l7hr>=2?'var(--accent2)':'var(--green)'}}>{p.l7hr}</span></td>
@@ -13073,7 +13199,7 @@ function HeatingUpTab() {
                   <div style={{display:'flex',alignItems:'center',gap:4,overflow:'hidden'}}>
                     <PlayerAvatar pid={p.pid} name={p.name} size={16}/>
                     <span style={{fontFamily:osw,fontWeight:700,fontSize:10,color:isKeyMatchup(p.pid,p.name)?'var(--c-warn)':'var(--text)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.name}</span>
-                    <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={p.pid} name={p.name} team={p.team}/></span>
+                    <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={p.pid} name={p.name} team={p.team}/><GamblyButton name={p.name} team={p.team} prop="hr"/></span>
                   </div>
                 </td>
                 <td style={{padding:'2px 5px',textAlign:'right',fontFamily:osw,fontWeight:700,fontSize:11,color:evCol(p.avgEV)}}>{p.avgEV.toFixed(1)}</td>
@@ -16460,7 +16586,7 @@ function LongShotView({ data }) {
                         <PlayerAvatar pid={pid} name={name} size={16}/>
                         <span style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'var(--accent2)',whiteSpace:'nowrap',flexShrink:0}}>{b.batting_team||''}</span>
                         <span style={{fontFamily:osw,fontWeight:700,fontSize:10,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',color:isKeyMatchup(pid,name)?'var(--c-warn)':(b._boom>=50&&b._ps>=40)?'var(--c-violet)':'var(--text)'}}>{name}</span>
-                        <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={pid} name={name} team={b.batting_team||''}/></span>
+                        <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={pid} name={name} team={b.batting_team||''}/><GamblyButton name={name} team={b.batting_team||''} prop="hr"/></span>
                       </div>
                     </td>
                     <td style={{padding:'2px 4px',textAlign:'center'}}>
@@ -17738,7 +17864,7 @@ function SimLabView({ data }) {
                       onClick={() => { setSelBatter(b); setView('deepdive'); }}
                       style={{ cursor: 'pointer' }}>
                       <td style={{ textAlign: 'center', padding: '3px 4px' }}>
-                        <PickButton pid={parseInt(b.batter_id)||0} name={b.batter} team={b.batting_team}/>
+                        <PickButton pid={parseInt(b.batter_id)||0} name={b.batter} team={b.batting_team}/><GamblyButton name={b.batter} team={b.batting_team} prop="hr"/>
                       </td>
                       {/* ── Batter name — single-line, no wrap ── */}
                       <td className="sticky-batter" style={{ textAlign: 'left', maxWidth: 180 }}>
@@ -18232,7 +18358,7 @@ function SimLabView({ data }) {
                   return (
                     <tr key={`${b.batter_id}-${i}`} className="dr">
                       <td style={{ textAlign: 'center', padding: '3px 4px' }} onClick={e => e.stopPropagation()}>
-                        <PickButton pid={parseInt(b.batter_id) || 0} name={b.batter} team={b.batting_team}/>
+                        <PickButton pid={parseInt(b.batter_id) || 0} name={b.batter} team={b.batting_team}/><GamblyButton name={b.batter} team={b.batting_team} prop="hr"/>
                       </td>
                       <td className="sticky-batter" style={{ padding: '3px 6px', maxWidth: 170 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 5, overflow: 'hidden', cursor: 'pointer' }}
@@ -18377,7 +18503,7 @@ function SimLabView({ data }) {
                     return (
                       <tr key={`${b.batter_id}-${i}`} className="dr" onClick={() => { setSelBatter(b); setView('deepdive'); }} style={{ cursor: 'pointer' }}>
                         <td style={{ textAlign: 'center' }} onClick={e => e.stopPropagation()}>
-                          <PickButton pid={parseInt(b.batter_id)||0} name={b.batter} team={b.batting_team}/>
+                          <PickButton pid={parseInt(b.batter_id)||0} name={b.batter} team={b.batting_team}/><GamblyButton name={b.batter} team={b.batting_team} prop="hr"/>
                         </td>
                         <td className="sticky-batter" style={{ textAlign: 'left', maxWidth: 180 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 5, overflow: 'hidden' }}>
@@ -19208,7 +19334,7 @@ function BvPHistoryTab({ data }) {
     {key:'team',    label:'Tm',      align:'left',  render:r=><span style={{color:'var(--accent2)',fontWeight:700,fontFamily:"'Oswald',sans-serif",fontSize:11}}>{r.team}</span>},
     {key:'batter',  label:'Batter',  align:'left',  render:r=>(
       <div style={{display:'flex',alignItems:'center',gap:5}}>
-        <PickButton pid={r.batterId} name={r.batter} team={r.team}/>
+        <PickButton pid={r.batterId} name={r.batter} team={r.team}/><GamblyButton name={r.batter} team={r.team} prop="hr"/>
         <PlayerAvatar pid={r.batterId} name={r.batter} size={20}/>
         <div style={{cursor:'pointer',display:'flex',alignItems:'center',gap:3}}
           onClick={()=>{const cp=getCachedPlayer(r.batterId)||{};openAtBatSlide({pid:r.batterId,name:r.batter,team:r.team,avgEV:cp.avgEV,barrel:cp.barrel,hr:cp.hr,avg:cp.avg,obp:cp.obp,slg:cp.slg});}}>
@@ -20265,7 +20391,7 @@ function BatterLeaderboard() {
                       outline:isExpanded?'1px solid rgba(56,184,242,.25)':''}}>
                     {/* Pick button — first */}
                     <td style={{textAlign:'center',paddingRight:2}}>
-                      <PickButton pid={p.pid} name={p.name} team={p.team}/>
+                      <PickButton pid={p.pid} name={p.name} team={p.team}/><GamblyButton name={p.name} team={p.team} prop="hr"/>
                     </td>
                     {/* Batter name — single line, click opens slideout */}
                     <td className="batter-name-cell" style={{textAlign:'left',whiteSpace:'nowrap'}}>
@@ -22209,7 +22335,7 @@ function StatsTab() {
                         {!isGoneYardToday(parseInt(r.id)||0,r.name) && is2BagToday(parseInt(r.id)||0,r.name) && <span title="2+ total bases today (no HR)" style={{fontSize:9,flexShrink:0}}>2️⃣</span>}
                         {isHotBatPlayer(getCachedPlayer(parseInt(r.id)||0)||{})&&<span title="Hot bat 3+ HR L7" style={{fontSize:9,flexShrink:0}}>🔥</span>}
                         {INJURY_MAP?.[parseInt(r.id)||0]&&!LINEUP_STATUS?.[parseInt(r.id)||0]&&<span title={INJURY_MAP[parseInt(r.id)||0]?.label||'Injured'} style={{fontSize:9,flexShrink:0}}>🤕</span>}
-                        <PickButton pid={parseInt(r.id)||0} name={r.name||r.id} team={r.team||''}/>
+                        <PickButton pid={parseInt(r.id)||0} name={r.name||r.id} team={r.team||''}/><GamblyButton name={r.name||r.id} team={r.team||''} prop="hr"/>
                       </div>
                     </td>
                     <td style={{textAlign:'center',padding:'2px 4px',fontFamily:mono,fontSize:9,fontWeight:700,color:r._slot<99?'var(--green)':'transparent',minWidth:18}}>{r._slot<99?r._slot:'·'}</td>
@@ -22609,7 +22735,7 @@ function SoCloseTab({ data }) {
                           {r.name}
                         </span>
                         <span style={{fontFamily:mono,fontSize:7,color:'var(--accent2)',fontWeight:700}}>{r.team}</span>
-                        <PickButton pid={r.pid} name={r.name} team={r.team}/>
+                        <PickButton pid={r.pid} name={r.name} team={r.team}/><GamblyButton name={r.name} team={r.team} prop="hr"/>
                       </div>
                     </td>
                     <td style={{textAlign:'center',padding:'2px 4px'}}>
@@ -22994,7 +23120,7 @@ function PairsTab({ data }) {
                   cursor:'pointer',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
                 {b.batter}
               </span>
-              <PickButton pid={parseInt(b.batter_id)||0} name={b.batter} team={b.batting_team||''}/>
+              <PickButton pid={parseInt(b.batter_id)||0} name={b.batter} team={b.batting_team||''}/><GamblyButton name={b.batter} team={b.batting_team||''} prop="hr"/>
             </div>
             <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',marginTop:1}}>
               {b.batting_team} · vs <span
@@ -23795,7 +23921,7 @@ function BvPDeepDiveTab() {
                           return platoon ? <span title="Platoon advantage" data-tip="✓ Natural platoon advantage vs pitcher's hand" style={{fontSize:9,color:'var(--green)',marginLeft:2,flexShrink:0}}>✓</span> : null;
                         })()}
                         <span style={{flexShrink:0}}>
-                          <PickButton pid={parseInt(r.bid)||0} name={r.name} team={r.team||''}/>
+                          <PickButton pid={parseInt(r.bid)||0} name={r.name} team={r.team||''}/><GamblyButton name={r.name} team={r.team||''} prop="hr"/>
                         </span>
                       </div>
                     </td>
@@ -24298,7 +24424,7 @@ For non-pick questions: {"intro":"your full answer","picks":[],"disclaimer":""}`
                               <span onClick={pid?()=>{setOpen(false);const cp=getCachedPlayer(parseInt(pid)||0)||{};openAtBatSlide({pid:parseInt(pid),name:pick.name,team,avgEV:cp.avgEV,barrel:cp.barrel,hr:cp.hr,avg:cp.avg,obp:cp.obp,slg:cp.slg});}:undefined}
                                 style={{fontFamily:osw,fontWeight:700,fontSize:12,color:'var(--text)',cursor:pid?'pointer':'default',textDecoration:pid?'underline dotted':'none',textUnderlineOffset:2}}>{pick.name}</span>
                               {team&&<span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>{team}</span>}
-                              {pid&&<span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={pid} name={pick.name} team={team}/></span>}
+                              {pid&&<span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={pid} name={pick.name} team={team}/><GamblyButton name={pick.name} team={team} prop="hr"/></span>}
                             </div>
                             <div style={{fontFamily:mono,fontSize:8,color:'var(--accent)',marginTop:1}}>{pick.betType}</div>
                           </div>
@@ -24752,7 +24878,7 @@ function SBPropsTab() {
                       </span>
                       {r.confirmed && <span title="Confirmed in today's lineup" style={{fontSize:9,lineHeight:1}}>✅</span>}
                       <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}>
-                        <PickButton pid={parseInt(r.batterId)||0} name={r.batterName} team={r.batterTeam}/>
+                        <PickButton pid={parseInt(r.batterId)||0} name={r.batterName} team={r.batterTeam}/><GamblyButton name={r.batterName} team={r.batterTeam} prop="hr"/>
                       </span>
                     </div>
                     <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>
@@ -24986,7 +25112,7 @@ function WalksTab() {
                       </span>
                       {r.confirmed && <span title="Confirmed in today's lineup" style={{fontSize:9,lineHeight:1}}>✅</span>}
                       <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}>
-                        <PickButton pid={parseInt(r.batterId)||0} name={r.batterName} team={r.batterTeam}/>
+                        <PickButton pid={parseInt(r.batterId)||0} name={r.batterName} team={r.batterTeam}/><GamblyButton name={r.batterName} team={r.batterTeam} prop="hr"/>
                       </span>
                     </div>
                     <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>
@@ -25731,7 +25857,7 @@ function MatchupEngineTab() {
                           {getTeam(p.pid,p.team)}
                         </div>
                       </div>
-                      <PickButton pid={p.pid} name={p.name} team={p.team}/>
+                      <PickButton pid={p.pid} name={p.name} team={p.team}/><GamblyButton name={p.name} team={p.team} prop="hr"/>
                     </div>
                   );
                 })}
@@ -26123,7 +26249,7 @@ function MatchupEngineTab() {
                         textTransform:'uppercase',letterSpacing:.4,marginTop:1}}>EV L7</div>
                     </div>}
                     {/* Add to Picks */}
-                    {pid > 0 && <PickButton pid={pid} name={b.batter} team={b.batting_team}/>}
+                    {pid > 0 && <><PickButton pid={pid} name={b.batter} team={b.batting_team}/><GamblyButton name={b.batter} team={b.batting_team} prop="hr"/></>}
                   </div>
                 </div>
               </div>
@@ -27057,7 +27183,7 @@ function PowerBITab() {
                     </div>
                     <div style={{fontFamily:mono,fontSize:9,color:"var(--muted)"}}>{p.team}</div>
                   </div>
-                  <PickButton pid={String(p.pid)} name={p.name} team={p.team}/>
+                  <PickButton pid={String(p.pid)} name={p.name} team={p.team}/><GamblyButton name={p.name} team={p.team} prop="hr"/>
                 </div>
               ))}
             </div>}
@@ -27196,7 +27322,7 @@ function StatcastTab() {
                   <span style={{color:"var(--muted)"}}>· {p.grade?.grade||"—"}</span>
                 </div>
               </div>
-              <PickButton pid={p.pid} name={p.name} team={p.team}/>
+              <PickButton pid={p.pid} name={p.name} team={p.team}/><GamblyButton name={p.name} team={p.team} prop="hr"/>
             </div>;
           })}
         </div>}
@@ -31482,7 +31608,7 @@ function CrystalBallTab() {
 
                       {/* Pick button at bottom */}
                       <div style={{display:'flex',justifyContent:'center',marginTop:'auto'}}>
-                        <PickButton pid={parseInt(p.id)||0} name={p.name} team={p.team}/>
+                        <PickButton pid={parseInt(p.id)||0} name={p.name} team={p.team}/><GamblyButton name={p.name} team={p.team} prop="hr"/>
                       </div>
                     </>}
 
@@ -32126,7 +32252,7 @@ function TopThreeTab() {
                     </div>
 
                     <div style={{display:'flex',justifyContent:'center'}}>
-                      <PickButton pid={parseInt(bt.batter_id)||0} name={bt.batter} team={bt.batting_team||''}/>
+                      <PickButton pid={parseInt(bt.batter_id)||0} name={bt.batter} team={bt.batting_team||''}/><GamblyButton name={bt.batter} team={bt.batting_team||''} prop="hr"/>
                     </div>
                   </div>
 
@@ -32829,7 +32955,7 @@ function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, on
                             style={{fontFamily:osw,fontWeight:700,fontSize:10,color:'var(--text)',cursor:'pointer'}}>{r.name||r.id}</span>
                           {LINEUP_STATUS[parseInt(r.id)||0]?.status==='confirmed'&&<span style={{fontSize:9}}>✅</span>}
                           {INJURY_MAP?.[parseInt(r.id)||0]&&!LINEUP_STATUS?.[parseInt(r.id)||0]&&<span style={{fontSize:9}}>🤕</span>}
-                          <PickButton pid={parseInt(r.id)||0} name={r.name||r.id} team={r.team||''}/>
+                          <PickButton pid={parseInt(r.id)||0} name={r.name||r.id} team={r.team||''}/><GamblyButton name={r.name||r.id} team={r.team||''} prop="hr"/>
                         </div>
                       </td>
                       <td style={{textAlign:'center',padding:'2px 4px',fontFamily:mono,fontSize:9,fontWeight:700,color:r._slot<99?'var(--green)':'transparent',minWidth:18}}>{r._slot<99?r._slot:'·'}</td>
@@ -36905,7 +37031,7 @@ function BarrelLabTab() {
                       {b.trueHRScore}
                     </div>
                     <div onClick={e => e.stopPropagation()}>
-                      <PickButton pid={b.batter_id} name={b.batter} team={b.batting_team||''}/>
+                      <PickButton pid={b.batter_id} name={b.batter} team={b.batting_team||''}/><GamblyButton name={b.batter} team={b.batting_team||''} prop="hr"/>
                     </div>
                   </div>
                 </div>
@@ -37147,7 +37273,7 @@ function BarrelLabTab() {
                             </>);
                           })()}
                           <td style={{padding:'4px 6px',textAlign:'right'}} onClick={e => e.stopPropagation()}>
-                            <PickButton pid={b.batter_id} name={b.batter} team={b.batting_team||''}/>
+                            <PickButton pid={b.batter_id} name={b.batter} team={b.batting_team||''}/><GamblyButton name={b.batter} team={b.batting_team||''} prop="hr"/>
                           </td>
                         </tr>
                       );
@@ -38109,7 +38235,7 @@ function OnBaseTab() {
                       {b.onBaseScore}
                     </div>
                     <div onClick={e => e.stopPropagation()}>
-                      <PickButton pid={b.batter_id} name={b.batter} team={b.batting_team||''}/>
+                      <PickButton pid={b.batter_id} name={b.batter} team={b.batting_team||''}/><GamblyButton name={b.batter} team={b.batting_team||''} prop="tb2"/>
                     </div>
                   </div>
                 </div>
@@ -38349,7 +38475,7 @@ function OnBaseTab() {
                             </>);
                           })()}
                           <td style={{padding:'4px 6px',textAlign:'right'}} onClick={e => e.stopPropagation()}>
-                            <PickButton pid={b.batter_id} name={b.batter} team={b.batting_team||''}/>
+                            <PickButton pid={b.batter_id} name={b.batter} team={b.batting_team||''}/><GamblyButton name={b.batter} team={b.batting_team||''} prop="tb2"/>
                           </td>
                         </tr>
                       );
