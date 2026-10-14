@@ -1,4 +1,4 @@
 Date,Game Time (ET),Home Team,Away Team,Probable Pitcher ID (Home),Probable Pitcher ID (Away),Game ID,Venue ID,Venue Name,Day of Week,Day Abbr,Series Game #,Games in Series,Series Position,Day Context
-2026-10-14,08:00 PM,LAD,MIL,605483.0,688107.0,849811,22,UNIQLO Field at Dodger Stadium,Wednesday,Wed,3,7,Middle,~ Neutral
-2026-10-15,06:00 PM,CLE,TB,,643377.0,849818,5,Progressive Field,Thursday,Thu,3,7,Middle,✅ Best Day (getaway)
-2026-10-15,09:00 PM,LAD,MIL,,,849810,22,UNIQLO Field at Dodger Stadium,Thursday,Thu,4,7,Middle,✅ Best Day (getaway)
+2026-10-14,08:00 PM,LAD,MIL,605483,688107.0,849811,22,UNIQLO Field at Dodger Stadium,Wednesday,Wed,3,7,Middle,~ Neutral
+2026-10-15,01:00 PM,CLE,TB,668909,643377.0,849818,5,Progressive Field,Thursday,Thu,3,7,Middle,✅ Best Day (getaway)
+2026-10-15,08:00 PM,LAD,MIL,607192,,849810,22,UNIQLO Field at Dodger Stadium,Thursday,Thu,4,7,Middle,✅ Best Day (getaway)
