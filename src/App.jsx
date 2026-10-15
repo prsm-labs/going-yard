@@ -1207,11 +1207,11 @@ function GamblyMenuButton({ name, team }) {
     <div style={{position:'relative', display:'inline-block'}}>
       <button ref={btnRef} type="button" onClick={handleOpen}
         title="Send this bet to Gambly"
-        style={{fontSize:10, display:'inline-flex', alignItems:'center', gap:5,
-          padding:'4px 9px', borderRadius:5, border:'1px solid var(--border)',
+        style={{fontSize:9, display:'inline-flex', alignItems:'center', gap:3,
+          padding:'3px 6px', borderRadius:5, border:'1px solid var(--border)',
           background:'var(--surface2)', color:'var(--muted)', cursor:'pointer', whiteSpace:'nowrap'}}>
-        <img src="/brand/gambly.png" alt="Gambly" width={14} height={14} style={{display:'block'}}/>
-        Send to Gambly ▾
+        <img src="/brand/gambly.png" alt="Gambly" width={13} height={13} style={{display:'block'}}/>
+        ▾
       </button>
       {menu}
     </div>
@@ -2799,7 +2799,11 @@ function AtBatSlideIn() {
     const dateStr = `${today[2]}-${today[0]}-${today[1]}`;
     // Try 2026 first, fall back to 2025 if empty (early season)
     const fetchGameLog = async (pid, season) => {
-      const r = await fetch(`https://statsapi.mlb.com/api/v1/people/${pid}/stats?stats=gameLog&group=hitting&season=${season}&sportId=1&limit=25`);
+      // gameType widened 2026-10-14 -- MLB's gameLog endpoint defaults to
+      // regular-season-only even when gameType is omitted entirely (confirmed
+      // live); without this, the Recent Game Log table silently stopped at
+      // the last regular-season game once the postseason started.
+      const r = await fetch(`https://statsapi.mlb.com/api/v1/people/${pid}/stats?stats=gameLog&group=hitting&season=${season}&sportId=1&gameType=R,A,F,D,L,W&limit=25`);
       const d = await r.json();
       return d.stats?.[0]?.splits || [];
     };
@@ -2873,7 +2877,6 @@ function AtBatSlideIn() {
               style={{fontSize:13,lineHeight:1}}>✅</span>
           )}
           <PickButton pid={player.pid} name={player.name} team={player.team}/>
-          <GamblyMenuButton name={player.name} team={player.team}/>
         </div>
         {/* RISP Stats */}
         {risp && (
@@ -2901,7 +2904,14 @@ function AtBatSlideIn() {
             </div>
           </div>
         )}
-        <button onClick={()=>setPlayer(null)} style={{background:"none",border:"1px solid var(--border)",borderRadius:6,color:"var(--muted)",cursor:"pointer",padding:"5px 10px",fontFamily:"'DM Mono',monospace",fontSize:11}}>✕ Close</button>
+        {/* Close + Gambly stacked in a column — Gambly used to sit in the top
+            action row with a "Send to Gambly ▾" label, which widened the
+            header enough to force horizontal scroll on the whole slideout.
+            Shortened to icon+▾ (2026-10-14) and moved here, under Close. */}
+        <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:4,flexShrink:0}}>
+          <button onClick={()=>setPlayer(null)} style={{background:"none",border:"1px solid var(--border)",borderRadius:6,color:"var(--muted)",cursor:"pointer",padding:"5px 10px",fontFamily:"'DM Mono',monospace",fontSize:11}}>✕ Close</button>
+          <GamblyMenuButton name={player.name} team={player.team}/>
+        </div>
       </div>
 
       {/* Injury banner — visible on mobile */}
@@ -7537,7 +7547,9 @@ function LineupsView({ date }) {
 
     useEffect(() => {
       if (!pid) return;
-      fetch(`https://statsapi.mlb.com/api/v1/people/${pid}/stats?stats=gameLog&group=hitting&season=2026&sportId=1&gameType=R&limit=5`)
+      // gameType widened 2026-10-14 -- same R-only gap as every other
+      // gameLog call in this file.
+      fetch(`https://statsapi.mlb.com/api/v1/people/${pid}/stats?stats=gameLog&group=hitting&season=2026&sportId=1&gameType=R,A,F,D,L,W&limit=5`)
         .then(r => r.ok ? r.json() : null)
         .then(d => {
           const splits = d?.stats?.[0]?.splits || [];
@@ -20792,8 +20804,11 @@ async function fetchGameLog(pid) {
   if (cached && Date.now() - cached.ts < 3600000) return cached.games; // 1hr cache
   try {
     const season = new Date().getFullYear();
+    // gameType widened 2026-10-14 -- same R-only-by-default gap as every
+    // other gameLog call in this file; without it, Last7HRChart/HRDotTimeline
+    // silently froze on the last regular-season game once the postseason began.
     const r = await fetch(
-      `https://statsapi.mlb.com/api/v1/people/${pid}/stats?stats=gameLog&group=hitting&season=${season}`,
+      `https://statsapi.mlb.com/api/v1/people/${pid}/stats?stats=gameLog&group=hitting&season=${season}&gameType=R,A,F,D,L,W`,
       { signal: AbortSignal.timeout(6000) }
     );
     if (!r.ok) return [];
@@ -21009,9 +21024,12 @@ function RecentGameLog({ batterId }) {
 
     const fetchAtBats = async () => {
       try {
-        // Use the game log endpoint pattern that already works in the app
+        // Use the game log endpoint pattern that already works in the app.
+        // gameType widened 2026-10-14 -- was hardcoded to R-only, which
+        // silently froze this play-by-play list on the last regular-season
+        // game once the postseason started.
         const glRes = await fetch(
-          `https://statsapi.mlb.com/api/v1/people/${pid}/stats?stats=gameLog&group=hitting&season=2026&gameType=R`,
+          `https://statsapi.mlb.com/api/v1/people/${pid}/stats?stats=gameLog&group=hitting&season=2026&gameType=R,A,F,D,L,W`,
           { headers: { Accept: 'application/json' } }
         );
         if (!glRes.ok) throw new Error(`gameLog ${glRes.status}`);

@@ -1,8 +1,10 @@
 {
   "version": "2026.10.14",
-  "bundleFile": "index-vLzcyjIy.js",
+  "bundleFile": "index-BV7wJ8F1.js",
   "changelog": [
-    "Daily data update 2026-10-14"
+    "Add Gambly bet-slip button across batter picks",
+    "slideout",
+    "and My Picks"
   ],
-  "notifyUsers": false
+  "notifyUsers": true
 }
