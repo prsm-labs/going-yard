@@ -4047,3 +4047,8 @@ game_id,game_date,runner_id,runner_name,pitcher_id,pitcher_name,stolen_base,caug
 849820,2026-10-12,656775,Cedric Mullins,676282,Joey Cantillo,1,0,2B,6,bottom,bottom
 849813,2026-10-13,608070,José Ramírez,642547,Freddy Peralta,1,0,2B,5,top,top
 849811,2026-10-14,806198,Cooper Pratt,680736,Justin Wrobleski,1,0,2B,9,top,top
+849810,2026-10-15,686217,Sal Frelick,607192,Tyler Glasnow,1,0,2B,5,top,top
+849810,2026-10-15,666152,David Hamilton,623465,Evan Phillips,1,0,2B,5,top,top
+849818,2026-10-15,608070,José Ramírez,643377,Griffin Jax,0,1,2B,1,bottom,bottom
+849818,2026-10-15,608070,José Ramírez,643377,Griffin Jax,1,0,2B,3,bottom,bottom
+849818,2026-10-15,677587,Brayan Rocchio,669330,Tyler Wells,0,1,2B,5,bottom,bottom
