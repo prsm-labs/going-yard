@@ -1,5 +1,5 @@
 {
-  "fitted_date": "2026-10-20",
+  "fitted_date": "2026-10-21",
   "n_pitcher_games": 17760,
   "population_mean_cd_proxy": 0.00159609,
   "population_sd_cd_proxy": 7e-05,
@@ -2304,8 +2304,8 @@
       "n": 132
     },
     "687312": {
-      "mean": 0.00134675,
-      "n": 568
+      "mean": 0.00134672,
+      "n": 567
     },
     "687330": {
       "mean": 0.00159295,
