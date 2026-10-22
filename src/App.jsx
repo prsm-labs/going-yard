@@ -209,7 +209,28 @@ const styles = `
   .hbf{height:100%;border-radius:2px;transition:width .6s ease;}
   .hbn{font-family:'Oswald',sans-serif;font-weight:700;font-size:16px;min-width:28px;}
   .hl{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:9px;font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;font-family:'DM Mono',monospace;white-space:nowrap;}
-}
+/* 2026-10-22 CourtIQ layout: header game strip, score cards, side-by-side box scores */
+.gy-strip{display:flex;gap:8px;overflow-x:auto;padding:8px 2px;margin:0 0 4px;scroll-snap-type:x proximity;}
+.gy-chip{flex:0 0 auto;scroll-snap-align:start;display:grid;gap:2px;min-width:104px;text-align:left;padding:6px 10px;border-radius:10px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-family:'DM Mono',monospace;font-size:11px;}
+.gy-chip.all{align-content:center;}
+.gy-chip.active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);}
+.gy-chip .gc-row{display:flex;align-items:center;gap:6px;font-family:'Oswald',sans-serif;font-weight:600;font-size:12px;}
+.gy-chip .gc-score{margin-left:auto;font-weight:700;}
+.gy-chip .gc-status{font-size:10px;color:var(--muted);}
+.gy-chip .gc-status.live{color:var(--accent);}
+.gy-score-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;margin-bottom:12px;}
+.gy-score-card{display:grid;gap:3px;text-align:left;padding:9px 11px;border-radius:10px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-family:'DM Mono',monospace;font-size:11px;min-width:0;}
+.gy-score-card.active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);}
+.gy-score-card .sc-row{display:flex;align-items:center;gap:6px;font-family:'Oswald',sans-serif;font-size:13px;font-weight:600;}
+.gy-score-card .sc-row b{margin-left:auto;font-size:15px;}
+.gy-score-card .sc-rec{font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);font-weight:400;}
+.gy-score-card .sc-status{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--muted);}
+.gy-score-card .sc-note{font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.gy-box-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(430px,100%),1fr));gap:12px;}
+.gy-detail-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;min-width:0;}
+.gy-box-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px;min-width:0;}
+.gy-box-title{display:flex;align-items:center;gap:8px;font-family:'Oswald',sans-serif;font-weight:700;font-size:14px;margin-bottom:8px;}
+.gy-pill-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
 .hl.gone_yard{background:rgba(255,20,0,.25);color:#fff;border:1px solid rgba(255,20,0,.5);font-weight:800;letter-spacing:.5px;}
   .hl.elite{background:rgba(255,45,0,.18);color:#ff6040;border:1px solid rgba(255,45,0,.3);}
   .hl.hot{background:rgba(255,122,0,.15);color:#ff9a30;border:1px solid rgba(255,122,0,.25);}
@@ -449,6 +470,29 @@ const VENUE_NAME_MAP = {
 };
 const normVenue = name => VENUE_NAME_MAP[name] || name;
 const normTeam = t => (t && TEAM_ABBR_MAP[t]) || t || '—';
+
+// ── Header game filter (2026-10-22, user: CourtIQ's layout is the standard for every app) ──────────────
+// One game picked in the header GameStrip narrows every page (lists filter by team; each page's own game /
+// team filters still work on top). null = all games.
+let GY_GAME = null;   // { gamePk, away, home, label } -- abbreviations through gyAbbr()
+const GY_GAME_LISTENERS = new Set();
+const GY_TEAM_ALIAS = { ARI:'AZ', WAS:'WSH', CHW:'CWS', KCR:'KC', SDP:'SD', SFG:'SF', TBR:'TB', OAK:'ATH' };
+const gyAbbr = t => { const n = normTeam(String(t || '').toUpperCase()); return GY_TEAM_ALIAS[n] || n; };
+function setGyGame(g) { GY_GAME = g; GY_GAME_LISTENERS.forEach(fn => fn(g)); }
+function useGyGame() {
+  const [g, setG] = useState(GY_GAME);
+  useEffect(() => { GY_GAME_LISTENERS.add(setG); setG(GY_GAME); return () => { GY_GAME_LISTENERS.delete(setG); }; }, []);
+  return g;
+}
+function gyTeamOk(t, g = GY_GAME) { if (!g) return true; const a = gyAbbr(t); return a === g.away || a === g.home; }
+function gyGameOk(away, home, g = GY_GAME) { return !g || (gyTeamOk(away, g) && gyTeamOk(home, g)); }
+// CourtIQ-style pill for every sub-tab row (red accent kept)
+const gyPill = active => ({
+  padding:'5px 11px', borderRadius:999, cursor:'pointer', whiteSpace:'nowrap', flexShrink:0,
+  border:`1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+  background: active ? 'var(--accent)' : 'transparent', color: active ? '#fff' : 'var(--text)',
+  fontFamily:"'Oswald',sans-serif", fontWeight:600, fontSize:12, letterSpacing:.3, transition:'all .15s',
+});
 
 const T={
   EV_HH:95,       // Hard hit entry point
@@ -8361,7 +8405,9 @@ function XhrConversionTab({ games }) {
 }
 
 function LiveTab() {
-  const [games, setGames] = useState([]);
+  const [gamesAll, setGames] = useState([]);
+  const gyG = useGyGame();  // header game strip
+  const games = useMemo(() => gyG ? gamesAll.filter(g => gyGameOk(g.away?.abbr, g.home?.abbr, gyG)) : gamesAll, [gamesAll, gyG]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
@@ -8478,14 +8524,9 @@ function LiveTab() {
       ['⬆️⬇️ xHR Conversion', "Live version of Track Record's xHR column. A logistic model predicts each batted ball's HR probability from EV+LA+direction; summed per game and across the whole slate (Today's Slate card), compared against actual HRs via a z-score. Different question from Ball Carry — this checks whether the ball actually left the yard as often as expected, not whether it carried as far as physics predicts."],
     ]} onClose={()=>setShowLiveHelp(false)}/>}
     <div style={{display:'flex',gap:5,marginBottom:12,alignItems:'center',flexWrap:'wrap',rowGap:6}}>
-      <div style={{display:'flex',gap:4,padding:'3px',background:'var(--surface)',borderRadius:8,border:'1px solid var(--border)',flexWrap:'wrap',rowGap:4}}>
+      <div className="gy-pill-row">
       {[['gameday','Gameday'],['battracking','Bat Tracking'],['simlive','Live Sim'],['games','Live Games'],['lineups','Lineups'],['themes','Themes'],['ballcarry','Ball Carry'],['xhr','xHR']].map(([key,label])=>(
-        <button key={key} onClick={()=>setLiveView(key)}
-          style={{padding:'5px 9px',borderRadius:6,cursor:'pointer',border:'none',
-            fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,letterSpacing:.5,
-            textTransform:'uppercase',transition:'all .15s',
-            background:liveView===key?'var(--accent)':'transparent',
-            color:liveView===key?'white':'var(--muted)'}}>
+        <button key={key} onClick={()=>setLiveView(key)} style={gyPill(liveView===key)}>
           {label}
         </button>
       ))}
@@ -9974,7 +10015,9 @@ function GamedayTab() {
     return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
   };
   const [selDate,   setSelDate]   = useState(etToday);
-  const [games,     setGames]     = useState([]);
+  const [gamesAll,  setGames]     = useState([]);
+  const gyG = useGyGame();  // header game strip
+  const games = useMemo(() => gyG ? gamesAll.filter(x => gyGameOk(x.teams?.away?.team?.abbreviation, x.teams?.home?.team?.abbreviation, gyG)) : gamesAll, [gamesAll, gyG]);
   const [loading,   setLoading]   = useState(true);
   const [selGamePk, setSelGamePk] = useState(null);
   const [liveDataMap, setLiveDataMap] = useState({});   // gamePk → boxscore data
@@ -10025,6 +10068,16 @@ function GamedayTab() {
       _PENDING_GAMEDAY_PK = null;
     }
   }, [games]);
+
+  // 2026-10-22 CourtIQ layout: always one game open under the cards -- live first, else the first card
+  useEffect(() => {
+    if (!games.length) return;
+    if (games.some(x => x.gamePk === selGamePk)) return;
+    const live = games.find(x => x.status?.abstractGameState === 'Live');
+    const ord = x => x.status?.abstractGameState === 'Live' ? 0 : x.status?.abstractGameState === 'Final' ? 2 : 1;
+    const first = [...games].sort((x, y) => ord(x) - ord(y) || String(x.gameDate).localeCompare(String(y.gameDate)))[0];
+    setSelGamePk((live || first).gamePk);
+  }, [games]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-fetch live data for all live games when schedule loads
   useEffect(() => { if (games.length) loadAllLive(games); }, [games]);
@@ -10243,15 +10296,6 @@ function GamedayTab() {
   // ── Game detail panel (shared between mobile full-screen and desktop split) ──
   const DetailPanel = () => (
     <div style={{padding: isMobile ? '12px 14px' : '16px 20px', overflowY: isMobile ? undefined : 'auto', flex:1, minWidth:0}}>
-      {/* Mobile back button */}
-      {isMobile && (
-        <button onClick={() => setSelGamePk(null)}
-          style={{display:'flex',alignItems:'center',gap:6,marginBottom:12,padding:'6px 12px',
-            borderRadius:7,border:'1px solid var(--border)',background:'var(--surface2)',
-            color:'var(--muted)',fontFamily:mono,fontSize:10,cursor:'pointer'}}>
-          ← Back to Games
-        </button>
-      )}
 
       {liveLoad && !live ? (
         <div style={{display:'flex',alignItems:'center',gap:8,padding:24,color:'var(--muted)',fontFamily:mono,fontSize:11}}>
@@ -10262,11 +10306,13 @@ function GamedayTab() {
         {/* Game header */}
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:8}}>
           <div style={{display:'flex',alignItems:'center',gap:12}}>
+            {selGame.teams?.away?.team?.id && <img src={`https://www.mlbstatic.com/team-logos/${selGame.teams.away.team.id}.svg`} alt="" width="26" height="26" style={{objectFit:'contain'}}/>}
             <span style={{fontFamily:osw,fontWeight:700,fontSize:20}}>{selGame.teams?.away?.team?.abbreviation}</span>
             <span style={{fontFamily:osw,fontWeight:800,fontSize:26}}>{selGame.teams?.away?.score ?? '—'}</span>
             <span style={{fontFamily:mono,fontSize:10,color:'var(--muted)'}}>—</span>
             <span style={{fontFamily:osw,fontWeight:800,fontSize:26}}>{selGame.teams?.home?.score ?? '—'}</span>
             <span style={{fontFamily:osw,fontWeight:700,fontSize:20}}>{selGame.teams?.home?.team?.abbreviation}</span>
+            {selGame.teams?.home?.team?.id && <img src={`https://www.mlbstatic.com/team-logos/${selGame.teams.home.team.id}.svg`} alt="" width="26" height="26" style={{objectFit:'contain'}}/>}
           </div>
           <div style={{display:'flex',alignItems:'center',gap:8}}>
             {(() => { const st=gameStatus(selGame, live?.linescore || live?.liveLinescore); return <>
@@ -10368,13 +10414,9 @@ function GamedayTab() {
           justifyContent:'space-between'}}>
 
           {/* Left: existing tabs — unchanged */}
-          <div style={{display:'flex',gap:4}}>
+          <div className="gy-pill-row">
             {[['batting','🧢 Batting'],['pitching','⚾ Pitching'],['plays','📋 Plays']].map(([k,l]) => (
-              <button key={k} onClick={() => setBoxTab(k)}
-                style={{padding:'4px 11px',borderRadius:6,border:'none',cursor:'pointer',
-                  fontFamily:mono,fontSize:10,fontWeight:boxTab===k?700:400,
-                  background: boxTab===k?'var(--accent)':'var(--surface2)',
-                  color: boxTab===k?'white':'var(--muted)'}}>
+              <button key={k} onClick={() => setBoxTab(k)} style={gyPill(boxTab===k)}>
                 {l}
               </button>
             ))}
@@ -10387,10 +10429,7 @@ function GamedayTab() {
                 `https://www.mlb.com/tv/g${selGamePk}`,
                 '_blank','noopener'
               )}
-              style={{padding:'4px 11px',borderRadius:6,border:'none',
-                cursor:'pointer',fontFamily:mono,fontSize:10,fontWeight:600,
-                background:'var(--surface2)',color:'var(--muted)',
-                display:'flex',alignItems:'center',gap:4}}>
+              style={{...gyPill(false),display:'flex',alignItems:'center',gap:4}}>
               📺 Watch
             </button>
           )}
@@ -10556,13 +10595,17 @@ function GamedayTab() {
 
         {/* Batting / Pitching box score */}
         {/* Batting / Pitching box score */}
-        {(boxTab === 'batting' || boxTab === 'pitching') && ['away','home'].map(side => {
+        {(boxTab === 'batting' || boxTab === 'pitching') && <div className="gy-box-grid">{['away','home'].map(side => {
           const teamAbbr = selGame?.teams?.[side]?.team?.abbreviation || side.toUpperCase();
+          const teamId   = selGame?.teams?.[side]?.team?.id;
           const rows = boxTab === 'batting' ? boxRows(side) : pitchRows(side);
           if (!rows.length) return null;
           return (
-            <div key={side} style={{marginBottom:18}}>
-              <div style={{fontFamily:osw,fontWeight:700,fontSize:13,color:'var(--accent2)',marginBottom:6}}>{teamAbbr}</div>
+            <div key={side} className="gy-box-card">
+              <div className="gy-box-title">
+                {teamId && <img src={`https://www.mlbstatic.com/team-logos/${teamId}.svg`} alt="" width="22" height="22" style={{objectFit:'contain'}}/>}
+                {teamAbbr}<span style={{fontFamily:mono,fontSize:9,fontWeight:400,color:'var(--muted)'}}>{side}</span>
+              </div>
               <div style={{overflowX:'auto',border:'1px solid var(--border)',borderRadius:8}}>
                 <table style={{borderCollapse:'separate',borderSpacing:0,width:'100%'}}>
                   <thead>
@@ -10699,7 +10742,7 @@ function GamedayTab() {
               })()}
             </div>
           );
-        })}
+        })}</div>}
       </> : (
         <div style={{padding:24,color:'var(--muted)',fontFamily:mono,fontSize:11}}>
           {liveLoad ? 'Loading…' : 'Click a game to see the box score.'}
@@ -10709,182 +10752,66 @@ function GamedayTab() {
   );
 
   // ── Games list ───────────────────────────────────────────────────────────────
+  // 2026-10-22 CourtIQ layout: compact score cards. Same info as the old cards, tighter: status (+ outs live),
+  // logo / team / record / score, and one detail line -- live: pitcher + batter (or due up), final: W / L / S,
+  // upcoming: probable pitchers. Hits / errors are in the linescore of the open game.
   const GamesList = () => (
-    <div style={{
-      display: !isMobile && selGamePk ? 'flex' : 'grid', flexDirection:'column',
-      gridTemplateColumns: !isMobile && selGamePk ? undefined : 'repeat(auto-fill,minmax(240px,1fr))',
-      gap: !isMobile && selGamePk ? 0 : 10,
-      padding: !isMobile && selGamePk ? 0 : 12}}>
+    <div className="gy-score-grid">
       {[...games].sort((a, b) => {
-        // Sort order: Live → Preview (by time) → Final (by time)
         const order = s => s?.abstractGameState === 'Live' ? 0 : s?.abstractGameState === 'Final' ? 2 : 1;
         const oa = order(a.status), ob = order(b.status);
         if (oa !== ob) return oa - ob;
-        // Within same group, sort by game start time
         const ta = a.gameDate ? new Date(a.gameDate).getTime() : 0;
         const tb = b.gameDate ? new Date(b.gameDate).getTime() : 0;
         return ta - tb;
       }).map(g => {
-        const st  = gameStatus(g, liveDataMap[g.gamePk]?.linescore || liveDataMap[g.gamePk]?.liveLinescore);
+        const gLive = liveDataMap[g.gamePk];
+        const st  = gameStatus(g, gLive?.linescore || gLive?.liveLinescore);
         const aw  = g.teams?.away; const hm = g.teams?.home;
-        const awR = rhe(g,'away'); const hmR = rhe(g,'home');
         const abs = g.status?.abstractGameState;
         const sel = g.gamePk === selGamePk;
         const awWin = abs==='Final' && (aw?.score??0) > (hm?.score??0);
         const hmWin = abs==='Final' && (hm?.score??0) > (aw?.score??0);
+        const ls = gLive?.liveLinescore || gLive?.linescore || {};
+        const outs = abs === 'Live' ? (ls.outs ?? null) : null;
+        let note = '';
+        if (abs === 'Final' && g.decisions) {
+          note = [g.decisions.winner && `W: ${lastNameOf(g.decisions.winner.fullName)}`, g.decisions.loser && `L: ${lastNameOf(g.decisions.loser.fullName)}`, g.decisions.save && `S: ${lastNameOf(g.decisions.save.fullName)}`].filter(Boolean).join(' · ');
+        } else if (abs === 'Preview' && (aw?.probablePitcher || hm?.probablePitcher)) {
+          note = `${aw?.probablePitcher?.fullName ? lastNameOf(aw.probablePitcher.fullName) : 'TBD'} vs ${hm?.probablePitcher?.fullName ? lastNameOf(hm.probablePitcher.fullName) : 'TBD'}`;
+        } else if (abs === 'Live' && gLive) {
+          const half = ls.inningHalf || g.linescore?.inningHalf || '';
+          const batSide = half === 'Bottom' ? 'home' : 'away', pitSide = half === 'Bottom' ? 'away' : 'home';
+          const pIds = gLive.teams?.[pitSide]?.pitchers || [];
+          const pPl = pIds.length ? gLive.teams?.[pitSide]?.players?.[`ID${pIds[pIds.length - 1]}`] : null;
+          const bPl = gLive.currentBatterId ? gLive.teams?.[batSide]?.players?.[`ID${gLive.currentBatterId}`] : null;
+          const nameOf = id => { for (const sd of ['away','home']) { const pl = gLive.teams?.[sd]?.players?.[`ID${id}`]; if (pl?.person?.fullName) return lastNameOf(pl.person.fullName); } return ''; };
+          if ((outs ?? 0) >= 3) {
+            const due = [gLive.currentBatterId, gLive.onDeckId, gLive.inTheHoleId].filter(Boolean).slice(0, 3).map(nameOf).filter(Boolean);
+            if (due.length) note = `Due up: ${due.join(', ')}`;
+          } else {
+            const bs = bPl?.stats?.batting || {};
+            note = [pPl && `P ${lastNameOf(pPl.person?.fullName || '')} ${pPl.stats?.pitching?.inningsPitched ?? '—'} IP`, bPl && `AB ${lastNameOf(bPl.person?.fullName || '')} ${bs.hits ?? 0}-${bs.atBats ?? 0}`].filter(Boolean).join(' · ');
+          }
+        }
         return (
-          <div key={g.gamePk} onClick={() => { setSelGamePk(sel && !isMobile ? null : g.gamePk); setBoxTab('batting'); }}
-            style={{background: sel ? 'var(--surface2)' : 'var(--surface)',
-              border:`1px solid ${sel ? 'var(--accent)' : 'var(--border)'}`,
-              borderRadius: !isMobile && selGamePk ? 0 : 9, cursor:'pointer', padding:'10px 14px',
-              borderLeft: !isMobile && selGamePk ? `3px solid ${sel?'var(--accent)':'transparent'}` : undefined,
-              transition:'all .15s'}}>
-            {/* Status row — no gamePk */}
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:7}}>
-              <div style={{display:'flex',alignItems:'center',gap:5}}>
-                {st.dot && <div style={{width:6,height:6,borderRadius:'50%',background:st.color,animation:'pulse 1s infinite'}}/>}
-                <span style={{fontFamily:mono,fontSize:9,fontWeight:700,color:st.color,letterSpacing:.8}}>{st.label}</span>
-              </div>
-              {isLive && sel && lsOuts !== null &&
-                <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{lsOuts} out{lsOuts!==1?'s':''}</span>}
-            </div>
-            {/* Teams + score */}
-            {[[aw, awR, awWin],[hm, hmR, hmWin]].map(([team, rhe, win], ti) => (
-              <div key={ti} style={{display:'flex',alignItems:'center',gap:8,marginBottom:ti===0?3:0}}>
-                <span style={{fontFamily:osw,fontWeight:700,fontSize:13,
-                  color:win?'var(--text)':abs==='Final'?'var(--muted)':'var(--text)',minWidth:32}}>
-                  {team?.team?.abbreviation||'—'}
-                </span>
-                <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)',flex:1}}>
-                  {team?.team?.record?`${team.team.record.wins}-${team.team.record.losses}`:''}
-                </span>
-                {abs !== 'Preview' && <>
-                  <span style={{fontFamily:osw,fontWeight:win?800:400,fontSize:16,minWidth:20,textAlign:'right',color:win?'var(--text)':'var(--muted)'}}>{team?.score??'—'}</span>
-                  <span style={{fontFamily:mono,fontSize:9,color:'rgba(255,255,255,.25)',minWidth:12,textAlign:'right'}}>{rhe.h}</span>
-                  <span style={{fontFamily:mono,fontSize:9,color:rhe.e>0?'var(--accent)':'rgba(255,255,255,.2)',minWidth:12,textAlign:'right'}}>{rhe.e}</span>
-                </>}
-                {abs === 'Preview' && <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{team?.probablePitcher?.fullName ? lastNameOf(team.probablePitcher.fullName) : 'TBD'}</span>}
-              </div>
+          <button key={g.gamePk} className={`gy-score-card ${sel ? 'active' : ''}`}
+            onClick={() => { if (!sel) { setSelGamePk(g.gamePk); setBoxTab('batting'); } }}>
+            <span className="sc-status">
+              {st.dot && <span style={{width:6,height:6,borderRadius:'50%',background:st.color,animation:'pulse 1s infinite',flexShrink:0}}/>}
+              <span style={{fontWeight:700,color:st.color,letterSpacing:.6}}>{st.label}</span>
+              {outs !== null && <span style={{marginLeft:'auto'}}>{outs} out{outs!==1?'s':''}</span>}
+            </span>
+            {[[aw, awWin],[hm, hmWin]].map(([team, win], ti) => (
+              <span key={ti} className="sc-row" style={{color: abs==='Final' && !win ? 'var(--muted)' : undefined}}>
+                {team?.team?.id && <img src={`https://www.mlbstatic.com/team-logos/${team.team.id}.svg`} alt="" width="18" height="18" style={{objectFit:'contain',flexShrink:0}}/>}
+                {team?.team?.abbreviation || '—'}
+                <span className="sc-rec">{team?.team?.record ? `${team.team.record.wins}-${team.team.record.losses}` : ''}</span>
+                {abs !== 'Preview' && <b style={{fontWeight: win ? 800 : 600}}>{team?.score ?? '—'}</b>}
+              </span>
             ))}
-            {/* Decisions */}
-            {abs==='Final' && g.decisions && (
-              <div style={{marginTop:6,paddingTop:6,borderTop:'1px solid rgba(255,255,255,.05)',display:'flex',gap:10}}>
-                {g.decisions.winner && <span style={{fontFamily:mono,fontSize:8,color:'var(--green)'}}>W: {lastNameOf(g.decisions.winner.fullName)}</span>}
-                {g.decisions.loser  && <span style={{fontFamily:mono,fontSize:8,color:'var(--accent)'}}>L: {lastNameOf(g.decisions.loser.fullName)}</span>}
-                {g.decisions.save   && <span style={{fontFamily:mono,fontSize:8,color:'var(--accent2)'}}>S: {lastNameOf(g.decisions.save.fullName)}</span>}
-              </div>
-            )}
-            {abs==='Preview' && (aw?.probablePitcher||hm?.probablePitcher) && (
-              <div style={{marginTop:5,paddingTop:5,borderTop:'1px solid rgba(255,255,255,.05)',display:'flex',justifyContent:'space-between'}}>
-                <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>{aw?.probablePitcher?.fullName ? lastNameOf(aw.probablePitcher.fullName) : 'TBD'}</span>
-                <span style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.2)'}}>vs</span>
-                <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>{hm?.probablePitcher?.fullName ? lastNameOf(hm.probablePitcher.fullName) : 'TBD'}</span>
-              </div>
-            )}
-
-            {/* ── Live game detail: pitcher+batter (active) or due up (end of half) ── */}
-            {abs==='Live' && (() => {
-              const gLive        = liveDataMap[g.gamePk];
-              if (!gLive) return null;
-              const ls           = gLive.liveLinescore || gLive.linescore || {};
-              const half         = ls.inningHalf || g.linescore?.inningHalf || '';
-              const battingSide  = half === 'Bottom' ? 'home' : 'away';
-              const pitchingSide = half === 'Bottom' ? 'away' : 'home';
-              const battingAbbr  = g.teams?.[battingSide]?.team?.abbreviation  || '';
-              const pitchingAbbr = g.teams?.[pitchingSide]?.team?.abbreviation || '';
-
-              // Current pitcher = last in pitching team's pitchers list
-              const pitcherIds = gLive.teams?.[pitchingSide]?.pitchers || [];
-              const curPitchId = pitcherIds[pitcherIds.length - 1];
-              const pitcherPl  = curPitchId ? gLive.teams?.[pitchingSide]?.players?.[`ID${curPitchId}`] : null;
-              const pitcherName= lastNameOf(pitcherPl?.person?.fullName || '—');
-              const pitcherIP  = pitcherPl?.stats?.pitching?.inningsPitched ?? '—';
-              const pitcherERA = pitcherPl?.seasonStats?.pitching?.era ?? '—';
-
-              // Current batter
-              const gCurBat = gLive.currentBatterId || null;
-              const gOnDeck = gLive.onDeckId        || null;
-              const gInHole = gLive.inTheHoleId     || null;
-              const gOuts   = ls.outs ?? null;
-              const batPl   = gCurBat ? gLive.teams?.[battingSide]?.players?.[`ID${gCurBat}`] : null;
-              const batName = lastNameOf(batPl?.person?.fullName || '—');
-              const batSt   = batPl?.stats?.batting || {};
-              const batOPS  = batPl?.seasonStats?.batting?.ops ?? '—';
-
-              const inningOver = (gOuts ?? 0) >= 3;
-              const hasDueUp   = gCurBat || gOnDeck;
-
-              if (!curPitchId && !gCurBat && !hasDueUp) return null;
-
-              return (
-                <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid rgba(255,255,255,.06)'}}>
-                  {!inningOver && (curPitchId || gCurBat) ? (
-                    /* Active inning — pitcher + batter side by side */
-                    <div style={{display:'flex',gap:8}}>
-                      {curPitchId && (
-                        <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',
-                            textTransform:'uppercase',letterSpacing:.8,marginBottom:2}}>
-                            Pitching {pitchingAbbr}
-                          </div>
-                          <div style={{fontFamily:osw,fontWeight:700,fontSize:11,
-                            overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                            {pitcherName}
-                          </div>
-                          <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>
-                            {pitcherIP} IP · {pitcherERA} ERA
-                          </div>
-                        </div>
-                      )}
-                      {gCurBat && (
-                        <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontFamily:mono,fontSize:7,color:'var(--accent)',
-                            textTransform:'uppercase',letterSpacing:.8,marginBottom:2}}>
-                            At Bat {battingAbbr}
-                          </div>
-                          <div style={{fontFamily:osw,fontWeight:700,fontSize:11,
-                            overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                            {batName}
-                          </div>
-                          <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>
-                            {batSt.hits??0}-{batSt.atBats??0} · {batOPS} OPS
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ) : hasDueUp ? (
-                    /* End of half-inning — due up next */
-                    <div>
-                      <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',
-                        textTransform:'uppercase',letterSpacing:.8,marginBottom:6}}>
-                        Due Up {battingAbbr}
-                      </div>
-                      <div style={{display:'flex',gap:4}}>
-                        {[gCurBat, gOnDeck, gInHole].filter(Boolean).slice(0,3).map(id => {
-                          // Search both sides — battingSide can be wrong at end-of-half
-                          let fullName = '';
-                          for (const s of ['away','home']) {
-                            const p = gLive.teams?.[s]?.players?.[`ID${id}`];
-                            if (p?.person?.fullName) { fullName = p.person.fullName; break; }
-                          }
-                          const lastName = fullName ? lastNameOf(fullName) : '—';
-                          return (
-                            <div key={id} style={{flex:1,textAlign:'center',minWidth:0}}>
-                              <PlayerAvatar pid={id} name={fullName} size={26}/>
-                              <div style={{fontFamily:osw,fontSize:9,fontWeight:600,marginTop:2,
-                                overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                                {lastName}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })()}
-          </div>
+            {note && <span className="sc-note" title={note}>{note}</span>}
+          </button>
         );
       })}
     </div>
@@ -10900,23 +10827,13 @@ function GamedayTab() {
           <div className="sp" style={{marginRight:12}}/> Loading games…
         </div>
       ) : games.length === 0 ? (
-        <div style={{padding:48,textAlign:'center',color:'var(--muted)',fontFamily:mono,fontSize:11}}>No games scheduled</div>
-      ) : isMobile ? (
-        /* ── MOBILE: full-screen list OR full-screen detail ── */
-        selGamePk && selGame
-          ? DetailPanel()
-          : <div style={{padding:10}}>{GamesList()}</div>
-      ) : (
-        /* ── DESKTOP: side-by-side split ── */
-        <div style={{display:'flex', minHeight:'65vh'}}>
-          <div style={{width: selGamePk ? '300px' : '100%', flexShrink:0,
-            overflowY:'auto', borderRight: selGamePk ? '1px solid var(--border)' : 'none',
-            transition:'width .2s', padding: selGamePk ? 0 : 0}}>
-            {GamesList()}
-          </div>
-          {selGame && DetailPanel()}
+        <div style={{padding:48,textAlign:'center',color:'var(--muted)',fontFamily:mono,fontSize:11}}>
+          {gyG && gamesAll.length ? <>No {gyG.label} game on this date · <button onClick={() => setGyGame(null)} style={{...gyPill(false),fontSize:11}}>✕ all games</button></> : 'No games scheduled'}
         </div>
-      )}
+      ) : <>
+        <div style={{paddingTop:10}}>{GamesList()}</div>
+        {selGame && <div className="gy-detail-card">{DetailPanel()}</div>}
+      </>}
     </div>
   );
 }
@@ -11894,6 +11811,7 @@ function HRTrackerTab() {
   const [sortKey, setSortKey] = useState("chronoIndex");
   const [sortDir, setSortDir] = useState(-1); // -1 = newest (highest chronoIndex) first
   const [filterTeam, setFilterTeam] = useState("all");
+  const gyG = useGyGame();  // header game strip
   const [refreshing, setRefreshing] = useState(false);
   const [hrSearch, setHrSearch] = useState("");
   const [showHRHelp, setShowHRHelp] = useState(false);
@@ -11949,6 +11867,7 @@ function HRTrackerTab() {
 
   const filtered = hrs.filter(h => {
     if (filterTeam !== "all" && h.batterTeam !== filterTeam) return false;
+    if (gyG && !gyTeamOk(h.batterTeam, gyG)) return false;
     if (hrSearch.trim()) {
       const q = hrSearch.toLowerCase();
       return (h.batterName||"").toLowerCase().includes(q) ||
@@ -12049,14 +11968,9 @@ function HRTrackerTab() {
   ];
   const HRNav = () => (<>
     {showHRHelp && <HelpSlideout title="📊 HR Tracker Guide" items={HR_HELP} onClose={()=>setShowHRHelp(false)}/>}
-    <div style={{display:'flex',gap:6,marginBottom:14,alignItems:'center'}}>
+    <div className="gy-pill-row" style={{marginBottom:14}}>
       {[['tracker','💥 HR Tracker'],['leaderboard','🏆 HR Leaders'],['hotbats','🔥 Hot Bats'],['heatingup','📈 Heating Up']].map(([key,label]) => (
-        <button key={key} onClick={() => setHrTab(key)}
-          style={{padding:'5px 12px',borderRadius:7,cursor:'pointer',
-            fontFamily:"'DM Mono',monospace",fontWeight:hrTab===key?700:400,fontSize:10,
-            border:`1px solid ${hrTab===key?'var(--accent)':'var(--border)'}`,
-            background:hrTab===key?'rgba(232,65,26,.15)':'var(--surface2)',
-            color:hrTab===key?'var(--accent)':'var(--muted)'}}>
+        <button key={key} onClick={() => setHrTab(key)} style={gyPill(hrTab===key)}>
           {label}
         </button>
       ))}
@@ -12256,6 +12170,7 @@ function HRLeaderboardTab() {
   const [sortDir,    setSortDir]    = React.useState(1);
   const [search,     setSearch]     = React.useState('');
   const [teamFilter, setTeamFilter] = React.useState('ALL');
+  const gyG = useGyGame();  // header game strip
   const [statCards,  setStatCards]  = React.useState({ total:0, longDist:null, longEV:null });
   const [displayLimit, setDisplayLimit] = React.useState(50);
   const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
@@ -12340,6 +12255,7 @@ function HRLeaderboardTab() {
   const sorted = [...rows]
     .filter(r => {
       if (teamFilter !== 'ALL' && r.team !== teamFilter) return false;
+      if (gyG && !gyTeamOk(r.team, gyG)) return false;
       if (search) { const q=search.toLowerCase(); if (!r.name.toLowerCase().includes(q) && !r.team.toLowerCase().includes(q)) return false; }
       return true;
     })
@@ -12457,6 +12373,7 @@ function HotBatsTab() {
   const [sort, setSort]      = useState('l7hr');
   const [sortDir, setSortDir] = useState(1);
   const [teamFilter, setTeamFilter] = useState('ALL');
+  const gyG = useGyGame();  // header game strip
   const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
 
   useEffect(() => {
@@ -12486,7 +12403,7 @@ function HotBatsTab() {
   }, []);
 
   const teams_hb = ['ALL', ...Array.from(new Set(rows.map(p=>p.team).filter(Boolean))).sort()];
-  const sorted = [...rows].filter(p => teamFilter==='ALL' || p.team===teamFilter).sort((a,b) => sortDir * ((parseFloat(b[sort])||0)-(parseFloat(a[sort])||0)));
+  const sorted = [...rows].filter(p => (teamFilter==='ALL' || p.team===teamFilter) && gyTeamOk(p.team, gyG)).sort((a,b) => sortDir * ((parseFloat(b[sort])||0)-(parseFloat(a[sort])||0)));
   const Th = ({k,l,wrap}) => (<th onClick={()=>{ if(sort===k) setSortDir(d=>-d); else { setSort(k); setSortDir(-1); } }}
     style={{padding:'5px 8px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.8,
       color:sort===k?'var(--accent2)':'var(--muted)',cursor:'pointer',textAlign:'right',
@@ -12552,6 +12469,7 @@ function HeatingUpTab() {
   const [sort, setSort]      = useState('avgEV');
   const [sortDir, setSortDir] = useState(1);
   const [teamFilter, setTeamFilter] = useState('ALL');
+  const gyG = useGyGame();  // header game strip
   const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
 
   useEffect(() => {
@@ -12580,7 +12498,7 @@ function HeatingUpTab() {
   }, []);
 
   const teams_hu = ['ALL', ...Array.from(new Set(rows.map(p=>p.team).filter(Boolean))).sort()];
-  const sorted = [...rows].filter(p => teamFilter==='ALL' || p.team===teamFilter).sort((a,b) => sortDir * ((parseFloat(b[sort])||0)-(parseFloat(a[sort])||0)));
+  const sorted = [...rows].filter(p => (teamFilter==='ALL' || p.team===teamFilter) && gyTeamOk(p.team, gyG)).sort((a,b) => sortDir * ((parseFloat(b[sort])||0)-(parseFloat(a[sort])||0)));
   const evCol = v => v>=103?'var(--c-danger)':v>=98?'var(--c-warn)':v>=95?'var(--accent2)':v>=90?'var(--text)':'var(--muted)';
   const Th = ({k,l}) => (<th onClick={()=>{ if(sort===k) setSortDir(d=>-d); else { setSort(k); setSortDir(-1); } }}
     style={{padding:'5px 6px',fontSize:7,fontFamily:mono,textTransform:'uppercase',letterSpacing:.6,
@@ -12725,14 +12643,7 @@ function MLBTab() {
     return { AL: al.slice(0,6), NL: nl.slice(0,6) };
   }, [byDiv]);
 
-  const stBtn = key => ({
-    padding:'4px 12px', borderRadius:6, cursor:'pointer', border:'none',
-    fontFamily:osw, fontWeight:700, fontSize:10, letterSpacing:.5,
-    textTransform:'uppercase',
-    background: sub===key?'var(--accent)':'var(--surface2)',
-    color: sub===key?'white':'var(--muted)',
-    borderBottom: sub===key?'2px solid var(--accent)':'2px solid transparent',
-  });
+  const stBtn = key => gyPill(sub===key); // 2026-10-22 CourtIQ pills
 
   const vBtn = key => ({
     padding:'3px 10px', borderRadius:5, cursor:'pointer',
@@ -15744,6 +15655,7 @@ function LongShotView({ data }) {
   const [sortDir, setSortDir] = useState(1); // 1 = desc (bv-av = higher first)
   const [search, setSearch]   = useState('');
   const [teamFilter, setTeamFilter] = useState('ALL');
+  const gyG = useGyGame();  // header game strip
   const [pgFilter, setPgFilter]     = useState('ALL');
   const [expandedId, setExpandedId] = useState(null);
   const [lineupOnly, setLineupOnly]   = useState(false);
@@ -15829,6 +15741,7 @@ function LongShotView({ data }) {
       .filter(b => formFilter.size === 0 || formFilter.has(b._formClass))
       .filter(b => !hideFinal   || !FINAL_GAME_IDS.has(String(b.game_id)))
     if (teamFilter!=='ALL') r = r.filter(b=>b.batting_team===teamFilter);
+    if (gyG) r = r.filter(b=>gyTeamOk(b.batting_team, gyG));
     if (pgFilter!=='ALL')   r = r.filter(b=>b._pgLabel===pgFilter);
     if (search)      { const q=search.toLowerCase(); r=r.filter(b=>(b.batter||'').toLowerCase().includes(q)); }
     if (lineupOnly)  r = r.filter(b=>parseInt(b.batter_id||0)>0 && LINEUP_STATUS[parseInt(b.batter_id||0)]?.status==='confirmed');
@@ -15840,7 +15753,7 @@ function LongShotView({ data }) {
     if (picksOnly)   r = r.filter(b=>picks[String(b.batter_id||'')]);
     if (diamondOnly) r = r.filter(b=>{ const dp=DAILY_PICKS_CACHE[String(b.batter_id||'')]; return dp?.is_diamond==='1'||dp?.is_diamond===true; });
     return [...r].sort((a,b2)=>{ const av=a[sort]||0; const bv=b2[sort]||0; return sortDir*(bv-av); });
-  }, [rows,teamFilter,pgFilter,search,sort,sortDir,lineupOnly,goneYard,dueOnly,activeOnly,injuredOnly,hotOnly,picksOnly,diamondOnly,batterHand,pitcherHand,formFilter,hideFinal,]);
+  }, [rows,teamFilter,pgFilter,search,sort,sortDir,lineupOnly,goneYard,dueOnly,activeOnly,injuredOnly,hotOnly,picksOnly,diamondOnly,batterHand,pitcherHand,formFilter,hideFinal,gyG,]);
 
   const Th = ({k,label}) => (
     <th onClick={()=>{ if(sort===k) setSortDir(d=>-d); else{setSort(k);setSortDir(-1);} }}
@@ -19263,6 +19176,7 @@ function BatterLeaderboard() {
   const [sortCol, setSortCol] = useState('avgEV');
   const [sortDir, setSortDir] = useState('desc');
   const [teamFilter, setTeamFilter] = useState('all');
+  const gyG = useGyGame();  // header game strip
   const [searchQ, setSearchQ] = useState('');
   const [minPA, setMinPA] = useState(10);
   const [selectedWin, setSelectedWin] = useState('last7');
@@ -19396,7 +19310,7 @@ function BatterLeaderboard() {
       }
       return (ws(p,'pa') || 0) >= minPA;
     })
-    .filter(p => teamFilter === 'all' || p.team === teamFilter)
+    .filter(p => (teamFilter === 'all' || p.team === teamFilter) && gyTeamOk(p.team, gyG))
     .filter(p => {
 
       if (!matchesHandFilter(p.batSide||p.hand||'', blBatterHand)) return false;      if (slateFilter === 'all') return true;
@@ -19847,6 +19761,7 @@ function PitcherLeaderboard() {
   const [sortCol, setSortCol]       = useState('era');
   const [sortDir, setSortDir]       = useState('asc');
   const [teamFilter, setTeamFilter] = useState('all');
+  const gyG = useGyGame();  // header game strip
   const [roleFilter, setRoleFilter] = useState('SP'); // all | SP | RP
   const [searchQ, setSearchQ]       = useState('');
   const [minIP, setMinIP]           = useState(5);
@@ -19924,7 +19839,7 @@ function PitcherLeaderboard() {
   const filtered = withGrades
     .filter(p => p.ip >= minIP)
     .filter(p => matchesHandFilter(p.hand||'', plPitcherHand))
-    .filter(p => teamFilter === 'all' || p.team === teamFilter)
+    .filter(p => (teamFilter === 'all' || p.team === teamFilter) && gyTeamOk(p.team, gyG))
     .filter(p => roleFilter === 'all' || (roleFilter==='SP' ? p.gs > 0 : p.gs === 0))
     .filter(p => !searchQ || p.name.toLowerCase().includes(searchQ.toLowerCase()))
     .filter(p => gradeFilter === 'all' || p._grade.label === gradeFilter)
@@ -20818,11 +20733,13 @@ function StatsTab() {
   }, [matchupList]);
 
   // Teams allowed by matchup selection
+  const gyG = useGyGame();
   const matchupTeams = React.useMemo(() => {
+    if (gyG) return new Set([gyG.away, gyG.home]);  // header game strip
     if (!selMatchup) return null;  // null = no restriction
     const m = matchupList.find(m => m.key === selMatchup);
     return m ? new Set([m.away, m.home]) : null;
-  }, [selMatchup, matchupList]);
+  }, [selMatchup, matchupList, gyG]);
 
   // ── Batter split key ──────────────────────────────────────────────────────────
   // Batter split key: pitcher hand sets vs-hand, shared loc/dn set location/daynight
@@ -21911,6 +21828,7 @@ function SoCloseTab({ data }) {
   const [sortDir, setSortDir] = useState(-1);  // -1=desc 1=asc
   const [search,  setSearch]  = useState('');
   const [teamFilter, setTeamFilter] = useState('ALL');
+  const gyG = useGyGame();  // header game strip
   const [expandedBid,   setExpandedBid]   = useState(null);
   const [confirmedOnly, setConfirmedOnly] = useState(false);
   const [hrVer,         setHrVer]         = useState(0);
@@ -21968,6 +21886,7 @@ function SoCloseTab({ data }) {
       })
       .filter(r => {
         if (teamFilter !== 'ALL' && r.team !== teamFilter) return false;
+        if (gyG && !gyTeamOk(r.team, gyG)) return false;
         if (confirmedOnly && !r.confirmed) return false;
         if (search && !r.name.toLowerCase().includes(search.toLowerCase()) && !r.team.toLowerCase().includes(search.toLowerCase())) return false;
         return true;
@@ -21976,7 +21895,7 @@ function SoCloseTab({ data }) {
         const av = a[sortBy] ?? -999, bv = b[sortBy] ?? -999;
         return sortDir * (typeof av === 'string' ? av.localeCompare(bv) : bv - av) * -1;
       });
-  }, [sortBy, sortDir, teamFilter, search, confirmedOnly]);
+  }, [sortBy, sortDir, teamFilter, search, confirmedOnly, gyG]);
 
   // ── Teams on today's slate ─────────────────────────────────────────────────
   const teams = React.useMemo(() => {
@@ -23939,8 +23858,9 @@ function KPropsTab() {
     return out;
   }, [rows]);
 
+  const gyG = useGyGame();  // header game strip
   const filtered = rows.filter(r =>
-    (selGame === 'all' || r.gameId === selGame) &&
+    (selGame === 'all' || r.gameId === selGame) && gyTeamOk(r.pitcherTeam, gyG) &&
     (!searchQ || r.pitcherName.toLowerCase().includes(searchQ.toLowerCase()) || r.battingTeam.toLowerCase().includes(searchQ.toLowerCase())) &&
     r.bKPct  >= minBKPct &&
     r.pKPct  >= minPKPct &&
@@ -24170,8 +24090,9 @@ function SBPropsTab() {
     return out;
   }, [rows]);
 
+  const gyG = useGyGame();  // header game strip
   const filtered = rows.filter(r =>
-    (selGame === 'all' || r.gameId === selGame) &&
+    (selGame === 'all' || r.gameId === selGame) && gyTeamOk(r.batterTeam, gyG) &&
     (!searchQ || r.batterName.toLowerCase().includes(searchQ.toLowerCase()) || r.batterTeam.toLowerCase().includes(searchQ.toLowerCase())) &&
     r.seaSB  >= minSB &&
     r.speed  >= minSpeed &&
@@ -24394,8 +24315,9 @@ function WalksTab() {
     return out;
   }, [rows]);
 
+  const gyG = useGyGame();  // header game strip
   const filtered = rows.filter(r =>
-    (selGame === 'all' || r.gameId === selGame) &&
+    (selGame === 'all' || r.gameId === selGame) && gyTeamOk(r.batterTeam, gyG) &&
     (!searchQ || r.batterName.toLowerCase().includes(searchQ.toLowerCase()) || r.batterTeam.toLowerCase().includes(searchQ.toLowerCase()) || r.pitcherName.toLowerCase().includes(searchQ.toLowerCase())) &&
     r.seasonPA  >= minPA &&
     r.batBBPct  >= minBBPct &&
@@ -24691,11 +24613,18 @@ function MatchupEngineTab() {
   // Expose setSubTab globally so HomeTab's "→ All Matchups" button can deep-link
   React.useEffect(() => { window._setMatchupSubTab = setSubTab; return () => { window._setMatchupSubTab = null; }; }, [setSubTab]);
   const [showKMHelp, setShowKMHelp] = useState(false);
-  const [data, setData]           = useState([]);
-  const [tomorrowData, setTomorrowData] = useState([]);
+  const [dataAll, setData]           = useState([]);
+  const [tomorrowDataAll, setTomorrowData] = useState([]);
   // Full engine output (all batters) for the All Matchups tab
-  const [allPicksData, setAllPicksData]           = useState([]);
-  const [allPicksTomorrowData, setAllPicksTomorrowData] = useState([]);
+  const [allPicksDataAll, setAllPicksData]           = useState([]);
+  const [allPicksTomorrowDataAll, setAllPicksTomorrowData] = useState([]);
+  // 2026-10-22: header game strip narrows every Scouting list
+  const gyG = useGyGame();
+  const gyRows = rows => gyG ? rows.filter(r => gyTeamOk(r.batting_team ?? r.team, gyG)) : rows;
+  const data                 = useMemo(() => gyRows(dataAll), [dataAll, gyG]);                                 // eslint-disable-line react-hooks/exhaustive-deps
+  const tomorrowData         = useMemo(() => gyRows(tomorrowDataAll), [tomorrowDataAll, gyG]);                 // eslint-disable-line react-hooks/exhaustive-deps
+  const allPicksData         = useMemo(() => gyRows(allPicksDataAll), [allPicksDataAll, gyG]);                 // eslint-disable-line react-hooks/exhaustive-deps
+  const allPicksTomorrowData = useMemo(() => gyRows(allPicksTomorrowDataAll), [allPicksTomorrowDataAll, gyG]); // eslint-disable-line react-hooks/exhaustive-deps
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState(null);
   const [selGame, setSelGame]     = useState('all');
@@ -24998,15 +24927,7 @@ function MatchupEngineTab() {
   const flag = (v) => v === 'TRUE' || v === true || v === 1 || v === '1';
 
   // Sub-tab styles
-  const stBtn = (key) => ({
-    padding:'4px 10px', borderRadius:6, cursor:'pointer', border:'none',
-    fontFamily:"'Oswald',sans-serif", fontWeight:700, fontSize:10, letterSpacing:.5,
-    textTransform:'uppercase',
-    background: subTab===key ? 'var(--accent)' : 'var(--surface2)',
-    color: subTab===key ? 'white' : 'var(--muted)',
-    borderBottom: subTab===key ? '2px solid var(--accent)' : '2px solid transparent',
-    transition:'all .15s', flexShrink:0,
-  });
+  const stBtn = key => gyPill(subTab===key); // 2026-10-22 CourtIQ pills
 
   return <div>
     {/* CSV export button */}
@@ -27465,7 +27386,9 @@ function LocationMapTab({ games, weather }) {
 }
 
 function WeatherTab() {
-  const [games,   setGames]   = useState([]);
+  const [gamesAll, setGames]   = useState([]);
+  const gyG = useGyGame();  // header game strip
+  const games = useMemo(() => gyG ? gamesAll.filter(g => gyGameOk(g.away?.abbr, g.home?.abbr, gyG)) : gamesAll, [gamesAll, gyG]);
   const [weather, setWeather] = useState({});
   const [loading, setLoading] = useState(true);
   const [refreshed, setRefreshed] = useState(null);
@@ -27555,14 +27478,7 @@ function WeatherTab() {
   const domes = games.filter(g=>weather[g.home?.abbr]?.isDome).length;
   const rain  = games.filter(g=>{const w=weather[g.home?.abbr]; const s=(w?.hourly||[]).find(h=>h.hour===parseGameHour(g.gameTime)); return (s?.rainChance||0)>=30;}).length;
 
-  const stBtn = key => ({
-    padding:'6px 14px', borderRadius:7, cursor:'pointer', border:'none',
-    fontFamily:"'Oswald',sans-serif", fontWeight:700, fontSize:12, letterSpacing:.8,
-    textTransform:'uppercase',
-    background: subTab===key ? 'var(--accent)' : 'var(--surface2)',
-    color: subTab===key ? 'white' : 'var(--muted)',
-    transition:'all .15s',
-  });
+  const stBtn = key => gyPill(subTab===key); // 2026-10-22 CourtIQ pills
 
   const SortTri = ({col}) => parkSort.col===col
     ? <span style={{marginLeft:3,fontSize:9}}>{parkSort.dir==='desc'?'▼':'▲'}</span> : null;
@@ -33293,7 +33209,9 @@ function AllStarWeekTab() {
 function HomeTab() {
   const [sub, setSub] = React.useState('cheatsheet');
   const [showHelp, setShowHelp] = React.useState(false);
-  const [data, setData] = React.useState([]);
+  const [dataAll, setData] = React.useState([]);
+  const gyG = useGyGame();  // header game strip narrows Cheat Sheet / So Close / Pairs / Sim
+  const data = React.useMemo(() => gyG ? dataAll.filter(r => gyTeamOk(r.batting_team, gyG)) : dataAll, [dataAll, gyG]);
   const [refreshKey, setRefreshKey] = React.useState(0);
   const mono = "'DM Mono',monospace";
   const osw  = "'Oswald',sans-serif";
@@ -33313,15 +33231,7 @@ function HomeTab() {
     return () => clearInterval(poll);
   }, [refreshKey]);
 
-  const stBtn = key => ({
-    padding:'4px 10px', borderRadius:6, cursor:'pointer', border:'none',
-    fontFamily:osw, fontWeight:700, fontSize:10, letterSpacing:.5,
-    textTransform:'uppercase', flexShrink:0,
-    background: sub===key ? 'var(--accent)' : 'var(--surface2)',
-    color: sub===key ? 'white' : 'var(--muted)',
-    borderBottom: sub===key ? '2px solid var(--accent)' : '2px solid transparent',
-    transition:'all .15s',
-  });
+  const stBtn = key => gyPill(sub===key); // 2026-10-22 CourtIQ pills
 
   const HelpBtn2 = () => (
     <button onClick={()=>setShowHelp(v=>!v)}
@@ -34720,7 +34630,7 @@ function AvoidListTab() {
     if (lineupVer > 0 && Object.keys(LINEUP_STATUS).length > 0) setConfirmedOnly(true);
   }, [lineupVer]);
 
-  const eligibleBatters = useMemo(() => {
+  const eligibleBattersAll = useMemo(() => {
     // filterLineupAwareEligible (2026-08-09) — see its own comment; fixes a
     // real bug where a batter scratched from an already-posted lineup still
     // showed up via the raw isBarrelLabEligible(r) PA-based fallback.
@@ -34737,6 +34647,8 @@ function AvoidListTab() {
     }
     return base;
   }, [lineupVer, confirmedOnly, injuryVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  const gyG = useGyGame();  // header game strip
+  const eligibleBatters = useMemo(() => gyG ? eligibleBattersAll.filter(r => gyTeamOk(r.batting_team, gyG)) : eligibleBattersAll, [eligibleBattersAll, gyG]);
 
   const gameOptions = useMemo(() => {
     const seen = new Map();
@@ -35453,7 +35365,7 @@ function BarrelLabTab() {
     }
   }, [lineupVer]);
 
-  const eligibleBatters = useMemo(() => {
+  const eligibleBattersAll = useMemo(() => {
     // FIXED 2026-07-18: was Object.values(DAILY_PICKS_CACHE) — that cache
     // only ever keeps the FIRST daily_picks.csv row per batter_id (dozens of
     // other call sites look a player up by pid alone with no game context,
@@ -35482,6 +35394,8 @@ function BarrelLabTab() {
     }
     return base;
   }, [lineupVer, confirmedOnly, injuryVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  const gyG = useGyGame();  // header game strip
+  const eligibleBatters = useMemo(() => gyG ? eligibleBattersAll.filter(r => gyTeamOk(r.batting_team, gyG)) : eligibleBattersAll, [eligibleBattersAll, gyG]);
 
   // Trigger sim when game selected or lineups update
   const runBarrelSim = (batters) => {
@@ -36871,7 +36785,7 @@ function OnBaseTab() {
     }
   }, [lineupVer]);
 
-  const eligibleBatters = useMemo(() => {
+  const eligibleBattersAll = useMemo(() => {
     // FIXED 2026-07-18: was Object.values(DAILY_PICKS_CACHE) — same
     // doubleheader gap as BarrelLabTab (see its eligibleBatters comment for
     // the full explanation). DAILY_PICKS_ROWS preserves every game's row.
@@ -36891,6 +36805,8 @@ function OnBaseTab() {
     }
     return base;
   }, [lineupVer, confirmedOnly, injuryVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  const gyG = useGyGame();  // header game strip
+  const eligibleBatters = useMemo(() => gyG ? eligibleBattersAll.filter(r => gyTeamOk(r.batting_team, gyG)) : eligibleBattersAll, [eligibleBattersAll, gyG]);
 
   function runOnBaseSim(batters) {
     if (!batters.length) return;
@@ -37897,6 +37813,10 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
   const osw  = "'Oswald',sans-serif";
   const [gData,    setGData]    = useState({batters:{},pitchers:{}});
   const [cacheVer, setCacheVer] = useState(0);
+  // 2026-10-22: header game strip narrows every Cheat Sheet list (the lists read DAILY_PICKS_CACHE directly)
+  const gyG = useGyGame();
+  const gyDP = () => Object.values(DAILY_PICKS_CACHE||{}).filter(r => gyTeamOk(r.batting_team, gyG));
+  useEffect(() => { setCacheVer(v => v + 1); }, [gyG]);
 
   useEffect(() => {
     loadGameSplitsData().then(d => setGData(d));
@@ -37933,7 +37853,7 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
   const pitcherStatsCacheRef = React.useRef({}); // pid -> {hr9,hr,vsL:{hr9,hr}|null,vsR:{hr9,hr}|null} | 'loading' | 'error'
   const [pitcherAttackVer, setPitcherAttackVer] = useState(0);
   useEffect(() => {
-    const pids = [...new Set(Object.values(DAILY_PICKS_CACHE||{})
+    const pids = [...new Set(gyDP()
       .map(r => String(parseInt(r.pitcher_id)||0)).filter(p => p && p !== '0'))];
     const toFetch = pids.filter(pid => !pitcherStatsCacheRef.current[pid]);
     if (!toFetch.length) return;
@@ -37954,7 +37874,7 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
 
   const top5Attack = React.useMemo(() => {
     const byPitcher = {};
-    Object.values(DAILY_PICKS_CACHE||{}).forEach(r => {
+    gyDP().forEach(r => {
       const pid = String(parseInt(r.pitcher_id)||0);
       if (!pid || pid === '0' || !r.pitcher) return;
       if (!isActiveBatter(r)) return; // same eligibility gate Zone Matchups used, for the hand-mix average
@@ -38013,7 +37933,7 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
 
   // ── Top 5 HR: high yard score + hittable/target pitcher + high ISO ──────────
   const top5HR = React.useMemo(() => {
-    return Object.values(DAILY_PICKS_CACHE||{})
+    return gyDP()
       .filter(r => {
         if (!r._yard || parseFloat(r._yard||0) < 25) return false;
         const label = r._pgLabel||'';
@@ -38053,7 +37973,7 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
 
   // ── Top 5 2+Bases: highest g2tb_pct in L7 with a game today ────────────────
   const top52TB = React.useMemo(() => {
-    const todayIds = new Set(Object.values(DAILY_PICKS_CACHE||{}).map(r=>String(r.batter_id||'').split('.')[0]));
+    const todayIds = new Set(gyDP().map(r=>String(r.batter_id||'').split('.')[0]));
     return Object.entries(gData.batters||{})
       .filter(([id]) => todayIds.has(id))
       .map(([id, p]) => {
@@ -38083,7 +38003,7 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
 
   // ── Top 5 Hit: Sauce-weighted — h_game_pct × Sim H × Sig boost ────────────
   const top5Hit = React.useMemo(() => {
-    const todayIds = new Set(Object.values(DAILY_PICKS_CACHE||{}).map(r=>String(r.batter_id||'').split('.')[0]));
+    const todayIds = new Set(gyDP().map(r=>String(r.batter_id||'').split('.')[0]));
     return Object.entries(gData.batters||{})
       .filter(([id]) => todayIds.has(id))
       .map(([id, p]) => {
@@ -38115,7 +38035,7 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
   // ── Top 5 Close Calls: highest so_close_count with a game today ─────────────
   const top5Close = React.useMemo(() => {
     const seen = new Set();
-    return Object.values(DAILY_PICKS_CACHE||{})
+    return gyDP()
       .filter(b => {
         const bid = String(b.batter_id||'').split('.')[0];
         if (!bid||seen.has(bid)||!b.batter||!b.game_id) return false;
@@ -38140,7 +38060,7 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
   const top5EV = React.useMemo(() => {
     // windows.last7.avgEV — exact same source as Heating Up tab
     const seen = new Set();
-    return Object.values(DAILY_PICKS_CACHE||{})
+    return gyDP()
       .filter(r => {
         const bid = String(r.batter_id||'').split('.')[0];
         if (!bid||seen.has(bid)||!r.batter) return false;
@@ -38569,11 +38489,13 @@ function StreaksTab() {
     return list.sort((a,b)=>a.time.localeCompare(b.time));
   }, [players]);
 
+  const gyG = useGyGame();
   const matchupTeams = React.useMemo(() => {
+    if (gyG) return new Set([gyG.away, gyG.home]);  // header game strip
     if (!selMatchup) return null;
     const m = matchupList.find(m => m.key === selMatchup);
     return m ? new Set([m.away, m.home]) : null;
-  }, [selMatchup, matchupList]);
+  }, [selMatchup, matchupList, gyG]);
 
   const CATS = [
     { key:'hr',   label:'1+ HR',      emoji:'💥', test: g => (g.hrs||0) >= 1 },
@@ -38798,6 +38720,81 @@ function StreaksTab() {
         <div style={{textAlign:'center',padding:30,fontFamily:mono,fontSize:9,color:'var(--muted)'}}>
           Fetching game logs… {loadedCount} of {totalCount || '?'} batters loaded
         </div>
+      )}
+    </div>
+  );
+}
+
+// ── Header game strip (2026-10-22, CourtIQ layout) ──────────────────────────────────────────────────
+// Today's games (or the next day with games, labelled) as compact cards: logos, live score, status; live ->
+// upcoming -> final by start time. Tap a game to narrow every page to it (GY_GAME); tap again or the
+// "Showing ... ✕" chip to show all games.
+const gyEtDate = (offsetDays = 0) => {
+  const s = new Date(Date.now() + offsetDays * 864e5).toLocaleDateString('en-US', { timeZone:'America/New_York', year:'numeric', month:'2-digit', day:'2-digit' });
+  const [m, d, y] = s.split('/'); return `${y}-${m}-${d}`;
+};
+function GameStrip() {
+  const sel = useGyGame();
+  const [slate, setSlate] = useState(null);
+  useEffect(() => {
+    let alive = true, timer = null;
+    const load = async () => {
+      let out = null;
+      for (let i = 0; i < 6 && !out; i++) {
+        const date = gyEtDate(i);
+        try {
+          const r = await fetch(`https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${date}&hydrate=linescore,team&gameType=R,A,F,D,L,W`);
+          const games = (await r.json()).dates?.[0]?.games || [];
+          if (games.length) out = { date, today: i === 0, games };
+        } catch {}
+      }
+      if (!alive) return;
+      setSlate(out);
+      const live = out?.today && out.games.some(g => g.status?.abstractGameState === 'Live');
+      const open = out?.today && out.games.some(g => g.status?.abstractGameState !== 'Final');
+      timer = setTimeout(load, live ? 30000 : open ? 5 * 60000 : 30 * 60000);
+    };
+    load();
+    return () => { alive = false; clearTimeout(timer); };
+  }, []);
+  const games = slate?.games || [];
+  if (!games.length && !sel) return null;
+  const rank = g => { const a = g.status?.abstractGameState; return a === 'Live' ? 0 : a === 'Final' ? 2 : 1; };
+  const ordered = [...games].sort((a, b) => rank(a) - rank(b) || String(a.gameDate).localeCompare(String(b.gameDate)));
+  const dayLabel = slate && !slate.today ? new Date(slate.date + 'T12:00:00').toLocaleDateString('en-US', { weekday:'short', month:'numeric', day:'numeric' }) : null;
+  return (
+    <div className="gy-strip">
+      <button className={`gy-chip all ${!sel ? 'active' : ''}`} onClick={() => setGyGame(null)}>
+        All games<span className="gc-status">{dayLabel ? `Next: ${dayLabel}` : `${games.length} today`}</span>
+      </button>
+      {ordered.map(g => {
+        const aw = g.teams?.away, hm = g.teams?.home, ls = g.linescore || {};
+        const a = gyAbbr(aw?.team?.abbreviation), h = gyAbbr(hm?.team?.abbreviation);
+        const abs = g.status?.abstractGameState, det = g.status?.detailedState || '';
+        const started = abs === 'Live' || abs === 'Final';
+        const isSel = sel?.gamePk === g.gamePk;
+        const status = abs === 'Live' ? `● ${ls.inningHalf === 'Bottom' ? '▼' : '▲'}${ls.currentInning || ''}`
+          : abs === 'Final' ? (ls.currentInning > 9 ? `Final/${ls.currentInning}` : 'Final')
+          : det === 'Postponed' ? 'PPD'
+          : g.gameDate ? new Date(g.gameDate).toLocaleTimeString('en-US', { timeZone:'America/New_York', hour:'numeric', minute:'2-digit' }) : '';
+        return (
+          <button key={g.gamePk} className={`gy-chip ${isSel ? 'active' : ''}`}
+            onClick={() => setGyGame(isSel ? null : { gamePk: g.gamePk, away: a, home: h, label: `${a} @ ${h}` })}
+            title={isSel ? 'Tap again to show all games' : `Show only ${a} @ ${h} on every page`}>
+            {[[aw, a], [hm, h]].map(([t, ab], i) => (
+              <span key={i} className="gc-row">
+                {t?.team?.id && <img src={`https://www.mlbstatic.com/team-logos/${t.team.id}.svg`} alt="" width="16" height="16" style={{objectFit:'contain'}}/>}
+                {ab}{started && <b className="gc-score">{t?.score ?? ''}</b>}
+              </span>
+            ))}
+            <span className={`gc-status ${abs === 'Live' ? 'live' : ''}`}>{status}</span>
+          </button>
+        );
+      })}
+      {sel && (
+        <button className="gy-chip all" onClick={() => setGyGame(null)} title="Every page is narrowed to this game">
+          Showing {sel.label} only<span className="gc-status">✕ all games</span>
+        </button>
       )}
     </div>
   );
@@ -39120,6 +39117,7 @@ export default function App() {
             </div>
       </header>
       <HRTicker onHRClick={()=>setTab("homeruns")}/>
+      <GameStrip/>
       <nav className="tabs">
         {NAV.flatMap((n, i) => {
           const el = n.sep
