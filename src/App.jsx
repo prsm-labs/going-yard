@@ -209,56 +209,6 @@ const styles = `
   .hbf{height:100%;border-radius:2px;transition:width .6s ease;}
   .hbn{font-family:'Oswald',sans-serif;font-weight:700;font-size:16px;min-width:28px;}
   .hl{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:9px;font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;font-family:'DM Mono',monospace;white-space:nowrap;}
-  .splash-overlay{position:fixed;inset:0;background:#0d0d0f;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;z-index:99999;transition:opacity .6s ease,visibility .6s ease;}
-.splash-overlay.fade-out{opacity:0;visibility:hidden;}
-@keyframes ball-pulse{
-  0%,100% { filter: drop-shadow(0 0 18px rgba(232,65,26,.6)) drop-shadow(0 0 6px rgba(255,160,50,.4)); transform: scale(1); }
-  50%      { filter: drop-shadow(0 0 38px rgba(232,65,26,.9)) drop-shadow(0 0 16px rgba(255,200,50,.7)); transform: scale(1.07); }
-}
-@keyframes arc-float{
-  0%,100% { transform: translateY(0px); }
-  50%      { transform: translateY(-12px); }
-}
-@keyframes splash-fade-in{
-  from { opacity:0; transform:scale(.85); }
-  to   { opacity:1; transform:scale(1); }
-}
-@keyframes text-rise{
-  from { opacity:0; transform:translateY(14px); }
-  to   { opacity:1; transform:translateY(0); }
-}
-.splash-ball-wrap{
-  animation: arc-float 1.6s ease-in-out infinite;
-}
-.splash-ball{
-  width:130px;height:130px;object-fit:contain;
-  animation: ball-pulse 1.6s ease-in-out infinite;
-}
-.splash-logo-wrap{
-  animation: splash-fade-in .5s ease both;
-  display:flex;flex-direction:column;align-items:center;gap:22px;
-}
-.splash-title{
-  font-family:'Oswald',sans-serif;font-weight:800;font-size:30px;
-  letter-spacing:3px;color:#fff;
-  animation: text-rise .55s ease .25s both;
-}
-.splash-sub{
-  font-family:'Barlow Condensed',sans-serif;font-weight:500;font-size:12px;letter-spacing:3px;
-  color:rgba(255,255,255,.35);text-transform:uppercase;
-  animation: text-rise .55s ease .4s both;
-}
-.splash-bar-wrap{
-  width:120px;height:2px;background:rgba(255,255,255,.08);border-radius:2px;
-  overflow:hidden;margin-top:8px;animation: text-rise .55s ease .5s both;
-}
-.splash-bar{
-  height:100%;background:linear-gradient(90deg,#e8411a,#ff8020);border-radius:2px;
-  animation: splash-bar-fill 1.8s ease .3s both;
-}
-@keyframes splash-bar-fill{
-  from{width:0%} to{width:100%}
 }
 .hl.gone_yard{background:rgba(255,20,0,.25);color:#fff;border:1px solid rgba(255,20,0,.5);font-weight:800;letter-spacing:.5px;}
   .hl.elite{background:rgba(255,45,0,.18);color:#ff6040;border:1px solid rgba(255,45,0,.3);}
@@ -733,27 +683,6 @@ const POS_COLORS = {
   "OF":  "var(--green)",
   "DH":  "var(--accent)", // DH — red
   "P":   "var(--c-slate)", // pitcher — muted (shouldn't appear)
-};
-
-// PosAvatar — shows position abbreviation with color coding
-// Falls back to initials if no position available
-const PosAvatar = ({ player, size=30, style={} }) => {
-  const pos = player?.pos || GLOBAL_PLAYER_TEAM_MAP[player?.pid]?.pos || '';
-  const color = POS_COLORS[pos] || "var(--muted)";
-  const display = pos || ini(player?.name || '');
-  const fontSize = pos ? (pos.length > 2 ? 8 : pos.length === 2 ? 10 : 12) : 10;
-  return (
-    <div style={{
-      width:size, height:size, borderRadius:"50%",
-      background:`${color}18`,
-      border:`1.5px solid ${color}60`,
-      display:"flex", alignItems:"center", justifyContent:"center",
-      fontFamily:"'DM Mono',monospace", fontWeight:700,
-      fontSize, color, flexShrink:0, ...style
-    }}>
-      {display}
-    </div>
-  );
 };
 
 // SCOUTING ENGINE
@@ -1292,209 +1221,6 @@ function PickButton({pid,name,team}) {
 }
 
 // ── MY PICKS TAB ──────────────────────────────────────────────
-
-// ── PITCHER TAB ───────────────────────────────────────────────
-function PitcherTab() {
-  const [year, setYear] = useState('2026');
-  const [pitchers, setPitchers] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [sortKey, setSortKey] = useState('hr9');
-  const [sortDir, setSortDir] = useState(-1);
-  const [selPitcher, setSelPitcher] = useState(null);
-  const [pitcherDetail, setPitcherDetail] = useState(null);
-  const [loadingDetail, setLoadingDetail] = useState(false);
-
-  const fetchOneSeason = async (yr) => {
-    // Fetch directly from statsapi - simpler endpoint that actually works
-    const url = `https://statsapi.mlb.com/api/v1/stats?stats=season&group=pitching&gameType=R&season=${yr}&sportId=1&limit=500&hydrate=person,currentTeam`;
-    const res = await fetch(url);
-    if (!res.ok) return [];
-    const data = await res.json();
-    const splits = data.stats?.[0]?.splits || [];
-    return splits
-      .filter(l => parseInt(l.stat?.gamesStarted||0) >= 1)
-      .map(l => {
-        const s = l.stat || {};
-        return {
-          pid:   l.person?.id,
-          name:  l.person?.fullName || '—',
-          team:  l.team?.abbreviation || '—',
-          hand:  l.person?.pitchHand?.code === 'L' ? 'LHP' : 'RHP',
-          era:   s.era   || '—',
-          whip:  s.whip  || '—',
-          ip:    s.inningsPitched || '0',
-          k9:    s.strikeoutsPer9Inn || '—',
-          bb9:   s.walksPer9Inn || '—',
-          hr9:   parseFloat(s.homeRunsPer9 || 0),
-          hr:    parseInt(s.homeRuns || 0),
-          hits:  parseInt(s.hits || 0),
-          obp:   s.obp   || '—',
-          avg:   s.avg   || '—',
-          gs:    parseInt(s.gamesStarted || 0),
-          season: yr,
-        };
-      })
-      .filter(p => p.pid);
-  };
-
-  const load = async (yr) => {
-    setLoading(true);
-    setPitchers([]);
-    setSelPitcher(null);
-    try {
-      let results = [];
-      if (yr === 'all') {
-        // Fetch all three seasons and merge, dedup by pid keeping best HR/9
-        const [r2024, r2025, r2026] = await Promise.all([
-          fetchOneSeason(2024), fetchOneSeason(2025), fetchOneSeason(2026),
-        ]);
-        const merged = {};
-        for (const p of [...r2024, ...r2025, ...r2026]) {
-          const key = p.pid;
-          if (!merged[key] || (p.hr9||0) > (merged[key].hr9||0)) merged[key] = p;
-        }
-        results = Object.values(merged);
-      } else {
-        results = await fetchOneSeason(yr);
-      }
-      console.log('[PitcherTab] loaded:', results.length, 'pitchers for', yr);
-      results.sort((a,b) => (b.hr9||0) - (a.hr9||0));
-      setPitchers(results);
-    } catch(e) {
-      console.warn('[PitcherTab]', e.message);
-    }
-    setLoading(false);
-  };
-
-  useEffect(() => { load(year); }, [year]);
-
-  const loadDetail = async (p) => {
-    if (!p.pid) return;
-    setLoadingDetail(true);
-    try {
-      const res = await fetch(`/api/pitcher?pid=${p.pid}&year=${year}`);
-      const data = await res.json();
-      setPitcherDetail(data);
-    } catch(e) {}
-    setLoadingDetail(false);
-  };
-
-  const hs = (k) => { if (sortKey===k) setSortDir(d=>-d); else { setSortKey(k); setSortDir(-1); } };
-
-  const sorted = [...pitchers].sort((a,b) => {
-    const av = a[sortKey], bv = b[sortKey];
-    if (av == null && bv == null) return 0;
-    if (av == null) return 1; if (bv == null) return -1;
-    if (typeof av === 'string') return sortDir * av.localeCompare(bv);
-    return sortDir * (bv - av);
-  });
-
-  return <div>
-    <div className="hrow">
-
-      {/* Year selector */}
-      <div style={{display:'flex',gap:6,alignItems:'center'}}>
-        {['2024','2025','2026'].map(yr=>(
-          <button key={yr}
-            className={`chip ${year===yr?'active':''}`}
-            onClick={()=>setYear(yr)}
-            style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13}}>
-            {yr}
-          </button>
-        ))}
-        <button className={`chip ${year==='all'?'active':''}`} onClick={()=>setYear('all')}
-          style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13}}>All</button>
-      </div>
-    </div>
-
-    {loading
-      ? <div className="lw"><div className="sp"/><div className="lt">Loading {year} pitcher stats…</div></div>
-      : sorted.length === 0
-        ? <div style={{padding:'40px',textAlign:'center',color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>No pitcher data available for {year}.</div>
-        : <div className="tw-scroll"><div className="tw-scroll-inner"><table style={{width:'100%'}}>
-            <thead><tr>
-              <th style={{width:24}}>#</th>
-              {[
-                {key:'name',  label:'Pitcher', tip:'Starting pitcher'},
-                {key:'team',  label:'Team',    tip:"Pitcher's team"},
-                {key:'hand',  label:'Hand',    tip:'Throws L or R'},
-                {key:'gs',    label:'GS',      tip:'Games started'},
-                {key:'ip',    label:'IP',      tip:'Innings pitched'},
-                {key:'era',   label:'ERA',     tip:'Earned run average'},
-                {key:'whip',  label:'WHIP',    tip:'Walks + hits per inning'},
-                {key:'hr9',   label:'HR/9',    tip:'Home runs per 9 innings — higher = more hittable'},
-                {key:'hr',    label:'HR',      tip:'Home runs allowed'},
-                {key:'obp',   label:'OBP',     tip:'Opponent on-base %'},
-                {key:'avg',   label:'BAA',     tip:'Batting average against'},
-                {key:'k9',    label:'K/9',     tip:'Strikeouts per 9'},
-                {key:'bb9',   label:'BB/9',    tip:'Walks per 9'},
-                {key:'hits',  label:'H',       tip:'Hits allowed'},
-              ].map(c=>(
-                <th key={c.key} className={sortKey===c.key?'sk':''} onClick={()=>hs(c.key)} style={{cursor:'pointer'}}>
-                  <div style={{display:'flex',alignItems:'center',gap:2}}>
-                    <Tip text={c.tip}><span>{c.label}</span></Tip>
-                    {sortKey===c.key&&<span style={{color:'var(--accent)'}}>{sortDir<0?'↓':'↑'}</span>}
-                  </div>
-                </th>
-              ))}
-            </tr></thead>
-            <tbody>
-              {sorted.map((p,i)=>{
-                const isSelected = selPitcher?.pid === p.pid;
-                const hr9C = (p.hr9||0)>=1.5?'hot':(p.hr9||0)>=1.0?'warm':'avg';
-                return <>
-                  <tr key={p.pid} className={isSelected?'ex':''} style={{cursor:'pointer'}}
-                    onClick={()=>{ setSelPitcher(isSelected?null:p); if(!isSelected){setPitcherDetail(null);loadDetail(p);} }}>
-                    <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:i<3?'var(--accent)':'var(--muted)'}}>{i+1}</span></td>
-                    <td><div className="pn" style={{fontSize:13,cursor:'pointer',display:'flex',alignItems:'center',gap:4}}
-                      onClick={e=>{e.stopPropagation();openPitcherSlide({pid:p.pid,name:p.name,team:p.team,hand:p.hand,pitchMix:[]});}}
-                    >{p.name}<span style={{fontSize:10,color:'var(--muted)',opacity:.5}}>›</span></div></td>
-                    <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,color:'var(--accent2)'}}>{p.team}</span></td>
-                    <td><span style={{fontSize:10,fontFamily:"'DM Mono',monospace",padding:'2px 6px',borderRadius:4,background:p.hand==='LHP'?'rgba(56,184,242,.15)':'rgba(232,65,26,.1)',color:p.hand==='LHP'?'var(--ice)':'var(--accent)'}}>{p.hand}</span></td>
-                    <td><span className="sv avg">{p.gs}</span></td>
-                    <td><span className="sv avg">{p.ip}</span></td>
-                    <td><span className={`sv ${parseFloat(p.era)>=5?'hot':parseFloat(p.era)>=4?'warm':'avg'}`}>{p.era}</span></td>
-                    <td><span className={`sv ${parseFloat(p.whip)>=1.4?'hot':parseFloat(p.whip)>=1.2?'warm':'avg'}`}>{p.whip}</span></td>
-                    <td><span className={`sv ${hr9C}`} style={{fontWeight:700}}>{p.hr9>0?p.hr9.toFixed(2):'—'}</span></td>
-                    <td><span className={`sv ${p.hr>=10?'hot':p.hr>=5?'warm':'avg'}`}>{p.hr}</span></td>
-                    <td><span className={`sv ${parseFloat(p.obp)>=0.360?'hot':parseFloat(p.obp)>=0.320?'warm':'avg'}`}>{p.obp}</span></td>
-                    <td><span className={`sv ${parseFloat(p.avg)>=0.280?'hot':parseFloat(p.avg)>=0.250?'warm':'avg'}`}>{p.avg}</span></td>
-                    <td><span className={`sv ${parseFloat(p.k9)>=9?'good':parseFloat(p.k9)>=7?'avg':'cold'}`}>{p.k9}</span></td>
-                    <td><span className={`sv ${parseFloat(p.bb9)>=3.5?'hot':parseFloat(p.bb9)>=2.5?'warm':'avg'}`}>{p.bb9}</span></td>
-                    <td><span className="sv avg">{p.hits}</span></td>
-                  </tr>
-                  {isSelected && <tr key={p.pid+'-detail'} className="xr">
-                    <td colSpan={15} style={{padding:'14px 20px',background:'var(--surface2)'}}>
-                      {loadingDetail
-                        ? <div style={{display:'flex',alignItems:'center',gap:8,color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:11}}><div className="sp" style={{width:14,height:14,borderWidth:2}}/> Loading pitch mix…</div>
-                        : pitcherDetail?.pitchMix?.length > 0
-                          ? <div>
-                              <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1,marginBottom:10}}>Pitch Arsenal — {p.name} ({year})</div>
-                              <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
-                                {pitcherDetail.pitchMix.map(pitch=>(
-                                  <div key={pitch.name} style={{background:'var(--surface)',border:"1px solid " + (pitch.color||"var(--border)") + "40",borderRadius:8,padding:'10px 14px',minWidth:120}}>
-                                    <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:14,color:pitch.color||'var(--text)'}}>{pitch.name}</div>
-                                    <div style={{fontFamily:"'DM Mono',monospace",fontSize:20,fontWeight:700,color:'var(--text)',margin:'4px 0'}}>{pitch.pct?.toFixed(1)}%</div>
-                                    <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>
-                                      {pitch.velo>0&&<div>{pitch.velo} mph</div>}
-                                      {pitch.whiffPct>0&&<div>Whiff: {pitch.whiffPct.toFixed(1)}%</div>}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          : <div style={{color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:11}}>No pitch mix data available for {p.name} in {year}.</div>
-                      }
-                    </td>
-                  </tr>}
-                </>;
-              })}
-            </tbody>
-          </table></div></div>
-    }
-  </div>;
-}
-
 
 function ClearButton() {
   const [open, setOpen] = useState(false);
@@ -4561,92 +4287,6 @@ function winKey(w) {
   return 'last60';
 }
 
-function WindowButtons({ window: winVal, setWindow }) {
-  return (
-    <div style={{display:"flex",gap:5,alignItems:"center",flexWrap:"wrap"}}>
-      <span style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:1,marginRight:4}}>Window:</span>
-      {WINDOWS.map(w => (
-        <Tip key={w.key} text={w.tip}>
-          <button
-            className={`chip ${winVal===w.key?"active":""}`}
-            onClick={()=>setWindow(w.key)}
-            style={{padding:"4px 10px",fontSize:11,fontFamily:"'Oswald',sans-serif",fontWeight:600}}>
-            {w.label}
-          </button>
-        </Tip>
-      ))}
-    </div>
-  );
-}
-
-// ── UNIVERSAL STAT COLUMNS RENDERER ─────────────────────────────────────────
-// Returns the windowed stat columns for any batter row
-function StatCols({ p, window }) {
-  const w = p.windows?.[winKey(window)] ?? {};
-  const ev   = w.avgEV ?? p.avgEV ?? 0;
-  const bar  = w.barrel ?? p.barrel ?? 0;
-  const fb   = w.flyBall ?? p.flyBall ?? 0;
-  const la   = w.launchAngle ?? p.launchAngle ?? 0;
-  const pull   = w.pullAir ?? p.pullAir ?? 0;
-  const pulbrl = w.pulledBarrel ?? p.pulledBarrel ?? 0;
-  const chase= w.oSwing ?? p.oSwing ?? 30;
-  const hh   = w.hardHit ?? p.hardHit ?? 0;
-  const avg  = w.avg ?? p.avg ?? 0;
-  const hits = w.hits ?? 0;
-  const xbh  = w.xbh ?? 0;
-  const hr   = w.hr ?? p.hr ?? 0;
-  const bb   = w.bbPct ?? p.bbPct ?? 0;
-  const tb   = w.totalBases ?? 0;
-  const abhr = w.abPerHR ?? 99;
-  const abshr= w.abSinceHR ?? 0;
-  const alm  = w.almostPct ?? 0;
-  const k    = w.kPct ?? p.kPct ?? 0;
-
-  const evC  = ev>=T.EV_HR?"danger":ev>=T.EV_HH?"hot":ev>=92?"warm":"avg";
-  const barC = bar>=T.BAR_EL&&bar<=T.BAR_MAX?"hot":bar>=T.BAR_GD?"warm":bar>T.BAR_MAX?"warm":"avg";
-  const fbC  = fb>=T.FB_MIN&&fb<=T.FB_MAX?"hot":fb>=30?"warm":"avg";
-  const laC  = la>=T.LA_MIN&&la<=T.LA_MAX?"good":la>=19?"warm":"avg";
-  const puC  = pull>=T.PULL_EL?"hot":pull>=T.PULL_GD?"warm":"avg";
-  const pbC  = pulbrl>=8?"danger":pulbrl>=5?"hot":pulbrl>=3?"warm":"avg";
-  const chC  = chase<=T.CHASE_EL?"good":chase<=T.CHASE_GD?"avg":"cold";
-  const hhC  = hh>=T.HH_EL?"hot":hh>=T.HH_GD?"warm":"avg";
-  const avgC = avg>=0.300?"danger":avg>=0.270?"hot":avg>=0.240?"warm":"avg";
-  const hrC  = hr>=5?"danger":hr>=3?"hot":hr>=1?"warm":"avg";
-  const bbC  = bb>=12?"good":bb>=8?"avg":"avg";
-  const kC   = k>=28?"cold":k>=22?"avg":"good";
-  const almC = alm>=20?"hot":alm>=12?"warm":"avg";
-  const abhrC= abhr<=15?"danger":abhr<=22?"hot":abhr<=30?"warm":"avg";
-
-  const mini = (val, label, cls, suffix="") => (
-    <td key={label}>
-      <span className={`sv ${val===null||val===undefined?"avg":cls}`}>
-        {val===null||val===undefined ? "—" : typeof val==="number" ? (suffix ? val.toFixed(1)+suffix : val) : val}
-      </span>
-    </td>
-  );
-
-  return <>
-    {mini(ev,  "ev",   evC,  "")}
-    {mini(bar, "bar",  barC, "%")}
-    {mini(fb,  "fb",   fbC,  "%")}
-    {mini(la,  "la",   laC,  "°")}
-    {mini(pull,   "pull", puC, "%")}
-    {mini(chase,"chase",chC, "%")}
-    {mini(hh,  "hh",   hhC,  "%")}
-    {mini(pulbrl > 0 ? pulbrl : null, "pulbrl", pbC, "%")}
-    {mini(avg, "avg",  avgC, "")}
-    {mini(hits,"hits", "avg", "")}
-    {mini(xbh, "xbh",  hr>=2?"hot":"avg", "")}
-    {mini(hr,  "hr",   hrC,  "")}
-    {mini(bb,  "bb",   bbC,  "%")}
-    {mini(tb,  "tb",   "avg","")}
-    {mini(abhr,"abhr", abhrC,"")}
-    {mini(abshr,"abshr","avg","")}
-    {mini(alm, "alm",  almC, "%")}
-    {mini(k,   "k",    kC,   "%")}
-  </>;
-}
-
 // Universal column headers for stat cols
 const STAT_COL_HEADERS = [
   {key:"avgEV",    label:"EV",         tip:"Avg exit velocity (95+=hard, 103+=HR spike)"},
@@ -4771,7 +4411,14 @@ async function loadTodayLineups() {
   }
 }
 
-async function loadGlobalPlayerMap() {
+// 2026-10-22 cleanup: several components call this at startup at the same moment, before the first call finishes, so the
+// player list (2 x 1.5 MB) and 30 rosters were fetched 2x. Concurrent callers now share the one in-flight load.
+let _playerMapInflight = null;
+function loadGlobalPlayerMap() {
+  if (!_playerMapInflight) _playerMapInflight = _loadGlobalPlayerMap().finally(() => { _playerMapInflight = null; });
+  return _playerMapInflight;
+}
+async function _loadGlobalPlayerMap() {
   const now = Date.now();
   // Re-fetch after TTL expires — catches trades and free agent signings
   if (GLOBAL_PLAYER_MAP_LOADED && (now - GLOBAL_PLAYER_MAP_TS) < PLAYER_MAP_TTL) {
@@ -6712,11 +6359,6 @@ function GCard({game}) {
     <GPanel game={game} isLive={isLive} isFinal={isFin}/>
   </>}
   </div>;
-}
-
-// Shows weather for all today's home parks
-function ScoutingWeather() {
-  return <PregameWeatherRow/>;
 }
 
 function PregameWeatherRow() {
@@ -8908,237 +8550,6 @@ function LiveTab() {
 </div>;
 }
 
-
-
-function BvPTab() {
-  const [games, setGames] = useState([]);
-  const [loadingG, setLoadingG] = useState(true);
-  const [selGame, setSelGame] = useState(null);
-  const [selSide, setSelSide] = useState("away");
-  const [pitcher, setPitcher] = useState(null);
-  const [batters, setBatters] = useState([]);
-
-  useEffect(() => { fetchGames(setLoadingG, setGames, () => {}); }, []);
-  useEffect(() => {
-    if (games.length > 0 && !selGame) {
-      const first = games.find(g => g.status === "Preview") || games[0];
-      setSelGame(first);
-    }
-  }, [games, selGame]);
-  useEffect(() => {
-    if (!selGame) return;
-    const pitchSide  = selSide === "away" ? "home" : "away";
-    const batterSide = selSide;
-    const p = genPitcher(selGame, pitchSide);
-    setPitcher(p);
-    setBatters([]);
-
-    // Load pitcher data
-    fetchRealPitcher(selGame, pitchSide).then(realP => setPitcher(realP)).catch(() => {});
-    if (p.name && !p.name.includes('Starter')) {
-      fetchPitcherData(null, p.name).then(data => {
-        if (data?.found) {
-          setPitcher(prev => ({
-            ...prev,
-            pitchMix: data.pitchMix?.length > 0 ? data.pitchMix : prev.pitchMix,
-            era:      data.stats?.era  || prev.era,
-            whip:     data.stats?.whip || prev.whip,
-            fbVelo:   data.pitchMix?.[0]?.velo || prev.fbVelo,
-            loading:  false,
-          }));
-        } else {
-          setPitcher(prev => ({...prev, loading: false}));
-        }
-      }).catch(() => setPitcher(prev => ({...prev, loading: false})));
-    }
-
-    // Load batters — try live boxscore first, then fall back to cache
-    (async () => {
-      // Wait up to 5s for player cache to be ready
-      let waited = 0;
-      while (Object.keys(PLAYER_DATA_CACHE).length < 5 && waited < 5000) {
-        await new Promise(r => setTimeout(r, 500));
-        waited += 500;
-      }
-
-      try {
-        const res  = await fetch(`/api/boxscore?gamePk=${selGame.gamePk}`);
-        const data = await res.json();
-        const team = data.teams?.[batterSide];
-        const ta   = team?.team?.abbreviation || selGame[batterSide]?.abbr || batterSide.toUpperCase();
-        const batterIds = team?.batters?.length > 0
-          ? team.batters.slice(0, 9)
-          : Object.keys(team?.players || {}).slice(0, 9).map(k => parseInt(k.replace("ID","")));
-        const liveBatters = batterIds.map((bid, i) => {
-          const pl = team?.players?.[`ID${bid}`];
-          if (!pl) return null;
-          if (pl.position?.abbreviation === "P") return null;
-          const name  = pl.person?.fullName || `Player ${bid}`;
-          const hand  = pl.person?.batSide?.code || getBatterHand(name);
-          return buildBvPBatter(bid, name, ta, hand, p);
-        }).filter(Boolean).sort((a,b) => b.ms - a.ms);
-
-        if (liveBatters.length > 0) { setBatters(liveBatters); return; }
-      } catch(e) { console.warn("Live lineup fetch failed:", e.message); }
-
-      // Fallback: top players from cache ranked by score
-      const fallback = genBvPBatters(p);
-      setBatters(fallback.length > 0 ? fallback : []);
-    })();
-  }, [selGame, selSide]);
-
-  const PCOLS = PITCH_COLORS;
-  const abCls = r => r==="HR"?"hr":r==="H"?"hit":r==="K"?"k":"out";
-
-  // Handedness badge
-  const HandBadge = ({hand, matchup}) => {
-    const col = matchup?.cls==="pos"?"var(--green)":matchup?.cls==="neg"?"var(--ice)":"var(--muted)";
-    return <div style={{display:"flex",flexDirection:"column",gap:2,alignItems:"flex-start"}}>
-      <div style={{display:"inline-flex",alignItems:"center",gap:4,padding:"2px 7px",borderRadius:5,background:"var(--surface2)",border:"1px solid var(--border)"}}>
-        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,color:"var(--text)"}}>{hand==="S"?"S-Hits":hand==="L"?"LHB":"RHB"}</span>
-      </div>
-      {matchup && <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:col,fontWeight:600}}>{matchup.label}</span>}
-    </div>;
-  };
-
-  return <div>
-
-    <div className="note">
-      ℹ️ Pitcher handedness vs batter handedness is factored into every metric and the matchup grade.
-      <strong> ⚡ Platoon Adv</strong> = LHB vs RHP or RHB vs LHP (batter-favored).
-      <strong> ⚠️ Same Side</strong> = pitcher advantage — all metrics adjust accordingly.
-      Switch hitters always get the favorable side.
-    </div>
-
-    {loadingG ? <div style={{padding:"14px 0",fontFamily:"'DM Mono',monospace",fontSize:11,color:"var(--muted)"}}>Loading games…</div>
-    : <div className="bgs">{games.filter(g=>g.status!=="Final").map(g=>
-        <div key={g.id} className={`bgb ${selGame?.id===g.id?"active":""}`} onClick={()=>{setSelGame(g);setSelSide("away");}}>
-          <div className="bgbt">{g.away.abbr!=="???"?g.away.abbr:"TBD"} @ {g.home.abbr!=="???"?g.home.abbr:"TBD"}</div>
-          <div className="bgbs">{g.status==="Live"?`● Live ${g.inning||""}`:"Scheduled"}</div>
-        </div>
-      )}</div>
-    }
-
-    {selGame && pitcher && <>
-      <div style={{display:"flex",gap:7,marginBottom:12,alignItems:"center"}}>
-        <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--muted)",textTransform:"uppercase",letterSpacing:1}}>Facing pitcher from:</span>
-        {["away","home"].map(s=>
-          <button key={s} className={`chip ${selSide===s?"active":""}`} onClick={()=>setSelSide(s)}>
-            {selGame[s].abbr!=="???"?selGame[s].abbr:s==="away"?"Away Team":"Home Team"} ({s==="away"?"Away":"Home"})
-          </button>
-        )}
-      </div>
-
-      <div className="pc2">
-        <div className="ph">
-          <div className="pa">{ini(pitcher.name)}</div>
-          <div>
-            <div className="pnam">{pitcher.name}<span className="hnd">{pitcher.hand}</span></div>
-            <div className="psub">{pitcher.team && pitcher.team!=="???"?pitcher.team:selGame?.away?.abbr||selGame?.home?.abbr||"—"} · ERA {pitcher.era} · WHIP {pitcher.whip} · FB {pitcher.fbVelo} mph</div>
-          </div>
-        </div>
-        <div style={{fontSize:9,color:"var(--muted)",fontFamily:"'DM Mono',monospace",marginBottom:7,textTransform:"uppercase",letterSpacing:1}}>Pitch Arsenal</div>
-        {pitcher?.loading && <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",padding:"8px 0"}}>⟳ Loading pitch data…</div>}
-        <div className="pmg">{(pitcher.pitchMix||[]).map(pitch=>{
-          const col=PCOLS[pitch.name]||"#8899a6";
-          return <div key={pitch.name} className="pmc">
-            <div className="pmh"><div className="pmn" style={{color:col}}>{pitch.name}</div><div className="pmp" style={{color:col}}>{pitch.pct}%</div></div>
-            <div className="pub"><div className="puf" style={{width:`${pitch.pct}%`,background:col}}/></div>
-            <div className="psr">{pitch.velo&&<span>Velo: <span className="psv2 nu">{pitch.velo}</span></span>}{pitch.spin&&<span>Spin: <span className="psv2 nu">{pitch.spin}</span></span>}</div>
-            {pitch.isPutaway&&<div className="pta">☠️ Put-Away</div>}
-          </div>;
-        })}</div>
-      </div>
-
-      <div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>
-        Batters vs {pitcher.name} ({pitcher.hand}) — ranked by matchup grade
-      </div>
-      <div className="tw"><table style={{width:"100%"}}>
-        <thead><tr>
-          <th>#</th><th>Batter</th><th>Hand / Matchup</th><th>Grade</th>
-          <th><Tip text="Exit velocity vs this pitcher's mix, adjusted for handedness"><span>Avg EV</span></Tip></th>
-          <th><Tip text="Barrel% vs this pitch mix, adjusted for handedness"><span>Barrel%</span></Tip></th>
-          <th><Tip text="Fly ball% — elevated = HR hunting mode"><span>Fly Ball%</span></Tip></th>
-          <th><Tip text="Chase rate vs this pitcher. Lower = more disciplined."><span>Chase Rate</span></Tip></th>
-          <th><Tip text="Pull Air% — high = power zone HR intent"><span>Pull Air%</span></Tip></th>
-          <th><Tip text="Avg launch angle vs this mix. 15–35° = HR zone."><span>Launch °</span></Tip></th>
-          <th>Career vs P</th><th>Last 3 AB</th>
-        </tr></thead>
-        <tbody>{batters.map((b,i)=>{
-          const mg=b.mg||{grade:"C",cls:"c",color:"var(--c)"};
-          const evC=b.evVsFB>=T.EV_EL?"dng":b.evVsFB>=T.EV_HH?"hot":b.evVsFB>=90?"warm":"avg";
-          const barC=(b.barrelVsPitch??b.barrel)>=T.BAR_EL?"hot":(b.barrelVsPitch??b.barrel)>=T.BAR_GD?"warm":"avg";
-          const fbC=(b.flyBallVsPitch??35)>=42?"hot":(b.flyBallVsPitch??35)>=34?"warm":"avg";
-          const chC=(b.chaseVsPitch??30)<=T.CHASE_EL?"good":(b.chaseVsPitch??30)<=T.CHASE_GD?"avg":"cold";
-          const puC=(b.pullAirVsPitch??18)>=T.PULL_EL?"hot":(b.pullAirVsPitch??18)>=T.PULL_GD?"warm":"avg";
-          const laC=inHRZ(b.launchAngleVsPitch??18)?"good":"avg";
-          const abCl=r=>r==="HR"?"hr":r==="H"?"hit":r==="K"?"k":"out";
-          const matchupHighlight = b.matchup?.cls==="pos"?"rgba(39,201,122,.05)":b.matchup?.cls==="neg"?"rgba(56,184,242,.04)":"";
-          return <tr key={b.id} style={{background:matchupHighlight}}>
-            <td><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:15,color:i<3?"var(--accent2)":"var(--muted)"}}>{i+1}</span></td>
-            <td><div className="pc"><PlayerAvatar pid={b.id} name={b.name} size={30}/><div><div className="pn">{b.name}</div><div className="pt">{b.team} · {b.hr} HR</div></div></div></td>
-            <td>
-              <div style={{display:"flex",flexDirection:"column",gap:3}}>
-                <div style={{display:"inline-flex",alignItems:"center",gap:4,padding:"2px 8px",borderRadius:5,background:"var(--surface2)",border:"1px solid var(--border)",width:"fit-content"}}>
-                  <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12}}>{b.hand==="S"?"S-Hits":b.hand==="L"?"LHB":"RHB"}</span>
-                  <span style={{color:"var(--muted)",fontSize:10}}>vs {pitcher.hand}</span>
-                </div>
-                {b.matchup && <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",fontWeight:600,color:b.matchup.cls==="pos"?"var(--green)":b.matchup.cls==="neg"?"var(--ice)":"var(--muted)"}}>{b.matchup.label}</span>}
-                {b.matchup && <span style={{fontSize:8,fontFamily:"'DM Mono',monospace",color:"var(--muted)",lineHeight:1.3}}>{b.matchup.detail}</span>}
-              </div>
-            </td>
-            <td><div style={{display:"flex",alignItems:"center",gap:6}}><GBadge g={mg}/><span style={{fontSize:9,color:mg.color,fontFamily:"'DM Mono',monospace"}}>{mg.label}</span></div></td>
-            <td>
-              <span className={`sv ${evC}`}>{(b.evVsFB??88).toFixed(1)}</span>
-              <div style={{width:46,height:3,borderRadius:2,background:"var(--border)",overflow:"hidden",marginTop:2}}>
-                <div style={{height:"100%",borderRadius:2,width:`${Math.min(((b.evVsFB??88)/112)*100,100)}%`,background:(b.evVsFB??88)>=T.EV_EL?"var(--aplus)":(b.evVsFB??88)>=T.EV_HH?"var(--c-warn)":"var(--c-slate)"}}/>
-              </div>
-            </td>
-            <td>
-              <span className={`sv ${barC}`}>{(b.barrelVsPitch??b.barrel).toFixed(1)}%</span>
-              <div style={{width:46,height:3,borderRadius:2,background:"var(--border)",overflow:"hidden",marginTop:2}}>
-                <div style={{height:"100%",borderRadius:2,width:`${Math.min((b.barrelVsPitch??b.barrel)/25*100,100)}%`,background:(b.barrelVsPitch??b.barrel)>=T.BAR_EL?"var(--c-warn)":"var(--c-slate)"}}/>
-              </div>
-            </td>
-            <td>
-              <span className={`sv ${fbC}`}>{(b.flyBallVsPitch??35).toFixed(1)}%</span>
-              <div style={{width:46,height:3,borderRadius:2,background:"var(--border)",overflow:"hidden",marginTop:2}}>
-                <div style={{height:"100%",borderRadius:2,width:`${Math.min((b.flyBallVsPitch??35)/50*100,100)}%`,background:(b.flyBallVsPitch??35)>=40?"var(--c-warn)":"var(--c-slate)"}}/>
-              </div>
-            </td>
-            <td>
-              <span className={`sv ${chC}`}>{(b.chaseVsPitch??30).toFixed(1)}%</span>
-              <div style={{width:46,height:3,borderRadius:2,background:"var(--border)",overflow:"hidden",marginTop:2}}>
-                <div style={{height:"100%",borderRadius:2,width:`${Math.min((b.chaseVsPitch??30)/50*100,100)}%`,background:(b.chaseVsPitch??30)>=35?"var(--ice)":(b.chaseVsPitch??30)>=27?"var(--c-slate)":"var(--green)"}}/>
-              </div>
-            </td>
-            <td>
-              <span className={`sv ${puC}`}>{(b.pullAirVsPitch??18).toFixed(1)}%</span>
-              <div style={{width:46,height:3,borderRadius:2,background:"var(--border)",overflow:"hidden",marginTop:2}}>
-                <div style={{height:"100%",borderRadius:2,width:`${Math.min((b.pullAirVsPitch??18)/32*100,100)}%`,background:(b.pullAirVsPitch??18)>=22?"var(--c-warn)":"var(--c-slate)"}}/>
-              </div>
-            </td>
-            <td>
-              <span className={`sv ${laC}`}>{(b.launchAngleVsPitch??18).toFixed(1)}°</span>
-              {inHRZ(b.launchAngleVsPitch??18)&&<div style={{fontSize:8,color:"var(--green)",fontFamily:"'DM Mono',monospace",marginTop:1}}>{getLAZ(b.launchAngleVsPitch??18)}</div>}
-            </td>
-            <td>
-              <div className="h2h">
-                <div className="h2hs"><div className="h2hv" style={{color:(b.careerBA??0.25)>=0.28?"var(--c-warn)":"var(--text)"}}>{(b.careerBA??0.25).toFixed(3)}</div><div className="h2hl">AVG</div></div>
-                <div className="h2hs"><div className="h2hv" style={{color:(b.careerHR??0)>=2?"var(--c-danger)":(b.careerHR??0)>=1?"var(--c-warn)":"var(--muted)"}}>{b.careerHR??0}</div><div className="h2hl">HR</div></div>
-                <div className="h2hs"><div className="h2hv" style={{color:"var(--muted)"}}>{b.careerAB??0}</div><div className="h2hl">AB</div></div>
-              </div>
-            </td>
-            <td>
-              <div className="rab">{(b.last3||[]).map((r,j)=><div key={j} className={`abr ${abCl(r)}`}>{r}</div>)}</div>
-              <div style={{fontSize:8,color:"var(--muted)",fontFamily:"'DM Mono',monospace",marginTop:2}}>last 3 vs P</div>
-            </td>
-          </tr>;
-        })}</tbody>
-      </table></div>
-    </>}
-  </div>;
-}
 
 
 // TAB 5: PITCH TYPE MATCHUP BUILDER
@@ -14588,32 +13999,6 @@ function YardPicksFeedTab() {
   );
 }
 
-function OnlyHomersTab() {
-  return <div style={{margin:"-16px"}}>
-    {/* iframe — scaled 80% like Doink, full height */}
-    <iframe
-      title="Only Homers"
-      src="https://www.onlyhomers.com/"
-      frameBorder="0"
-      allowFullScreen
-      style={{width:"125%",height:"calc((100vh - 48px) * 1.25)",border:"none",display:"block",
-        transform:"scale(0.8)",transformOrigin:"top left"}}
-    />
-    {/* Open in new tab below frame */}
-    <div style={{padding:"8px 14px",borderTop:"1px solid var(--border)",
-      display:"flex",justifyContent:"flex-end",background:"var(--surface)"}}>
-      <a href="https://www.onlyhomers.com/" target="_blank" rel="noopener noreferrer"
-        style={{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:6,
-          background:"var(--accent)",color:"white",fontFamily:"'Oswald',sans-serif",
-          fontWeight:700,fontSize:12,letterSpacing:1,textDecoration:"none"}}>
-        ↗ Open in New Tab
-      </a>
-    </div>
-  </div>;
-}
-
-
-
 // ── GRADE CONFIG ─────────────────────────────────────────────────
 const GRADE_CFG = {
   "A+": {color:"var(--c-yellow2)",bg:"rgba(255,204,0,.18)", border:"rgba(255,204,0,.5)",  label:"A+"},
@@ -16323,34 +15708,6 @@ function YardBadge({ score }) {
   );
 }
 
-
-function SplashScreen({ onDone }) {
-  const [fading, setFading] = React.useState(false);
-  useEffect(() => {
-    // Minimum display time: 2s, then fade out
-    const t = setTimeout(() => setFading(true), 2000);
-    return () => clearTimeout(t);
-  }, []);
-  useEffect(() => {
-    if (fading) {
-      // After fade transition completes, tell parent we're done
-      const t = setTimeout(onDone, 650);
-      return () => clearTimeout(t);
-    }
-  }, [fading, onDone]);
-  return (
-    <div className={`splash-overlay${fading ? ' fade-out' : ''}`}>
-      <div className="splash-logo-wrap">
-        <div className="splash-ball-wrap">
-          <img src="/icon-192.png" alt="Going Yard" className="splash-ball"/>
-        </div>
-        <div className="splash-title">GOING YARD</div>
-        <div className="splash-sub">MLB Home Run Intelligence</div>
-        <div className="splash-bar-wrap"><div className="splash-bar"/></div>
-      </div>
-    </div>
-  );
-}
 
 function PSBadge({ score }) {
   if (!score || score < 1) return null;
@@ -38535,19 +37892,6 @@ function OnBaseTab() {
   );
 }
 
-// Standalone CheatSheetWrapper kept for backward compat (unused in nav now)
-function CheatSheetWrapper() {
-  const [data, setData] = React.useState([]);
-  React.useEffect(() => {
-    const poll = setInterval(() => {
-      const rows = Object.values(DAILY_PICKS_CACHE || {});
-      if (rows.length > 0) { setData(rows); clearInterval(poll); }
-    }, 400);
-    return () => clearInterval(poll);
-  }, []);
-  return <div style={{padding:'8px 14px'}}><CheatSheetTab data={data}/></div>;
-}
-
 function CheatSheetTab({ data, showAllMatchupsLink }) {
   const mono = "'DM Mono',monospace";
   const osw  = "'Oswald',sans-serif";
@@ -39460,8 +38804,12 @@ function StreaksTab() {
 }
 
 export default function App() {
-  const [showSplash, setShowSplash] = useState(true);
   const [tab, setTab] = useState("home");
+  // 2026-10-22 cleanup: heavy tabs mount the first time they're opened, then stay mounted (keeps their filters).
+  // Before this every one of them mounted on page load and fetched its data (~3 MB gzipped of splits alone).
+  const openedTabs = useRef(new Set());
+  openedTabs.current.add(tab);
+  const opened = (k) => openedTabs.current.has(k);
   // Theme: 'light' | 'dark' | null (null = follow OS/browser prefers-color-scheme).
   // Persisted explicitly only when the user picks light/dark via the toggle --
   // localStorage absence means "still following system," matching the
@@ -39665,7 +39013,6 @@ export default function App() {
   ];
 
   return <>
-    {showSplash && <SplashScreen onDone={() => setShowSplash(false)}/>}
     <style>{styles}</style>
     <div className="app">
       {newVersionAvailable && (
@@ -39800,44 +39147,20 @@ export default function App() {
       </nav>
       <main className="content">
         <div style={{display:tab==="weather"?"block":"none"}}><WeatherTab/></div>
-        <div style={{display:tab==="stats"?"block":"none"}}><StatsTab/></div>
+        {opened("stats") && <div style={{display:tab==="stats"?"block":"none"}}><StatsTab/></div>}
         {tab==="live"     && <LiveTab/>}
         {tab==="allstarweek" && <AllStarWeekTab/>}
         {tab==="picks"    && <MyPicksTab/>}
         {tab==="crystal"  && <CrystalBallTab/>}
         {tab==="links"    && <LinksTab/>}
         {tab==="powerbi" && <PowerBITab/>}
-        <div style={{display:tab==="statcast"?"block":"none"}}><StatcastTab/></div>
+        {opened("statcast") && <div style={{display:tab==="statcast"?"block":"none"}}><StatcastTab/></div>}
         <div style={{display:tab==="home"?"block":"none"}}><HomeTab/></div>
         <div style={{display:tab==="homeruns"?"block":"none"}}><HRTrackerTab/></div>
-        <div style={{display:tab==="mlbscores"?"block":"none"}}><MLBTab/></div>
-        <div style={{display:tab==="yardpicks"?"block":"none"}}><YardPicksFeedTab/></div>
-        <div style={{display:tab==="trackrecord"?"block":"none"}}><TrackRecordTab/></div>
-        <div style={{display:tab==="onlyhomers"?"block":"none"}}><OnlyHomersTab/></div>
-        <div style={{display:tab==="doink"?'block':'none'}}>
-          <div style={{padding:"8px 14px",background:"rgba(245,166,35,.1)",
-            borderBottom:"1px solid rgba(245,166,35,.25)",
-            display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-            <span style={{fontSize:12}}>👾</span>
-            <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--text)"}}>New users — sign up with code</span>
-            <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:13,
-              color:"var(--accent2)",letterSpacing:.5,padding:"1px 8px",borderRadius:4,
-              background:"rgba(245,166,35,.15)",border:"1px solid rgba(245,166,35,.3)"}}>
-              SHARP9346
-            </span>
-            <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:"var(--muted)"}}>for 25% off —</span>
-            <a href="https://doinksports.com/research/mlb/weather-man" target="_blank" rel="noopener noreferrer"
-              style={{fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:700,
-                color:"var(--ice)",textDecoration:"underline",textUnderlineOffset:3}}>
-              Sign Up / Log In ↗
-            </a>
-          </div>
-          <iframe src="https://doinksports.com/research/mlb/weather-man"
-            style={{width:'125%',height:'calc((100vh - 80px) * 1.25)',border:'none',display:'block',
-              transform:'scale(0.8)',transformOrigin:'top left'}}
-            title="Doink Sports MLB Research"/>
-        </div>
-        <div style={{display:tab==="getapp"?"block":"none"}}><GetAppTab/></div>
+        {opened("mlbscores") && <div style={{display:tab==="mlbscores"?"block":"none"}}><MLBTab/></div>}
+        {opened("yardpicks") && <div style={{display:tab==="yardpicks"?"block":"none"}}><YardPicksFeedTab/></div>}
+        {opened("trackrecord") && <div style={{display:tab==="trackrecord"?"block":"none"}}><TrackRecordTab/></div>}
+        {opened("getapp") && <div style={{display:tab==="getapp"?"block":"none"}}><GetAppTab/></div>}
         <div style={{display:tab==="matchup"?"block":"none"}}><MatchupEngineTab/></div>
       </main>
       <div style={{textAlign:"center",padding:"12px 0 8px",borderTop:"1px solid var(--border)",marginTop:24}}>
