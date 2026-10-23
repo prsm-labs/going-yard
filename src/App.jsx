@@ -63,7 +63,7 @@ async function getPushState() {
 const BUILD_TIMESTAMP = import.meta.env.VITE_BUILD_TIME || "—";
 
 const styles = `
-  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&family=Barlow+Condensed:wght@400;500;600;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500&family=Barlow+Condensed:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap');
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
   :root{
     --bg:#080c10;--surface:#0d1318;--surface2:#131b22;--border:#1e2d3a;
@@ -97,7 +97,7 @@ const styles = `
   @media(prefers-color-scheme:light){
     :root:not([data-theme="dark"]){
       --bg:#f5f6f8;--surface:#ffffff;--surface2:#eef1f4;--border:#d7dee5;
-      --text:#1a2733;--muted:#738aa1;
+      --text:#1a2733;--muted:#5d6573;
       --accent:#e8411a;--accent2:#b67508;--ice:#0e93d0;--green:#1f9e60;
       --fire2:#d96800;--fire3:#b28000;--aplus:#ff3010;
       --a:#d95f00;--b:#b67508;--c:#288ccb;--d:#738aa1;--f:#0e93d0;
@@ -114,7 +114,7 @@ const styles = `
   /* Explicit user choice always wins over the OS preference, both directions */
   :root[data-theme="light"]{
     --bg:#f5f6f8;--surface:#ffffff;--surface2:#eef1f4;--border:#d7dee5;
-    --text:#1a2733;--muted:#738aa1;
+    --text:#1a2733;--muted:#5d6573;
     --accent:#e8411a;--accent2:#b67508;--ice:#0e93d0;--green:#1f9e60;
     --fire2:#d96800;--fire3:#b28000;--aplus:#ff3010;
     --a:#d95f00;--b:#b67508;--c:#288ccb;--d:#738aa1;--f:#0e93d0;
@@ -440,6 +440,48 @@ const styles = `
   --tip-offset: calc(100% + 6px);
 }
 [data-tip]:hover::after{opacity:1;}
+  /* ── 2026-10-23 light-mode quick fix + CourtIQ fonts (user: light mode looked "poorly inverted"; match the fonts, keep
+     Going Yard's own red accent). Dark mode colors are unchanged. Light only: plain header (the #0a1520 gradient was a
+     dark-mode piece), HR ticker on the light surface (its #0a0e14 panel hid var(--text) items), light borders, and the
+     dark-first inline literals remapped by attribute selector -- faint white fills / borders -> light grey / --border,
+     faint white text -> --muted, the dark panel hexes -> --surface. Full tokenizing is the winter overhaul's job. ── */
+  @media(prefers-color-scheme:light){
+    :root:not([data-theme="dark"]) .header{background:none;}
+    :root:not([data-theme="dark"]) .ticker-wrap{background:var(--surface);border:1px solid var(--border);border-radius:10px;}
+    :root:not([data-theme="dark"]) .ticker-item{border-right-color:var(--border);}
+    :root:not([data-theme="dark"]) td,:root:not([data-theme="dark"]) .tw-scroll td{border-bottom-color:var(--border);}
+    :root:not([data-theme="dark"]) tr.dr:hover td{background:rgba(15,23,42,.035);}
+    :root:not([data-theme="dark"]) [style*="background: rgba(255,:root:not([data-theme="dark"]) 255,:root:not([data-theme="dark"]) 255,:root:not([data-theme="dark"]) 0.0"],:root:not([data-theme="dark"]) [style*="background: rgba(255,:root:not([data-theme="dark"]) 255,:root:not([data-theme="dark"]) 255,:root:not([data-theme="dark"]) 0.1"],:root:not([data-theme="dark"]) [style*="background-color: rgba(255,:root:not([data-theme="dark"]) 255,:root:not([data-theme="dark"]) 255,:root:not([data-theme="dark"]) 0.0"],:root:not([data-theme="dark"]) [style*="background-color: rgba(255,:root:not([data-theme="dark"]) 255,:root:not([data-theme="dark"]) 255,:root:not([data-theme="dark"]) 0.1"]{background:rgba(15,23,42,.04)!important;}
+    :root:not([data-theme="dark"]) [style*="border: 1px solid rgba(255,:root:not([data-theme="dark"]) 255,:root:not([data-theme="dark"]) 255"]{border-color:var(--border)!important;}
+    :root:not([data-theme="dark"]) [style*="border-bottom: 1px solid rgba(255,:root:not([data-theme="dark"]) 255,:root:not([data-theme="dark"]) 255"]{border-bottom-color:var(--border)!important;}
+    :root:not([data-theme="dark"]) [style*="border-top: 1px solid rgba(255,:root:not([data-theme="dark"]) 255,:root:not([data-theme="dark"]) 255"]{border-top-color:var(--border)!important;}
+    :root:not([data-theme="dark"]) [style^="color: rgba(255,:root:not([data-theme="dark"]) 255,:root:not([data-theme="dark"]) 255,:root:not([data-theme="dark"]) 0.2"],:root:not([data-theme="dark"]) [style^="color: rgba(255,:root:not([data-theme="dark"]) 255,:root:not([data-theme="dark"]) 255,:root:not([data-theme="dark"]) 0.3"],:root:not([data-theme="dark"]) [style^="color: rgba(255,:root:not([data-theme="dark"]) 255,:root:not([data-theme="dark"]) 255,:root:not([data-theme="dark"]) 0.4"],:root:not([data-theme="dark"]) [style^="color: rgba(255,:root:not([data-theme="dark"]) 255,:root:not([data-theme="dark"]) 255,:root:not([data-theme="dark"]) 0.5"],:root:not([data-theme="dark"]) [style^="color: rgba(255,:root:not([data-theme="dark"]) 255,:root:not([data-theme="dark"]) 255,:root:not([data-theme="dark"]) 0.6"],:root:not([data-theme="dark"]) [style*="; color: rgba(255,:root:not([data-theme="dark"]) 255,:root:not([data-theme="dark"]) 255,:root:not([data-theme="dark"]) 0.2"],:root:not([data-theme="dark"]) [style*="; color: rgba(255,:root:not([data-theme="dark"]) 255,:root:not([data-theme="dark"]) 255,:root:not([data-theme="dark"]) 0.3"],:root:not([data-theme="dark"]) [style*="; color: rgba(255,:root:not([data-theme="dark"]) 255,:root:not([data-theme="dark"]) 255,:root:not([data-theme="dark"]) 0.4"],:root:not([data-theme="dark"]) [style*="; color: rgba(255,:root:not([data-theme="dark"]) 255,:root:not([data-theme="dark"]) 255,:root:not([data-theme="dark"]) 0.5"],:root:not([data-theme="dark"]) [style*="; color: rgba(255,:root:not([data-theme="dark"]) 255,:root:not([data-theme="dark"]) 255,:root:not([data-theme="dark"]) 0.6"]{color:var(--muted)!important;}
+    :root:not([data-theme="dark"]) [style*="background: rgb(13,:root:not([data-theme="dark"]) 19,:root:not([data-theme="dark"]) 24)"],:root:not([data-theme="dark"]) [style*="background: rgb(13,:root:not([data-theme="dark"]) 17,:root:not([data-theme="dark"]) 23)"],:root:not([data-theme="dark"]) [style*="background: rgb(15,:root:not([data-theme="dark"]) 23,:root:not([data-theme="dark"]) 32)"],:root:not([data-theme="dark"]) [style*="background: rgb(10,:root:not([data-theme="dark"]) 16,:root:not([data-theme="dark"]) 32)"],:root:not([data-theme="dark"]) [style*="background: rgb(10,:root:not([data-theme="dark"]) 14,:root:not([data-theme="dark"]) 20)"],:root:not([data-theme="dark"]) [style*="background: rgb(16,:root:not([data-theme="dark"]) 24,:root:not([data-theme="dark"]) 32)"],:root:not([data-theme="dark"]) [style*="background-color: rgb(13,:root:not([data-theme="dark"]) 19,:root:not([data-theme="dark"]) 24)"],:root:not([data-theme="dark"]) [style*="background-color: rgb(10,:root:not([data-theme="dark"]) 14,:root:not([data-theme="dark"]) 20)"]{background:var(--surface)!important;}
+    :root:not([data-theme="dark"]) [style*="background: rgb(31, 33, 51)"]{background:#eceefb!important;}
+    :root:not([data-theme="dark"]) [style*="background: rgb(31, 23, 24)"]{background:#fbecec!important;}
+    :root:not([data-theme="dark"]) [style*="background: rgb(15, 34, 32)"]{background:#e8f5f1!important;}
+  }
+    :root[data-theme="light"] .header{background:none;}
+    :root[data-theme="light"] .ticker-wrap{background:var(--surface);border:1px solid var(--border);border-radius:10px;}
+    :root[data-theme="light"] .ticker-item{border-right-color:var(--border);}
+    :root[data-theme="light"] td,:root[data-theme="light"] .tw-scroll td{border-bottom-color:var(--border);}
+    :root[data-theme="light"] tr.dr:hover td{background:rgba(15,23,42,.035);}
+    :root[data-theme="light"] [style*="background: rgba(255,:root[data-theme="light"] 255,:root[data-theme="light"] 255,:root[data-theme="light"] 0.0"],:root[data-theme="light"] [style*="background: rgba(255,:root[data-theme="light"] 255,:root[data-theme="light"] 255,:root[data-theme="light"] 0.1"],:root[data-theme="light"] [style*="background-color: rgba(255,:root[data-theme="light"] 255,:root[data-theme="light"] 255,:root[data-theme="light"] 0.0"],:root[data-theme="light"] [style*="background-color: rgba(255,:root[data-theme="light"] 255,:root[data-theme="light"] 255,:root[data-theme="light"] 0.1"]{background:rgba(15,23,42,.04)!important;}
+    :root[data-theme="light"] [style*="border: 1px solid rgba(255,:root[data-theme="light"] 255,:root[data-theme="light"] 255"]{border-color:var(--border)!important;}
+    :root[data-theme="light"] [style*="border-bottom: 1px solid rgba(255,:root[data-theme="light"] 255,:root[data-theme="light"] 255"]{border-bottom-color:var(--border)!important;}
+    :root[data-theme="light"] [style*="border-top: 1px solid rgba(255,:root[data-theme="light"] 255,:root[data-theme="light"] 255"]{border-top-color:var(--border)!important;}
+    :root[data-theme="light"] [style^="color: rgba(255,:root[data-theme="light"] 255,:root[data-theme="light"] 255,:root[data-theme="light"] 0.2"],:root[data-theme="light"] [style^="color: rgba(255,:root[data-theme="light"] 255,:root[data-theme="light"] 255,:root[data-theme="light"] 0.3"],:root[data-theme="light"] [style^="color: rgba(255,:root[data-theme="light"] 255,:root[data-theme="light"] 255,:root[data-theme="light"] 0.4"],:root[data-theme="light"] [style^="color: rgba(255,:root[data-theme="light"] 255,:root[data-theme="light"] 255,:root[data-theme="light"] 0.5"],:root[data-theme="light"] [style^="color: rgba(255,:root[data-theme="light"] 255,:root[data-theme="light"] 255,:root[data-theme="light"] 0.6"],:root[data-theme="light"] [style*="; color: rgba(255,:root[data-theme="light"] 255,:root[data-theme="light"] 255,:root[data-theme="light"] 0.2"],:root[data-theme="light"] [style*="; color: rgba(255,:root[data-theme="light"] 255,:root[data-theme="light"] 255,:root[data-theme="light"] 0.3"],:root[data-theme="light"] [style*="; color: rgba(255,:root[data-theme="light"] 255,:root[data-theme="light"] 255,:root[data-theme="light"] 0.4"],:root[data-theme="light"] [style*="; color: rgba(255,:root[data-theme="light"] 255,:root[data-theme="light"] 255,:root[data-theme="light"] 0.5"],:root[data-theme="light"] [style*="; color: rgba(255,:root[data-theme="light"] 255,:root[data-theme="light"] 255,:root[data-theme="light"] 0.6"]{color:var(--muted)!important;}
+    :root[data-theme="light"] [style*="background: rgb(13,:root[data-theme="light"] 19,:root[data-theme="light"] 24)"],:root[data-theme="light"] [style*="background: rgb(13,:root[data-theme="light"] 17,:root[data-theme="light"] 23)"],:root[data-theme="light"] [style*="background: rgb(15,:root[data-theme="light"] 23,:root[data-theme="light"] 32)"],:root[data-theme="light"] [style*="background: rgb(10,:root[data-theme="light"] 16,:root[data-theme="light"] 32)"],:root[data-theme="light"] [style*="background: rgb(10,:root[data-theme="light"] 14,:root[data-theme="light"] 20)"],:root[data-theme="light"] [style*="background: rgb(16,:root[data-theme="light"] 24,:root[data-theme="light"] 32)"],:root[data-theme="light"] [style*="background-color: rgb(13,:root[data-theme="light"] 19,:root[data-theme="light"] 24)"],:root[data-theme="light"] [style*="background-color: rgb(10,:root[data-theme="light"] 14,:root[data-theme="light"] 20)"]{background:var(--surface)!important;}
+    :root[data-theme="light"] [style*="background: rgb(31, 33, 51)"]{background:#eceefb!important;}
+    :root[data-theme="light"] [style*="background: rgb(31, 23, 24)"]{background:#fbecec!important;}
+    :root[data-theme="light"] [style*="background: rgb(15, 34, 32)"]{background:#e8f5f1!important;}
+  /* Fonts: Inter everywhere with fixed-width digits (CourtIQ), both themes; the HR ticker keeps its DM Mono scoreboard look.
+     Tabs / section titles drop the uppercase letter-spacing (CourtIQ's plain case). */
+  body,body *:not(.ticker-wrap):not(.ticker-wrap *){font-family:Inter,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif!important;}
+  body{font-variant-numeric:tabular-nums;}
+  .tab{text-transform:none;letter-spacing:0;font-size:13px;}
+  .section-title{text-transform:none;letter-spacing:-.01em;}
+  .ticker-wrap span{white-space:nowrap;} /* the empty-ticker message wrapped onto 2 lines on phones */
 `;
 
 // THRESHOLDS
