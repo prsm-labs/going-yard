@@ -4058,3 +4058,8 @@ game_id,game_date,runner_id,runner_name,pitcher_id,pitcher_name,stolen_base,caug
 849817,2026-10-18,670764,Taylor Walls,542888,Shawn Armstrong,1,0,2B,4,top,top
 849815,2026-10-19,802415,Chandler Simpson,682120,Tim Herrin,1,0,2B,2,bottom,bottom
 849815,2026-10-19,683748,Victor Mesa Jr.,682120,Tim Herrin,1,0,2B,2,bottom,bottom
+849805,2026-10-23,686217,Sal Frelick,607259,Nick Martinez,1,0,3B,2,bottom,bottom
+849805,2026-10-23,683748,Victor Mesa Jr.,694819,Jacob Misiorowski,0,1,3B,5,top,top
+849805,2026-10-23,666018,Jonathan Aranda,682842,Abner Uribe,0,1,2B,6,top,top
+849805,2026-10-23,622761,Jorge Mateo,656730,Trevor Megill,1,0,3B,9,top,top
+849805,2026-10-23,802415,Chandler Simpson,656730,Trevor Megill,1,0,2B,9,top,top
