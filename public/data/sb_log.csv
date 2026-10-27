@@ -4070,3 +4070,6 @@ game_id,game_date,runner_id,runner_name,pitcher_id,pitcher_name,stolen_base,caug
 849802,2026-10-24,694192,Jackson Chourio,687330,Kevin Kelly,1,0,3B,8,bottom,bottom
 849802,2026-10-24,592885,Christian Yelich,687330,Kevin Kelly,1,0,2B,8,bottom,bottom
 849802,2026-10-24,661388,William Contreras,571927,Steven Matz,1,0,2B,8,bottom,bottom
+849804,2026-10-26,802415,Chandler Simpson,688107,Robert Gasser,0,1,2B,1,bottom,bottom
+849804,2026-10-26,669003,Garrett Mitchell,642547,Freddy Peralta,0,1,2B,2,top,top
+849804,2026-10-26,694192,Jackson Chourio,642547,Freddy Peralta,1,0,2B,5,top,top
