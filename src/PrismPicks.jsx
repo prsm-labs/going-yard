@@ -10,6 +10,53 @@ const pct = (v) => (v == null ? "—" : `${Math.round(v)}%`);
 const share = (h, n) => (n ? `${Math.round((h / n) * 100)}%` : "—");
 const md = (d) => (d ? `${+d.slice(5, 7)}/${+d.slice(8, 10)}` : "");
 
+// 💎 PRISM Picks record for the Track Record tab (2026-10-27, user): the live graded record (locked before first pitch,
+// graded from the at-bat log) plus the walk-forward backtest by month, newest day first. Same data file as the card.
+export function PrismPicksRecord() {
+  const [data, setData] = useState(null);
+  useEffect(() => {
+    fetch("/data/prism_picks.json", { cache: "no-cache" }).then((r) => (r.ok ? r.json() : null)).then(setData).catch(() => setData(null));
+  }, []);
+  if (!data?.backtest) return null;
+  const bt = data.backtest, live = data.live || { n: 0, hits: 0 };
+  const days = [...(data.nights || [])].filter((n) => n.graded).reverse();
+  const pending = data.tonight?.picks?.length ? data.tonight : null;
+  return (
+    <div className="gy-prism-card open" style={{ margin: "12px 14px 0" }}>
+      <div className="gy-prism-head">
+        <span className="gy-prism-gem" aria-hidden="true">💎</span>
+        <div className="gy-prism-titles">
+          <div className="gy-prism-title">PRISM Picks record</div>
+          <div className="gy-prism-sub">Live since {md(live.since)} · locked before first pitch, graded from the box score</div>
+        </div>
+        <div className="gy-prism-stat">
+          <b>{live.n ? share(live.hits, live.n) : "—"}</b>
+          <span>live {live.hits}/{live.n}</span>
+          <span>backtest {share(bt.hits, bt.n)}</span>
+        </div>
+      </div>
+      <div className="gy-prism-muted" style={{ margin: "6px 0" }}>
+        Backtest {bt.hits} of {bt.n} ({share(bt.hits, bt.n)}, said {Math.round(bt.said * 100)}%), {md(bt.from)}–{md(bt.to)}, each month predicted only from earlier months:{" "}
+        {Object.entries(bt.months || {}).map(([m, v]) => `${m.slice(5)}: ${share(v[1], v[0])} (${v[1]}/${v[0]})`).join(" · ")}
+      </div>
+      {pending && (
+        <div className="gy-prism-past-row">
+          <b>{md(pending.date)}</b> pending · {pending.picks.map((p) => `${p.name} ${p.label} (${pct(p.chancePct)})`).join(" · ")}
+        </div>
+      )}
+      {days.length === 0 && !pending && <div className="gy-prism-empty">No graded days yet — the first locked picks are graded the next morning.</div>}
+      {days.map((n) => (
+        <div key={n.date} className="gy-prism-past-row">
+          <b>{md(n.date)}</b> {n.picks.filter((p) => p.result === "hit").length}/{n.picks.filter((p) => p.result !== "void").length}{" "}
+          <span className="gy-prism-muted">
+            {n.picks.map((p) => `${p.result === "hit" ? "✅" : p.result === "void" ? "– void" : "❌"} ${p.name} ${p.label}${p.actual != null ? ` (${p.actual})` : ""}`).join(" · ")}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function PrismPicks({ onOpen, actions, avatar }) {
   const [data, setData] = useState(null);
   const [open, setOpen] = useState(false);

@@ -3,7 +3,7 @@ import ReactDOM from "react-dom";
 import { createRoot } from "react-dom/client";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import PrismPicks from "./PrismPicks.jsx";  // 2026-10-27 💎 PRISM Picks card (Cheat Sheet)
+import PrismPicks, { PrismPicksRecord } from "./PrismPicks.jsx";  // 2026-10-27 💎 PRISM Picks card (Cheat Sheet)
 
 // Global ref so non-React functions (setPick) can trigger cloud saves
 let _GLOBAL_GET_TOKEN = null;
@@ -26515,6 +26515,7 @@ function TrackRecordTab() {
   };
 
   return <div style={{padding:'0 0 20px'}}>
+    <PrismPicksRecord/>
     <div style={{padding:'12px 14px 0', display:'flex',
       alignItems:'center', gap:12, flexWrap:'wrap'}}>
       <div style={{fontFamily:"'Oswald',sans-serif", fontWeight:700,
