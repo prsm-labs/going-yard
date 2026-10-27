@@ -1,19 +1,11 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { ClerkProvider } from '@clerk/clerk-react'
 import './index.css'
 import App from './App.jsx'
 
-const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
-
-if (!PUBLISHABLE_KEY) {
-  throw new Error('Missing Clerk Publishable Key — add VITE_CLERK_PUBLISHABLE_KEY to your .env file')
-}
-
+// 2026-10-27: Clerk login removed (user) -- My Picks live in this browser, like the other PRISM Labs apps.
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
-      <App />
-    </ClerkProvider>
+    <App />
   </StrictMode>,
 )

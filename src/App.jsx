@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import ReactDOM from "react-dom";
 import { createRoot } from "react-dom/client";
-import { UserButton, SignedIn, SignedOut, SignInButton, useAuth, useClerk } from "@clerk/clerk-react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -1047,30 +1046,6 @@ const PICK_TYPES = {
 function loadPicks() { try { return JSON.parse(localStorage.getItem("gy_picks")||"{}"); } catch { return {}; } }
 function savePicks(p) { try { localStorage.setItem("gy_picks",JSON.stringify(p)); } catch {} }
 
-// ── Cloud picks sync (Clerk + Upstash) ──────────────────────────────────────
-async function savePicksCloud(picks, getToken) {
-  try {
-    const token = await getToken();
-    if (!token) return;
-    await fetch('/api/save-picks', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify({ picks })
-    });
-  } catch(e) { console.warn('cloud save failed:', e); }
-}
-
-async function loadPicksCloud(getToken) {
-  try {
-    const token = await getToken();
-    if (!token) return null;
-    const r = await fetch('/api/get-picks', {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    const d = await r.json();
-    return d.picks || null;
-  } catch(e) { console.warn('cloud load failed:', e); return null; }
-}
 let GLOBAL_PICKS = loadPicks();
 const PICKS_LISTENERS = new Set();
 function subscribePicks(fn) { PICKS_LISTENERS.add(fn); return ()=>PICKS_LISTENERS.delete(fn); }
@@ -1080,7 +1055,6 @@ function setPick(pid, name, team, type) {
   else { GLOBAL_PICKS[pid]={pid,name,team,type,ts:Date.now()}; }
   savePicks(GLOBAL_PICKS);
   PICKS_LISTENERS.forEach(fn=>fn({...GLOBAL_PICKS}));
-  if (_GLOBAL_GET_TOKEN) savePicksCloud(GLOBAL_PICKS, _GLOBAL_GET_TOKEN);
 }
 function usePicks() {
   const [picks,setPicksState] = useState({...GLOBAL_PICKS});
@@ -1611,7 +1585,7 @@ function openBetSlip(picks, bprops) {
         '<div style="display:flex;align-items:center;gap:8px">'+
           '<span style="font-size:20px">💣</span>'+
           '<div><div style="font-family:Oswald,sans-serif;font-weight:800;font-size:18px;color:#ff4020;letter-spacing:1px">GOING YARD</div>'+
-          '<div style="font-size:9px;color:#38b8f2;letter-spacing:2px">goingyard.app</div></div>'+
+          '<div style="font-size:9px;color:#38b8f2;letter-spacing:2px">mlb.degenlabs.app</div></div>'+
         '</div>'+
         '<div style="text-align:right">'+
           '<div style="font-size:10px;color:rgba(255,255,255,.65)">Bet Slip</div>'+
@@ -3133,18 +3107,8 @@ function AtBatSlideIn() {
               {scoutNoteLocked && (
                 <div style={{display:'flex',flexDirection:'column',gap:8,alignItems:'flex-start'}}>
                   <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',lineHeight:1.5}}>
-                    🔒 Sign in to generate a Scouting Note for this matchup. Today's Top 3 picks
-                    and any note someone's already generated today are always free — no sign-in needed.
-                  </div>
-                  <SignInButton mode="modal">
-                    <button style={{padding:'5px 12px',borderRadius:6,border:'1px solid var(--border)',
-                        background:'var(--surface)',color:'var(--accent)',cursor:'pointer',
-                        fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,letterSpacing:.5}}>
-                      SIGN IN
-                    </button>
-                  </SignInButton>
-                  <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--muted)'}}>
-                    Signed in already? Close and reopen this section to try again.
+                    🔒 Scouting Notes are generated for today's Top 4 picks, and any note someone
+                    has already generated today is free to open.
                   </div>
                 </div>
               )}
@@ -7603,849 +7567,6 @@ function LineupsView({ date }) {
 }
 
 
-// ── Live Themes: Tier badge ───────────────────────────────────────────────────
-function TierBadge({ tier }) {
-  const cfg = {
-    1: { color:'var(--accent2)', bg:'rgba(245,166,35,.16)', border:'rgba(245,166,35,.45)' },
-    2: { color:'#a0aab4', bg:'rgba(160,170,180,.12)', border:'rgba(160,170,180,.30)' },
-    3: { color:'#5a636c', bg:'rgba(90,99,108,.09)',   border:'rgba(90,99,108,.22)'  },
-  }[tier] || {};
-  return (
-    <span style={{ fontFamily:"'DM Mono',monospace", fontSize:8, fontWeight:700,
-      color:cfg.color, background:cfg.bg, border:`1px solid ${cfg.border}`,
-      borderRadius:4, padding:'1px 5px', whiteSpace:'nowrap' }}>
-      T{tier}
-    </span>
-  );
-}
-
-// ── Live Themes: FINAL game badge ─────────────────────────────────────────────
-function FinalBadge() {
-  return (
-    <span style={{ fontFamily:"'DM Mono',monospace", fontSize:7, fontWeight:700,
-      color:'#6b7280', background:'rgba(107,114,128,.12)', border:'1px solid rgba(107,114,128,.25)',
-      borderRadius:3, padding:'1px 4px', whiteSpace:'nowrap', marginRight:4 }}>
-      FINAL
-    </span>
-  );
-}
-
-// ── Live Themes: lightweight read-only table ──────────────────────────────────
-function ThemeMatchTable({ rows }) {
-  const mono = "'DM Mono',monospace";
-  const osw  = "'Oswald',sans-serif";
-  const [expandedId, setExpandedId] = useState(null);
-  if (!rows || rows.length === 0) {
-    return <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)',padding:14}}>No confirmed batters match this cluster.</div>;
-  }
-  return (
-    <div className="tw" style={{marginTop:6,overflowX:'auto'}}>
-      <table style={{width:'100%',minWidth:600}}>
-        <thead><tr style={{borderBottom:'1px solid var(--border)'}}>
-          {[['Tier','center'],['Batter','left'],['Yard','center'],['Boom','right'],
-            ['⚡','right'],['P.Grade','right'],['vs Pitcher','left'],
-            ['Sim TB','right'],['L7 EV','right'],['Brl%','right'],
-            ['ZoneFit','right'],['xwOBA','right'],['Grade','right'],['Match','right'],
-          ].map(([lbl,align])=>(
-            <th key={lbl} style={{padding:'4px 5px',fontSize:8,fontFamily:mono,
-              textTransform:'uppercase',letterSpacing:.6,color:'var(--muted)',
-              textAlign:align,whiteSpace:'nowrap'}}>{lbl}</th>
-          ))}
-        </tr></thead>
-        <tbody>
-          {rows.map(b => {
-            const pid  = parseInt(b.batter_id||0);
-            const uid  = String(b.batter_id||b.batter||Math.random());
-            const isExp = expandedId === uid;
-            const isFinal = FINAL_GAME_IDS.has(String(b.game_id||''));
-            const tier  = b._themeTier;
-            const yard  = b._yard  ?? 0;
-            const boom  = b._boom  ?? 0;
-            const sig   = b._sig   ?? 0;
-            const pgLabel = b._pgLabel || b.pitcher_grade_label || '';
-            const pgColor = pgLabel.toLowerCase().includes('elite') ? 'var(--c-danger)'
-                          : pgLabel.toLowerCase().includes('tough') ? 'var(--c-warn)'
-                          : pgLabel.toLowerCase().includes('hittable') ? 'var(--green)'
-                          : pgLabel.toLowerCase().includes('target') ? 'var(--ice)'
-                          : 'var(--muted)';
-            const simTB = parseFloat(b.sim_tb)||0;
-            const ev7   = parseFloat(b.recent_avg_ev)||0;
-            const brl7  = parseFloat(b.recent_barrel_pct)||0;
-            const zf    = parseFloat(b.zone_fit)||0;
-            const xw    = parseFloat(b.season_xwoba)||0;
-            const effG  = computeEffectiveGrade(b.grade, pgLabel);
-            const gc    = GRADE_CFG[effG] || GRADE_CFG['D'];
-            return (
-              <React.Fragment key={uid}>
-                <tr onClick={()=>setExpandedId(v=>v===uid?null:uid)}
-                  style={{cursor:'pointer',height:26,
-                    borderBottom:'1px solid rgba(255,255,255,.04)',
-                    background:isExp?'rgba(255,255,255,.04)':'transparent',
-                    borderLeft:`2px solid ${isExp?'var(--accent)':'transparent'}`,
-                    opacity: isFinal ? 0.5 : 1}}>
-                  <td style={{padding:'2px 5px',textAlign:'center'}}><TierBadge tier={tier}/></td>
-                  <td style={{padding:'2px 6px',maxWidth:160}}>
-                    <div style={{display:'flex',alignItems:'center',gap:4,overflow:'hidden'}}>
-                      {isFinal && <FinalBadge/>}
-                      <PlayerAvatar pid={pid} name={b.batter||''} size={16}/>
-                      <span style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'var(--accent2)',whiteSpace:'nowrap',flexShrink:0}}>{b.batting_team||''}</span>
-                      <span
-                        onClick={e => { e.stopPropagation(); openAtBatSlide({ pid, name: b.batter||'', team: b.batting_team||'' }); }}
-                        style={{fontFamily:osw,fontWeight:700,fontSize:10,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',
-                          cursor:'pointer',color:isKeyMatchup(pid,b.batter||'')?'var(--c-warn)':'var(--text)'}}>
-                        {b.batter||'—'}
-                      </span>
-                      <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={pid} name={b.batter||''} team={b.batting_team||''}/><GamblyButton name={b.batter||''} team={b.batting_team||''} prop="hr"/></span>
-                    </div>
-                  </td>
-                  <td style={{padding:'2px 4px',textAlign:'center',verticalAlign:'middle'}}><YardBadge score={yard}/></td>
-                  <td style={{padding:'2px 6px',textAlign:'right',fontFamily:osw,fontWeight:800,fontSize:10,
-                    color:boom>=60?'var(--c-danger)':boom>=45?'var(--accent2)':boom>=30?'var(--text)':'var(--muted)'}}>
-                    {boom>0?Math.round(boom):'—'}
-                  </td>
-                  <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,
-                    color:sig>=10?'var(--c-danger)':sig>=7?'var(--accent2)':sig>=4?'var(--green)':'var(--muted)'}}>
-                    {sig>0?sig.toFixed(1):'—'}
-                  </td>
-                  <td style={{padding:'2px 6px',textAlign:'right'}}>
-                    <span style={{fontFamily:mono,fontSize:9,color:pgColor,fontWeight:700}}>{pgLabel.split(' ')[0]||'—'}</span>
-                  </td>
-                  <td
-                    onClick={e => {
-                      e.stopPropagation();
-                      if (b.pitcher_id) openPitcherSlide({ pid: parseInt(b.pitcher_id||0), name: resolvePitcherName(b.pitcher,b.batting_team,b.pitcher_id), team:'', hand: b.pitcher_hand||'', pitchMix:[] });
-                    }}
-                    style={{padding:'2px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',whiteSpace:'nowrap',maxWidth:90,overflow:'hidden',textOverflow:'ellipsis',cursor:b.pitcher_id?'pointer':'default'}}>
-                    {resolvePitcherName(b.pitcher,b.batting_team,b.pitcher_id)}
-                  </td>
-                  <td style={{padding:'2px 6px',textAlign:'right',fontFamily:osw,fontWeight:800,fontSize:11,
-                    color:simTB>=2?'var(--c-warn)':simTB>=1.5?'var(--accent2)':'var(--text)'}}>
-                    {simTB>0?simTB.toFixed(2):'—'}
-                  </td>
-                  <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,
-                    color:ev7>=97?'var(--accent2)':ev7>=93?'var(--text)':'var(--muted)'}}>
-                    {ev7>0?ev7.toFixed(1):'—'}
-                  </td>
-                  <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,
-                    color:brl7>=12?'var(--c-danger)':brl7>=8?'var(--accent2)':brl7>=5?'var(--text)':'var(--muted)'}}>
-                    {brl7>0?brl7.toFixed(1)+'%':'—'}
-                  </td>
-                  <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,
-                    color:zf>=8?'var(--c-danger)':zf>=5?'var(--accent2)':zf>=2?'var(--green)':'var(--muted)'}}>
-                    {zf>0?zf.toFixed(1)+'%':'—'}
-                  </td>
-                  <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,
-                    color:xw>=0.400?'var(--c-danger)':xw>=0.360?'var(--accent2)':xw>=0.320?'var(--green)':'var(--muted)'}}>
-                    {xw>0?xw.toFixed(3):'—'}
-                  </td>
-                  <td style={{padding:'2px 6px',textAlign:'right'}}>
-                    <span style={{fontFamily:mono,fontSize:9,color:gc.color,fontWeight:700}}>{effG}</span>
-                  </td>
-                  <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,fontWeight:700,
-                    color:(b._themeScore??0)>=70?'var(--c-danger)':(b._themeScore??0)>=50?'var(--accent2)':'var(--muted)'}}>
-                    {b._themeScore!=null?b._themeScore.toFixed(0):'—'}
-                  </td>
-                </tr>
-                {isExp && (
-                  <tr><td colSpan={14} style={{padding:'0 10px 10px',background:'rgba(255,255,255,.02)'}}>
-                    <Last7HRChart batterId={pid}/>
-                    <RecentGameLog batterId={pid}/>
-                  </td></tr>
-                )}
-              </React.Fragment>
-            );
-          })}
-        </tbody>
-      </table>
-      <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',textAlign:'right',
-        marginTop:4,padding:'2px 6px'}}>
-        T1=top 10% · T2=11–30% · T3=31–60% · confirmed batters only
-      </div>
-    </div>
-  );
-}
-
-// ── Theme Match Score — standalone, called per batter per cluster ──────────────
-function computeThemeMatchScore(batter, cluster, bid) {
-  const sig  = parseFloat(batter.weighted_flag_score||0) * 4.6;
-  const boom = parseFloat(batter._boom) ||
-    computeBoomScore(sig, getZoneFit(batter),
-      parseFloat(batter.recent_iso)||0, parseFloat(batter.sim_tb)||0,
-      parseFloat(batter.weighted_flag_score)||0,
-      shrinkageAdjBarrelSpike(batter),
-      parseInt(batter.recent_hr_count||0),
-      parseFloat(batter.recent_batter_ahead_pct||0),
-      !!batter.hh_precursor, parseFloat(batter.primary_pitch_hr_rate||0),
-      parseInt(batter.recent_barrels_3d)||0, parseInt(batter.recent_hrs_3d)||0,
-      parseFloat(batter.recent_avg_bat_speed)||0, parseInt(batter.recent_pb_2d)||0,
-      batter.la_locked, parseFloat(batter.season_swstr_pct)||0,
-      parseFloat(batter.park_pull_fit)||0,
-      parseInt(batter._zoneEdges||0), parseInt(batter._zoneKPenalty||0),
-      (()=>{const ls=liveSlot(bid,batter.lineup_slot);return ls>0&&
-        (batter.pitcher_weak_slots||'').split(',').map(Number).filter(Boolean).includes(ls);})(),
-      parseFloat(batter.season_xwoba)||0);
-  const ys = computeYardScore(
-    sig, parseFloat(batter.gHR)||0, boom, getPS(batter),
-    batter.batter_hand||'', batter.pitcher_hand||'',
-    parseInt(batter.days_rest ?? 1),
-    liveSlot(bid, batter.lineup_slot),
-    getHandSpecificGrade(batter));
-
-  const ysProx    = Math.max(0, 1 - Math.abs(ys - cluster.mean) / 30);
-  const boomProx  = Math.max(0, 1 - Math.abs(boom - cluster.boomAvg) / 50);
-  const xwobaProx = Math.max(0, 1 - Math.abs(
-    (parseFloat(batter.season_xwoba)||0) - cluster.xwobaAvg) / 0.150);
-  const isoProx   = Math.max(0, 1 - Math.abs(
-    (parseFloat(batter.recent_iso)||0) - cluster.isoAvg) / 0.200);
-  const gradeLabel = (batter.pitcher_grade_label||'').toLowerCase();
-  const gradeMod   = gradeLabel.includes('elite') ? -0.10
-                   : gradeLabel.includes('tough') ? -0.05 : 0;
-
-  return { ys, boom, sig,
-    score: Math.max(0,
-      (ysProx*0.50 + boomProx*0.20 + xwobaProx*0.20 + isoProx*0.10 + gradeMod) * 100) };
-}
-
-// ── LiveThemesTab — self-contained, reads from module-level globals only ──────
-function LiveThemesTab() {
-  const mono = "'DM Mono',monospace";
-  const osw  = "'Oswald',sans-serif";
-
-  const [todaysHRs, setTodaysHRs]   = useState([]);
-  const [lineupVer, setLineupVer]   = useState(LINEUP_VERSION);
-  const [finalVer,  setFinalVer]    = useState(0);
-  const [cacheReady, setCacheReady] = useState(
-    Object.keys(DAILY_PICKS_CACHE||{}).length > 0
-  );
-  const [themesHideFinal, setThemesHideFinal] = useState(false);
-  const [themesSelGame,   setThemesSelGame]   = useState('all');
-  // Wait for DAILY_PICKS_CACHE to populate before HR stat lookups resolve
-  useEffect(() => {
-    if (cacheReady) return;
-    const id = setInterval(() => {
-      if (Object.keys(DAILY_PICKS_CACHE||{}).length > 0) {
-        setCacheReady(true);
-        clearInterval(id);
-      }
-    }, 500);
-    return () => clearInterval(id);
-  }, [cacheReady]);
-  // Subscribe to lineup updates
-  useEffect(() => {
-    const unsub = subscribeLineup(v => setLineupVer(v));
-    return unsub;
-  }, []);
-
-  // Watch FINAL_GAME_IDS.size every 30s so final-game dimming updates
-  useEffect(() => {
-    const id = setInterval(() => setFinalVer(FINAL_GAME_IDS.size), 30000);
-    return () => clearInterval(id);
-  }, []);
-
-  // Poll /api/homeruns every 60s — same endpoint as HR Tracker
-  // Re-runs when cacheReady flips so stat lookups resolve on late cache load
-  useEffect(() => {
-    const fetchHRs = async () => {
-      try {
-        const res = await fetch('/api/homeruns');
-        const d = await res.json();
-        const hrs = (d.homeruns || []).map(hr => {
-          const bid = String(hr.batter_id || hr.batterId || '');
-          const dp  = DAILY_PICKS_CACHE[bid] ||
-            Object.values(DAILY_PICKS_CACHE).find(r =>
-              String(r.batter_id||'').split('.')[0] === bid);
-          let yardScore=0, boomScore=0, xwoba=0, iso=0;
-          if (dp) {
-            const sig = parseFloat(dp.weighted_flag_score||0)*4.6;
-            boomScore = computeBoomScore(sig,
-              getZoneFit(dp), parseFloat(dp.recent_iso||0),
-              parseFloat(dp.sim_tb||0), parseFloat(dp.weighted_flag_score||0),
-              shrinkageAdjBarrelSpike(dp), parseInt(dp.recent_hr_count||0),
-              parseFloat(dp.recent_batter_ahead_pct||0), !!dp.hh_precursor,
-              parseFloat(dp.primary_pitch_hr_rate||0), parseInt(dp.recent_barrels_3d||0),
-              parseInt(dp.recent_hrs_3d||0), parseFloat(dp.recent_avg_bat_speed||0),
-              parseInt(dp.recent_pb_2d||0), dp.la_locked,
-              parseFloat(dp.season_swstr_pct||0), parseFloat(dp.park_pull_fit||0),
-              parseInt(dp._zoneEdges||0), parseInt(dp._zoneKPenalty||0), false,
-              parseFloat(dp.season_xwoba||0));
-            yardScore = computeYardScore(sig, parseFloat(dp.gHR||0), boomScore,
-              getPS(dp), dp.batter_hand||'', dp.pitcher_hand||'',
-              parseInt(dp.days_rest??1), liveSlot(bid, dp.lineup_slot),
-              getHandSpecificGrade(dp));
-            xwoba = parseFloat(dp.season_xwoba||0);
-            iso   = parseFloat(dp.recent_iso||0);
-          }
-          console.log('[Themes] HR entry:', {
-            batter: hr.batter_name || hr.batter,
-            batter_id: bid,
-            cacheHit: !!dp,
-            yardScore, boomScore, xwoba, iso,
-          });
-          return {
-            batter_id: bid,
-            batter:    hr.batterName || hr.batter_name || hr.batter || '',
-            game_id:   String(hr.game_id || hr.gamePk || ''),
-            yardScore, boomScore, xwoba, iso,
-          };
-        });
-        console.log('[Themes] todaysHRs:', hrs.length, hrs);
-        setTodaysHRs(hrs);
-      } catch(e) {
-        console.warn('[Themes] HR fetch failed:', e.message);
-      }
-    };
-    fetchHRs();
-    const id = setInterval(fetchHRs, 60000);
-    return () => clearInterval(id);
-  }, [cacheReady]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Cluster detection — gap-based (restored July 10 2026). Sort ascending by
-  // Yard Score and walk the list; a gap > 7 YS points between consecutive
-  // batters starts a new cluster. Only clusters with 3+ members count (a
-  // single fluke HR isn't a trend), then keep the top 3 by member count.
-  // This can legitimately produce 1, 2, or 3 clusters on a given day — that's
-  // correct, not a bug: a day with one real concentration should show one
-  // cluster, not be force-split into three. A prior version replaced this
-  // with a fixed tertile split (Math.ceil(n/3) into exactly 3 even groups
-  // regardless of the real distribution), which defeated the feature's
-  // purpose — it degenerated into re-sorting today's HRs into thirds, the
-  // same information already visible in All Matchups' sort-by-score view.
-  const clusters = useMemo(() => {
-    if (todaysHRs.length < 3) return [];
-    const sorted = [...todaysHRs].sort((a, b) => a.yardScore - b.yardScore); // low first
-    const groups = [];
-    let current = [sorted[0]];
-    for (let i = 1; i < sorted.length; i++) {
-      if (sorted[i].yardScore - sorted[i - 1].yardScore > 7) {
-        groups.push(current);
-        current = [];
-      }
-      current.push(sorted[i]);
-    }
-    groups.push(current);
-    const avg = arr => arr.reduce((s, x) => s + x, 0) / arr.length;
-    return groups
-      .filter(g => g.length >= 3)
-      .sort((a, b) => b.length - a.length)
-      .slice(0, 3)
-      .map(members => {
-        const sortedMembers = [...members].sort((a, b) => b.yardScore - a.yardScore); // high first for display
-        return {
-          members: sortedMembers,
-          mean:     avg(members.map(m => m.yardScore)),
-          xwobaAvg: avg(members.map(m => m.xwoba)),
-          isoAvg:   avg(members.map(m => m.iso)),
-          boomAvg:  avg(members.map(m => m.boomScore)),
-        };
-      });
-  }, [todaysHRs]);
-
-  // Confirmed pool — re-evaluates on lineup or final-game version changes
-  const hrBidSet = useMemo(
-    () => new Set(todaysHRs.map(h => h.batter_id)),
-    [todaysHRs]
-  );
-
-  const confirmedPool = useMemo(() => {
-    return Object.values(DAILY_PICKS_CACHE).filter(r => {
-      const bid = String(r.batter_id||'').trim();
-      if (!bid || bid === 'NaN') return false;
-      if (LINEUP_STATUS[bid]?.status !== 'confirmed') return false;
-      if (hrBidSet.has(bid)) return false;
-      return true;
-    });
-  }, [lineupVer, finalVer, hrBidSet]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const themesGameOptions = useMemo(() => {
-    const seen = new Set();
-    const opts = [{ value:'all', label:'All Games' }];
-    [...todaysHRs, ...confirmedPool].forEach(r => {
-      const gid = String(r.game_id||'');
-      if (!gid || seen.has(gid)) return;
-      seen.add(gid);
-      const g = LIVE_GAMES_CACHE.find(x => String(x.gamePk||x.id) === gid);
-      const label = g
-        ? `${g.away?.abbr||'?'} @ ${g.home?.abbr||'?'}`
-        : gid;
-      opts.push({ value: gid, label });
-    });
-    return opts;
-  }, [todaysHRs, confirmedPool]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Per-cluster scored + tiered rows
-  const clusterTables = useMemo(() => {
-    if (!clusters.length || !confirmedPool.length) return [];
-    return clusters.map(cluster => {
-      const scored = confirmedPool.map(b => {
-        const bid = String(b.batter_id||'').trim();
-        const { ys, boom, sig, score } = computeThemeMatchScore(b, cluster, bid);
-        return { ...b, _ys: ys, _boom: boom, _sig: sig, _themeScore: score };
-      }).sort((a, b) => b._themeScore - a._themeScore);
-
-      const n    = scored.length;
-      const t1   = Math.max(1, Math.ceil(n * 0.10));
-      const t2   = Math.ceil(n * 0.30);
-      const t3   = Math.ceil(n * 0.60);
-      const rows = scored.slice(0, t3).map((b, i) => ({
-        ...b,
-        _themeTier: i < t1 ? 1 : i < t2 ? 2 : 3,
-        _yard: b._ys,
-      }))
-      .filter(b => !themesHideFinal || !FINAL_GAME_IDS.has(String(b.game_id)))
-      .filter(b => themesSelGame === 'all' || String(b.game_id) === themesSelGame);
-      return { ...cluster, rows };
-    });
-  }, [clusters, confirmedPool, themesHideFinal, themesSelGame, finalVer]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const activeClusterCount = clusterTables.length;
-  const isActive = activeClusterCount > 0;
-
-  return (
-    <div>
-      {!isActive ? (
-        <div style={{textAlign:'center',padding:'40px 20px',color:'var(--muted)'}}>
-          <div style={{fontSize:32,marginBottom:12}}>🔥</div>
-          <div style={{fontFamily:osw,fontSize:16,letterSpacing:1,
-            textTransform:'uppercase',marginBottom:8}}>
-            Live Themes
-          </div>
-          <div style={{fontFamily:mono,fontSize:11,marginBottom:16}}>
-            Themes activate when 3+ home runs land today.
-          </div>
-          <div style={{fontFamily:mono,fontSize:13,color:'var(--accent)'}}>
-            {todaysHRs.length} HR{todaysHRs.length !== 1 ? 's' : ''} so far today
-          </div>
-          {/* DEBUG — remove after fix confirmed */}
-          <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,
-            color:'rgba(255,255,255,.3)',textAlign:'center',marginTop:8}}>
-            todaysHRs: {todaysHRs.length} |
-            clusters: {clusters.length} |
-            cacheReady: {String(cacheReady)}
-          </div>
-        </div>
-      ) : (
-        <div>
-          <div style={{fontFamily:osw,fontSize:13,letterSpacing:.8,
-            textTransform:'uppercase',color:'var(--muted)',marginBottom:8}}>
-            🔥 Live Themes — {todaysHRs.length} HRs landed today
-          </div>
-          <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginBottom:12}}>
-            <button
-              onClick={() => setThemesHideFinal(v => !v)}
-              style={{
-                padding:'4px 10px',borderRadius:6,cursor:'pointer',
-                fontFamily:mono,fontSize:9,fontWeight:700,
-                background: themesHideFinal ? 'rgba(255,107,107,.12)' : 'var(--surface2)',
-                color:       themesHideFinal ? 'var(--c-coral)' : 'var(--muted)',
-                border:`1px solid ${themesHideFinal ? 'rgba(255,107,107,.4)' : 'var(--border)'}`,
-              }}>
-              {themesHideFinal ? '✓ Hiding Final' : '🚫 Hide Final'}
-            </button>
-            {themesGameOptions.length > 2 && (
-              <select
-                value={themesSelGame}
-                onChange={e => setThemesSelGame(e.target.value)}
-                style={{
-                  fontFamily:mono,fontSize:9,
-                  background:'var(--surface2)',color:'var(--text)',
-                  border:'1px solid var(--border)',borderRadius:6,
-                  padding:'4px 8px',cursor:'pointer',
-                }}>
-                {themesGameOptions.map(o => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-            )}
-          </div>
-          {clusterTables.map((cluster, ci) => (
-            <div key={ci} style={{marginBottom:24}}>
-              <div style={{background:'var(--surface2)',borderLeft:'3px solid var(--accent)',
-                borderRadius:8,padding:'10px 14px',marginBottom:8}}>
-                <div style={{fontFamily:osw,fontWeight:700,fontSize:13,letterSpacing:.8,
-                  textTransform:'uppercase',color:'var(--text)',marginBottom:4}}>
-                  YS ~{Math.round(cluster.mean)} — {cluster.members.length} HRs landed
-                </div>
-                <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)',marginBottom:4}}>
-                  {cluster.members.map(m=>m.batter).join(' · ')}
-                </div>
-                <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)',
-                  display:'flex',gap:16,flexWrap:'wrap'}}>
-                  <span>Avg YS {cluster.mean.toFixed(1)}</span>
-                  <span>Avg Boom {cluster.boomAvg.toFixed(0)}</span>
-                  <span>Avg xwOBA {cluster.xwobaAvg.toFixed(3)}</span>
-                  <span>Avg ISO {cluster.isoAvg.toFixed(3)}</span>
-                </div>
-              </div>
-              <ThemeMatchTable rows={cluster.rows}/>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Ball Carry — "Juiced or Dead?" live per-game tracker ──────────────────
-// Physics: with EV+LA held fixed, a ball's carry distance is predictable.
-// Actual distance deviating from that EV/LA-implied expectation is the
-// ball itself (COR/drag), not the swing. Deliberately does NOT weight
-// temperature/wind into the verdict (too noisy mid-game); elevation and
-// batted-ball direction (Pull/Center/Oppo — Center carries ~14-17ft
-// farther at matched EV+LA) are both handled server-side (see
-// api/ball-carry.js). Weather shown below is context only.
-const CARRY_VERDICT_STYLE = {
-  JUICED: { color: 'var(--c-warn)', label: '🔴 Ball carrying HOT',  bg: 'rgba(255,128,32,.08)'  },
-  DEAD:   { color: 'var(--ice)', label: '🔵 Ball carrying DEAD', bg: 'rgba(56,184,242,.08)'   },
-  NORMAL: { color: 'var(--green)', label: '✅ Ball carrying normal', bg: 'rgba(39,201,122,.06)' },
-};
-// A NORMAL verdict within this many ft of either threshold gets flagged
-// "Borderline" instead of reading as a flat, unremarkable normal day —
-// added 2026-07-22 after the ATH@AZ case (park-adj +9ft vs an +11.7ft
-// JUICED bar — a real near-miss, not a clean normal).
-const BORDERLINE_MARGIN_FT = 3;
-const CARRY_BORDERLINE_STYLE = { color: 'var(--accent2)', label: '🟡 Borderline normal', bg: 'rgba(245,166,35,.08)' };
-
-// Pitch-drag (2026-08-07) — a separate diagnostic, so deliberately kept
-// visually secondary to the batted-ball verdict above (no background tint
-// of its own, just a colored label) rather than competing for attention.
-// Reuses the same JUICED=orange/DEAD=blue convention as CARRY_VERDICT_STYLE
-// so the meaning stays consistent throughout the app; NORMAL stays muted
-// rather than green, since this signal is supplementary, not primary.
-const PITCH_DRAG_VERDICT_COLOR = { JUICED: 'var(--c-warn)', DEAD: 'var(--ice)', NORMAL: 'var(--muted)' };
-
-function BallCarryCard({ game }) {
-  const [data, setData]       = useState(null);
-  const [weather, setWeather] = useState(null);
-  const [expanded, setExpanded] = useState(false);
-  const gamePk = game.gamePk || game.id;
-
-  useEffect(() => {
-    let mounted = true;
-    async function poll() {
-      try {
-        const r = await fetch(`/api/ball-carry?gamePk=${gamePk}`);
-        const d = await r.json();
-        if (mounted) setData(d);
-      } catch (e) { /* silent — retry next interval */ }
-    }
-    poll();
-    const iv = setInterval(poll, 3 * 60 * 1000); // every 3 min, matches PROMPT_BallCarryTracker.md spec
-    return () => { mounted = false; clearInterval(iv); };
-  }, [gamePk]);
-
-  useEffect(() => {
-    let mounted = true;
-    const team = game.home?.abbr;
-    if (team && team !== '???') {
-      fetchWeather(team, game.gameTime).then(d => { if (mounted) setWeather(d); });
-    }
-    return () => { mounted = false; };
-  }, [game.home?.abbr, game.gameTime]);
-
-  const label = `${game.away?.abbr || '?'} @ ${game.home?.abbr || '?'}`;
-  const isBorderline = data?.verdict === 'NORMAL'
-    && data.dead_threshold_ft != null && data.juiced_threshold_ft != null
-    && Math.min(
-         Math.abs(data.park_adj_deviation - data.dead_threshold_ft),
-         Math.abs(data.park_adj_deviation - data.juiced_threshold_ft)
-       ) <= BORDERLINE_MARGIN_FT;
-  const style = isBorderline ? CARRY_BORDERLINE_STYLE
-    : data?.verdict ? CARRY_VERDICT_STYLE[data.verdict] : null;
-  const wCur = weather?.current;
-
-  return (
-    <div style={{
-      border: `1px solid ${style ? style.color + '40' : 'var(--border)'}`,
-      background: style ? style.bg : 'var(--surface2)',
-      borderRadius: 10, padding: '10px 14px', marginBottom: 8,
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 13 }}>{label}</span>
-          {game.status === 'Live' && <span style={{ fontSize: 9, color: 'var(--accent)', fontFamily: "'DM Mono',monospace", fontWeight: 700 }}>🔴 {game.inning || 'LIVE'}</span>}
-          {game.status === 'Final' && <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>FINAL</span>}
-        </div>
-        {/* Wind is still context-only (too noisy at single-game granularity — see
-            header note). Temperature is NOT context-only anymore (2026-07-30):
-            gameData.weather.temp now feeds a small density correction into the
-            verdict itself (data.temp_adj_ft below) — the wCur temp shown here is
-            the separate live weather.js fetch, kept for the wind label alongside it. */}
-        {weather?.isDome
-          ? <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>🏟️ Dome</span>
-          : wCur && <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>
-              {wCur.temp != null ? `${Math.round(wCur.temp)}°F` : ''}{wCur.windLabel ? ` · ${wCur.windLabel}` : ''}
-            </span>}
-      </div>
-
-      {!data || data.status === 'insufficient_data' ? (
-        <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)', marginTop: 6 }}>
-          ⚾ Tracking… {data?.n != null ? `(${data.n}/3 quality batted balls so far)` : ''}
-          {/* Pitch-drag (2026-08-07) converges much faster than batted balls
-              (available from pitch 1) — show it here even while the
-              batted-ball verdict itself is still "insufficient_data", since
-              that's the entire point of having a higher-sample-size early
-              read alongside the slower one. */}
-          {data?.pitchDrag?.status === 'ok' && (
-            <div style={{ marginTop: 4 }}
-              title={`Early pitch-drag read (separate signal, not the batted-ball verdict above) — ${data.pitchDrag.n_pitchers} pitchers, ${data.pitchDrag.n_pitches} four-seam fastballs tracked so far tonight. z=${data.pitchDrag.z>=0?'+':''}${data.pitchDrag.z} (need |z|>=2 for DEAD/JUICED). This can't tell real ball-to-ball variance apart from tracking-system calibration drift — treat as "tracked pitches are running hot/cold," not "the ball is different."`}>
-              <span style={{ color: PITCH_DRAG_VERDICT_COLOR[data.pitchDrag.verdict] || 'var(--muted)', fontWeight: 700 }}>
-                ⚡ Pitch Drag: {data.pitchDrag.verdict}
-              </span>
-              <span style={{ color: 'var(--muted)', marginLeft: 6 }}>
-                z={data.pitchDrag.z >= 0 ? '+' : ''}{data.pitchDrag.z} · {data.pitchDrag.n_pitchers} pitchers, {data.pitchDrag.n_pitches} pitches
-              </span>
-            </div>
-          )}
-        </div>
-      ) : (
-        <>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
-            <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 11, fontWeight: 700, color: style?.color }}>{style?.label}</span>
-            <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)' }}
-              title={`raw average (before park adjustment): ${data.avg_deviation>=0?'+':''}${data.avg_deviation}ft. ${data.homeAbbr||'this park'}'s own season baseline: ${data.park_baseline_ft>=0?'+':''}${data.park_baseline_ft}ft — subtracted to get the park-adjusted number. Game temp ${data.game_temp_f!=null?data.game_temp_f+'°F':'unknown'} already folded into each ball's expected distance (${data.temp_adj_ft>=0?'+':''}${data.temp_adj_ft??0}ft/ball) before averaging — literature-approximate correction, not fit against Going Yard's own data (no persisted historical weather log exists yet). ${data.z!=null?`z-score: ${data.z>=0?'+':''}${data.z} (need |z|>=${data.z_threshold} for DEAD/JUICED — scales with this game's own ${data.n} balls via se=±${data.se}ft, not a fixed number, so a thin sample needs a much bigger raw deviation to count as a real signal vs noise).`:''}`}>
-              park-adj {data.park_adj_deviation >= 0 ? '+' : ''}{data.park_adj_deviation}ft
-              {data.park_baseline_ft != null && ` (${data.homeAbbr||'park'} baseline ${data.park_baseline_ft >= 0 ? '+' : ''}${data.park_baseline_ft}ft)`}
-              {' '}· raw {data.avg_deviation >= 0 ? '+' : ''}{data.avg_deviation}ft · n={data.n}
-              {data.z != null && ` · z=${data.z >= 0 ? '+' : ''}${data.z}`}
-              {data.game_temp_f != null && ` · ${data.game_temp_f}°F`}
-            </span>
-            <button onClick={() => setExpanded(v => !v)}
-              style={{ marginLeft: 'auto', fontSize: 9, fontFamily: "'DM Mono',monospace", color: 'var(--muted)',
-                background: 'transparent', border: '1px solid var(--border)', borderRadius: 5, padding: '2px 8px', cursor: 'pointer' }}>
-              {expanded ? '▲ Hide balls' : '▼ Show balls'}
-            </button>
-          </div>
-          {/* Pitch-drag (2026-08-07) — a separate, faster-converging diagnostic
-              shown alongside (never blended into) the batted-ball verdict above. */}
-          {data.pitchDrag?.status === 'ok' && (
-            <div style={{ marginTop: 4, fontFamily: "'DM Mono',monospace", fontSize: 10 }}
-              title={`Pitch-drag signal (separate from the batted-ball verdict above, derived from ${data.pitchDrag.n_pitches} four-seam fastballs across ${data.pitchDrag.n_pitchers} pitchers tonight, vs. each pitcher's own season-normal). z=${data.pitchDrag.z>=0?'+':''}${data.pitchDrag.z} (need |z|>=2 for DEAD/JUICED). Validated: converges within ~2 innings, correlates with real batted-ball carry (r=-0.23) — but can't distinguish real ball-to-ball variance from tracking-system calibration drift. "Tracked pitches running hot/cold," not "the ball is different."`}>
-              <span style={{ color: PITCH_DRAG_VERDICT_COLOR[data.pitchDrag.verdict] || 'var(--muted)', fontWeight: 700 }}>
-                ⚡ Pitch Drag: {data.pitchDrag.verdict}
-              </span>
-              <span style={{ color: 'var(--muted)', marginLeft: 6 }}>
-                z={data.pitchDrag.z >= 0 ? '+' : ''}{data.pitchDrag.z} · {data.pitchDrag.n_pitchers} pitchers, {data.pitchDrag.n_pitches} pitches
-              </span>
-            </div>
-          )}
-          {expanded && (
-            <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 6 }}>
-              {data.balls.map((b, i) => (
-                <div key={i} style={{ display: 'flex', gap: 10, fontFamily: "'DM Mono',monospace", fontSize: 9,
-                  color: 'var(--muted)', padding: '2px 0',
-                  background: b.is_outlier ? 'rgba(167,139,250,.08)' : 'transparent',
-                  borderRadius: 4 }}>
-                  <span style={{ width: 110, color: 'var(--text)', flexShrink: 0 }}>{b.batter}{b.isHR ? ' 💥' : ''}</span>
-                  <span>Inn {b.inning}</span>
-                  <span>{b.ev}mph / {b.la}°</span>
-                  <span>{b.dist}ft (exp {b.exp_dist}ft)</span>
-                  {b.direction && <span style={{ opacity: 0.7 }}>{b.direction}</span>}
-                  <span style={{ color: b.deviation >= 0 ? 'var(--green)' : 'var(--c-coral)', fontWeight: 700 }}>
-                    {b.deviation >= 0 ? '+' : ''}{b.deviation}ft
-                  </span>
-                  {b.is_outlier && (
-                    <span title={`Individual-ball outlier — |deviation| ≥ 25ft. Doesn't move the game verdict on its own (that needs several balls to mean anything), but this specific ball carried meaningfully differently than its own EV/LA/temp/direction predicted.`}
-                      style={{ color: 'var(--c-purple)', fontWeight: 700 }}>
-                      ⚡ outlier
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  );
-}
-
-function BallCarryTab({ games }) {
-  const [showHelp, setShowHelp] = useState(false);
-  const started = (games || []).filter(g => g.status === 'Live' || g.status === 'Final');
-
-  return (
-    <div>
-      {showHelp && <HelpSlideout title="⚾ Ball Carry Guide" items={[
-        ['What is this?', 'Per-game "dead ball / juiced ball" detector. Holds Exit Velocity and Launch Angle fixed and compares actual batted-ball distance against what the physics says it should be — a ball flying meaningfully farther or shorter than EV+LA predict is a ball-construction signal, not a swing signal.'],
-        ['Temperature (2026-07-30)', 'Game-time temperature (from the same live feed, no extra fetch) now folds a small density correction into each ball’s expected distance before averaging — cold/dense air no longer reads as falsely DEAD, hot/thin air no longer reads as falsely JUICED. Honestly caveated: this correction is a physics-literature approximation, not fit against Going Yard’s own data (there’s no persisted historical per-game weather log to fit it against yet) — unlike the EV/LA/direction terms, which are.'],
-        ['What it still does NOT use', 'Wind is still context-only, not part of the verdict — it’s shown next to each card but too noisy at single-game granularity to correct for cleanly the way temperature can be.'],
-        ['Elevation / park', 'Each park’s own seasonal average carry deviation is subtracted before classifying — shown right on the card ("park baseline") so it’s never a hidden adjustment. This is why a hitter-friendly park (Coors, Arizona) can show a big raw number and still read NORMAL — the raw distance is only modestly above what that park normally allows.'],
-        ['🟡 Borderline normal', 'A NORMAL verdict within 3ft of the DEAD or JUICED line gets this instead of a flat green normal — a near-miss isn’t the same as an unremarkable day, and this keeps close calls visible instead of hidden inside "normal."'],
-        ['⚡ Pitch Drag (2026-08-07)', 'A SEPARATE diagnostic shown alongside the batted-ball verdict — derived from pitch trajectory data (not batted balls), which gives ~30-40x more data points per game. Available from pitch 1, so it shows a real reading well before enough batted balls exist for the verdict above. Validated: different pitchers in the same game show strongly correlated deviations from their own normal (not explained by park or weather — survives a fixed-dome control), and it correlates with real batted-ball carry that same game. Honest caveat: it can\'t tell real ball-to-ball manufacturing variance apart from tracking-system (Hawkeye/TrackMan) calibration drift — "tracked pitches running hot/cold," not "the ball is different." Never blended into the verdict above.'],
-        ['Direction (Pull/Center/Oppo)', 'Also corrects for where the ball was hit. Center-field contact carries ~14-17ft farther than pulled or opposite-field contact at the same EV+LA (pure backspin vs. sidespin bleed-off) — a real physical effect, not noise. Without this, a handful of unusually center-heavy or pull-heavy balls in one game could fake a DEAD/JUICED reading. Shown per-ball in the expanded list below.'],
-        ['⚡ Outlier balls', 'Any single ball whose actual distance deviates 25+ft from what EV/LA/temp/direction predict gets flagged individually in the expanded ball list, even on a day the overall game verdict stays NORMAL — a real 103mph flyout that died well short of expected is worth seeing on its own, not just averaged away into a game total that needs several balls to mean anything.'],
-        ['z-score verdict (2026-07-30)', 'DEAD/JUICED now requires a real per-game z-score (|z|≥2, ~95% confidence) instead of a fixed +/-ft cutoff — a game with only 3-5 balls needs a much bigger raw deviation to count as a real signal than a game with 15+, since the standard error shrinks as sample size grows. The "dead/juiced threshold" ft numbers on the card are that game\'s own z=2 line, not a fixed number — they\'ll differ game to game.'],
-        ['Minimum sample', 'Needs at least 3 quality batted balls (EV≥95mph, LA 15–35°, dist≥150ft) before showing a verdict — even then, the z-score above accounts for how thin that sample is.'],
-      ]} onClose={() => setShowHelp(false)}/>}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 14 }}>⚾ Ball Carry — Juiced or Dead?</span>
-        <HelpBtn onClick={() => setShowHelp(v => !v)}/>
-      </div>
-      {started.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 40, fontFamily: "'DM Mono',monospace", fontSize: 11, color: 'var(--muted)' }}>
-          No games in progress yet today — check back once first pitch happens.
-        </div>
-      ) : (
-        started.map(g => <BallCarryCard key={g.id} game={g}/>)
-      )}
-    </div>
-  );
-}
-
-// ── xHR Conversion — "is HR conversion running hot or cold?" live tracker ──
-// Live counterpart to xhr_conversion_tracker.py (the offline/batch version
-// already feeding Track Record's "xHR" column). Different question from
-// Ball Carry: Ball Carry holds EV+LA fixed and checks whether a ball's
-// *distance* matches physics; this checks whether the actual OUTCOME
-// (did it clear the fence) matches what a logistic model trained on every
-// batted ball this season says it should, given EV+LA+direction. Built
-// 2026-07-26 alongside a shrinkage fix to Barrel Lab's Monte Carlo — see
-// api/xhr-conversion.js header comment for the model/coefficients.
-const XHR_VERDICT_STYLE = {
-  JUICED: { color: 'var(--c-purple)', label: '⬆️ HR conversion running HOT',  bg: 'rgba(167,139,250,.08)' },
-  DEAD:   { color: '#f472b6', label: '⬇️ HR conversion running COLD', bg: 'rgba(244,114,182,.08)' },
-  NORMAL: { color: 'var(--green)', label: '✅ HR conversion normal',        bg: 'rgba(39,201,122,.06)'  },
-};
-
-function XhrConversionCard({ game, onData }) {
-  const [data, setData] = useState(null);
-  const [expanded, setExpanded] = useState(false);
-  const gamePk = game.gamePk || game.id;
-
-  useEffect(() => {
-    let mounted = true;
-    async function poll() {
-      try {
-        const r = await fetch(`/api/xhr-conversion?gamePk=${gamePk}`);
-        const d = await r.json();
-        if (mounted) { setData(d); onData && onData(gamePk, d); }
-      } catch (e) { /* silent — retry next interval */ }
-    }
-    poll();
-    const iv = setInterval(poll, 3 * 60 * 1000); // same 3-min cadence as Ball Carry
-    return () => { mounted = false; clearInterval(iv); };
-  }, [gamePk]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const label = `${game.away?.abbr || '?'} @ ${game.home?.abbr || '?'}`;
-  const style = data?.verdict ? XHR_VERDICT_STYLE[data.verdict] : null;
-
-  return (
-    <div style={{
-      border: `1px solid ${style ? style.color + '40' : 'var(--border)'}`,
-      background: style ? style.bg : 'var(--surface2)',
-      borderRadius: 10, padding: '10px 14px', marginBottom: 8,
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 13 }}>{label}</span>
-        {game.status === 'Live' && <span style={{ fontSize: 9, color: 'var(--accent)', fontFamily: "'DM Mono',monospace", fontWeight: 700 }}>🔴 {game.inning || 'LIVE'}</span>}
-        {game.status === 'Final' && <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: "'DM Mono',monospace" }}>FINAL</span>}
-      </div>
-
-      {!data || data.status === 'insufficient_data' ? (
-        <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)', marginTop: 6 }}>
-          ⚾ Tracking… {data?.n != null ? `(${data.n}/5 batted balls so far)` : ''}
-        </div>
-      ) : (
-        <>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
-            <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 11, fontWeight: 700, color: style?.color }}>{style?.label}</span>
-            <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)' }}
-              title={`z-score = (actual - expected) / standard error. |z|>=${data.z_threshold} triggers a DEAD/JUICED verdict (~95% confidence).`}>
-              actual {data.actual_hr} vs expected {data.expected_hr} (z={data.z >= 0 ? '+' : ''}{data.z}) · n={data.n}
-            </span>
-            <button onClick={() => setExpanded(v => !v)}
-              style={{ marginLeft: 'auto', fontSize: 9, fontFamily: "'DM Mono',monospace", color: 'var(--muted)',
-                background: 'transparent', border: '1px solid var(--border)', borderRadius: 5, padding: '2px 8px', cursor: 'pointer' }}>
-              {expanded ? '▲ Hide balls' : '▼ Show balls'}
-            </button>
-          </div>
-          {expanded && (
-            <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 6 }}>
-              {data.balls.map((b, i) => (
-                <div key={i} style={{ display: 'flex', gap: 10, fontFamily: "'DM Mono',monospace", fontSize: 9,
-                  color: 'var(--muted)', padding: '2px 0' }}>
-                  <span style={{ width: 110, color: 'var(--text)', flexShrink: 0 }}>{b.batter}{b.isHR ? ' 💥' : ''}</span>
-                  <span>Inn {b.inning}</span>
-                  <span>{b.ev}mph / {b.la}°</span>
-                  {b.direction && <span style={{ opacity: 0.7 }}>{b.direction}</span>}
-                  <span style={{ color: b.isHR ? 'var(--c-purple)' : 'var(--muted)', fontWeight: b.isHR ? 700 : 400 }}>
-                    xHR {(b.xhr_prob * 100).toFixed(0)}%
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  );
-}
-
-function XhrConversionTab({ games }) {
-  const [showHelp, setShowHelp] = useState(false);
-  const [results, setResults] = useState({}); // gamePk -> latest /api/xhr-conversion response
-  const started = (games || []).filter(g => g.status === 'Live' || g.status === 'Final');
-
-  // No separate day-level API call — reuses whatever each card has already
-  // fetched for its own per-game display, pooled here client-side.
-  const handleData = useCallback((gamePk, d) => {
-    setResults(prev => ({ ...prev, [gamePk]: d }));
-  }, []);
-
-  const valid = Object.values(results).filter(d => d.status === 'ok');
-  const dayActual   = valid.reduce((s, d) => s + d.actual_hr, 0);
-  const dayExpected = valid.reduce((s, d) => s + d.expected_hr, 0);
-  const dayVar       = valid.reduce((s, d) => s + (d.se || 0) * (d.se || 0), 0);
-  const daySe = Math.sqrt(dayVar);
-  const dayZ  = daySe > 0 ? (dayActual - dayExpected) / daySe : 0;
-  const dayVerdict = valid.length
-    ? (dayZ <= -2 ? 'DEAD' : dayZ >= 2 ? 'JUICED' : 'NORMAL')
-    : null;
-  const dayStyle = dayVerdict ? XHR_VERDICT_STYLE[dayVerdict] : null;
-
-  return (
-    <div>
-      {showHelp && <HelpSlideout title="⬆️⬇️ xHR Conversion Guide" items={[
-        ['What is this?', 'Live "is HR conversion running hot or cold" tracker. A logistic regression fit on every real batted ball this season (Exit Velocity, Launch Angle, direction) predicts each ball\'s probability of clearing the fence — summed across a game or the whole slate, that gives an expected HR count directly comparable to the actual count.'],
-        ['How is this different from Ball Carry?', 'Ball Carry holds EV+LA fixed and checks whether a ball\'s DISTANCE matches physics. This checks whether the OUTCOME (did it clear the fence) matches what the model expects given EV+LA+direction — a more direct read on "is HR conversion behaving normally today" specifically.'],
-        ['Today\'s Slate card', 'Pools every game\'s already-fetched data client-side — no extra API calls. Uses the same z-score methodology (Poisson-binomial variance) as the per-game cards and the offline Track Record "xHR" column, just computed live from whatever has happened so far today.'],
-        ['Minimum sample', 'Needs at least 5 batted balls with recorded contact before a per-game verdict shows (the offline Track Record table uses 10 — a smaller live threshold trades some precision for showing something sooner).'],
-      ]} onClose={() => setShowHelp(false)}/>}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 14 }}>⬆️⬇️ xHR Conversion — Hot or Cold?</span>
-        <HelpBtn onClick={() => setShowHelp(v => !v)}/>
-      </div>
-
-      {valid.length > 0 && (
-        <div style={{
-          border: `1px solid ${dayStyle ? dayStyle.color + '40' : 'var(--border)'}`,
-          background: dayStyle ? dayStyle.bg : 'var(--surface2)',
-          borderRadius: 10, padding: '10px 14px', marginBottom: 12,
-        }}>
-          <div style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 700, fontSize: 12, letterSpacing: .5,
-            textTransform: 'uppercase', color: 'var(--text)', marginBottom: 4 }}>
-            Today's Slate
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 11, fontWeight: 700, color: dayStyle?.color }}>{dayStyle?.label}</span>
-            <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--muted)' }}>
-              actual {dayActual} vs expected {dayExpected.toFixed(1)} (z={dayZ >= 0 ? '+' : ''}{dayZ.toFixed(2)}) · {valid.length} game{valid.length===1?'':'s'} reporting
-            </span>
-          </div>
-        </div>
-      )}
-
-      {started.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 40, fontFamily: "'DM Mono',monospace", fontSize: 11, color: 'var(--muted)' }}>
-          No games in progress yet today — check back once first pitch happens.
-        </div>
-      ) : (
-        started.map(g => <XhrConversionCard key={g.id} game={g} onData={handleData}/>)
-      )}
-    </div>
-  );
-}
-
 function LiveTab() {
   const [gamesAll, setGames] = useState([]);
   const gyG = useGyGame();  // header game strip
@@ -8561,13 +7682,10 @@ function LiveTab() {
       ['⚡ Live Sim', "Monte Carlo simulation running against live in-game conditions. Recalculates as lineups and game states change throughout the day."],
       ['🎮 Live Games', "Score ticker for all today's games with live updates. Use the date picker to browse past game scores."],
       ['📋 Lineups', "Today's confirmed and projected batting orders for every team. Green = confirmed, yellow = projected. Tap any batter to open their stat slideout."],
-      ['🔥 Themes', "Live HR pattern detection. Activates when 3+ home runs land today. Detects score clusters among batters who have gone yard and surfaces confirmed lineup matches with similar profiles — organized into cluster tables that update as more HRs land throughout the day."],
-      ['⚾ Ball Carry', "Per-game dead ball / juiced ball detector. Compares actual batted-ball distance against what EV+LA physics predict, park/elevation-adjusted. Does not use weather in the verdict — shown as context only."],
-      ['⬆️⬇️ xHR Conversion', "Live version of Track Record's xHR column. A logistic model predicts each batted ball's HR probability from EV+LA+direction; summed per game and across the whole slate (Today's Slate card), compared against actual HRs via a z-score. Different question from Ball Carry — this checks whether the ball actually left the yard as often as expected, not whether it carried as far as physics predicts."],
     ]} onClose={()=>setShowLiveHelp(false)}/>}
     <div style={{display:'flex',gap:5,marginBottom:12,alignItems:'center',flexWrap:'wrap',rowGap:6}}>
       <div className="gy-pill-row">
-      {[['gameday','Gameday'],['battracking','Bat Tracking'],['simlive','Live Sim'],['games','Live Games'],['lineups','Lineups'],['themes','Themes'],['ballcarry','Ball Carry'],['xhr','xHR']].map(([key,label])=>(
+      {[['gameday','Gameday'],['battracking','Bat Tracking'],['simlive','Live Sim'],['games','Live Games'],['lineups','Lineups']].map(([key,label])=>(
         <button key={key} onClick={()=>setLiveView(key)} style={gyPill(liveView===key)}>
           {label}
         </button>
@@ -8580,9 +7698,6 @@ function LiveTab() {
   {liveView==='simlive' && <LiveSimTab games={games} date={liveDate} isToday={liveDate===liveTodayStr}/>}
   {liveView==='lineups' && <LineupsView date={liveDate}/>}
   {liveView==='gameday' && <GamedayTab date={liveDate}/>}
-  {liveView==='themes' && <LiveThemesTab/>}
-  {liveView==='ballcarry' && <BallCarryTab games={games}/>}
-  {liveView==='xhr' && <XhrConversionTab games={games}/>}
 
   {liveView==='games' && <>
 
@@ -11558,110 +10673,6 @@ const LIVE_GAMES_CACHE = [];
 const LIVE_AB_STATUS_CACHE = {};
 let _notifyNewHR = null; // callback set by useHRNotifications hook
 
-// ── Ball State Adjustment (live-only, 2026-07-30) ───────────────────────────
-// Purely additive/visual badge for Barrel Lab + On Base — surfaces a
-// currently-live game's Ball Carry / xHR Conversion verdict (DEAD/JUICED)
-// next to any batter playing in that game. Explicitly NEVER touches Yard
-// Score, Boom, PS Score, TrueHRScore, MatchupScore, SimHR%, OnBaseScore, or
-// SimTB2% — this is a read-only client-side lookup rendered as a badge, not
-// a multiplier or input to any scoring function. Pre-game rows are
-// unaffected by construction: a game only ever appears in BALL_STATE_CACHE
-// once it's genuinely 'Live' (see startBallStatePolling below) and has
-// produced a confident verdict from the live endpoints — there is no path
-// for this to influence anything before or independent of live play.
-const BALL_STATE_CACHE = {}; // gamePk (string) -> { carryVerdict, carryZ, xhrVerdict, xhrZ, dragVerdict, dragZ, updated }
-let _BALL_STATE_VER = 0;
-let _ballStatePollActive = false;
-
-async function pollBallState() {
-  const liveGames = (LIVE_GAMES_CACHE || []).filter(g => g.status === 'Live');
-  if (!liveGames.length) return;
-  await Promise.all(liveGames.map(async (g) => {
-    const gamePk = String(g.gamePk || g.id || '');
-    if (!gamePk) return;
-    try {
-      const [carryD, xhrD] = await Promise.all([
-        fetch(`/api/ball-carry?gamePk=${gamePk}`).then(r => r.json()).catch(() => null),
-        fetch(`/api/xhr-conversion?gamePk=${gamePk}`).then(r => r.json()).catch(() => null),
-      ]);
-      // Pitch-drag (2026-08-07) rides along on the same /api/ball-carry
-      // response fetched for carryD above — no extra request needed.
-      const dragD = carryD?.pitchDrag;
-      BALL_STATE_CACHE[gamePk] = {
-        carryVerdict: carryD?.status === 'ok' ? carryD.verdict : null,
-        carryZ:       carryD?.status === 'ok' ? carryD.z : null,
-        xhrVerdict:   xhrD?.status === 'ok' ? xhrD.verdict : null,
-        xhrZ:         xhrD?.status === 'ok' ? xhrD.z : null,
-        dragVerdict:  dragD?.status === 'ok' ? dragD.verdict : null,
-        dragZ:        dragD?.status === 'ok' ? dragD.z : null,
-      };
-      _BALL_STATE_VER++;
-    } catch (_) { /* leave prior cached value in place, retry next cycle */ }
-  }));
-}
-
-// Idempotent — safe to call from both BarrelLabTab and OnBaseTab; the
-// interval only ever gets created once regardless of how many tabs call it.
-// Same 3-min cadence as the Live tab's own BallCarryCard/XhrConversionCard.
-function startBallStatePolling() {
-  if (_ballStatePollActive) return;
-  _ballStatePollActive = true;
-  pollBallState();
-  setInterval(pollBallState, 3 * 60 * 1000);
-}
-
-// { icon, label, color, tooltip } or null. Fires when ANY of the (now 3,
-// added 2026-08-07: Ball Carry, xHR Conversion, Pitch Drag) live
-// diagnostics is confidently DEAD/JUICED for the batter's game (all being
-// unavailable/NORMAL/not-yet-reporting returns null). Priority order below
-// (Ball Carry, then xHR, then Pitch Drag) is used only to break a genuine
-// tie between disagreeing verdicts -- a real majority among the signals
-// that HAVE reported always wins first. Tooltip discloses exactly how many
-// of the 3 fired and whether they agree, rather than silently picking one
-// — same "don't overstate confidence" discipline as every other
-// unvalidated-but-real signal in this app (Recent EV false-negative flag,
-// Longshot, etc).
-function getBallStateBadge(gameId) {
-  const state = BALL_STATE_CACHE[String(gameId || '')];
-  if (!state) return null;
-  const signals = [
-    { key: 'Ball Carry',     verdict: state.carryVerdict, z: state.carryZ },
-    { key: 'xHR Conversion', verdict: state.xhrVerdict,   z: state.xhrZ   },
-    { key: 'Pitch Drag',     verdict: state.dragVerdict,  z: state.dragZ  },
-  ].filter(s => s.verdict === 'DEAD' || s.verdict === 'JUICED');
-  if (!signals.length) return null;
-
-  const counts = {};
-  signals.forEach(s => { counts[s.verdict] = (counts[s.verdict] || 0) + 1; });
-  const maxCount = Math.max(...Object.values(counts));
-  const leaders = Object.keys(counts).filter(v => counts[v] === maxCount);
-  // A tie (leaders.length > 1) falls back to whichever fired signal has the
-  // highest priority — signals[] preserves the Ball Carry/xHR/Pitch Drag
-  // order from the array above even after filtering, so signals[0] is
-  // always the highest-priority one that actually fired.
-  const primary = leaders.length === 1 ? leaders[0] : signals[0].verdict;
-  const isJuiced = primary === 'JUICED';
-
-  const parts = signals.map(s => `${s.key}: ${s.verdict}${s.z != null ? ` (z=${s.z >= 0 ? '+' : ''}${s.z})` : ''}`);
-  let confidenceNote;
-  if (signals.length === 1) {
-    confidenceNote = ' Based on 1 of 3 live diagnostics (the others are NORMAL or not yet reporting).';
-  } else if (leaders.length > 1) {
-    confidenceNote = ' The live diagnostics disagree — shown with lower confidence.';
-  } else if (maxCount === signals.length) {
-    confidenceNote = ` All ${signals.length} live diagnostics that have reported agree.`;
-  } else {
-    confidenceNote = ` Majority agree (${maxCount} of ${signals.length} that have reported) — shown with the outlier noted above.`;
-  }
-
-  return {
-    icon: isJuiced ? '🔴' : '🔵',
-    label: isJuiced ? 'Juiced Ball' : 'Dead Ball',
-    color: isJuiced ? 'var(--c-warn)' : 'var(--ice)',
-    tooltip: `Live-only ball state signal — does not affect any score. ${parts.join(' · ')}.${confidenceNote}`,
-  };
-}
-
 // Global navigation — lets notifications route to tabs/views without prop drilling
 let _GLOBAL_NAV = null; // { setTab, setLiveView } — set by App on mount
 let _OPEN_TEAM_SLIDE = null; // (teamObj) => void — set by App on mount, universal across all tabs
@@ -12614,505 +11625,6 @@ const TEAM_ID_TO_ABBR = {
   137:'SF', 138:'STL',139:'TB', 140:'TEX',141:'TOR',142:'MIN',
   143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL',
 };
-// MLB team logo URLs — official CDN
-const teamLogoUrl = id => `https://www.mlbstatic.com/team-logos/team-cap-on-light/${id}.svg`;
-
-function MLBTab() {
-  const [sub, setSub]           = React.useState('standings');
-  const [view, setView]         = React.useState('division'); // division | league | wildcard
-  const [standings, setStandings] = React.useState([]);
-  const [loading, setLoading]   = React.useState(true);
-  const mono = "'DM Mono',monospace";
-  const osw  = "'Oswald',sans-serif";
-
-  // ── Fetch standings ────────────────────────────────────────────────────────
-  React.useEffect(() => {
-    if (sub !== 'standings' && sub !== 'playoff') return;
-    setLoading(true);
-    fetch('https://statsapi.mlb.com/api/v1/standings?leagueId=103,104&season=2026&standingsTypes=regularSeason&hydrate=division,conference,league,record')
-      .then(r => r.json())
-      .then(d => { setStandings(d.records || []); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, [sub]);
-
-
-
-  // ── Helpers ───────────────────────────────────────────────────────────────
-  const divOrder = ['AL East','AL Central','AL West','NL East','NL Central','NL West'];
-  const divRecords = standings.filter(r => r.standingsType === 'regularSeason');
-
-  const byDiv = React.useMemo(() => {
-    const map = {};
-    divRecords.forEach(rec => {
-      const key = rec.division?.nameShort || rec.division?.name || '?';
-      map[key] = (rec.teamRecords || []).map(t => {
-        const tid = t.team?.id;
-        const abbr = normTeam(TEAM_ID_TO_ABBR[tid] || t.team?.abbreviation || '?');
-        return {
-          teamId:  tid,
-          abbr,
-          name:    t.team?.name || abbr,
-          logo:    teamLogoUrl(tid),
-          w:       t.wins, l: t.losses,
-          pct:     parseFloat(t.winningPercentage || 0),
-          gb:      t.gamesBack || '-',
-          rs:      t.runsScored || 0,
-          ra:      t.runsAllowed || 0,
-          diff:    (t.runsScored||0) - (t.runsAllowed||0),
-          streak:  t.streak?.streakCode || '-',
-          l10:     (() => { const s = t.records?.splitRecords?.find(r=>r.type==='lastTen'); return s?`${s.wins}-${s.losses}`:'-'; })(),
-          home:    (() => { const s = t.records?.splitRecords?.find(r=>r.type==='home');    return s?`${s.wins}-${s.losses}`:'-'; })(),
-          away:    (() => { const s = t.records?.splitRecords?.find(r=>r.type==='away');    return s?`${s.wins}-${s.losses}`:'-'; })(),
-          wildCardGB:  t.wildCardGamesBack || '-',
-          clinched:    t.clinched || false,
-        };
-      });
-    });
-    return map;
-  }, [divRecords]);
-
-  // Wildcard: top 3 non-division-leaders per league
-  const wildcardTeams = React.useMemo(() => {
-    const al = [], nl = [];
-    Object.entries(byDiv).forEach(([div, teams]) => {
-      const isAL = div.startsWith('AL');
-      teams.forEach((t, i) => {
-        if (i > 0) (isAL ? al : nl).push(t); // skip division leaders
-      });
-    });
-    al.sort((a,b) => b.pct - a.pct);
-    nl.sort((a,b) => b.pct - a.pct);
-    return { AL: al.slice(0,6), NL: nl.slice(0,6) };
-  }, [byDiv]);
-
-  const stBtn = key => gyPill(sub===key); // 2026-10-22 CourtIQ pills
-
-  const vBtn = key => ({
-    padding:'3px 10px', borderRadius:5, cursor:'pointer',
-    border:`1px solid ${view===key?'var(--accent2)':'var(--border)'}`,
-    fontFamily:mono, fontSize:9,
-    background: view===key?'rgba(56,184,242,.1)':'transparent',
-    color: view===key?'var(--accent2)':'var(--muted)',
-  });
-
-  // ── Team row ──────────────────────────────────────────────────────────────
-  const TeamRow = ({t, rank, showWC}) => {
-    const diffCol = t.diff > 0 ? 'var(--green)' : t.diff < 0 ? 'var(--accent)' : 'var(--muted)';
-    const pctCol  = t.pct >= .600 ? 'var(--green)' : t.pct >= .500 ? 'var(--text)' : t.pct < .400 ? 'var(--accent)' : 'var(--muted)';
-    return (
-      <tr style={{borderBottom:'1px solid rgba(255,255,255,.04)',
-        background: rank===1?'rgba(39,201,122,.04)':'transparent'}}>
-        <td style={{padding:'4px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',textAlign:'center',width:24}}>{rank}</td>
-        <td style={{padding:'4px 6px'}}>
-          <div style={{display:'flex',alignItems:'center',gap:5,cursor:'pointer'}}
-            onClick={()=>_OPEN_TEAM_SLIDE?.(t)}>
-            <img src={t.logo} alt={t.abbr}
-              style={{width:20,height:20,objectFit:'contain',flexShrink:0}}
-              onError={e=>e.target.style.display='none'}/>
-            <span style={{fontFamily:osw,fontWeight:700,fontSize:12,color:'var(--accent2)',
-              textDecoration:'underline',textDecorationStyle:'dotted'}}>
-              {t.abbr}
-            </span>
-            {t.clinched && <span style={{fontSize:8,color:'var(--green)'}}>✓</span>}
-          </div>
-        </td>
-        <td style={{padding:'4px 6px',fontFamily:osw,fontWeight:700,fontSize:12,textAlign:'right'}}>{t.w}</td>
-        <td style={{padding:'4px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',textAlign:'right'}}>{t.l}</td>
-        <td style={{padding:'4px 6px',fontFamily:osw,fontWeight:700,fontSize:11,color:pctCol,textAlign:'right'}}>{t.pct.toFixed(3).replace('0.','.')}</td>
-        <td style={{padding:'4px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',textAlign:'right'}}>{showWC ? t.wildCardGB : t.gb}</td>
-        <td style={{padding:'4px 6px',fontFamily:mono,fontSize:9,textAlign:'right',color:diffCol}}>{t.diff>0?`+${t.diff}`:t.diff}</td>
-        <td style={{padding:'4px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',textAlign:'right'}}>{t.l10}</td>
-        <td style={{padding:'4px 6px',fontFamily:mono,fontSize:9,textAlign:'right',
-          color:/^W/.test(t.streak)?'var(--green)':'var(--accent)'}}>{t.streak}</td>
-      </tr>
-    );
-  };
-
-  const THead = ({gbLabel='GB'}) => (
-    <thead>
-      <tr style={{background:'var(--surface2)'}}>
-        {['#','Team','W','L','PCT',gbLabel,'DIFF','L10','STK'].map((h,i) => (
-          <th key={h} style={{padding:'4px 6px',fontFamily:mono,fontSize:8,color:'var(--muted)',
-            textTransform:'uppercase',letterSpacing:.5,textAlign:i>=2?'right':'left',
-            borderBottom:'1px solid var(--border)',fontWeight:400}}>{h}</th>
-        ))}
-      </tr>
-    </thead>
-  );
-
-  // ── Playoff picture ────────────────────────────────────────────────────────
-  const PlayoffSection = ({league}) => {
-    const divs = Object.entries(byDiv).filter(([k]) => k.startsWith(league));
-    const leaders = divs.map(([,teams]) => ({...teams[0], isDivLeader:true})).sort((a,b)=>b.pct-a.pct);
-    const wc = wildcardTeams[league].map((t,i) => ({...t, wcSeed: i+1}));
-    return (
-      <div style={{marginBottom:20}}>
-        <div style={{fontFamily:osw,fontWeight:800,fontSize:14,color:'var(--accent)',
-          letterSpacing:1,marginBottom:8,textTransform:'uppercase'}}>
-          {league === 'AL' ? '🏆 American League' : '🏆 National League'}
-        </div>
-        <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
-          {/* Division leaders */}
-          <div style={{flex:1,minWidth:160}}>
-            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',
-              textTransform:'uppercase',letterSpacing:.5,marginBottom:4}}>Division Leaders</div>
-            {leaders.map((t,i) => (
-              <div key={t.teamId} style={{display:'flex',alignItems:'center',gap:8,
-                padding:'5px 8px',borderRadius:6,marginBottom:4,
-                background:'rgba(39,201,122,.06)',border:'1px solid rgba(39,201,122,.15)'}}>
-                <span style={{fontFamily:mono,fontSize:9,color:'var(--green)',width:14}}>{i+1}</span>
-                <span onClick={()=>_OPEN_TEAM_SLIDE?.(t)}
-                  style={{fontFamily:osw,fontWeight:800,fontSize:12,color:'var(--accent2)',
-                    cursor:'pointer',flex:1}}>
-                  {t.abbr}
-                </span>
-                <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{t.w}-{t.l}</span>
-              </div>
-            ))}
-          </div>
-          {/* Wild card */}
-          <div style={{flex:1,minWidth:160}}>
-            <div style={{fontFamily:mono,fontSize:8,color:'var(--muted)',
-              textTransform:'uppercase',letterSpacing:.5,marginBottom:4}}>Wild Card Race</div>
-            {wc.map((t,i) => (
-              <div key={t.teamId} style={{display:'flex',alignItems:'center',gap:8,
-                padding:'5px 8px',borderRadius:6,marginBottom:4,
-                background: i<3?'rgba(245,166,35,.06)':'rgba(255,255,255,.02)',
-                border: i<3?'1px solid rgba(245,166,35,.2)':'1px solid rgba(255,255,255,.04)'}}>
-                <span style={{fontFamily:mono,fontSize:9,color:i<3?'var(--accent2)':'var(--muted)',width:14}}>
-                  {i<3?'✓':'·'}
-                </span>
-                <span onClick={()=>_OPEN_TEAM_SLIDE?.(t)}
-                  style={{fontFamily:osw,fontWeight:800,fontSize:12,color:'var(--accent2)',
-                    cursor:'pointer',flex:1}}>
-                  {t.abbr}
-                </span>
-                <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>
-                  {t.wildCardGB === '-' || t.wildCardGB === 0 ? <span style={{color:'var(--accent2)'}}>—</span> : `-${t.wildCardGB}`}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // ── Team Stats Slideout ───────────────────────────────────────────────────
-
-  // ── RENDER ─────────────────────────────────────────────────────────────────
-  return (
-    <div>
-      {/* Sub-nav */}
-      <div style={{display:'flex',gap:6,marginBottom:14,alignItems:'center',flexWrap:'wrap'}}>
-        <button style={stBtn('standings')} onClick={()=>setSub('standings')}>📊 Standings</button>
-        <button style={stBtn('playoff')}   onClick={()=>setSub('playoff')}>🏆 Playoff Picture</button>
-        <button style={stBtn('scores')}    onClick={()=>setSub('scores')}>📺 Scores</button>
-      </div>
-
-      {sub === 'standings' && (
-        <div>
-          {/* View toggle */}
-          <div style={{display:'flex',gap:6,marginBottom:12}}>
-            {[['division','By Division'],['league','By League'],['wildcard','Wild Card']].map(([k,l])=>(
-              <button key={k} style={vBtn(k)} onClick={()=>setView(k)}>{l}</button>
-            ))}
-          </div>
-          {loading ? (
-            <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)',padding:20,textAlign:'center'}}>
-              Loading standings…
-            </div>
-          ) : view === 'division' ? (
-            // Division view — 6 tables
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(340px,1fr))',gap:16}}>
-              {divOrder.map(divName => {
-                const teams = byDiv[divName] || byDiv[Object.keys(byDiv).find(k=>k.includes(divName.split(' ')[1]))] || [];
-                if (!teams.length) return null;
-                return (
-                  <div key={divName} style={{border:'1px solid var(--border)',borderRadius:8,overflow:'hidden'}}>
-                    <div style={{padding:'6px 10px',background:'var(--surface2)',
-                      fontFamily:osw,fontWeight:800,fontSize:12,color:'var(--accent)',
-                      letterSpacing:.8,textTransform:'uppercase'}}>{divName}</div>
-                    <table style={{width:'100%',borderCollapse:'collapse'}}>
-                      <THead/>
-                      <tbody>{teams.map((t,i)=><TeamRow key={t.teamId} t={t} rank={i+1}/>)}</tbody>
-                    </table>
-                  </div>
-                );
-              })}
-            </div>
-          ) : view === 'league' ? (
-            // League view — AL then NL
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(360px,1fr))',gap:16}}>
-              {['AL','NL'].map(lg => {
-                const teams = Object.entries(byDiv)
-                  .filter(([k])=>k.startsWith(lg))
-                  .flatMap(([,t])=>t)
-                  .sort((a,b)=>b.pct-a.pct);
-                return (
-                  <div key={lg} style={{border:'1px solid var(--border)',borderRadius:8,overflow:'hidden'}}>
-                    <div style={{padding:'6px 10px',background:'var(--surface2)',
-                      fontFamily:osw,fontWeight:800,fontSize:12,color:'var(--accent)',
-                      letterSpacing:.8}}>{lg === 'AL' ? '🏆 American League' : '🏆 National League'}</div>
-                    <table style={{width:'100%',borderCollapse:'collapse'}}>
-                      <THead/>
-                      <tbody>{teams.map((t,i)=><TeamRow key={t.teamId} t={t} rank={i+1}/>)}</tbody>
-                    </table>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            // Wildcard view
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(360px,1fr))',gap:16}}>
-              {['AL','NL'].map(lg => {
-                const teams = wildcardTeams[lg];
-                return (
-                  <div key={lg} style={{border:'1px solid var(--border)',borderRadius:8,overflow:'hidden'}}>
-                    <div style={{padding:'6px 10px',background:'var(--surface2)',
-                      fontFamily:osw,fontWeight:800,fontSize:12,color:'var(--accent2)',
-                      letterSpacing:.8}}>{lg} Wild Card Race</div>
-                    <table style={{width:'100%',borderCollapse:'collapse'}}>
-                      <THead gbLabel="WC GB"/>
-                      <tbody>{teams.map((t,i)=>(
-                        <tr key={t.teamId} style={{borderBottom:'1px solid rgba(255,255,255,.04)',
-                          background:i<3?'rgba(245,166,35,.03)':'transparent'}}>
-                          <td style={{padding:'4px 6px',fontFamily:mono,fontSize:9,
-                            color:i<3?'var(--accent2)':'var(--muted)',textAlign:'center',width:24}}>
-                            {i<3?'✓':'·'}
-                          </td>
-                          <td style={{padding:'4px 6px'}}>
-                            <span onClick={()=>_OPEN_TEAM_SLIDE?.(t)}
-                              style={{fontFamily:osw,fontWeight:700,fontSize:12,
-                                color:'var(--accent2)',cursor:'pointer',
-                                textDecoration:'underline',textDecorationStyle:'dotted'}}>
-                              {t.abbr}
-                            </span>
-                          </td>
-                          <td style={{padding:'4px 6px',fontFamily:osw,fontWeight:700,fontSize:12,textAlign:'right'}}>{t.w}</td>
-                          <td style={{padding:'4px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',textAlign:'right'}}>{t.l}</td>
-                          <td style={{padding:'4px 6px',fontFamily:osw,fontWeight:700,fontSize:11,textAlign:'right'}}>{t.pct.toFixed(3).replace('0.','.')}</td>
-                          <td style={{padding:'4px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',textAlign:'right'}}>{t.wildCardGB===0?'—':t.wildCardGB}</td>
-                          <td style={{padding:'4px 6px',fontFamily:mono,fontSize:9,textAlign:'right',color:t.diff>0?'var(--green)':'var(--accent)'}}>{t.diff>0?`+${t.diff}`:t.diff}</td>
-                          <td style={{padding:'4px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',textAlign:'right'}}>{t.l10}</td>
-                          <td style={{padding:'4px 6px',fontFamily:mono,fontSize:9,textAlign:'right',color:/^W/.test(t.streak)?'var(--green)':'var(--accent)'}}>{t.streak}</td>
-                        </tr>
-                      ))}</tbody>
-                    </table>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {sub === 'playoff' && (
-        <div>
-          {loading
-            ? <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)',padding:20,textAlign:'center'}}>Loading…</div>
-            : <>
-              <div style={{display:'flex',justifyContent:'flex-end',marginBottom:10}}>
-                <button onClick={()=>{
-                  const el = document.getElementById('playoff-bracket');
-                  if(!el) return;
-                  import('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js')
-                    .then(()=> window.html2canvas(el,{backgroundColor:'#0d0f1a',scale:2}))
-                    .then(canvas=>{
-                      const a=document.createElement('a');
-                      a.download='going-yard-playoff-picture.png';
-                      a.href=canvas.toDataURL('image/png');
-                      a.click();
-                    }).catch(()=>alert('Export unavailable — try screenshotting'));
-                }}
-                  style={{padding:'4px 12px',borderRadius:6,fontSize:9,cursor:'pointer',
-                    border:'1px solid var(--border)',background:'var(--surface2)',
-                    color:'var(--muted)',fontFamily:mono,fontWeight:700}}>
-                  ↓ Download PNG
-                </button>
-              </div>
-              <div id="playoff-bracket" style={{padding:'0 4px',overflowX:'auto'}}>
-                {['AL','NL'].map(lg => {
-                  const divs = Object.entries(byDiv).filter(([k])=>k.startsWith(lg));
-                  const leaders = divs.map(([div,teams])=>({...teams[0],div})).sort((a,b)=>b.pct-a.pct);
-                  const wc = wildcardTeams[lg].slice(0,3);
-                  const BracketTeam = ({t, seed, highlight}) => t ? (
-                    <div onClick={()=>_OPEN_TEAM_SLIDE?.(t)}
-                      style={{display:'flex',alignItems:'center',gap:6,
-                        padding:'5px 8px',borderRadius:5,cursor:'pointer',
-                        background: highlight?'rgba(39,201,122,.08)':'rgba(255,255,255,.03)',
-                        border:`1px solid ${highlight?'rgba(39,201,122,.3)':'rgba(255,255,255,.08)'}`,
-                        marginBottom:4,minWidth:150}}>
-                      <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)',width:14,flexShrink:0}}>
-                        {seed}
-                      </span>
-                      <img src={t.logo} alt={t.abbr}
-                        style={{width:18,height:18,objectFit:'contain',flexShrink:0}}
-                        onError={e=>e.target.style.display='none'}/>
-                      <span style={{fontFamily:osw,fontWeight:800,fontSize:11,color:'var(--text)',flex:1}}>
-                        {t.abbr}
-                      </span>
-                      <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>
-                        {t.w}-{t.l}
-                      </span>
-                    </div>
-                  ) : (
-                    <div style={{padding:'5px 8px',borderRadius:5,marginBottom:4,
-                      background:'rgba(255,255,255,.01)',border:'1px solid rgba(255,255,255,.04)',
-                      minWidth:150}}>
-                      <span style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.2)'}}>TBD</span>
-                    </div>
-                  );
-                  const VS = () => (
-                    <div style={{fontFamily:osw,fontWeight:700,fontSize:9,
-                      color:'var(--accent)',letterSpacing:1,textAlign:'center',
-                      padding:'2px 0',margin:'2px 0'}}>vs</div>
-                  );
-                  const Round = ({title, children}) => (
-                    <div style={{flexShrink:0}}>
-                      <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',
-                        textTransform:'uppercase',letterSpacing:.5,textAlign:'center',
-                        marginBottom:6,borderBottom:'1px solid var(--border)',paddingBottom:4}}>
-                        {title}
-                      </div>
-                      {children}
-                    </div>
-                  );
-                  const Arrow = () => (
-                    <div style={{display:'flex',alignItems:'center',padding:'0 6px',
-                      color:'rgba(255,255,255,.2)',fontSize:16,alignSelf:'center'}}>›</div>
-                  );
-                  return (
-                    <div key={lg} style={{marginBottom:24}}>
-                      <div style={{fontFamily:osw,fontWeight:800,fontSize:14,
-                        color:'var(--accent)',letterSpacing:1,marginBottom:10,
-                        textTransform:'uppercase'}}>
-                        {lg==='AL'?'🏆 American League':'🏆 National League'}
-                      </div>
-                      <div style={{display:'flex',gap:0,alignItems:'stretch',overflowX:'auto',
-                        paddingBottom:8}}>
-                        {/* Wild Card round -- only #1 AND #2 seeds get a bye (fixed
-                            2026-09-12: this previously gave only #1 a bye, ran a 3rd WC
-                            series against a nonexistent "4th wild card team" that isn't a
-                            real playoff seed, and dropped #2's bye from the bracket
-                            entirely). Correct format: WC round is 2 series, #3 vs #6 and
-                            #4 vs #5. */}
-                        <Round title="Wild Card (3 games)">
-                          <div style={{marginBottom:16}}>
-                            <BracketTeam t={leaders[2]} seed={3} highlight/>
-                            <VS/>
-                            <BracketTeam t={wc[2]} seed={6}/>
-                          </div>
-                          <div>
-                            <BracketTeam t={wc[0]} seed={4}/>
-                            <VS/>
-                            <BracketTeam t={wc[1]} seed={5}/>
-                          </div>
-                        </Round>
-                        <Arrow/>
-                        {/* Division Series -- both bye teams (#1 and #2) are seeded in
-                            directly; the other DS slot in each matchup is that side's
-                            Wild Card round winner (unresolved pre-playoffs, shown as
-                            "WC" since this bracket is a standings projection, not a
-                            live-updated one). */}
-                        <Round title="Division Series (5 games)">
-                          <div style={{marginBottom:16}}>
-                            <BracketTeam t={leaders[0]} seed={1} highlight/>
-                            <VS/>
-                            <BracketTeam t={null} seed="WC"/>
-                          </div>
-                          <div>
-                            <BracketTeam t={leaders[1]} seed={2} highlight/>
-                            <VS/>
-                            <BracketTeam t={null} seed="WC"/>
-                          </div>
-                        </Round>
-                        <Arrow/>
-                        {/* Championship Series */}
-                        <Round title={`${lg}CS (7 games)`}>
-                          <div style={{marginTop:24}}>
-                            <BracketTeam t={null} seed=""/>
-                            <VS/>
-                            <BracketTeam t={null} seed=""/>
-                          </div>
-                        </Round>
-                        <Arrow/>
-                        {/* World Series placeholder */}
-                        <Round title="World Series">
-                          <div style={{marginTop:36}}>
-                            <BracketTeam t={null} seed="🏆"/>
-                          </div>
-                        </Round>
-                      </div>
-                      {/* Wildcard race below */}
-                      <div style={{marginTop:10}}>
-                        <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',
-                          textTransform:'uppercase',letterSpacing:.5,marginBottom:6}}>
-                          Wild Card Race — {lg}
-                        </div>
-                        <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-                          {wildcardTeams[lg].map((t,i)=>(
-                            <div key={t.teamId} onClick={()=>_OPEN_TEAM_SLIDE?.(t)}
-                              style={{display:'flex',alignItems:'center',gap:5,
-                                padding:'4px 8px',borderRadius:5,cursor:'pointer',
-                                background:i<3?'rgba(245,166,35,.06)':'rgba(255,255,255,.02)',
-                                border:i<3?'1px solid rgba(245,166,35,.2)':'1px solid rgba(255,255,255,.04)'}}>
-                              <span style={{fontFamily:mono,fontSize:8,color:i<3?'var(--accent2)':'var(--muted)',width:14}}>
-                                {i<3?`WC${i+1}`:`+${i-2}`}
-                              </span>
-                              <img src={t.logo} alt={t.abbr}
-                                style={{width:16,height:16,objectFit:'contain'}}
-                                onError={e=>e.target.style.display='none'}/>
-                              <span style={{fontFamily:osw,fontWeight:800,fontSize:11,
-                                color:'var(--text)'}}>{t.abbr}</span>
-                              <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>
-                                {t.wildCardGB==='-'||t.wildCardGB===0?'—':`-${t.wildCardGB}`}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-                <div style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.2)',marginTop:8}}>
-                  * Bracket shows current standings projection · TBD = wild card game winners
-                  · Tap any team to view stats · Data: MLB Stats API
-                </div>
-              </div>
-            </>
-          }
-        </div>
-      )}
-
-      {sub === 'scores' && (
-        <div style={{margin:'-8px -14px'}}>
-          <iframe title="MLB Scores" src="https://www.mlb.com/scores"
-            frameBorder="0" allowFullScreen
-            style={{width:'125%',height:'calc((100vh - 48px) * 1.25)',border:'none',display:'block',
-              transform:'scale(0.8)',transformOrigin:'top left'}}/>
-          <div style={{padding:'8px 14px',borderTop:'1px solid var(--border)',
-            display:'flex',justifyContent:'flex-end',background:'var(--surface)'}}>
-            <a href="https://www.mlb.com/scores" target="_blank" rel="noopener noreferrer"
-              style={{display:'flex',alignItems:'center',gap:5,padding:'5px 12px',borderRadius:6,
-                background:'var(--accent)',color:'white',fontFamily:osw,
-                fontWeight:700,fontSize:12,letterSpacing:1,textDecoration:'none'}}>
-              ↗ Open in New Tab
-            </a>
-          </div>
-        </div>
-      )}
-
-      {/* Footer note */}
-      {sub !== 'scores' && !loading && (
-        <div style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.2)',
-          marginTop:12,textAlign:'right'}}>
-          Tap any team abbreviation to open team stats · Data: MLB Stats API
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ── ODDS CALCULATOR SLIDEOUT ──────────────────────────────────────────────────
 const CALC_CURRENCIES = ['USD','EUR','GBP','CAD','AUD','JPY'];
@@ -15686,305 +14198,6 @@ function BoomBadge({ score }) {
         background:bg,color:col,whiteSpace:'nowrap',cursor:'default'}}>
       {score}
     </span>
-  );
-}
-
-function LongShotView({ data }) {
-  const [lineupVer, setLineupVer] = useState(LINEUP_VERSION);
-  useEffect(() => { const unsub = subscribeLineup(v => setLineupVer(v)); return unsub; }, []);
-  const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
-  const [sort, setSort]       = useState('_yard');
-  const [sortDir, setSortDir] = useState(1); // 1 = desc (bv-av = higher first)
-  const [search, setSearch]   = useState('');
-  const [teamFilter, setTeamFilter] = useState('ALL');
-  const gyG = useGyGame();  // header game strip
-  const [pgFilter, setPgFilter]     = useState('ALL');
-  const [expandedId, setExpandedId] = useState(null);
-  const [lineupOnly, setLineupOnly]   = useState(false);
-  const [goneYard,   setGoneYard]     = useState(false);
-  const [dueOnly,    setDueOnly]      = useState(false);
-  const [activeOnly, setActiveOnly]   = useState(false);
-  const [injuredOnly,setInjuredOnly]  = useState(false);
-  const [hotOnly,    setHotOnly]      = useState(false);
-  const [picksOnly,  setPicksOnly]    = useState(false);
-  const [diamondOnly,setDiamondOnly]  = useState(false);
-  const [hideFinal, setHideFinal]       = useState(false);
-  
-  const [batterHand, setBatterHand]     = useState('ALL');
-  const [pitcherHand, setPitcherHand]   = useState('ALL');
-  const [formFilter, setFormFilter]     = useState(new Set());
-  const picks = usePicks();
-  const pitcherGradeCache = useRef({});
-  const [cacheVersion, setCacheVersion] = useState(0);
-  const SOFT_GRADES = new Set(['🎯 Target','💥 Hittable','🤔 Average']);
-  const SOFT_LABEL_LIST = ['ALL','🤔 Average','💥 Hittable','🎯 Target'];
-  const pgColor = pg => ({'💥 Hittable':'var(--green)','🎯 Target':'var(--ice)','🤔 Average':'var(--muted)'}[pg]||'var(--muted)');
-  const tbColor = v => v>=2.0?'var(--green)':v>=1.5?'var(--accent2)':v>=1.0?'var(--text)':'var(--muted)';
-
-  const rows = React.useMemo(() => {
-    const out = [];
-    for (const b of (data||[])) {
-      // ── GATE 1: Strictly C or D grade only ───────────────────────────────
-      const grade = (b.grade||'').trim();
-      if (!['C','D'].includes(grade)) continue;
-      // ── GATE 2: Not ‼️ Elite pitcher ─────────────────────────────────────
-      const pid2    = String(parseInt(b.pitcher_id)||0);
-      const pgLabel = pitcherGradeCache.current[pid2] || b._pgLabel || b.pitcher_grade_label || '';
-      if (pgLabel) b._pgLabel = pgLabel;
-      if (pgLabel.includes('‼️') || pgLabel.toLowerCase().includes('elite')) continue;
-      // ── UNIFIED SCORING — same as AllMatchups ─────────────────────────────
-      const _sig = Math.min(14, Math.max(0, Math.round((parseFloat(b.weighted_flag_score)||0) * 4.6)));
-      const _boom = computeBoomScore(_sig, getZoneFit(b), b.recent_iso, parseFloat(b.sim_tb)||0, b.weighted_flag_score,
-        shrinkageAdjBarrelSpike(b), parseInt(b.recent_hr_count||0), parseFloat(b.recent_batter_ahead_pct||0),
-        !!b.hh_precursor, parseFloat(b.primary_pitch_hr_rate||0),
-        parseInt(b.recent_barrels_3d)||0, parseInt(b.recent_hrs_3d)||0,
-        parseFloat(b.recent_avg_bat_speed)||0, parseInt(b.recent_pb_2d)||0, b.la_locked, parseFloat(b.season_swstr_pct)||0, parseFloat(b.park_pull_fit)||0, parseInt(b._zoneEdges||0), parseInt(b._zoneKPenalty||0), (()=>{const _ls=liveSlot(b.batter_id,b.lineup_slot);return _ls>0&&(b.pitcher_weak_slots||"").split(",").map(Number).filter(Boolean).includes(_ls);})(), parseFloat(b.season_xwoba)||0);
-      const _ps   = getPS(b);
-      const _yard = computeYardScore(_sig, parseFloat(b.gHR)||0, _boom, _ps,
-        b.batter_hand||'', b.pitcher_hand||'', parseInt(b.days_rest??1),
-        liveSlot(b.batter_id, b.lineup_slot), getHandSpecificGrade(b));
-      // ── GATE 3: Minimum Yard Score ─────────────────────────────────────────
-      if (_yard < 10) continue;
-      // ── GATE 4: Must have at least one live signal ─────────────────────────
-      const brlPct  = parseFloat(b.recent_barrel_pct)||0;
-      const brl3d   = parseInt(b.recent_barrels_3d)||0;
-      const hrs3d   = parseInt(b.recent_hrs_3d)||0;
-      const pb2d    = parseInt(b.recent_pb_2d)||0;
-      const batSpeed= parseFloat(b.recent_avg_bat_speed)||0;
-      const hrCount7= parseInt(b.recent_hr_count)||0;
-      const _zf     = parseFloat(b.zone_fit)||0;
-      const hasSignal = (
-        (brl3d >= 2 && hrs3d === 0) || brlPct >= 8 || batSpeed >= 74 ||
-        _zf >= 70 || hrCount7 >= 2 || (parseFloat(b.recent_avg_ev)||0) >= 97 ||
-        (pgLabel === '🎯 Target' && _boom >= 35)
-      );
-      if (!hasSignal) continue;
-      out.push({ ...b, _pgLabel:pgLabel,
-        _simHR: parseFloat(b.sim_hr_adj)||0, _simTB: parseFloat(b.sim_tb)||0,
-        _bvpFB: parseFloat(b.bvp_fb_pct)||0, _recEV: parseFloat(b.recent_avg_ev)||0,
-        _bvpLA: parseFloat(b.bvp_avg_la)||0, _recLA: parseFloat(b.recent_avg_la)||0,
-        _recFB: parseFloat(b.recent_fb_pct)||0, _flags: parseInt(b.total_flags)||0,
-        _sig, _boom, _ps, _yard, _kHR: parseFloat(b.gHR)||0,
-        _brl: brlPct, _zf,
-        _formClass: getFormClass(b),
-        _hrYest: parseInt(b.hr_yesterday||0),
-        _hrPct: parseFloat(b.proj_hr_adj)||parseFloat(b.sim_hr)||0,
-      });
-    }
-    return out;
-  }, [data, cacheVersion, lineupVer]);
-
-  const teams = React.useMemo(() => ['ALL',...Array.from(new Set(rows.map(r=>r.batting_team||'').filter(Boolean))).sort()], [rows]);
-
-  const filtered = React.useMemo(() => {
-    let r = rows.filter(b => b._simTB >= 0.01)
-      .filter(b => matchesHandFilter(b.batter_hand, batterHand))
-      .filter(b => matchesHandFilter(b.pitcher_hand, pitcherHand))
-      .filter(b => formFilter.size === 0 || formFilter.has(b._formClass))
-      .filter(b => !hideFinal   || !FINAL_GAME_IDS.has(String(b.game_id)))
-    if (teamFilter!=='ALL') r = r.filter(b=>b.batting_team===teamFilter);
-    if (gyG) r = r.filter(b=>gyTeamOk(b.batting_team, gyG));
-    if (pgFilter!=='ALL')   r = r.filter(b=>b._pgLabel===pgFilter);
-    if (search)      { const q=search.toLowerCase(); r=r.filter(b=>(b.batter||'').toLowerCase().includes(q)); }
-    if (lineupOnly)  r = r.filter(b=>parseInt(b.batter_id||0)>0 && LINEUP_STATUS[parseInt(b.batter_id||0)]?.status==='confirmed');
-    if (goneYard)    r = r.filter(b=>{ const pid=parseInt(b.batter_id||0); const nm=(b.batter||'').toLowerCase(); return pid>0 && Array.isArray(HR_DATA) && HR_DATA.some(h=>h.batterId===pid||(h.batterName&&h.batterName.toLowerCase()===nm)); });
-    if (dueOnly)     r = r.filter(b=>{ const dp=DAILY_PICKS_CACHE[String(b.batter_id||'')]; return dp&&isDue(dp); });
-    if (activeOnly)  r = r.filter(b=>!INJURY_MAP[String(b.batter_id||'')]);
-    if (injuredOnly) r = r.filter(b=>!!INJURY_MAP[String(b.batter_id||'')]);
-    if (hotOnly)     r = r.filter(b=>{ const dp=DAILY_PICKS_CACHE[String(b.batter_id||'')]; return dp&&isHotBatPlayer(dp); });
-    if (picksOnly)   r = r.filter(b=>picks[String(b.batter_id||'')]);
-    if (diamondOnly) r = r.filter(b=>{ const dp=DAILY_PICKS_CACHE[String(b.batter_id||'')]; return dp?.is_diamond==='1'||dp?.is_diamond===true; });
-    return [...r].sort((a,b2)=>{ const av=a[sort]||0; const bv=b2[sort]||0; return sortDir*(bv-av); });
-  }, [rows,teamFilter,pgFilter,search,sort,sortDir,lineupOnly,goneYard,dueOnly,activeOnly,injuredOnly,hotOnly,picksOnly,diamondOnly,batterHand,pitcherHand,formFilter,hideFinal,gyG,]);
-
-  const Th = ({k,label}) => (
-    <th onClick={()=>{ if(sort===k) setSortDir(d=>-d); else{setSort(k);setSortDir(-1);} }}
-      style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,
-        color:sort===k?'var(--accent2)':'var(--muted)',cursor:'pointer',textAlign:'right',
-        whiteSpace:'nowrap',borderBottom:'1px solid var(--border)'}}>
-      {label}{sort===k?(sortDir===1?' ▼':' ▲'):''}
-    </th>
-  );
-
-  return (
-    <div>
-
-      <div style={{display:'flex',gap:6,marginBottom:10,flexWrap:'wrap',alignItems:'center'}}>
-        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search batter…"
-          style={{padding:'4px 10px',borderRadius:6,fontSize:10,fontFamily:mono,width:130,outline:'none',
-            border:`1px solid ${search?'var(--accent2)':'var(--border)'}`,background:'var(--surface2)',color:'var(--text)'}}/>
-        <select value={teamFilter} onChange={e=>setTeamFilter(e.target.value)}
-          style={{padding:'3px 8px',borderRadius:6,fontSize:10,fontFamily:mono,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',cursor:'pointer'}}>
-          {teams.map(t=><option key={t} value={t}>{t==='ALL'?'All Teams':t}</option>)}
-        </select>
-        <HandFilter mode="batter" value={batterHand} onChange={setBatterHand}/>
-      <HandFilter mode="pitcher" value={pitcherHand} onChange={setPitcherHand}/>
-      <FormClassFilter selected={formFilter} onChange={setFormFilter}/>
-      
-            <button onClick={()=>setHideFinal(v=>!v)} style={{padding:'3px 9px',borderRadius:6,
-        border:`1px solid ${hideFinal?'var(--c-danger)':'var(--border)'}`,
-        background:hideFinal?'rgba(255,64,32,.12)':'transparent',
-        color:hideFinal?'var(--c-danger)':'var(--muted)',fontFamily:"'DM Mono',monospace",
-        fontSize:9,cursor:'pointer',whiteSpace:'nowrap'}}>
-        {hideFinal?'✓ Hiding Final':'Hide Final'}
-      </button>
-      <select value={pgFilter} onChange={e=>setPgFilter(e.target.value)}
-          style={{padding:'3px 8px',borderRadius:6,fontSize:10,fontFamily:mono,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text)',cursor:'pointer'}}>
-          {SOFT_LABEL_LIST.map(g=><option key={g} value={g}>{g==='ALL'?'All Pitchers':g}</option>)}
-        </select>
-        <button onClick={()=>{
-          const hdr = ['Grade','Team','Batter','Pitcher','P.Grade','Sim TB','BvP FB%','BvP EV','HR%'];
-          const csvRows = [hdr, ...filtered.map(b=>[
-            b.grade||'', b.batting_team||'', b.batter||'', b.pitcher||'', b._pgLabel||'',
-            b._simTB.toFixed(2), b._bvpFB>0?b._bvpFB.toFixed(1):'', b._recEV>0?b._recEV.toFixed(1):'',
-            b._simHR>0?(b._simHR*100).toFixed(1):''
-          ])];
-          const csv = csvRows.map(r=>r.join(',')).join('\n');
-          const a = Object.assign(document.createElement('a'), {href:'data:text/csv;charset=utf-8,'+encodeURIComponent(csv), download:`LongShots-${new Date().toISOString().slice(0,10)}.csv`});
-          a.click();
-        }} style={{padding:'4px 10px',borderRadius:6,cursor:'pointer',fontSize:10,fontFamily:mono,
-          border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--muted)'}}>
-          ⬇ CSV
-        </button>
-        <span style={{fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{filtered.length} long shots</span>
-      </div>
-      {/* Hidden PitcherCards — populate grade cache with real ERA/K9/WHIP grades */}
-      <div style={{display:'none'}}>
-        {[...new Set((data||[]).map(r=>r.pitcher_id).filter(Boolean))].map(pid=>(
-          <PitcherCard key={pid} pitcherId={pid} pitcherName=""
-            onGrade={(id,g)=>{ pitcherGradeCache.current[id]=g; setCacheVersion(v=>v+1); }}/>
-        ))}
-      </div>
-
-      {/* Sticker filters */}
-      <div style={{display:'flex',gap:6,marginBottom:10,flexWrap:'wrap'}}>
-        {[
-          [()=>setLineupOnly(v=>!v), lineupOnly,  'rgba(39,201,122,.12)', 'var(--green)',        '✅'],
-          [()=>setGoneYard(v=>!v),   goneYard,    'rgba(255,64,32,.15)',  'var(--accent)',   '💥'],
-          [()=>setDueOnly(v=>!v),    dueOnly,     'rgba(56,184,242,.18)', 'var(--ice)',      '⏳'],
-          [()=>{setActiveOnly(v=>!v);if(!activeOnly)setInjuredOnly(false);}, activeOnly,  'rgba(52,211,153,.12)', 'var(--c-emerald)', '☑️'],
-          [()=>{setInjuredOnly(v=>!v);if(!injuredOnly)setActiveOnly(false);},injuredOnly,'rgba(251,146,60,.12)', 'var(--c-orange2)', '🤕'],
-          [()=>setHotOnly(v=>!v),    hotOnly,     'rgba(251,146,60,.12)', 'var(--c-orange2)',        '🔥'],
-          [()=>setPicksOnly(v=>!v),  picksOnly,   'rgba(245,166,35,.12)', 'var(--accent2)', '🎯'],
-          [()=>setDiamondOnly(v=>!v),diamondOnly, 'rgba(255,204,0,.18)',  'var(--c-yellow2)',        '💎'],
-        ].map(([fn,active,bg,col,emoji])=>(
-          <button key={emoji} onClick={fn}
-            style={{padding:'4px 9px',borderRadius:7,cursor:'pointer',flexShrink:0,fontSize:14,
-              border:`1px solid ${active?col:'var(--border)'}`,
-              background:active?bg:'transparent',color:active?col:'var(--muted)'}}>
-            {emoji}
-          </button>
-        ))}
-      </div>
-      <div className="tw">
-        <table style={{width:'100%'}}>
-          <thead><tr>
-            <th className="sticky-batter" style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)'}}>Batter</th>
-            <Th k="_yard"   label={<img src="/icon-192.png" alt="Yard" style={{width:14,height:14,borderRadius:2,objectFit:'cover',verticalAlign:'middle'}}/>}/>
-            <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'center',borderBottom:'1px solid var(--border)'}}>Form</th>
-            <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'center',borderBottom:'1px solid var(--border)'}} title="HR Upside — computed ceiling based on barrel, zone, BvP, and matchup quality">HR&#x2b06;</th>
-            <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'center',borderBottom:'1px solid var(--border)'}}>Gr</th>
-            <th style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,color:'var(--muted)',textAlign:'left',borderBottom:'1px solid var(--border)'}}>Pitcher</th>
-            <Th k="_simTB"  label="Sim TB"/>
-            <Th k="_iso"    label="ISO" title="Isolated Power — raw power metric (SLG − AVG)" data-tip="Isolated Power — raw power metric (SLG − AVG)"/>
-            <Th k="_zf"     label="ZoneFit" title="Zone Fit — contact zone overlap with pitcher tendencies" data-tip="Zone Fit — contact zone overlap with pitcher tendencies"/>
-            <Th k="_bvpFB"  label="BvP FB%"/>
-            <Th k="_recEV"  label="EV"/>
-            <Th k="_bsD"    label="BS Δ" title="Bat Speed Δ vs season baseline (mph) — green = trending up" data-tip="Bat Speed Δ vs season baseline (mph) — green = trending up"/>
-                        <Th k="_pgLabel" label="P Grade" title="Pitcher Grade: 🎯Target / 💥Hittable / Average / ⚠️Tough / ‼️Elite" data-tip="Pitcher Grade: 🎯Target / 💥Hittable / Average / ⚠️Tough / ‼️Elite"/>
-          </tr></thead>
-          <tbody>
-            {filtered.map(b => {
-              const pid  = parseInt(b.batter_id||b.player_id||0);
-              const name = b.batter||'';
-              const uid  = b.batter_id||b.player_id||name;
-              const isExp = expandedId === uid;
-              return (
-                <React.Fragment key={uid}>
-                  <tr onClick={()=>setExpandedId(v=>v===uid?null:uid)}
-                    style={{cursor:'pointer',height:26,borderBottom:'1px solid rgba(255,255,255,.04)',
-                      background:isExp?'rgba(255,255,255,.04)':'transparent',
-                      borderLeft:`2px solid ${isExp?'var(--accent)':'transparent'}`}}>
-                    <td className="sticky-batter" style={{padding:'2px 6px',maxWidth:170}} title={b._boom>=50&&b._ps>=40?'🔥 Convergence Zone — Boom+PS both signal':''}>
-                      <div style={{display:'flex',alignItems:'center',gap:4,overflow:'hidden'}}>
-                        <PlayerAvatar pid={pid} name={name} size={16}/>
-                        <span style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'var(--accent2)',whiteSpace:'nowrap',flexShrink:0}}>{b.batting_team||''}</span>
-                        <span style={{fontFamily:osw,fontWeight:700,fontSize:10,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',color:isKeyMatchup(pid,name)?'var(--c-warn)':(b._boom>=50&&b._ps>=40)?'var(--c-violet)':'var(--text)'}}>{name}</span>
-                        <span onClick={e=>e.stopPropagation()} style={{flexShrink:0}}><PickButton pid={pid} name={name} team={b.batting_team||''}/><GamblyButton name={name} team={b.batting_team||''} prop="hr"/></span>
-                      </div>
-                    </td>
-                    <td style={{padding:'2px 4px',textAlign:'center'}}>
-                      <YardBadge score={b._yard}/>
-                    </td>
-                    <td style={{padding:'2px 4px',textAlign:'center',verticalAlign:'middle'}}>
-                      <FormBadge formKey={b._formClass}/>
-                    </td>
-                    <td style={{padding:'2px 4px',textAlign:'center',verticalAlign:'middle'}}>
-                      {(()=>{const u=computeHRUpside(b);const short=u.label==='BELOW AVG'?'LOW':u.label==='STRONG'?'STR':u.label==='ELITE'?'ELITE':'GOOD';return(
-                        <span title={'HR Upside: '+u.label+' — '+u.lit+'/'+u.total+' conditions'+(u.h2hLoaded===false?' (* = open slideout for H2H grade)':' (H2H incl.)')}
-                          style={{fontFamily:"'Oswald',sans-serif",fontWeight:800,fontSize:7,
-                            color:u.color,letterSpacing:.3,whiteSpace:'nowrap',
-                            padding:'1px 3px',borderRadius:3,
-                            background:`${u.color}18`,border:`1px solid ${u.color}33`,
-                            cursor:'default'}}>
-                          {short}{u.h2hLoaded===false?'*':''}
-                        </span>
-                      );})()}
-                    </td>
-                    <td style={{padding:'2px 6px',textAlign:'center',fontFamily:osw,fontWeight:800,fontSize:10}}>
-                      {(() => {
-                        const effG = computeEffectiveGrade(b.grade, b._pgLabel || '');
-                        const gc   = GRADE_CFG[effG] || GRADE_CFG['D'];
-                        const isHV = (b._formClass==='Worm'||b._formClass==='Whiff') && (parseFloat(b.gHR)||0) < 15;
-                        return <span title={`Effective Grade: ${effG} (Batter: ${b.grade||'?'} × ${b._pgLabel||'No pitcher grade'})`}
-                          style={{color:gc.color,cursor:'default'}}>
-                          {effG}{isHV?' ⚡':''}
-                        </span>;
-                      })()}
-                    </td>
-                    <td style={{padding:'2px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)',whiteSpace:'nowrap',maxWidth:100,overflow:'hidden',textOverflow:'ellipsis'}}>{resolvePitcherName(b.pitcher, b.batting_team, b.pitcher_id)}</td>
-                    <td style={{padding:'2px 6px',textAlign:'right'}}>
-                      <span style={{fontFamily:osw,fontWeight:800,fontSize:11,color:tbColor(b._simTB)}}>{b._simTB.toFixed(2)}</span>
-                    </td>
-                    <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,
-                      color:b._iso>=0.25?'var(--c-warn)':b._iso>=0.18?'var(--accent2)':'var(--muted)'}}>
-                      {b._iso>0?b._iso.toFixed(3):'—'}
-                    </td>
-                    <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,
-                      color:b._zf>=8?'var(--c-danger)':b._zf>=5?'var(--accent2)':b._zf>=2?'var(--green)':'var(--muted)'}}>
-                      {b._zf>0?b._zf.toFixed(1)+'%':'—'}
-                    </td>
-                    <td style={{padding:'2px 6px',textAlign:'right',fontFamily:mono,fontSize:9,color:b._bvpFB>=20&&b._bvpFB<36?'var(--green)':b._bvpFB>=36&&b._bvpFB<42?'var(--accent2)':'var(--muted)'}}>{b._bvpFB>0?`${b._bvpFB.toFixed(0)}%`:'—'}</td>
-                    <td style={{padding:'2px 6px',textAlign:'right',fontFamily:osw,fontWeight:700,fontSize:10,color:b._recEV>=97?'var(--c-warn)':b._recEV>=93?'var(--text)':'var(--muted)'}}>{b._recEV>0?b._recEV.toFixed(1):'—'}</td>
-                    <td style={{padding:'2px 5px',textAlign:'right',fontFamily:mono,fontSize:9}}>
-                      {(()=>{
-                        const d=b._bsD;
-                        if(d==null||isNaN(d)) return <span style={{color:'var(--muted)'}}>—</span>;
-                        const arrow=d>=0.5?'↑':d<=-0.5?'↓':'→';
-                        const col=d>=1.5?'var(--green)':d>=0.5?'#a8d8a8':d<=-1.5?'var(--c-danger)':d<=-0.5?'var(--accent2)':'var(--muted)';
-                        return <span style={{color:col,fontWeight:700}}>{arrow}{d>=0?'+':''}{d.toFixed(1)}</span>;
-                      })()}
-                    </td>
-                                        <td style={{padding:'2px 6px',textAlign:'right'}}><span style={{fontFamily:mono,fontSize:9,color:pgColor(b._pgLabel),fontWeight:700}}>{b._pgLabel.split(' ')[0]}</span></td>
-                  </tr>
-                  {isExp && (
-                    <tr><td colSpan={10} style={{padding:'0 10px 10px',background:'rgba(255,255,255,.02)'}}>
-                      <Last7HRChart batterId={pid}/>
-                      <RecentGameLog batterId={pid}/>
-                    </td></tr>
-                  )}
-                </React.Fragment>
-              );
-            })}
-            {filtered.length===0 && (
-              <tr><td colSpan={10} style={{padding:'30px',textAlign:'center',fontFamily:mono,fontSize:10,color:'var(--muted)'}}>
-                No long shots match current filters.
-              </td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
   );
 }
 
@@ -22691,682 +20904,6 @@ function PairsTab({ data }) {
 }
 
 
-// ══════════════════════════════════════════════════════════════════════════════
-// BVP DEEP DIVE PAGE
-// All data pre-computed in bvp_matrix.json by mlbdata_aggregate.py
-// App does zero computation — pure lookups from the loaded JSON
-// ══════════════════════════════════════════════════════════════════════════════
-
-const BVP_MATRIX_CACHE = { data: null };
-
-function ZoneGrid({ grid, title, color }) {
-  // 3×3 strike zone grid — zones 1-9 (top-left to bottom-right)
-  // zone layout: 1(TL) 2(TC) 3(TR) / 4(ML) 5(MC) 6(MR) / 7(BL) 8(BC) 9(BR)
-  const ZONES = [[1,2,3],[4,5,6],[7,8,9]];
-  const vals  = ZONES.flat().map(z => parseFloat(grid?.[String(z)])||0);
-  const maxV  = Math.max(...vals, 1);
-  return (
-    <div>
-      {title && <div style={{fontSize:8,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.7,marginBottom:4,fontFamily:"'DM Mono',monospace"}}>{title}</div>}
-      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:2,width:96}}>
-        {ZONES.flat().map(z => {
-          const v = parseFloat(grid?.[String(z)])||0;
-          const intensity = maxV > 0 ? v / maxV : 0;
-          const bg = color === 'red'
-            ? `rgba(255,64,32,${(intensity*0.6+0.05).toFixed(2)})`
-            : `rgba(39,201,122,${(intensity*0.6+0.05).toFixed(2)})`;
-          return (
-            <div key={z} style={{height:28,display:'flex',alignItems:'center',justifyContent:'center',
-              background:bg,borderRadius:3,border:'1px solid rgba(255,255,255,.08)'}}>
-              <span style={{fontSize:8,fontWeight:700,color:'rgba(255,255,255,.85)',fontFamily:"'DM Mono',monospace"}}>
-                {v>0?v.toFixed(0)+'%':''}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function BvPDeepDiveTab() {
-  const mono = "'DM Mono',monospace";
-  const osw  = "'Oswald',sans-serif";
-
-  const [matrix,      setMatrix]       = useState(null);
-  const [loading,     setLoading]      = useState(true);
-  const [selPitcher,  setSelPitcher]   = useState(null);   // pitcher_id string
-  const [selPitches,  setSelPitches]   = useState(new Set()); // multi-select pitch types
-  const [dateWin,     setDateWin]      = useState('A');    // A=season 30/15/7=last N days
-  const [location,    setLocation]     = useState('A');    // A=all H=home Away=away
-  const [selGame,     setSelGame]      = useState(null);
-  const [dayNight,    setDayNight]     = useState('D');    // D/N only — aggregate has no A key
-  const [batterHand,  setBatterHand]   = useState('ALL');
-  const [pitcherHand, setPitcherHand]  = useState('ALL'); // RHP / LHP / ALL
-  const [sortBy,      setSortBy]       = useState('avg_ev');
-  const [sortDir,     setSortDir]      = useState('desc');
-  const [selBatter,   setSelBatter]    = useState(null);   // bid for zone overlay
-  const [dateSlot,    setDateSlot]     = useState('today');
-
-  // ── Load bvp_matrix.json once ──────────────────────────────────────────────
-  useEffect(() => {
-    if (BVP_MATRIX_CACHE.data) { setMatrix(BVP_MATRIX_CACHE.data); setLoading(false); return; }
-    fetch('/data/bvp_matrix.json')
-      .then(r => r.ok ? r.json() : null)
-      .then(d => {
-        if (d?.matrix && typeof d.matrix === 'object') { BVP_MATRIX_CACHE.data = d.matrix; setMatrix(d.matrix); }
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, []);
-
-
-
-
-
-
-  // ── Toggle pitch selection ─────────────────────────────────────────────────
-  const togglePitch = pt => {
-    setSelPitches(prev => {
-      const next = new Set(prev);
-      next.has(pt) ? next.delete(pt) : next.add(pt);
-      return next;
-    });
-    setSelBatter(null);
-  };
-
-  // ── Build batter rows from selected pitcher + pitches + day/night ──────────
-  // pitcher must be declared before useMemo (can't be after guard)
-  const pitcher = (matrix && selPitcher) ? (matrix[selPitcher] || null) : null;
-
-  const batterRows = React.useMemo(() => {
-    if (!pitcher) return [];
-    try {
-      const matchup  = pitcher.matchup || '';
-      const parts    = matchup.split(' @ ');
-      const awayTeam = parts[0]?.trim() || '';
-      const homeTeam = parts[1]?.trim() || '';
-      const opposingTeam = pitcher.team === homeTeam ? awayTeam
-                         : pitcher.team === awayTeam ? homeTeam : '';
-
-      const seen = new Set();
-      return Object.values(DAILY_PICKS_CACHE).filter(b => {
-        const bid  = String(b.batter_id||'').split('.')[0];
-        const team = b.batting_team || b.team || '';
-        if (!bid || seen.has(bid)) return false;
-        if (opposingTeam && team !== opposingTeam) return false;
-        const ls = LINEUP_STATUS[parseInt(bid)||0];
-        if (!ls) return false;
-        if (!isActiveBatter(b)) return false; // hide stale/inactive batters
-        seen.add(bid);
-        // Hand filter: does batter hand match selected filter?
-        if (batterHand !== 'ALL') {
-          const bh = (b.batter_hand||'').charAt(0).toUpperCase();
-          if (bh && bh !== batterHand.charAt(0)) return false;
-        }
-        return true;
-      }).map(dp => {
-        const bid  = String(dp.batter_id||'').split('.')[0];
-        const ls   = LINEUP_STATUS[parseInt(bid)||0];
-        const hand = (dp.batter_hand||dp.hand||'').charAt(0).toUpperCase();
-
-        // Platoon advantage
-        const ph = (pitcher.hand||'').charAt(0).toUpperCase();
-        const platoon = (ph==='R'&&(hand==='L'||hand==='S'))||(ph==='L'&&hand==='R');
-
-        // PS convergence pitch matches selected pitch type?
-        const convPitch = dp.ps_conv_pitch || '';
-        const pitchMatch = selPitches.size > 0 && selPitches.has(convPitch);
-
-        return {
-          bid,
-          name:        dp.batter || bid,
-          hand,
-          team:        dp.batting_team || '',
-          platoon,
-          pitchMatch,
-          convPitch,
-          lineup_slot: ls?.slot || ls?.lineup_slot || 9,
-          // ── Yard / Grade ───────────────────────────────────────────────
-          _yard:       parseFloat(dp._yard||0),
-          grade:       dp.grade || '',
-          // ── BvP: how batter did vs THIS pitcher (from matchup engine) ──
-          bvp_ev:      parseFloat(dp.bvp_avg_ev||0),
-          bvp_hh:      parseFloat(dp.bvp_hh_pct||0),
-          bvp_fb:      parseFloat(dp.bvp_fb_pct||0),
-          bvp_gb:      parseFloat(dp.bvp_gb_pct||0),
-          bvp_brl:     parseFloat(dp.bvp_barrel_pct||0),
-          bvp_la:      parseFloat(dp.bvp_avg_la||0),
-          bvp_bs:      parseFloat(dp.bvp_avg_bat_speed||0),
-          bvp_iso:     parseFloat(dp.bvp_iso||0),
-          bvp_pfb:     parseFloat(dp.bvp_pulled_fb_pct||0),
-          // ── Recent form: last ~15 days from matchup engine ─────────────
-          rec_ev:      parseFloat(dp.recent_avg_ev||0),
-          rec_hh:      parseFloat(dp.recent_hh_pct||0),
-          rec_fb:      parseFloat(dp.recent_fb_pct||0),
-          rec_gb:      parseFloat(dp.recent_gb_pct||0),
-          rec_iso:     parseFloat(dp.recent_iso||0),
-          rec_k:       parseFloat(dp.recent_k_pct||0),
-          rec_bs:      parseFloat(dp.recent_avg_bat_speed||0),
-          // ── PS / sim ───────────────────────────────────────────────────
-          ps_score:    getPS(dp),
-          sim_tb:      parseFloat(dp.sim_tb||0),
-          zone_fit:    getZoneFit(dp),
-          bat_speed_delta: parseFloat(dp.bat_speed_vs_baseline||0),
-          la_mean:     parseFloat(dp.la_mean_l15||0),
-          la_std:      parseFloat(dp.la_stddev||0),
-          season_woba: parseFloat(dp.season_woba||0),
-          season_xwoba:parseFloat(dp.season_xwoba||0),
-        };
-      }).sort((a,b) => (a.lineup_slot||9) - (b.lineup_slot||9));
-    } catch(e) {
-      console.error('BvP batterRows error:', e);
-      return [];
-    }
-  }, [pitcher, selPitches, batterHand]);
-
-
-  // ── Sort batter rows ───────────────────────────────────────────────────────
-  const sortedRows = React.useMemo(() => {
-    const dir = sortDir === 'desc' ? -1 : 1;
-    return [...batterRows].sort((a,b) => {
-      const av = a[sortBy] ?? -999, bv = b[sortBy] ?? -999;
-      return dir * (bv - av);
-    });
-  }, [batterRows, sortBy, sortDir]);
-
-  const handleSort = col => {
-    if (col === sortBy) setSortDir(d => d==='desc'?'asc':'desc');
-    else { setSortBy(col); setSortDir('desc'); }
-  };
-
-  const sortArrow = col => col===sortBy?(sortDir==='desc'?'▼':'▲'):'';
-
-  // ── Colors ─────────────────────────────────────────────────────────────────
-  const evCol  = v => !v?'var(--muted)':v>=103?'var(--c-danger)':v>=97?'var(--accent2)':'var(--muted)';
-  const hhCol  = v => !v?'var(--muted)':v>=40?'var(--c-danger)':v>=30?'var(--accent2)':'var(--muted)';
-  const brlCol = v => !v?'var(--muted)':v>=10?'var(--c-danger)':v>=6?'var(--accent2)':'var(--muted)';
-  const avCol  = v => !v?'var(--muted)':v>=0.280?'var(--green)':v>=0.240?'var(--accent2)':'var(--muted)';
-  const wCol   = v => !v?'var(--muted)':v>=0.370?'var(--c-danger)':v>=0.310?'var(--accent2)':'var(--muted)';
-  const xwCol  = v => !v?'var(--muted)':v>=0.380?'var(--c-danger)':v>=0.320?'var(--accent2)':'var(--muted)';
-  const isoCol = v => !v?'var(--muted)':v>=0.250?'var(--c-warn)':v>=0.180?'var(--accent2)':'var(--muted)';
-  const ydCol  = v => !v?'var(--muted)':v>=75?'var(--c-gold)':v>=60?'var(--c-danger)':v>=45?'var(--accent2)':v>=20?'#c4a882':'var(--muted)';
-  const pgCol  = g => !g?'var(--muted)':g.includes('Target')?'var(--green)':g.includes('Hittable')?'var(--c-lime)':g.includes('Elite')?'var(--c-danger)':g.includes('Tough')?'var(--accent2)':'var(--muted)';
-
-  const TH = ({ col, label, title }) => (
-    <th onClick={()=>handleSort(col)} title={title}
-      style={{padding:'5px 6px',fontSize:8,fontFamily:mono,textTransform:'uppercase',
-        letterSpacing:.6,color:sortBy===col?'var(--accent2)':'var(--muted)',
-        cursor:'pointer',whiteSpace:'nowrap',borderBottom:'1px solid var(--border)',
-        background:'var(--surface2)',position:'sticky',top:0,zIndex:10,textAlign:'right'}}>
-      {label}{sortArrow(col)}
-    </th>
-  );
-
-  const selBatterData = selBatter ? pitcher?.vs_batter?.[selBatter] : null;
-  const _selPitchArr  = [...selPitches];
-  const selZoneGrid   = selBatterData
-    ? (selPitches.size===1
-        ? selBatterData.by_pitch?.[_selPitchArr[0]]?.[dayNight]?.zone_grid
-        : selBatterData.overall?.[dayNight]?.zone_grid)
-    : null;
-
-  // Guard after all hooks — no early returns before hooks (fixes React #310)
-  if (loading || !matrix) return (
-    <div style={{padding:40,color:loading?'var(--muted)':'var(--accent)',
-      fontFamily:"'DM Mono',monospace",fontSize:11,textAlign:'center'}}>
-      {loading ? 'Loading BvP matrix…' : '⚠ bvp_matrix.json not found. Run mlbdata_aggregate.py to generate it.'}
-    </div>
-  );
-
-  // ── Pitcher list (after guard — matrix is guaranteed non-null here) ────────
-  const pitchers = Object.entries(matrix).map(([pid, p]) => ({ pid, ...p }))
-    .sort((a,b) => (a.name||'').localeCompare(b.name||''));
-
-  // Opposing team for the selected pitcher
-  const opposingTeam = (() => {
-    if (!pitcher) return '';
-    const parts = (pitcher.matchup||'').split(' @ ');
-    return pitcher.team === parts[1]?.trim() ? parts[0]?.trim()
-         : pitcher.team === parts[0]?.trim() ? parts[1]?.trim()
-         : '';
-  })();
-
-  return (
-    <div style={{padding:'0 4px'}}>
-
-      {/* ── Game selector strip ─────────────────────────────────────────── */}
-      {(()=>{
-        // Build unique games from pitchers, sorted by game time
-        const games = [];
-        const seen = new Set();
-        pitchers.forEach(p => {
-          const key = p.matchup || p.team || '';
-          if (key && !seen.has(key)) {
-            seen.add(key);
-            // Find game time from SCHEDULE_CACHE or daily_picks via matchup string
-            const dp = Object.values(DAILY_PICKS_CACHE).find(b =>
-              b.batting_team && p.matchup && p.matchup.includes(b.batting_team)
-            );
-            games.push({ key, label: key, time: dp?.game_time || '' });
-          }
-        });
-        // Sort by time
-        games.sort((a,b) => (a.time||'').localeCompare(b.time||''));
-        if (!games.length) return null;
-        return (
-          <div style={{marginBottom:14}}>
-            <div style={{fontSize:8,color:'var(--muted)',fontFamily:mono,textTransform:'uppercase',
-              letterSpacing:.7,marginBottom:6}}>Select Matchup</div>
-            <div style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:4,
-              WebkitOverflowScrolling:'touch',scrollbarWidth:'none'}}>
-              <button onClick={()=>{setSelGame(null);setSelPitcher(null);setSelBatter(null);}}
-                style={{flexShrink:0,padding:'6px 10px',borderRadius:8,fontSize:9,fontFamily:mono,
-                  cursor:'pointer',border:`1px solid ${selGame===null?'var(--accent2)':'var(--border)'}`,
-                  background:selGame===null?'rgba(232,65,26,.12)':'var(--surface2)',
-                  color:selGame===null?'var(--accent2)':'var(--muted)',whiteSpace:'nowrap'}}>
-                All Games
-              </button>
-              {games.map(g => {
-                const active = selGame === g.key;
-                // Parse teams from matchup string "AWAY @ HOME"
-                const [away='', home=''] = g.key.split(' @ ');
-                return (
-                  <button key={g.key}
-                    onClick={()=>{setSelGame(g.key);setSelPitcher(null);setSelBatter(null);}}
-                    style={{flexShrink:0,padding:'6px 10px',borderRadius:8,cursor:'pointer',
-                      border:`1px solid ${active?'var(--accent2)':'var(--border)'}`,
-                      background:active?'rgba(232,65,26,.08)':'var(--surface2)',
-                      display:'flex',flexDirection:'column',alignItems:'center',gap:2}}>
-                    <div style={{display:'flex',alignItems:'center',gap:5}}>
-                      <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,
-                        color:active?'var(--text)':'var(--muted)'}}>{away}</span>
-                      <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>@</span>
-                      <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:11,
-                        color:active?'var(--text)':'var(--muted)'}}>{home}</span>
-                    </div>
-                    {g.time && <div style={{fontFamily:mono,fontSize:7,color:active?'var(--accent2)':'var(--muted)'}}>{g.time}</div>}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* ── Pitcher selector — grouped by game, filtered by hand ────────── */}
-      <div style={{marginBottom:12}}>
-        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,flexWrap:'wrap'}}>
-          <span style={{fontSize:9,color:'var(--muted)',fontFamily:mono,textTransform:'uppercase',letterSpacing:.7}}>
-            Select Pitcher
-          </span>
-          {/* Hand filter */}
-          {[['ALL','All'],['R','RHP'],['L','LHP']].map(([v,l])=>(
-            <button key={v} onClick={()=>setPitcherHand(v)}
-              style={{padding:'2px 8px',borderRadius:4,fontSize:8,fontFamily:mono,cursor:'pointer',
-                border:`1px solid ${pitcherHand===v?'var(--accent2)':'var(--border)'}`,
-                background:pitcherHand===v?'rgba(232,65,26,.1)':'transparent',
-                color:pitcherHand===v?'var(--accent2)':'var(--muted)',fontWeight:pitcherHand===v?700:400}}>
-              {l}
-            </button>
-          ))}
-        </div>
-        {/* Group pitchers by matchup */}
-        {(()=>{
-          const filtered = pitchers.filter(p =>
-            (!selGame || p.matchup === selGame) &&
-            (pitcherHand==='ALL' || p.hand===pitcherHand || p.hand===(pitcherHand==='R'?'Right':'Left'))
-          );
-          const byGame = {};
-          filtered.forEach(p => {
-            const key = p.matchup || p.team || 'Other';
-            if (!byGame[key]) byGame[key] = [];
-            byGame[key].push(p);
-          });
-          return Object.entries(byGame).sort(([a],[b])=>a.localeCompare(b)).map(([game, gPitchers]) => (
-            <div key={game} style={{marginBottom:10}}>
-              <div style={{fontSize:8,color:'var(--muted)',fontFamily:mono,letterSpacing:.5,
-                marginBottom:5,paddingBottom:3,borderBottom:'1px solid rgba(255,255,255,.06)'}}>
-                {game}
-              </div>
-              <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
-                {gPitchers.sort((a,b)=>(b.is_starter?1:0)-(a.is_starter?1:0)||(a.name||'').localeCompare(b.name||'')).map(p => (
-                  <button key={p.pid}
-                    onClick={()=>{setSelPitcher(p.pid);setSelPitches(new Set());setSelBatter(null);}}
-                    style={{padding:'3px 8px',borderRadius:5,fontSize:9,fontFamily:mono,cursor:'pointer',
-                      border:`1px solid ${selPitcher===p.pid?'var(--accent2)':p.is_starter?'rgba(255,255,255,.2)':'var(--border)'}`,
-                      background:selPitcher===p.pid?'rgba(232,65,26,.12)':'var(--surface2)',
-                      color:selPitcher===p.pid?'var(--accent2)':p.is_starter?'var(--text)':'var(--muted)',
-                      fontWeight:selPitcher===p.pid?700:p.is_starter?600:400}}>
-                    {p.is_starter && <span style={{marginRight:3,fontSize:7,opacity:.7}}>★</span>}
-                    {p.name||'Unknown'}
-                    {p.hand && <span style={{marginLeft:4,fontSize:7,opacity:.6}}>{p.hand==='R'||p.hand==='Right'?'R':'L'}</span>}
-                    {p.grade && !p.is_starter && <span style={{marginLeft:4,fontSize:7,color:pgCol(p.grade||'')}}>{(p.grade||'').split(' ')[0]}</span>}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ));
-        })()}
-      </div>
-
-      {pitcher && (<>
-
-        {/* ── Pitcher summary card ─────────────────────────────────────────── */}
-        <div style={{background:'var(--surface2)',borderRadius:8,border:'1px solid var(--border)',
-          padding:'10px 14px',marginBottom:12,display:'flex',gap:24,alignItems:'center',flexWrap:'wrap'}}>
-          <div>
-            <div style={{fontFamily:osw,fontWeight:800,fontSize:16,color:'var(--text)'}}>{pitcher.name}</div>
-            <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',marginTop:2}}>
-              {pitcher.hand && `${pitcher.hand}HP`} · {pitcher.pa} PA faced (2026)
-            </div>
-          </div>
-          {(()=>{
-            // Build split key from active filters: "{dateWin}_{dayNight}_{batterHand[0]}"
-            const hKey = batterHand==='ALL'?'A':batterHand.charAt(0);
-            const pLocKey = location==='A'?'A':location==='H'?'H':'A_loc';
-            const splitKey = `${dateWin}_${dayNight}_${hKey}_${pLocKey}`;
-            const split = (pitcher.stats_by_split||{})[splitKey] || (pitcher.stats_by_split||{})['A_A_A'] || {};
-            const pa  = split.pa  ?? pitcher.pa;
-            const hh  = split.hh_pct  ?? pitcher.hh_pct_allowed;
-            const brl = split.brl_pct ?? pitcher.brl_pct_allowed;
-            const mb  = split.mb_pct  ?? pitcher.mb_pct;
-            const hr  = split.hr      ?? pitcher.hr_allowed;
-            const fb  = split.fb_pct;
-            const kk  = split.k_pct;
-            const bb  = split.bb_pct;
-            return [
-              ['HH% Allowed', hh,  v=>v>=35?'var(--c-danger)':v>=28?'var(--accent2)':'var(--muted)', v=>v?.toFixed(1)+'%'],
-              ['Brl% Allowed', brl, v=>v>=9?'var(--c-danger)':v>=6?'var(--accent2)':'var(--muted)',  v=>v?.toFixed(1)+'%'],
-              ['Meatball%',   mb,  v=>v>=60?'var(--c-danger)':v>=50?'var(--accent2)':'var(--muted)', v=>v?.toFixed(1)+'%'],
-              ['HR Allowed',  hr,  v=>v>=20?'var(--c-danger)':v>=12?'var(--accent2)':'var(--muted)', v=>String(v)],
-              ...(fb!=null?[['FB% Allowed', fb, v=>v>=38?'var(--c-danger)':v>=30?'var(--accent2)':'var(--muted)', v=>v?.toFixed(1)+'%']]:[]),
-              ...(kk!=null?[['K%',          kk, v=>v>=28?'var(--green)':v>=22?'var(--c-lime)':'var(--muted)',  v=>v?.toFixed(1)+'%']]:[]),
-              ...(bb!=null?[['BB%',         bb, v=>v>=12?'var(--accent2)':'var(--muted)',                  v=>v?.toFixed(1)+'%']]:[]),
-              ['PA (split)',  pa,  ()=>'var(--muted)', v=>String(v)],
-            ].filter(([,val])=>val!=null);
-          })().map(([lbl,val,col,fmt])=>(
-            <div key={lbl} style={{textAlign:'center'}}>
-              <div style={{fontFamily:mono,fontSize:7,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.5,marginBottom:2}}>{lbl}</div>
-              <div style={{fontFamily:osw,fontWeight:800,fontSize:15,color:col(val)}}>{val!=null?fmt(val):'—'}</div>
-            </div>
-          ))}
-          <div style={{marginLeft:'auto',display:'flex',gap:4,alignItems:'center'}}>
-            <span style={{fontSize:8,color:'var(--muted)',fontFamily:mono}}>Grade:</span>
-            <span style={{fontFamily:osw,fontWeight:700,fontSize:13,color:pgCol(pitcher.grade)}}>{pitcher.grade||'—'}</span>
-          </div>
-        </div>
-
-        {/* ── Pitch mix selector ───────────────────────────────────────────── */}
-        <div style={{marginBottom:10}}>
-          <div style={{fontSize:9,color:'var(--muted)',fontFamily:mono,textTransform:'uppercase',letterSpacing:.7,marginBottom:6}}>
-            Select Pitches <span style={{opacity:.5}}>(multi-select · empty = all)</span>
-          </div>
-          <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'flex-start'}}>
-            {Object.entries(pitcher.pitch_mix||{})
-              .sort((a,b)=>b[1]-a[1])
-              .map(([pt, pct]) => {
-                const isOn = selPitches.has(pt);
-                return (
-                  <button key={pt} onClick={()=>togglePitch(pt)}
-                    style={{padding:'5px 10px',borderRadius:6,fontSize:9,fontFamily:mono,cursor:'pointer',
-                      border:`1px solid ${isOn?'var(--c-lime)':'var(--border)'}`,
-                      background:isOn?'rgba(39,201,122,.12)':'var(--surface2)',
-                      color:isOn?'var(--c-lime)':'var(--text)',fontWeight:isOn?700:400}}>
-                    {pitcher.pitch_names?.[pt]||pt}
-                    <span style={{marginLeft:4,opacity:.7}}>{pct.toFixed(0)}%</span>
-                  </button>
-                );
-              })}
-          </div>
-        </div>
-
-        {/* ── Zone grid for selected pitch ─────────────────────────────────── */}
-        {selPitches.size === 1 && pitcher.zone_by_pitch && [...selPitches][0] && pitcher.zone_by_pitch[[...selPitches][0]] && (
-          <div style={{display:'flex',gap:20,marginBottom:14,alignItems:'flex-start',flexWrap:'wrap'}}>
-            {['D','N'].map(dn => {
-              const _pt0 = [...selPitches][0];
-              const _locK = location==='A'?'A':location==='H'?'H':'A_loc';
-              const zg = pitcher.zone_by_pitch?.[_pt0]?.[`${dateWin}_${dn}_${_locK}`];
-              if (!zg) return null;
-              return <ZoneGrid key={dn} grid={zg} title={`${dn==='D'?'Day':'Night'} — Pitcher Locations`} color="red"/>;
-            })}
-            {selZoneGrid && (
-              <ZoneGrid grid={selZoneGrid}
-                title={`${selBatter ? (pitcher.vs_batter?.[selBatter]?.name||'Batter') : 'Select batter'} — Contact Zones`}
-                color="green"/>
-            )}
-          </div>
-        )}
-
-        {/* ── Filters ──────────────────────────────────────────────────────── */}
-        <div style={{display:'flex',gap:8,marginBottom:10,alignItems:'center',flexWrap:'wrap'}}>
-          {/* Date Window */}
-          {[['A','All Season'],['30','L30'],['15','L15'],['7','L7']].map(([v,l])=>(
-            <button key={v} onClick={()=>setDateWin(v)}
-              style={{padding:'3px 9px',borderRadius:5,fontSize:9,fontFamily:mono,cursor:'pointer',
-                border:`1px solid ${dateWin===v?'var(--c-gold)':'var(--border)'}`,
-                background:dateWin===v?'rgba(255,215,0,.1)':'transparent',
-                color:dateWin===v?'var(--c-gold)':'var(--muted)',fontWeight:dateWin===v?700:400}}>
-              {l}
-            </button>
-          ))}
-          <div style={{width:1,height:16,background:'var(--border)',margin:'0 4px'}}/>
-          {/* Day/Night */}
-          {[['A','All'],['D','☀️ Day'],['N','🌙 Night']].map(([v,l])=>(
-            <button key={v} onClick={()=>setDayNight(v)}
-              style={{padding:'3px 9px',borderRadius:5,fontSize:9,fontFamily:mono,cursor:'pointer',
-                border:`1px solid ${dayNight===v?'var(--accent2)':'var(--border)'}`,
-                background:dayNight===v?'rgba(232,65,26,.1)':'transparent',
-                color:dayNight===v?'var(--accent2)':'var(--muted)',fontWeight:dayNight===v?700:400}}>
-              {l}
-            </button>
-          ))}
-          <div style={{width:1,height:16,background:'var(--border)',margin:'0 4px'}}/>
-          {/* Home / Away */}
-          {[['A','All'],['H','🏠 Home'],['Away','✈️ Away']].map(([v,l])=>(
-            <button key={v} onClick={()=>setLocation(v)}
-              style={{padding:'3px 9px',borderRadius:5,fontSize:9,fontFamily:mono,cursor:'pointer',
-                border:`1px solid ${location===v?'var(--ice)':'var(--border)'}`,
-                background:location===v?'rgba(56,184,242,.1)':'transparent',
-                color:location===v?'var(--ice)':'var(--muted)',fontWeight:location===v?700:400}}>
-              {l}
-            </button>
-          ))}
-          <div style={{width:1,height:16,background:'var(--border)',margin:'0 4px'}}/>
-          {/* Batter hand */}
-          {[['ALL','All'],['R','RHB'],['L','LHB']].map(([v,l])=>(
-            <button key={v} onClick={()=>setBatterHand(v)}
-              style={{padding:'3px 9px',borderRadius:5,fontSize:9,fontFamily:mono,cursor:'pointer',
-                border:`1px solid ${batterHand===v?'var(--accent2)':'var(--border)'}`,
-                background:batterHand===v?'rgba(232,65,26,.1)':'transparent',
-                color:batterHand===v?'var(--accent2)':'var(--muted)',fontWeight:batterHand===v?700:400}}>
-              {l}
-            </button>
-          ))}
-          <div style={{marginLeft:'auto',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>
-            {sortedRows.length} {opposingTeam||'opposing'} batters in lineup · {selPitches.size>0?[...selPitches].join('+'):'All pitches'} · {dateWin==='A'?'Full Season':`Last ${dateWin} days`} · {dayNight==='D'?'Day':'Night'} · {location==='A'?'All venues':location==='H'?'Home':'Away'}
-          </div>
-        </div>
-
-        {/* ── Batter table ─────────────────────────────────────────────────── */}
-        <div style={{overflowX:'auto'}}>
-          <table className="tw" style={{width:'100%',borderCollapse:'collapse',fontSize:10}}>
-              <thead>
-              <tr>
-                <th className="sticky-batter" style={{padding:'5px 8px',fontSize:8,fontFamily:mono,
-                  textTransform:'uppercase',letterSpacing:.6,color:'var(--muted)',textAlign:'left',
-                  borderBottom:'1px solid var(--border)',background:'var(--surface2)',
-                  position:'sticky',left:0,top:0,zIndex:20,whiteSpace:'nowrap'}}>
-                  Batter {pitcher && <span style={{fontSize:7,opacity:.5,fontWeight:400}}>✓ = platoon · ⚡ = PS pitch match</span>}
-                </th>
-                <TH col="yard"     label="🎯" title="Yard Score — composite HR probability 0-99"/>
-                <TH col="grade"    label="Gr"     title="Matchup Grade"/>
-                <TH col="ps_score" label="PS"     title="PS Score (always available)"/>
-                <TH col="la_mean"  label="LA°"    title="Launch Angle Mean L15 (44% of batters)"/>
-                <TH col="sim_tb"   label="SimTB"  title="Simulated Total Bases (key matchup batters only)"/>
-                <TH col="rec_ev"   label="EV"     title="Recent Exit Velocity (key matchup batters)"/>
-                <TH col="rec_hh"   label="HH%"    title="Recent Hard Hit Rate (key matchup batters)"/>
-                <TH col="rec_iso"  label="ISO"    title="Recent ISO (key matchup batters)"/>
-                {/* BvP: populated only when batter has prior history vs this pitcher */}
-                <th style={{padding:'4px 8px',fontSize:7,fontFamily:mono,color:'rgba(255,215,0,.6)',
-                  background:'rgba(255,215,0,.04)',borderBottom:'1px solid var(--border)',
-                  borderLeft:'1px solid rgba(255,215,0,.15)',textAlign:'center',whiteSpace:'nowrap'}}
-                  colSpan={4}>
-                  ↓ vs {pitcher?.name ? lastNameOf(pitcher.name) : 'pitcher'} (direct history)
-                </th>
-              </tr>
-              <tr>
-                <th className="sticky-batter" style={{background:'var(--surface2)',position:'sticky',left:0,zIndex:20,borderBottom:'1px solid var(--border)'}}/>
-                <th colSpan={8} style={{borderBottom:'1px solid var(--border)',background:'var(--surface2)'}}/>
-                <TH col="bvp_ev"  label="EV"   title="Exit Velocity vs this pitcher specifically"/>
-                <TH col="bvp_hh"  label="HH%"  title="Hard Hit Rate vs this pitcher"/>
-                <TH col="bvp_iso" label="ISO"  title="ISO vs this pitcher"/>
-                <TH col="bvp_fb"  label="FB%"  title="Fly Ball Rate vs this pitcher"/>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedRows.map(r => {
-                const isSelected = selBatter === r.bid;
-                const dp = DAILY_PICKS_CACHE[r.bid];
-                return (
-                  <tr key={r.bid}
-                    onClick={()=>setSelBatter(isSelected?null:r.bid)}
-                    style={{cursor:'pointer',borderBottom:'1px solid rgba(255,255,255,.04)',
-                      background:isSelected?'rgba(232,65,26,.08)':'transparent',
-                      height:28}}>
-                    {/* Sticky batter cell */}
-                    <td className="sticky-batter" style={{padding:'2px 8px',
-                      background:isSelected?'rgba(232,65,26,.08)':'var(--surface)',
-                      position:'sticky',left:0,zIndex:5,whiteSpace:'nowrap',minWidth:160}}>
-                      <div style={{display:'flex',alignItems:'center',gap:4}}>
-                        <PlayerAvatar pid={parseInt(r.bid)||0} name={r.name} size={16}/>
-                        <span style={{fontFamily:mono,fontSize:8,fontWeight:700,color:'var(--accent2)',flexShrink:0}}>
-                          {r.team||''}
-                        </span>
-                        <span onClick={e=>{e.stopPropagation();openAtBatSlide({pid:parseInt(r.bid)||0,name:r.name,team:r.team||''});}}
-                          style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:10,
-                            color:isKeyMatchup(parseInt(r.bid)||0,r.name)?'var(--c-warn)':'var(--text)',
-                            cursor:'pointer',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                          {r.name}
-                        </span>
-                        {(()=>{
-                          const ph = pitcher?.hand?.charAt(0).toUpperCase();
-                          const bh = r.hand?.charAt(0).toUpperCase();
-                          const platoon = (ph==='R'&&(bh==='L'||bh==='S'))||(ph==='L'&&bh==='R');
-                          return platoon ? <span title="Platoon advantage" data-tip="✓ Natural platoon advantage vs pitcher's hand" style={{fontSize:9,color:'var(--green)',marginLeft:2,flexShrink:0}}>✓</span> : null;
-                        })()}
-                        <span style={{flexShrink:0}}>
-                          <PickButton pid={parseInt(r.bid)||0} name={r.name} team={r.team||''}/><GamblyButton name={r.name} team={r.team||''} prop="hr"/>
-                        </span>
-                      </div>
-                    </td>
-                    {/* Yard Score — static from daily picks */}
-                    <td style={{textAlign:'right',padding:'2px 6px'}}>
-                      {r._yard > 0 && <YardBadge score={r._yard}/>}
-                    </td>
-                    {/* Grade */}
-                    <td style={{textAlign:'center',padding:'2px 4px',fontFamily:mono,fontSize:9,
-                      color:r.grade==='A+'?'var(--c-gold)':r.grade==='A'?'var(--green)':r.grade==='B'?'var(--accent2)':'var(--muted)',fontWeight:700}}>
-                      {r.grade||'—'}
-                    </td>
-                    {/* BvP stats — adjust to pitch/day/night selection */}
-                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,color:r.pa>=10?'var(--text)':'var(--muted)'}}>{r.pa}</td>
-                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,color:avCol(r.avg)}}>{r.avg?.toFixed(3)||'—'}</td>
-                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:osw,fontWeight:700,fontSize:10,color:r.hr>=2?'var(--c-danger)':r.hr>=1?'var(--accent2)':'var(--muted)'}}>{r.hr||'—'}</td>
-                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{r.bb||'—'}</td>
-                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,color:r.k>=4?'var(--c-danger)':'var(--muted)'}}>{r.k||'—'}</td>
-                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,color:evCol(r.avg_ev)}}>{r.avg_ev?.toFixed(1)||'—'}</td>
-                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,color:hhCol(r.hh_pct)}}>{r.hh_pct!=null?r.hh_pct.toFixed(1)+'%':'—'}</td>
-                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,color:brlCol(r.brl_pct)}}>{r.brl_pct!=null?r.brl_pct.toFixed(1)+'%':'—'}</td>
-                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,color:r.pbrl_pct>=5?'var(--c-danger)':'var(--muted)'}}>{r.pbrl_pct!=null?r.pbrl_pct.toFixed(1)+'%':'—'}</td>
-                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,color:r.fb_pct>=35?'var(--green)':'var(--muted)'}}>{r.fb_pct!=null?r.fb_pct.toFixed(1)+'%':'—'}</td>
-                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,color:r.gb_pct>=55?'var(--c-danger)':'var(--muted)'}}>{r.gb_pct!=null?r.gb_pct.toFixed(1)+'%':'—'}</td>
-                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,color:'var(--muted)'}}>{r.pfb_pct!=null?r.pfb_pct.toFixed(1)+'%':'—'}</td>
-                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,color:isoCol(r.iso)}}>{r.iso?.toFixed(3)||'—'}</td>
-                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,color:wCol(r.woba)}}>{r.woba?.toFixed(3)||'—'}</td>
-                    <td style={{textAlign:'right',padding:'2px 6px',fontFamily:mono,fontSize:9,color:xwCol(r.xwoba)}}>{r.xwoba?.toFixed(3)||'—'}</td>
-                  </tr>
-                );
-              {/* ── Totals / Averages row ─────────────────────────────── */}
-              {sortedRows.length > 1 && (() => {
-                const n = sortedRows.filter(r=>r.ab>0).length || 1;
-                const sum = k => sortedRows.reduce((a,r)=>a+(parseFloat(r[k])||0),0);
-                const wavg = (k,w='ab') => {
-                  const tot = sum(w); if(!tot) return null;
-                  return sortedRows.reduce((a,r)=>a+(parseFloat(r[k])||0)*(parseFloat(r[w])||0),0)/tot;
-                };
-                const totAB=sum('ab'),totH=sum('h'),totHR=sum('hr'),totBB=sum('bb'),totK=sum('k');
-                const avgEV=sum('avg_ev')/n, avgLA=sum('avg_la')/n;
-                const avgAvg=wavg('avg'),avgOBP=wavg('obp'),avgSLG=wavg('slg');
-                const avgISO=avgSLG&&avgAvg?avgSLG-avgAvg:null;
-                const tc={padding:'2px 6px',fontFamily:"'DM Mono',monospace",fontSize:9,fontWeight:700,
-                  textAlign:'right',color:'var(--accent2)',background:'rgba(56,184,242,.06)',
-                  borderTop:'1px solid rgba(56,184,242,.2)'};
-                return (
-                  <tr style={{borderTop:'2px solid rgba(56,184,242,.25)'}}>
-                    <td className="sticky-batter" style={{...tc,textAlign:'left',
-                      position:'sticky',left:0,zIndex:5,background:'rgba(56,184,242,.06)'}}>
-                      <span style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'var(--accent2)',fontWeight:700}}>
-                        TOTALS / AVG · {sortedRows.length} batters
-                      </span>
-                    </td>
-                    <td style={tc}>{totAB||'—'}</td>
-                    <td style={tc}>{totH||'—'}</td>
-                    <td style={tc}>{totHR||'—'}</td>
-                    <td style={tc}>{totBB||'—'}</td>
-                    <td style={tc}>{totK||'—'}</td>
-                    <td style={tc}>{avgAvg?.toFixed(3)||'—'}</td>
-                    <td style={tc}>{avgOBP?.toFixed(3)||'—'}</td>
-                    <td style={tc}>{avgSLG?.toFixed(3)||'—'}</td>
-                    <td style={tc}>{avgEV?.toFixed(1)||'—'}</td>
-                    <td style={tc}>{avgLA?.toFixed(1)||'—'}</td>
-                    <td style={tc}>{(sum('barrel_pct')/n).toFixed(1)+'%'}</td>
-                    <td style={tc}>{(sum('hh_pct')/n).toFixed(1)+'%'}</td>
-                    <td style={tc}>{(sum('fb_pct')/n).toFixed(1)+'%'}</td>
-                    <td style={tc}>{(sum('gb_pct')/n).toFixed(1)+'%'}</td>
-                    <td style={tc}>{(sum('pfb_pct')/n).toFixed(1)+'%'}</td>
-                    <td style={tc}>{avgISO?.toFixed(3)||'—'}</td>
-                    <td style={tc}>{wavg('woba')?.toFixed(3)||'—'}</td>
-                    <td style={tc}>{wavg('xwoba')?.toFixed(3)||'—'}</td>
-                  </tr>
-                );
-              })()}
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        {/* ── Selected batter zone overlay ──────────────────────────────────── */}
-        {selBatter && selZoneGrid && (
-          <div style={{marginTop:12,background:'var(--surface2)',borderRadius:8,
-            border:'1px solid var(--border)',padding:'12px 14px'}}>
-            <div style={{fontSize:9,color:'var(--muted)',fontFamily:mono,textTransform:'uppercase',
-              letterSpacing:.7,marginBottom:8}}>
-              {pitcher.vs_batter?.[selBatter]?.name} — Contact Zone vs {[...selPitches].join('+')||'All Pitches'}
-            </div>
-            <div style={{display:'flex',gap:20,alignItems:'flex-start'}}>
-              <ZoneGrid grid={selZoneGrid} title="Batter Contact Zones" color="green"/>
-              {selPitches.size===1 && (
-                <ZoneGrid
-                  grid={pitcher.zone_by_pitch?.[[...selPitches][0]]?.[`${dateWin}_${dayNight}_${location==='A'?'A':location==='H'?'H':'A_loc'}`]}
-                  title="Pitcher Location" color="red"/>
-              )}
-              <div style={{fontSize:9,fontFamily:mono,color:'var(--muted)',lineHeight:1.8}}>
-                <div>Green = batter contact frequency</div>
-                <div>Red = where pitcher leaves the {[...selPitches][0]||'pitch'}</div>
-                <div style={{marginTop:8,color:'var(--text)'}}>Overlap = damage zone</div>
-              </div>
-            </div>
-          </div>
-        )}
-
-      </>)}
-    </div>
-  );
-}
-
-
 // ── TeamBtn — universal team name click → opens team slideout ─────────────
 // Usage: <TeamBtn abbr="NYY"/> anywhere in the app
 function TeamBtn({ abbr, style }) {
@@ -24989,7 +22526,6 @@ function MatchupEngineTab() {
     {showKMHelp && <HelpSlideout title="⚡ Matchups Guide" items={[
       ['⚡ Key Matchups', "Today's top batter vs pitcher matchups ranked by Yard Score and signal count. Each card shows pitcher grade, Boom score, key Statcast signals, and lineup confirmation. Tap any card to open the full batter slideout."],
       ['📋 All Matchups', "Every scheduled confirmed batter with full stats, grades, and Yard Score V2. Horizontally scrollable. Sort any column, filter by pitcher grade, batter grade, confirmed status, handedness, and more. CSV export available."],
-      ['🎯 Long Shot', "Higher-odds plays — lower-grade batters facing hittable or target pitchers. Good for prop diversification and finding undervalued names."],
       ['📜 BvP History', "Head-to-head career at-bat history between a specific batter and pitcher. See results by pitch type, contact quality, and outcomes."],
       ['🧮 Odds Calculator', "Slideout calculator for HR, hits, and TB prop bets. Manual mode: enter your odds and stake for payout. Suggested mode: the engine recommends a unit-fraction stake based on signal strength. Parlay mode: 2–5 legs, straight parlay plus an optional Round Robin combo breakdown, with bankroll-capped suggested stakes. Supports multiple currencies."],
       ['Yard Score 🎯', "Going Yard's HR probability score (0–99). Higher = stronger alignment of contact quality, matchup, park, weather, and recent form. Not a guarantee — a signal composite."],
@@ -25002,7 +22538,6 @@ function MatchupEngineTab() {
       <div style={{display:'flex',gap:4,flexWrap:'wrap',justifyContent:'center'}}>
         <button style={stBtn('matchups')}   onClick={()=>setSubTab('matchups')}>⚡ Key Matchups</button>
         <button style={stBtn('allmatches')} data-subtab="allmatches" onClick={()=>setSubTab('allmatches')}>📋 All Matchups</button>
-        <button style={stBtn('longshot')}   onClick={()=>setSubTab('longshot')}>🎲 Long Shot</button>
         <button style={stBtn('attack')}     onClick={()=>setSubTab('attack')}>🎯 Attack List</button>
       </div>
       {/* Row 2: prop markets */}
@@ -25021,7 +22556,7 @@ function MatchupEngineTab() {
       </div>
     </div>
     {/* Date slot toggle — only shown for matchups and simlab */}
-    {(subTab === 'matchups' || subTab === 'simlab' || subTab === 'allmatches' || subTab === 'longshot') && (
+    {(subTab === 'matchups' || subTab === 'allmatches') && (
       <div style={{display:'flex',gap:6,marginBottom:14,alignItems:'center'}}>
         {[
           { slot: 'today',    label: todayLabel },
@@ -25069,25 +22604,7 @@ function MatchupEngineTab() {
       <SimLabView key={`allmatches-${dateSlot}`} data={dateSlot==='tomorrow'&&allPicksTomorrowData.length>0 ? allPicksTomorrowData : allPicksData}/>
     </div>
 
-    {/* Long Shot — C/D grade batters with soft pitcher or good day conditions */}
-    {subTab === 'bvp'      && <BvPDeepDiveTab/>}
-    {subTab === 'pairs'    && <PairsTab data={data}/>}
-    {subTab === 'streaks'    && <StreaksTab/>}
-    {subTab === 'soclose'  && <SoCloseTab data={data}/>}
-    {subTab === 'longshot' && (
-      <LongShotView data={dateSlot==='tomorrow'&&allPicksTomorrowData.length>0 ? allPicksTomorrowData : allPicksData}/>
-    )}
-
-    {/* Sim Lab — display:none keeps component mounted so filters/sort persist across sub-tab switches */}
-    <div style={{display: subTab==='simlab' ? 'block' : 'none'}}>
-      <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:10}}>
-        <span style={{fontSize:10,color:'var(--accent)',fontFamily:"'DM Mono',monospace",fontWeight:700,opacity:.6}}>🧠</span>
-      </div>
-      <SimLabView data={activeData}/>
-    </div>
-
     {/* Batter Leaderboard */}
-    {subTab==='barrel' && <DailyBarrelTab/>}
 
     {subTab==='history' && <BvPHistoryTab data={activeData}/>}
 
@@ -25925,347 +23442,6 @@ function MatchupEngineTab() {
 
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DAILY BARREL v2 — Pitcher-first at-bat log explorer
-// Flow: Pick pitcher from today's schedule → pitch mix filters → batter table
-//       adjusts per pitcher hand + selected pitches → click batter for slide-out log
-// ─────────────────────────────────────────────────────────────────────────────
-function DailyBarrelTab() {
-  const [rows,        setRows]        = useState([]);
-  const [loading,     setLoading]     = useState(true);
-  const [error,       setError]       = useState(null);
-  const [games,       setGames]       = useState([]);  // today's schedule
-  const [selPitcher,  setSelPitcher]  = useState(null); // { id, name, hand, team, oppTeam, oppAbbr }
-  const [fPitches,    setFPitches]    = useState(new Set()); // empty = all
-  const [fBatHand,    setFBatHand]    = useState('all');
-  const [fMinEV,      setFMinEV]      = useState(0);
-  const [fBarrel,     setFBarrel]     = useState(false);
-  const [fDays,       setFDays]       = useState('season');
-  const [selBatter,   setSelBatter]   = useState(null); // batter id for slideout
-  const [sortCol,     setSortCol]     = useState({col:'avgEV',dir:'desc'});
-  const SEASON_START_DB = '2026-03-25';
-
-  // Load at-bat log
-  useEffect(() => {
-    fetch('/data/mlb_atbat_log_full.csv')
-      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status} — make sure mlb_atbat_log_full.csv is in public/data/`); return r.text(); })
-      .then(text => { setRows(parseCSVText(text).filter(r=>(r['Date']||'')>=SEASON_START_DB)); setLoading(false); })
-      .catch(e => { setError(e.message); setLoading(false); });
-  }, []);
-
-  // Load today's schedule for pitcher picker
-  useEffect(() => {
-    const today = new Date().toLocaleDateString('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).split('/').reduce((a,p,i)=>i===2?p+'-'+a.split('-')[0]+'-'+a.split('-')[1]:a.includes('-')?a:p,[]).replace(/(\d+)\/(\d+)\/(\d+)/,'$3-$1-$2');
-    const d = new Date(); const s = d.toLocaleDateString('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}); const [m,dy,y]=s.split('/'); const todayStr=`${y}-${m.padStart(2,'0')}-${dy.padStart(2,'0')}`;
-    fetch(`https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${todayStr}&hydrate=probablePitcher(note),team&fields=dates,games,gamePk,teams,away,home,team,abbreviation,probablePitcher,fullName,pitchHand,id`)
-      .then(r=>r.json())
-      .then(data=>{
-        const gs = data.dates?.[0]?.games || [];
-        const pitchers = [];
-        gs.forEach(g=>{
-          const aw = g.teams?.away, hm = g.teams?.home;
-          if (aw?.probablePitcher?.id) pitchers.push({
-            id: String(aw.probablePitcher.id), name: aw.probablePitcher.fullName,
-            hand: aw.probablePitcher.pitchHand?.code||'R',
-            team: aw.team?.abbreviation||'', oppTeam: hm.team?.abbreviation||'',
-            gamePk: g.gamePk, label: `${aw.team?.abbreviation||'?'} @ ${hm.team?.abbreviation||'?'}`
-          });
-          if (hm?.probablePitcher?.id) pitchers.push({
-            id: String(hm.probablePitcher.id), name: hm.probablePitcher.fullName,
-            hand: hm.probablePitcher.pitchHand?.code||'R',
-            team: hm.team?.abbreviation||'', oppTeam: aw.team?.abbreviation||'',
-            gamePk: g.gamePk, label: `${aw.team?.abbreviation||'?'} @ ${hm.team?.abbreviation||'?'}`
-          });
-        });
-        setGames(pitchers);
-        if (pitchers.length > 0) setSelPitcher(pitchers[0]);
-      }).catch(()=>{});
-  }, []);
-
-  // Resolve name from cache
-  const rn = id => getCachedPlayer(id)?.name || `#${id}`;
-
-  // Date cutoff
-  const cutoff = useMemo(()=>{
-    if (fDays==='season') return SEASON_START_DB;
-    const d=new Date(); d.setDate(d.getDate()-parseInt(fDays)); return d.toISOString().slice(0,10);
-  },[fDays]);
-
-  // Rows for selected pitcher's opponents — filtered by pitch mix + batter hand + date
-  const pitcherRows = useMemo(()=>{
-    if (!selPitcher || rows.length===0) return [];
-    return rows.filter(r=>{
-      if ((r['Date']||'')<cutoff) return false;
-      // Filter to at-bats AGAINST this pitcher by name (most reliable since IDs vary)
-      const pitId = String(r['Pitcher']||'');
-      const nameMatch = selPitcher.name && (rn(pitId).toLowerCase()===selPitcher.name.toLowerCase() || pitId===selPitcher.id);
-      if (!nameMatch && pitId!==selPitcher.id) return false;
-      if (fBatHand!=='all' && r['Batter Hand']!==fBatHand) return false;
-      if (fPitches.size>0 && !fPitches.has(r['Pitch Type'])) return false;
-      if (fMinEV>0 && (parseFloat(r['Exit Velocity'])||0)<fMinEV) return false;
-      if (fBarrel && parseInt(r['Is Barrel']||0)!==1) return false;
-      return true;
-    });
-  },[rows, selPitcher, cutoff, fBatHand, fPitches, fMinEV, fBarrel]);
-
-  // Pitch mix for selected pitcher from full season data
-  const pitcherMix = useMemo(()=>{
-    if (!selPitcher || rows.length===0) return [];
-    const pitRows = rows.filter(r=>{
-      const pid=String(r['Pitcher']||'');
-      return pid===selPitcher.id || rn(pid).toLowerCase()===selPitcher.name?.toLowerCase();
-    });
-    const counts={};
-    pitRows.forEach(r=>{ const pt=r['Pitch Type']; if(pt) counts[pt]=(counts[pt]||0)+1; });
-    const total=Object.values(counts).reduce((a,b)=>a+b,0);
-    return Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([pt,n])=>({ pt, pct:total>0?Math.round(n/total*100):0, n }));
-  },[rows, selPitcher]);
-
-  // Batter aggregates
-  const batterStats = useMemo(()=>{
-    const map={};
-    pitcherRows.forEach(r=>{
-      const id=String(r['Batter']||''); if(!id||id==='nan') return;
-      if (!map[id]) map[id]={id,hand:r['Batter Hand']||'',pa:0,evs:[],barrels:0,hh:0,hrs:0,fbs:[],las:[],hits:0,pas:0};
-      const m=map[id]; m.pa++;
-      const ev=parseFloat(r['Exit Velocity']); if(!isNaN(ev)&&ev>0) m.evs.push(ev);
-      if(parseInt(r['Is Barrel']||0)===1) m.barrels++;
-      if(parseInt(r['Is Hard Hit']||0)===1) m.hh++;
-      if(parseInt(r['Is Home Run']||0)===1) m.hrs++;
-      const bbt=(r['Batted Ball Type']||'').toLowerCase();
-      if(bbt==='fly_ball'||bbt==='line_drive') m.fbs.push(1);
-      const la=parseFloat(r['Launch Angle']); if(!isNaN(la)) m.las.push(la);
-      const res=(r['At-Bat Result']||'').toLowerCase();
-      if(['single','double','triple','home_run'].some(h=>res.includes(h))) m.hits++;
-    });
-    return Object.values(map).filter(m=>m.pa>=3).map(m=>({
-      id:m.id, name:rn(m.id), hand:m.hand, pa:m.pa,
-      avgEV: m.evs.length ? +(m.evs.reduce((a,b)=>a+b,0)/m.evs.length).toFixed(1) : null,
-      barrelPct: +(m.barrels/m.pa*100).toFixed(1),
-      hhPct: +(m.hh/m.pa*100).toFixed(1),
-      hrCount: m.hrs,
-      fbPct: +(m.fbs.length/m.pa*100).toFixed(1),
-      avgLA: m.las.length ? +(m.las.reduce((a,b)=>a+b,0)/m.las.length).toFixed(1) : null,
-      hitRate: +(m.hits/m.pa*100).toFixed(1),
-    }));
-  },[pitcherRows]);
-
-  // Per-batter at-bat log for slideout
-  const batterLog = useMemo(()=>{
-    if (!selBatter) return [];
-    return pitcherRows.filter(r=>String(r['Batter'])===String(selBatter))
-      .map(r=>({
-        date: r['Date']||'', pitch: r['Pitch Type']||'',
-        ev: parseFloat(r['Exit Velocity'])||null,
-        la: parseFloat(r['Launch Angle'])||null,
-        dist: parseFloat(r['Hit Distance'])||null,
-        result: (r['At-Bat Result']||'').replace(/_/g,' '),
-        barrel: parseInt(r['Is Barrel']||0),
-        hh: parseInt(r['Is Hard Hit']||0),
-        hr: parseInt(r['Is Home Run']||0),
-        bbt: r['Batted Ball Type']||'',
-        count: r['Pitch Count']||'',
-      })).sort((a,b)=>b.date.localeCompare(a.date));
-  },[pitcherRows, selBatter]);
-
-  const togglePitch = pt => { setFPitches(p=>{ const n=new Set(p); n.has(pt)?n.delete(pt):n.add(pt); return n; }); };
-  const sortArr = (arr,col,dir) => [...arr].sort((a,b)=>{ const av=a[col]??-Infinity,bv=b[col]??-Infinity; return dir==='desc'?bv-av:av-bv; });
-  const thClick = col => () => setSortCol(s=>({col,dir:s.col===col&&s.dir==='desc'?'asc':'desc'}));
-  const thArrow = col => sortCol.col===col?(sortCol.dir==='desc'?' ▼':' ▲'):'';
-  const evCol = v => v==null?'var(--muted)':v>=95?'var(--c-danger)':v>=92?'var(--c-warn)':v>=90?'var(--accent2)':'var(--text)';
-  const brlCol = v => v>=10?'var(--c-danger)':v>=6?'var(--c-warn)':v>=3?'var(--accent2)':'var(--text)';
-  const pillStyle = (active,col='var(--accent2)')=>({ padding:'3px 9px',borderRadius:20,cursor:'pointer',fontSize:10,fontWeight:active?700:400,fontFamily:"'DM Mono',monospace",border:`1px solid ${active?col:'var(--border)'}`,background:active?col+'20':'transparent',color:active?col:'var(--muted)',transition:'all .12s',whiteSpace:'nowrap' });
-
-  if (loading) return <div style={{padding:'40px',textAlign:'center'}}><div className="sp" style={{margin:'0 auto 12px',width:24,height:24,borderWidth:2}}/><div style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--muted)'}}>Loading at-bat log…</div></div>;
-  if (error) return <div style={{padding:'16px',background:'rgba(255,64,32,.08)',borderRadius:8,border:'1px solid rgba(255,64,32,.25)',fontFamily:"'DM Mono',monospace",fontSize:11,color:'var(--accent)'}}>✗ {error}</div>;
-
-  return <div>
-
-    {/* ── Step 1: Pitcher Picker ─────────────────────────────────── */}
-    <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:10,padding:'12px 14px',marginBottom:12}}>
-      <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1,marginBottom:8}}>
-        Step 1 — Select Today's Pitcher
-      </div>
-      {games.length === 0
-        ? <div style={{fontSize:11,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>No probable pitchers found for today</div>
-        : <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-          {games.map(p=>{
-            const active = selPitcher?.id===p.id;
-            return <button key={p.id+p.gamePk} onClick={()=>{ setSelPitcher(p); setFPitches(new Set()); }}
-              style={{...pillStyle(active,'var(--ice)'),padding:'5px 12px',borderRadius:8}}>
-              <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12}}>{p.name}</span>
-              <span style={{marginLeft:5,fontSize:9,opacity:.7}}>{p.hand}HP · {p.label}</span>
-            </button>;
-          })}
-        </div>
-      }
-    </div>
-
-    {selPitcher && <>
-
-    {/* ── Step 2: Pitch Mix + Filters ───────────────────────────── */}
-    <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:10,padding:'12px 14px',marginBottom:12}}>
-      <div style={{display:'flex',gap:10,alignItems:'center',marginBottom:8,flexWrap:'wrap'}}>
-        <div>
-          <PlayerAvatar pid={selPitcher.id} name={selPitcher.name} size={32}/>
-        </div>
-        <div>
-          <div style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:15}}>{selPitcher.name}</div>
-          <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)'}}>
-            {selPitcher.hand}HP · {selPitcher.team} · vs {selPitcher.oppTeam}
-          </div>
-        </div>
-        <div style={{marginLeft:'auto',fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--muted)'}}>
-          {pitcherRows.length.toLocaleString()} at-bats
-        </div>
-      </div>
-
-      {/* Pitch mix pills — built from actual data */}
-      <div style={{marginBottom:8}}>
-        <div style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1,marginBottom:5}}>
-          Step 2 — Filter Pitch Mix
-        </div>
-        <div style={{display:'flex',gap:5,flexWrap:'wrap',alignItems:'center'}}>
-          <button onClick={()=>setFPitches(new Set())} style={pillStyle(fPitches.size===0,'var(--text)')}>All Pitches</button>
-          {pitcherMix.map(({pt,pct})=>(
-            <button key={pt} onClick={()=>togglePitch(pt)} style={pillStyle(fPitches.has(pt),'var(--accent2)')}>
-              {pt} <span style={{opacity:.6,fontSize:9}}>{pct}%</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Secondary filters */}
-      <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
-        <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1}}>Batter:</span>
-        {['all','L','R','S'].map(h=>(
-          <button key={h} onClick={()=>setFBatHand(h)} style={pillStyle(fBatHand===h,'var(--green)')}>
-            {h==='all'?'Both Hands':h+'HB'}
-          </button>
-        ))}
-        <span style={{width:1,height:16,background:'var(--border)'}}/>
-        {[['season','Season'],['30','L30'],['14','L14'],['7','L7']].map(([v,l])=>(
-          <button key={v} onClick={()=>setFDays(v)} style={pillStyle(fDays===v,'var(--accent2)')}>{l}</button>
-        ))}
-        <span style={{width:1,height:16,background:'var(--border)'}}/>
-        <div style={{display:'flex',alignItems:'center',gap:5}}>
-          <span style={{fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace"}}>Min EV:</span>
-          <input type="range" min={0} max={115} step={1} value={fMinEV} onChange={e=>setFMinEV(parseInt(e.target.value))}
-            style={{width:70,accentColor:'var(--accent2)'}}/>
-          <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:fMinEV>0?'var(--accent2)':'var(--muted)',minWidth:28,fontWeight:fMinEV>0?700:400}}>
-            {fMinEV>0?`${fMinEV}+`:'Any'}
-          </span>
-        </div>
-        <button onClick={()=>setFBarrel(v=>!v)} style={{...pillStyle(fBarrel,'var(--c-warn)')}}>🛢 Barrel</button>
-      </div>
-    </div>
-
-    {/* ── Step 3: Opposing Batters Table ────────────────────────── */}
-    <div style={{marginBottom:8,fontSize:9,color:'var(--muted)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:1}}>
-      Step 3 — {selPitcher.oppTeam} Batters vs {selPitcher.name}{fPitches.size>0?` · ${[...fPitches].join('/')}`:''}
-      {fBatHand!=='all'?` · ${fBatHand}HB`:''}
-    </div>
-
-    {batterStats.length === 0
-      ? <div style={{padding:'24px',textAlign:'center',color:'var(--muted)',fontFamily:"'DM Mono',monospace",fontSize:11,background:'var(--surface)',borderRadius:8,border:'1px solid var(--border)'}}>
-          No at-bat data found for this pitcher vs current filters.<br/>
-          <span style={{fontSize:9,opacity:.6}}>Try expanding the date window or removing pitch filters</span>
-        </div>
-      : <div className="tw"><table>
-          <thead><tr style={{background:'var(--surface2)'}}>
-            {[['name','Batter',false,'left'],['hand','Hand',false,'center'],['pa','PA',true,'right'],
-              ['avgEV','Avg EV',true,'right'],['barrelPct','Brl%',true,'right'],
-              ['hhPct','HH%',true,'right'],['hrCount','HR',true,'right'],
-              ['fbPct','FB%',true,'right'],['avgLA','Avg LA',true,'right'],
-              ['hitRate','Hit%',true,'right'],
-            ].map(([col,label,sortable,align])=>(
-              <th key={col} onClick={sortable?thClick(col):undefined} style={{
-                padding:'6px 8px',textAlign:align,cursor:sortable?'pointer':'default',userSelect:'none',
-                fontFamily:"'DM Mono',monospace",fontSize:9,fontWeight:700,
-                color:sortCol.col===col?'var(--accent2)':'var(--muted)',
-                textTransform:'uppercase',letterSpacing:.8,whiteSpace:'nowrap'}}>
-                {label}{sortable?thArrow(col):''}
-              </th>
-            ))}
-            <th style={{padding:'6px 8px',fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8}}>Log</th>
-          </tr></thead>
-          <tbody>
-            {sortArr(batterStats,sortCol.col,sortCol.dir).map(m=>(
-              <tr key={m.id} className="dr" style={{background:selBatter===m.id?'rgba(255,255,255,.06)':'transparent'}}>
-                <td><div style={{display:'flex',alignItems:'center',gap:6}}>
-                  <PlayerAvatar pid={m.id} name={m.name} size={22}/>
-                  <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,
-                    color:isKeyMatchup(m.id)?'var(--c-warn)':'var(--text)'}}>{m.name}</span>
-                </div></td>
-                <td style={{textAlign:'center'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)'}}>{m.hand}HB</span></td>
-                <td style={{textAlign:'right'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{m.pa}</span></td>
-                <td style={{textAlign:'right'}}><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color:evCol(m.avgEV)}}>{m.avgEV??'—'}</span></td>
-                <td style={{textAlign:'right'}}><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,color:brlCol(m.barrelPct)}}>{m.barrelPct}%</span></td>
-                <td style={{textAlign:'right'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:m.hhPct>=40?'var(--accent2)':'var(--text)'}}>{m.hhPct}%</span></td>
-                <td style={{textAlign:'right'}}><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,color:m.hrCount>0?'var(--accent)':'var(--text)'}}>{m.hrCount}</span></td>
-                <td style={{textAlign:'right'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:11}}>{m.fbPct}%</span></td>
-                <td style={{textAlign:'right'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:m.avgLA>=18&&m.avgLA<=35?'var(--green)':'var(--text)'}}>{m.avgLA!=null?`${m.avgLA}°`:'—'}</span></td>
-                <td style={{textAlign:'right'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:m.hitRate>=30?'var(--green)':'var(--text)'}}>{m.hitRate}%</span></td>
-                <td style={{textAlign:'center'}}>
-                  <button onClick={()=>setSelBatter(s=>s===m.id?null:m.id)}
-                    style={{padding:'2px 8px',borderRadius:5,cursor:'pointer',fontSize:9,
-                      fontFamily:"'DM Mono',monospace",fontWeight:700,
-                      border:`1px solid ${selBatter===m.id?'var(--accent)':'var(--border)'}`,
-                      background:selBatter===m.id?'rgba(232,65,26,.15)':'transparent',
-                      color:selBatter===m.id?'var(--accent)':'var(--muted)'}}>
-                    {selBatter===m.id?'▲ Hide':'▼ Log'}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table></div>
-    }
-
-    {/* ── Batter At-Bat Log Slide-out ────────────────────────────── */}
-    {selBatter && batterLog.length > 0 && (()=>{
-      const bm = batterStats.find(b=>b.id===String(selBatter));
-      return <div style={{marginTop:8,background:'rgba(0,0,0,.3)',border:'1px solid var(--border)',borderRadius:10,overflow:'hidden'}}>
-        <div style={{padding:'8px 14px',background:'var(--surface2)',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',gap:8}}>
-          <PlayerAvatar pid={selBatter} name={bm?.name||''} size={26}/>
-          <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13}}>{bm?.name||''}</span>
-          <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)'}}>
-            vs {selPitcher.name}{fPitches.size>0?` · ${[...fPitches].join('/')}`:''} · {batterLog.length} AB
-          </span>
-          <button onClick={()=>setSelBatter(null)}
-            style={{marginLeft:'auto',background:'none',border:'none',color:'var(--muted)',cursor:'pointer',fontSize:16,padding:'0 4px'}}>✕</button>
-        </div>
-        <div className="tw"><table>
-          <thead><tr>
-            {['Date','Pitch','EV','LA','Dist','Result','Flags'].map(l=>(
-              <th key={l} style={{padding:'5px 8px',textAlign:l==='EV'||l==='LA'||l==='Dist'?'right':'left',fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)',textTransform:'uppercase',letterSpacing:.8}}>{l}</th>
-            ))}
-          </tr></thead>
-          <tbody>
-            {batterLog.map((r,i)=>(
-              <tr key={i} className="dr" style={{opacity:r.barrel||r.hh||r.hr?1:.65}}>
-                <td><span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)'}}>{r.date}</span></td>
-                <td><span style={{padding:'1px 5px',borderRadius:4,fontFamily:"'DM Mono',monospace",fontSize:9,fontWeight:700,background:'rgba(255,255,255,.05)',border:'1px solid rgba(255,255,255,.1)',color:'var(--text)'}}>{r.pitch}</span></td>
-                <td style={{textAlign:'right'}}><span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,color:evCol(r.ev)}}>{r.ev??'—'}</span></td>
-                <td style={{textAlign:'right'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:r.la>=18&&r.la<=35?'var(--green)':'var(--text)'}}>{r.la!=null?`${r.la}°`:'—'}</span></td>
-                <td style={{textAlign:'right'}}><span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--text)'}}>{r.dist??'—'}</span></td>
-                <td><span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:'var(--muted)'}}>{r.result}</span></td>
-                <td><div style={{display:'flex',gap:2}}>
-                  {r.hr===1&&<span style={{fontSize:11}}>💥</span>}
-                  {r.barrel===1&&<span style={{fontSize:11}}>🛢</span>}
-                  {r.hh===1&&!r.barrel&&<span style={{fontSize:11}}>⚡</span>}
-                </div></td>
-              </tr>
-            ))}
-          </tbody>
-        </table></div>
-      </div>;
-    })()}
-
-    </>}
-  </div>;
-}
-
-
 // ─────────────────────────────────────────────────────────────────────────────
 // 🔒 LOCK IN TAB
 // Sub-pages: Discover (top plays today), Props (hit rates), Odds, Bet Slip
@@ -26273,7 +23449,7 @@ function DailyBarrelTab() {
 // Odds data: The Odds API (free tier 500 req/mo → swap in key when ready)
 // ─────────────────────────────────────────────────────────────────────────────
 function GetAppTab() {
-  const url = "https://goingyard.app";
+  const url = "https://mlb.degenlabs.app";
   const Step = ({n, text}) => (
     <div style={{display:"flex",gap:10,marginBottom:8,alignItems:"flex-start"}}>
       <div style={{width:22,height:22,borderRadius:"50%",background:"var(--accent)",
@@ -26328,7 +23504,7 @@ function GetAppTab() {
 
     {/* iOS */}
     <Card icon="🍎" title="iPhone / iPad" subtitle="iOS Safari · 30 seconds">
-      <Step n="1" text={<>Open <strong style={{color:"var(--accent2)"}}>goingyard.app</strong> in Safari (must be Safari, not Chrome)</>}/>
+      <Step n="1" text={<>Open <strong style={{color:"var(--accent2)"}}>mlb.degenlabs.app</strong> in Safari (must be Safari, not Chrome)</>}/>
       <Step n="2" text={<>Tap the <strong>Share</strong> button <span style={{fontSize:16}}>⎙</span> at the bottom of the screen</>}/>
       <Step n="3" text={<>Scroll down and tap <strong>"Add to Home Screen"</strong></>}/>
       <Step n="4" text={<>Tap <strong>"Add"</strong> in the top right — the Going Yard icon appears on your home screen</>}/>
@@ -26341,7 +23517,7 @@ function GetAppTab() {
 
     {/* Android */}
     <Card icon="🤖" title="Android" subtitle="Chrome · 30 seconds">
-      <Step n="1" text={<>Open <strong style={{color:"var(--accent2)"}}>goingyard.app</strong> in Chrome</>}/>
+      <Step n="1" text={<>Open <strong style={{color:"var(--accent2)"}}>mlb.degenlabs.app</strong> in Chrome</>}/>
       <Step n="2" text={<>Tap the <strong>⋮</strong> menu (three dots) in the top right</>}/>
       <Step n="3" text={<>Tap <strong>"Add to Home screen"</strong> or <strong>"Install app"</strong></>}/>
       <Step n="4" text={<>Tap <strong>"Add"</strong> — the icon appears on your home screen and app drawer</>}/>
@@ -26356,12 +23532,12 @@ function GetAppTab() {
     <Card icon="🖥️" title="Mac" subtitle="Safari or Chrome · desktop shortcut">
       <div style={{marginBottom:10,fontSize:11,color:"var(--muted)",fontFamily:"'Oswald',sans-serif",
         fontWeight:600,letterSpacing:.5,textTransform:"uppercase"}}>Safari</div>
-      <Step n="1" text={<>Open <strong style={{color:"var(--accent2)"}}>goingyard.app</strong> in Safari</>}/>
+      <Step n="1" text={<>Open <strong style={{color:"var(--accent2)"}}>mlb.degenlabs.app</strong> in Safari</>}/>
       <Step n="2" text={<>Go to <strong>File → Add to Dock</strong> (macOS Sonoma+) or <strong>File → Share → Add to Home Screen</strong></>}/>
       <Step n="3" text={<>Click <strong>Add</strong> — appears in your Dock and Launchpad</>}/>
       <div style={{marginBottom:10,marginTop:14,fontSize:11,color:"var(--muted)",fontFamily:"'Oswald',sans-serif",
         fontWeight:600,letterSpacing:.5,textTransform:"uppercase"}}>Chrome</div>
-      <Step n="1" text={<>Open <strong style={{color:"var(--accent2)"}}>goingyard.app</strong> in Chrome</>}/>
+      <Step n="1" text={<>Open <strong style={{color:"var(--accent2)"}}>mlb.degenlabs.app</strong> in Chrome</>}/>
       <Step n="2" text={<>Click the <strong>⊕</strong> install icon in the address bar (right side)</>}/>
       <Step n="3" text={<>Click <strong>"Install"</strong> — opens as a standalone window</>}/>
     </Card>
@@ -26370,12 +23546,12 @@ function GetAppTab() {
     <Card icon="🪟" title="Windows" subtitle="Chrome or Edge · desktop shortcut">
       <div style={{marginBottom:10,fontSize:11,color:"var(--muted)",fontFamily:"'Oswald',sans-serif",
         fontWeight:600,letterSpacing:.5,textTransform:"uppercase"}}>Chrome</div>
-      <Step n="1" text={<>Open <strong style={{color:"var(--accent2)"}}>goingyard.app</strong> in Chrome</>}/>
+      <Step n="1" text={<>Open <strong style={{color:"var(--accent2)"}}>mlb.degenlabs.app</strong> in Chrome</>}/>
       <Step n="2" text={<>Click the <strong>⋮</strong> menu → <strong>Save and share → Create shortcut</strong></>}/>
       <Step n="3" text={<>Check <strong>"Open as window"</strong> and click <strong>Create</strong></>}/>
       <div style={{marginBottom:10,marginTop:14,fontSize:11,color:"var(--muted)",fontFamily:"'Oswald',sans-serif",
         fontWeight:600,letterSpacing:.5,textTransform:"uppercase"}}>Edge</div>
-      <Step n="1" text={<>Open <strong style={{color:"var(--accent2)"}}>goingyard.app</strong> in Edge</>}/>
+      <Step n="1" text={<>Open <strong style={{color:"var(--accent2)"}}>mlb.degenlabs.app</strong> in Edge</>}/>
       <Step n="2" text={<>Click <strong>⋯</strong> menu → <strong>Apps → Install this site as an app</strong></>}/>
       <Step n="3" text={<>Click <strong>Install</strong> — pinned to taskbar and Start menu</>}/>
     </Card>
@@ -26595,99 +23771,6 @@ function DataStatusBadge() {
       <div style={{width:8,height:8,borderRadius:'50%',background:cfg.dot,boxShadow:status==="live"?`0 0 6px ${cfg.dot}`:"none",animation:status==="live"?"pulse 1.5s ease-in-out infinite":"none"}}/>
     </div>
   );
-}
-
-
-function StatcastTab() {
-  const picks = usePicks();
-  // Merge Statcast cache with full MLB roster so new/low-AB players are findable
-  const players = (() => {
-    const cached = Object.values(PLAYER_DATA_CACHE);
-    const cachedIds = new Set(cached.map(p => p.pid));
-    // Add anyone in the MLB player map who isn't in the Statcast cache
-    const rosterOnly = Object.entries(GLOBAL_PLAYER_TEAM_MAP)
-      .filter(([id]) => !cachedIds.has(parseInt(id)))
-      .map(([id, info]) => ({
-        pid:  parseInt(id),
-        name: info.name,
-        team: info.team || '—',
-        hand: info.hand || 'R',
-        pos:  info.pos  || '',
-        // No Statcast data yet — zeros
-        avgEV: 0, barrel: 0, hardHit: 0, hr: 0, grade: null,
-      }));
-    return [...cached, ...rosterOnly];
-  })();
-  const [searchQ, setSearchQ] = useState("");
-  const [showPicker, setShowPicker] = useState(false);
-  const filtered = searchQ.trim()
-    ? players.filter(p => p.name?.toLowerCase().includes(searchQ.toLowerCase()) || p.team?.toLowerCase().includes(searchQ.toLowerCase())).slice(0,12)
-    : [];
-  return <div style={{margin:"-16px"}}>
-    {/* Add to My Picks — above frame */}
-    <div style={{padding:"8px 14px",borderBottom:"1px solid var(--border)",background:"var(--surface)"}}>
-    <div style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,padding:"10px 14px"}}>
-      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:showPicker?10:0}}>
-        <span style={{fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:13,letterSpacing:1}}>🎯 Add to My Picks</span>
-        <span style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace"}}>Add players while browsing Statcast</span>
-        <button onClick={()=>setShowPicker(s=>!s)}
-          style={{marginLeft:"auto",padding:"4px 12px",borderRadius:6,border:"1px solid var(--border)",
-            background:showPicker?"var(--accent)":"var(--surface2)",color:showPicker?"white":"var(--muted)",
-            cursor:"pointer",fontFamily:"'DM Mono',monospace",fontSize:11}}>
-          {showPicker?"✕ Close":"＋ Open Picker"}
-        </button>
-      </div>
-      {showPicker && <>
-        <div style={{position:"relative",marginBottom:8}}>
-          <input autoFocus type="text" value={searchQ} onChange={e=>setSearchQ(e.target.value)}
-            placeholder="Search player or team…"
-            style={{width:"100%",padding:"8px 12px 8px 32px",background:"var(--surface2)",
-              border:"1px solid var(--border)",borderRadius:8,color:"var(--text)",
-              fontFamily:"'DM Mono',monospace",fontSize:12,outline:"none",boxSizing:"border-box"}}/>
-          <span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:"var(--muted)",fontSize:13}}>🔍</span>
-          {searchQ&&<button onClick={()=>setSearchQ("")} style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"var(--muted)",cursor:"pointer",fontSize:13}}>✕</button>}
-        </div>
-        {searchQ&&filtered.length===0&&<div style={{fontSize:11,color:"var(--muted)",fontFamily:"'DM Mono',monospace",padding:"8px 0"}}>No players found.</div>}
-        {filtered.length>0&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:8}}>
-          {filtered.map(p=>{
-            const key=String(p.pid),current=picks[key]?.type;
-            return <div key={p.pid} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,background:"var(--surface2)",border:`1px solid ${current?PICK_TYPES[current].color:"var(--border)"}`}}>
-              <PlayerAvatar pid={p.pid||p.id} name={p.name} size={30}/>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontWeight:600,fontSize:12,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{p.name}</div>
-                <div style={{fontSize:9,fontFamily:"'DM Mono',monospace",display:"flex",gap:5}}>
-                  <span style={{color:"var(--accent2)",fontWeight:700}}>{getTeam(p.pid, p.team)}</span>
-                  <span style={{color:"var(--muted)"}}>· {p.grade?.grade||"—"}</span>
-                </div>
-              </div>
-              <PickButton pid={p.pid} name={p.name} team={p.team}/><GamblyButton name={p.name} team={p.team} prop="hr"/>
-            </div>;
-          })}
-        </div>}
-        {!searchQ&&<div style={{fontSize:10,color:"var(--muted)",fontFamily:"'DM Mono',monospace",padding:"4px 0"}}>Start typing to search {players.length} batters</div>}
-      </>}
-    </div></div>
-    {/* iframe — scaled 80% like Doink */}
-    <iframe
-      title="Baseball Savant"
-      src="https://baseballsavant.mlb.com/"
-      frameBorder="0"
-      allowFullScreen
-      style={{width:"125%",height:"calc((100vh - 130px) * 1.25)",border:"none",display:"block",
-        transform:"scale(0.8)",transformOrigin:"top left"}}
-    />
-    {/* Open in new tab below frame */}
-    <div style={{padding:"8px 14px",borderTop:"1px solid var(--border)",
-      display:"flex",justifyContent:"flex-end",background:"var(--surface)"}}>
-      <a href="https://baseballsavant.mlb.com/" target="_blank" rel="noopener noreferrer"
-        style={{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:6,
-          background:"rgba(56,184,242,.15)",border:"1px solid rgba(56,184,242,.3)",
-          color:"var(--ice)",fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:12,
-          letterSpacing:1,textDecoration:"none"}}>
-        ↗ Open in New Tab
-      </a>
-    </div>
-  </div>;
 }
 
 
@@ -28422,7 +25505,7 @@ function LegendButton() {
           ))}
           <div style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:'rgba(255,255,255,.2)',
             textAlign:'center',paddingTop:8,borderTop:'1px solid var(--border)'}}>
-            Going Yard · goingyard.app
+            Going Yard · mlb.degenlabs.app
           </div>
         </div>
       </div>
@@ -28510,8 +25593,6 @@ function TrackRecordTab() {
   const [showOnlyMidTier,  setShowOnlyMidTier]  = useState(false);
   const [showOnlyLongshotTR, setShowOnlyLongshotTR] = useState(false);
   const [showOnlyTop4Pick, setShowOnlyTop4Pick] = useState(false);
-  const [carryFilter,    setCarryFilter]    = useState(''); // '' | 'DEAD' | 'JUICED'
-  const [xhrFilter,      setXhrFilter]      = useState(''); // '' | 'DEAD' | 'JUICED'
   const [teamFilter,     setTeamFilter]     = useState('ALL');
   // Pitcher Grade multi-select — new here (2026-08-02), same PITCHER_GRADE_OPTIONS
   // Set-of-strings pattern Barrel Lab/On Base/Arsenal Fit already use, required by
@@ -28552,14 +25633,12 @@ function TrackRecordTab() {
       // existing obRes.ok fallback already handles a 404 gracefully.
       const suf = year === 2025 ? '-2025' : '';
       try {
-        const [amRes, blRes, idRes, hrRes, obRes, bcRes, xhrRes, top4LockRes] = await Promise.all([
+        const [amRes, blRes, idRes, hrRes, obRes, top4LockRes] = await Promise.all([
           fetch(`/data/track-record-matchups${suf}.csv`),
           fetch(`/data/track-record-barrel${suf}.csv`),
           fetch('/data/player_id.csv'),
           fetch(`/data/track-record-hr${suf}.csv`),
           fetch(`/data/track-record-onbase${suf}.csv`),
-          fetch(`/data/track-record-ball-carry${suf}.csv`),
-          fetch(`/data/track-record-xhr${suf}.csv`),
           // Real locked Top 4 picks (2026-08-13) — see api/top4-lock.js and
           // TopThreeTab's own comment for the full rationale. When a real
           // record exists for a date, it OVERRIDES the reconstruction below
@@ -28587,60 +25666,12 @@ function TrackRecordTab() {
         const idText = idRes.ok ? await idRes.text() : '';
         const hrText = hrRes.ok ? await hrRes.text() : '';
         const obText = obRes.ok ? await obRes.text() : '';
-        const bcText = bcRes.ok ? await bcRes.text() : '';
-        const xhrText = xhrRes.ok ? await xhrRes.text() : '';
 
         const amRows = parseCSV(amText);
         const blRows = blText ? parseCSV(blText) : [];
         const idRows = idText ? parseCSV(idText) : [];
         const hrRows = hrText ? parseCSV(hrText) : [];
         const obRows = obText ? parseCSV(obText) : [];
-        const bcRows = bcText ? parseCSV(bcText) : [];
-        const xhrRows = xhrText ? parseCSV(xhrText) : [];
-
-        // xHR conversion lookup — keyed by Game ID only (this file has no
-        // pre-Game-ID history to fall back for; it didn't exist before
-        // 2026-07-25 — see CLAUDE.md "xHR Conversion Tracker" session log).
-        // Distinct signal from Ball Carry above: Ball Carry asks "did the
-        // ball fly as far as EV/LA implies"; xHR asks "did as many of these
-        // balls actually clear the fence as EV/LA/direction history says
-        // should have" — a more direct dead/juiced-ball diagnostic.
-        const xhrLookup = {};
-        xhrRows.forEach(r => {
-          const gid = (r['Game ID'] || '').toString().trim();
-          if (!gid) return;
-          xhrLookup[gid] = {
-            verdict: (r.verdict || '').trim().toUpperCase(),
-            z:       r.z    != null && r.z    !== '' ? parseFloat(r.z)    : null,
-            diff:    r.diff != null && r.diff !== '' ? parseFloat(r.diff) : null,
-          };
-        });
-
-        // Ball carry lookup — keyed by Game ID (primary) with a date+team
-        // fallback for rows that predate Game ID being added to the export
-        // (before 2026-07-22). Game ID is the correct key: a date+team key
-        // collides on doubleheader days (2 games, same date+team) and the
-        // second game's verdict silently overwrote the first's for every
-        // batter on that team that day — confirmed 2026-07-23, see CLAUDE.md
-        // "Ball Carry live/offline divergence fix". Game ID disambiguates
-        // the two games cleanly.
-        const carryLookup = {};
-        bcRows.forEach(r => {
-          const d = normDate(r.date || '');
-          if (!d) return;
-          const entry = {
-            verdict:    (r.verdict || '').trim().toUpperCase(),
-            dev:        parseFloat(r.park_adj_deviation || 0),
-            deadThr:    r.dead_threshold_ft   != null && r.dead_threshold_ft   !== '' ? parseFloat(r.dead_threshold_ft)   : null,
-            juicedThr:  r.juiced_threshold_ft != null && r.juiced_threshold_ft !== '' ? parseFloat(r.juiced_threshold_ft) : null,
-          };
-          const gid = (r['Game ID'] || '').toString().trim();
-          if (gid) carryLookup[`gid_${gid}`] = entry;
-          const home = (r.home_team || '').trim().toUpperCase();
-          const away = (r.away_team || '').trim().toUpperCase();
-          if (home) carryLookup[`${d}_${home}`] = entry;
-          if (away) carryLookup[`${d}_${away}`] = entry;
-        });
 
         // Build Barrel Lab lookup: { 'YYYY-MM-DD_battername': row }
         const blLookup = {};
@@ -28705,9 +25736,6 @@ function TrackRecordTab() {
           const name  = (r.Batter || '').trim().toLowerCase();
           const blRow = blLookup[`${date}_${name}`] || {};
           const obRow = obLookup[`${date}_${name}`] || {};
-          const carryRow = carryLookup[`gid_${(r['Game ID']||'').toString().trim()}`]
-            || carryLookup[`${date}_${(r.Team||'').trim().toUpperCase()}`] || null;
-          const xhrRow = xhrLookup[(r['Game ID']||'').toString().trim()] || null;
           const tbSignal = (obRow['TB Signal']||'').toString().trim() === '1';
           const pitcherNameRaw = r['vs Pitcher'] || blRow['Pitcher'] || '';
           const batterId  = resolveId(r.Batter, r.Team);
@@ -29020,23 +26048,6 @@ function TrackRecordTab() {
             closeCalls: parseInt(r['Live Close Calls'] || 0),
             ccMaxEV:    parseFloat(r['Live CC Max EV'] || 0),
             ccMaxDist:  parseFloat(r['Live CC Max Dist'] || 0),
-            // Ball carry (dead ball / juiced ball) — see PROMPT_BallCarryTracker.md,
-            // 2026-07-22. Park/elevation-adjusted; deliberately NOT weather-adjusted.
-            // isBorderlineCarry: NORMAL verdict within 3ft of either threshold —
-            // same BORDERLINE_MARGIN_FT convention as the live Ball Carry page.
-            ballCarryVerdict: carryRow?.verdict || '',
-            ballCarryDev:     carryRow ? carryRow.dev : null,
-            isBorderlineCarry: !!(carryRow && carryRow.verdict === 'NORMAL'
-              && carryRow.deadThr != null && carryRow.juicedThr != null
-              && Math.min(Math.abs(carryRow.dev - carryRow.deadThr), Math.abs(carryRow.dev - carryRow.juicedThr)) <= 3),
-            // xHR conversion (expected-vs-actual HR count, z-score based) —
-            // see CLAUDE.md "xHR Conversion Tracker" session log, 2026-07-25.
-            // Distinct from Ball Carry above — this is outcome-probability-
-            // based (did enough of these balls actually leave the park),
-            // not distance-based.
-            xhrVerdict: xhrRow?.verdict || '',
-            xhrZ:       xhrRow ? xhrRow.z    : null,
-            xhrDiff:    xhrRow ? xhrRow.diff : null,
           };
         });
 
@@ -29316,8 +26327,6 @@ function TrackRecordTab() {
     if (showOnlyMidTier) rows = rows.filter(r => r.isMidTier);
     if (showOnlyLongshotTR) rows = rows.filter(r => r.isLongshot);
     if (showOnlyTop4Pick) rows = rows.filter(r => r.isTop4Pick);
-    if (carryFilter)    rows = rows.filter(r => r.ballCarryVerdict === carryFilter);
-    if (xhrFilter)       rows = rows.filter(r => r.xhrVerdict === xhrFilter);
     if (selPitcherGradesTR.size > 0) rows = rows.filter(r => selPitcherGradesTR.has((r.pitcherGrade||'').trim()));
     if (selBullpenTiers.size > 0) rows = rows.filter(r => selBullpenTiers.has(bullpenTierLabel(r.bullpenRank)));
     if (showOnlyAvoid) rows = rows.filter(r => r.isAvoid);
@@ -29335,7 +26344,7 @@ function TrackRecordTab() {
       }
       return sortDir * ((av||0) - (bv||0));
     });
-  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, showOnlyWeakSlot, showOnlyCC, showOnlySauce2, showOnlySauce3, showOnlySauce25, showOnlyTopIso, showOnlyPrimeIso, showOnlySolidContact, showOnlyLockedIn, showOnlyHitSignal, showOnlySecretSauce, showOnlyAvoid, showOnly2Bagger, showOnlyTBSignal, showOnlySimTB2, showOnlyHighIQ, showOnlyHandMatch, showOnlyDayLate, showOnlyYoungGun, showOnlyChalk, showOnlyMidTier, showOnlyLongshotTR, showOnlyTop4Pick, carryFilter, xhrFilter, selPitcherGradesTR, selBullpenTiers, search, sortCol, sortDir]);
+  }, [dateRows, teamFilter, showOnlyHR, showOnlySignal, showOnlyKM, showOnlyWeakSlot, showOnlyCC, showOnlySauce2, showOnlySauce3, showOnlySauce25, showOnlyTopIso, showOnlyPrimeIso, showOnlySolidContact, showOnlyLockedIn, showOnlyHitSignal, showOnlySecretSauce, showOnlyAvoid, showOnly2Bagger, showOnlyTBSignal, showOnlySimTB2, showOnlyHighIQ, showOnlyHandMatch, showOnlyDayLate, showOnlyYoungGun, showOnlyChalk, showOnlyMidTier, showOnlyLongshotTR, showOnlyTop4Pick, selPitcherGradesTR, selBullpenTiers, search, sortCol, sortDir]);
 
   const summary = useMemo(() => {
     // FIXED 2026-08-06: every card below used to compute off `dateRows`
@@ -29978,10 +26987,6 @@ function TrackRecordTab() {
             { key:'stb2',  label:'🎲 Sim TB ≥2.0 Only',     active:showOnlySimTB2,   onToggle:()=>setShowOnlySimTB2(v=>!v),   color:'var(--c-purple)' },
             { key:'iq',    label:'🧠 High Plate IQ Only',   active:showOnlyHighIQ,   onToggle:()=>setShowOnlyHighIQ(v=>!v),   color:'var(--ice)' },
             { key:'hm',    label:'⭐ Hand Match Only',      active:showOnlyHandMatch,onToggle:()=>setShowOnlyHandMatch(v=>!v),color:'var(--c-amber)' },
-            { key:'cj',    label:'🔴 Juiced Ball Only',     active:carryFilter==='JUICED', onToggle:()=>setCarryFilter(v=>v==='JUICED'?'':'JUICED'), color:'var(--c-warn)' },
-            { key:'cd',    label:'🔵 Dead Ball Only',       active:carryFilter==='DEAD',   onToggle:()=>setCarryFilter(v=>v==='DEAD'?'':'DEAD'),     color:'var(--ice)' },
-            { key:'xj',    label:'⬆️ xHR Juiced Only',      active:xhrFilter==='JUICED',   onToggle:()=>setXhrFilter(v=>v==='JUICED'?'':'JUICED'),   color:'var(--c-purple)' },
-            { key:'xd',    label:'⬇️ xHR Dead Only',        active:xhrFilter==='DEAD',     onToggle:()=>setXhrFilter(v=>v==='DEAD'?'':'DEAD'),       color:'#f472b6' },
           ]}
           pitcherGrades={selPitcherGradesTR}
           onPitcherGradesChange={setSelPitcherGradesTR}
@@ -30000,7 +27005,7 @@ function TrackRecordTab() {
               'PulledBrl%','Brl/BIP','HR/FB','FB%','HH%',
               'Plate IQ','IQ Grade','Zone Risk','Hand Match',
               'Went Yard','Any Hit','HR','AB','H','TB','RBI','BB','K','Avg EV','Launch Angle',
-              'Live Close Calls','Live CC Max EV','Live CC Max Dist','Ball Carry','xHR Verdict',
+              'Live Close Calls','Live CC Max EV','Live CC Max Dist',
               'Game ID','Batter ID','Pitcher ID'];
             const csvRows = [headers.map(esc).join(',')];
             filteredRows.forEach(r => {
@@ -30024,7 +27029,7 @@ function TrackRecordTab() {
                 r.wentYard ? 'YES' : '', r.hitAny ? 'YES' : '', r.actualHR || 0, r.actualAB || 0, r.actualH || 0,
                 r.actualTB || 0, r.actualRBI || 0, r.actualBB || 0, r.actualK || 0,
                 r.actualEV || '', r.actualLA || '',
-                r.closeCalls || 0, r.ccMaxEV || '', r.ccMaxDist || '', r.ballCarryVerdict || '', r.xhrVerdict || '',
+                r.closeCalls || 0, r.ccMaxEV || '', r.ccMaxDist || '',
                 r.gameId || '', r.batterId || '', r.pitcherId || '',
               ].map(esc).join(','));
             });
@@ -30138,10 +27143,6 @@ function TrackRecordTab() {
                   <SortTh col="closeCalls" label="CC" color="var(--green)"/>
                   <SortTh col="ccMaxEV"   label="CC Max EV" color="var(--green)"/>
                   <SortTh col="ccMaxDist" label="CC Dist" color="var(--green)"/>
-                  <SortTh col="ballCarryVerdict" label="Ball Carry" color="var(--green)"
-                    title="Dead ball / juiced ball verdict for this game (park/elevation-adjusted, not weather-adjusted)"/>
-                  <SortTh col="xhrVerdict" label="xHR" color="var(--green)"
-                    title="xHR conversion verdict — did as many of this game's batted balls actually clear the fence as EV/LA/direction history predicts (z-score based, distinct from Ball Carry)"/>
                 </>}
               </tr>
             </thead>
@@ -30335,18 +27336,6 @@ function TrackRecordTab() {
                         textAlign:'center'}}>{r.ccMaxEV || '—'}</td>
                       <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
                         textAlign:'center'}}>{r.ccMaxDist || '—'}</td>
-                      <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
-                        textAlign:'center', fontWeight:700,
-                        color: r.ballCarryVerdict==='JUICED' ? 'var(--c-warn)' : r.ballCarryVerdict==='DEAD' ? 'var(--ice)' : r.isBorderlineCarry ? 'var(--accent2)' : 'var(--muted)'}}
-                        title={r.ballCarryDev != null ? `park-adj deviation ${r.ballCarryDev>=0?'+':''}${r.ballCarryDev}ft${r.isBorderlineCarry?' — borderline (within 3ft of a threshold)':''}` : ''}>
-                        {r.ballCarryVerdict==='JUICED' ? '🔴' : r.ballCarryVerdict==='DEAD' ? '🔵' : r.isBorderlineCarry ? '🟡' : r.ballCarryVerdict==='NORMAL' ? '—' : ''}
-                      </td>
-                      <td style={{padding:'3px 6px', fontFamily:mono, fontSize:9,
-                        textAlign:'center', fontWeight:700,
-                        color: r.xhrVerdict==='JUICED' ? 'var(--c-purple)' : r.xhrVerdict==='DEAD' ? '#f472b6' : 'var(--muted)'}}
-                        title={r.xhrZ != null ? `z=${r.xhrZ>=0?'+':''}${r.xhrZ} (actual ${r.xhrDiff>=0?'+':''}${r.xhrDiff} HR vs. expected)` : ''}>
-                        {r.xhrVerdict==='JUICED' ? '⬆️' : r.xhrVerdict==='DEAD' ? '⬇️' : r.xhrVerdict==='NORMAL' ? '—' : ''}
-                      </td>
                     </>}
                   </tr>
                 );
@@ -30364,6 +27353,13 @@ function LinksTab() {
   const osw  = "'Oswald',sans-serif";
 
   const links = [
+    {
+      name: 'Baseball Savant',
+      url:  'https://baseballsavant.mlb.com/',
+      emoji: '📡',
+      color: 'var(--ice)',
+      summary: 'Statcast leaderboards, player pages and pitch-by-pitch search from MLB. (Was the Statcast tab.)',
+    },
     {
       name: 'OnlyHomers',
       url:  'https://onlyhomers.com',
@@ -30502,532 +27498,6 @@ let GAME_SPLITS_LOADED = false;
 let SB_LOG_DATA       = null; // sb_log.csv rows
 let SPRINT_SPEED_DATA = null; // sprint_speed.csv rows keyed by player_id
 let BASERUNNING_DATA  = null; // baserunning.csv rows keyed by player_id
-
-// ═══════════════════════════════════════════════════════════════════════════
-// 🔮  CRYSTAL BALL TAB
-// ═══════════════════════════════════════════════════════════════════════════
-// ── Crystal Ball tier configs ────────────────────────────────────────────────
-const CB_TIERS = [
-  {
-    id:'chosen', name:'The Chosen', sub:'All signals firing',
-    emoji:'👑', accentRgb:'255,215,0',
-    border:'rgba(255,215,0,0.5)', glow:'rgba(255,215,0,0.3)',
-    bg:'linear-gradient(160deg,rgba(255,215,0,0.12)0%,rgba(20,10,0,0.7)100%)',
-    tagBg:'rgba(255,215,0,0.1)', tagColor:'rgba(255,215,0,0.9)', tagBorder:'rgba(255,215,0,0.25)',
-    filter: b => b.yard >= 32 && b.ev >= 92,
-    score:  b => {
-      let s = b.yard * 1.2;
-      if (b.sig >= 3)  s += b.sig * 3;
-      if (b.ev >= 95)  s += (b.ev-95) * 2;
-      if (b.la >= 18 && b.la <= 35) s += 10;
-      if (b.bsDelta >= 1) s += b.bsDelta * 5;
-      if (b.closeCall >= 1) s += b.closeCall * 6;
-      if (b.zf >= 3)  s += b.zf * 4;
-      if (b.pg.includes('Target'))   s += 14;
-      if (b.pg.includes('Hittable')) s += 9;
-      s += ({'A+':12,'A':9,'B':6,'C':3,'D':0}[b.effGrade]||0);
-      return s;
-    },
-  },
-  {
-    id:'darkhorse', name:'Dark Horse', sub:'Yard 20–31 · Under radar',
-    emoji:'🐎', accentRgb:'255,90,30',
-    border:'rgba(255,90,30,0.5)', glow:'rgba(255,90,30,0.25)',
-    bg:'linear-gradient(160deg,rgba(255,90,30,0.12)0%,rgba(20,5,0,0.7)100%)',
-    tagBg:'rgba(255,90,30,0.1)', tagColor:'rgba(255,140,80,0.9)', tagBorder:'rgba(255,90,30,0.25)',
-    filter: b => b.yard >= 20 && b.yard <= 31 && b.ev >= 88,
-    score:  b => {
-      let s = b.yard;
-      if (b.sig >= 2)  s += b.sig * 3.5;
-      if (b.closeCall >= 1) s += b.closeCall * 7;
-      if (b.bsDelta >= 0.5) s += b.bsDelta * 5;
-      if (b.zf >= 2)   s += b.zf * 4;
-      if (b.ev >= 93)  s += (b.ev-93) * 1.5;
-      if (b.la >= 18 && b.la <= 35) s += 8;
-      if (b.pg.includes('Target'))   s += 12;
-      if (b.pg.includes('Hittable')) s += 8;
-      if (b.pg.includes('Average'))  s += 4;
-      return s;
-    },
-  },
-  {
-    id:'wildcard', name:'Wild Card', sub:'Spike signals · Surprise',
-    emoji:'🃏', accentRgb:'0,210,170',
-    border:'rgba(0,210,170,0.45)', glow:'rgba(0,210,170,0.22)',
-    bg:'linear-gradient(160deg,rgba(0,210,170,0.1)0%,rgba(0,14,12,0.7)100%)',
-    tagBg:'rgba(0,210,170,0.08)', tagColor:'rgba(0,210,170,0.85)', tagBorder:'rgba(0,210,170,0.22)',
-    filter: b => b.yard >= 13 && b.yard < 32 && (
-      b.bsDelta >= 1.5 || b.closeCall >= 2 || b.zf >= 4 || (b.ev >= 96 && b.la >= 20)
-    ),
-    score:  b => {
-      let s = b.yard * 0.8;
-      if (b.bsDelta >= 1.5) s += b.bsDelta * 8;
-      if (b.closeCall >= 2) s += b.closeCall * 9;
-      if (b.zf >= 4)  s += b.zf * 6;
-      if (b.ev >= 96)  s += (b.ev-96) * 3;
-      if (b.sig >= 3)  s += b.sig * 2.5;
-      if (b.la >= 20 && b.la <= 34) s += 7;
-      if (b.pg.includes('Target'))   s += 10;
-      if (b.pg.includes('Hittable')) s += 7;
-      if (b.pg.includes('Average'))  s += 5;
-      s += Math.random() * 8; // a touch of chaos
-      return s;
-    },
-  },
-];
-
-function CrystalBallTab() {
-  const mono = "'DM Mono',monospace";
-  const osw  = "'Oswald',sans-serif";
-
-  const [phase,    setPhase]    = useState('idle');    // idle | gazing | cards | done
-  const [picks,    setPicks]    = useState([]);         // 3 picks, one per tier
-  const [flipped,  setFlipped]  = useState([false, false, false]);
-  const [showHelp, setShowHelp] = useState(false);
-  const [orbPulse, setOrbPulse] = useState(false);
-
-  const buildBatters = () => {
-    const out = [], seen = new Set();
-    Object.values(DAILY_PICKS_CACHE||{}).forEach(r => {
-      const bid = String(r.batter_id||'').split('.')[0];
-      if (!bid||seen.has(bid)||!r.batter||!r.game_id) return;
-      seen.add(bid);
-      if (INJURY_MAP?.[parseInt(bid)||0] && !LINEUP_STATUS?.[parseInt(bid)||0]) return;
-      if (!isActiveBatter(r)) return ; // hide stale/inactive batters
-      const pg = r._pgLabel||'';
-      if (pg.includes('Elite')||pg.includes('Tough')) return;
-      const sig  = parseFloat(r._trackerSig||r.weighted_flag_score*4.6||0);
-      const ghr  = parseFloat(r.gHR||r.kHR||0);
-      const ps   = getPS(r);
-      const boom = computeBoomScore(sig, getZoneFit(r), parseFloat(r.iso||0), parseFloat(r.sim_tb||0), parseFloat(r.weighted_flag_score||0), shrinkageAdjBarrelSpike(r), parseInt(r.recent_hr_count||0), parseFloat(r.recent_batter_ahead_pct||0), !!r.hh_precursor, parseFloat(r.primary_pitch_hr_rate||0), parseInt(r.recent_barrels_3d)||0, parseInt(r.recent_hrs_3d)||0, parseFloat(r.recent_avg_bat_speed)||0, parseInt(r.recent_pb_2d)||0, r.la_locked, parseFloat(r.season_swstr_pct)||0, parseFloat(r.park_pull_fit)||0, parseInt(r._zoneEdges||0), parseInt(r._zoneKPenalty||0), (()=>{const _ls=liveSlot(r.batter_id,r.lineup_slot);return _ls>0&&(r.pitcher_weak_slots||"").split(",").map(Number).filter(Boolean).includes(_ls);})(), parseFloat(r.season_xwoba)||0);
-      const yard = computeYardScore(sig, ghr, boom, ps, r.batter_hand||'', r.pitcher_hand||'', parseInt(r.days_rest??1), liveSlot(r.batter_id,r.lineup_slot), getHandSpecificGrade(r));
-      const ev   = parseFloat(r.recent_avg_ev||0);
-      const la   = parseFloat(r.recent_avg_la||0);
-      const bsDelta   = parseFloat(r.bat_speed_vs_baseline||0);
-      const closeCall = parseInt(r.so_close_count||0);
-      const zf   = getZoneFit(r);
-      if (yard < 10 || ev < 82) return;
-      const effGrade = computeEffectiveGrade(r.grade||'D', pg);
-      const name = (r.batter&&!/^\d+$/.test(r.batter))
-        ? r.batter : getCachedPlayer(parseInt(bid)||0)?.name||r.batter||bid;
-      out.push({id:bid, name, team:r.batting_team||'', yard, sig, ev, la,
-        bsDelta, closeCall, zf, effGrade, pg, pitcher:r.pitcher||'', hand:r.batter_hand||''});
-    });
-    return out;
-  };
-
-  const drawOne = (batters, tier) => {
-    const pool = batters
-      .filter(tier.filter)
-      .map(b => ({...b, crystal:tier.score(b)}))
-      .sort((a,b) => b.crystal - a.crystal)
-      .slice(0, 15);
-    if (!pool.length) return null;
-    const remaining = [...pool];
-    const total = remaining.reduce((s,r)=>s+Math.max(1,r.crystal),0);
-    let rand = Math.random() * total;
-    let pick = remaining[0];
-    for (let j=0; j<remaining.length; j++) {
-      rand -= Math.max(1, remaining[j].crystal);
-      if (rand <= 0) { pick = remaining[j]; break; }
-    }
-    const reasons = [];
-    if (pick.sig >= 4)        reasons.push(`${pick.sig} signals firing`);
-    if (pick.ev >= 95)        reasons.push(`${pick.ev.toFixed(1)} mph EV`);
-    if (pick.closeCall >= 1)  reasons.push(`${pick.closeCall} close call${pick.closeCall>1?'s':''}`);
-    if (pick.bsDelta >= 0.5)  reasons.push(`bat speed +${pick.bsDelta.toFixed(1)}`);
-    if (pick.la >= 20 && pick.la <= 34) reasons.push(`${pick.la.toFixed(0)}° LA`);
-    if (pick.zf >= 5)         reasons.push(`zone fit ${pick.zf.toFixed(1)} 🔥`);
-    if (pick.pg.includes('Target'))   reasons.push('🎯 Target pitcher');
-    if (pick.pg.includes('Hittable')) reasons.push('💥 Hittable pitcher');
-    if (!reasons.length)      reasons.push(`yard score ${pick.yard}`);
-    return {...pick, reasons: reasons.slice(0,3)};
-  };
-
-  const startGazing = () => {
-    setPhase('gazing');
-    setOrbPulse(true);
-    setFlipped([false,false,false]);
-    setPicks([]);
-    setTimeout(() => {
-      const batters = buildBatters();
-      const drawn = CB_TIERS.map(t => drawOne(batters, t));
-      setPicks(drawn);
-      setOrbPulse(false);
-      setPhase('cards');
-    }, 3000);
-  };
-
-  const flipCard = (i) => {
-    if (phase !== 'cards' && phase !== 'done') return;
-    setFlipped(f => {
-      const next = [...f];
-      next[i] = true;
-      return next;
-    });
-    if (flipped.filter(Boolean).length === 2) {
-      setTimeout(() => setPhase('done'), 600);
-    }
-  };
-
-  const reset = () => {
-    setPhase('idle');
-    setPicks([]);
-    setFlipped([false,false,false]);
-    setOrbPulse(false);
-  };
-
-  const gradeColor = g => g==='A+'?'var(--c-gold)':g==='A'?'#ff9f1c':g==='B'?'var(--ice)':'var(--muted)';
-  const allFlipped = flipped.every(Boolean);
-
-  return (
-    <div style={{maxWidth:720,margin:'0 auto',padding:'24px 16px',
-      display:'flex',flexDirection:'column',alignItems:'center'}}>
-
-      {/* Header */}
-      <div style={{textAlign:'center',marginBottom:24,width:'100%',position:'relative'}}>
-        <div style={{fontFamily:osw,fontSize:26,fontWeight:900,letterSpacing:2,
-          color:'var(--text)',textTransform:'uppercase',marginBottom:4}}>
-          🔮 Crystal Ball
-        </div>
-        <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',letterSpacing:1,marginBottom:8}}>
-          THREE TIERS · ONE CARD EACH · CLICK TO REVEAL
-        </div>
-        <div style={{display:'inline-flex',alignItems:'center',gap:6,
-          background:'rgba(245,166,35,0.07)',border:'1px solid rgba(245,166,35,0.18)',
-          borderRadius:6,padding:'4px 10px'}}>
-          <span>🎱</span>
-          <span style={{fontFamily:mono,fontSize:7.5,color:'rgba(245,166,35,0.75)'}}>
-            Just for fun — but it just might come true
-          </span>
-        </div>
-        <div style={{position:'absolute',top:0,right:0}}>
-          <HelpBtn onClick={()=>setShowHelp(true)}/>
-        </div>
-      </div>
-
-      {/* Orb — shown during idle and gazing */}
-      {(phase === 'idle' || phase === 'gazing') && (
-        <div style={{position:'relative',width:150,height:150,marginBottom:28,
-          cursor:phase==='idle'?'pointer':'default'}}
-          onClick={phase==='idle'?startGazing:undefined}>
-          <div style={{position:'absolute',inset:-14,borderRadius:'50%',
-            background:orbPulse?'radial-gradient(circle,rgba(168,85,247,0.3)0%,transparent 75%)':'none',
-            animation:orbPulse?'orbBreath 1.1s ease-in-out infinite':'none'}}/>
-          <div style={{position:'absolute',inset:0,borderRadius:'50%',
-            background:'radial-gradient(circle at 38% 32%,rgba(210,180,255,0.18)0%,rgba(100,55,185,0.55)40%,rgba(15,8,40,0.93)100%)',
-            border:'1.5px solid rgba(168,85,247,0.4)',
-            boxShadow:orbPulse
-              ?'0 0 36px rgba(168,85,247,0.55),inset 0 0 24px rgba(100,50,200,0.25)'
-              :'0 0 16px rgba(168,85,247,0.25)',
-            transition:'box-shadow 0.4s',display:'flex',alignItems:'center',
-            justifyContent:'center',flexDirection:'column',gap:5}}>
-            <div style={{position:'absolute',inset:0,borderRadius:'50%',
-              background:'radial-gradient(ellipse at 30% 25%,rgba(255,255,255,0.07)0%,transparent 55%)',
-              pointerEvents:'none'}}/>
-            {phase==='idle' && <>
-              <div style={{fontSize:30,filter:'drop-shadow(0 0 8px rgba(200,150,255,0.8))'}}>🔮</div>
-              <div style={{fontFamily:mono,fontSize:7.5,color:'rgba(200,170,255,0.7)',
-                letterSpacing:1,textAlign:'center',lineHeight:1.6}}>TAP TO<br/>BEGIN</div>
-            </>}
-            {phase==='gazing' && <>
-              <div style={{fontSize:24,animation:'orbSpin 1.3s linear infinite'}}>✨</div>
-              <div style={{fontFamily:mono,fontSize:7.5,color:'rgba(180,140,255,0.8)',
-                letterSpacing:1,textAlign:'center',lineHeight:1.7}}>READING<br/>THE DATA…</div>
-            </>}
-          </div>
-        </div>
-      )}
-
-      {/* Idle description */}
-      {phase === 'idle' && (
-        <div style={{textAlign:'center',marginBottom:20,animation:'fadeUp 0.5s ease'}}>
-          <div style={{fontFamily:mono,fontSize:10,color:'var(--muted)',lineHeight:1.9,
-            maxWidth:360,marginBottom:16}}>
-            The orb draws one batter from each tier.<br/>
-            Three cards appear face-down.<br/>
-            <span style={{color:'rgba(255,215,0,0.6)'}}>👑 Chosen</span>{' · '}
-            <span style={{color:'rgba(255,90,30,0.7)'}}>🐎 Dark Horse</span>{' · '}
-            <span style={{color:'rgba(0,210,170,0.6)'}}>🃏 Wild Card</span>
-          </div>
-          <button onClick={startGazing}
-            style={{padding:'10px 30px',borderRadius:8,cursor:'pointer',
-              fontFamily:osw,fontSize:14,fontWeight:800,letterSpacing:2,
-              border:'1px solid rgba(168,85,247,0.45)',
-              background:'rgba(168,85,247,0.12)',color:'var(--c-lavender)',
-              boxShadow:'0 0 20px rgba(168,85,247,0.18)',textTransform:'uppercase'}}>
-            🔮 Begin Grand Reveal
-          </button>
-        </div>
-      )}
-
-      {/* Gazing status */}
-      {phase === 'gazing' && (
-        <div style={{fontFamily:mono,fontSize:9,letterSpacing:2,color:'rgba(168,85,247,0.7)',
-          animation:'orbBreath 1.1s ease-in-out infinite',textAlign:'center'}}>
-          CONSULTING THE DATA SPIRITS…
-        </div>
-      )}
-
-      {/* 3 cards — show when picks are ready */}
-      {(phase === 'cards' || phase === 'done') && picks.length === 3 && (
-        <div style={{width:'100%',display:'flex',gap:12,
-          justifyContent:'flex-start',flexWrap:'nowrap',overflowX:'auto',
-          WebkitOverflowScrolling:'touch',paddingBottom:8,marginBottom:16,
-          scrollSnapType:'x mandatory'}}>
-          {picks.map((pick, i) => {
-            const tier = CB_TIERS[i];
-            const isFlipped = flipped[i];
-            const p = pick;
-            return (
-              <div key={i}
-                onClick={() => !isFlipped && flipCard(i)}
-                style={{
-                  width:195, height:273, flexShrink:0,
-                  scrollSnapAlign:'start',
-                  perspective:1000,cursor:isFlipped?'default':'pointer',
-                  position:'relative',
-                }}>
-                {/* Card wrapper — rotates on flip */}
-                <div style={{
-                  position:'absolute',inset:0,
-                  transformStyle:'preserve-3d',
-                  transition:'transform 0.65s cubic-bezier(0.4,0.2,0.2,1)',
-                  transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
-                }}>
-
-                  {/* ── CARD BACK (face-down = Going Yard logo) ── */}
-                  <div style={{
-                    position:'absolute',inset:0,backfaceVisibility:'hidden',
-                    borderRadius:12,overflow:'hidden',
-                    background:'linear-gradient(160deg,#0d1318 0%,#1a0a2e 50%,#0a1020 100%)',
-                    border:'2px solid rgba(168,85,247,0.35)',
-                    boxShadow:'0 8px 32px rgba(0,0,0,0.6),inset 0 1px 0 rgba(255,255,255,0.05)',
-                    display:'flex',flexDirection:'column',
-                    alignItems:'center',justifyContent:'center',gap:12,
-                  }}>
-                    {/* Decorative border inset */}
-                    <div style={{position:'absolute',inset:8,borderRadius:8,
-                      border:'1px solid rgba(168,85,247,0.18)',pointerEvents:'none'}}/>
-                    {/* Corner diamonds */}
-                    {[[8,8],[8,'auto'],[8,'auto'],['auto',8]].map((_,ci)=>(
-                      <div key={ci} style={{position:'absolute',
-                        top:ci<2?14:'auto',bottom:ci>=2?14:'auto',
-                        left:ci%2===0?14:'auto',right:ci%2===1?14:'auto',
-                        width:6,height:6,borderRadius:1,
-                        background:'rgba(168,85,247,0.4)',
-                        transform:'rotate(45deg)'}}/>
-                    ))}
-                    {/* GY logo */}
-                    <img src="/icon-192.png" alt="Going Yard"
-                      style={{width:64,height:64,borderRadius:12,
-                        filter:'drop-shadow(0 0 12px rgba(168,85,247,0.6))',
-                        opacity:.92}}/>
-                    <div style={{fontFamily:osw,fontSize:13,fontWeight:900,
-                      letterSpacing:3,color:'rgba(200,170,255,0.7)',textTransform:'uppercase'}}>
-                      GOING YARD
-                    </div>
-                    {/* Tier hint */}
-                    <div style={{fontFamily:mono,fontSize:8,
-                      color:`rgba(${tier.accentRgb},0.55)`,letterSpacing:1.5,
-                      textTransform:'uppercase'}}>
-                      {tier.emoji} {tier.name}
-                    </div>
-                    {/* Tap hint */}
-                    {!isFlipped && (
-                      <div style={{position:'absolute',bottom:16,fontFamily:mono,
-                        fontSize:7,color:'rgba(255,255,255,0.2)',letterSpacing:1.5}}>
-                        TAP TO REVEAL
-                      </div>
-                    )}
-                  </div>
-
-                  {/* ── CARD FRONT (face-up = player reveal) ── */}
-                  <div style={{
-                    position:'absolute',inset:0,backfaceVisibility:'hidden',
-                    transform:'rotateY(180deg)',
-                    borderRadius:12,overflow:'hidden',
-                    background:tier.bg,
-                    border:`2px solid ${tier.border}`,
-                    boxShadow:`0 8px 32px rgba(0,0,0,0.6),0 0 20px ${tier.glow}`,
-                    display:'flex',flexDirection:'column',padding:'12px 11px',gap:8,
-                  }}>
-                    {/* Tier badge */}
-                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                      <div style={{display:'flex',alignItems:'center',gap:5}}>
-                        <span style={{fontSize:13}}>{tier.emoji}</span>
-                        <span style={{fontFamily:osw,fontSize:9,fontWeight:800,
-                          color:`rgba(${tier.accentRgb},0.9)`,letterSpacing:1,
-                          textTransform:'uppercase'}}>{tier.name}</span>
-                      </div>
-                      {p && <div style={{display:'flex',alignItems:'center',gap:4}}>
-                        <YardBadge score={p.yard}/>
-                        {LINEUP_STATUS[parseInt(p.id)||0]?.status === 'confirmed' && (
-                          <span title="✅ Confirmed in today's lineup"
-                            style={{fontSize:11,flexShrink:0,lineHeight:1}}>✅</span>
-                        )}
-                        {Array.isArray(HR_DATA) && HR_DATA.some(h =>
-                          h.batterId === parseInt(p.id)||0 ||
-                          (h.batterName && h.batterName.toLowerCase() === p.name.toLowerCase())
-                        ) && (
-                          <span title="💥 Gone Yard today"
-                            style={{fontSize:11,flexShrink:0,lineHeight:1}}>💥</span>
-                        )}
-                        {!(Array.isArray(HR_DATA) && HR_DATA.some(h =>
-                          h.batterId === parseInt(p.id)||0 ||
-                          (h.batterName && h.batterName.toLowerCase() === p.name.toLowerCase())
-                        )) && Array.isArray(TB2_DATA) && TB2_DATA.some(t =>
-                          t.batterId === parseInt(p.id)||0 ||
-                          (t.batterName && t.batterName.toLowerCase() === p.name.toLowerCase())
-                        ) && (
-                          <span title="2️⃣ 2+ total bases today (no HR)"
-                            style={{fontSize:11,flexShrink:0,lineHeight:1}}>2️⃣</span>
-                        )}
-                      </div>}
-                    </div>
-
-                    {/* Player avatar + name */}
-                    {p && <>
-                      <div style={{display:'flex',alignItems:'center',gap:8}}>
-                        <PlayerAvatar pid={parseInt(p.id)||0} size={36}/>
-                        <div style={{flex:1,minWidth:0,cursor:'pointer'}}
-                          onClick={e=>{e.stopPropagation();const cp=getCachedPlayer(parseInt(p.id)||0)||{};
-                            openAtBatSlide({pid:parseInt(p.id)||0,name:p.name,team:p.team,
-                              avgEV:cp.avgEV,barrel:cp.barrel,hardHit:cp.hardHit,flyBall:cp.flyBall,
-                              hr:cp.hr,avg:cp.avg,obp:cp.obp,slg:cp.slg,xwoba:cp.xwoba,
-                              kPct:cp.kPct,bbPct:cp.bbPct,launchAngle:cp.launchAngle});}}>
-                          <div style={{fontFamily:osw,fontSize:13,fontWeight:900,
-                            color:'var(--text)',lineHeight:1.2,
-                            whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',
-                            textDecoration:'underline',
-                            textDecorationColor:`rgba(${tier.accentRgb},0.4)`,
-                            textUnderlineOffset:2}}>
-                            {p.name}
-                          </div>
-                          <div style={{fontFamily:mono,fontSize:7.5,color:'var(--muted)',
-                            whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                            {p.team}{p.hand?` · ${p.hand}HB`:''}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Pitcher */}
-                      {p.pgLabel && <div style={{fontFamily:mono,fontSize:7.5,
-                        color:'var(--muted)',lineHeight:1.3}}>
-                        {p.pgLabel}{p.pitcher?` · vs ${p.pitcher}`:''}
-                      </div>}
-
-                      {/* Effective grade */}
-                      {p.effGrade && p.effGrade !== 'D' && (
-                        <div style={{display:'flex',alignItems:'center',gap:4}}>
-                          <span style={{fontFamily:osw,fontSize:8,fontWeight:800,
-                            color:gradeColor(p.effGrade)}}>
-                            Grade {p.effGrade}
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Reason tags */}
-                      <div style={{display:'flex',flexWrap:'wrap',gap:3,flex:1,alignContent:'flex-start'}}>
-                        {p.reasons.map((r,ri)=>(
-                          <span key={ri} style={{fontFamily:mono,fontSize:7,
-                            padding:'2px 5px',borderRadius:3,
-                            background:tier.tagBg,color:tier.tagColor,
-                            border:`1px solid ${tier.tagBorder}`}}>
-                            {r}
-                          </span>
-                        ))}
-                      </div>
-
-                      {/* Pick button at bottom */}
-                      <div style={{display:'flex',justifyContent:'center',marginTop:'auto'}}>
-                        <PickButton pid={parseInt(p.id)||0} name={p.name} team={p.team}/><GamblyButton name={p.name} team={p.team} prop="hr"/>
-                      </div>
-                    </>}
-
-                    {/* No pick found */}
-                    {!p && (
-                      <div style={{flex:1,display:'flex',alignItems:'center',
-                        justifyContent:'center',fontFamily:mono,fontSize:8,
-                        color:'var(--muted)',textAlign:'center',lineHeight:1.7}}>
-                        No qualifying<br/>batter found<br/>for this tier today
-                      </div>
-                    )}
-                  </div>
-
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Flip hint */}
-      {phase === 'cards' && !allFlipped && (
-        <div style={{fontFamily:mono,fontSize:9,color:'var(--muted)',
-          letterSpacing:1,textAlign:'center',marginBottom:16,
-          animation:'fadeUp 0.4s ease'}}>
-          {flipped.filter(Boolean).length === 0
-            ? '👆 Click any card to reveal'
-            : `${3 - flipped.filter(Boolean).length} card${3-flipped.filter(Boolean).length!==1?'s':''} remaining`}
-        </div>
-      )}
-
-      {/* Footer when all revealed */}
-      {(phase === 'done' || (phase === 'cards' && allFlipped)) && (
-        <div style={{textAlign:'center',padding:'8px 0 16px',animation:'fadeUp 0.5s ease'}}>
-          <div style={{fontFamily:mono,fontSize:8,color:'rgba(168,85,247,0.4)',
-            letterSpacing:1,marginBottom:12}}>
-            ⚠ NOT FINANCIAL ADVICE. THE ORBS HAVE SPOKEN.
-          </div>
-          <button onClick={startGazing}
-            style={{padding:'7px 20px',borderRadius:7,cursor:'pointer',marginRight:8,
-              fontFamily:mono,fontSize:9,fontWeight:700,letterSpacing:1,
-              border:'1px solid rgba(168,85,247,0.3)',
-              background:'rgba(168,85,247,0.1)',color:'var(--c-lavender)'}}>
-            🔮 Ask Again
-          </button>
-          <button onClick={reset}
-            style={{padding:'7px 20px',borderRadius:7,cursor:'pointer',
-              fontFamily:mono,fontSize:9,fontWeight:700,letterSpacing:1,
-              border:'1px solid var(--border)',background:'transparent',color:'var(--muted)'}}>
-            ↺ Reset
-          </button>
-        </div>
-      )}
-
-      <style>{`
-        @keyframes orbBreath {
-          0%,100%{opacity:.7;transform:scale(1);}
-          50%{opacity:1;transform:scale(1.05);}
-        }
-        @keyframes orbSpin {
-          from{transform:rotate(0deg);}
-          to{transform:rotate(360deg);}
-        }
-        @keyframes fadeUp {
-          from{opacity:0;transform:translateY(10px);}
-          to{opacity:1;transform:translateY(0);}
-        }
-      `}</style>
-
-      <div style={{fontFamily:mono,fontSize:7.5,color:'rgba(255,255,255,0.1)',
-        textAlign:'center',padding:'8px 0',letterSpacing:.4,lineHeight:1.8}}>
-        For entertainment only. Past patterns do not guarantee future outcomes.
-      </div>
-
-      {showHelp && <HelpSlideout title="🔮 Crystal Ball Guide" onClose={()=>setShowHelp(false)} items={[
-        ['How it works',     'Press Begin Grand Reveal. The orb gazes into today\'s HPE data and draws one batter from each of three tiers. Three face-down cards appear — click each to flip and reveal your pick.'],
-        ['👑 The Chosen',    'Yard Score 32+ with EV 92+. The most fully-aligned candidates the HPE can find today — live signals, strong matchup, elevated power profile. Highest single-game HR probability tier.'],
-        ['🐎 Dark Horse',    'Yard Score 20–31 — the proven sweet spot in the data (9–10% HR rate). Flying under the radar, not being managed around. Close calls and bat speed spikes are weighted heavily here.'],
-        ['🃏 Wild Card',     'Any Yard Score 13+ with at least one spike signal: bat speed surge ≥1.5 above baseline, 2+ close calls, zone fit ≥4, or EV 96+ with solid launch angle. Includes a small chaos factor — the one nobody sees coming.'],
-        ['Clicking the card','Click any card to flip and reveal the batter. Tap their name to open the full stats slideout. Use the [+] button to add them to My Picks.'],
-        ['Ask Again',        'Draws a fresh pick from each tier\'s top-15 pool using weighted randomness. Higher crystal scores are more likely but not guaranteed — you\'ll see variety across reshuffles.'],
-        ['The disclaimer',   'Just for fun — but the data is real. Enjoy the hits when they land.'],
-      ]}/>}
-    </div>
-  );
-}
 
 // ── Top 4 Tonight (2026-08-05, reworked 2026-08-09) — deterministic, one
 // real pick per HR-distribution tier, with a real Claude-narrated Scouting
@@ -31548,7 +28018,7 @@ function TopThreeTab() {
                         // would be confusing, so it gets a generic message
                         // instead of the raw error code.
                         <div style={{fontFamily:mono,fontSize:8,color:'var(--c-coral)'}}>
-                          {noteState.error === 'sign_in_required'
+                          {(noteState.error === 'sign_in_required' || noteState.error === 'top4_only')
                             ? "Couldn't generate a note for this pick — try refreshing."
                             : `Couldn't generate: ${noteState.error}`}
                         </div>
@@ -32427,827 +28897,7 @@ function GameSplitsTab({ window, setWindow, selMatchup, setSelMatchup, pTeam, on
   );
 }
 
-// ── SimTab — Monte Carlo HR Simulator ────────────────────────────────────────
-// Runs 10,000 game simulations across all active batters today.
-// Each sim draws a random roll per batter per at-bat opportunity.
-// Base HR probability is derived from Yard Score + Sig + pitcher grade + park factor.
-// Results show top 5 batters ranked by HR% across 10k sims.
-function SimTab({ data }) {
-  const mono = "'DM Mono',monospace";
-  const osw  = "'Oswald',sans-serif";
-
-  const SIM_COUNT = 10000;
-
-  const [phase, setPhase]     = React.useState('idle');  // idle | running | done
-  const [results, setResults] = React.useState([]);
-  const [elapsed, setElapsed] = React.useState(0);
-  const [simCount, setSimCount] = React.useState(SIM_COUNT);
-  const [progress, setProgress] = React.useState(0);   // 0-100
-  const rafRef   = React.useRef(null);
-  const startRef = React.useRef(null);
-
-  // ── Derive per-batter base HR probability from engine fields ──────────────
-  const buildBatterPool = React.useCallback(() => {
-    const rows = Object.values(DAILY_PICKS_CACHE || {});
-    const seen  = new Set();
-    const pool  = [];
-
-    for (const r of rows) {
-      const pid = String(r.batter_id || '').split('.')[0];
-      if (!pid || seen.has(pid) || !r.batter || !r.game_id) continue;
-      seen.add(pid);
-      if (INJURY_MAP?.[parseInt(pid)||0] && !LINEUP_STATUS?.[parseInt(pid)||0]) continue;
-      if (!isActiveBatter(r)) continue;
-
-      // Pull scoring inputs
-      const sig    = (typeof sigCache !== 'undefined' ? sigCache.current[String(pid)] : null)
-                  ?? SIG_CACHE_GLOBAL[String(pid)]
-                  ?? (parseFloat(r.weighted_flag_score||0) * 4.6);
-      const ghr    = parseFloat(r.gHR   || 0);
-      const simTB  = parseFloat(r.sim_tb || 0);
-      const iso    = parseFloat(r.recent_iso || 0);
-      const ps     = getPS(r);
-      const zf     = getZoneFit(r);
-      const boom   = parseFloat(r._boom) || computeBoomScore(sig, zf, iso, simTB, parseFloat(r.weighted_flag_score||0), shrinkageAdjBarrelSpike(r), parseInt(r.recent_hr_count||0), parseFloat(r.recent_batter_ahead_pct||0), !!r.hh_precursor, parseFloat(r.primary_pitch_hr_rate||0), parseInt(r.recent_barrels_3d)||0, parseInt(r.recent_hrs_3d)||0, parseFloat(r.recent_avg_bat_speed)||0, parseInt(r.recent_pb_2d)||0, r.la_locked, parseFloat(r.season_swstr_pct)||0, parseFloat(r.park_pull_fit)||0, parseInt(r._zoneEdges||0), parseInt(r._zoneKPenalty||0), (()=>{const _ls=liveSlot(r.batter_id,r.lineup_slot);return _ls>0&&(r.pitcher_weak_slots||"").split(",").map(Number).filter(Boolean).includes(_ls);})(), parseFloat(r.season_xwoba)||0);
-      const yard   = computeYardScore(sig, ghr, boom, ps, r.batter_hand||'', r.pitcher_hand||'', parseInt(r.days_rest??1), liveSlot(r.batter_id,r.lineup_slot), getHandSpecificGrade(r));
-      const pgLabel = r._pgLabel || '';
-
-      // ── SimTab hrProb — 638k at-bat data calibrated (June 2026) ──────────────
-      // Base rate derived from Yard Score tiers (validated against actual HR rates)
-      const baseRate = yard >= 32 ? 0.130
-                     : yard >= 24 ? 0.100
-                     : yard >= 18 ? 0.080
-                     : yard >= 13 ? 0.060 : 0.040;
-
-      // Pitcher modifier — pgLabel grade (confirmed in data)
-      const pitcherMod = pgLabel.includes('Target')  ? 1.30
-                       : pgLabel.includes('Hittable') ? 1.15
-                       : pgLabel.includes('Tough')    ? 0.80
-                       : pgLabel.includes('Elite')    ? 0.60 : 1.0;
-
-      // Park + wind modifier
-      const parkMod = (() => {
-        const we = parseFloat(r.wind_effect || 0);
-        if (we >= 8) return 1.20;
-        if (we >= 4) return 1.10;
-        if (we <= -4) return 0.88;
-        return 1.0;
-      })();
-
-      // Sig boost
-      const sigMod = sig >= 6 ? 1.25 : sig >= 4 ? 1.12 : sig >= 2 ? 1.05 : 1.0;
-
-      // ── NEW: 638k-validated modifiers ─────────────────────────────────────
-      // Hot hand: 2+ HRs last 3 games = 13.16% vs 9.78% baseline (+3.38pt)
-      const hrCount = parseInt(r.recent_hr_count || 0);
-      const hotHandMod = hrCount >= 2 ? 1.18 : hrCount >= 1 ? 1.08 : 1.0;
-
-      // Days rest: 0 rest = 13.13%, 4 days = 7.42%. Groove breaks with rest.
-      const daysRest = parseInt(r.days_rest ?? 1);
-      const restMod = daysRest === 0 ? 1.12
-                    : daysRest === 1 ? 1.00
-                    : daysRest === 2 ? 0.97
-                    : daysRest === 3 ? 0.92
-                    : daysRest >= 4  ? 0.84 : 1.0;
-
-      // Barrel spike: recent barrel% vs personal season baseline (+2pt confirmed)
-      const bSpike = parseFloat(r.recent_barrel_spike);
-      const barrelSpikeMod = isNaN(bSpike) ? 1.0
-                           : bSpike >= 6   ? 1.15
-                           : bSpike >= 3   ? 1.10
-                           : bSpike >= 1   ? 1.05
-                           : bSpike < -2   ? 0.93 : 1.0;
-
-      // Count discipline: >25% batter-ahead = 12.08% vs 8.19% (+3.89pt)
-      const baRaw = parseFloat(r.recent_batter_ahead_pct || 0);
-      const countMod = baRaw >= 30 ? 1.10
-                     : baRaw >= 25 ? 1.08
-                     : baRaw < 10  ? 0.88 : 1.0;
-
-      // Platoon: LHB vs LHP = -12%, LHB vs RHP = +3%
-      const _bh2 = (r.batter_hand  || '').toUpperCase()[0];
-      const _ph2 = (r.pitcher_hand || '').toUpperCase()[0];
-      const platoonMod2 = (_ph2 === 'L' && (_bh2 === 'L' || _bh2 === 'S')) ? 0.88
-                        : (_ph2 === 'L' && _bh2 === 'R') ? 1.03
-                        : (_ph2 === 'R' && (_bh2 === 'L' || _bh2 === 'S')) ? 1.03
-                        : 1.0;
-
-      // HH Precursor: loud contact no-HR last game = +1.32pt
-      const precursorMod = r.hh_precursor ? 1.06 : 1.0;
-
-      // Lineup slot — base probability adjustment (separate from PA count)
-      // Slot 3: 14.88% vs slot 9: 7.14%. Biggest gap in dataset.
-      const lineupSlot = liveSlot(parseInt(r.batter_id||0), r.lineup_slot) || parseInt(r._lineupSlot||0) || 5;
-      const slotProbMod = lineupSlot === 3 ? 1.06
-                        : lineupSlot === 4 ? 1.06
-                        : lineupSlot === 2 ? 1.03
-                        : lineupSlot === 5 ? 1.02
-                        : lineupSlot === 1 ? 1.01
-                        : lineupSlot === 7 ? 0.96
-                        : lineupSlot === 8 ? 0.92
-                        : lineupSlot === 9 ? 0.86 : 1.0;
-
-      // Final per-PA HR probability — all modifiers stacked
-      const hrProb = Math.min(0.30,
-        baseRate * pitcherMod * parkMod * sigMod *
-        hotHandMod * restMod * barrelSpikeMod * countMod * platoonMod2 * precursorMod * slotProbMod
-      );
-
-      // PA count: lineup slot (leadoff ~4.3, cleanup ~4.0, bottom ~3.5)
-      const avgPA = lineupSlot <= 2 ? 4.3
-                  : lineupSlot <= 5 ? 4.0
-                  : lineupSlot <= 7 ? 3.7 : 3.5;
-
-      pool.push({
-        pid, name: r.batter, team: r.batting_team || '',
-        pitcher: r.pitcher || '', pgLabel,
-        pitcherId: String(r.pitcher_id || '').split('.')[0] || null,
-        pitcherHand: r.pitcher_hand || '',
-        yard, sig: Math.round(sig), boom, ghr, ps,
-        hrProb,       // per-PA HR probability
-        avgPA,        // expected PAs this game
-        pitcherMod, parkMod, sigMod,
-      });
-    }
-
-    return pool;
-  }, [data]);
-
-  // ── Run the Monte Carlo simulation in async chunks to avoid blocking UI ────
-  const runSim = React.useCallback(() => {
-    const pool = buildBatterPool();
-    if (pool.length === 0) return;
-
-    setPhase('running');
-    setProgress(0);
-    startRef.current = performance.now();
-
-    // Accumulate HR counts per batter
-    const hrCounts = new Float32Array(pool.length);
-    const BATCH = 500;  // sims per animation frame
-    let   done  = 0;
-    const N     = simCount;
-
-    const tick = () => {
-      const batchEnd = Math.min(done + BATCH, N);
-      for (let s = done; s < batchEnd; s++) {
-        for (let b = 0; b < pool.length; b++) {
-          const { hrProb, avgPA } = pool[b];
-          // Each sim: roll for each expected PA
-          // Use Poisson-like: actual PAs = Poisson(avgPA), each PA independent Bernoulli
-          const actualPA = Math.max(1, Math.round(avgPA + (Math.random() - 0.5) * 1.4));
-          for (let pa = 0; pa < actualPA; pa++) {
-            if (Math.random() < hrProb) { hrCounts[b]++; break; } // max 1 per game sim
-          }
-        }
-      }
-      done = batchEnd;
-      setProgress(Math.round((done / N) * 100));
-
-      if (done < N) {
-        rafRef.current = requestAnimationFrame(tick);
-      } else {
-        // Build sorted results
-        const res = pool.map((b, i) => ({
-          ...b,
-          simHRs:   hrCounts[i],
-          hrPct:    (hrCounts[i] / N) * 100,
-        }))
-        .sort((a, b) => b.hrPct - a.hrPct)
-        .slice(0, 5);
-
-        setResults(res);
-        setElapsed(Math.round(performance.now() - startRef.current));
-        setPhase('done');
-      }
-    };
-
-    rafRef.current = requestAnimationFrame(tick);
-    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
-  }, [buildBatterPool, simCount]);
-
-  React.useEffect(() => {
-    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
-  }, []);
-
-  // ── Medal colors ──────────────────────────────────────────────────────────
-  const MEDALS = [
-    { icon:'🥇', col:'var(--c-gold)', bg:'rgba(255,215,0,.10)',  border:'rgba(255,215,0,.25)' },
-    { icon:'🥈', col:'#c0c0c0', bg:'rgba(192,192,192,.08)',border:'rgba(192,192,192,.20)' },
-    { icon:'🥉', col:'#cd7f32', bg:'rgba(205,127,50,.10)', border:'rgba(205,127,50,.22)' },
-    { icon:'4',  col:'rgba(255,255,255,.5)', bg:'rgba(255,255,255,.04)', border:'rgba(255,255,255,.10)' },
-    { icon:'5',  col:'rgba(255,255,255,.4)', bg:'rgba(255,255,255,.03)', border:'rgba(255,255,255,.08)' },
-  ];
-
-  // ── Bar width for HR% bar chart ───────────────────────────────────────────
-  const maxPct = results.length > 0 ? results[0].hrPct : 1;
-
-  return (
-    <div style={{padding:'0 2px'}}>
-
-      {/* Header */}
-      <div style={{marginBottom:12,padding:'10px 14px',borderRadius:10,
-        background:'linear-gradient(135deg,rgba(232,65,26,.12) 0%,rgba(0,0,0,0) 100%)',
-        border:'1px solid rgba(232,65,26,.18)'}}>
-        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
-          <span style={{fontSize:18}}>🎰</span>
-          <span style={{fontFamily:osw,fontWeight:800,fontSize:14,letterSpacing:.5,
-            color:'white'}}>HR SIM</span>
-          <span style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.4)',
-            marginLeft:2}}>Monte Carlo · Today's Slate</span>
-        </div>
-        <div style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.4)',lineHeight:1.6}}>
-          Simulates today's games {simCount.toLocaleString()} times. Each run draws randomized
-          at-bat outcomes from each batter's Yard Score, pitcher grade, park &amp; wind context.
-          Results show how often each batter goes yard across all sims.
-        </div>
-      </div>
-
-      {/* Controls */}
-      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12,flexWrap:'wrap'}}>
-        {/* Sim count selector */}
-        <div style={{display:'flex',gap:4}}>
-          {[1000,5000,10000].map(n => (
-            <button key={n}
-              onClick={()=>{ if(phase!=='running') setSimCount(n); }}
-              style={{padding:'4px 9px',borderRadius:6,cursor:phase==='running'?'not-allowed':'pointer',
-                border:`1px solid ${simCount===n?'rgba(232,65,26,.5)':'var(--border)'}`,
-                background:simCount===n?'rgba(232,65,26,.15)':'var(--surface2)',
-                color:simCount===n?'var(--c-danger)':'var(--muted)',
-                fontFamily:mono,fontSize:9,transition:'all .12s'}}>
-              {n.toLocaleString()}
-            </button>
-          ))}
-          <span style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.3)',
-            alignSelf:'center',paddingLeft:2}}>sims</span>
-        </div>
-
-        {/* Sim button */}
-        <button
-          onClick={()=>{ if(phase!=='running'){ setResults([]); setPhase('idle'); runSim(); } }}
-          disabled={phase==='running'}
-          style={{padding:'6px 18px',borderRadius:8,cursor:phase==='running'?'not-allowed':'pointer',
-            border:'none',fontFamily:osw,fontWeight:800,fontSize:12,letterSpacing:.8,
-            background:phase==='running'
-              ? 'rgba(255,255,255,.08)'
-              : 'linear-gradient(135deg,#e8411a 0%,#c42d0d 100%)',
-            color:phase==='running'?'rgba(255,255,255,.3)':'white',
-            boxShadow:phase==='running'?'none':'0 2px 12px rgba(232,65,26,.4)',
-            transition:'all .15s',display:'flex',alignItems:'center',gap:6}}>
-          {phase==='running'
-            ? <><span style={{display:'inline-block',animation:'spin 1s linear infinite'}}>⟳</span> SIMULATING…</>
-            : phase==='done' ? '↺ RE-SIM' : '▶ RUN SIM'}
-        </button>
-
-        {phase==='done' && (
-          <span style={{fontFamily:mono,fontSize:8,color:'rgba(255,255,255,.3)',marginLeft:'auto'}}>
-            {simCount.toLocaleString()} sims · {elapsed}ms
-          </span>
-        )}
-      </div>
-
-      {/* Progress bar */}
-      {phase==='running' && (
-        <div style={{marginBottom:12,height:3,borderRadius:2,
-          background:'rgba(255,255,255,.08)',overflow:'hidden'}}>
-          <div style={{height:'100%',borderRadius:2,
-            background:'linear-gradient(90deg,#e8411a,#f5a623)',
-            width:`${progress}%`,transition:'width .1s linear'}}/>
-        </div>
-      )}
-
-      {/* Results */}
-      {phase==='done' && results.length > 0 && (
-        <div style={{display:'flex',flexDirection:'column',gap:8}}>
-
-          {/* "Sim says…" header */}
-          <div style={{fontFamily:osw,fontWeight:800,fontSize:10,letterSpacing:.8,
-            color:'rgba(255,255,255,.3)',textTransform:'uppercase',marginBottom:2}}>
-            Sim says… top 5 today
-          </div>
-
-          {results.map((b, i) => {
-            const m = MEDALS[i] || MEDALS[4];
-            const barW = Math.round((b.hrPct / maxPct) * 100);
-            const pitcherTag = b.pgLabel.includes('Target')  ? { txt:'🎯 Target',  col:'var(--green)' }
-                             : b.pgLabel.includes('Hittable') ? { txt:'💥 Hit',     col:'var(--accent2)' }
-                             : b.pgLabel.includes('Tough')    ? { txt:'⚠️ Tough',   col:'#ef4444' }
-                             : b.pgLabel.includes('Elite')    ? { txt:'‼️ Elite',   col:'#ef4444' }
-                             : null;
-
-            const handleBatter = e => {
-              e.stopPropagation();
-              const cp = getCachedPlayer(parseInt(b.pid)||0) || {};
-              openAtBatSlide({ pid:parseInt(b.pid)||0, name:b.name, team:b.team,
-                avgEV:cp.avgEV, barrel:cp.barrel, hardHit:cp.hardHit,
-                flyBall:cp.flyBall, hr:cp.hr, avg:cp.avg, obp:cp.obp,
-                slg:cp.slg, xwoba:cp.xwoba, kPct:cp.kPct, bbPct:cp.bbPct,
-                launchAngle:cp.launchAngle });
-            };
-            const handlePitcher = e => {
-              e.stopPropagation();
-              if (!b.pitcherId) return;
-              openPitcherSlide({ pid:parseInt(b.pitcherId)||0, name:b.pitcher,
-                team:'', hand:b.pitcherHand, pitchMix:[] });
-            };
-
-            return (
-              <div key={b.pid} style={{borderRadius:10,overflow:'hidden',
-                background:m.bg, border:`1px solid ${m.border}`,
-                padding:'10px 12px'}}>
-
-                {/* Top row: medal + avatar + name + team + HR% */}
-                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:7}}>
-
-                  {/* Medal */}
-                  {i < 3
-                    ? <span style={{fontSize:15,lineHeight:1,flexShrink:0}}>{m.icon}</span>
-                    : <span style={{width:16,height:16,borderRadius:3,
-                        background:'rgba(255,255,255,.07)',display:'inline-flex',
-                        alignItems:'center',justifyContent:'center',flexShrink:0,
-                        fontFamily:mono,fontSize:8,color:m.col}}>{m.icon}</span>
-                  }
-
-                  {/* Avatar — clickable */}
-                  <div onClick={handleBatter} style={{cursor:'pointer',flexShrink:0}}>
-                    <PlayerAvatar pid={b.pid} name={b.name} size={36}
-                      border={`2px solid ${m.col}60`}/>
-                  </div>
-
-                  {/* Name block */}
-                  <div style={{flex:1,minWidth:0}}>
-                    {/* Batter name — clickable */}
-                    <div onClick={handleBatter}
-                      style={{cursor:'pointer',fontFamily:osw,fontWeight:800,fontSize:13,
-                        color:'white',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',
-                        textDecoration:'underline',textDecorationStyle:'dotted',
-                        textDecorationColor:'rgba(255,255,255,.25)',
-                        lineHeight:1.2,marginBottom:2}}>
-                      {b.name}
-                    </div>
-                    {/* Team + pitcher line */}
-                    <div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}>
-                      <span style={{fontFamily:mono,fontSize:8,
-                        color:'rgba(255,255,255,.45)',flexShrink:0}}>
-                        {b.team}
-                      </span>
-                      {b.pitcher && (<>
-                        <span style={{fontFamily:mono,fontSize:7,
-                          color:'rgba(255,255,255,.2)'}}>vs</span>
-                        <span onClick={handlePitcher}
-                          style={{cursor:b.pitcherId?'pointer':'default',
-                            fontFamily:mono,fontSize:8,
-                            color:b.pitcherId?'rgba(255,255,255,.55)':'rgba(255,255,255,.3)',
-                            textDecoration:b.pitcherId?'underline':'none',
-                            textDecorationStyle:'dotted',
-                            textDecorationColor:'rgba(255,255,255,.2)'}}>
-                          {b.pitcher}
-                        </span>
-                      </>)}
-                      {pitcherTag && (
-                        <span style={{fontFamily:mono,fontSize:7,color:pitcherTag.col,
-                          background:`${pitcherTag.col}18`,border:`1px solid ${pitcherTag.col}40`,
-                          borderRadius:4,padding:'1px 5px',flexShrink:0}}>
-                          {pitcherTag.txt}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* HR% big number — right side */}
-                  <div style={{textAlign:'right',flexShrink:0}}>
-                    <div style={{fontFamily:osw,fontWeight:800,fontSize:20,
-                      color:m.col,lineHeight:1}}>
-                      {b.hrPct.toFixed(1)}%
-                    </div>
-                    <div style={{fontFamily:mono,fontSize:7,
-                      color:'rgba(255,255,255,.3)',marginTop:1}}>
-                      HR in sim
-                    </div>
-                  </div>
-                </div>
-
-                {/* HR% bar */}
-                <div style={{marginBottom:7}}>
-                  <div style={{height:4,borderRadius:2,
-                    background:'rgba(255,255,255,.08)',overflow:'hidden'}}>
-                    <div style={{height:'100%',borderRadius:2,
-                      width:`${barW}%`,
-                      background:i===0
-                        ? 'linear-gradient(90deg,#ffd700,#f5a623)'
-                        : i===1
-                        ? 'linear-gradient(90deg,#a0a0a0,#c8c8c8)'
-                        : i===2
-                        ? 'linear-gradient(90deg,#cd7f32,#e8a060)'
-                        : 'rgba(255,255,255,.25)',
-                      transition:'width .4s ease'}}/>
-                  </div>
-                </div>
-
-                {/* Signal pills */}
-                <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
-                  {[
-                    { label:'Yard', val:b.yard,
-                      col: b.yard>=32?'var(--c-gold)':b.yard>=24?'var(--c-danger)':b.yard>=18?'var(--accent2)':'var(--muted)' },
-                    { label:'Sig',  val:b.sig,
-                      col: b.sig>=6?'var(--c-danger)':b.sig>=4?'var(--accent2)':b.sig>=2?'var(--green)':'var(--muted)' },
-                    { label:'Boom', val:b.boom,
-                      col: b.boom>=70?'var(--c-danger)':b.boom>=50?'var(--accent2)':'var(--muted)' },
-                    { label:'gHR',  val:b.ghr>0?Math.round(b.ghr):null,
-                      col: b.ghr>=70?'var(--c-danger)':b.ghr>=50?'var(--accent2)':'var(--muted)' },
-                  ].filter(x=>x.val!=null&&x.val>0).map(x => (
-                    <span key={x.label} style={{fontFamily:mono,fontSize:7,
-                      color:x.col,background:`${x.col}14`,border:`1px solid ${x.col}30`,
-                      borderRadius:4,padding:'1px 5px'}}>
-                      {x.label} {x.val}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-
-          {/* Disclaimer */}
-          <div style={{fontFamily:mono,fontSize:7,color:'rgba(255,255,255,.22)',
-            textAlign:'center',padding:'6px 0 2px',lineHeight:1.6}}>
-            Simulation probabilities are model estimates, not guarantees.
-            Results vary each run due to random sampling.
-          </div>
-        </div>
-      )}
-
-      {/* Empty state */}
-      {phase==='idle' && (
-        <div style={{textAlign:'center',padding:'28px 14px',
-          fontFamily:mono,fontSize:9,color:'rgba(255,255,255,.2)',lineHeight:2}}>
-          Press <strong style={{color:'rgba(255,255,255,.4)'}}>▶ RUN SIM</strong> to simulate today's slate<br/>
-          and find the top HR candidates
-        </div>
-      )}
-
-    </div>
-  );
-}
-
-// ── All-Star Week — Overview, HR Derby, Game, Rosters, History ─────────────
-// Fully year-agnostic: no hardcoded years/venues/gamePks anywhere below — all
-// discovery happens server-side in api/allstar.js. See that file's header
-// comment for the HR Derby's undocumented-but-stable discovery chain.
-function allStarFmtDate(iso) {
-  if (!iso) return '';
-  try {
-    return new Date(iso).toLocaleDateString('en-US', {
-      timeZone: 'America/New_York', weekday: 'short', month: 'short',
-      day: 'numeric', hour: 'numeric', minute: '2-digit',
-    });
-  } catch (e) { return iso; }
-}
-
-function AllStarWeekTab() {
-  const [sub, setSub] = useState('overview');
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [historyYear, setHistoryYear] = useState(new Date().getFullYear() - 1);
-  const [historyData, setHistoryData] = useState(null);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const mono = "'DM Mono',monospace", osw = "'Oswald',sans-serif";
-
-  const load = React.useCallback(async () => {
-    try {
-      const res = await fetch('/api/allstar');
-      const d = await res.json();
-      setData(d);
-    } catch (e) {
-      setError(e.message);
-    }
-    setLoading(false);
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
-
-  // Live Derby polling — only while the Derby has actually started and isn't
-  // done yet. "Preview" = not started, "Final" = done — neither needs polling.
-  const derbyState = data?.derby?.status?.state || '';
-  const derbyIsLive = !!derbyState && derbyState !== 'Final' && derbyState !== 'Preview';
-  useEffect(() => {
-    if (!derbyIsLive) return;
-    const id = setInterval(async () => {
-      try {
-        const res = await fetch('/api/allstar?derbyOnly=1');
-        const d = await res.json();
-        if (d.derby) setData(prev => prev ? { ...prev, derby: d.derby } : prev);
-      } catch (e) {}
-    }, 15000);
-    return () => clearInterval(id);
-  }, [derbyIsLive]);
-
-  const loadHistory = async (yr) => {
-    setHistoryLoading(true);
-    setHistoryData(null);
-    try {
-      const res = await fetch(`/api/allstar?season=${yr}`);
-      const d = await res.json();
-      setHistoryData(d);
-    } catch (e) {}
-    setHistoryLoading(false);
-  };
-
-  const stBtn = key => ({
-    padding: '5px 12px', borderRadius: 6, cursor: 'pointer', border: 'none',
-    fontFamily: osw, fontWeight: 700, fontSize: 10, letterSpacing: .5,
-    textTransform: 'uppercase',
-    background: sub === key ? 'var(--accent)' : 'var(--surface2)',
-    color: sub === key ? 'white' : 'var(--muted)',
-  });
-
-  if (loading) return <div style={{ padding: 20, fontFamily: mono, color: 'var(--muted)' }}>Loading All-Star Week…</div>;
-  if (error) return <div style={{ padding: 20, fontFamily: mono, color: 'var(--accent)' }}>Error: {error}</div>;
-
-  const asg = data?.asg;
-  const derby = data?.derby;
-  const rosters = data?.rosters || { away: [], home: [] };
-
-  return (
-    <div>
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
-        <button style={stBtn('overview')} onClick={() => setSub('overview')}>Overview</button>
-        <button style={stBtn('derby')} onClick={() => setSub('derby')}>🥊 HR Derby</button>
-        <button style={stBtn('game')} onClick={() => setSub('game')}>⭐ All-Star Game</button>
-        <button style={stBtn('rosters')} onClick={() => setSub('rosters')}>👥 Rosters</button>
-        <button style={stBtn('history')} onClick={() => setSub('history')}>📋 History</button>
-      </div>
-
-      {sub === 'overview' && (
-        <div>
-          <div style={{ fontFamily: osw, fontWeight: 800, fontSize: 20, marginBottom: 4 }}>
-            {data?.season} MLB All-Star Week
-          </div>
-          <div style={{ fontFamily: mono, fontSize: 11, color: 'var(--muted)', marginBottom: 16 }}>
-            {asg?.venue?.name || 'Venue TBD'}
-          </div>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <div style={{ flex: '1 1 260px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 16 }}>
-              <div style={{ fontFamily: osw, fontWeight: 700, fontSize: 13, color: 'var(--accent)', marginBottom: 6 }}>🥊 Home Run Derby</div>
-              {derby ? <>
-                <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)' }}>{allStarFmtDate(derby.eventDate)}</div>
-                <div style={{ fontFamily: mono, fontSize: 11, marginTop: 4, color: derbyIsLive ? 'var(--green)' : 'var(--text)' }}>
-                  {derbyIsLive ? '🔴 LIVE — ' : ''}{derby.status?.state || 'Scheduled'}
-                </div>
-              </> : <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)' }}>Derby data unavailable</div>}
-            </div>
-            <div style={{ flex: '1 1 260px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 16 }}>
-              <div style={{ fontFamily: osw, fontWeight: 700, fontSize: 13, color: 'var(--ice)', marginBottom: 6 }}>⭐ All-Star Game</div>
-              {asg ? <>
-                <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)' }}>{allStarFmtDate(asg.gameDate)}</div>
-                <div style={{ fontFamily: mono, fontSize: 11, marginTop: 4 }}>
-                  {asg.teams.away.name} {asg.teams.away.score ?? ''} @ {asg.teams.home.name} {asg.teams.home.score ?? ''}
-                </div>
-                <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>{asg.status}</div>
-              </> : <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)' }}>Game data unavailable</div>}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {sub === 'derby' && (
-        <div>
-          {!derby ? <div style={{ fontFamily: mono, color: 'var(--muted)' }}>Derby data unavailable — MLB may not have published this year's bracket yet, or the undocumented endpoint this relies on has changed. Check back closer to Derby night.</div> :
-            <>
-              <div style={{ fontFamily: osw, fontWeight: 800, fontSize: 16, marginBottom: 4 }}>{derby.name}</div>
-              <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)', marginBottom: 4 }}>{derby.venue?.name} · {allStarFmtDate(derby.eventDate)}</div>
-              <div style={{ fontFamily: mono, fontSize: 11, color: derbyIsLive ? 'var(--green)' : 'var(--accent)', marginBottom: 16 }}>
-                {derbyIsLive ? '🔴 LIVE — ' : ''}{derby.status?.state}
-                {derby.status?.currentRound ? ` · Round ${derby.status.currentRound}` : ''}
-                {derbyIsLive && derby.status?.swingsRemaining != null ? ` · ${derby.status.swingsRemaining} swings left` : ''}
-              </div>
-              {(() => {
-                // Shared batter-card renderer — Pool rounds (Round 1) list batters
-                // directly under `r.batters`; Bracket rounds (Round 2+) use
-                // `r.matchups[].topSeed`/`bottomSeed` instead (confirmed live,
-                // 2026-07-14 All-Star Derby: round.batters is absent entirely on
-                // Bracket-type rounds — this is why Round 2/3 rendered empty before).
-                const DerbyBatterCard = (b, key) => {
-                  const pid = b?.player?.id;
-                  const cp = pid ? getCachedPlayer(pid) : null;
-                  const bestSwing = b?.topDerbyHitData;
-                  const hasBestSwing = bestSwing && (bestSwing.launchSpeed > 0 || bestSwing.totalDistance > 0);
-                  return (
-                    <div key={key} onClick={() => pid && openAtBatSlide({
-                        pid, name: b.player?.fullName,
-                        team: cp?.team || GLOBAL_PLAYER_TEAM_MAP[pid]?.team || '',
-                      })}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
-                        background: b.winner ? 'rgba(39,201,122,.08)' : 'var(--surface)',
-                        border: `1px solid ${b.winner ? 'rgba(39,201,122,.4)' : 'var(--border)'}`,
-                        borderRadius: 8, cursor: pid ? 'pointer' : 'default',
-                      }}>
-                      <PlayerAvatar pid={pid} name={b.player?.fullName} size={26} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{
-                          fontFamily: osw, fontWeight: 700, fontSize: 11, color: b.winner ? 'var(--green)' : 'var(--text)',
-                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                        }}>
-                          {b.winner && '👑 '}{b.player?.fullName || 'TBD'}
-                        </div>
-                        <div style={{ fontFamily: mono, fontSize: 9, color: 'var(--muted)' }}>
-                          {b.complete ? `${b.numHomeRuns ?? 0} HR` : b.started ? 'Batting…' : 'Waiting'}
-                          {hasBestSwing && ` · Best: ${bestSwing.launchSpeed}mph, ${Math.round(bestSwing.totalDistance)}ft`}
-                        </div>
-                        {cp && (
-                          <div style={{ fontFamily: mono, fontSize: 8, color: 'var(--muted)', opacity: .75, marginTop: 1 }}>
-                            Season: {cp.avgEV ? `${cp.avgEV} EV` : ''}{cp.barrel ? ` · ${cp.barrel}% Brl` : ''}{cp.hr ? ` · ${cp.hr} HR` : ''}{cp.xwoba ? ` · ${cp.xwoba} xwOBA` : ''}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                };
-                return (derby.rounds || []).map(r => (
-                  <div key={r.round} style={{ marginBottom: 20 }}>
-                    <div style={{ fontFamily: osw, fontWeight: 700, fontSize: 12, color: 'var(--muted)', textTransform: 'uppercase', marginBottom: 8 }}>
-                      Round {r.round} — {r.type} ({r.numBatters} batters)
-                    </div>
-                    {Array.isArray(r.batters) && r.batters.length > 0 && (
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', gap: 8 }}>
-                        {r.batters.map((b, i) => DerbyBatterCard(b, i))}
-                      </div>
-                    )}
-                    {Array.isArray(r.matchups) && r.matchups.length > 0 && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        {r.matchups.map((m, mi) => (
-                          <div key={mi} style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 8, alignItems: 'center' }}>
-                            {DerbyBatterCard(m.topSeed, `${mi}-top`)}
-                            <div style={{ fontFamily: osw, fontWeight: 700, fontSize: 10, color: 'var(--muted)' }}>VS</div>
-                            {DerbyBatterCard(m.bottomSeed, `${mi}-bottom`)}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {!(Array.isArray(r.batters) && r.batters.length) && !(Array.isArray(r.matchups) && r.matchups.length) && (
-                      <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)' }}>Matchups not yet set.</div>
-                    )}
-                  </div>
-                ));
-              })()}
-            </>}
-        </div>
-      )}
-
-      {sub === 'game' && (
-        <div>
-          {!asg ? <div style={{ fontFamily: mono, color: 'var(--muted)' }}>Game data unavailable.</div> :
-            <>
-              <div style={{ fontFamily: osw, fontWeight: 800, fontSize: 16, marginBottom: 8 }}>
-                {asg.teams.away.name} @ {asg.teams.home.name}
-              </div>
-              <div style={{ display: 'flex', gap: 20, alignItems: 'center', marginBottom: 12 }}>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)' }}>{asg.teams.away.name}</div>
-                  <div style={{ fontFamily: osw, fontWeight: 800, fontSize: 28, color: asg.isWinner.away ? 'var(--green)' : 'var(--text)' }}>
-                    {asg.teams.away.score ?? '–'}
-                  </div>
-                </div>
-                <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)' }}>at</div>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)' }}>{asg.teams.home.name}</div>
-                  <div style={{ fontFamily: osw, fontWeight: 800, fontSize: 28, color: asg.isWinner.home ? 'var(--green)' : 'var(--text)' }}>
-                    {asg.teams.home.score ?? '–'}
-                  </div>
-                </div>
-              </div>
-              <div style={{ fontFamily: mono, fontSize: 11, color: 'var(--muted)' }}>{asg.status} · {asg.venue.name} · {allStarFmtDate(asg.gameDate)}</div>
-              {asg.description && <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)', marginTop: 6 }}>{asg.description}</div>}
-              <div style={{ marginTop: 16, fontFamily: mono, fontSize: 10, color: 'var(--muted)' }}>
-                For live play-by-play and Statcast detail, check the 📡 Live → Gameday tab or 💥 HR Tracker — both already pick up this game automatically since it's a real gamePk.
-              </div>
-            </>}
-        </div>
-      )}
-
-      {sub === 'rosters' && (
-        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
-          {['away', 'home'].map(side => (
-            <div key={side} style={{ flex: '1 1 300px' }}>
-              <div style={{ fontFamily: osw, fontWeight: 700, fontSize: 13, color: 'var(--accent)', marginBottom: 8 }}>
-                {asg?.teams?.[side]?.name || (side === 'away' ? 'Away' : 'Home')} ({rosters[side].length})
-              </div>
-              {rosters[side].length === 0 && <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)' }}>Roster not yet posted.</div>}
-              {rosters[side].map(p => {
-                const realTeam = TEAM_ID_TO_ABBR[p.parentTeamId] || '';
-                return (
-                <div key={p.id} onClick={() => openAtBatSlide({ pid: p.id, name: p.name, team: realTeam })}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 8, padding: '6px 4px', cursor: 'pointer',
-                    borderBottom: '1px solid rgba(255,255,255,.04)',
-                  }}>
-                  <PlayerAvatar pid={p.id} name={p.name} size={24} />
-                  <span style={{ fontFamily: mono, fontSize: 9, color: 'var(--muted)', width: 26 }}>{p.pos}</span>
-                  <span style={{ fontFamily: osw, fontWeight: 600, fontSize: 12 }}>{p.name}</span>
-                  {realTeam && <span style={{ fontFamily: mono, fontSize: 8, color: 'var(--muted)', opacity: .7 }}>{realTeam}</span>}
-                  <span style={{ flex: 1 }} />
-                  {p.battingOrder && <span style={{ fontFamily: mono, fontSize: 9, color: 'var(--muted)' }}>#{p.battingOrder}</span>}
-                </div>
-                );
-              })}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {sub === 'history' && (
-        <div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16 }}>
-            <input type="number" value={historyYear} onChange={e => setHistoryYear(parseInt(e.target.value) || historyYear)}
-              style={{
-                width: 80, padding: '5px 8px', background: 'var(--surface2)', border: '1px solid var(--border)',
-                borderRadius: 6, color: 'var(--text)', fontFamily: mono, fontSize: 11,
-              }} />
-            <button onClick={() => loadHistory(historyYear)}
-              style={{
-                padding: '5px 12px', borderRadius: 6, cursor: 'pointer', border: '1px solid var(--border)',
-                background: 'var(--surface2)', color: 'var(--muted)', fontFamily: mono, fontSize: 11,
-              }}>
-              Load
-            </button>
-          </div>
-          {historyLoading && <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)' }}>Loading…</div>}
-          {historyData?.asg && (
-            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 16 }}>
-              <div style={{ fontFamily: osw, fontWeight: 700, fontSize: 14, marginBottom: 6 }}>
-                {historyData.asg.teams.away.name} {historyData.asg.teams.away.score} @ {historyData.asg.teams.home.name} {historyData.asg.teams.home.score}
-              </div>
-              <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)' }}>
-                {historyData.asg.venue.name} · {allStarFmtDate(historyData.asg.gameDate)} · {historyData.asg.status}
-              </div>
-              {historyData.asg.description && <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)', marginTop: 6 }}>{historyData.asg.description}</div>}
-              {historyData.asg.detail && (historyData.asg.detail.attendance || historyData.asg.detail.durationMinutes) && (
-                <div style={{ fontFamily: mono, fontSize: 9, color: 'var(--muted)', marginTop: 6 }}>
-                  {historyData.asg.detail.attendance ? `Attendance: ${historyData.asg.detail.attendance.toLocaleString()}` : ''}
-                  {historyData.asg.detail.durationMinutes ? ` · Duration: ${historyData.asg.detail.durationMinutes} min` : ''}
-                </div>
-              )}
-              {historyData.asg.detail?.innings?.length > 0 && (
-                <div style={{ marginTop: 10, overflowX: 'auto' }}>
-                  <table style={{ borderCollapse: 'collapse', fontFamily: mono, fontSize: 9 }}>
-                    <thead><tr>
-                      <td style={{ padding: '2px 6px', color: 'var(--muted)' }}></td>
-                      {historyData.asg.detail.innings.map(inn => <td key={inn.num} style={{ padding: '2px 6px', textAlign: 'center', color: 'var(--muted)' }}>{inn.num}</td>)}
-                      <td style={{ padding: '2px 6px', textAlign: 'center', color: 'var(--accent)', fontWeight: 700 }}>R</td>
-                    </tr></thead>
-                    <tbody>
-                      {['away', 'home'].map(side => (
-                        <tr key={side}>
-                          <td style={{ padding: '2px 6px', color: 'var(--muted)' }}>{historyData.asg.teams[side]?.name?.split(' ')[0] || side}</td>
-                          {historyData.asg.detail.innings.map(inn => <td key={inn.num} style={{ padding: '2px 6px', textAlign: 'center' }}>{inn[side]?.runs ?? '—'}</td>)}
-                          <td style={{ padding: '2px 6px', textAlign: 'center', fontWeight: 700 }}>{historyData.asg.detail.teamTotals?.[side]?.runs ?? '—'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-              {historyData.asg.detail?.hrLog?.length > 0 && (
-                <div style={{ marginTop: 10 }}>
-                  <div style={{ fontFamily: osw, fontWeight: 700, fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', marginBottom: 4 }}>💥 Home Runs</div>
-                  {historyData.asg.detail.hrLog.map((h, i) => (
-                    <div key={i} style={{ fontFamily: mono, fontSize: 10, marginBottom: 2 }}>
-                      {h.batterName} — Inn {h.inning}{h.rbi > 1 ? ` (${h.rbi}-run)` : ''}
-                    </div>
-                  ))}
-                </div>
-              )}
-              {historyData.derby && (
-                <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
-                  <div style={{ fontFamily: osw, fontWeight: 700, fontSize: 12, color: 'var(--accent)' }}>🥊 {historyData.derby.name}</div>
-                  {(historyData.derby.rounds || []).slice(-1).map(r => {
-                    // Finals round is always Bracket-type (matchups, not batters) —
-                    // r.batters is only ever populated on the Round 1 Pool round,
-                    // so the champion has to be found via topSeed/bottomSeed here.
-                    const matchupSides = (r.matchups || []).flatMap(m => [m.topSeed, m.bottomSeed]);
-                    const winner = (r.batters || []).find(b => b.winner) || matchupSides.find(b => b?.winner);
-                    return winner ? <div key="w" style={{ fontFamily: mono, fontSize: 11, marginTop: 4 }}>👑 Champion: {winner.player?.fullName}</div> : null;
-                  })}
-                </div>
-              )}
-              {!historyData.derby && (
-                <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)', fontFamily: mono, fontSize: 9, color: 'var(--muted)' }}>
-                  🥊 No Derby bracket found for {historyYear} — either no Derby was held that year, or the historical archive lookup didn't find a match.
-                </div>
-              )}
-            </div>
-          )}
-          {!historyLoading && historyData && !historyData.asg && (
-            <div style={{ fontFamily: mono, fontSize: 10, color: 'var(--muted)' }}>No All-Star Game found for {historyYear}.</div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── HomeTab — landing page with sub-nav: Cheat Sheet, Streaks, Close Calls, Pairs, Crystal Ball ──
+// ── HomeTab — landing page with sub-nav: Cheat Sheet, Streaks, Close Calls, Pairs, Top 4 ──
 function HomeTab() {
   const [sub, setSub] = React.useState('cheatsheet');
   const [showHelp, setShowHelp] = React.useState(false);
@@ -33291,7 +28941,6 @@ function HomeTab() {
         ['🤏 Close Calls', 'Batters who nearly went yard — high EV, deep flyouts that just missed. Prime bounce-back candidates for today.'],
         ['🔗 Pairs', 'Two-batter combos sharing favorable conditions — same park, pitcher, or contact trend. Curated to 2–3 top pairs per category.'],
         ['🎰 Sim', 'Monte Carlo simulator — runs up to 10,000 game simulations using each batter\'s Yard Score, pitcher grade, park & wind factors. Shows top 5 HR candidates by simulation frequency.'],
-        ['🔮 Crystal Ball', 'The engine\'s three picks: The Chosen (elite stack), Dark Horse (under the radar), Wild Card (spike signal).'],
         ['🎯 Top 4 Tonight', 'The deterministic counterpart to Crystal Ball — no randomness. One real pick per HR-distribution tier (Young Gun, Chalk, Mid-Tier, Longshot), each ranked within its own tier by TrueHRScore + MatchupScore (pitcher/bullpen-weighted). The Mid-Tier pick additionally requires Prime ISO (Arsenal Fit ISO>.200, BvP EV>=93, Zone Fit>=2 — all season-long, no recent-form input) — the highest-validated combo of its kind after research found recent/L7 form carries little standalone HR correlation. Each pick comes with a real Claude-narrated Scouting Note anchored on that same Arsenal Fit data. Re-ranks itself automatically once lineups confirm.'],
         ['🛢️ Daily Barrel', 'Monte Carlo HR simulation (10,000 PAs per matchup). TrueHRScore + MatchupScore per batter, ★ Barrel Signal flag for the strictest matchups, 🎲 Longshot flag for undervalued plays. Live tracker: Barrel Signal hits at 16.9% HR rate.'],
         ['🔵 On Base', 'A parallel Monte Carlo engine targeting 2+ total bases per game — the hits/TB prop market, not just HRs. OnBaseScore + MatchupScore + SimTB2%, with its own ★ TB Signal flag. Very new — early hit rate is promising but the sample is still small.'],
@@ -33308,8 +28957,6 @@ function HomeTab() {
         <button style={stBtn('streaks')}    onClick={()=>setSub('streaks')}>🔥 Streaks</button>
         <button style={stBtn('soclose')}    onClick={()=>setSub('soclose')}>🤏 Close Calls</button>
         <button style={stBtn('pairs')}      onClick={()=>setSub('pairs')}>🔗 Pairs</button>
-        <button style={stBtn('sim')}        onClick={()=>setSub('sim')}>🎰 Sim</button>
-        <button style={stBtn('crystal')}    onClick={()=>setSub('crystal')}>🔮</button>
         <button style={stBtn('top3')}       onClick={()=>setSub('top3')}>🎯 Top 4</button>
         <button data-subtab="barrellab" style={stBtn('barrellab')} onClick={()=>setSub('barrellab')}>🛢️ Daily Barrel</button>
         <button data-subtab="onbase"    style={stBtn('onbase')}    onClick={()=>setSub('onbase')}>🔵 On Base</button>
@@ -33341,8 +28988,6 @@ function HomeTab() {
       {sub==='streaks'    && <StreaksTab/>}
       {sub==='soclose'    && <SoCloseTab data={data}/>}
       {sub==='pairs'      && <PairsTab data={data}/>}
-      {sub==='sim'        && <SimTab data={data}/>}
-      {sub==='crystal'    && <CrystalBallTab embedded/>}
       {sub==='top3'       && <TopThreeTab/>}
       {sub==='barrellab'  && <BarrelLabTab/>}
       {sub==='onbase'     && <OnBaseTab/>}
@@ -33726,8 +29371,8 @@ async function loadDayLateLookup(force = false) {
   if (!force && DAY_LATE_LOOKUP && DAY_LATE_LOOKUP_DATE === todayET) return DAY_LATE_LOOKUP;
   try {
     const [blText, amText] = await Promise.all([
-      fetch('/data/track-record-barrel.csv').then(r => r.text()),
-      fetch('/data/track-record-matchups.csv').then(r => r.text()),
+      fetch('/data/track-record-barrel-recent.csv').then(r => r.text()),   // last 3 tracked dates (2026-10-27; was the full season, ~6.5 MB)
+      fetch('/data/track-record-matchups-recent.csv').then(r => r.text()),
     ]);
     const blRows = parseCSV(blText);
     const amRows = parseCSV(amText);
@@ -33814,7 +29459,7 @@ async function loadRecentHRLookup(force = false) {
   const todayET = getETDateStr();
   if (!force && RECENT_HR_LOOKUP && RECENT_HR_LOOKUP_DATE === todayET) return RECENT_HR_LOOKUP;
   try {
-    const amText = await fetch('/data/track-record-matchups.csv').then(r => r.text());
+    const amText = await fetch('/data/track-record-matchups-recent.csv').then(r => r.text());   // last 3 tracked dates (2026-10-27)
     const amRows = parseCSV(amText);
     const dateSet = new Set(amRows.map(r => r.export_date).filter(Boolean));
     const parsedDates = Array.from(dateSet)
@@ -35363,7 +31008,6 @@ function BarrelLabTab() {
   const [blMinEv,    setBlMinEv]    = useState('');
   const [dayLateVer,       setDayLateVer]       = useState(0);
   const [playerVer,        setPlayerVer]        = useState(0); // tracks PLAYER_CACHE_DATE — Chalk needs real season HR/ISO from getCachedPlayer()
-  const [ballStateVer,     setBallStateVer]     = useState(0); // tracks _BALL_STATE_VER — live-only Ball Carry/xHR badge, display-only, never touches scoring
 
   useEffect(() => {
     const unsub    = subscribeLineup(v => setLineupVer(v));
@@ -35392,10 +31036,8 @@ function BarrelLabTab() {
     // Ball State Adjustment (2026-07-30) — starts the shared live-only
     // Ball Carry/xHR poller (idempotent, safe to also be started by
     // OnBaseTab) and watches its version counter for badge refreshes.
-    startBallStatePolling();
-    const ballStateId = setInterval(() => { if (_BALL_STATE_VER !== ballStateVer) setBallStateVer(_BALL_STATE_VER); }, 5000);
-    return () => { unsub(); unsubInj(); clearInterval(finId); clearInterval(hrId); clearInterval(liveId); clearInterval(dayLateId); clearInterval(playerId); clearInterval(ballStateId); };
-  }, [hrVer, dayLateVer, ballStateVer]);
+    return () => { unsub(); unsubInj(); clearInterval(finId); clearInterval(hrId); clearInterval(liveId); clearInterval(dayLateId); clearInterval(playerId); };
+  }, [hrVer, dayLateVer]);
 
   // Auto-switch to confirmed-only once lineups first post.
   // Fires one time only — permanently disabled once the user manually
@@ -35590,10 +31232,6 @@ function BarrelLabTab() {
         // a real, filterable, badge-able counterpart here too.
         isMidTier: !isLongshotBatter(r, r.trueHRScore, r.matchupScore)
           && !isChalkBatter(r) && !isYoungGunBatter(r),
-        // Ball State Adjustment (2026-07-30) — display-only, see
-        // getBallStateBadge's own comment block for the "never touches
-        // scoring" guarantee. null on any non-live/no-signal game.
-        ballStateBadge: getBallStateBadge(r.game_id),
         isSauce2: isSauce2Batter(r),
         isSauce3: isSauce3Batter(r),
         isSauce25: isSauce25Batter(r),
@@ -35641,7 +31279,7 @@ function BarrelLabTab() {
     .filter(r => blMinL7Ev  === '' || parseFloat(r.recent_avg_ev||0) >= parseFloat(blMinL7Ev))
     .filter(r => blMinEv    === '' || parseFloat(r.bvp_avg_ev||0)    >= parseFloat(blMinEv))
     .sort((a, b) => b.trueHRScore - a.trueHRScore);
-  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, blChalkOnly, blMidTierOnly, blDayLateOnly, blYoungGunsOnly, blPicksOnly, picks, blGoneYardOnly, blTB2Only, blHighIQOnly, blHandMatchOnly, blSauce3Only, blSauce25Only, blTopIsoOnly, blPrimeIsoOnly, blSolidContactOnly, blLockedInOnly, blHitSignalOnly, blSecretSauceOnly, blBullpenTiers, blAvoidOnly, blHideAvoid, blBatterHand, blPitcherGrades, blMinL7Iso, blMinIso, blMinL7Ev, blMinEv, hrVer, finalVer, dayLateVer, playerVer, ballStateVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [eligibleBatters, simResults, blHideFinal, blLongshotOnly, blChalkOnly, blMidTierOnly, blDayLateOnly, blYoungGunsOnly, blPicksOnly, picks, blGoneYardOnly, blTB2Only, blHighIQOnly, blHandMatchOnly, blSauce3Only, blSauce25Only, blTopIsoOnly, blPrimeIsoOnly, blSolidContactOnly, blLockedInOnly, blHitSignalOnly, blSecretSauceOnly, blBullpenTiers, blAvoidOnly, blHideAvoid, blBatterHand, blPitcherGrades, blMinL7Iso, blMinIso, blMinL7Ev, blMinEv, hrVer, finalVer, dayLateVer, playerVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Color threshold helpers
   const clr = (v, g1, g2, y1, y2) => {
@@ -36430,13 +32068,6 @@ function BarrelLabTab() {
                     {b.rainRiskTier==='warning' ? `⚠️ Rain Risk (${Math.round(b.rainRiskPct)}%)` : `🌧 Rain Watch (${Math.round(b.rainRiskPct)}%)`}
                   </div>
                 )}
-                {b.ballStateBadge && (
-                  <div title={b.ballStateBadge.tooltip}
-                    style={{fontFamily:mono,fontSize:8,fontWeight:700,color:b.ballStateBadge.color,
-                    letterSpacing:.6,textTransform:'uppercase',marginBottom:4}}>
-                    {b.ballStateBadge.icon} {b.ballStateBadge.label} (Live)
-                  </div>
-                )}
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px 10px',fontFamily:mono,fontSize:8}}>
                   {[
                     ['BARRELSCORE', b.trueHRScore, trueClr(b.trueHRScore)],
@@ -36537,13 +32168,6 @@ function BarrelLabTab() {
                                     background:'rgba(56,184,242,.20)',border:'1px solid rgba(56,184,242,.4)',
                                     color:'var(--ice)',fontFamily:"'DM Mono',monospace",
                                     fontWeight:800,fontSize:7,letterSpacing:.5}}>2️⃣</div>
-                                )}
-                                {b.ballStateBadge && (
-                                  <div title={b.ballStateBadge.tooltip}
-                                    style={{padding:'2px 6px',borderRadius:4,flexShrink:0,
-                                    background:`${b.ballStateBadge.color}33`,border:`1px solid ${b.ballStateBadge.color}80`,
-                                    color:b.ballStateBadge.color,fontFamily:"'DM Mono',monospace",
-                                    fontWeight:800,fontSize:7,letterSpacing:.5}}>{b.ballStateBadge.icon}</div>
                                 )}
                                 {fin && <span style={{fontSize:7,color:'var(--muted)',border:'1px solid var(--border)',borderRadius:3,padding:'1px 3px'}}>FINAL</span>}
                               </div>
@@ -36775,7 +32399,6 @@ function OnBaseTab() {
   const [hrVer, setHrVer] = useState(_HR_VER||0);
   const [dayLateVer,       setDayLateVer]       = useState(0);
   const [playerVer,        setPlayerVer]        = useState(0); // tracks PLAYER_CACHE_DATE — Chalk needs real season HR/ISO from getCachedPlayer()
-  const [ballStateVer,     setBallStateVer]     = useState(0); // tracks _BALL_STATE_VER — live-only Ball Carry/xHR badge, display-only, never touches scoring
 
   useEffect(() => {
     const unsub    = subscribeLineup(v => setLineupVer(v));
@@ -36795,10 +32418,8 @@ function OnBaseTab() {
     }, 3000);
     // Ball State Adjustment (2026-07-30) — see BarrelLabTab's identical block
     // for the full explanation; idempotent, safe for both tabs to start it.
-    startBallStatePolling();
-    const ballStateId = setInterval(() => { if (_BALL_STATE_VER !== ballStateVer) setBallStateVer(_BALL_STATE_VER); }, 5000);
-    return () => { unsub(); unsubInj(); clearInterval(finId); clearInterval(liveId); clearInterval(hrId); clearInterval(dayLateId); clearInterval(playerId); clearInterval(ballStateId); };
-  }, [ballStateVer]); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => { unsub(); unsubInj(); clearInterval(finId); clearInterval(liveId); clearInterval(hrId); clearInterval(dayLateId); clearInterval(playerId); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // "Gone Yard Today" / "2+ TB Today" checks — same HR_DATA/TB2_DATA pattern
   // as Barrel Lab's isGoneYardBL/is2BagBL. hrVer (polled every 5s from
@@ -36940,10 +32561,6 @@ function OnBaseTab() {
         // just the elimination bucket.
         isMidTier: !isLongshotBatter(r, r.onBaseScore, r.matchupScore)
           && !isChalkBatter(r) && !isYoungGunBatter(r),
-        // Ball State Adjustment (2026-07-30) — display-only, see
-        // getBallStateBadge's own comment block for the "never touches
-        // scoring" guarantee. null on any non-live/no-signal game.
-        ballStateBadge: getBallStateBadge(r.game_id),
         isSauce2: isSauce2Batter(r),
         isSauce3: isSauce3Batter(r),
         isSauce25: isSauce25Batter(r),
@@ -36989,7 +32606,7 @@ function OnBaseTab() {
     .filter(r => obMinL7Ev  === '' || parseFloat(r.recent_avg_ev||0) >= parseFloat(obMinL7Ev))
     .filter(r => obMinEv    === '' || parseFloat(r.bvp_avg_ev||0)    >= parseFloat(obMinEv))
     .sort((a, b) => b.onBaseScore - a.onBaseScore);
-  }, [eligibleBatters, simResults, obHideFinal, obLongshotOnly, obChalkOnly, obMidTierOnly, obDayLateOnly, obYoungGunsOnly, obPicksOnly, obGoneYardOnly, obTB2Only, obHighIQOnly, obHandMatchOnly, obSauce3Only, obSauce25Only, obHitSignalOnly, obSecretSauceOnly, obBullpenTiers, obAvoidOnly, obHideAvoid, obBatterHand, obPitcherGrades, obMinL7Iso, obMinIso, obMinL7Ev, obMinEv, picks, finalVer, hrVer, dayLateVer, playerVer, ballStateVer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [eligibleBatters, simResults, obHideFinal, obLongshotOnly, obChalkOnly, obMidTierOnly, obDayLateOnly, obYoungGunsOnly, obPicksOnly, obGoneYardOnly, obTB2Only, obHighIQOnly, obHandMatchOnly, obSauce3Only, obSauce25Only, obHitSignalOnly, obSecretSauceOnly, obBullpenTiers, obAvoidOnly, obHideAvoid, obBatterHand, obPitcherGrades, obMinL7Iso, obMinIso, obMinL7Ev, obMinEv, picks, finalVer, hrVer, dayLateVer, playerVer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const byTeam = useMemo(() => {
     const teams = {};
@@ -37636,13 +33253,6 @@ function OnBaseTab() {
                     {b.rainRiskTier==='warning' ? `⚠️ Rain Risk (${Math.round(b.rainRiskPct)}%)` : `🌧 Rain Watch (${Math.round(b.rainRiskPct)}%)`}
                   </div>
                 )}
-                {b.ballStateBadge && (
-                  <div title={b.ballStateBadge.tooltip}
-                    style={{fontFamily:mono,fontSize:8,fontWeight:700,color:b.ballStateBadge.color,
-                    letterSpacing:.6,textTransform:'uppercase',marginBottom:6}}>
-                    {b.ballStateBadge.icon} {b.ballStateBadge.label} (Live)
-                  </div>
-                )}
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px 10px',fontFamily:mono,fontSize:8}}>
                   {[
                     ['ONBASESCORE', b.onBaseScore, obsClr(b.onBaseScore)],
@@ -37742,13 +33352,6 @@ function OnBaseTab() {
                                   background:'rgba(56,184,242,.20)',border:'1px solid rgba(56,184,242,.4)',
                                   color:'var(--ice)',fontFamily:"'DM Mono',monospace",
                                   fontWeight:800,fontSize:7,letterSpacing:.5}}>2️⃣</div>
-                              )}
-                              {b.ballStateBadge && (
-                                <div title={b.ballStateBadge.tooltip}
-                                  style={{padding:'2px 6px',borderRadius:4,flexShrink:0,
-                                  background:`${b.ballStateBadge.color}33`,border:`1px solid ${b.ballStateBadge.color}80`,
-                                  color:b.ballStateBadge.color,fontFamily:"'DM Mono',monospace",
-                                  fontWeight:800,fontSize:7,letterSpacing:.5}}>{b.ballStateBadge.icon}</div>
                               )}
                               {fin && <span style={{fontSize:7,color:'var(--muted)',border:'1px solid var(--border)',borderRadius:3,padding:'1px 3px'}}>FINAL</span>}
                             </div>
@@ -37861,7 +33464,11 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
   useEffect(() => { setCacheVer(v => v + 1); }, [gyG]);
 
   useEffect(() => {
-    loadGameSplitsData().then(d => setGData(d));
+    // 2026-10-27: the lists here only read each batter's L7 overall line -> slim batter_l7.json (pipeline) instead of
+    // both full game-splits files (~2 MB gzipped) on every visit; falls back to the full files if it's missing.
+    fetch('/data/batter_l7.json').then(r => r.ok ? r.json() : null)
+      .then(b => b ? setGData({ batters: b, pitchers: {} }) : loadGameSplitsData().then(d => setGData(d)))
+      .catch(() => loadGameSplitsData().then(d => setGData(d)));
     const id = setInterval(() => {
       if (Object.keys(DAILY_PICKS_CACHE||{}).length > 0) {
         setCacheVer(v => v + 1);
@@ -38885,14 +34492,6 @@ export default function App() {
   const [appTeamLoading, setAppTeamLoading] = useState(false);
   const [appTeamSchedule, setAppTeamSchedule] = useState([]);
   const [appSchedLoading, setAppSchedLoading] = useState(false);
-  const { isSignedIn, getToken } = useAuth();
-  const { addListener } = useClerk();
-
-  // Keep global token ref updated so setPick (outside React) can reach it
-  useEffect(() => {
-    _GLOBAL_GET_TOKEN = isSignedIn ? getToken : null;
-    return () => { _GLOBAL_GET_TOKEN = null; };
-  }, [isSignedIn, getToken]);
 
   // Wire global nav on mount so notifications can route to tabs
   useEffect(() => {
@@ -38990,48 +34589,6 @@ export default function App() {
     return () => clearInterval(id);
   }, []);
 
-  // ── Cloud picks sync ────────────────────────────────────────────────────
-  const prevSignedIn = useRef(false);
-
-  useEffect(() => {
-    const justLoggedIn  = isSignedIn && !prevSignedIn.current;
-    const justLoggedOut = !isSignedIn && prevSignedIn.current;
-    prevSignedIn.current = !!isSignedIn;
-
-    if (justLoggedIn) {
-      // Load cloud picks on login
-      loadPicksCloud(getToken).then(cloudPicks => {
-        const cloudCount = cloudPicks ? Object.keys(cloudPicks).length : 0;
-        if (cloudCount > 0) {
-          // Cloud has picks → use cloud, overwrite local
-          savePicks(cloudPicks);
-          GLOBAL_PICKS = cloudPicks;
-          PICKS_LISTENERS.forEach(fn => fn({...cloudPicks}));
-        } else {
-          // Cloud empty → keep local picks and push them up to cloud
-          const local = loadPicks();
-          if (Object.keys(local).length > 0) {
-            savePicksCloud(local, getToken);
-          }
-        }
-      });
-    }
-
-  }, [isSignedIn, getToken]);
-
-  // useClerk listener — catches logout reliably even through undefined isSignedIn transition
-  useEffect(() => {
-    const unsub = addListener(({ session }) => {
-      if (!session) {
-        savePicks({});
-        GLOBAL_PICKS = {};
-        PICKS_LISTENERS.forEach(fn => fn({}));
-        _GLOBAL_GET_TOKEN = null;
-      }
-    });
-    return () => unsub && unsub();
-  }, [addListener]);
-
   const NAV = [
     {key:"home",       label:"🏡 Home"},
     {key:"homeruns",   label:"💥 HR Tracker"},
@@ -39042,9 +34599,6 @@ export default function App() {
     {key:"weather",    label:"🌤️ Weather"},
     {key:"picks",      label:"🎯 My Picks"},
     {key:"_sep1",      label:"|", sep:true},
-    {key:"statcast",   label:"📡 Statcast"},
-    {key:"mlbscores",  label:"⚾ MLB"},
-    {key:"allstarweek",label:"⭐ All-Star Week"},
     {key:"yardpicks",  label:"🧾 Yard Picks"},
     {key:"trackrecord",label:"📋 Track Record"},
     {key:"links",      label:"🔗 Links"},
@@ -39141,20 +34695,6 @@ export default function App() {
               display:"flex",alignItems:"center",flexShrink:0}}>
             🎯
           </button>
-          <SignedOut>
-            <SignInButton mode="modal">
-              <button style={{padding:"3px 8px",borderRadius:6,border:"1px solid var(--border)",
-                background:"var(--surface2)",color:"var(--accent)",cursor:"pointer",
-                fontFamily:"'Oswald',sans-serif",fontWeight:700,fontSize:9,letterSpacing:.6,
-                flexShrink:0,whiteSpace:'nowrap'}}>
-                LOG IN
-              </button>
-            </SignInButton>
-          </SignedOut>
-          <SignedIn>
-            <UserButton afterSignOutUrl={window.location.href}
-              appearance={{elements:{avatarBox:{width:24,height:24}}}}/>
-          </SignedIn>
           <ContactBtn/>
             </div>
       </header>
@@ -39189,15 +34729,11 @@ export default function App() {
         <div style={{display:tab==="weather"?"block":"none"}}><WeatherTab/></div>
         {opened("stats") && <div style={{display:tab==="stats"?"block":"none"}}><StatsTab/></div>}
         {tab==="live"     && <LiveTab/>}
-        {tab==="allstarweek" && <AllStarWeekTab/>}
         {tab==="picks"    && <MyPicksTab/>}
-        {tab==="crystal"  && <CrystalBallTab/>}
         {tab==="links"    && <LinksTab/>}
         {tab==="powerbi" && <PowerBITab/>}
-        {opened("statcast") && <div style={{display:tab==="statcast"?"block":"none"}}><StatcastTab/></div>}
         <div style={{display:tab==="home"?"block":"none"}}><HomeTab/></div>
         <div style={{display:tab==="homeruns"?"block":"none"}}><HRTrackerTab/></div>
-        {opened("mlbscores") && <div style={{display:tab==="mlbscores"?"block":"none"}}><MLBTab/></div>}
         {opened("yardpicks") && <div style={{display:tab==="yardpicks"?"block":"none"}}><YardPicksFeedTab/></div>}
         {opened("trackrecord") && <div style={{display:tab==="trackrecord"?"block":"none"}}><TrackRecordTab/></div>}
         {opened("getapp") && <div style={{display:tab==="getapp"?"block":"none"}}><GetAppTab/></div>}

@@ -1,10 +1,8 @@
 {
-  "version": "2026.10.14",
-  "bundleFile": "index-BV7wJ8F1.js",
+  "version": "2026.10.27",
+  "bundleFile": "index-DnJjo4JX.js",
   "changelog": [
-    "Add Gambly bet-slip button across batter picks",
-    "slideout",
-    "and My Picks"
+    "Restore Track Record history lost in the 10/5 data commit (2026 5/17-10/4 + 2025 backfill)"
   ],
   "notifyUsers": true
 }

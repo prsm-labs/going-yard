@@ -18,14 +18,14 @@ export default async function handler(req, res) {
     : 'New features and improvements are live.';
 
   try {
-    const r = await fetch('https://yard.prsmlabs.app/api/notify', {
+    const r = await fetch('https://mlb.degenlabs.app/api/notify', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         secret,
         title:    '🚀 Going Yard Updated',
         body:     changeText,
-        url:      'https://yard.prsmlabs.app',
+        url:      'https://mlb.degenlabs.app',
         dedupKey,
       }),
     });

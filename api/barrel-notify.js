@@ -207,14 +207,14 @@ export default async function handler(req, res) {
   try {
     const base = process.env.VERCEL_URL
       ? `https://${process.env.VERCEL_URL}`
-      : 'https://yard.prsmlabs.app';
+      : 'https://mlb.degenlabs.app';
     const r = await fetch(`${base}/api/notify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         secret:   process.env.NOTIFY_SECRET,
         title, body, dedupKey,
-        url: 'https://yard.prsmlabs.app/#scouting/barrellab',
+        url: 'https://mlb.degenlabs.app/#scouting/barrellab',
       }),
     });
     const data = await r.json();

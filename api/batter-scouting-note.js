@@ -100,7 +100,6 @@
 // rather than open.
 
 import { Redis } from '@upstash/redis';
-import { verifyToken } from '@clerk/backend';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
@@ -630,21 +629,13 @@ export default async function handler(req, res) {
   // Top 4 Tonight picks (recomputed server-side, see isTodaysTop4() above);
   // everyone else needs a valid Clerk session token. Same verifyToken()
   // pattern already used in api/save-picks.js for Cloud picks sync.
+  // 2026-10-27: login removed (user). A brand-new note is generated only for today's Top 4 picks; any note already
+  // generated today stays free (cache hit above). Keeps the Anthropic cost capped with no sign-in.
   if (!(await isTodaysTop4(batterId, pitcherId))) {
-    const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
-    let signedIn = false;
-    if (token) {
-      try {
-        const payload = await verifyToken(token, { secretKey: process.env.CLERK_SECRET_KEY });
-        signedIn = !!payload?.sub;
-      } catch (e) { signedIn = false; }
-    }
-    if (!signedIn) {
-      return res.status(401).json({
-        error: 'sign_in_required',
-        message: "Sign in to generate a Scouting Note for this matchup — today's Top 3 picks and any note someone's already generated today are always free.",
-      });
-    }
+    return res.status(401).json({
+      error: 'top4_only',
+      message: "Scouting Notes are generated for today's Top 4 picks, and any note already generated today is free to open.",
+    });
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;

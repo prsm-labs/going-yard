@@ -3,7 +3,47 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- 2026-10-27 moved to degenlabs.app (user). An old address sends the visitor to https://mlb.degenlabs.app and carries this browser's
+         saved data (My Picks, filters, settings: localStorage) along in the URL hash once, so nothing is lost; the new address
+         reads it in, keeps anything it already has, and clears the hash. API routes (/api/...) on the old addresses keep working
+         (api/hr-monitor.js still calls https://goingyard.app). Same script as the other PRISM Labs apps. -->
+    <script>
+      (function () {
+        var OLD = {'goingyard.app':1, 'www.goingyard.app':1, 'yard.prsmlabs.app':1}, TO = 'mlb.degenlabs.app', KEY = 'prism-migrate=';
+        try {
+          if (OLD[location.hostname]) {
+            var d = {}, s = '', i, k;
+            try { for (i = 0; i < localStorage.length; i++) { k = localStorage.key(i); d[k] = localStorage.getItem(k); } } catch (e) {}
+            try { s = JSON.stringify(d); } catch (e) {}
+            var hash = s && s.length > 2 && s.length < 60000 ? '#' + KEY + encodeURIComponent(s) : location.hash;
+            location.replace('https://' + TO + location.pathname + location.search + hash);
+            return;
+          }
+          var at = location.hash.indexOf(KEY);
+          if (at === 1) {
+            var o = JSON.parse(decodeURIComponent(location.hash.slice(1 + KEY.length)));
+            for (var key in o) { try { if (localStorage.getItem(key) === null) localStorage.setItem(key, o[key]); } catch (e) {} }
+            history.replaceState(null, '', location.pathname + location.search);
+          }
+        } catch (e) {}
+      })();
+    </script>
     <title>Going Yard</title>
+    <meta name="description" content="Going Yard — daily home run picks for every MLB slate, graded and tracked. A PRISM Labs app." />
+    <!-- 2026-10-27 link preview (Open Graph / Twitter): the PRISM Labs card for this app, 1200x630 (public/og.png) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="PRISM Labs" />
+    <meta property="og:title" content="Going Yard · MLB · PRISM Labs" />
+    <meta property="og:description" content="Daily home run picks, graded and tracked." />
+    <meta property="og:url" content="https://mlb.degenlabs.app/" />
+    <meta property="og:image" content="https://mlb.degenlabs.app/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Going Yard — Daily home run picks, graded and tracked." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Going Yard · MLB · PRISM Labs" />
+    <meta name="twitter:description" content="Daily home run picks, graded and tracked." />
+    <meta name="twitter:image" content="https://mlb.degenlabs.app/og.png" />
 
     <!-- Favicon -->
     <link rel="icon" href="/favicon.ico" sizes="any">
