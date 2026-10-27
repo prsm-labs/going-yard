@@ -3,6 +3,7 @@ import ReactDOM from "react-dom";
 import { createRoot } from "react-dom/client";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import PrismPicks from "./PrismPicks.jsx";  // 2026-10-27 💎 PRISM Picks card (Cheat Sheet)
 
 // Global ref so non-React functions (setPick) can trigger cloud saves
 let _GLOBAL_GET_TOKEN = null;
@@ -33794,6 +33795,10 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
 
   return (
     <div style={{padding:'8px 4px'}}>
+      <PrismPicks
+        onOpen={p=>openAtBatSlide({pid:parseInt(p.playerId)||0, name:p.name, team:p.team})}
+        avatar={p=><PlayerAvatar pid={parseInt(p.playerId)||0} name={p.name} size={30}/>}
+        actions={p=><><PickButton pid={parseInt(p.playerId)||0} name={p.name} team={p.team}/><GamblyButton name={p.name} team={p.team} prop="hits" text={`${p.name} (${p.team}) — ${p.label}`}/></>}/>
       <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:12,flexWrap:'wrap'}}>
         <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>Top 5 batters per category · today only · L7 data</span>
         {showAllMatchupsLink && (
