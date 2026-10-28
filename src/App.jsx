@@ -3,7 +3,8 @@ import ReactDOM from "react-dom";
 import { createRoot } from "react-dom/client";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import PrismPicks, { PrismPicksRecord } from "./PrismPicks.jsx";  // 2026-10-27 💎 PRISM Picks card (Cheat Sheet)
+import PrismPicks, { PrismPicksRecord } from "./PrismPicks.jsx";
+import ViewPicker, { ViewSelect, Responsive } from "./ViewPicker.jsx";  // 2026-10-28 phone dropdown for view rows  // 2026-10-27 💎 PRISM Picks card (Cheat Sheet)
 
 // Global ref so non-React functions (setPick) can trigger cloud saves
 let _GLOBAL_GET_TOKEN = null;
@@ -7685,13 +7686,8 @@ function LiveTab() {
       ['📋 Lineups', "Today's confirmed and projected batting orders for every team. Green = confirmed, yellow = projected. Tap any batter to open their stat slideout."],
     ]} onClose={()=>setShowLiveHelp(false)}/>}
     <div style={{display:'flex',gap:5,marginBottom:12,alignItems:'center',flexWrap:'wrap',rowGap:6}}>
-      <div className="gy-pill-row">
-      {[['gameday','Gameday'],['battracking','Bat Tracking'],['simlive','Live Sim'],['games','Live Games'],['lineups','Lineups']].map(([key,label])=>(
-        <button key={key} onClick={()=>setLiveView(key)} style={gyPill(liveView===key)}>
-          {label}
-        </button>
-      ))}
-      </div>
+      <ViewPicker options={[['gameday','Gameday'],['battracking','Bat Tracking'],['simlive','Live Sim'],['games','Live Games'],['lineups','Lineups']]}
+        value={liveView} onChange={setLiveView} pillStyle={gyPill} label="Live"/>
       <HelpBtn onClick={()=>setShowLiveHelp(v=>!v)}/>
     </div>
 
@@ -11022,14 +11018,9 @@ function HRTrackerTab() {
   ];
   const HRNav = () => (<>
     {showHRHelp && <HelpSlideout title="📊 HR Tracker Guide" items={HR_HELP} onClose={()=>setShowHRHelp(false)}/>}
-    <div className="gy-pill-row" style={{marginBottom:14}}>
-      {[['tracker','💥 HR Tracker'],['leaderboard','🏆 HR Leaders'],['hotbats','🔥 Hot Bats'],['heatingup','📈 Heating Up']].map(([key,label]) => (
-        <button key={key} onClick={() => setHrTab(key)} style={gyPill(hrTab===key)}>
-          {label}
-        </button>
-      ))}
-      <HelpBtn onClick={()=>setShowHRHelp(v=>!v)}/>
-    </div>
+    <ViewPicker options={[['tracker','💥 HR Tracker'],['leaderboard','🏆 HR Leaders'],['hotbats','🔥 Hot Bats'],['heatingup','📈 Heating Up']]}
+      value={hrTab} onChange={setHrTab} pillStyle={gyPill} rowStyle={{marginBottom:14}} label="HR"
+      after={<HelpBtn onClick={()=>setShowHRHelp(v=>!v)}/>}/>
   </>);
   if (hrTab === 'hotbats')     return <div><HRNav/><HotBatsTab/></div>;
   if (hrTab === 'heatingup')   return <div><HRNav/><HeatingUpTab/></div>;
@@ -22534,6 +22525,14 @@ function MatchupEngineTab() {
       ['Batter Grades', "A+ = 6–8 signal flags (live tracker: 18.8% HR rate) · A = 4–5 (17.5%) · B = 2–3 (12.8%) · C = 1 (12.1%) · D = 0 (9.8%). Signals include LA lock, bat speed peak, pitch convergence, platoon match, close calls, and zone fit."],
       ['🏆 Milestones', "Every active batter within 5 of a career or season round-number milestone (Home Runs, Hits, Total Bases, Stolen Bases, Extra-Base Hits) — modeled on Baseball-Reference's own upcoming-milestones page, extended to season totals too. Refreshed nightly (not live during games) by a standalone MLB Stats API pull — too many players (~660) to check live on page load. Career milestones use nearest-100 (HR/SB/XBH) or nearest-500 (Hits/Total Bases, since career totals run into the thousands); season milestones use nearest-10 (HR/SB/XBH) or nearest-50 (Hits/Total Bases) so a real single-season number like 30 stolen bases doesn't get missed."],
     ]} onClose={()=>setShowKMHelp(false)}/>}
+    <Responsive phone={
+      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}>
+        <ViewSelect label="Scouting" value={subTab} onChange={setSubTab} options={[
+          ['matchups','⚡ Key Matchups'],['allmatches','📋 All Matchups'],['attack','🎯 Attack List'],['kprops','⚡ Strikeouts'],
+          ['sbprops','🏃 Stolen Bases'],['walks','🚶 Walks'],['batters','🧢 Batters'],['pitchers','⚾ Pitchers'],
+          ['history','📜 BvP History'],['milestones','🏆 Milestones']]}/>
+        <HelpBtn onClick={()=>setShowKMHelp(v=>!v)}/>
+      </div>} desktop={
     <div style={{display:'flex',flexDirection:'column',gap:4,marginBottom:14}}>
       {/* Row 1: matchup boards */}
       <div style={{display:'flex',gap:4,flexWrap:'wrap',justifyContent:'center'}}>
@@ -22555,7 +22554,7 @@ function MatchupEngineTab() {
         <button style={stBtn('milestones')} data-subtab="milestones" onClick={()=>setSubTab('milestones')}>🏆 Milestones</button>
         <HelpBtn onClick={()=>setShowKMHelp(v=>!v)}/>
       </div>
-    </div>
+    </div>}/>
     {/* Date slot toggle — only shown for matchups and simlab */}
     {(subTab === 'matchups' || subTab === 'allmatches') && (
       <div style={{display:'flex',gap:6,marginBottom:14,alignItems:'center'}}>
@@ -28955,6 +28954,9 @@ function HomeTab() {
 
       {/* Sub-nav */}
       <div style={{display:'flex',gap:4,flexWrap:'wrap',marginBottom:10,alignItems:'center'}}>
+        <Responsive phone={<ViewSelect label="Home" value={sub} onChange={setSub} options={[
+          ['cheatsheet','📋 Cheat Sheet'],['streaks','🔥 Streaks'],['soclose','🤏 Close Calls'],['pairs','🔗 Pairs'],['top3','🎯 Top 4'],
+          ['barrellab','🛢️ Daily Barrel'],['onbase','🔵 On Base'],['avoid','🚫 Avoid'],['younggun','☎️ Called-Up']]}/>} desktop={<>
         <button style={stBtn('cheatsheet')} onClick={()=>setSub('cheatsheet')}>📋 Cheat Sheet</button>
         <button style={stBtn('streaks')}    onClick={()=>setSub('streaks')}>🔥 Streaks</button>
         <button style={stBtn('soclose')}    onClick={()=>setSub('soclose')}>🤏 Close Calls</button>
@@ -28964,6 +28966,7 @@ function HomeTab() {
         <button data-subtab="onbase"    style={stBtn('onbase')}    onClick={()=>setSub('onbase')}>🔵 On Base</button>
         <button data-subtab="avoid"     style={stBtn('avoid')}     onClick={()=>setSub('avoid')}>🚫 Avoid</button>
         <button data-subtab="younggun"  style={stBtn('younggun')}  onClick={()=>setSub('younggun')}>☎️ Called-Up</button>
+        </>}/>
         <HelpBtn2/>
         {/* Refresh — visible when on cheat sheet */}
         {sub==='cheatsheet' && (
