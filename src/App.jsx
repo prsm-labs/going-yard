@@ -5,6 +5,11 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import PrismPicks, { PrismPicksRecord } from "./PrismPicks.jsx";
 import ViewPicker, { ViewSelect, Responsive } from "./ViewPicker.jsx";  // 2026-10-28 phone dropdown for view rows  // 2026-10-27 💎 PRISM Picks card (Cheat Sheet)
+// 2026-10-28 big-screen zoom (index.css --z): pop-ups measured in window pixels are placed in page pixels
+const pageZoom = () => parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
+const zoomRect = (el) => { const z = pageZoom(), r = el.getBoundingClientRect(); return { left: r.left / z, right: r.right / z, top: r.top / z, bottom: r.bottom / z, width: r.width / z, height: r.height / z }; };
+const pageW = () => window.innerWidth / pageZoom();
+const pageH = () => window.innerHeight / pageZoom();
 
 // Global ref so non-React functions (setPick) can trigger cloud saves
 let _GLOBAL_GET_TOKEN = null;
@@ -142,8 +147,8 @@ const styles = `
     --tint-weakslot:#2f2e16;--tint-barrelsignal:#171817;--tint-rainrisk:#211a2e;
     --tint-tbsignal:#0f1a21;--tint-activehdr:#212320;
   }
-  html,body{background:var(--bg);color:var(--text);font-family:'Oswald',sans-serif;min-height:100vh;overflow-x:clip;max-width:100%;width:100%;}
-  .app{min-height:100vh;display:flex;flex-direction:column;overflow-x:clip;max-width:100%;width:100%;}
+  html,body{background:var(--bg);color:var(--text);font-family:'Oswald',sans-serif;min-height:calc(100vh / var(--z, 1));overflow-x:clip;max-width:100%;width:100%;}
+  .app{min-height:calc(100vh / var(--z, 1));display:flex;flex-direction:column;overflow-x:clip;max-width:100%;width:100%;}
   .app-inner{width:100%;display:flex;flex-direction:column;min-height:100%;}
   .header{padding:12px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:linear-gradient(180deg,#0a1520 0%,var(--bg) 100%);gap:8px;overflow:hidden;}
   .logo{font-family:'Oswald',sans-serif;font-weight:700;font-size:17px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text);display:flex;align-items:center;gap:6px;min-width:0;flex-shrink:1;overflow:hidden;white-space:nowrap;}
@@ -177,7 +182,7 @@ const styles = `
   .window-active{border-color:var(--accent2)!important;color:var(--accent2)!important;background:rgba(245,166,35,.1)!important;}
   .chip:hover{border-color:var(--muted);color:var(--text);}
   .fl{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;margin-right:4px;}
-  .tw{overflow-x:auto;overflow-y:auto;max-height:72vh;border-radius:10px;border:1px solid var(--border);}
+  .tw{overflow-x:auto;overflow-y:auto;max-height:calc(72vh / var(--z, 1));border-radius:10px;border:1px solid var(--border);}
   .tw table{border-collapse:separate;border-spacing:0;}
   .tw th{position:sticky;top:0;z-index:10;background:var(--surface2);}
   .tw th.sticky-batter{position:sticky;top:0;left:0;z-index:20;background:var(--surface2);}
@@ -402,7 +407,7 @@ const styles = `
   input[type=text]::placeholder{color:var(--muted);}
   /* Scrollable table with frozen header */
   .tw-scroll{border-radius:10px;border:1px solid var(--border);overflow:hidden;}
-  .tw-scroll-inner{overflow-x:auto;overflow-y:auto;max-height:62vh;}
+  .tw-scroll-inner{overflow-x:auto;overflow-y:auto;max-height:calc(62vh / var(--z, 1));}
   .tw-scroll table{width:100%;border-collapse:separate;border-spacing:0;}
   .tw-scroll th{padding:9px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-family:'DM Mono',monospace;white-space:nowrap;border-bottom:2px solid var(--border);cursor:pointer;user-select:none;background:var(--surface2);position:sticky;top:0;z-index:20;}
   .tw-scroll td{padding:10px 12px;font-size:12px;border-bottom:1px solid rgba(30,45,58,.5);vertical-align:middle;}
@@ -1168,9 +1173,9 @@ function GamblyMenuButton({ name, team }) {
   const handleOpen = (e) => {
     e.stopPropagation();
     if (!open && btnRef.current) {
-      const r = btnRef.current.getBoundingClientRect();
+      const r = zoomRect(btnRef.current);
       const menuW = 190, menuH = 220;
-      const vw = window.innerWidth, vh = window.innerHeight;
+      const vw = pageW(), vh = pageH();
       let left = r.right - menuW;
       if (left < 4) left = Math.min(4, r.left);
       if (left + menuW > vw - 4) left = vw - menuW - 4;
@@ -1226,11 +1231,11 @@ function PickButton({pid,name,team}) {
   const handleOpen = (e) => {
     e.stopPropagation();
     if(!open && btnRef.current){
-      const r = btnRef.current.getBoundingClientRect();
+      const r = zoomRect(btnRef.current);
       const menuW = 148;
       const menuH = 240; // approx height of the menu
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
+      const vw = pageW();
+      const vh = pageH();
       // Horizontal: prefer right-aligned to button, clamp to viewport
       let left = r.right - menuW;
       if (left < 4) left = Math.min(4, r.left);
@@ -8931,7 +8936,7 @@ function BatTrackingTab({ games, date, isToday }) {
         </div>
       ) : (
         <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch',
-          border:'1px solid var(--border)',borderRadius:8,maxHeight:'62vh',overflowY:'auto'}}>
+          border:'1px solid var(--border)',borderRadius:8,maxHeight:'calc(62vh / var(--z, 1))',overflowY:'auto'}}>
           <table style={{width:'100%',borderCollapse:'collapse',minWidth:700}}>
             <thead style={{position:'sticky',top:0,zIndex:5}}>
               <tr>
@@ -9654,7 +9659,7 @@ function GamedayTab() {
               ) : (
                 <div>
                   {/* ── Compact scrollable play list ── */}
-                  <div style={{maxHeight:'38vh',overflowY:'auto',display:'flex',flexDirection:'column',gap:3,marginBottom:10}}>
+                  <div style={{maxHeight:'calc(38vh / var(--z, 1))',overflowY:'auto',display:'flex',flexDirection:'column',gap:3,marginBottom:10}}>
                     {plays.map((pl, i) => {
                       const ev   = pl.result?.event || '';
                       const inn  = pl.about?.inning || '';
@@ -9973,7 +9978,7 @@ function GamedayTab() {
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
-    <div style={{margin:'-4px 0', minHeight:'70vh'}}>
+    <div style={{margin:'-4px 0', minHeight:'calc(70vh / var(--z, 1))'}}>
       <DateStrip/>
 
       {loading ? (
@@ -21238,7 +21243,7 @@ For non-pick questions: {"intro":"your full answer","picks":[],"disclaimer":""}`
 
   return (<>
     {open&&(
-      <div style={{position:'fixed',bottom:72,left:12,width:'min(380px,calc(100vw - 24px))',height:'50vh',
+      <div style={{position:'fixed',bottom:72,left:12,width:'min(380px,calc(100vw - 24px))',height:'calc(50vh / var(--z, 1))',
         background:'var(--surface)',border:'1px solid var(--border)',borderRadius:16,zIndex:1000,
         display:'flex',flexDirection:'column',boxShadow:'0 8px 32px rgba(0,0,0,.6)',overflow:'hidden'}}>
         <div style={{padding:'10px 14px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',
@@ -23704,7 +23709,7 @@ function PowerBITab() {
           </>}
         </div>
       </div>
-      <div style={{width:'100%',height:'calc(100vh - 170px)',overflow:'hidden',position:'relative'}}>
+      <div style={{width:'100%',height:'calc(100vh / var(--z, 1) - 170px)',overflow:'hidden',position:'relative'}}>
         <iframe
           key={activeDash.key}
           title={activeDash.label}
@@ -29757,10 +29762,10 @@ function FilterPanel({ toggles, pitcherGrades, onPitcherGradesChange, bullpenTie
   // clamping within the viewport handles both cases, and any future one.
   React.useLayoutEffect(() => {
     if (!open || !btnRef.current) return;
-    const rect = btnRef.current.getBoundingClientRect();
-    const panelW = Math.min(280, window.innerWidth - 16);
+    const rect = zoomRect(btnRef.current);
+    const panelW = Math.min(280, pageW() - 16);
     let left = rect.right - panelW; // default: right-align to button
-    left = Math.max(8, Math.min(left, window.innerWidth - panelW - 8));
+    left = Math.max(8, Math.min(left, pageW() - panelW - 8));
     // Vertical clamp (2026-08-02) — top was previously always rect.bottom+4,
     // unclamped. A Filters button sitting in the lower half of a long page
     // (Track Record's stat-card-heavy layout, or any scrolled state on
@@ -29771,9 +29776,9 @@ function FilterPanel({ toggles, pitcherGrades, onPitcherGradesChange, bullpenTie
     // much room below is a guaranteed-safe bound regardless of how many
     // toggles/minFilters a given caller passes in — no need to measure the
     // actual rendered panel height.
-    const panelMaxH = window.innerHeight * 0.6;
+    const panelMaxH = pageH() * 0.6;
     let top = rect.bottom + 4;
-    top = Math.max(8, Math.min(top, window.innerHeight - panelMaxH - 8));
+    top = Math.max(8, Math.min(top, pageH() - panelMaxH - 8));
     setPanelPos({ top, left });
   }, [open]);
 
@@ -29801,7 +29806,7 @@ function FilterPanel({ toggles, pitcherGrades, onPitcherGradesChange, bullpenTie
         // panel always stays within [8px, viewportWidth-8px].
         <div style={{position:'fixed',top:panelPos.top,left:panelPos.left,zIndex:80,
           background:'var(--surface)',border:'1px solid var(--border)',borderRadius:8,
-          padding:10,minWidth:230,maxWidth:'min(280px, calc(100vw - 16px))',maxHeight:'60vh',overflowY:'auto',
+          padding:10,minWidth:230,maxWidth:'min(280px, calc(100vw - 16px))',maxHeight:'calc(60vh / var(--z, 1))',overflowY:'auto',
           boxShadow:'0 4px 16px rgba(0,0,0,.4)',display:'flex',flexDirection:'column',gap:6}}>
           {toggles.map(t => (
             <label key={t.key} title={t.title} style={{display:'flex',alignItems:'center',gap:7,cursor:'pointer',
