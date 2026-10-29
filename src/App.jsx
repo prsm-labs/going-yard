@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import PrismPicks, { PrismPicksRecord } from "./PrismPicks.jsx";
+import OffseasonNotice, { isOffseason } from "./Offseason.jsx"; // 2026-10-29 offseason banner + notice; no PRISM Picks in the offseason
 import ViewPicker, { ViewSelect, Responsive } from "./ViewPicker.jsx";  // 2026-10-28 phone dropdown for view rows  // 2026-10-27 💎 PRISM Picks card (Cheat Sheet)
 // 2026-10-28 big-screen zoom (index.css --z): pop-ups measured in window pixels are placed in page pixels
 const pageZoom = () => parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
@@ -33804,10 +33805,10 @@ function CheatSheetTab({ data, showAllMatchupsLink }) {
 
   return (
     <div style={{padding:'8px 4px'}}>
-      <PrismPicks
+      {!isOffseason() && <PrismPicks
         onOpen={p=>openAtBatSlide({pid:parseInt(p.playerId)||0, name:p.name, team:p.team})}
         avatar={p=><PlayerAvatar pid={parseInt(p.playerId)||0} name={p.name} size={30}/>}
-        actions={p=><><PickButton pid={parseInt(p.playerId)||0} name={p.name} team={p.team}/><GamblyButton name={p.name} team={p.team} prop="hits" text={`${p.name} (${p.team}) — ${p.label}`}/></>}/>
+        actions={p=><><PickButton pid={parseInt(p.playerId)||0} name={p.name} team={p.team}/><GamblyButton name={p.name} team={p.team} prop="hits" text={`${p.name} (${p.team}) — ${p.label}`}/></>}/>}
       <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:12,flexWrap:'wrap'}}>
         <span style={{fontFamily:mono,fontSize:8,color:'var(--muted)'}}>Top 5 batters per category · today only · L7 data</span>
         {showAllMatchupsLink && (
@@ -34712,6 +34713,7 @@ export default function App() {
           <ContactBtn/>
             </div>
       </header>
+      <OffseasonNotice/>
       <HRTicker onHRClick={()=>setTab("homeruns")}/>
       <GameStrip/>
       <nav className="tabs">
