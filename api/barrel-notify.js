@@ -105,6 +105,19 @@ function isBarrelSignal(r, trueHRScore, matchupScore) {
     && parseFloat(r.sim_tb || 0) >= 1.5;
 }
 
+// 2026-10-29: no alerts on a day MLB has no games (offseason, All-Star break, off days) -- daily_picks.csv still holds the last
+// real slate then, so this cron (noon / 4 / 6 PM ET, Vercel-side, runs all winter) would push frozen picks. Fails open: if the
+// schedule can't be read, it behaves as before.
+async function gamesToday() {
+  try {
+    const day = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+    const r = await fetch(`https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${day}`);
+    if (!r.ok) return null;
+    const d = await r.json();
+    return (d.dates || []).reduce((n, x) => n + (x.games || []).length, 0);
+  } catch { return null; }
+}
+
 export default async function handler(req, res) {
   const isManual = req.method === 'POST';
   if (isManual) {
@@ -112,6 +125,7 @@ export default async function handler(req, res) {
     if (secret !== process.env.NOTIFY_SECRET)
       return res.status(401).json({ error: 'Unauthorized' });
   }
+  if ((await gamesToday()) === 0) return res.json({ ok: false, reason: 'no MLB games today' });
 
   const etHour = parseInt(new Date().toLocaleString('en-US', {
     timeZone: 'America/New_York', hour: 'numeric', hour12: false,
